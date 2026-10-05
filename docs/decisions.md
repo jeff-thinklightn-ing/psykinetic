@@ -103,3 +103,11 @@ shover pushes less, and an exhausted entity cannot push and is easier to
 push. One set of rules for every entity. Stamina is shown on the body, not
 on a bar, and joins `tile`, `hp` and `facing` as replicated state (amending
 10) because clients need it to draw that.
+
+## 15. The server persists entities, not the room, as JSON
+
+A dedicated server keeps a JSON snapshot of its level entities and restores
+them on start; terrain is regenerated from the map and players are never
+saved. Anything unreadable is logged and ignored rather than fatal. The
+server itself is a Dedicated Server export run as a systemd service on a
+Linux box (`docs/server.md`).

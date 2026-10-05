@@ -62,6 +62,8 @@ const TOSS_DRAG_MIN := 10.0
 const TOSS_AIM_LENGTH := 26.0
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
+## With --state, the server writes its snapshot this often.
+const SNAPSHOT_EVERY_TICKS := 30
 
 ## Server only: peer id -> that peer's player.
 var _players: Dictionary[int, Player] = {}
@@ -109,7 +111,7 @@ func _ready() -> void:
 		World.entity_despawned.connect(_on_entity_despawned)
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
-		_start_level()
+		_start_level(true)
 	else:
 		# Terrain is static level data, not replicated state.
 		World.mirror_reset()
@@ -274,7 +276,9 @@ func _paint_level() -> void:
 
 ## (Re)builds the room. Also the R restart: removing the old entities and
 ## spawning new ones replicates to every client through the spawner.
-func _start_level() -> void:
+## With [param from_snapshot], entities come from the --state file when it
+## has one; the room itself is always the ASCII map.
+func _start_level(from_snapshot := false) -> void:
 	if not Net.is_authority():
 		return
 	World.reset()
@@ -290,10 +294,44 @@ func _start_level() -> void:
 	# The local player first, so in single-player it keeps the lowest id.
 	if Net.mode != Net.Mode.SERVER:
 		_spawn_player(Net.local_id)
-	for spec in LEVEL_ENTITIES:
-		_spawn(spec)
+	if not (from_snapshot and _spawn_from_snapshot()):
+		for spec in LEVEL_ENTITIES:
+			_spawn(spec)
 	for peer in multiplayer.get_peers():
 		_spawn_player(peer)
+
+
+## True if a usable snapshot was found; its entities are then in the room.
+func _spawn_from_snapshot() -> bool:
+	if Net.state_path == "":
+		return false
+	var snapshot := Snapshot.load(Net.state_path)
+	if not snapshot["ok"]:
+		return false
+	var restored := 0
+	for entry: Dictionary in snapshot["entities"]:
+		var spec: Dictionary = entry["spec"]
+		if not SCENES.has(spec["scene"]):
+			push_warning("[state] skipping unknown entity type %s" % spec["scene"])
+			continue
+		var entity := _spawn(spec)
+		if entity == null:
+			continue
+		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
+		restored += 1
+	print("[state] loaded %d entities from %s (saved at tick %d)" % [
+		restored, Net.state_path, snapshot["tick"]])
+	return true
+
+
+func _save_state() -> void:
+	if Net.is_authority() and Net.state_path != "":
+		Snapshot.save(Net.state_path, World.tick, World.get_entities())
+
+
+func _exit_tree() -> void:
+	# Clean shutdown (quit, window closed): keep the last state.
+	_save_state()
 
 
 func _spawn(spec: Dictionary) -> GridEntity:
@@ -344,6 +382,7 @@ func _build_entity(spec: Dictionary) -> Node:
 	for property: String in props:
 		entity.set(property, props[property])
 	entity.owner_peer = spec.get("peer", 0)
+	entity.spawn_spec = spec
 	entity.start_tile = spec["tile"]
 	# Placeholders until World (server) or the synchronizer (client) says otherwise.
 	entity.tile = spec["tile"]
@@ -388,6 +427,8 @@ func _respawn_due_players(tick: int) -> void:
 func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
 		_respawn_due_players(tick)
+		if tick % SNAPSHOT_EVERY_TICKS == 0:
+			_save_state()
 	var player := _local_player()
 	var hp_text := "no player" if Net.mode == Net.Mode.SERVER else "dead, respawning"
 	if player != null:

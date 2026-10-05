@@ -67,6 +67,9 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 var id := 0
 ## Peer whose input may order this entity; 0 for none. Same on every peer.
 var owner_peer := 0
+## The MultiplayerSpawner spec this entity was built from, kept so a server
+## snapshot can rebuild it. Set by Main on every peer.
+var spawn_spec: Dictionary = {}
 var tile := Vector2i.ZERO:
 	set(value):
 		var old := tile

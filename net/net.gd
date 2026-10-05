@@ -5,6 +5,8 @@ extends Node
 ##   --server                     dedicated: runs the sim, no local player, fine with --headless
 ##   --client --address=<ip>      connects to a server; runs no sim
 ##   --port=<n>                   default 7777
+##   --state=<path>               server/host: JSON snapshot of entity state, written every
+##                                30 ticks and on clean shutdown, loaded on start if present
 ##
 ## Test hooks (used by tests/net_test):
 ##   --test-move=<dx>,<dy>        once the local player exists, order it to move by this offset
@@ -23,6 +25,8 @@ const MAX_CLIENTS := 8
 var mode := Mode.HOST
 var address := "127.0.0.1"
 var port := DEFAULT_PORT
+## Snapshot file for the authority, or "" for none.
+var state_path := ""
 ## True once an ENet peer is in place. False means offline single-player.
 var online := false
 
@@ -88,7 +92,15 @@ func _notification(what: int) -> void:
 ## either say yes (offline peer) or fail (closed ENet peer), and a mirror must
 ## never start simulating.
 func is_authority() -> bool:
-	return mode != Mode.CLIENT and multiplayer.is_server()
+	if mode == Mode.CLIENT:
+		return false
+	# A server or host whose peer is closed (shutting down, or never opened)
+	# is simply offline: still the only authority there is. A closed ENet peer
+	# cannot even be asked is_server(), so settle it here.
+	var peer := multiplayer.multiplayer_peer
+	if peer == null or peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+		return true
+	return multiplayer.is_server()
 
 
 ## Closes the connection, if any. Safe to call more than once.
@@ -155,7 +167,7 @@ func _parse_args() -> void:
 				mode = Mode.SERVER
 			"--client":
 				mode = Mode.CLIENT
-			"--address", "--port", "--test-move", "--test-contest", "--test-exit-after":
+			"--address", "--port", "--state", "--test-move", "--test-contest", "--test-exit-after":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -170,6 +182,8 @@ func _set_option(key: String, value: String) -> void:
 		"--port":
 			if value.is_valid_int():
 				port = value.to_int()
+		"--state":
+			state_path = value
 		"--test-move":
 			var parts := value.split(",")
 			if parts.size() == 2:

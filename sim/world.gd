@@ -202,6 +202,21 @@ func despawn(entity: GridEntity) -> void:
 	entity.queue_free()
 
 
+## Puts back state read from a snapshot, right after spawn. Values are clamped
+## to what the entity allows; a facing that is not a direction is ignored.
+func restore(entity: GridEntity, hp: int, stamina: int, facing: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	if not entity.spawned:
+		return
+	if entity.max_hp > 0:
+		entity.hp = clampi(hp, 1, entity.max_hp)
+	if entity.max_stamina > 0:
+		entity.stamina = clampi(stamina, 0, entity.max_stamina)
+	if facing in DIRECTIONS:
+		entity._world_set_facing(facing)
+
+
 ## Moves [param entity] one tile in [param direction] (one of [constant DIRECTIONS]),
 ## pushing any chain of pushable entities whose total mass does not exceed the
 ## mover's. Resolves immediately. Diagonals may not cut a wall corner.

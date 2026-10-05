@@ -7,7 +7,8 @@
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `iso.gd` (grid ↔ pixel math). |
 | `entities/` | Entity scenes (`player.tscn`, `monster.tscn`, `pushable.tscn`). Scenes only add visuals and tuning values to a sim script. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
-| `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. |
+| `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
+| `server/` | systemd unit and deploy script for the dedicated server; see `docs/server.md`. |
 | `main.tscn`, `main.gd` | Test room, camera, HUD, input, and (on the server) level and player spawning. |
 | `tests/` | `push_test.tscn`: scripted sim test, run by `run.ps1` / `run.sh`. `net_test.ps1` / `net_test.sh`: one server and two clients on localhost. |
 
@@ -111,6 +112,15 @@ sim state.
 
 `F3` toggles a debug overlay: peer id, round trip time (from ENet), and
 mispredictions in the last minute.
+
+**Persistence.** With `--state=<path>` the authority writes a JSON snapshot
+of every level entity (type, name, tile, hp, stamina, facing, spawn
+properties) every 30 ticks and on clean shutdown, and rebuilds the room's
+entities from it on start. Terrain always comes from the ASCII map; players
+are never in it. A missing or unreadable snapshot is logged and the room is
+generated fresh. Restoring goes through the same path as spawning
+(`spawner.spawn` + `World.spawn`) plus `World.restore` for hp, stamina and
+facing, so it is gated like everything else. Details in `docs/server.md`.
 
 **Players.** The server spawns one `Player` per peer (and one for itself when
 hosting) on the first free tile in `PLAYER_STARTS`, tinted by join order, and
@@ -384,6 +394,12 @@ The test scene stops `World`'s own clock, builds small ASCII rooms through the
 normal `World` API, calls `World.step()` by hand, and checks tiles and damage.
 It prints PASS or FAIL per assertion and quits with exit code 1 if any
 assertion failed, 0 otherwise.
+
+`tests/state_test.ps1` / `tests/state_test.sh` run a host three times with
+`--state`: the first pushes a crate and must write a snapshot without
+players; the second must load it with the crate where it was left; the third
+starts from a corrupt file and must log it, generate the room fresh, and
+replace the file on exit.
 
 `tests/net_test.ps1` / `tests/net_test.sh` start one headless `--server` and
 two headless `--client` instances on localhost (port 17777). Each client

@@ -1,0 +1,26 @@
+# Psykinetic dedicated server. Install with:
+#   sudo cp server/psykinetic.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now psykinetic
+# See docs/server.md.
+
+[Unit]
+Description=Psykinetic dedicated server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=psykinetic
+Group=psykinetic
+WorkingDirectory=/opt/psykinetic
+# The Dedicated Server export strips visuals but is not headless by itself.
+ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json
+# Creates /var/lib/psykinetic owned by the service user.
+StateDirectory=psykinetic
+# Godot keeps its own user data under $HOME; give it somewhere writable.
+Environment=HOME=/var/lib/psykinetic
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
