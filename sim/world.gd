@@ -3,7 +3,13 @@ extends Node
 ##
 ## Owns terrain and tile occupancy, runs the fixed 10 Hz tick, and is the only
 ## code allowed to move entities. Every mutation is gated behind
-## multiplayer.is_server(). See docs/design.md.
+## Net.is_authority(), which is multiplayer.is_server() for anything that was
+## not launched as a client. See docs/design.md.
+##
+## On a client nothing here simulates. World is then a read-only mirror: the
+## tick arrives by RPC, entities arrive through MultiplayerSpawner /
+## MultiplayerSynchronizer, and occupancy is rebuilt from their tiles. The
+## mirror_* functions are the only writers and refuse to run on the server.
 
 signal ticked(tick: int)
 signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
@@ -70,7 +76,10 @@ class Hit:
 
 
 func _process(delta: float) -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
+		# Mirror: no sim, only render time since the last replicated tick.
+		_accumulator += delta
+		tick_alpha = minf(_accumulator / TICK_DT, 1.0)
 		return
 	_accumulator += delta
 	var steps := 0
@@ -84,7 +93,7 @@ func _process(delta: float) -> void:
 
 ## Advances the sim one tick. Driven by _process; tests call it directly.
 func step() -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return
 	tick += 1
 	# 1. Act, in ascending id. Iterate a copy: entities may despawn mid-tick.
@@ -96,12 +105,15 @@ func step() -> void:
 	# 3. Hazard tiles.
 	_apply_hazards()
 	ticked.emit(tick)
+	# 4. The tick counter goes to clients once per tick.
+	if not multiplayer.get_peers().is_empty():
+		_net_tick.rpc(tick)
 
 
 # --- Mutations (server only) --------------------------------------------------
 
 func reset() -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return
 	for entity in _entities:
 		if is_instance_valid(entity):
@@ -120,7 +132,7 @@ func reset() -> void:
 
 func load_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i],
 		fire_tiles: Array[Vector2i] = []) -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return
 	_floor.clear()
 	_walls.clear()
@@ -134,7 +146,7 @@ func load_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i],
 
 
 func spawn(entity: GridEntity, at: Vector2i) -> bool:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return false
 	if entity.spawned or not is_free(at):
 		push_warning("World.spawn: cannot place %s at %s" % [entity.name, at])
@@ -147,7 +159,7 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 
 
 func despawn(entity: GridEntity) -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return
 	if not entity.spawned:
 		return
@@ -162,7 +174,7 @@ func despawn(entity: GridEntity) -> void:
 ## pushing any chain of pushable entities whose total mass does not exceed the
 ## mover's. Resolves immediately. Diagonals may not cut a wall corner.
 func try_move(entity: GridEntity, direction: Vector2i) -> bool:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return false
 	if not entity.spawned or direction not in DIRECTIONS:
 		return false
@@ -172,20 +184,21 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	if not _shift(entity, entity, direction, entity.mass, duration):
 		return false
 	entity.next_move_tick = tick + duration
+	entity._world_set_facing(direction)
 	return true
 
 
 ## Melee: attack_damage plus a push of attack_force. Queued; resolved after
 ## every entity has acted this tick.
 func try_attack(attacker: GridEntity, target: GridEntity) -> bool:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return false
 	return _try_hit(attacker, target, attacker.attack_damage, attacker.attack_force)
 
 
 ## Shove: no direct damage, only a push of shove_force. Queued like an attack.
 func try_shove(attacker: GridEntity, target: GridEntity) -> bool:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return false
 	if attacker.shove_force <= 0:
 		return false
@@ -196,7 +209,7 @@ func try_shove(attacker: GridEntity, target: GridEntity) -> bool:
 ## max_hp > 0 can be hurt; at 0 hp the entity is removed and its tile is empty.
 func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		cause: StringName = &"attack") -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
@@ -207,9 +220,10 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		despawn(target)
 
 
-## Player intent. Clients will send this to the host by RPC once there is one.
+## Player intent: walk to [param target]. Server only; input code on any peer
+## goes through command_move().
 func order_move(entity: GridEntity, target: Vector2i) -> void:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return
 	if not entity.spawned:
 		return
@@ -219,9 +233,22 @@ func order_move(entity: GridEntity, target: Vector2i) -> void:
 	entity.action_target = null
 
 
-## Player intent: attack or shove [param target] on the entity's next free tick.
-func order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity) -> void:
-	if not multiplayer.is_server():
+## Player intent: attack [param target] on the entity's next free tick.
+func order_attack(entity: GridEntity, target: GridEntity) -> void:
+	if not Net.is_authority():
+		return
+	_order_action(entity, GridEntity.Order.ATTACK, target)
+
+
+## Player intent: shove [param target] on the entity's next free tick.
+func order_shove(entity: GridEntity, target: GridEntity) -> void:
+	if not Net.is_authority():
+		return
+	_order_action(entity, GridEntity.Order.SHOVE, target)
+
+
+func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity) -> void:
+	if not Net.is_authority():
 		return
 	if not entity.spawned or not target.spawned or entity == target:
 		return
@@ -230,14 +257,156 @@ func order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntit
 	entity.has_move_order = false
 
 
+# --- Input from any peer ------------------------------------------------------
+# Input code calls command_*. On the server that is the gated order_* directly;
+# on a client it is an RPC to the server, which checks that the sender owns the
+# entity before calling the same order_*. Clients never call try_*.
+
+func command_move(entity: GridEntity, target: Vector2i) -> void:
+	if Net.is_authority():
+		order_move(entity, target)
+	else:
+		request_move.rpc_id(1, entity.get_path(), target)
+
+
+func command_attack(entity: GridEntity, target: GridEntity) -> void:
+	if Net.is_authority():
+		order_attack(entity, target)
+	else:
+		request_attack.rpc_id(1, entity.get_path(), target.get_path())
+
+
+func command_shove(entity: GridEntity, target: GridEntity) -> void:
+	if Net.is_authority():
+		order_shove(entity, target)
+	else:
+		request_shove.rpc_id(1, entity.get_path(), target.get_path())
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_move(entity_path: NodePath, target: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	var entity := _entity_owned_by_sender(entity_path)
+	if entity != null:
+		order_move(entity, target)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_attack(entity_path: NodePath, target_path: NodePath) -> void:
+	if not Net.is_authority():
+		return
+	var entity := _entity_owned_by_sender(entity_path)
+	var target := _entity_at_path(target_path)
+	if entity != null and target != null:
+		order_attack(entity, target)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_shove(entity_path: NodePath, target_path: NodePath) -> void:
+	if not Net.is_authority():
+		return
+	var entity := _entity_owned_by_sender(entity_path)
+	var target := _entity_at_path(target_path)
+	if entity != null and target != null:
+		order_shove(entity, target)
+
+
+func _entity_at_path(path: NodePath) -> GridEntity:
+	var entity := get_node_or_null(path) as GridEntity
+	if entity == null or not entity.spawned:
+		return null
+	return entity
+
+
+## The entity at [param path], but only if the peer that sent the current RPC
+## owns it. Anything else is rejected and logged.
+func _entity_owned_by_sender(path: NodePath) -> GridEntity:
+	var sender := multiplayer.get_remote_sender_id()
+	var entity := _entity_at_path(path)
+	if entity == null or entity.owner_peer != sender:
+		_log("rejected order from peer %d for %s" % [sender, path])
+		return null
+	return entity
+
+
+# --- Client mirror (non-server only) -------------------------------------------
+# Nothing derived is replicated. A client gets entity tiles and rebuilds the
+# occupancy map from them; terrain comes from the same level data the server
+# loaded.
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _net_tick(server_tick: int) -> void:
+	if Net.is_authority():
+		return
+	tick = server_tick
+	_accumulator = 0.0
+	tick_alpha = 0.0
+	ticked.emit(tick)
+
+
+func mirror_reset() -> void:
+	if Net.is_authority():
+		return
+	_entities.clear()
+	_occupancy.clear()
+	_floor.clear()
+	_walls.clear()
+	_fire.clear()
+	tick = 0
+	tick_alpha = 0.0
+	_accumulator = 0.0
+
+
+func mirror_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i],
+		fire_tiles: Array[Vector2i] = []) -> void:
+	if Net.is_authority():
+		return
+	_floor.clear()
+	_walls.clear()
+	_fire.clear()
+	for t in floor_tiles:
+		_floor[t] = true
+	for t in wall_tiles:
+		_walls[t] = true
+	for t in fire_tiles:
+		_fire[t] = true
+
+
+func mirror_add(entity: GridEntity) -> void:
+	if Net.is_authority():
+		return
+	if entity not in _entities:
+		_entities.append(entity)
+	entity._mirror_attach()
+	mirror_changed()
+
+
+func mirror_remove(entity: GridEntity) -> void:
+	if Net.is_authority():
+		return
+	_entities.erase(entity)
+	mirror_changed()
+
+
+## Rebuilds occupancy from the entities' replicated tiles.
+func mirror_changed() -> void:
+	if Net.is_authority():
+		return
+	_occupancy.clear()
+	for entity in _entities:
+		_occupancy[entity.tile] = entity
+
+
 func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, force: int) -> bool:
-	if not multiplayer.is_server():
+	if not Net.is_authority():
 		return false
 	if not attacker.spawned or not target.spawned or attacker == target:
 		return false
 	if tick < attacker.next_attack_tick or not can_melee(attacker.tile, target.tile):
 		return false
 	attacker.next_attack_tick = tick + attacker.attack_ticks
+	attacker._world_set_facing(target.tile - attacker.tile)
 	var hit := Hit.new()
 	hit.source = attacker
 	hit.target = target
@@ -320,7 +489,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: int
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS))
-		body.pushed.emit(tiles)
+		body._world_pushed(tiles)
 		var note := ""
 		var next_body: GridEntity = null
 		if impact > 0:
@@ -341,7 +510,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: int
 
 
 func _impact(entity: GridEntity, amount: int, source: GridEntity) -> void:
-	entity.impacted.emit(amount)
+	entity._world_impacted(amount)
 	damage(entity, amount, source, &"impact")
 
 
@@ -369,7 +538,7 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	_relocate(entity, to)
 	entity._world_slide_from(from, tick, duration)
 	if entity != mover:
-		entity.pushed.emit(1)
+		entity._world_pushed(1)
 		_log("push: %s -> %s dir=%s tiles=1 impact=0 stopped_by=nothing (walked into)" % [
 			mover.name, entity.name, direction])
 		entity_pushed.emit(entity, mover, direction, 1, 0, "nothing (walked into)")
@@ -404,6 +573,18 @@ func get_entity_at(at: Vector2i) -> GridEntity:
 
 func get_entities() -> Array[GridEntity]:
 	return _entities.duplicate()
+
+
+## True if occupancy and the entity list describe the same thing: every entity
+## is the occupant of its own walkable tile, and nothing else is occupied.
+func is_occupancy_consistent() -> bool:
+	if _occupancy.size() != _entities.size():
+		return false
+	for entity in _entities:
+		if not is_instance_valid(entity) or not is_walkable(entity.tile) \
+				or _occupancy.get(entity.tile) != entity:
+			return false
+	return true
 
 
 ## Distance in steps (a diagonal is one step). Used for reach and sight range.

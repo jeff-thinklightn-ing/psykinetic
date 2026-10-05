@@ -156,8 +156,8 @@ func _test_resolution_order() -> void:
 	var low: GridEntity = e["P"][0]   # at (2, 1), id 1: shoves the imp down
 	var high: GridEntity = e["P"][1]  # at (1, 2), id 2: shoves the imp right
 	var imp: GridEntity = e["m"][0]
-	World.order_action(high, GridEntity.Order.SHOVE, imp)
-	World.order_action(low, GridEntity.Order.SHOVE, imp)
+	World.order_shove(high, imp)
+	World.order_shove(low, imp)
 	World.step()
 	_check(low.id < high.id, "ids ascend in spawn order")
 	_check(imp.tile == Vector2i(2, 3), "lower id resolves first: imp went down (at %s)" % imp.tile)
@@ -237,7 +237,7 @@ func _build(rows: Array[String]) -> Dictionary:
 func _shove(attacker: GridEntity, target: GridEntity) -> void:
 	while World.tick < attacker.next_attack_tick:
 		World.step()
-	World.order_action(attacker, GridEntity.Order.SHOVE, target)
+	World.order_shove(attacker, target)
 	World.step()
 
 

@@ -59,3 +59,23 @@ visibly lurched. A diagonal step now takes `ceil(move_ticks × 1.5)` ticks
 (`World.DIAGONAL_TICK_SCALE`), and A* is costed in ticks. Set the constant to
 1.0 to get uniform cost back. The corner-cutting rule in 5 is unchanged, and
 force pushes are unaffected: force is still counted in tiles.
+
+## 9. ENet, three launch modes, host is the default
+
+Networking is Godot's high-level multiplayer over ENet. `--server`, `--host`
+and `--client --address=<ip>` pick the mode; no arguments means `--host`, so
+single-player is simply a host with no clients. Default port 7777.
+
+## 10. Replicate state, not results
+
+Only `tile`, `hp` and `facing` per entity, entity creation and removal, and
+the tick counter are replicated. Anything that can be derived — occupancy,
+paths, static entity configuration, terrain — is rebuilt on the client from
+that and from shared level data.
+
+## 11. Clients send intents, never mutations
+
+A client's only way to affect the sim is an order RPC, which the server
+accepts only for an entity that peer owns. The authority gate is
+`Net.is_authority()`: `multiplayer.is_server()`, and never true in a process
+launched as a client.
