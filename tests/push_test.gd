@@ -3,16 +3,20 @@ extends Node
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 ##
-## Numbers below assume the scene defaults: player mass 80 / shove force 3,
-## imp mass 40 / hp 12, crate mass 30 / hp 12, impact_per_force 2, ratio
-## clamp 1.5. So a shoved imp or crate has ratio 1.5.
+## Numbers below assume the scene defaults: player mass 80 / strength 10 /
+## stamina 100, imp mass 40 / hp 12 / strength 6 / stamina 60, crate mass 30 /
+## hp 12, boulder mass 200, and World's force_scale 0.1, max_force 4,
+## impact_per_force 2, ratio clamp 1.5. So a player's shove has force
+## 10 * 80 / 40 * 0.1 = 2.0 on a rested imp and 2.67 on a crate, each with
+## ratio 1.5, and costs 9 stamina.
 
 const SCENES := {
 	"P": preload("res://entities/player.tscn"),
 	"m": preload("res://entities/monster.tscn"),
 	"c": preload("res://entities/pushable.tscn"),
+	"o": preload("res://entities/pushable.tscn"),
 }
-const NAMES := {"P": "Player", "m": "Imp", "c": "Crate"}
+const NAMES := {"P": "Player", "m": "Imp", "c": "Crate", "o": "Boulder"}
 
 var _failures := 0
 var _room: Node2D
@@ -32,6 +36,7 @@ func _ready() -> void:
 	_test_mass_gate()
 	_test_no_attack_mid_step()
 	_test_no_friendly_fire()
+	_test_stamina()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -48,8 +53,8 @@ func _test_shove_into_wall() -> void:
 	var imp: GridEntity = e["m"][0]
 	_shove(e["P"][0], imp)
 	_check(imp.tile == Vector2i(2, 1), "imp against the wall does not move")
-	_check(_damage(imp, &"impact") == 9, "full force 3 -> impact 3 * 2 * 1.5 = 9 (got %d)" % _damage(imp, &"impact"))
-	_check(imp.hp == 3, "imp hp 12 -> 3 (got %d)" % imp.hp)
+	_check(_damage(imp, &"impact") == 6, "full force 2 -> impact 2 * 2 * 1.5 = 6 (got %d)" % _damage(imp, &"impact"))
+	_check(imp.hp == 6, "imp hp 12 -> 6 (got %d)" % imp.hp)
 	_check(_damage(e["P"][0], &"impact") == 0, "only the pushed entity takes wall impact")
 
 	e = _build([
@@ -60,23 +65,23 @@ func _test_shove_into_wall() -> void:
 	imp = e["m"][0]
 	_shove(e["P"][0], imp)
 	_check(imp.tile == Vector2i(3, 1), "imp with one free tile travels 1")
-	_check(_damage(imp, &"impact") == 6, "remaining force 2 -> impact 6 (got %d)" % _damage(imp, &"impact"))
+	_check(_damage(imp, &"impact") == 3, "remaining force 1 -> impact 3 (got %d)" % _damage(imp, &"impact"))
 
 
 func _test_shove_monster_into_monster() -> void:
 	print("\n== shove a monster into a monster ==")
 	var e := _build([
 		"########",
-		"#Pm.m..#",
+		"#Pmm...#",
 		"########",
 	])
 	var first: GridEntity = e["m"][0]
 	var second: GridEntity = e["m"][1]
 	_shove(e["P"][0], first)
-	_check(first.tile == Vector2i(3, 1), "first imp travels 1 then is stopped by the second")
+	_check(first.tile == Vector2i(2, 1), "first imp is stopped at once by the second")
 	_check(_damage(first, &"impact") == 6, "first imp takes impact 6 (got %d)" % _damage(first, &"impact"))
 	_check(_damage(second, &"impact") == 6, "second imp takes impact 6 (got %d)" % _damage(second, &"impact"))
-	_check(second.tile == Vector2i(5, 1), "second imp moves exactly one tile (at %s)" % second.tile)
+	_check(second.tile == Vector2i(4, 1), "second imp moves exactly one tile (at %s)" % second.tile)
 
 
 func _test_shove_crate_until_it_breaks() -> void:
@@ -97,9 +102,8 @@ func _test_shove_crate_until_it_breaks() -> void:
 		shoves += 1
 		hp_always_dropped = hp_always_dropped and crate.hp < hp_before
 	_check(not crate.spawned, "crate broke")
-	_check(shoves == 2, "took 2 shoves: 3 after sliding 2 tiles, then 9 flush (took %d)" % shoves)
+	_check(shoves == 3, "took 3 shoves: 2 after sliding 2 tiles, then 8 and 8 flush (took %d)" % shoves)
 	_check(hp_always_dropped, "every shove into the wall cost the crate hp")
-	_check(_damage(crate, &"impact") == 12, "total impact equals crate hp 12 (got %d)" % _damage(crate, &"impact"))
 	_check(World.get_entity_at(Vector2i(4, 1)) == null, "broken crate leaves its tile empty")
 
 
@@ -107,12 +111,12 @@ func _test_push_onto_fire() -> void:
 	print("\n== push a monster onto fire ==")
 	var e := _build([
 		"#######",
-		"#Pm.~.#",
+		"#Pm~..#",
 		"#######",
 	])
 	var imp: GridEntity = e["m"][0]
 	_shove(e["P"][0], imp)
-	_check(imp.tile == Vector2i(4, 1), "imp stops on the fire tile, not past it (at %s)" % imp.tile)
+	_check(imp.tile == Vector2i(3, 1), "imp stops on the fire tile, not past it (at %s)" % imp.tile)
 	_check(_damage(imp, &"impact") == 3, "stopping on fire counts as a stop: impact 3 (got %d)" % _damage(imp, &"impact"))
 	_check(_damage(imp, &"fire") == 2, "fire ticks the same tick: 2 (got %d)" % _damage(imp, &"fire"))
 	_check(imp.hp == 7, "imp hp 12 - 3 - 2 = 7 (got %d)" % imp.hp)
@@ -163,7 +167,7 @@ func _test_resolution_order() -> void:
 	World.step()
 	_check(low.id < high.id, "ids ascend in spawn order")
 	_check(imp.tile == Vector2i(2, 3), "lower id resolves first: imp went down (at %s)" % imp.tile)
-	_check(_damage(imp, &"impact") == 6, "and hit the wall once: impact 6 (got %d)" % _damage(imp, &"impact"))
+	_check(_damage(imp, &"impact") == 3, "and hit the wall once: impact 3 (got %d)" % _damage(imp, &"impact"))
 
 
 func _test_mass_gate() -> void:
@@ -189,8 +193,9 @@ func _test_mass_gate() -> void:
 	var brute: Monster = e["m"][0]
 	brute.sight_range = 7
 	brute.mass = 100.0
+	brute.strength = 20  # An attack carries half force: 20 * 100 / 80 * 0.1 / 2 = 1.25.
 	World.step()
-	_check(player.tile == Vector2i(1, 1), "brute (100) knocks the player back one tile (at %s)" % player.tile)
+	_check(player.tile == Vector2i(1, 1), "a heavy, strong monster knocks the player back one tile (at %s)" % player.tile)
 
 
 func _test_no_friendly_fire() -> void:
@@ -214,7 +219,69 @@ func _test_no_friendly_fire() -> void:
 	_check(first.next_attack_tick == 0, "the refused hits cost no cooldown")
 	_walk_to(second, Vector2i(3, 1))
 	_shove(second, imp)
-	_check(_damage(imp, &"impact") == 9, "players can still shove monsters (impact %d)" % _damage(imp, &"impact"))
+	_check(_damage(imp, &"impact") == 6, "players can still shove monsters (impact %d)" % _damage(imp, &"impact"))
+
+
+func _test_stamina() -> void:
+	print("\n== stamina ==")
+	var lane: Array[String] = [
+		"##########",
+		"#Pm......#",
+		"##########",
+	]
+	var e := _build(lane)
+	var player: GridEntity = e["P"][0]
+	var imp: GridEntity = e["m"][0]
+	_shove(player, imp)
+	var full_tiles := imp.tile.x - 2
+	_check(full_tiles == 3, "full-stamina shove throws a rested imp 3 tiles (got %d)" % full_tiles)
+	_check(player.stamina == 91, "that shove cost 5 + 2.0 * 40 * 0.05 = 9, and its tick regained nothing (stamina %d)" % player.stamina)
+	World.step()
+	_check(player.stamina == 93, "a resting tick regains 2 (stamina %d)" % player.stamina)
+	World.order_move(player, Vector2i(2, 1))
+	World.step()
+	_check(player.tile == Vector2i(2, 1) and player.stamina == 95, "a walking tick regains 2 as well (stamina %d)" % player.stamina)
+
+	e = _build(lane)
+	player = e["P"][0]
+	imp = e["m"][0]
+	player.stamina = 3
+	_shove(player, imp)
+	var low_tiles := imp.tile.x - 2
+	_check(low_tiles == 1, "with 3 of the 9 stamina needed, force is a third: 1 tile (got %d)" % low_tiles)
+	_check(low_tiles < full_tiles, "a low-stamina shove throws a monster less far than a full one")
+	_check(player.stamina == 0, "and spends everything that was left (stamina %d)" % player.stamina)
+
+	e = _build([
+		"#####",
+		"#Pm.#",
+		"#####",
+	])
+	player = e["P"][0]
+	imp = e["m"][0]
+	player.stamina = 0
+	_shove(player, imp)
+	_check(imp.tile == Vector2i(2, 1), "a shove from 0 stamina has no force")
+
+	e = _build([
+		"######",
+		"#Po..#",
+		"######",
+	])
+	player = e["P"][0]
+	var boulder: GridEntity = e["o"][0]
+	_shove(player, boulder)
+	_check(boulder.tile == Vector2i(2, 1), "shoving a boulder moves nothing")
+	_check(player.stamina == 91, "but still costs stamina: 5 + 0.4 * 200 * 0.05 = 9 (stamina %d)" % player.stamina)
+
+	e = _build(lane)
+	player = e["P"][0]
+	imp = e["m"][0]
+	imp.stamina = 0
+	_shove(player, imp)
+	var exhausted_tiles := imp.tile.x - 2
+	_check(exhausted_tiles == 6, "an imp at 0 stamina counts as half its mass: thrown 6 tiles (got %d)" % exhausted_tiles)
+	_check(exhausted_tiles > full_tiles, "a monster at 0 stamina is pushed farther than one at full")
 
 
 func _test_no_attack_mid_step() -> void:
@@ -238,7 +305,8 @@ func _test_no_attack_mid_step() -> void:
 
 # --- helpers ------------------------------------------------------------------
 
-## '#' wall, '.' floor, '~' fire, 'P' player, 'm' imp (AI off), 'c' crate.
+## '#' wall, '.' floor, '~' fire, 'P' player, 'm' imp (AI off), 'c' crate,
+## 'o' boulder.
 ## Players spawn first so they hold the lowest ids.
 func _build(rows: Array[String]) -> Dictionary:
 	World.reset()
@@ -272,6 +340,9 @@ func _build(rows: Array[String]) -> Dictionary:
 			var entity: GridEntity = SCENES[kind].instantiate()
 			if entity is Monster:
 				entity.sight_range = 0  # Stands still unless a test turns it on.
+			if kind == "o":
+				entity.mass = 200.0
+				entity.body_material = GridEntity.BodyMaterial.STONE
 			entity.name = "%s%d" % [NAMES[kind], out[kind].size() + 1]
 			_room.add_child(entity)
 			World.spawn(entity, spawn[1])

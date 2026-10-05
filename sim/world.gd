@@ -48,9 +48,24 @@ const PATH_DIAGONAL_COST := int(PATH_STEP_COST * DIAGONAL_TICK_SCALE)
 const PATH_DIAGONAL_EXTRA := 1
 const PATH_FIRE_EXTRA := 5000
 
+## Share of the shove force that a melee attack carries.
+const ATTACK_FORCE_FACTOR := 0.5
+## Mass multiplier for being pushed while at 0 stamina.
+const EXHAUSTED_MASS_FACTOR := 0.5
+
+# Exported vars, not consts: GDScript cannot export constants.
 ## Impact damage per unit of force left over when a pushed entity is stopped.
-## (An exported var, not a const: GDScript cannot export constants.)
 @export var impact_per_force := 2
+## FORCE_SCALE: force = strength x mover_mass / target_mass x this.
+@export var force_scale := 0.1
+## MAX_FORCE: upper clamp on that force.
+@export var max_force := 4.0
+## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
+## base + force x target_mass x scale stamina.
+@export var shove_cost_base := 5.0
+@export var shove_cost_scale := 0.05
+## STAMINA_REGEN: stamina regained on a tick spent resting or walking.
+@export var stamina_regen := 2
 
 var tick := 0
 ## Fraction of the way from the last tick to the next one, in [0, 1). Read by rendering.
@@ -76,7 +91,7 @@ class Hit:
 	var target_name := ""
 	var direction := Vector2i.ZERO
 	var damage := 0
-	var force := 0
+	var force := 0.0
 
 
 func _process(delta: float) -> void:
@@ -108,8 +123,10 @@ func step() -> void:
 	_resolve_hits()
 	# 3. Hazard tiles.
 	_apply_hazards()
+	# 4. Stamina comes back for whoever did not exert themselves this tick.
+	_regen_stamina()
 	ticked.emit(tick)
-	# 4. The tick counter goes to clients once per tick.
+	# 5. The tick counter goes to clients once per tick.
 	if not multiplayer.get_peers().is_empty():
 		_net_tick.rpc(tick)
 
@@ -192,21 +209,22 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	return true
 
 
-## Melee: attack_damage plus a push of attack_force. Queued; resolved after
-## every entity has acted this tick.
+## Melee: attack_damage plus a push of half the shove force, at no stamina
+## cost. Queued; resolved after every entity has acted this tick.
 func try_attack(attacker: GridEntity, target: GridEntity) -> bool:
 	if not Net.is_authority():
 		return false
-	return _try_hit(attacker, target, attacker.attack_damage, attacker.attack_force)
+	return _try_hit(attacker, target, attacker.attack_damage, false)
 
 
-## Shove: no direct damage, only a push of shove_force. Queued like an attack.
+## Shove: no direct damage, only a push at full force, paid for in stamina
+## whether or not anything moves. Queued like an attack.
 func try_shove(attacker: GridEntity, target: GridEntity) -> bool:
 	if not Net.is_authority():
 		return false
-	if attacker.shove_force <= 0:
+	if attacker.strength <= 0:
 		return false
-	return _try_hit(attacker, target, 0, attacker.shove_force)
+	return _try_hit(attacker, target, 0, true)
 
 
 ## [param cause] is &"attack", &"impact" or &"fire". Only FLESH and WOOD with
@@ -408,7 +426,7 @@ func mirror_changed() -> void:
 		_occupancy[entity.tile] = entity
 
 
-func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, force: int) -> bool:
+func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shove: bool) -> bool:
 	if not Net.is_authority():
 		return false
 	if not attacker.spawned or not target.spawned or attacker == target:
@@ -423,6 +441,20 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, force: 
 		return false
 	attacker.next_attack_tick = tick + attacker.attack_ticks
 	attacker._world_set_facing(target.tile - attacker.tile)
+	attacker._world_note_exertion(tick)
+	var force := push_force(attacker, target)
+	if is_shove:
+		# Paid now, whatever the shove goes on to do. Short on stamina: the
+		# force shrinks in proportion and everything left is spent.
+		var cost := shove_cost(force, target)
+		if attacker.max_stamina > 0 and cost > 0:
+			if attacker.stamina < cost:
+				force *= float(attacker.stamina) / cost
+				attacker.stamina = 0
+			else:
+				attacker.stamina -= cost
+	else:
+		force *= ATTACK_FORCE_FACTOR
 	var hit := Hit.new()
 	hit.source = attacker
 	hit.target = target
@@ -451,7 +483,7 @@ func _resolve_hits() -> void:
 			continue
 		if hit.damage > 0:
 			damage(hit.target, hit.damage, hit.source, &"attack")
-		if hit.force > 0 and _alive(hit.target):
+		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, hit.direction, hit.force)
 
 
@@ -460,20 +492,23 @@ func _resolve_hits() -> void:
 ## travels up to floor(force * ratio) tiles; whatever force is left when
 ## something stops it becomes impact. Nothing here knows what kind of entity
 ## it is pushing.
-func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: int) -> void:
+func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: float) -> void:
 	var mover_mass: float = mover.mass
 	var budget: float = mover_mass
 	var body: GridEntity = first
-	var f: int = force
-	while body != null and f > 0:
-		if body.mass > budget:
+	var f: float = force
+	while body != null and f > 0.0:
+		# An exhausted body counts as half its mass for everything below.
+		var body_mass := pushed_mass(body)
+		if body_mass > budget:
 			_log("push: %s -> %s blocked: too heavy (mass %s, %s left)" % [
-				mover.name, body.name, body.mass, budget])
+				mover.name, body.name, body_mass, budget])
 			return
-		budget -= body.mass
+		budget -= body_mass
 
-		var ratio := mass_ratio(mover_mass, body.mass)
-		var max_tiles: int = maxi(floori(f * ratio + 0.001), 1)
+		var ratio := mass_ratio(mover_mass, body_mass)
+		# Less than a tile's worth of force moves nothing and hurts nothing.
+		var max_tiles: int = floori(f * ratio + 0.001)
 		var start: Vector2i = body.tile
 		var tiles := 0
 		var stopped := false
@@ -498,9 +533,9 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: int
 				break
 
 		# Force spent on travel, rounded up; the rest is what hits.
-		var remaining := 0
+		var remaining := 0.0
 		if stopped:
-			remaining = maxi(f - ceili(tiles / ratio - 0.001), 0)
+			remaining = maxf(f - ceili(tiles / ratio - 0.001), 0.0)
 		var impact := impact_damage(remaining, ratio)
 
 		if tiles > 0:
@@ -511,23 +546,33 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: int
 		if impact > 0:
 			_impact(body, impact, mover)
 		if blocker != null:
-			var blocker_impact := impact_damage(remaining, mass_ratio(mover_mass, blocker.mass))
+			var blocker_impact := impact_damage(
+					remaining, mass_ratio(mover_mass, pushed_mass(blocker)))
 			note = " (%s takes %d)" % [blocker.name, blocker_impact]
 			if blocker_impact > 0:
 				_impact(blocker, blocker_impact, mover)
 			if _alive(blocker):
 				next_body = blocker
-		_log("push: %s -> %s dir=%s tiles=%d impact=%d stopped_by=%s%s" % [
-			mover.name, body.name, direction, tiles, impact, stopped_by, note])
+		_log("push: %s -> %s dir=%s force=%.2f tiles=%d impact=%d stopped_by=%s%s" % [
+			mover.name, body.name, direction, f, tiles, impact, stopped_by, note])
 		entity_pushed.emit(body, mover, direction, tiles, impact, stopped_by)
 
 		body = next_body
-		f = remaining - 1
+		f = remaining - 1.0
 
 
 func _impact(entity: GridEntity, amount: int, source: GridEntity) -> void:
 	entity._world_impacted(amount)
 	damage(entity, amount, source, &"impact")
+
+
+## Resting and walking regain stamina. A tick in which the entity attacked,
+## shoved, or was moved more than one tile does not.
+func _regen_stamina() -> void:
+	for entity in _entities:
+		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
+				and not entity.exerted_on(tick):
+			entity.stamina = mini(entity.stamina + stamina_regen, entity.max_stamina)
 
 
 func _apply_hazards() -> void:
@@ -566,6 +611,7 @@ func _relocate(entity: GridEntity, to: Vector2i) -> void:
 	_occupancy.erase(from)
 	_occupancy[to] = entity
 	entity._world_set_tile(to)
+	entity._world_note_moved(tick)
 	entity_moved.emit(entity, from, to)
 
 
@@ -636,7 +682,27 @@ func mass_ratio(mover_mass: float, target_mass: float) -> float:
 	return clampf(mover_mass / maxf(target_mass, 0.001), MASS_RATIO_MIN, MASS_RATIO_MAX)
 
 
-func impact_damage(remaining_force: int, ratio: float) -> int:
+## Mass used when [param entity] is on the receiving end of a push: halved
+## while it is exhausted.
+func pushed_mass(entity: GridEntity) -> float:
+	return entity.mass * EXHAUSTED_MASS_FACTOR if entity.is_exhausted() else entity.mass
+
+
+## Force of a shove by [param attacker] on [param target], before stamina:
+## strength x mover_mass / target_mass x force_scale, clamped to max_force.
+## An exhausted attacker has none. A melee attack carries half of this.
+func push_force(attacker: GridEntity, target: GridEntity) -> float:
+	if attacker.strength <= 0 or attacker.is_exhausted():
+		return 0.0
+	var raw := attacker.strength * attacker.mass / maxf(pushed_mass(target), 0.001) * force_scale
+	return clampf(raw, 0.0, max_force)
+
+
+func shove_cost(force: float, target: GridEntity) -> int:
+	return roundi(shove_cost_base + force * pushed_mass(target) * shove_cost_scale)
+
+
+func impact_damage(remaining_force: float, ratio: float) -> int:
 	return roundi(remaining_force * impact_per_force * ratio)
 
 

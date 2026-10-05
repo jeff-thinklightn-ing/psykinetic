@@ -114,7 +114,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	var tile := _mouse_tile()
+	var hovered := _entity_under_mouse()
+	var tile := hovered.tile if hovered != null else _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
 	if debug_overlay.visible:
@@ -136,8 +137,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	var player := _local_player()
 	if player == null:
 		return
-	var tile := _mouse_tile()
-	var target := World.get_entity_at(tile)
+	# A sprite under the cursor wins over the tile under the cursor.
+	var target := _entity_under_mouse()
+	var tile := target.tile if target != null else _mouse_tile()
+	if target == null:
+		target = World.get_entity_at(tile)
 	var in_reach := target != null and target != player \
 			and World.can_target(player, target) and World.can_melee(player.tile, tile)
 	match click.button_index:
@@ -159,6 +163,30 @@ func _local_player() -> Player:
 		if entity is Player and entity.owner_peer == Net.local_id and entity.spawned:
 			return entity
 	return null
+
+
+## The entity whose sprite is under the cursor, or null. Sprites stand taller
+## than their tile, so pointing at a body would otherwise hit the tile behind
+## it. Where sprites overlap, the one drawn in front (lower on screen) wins.
+## The local player is skipped so clicks pass through to what is behind it.
+func _entity_under_mouse() -> GridEntity:
+	if DisplayServer.get_name() == "headless":
+		return null
+	var mouse := get_global_mouse_position()
+	var own := _local_player()
+	var best: GridEntity = null
+	for entity in World.get_entities():
+		if entity == own or not entity.spawned:
+			continue
+		var sprite := entity.get_node_or_null("Sprite") as Sprite2D
+		if sprite == null:
+			continue
+		var point := sprite.to_local(mouse)
+		if not sprite.get_rect().has_point(point) or not sprite.is_pixel_opaque(point):
+			continue
+		if best == null or entity.position.y > best.position.y:
+			best = entity
+	return best
 
 
 ## Screen -> grid: the canvas transform (camera, stretch) is undone by
@@ -255,6 +283,7 @@ func _build_entity(spec: Dictionary) -> Node:
 	# Placeholders until World (server) or the synchronizer (client) says otherwise.
 	entity.tile = spec["tile"]
 	entity.hp = entity.max_hp
+	entity.stamina = entity.max_stamina
 	return entity
 
 
@@ -312,6 +341,9 @@ func _on_world_ticked(tick: int) -> void:
 func _debug_text() -> String:
 	var lines: Array[String] = ["peer id: %d (%s)" % [
 		Net.local_id, Net.Mode.keys()[Net.mode].to_lower() if Net.online else "offline"]]
+	var player := _local_player()
+	if player != null:
+		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
 	if Net.mode == Net.Mode.CLIENT:
 		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))
 		lines.append("mispredicts: %d / min (%d total)" % [

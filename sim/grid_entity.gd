@@ -26,8 +26,14 @@ enum BodyMaterial { FLESH, WOOD, STONE, METAL }
 enum Order { NONE, ATTACK, SHOVE }
 
 ## The only state sent over the network, besides World's tick.
-const REPLICATED: Array[String] = ["tile", "hp", "facing"]
+const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina"]
 const HOP_HEIGHT := 6.0
+## Stamina shown on the body: the sprite's height at 0 stamina...
+const TIRED_HEIGHT := 0.7
+## ...and a slow bob once stamina is below this fraction.
+const WINDED_BELOW := 0.25
+const BOB_HEIGHT := 1.5
+const BOB_HZ := 0.7
 const PIP_REACH := 4.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)
 const HURT_TINT := Color(1.0, 0.3, 0.3)
@@ -43,10 +49,10 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 ## 0 means indestructible.
 @export var max_hp := 0
 @export var attack_damage := 0
-## Push force (tiles) carried by a melee attack.
-@export var attack_force := 0
-## Push force of a shove; 0 means this entity cannot shove.
-@export var shove_force := 0
+## Drives push force (see World.push_force). 0 means it cannot push at all.
+@export var strength := 0
+## 0 means no stamina: never tires, never counts as exhausted.
+@export var max_stamina := 0
 ## Cooldown shared by attack and shove.
 @export var attack_ticks := 10
 ## Sprite colour override; alpha 0 means keep the scene's colour.
@@ -68,6 +74,7 @@ var hp := 0:
 		hp = value
 		if _mirroring and value < old:
 			_start_hurt_fade()
+var stamina := 0
 ## Direction of the last step or attack.
 var facing := Vector2i(0, 1)
 var spawned := false
@@ -90,6 +97,13 @@ var _prediction: MovePrediction
 # Feedback visuals live on the Sprite child, never on this node's position.
 var _sprite: Node2D
 var _sprite_rest := Vector2.ZERO
+var _sprite_rest_scale := Vector2.ONE
+## How far the push hop currently lifts the sprite; tweened.
+var _hop_offset := 0.0
+# Regen bookkeeping, written by World through the _world_note_* hooks.
+var _exerted_tick := -1
+var _moved_tick := -1
+var _moved_tiles := 0
 var _pip: Node2D
 var _pip_rest := Vector2.ZERO
 var _hop: Tween
@@ -117,6 +131,7 @@ func _ready() -> void:
 	_sprite = get_node_or_null("Sprite")
 	if _sprite != null:
 		_sprite_rest = _sprite.position
+		_sprite_rest_scale = _sprite.scale
 		if tint.a > 0.0:
 			_sprite.modulate = tint
 	_pip = get_node_or_null("Sprite/Facing")
@@ -144,6 +159,17 @@ func _sim_tick() -> void:
 
 func is_creature() -> bool:
 	return body_material == BodyMaterial.FLESH
+
+
+## Out of stamina: cannot push, and counts as half its mass when pushed.
+func is_exhausted() -> bool:
+	return max_stamina > 0 and stamina <= 0
+
+
+## True if this entity attacked, shoved, or was moved more than one tile on
+## [param on_tick]. Such a tick regains no stamina.
+func exerted_on(on_tick: int) -> bool:
+	return _exerted_tick == on_tick or (_moved_tick == on_tick and _moved_tiles > 1)
 
 
 func is_breakable() -> bool:
@@ -175,7 +201,27 @@ func _process(delta: float) -> void:
 				(shown_facing.x - shown_facing.y) * Iso.HALF.x,
 				(shown_facing.x + shown_facing.y) * Iso.HALF.y)
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH
+	_update_body()
 	_update_flash()
+
+
+## Stamina is read off the body: it sags toward TIRED_HEIGHT as stamina drops
+## (feet stay planted) and bobs slowly when nearly spent. The push hop is
+## added on top. All of it on the Sprite child, never on this node.
+func _update_body() -> void:
+	var body := _sprite as Sprite2D
+	if body == null:
+		return
+	var offset := -_hop_offset
+	if max_stamina > 0:
+		var fraction := clampf(float(stamina) / max_stamina, 0.0, 1.0)
+		var height := lerpf(TIRED_HEIGHT, 1.0, fraction)
+		body.scale.y = _sprite_rest_scale.y * height
+		offset += (1.0 - height) * body.get_rect().size.y * 0.5 * _sprite_rest_scale.y
+		if fraction < WINDED_BELOW:
+			var phase := Time.get_ticks_msec() / 1000.0 * TAU * BOB_HZ + get_instance_id() % 7
+			offset += sin(phase) * BOB_HEIGHT
+	body.position.y = _sprite_rest.y + offset
 
 
 # --- World-only hooks. Do not call from anywhere else. ------------------------
@@ -186,6 +232,7 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	_from_tile = at
 	_move_duration = 0
 	hp = max_hp
+	stamina = max_stamina
 	next_move_tick = 0
 	next_attack_tick = 0
 	has_move_order = false
@@ -207,6 +254,17 @@ func _world_slide_from(from: Vector2i, at_tick: int, duration: int) -> void:
 	_from_tile = from
 	_move_tick = at_tick
 	_move_duration = duration
+
+
+func _world_note_exertion(on_tick: int) -> void:
+	_exerted_tick = on_tick
+
+
+func _world_note_moved(on_tick: int) -> void:
+	if _moved_tick != on_tick:
+		_moved_tick = on_tick
+		_moved_tiles = 0
+	_moved_tiles += 1
 
 
 func _world_pushed(tiles: int) -> void:
@@ -309,11 +367,11 @@ func _on_pushed(_tiles: int) -> void:
 		return
 	if _hop != null:
 		_hop.kill()
-	_sprite.position = _sprite_rest
+	_hop_offset = 0.0
 	_hop = create_tween()
-	_hop.tween_property(_sprite, "position:y", _sprite_rest.y - HOP_HEIGHT, 0.08) \
+	_hop.tween_property(self, "_hop_offset", HOP_HEIGHT, 0.08) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	_hop.tween_property(_sprite, "position:y", _sprite_rest.y, 0.12) \
+	_hop.tween_property(self, "_hop_offset", 0.0, 0.12) \
 			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 
 

@@ -9,7 +9,8 @@ mass = 40.0
 move_ticks = 4
 max_hp = 12
 attack_damage = 1
-attack_force = 1
+strength = 6
+max_stamina = 60
 attack_ticks = 10
 
 [node name="Sprite" type="Sprite2D" parent="."]

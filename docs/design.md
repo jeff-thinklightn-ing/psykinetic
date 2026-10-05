@@ -68,8 +68,8 @@ opened it runs offline instead.
   start tile, owner peer, static property overrides) builds the same node on
   every peer, so static configuration is never replicated.
 - *Per-entity state*: a `MultiplayerSynchronizer` on every `GridEntity`
-  (built in `GridEntity._init`) sends `tile`, `hp` and `facing`, on change.
-  Nothing else.
+  (built in `GridEntity._init`) sends `tile`, `hp`, `facing` and `stamina`,
+  on change. Nothing else.
 - *The tick counter*: `World._net_tick`, one RPC per tick.
 - *Input*: `World.request_move`, `request_attack`, `request_shove` —
   `@rpc("any_peer", "call_remote", "reliable")`. Each checks that the calling
@@ -147,8 +147,9 @@ server only:
      carries force, resolve the whole push (including propagation) before the
      next hit.
 4. **Hazards.** In ascending id, every creature standing on fire takes 2.
-5. Emit `World.ticked(tick)`.
-6. Send the tick counter to clients.
+5. **Stamina.** Everyone who did not exert themselves this tick regains some.
+6. Emit `World.ticked(tick)`.
+7. Send the tick counter to clients.
 
 Entities reduced to 0 hp are removed from occupancy immediately (their tile
 is empty for whatever resolves next) and their node is freed at end of frame.
@@ -181,8 +182,9 @@ sight is a Bresenham walk blocked by walls and by entities with
 
 ## Force pushes
 
-Attacks and shoves carry **force** (an int, in tiles). All of this lives in
-`World._push` and treats every entity alike — there is no player branch.
+Attacks and shoves carry **force** (a number, in tiles; see Strength and
+stamina for where it comes from). All of this lives in `World._push` and
+treats every entity alike — there is no player branch.
 
 **Mass gate (decides whether anything moves).** The mover's mass is a budget.
 Each body the push sets in motion spends its own mass from the budget. A body
@@ -190,8 +192,9 @@ heavier than what is left does not move: if that is the first target the push
 does nothing at all; if it is further down the chain the push ends there.
 
 **Travel.** With `ratio = clamp(mover_mass / body_mass, 0.5, 1.5)`, the body
-travels up to `floor(force × ratio)` tiles (at least 1), one tile at a time
-along the push direction, until something stops it:
+travels up to `floor(force × ratio)` tiles, one tile at a time along the push
+direction, until something stops it. If that comes to less than one tile the
+push does nothing: no movement and no impact.
 
 | Stopped by | Result |
 | --- | --- |
@@ -213,16 +216,59 @@ and are hurt more; heavier ones less. With equal masses this is exactly
 - `STONE`, `METAL` — never take damage, never break. Pushable if light enough.
 - Walls are terrain, not entities: immovable, absorb nothing.
 
-**Forces.** Player attack 2 (plus 2 damage), player shove 3 (no damage),
-monster attack 1 (plus 1 damage).
-
 Every push prints one line per body moved:
 
 ```
-[tick 1] push: Player -> Imp1 dir=(1, 0) tiles=1 impact=6 stopped_by=Imp2 (Imp2 takes 6)
+[tick 1] push: Player -> Imp1 dir=(1, 0) force=2.00 tiles=0 impact=6 stopped_by=Imp2 (Imp2 takes 6)
 ```
 
 and each pushed entity's sprite hops; an impact flashes it for one frame.
+
+## Strength and stamina
+
+Every `GridEntity` has `strength`, `max_stamina` and `stamina` (ints). The
+rules are the same for all of them; an entity with `max_stamina` 0 (crates,
+the boulder) simply has no stamina and is never exhausted.
+
+| | strength | max_stamina |
+| --- | --- | --- |
+| Player | 10 | 100 |
+| Monster | 6 | 60 |
+| Pushable | 0 | 0 |
+
+**Force** (`World.push_force`):
+
+```
+force = clamp(strength × mover_mass / target_mass × force_scale, 0, max_force)
+```
+
+A shove uses all of it; a melee attack carries half and costs no stamina.
+`World.force_scale` (0.1) and `World.max_force` (4) are exported. A player's
+shove on a rested imp is 10 × 80 / 40 × 0.1 = 2.0.
+
+**Cost of a shove** (`World.shove_cost`), paid when the shove is accepted,
+whether or not anything ends up moving:
+
+```
+cost = round(shove_cost_base + force × target_mass × shove_cost_scale)     # 5, 0.05
+```
+
+If the shover has less stamina than the cost, the force is scaled by
+`stamina / cost` and all remaining stamina is spent.
+
+**Regeneration.** At the end of each tick an entity regains
+`World.stamina_regen` (2), unless on that tick it attacked, shoved, or was
+moved more than one tile. Standing and walking regain; attacking, shoving and
+being thrown do not.
+
+**Exhaustion.** At 0 stamina an entity's push force is 0, and it counts as
+half its mass wherever it is on the receiving end of a push (`World.pushed_mass`:
+the force formula, the mass gate, travel and impact). So an exhausted target
+is thrown farther and an exhausted attacker cannot push at all.
+
+**On screen.** There is no bar. A creature's sprite sags from full height to
+70% as its stamina falls, feet planted, and bobs slowly below 25%. The number
+is only in the F3 overlay. `stamina` is replicated so clients can draw this.
 
 ## Hazards
 
@@ -273,8 +319,11 @@ u = (lx - 16) / 16;  v = (ly - 8) / 8
 tile = (round((u + v) / 2), round((v - u) / 2))
 ```
 
-Clicks go `get_global_mouse_position()` → `ground.to_local()` →
-`Iso.local_to_tile()`. `main.gd` checks at startup that `Iso` agrees with the
+A click first looks for an entity whose sprite is under the cursor
+(`main.gd`, `_entity_under_mouse`: opaque pixels only, the sprite drawn in
+front wins, the local player is skipped) and targets that entity and its
+tile. Otherwise it goes `get_global_mouse_position()` → `ground.to_local()` →
+`Iso.local_to_tile()`. The hover highlight follows the same rule. `main.gd` checks at startup that `Iso` agrees with the
 TileMapLayer's own `map_to_local`.
 
 ## Testing

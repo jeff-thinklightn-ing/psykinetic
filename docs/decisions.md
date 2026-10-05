@@ -94,3 +94,12 @@ snaps to the server and drops the predicted path. Nothing else is predicted —
 not pushes, attacks, or other entities. Everything else is drawn one tick in
 the past (`World.NET_DISPLAY_DELAY_TICKS`). Prediction is presentation only
 and never writes sim state.
+
+## 14. Force comes from strength, and effort costs stamina
+
+Attack and shove force are no longer fixed numbers. Force is derived from
+the attacker's strength and the mass ratio; a shove costs stamina, a tired
+shover pushes less, and an exhausted entity cannot push and is easier to
+push. One set of rules for every entity. Stamina is shown on the body, not
+on a bar, and joins `tile`, `hp` and `facing` as replicated state (amending
+10) because clients need it to draw that.
