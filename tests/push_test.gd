@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_diagonals()
 	_test_resolution_order()
 	_test_mass_gate()
+	_test_no_attack_mid_step()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -191,6 +192,25 @@ func _test_mass_gate() -> void:
 	_check(player.tile == Vector2i(1, 1), "brute (100) knocks the player back one tile (at %s)" % player.tile)
 
 
+func _test_no_attack_mid_step() -> void:
+	print("\n== no attacking mid-step ==")
+	var e := _build([
+		"######",
+		"#P.m.#",
+		"######",
+	])
+	var player: GridEntity = e["P"][0]
+	var imp: Monster = e["m"][0]
+	imp.sight_range = 7
+	World.step()
+	_check(imp.tile == Vector2i(2, 1), "imp steps next to the player on tick 1")
+	for i in imp.move_ticks - 1:
+		World.step()
+	_check(player.hp == 20, "no damage while the imp is still crossing (tick %d, hp %d)" % [World.tick, player.hp])
+	World.step()
+	_check(player.hp == 19, "imp hits on the tick its step ends (tick %d, hp %d)" % [World.tick, player.hp])
+
+
 # --- helpers ------------------------------------------------------------------
 
 ## '#' wall, '.' floor, '~' fire, 'P' player, 'm' imp (AI off), 'c' crate.
@@ -235,7 +255,7 @@ func _build(rows: Array[String]) -> Dictionary:
 
 
 func _shove(attacker: GridEntity, target: GridEntity) -> void:
-	while World.tick < attacker.next_attack_tick:
+	while World.tick < maxi(attacker.next_attack_tick, attacker.next_move_tick):
 		World.step()
 	World.order_shove(attacker, target)
 	World.step()

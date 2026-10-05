@@ -37,9 +37,6 @@ const LEVEL_ENTITIES: Array[Dictionary] = [
 	{"scene": "monster", "name": "CorridorImp3", "tile": Vector2i(3, 8)},
 	{"scene": "monster", "name": "Imp1", "tile": Vector2i(2, 11)},
 	{"scene": "monster", "name": "Imp2", "tile": Vector2i(5, 12)},
-	{"scene": "monster", "name": "Brute", "tile": Vector2i(9, 11), "props": {
-		"mass": 100.0, "max_hp": 24,
-		"modulate": Color(0.6, 0.45, 0.75), "scale": Vector2(1.3, 1.3)}},
 	{"scene": "pushable", "name": "Crate1", "tile": Vector2i(8, 2)},
 	{"scene": "pushable", "name": "Crate2", "tile": Vector2i(8, 3)},
 	{"scene": "pushable", "name": "Crate3", "tile": Vector2i(4, 2)},
@@ -58,8 +55,15 @@ const PLAYER_TINTS: Array[Color] = [
 	Color(0.4, 0.9, 0.9), Color(1.0, 0.6, 0.3), Color(0.75, 0.75, 0.8), Color(0.7, 0.55, 1.0),
 ]
 
+## Ticks between a player dying and reappearing at a start tile.
+const RESPAWN_TICKS := 20
+
 ## Server only: peer id -> that peer's player.
 var _players: Dictionary[int, Player] = {}
+## Server only: peer id -> join order, so a respawn keeps its name and tint.
+var _player_index: Dictionary[int, int] = {}
+## Server only: peer id -> tick at which its dead player comes back.
+var _respawn_at: Dictionary[int, int] = {}
 var _next_player_index := 0
 var _test_target := Vector2i.ZERO
 var _test_ordered := false
@@ -90,6 +94,7 @@ func _ready() -> void:
 	if Net.is_authority():
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+		World.entity_despawned.connect(_on_entity_despawned)
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		_start_level()
@@ -178,6 +183,8 @@ func _start_level() -> void:
 	World.load_terrain(ground.get_used_cells(), walls.get_used_cells(),
 			ground.get_used_cells_by_id(FIRE_SOURCE))
 	_players.clear()
+	_player_index.clear()
+	_respawn_at.clear()
 	_next_player_index = 0
 	# The local player first, so in single-player it keeps the lowest id.
 	if Net.mode != Net.Mode.SERVER:
@@ -202,8 +209,10 @@ func _spawn_player(peer: int) -> void:
 	if not World.is_free(tile):
 		print("[net] no free start tile for peer %d" % peer)
 		return
-	var index := _next_player_index
-	_next_player_index += 1
+	if not _player_index.has(peer):
+		_player_index[peer] = _next_player_index
+		_next_player_index += 1
+	var index := _player_index[peer]
 	var player := _spawn({
 		"scene": "player", "name": "Player%d" % (index + 1), "tile": tile, "peer": peer,
 		"props": {"tint": PLAYER_TINTS[index % PLAYER_TINTS.size()]},
@@ -248,16 +257,37 @@ func _on_peer_connected(peer: int) -> void:
 func _on_peer_disconnected(peer: int) -> void:
 	var player: Player = _players.get(peer)
 	_players.erase(peer)
+	_player_index.erase(peer)
+	_respawn_at.erase(peer)
 	if is_instance_valid(player) and player.spawned:
 		World.despawn(player)
 	print("[net] peer %d left" % peer)
 
 
+## A player that dies comes back after RESPAWN_TICKS, as long as its peer is
+## still here. Placeholder rule so the test room stays usable.
+func _on_entity_despawned(entity: GridEntity) -> void:
+	var peer := entity.owner_peer
+	if entity is Player and _players.get(peer) == entity:
+		_players.erase(peer)
+		_respawn_at[peer] = World.tick + RESPAWN_TICKS
+		print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
+
+
+func _respawn_due_players(tick: int) -> void:
+	for peer: int in _respawn_at.keys():
+		if tick >= _respawn_at[peer]:
+			_respawn_at.erase(peer)
+			_spawn_player(peer)
+
+
 # --- HUD, logging, test hooks -------------------------------------------------
 
 func _on_world_ticked(tick: int) -> void:
+	if Net.is_authority():
+		_respawn_due_players(tick)
 	var player := _local_player()
-	var hp_text := "no player"
+	var hp_text := "no player" if Net.mode == Net.Mode.SERVER else "dead, respawning"
 	if player != null:
 		hp_text = "HP %d/%d" % [player.hp, player.max_hp]
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()

@@ -405,6 +405,10 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, force: 
 		return false
 	if tick < attacker.next_attack_tick or not can_melee(attacker.tile, target.tile):
 		return false
+	# No hitting mid-step: the attacker's tile changes when a step starts, but
+	# on screen it is still crossing over, so the blow would land from afar.
+	if tick < attacker.next_move_tick:
+		return false
 	attacker.next_attack_tick = tick + attacker.attack_ticks
 	attacker._world_set_facing(target.tile - attacker.tile)
 	var hit := Hit.new()

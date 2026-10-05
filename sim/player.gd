@@ -8,7 +8,8 @@ extends GridEntity
 
 func _sim_tick() -> void:
 	if action_order != Order.NONE:
-		if World.tick < next_attack_tick:
+		# World refuses hits during the cooldown and while still mid-step.
+		if World.tick < maxi(next_attack_tick, next_move_tick):
 			return
 		var order := action_order
 		action_order = Order.NONE

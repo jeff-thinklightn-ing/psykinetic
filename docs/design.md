@@ -89,8 +89,9 @@ no push resolution.
 
 **Players.** The server spawns one `Player` per peer (and one for itself when
 hosting) on the first free tile in `PLAYER_STARTS`, tinted by join order, and
-removes it when the peer leaves. `R` on the host rebuilds the room for
-everyone.
+removes it when the peer leaves. A player that dies is respawned at a start
+tile 20 ticks later with the same name and tint (a placeholder rule that
+keeps the test room usable). `R` on the host rebuilds the room for everyone.
 
 ## Tick order
 
@@ -108,7 +109,9 @@ server only:
      Later entities see the result within the same tick.
    - `try_attack` / `try_shove` are only *accepted* here (cooldown and reach
      checked, cooldown started) and queued as a hit aimed at
-     `attacker.tile + direction`.
+     `attacker.tile + direction`. They are refused while the attacker is
+     still mid-step (`tick < next_move_tick`): its tile changes when a step
+     starts, but on screen it has not arrived yet.
 3. **Resolve hits**, in ascending id of the attacker. For each hit:
    - If the attacker or target is gone, or the target is no longer on the
      tile the hit was aimed at, the hit is **dropped** — no damage, no push,
