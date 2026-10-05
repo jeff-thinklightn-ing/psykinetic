@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://sim/monster.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/capsule.svg" id="2_capsule"]
+
+[node name="Monster" type="Node2D"]
+script = ExtResource("1_script")
+mass = 90.0
+move_ticks = 4
+max_hp = 5
+attack_damage = 1
+attack_ticks = 10
+
+[node name="Sprite" type="Sprite2D" parent="."]
+modulate = Color(0.9, 0.25, 0.25, 1)
+position = Vector2(0, -8)
+texture = ExtResource("2_capsule")

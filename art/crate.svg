@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <!-- White so instances can tint it with modulate. The footprint is the bottom 20x10. -->
+  <polygon points="0,5 10,10 10,20 0,15" fill="#c8c8c8"/>
+  <polygon points="10,10 20,5 20,15 10,20" fill="#9a9a9a"/>
+  <polygon points="10,0 20,5 10,10 0,5" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,56 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="TileSet" path="res://art/tileset.tres" id="2_tileset"]
+[ext_resource type="PackedScene" path="res://entities/player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://entities/monster.tscn" id="4_monster"]
+[ext_resource type="PackedScene" path="res://entities/pushable.tscn" id="5_pushable"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Ground" type="TileMapLayer" parent="."]
+tile_set = ExtResource("2_tileset")
+
+[node name="Cursor" type="Polygon2D" parent="."]
+color = Color(1, 1, 1, 0.25)
+polygon = PackedVector2Array(-16, 0, 0, -8, 16, 0, 0, 8)
+
+[node name="YSort" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Walls" type="TileMapLayer" parent="YSort"]
+y_sort_enabled = true
+tile_set = ExtResource("2_tileset")
+
+[node name="Entities" type="Node2D" parent="YSort"]
+y_sort_enabled = true
+
+[node name="Player" parent="YSort/Entities" instance=ExtResource("3_player")]
+start_tile = Vector2i(2, 2)
+
+[node name="Monster" parent="YSort/Entities" instance=ExtResource("4_monster")]
+start_tile = Vector2i(13, 9)
+
+[node name="Crate" parent="YSort/Entities" instance=ExtResource("5_pushable")]
+start_tile = Vector2i(4, 5)
+
+[node name="Crate2" parent="YSort/Entities" instance=ExtResource("5_pushable")]
+start_tile = Vector2i(5, 5)
+
+[node name="Boulder" parent="YSort/Entities" instance=ExtResource("5_pushable")]
+modulate = Color(0.55, 0.55, 0.6, 1)
+start_tile = Vector2i(8, 2)
+mass = 200.0
+body_material = 2
+
+[node name="Camera" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Label" type="Label" parent="HUD"]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 600.0
+offset_bottom = 31.0
