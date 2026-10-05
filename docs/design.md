@@ -8,7 +8,7 @@
 | `entities/` | Entity scenes (`player.tscn`, `monster.tscn`, `pushable.tscn`). Scenes only add visuals and tuning values to a sim script. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `main.tscn`, `main.gd` | Test room, camera, HUD, and input. View/input glue only. |
-| `tests/` | `push_test.tscn`: scripted sim test, run headless. |
+| `tests/` | `push_test.tscn`: scripted sim test. `run.ps1` / `run.sh` run it headless. |
 
 ## The rule: no Node mutates position directly
 
@@ -191,10 +191,18 @@ TileMapLayer's own `map_to_local`.
 
 ## Testing
 
+All sim behaviour is verified headless via `tests/run`, never through the editor.
+
 ```
-godot --headless --path . res://tests/push_test.tscn
+tests/run.ps1        # Windows
+tests/run.sh         # anything with a POSIX shell
 ```
+
+Both run `godot --headless --path . --scene tests/push_test.tscn` from the
+project root. Godot is taken from the `GODOT_PATH` environment variable, or
+`godot` on `PATH` if that is not set.
 
 The test scene stops `World`'s own clock, builds small ASCII rooms through the
 normal `World` API, calls `World.step()` by hand, and checks tiles and damage.
-The exit code is the number of failed checks.
+It prints PASS or FAIL per assertion and quits with exit code 1 if any
+assertion failed, 0 otherwise.

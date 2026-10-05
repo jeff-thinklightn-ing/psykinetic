@@ -1,7 +1,7 @@
 extends Node
 ## Scripted sim test. Builds small rooms, steps World by hand, checks outcomes.
-##   godot --headless --path . res://tests/push_test.tscn
-## Headless, the exit code is the number of failed checks (0 = pass).
+## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
+## and quits with exit code 1 if any assertion failed, 0 otherwise.
 ##
 ## Numbers below assume the scene defaults: player mass 80 / shove force 3,
 ## imp mass 40 / hp 12, crate mass 30 / hp 12, impact_per_force 2, ratio
@@ -33,9 +33,7 @@ func _ready() -> void:
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
-	# In a window (editor, MCP run) stay open so the output can be read.
-	if DisplayServer.get_name() == "headless":
-		get_tree().quit(_failures)
+	get_tree().quit(1 if _failures > 0 else 0)
 
 
 func _test_shove_into_wall() -> void:
@@ -262,7 +260,7 @@ func _damage(entity: GridEntity, cause: StringName) -> int:
 func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
-	print("  %s  %s" % ["ok  " if ok else "FAIL", label])
+	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
 
 
 func _on_entity_damaged(entity: GridEntity, amount: int, _source: GridEntity, cause: StringName) -> void:
