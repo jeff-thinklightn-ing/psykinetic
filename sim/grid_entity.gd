@@ -28,12 +28,17 @@ enum Order { NONE, ATTACK, SHOVE }
 ## The only state sent over the network, besides World's tick.
 const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina"]
 const HOP_HEIGHT := 6.0
+## A body tossed overhead arcs this high instead, and for longer.
+const LOFT_HEIGHT := 20.0
 ## Stamina shown on the body: the sprite's height at 0 stamina...
 const TIRED_HEIGHT := 0.7
 ## ...and a slow bob once stamina is below this fraction.
 const WINDED_BELOW := 0.25
 const BOB_HEIGHT := 1.5
 const BOB_HZ := 0.7
+## A stunned body reels: sprite rotation swings this far, this fast.
+const REEL_ANGLE := 0.35
+const REEL_HZ := 2.5
 const PIP_REACH := 4.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)
 const HURT_TINT := Color(1.0, 0.3, 0.3)
@@ -80,10 +85,14 @@ var facing := Vector2i(0, 1)
 var spawned := false
 var next_move_tick := 0
 var next_attack_tick := 0
+## Set by World when a collision stuns this entity. Server only.
+var stunned_until_tick := 0
 var has_move_order := false
 var move_order := Vector2i.ZERO
 var action_order := Order.NONE
 var action_target: GridEntity
+## For a shove: the way to toss the target, or ZERO for straight away.
+var action_direction := Vector2i.ZERO
 
 # Render interpolation: slide from _from_tile to tile over _move_duration ticks.
 var _from_tile := Vector2i.ZERO
@@ -100,8 +109,12 @@ var _sprite_rest := Vector2.ZERO
 var _sprite_rest_scale := Vector2.ONE
 ## How far the push hop currently lifts the sprite; tweened.
 var _hop_offset := 0.0
+## Whether the push being shown is an overhead toss (a higher, longer arc).
+var _lofted := false
+## Tick (this peer's clock) until which the sprite reels from a stun.
+var _reel_until := 0.0
 # Regen bookkeeping, written by World through the _world_note_* hooks.
-var _exerted_tick := -1
+var _exerted_tick := -1000
 var _moved_tick := -1
 var _moved_tiles := 0
 var _pip: Node2D
@@ -161,15 +174,22 @@ func is_creature() -> bool:
 	return body_material == BodyMaterial.FLESH
 
 
+## 0..1; always 1 for an entity that has no stamina.
+func stamina_fraction() -> float:
+	if max_stamina <= 0:
+		return 1.0
+	return clampf(float(stamina) / max_stamina, 0.0, 1.0)
+
+
 ## Out of stamina: cannot push, and counts as half its mass when pushed.
 func is_exhausted() -> bool:
 	return max_stamina > 0 and stamina <= 0
 
 
-## True if this entity attacked, shoved, or was moved more than one tile on
-## [param on_tick]. Such a tick regains no stamina.
-func exerted_on(on_tick: int) -> bool:
-	return _exerted_tick == on_tick or (_moved_tick == on_tick and _moved_tiles > 1)
+## Tick on which this entity last attacked, shoved, or was moved more than
+## one tile. Stamina does not regenerate for a while after it.
+func last_exertion_tick() -> int:
+	return _exerted_tick
 
 
 func is_breakable() -> bool:
@@ -222,6 +242,11 @@ func _update_body() -> void:
 			var phase := Time.get_ticks_msec() / 1000.0 * TAU * BOB_HZ + get_instance_id() % 7
 			offset += sin(phase) * BOB_HEIGHT
 	body.position.y = _sprite_rest.y + offset
+	# Stunned: reel from side to side until it wears off.
+	if World.tick + World.tick_alpha < _reel_until:
+		body.rotation = sin(Time.get_ticks_msec() / 1000.0 * TAU * REEL_HZ) * REEL_ANGLE
+	else:
+		body.rotation = 0.0
 
 
 # --- World-only hooks. Do not call from anywhere else. ------------------------
@@ -233,6 +258,7 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	_move_duration = 0
 	hp = max_hp
 	stamina = max_stamina
+	stunned_until_tick = 0
 	next_move_tick = 0
 	next_attack_tick = 0
 	has_move_order = false
@@ -265,18 +291,29 @@ func _world_note_moved(on_tick: int) -> void:
 		_moved_tick = on_tick
 		_moved_tiles = 0
 	_moved_tiles += 1
+	# One tile is a step. More than one in a tick is being thrown.
+	if _moved_tiles > 1:
+		_exerted_tick = on_tick
 
 
-func _world_pushed(tiles: int) -> void:
+func _world_pushed(tiles: int, lofted := false) -> void:
+	_lofted = lofted
 	pushed.emit(tiles)
 	if not multiplayer.get_peers().is_empty():
-		_net_pushed.rpc(tiles)
+		_net_pushed.rpc(tiles, lofted)
 
 
 func _world_impacted(amount: int) -> void:
 	impacted.emit(amount)
 	if not multiplayer.get_peers().is_empty():
 		_net_impacted.rpc(amount)
+
+
+func _world_stunned(until_tick: int, ticks: int) -> void:
+	stunned_until_tick = until_tick
+	_reel_until = until_tick
+	if not multiplayer.get_peers().is_empty():
+		_net_stunned.rpc(ticks)
 
 
 func _world_remove() -> void:
@@ -327,10 +364,11 @@ func predict_move(target: Vector2i) -> void:
 		_prediction.order(self, target)
 
 
-## The local player just ordered something else: stop after the current step.
-func predict_stop() -> void:
+## The local player just ordered an attack or shove on something standing on
+## [param target_tile]: show the walk up to it. The hit itself is not predicted.
+func predict_approach(target_tile: Vector2i) -> void:
 	if _prediction != null:
-		_prediction.cancel_unstarted()
+		_prediction.order(self, target_tile, false)
 
 
 ## Tile the sprite is drawn on, which on the predicting client may be ahead
@@ -351,13 +389,19 @@ func _mispredicted(reason: String) -> void:
 
 # Cosmetic only: they replay feedback, they carry no sim state.
 @rpc("authority", "call_remote", "reliable")
-func _net_pushed(tiles: int) -> void:
+func _net_pushed(tiles: int, lofted: bool) -> void:
+	_lofted = lofted
 	pushed.emit(tiles)
 
 
 @rpc("authority", "call_remote", "reliable")
 func _net_impacted(amount: int) -> void:
 	impacted.emit(amount)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_stunned(ticks: int) -> void:
+	_reel_until = World.tick + ticks
 
 
 # --- Feedback visuals ---------------------------------------------------------
@@ -369,9 +413,11 @@ func _on_pushed(_tiles: int) -> void:
 		_hop.kill()
 	_hop_offset = 0.0
 	_hop = create_tween()
-	_hop.tween_property(self, "_hop_offset", HOP_HEIGHT, 0.08) \
+	var height := LOFT_HEIGHT if _lofted else HOP_HEIGHT
+	var stretch := 1.8 if _lofted else 1.0
+	_hop.tween_property(self, "_hop_offset", height, 0.08 * stretch) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	_hop.tween_property(self, "_hop_offset", 0.0, 0.12) \
+	_hop.tween_property(self, "_hop_offset", 0.0, 0.12 * stretch) \
 			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 
 

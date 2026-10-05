@@ -3,7 +3,22 @@ extends GridEntity
 ## Picks the nearest player it can see (within sight range, in line of sight).
 ## Attacks if that player is in melee reach, otherwise walks toward them.
 
+## Mass reads off the body: the sprite runs from SHADE_LIGHT at
+## SHADE_LIGHT_MASS to SHADE_DARK at SHADE_DARK_MASS. Darker is heavier.
+const SHADE_LIGHT_MASS := 20.0
+const SHADE_DARK_MASS := 80.0
+const SHADE_LIGHT := Color(1.0, 0.62, 0.55)
+const SHADE_DARK := Color(0.33, 0.04, 0.08)
+
 @export var sight_range := 7
+
+
+func _ready() -> void:
+	super()
+	# An explicit tint wins; otherwise colour by mass.
+	if _sprite != null and tint.a <= 0.0:
+		var heaviness := clampf(inverse_lerp(SHADE_LIGHT_MASS, SHADE_DARK_MASS, mass), 0.0, 1.0)
+		_sprite.modulate = SHADE_LIGHT.lerp(SHADE_DARK, heaviness)
 
 
 func _sim_tick() -> void:

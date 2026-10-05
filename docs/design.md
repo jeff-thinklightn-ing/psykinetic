@@ -77,8 +77,9 @@ opened it runs offline instead.
   the gated `order_move` / `order_attack` / `order_shove`. Input code calls
   `World.command_*`, which is the direct call on the server and the RPC on a
   client. Clients never call `try_move`, `try_attack` or `try_shove`.
-- *Feedback*: `GridEntity._net_pushed` / `_net_impacted` replay the hop and
-  flash on clients. They carry no sim state.
+- *Feedback*: `GridEntity._net_pushed` / `_net_impacted` / `_net_stunned`
+  replay the hop, the flash and the stun reel on clients. They carry no sim
+  state.
 
 **Nothing derived is replicated.** A client's `World` is a mirror: it loads
 terrain from the same level data, keeps the list of entities the spawner has
@@ -209,6 +210,32 @@ push does nothing: no movement and no impact.
 and are hurt more; heavier ones less. With equal masses this is exactly
 "one tile per unit of force, leftover × 2 damage".
 
+**Toss.** A shove normally pushes its target straight away from the shover.
+Given a direction (`World.order_shove(entity, target, direction)`, any of the
+eight) it tosses the target that way instead. Everything else is the same
+shove: same reach, force, stamina cost, mass gate and impact.
+
+Tossed straight back at the thrower, the target goes over the thrower's head
+and comes down on the tile behind. That lift counts as two tiles of travel,
+after which it carries on as normal with whatever travel is left. It needs a
+free tile behind the thrower with no wall in the way — if there is none the
+toss is refused and costs nothing — and enough force for two tiles; a target
+too heavy for that is not lifted, though the attempt is still paid for. The
+sprite arcs higher for an overhead toss.
+
+The input is right button held on a target and dragged:
+released without dragging it is a plain shove; dragged, an arrow shows the
+grid direction nearest the drag on screen, and release tosses that way.
+
+**Stun.** A creature that is thrown into a wall or into another entity is
+stunned, and so is a creature that something is thrown into — even when no
+force is left to do damage. A stun lasts
+`stun_ticks_base + round(remaining × stun_ticks_per_force)` ticks (4 and 3,
+exported on `World`); a longer stun replaces a shorter one. A stunned entity
+skips its turn and cannot move, attack or shove; its orders wait. Landing on
+fire is not a collision and does not stun. On screen the sprite reels from
+side to side until it wears off.
+
 **Materials** (`GridEntity.body_material`) decide what impact does:
 
 - `FLESH` — a creature. Takes damage, dies at 0 hp, burns on fire.
@@ -242,24 +269,34 @@ the boulder) simply has no stamina and is never exhausted.
 force = clamp(strength × mover_mass / target_mass × force_scale, 0, max_force)
 ```
 
-A shove uses all of it; a melee attack carries half and costs no stamina.
-`World.force_scale` (0.1) and `World.max_force` (4) are exported. A player's
-shove on a rested imp is 10 × 80 / 40 × 0.1 = 2.0.
+That is then multiplied by the attacker's stamina fraction
+(`stamina / max_stamina`), so pushes fade steadily as the attacker tires
+rather than cutting out. A shove uses all of the result; a melee attack
+carries half and costs no stamina. `World.force_scale` (0.1) and
+`World.max_force` (4) are exported. A fresh player's shove on a rested imp is
+10 × 80 / 40 × 0.1 = 2.0. Shoving the same imp six times in a row throws it
+3, 2, 2, 1, 1, 0 tiles.
 
 **Cost of a shove** (`World.shove_cost`), paid when the shove is accepted,
 whether or not anything ends up moving:
 
 ```
-cost = round(shove_cost_base + force × target_mass × shove_cost_scale)     # 5, 0.05
+cost = round(shove_cost_base + force × target_mass × shove_cost_scale)     # 5, 0.15
 ```
+
+A fresh player's shove on an imp costs 5 + 2.0 × 40 × 0.15 = 17. Because the
+cost follows the force, weaker shoves cost less: shoving nonstop, a full bar
+lasts ten shoves, the last few too weak to move an imp.
 
 If the shover has less stamina than the cost, the force is scaled by
 `stamina / cost` and all remaining stamina is spent.
 
 **Regeneration.** At the end of each tick an entity regains
-`World.stamina_regen` (2), unless on that tick it attacked, shoved, or was
-moved more than one tile. Standing and walking regain; attacking, shoving and
-being thrown do not.
+`World.stamina_regen` (2), unless it attacked, shoved, or was moved more than
+one tile on that tick or within the `World.stamina_regen_delay` (10) ticks
+before it. Standing and walking regain; attacking, shoving and being thrown
+do not, and they hold regeneration off for a second. From empty, a full
+player bar takes that second plus five more.
 
 **Exhaustion.** At 0 stamina an entity's push force is 0, and it counts as
 half its mass wherever it is on the receiving end of a push (`World.pushed_mass`:
@@ -278,14 +315,18 @@ creature (`FLESH`) on a fire tile at the end of a tick takes
 
 ## Behaviours
 
-- **Player** — an action order (attack, shove) waits for the cooldown, fires
-  once, and clears. Otherwise follows its move order one step at a time,
-  re-running A* each step; the goal tile may be occupied, so clicking a crate
-  walks up to it and pushes it. Left click: attack an adjacent creature, else
-  move. Right click: shove an adjacent entity.
+- **Player** — an action order (attack, shove) walks up to its target if it
+  is out of reach, re-pathing each step, then fires once when in reach and
+  off cooldown, and clears. Otherwise follows its move order one step at a
+  time, re-running A* each step; the goal tile may be occupied, so clicking a
+  crate walks up to it and pushes it. Left click: attack a creature (walking
+  to it first), else move. Right click: shove any entity (walking to it
+  first). On a client the walk up to the target is predicted; the hit is not.
 - **Monster** — targets the nearest player it can see (within `sight_range`
   and in line of sight). Attacks if that player is in melee reach, otherwise
   takes the first step of an A* path toward them. Sees nobody: stands still.
+  Its sprite is shaded by mass, pale at 20 through dark at 80, so heavier
+  monsters look darker. The test room's imps are 25, 30, 40, 60 and 70.
 - **Pushable** — never acts.
 
 ## Rendering between ticks

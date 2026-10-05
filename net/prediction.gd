@@ -39,7 +39,9 @@ func is_active() -> bool:
 
 ## Predicts the walk the server will do for a move order to [param target].
 ## Steps already being shown stay; steps not yet started are replaced.
-func order(entity: GridEntity, target: Vector2i) -> void:
+## With [param into_goal] false the walk stops next to the target tile, which
+## is what the server does when closing in to attack or shove.
+func order(entity: GridEntity, target: Vector2i, into_goal := true) -> void:
 	cancel_unstarted()
 	var at: Vector2i = entity.tile
 	var start := _clock
@@ -49,6 +51,8 @@ func order(entity: GridEntity, target: Vector2i) -> void:
 		start = maxf(_clock, last.start + last.duration)
 	var latency := Net.rtt_ticks()
 	for next in World.find_path(at, target, true):
+		if next == target and not into_goal:
+			break
 		# The goal may be occupied. The server only steps into it if the
 		# occupant can be walked into and shoved along.
 		var occupant := World.get_entity_at(next)

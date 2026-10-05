@@ -32,11 +32,12 @@ const SCENES := {
 ## Spawned by the server in this order, which is also entity id order.
 ## "props" are set on the instance on every peer before it enters the tree.
 const LEVEL_ENTITIES: Array[Dictionary] = [
-	{"scene": "monster", "name": "CorridorImp1", "tile": Vector2i(1, 8)},
-	{"scene": "monster", "name": "CorridorImp2", "tile": Vector2i(2, 8)},
-	{"scene": "monster", "name": "CorridorImp3", "tile": Vector2i(3, 8)},
-	{"scene": "monster", "name": "Imp1", "tile": Vector2i(2, 11)},
-	{"scene": "monster", "name": "Imp2", "tile": Vector2i(5, 12)},
+	# Imps come in different masses; Monster shades them darker as they get heavier.
+	{"scene": "monster", "name": "CorridorImp1", "tile": Vector2i(1, 8), "props": {"mass": 25.0}},
+	{"scene": "monster", "name": "CorridorImp2", "tile": Vector2i(2, 8), "props": {"mass": 40.0}},
+	{"scene": "monster", "name": "CorridorImp3", "tile": Vector2i(3, 8), "props": {"mass": 60.0}},
+	{"scene": "monster", "name": "Imp1", "tile": Vector2i(2, 11), "props": {"mass": 30.0}},
+	{"scene": "monster", "name": "Imp2", "tile": Vector2i(5, 12), "props": {"mass": 70.0}},
 	{"scene": "pushable", "name": "Crate1", "tile": Vector2i(8, 2)},
 	{"scene": "pushable", "name": "Crate2", "tile": Vector2i(8, 3)},
 	{"scene": "pushable", "name": "Crate3", "tile": Vector2i(4, 2)},
@@ -55,6 +56,10 @@ const PLAYER_TINTS: Array[Color] = [
 	Color(0.4, 0.9, 0.9), Color(1.0, 0.6, 0.3), Color(0.75, 0.75, 0.8), Color(0.7, 0.55, 1.0),
 ]
 
+## World pixels the cursor must travel with the right button held before a
+## shove becomes an aimed toss.
+const TOSS_DRAG_MIN := 10.0
+const TOSS_AIM_LENGTH := 26.0
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
 
@@ -69,6 +74,10 @@ var _test_target := Vector2i.ZERO
 var _test_ordered := false
 var _test_arrived := false
 var _test_contested := false
+## Right button held on this entity: released without a drag it is a shove,
+## dragged it is a toss in the dragged direction.
+var _toss_target: GridEntity
+var _toss_from := Vector2.ZERO
 
 @onready var ground: TileMapLayer = $Ground
 @onready var walls: TileMapLayer = $YSort/Walls
@@ -78,6 +87,7 @@ var _test_contested := false
 @onready var camera: Camera2D = $Camera
 @onready var hud: Label = $HUD/Label
 @onready var debug_overlay: Label = $HUD/Debug
+@onready var toss_aim: Line2D = $TossAim
 
 
 func _ready() -> void:
@@ -120,6 +130,7 @@ func _process(_delta: float) -> void:
 	cursor.position = Iso.tile_to_local(tile)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
+	_update_toss_aim()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -132,28 +143,82 @@ func _unhandled_input(event: InputEvent) -> void:
 			_start_level()
 		return
 	var click := event as InputEventMouseButton
-	if click == null or not click.pressed:
+	if click == null:
 		return
 	var player := _local_player()
 	if player == null:
+		_toss_target = null
+		return
+	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
+		_release_toss(player)
+		return
+	if not click.pressed:
 		return
 	# A sprite under the cursor wins over the tile under the cursor.
 	var target := _entity_under_mouse()
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
-	var in_reach := target != null and target != player \
-			and World.can_target(player, target) and World.can_melee(player.tile, tile)
+	var targetable := target != null and target != player and World.can_target(player, target)
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
-			# Adjacent creature: attack. Anything else: walk there (and push).
-			if in_reach and target.is_creature():
+			# A creature: go to it and attack. Anything else: walk there (and push).
+			if targetable and target.is_creature():
 				World.command_attack(player, target)
 			else:
 				World.command_move(player, tile)
 		MOUSE_BUTTON_RIGHT:
-			if in_reach:
-				World.command_shove(player, target)
+			# Any entity: go to it and shove. Sent on release, so that
+			# dragging first can aim it.
+			if targetable:
+				_toss_target = target
+				_toss_from = get_global_mouse_position()
+
+
+func _release_toss(player: Player) -> void:
+	var target := _toss_target
+	var direction := _toss_direction()
+	_toss_target = null
+	if is_instance_valid(target) and target.spawned:
+		World.command_shove(player, target, direction)
+
+
+## Grid direction the current right-button drag points along, by screen angle,
+## or ZERO if the cursor has barely moved (a plain shove).
+func _toss_direction() -> Vector2i:
+	var drag := get_global_mouse_position() - _toss_from
+	if drag.length() < TOSS_DRAG_MIN:
+		return Vector2i.ZERO
+	var best := Vector2i.ZERO
+	var best_dot := -INF
+	for direction in World.DIRECTIONS:
+		var dot := drag.normalized().dot(_screen_vector(direction).normalized())
+		if dot > best_dot:
+			best = direction
+			best_dot = dot
+	return best
+
+
+## Where a grid direction points on screen.
+func _screen_vector(direction: Vector2i) -> Vector2:
+	return Vector2((direction.x - direction.y) * Iso.HALF.x, (direction.x + direction.y) * Iso.HALF.y)
+
+
+## An arrow from the held target showing which way it will be tossed.
+func _update_toss_aim() -> void:
+	var direction := Vector2i.ZERO
+	if is_instance_valid(_toss_target) and _toss_target.spawned:
+		direction = _toss_direction()
+	else:
+		_toss_target = null
+	toss_aim.visible = direction != Vector2i.ZERO
+	if not toss_aim.visible:
+		return
+	var along := _screen_vector(direction).normalized()
+	var tail := _toss_target.position + Vector2(0, -8)
+	var tip := tail + along * TOSS_AIM_LENGTH
+	toss_aim.points = PackedVector2Array([
+		tail, tip, tip + along.rotated(2.6) * 7.0, tip, tip + along.rotated(-2.6) * 7.0])
 
 
 ## The player this peer's input controls, or null (dedicated server, dead,
@@ -330,7 +395,7 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove   R restart (host)   F3 debug" % [
+	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R restart (host)   F3 debug" % [
 		mode_text, hp_text, tick]
 	if player != null:
 		player.enable_prediction()

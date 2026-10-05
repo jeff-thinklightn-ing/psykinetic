@@ -63,9 +63,16 @@ const EXHAUSTED_MASS_FACTOR := 0.5
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
-@export var shove_cost_scale := 0.05
+@export var shove_cost_scale := 0.15
 ## STAMINA_REGEN: stamina regained on a tick spent resting or walking.
 @export var stamina_regen := 2
+## A creature that is thrown into a wall or another entity, or is the one run
+## into, is stunned for base + round(remaining force x per_force) ticks.
+@export var stun_ticks_base := 4
+@export var stun_ticks_per_force := 3.0
+## Ticks after attacking, shoving or being thrown before regen resumes.
+## 0 means only the tick of the exertion itself is lost.
+@export var stamina_regen_delay := 10
 
 var tick := 0
 ## Fraction of the way from the last tick to the next one, in [0, 1). Read by rendering.
@@ -89,7 +96,10 @@ class Hit:
 	var source_id := 0
 	var source_name := ""
 	var target_name := ""
+	## Where the target stood relative to the source when the hit was accepted.
 	var direction := Vector2i.ZERO
+	## Which way the target is pushed. The same as direction unless tossed.
+	var push_direction := Vector2i.ZERO
 	var damage := 0
 	var force := 0.0
 
@@ -117,7 +127,8 @@ func step() -> void:
 	tick += 1
 	# 1. Act, in ascending id. Iterate a copy: entities may despawn mid-tick.
 	for entity in _entities.duplicate():
-		if _alive(entity):
+		# A stunned entity skips its turn; its orders wait for it.
+		if _alive(entity) and not is_stunned(entity):
 			entity._sim_tick()
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_resolve_hits()
@@ -199,7 +210,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	if not entity.spawned or direction not in DIRECTIONS:
 		return false
-	if tick < entity.next_move_tick:
+	if tick < entity.next_move_tick or is_stunned(entity):
 		return false
 	var duration := step_ticks(entity, direction)
 	if not _shift(entity, entity, direction, entity.mass, duration):
@@ -219,12 +230,18 @@ func try_attack(attacker: GridEntity, target: GridEntity) -> bool:
 
 ## Shove: no direct damage, only a push at full force, paid for in stamina
 ## whether or not anything moves. Queued like an attack.
-func try_shove(attacker: GridEntity, target: GridEntity) -> bool:
+##
+## [param direction] aims it: Vector2i.ZERO pushes the target straight away
+## from the attacker; one of [constant DIRECTIONS] tosses it that way instead.
+## Tossed straight back at the attacker it goes over the attacker's head and
+## lands on the tile behind, which must be free.
+func try_shove(attacker: GridEntity, target: GridEntity,
+		direction := Vector2i.ZERO) -> bool:
 	if not Net.is_authority():
 		return false
 	if attacker.strength <= 0:
 		return false
-	return _try_hit(attacker, target, 0, true)
+	return _try_hit(attacker, target, 0, true, direction)
 
 
 ## [param cause] is &"attack", &"impact" or &"fire". Only FLESH and WOOD with
@@ -259,17 +276,22 @@ func order_move(entity: GridEntity, target: Vector2i) -> void:
 func order_attack(entity: GridEntity, target: GridEntity) -> void:
 	if not Net.is_authority():
 		return
-	_order_action(entity, GridEntity.Order.ATTACK, target)
+	_order_action(entity, GridEntity.Order.ATTACK, target, Vector2i.ZERO)
 
 
 ## Player intent: shove [param target] on the entity's next free tick.
-func order_shove(entity: GridEntity, target: GridEntity) -> void:
+## With a [param direction] it is a toss: the target goes that way instead of
+## straight away from the entity.
+func order_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
 	if not Net.is_authority():
 		return
-	_order_action(entity, GridEntity.Order.SHOVE, target)
+	if direction != Vector2i.ZERO and direction not in DIRECTIONS:
+		return
+	_order_action(entity, GridEntity.Order.SHOVE, target, direction)
 
 
-func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity) -> void:
+func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity,
+		direction: Vector2i) -> void:
 	if not Net.is_authority():
 		return
 	if not entity.spawned or not target.spawned or entity == target:
@@ -278,6 +300,7 @@ func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEnti
 		return
 	entity.action_order = order
 	entity.action_target = target
+	entity.action_direction = direction
 	entity.has_move_order = false
 
 
@@ -299,16 +322,16 @@ func command_attack(entity: GridEntity, target: GridEntity) -> void:
 	if Net.is_authority():
 		order_attack(entity, target)
 	else:
-		entity.predict_stop()
+		entity.predict_approach(target.tile)
 		request_attack.rpc_id(1, entity.get_path(), target.get_path())
 
 
-func command_shove(entity: GridEntity, target: GridEntity) -> void:
+func command_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
 	if Net.is_authority():
-		order_shove(entity, target)
+		order_shove(entity, target, direction)
 	else:
-		entity.predict_stop()
-		request_shove.rpc_id(1, entity.get_path(), target.get_path())
+		entity.predict_approach(target.tile)
+		request_shove.rpc_id(1, entity.get_path(), target.get_path(), direction)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -331,13 +354,13 @@ func request_attack(entity_path: NodePath, target_path: NodePath) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_shove(entity_path: NodePath, target_path: NodePath) -> void:
+func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vector2i) -> void:
 	if not Net.is_authority():
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
 	if entity != null and target != null:
-		order_shove(entity, target)
+		order_shove(entity, target, direction)
 
 
 func _entity_at_path(path: NodePath) -> GridEntity:
@@ -426,18 +449,27 @@ func mirror_changed() -> void:
 		_occupancy[entity.tile] = entity
 
 
-func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shove: bool) -> bool:
+func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shove: bool,
+		push_direction := Vector2i.ZERO) -> bool:
 	if not Net.is_authority():
 		return false
 	if not attacker.spawned or not target.spawned or attacker == target:
 		return false
-	if not can_target(attacker, target):
+	if not can_target(attacker, target) or is_stunned(attacker):
 		return false
 	if tick < attacker.next_attack_tick or not can_melee(attacker.tile, target.tile):
 		return false
 	# No hitting mid-step: the attacker's tile changes when a step starts, but
 	# on screen it is still crossing over, so the blow would land from afar.
 	if tick < attacker.next_move_tick:
+		return false
+	var aim: Vector2i = target.tile - attacker.tile
+	if push_direction == Vector2i.ZERO:
+		push_direction = aim
+	elif push_direction not in DIRECTIONS:
+		return false
+	elif push_direction == -aim and not _can_land_behind(attacker, push_direction):
+		# Overhead toss with nowhere to come down: refused, costs nothing.
 		return false
 	attacker.next_attack_tick = tick + attacker.attack_ticks
 	attacker._world_set_facing(target.tile - attacker.tile)
@@ -461,7 +493,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	hit.source_id = attacker.id
 	hit.source_name = attacker.name
 	hit.target_name = target.name
-	hit.direction = target.tile - attacker.tile
+	hit.direction = aim
+	hit.push_direction = push_direction
 	hit.damage = hit_damage
 	hit.force = force
 	_hits.append(hit)
@@ -484,7 +517,7 @@ func _resolve_hits() -> void:
 		if hit.damage > 0:
 			damage(hit.target, hit.damage, hit.source, &"attack")
 		if hit.force > 0.0 and _alive(hit.target):
-			_push(hit.source, hit.target, hit.direction, hit.force)
+			_push(hit.source, hit.target, hit.push_direction, hit.force)
 
 
 ## Force push. The mover's mass is a budget: each body set in motion spends its
@@ -512,17 +545,39 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		var start: Vector2i = body.tile
 		var tiles := 0
 		var stopped := false
+		var collided := false
 		var stopped_by := "nothing (force spent)"
 		var blocker: GridEntity = null
+		# An overhead toss: the first body is lifted over the mover's own tile
+		# and comes down behind it. That is two tiles of travel in one go.
+		var lofted := body == first and body.tile + direction == mover.tile
+		if lofted:
+			if max_tiles < 2:
+				stopped_by = "nothing (too heavy to lift overhead)"
+				max_tiles = 0
+			elif not _can_land_behind(mover, direction):
+				stopped_by = "nothing (no room to land)"
+				max_tiles = 0
+			else:
+				var landing: Vector2i = mover.tile + direction
+				body._world_note_moved(tick)
+				_relocate(body, landing)
+				tiles = 2
+				if _fire.has(landing) and body.is_creature():
+					stopped = true
+					stopped_by = "fire"
+					max_tiles = 0
 		while tiles < max_tiles:
 			var next: Vector2i = body.tile + direction
 			if _terrain_blocks_step(body.tile, direction):
 				stopped = true
+				collided = true
 				stopped_by = "wall"
 				break
 			blocker = _occupancy.get(next)
 			if blocker != null:
 				stopped = true
+				collided = true
 				stopped_by = blocker.name
 				break
 			_relocate(body, next)
@@ -540,12 +595,16 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS))
-		body._world_pushed(tiles)
+		body._world_pushed(tiles, lofted and tiles > 0)
 		var note := ""
 		var next_body: GridEntity = null
 		if impact > 0:
 			_impact(body, impact, mover)
+		# Running into something stuns, even with no force left to hurt.
+		if collided:
+			_stun(body, remaining)
 		if blocker != null:
+			_stun(blocker, remaining)
 			var blocker_impact := impact_damage(
 					remaining, mass_ratio(mover_mass, pushed_mass(blocker)))
 			note = " (%s takes %d)" % [blocker.name, blocker_impact]
@@ -561,17 +620,35 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		f = remaining - 1.0
 
 
+## True if a body tossed over [param mover] in [param direction] has a free
+## tile to come down on directly behind it, with no wall in the way.
+func _can_land_behind(mover: GridEntity, direction: Vector2i) -> bool:
+	var from: Vector2i = mover.tile - direction
+	return not _terrain_blocks_step(from, direction) \
+			and not _terrain_blocks_step(mover.tile, direction) \
+			and not _occupancy.has(mover.tile + direction)
+
+
+## Creatures only. A longer stun replaces a shorter one; they do not add up.
+func _stun(entity: GridEntity, remaining_force: float) -> void:
+	if not _alive(entity) or not entity.is_creature():
+		return
+	var ticks := stun_ticks_base + roundi(remaining_force * stun_ticks_per_force)
+	if tick + ticks > entity.stunned_until_tick:
+		entity._world_stunned(tick + ticks, ticks)
+
+
 func _impact(entity: GridEntity, amount: int, source: GridEntity) -> void:
 	entity._world_impacted(amount)
 	damage(entity, amount, source, &"impact")
 
 
-## Resting and walking regain stamina. A tick in which the entity attacked,
-## shoved, or was moved more than one tile does not.
+## Resting and walking regain stamina. Attacking, shoving, or being moved more
+## than one tile in a tick stops it for that tick and stamina_regen_delay more.
 func _regen_stamina() -> void:
 	for entity in _entities:
 		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
-				and not entity.exerted_on(tick):
+				and tick - entity.last_exertion_tick() > stamina_regen_delay:
 			entity.stamina = mini(entity.stamina + stamina_regen, entity.max_stamina)
 
 
@@ -682,20 +759,26 @@ func mass_ratio(mover_mass: float, target_mass: float) -> float:
 	return clampf(mover_mass / maxf(target_mass, 0.001), MASS_RATIO_MIN, MASS_RATIO_MAX)
 
 
+## Stunned entities cannot move, attack or shove, and skip their turn.
+func is_stunned(entity: GridEntity) -> bool:
+	return tick < entity.stunned_until_tick
+
+
 ## Mass used when [param entity] is on the receiving end of a push: halved
 ## while it is exhausted.
 func pushed_mass(entity: GridEntity) -> float:
 	return entity.mass * EXHAUSTED_MASS_FACTOR if entity.is_exhausted() else entity.mass
 
 
-## Force of a shove by [param attacker] on [param target], before stamina:
-## strength x mover_mass / target_mass x force_scale, clamped to max_force.
-## An exhausted attacker has none. A melee attack carries half of this.
+## Force of a shove by [param attacker] on [param target]:
+## strength x mover_mass / target_mass x force_scale, clamped to max_force,
+## then scaled by how much stamina the attacker has left. So pushes fade as
+## the attacker tires, down to nothing at 0. A melee attack carries half.
 func push_force(attacker: GridEntity, target: GridEntity) -> float:
-	if attacker.strength <= 0 or attacker.is_exhausted():
+	if attacker.strength <= 0:
 		return 0.0
 	var raw := attacker.strength * attacker.mass / maxf(pushed_mass(target), 0.001) * force_scale
-	return clampf(raw, 0.0, max_force)
+	return clampf(raw, 0.0, max_force) * attacker.stamina_fraction()
 
 
 func shove_cost(force: float, target: GridEntity) -> int:

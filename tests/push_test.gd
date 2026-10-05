@@ -8,7 +8,9 @@ extends Node
 ## hp 12, boulder mass 200, and World's force_scale 0.1, max_force 4,
 ## impact_per_force 2, ratio clamp 1.5. So a player's shove has force
 ## 10 * 80 / 40 * 0.1 = 2.0 on a rested imp and 2.67 on a crate, each with
-## ratio 1.5, and costs 9 stamina.
+## ratio 1.5, and costs 5 + force * mass * 0.15 = 17 stamina. Force is then
+## scaled by the shover's stamina fraction. Regen is 2 per tick, starting 10
+## ticks after the last exertion.
 
 const SCENES := {
 	"P": preload("res://entities/player.tscn"),
@@ -37,6 +39,9 @@ func _ready() -> void:
 	_test_no_attack_mid_step()
 	_test_no_friendly_fire()
 	_test_stamina()
+	_test_stun()
+	_test_approach()
+	_test_toss()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -102,7 +107,7 @@ func _test_shove_crate_until_it_breaks() -> void:
 		shoves += 1
 		hp_always_dropped = hp_always_dropped and crate.hp < hp_before
 	_check(not crate.spawned, "crate broke")
-	_check(shoves == 3, "took 3 shoves: 2 after sliding 2 tiles, then 8 and 8 flush (took %d)" % shoves)
+	_check(shoves == 3, "took 3 shoves, each a little weaker as the player tires (took %d)" % shoves)
 	_check(hp_always_dropped, "every shove into the wall cost the crate hp")
 	_check(World.get_entity_at(Vector2i(4, 1)) == null, "broken crate leaves its tile empty")
 
@@ -235,22 +240,32 @@ func _test_stamina() -> void:
 	_shove(player, imp)
 	var full_tiles := imp.tile.x - 2
 	_check(full_tiles == 3, "full-stamina shove throws a rested imp 3 tiles (got %d)" % full_tiles)
-	_check(player.stamina == 91, "that shove cost 5 + 2.0 * 40 * 0.05 = 9, and its tick regained nothing (stamina %d)" % player.stamina)
+	_check(player.stamina == 83, "that shove cost 5 + 2.0 * 40 * 0.15 = 17 (stamina %d)" % player.stamina)
+	for i in World.stamina_regen_delay:
+		World.step()
+	_check(player.stamina == 83, "nothing comes back for %d ticks after a shove (stamina %d)" % [World.stamina_regen_delay, player.stamina])
 	World.step()
-	_check(player.stamina == 93, "a resting tick regains 2 (stamina %d)" % player.stamina)
+	_check(player.stamina == 85, "then a resting tick regains 2 (stamina %d)" % player.stamina)
 	World.order_move(player, Vector2i(2, 1))
 	World.step()
-	_check(player.tile == Vector2i(2, 1) and player.stamina == 95, "a walking tick regains 2 as well (stamina %d)" % player.stamina)
+	_check(player.tile == Vector2i(2, 1) and player.stamina == 87, "a walking tick regains 2 as well (stamina %d)" % player.stamina)
 
 	e = _build(lane)
 	player = e["P"][0]
 	imp = e["m"][0]
-	player.stamina = 3
+	player.stamina = 50
 	_shove(player, imp)
 	var low_tiles := imp.tile.x - 2
-	_check(low_tiles == 1, "with 3 of the 9 stamina needed, force is a third: 1 tile (got %d)" % low_tiles)
+	_check(low_tiles == 1, "at half stamina the force is half: 1 tile (got %d)" % low_tiles)
 	_check(low_tiles < full_tiles, "a low-stamina shove throws a monster less far than a full one")
-	_check(player.stamina == 0, "and spends everything that was left (stamina %d)" % player.stamina)
+	_check(player.stamina == 39, "and a weaker shove costs less: 5 + 1.0 * 40 * 0.15 = 11 (stamina %d)" % player.stamina)
+
+	e = _build(lane)
+	player = e["P"][0]
+	imp = e["m"][0]
+	player.stamina = 4
+	_shove(player, imp)
+	_check(player.stamina == 0, "a shove it cannot afford spends everything that was left (stamina %d)" % player.stamina)
 
 	e = _build([
 		"#####",
@@ -272,7 +287,7 @@ func _test_stamina() -> void:
 	var boulder: GridEntity = e["o"][0]
 	_shove(player, boulder)
 	_check(boulder.tile == Vector2i(2, 1), "shoving a boulder moves nothing")
-	_check(player.stamina == 91, "but still costs stamina: 5 + 0.4 * 200 * 0.05 = 9 (stamina %d)" % player.stamina)
+	_check(player.stamina == 83, "but still costs stamina: 5 + 0.4 * 200 * 0.15 = 17 (stamina %d)" % player.stamina)
 
 	e = _build(lane)
 	player = e["P"][0]
@@ -282,6 +297,195 @@ func _test_stamina() -> void:
 	var exhausted_tiles := imp.tile.x - 2
 	_check(exhausted_tiles == 6, "an imp at 0 stamina counts as half its mass: thrown 6 tiles (got %d)" % exhausted_tiles)
 	_check(exhausted_tiles > full_tiles, "a monster at 0 stamina is pushed farther than one at full")
+
+	e = _build([
+		"#####",
+		"#Pm##",
+		"#####",
+	])
+	player = e["P"][0]
+	imp = e["m"][0]
+	imp.max_hp = 0  # Indestructible, so it stays put to be shoved again.
+	var shoves := 0
+	while player.stamina > 0 and shoves < 30:
+		_shove(player, imp)
+		shoves += 1
+	_check(shoves == 10, "shoving nonstop empties a full bar in 10 ever-cheaper shoves (took %d)" % shoves)
+
+	# Chase one imp down a long lane, shoving it again each time.
+	e = _build([
+		"###############",
+		"#Pm...........#",
+		"###############",
+	])
+	player = e["P"][0]
+	imp = e["m"][0]
+	var thrown: Array[int] = []
+	for i in 6:
+		_walk_to(player, imp.tile + Vector2i.LEFT)
+		var before := imp.tile.x
+		_shove(player, imp)
+		thrown.append(imp.tile.x - before)
+	_check(thrown == [3, 2, 2, 1, 1, 0], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
+
+
+func _test_stun() -> void:
+	print("\n== collisions stun ==")
+	# Thrown one tile into a wall with force 1 left: stunned 4 + 3 = 7 ticks.
+	var e := _build([
+		"#####",
+		"#Pm.#",
+		"#####",
+	])
+	var player: GridEntity = e["P"][0]
+	var imp: Monster = e["m"][0]
+	imp.sight_range = 7  # It wants to walk straight back to the player.
+	_shove(player, imp)
+	_check(imp.tile == Vector2i(3, 1) and World.is_stunned(imp), "imp thrown into a wall is stunned")
+	_check(imp.stunned_until_tick == World.tick + 7, "for 4 + 1 * 3 = 7 ticks (until %d, now %d)" % [imp.stunned_until_tick, World.tick])
+	for i in 6:
+		World.step()
+	_check(imp.tile == Vector2i(3, 1), "it does not move while stunned (tick %d, at %s)" % [World.tick, imp.tile])
+	World.step()
+	_check(imp.tile == Vector2i(2, 1), "and walks back the tick the stun ends (tick %d, at %s)" % [World.tick, imp.tile])
+
+	e = _build([
+		"########",
+		"#Pm..m.#",
+		"########",
+	])
+	var first: GridEntity = e["m"][0]
+	var second: GridEntity = e["m"][1]
+	_shove(e["P"][0], first)
+	_check(first.tile == Vector2i(4, 1) and second.tile == Vector2i(5, 1), "first imp flies two tiles and stops against the second")
+	_check(_damage(first, &"impact") == 0 and _damage(second, &"impact") == 0, "with no force left, the collision does no damage")
+	_check(World.is_stunned(first) and World.is_stunned(second), "but both imps are stunned")
+	_check(first.stunned_until_tick == World.tick + 4, "for the base 4 ticks (until %d, now %d)" % [first.stunned_until_tick, World.tick])
+	_check(not World.is_stunned(e["P"][0]), "the shover is not")
+
+	e = _build([
+		"######",
+		"#Pc.##",
+		"######",
+	])
+	_shove(e["P"][0], e["c"][0])
+	_check(not World.is_stunned(e["c"][0]), "crates are not stunned")
+
+
+func _test_approach() -> void:
+	print("\n== attack and shove orders walk into reach first ==")
+	var e := _build([
+		"########",
+		"#P...m.#",
+		"########",
+	])
+	var player: GridEntity = e["P"][0]
+	var imp: GridEntity = e["m"][0]
+	World.order_shove(player, imp)
+	for i in 30:
+		if imp.tile != Vector2i(5, 1):
+			break
+		World.step()
+	_check(player.tile == Vector2i(4, 1), "player walked up next to the imp (at %s)" % player.tile)
+	_check(imp.tile == Vector2i(6, 1), "and shoved it on arrival (imp at %s)" % imp.tile)
+	_check(player.action_order == GridEntity.Order.NONE, "the order is done")
+
+	e = _build([
+		"########",
+		"#P...m.#",
+		"########",
+	])
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_attack(player, imp)
+	for i in 30:
+		if imp.hp < imp.max_hp:
+			break
+		World.step()
+	_check(player.tile == Vector2i(4, 1), "an attack order closes in the same way (at %s)" % player.tile)
+	_check(_damage(imp, &"attack") == 2, "and lands its hit (attack damage %d)" % _damage(imp, &"attack"))
+
+
+func _test_toss() -> void:
+	print("\n== toss: a shove aimed in a chosen direction ==")
+	var room: Array[String] = [
+		"#######",
+		"#.....#",
+		"#..m..#",
+		"#..P..#",
+		"#######",
+	]
+	var e := _build(room)
+	var player: GridEntity = e["P"][0]
+	var imp: GridEntity = e["m"][0]
+	World.order_shove(player, imp, Vector2i(1, 0))
+	World.step()
+	_check(imp.tile == Vector2i(5, 2), "imp north of the player is tossed east, not north (at %s)" % imp.tile)
+	_check(player.stamina == 83, "a toss costs what a shove costs (stamina %d)" % player.stamina)
+	_check(player.facing == Vector2i(0, -1), "the player still faces the imp it threw")
+
+	e = _build(room)
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_shove(player, imp, Vector2i(-1, -1))
+	World.step()
+	_check(imp.tile == Vector2i(2, 1), "a diagonal toss works too (at %s)" % imp.tile)
+
+	e = _build(room)
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_shove(player, imp, Vector2i(0, 1))
+	World.step()
+	_check(imp.tile == Vector2i(3, 2), "tossed back over the thrower with a wall behind: nowhere to land, refused")
+	_check(player.stamina == 100, "and that refused toss costs nothing (stamina %d)" % player.stamina)
+
+	var deep_room: Array[String] = [
+		"#######",
+		"#.....#",
+		"#..m..#",
+		"#..P..#",
+		"#.....#",
+		"#.....#",
+		"#######",
+	]
+	e = _build(deep_room)
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_shove(player, imp, Vector2i(0, 1))
+	World.step()
+	_check(imp.tile == Vector2i(3, 5), "with room behind, the imp goes over the thrower's head: 2 tiles to clear, 1 more (at %s)" % imp.tile)
+	_check(player.tile == Vector2i(3, 3) and World.is_occupancy_consistent(), "the thrower stays put and occupancy is consistent")
+	_check(player.stamina == 83, "it costs what a shove costs (stamina %d)" % player.stamina)
+
+	e = _build(deep_room)
+	player = e["P"][0]
+	imp = e["m"][0]
+	imp.mass = 70.0
+	World.order_shove(player, imp, Vector2i(0, 1))
+	World.step()
+	_check(imp.tile == Vector2i(3, 2), "an imp too heavy to throw two tiles cannot be lifted overhead")
+	_check(player.stamina < 100, "but the attempt is paid for (stamina %d)" % player.stamina)
+
+	e = _build([
+		"#######",
+		"#.....#",
+		"#..m..#",
+		"#..P..#",
+		"#..m..#",
+		"#######",
+	])
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_shove(player, imp, Vector2i(0, 1))
+	World.step()
+	_check(imp.tile == Vector2i(3, 2) and player.stamina == 100, "something standing behind the thrower also blocks it, for free")
+
+	e = _build(room)
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_shove(player, imp, Vector2i(2, 0))
+	World.step()
+	_check(imp.tile == Vector2i(3, 2) and player.action_order == GridEntity.Order.NONE, "a direction that is not a grid step is ignored")
 
 
 func _test_no_attack_mid_step() -> void:
