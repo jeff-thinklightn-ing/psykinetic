@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_resolution_order()
 	_test_mass_gate()
 	_test_no_attack_mid_step()
+	_test_no_friendly_fire()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -190,6 +191,30 @@ func _test_mass_gate() -> void:
 	brute.mass = 100.0
 	World.step()
 	_check(player.tile == Vector2i(1, 1), "brute (100) knocks the player back one tile (at %s)" % player.tile)
+
+
+func _test_no_friendly_fire() -> void:
+	print("\n== players cannot attack or shove each other ==")
+	var e := _build([
+		"######",
+		"#PP.m#",
+		"######",
+	])
+	var first: GridEntity = e["P"][0]
+	var second: GridEntity = e["P"][1]
+	var imp: GridEntity = e["m"][0]
+	first.owner_peer = 1
+	second.owner_peer = 2
+	World.order_shove(first, second)
+	World.step()
+	_check(second.tile == Vector2i(2, 1), "shoved player does not move (at %s)" % second.tile)
+	World.order_attack(first, second)
+	World.step()
+	_check(second.hp == second.max_hp, "attacked player takes no damage (hp %d)" % second.hp)
+	_check(first.next_attack_tick == 0, "the refused hits cost no cooldown")
+	_walk_to(second, Vector2i(3, 1))
+	_shove(second, imp)
+	_check(_damage(imp, &"impact") == 9, "players can still shove monsters (impact %d)" % _damage(imp, &"impact"))
 
 
 func _test_no_attack_mid_step() -> void:

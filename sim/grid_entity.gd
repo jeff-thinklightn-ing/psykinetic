@@ -84,6 +84,8 @@ var _move_tick := 0.0
 var _move_duration := 0
 ## True on a client once this mirror is registered with World.
 var _mirroring := false
+## Set only on the client that controls this entity. See MovePrediction.
+var _prediction: MovePrediction
 
 # Feedback visuals live on the Sprite child, never on this node's position.
 var _sprite: Node2D
@@ -149,15 +151,29 @@ func is_breakable() -> bool:
 			and (body_material == BodyMaterial.FLESH or body_material == BodyMaterial.WOOD)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	var shown_facing := facing
+	if _prediction != null and _prediction.advance(delta):
+		_mispredicted("no confirmation from the server")
 	if spawned:
-		var t := 1.0
-		if _move_duration > 0:
-			t = clampf((World.tick + World.tick_alpha - _move_tick) / _move_duration, 0.0, 1.0)
-		position = Iso.tile_to_local(_from_tile).lerp(Iso.tile_to_local(tile), t)
+		if _prediction != null and _prediction.is_active():
+			# The local player's own walking: shown ahead of the server.
+			position = _prediction.position()
+			shown_facing = _prediction.facing()
+		else:
+			# Mirrors are drawn slightly in the past, so a tile change is
+			# always known before its slide has to start.
+			var now := World.tick + World.tick_alpha
+			if _mirroring:
+				now -= World.NET_DISPLAY_DELAY_TICKS
+			var t := 1.0
+			if _move_duration > 0:
+				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
+			position = Iso.tile_to_local(_from_tile).lerp(Iso.tile_to_local(tile), t)
 	if _pip != null:
 		var screen_facing := Vector2(
-				(facing.x - facing.y) * Iso.HALF.x, (facing.x + facing.y) * Iso.HALF.y)
+				(shown_facing.x - shown_facing.y) * Iso.HALF.x,
+				(shown_facing.x + shown_facing.y) * Iso.HALF.y)
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH
 	_update_flash()
 
@@ -218,15 +234,61 @@ func _mirror_attach() -> void:
 	spawned = true
 
 
-## A replicated tile arrived. The client does not know why the entity moved,
-## so it picks a slide length from the size of the jump.
+## A replicated tile arrived.
 func _mirror_tile_changed(old: Vector2i) -> void:
+	World.mirror_changed()
+	if _prediction != null and _prediction.is_active():
+		if _prediction.reconcile(tile):
+			# Already on screen: the prediction showed this step.
+			_from_tile = tile
+			_move_duration = 0
+		else:
+			# Somewhere the prediction did not go (blocked, re-pathed, pushed).
+			_mispredicted("the server moved it elsewhere")
+		return
+	# Interpolate: slide from the old tile, starting on the tick it arrived in.
+	# The client is not told why the entity moved, so the slide length comes
+	# from the size of the jump (one step, or a push).
 	var delta := tile - old
 	var steps := maxi(absi(delta.x), absi(delta.y))
 	_from_tile = old
-	_move_tick = World.tick + World.tick_alpha
+	_move_tick = World.tick
 	_move_duration = World.step_ticks(self, delta) if steps == 1 else clampi(steps, 1, 3)
-	World.mirror_changed()
+
+
+## Turns on prediction of this entity's own walking. Only meaningful on the
+## client that controls it; everywhere else it does nothing.
+func enable_prediction() -> void:
+	if _mirroring and _prediction == null:
+		_prediction = MovePrediction.new()
+
+
+## The local player just ordered a move: start showing it now.
+func predict_move(target: Vector2i) -> void:
+	if _prediction != null:
+		_prediction.order(self, target)
+
+
+## The local player just ordered something else: stop after the current step.
+func predict_stop() -> void:
+	if _prediction != null:
+		_prediction.cancel_unstarted()
+
+
+## Tile the sprite is drawn on, which on the predicting client may be ahead
+## of [member tile].
+func shown_tile() -> Vector2i:
+	return Iso.local_to_tile(position)
+
+
+## The server's result wins: snap to its tile and forget the predicted path.
+func _mispredicted(reason: String) -> void:
+	var predicted := _prediction.predicted_tile()
+	_prediction.clear()
+	_from_tile = tile
+	_move_duration = 0
+	Net.record_mispredict()
+	print("[net] mispredict: %s predicted %s, server has %s (%s)" % [name, predicted, tile, reason])
 
 
 # Cosmetic only: they replay feedback, they carry no sim state.

@@ -8,6 +8,7 @@ extends Node
 ##
 ## Test hooks (used by tests/net_test):
 ##   --test-move=<dx>,<dy>        once the local player exists, order it to move by this offset
+##   --test-contest=<x>,<y>,<tick> at that server tick, order the local player to tile (x, y)
 ##   --test-exit-after=<seconds>  quit after this long
 ##
 ## Options are read from both the engine argument list and the user arguments
@@ -30,11 +31,49 @@ var online := false
 var local_id := 1
 
 var test_move := Vector2i.ZERO
+var test_contest_tile := Vector2i.ZERO
+var test_contest_tick := 0
 var test_exit_after := 0.0
+
+var mispredicts_total := 0
+## Times (msec) of mispredictions in the last minute.
+var _mispredict_times: Array[int] = []
 
 
 func _enter_tree() -> void:
 	_parse_args()
+
+
+## Round trip time to the server in milliseconds, as measured by ENet.
+## 0 on the server, the host, offline, and before a client has connected.
+func rtt_ms() -> float:
+	if mode != Mode.CLIENT or not online:
+		return 0.0
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	if enet == null or enet.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return 0.0
+	var server := enet.get_peer(1)
+	if server == null:
+		return 0.0
+	return server.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME)
+
+
+## The same in sim ticks, capped so a bad reading cannot stall reconciliation.
+func rtt_ticks() -> float:
+	return minf(rtt_ms() / 1000.0 * World.TICK_RATE, 10.0)
+
+
+func record_mispredict() -> void:
+	mispredicts_total += 1
+	_mispredict_times.append(Time.get_ticks_msec())
+
+
+## Mispredictions in the last 60 seconds.
+func mispredicts_per_minute() -> int:
+	var cutoff := Time.get_ticks_msec() - 60000
+	while not _mispredict_times.is_empty() and _mispredict_times[0] < cutoff:
+		_mispredict_times.pop_front()
+	return _mispredict_times.size()
 
 
 func _notification(what: int) -> void:
@@ -116,7 +155,7 @@ func _parse_args() -> void:
 				mode = Mode.SERVER
 			"--client":
 				mode = Mode.CLIENT
-			"--address", "--port", "--test-move", "--test-exit-after":
+			"--address", "--port", "--test-move", "--test-contest", "--test-exit-after":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -135,5 +174,10 @@ func _set_option(key: String, value: String) -> void:
 			var parts := value.split(",")
 			if parts.size() == 2:
 				test_move = Vector2i(parts[0].to_int(), parts[1].to_int())
+		"--test-contest":
+			var parts := value.split(",")
+			if parts.size() == 3:
+				test_contest_tile = Vector2i(parts[0].to_int(), parts[1].to_int())
+				test_contest_tick = parts[2].to_int()
 		"--test-exit-after":
 			test_exit_after = value.to_float()

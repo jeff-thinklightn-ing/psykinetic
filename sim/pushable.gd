@@ -5,6 +5,8 @@ extends GridEntity
 
 
 func _init() -> void:
+	# GridEntity._init builds the synchronizer; it is not called implicitly.
+	super()
 	pushable = true
 	body_material = BodyMaterial.WOOD
 	mass = 30.0

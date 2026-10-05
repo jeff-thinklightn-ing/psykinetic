@@ -79,3 +79,18 @@ A client's only way to affect the sim is an order RPC, which the server
 accepts only for an entity that peer owns. The authority gate is
 `Net.is_authority()`: `multiplayer.is_server()`, and never true in a process
 launched as a client.
+
+## 12. No direct friendly fire
+
+Players cannot attack or shove each other. The rule is applied where a hit is
+accepted, not in the push code, which still has no per-entity-type branches;
+indirect hits (a shoved crate or monster landing on another player) remain.
+
+## 13. Predict only the local player's walking; interpolate the rest
+
+A client shows its own player's move orders immediately and reconciles
+against the server's replicated tile: a match changes nothing, a mismatch
+snaps to the server and drops the predicted path. Nothing else is predicted —
+not pushes, attacks, or other entities. Everything else is drawn one tick in
+the past (`World.NET_DISPLAY_DELAY_TICKS`). Prediction is presentation only
+and never writes sim state.

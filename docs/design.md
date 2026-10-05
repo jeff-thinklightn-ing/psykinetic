@@ -7,7 +7,7 @@
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `iso.gd` (grid ↔ pixel math). |
 | `entities/` | Entity scenes (`player.tscn`, `monster.tscn`, `pushable.tscn`). Scenes only add visuals and tuning values to a sim script. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
-| `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. |
+| `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. |
 | `main.tscn`, `main.gd` | Test room, camera, HUD, input, and (on the server) level and player spawning. |
 | `tests/` | `push_test.tscn`: scripted sim test, run by `run.ps1` / `run.sh`. `net_test.ps1` / `net_test.sh`: one server and two clients on localhost. |
 
@@ -87,9 +87,36 @@ one changes. Only the `mirror_*` functions write to it, and they refuse to
 run on the server. Clients run no `_sim_tick`, no pathfinding for the sim, and
 no push resolution.
 
+**What a client draws.** Two cases, both presentation only — neither writes
+sim state.
+
+- *Everything except the local player's own walking* is interpolated one tick
+  in the past (`World.NET_DISPLAY_DELAY_TICKS`, the `net_display_delay_ticks`
+  setting). A replicated tile change is stamped with the tick it arrived in,
+  and its slide starts when the display clock, running one tick behind,
+  reaches that tick. The change is therefore always in hand before its slide
+  has to begin.
+- *The local player's own walking* is predicted (`net/prediction.gd`). On a
+  move order the client computes the path on its mirror and starts showing it
+  at once, at the normal step timing. Each replicated tile for that player is
+  then compared with the steps already shown: if it is the next one, nothing
+  happens; if it is anything else, the sprite snaps to the server's tile and
+  the predicted path is dropped. A shown step that the server never confirms
+  (it refused the move, so no tile change is ever sent) counts as a
+  misprediction once it is `RECONCILE_GRACE_TICKS` (4) plus the round trip
+  time overdue. Only walking is predicted. Pushes of the local player are
+  never predicted, and neither are attacks, shoves, or anything about other
+  entities; the server's result always wins.
+
+`F3` toggles a debug overlay: peer id, round trip time (from ENet), and
+mispredictions in the last minute.
+
 **Players.** The server spawns one `Player` per peer (and one for itself when
 hosting) on the first free tile in `PLAYER_STARTS`, tinted by join order, and
-removes it when the peer leaves. A player that dies is respawned at a start
+removes it when the peer leaves. Players cannot attack or shove each other
+(`World.can_target`: no hit is accepted between two peer-controlled
+entities); they can still be hit by a crate or monster another player sent
+flying. A player that dies is respawned at a start
 tile 20 ticks later with the same name and tint (a placeholder rule that
 keeps the test room usable). `R` on the host rebuilds the room for everyone.
 
@@ -229,10 +256,12 @@ position = lerp(Iso.tile_to_local(from_tile), Iso.tile_to_local(tile), t)
 
 The sim position jumps at the tick; the sprite slides after it.
 
-On a client the same code runs from mirrored values: `World.tick` is the last
-replicated tick and `tick_alpha` counts up locally since it arrived. A client
-is not told why a tile changed, so it picks the slide length from the size of
-the jump (one step: the entity's step time; more: a push).
+On a client the same code runs from mirrored values, one tick in the past:
+`World.tick` is the last replicated tick and `tick_alpha` counts up locally
+since it arrived. A client is not told why a tile changed, so it picks the
+slide length from the size of the jump (one step: the entity's step time;
+more: a push). The local player's own walking is drawn by the prediction
+instead; see Networking.
 
 ## Grid ↔ screen
 
@@ -271,4 +300,9 @@ two headless `--client` instances on localhost (port 17777). Each client
 orders its player to move (`--test-move`), everything exits on a timer
 (`--test-exit-after`), and the script checks the logs: the server spawned two
 players, both moved, occupancy was consistent at every move and at exit, each
-client saw its own move arrive, and nothing printed an error.
+client saw its own move arrive, and nothing printed an error. Client 1's move
+pushes a crate, which must show at its new tile on both clients. Then both
+clients order a move into the same free tile on the same tick
+(`--test-contest`): each predicts the step, the server gives the tile to one,
+and the other must count one misprediction and end up drawn on the server's
+tile.

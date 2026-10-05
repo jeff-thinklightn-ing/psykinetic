@@ -25,10 +25,17 @@ start() {
 	"$GODOT" --headless --path . "$@" "--port=$PORT" >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 }
 
-start server --server --test-exit-after=12
+start server --server --test-exit-after=16
 sleep 2
-start client1 --client --address=127.0.0.1 --test-move=-2,0 --test-exit-after=7
-start client2 --client --address=127.0.0.1 --test-move=0,1 --test-exit-after=8
+start client1 --client --address=127.0.0.1 --test-move=-3,0 --test-contest=9,1,70 --test-exit-after=9
+# Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
+# so its move ends by pushing the crate to (7, 2). Client 2 joins after that
+# to the start tile client 1 left and walks to (9, 2). Both are then one step
+# from (9, 1), and at server tick
+# 70 both order a move into it. Each client predicts the step; the server lets
+# only one of them have the tile.
+sleep 1
+start client2 --client --address=127.0.0.1 --test-move=-2,0 --test-contest=9,1,70 --test-exit-after=9
 wait
 
 failures=0
@@ -58,6 +65,23 @@ check "$inconsistent" 0 "occupancy was consistent at every logged move, on serve
 check "$final" 1 "server occupancy consistent at exit"
 check "$arrived1" 1 "client 1 saw its own move replicated"
 check "$arrived2" 1 "client 2 saw its own move replicated"
+pushed=$(count 'push: Player1 -> Crate1' "$LOGS/server.log")
+check "$pushed" 1 "server log shows Player1 pushing Crate1"
+for name in server client1 client2; do
+	crate=$(count '\[test\] tiles: .*Crate1=\(7, 2\)' "$LOGS/$name.log")
+	check "$crate" 1 "$name has the pushed crate at (7, 2)"
+done
+clients="$LOGS/client1.log $LOGS/client2.log"
+contest=$(count 'moved .* -> \(9, 1\)' "$LOGS/server.log")
+check "$contest" 1 "exactly one player took the contested tile (9, 1) on the server"
+shown=$(cat $clients | grep -c 'display: .*server_tile=\(([^)]*)\) shown_tile=\1 ' || true)
+check "$shown" 2 "both clients end up showing their player on the server's tile"
+winner=$(cat $clients | grep -cE 'display: .*server_tile=\(9, 1\) .*mispredicts=0' || true)
+check "$winner" 1 "the winner is on (9, 1) with no mispredictions"
+loser=$(cat $clients | grep -E 'display: .*mispredicts=1' | grep -vc 'server_tile=(9, 1)' || true)
+check "$loser" 1 "the loser is not on (9, 1) and counted exactly one misprediction"
+predicted=$(cat $clients | grep -cE 'mispredict: Player[0-9]+ predicted \(9, 1\)' || true)
+check "$predicted" 1 "the loser had predicted (9, 1) before snapping back"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

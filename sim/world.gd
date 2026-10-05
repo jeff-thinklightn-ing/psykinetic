@@ -32,6 +32,10 @@ const FIRE_DAMAGE := 2
 const MASS_RATIO_MIN := 0.5
 const MASS_RATIO_MAX := 1.5
 const MAX_PUSH_SLIDE_TICKS := 3
+## net_display_delay_ticks: how far in the past a client draws everything it
+## does not predict. One tick means a replicated tile change is always in hand
+## before its slide has to begin.
+const NET_DISPLAY_DELAY_TICKS := 1
 ## A diagonal step takes this many times the ticks of an orthogonal one (rounded
 ## up), so world speed is roughly constant in every direction. On screen a
 ## sideways diagonal covers 32 px against 18 px for an orthogonal step; at 1.0
@@ -252,6 +256,8 @@ func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEnti
 		return
 	if not entity.spawned or not target.spawned or entity == target:
 		return
+	if not can_target(entity, target):
+		return
 	entity.action_order = order
 	entity.action_target = target
 	entity.has_move_order = false
@@ -266,6 +272,8 @@ func command_move(entity: GridEntity, target: Vector2i) -> void:
 	if Net.is_authority():
 		order_move(entity, target)
 	else:
+		# Shown at once on this client; the server still decides what happens.
+		entity.predict_move(target)
 		request_move.rpc_id(1, entity.get_path(), target)
 
 
@@ -273,6 +281,7 @@ func command_attack(entity: GridEntity, target: GridEntity) -> void:
 	if Net.is_authority():
 		order_attack(entity, target)
 	else:
+		entity.predict_stop()
 		request_attack.rpc_id(1, entity.get_path(), target.get_path())
 
 
@@ -280,6 +289,7 @@ func command_shove(entity: GridEntity, target: GridEntity) -> void:
 	if Net.is_authority():
 		order_shove(entity, target)
 	else:
+		entity.predict_stop()
 		request_shove.rpc_id(1, entity.get_path(), target.get_path())
 
 
@@ -402,6 +412,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, force: 
 	if not Net.is_authority():
 		return false
 	if not attacker.spawned or not target.spawned or attacker == target:
+		return false
+	if not can_target(attacker, target):
 		return false
 	if tick < attacker.next_attack_tick or not can_melee(attacker.tile, target.tile):
 		return false
@@ -605,6 +617,14 @@ func step_ticks(entity: GridEntity, direction: Vector2i) -> int:
 
 func are_adjacent(a: Vector2i, b: Vector2i) -> bool:
 	return distance(a, b) == 1
+
+
+## No friendly fire: an entity controlled by a peer may not attack or shove
+## another peer-controlled entity. This is decided when a hit is accepted; the
+## push code itself still treats every body alike, so a player can be caught
+## by a crate or monster that someone else sent flying.
+func can_target(attacker: GridEntity, target: GridEntity) -> bool:
+	return attacker.owner_peer == 0 or target.owner_peer == 0
 
 
 ## Adjacent, and not diagonally across a wall corner.

@@ -68,6 +68,7 @@ var _next_player_index := 0
 var _test_target := Vector2i.ZERO
 var _test_ordered := false
 var _test_arrived := false
+var _test_contested := false
 
 @onready var ground: TileMapLayer = $Ground
 @onready var walls: TileMapLayer = $YSort/Walls
@@ -76,6 +77,7 @@ var _test_arrived := false
 @onready var cursor: Polygon2D = $Cursor
 @onready var camera: Camera2D = $Camera
 @onready var hud: Label = $HUD/Label
+@onready var debug_overlay: Label = $HUD/Debug
 
 
 func _ready() -> void:
@@ -115,10 +117,15 @@ func _process(_delta: float) -> void:
 	var tile := _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
+	if debug_overlay.visible:
+		debug_overlay.text = _debug_text()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_F3:
+		debug_overlay.visible = not debug_overlay.visible
+		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
 		if Net.is_authority():
 			_start_level()
@@ -131,7 +138,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var tile := _mouse_tile()
 	var target := World.get_entity_at(tile)
-	var in_reach := target != null and target != player and World.can_melee(player.tile, tile)
+	var in_reach := target != null and target != player \
+			and World.can_target(player, target) and World.can_melee(player.tile, tile)
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
 			# Adjacent creature: attack. Anything else: walk there (and push).
@@ -293,9 +301,26 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove   R restart (host)" % [
+	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove   R restart (host)   F3 debug" % [
 		mode_text, hp_text, tick]
+	if player != null:
+		player.enable_prediction()
 	_run_test_move(player)
+	_run_test_contest(player, tick)
+
+
+func _debug_text() -> String:
+	var lines: Array[String] = ["peer id: %d (%s)" % [
+		Net.local_id, Net.Mode.keys()[Net.mode].to_lower() if Net.online else "offline"]]
+	if Net.mode == Net.Mode.CLIENT:
+		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))
+		lines.append("mispredicts: %d / min (%d total)" % [
+			Net.mispredicts_per_minute(), Net.mispredicts_total])
+		lines.append("display delay: %d tick" % World.NET_DISPLAY_DELAY_TICKS)
+	else:
+		lines.append("rtt: n/a (this peer is the authority)")
+		lines.append("mispredicts: n/a (nothing is predicted here)")
+	return "\n".join(lines)
 
 
 func _log_player_move(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
@@ -320,8 +345,30 @@ func _run_test_move(player: Player) -> void:
 			player.name, player.tile, World.is_occupancy_consistent()])
 
 
+## --test-contest: at a fixed server tick, order the local player to a given
+## tile. Two clients doing this for the same tile race for it on the server.
+func _run_test_contest(player: Player, tick: int) -> void:
+	if Net.test_contest_tick <= 0 or _test_contested or player == null \
+			or tick < Net.test_contest_tick:
+		return
+	_test_contested = true
+	World.command_move(player, Net.test_contest_tile)
+	print("[test] contest: %s at %s ordered to %s, now showing %s" % [
+		player.name, player.tile, Net.test_contest_tile, player.shown_tile()])
+
+
 func _on_test_exit() -> void:
 	print("[test] final tick=%d entities=%d occupancy_consistent=%s" % [
 		World.tick, World.get_entities().size(), World.is_occupancy_consistent()])
+	var player := _local_player()
+	if player != null and not Net.is_authority():
+		print("[test] display: %s server_tile=%s shown_tile=%s mispredicts=%d" % [
+			player.name, player.tile, player.shown_tile(), Net.mispredicts_total])
+	# This peer's view of where everything is, for comparing across instances.
+	var tiles: Array[String] = []
+	for entity in World.get_entities():
+		tiles.append("%s=%s" % [entity.name, entity.tile])
+	tiles.sort()
+	print("[test] tiles: %s" % " ".join(tiles))
 	Net.shutdown()
 	get_tree().quit()
