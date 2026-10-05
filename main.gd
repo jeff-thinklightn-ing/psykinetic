@@ -76,6 +76,9 @@ var _test_target := Vector2i.ZERO
 var _test_ordered := false
 var _test_arrived := false
 var _test_contested := false
+## Client: whether this peer has ever had a player, to tell a rejected join
+## from a later disconnect.
+var _had_player := false
 ## Right button held on this entity: released without a drag it is a shove,
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
@@ -106,7 +109,8 @@ func _ready() -> void:
 	spawner.spawn_function = _build_entity
 	Net.start()
 	if Net.is_authority():
-		multiplayer.peer_connected.connect(_on_peer_connected)
+		# Players are spawned for authenticated peers only.
+		Net.peer_authenticated.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 		World.entity_despawned.connect(_on_entity_despawned)
 		if Net.mode == Net.Mode.SERVER:
@@ -117,8 +121,9 @@ func _ready() -> void:
 		World.mirror_reset()
 		World.mirror_terrain(ground.get_used_cells(), walls.get_used_cells(),
 				ground.get_used_cells_by_id(FIRE_SOURCE))
-		multiplayer.server_disconnected.connect(
-				func() -> void: hud.text = "disconnected from server")
+		multiplayer.server_disconnected.connect(_on_server_disconnected)
+		multiplayer.connection_failed.connect(
+				func() -> void: hud.text = "connection failed")
 
 	World.ticked.connect(_on_world_ticked)
 	if Net.test_exit_after > 0.0:
@@ -439,6 +444,8 @@ func _on_world_ticked(tick: int) -> void:
 	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R restart (host)   F3 debug" % [
 		mode_text, hp_text, tick]
 	if player != null:
+		_had_player = true
+	if player != null:
 		player.enable_prediction()
 	_run_test_move(player)
 	_run_test_contest(player, tick)
@@ -465,6 +472,14 @@ func _log_player_move(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 	if entity is Player:
 		print("[net] %s (peer %d) moved %s -> %s occupancy_consistent=%s" % [
 			entity.name, entity.owner_peer, from, to, World.is_occupancy_consistent()])
+
+
+func _on_server_disconnected() -> void:
+	if _had_player:
+		hud.text = "disconnected from server"
+	else:
+		hud.text = "authentication failed"
+		print("[net] authentication failed: disconnected before a player was spawned")
 
 
 ## --test-move: order the local player once, then report when the move shows

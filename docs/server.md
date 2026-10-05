@@ -12,12 +12,16 @@ reset it.
 | systemd unit | `server/psykinetic.service` |
 | Deploy script: pull, export, install, restart | `server/deploy.sh` |
 | Snapshot code | `net/snapshot.gd`, used by `main.gd` |
+| Token file template | `server/env.example` → `/etc/psykinetic/env` |
+| Client bundle | `client/launch.bat` (placeholders), `tests/export_client.ps1` |
 
 The service runs:
 
 ```
-/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json
+/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --token=${PSYKINETIC_TOKEN}
 ```
+
+with `PSYKINETIC_TOKEN` read from `/etc/psykinetic/env`.
 
 `--headless` is needed: the Dedicated Server export strips textures and
 other visuals from the `.pck` but the binary is a normal one, so without the
@@ -41,6 +45,12 @@ sudo install -d -o psykinetic -g psykinetic /var/lib/psykinetic
 # The repo, and where Godot is.
 git clone https://github.com/jeff-thinklightn-ing/psykinetic.git ~/psykinetic
 export GODOT_PATH=/path/to/Godot_v4.7.2-stable_linux.x86_64   # put it in your shell profile too
+
+# The join token. Root-only; the real file is never in the repo.
+sudo install -d -m 755 /etc/psykinetic
+sudo install -m 600 ~/psykinetic/server/env.example /etc/psykinetic/env
+sudo sed -i "s/change-me/$(openssl rand -hex 16)/" /etc/psykinetic/env
+sudo cat /etc/psykinetic/env     # note the token; players need it
 
 # The unit.
 sudo cp ~/psykinetic/server/psykinetic.service /etc/systemd/system/
@@ -87,15 +97,43 @@ The unit restarts the server 5 seconds after any failure.
 
 ## Connecting a client
 
-On a machine on the tailnet, with the project or an exported client:
+On a machine on the tailnet, with the project:
 
 ```
-godot --path . --client --address=<tailnet-ip>
+godot --path . --client --address=<tailnet-ip> --token=<the token>
 ```
 
 Add `--port=<n>` if the server is not on 7777. `tailscale ip -4` on the box
 gives the address. `F3` in the client shows peer id, round trip time and
 mispredictions.
+
+To hand someone an exported client, on a Windows machine with the Windows
+export templates installed:
+
+```
+tests\export_client.ps1 -Address <tailnet-ip> -Token <the token>
+```
+
+That exports the `Windows Client` preset to `build\client\` and writes a
+`launch.bat` next to it with the address and token filled in. `build\` is
+gitignored. `client/launch.bat` in the repo only has placeholders.
+
+## Join authentication
+
+The server only accepts a peer that sends the token (`Net.authenticate`,
+which the client does the moment it connects). Until then the peer has no
+player and every gameplay RPC from it is ignored. A wrong or empty token is
+rejected at once; a peer that sends nothing is dropped after 5 seconds. The
+log line is `[net] rejected peer N from <address> (<why>)`. At most 4
+peers can be authenticated at once; the rest are refused as `server full`.
+
+A client dropped before it was given a player shows `authentication failed`.
+
+`--server` refuses to start without `--token` (it logs why and exits 1).
+`--host` without a token is local play: anyone who connects is let in.
+
+To change the token: edit `/etc/psykinetic/env`, then
+`sudo systemctl restart psykinetic`. Everyone needs the new one.
 
 ## The snapshot (`--state`)
 

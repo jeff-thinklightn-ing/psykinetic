@@ -14,6 +14,7 @@ $logs = Join-Path ([IO.Path]::GetTempPath()) 'psykinetic-net-test'
 New-Item -ItemType Directory -Force $logs | Out-Null
 Remove-Item (Join-Path $logs '*') -Force -ErrorAction SilentlyContinue
 $port = 17777
+$token = 'test-secret'
 
 function Start-Instance($name, $modeArgs) {
 	$arguments = @('--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$port")
@@ -22,9 +23,9 @@ function Start-Instance($name, $modeArgs) {
 		-RedirectStandardError (Join-Path $logs "$name.err")
 }
 
-$server = Start-Instance 'server' @('--server', '--test-exit-after=16')
+$server = Start-Instance 'server' @('--server', "--token=$token", '--test-exit-after=16')
 Start-Sleep -Seconds 2
-$client1 = Start-Instance 'client1' @('--client', '--address=127.0.0.1', '--test-move=-3,0', '--test-contest=9,1,70', '--test-exit-after=9')
+$client1 = Start-Instance 'client1' @('--client', '--address=127.0.0.1', "--token=$token", '--test-move=-3,0', '--test-contest=9,1,70', '--test-exit-after=9')
 # Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
 # so its move ends by pushing the crate to (7, 2). Client 2 joins after that
 # to the start tile client 1 left and walks to (9, 2). Both are then one step
@@ -32,9 +33,12 @@ $client1 = Start-Instance 'client1' @('--client', '--address=127.0.0.1', '--test
 # 70 both order a move into it. Each client predicts the step; the server lets
 # only one of them have the tile.
 Start-Sleep -Seconds 1
-$client2 = Start-Instance 'client2' @('--client', '--address=127.0.0.1', '--test-move=-2,0', '--test-contest=9,1,70', '--test-exit-after=9')
+$client2 = Start-Instance 'client2' @('--client', '--address=127.0.0.1', "--token=$token", '--test-move=-2,0', '--test-contest=9,1,70', '--test-exit-after=9')
+# A third client with the wrong token must be rejected and never get a player.
+Start-Sleep -Seconds 1
+$client3 = Start-Instance 'client3' @('--client', '--address=127.0.0.1', '--token=wrong-secret', '--test-move=0,1', '--test-exit-after=4')
 
-$all = @($server, $client1, $client2)
+$all = @($server, $client1, $client2, $client3)
 $all | Wait-Process -Timeout 40 -ErrorAction SilentlyContinue
 $all | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
@@ -45,6 +49,7 @@ function Read-Log($name) {
 $serverLog = Read-Log 'server'
 $client1Log = Read-Log 'client1'
 $client2Log = Read-Log 'client2'
+$client3Log = Read-Log 'client3'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -57,7 +62,12 @@ $movers = @($serverLog | Select-String '\[net\] (Player\d+) \(peer \d+\) moved' 
 	ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
 $inconsistent = @(($serverLog + $client1Log + $client2Log) | Select-String 'occupancy_consistent=false')
 
-Assert ($joined.Count -eq 2) "server spawned a player for each client (saw $($joined.Count))"
+Assert ($joined.Count -eq 2) "server spawned a player for each client with the right token (saw $($joined.Count))"
+Assert (@($serverLog | Select-String '\[net\] peer \d+ authenticated').Count -eq 2) 'server authenticated the two right-token clients'
+$rejected = @($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(wrong token\)')
+Assert ($rejected.Count -eq 1) "server rejected the wrong-token client with its address (saw $($rejected.Count))"
+Assert (@($client3Log | Select-String 'authentication failed').Count -eq 1) 'the wrong-token client reports authentication failed'
+Assert (@($client3Log | Select-String '\[test\] Player').Count -eq 0) 'and never got a player to order around' 
 Assert ($movers.Count -eq 2) "server log shows both players moved (saw: $($movers -join ', '))"
 Assert (@($serverLog | Select-String 'rejected order').Count -eq 0) 'server rejected no orders'
 Assert ($inconsistent.Count -eq 0) 'occupancy was consistent at every logged move, on server and clients'

@@ -8,7 +8,8 @@
 | `entities/` | Entity scenes (`player.tscn`, `monster.tscn`, `pushable.tscn`). Scenes only add visuals and tuning values to a sim script. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
-| `server/` | systemd unit and deploy script for the dedicated server; see `docs/server.md`. |
+| `server/` | systemd unit, deploy script, and token file template for the dedicated server; see `docs/server.md`. |
+| `client/` | `launch.bat` with placeholders; `tests/export_client.ps1` bundles it with the exported Windows client. |
 | `main.tscn`, `main.gd` | Test room, camera, HUD, input, and (on the server) level and player spawning. |
 | `tests/` | `push_test.tscn`: scripted sim test, run by `run.ps1` / `run.sh`. `net_test.ps1` / `net_test.sh`: one server and two clients on localhost. |
 
@@ -81,6 +82,14 @@ opened it runs offline instead.
 - *Feedback*: `GridEntity._net_pushed` / `_net_impacted` / `_net_stunned`
   replay the hop, the flash and the stun reel on clients. They carry no sim
   state.
+
+**Joining.** A server started with `--token` admits a peer only once it has
+sent that token (`Net.authenticate`, an `any_peer` RPC the client fires on
+connect). Unauthenticated peers get no player and their order RPCs are
+ignored; a wrong or empty token, or none within 5 seconds, gets the peer
+disconnected and logged with its address. Up to 4 authenticated peers.
+`--server` refuses to start without a token; `--host` without one lets
+anyone in. Details in `docs/server.md`.
 
 **Nothing derived is replicated.** A client's `World` is a mirror: it loads
 terrain from the same level data, keeps the list of entities the spawner has
@@ -411,4 +420,6 @@ pushes a crate, which must show at its new tile on both clients. Then both
 clients order a move into the same free tile on the same tick
 (`--test-contest`): each predicts the step, the server gives the tile to one,
 and the other must count one misprediction and end up drawn on the server's
-tile.
+tile. The server runs with `--token`; a third client with the wrong token
+must be rejected with its address logged, report `authentication failed`,
+and never get a player.

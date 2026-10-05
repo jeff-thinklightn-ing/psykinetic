@@ -389,6 +389,9 @@ func _entity_at_path(path: NodePath) -> GridEntity:
 ## owns it. Anything else is rejected and logged.
 func _entity_owned_by_sender(path: NodePath) -> GridEntity:
 	var sender := multiplayer.get_remote_sender_id()
+	if not Net.is_peer_authenticated(sender):
+		_log("ignored order from unauthenticated peer %d" % sender)
+		return null
 	var entity := _entity_at_path(path)
 	if entity == null or entity.owner_peer != sender:
 		_log("rejected order from peer %d for %s" % [sender, path])

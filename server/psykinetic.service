@@ -13,8 +13,10 @@ Type=simple
 User=psykinetic
 Group=psykinetic
 WorkingDirectory=/opt/psykinetic
+# PSYKINETIC_TOKEN lives here, root-owned, mode 600. See server/env.example.
+EnvironmentFile=/etc/psykinetic/env
 # The Dedicated Server export strips visuals but is not headless by itself.
-ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json
+ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --token=${PSYKINETIC_TOKEN}
 # Creates /var/lib/psykinetic owned by the service user.
 StateDirectory=psykinetic
 # Godot keeps its own user data under $HOME; give it somewhere writable.

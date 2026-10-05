@@ -5,6 +5,9 @@ extends Node
 ##   --server                     dedicated: runs the sim, no local player, fine with --headless
 ##   --client --address=<ip>      connects to a server; runs no sim
 ##   --port=<n>                   default 7777
+##   --token=<string>             server: required; a peer must send it (Net.authenticate)
+##                                within 5 s or it is disconnected. host: optional; without
+##                                it anyone may join (local play). client: sent on connect
 ##   --state=<path>               server/host: JSON snapshot of entity state, written every
 ##                                30 ticks and on clean shutdown, loaded on start if present
 ##
@@ -20,13 +23,26 @@ extends Node
 enum Mode { HOST, SERVER, CLIENT }
 
 const DEFAULT_PORT := 7777
+## ENet connections, including ones still waiting to authenticate.
 const MAX_CLIENTS := 8
+## Authenticated peers at once; later ones are refused.
+const MAX_PLAYERS := 4
+## Seconds a connected peer has to send the token.
+const AUTH_TIMEOUT := 5.0
+
+## A peer has sent the right token (or none was required) and may be given a
+## player. Main spawns players on this, never on peer_connected.
+signal peer_authenticated(peer: int)
 
 var mode := Mode.HOST
 var address := "127.0.0.1"
 var port := DEFAULT_PORT
 ## Snapshot file for the authority, or "" for none.
 var state_path := ""
+## Join token. Never written anywhere in the repo; see server/env.example.
+var token := ""
+## Server only: peers that have authenticated.
+var _authenticated: Dictionary[int, bool] = {}
 ## True once an ENet peer is in place. False means offline single-player.
 var online := false
 
@@ -103,6 +119,67 @@ func is_authority() -> bool:
 	return multiplayer.is_server()
 
 
+## Server side: has [param peer] sent the right token? The authority itself
+## always has.
+func is_peer_authenticated(peer: int) -> bool:
+	return peer == local_id or _authenticated.has(peer)
+
+
+## Sent by a client right after it connects. On the server, a correct token
+## lets the peer in; anything else gets it disconnected.
+@rpc("any_peer", "call_remote", "reliable")
+func authenticate(offered: String) -> void:
+	if not is_authority():
+		return
+	var peer := multiplayer.get_remote_sender_id()
+	if peer == 0 or _authenticated.has(peer):
+		return
+	if token == "" or offered != token:
+		_reject(peer, "empty token" if offered == "" else "wrong token")
+	elif _authenticated.size() >= MAX_PLAYERS:
+		_reject(peer, "server full")
+	else:
+		_admit(peer)
+
+
+func _on_peer_connected(peer: int) -> void:
+	if _authenticated.size() >= MAX_PLAYERS:
+		_reject(peer, "server full")
+	elif token == "":
+		# A host without a token is local play: anyone may join.
+		_admit(peer)
+	else:
+		get_tree().create_timer(AUTH_TIMEOUT).timeout.connect(_on_auth_timeout.bind(peer))
+
+
+func _on_auth_timeout(peer: int) -> void:
+	if online and peer in multiplayer.get_peers() and not _authenticated.has(peer):
+		_reject(peer, "no token after %d s" % roundi(AUTH_TIMEOUT))
+
+
+func _on_peer_disconnected(peer: int) -> void:
+	_authenticated.erase(peer)
+
+
+func _admit(peer: int) -> void:
+	_authenticated[peer] = true
+	print("[net] peer %d authenticated (%d of %d)" % [peer, _authenticated.size(), MAX_PLAYERS])
+	peer_authenticated.emit(peer)
+
+
+func _reject(peer: int, why: String) -> void:
+	print("[net] rejected peer %d from %s (%s)" % [peer, _peer_address(peer), why])
+	multiplayer.multiplayer_peer.disconnect_peer(peer)
+
+
+func _peer_address(peer: int) -> String:
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	if enet == null:
+		return "?"
+	var packet_peer := enet.get_peer(peer)
+	return packet_peer.get_remote_address() if packet_peer != null else "?"
+
+
 ## Closes the connection, if any. Safe to call more than once.
 func shutdown() -> void:
 	if online:
@@ -121,13 +198,16 @@ func start() -> void:
 		if error != OK:
 			push_error("[net] cannot connect to %s:%d (%s)" % [address, port, error_string(error)])
 			return
-		multiplayer.connected_to_server.connect(
-				func() -> void: print("[net] connected as peer %d" % multiplayer.get_unique_id()))
+		multiplayer.connected_to_server.connect(_on_connected_to_server)
 		multiplayer.connection_failed.connect(
 				func() -> void: print("[net] connection to %s:%d failed" % [address, port]))
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		print("[net] client connecting to %s:%d" % [address, port])
 	else:
+		if mode == Mode.SERVER and token == "":
+			push_error("[net] --server needs --token=<string>: refusing to run an open server")
+			get_tree().quit(1)
+			return
 		var error := peer.create_server(port, MAX_CLIENTS)
 		if error != OK:
 			if mode == Mode.SERVER:
@@ -137,10 +217,19 @@ func start() -> void:
 				# Single-player must keep working when the port is taken.
 				print("[net] port %d unavailable (%s); running offline" % [port, error_string(error)])
 			return
-		print("[net] %s listening on port %d" % ["server" if mode == Mode.SERVER else "host", port])
+		print("[net] %s listening on port %d%s" % [
+			"server" if mode == Mode.SERVER else "host", port,
+			", token required" if token != "" else ", no token: open to anyone"])
+		multiplayer.peer_connected.connect(_on_peer_connected)
+		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.multiplayer_peer = peer
 	local_id = multiplayer.get_unique_id()
 	online = true
+
+
+func _on_connected_to_server() -> void:
+	print("[net] connected as peer %d" % multiplayer.get_unique_id())
+	authenticate.rpc_id(1, token)
 
 
 func _on_server_disconnected() -> void:
@@ -167,7 +256,7 @@ func _parse_args() -> void:
 				mode = Mode.SERVER
 			"--client":
 				mode = Mode.CLIENT
-			"--address", "--port", "--state", "--test-move", "--test-contest", "--test-exit-after":
+			"--address", "--port", "--state", "--token", "--test-move", "--test-contest", "--test-exit-after":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -184,6 +273,8 @@ func _set_option(key: String, value: String) -> void:
 				port = value.to_int()
 		"--state":
 			state_path = value
+		"--token":
+			token = value
 		"--test-move":
 			var parts := value.split(",")
 			if parts.size() == 2:
