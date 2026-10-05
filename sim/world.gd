@@ -7,16 +7,40 @@ extends Node
 
 signal ticked(tick: int)
 signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
-signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity)
+## [param cause] is &"attack", &"impact" or &"fire".
+signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity, cause: StringName)
+signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, tiles: int, impact: int, stopped_by: String)
 signal entity_despawned(entity: GridEntity)
 
 const TICK_RATE := 10
 const TICK_DT := 1.0 / TICK_RATE
 ## Ticks run per frame at most; beyond this the sim slows down instead of spiralling.
 const MAX_CATCHUP_TICKS := 5
+## Orthogonals first so ties in pathfinding prefer straight steps.
 const DIRECTIONS: Array[Vector2i] = [
-	Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP,
+	Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1),
+	Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1),
 ]
+const FIRE_DAMAGE := 2
+## Clamp on mover_mass / target_mass when scaling push travel and impact.
+const MASS_RATIO_MIN := 0.5
+const MASS_RATIO_MAX := 1.5
+const MAX_PUSH_SLIDE_TICKS := 3
+## A diagonal step takes this many times the ticks of an orthogonal one (rounded
+## up), so world speed is roughly constant in every direction. On screen a
+## sideways diagonal covers 32 px against 18 px for an orthogonal step; at 1.0
+## it would move nearly twice as fast as everything else.
+const DIAGONAL_TICK_SCALE := 1.5
+# Path costs are integers proportional to ticks. The +1 only breaks ties in
+# favour of straight lines; fire is a detour worth five steps.
+const PATH_STEP_COST := 1000
+const PATH_DIAGONAL_COST := int(PATH_STEP_COST * DIAGONAL_TICK_SCALE)
+const PATH_DIAGONAL_EXTRA := 1
+const PATH_FIRE_EXTRA := 5000
+
+## Impact damage per unit of force left over when a pushed entity is stopped.
+## (An exported var, not a const: GDScript cannot export constants.)
+@export var impact_per_force := 2
 
 var tick := 0
 ## Fraction of the way from the last tick to the next one, in [0, 1). Read by rendering.
@@ -24,9 +48,25 @@ var tick_alpha := 0.0
 
 var _floor: Dictionary[Vector2i, bool] = {}
 var _walls: Dictionary[Vector2i, bool] = {}
+var _fire: Dictionary[Vector2i, bool] = {}
 var _occupancy: Dictionary[Vector2i, GridEntity] = {}
+## Always in ascending id order: ids are handed out in spawn order.
 var _entities: Array[GridEntity] = []
+var _hits: Array[Hit] = []
+var _next_id := 1
 var _accumulator := 0.0
+
+
+## An attack or shove accepted this tick, waiting for the resolve phase.
+class Hit:
+	var source: GridEntity
+	var target: GridEntity
+	var source_id := 0
+	var source_name := ""
+	var target_name := ""
+	var direction := Vector2i.ZERO
+	var damage := 0
+	var force := 0
 
 
 func _process(delta: float) -> void:
@@ -37,17 +77,24 @@ func _process(delta: float) -> void:
 	while _accumulator >= TICK_DT:
 		_accumulator -= TICK_DT
 		if steps < MAX_CATCHUP_TICKS:
-			_step()
+			step()
 			steps += 1
 	tick_alpha = _accumulator / TICK_DT
 
 
-func _step() -> void:
+## Advances the sim one tick. Driven by _process; tests call it directly.
+func step() -> void:
+	if not multiplayer.is_server():
+		return
 	tick += 1
-	# Spawn order. Iterate a copy: entities may despawn each other mid-tick.
+	# 1. Act, in ascending id. Iterate a copy: entities may despawn mid-tick.
 	for entity in _entities.duplicate():
-		if is_instance_valid(entity) and entity.spawned:
+		if _alive(entity):
 			entity._sim_tick()
+	# 2. Hits (attacks and shoves) queued during the act phase.
+	_resolve_hits()
+	# 3. Hazard tiles.
+	_apply_hazards()
 	ticked.emit(tick)
 
 
@@ -61,22 +108,29 @@ func reset() -> void:
 			entity._world_remove()
 	_entities.clear()
 	_occupancy.clear()
+	_hits.clear()
 	_floor.clear()
 	_walls.clear()
+	_fire.clear()
+	_next_id = 1
 	tick = 0
 	tick_alpha = 0.0
 	_accumulator = 0.0
 
 
-func load_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i]) -> void:
+func load_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i],
+		fire_tiles: Array[Vector2i] = []) -> void:
 	if not multiplayer.is_server():
 		return
 	_floor.clear()
 	_walls.clear()
+	_fire.clear()
 	for t in floor_tiles:
 		_floor[t] = true
 	for t in wall_tiles:
 		_walls[t] = true
+	for t in fire_tiles:
+		_fire[t] = true
 
 
 func spawn(entity: GridEntity, at: Vector2i) -> bool:
@@ -87,7 +141,8 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 		return false
 	_occupancy[at] = entity
 	_entities.append(entity)
-	entity._world_place(at, tick)
+	entity._world_place(_next_id, at)
+	_next_id += 1
 	return true
 
 
@@ -105,7 +160,7 @@ func despawn(entity: GridEntity) -> void:
 
 ## Moves [param entity] one tile in [param direction] (one of [constant DIRECTIONS]),
 ## pushing any chain of pushable entities whose total mass does not exceed the
-## mover's. The only way an entity's tile ever changes.
+## mover's. Resolves immediately. Diagonals may not cut a wall corner.
 func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	if not multiplayer.is_server():
 		return false
@@ -113,32 +168,41 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	if tick < entity.next_move_tick:
 		return false
-	if not _shift(entity, direction, entity.mass, entity.move_ticks):
+	var duration := step_ticks(entity, direction)
+	if not _shift(entity, entity, direction, entity.mass, duration):
 		return false
-	entity.next_move_tick = tick + entity.move_ticks
+	entity.next_move_tick = tick + duration
 	return true
 
 
+## Melee: attack_damage plus a push of attack_force. Queued; resolved after
+## every entity has acted this tick.
 func try_attack(attacker: GridEntity, target: GridEntity) -> bool:
 	if not multiplayer.is_server():
 		return false
-	if not attacker.spawned or not is_instance_valid(target) or not target.spawned:
-		return false
-	if tick < attacker.next_attack_tick or not are_adjacent(attacker.tile, target.tile):
-		return false
-	attacker.next_attack_tick = tick + attacker.attack_ticks
-	damage(target, attacker.attack_damage, attacker)
-	return true
+	return _try_hit(attacker, target, attacker.attack_damage, attacker.attack_force)
 
 
-func damage(target: GridEntity, amount: int, source: GridEntity = null) -> void:
+## Shove: no direct damage, only a push of shove_force. Queued like an attack.
+func try_shove(attacker: GridEntity, target: GridEntity) -> bool:
+	if not multiplayer.is_server():
+		return false
+	if attacker.shove_force <= 0:
+		return false
+	return _try_hit(attacker, target, 0, attacker.shove_force)
+
+
+## [param cause] is &"attack", &"impact" or &"fire". Only FLESH and WOOD with
+## max_hp > 0 can be hurt; at 0 hp the entity is removed and its tile is empty.
+func damage(target: GridEntity, amount: int, source: GridEntity = null,
+		cause: StringName = &"attack") -> void:
 	if not multiplayer.is_server():
 		return
-	if not target.spawned or target.max_hp <= 0 or amount <= 0:
+	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
 	target.hp = maxi(target.hp - amount, 0)
 	target.damaged.emit(amount)
-	entity_damaged.emit(target, amount, source)
+	entity_damaged.emit(target, amount, source, cause)
 	if target.hp == 0:
 		despawn(target)
 
@@ -151,24 +215,173 @@ func order_move(entity: GridEntity, target: Vector2i) -> void:
 		return
 	entity.move_order = target
 	entity.has_move_order = true
+	entity.action_order = GridEntity.Order.NONE
+	entity.action_target = null
 
 
-func _shift(entity: GridEntity, direction: Vector2i, push_budget: float, duration: int) -> bool:
+## Player intent: attack or shove [param target] on the entity's next free tick.
+func order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity) -> void:
+	if not multiplayer.is_server():
+		return
+	if not entity.spawned or not target.spawned or entity == target:
+		return
+	entity.action_order = order
+	entity.action_target = target
+	entity.has_move_order = false
+
+
+func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, force: int) -> bool:
+	if not multiplayer.is_server():
+		return false
+	if not attacker.spawned or not target.spawned or attacker == target:
+		return false
+	if tick < attacker.next_attack_tick or not can_melee(attacker.tile, target.tile):
+		return false
+	attacker.next_attack_tick = tick + attacker.attack_ticks
+	var hit := Hit.new()
+	hit.source = attacker
+	hit.target = target
+	hit.source_id = attacker.id
+	hit.source_name = attacker.name
+	hit.target_name = target.name
+	hit.direction = target.tile - attacker.tile
+	hit.damage = hit_damage
+	hit.force = force
+	_hits.append(hit)
+	return true
+
+
+## Ascending source id. A hit whose target is no longer where it was aimed
+## (an earlier hit or a move displaced something) is dropped, never re-aimed.
+func _resolve_hits() -> void:
+	if _hits.is_empty():
+		return
+	var hits := _hits
+	_hits = []
+	hits.sort_custom(func(a: Hit, b: Hit) -> bool: return a.source_id < b.source_id)
+	for hit in hits:
+		if not _alive(hit.source) or not _alive(hit.target) \
+				or hit.target.tile != hit.source.tile + hit.direction:
+			_log("hit dropped: %s -> %s (no longer lined up)" % [hit.source_name, hit.target_name])
+			continue
+		if hit.damage > 0:
+			damage(hit.target, hit.damage, hit.source, &"attack")
+		if hit.force > 0 and _alive(hit.target):
+			_push(hit.source, hit.target, hit.direction, hit.force)
+
+
+## Force push. The mover's mass is a budget: each body set in motion spends its
+## own mass from it, and a body heavier than what is left does not move. A body
+## travels up to floor(force * ratio) tiles; whatever force is left when
+## something stops it becomes impact. Nothing here knows what kind of entity
+## it is pushing.
+func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: int) -> void:
+	var mover_mass: float = mover.mass
+	var budget: float = mover_mass
+	var body: GridEntity = first
+	var f: int = force
+	while body != null and f > 0:
+		if body.mass > budget:
+			_log("push: %s -> %s blocked: too heavy (mass %s, %s left)" % [
+				mover.name, body.name, body.mass, budget])
+			return
+		budget -= body.mass
+
+		var ratio := mass_ratio(mover_mass, body.mass)
+		var max_tiles: int = maxi(floori(f * ratio + 0.001), 1)
+		var start: Vector2i = body.tile
+		var tiles := 0
+		var stopped := false
+		var stopped_by := "nothing (force spent)"
+		var blocker: GridEntity = null
+		while tiles < max_tiles:
+			var next: Vector2i = body.tile + direction
+			if _terrain_blocks_step(body.tile, direction):
+				stopped = true
+				stopped_by = "wall"
+				break
+			blocker = _occupancy.get(next)
+			if blocker != null:
+				stopped = true
+				stopped_by = blocker.name
+				break
+			_relocate(body, next)
+			tiles += 1
+			if _fire.has(next) and body.is_creature():
+				stopped = true
+				stopped_by = "fire"
+				break
+
+		# Force spent on travel, rounded up; the rest is what hits.
+		var remaining := 0
+		if stopped:
+			remaining = maxi(f - ceili(tiles / ratio - 0.001), 0)
+		var impact := impact_damage(remaining, ratio)
+
+		if tiles > 0:
+			body._world_slide_from(start, tick, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS))
+		body.pushed.emit(tiles)
+		var note := ""
+		var next_body: GridEntity = null
+		if impact > 0:
+			_impact(body, impact, mover)
+		if blocker != null:
+			var blocker_impact := impact_damage(remaining, mass_ratio(mover_mass, blocker.mass))
+			note = " (%s takes %d)" % [blocker.name, blocker_impact]
+			if blocker_impact > 0:
+				_impact(blocker, blocker_impact, mover)
+			if _alive(blocker):
+				next_body = blocker
+		_log("push: %s -> %s dir=%s tiles=%d impact=%d stopped_by=%s%s" % [
+			mover.name, body.name, direction, tiles, impact, stopped_by, note])
+		entity_pushed.emit(body, mover, direction, tiles, impact, stopped_by)
+
+		body = next_body
+		f = remaining - 1
+
+
+func _impact(entity: GridEntity, amount: int, source: GridEntity) -> void:
+	entity.impacted.emit(amount)
+	damage(entity, amount, source, &"impact")
+
+
+func _apply_hazards() -> void:
+	if _fire.is_empty():
+		return
+	for entity in _entities.duplicate():
+		if _alive(entity) and entity.is_creature() and _fire.has(entity.tile):
+			damage(entity, FIRE_DAMAGE, null, &"fire")
+
+
+## One walking step for [param entity], shoving the pushable chain ahead of it.
+func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_budget: float,
+		duration: int) -> bool:
 	var from: Vector2i = entity.tile
 	var to: Vector2i = from + direction
-	if not is_walkable(to):
+	if _terrain_blocks_step(from, direction):
 		return false
 	var blocker: GridEntity = _occupancy.get(to)
 	if blocker != null:
 		if not blocker.pushable or blocker.mass > push_budget:
 			return false
-		if not _shift(blocker, direction, push_budget - blocker.mass, duration):
+		if not _shift(mover, blocker, direction, push_budget - blocker.mass, duration):
 			return false
+	_relocate(entity, to)
+	entity._world_slide_from(from, tick, duration)
+	if entity != mover:
+		entity.pushed.emit(1)
+		_log("push: %s -> %s dir=%s tiles=1 impact=0 stopped_by=nothing (walked into)" % [
+			mover.name, entity.name, direction])
+		entity_pushed.emit(entity, mover, direction, 1, 0, "nothing (walked into)")
+	return true
+
+
+func _relocate(entity: GridEntity, to: Vector2i) -> void:
+	var from: Vector2i = entity.tile
 	_occupancy.erase(from)
 	_occupancy[to] = entity
-	entity._world_set_tile(to, tick, duration)
+	entity._world_set_tile(to)
 	entity_moved.emit(entity, from, to)
-	return true
 
 
 # --- Queries (safe anywhere) --------------------------------------------------
@@ -181,6 +394,10 @@ func is_free(at: Vector2i) -> bool:
 	return is_walkable(at) and not _occupancy.has(at)
 
 
+func is_fire(at: Vector2i) -> bool:
+	return _fire.has(at)
+
+
 func get_entity_at(at: Vector2i) -> GridEntity:
 	return _occupancy.get(at)
 
@@ -189,8 +406,33 @@ func get_entities() -> Array[GridEntity]:
 	return _entities.duplicate()
 
 
+## Distance in steps (a diagonal is one step). Used for reach and sight range.
+func distance(a: Vector2i, b: Vector2i) -> int:
+	return maxi(absi(a.x - b.x), absi(a.y - b.y))
+
+
+## Ticks one walking step in [param direction] takes for [param entity].
+func step_ticks(entity: GridEntity, direction: Vector2i) -> int:
+	if direction.x != 0 and direction.y != 0:
+		return ceili(entity.move_ticks * DIAGONAL_TICK_SCALE)
+	return entity.move_ticks
+
+
 func are_adjacent(a: Vector2i, b: Vector2i) -> bool:
-	return _manhattan(a, b) == 1
+	return distance(a, b) == 1
+
+
+## Adjacent, and not diagonally across a wall corner.
+func can_melee(from: Vector2i, to: Vector2i) -> bool:
+	return are_adjacent(from, to) and not _cuts_corner(from, to - from)
+
+
+func mass_ratio(mover_mass: float, target_mass: float) -> float:
+	return clampf(mover_mass / maxf(target_mass, 0.001), MASS_RATIO_MIN, MASS_RATIO_MAX)
+
+
+func impact_damage(remaining_force: int, ratio: float) -> int:
+	return roundi(remaining_force * impact_per_force * ratio)
 
 
 func blocks_sight(at: Vector2i) -> bool:
@@ -219,8 +461,11 @@ func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	return true
 
 
-## A* over the occupancy grid, 4-connected. Returns the tiles to step through,
-## excluding [param from] and including [param to]; empty if unreachable.
+## A* over the occupancy grid, 8-connected, costed in ticks (see
+## [constant DIAGONAL_TICK_SCALE]).
+## Returns the tiles to step through, excluding [param from] and including
+## [param to]; empty if unreachable. Diagonals never cut a wall corner. Fire is
+## walkable but avoided when a short detour exists.
 ## With [param ignore_goal_occupant] the goal may be occupied (walk up to a
 ## monster, push a crate), but occupied tiles along the way still block.
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false) -> Array[Vector2i]:
@@ -238,9 +483,9 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false) -> A
 
 	while not open.is_empty():
 		var best := 0
-		var best_f: int = cost[open[0]] + _manhattan(open[0], to)
+		var best_f: int = cost[open[0]] + _path_heuristic(open[0], to)
 		for i in range(1, open.size()):
-			var f: int = cost[open[i]] + _manhattan(open[i], to)
+			var f: int = cost[open[i]] + _path_heuristic(open[i], to)
 			if f < best_f:
 				best = i
 				best_f = f
@@ -257,11 +502,17 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false) -> A
 		closed[current] = true
 		for direction in DIRECTIONS:
 			var next: Vector2i = current + direction
-			if closed.has(next) or not is_walkable(next):
+			if closed.has(next) or _terrain_blocks_step(current, direction):
 				continue
 			if _occupancy.has(next) and next != to:
 				continue
-			var next_cost: int = cost[current] + 1
+			var next_cost: int = cost[current]
+			if direction.x != 0 and direction.y != 0:
+				next_cost += PATH_DIAGONAL_COST + PATH_DIAGONAL_EXTRA
+			else:
+				next_cost += PATH_STEP_COST
+			if _fire.has(next):
+				next_cost += PATH_FIRE_EXTRA
 			if not cost.has(next) or next_cost < cost[next]:
 				cost[next] = next_cost
 				came_from[next] = current
@@ -270,5 +521,32 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false) -> A
 	return path
 
 
-func _manhattan(a: Vector2i, b: Vector2i) -> int:
-	return absi(a.x - b.x) + absi(a.y - b.y)
+## Cheapest possible cost between two tiles on an empty grid.
+func _path_heuristic(a: Vector2i, b: Vector2i) -> int:
+	var dx := absi(a.x - b.x)
+	var dy := absi(a.y - b.y)
+	var diagonals := mini(dx, dy)
+	return diagonals * PATH_DIAGONAL_COST + (maxi(dx, dy) - diagonals) * PATH_STEP_COST
+
+
+## True if terrain alone forbids stepping from [param from] in [param direction]:
+## the destination is not floor, or a diagonal would cut a wall corner.
+func _terrain_blocks_step(from: Vector2i, direction: Vector2i) -> bool:
+	return not is_walkable(from + direction) or _cuts_corner(from, direction)
+
+
+## A diagonal cuts a corner if either orthogonal neighbour it passes between is
+## not open floor. Entities standing there do not count.
+func _cuts_corner(from: Vector2i, direction: Vector2i) -> bool:
+	if direction.x == 0 or direction.y == 0:
+		return false
+	return not is_walkable(from + Vector2i(direction.x, 0)) \
+			or not is_walkable(from + Vector2i(0, direction.y))
+
+
+func _alive(entity: Variant) -> bool:
+	return is_instance_valid(entity) and entity.spawned
+
+
+func _log(message: String) -> void:
+	print("[tick %d] %s" % [tick, message])

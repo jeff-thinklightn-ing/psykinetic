@@ -5,9 +5,13 @@
 
 [node name="Player" type="Node2D"]
 script = ExtResource("1_script")
-mass = 70.0
+mass = 80.0
 move_ticks = 2
-max_hp = 10
+max_hp = 20
+attack_damage = 2
+attack_force = 2
+shove_force = 3
+attack_ticks = 5
 
 [node name="Sprite" type="Sprite2D" parent="."]
 modulate = Color(0.35, 0.65, 1, 1)

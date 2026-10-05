@@ -1,11 +1,25 @@
 class_name Player
 extends GridEntity
-## Walks toward its move order (set through World.order_move), re-pathing every
-## step so it reacts to things moving. Stepping into the ordered tile pushes
-## whatever is on it, if World allows.
+## Carries out orders set through World.order_move / World.order_action.
+## An action order (attack, shove) waits for the cooldown, fires once, and
+## clears. A move order re-paths every step so it reacts to things moving;
+## stepping into the ordered tile pushes whatever is on it, if World allows.
 
 
 func _sim_tick() -> void:
+	if action_order != Order.NONE:
+		if World.tick < next_attack_tick:
+			return
+		var order := action_order
+		action_order = Order.NONE
+		if is_instance_valid(action_target):
+			if order == Order.ATTACK:
+				World.try_attack(self, action_target)
+			else:
+				World.try_shove(self, action_target)
+		action_target = null
+		return
+
 	if not has_move_order or World.tick < next_move_tick:
 		return
 	if tile == move_order:

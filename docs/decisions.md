@@ -30,3 +30,32 @@ yet.
 The sim advances at a fixed 10 ticks per second, independent of frame rate.
 Durations in the sim (move time, attack cooldown) are counted in ticks.
 Rendering interpolates between ticks.
+
+## 5. Eight directions, uniform step cost, no wall corner-cutting
+
+Entities move in eight directions and a diagonal costs the same ticks as an
+orthogonal step. A diagonal may not pass between tiles where either orthogonal
+neighbour is a wall; passing between two entities is allowed.
+
+## 6. Pushes: mass decides if, force decides how far
+
+Whether a push moves anything is decided by mass alone: the mover's mass is a
+budget spent by each body it sets in motion. How far a body goes and how hard
+it lands is decided by force, scaled by `mover_mass / body_mass` clamped to
+0.5–1.5. Leftover force becomes impact damage. The push code has no
+per-entity-type branches; `body_material` decides what damage means.
+
+## 7. Hits resolve after everyone has acted, in entity id order
+
+Attacks and shoves are queued during the act phase and resolved afterwards in
+ascending attacker id. A hit whose target is no longer where it was aimed is
+dropped, never re-aimed.
+
+## 8. Diagonal steps take 1.5× the ticks (reverses the cost half of 5)
+
+Uniform step cost made sideways movement on screen nearly twice as fast as
+any other direction, and paths that mixed diagonal and orthogonal steps
+visibly lurched. A diagonal step now takes `ceil(move_ticks × 1.5)` ticks
+(`World.DIAGONAL_TICK_SCALE`), and A* is costed in ticks. Set the constant to
+1.0 to get uniform cost back. The corner-cutting rule in 5 is unchanged, and
+force pushes are unaffected: force is still counted in tiles.
