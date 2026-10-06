@@ -13,7 +13,8 @@ reset it.
 | Deploy script: pull, export, install, restart | `server/deploy.sh` |
 | Snapshot code | `net/snapshot.gd`, used by `main.gd` |
 | Token file template | `server/env.example` → `/etc/psykinetic/env` |
-| Client bundle | `client/launch.bat` (placeholders), `tests/export_client.ps1` |
+| Client bundle | `client/` (`launch.bat`, `update.ps1`, `README.txt`, `settings.example.cfg`), built by `tools/release_client.ps1` |
+| Version | `version.txt`, `CHANGELOG.md` |
 
 The service runs:
 
@@ -107,27 +108,58 @@ Add `--port=<n>` if the server is not on 7777. `tailscale ip -4` on the box
 gives the address. `F3` in the client shows peer id, round trip time and
 mispredictions.
 
-To hand someone an exported client, on a Windows machine with the Windows
-export templates installed:
+Players get the self-updating Windows client from a GitHub release (see
+Releasing the client). They unzip it, run `launch.bat`, and the game asks
+for the address and token once, then keeps them in `settings.cfg` next to
+the exe. Nothing in the zip carries an address or token.
+
+## Releasing the client
+
+Versions live in `version.txt` at the project root (`0.1.0`). The game reads
+it at start, a client sends it when it joins, and the server rejects any
+other version with a `client out of date` message, so the server and the
+clients must be released together.
+
+On a Windows machine with the Windows export templates installed, a clean
+working tree, and `gh` logged in:
 
 ```
-tests\export_client.ps1 -Address <tailnet-ip> -Token <the token>
+tools\release_client.ps1                 # bumps the patch number: 0.1.0 -> 0.1.1
+tools\release_client.ps1 -Version 0.2.0  # releases exactly that version
 ```
 
-That exports the `Windows Client` preset to `build\client\` and writes a
-`launch.bat` next to it with the address and token filled in. `build\` is
-gitignored. `client/launch.bat` in the repo only has placeholders.
+It writes `version.txt`, commits `Release vX.Y.Z` and tags it; exports the
+`Windows Client` preset to `build\client\`; adds `version.txt`,
+`launch.bat`, `update.ps1`, `settings.example.cfg` and `README.txt`; zips it
+to `build\psykinetic-client-vX.Y.Z.zip`; then pushes the commit and tag and
+runs `gh release create` with the top section of `CHANGELOG.md` as the
+notes. Without `gh` it prints the manual steps instead. It refuses to zip if
+any bundled text file carries a real token.
+
+So before releasing: add a `## vX.Y.Z` section at the top of `CHANGELOG.md`
+and commit it. Then deploy the server (`server/deploy.sh`) from the same
+commit so the versions match.
+
+Clients update themselves: `launch.bat` runs `update.ps1`, which asks the
+GitHub API for the latest release, and if its tag is newer than the local
+`version.txt`, downloads the zip and unpacks it over the client folder,
+keeping `settings.cfg`. It never runs while `psykinetic.exe` is running,
+needs no admin rights, and on any failure writes one line to `update.log`
+and starts the game anyway.
 
 ## Join authentication
 
-The server only accepts a peer that sends the token (`Net.authenticate`,
-which the client does the moment it connects). Until then the peer has no
-player and every gameplay RPC from it is ignored. A wrong or empty token is
-rejected at once; a peer that sends nothing is dropped after 5 seconds. The
-log line is `[net] rejected peer N from <address> (<why>)`. At most 4
-peers can be authenticated at once; the rest are refused as `server full`.
+The server only accepts a peer that sends the token and its version
+(`Net.authenticate`, which the client does the moment it connects). Until
+then the peer has no player and every gameplay RPC from it is ignored. A
+version mismatch, or a wrong or empty token, is rejected at once; a peer
+that sends nothing is dropped after 5 seconds. The log line is
+`[net] rejected peer N from <address> (<why>)`. At most 4 peers can be
+authenticated at once; the rest are refused as `server full`.
 
-A client dropped before it was given a player shows `authentication failed`.
+A rejected client is told why before it is cut off and shows it:
+`authentication failed`, `client out of date` (with both versions), or
+`server full`.
 
 `--server` refuses to start without `--token` (it logs why and exits 1).
 `--host` without a token is local play: anyone who connects is let in.

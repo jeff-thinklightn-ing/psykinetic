@@ -37,8 +37,15 @@ $client2 = Start-Instance 'client2' @('--client', '--address=127.0.0.1', "--toke
 # A third client with the wrong token must be rejected and never get a player.
 Start-Sleep -Seconds 1
 $client3 = Start-Instance 'client3' @('--client', '--address=127.0.0.1', '--token=wrong-secret', '--test-move=0,1', '--test-exit-after=4')
+# A fourth joins with no mode argument, from a settings file like an exported client.
+$settings = Join-Path $logs 'settings.cfg'
+Set-Content $settings "address=127.0.0.1`nport=$port`ntoken=$token`n" -Encoding ascii
+Start-Sleep -Seconds 1
+$client4 = Start-Instance 'client4' @("--settings=`"$settings`"", '--test-move=0,1', '--test-exit-after=4')
+# A fifth has the right token but claims another version: turned away as out of date.
+$client5 = Start-Instance 'client5' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=0.0.1', '--test-exit-after=4')
 
-$all = @($server, $client1, $client2, $client3)
+$all = @($server, $client1, $client2, $client3, $client4, $client5)
 $all | Wait-Process -Timeout 40 -ErrorAction SilentlyContinue
 $all | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
@@ -50,6 +57,8 @@ $serverLog = Read-Log 'server'
 $client1Log = Read-Log 'client1'
 $client2Log = Read-Log 'client2'
 $client3Log = Read-Log 'client3'
+$client4Log = Read-Log 'client4'
+$client5Log = Read-Log 'client5'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -58,12 +67,15 @@ function Assert($ok, $label) {
 }
 
 $joined = @($serverLog | Select-String '\[net\] peer \d+ joined as Player')
-$movers = @($serverLog | Select-String '\[net\] (Player\d+) \(peer \d+\) moved' |
+$movers = @($serverLog | Select-String '\[net\] (Player[12]) \(peer \d+\) moved' |
 	ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
 $inconsistent = @(($serverLog + $client1Log + $client2Log) | Select-String 'occupancy_consistent=false')
 
-Assert ($joined.Count -eq 2) "server spawned a player for each client with the right token (saw $($joined.Count))"
-Assert (@($serverLog | Select-String '\[net\] peer \d+ authenticated').Count -eq 2) 'server authenticated the two right-token clients'
+Assert ($joined.Count -eq 3) "server spawned a player for each client with the right token and version (saw $($joined.Count))"
+Assert (@($serverLog | Select-String '\[net\] peer \d+ authenticated').Count -eq 3) 'server authenticated the three good clients'
+Assert (@($client4Log | Select-String '\[net\] using .*settings\.cfg').Count -eq 1 -and @($client4Log | Select-String '\[test\] Player\d+ arrived').Count -eq 1) 'a client with no arguments joins from settings.cfg and plays'
+Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client 0\.0\.1, server ').Count -eq 1) 'server rejected the out-of-date client, naming both versions'
+Assert (@($client5Log | Select-String '\[net\] client out of date').Count -eq 1) 'the out-of-date client was told so'
 $rejected = @($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(wrong token\)')
 Assert ($rejected.Count -eq 1) "server rejected the wrong-token client with its address (saw $($rejected.Count))"
 Assert (@($client3Log | Select-String 'authentication failed').Count -eq 1) 'the wrong-token client reports authentication failed'

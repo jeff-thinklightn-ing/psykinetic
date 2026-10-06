@@ -9,7 +9,9 @@
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
 | `server/` | systemd unit, deploy script, and token file template for the dedicated server; see `docs/server.md`. |
-| `client/` | `launch.bat` with placeholders; `tests/export_client.ps1` bundles it with the exported Windows client. |
+| `client/` | What ships next to the exported Windows exe: `launch.bat`, the self-updater `update.ps1`, `README.txt`, `settings.example.cfg`. |
+| `tools/` | `release_client.ps1`: version bump, tag, export, zip, GitHub release. |
+| `version.txt`, `CHANGELOG.md` | The game version and its release notes. |
 | `main.tscn`, `main.gd` | Test room, camera, HUD, input, and (on the server) level and player spawning. |
 | `tests/` | `push_test.tscn`: scripted sim test, run by `run.ps1` / `run.sh`. `net_test.ps1` / `net_test.sh`: one server and two clients on localhost. |
 
@@ -83,13 +85,17 @@ opened it runs offline instead.
   replay the hop, the flash and the stun reel on clients. They carry no sim
   state.
 
-**Joining.** A server started with `--token` admits a peer only once it has
-sent that token (`Net.authenticate`, an `any_peer` RPC the client fires on
-connect). Unauthenticated peers get no player and their order RPCs are
-ignored; a wrong or empty token, or none within 5 seconds, gets the peer
-disconnected and logged with its address. Up to 4 authenticated peers.
-`--server` refuses to start without a token; `--host` without one lets
-anyone in. Details in `docs/server.md`.
+**Joining.** A peer is admitted only once it has sent its version and, if
+the server has one, the token (`Net.authenticate`, an `any_peer` RPC the
+client fires on connect). Unauthenticated peers get no player and their
+order RPCs are ignored; a version mismatch, a wrong or empty token, or
+nothing within 5 seconds, gets the peer told why (`Net.rejected`),
+disconnected, and logged with its address. Up to 4 authenticated peers.
+`--server` refuses to start without a token; `--host` without one lets any
+matching version in. The version is `version.txt` at the project root. An
+exported client with no arguments joins from `settings.cfg` next to its exe,
+or asks for the address and token once (`net/setup_screen.gd`) and writes
+that file. Details in `docs/server.md`.
 
 **Nothing derived is replicated.** A client's `World` is a mirror: it loads
 terrain from the same level data, keeps the list of entities the spawner has
@@ -422,4 +428,6 @@ clients order a move into the same free tile on the same tick
 and the other must count one misprediction and end up drawn on the server's
 tile. The server runs with `--token`; a third client with the wrong token
 must be rejected with its address logged, report `authentication failed`,
-and never get a player.
+and never get a player; a fourth joins with no mode argument from a
+`settings.cfg` (`--settings`) and must play; a fifth claims another version
+(`--test-version`) and must be told `client out of date`.

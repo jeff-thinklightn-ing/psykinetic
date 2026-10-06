@@ -40,6 +40,12 @@ start client2 --client --address=127.0.0.1 "--token=$TOKEN" --test-move=-2,0 --t
 # A third client with the wrong token must be rejected and never get a player.
 sleep 1
 start client3 --client --address=127.0.0.1 --token=wrong-secret --test-move=0,1 --test-exit-after=4
+# A fourth joins with no mode argument, from a settings file like an exported client.
+printf 'address=127.0.0.1\nport=%s\ntoken=%s\n' "$PORT" "$TOKEN" >"$LOGS/settings.cfg"
+sleep 1
+start client4 "--settings=$LOGS/settings.cfg" --test-move=0,1 --test-exit-after=4
+# A fifth has the right token but claims another version: turned away as out of date.
+start client5 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=0.0.1 --test-exit-after=4
 wait
 
 failures=0
@@ -54,7 +60,7 @@ check() {
 count() { grep -cE "$1" "$2" 2>/dev/null || true; }
 
 joined=$(count '\[net\] peer [0-9]+ joined as Player' "$LOGS/server.log")
-movers=$(grep -oE '\[net\] Player[0-9]+ \(peer [0-9]+\) moved' "$LOGS/server.log" 2>/dev/null |
+movers=$(grep -oE '\[net\] Player[12] \(peer [0-9]+\) moved' "$LOGS/server.log" 2>/dev/null |
 	grep -oE 'Player[0-9]+' | sort -u | wc -l | tr -d ' ')
 rejected=$(count 'rejected order' "$LOGS/server.log")
 inconsistent=$(cat "$LOGS"/*.log 2>/dev/null | grep -c 'occupancy_consistent=false' || true)
@@ -62,8 +68,11 @@ final=$(count '\[test\] final .*occupancy_consistent=true' "$LOGS/server.log")
 arrived1=$(count '\[test\] Player[0-9]+ arrived' "$LOGS/client1.log")
 arrived2=$(count '\[test\] Player[0-9]+ arrived' "$LOGS/client2.log")
 
-check "$joined" 2 "server spawned a player for each client with the right token"
-check "$(count '\[net\] peer [0-9]+ authenticated' "$LOGS/server.log")" 2 "server authenticated the two right-token clients"
+check "$joined" 3 "server spawned a player for each client with the right token and version"
+check "$(count '\[net\] peer [0-9]+ authenticated' "$LOGS/server.log")" 3 "server authenticated the three good clients"
+check "$(count '\[net\] using .*settings\.cfg' "$LOGS/client4.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/client4.log")" 11 "a client with no arguments joins from settings.cfg and plays"
+check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client 0\.0\.1, server ' "$LOGS/server.log")" 1 "server rejected the out-of-date client, naming both versions"
+check "$(count '\[net\] client out of date' "$LOGS/client5.log")" 1 "the out-of-date client was told so"
 check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(wrong token\)' "$LOGS/server.log")" 1 "server rejected the wrong-token client with its address"
 check "$(count 'authentication failed' "$LOGS/client3.log")" 1 "the wrong-token client reports authentication failed"
 check "$(count '\[test\] Player' "$LOGS/client3.log")" 0 "and never got a player to order around"

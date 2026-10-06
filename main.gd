@@ -79,6 +79,8 @@ var _test_contested := false
 ## Client: whether this peer has ever had a player, to tell a rejected join
 ## from a later disconnect.
 var _had_player := false
+## Client: the server said why it turned us away; keep that message up.
+var _rejected := false
 ## Right button held on this entity: released without a drag it is a shove,
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
@@ -107,6 +109,30 @@ func _ready() -> void:
 
 	# Every peer builds entities the same way; only the server decides when.
 	spawner.spawn_function = _build_entity
+	World.ticked.connect(_on_world_ticked)
+	if Net.test_exit_after > 0.0:
+		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
+
+	if Net.needs_setup:
+		# An exported client with no settings.cfg yet: ask once, then join.
+		var setup := SetupScreen.new()
+		setup.submitted.connect(_on_setup_submitted)
+		add_child(setup)
+		hud.text = "enter the server address and token"
+		return
+	_go_online()
+
+
+func _on_setup_submitted(address: String, port: int, token: String) -> void:
+	if not Net.save_settings(address, port, token):
+		hud.text = "could not write %s" % Net.settings_path()
+	Net.configure_client(address, port, token)
+	_go_online()
+
+
+## Starts networking in whatever mode Net settled on, and sets this peer up
+## as the authority or as a mirror accordingly.
+func _go_online() -> void:
 	Net.start()
 	if Net.is_authority():
 		# Players are spawned for authenticated peers only.
@@ -124,10 +150,7 @@ func _ready() -> void:
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		multiplayer.connection_failed.connect(
 				func() -> void: hud.text = "connection failed")
-
-	World.ticked.connect(_on_world_ticked)
-	if Net.test_exit_after > 0.0:
-		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
+		Net.join_rejected.connect(_on_join_rejected)
 
 
 func _process(_delta: float) -> void:
@@ -474,7 +497,18 @@ func _log_player_move(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 			entity.name, entity.owner_peer, from, to, World.is_occupancy_consistent()])
 
 
+func _on_join_rejected(reason: String, server_version: String) -> void:
+	_rejected = true
+	if reason == "client out of date":
+		hud.text = "client out of date: the server runs v%s, this is v%s. Run launch.bat to update." % [
+			server_version, Net.version]
+	else:
+		hud.text = reason
+
+
 func _on_server_disconnected() -> void:
+	if _rejected:
+		return  # The reason is already on screen.
 	if _had_player:
 		hud.text = "disconnected from server"
 	else:
