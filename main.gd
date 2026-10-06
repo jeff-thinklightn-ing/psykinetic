@@ -64,6 +64,11 @@ const TOSS_AIM_LENGTH := 26.0
 const RESPAWN_TICKS := 20
 ## With --state, the server writes its snapshot this often.
 const SNAPSHOT_EVERY_TICKS := 30
+## A dead level entity (monster killed, crate broken) comes back at its spawn
+## tile once this many ticks have passed since it died...
+const RESPAWN_DELAY_TICKS := 600
+## ...and no player is within this many tiles of that spawn tile.
+const RESPAWN_MIN_DISTANCE := 6
 
 ## Server only: peer id -> that peer's player entity.
 var _players: Dictionary[int, Player] = {}
@@ -74,6 +79,16 @@ var _peer_ids: Dictionary[int, String] = {}
 var _records: Dictionary[String, PlayerRecord] = {}
 ## Server only: peer id -> tick at which its dead player comes back.
 var _respawn_at: Dictionary[int, int] = {}
+## Server only: LEVEL_ENTITIES index -> the entity holding that slot now.
+var _alive_slots: Dictionary[int, GridEntity] = {}
+## Server only: LEVEL_ENTITIES index -> tick its entity died or broke.
+var _dead_since: Dictionary[int, int] = {}
+# Server console: lines from stdin (read on a thread) and from --admin-port.
+var _stdin_thread: Thread
+var _stdin_mutex := Mutex.new()
+var _stdin_lines: Array[String] = []
+var _admin: TCPServer
+var _admin_clients: Array[StreamPeerTCP] = []
 var _test_target := Vector2i.ZERO
 var _test_ordered := false
 var _test_arrived := false
@@ -144,6 +159,7 @@ func _go_online() -> void:
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		_start_level(true)
+		_start_console()
 	else:
 		# Terrain is static level data, not replicated state.
 		World.mirror_reset()
@@ -163,6 +179,7 @@ func _process(_delta: float) -> void:
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
+	_poll_console()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -311,6 +328,11 @@ func _paint_level() -> void:
 func _start_level(from_snapshot := false) -> void:
 	if not Net.is_authority():
 		return
+	# Whoever is online keeps their place through the rebuild.
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and player.spawned and _records.has(_peer_ids.get(peer, "")):
+			_records[_peer_ids[peer]].remember(player)
 	World.reset()
 	for child in entities.get_children():
 		entities.remove_child(child)
@@ -320,12 +342,16 @@ func _start_level(from_snapshot := false) -> void:
 	_players.clear()
 	_peer_ids.clear()
 	_respawn_at.clear()
-	_records.clear()
+	_alive_slots.clear()
+	_dead_since.clear()
 	# Level entities first (from the snapshot if there is one), then the
 	# players: a returning player's tile must be known to be free or taken.
+	# Player records survive a rebuild; a snapshot brings its own.
+	if from_snapshot:
+		_records.clear()
 	if not (from_snapshot and _spawn_from_snapshot()):
-		for spec in LEVEL_ENTITIES:
-			_spawn(spec)
+		for slot in LEVEL_ENTITIES.size():
+			_spawn(_slot_spec(slot))
 	if Net.mode != Net.Mode.SERVER:
 		_join_player(Net.local_id, Net.player_id, Net.player_name)
 	for peer in multiplayer.get_peers():
@@ -355,9 +381,52 @@ func _spawn_from_snapshot() -> bool:
 			continue
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
 		restored += 1
+	# Slots with no entity are dead: pick up their timers, or start one now.
+	for respawn: Dictionary in snapshot["respawns"]:
+		if not _alive_slots.has(respawn["spawn"]):
+			_dead_since[respawn["spawn"]] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
+	for slot in LEVEL_ENTITIES.size():
+		if not _alive_slots.has(slot) and not _dead_since.has(slot):
+			_dead_since[slot] = World.tick
 	print("[state] loaded %d entities and %d player records from %s (saved at tick %d)" % [
 		restored, snapshot["players"].size(), Net.state_path, snapshot["tick"]])
 	return true
+
+
+## The spawn table entry for [param slot], tagged with its index so the
+## entity can be tracked through death and respawn.
+func _slot_spec(slot: int) -> Dictionary:
+	var spec: Dictionary = LEVEL_ENTITIES[slot].duplicate(true)
+	spec["spawn"] = slot
+	return spec
+
+
+## Brings dead level entities back: after RESPAWN_DELAY_TICKS, with no player
+## within RESPAWN_MIN_DISTANCE of the spawn tile, onto a free tile. With
+## [param force], at once regardless of time and distance. Returns how many.
+func _check_respawns(tick: int, force := false) -> int:
+	var count := 0
+	for slot: int in _dead_since.keys():
+		if not force and tick - _dead_since[slot] < RESPAWN_DELAY_TICKS:
+			continue
+		var spec := _slot_spec(slot)
+		var tile: Vector2i = spec["tile"]
+		if not World.is_free(tile):
+			continue
+		if not force and _player_within(tile, RESPAWN_MIN_DISTANCE):
+			continue
+		if _spawn(spec) == null:
+			continue
+		count += 1
+		print("[world] respawned %s at %s" % [spec["scene"], tile])
+	return count
+
+
+func _player_within(tile: Vector2i, distance: int) -> bool:
+	for player: Player in _players.values():
+		if is_instance_valid(player) and player.spawned and World.distance(player.tile, tile) <= distance:
+			return true
+	return false
 
 
 func _save_state() -> void:
@@ -369,12 +438,20 @@ func _save_state() -> void:
 			_records[_peer_ids[peer]].remember(player)
 	var records: Array[PlayerRecord] = []
 	records.assign(_records.values())
-	Snapshot.save(Net.state_path, World.tick, World.get_entities(), records)
+	var respawns: Array[Dictionary] = []
+	for slot: int in _dead_since:
+		respawns.append({"spawn": slot,
+			"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
+	Snapshot.save(Net.state_path, World.tick, World.get_entities(), records, respawns)
 
 
 func _exit_tree() -> void:
 	# Clean shutdown (quit, window closed): keep the last state.
 	_save_state()
+	# The stdin thread ends on its own once stdin is closed; join it then. One
+	# still blocked on a live terminal cannot be joined and is left to die.
+	if _stdin_thread != null and _stdin_thread.is_started() and not _stdin_thread.is_alive():
+		_stdin_thread.wait_to_finish()
 
 
 func _spawn(spec: Dictionary) -> GridEntity:
@@ -383,6 +460,9 @@ func _spawn(spec: Dictionary) -> GridEntity:
 		entities.remove_child(entity)
 		entity.queue_free()
 		return null
+	if spec.has("spawn"):
+		_alive_slots[spec["spawn"]] = entity
+		_dead_since.erase(spec["spawn"])
 	return entity
 
 
@@ -493,6 +573,11 @@ func _on_peer_disconnected(peer: int) -> void:
 ## A player that dies comes back after RESPAWN_TICKS, as long as its peer is
 ## still here. Placeholder rule so the test room stays usable.
 func _on_entity_despawned(entity: GridEntity) -> void:
+	if entity.spawn_spec.has("spawn"):
+		var slot: int = entity.spawn_spec["spawn"]
+		if _alive_slots.get(slot) == entity:
+			_alive_slots.erase(slot)
+			_dead_since[slot] = World.tick
 	var peer := entity.owner_peer
 	if entity is Player and _players.get(peer) == entity:
 		_players.erase(peer)
@@ -514,6 +599,7 @@ func _respawn_due_players(tick: int) -> void:
 func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
 		_respawn_due_players(tick)
+		_check_respawns(tick)
 		if tick % SNAPSHOT_EVERY_TICKS == 0:
 			_save_state()
 	var player := _local_player()
@@ -573,6 +659,105 @@ func _on_server_disconnected() -> void:
 	else:
 		hud.text = "authentication failed"
 		print("[net] authentication failed: disconnected before a player was spawned")
+
+
+# --- Server console -----------------------------------------------------------
+# Lines from stdin (a dedicated server, or --console) and from a localhost
+# TCP port (--admin-port), one command per line. See admin_command().
+
+func _start_console() -> void:
+	if Net.mode == Net.Mode.SERVER or Net.console:
+		_stdin_thread = Thread.new()
+		_stdin_thread.start(_read_stdin)
+	if Net.admin_port > 0:
+		_admin = TCPServer.new()
+		var error := _admin.listen(Net.admin_port, "127.0.0.1")
+		if error == OK:
+			print("[admin] console on 127.0.0.1:%d" % Net.admin_port)
+		else:
+			push_warning("[admin] cannot listen on 127.0.0.1:%d (%s)" % [Net.admin_port, error_string(error)])
+			_admin = null
+
+
+## Runs on its own thread: stdin reads block. Lines go to _stdin_lines for
+## the main thread. Ends when stdin is closed or empty (a service's is).
+func _read_stdin() -> void:
+	var empties := 0
+	while true:
+		# One read may hold several lines (piped input), or nothing (EOF).
+		var chunk: String = OS.read_string_from_stdin()
+		if chunk.strip_edges().is_empty():
+			empties += 1
+			if empties >= 20:
+				return
+			OS.delay_msec(100)
+			continue
+		empties = 0
+		_stdin_mutex.lock()
+		for line in chunk.split("
+", false):
+			if not line.strip_edges().is_empty():
+				_stdin_lines.append(line.strip_edges())
+		_stdin_mutex.unlock()
+
+
+func _poll_console() -> void:
+	if _stdin_thread != null:
+		_stdin_mutex.lock()
+		var lines := _stdin_lines.duplicate()
+		_stdin_lines.clear()
+		_stdin_mutex.unlock()
+		for line in lines:
+			print(admin_command(line))
+	if _admin == null:
+		return
+	while _admin.is_connection_available():
+		_admin_clients.append(_admin.take_connection())
+	for client in _admin_clients.duplicate():
+		client.poll()
+		if client.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			_admin_clients.erase(client)
+		elif client.get_available_bytes() > 0:
+			var line: String = client.get_utf8_string(client.get_available_bytes()).strip_edges()
+			if not line.is_empty():
+				client.put_data((admin_command(line) + "\n").to_utf8_buffer())
+			client.disconnect_from_host()
+			_admin_clients.erase(client)
+
+
+## One console command; the reply is what the operator sees.
+func admin_command(line: String) -> String:
+	if not Net.is_authority():
+		return "not the authority"
+	var words := line.strip_edges().split(" ", false)
+	if words.is_empty():
+		return ""
+	match words[0].to_lower():
+		"reset":
+			_start_level()
+			return "room rebuilt from the map; %d player records kept" % _records.size()
+		"respawn":
+			return "respawned %d" % _check_respawns(World.tick, true)
+		"players":
+			var lines: Array[String] = []
+			for peer: int in _players:
+				var player: Player = _players[peer]
+				if not is_instance_valid(player) or not player.spawned:
+					continue
+				var id: String = _peer_ids.get(peer, "")
+				var record: PlayerRecord = _records.get(id)
+				lines.append("%s %s (%s) peer %d at %s hp %d/%d" % [
+					player.name, record.name if record != null else "?", id.left(8), peer,
+					player.tile, player.hp, player.max_hp])
+			return "%d connected\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 connected"
+		"save":
+			if Net.state_path == "":
+				return "no --state file to save to"
+			_save_state()
+			return "saved %s at tick %d" % [Net.state_path, World.tick]
+		"help":
+			return "reset | respawn | players | save"
+	return "unknown command %s (try help)" % words[0]
 
 
 ## --test-move: order the local player once, then report when the move shows

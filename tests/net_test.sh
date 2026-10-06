@@ -27,7 +27,7 @@ ID_D=d0d0d0d0-0000-4000-8000-00000000000d
 start() {
 	name="$1"
 	shift
-	"$GODOT" --headless --path . "$@" "--port=$PORT" >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
+	"$GODOT" --headless --path . "$@" "--port=$PORT" </dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 }
 
 start server --server "--token=$TOKEN" "--state=$STATE" --test-exit-after=16

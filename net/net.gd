@@ -10,6 +10,8 @@ extends Node
 ##                                it anyone may join (local play). client: sent on connect
 ##   --state=<path>               server/host: JSON snapshot of entity state, written every
 ##                                30 ticks and on clean shutdown, loaded on start if present
+##   --admin-port=<n>             server/host: accept console commands on 127.0.0.1:<n> (TCP)
+##   --console                    read console commands from stdin (--server does this anyway)
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
@@ -66,6 +68,10 @@ var address := "127.0.0.1"
 var port := DEFAULT_PORT
 ## Snapshot file for the authority, or "" for none.
 var state_path := ""
+## Localhost TCP port for console commands, or 0 for none.
+var admin_port := 0
+## Read console commands from stdin. Always on for --server.
+var console := false
 ## Join token. Never written anywhere in the repo; see server/env.example.
 var token := ""
 ## Who this client says it is. From settings.cfg, --player-id/--name, or
@@ -440,7 +446,9 @@ func _parse_args() -> void:
 			"--client":
 				mode = Mode.CLIENT
 				_mode_given = true
-			"--address", "--port", "--state", "--token", "--settings", "--player-id", "--name", \
+			"--console":
+				console = true
+			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--test-move", "--test-contest", "--test-exit-after", "--test-version":
 				if not has_value and i + 1 < args.size():
 					i += 1
@@ -466,6 +474,9 @@ func _set_option(key: String, value: String) -> void:
 			player_id = value.strip_edges()
 		"--name":
 			player_name = value
+		"--admin-port":
+			if value.is_valid_int():
+				admin_port = value.to_int()
 		"--test-version":
 			_test_version = value
 		"--test-move":

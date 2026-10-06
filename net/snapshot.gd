@@ -15,8 +15,9 @@ const VERSION := 1
 
 
 ## Writes [param entities] to [param path]. Returns false and logs on failure.
+## [param respawns] lists dead level entities as {spawn, ticks_left}.
 static func save(path: String, tick: int, entities: Array[GridEntity],
-		players: Array[PlayerRecord] = []) -> bool:
+		players: Array[PlayerRecord] = [], respawns: Array[Dictionary] = []) -> bool:
 	var list: Array[Dictionary] = []
 	for entity in entities:
 		if not is_instance_valid(entity) or not entity.spawned or entity.owner_peer != 0:
@@ -29,12 +30,14 @@ static func save(path: String, tick: int, entities: Array[GridEntity],
 			"stamina": entity.stamina,
 			"facing": [entity.facing.x, entity.facing.y],
 			"props": JSON.from_native(entity.spawn_spec.get("props", {})),
+			"spawn": int(entity.spawn_spec.get("spawn", -1)),
 		})
 	var records: Array[Dictionary] = []
 	for record in players:
 		records.append(record.to_dict())
 	var text := JSON.stringify(
-			{"version": VERSION, "tick": tick, "entities": list, "players": records}, "\t")
+			{"version": VERSION, "tick": tick, "entities": list, "players": records,
+				"respawns": respawns}, "\t")
 
 	var directory := path.get_base_dir()
 	if directory != "" and not DirAccess.dir_exists_absolute(directory):
@@ -58,7 +61,7 @@ static func save(path: String, tick: int, entities: Array[GridEntity],
 ## per restorable entity: {spec, hp, stamina, facing}. Entries that make no
 ## sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
-	var nothing := {"ok": false, "tick": 0, "entities": [], "players": []}
+	var nothing := {"ok": false, "tick": 0, "entities": [], "players": [], "respawns": []}
 	if not FileAccess.file_exists(path):
 		print("[state] no snapshot at %s; starting fresh" % path)
 		return nothing
@@ -92,7 +95,14 @@ static func load(path: String) -> Dictionary:
 				push_warning("[state] skipping a player record that makes no sense: %s" % [entry])
 				continue
 			players.append(record)
-	return {"ok": true, "tick": int(data.get("tick", 0)), "entities": entities, "players": players}
+	var respawns: Array[Dictionary] = []
+	var respawn_entries: Variant = data.get("respawns", [])
+	if respawn_entries is Array:
+		for entry in respawn_entries:
+			if entry is Dictionary and entry.get("spawn") is float:
+				respawns.append({"spawn": int(entry["spawn"]), "ticks_left": int(entry.get("ticks_left", 0))})
+	return {"ok": true, "tick": int(data.get("tick", 0)), "entities": entities,
+		"players": players, "respawns": respawns}
 
 
 static func _parse_entry(entry: Variant) -> Dictionary:
@@ -103,13 +113,16 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		return {}
 	var facing: Variant = vector(entry.get("facing"))
 	var props: Variant = JSON.to_native(entry.get("props", {}))
+	var spec := {
+		"scene": entry["type"],
+		"name": entry["name"],
+		"tile": tile,
+		"props": props if props is Dictionary else {},
+	}
+	if entry.get("spawn") is float and int(entry["spawn"]) >= 0:
+		spec["spawn"] = int(entry["spawn"])
 	return {
-		"spec": {
-			"scene": entry["type"],
-			"name": entry["name"],
-			"tile": tile,
-			"props": props if props is Dictionary else {},
-		},
+		"spec": spec,
 		"hp": int(entry.get("hp", 0)),
 		"stamina": int(entry.get("stamina", 0)),
 		"facing": facing if facing != null else Vector2i(0, 1),

@@ -12,6 +12,7 @@ reset it.
 | systemd unit | `server/psykinetic.service` |
 | Deploy script: pull, export, install, restart | `server/deploy.sh` |
 | Snapshot code | `net/snapshot.gd`, used by `main.gd` |
+| Console client | `server/admin.sh` → `--admin-port` |
 | Token file template | `server/env.example` → `/etc/psykinetic/env` |
 | Client bundle | `client/` (`launch.bat`, `update.ps1`, `README.txt`, `settings.example.cfg`), built by `tools/release_client.ps1` |
 | Version | `version.txt`, `CHANGELOG.md` |
@@ -95,6 +96,35 @@ sudo systemctl restart psykinetic
 ```
 
 The unit restarts the server 5 seconds after any failure.
+
+## Console
+
+The server takes four commands: `reset` (rebuild the room from the map;
+player records are kept and anyone online keeps their place), `respawn`
+(bring every dead monster and crate back now), `players` (who is connected,
+where, with what hp), `save` (write the snapshot now).
+
+Under systemd the server's stdin is closed, so the unit runs it with
+`--admin-port=7778` and commands go over a localhost TCP connection, one
+per connection, reply written back. `server/admin.sh` wraps that with
+bash's `/dev/tcp`, no netcat needed:
+
+```sh
+~/psykinetic/server/admin.sh players
+~/psykinetic/server/admin.sh respawn
+~/psykinetic/server/admin.sh reset
+~/psykinetic/server/admin.sh save
+```
+
+It must run on the box; the port only listens on localhost. By hand:
+`exec 3<>/dev/tcp/127.0.0.1/7778; echo players >&3; cat <&3`.
+
+A server started in a terminal (or any mode with `--console`) also reads
+the same commands from stdin.
+
+Dead monsters and broken crates come back on their own after 60 seconds,
+once no player is within 6 tiles of the spawn tile; `respawn` skips the
+wait. Players still get their own 2-second respawn.
 
 ## Connecting a client
 
@@ -193,6 +223,8 @@ ticks (3 seconds) and on clean shutdown, and loads it when it starts.
   server.
 - **`R` on a host** rebuilds the room fresh, ignoring the snapshot; the next
   write then overwrites it.
+- **Respawn timers**: a dead monster or crate is in the file as a slot
+  with its remaining delay, so a restart does not reset the wait.
 - **Shutdown**: `systemctl stop` sends SIGTERM, which Godot does not handle
   as a clean quit, so a stop can lose up to the last 3 seconds of state.
   Window close and in-game quit save properly.

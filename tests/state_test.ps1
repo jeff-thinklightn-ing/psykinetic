@@ -13,11 +13,13 @@ $dir = Join-Path ([IO.Path]::GetTempPath()) 'psykinetic-state-test'
 New-Item -ItemType Directory -Force $dir | Out-Null
 Remove-Item (Join-Path $dir '*') -Force -ErrorAction SilentlyContinue
 $state = Join-Path $dir 'world.json'
+$noStdin = Join-Path $dir 'stdin.empty'
+Set-Content $noStdin '' -NoNewline
 
 function Run-Host($name, $extra) {
 	$arguments = @('--headless', '--path', "`"$root`"", '--host', '--port=17781', "--state=`"$state`"") + $extra
 	$p = Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru -Wait `
-		-RedirectStandardOutput (Join-Path $dir "$name.log") -RedirectStandardError (Join-Path $dir "$name.err")
+		-RedirectStandardInput $noStdin -RedirectStandardOutput (Join-Path $dir "$name.log") -RedirectStandardError (Join-Path $dir "$name.err")
 	@(Get-Content (Join-Path $dir "$name.log"))
 }
 

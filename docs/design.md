@@ -128,6 +128,25 @@ sim state.
 `F3` toggles a debug overlay: peer id, round trip time (from ENet), and
 mispredictions in the last minute.
 
+**Respawn.** `LEVEL_ENTITIES` in `main.gd` is the spawn table: one slot
+per monster, crate and boulder, with its tile, scene and properties. Every
+level entity carries its slot (`spawn` in its spec, saved in the snapshot).
+When a slot's entity is killed or broken the slot is dead from that tick,
+and comes back — a fresh entity on the slot's own tile, at full stats — once
+`RESPAWN_DELAY_TICKS` (600) have passed, no player is within
+`RESPAWN_MIN_DISTANCE` (6) tiles of that tile, and the tile is free. A crate
+that was only pushed is alive and stays where it is; one pushed and then
+broken comes back at its spawn tile. The log line is
+`[world] respawned <type> at (x, y)`. The snapshot records each dead slot's
+remaining delay.
+
+**Console.** The authority takes commands: a dedicated server (or
+`--console`) reads lines from stdin on a thread, and `--admin-port=<n>`
+accepts them on `127.0.0.1:<n>`, one command per connection, reply written
+back. `reset` rebuilds the room from the map keeping player records (online
+players keep their places), `respawn` brings every dead slot back at once,
+`players` lists who is connected, `save` writes the snapshot.
+
 **Persistence.** With `--state=<path>` the authority writes a JSON snapshot
 of every level entity (type, name, tile, hp, stamina, facing, spawn
 properties) and every player record every 30 ticks and on clean shutdown,

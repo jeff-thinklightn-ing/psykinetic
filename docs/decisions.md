@@ -119,3 +119,11 @@ the server remembers each id (tile, stats, colour, name) in the snapshot and
 puts a returning player back as they were. No accounts, no passwords: the
 join token guards the server, the id only says which player you are. One
 connection per id at a time.
+
+## 17. Level entities respawn by slot, away from players
+
+The level's spawn table is the source of truth for what should exist. A
+dead slot comes back on its own tile at full stats after a delay, but never
+while a player is nearby, so nothing appears on top of someone. Pushed
+things are alive and stay put. The server console is a localhost TCP port
+under systemd (stdin is closed there), stdin elsewhere.

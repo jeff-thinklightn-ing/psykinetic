@@ -20,9 +20,14 @@ $state = Join-Path $logs 'world.json'
 $idC = 'c0ffee00-0000-4000-8000-00000000000c'
 $idD = 'd0d0d0d0-0000-4000-8000-00000000000d'
 
+# Servers read console commands from stdin; give them a closed one.
+$noStdin = Join-Path $logs 'stdin.empty'
+Set-Content $noStdin '' -NoNewline
+
 function Start-Instance($name, $modeArgs) {
 	$arguments = @('--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$port")
 	Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru `
+		-RedirectStandardInput $noStdin `
 		-RedirectStandardOutput (Join-Path $logs "$name.log") `
 		-RedirectStandardError (Join-Path $logs "$name.err")
 }
