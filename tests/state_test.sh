@@ -45,12 +45,14 @@ check "$(count '"version": 1' "$STATE")" 1 "snapshot carries version 1"
 # is pretty-printed as "tile": [ then 7, then 2 on their own lines.
 crate_tile=$(sed -n '/"name": "Crate1"/,/"type": "pushable"/p' "$STATE" | grep -A2 '"tile"' | grep -cE '^[[:space:]]*7,$' || true)
 check "$crate_tile" 1 "snapshot has Crate1 at [7, 2]"
-check "$(count '"type": "player"' "$STATE")" 0 "snapshot holds no players"
-check "$(count '"hp": ' "$STATE")" 9 "snapshot holds the 9 level entities"
+check "$(count '"type": "player"' "$STATE")" 0 "players are not among the entities"
+check "$(count '"player_id": "dev-host"' "$STATE")" 1 "snapshot holds the dev host's player record"
+check "$(count '"type": "(monster|pushable)"' "$STATE")" 9 "snapshot holds the 9 level entities"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 run_host second --test-exit-after=2
-check "$(count '\[state\] loaded 9 entities' "$DIR/second.log")" 1 "second run loads 9 entities from the snapshot"
+check "$(count '\[state\] loaded 9 entities and 1 player records' "$DIR/second.log")" 1 "second run loads 9 entities and 1 player record from the snapshot"
+check "$(count '\[net\] Player \(dev-host\) joined as Player1 at \(8, 2\) \(back\)' "$DIR/second.log")" 1 "the host comes back where it left off, as Player1"
 check "$(count 'tiles: .*Crate1=\(7, 2\)' "$DIR/second.log")" 1 "second run has Crate1 where the first left it"
 
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
@@ -58,6 +60,7 @@ echo 'this is not json' >"$STATE"
 run_host third --test-exit-after=2
 check "$(count 'does not parse.*starting fresh' "$DIR/third.log")" 1 "a corrupt snapshot is logged and ignored"
 check "$(count 'tiles: .*Crate1=\(8, 2\)' "$DIR/third.log")" 1 "and the room is generated fresh (Crate1 back at (8, 2))"
+check "$(count 'tiles: .*Player1=\(11, 2\)' "$DIR/third.log")" 1 "with the host at a start tile"
 check "$(count '"version": 1' "$STATE")" 1 "the corrupt file was replaced by a good snapshot on exit"
 check "$(cat "$DIR"/*.err 2>/dev/null | wc -l | tr -d ' ')" 0 "no run printed errors"
 

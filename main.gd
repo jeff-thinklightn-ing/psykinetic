@@ -65,13 +65,15 @@ const RESPAWN_TICKS := 20
 ## With --state, the server writes its snapshot this often.
 const SNAPSHOT_EVERY_TICKS := 30
 
-## Server only: peer id -> that peer's player.
+## Server only: peer id -> that peer's player entity.
 var _players: Dictionary[int, Player] = {}
-## Server only: peer id -> join order, so a respawn keeps its name and tint.
-var _player_index: Dictionary[int, int] = {}
+## Server only: peer id -> the player_id it joined with.
+var _peer_ids: Dictionary[int, String] = {}
+## Server only: everyone who has ever joined, by player_id. Saved in the
+## snapshot, so a player comes back where they left off, in their colour.
+var _records: Dictionary[String, PlayerRecord] = {}
 ## Server only: peer id -> tick at which its dead player comes back.
 var _respawn_at: Dictionary[int, int] = {}
-var _next_player_index := 0
 var _test_target := Vector2i.ZERO
 var _test_ordered := false
 var _test_arrived := false
@@ -123,8 +125,8 @@ func _ready() -> void:
 	_go_online()
 
 
-func _on_setup_submitted(address: String, port: int, token: String) -> void:
-	if not Net.save_settings(address, port, token):
+func _on_setup_submitted(address: String, port: int, token: String, player_name: String) -> void:
+	if not Net.save_settings(address, port, token, player_name):
 		hud.text = "could not write %s" % Net.settings_path()
 	Net.configure_client(address, port, token)
 	_go_online()
@@ -136,7 +138,7 @@ func _go_online() -> void:
 	Net.start()
 	if Net.is_authority():
 		# Players are spawned for authenticated peers only.
-		Net.peer_authenticated.connect(_on_peer_connected)
+		Net.peer_authenticated.connect(_on_peer_authenticated)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 		World.entity_despawned.connect(_on_entity_despawned)
 		if Net.mode == Net.Mode.SERVER:
@@ -316,26 +318,32 @@ func _start_level(from_snapshot := false) -> void:
 	World.load_terrain(ground.get_used_cells(), walls.get_used_cells(),
 			ground.get_used_cells_by_id(FIRE_SOURCE))
 	_players.clear()
-	_player_index.clear()
+	_peer_ids.clear()
 	_respawn_at.clear()
-	_next_player_index = 0
-	# The local player first, so in single-player it keeps the lowest id.
-	if Net.mode != Net.Mode.SERVER:
-		_spawn_player(Net.local_id)
+	_records.clear()
+	# Level entities first (from the snapshot if there is one), then the
+	# players: a returning player's tile must be known to be free or taken.
 	if not (from_snapshot and _spawn_from_snapshot()):
 		for spec in LEVEL_ENTITIES:
 			_spawn(spec)
+	if Net.mode != Net.Mode.SERVER:
+		_join_player(Net.local_id, Net.player_id, Net.player_name)
 	for peer in multiplayer.get_peers():
-		_spawn_player(peer)
+		var id := Net.player_of(peer)
+		if id != "":
+			_join_player(peer, id, _records[id].name if _records.has(id) else Net.DEFAULT_NAME)
 
 
-## True if a usable snapshot was found; its entities are then in the room.
+## True if a usable snapshot was found; its entities are then in the room and
+## its player records are known, so players joining next come back as they were.
 func _spawn_from_snapshot() -> bool:
 	if Net.state_path == "":
 		return false
 	var snapshot := Snapshot.load(Net.state_path)
 	if not snapshot["ok"]:
 		return false
+	for record: PlayerRecord in snapshot["players"]:
+		_records[record.player_id] = record
 	var restored := 0
 	for entry: Dictionary in snapshot["entities"]:
 		var spec: Dictionary = entry["spec"]
@@ -347,14 +355,21 @@ func _spawn_from_snapshot() -> bool:
 			continue
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
 		restored += 1
-	print("[state] loaded %d entities from %s (saved at tick %d)" % [
-		restored, Net.state_path, snapshot["tick"]])
+	print("[state] loaded %d entities and %d player records from %s (saved at tick %d)" % [
+		restored, snapshot["players"].size(), Net.state_path, snapshot["tick"]])
 	return true
 
 
 func _save_state() -> void:
-	if Net.is_authority() and Net.state_path != "":
-		Snapshot.save(Net.state_path, World.tick, World.get_entities())
+	if not Net.is_authority() or Net.state_path == "":
+		return
+	for peer: int in _players.keys():
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and player.spawned and _records.has(_peer_ids.get(peer, "")):
+			_records[_peer_ids[peer]].remember(player)
+	var records: Array[PlayerRecord] = []
+	records.assign(_records.values())
+	Snapshot.save(Net.state_path, World.tick, World.get_entities(), records)
 
 
 func _exit_tree() -> void:
@@ -371,23 +386,56 @@ func _spawn(spec: Dictionary) -> GridEntity:
 	return entity
 
 
-func _spawn_player(peer: int) -> void:
-	var tile := _free_start_tile()
+## Gives [param peer] the player its [param id] stands for: back where that
+## player left off if the server has seen the id before (nearest free tile
+## if its own is taken), fresh at a start tile if not. [param respawn] is a
+## death: known player, but a start tile and full stats.
+func _join_player(peer: int, id: String, player_name: String, respawn := false) -> void:
+	var record: PlayerRecord = _records.get(id)
+	var known := record != null
+	if not known:
+		record = PlayerRecord.new()
+		record.player_id = id
+		record.index = _records.size() + 1
+		record.color = PLAYER_TINTS[(record.index - 1) % PLAYER_TINTS.size()]
+		_records[id] = record
+	record.name = player_name
+	var tile := _nearest_free(record.tile) if known and not respawn else _free_start_tile()
 	if not World.is_free(tile):
-		print("[net] no free start tile for peer %d" % peer)
+		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
 		return
-	if not _player_index.has(peer):
-		_player_index[peer] = _next_player_index
-		_next_player_index += 1
-	var index := _player_index[peer]
 	var player := _spawn({
-		"scene": "player", "name": "Player%d" % (index + 1), "tile": tile, "peer": peer,
-		"props": {"tint": PLAYER_TINTS[index % PLAYER_TINTS.size()]},
+		"scene": "player", "name": "Player%d" % record.index, "tile": tile, "peer": peer,
+		"props": {"tint": record.color},
 	}) as Player
 	if player == null:
 		return
+	if known and not respawn:
+		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
+	record.remember(player)
 	_players[peer] = player
-	print("[net] peer %d joined as %s at %s" % [peer, player.name, tile])
+	_peer_ids[peer] = id
+	print("[net] %s (%s) joined as %s at %s%s" % [
+		player_name, id.left(8), player.name, tile, " (back)" if known and not respawn else ""])
+
+
+## [param wanted] if it is free, else the closest free walkable tile that is
+## not on fire, else a start tile.
+func _nearest_free(wanted: Vector2i) -> Vector2i:
+	var queue: Array[Vector2i] = [wanted]
+	var seen: Dictionary[Vector2i, bool] = {wanted: true}
+	while not queue.is_empty():
+		var tile: Vector2i = queue.pop_front()
+		if World.is_free(tile) and not World.is_fire(tile):
+			return tile
+		if seen.size() > 200:
+			break
+		for direction in World.DIRECTIONS:
+			var next := tile + direction
+			if not seen.has(next) and World.is_walkable(next):
+				seen[next] = true
+				queue.append(next)
+	return _free_start_tile()
 
 
 func _free_start_tile() -> Vector2i:
@@ -419,18 +467,27 @@ func _build_entity(spec: Dictionary) -> Node:
 	return entity
 
 
-func _on_peer_connected(peer: int) -> void:
-	_spawn_player(peer)
+func _on_peer_authenticated(peer: int, id: String, player_name: String) -> void:
+	_join_player(peer, id, player_name)
 
 
 func _on_peer_disconnected(peer: int) -> void:
 	var player: Player = _players.get(peer)
+	var id: String = _peer_ids.get(peer, "")
 	_players.erase(peer)
-	_player_index.erase(peer)
+	_peer_ids.erase(peer)
 	_respawn_at.erase(peer)
+	if id == "":
+		print("[net] peer %d left before joining" % peer)
+		return
+	var record: PlayerRecord = _records.get(id)
 	if is_instance_valid(player) and player.spawned:
+		if record != null:
+			record.remember(player)
 		World.despawn(player)
-	print("[net] peer %d left" % peer)
+	elif record != null:
+		record.last_seen = int(Time.get_unix_time_from_system())
+	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
 
 
 ## A player that dies comes back after RESPAWN_TICKS, as long as its peer is
@@ -447,7 +504,9 @@ func _respawn_due_players(tick: int) -> void:
 	for peer: int in _respawn_at.keys():
 		if tick >= _respawn_at[peer]:
 			_respawn_at.erase(peer)
-			_spawn_player(peer)
+			var id: String = _peer_ids.get(peer, "")
+			if id != "" and _records.has(id):
+				_join_player(peer, id, _records[id].name, true)
 
 
 # --- HUD, logging, test hooks -------------------------------------------------
@@ -549,8 +608,8 @@ func _on_test_exit() -> void:
 		World.tick, World.get_entities().size(), World.is_occupancy_consistent()])
 	var player := _local_player()
 	if player != null and not Net.is_authority():
-		print("[test] display: %s server_tile=%s shown_tile=%s mispredicts=%d" % [
-			player.name, player.tile, player.shown_tile(), Net.mispredicts_total])
+		print("[test] display: %s server_tile=%s shown_tile=%s mispredicts=%d color=%s" % [
+			player.name, player.tile, player.shown_tile(), Net.mispredicts_total, player.tint.to_html(false)])
 	# This peer's view of where everything is, for comparing across instances.
 	var tiles: Array[String] = []
 	for entity in World.get_entities():

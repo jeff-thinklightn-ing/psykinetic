@@ -130,16 +130,25 @@ mispredictions in the last minute.
 
 **Persistence.** With `--state=<path>` the authority writes a JSON snapshot
 of every level entity (type, name, tile, hp, stamina, facing, spawn
-properties) every 30 ticks and on clean shutdown, and rebuilds the room's
-entities from it on start. Terrain always comes from the ASCII map; players
-are never in it. A missing or unreadable snapshot is logged and the room is
+properties) and every player record every 30 ticks and on clean shutdown,
+and rebuilds the room's entities and its memory of players from it on start.
+Terrain always comes from the ASCII map. A missing or unreadable snapshot is logged and the room is
 generated fresh. Restoring goes through the same path as spawning
 (`spawner.spawn` + `World.spawn`) plus `World.restore` for hp, stamina and
 facing, so it is gated like everything else. Details in `docs/server.md`.
 
-**Players.** The server spawns one `Player` per peer (and one for itself when
-hosting) on the first free tile in `PLAYER_STARTS`, tinted by join order, and
-removes it when the peer leaves. Players cannot attack or shove each other
+**Players.** Every client has a `player_id` (a UUID made on first run and
+kept in `settings.cfg`, or `--player-id`; a host run from the project is the
+fixed `dev-host`) and a display name, both sent in the hello. The server
+keeps a `PlayerRecord` per id (`net/player_record.gd`: name, tile, hp,
+stamina, facing, colour, last seen), saved in the snapshot. A first-time id
+is spawned fresh on a free start tile and given the next join index, which
+fixes its node name (`Player3`) and colour for good. A known id comes back
+on its recorded tile (nearest free one if taken) with its recorded stats and
+colour. On disconnect the record is updated from the entity and the entity
+is despawned. An id that is already online is refused with
+`already connected`. The log says `[net] <name> (<id prefix>) joined ...`
+and `... left`. Players cannot attack or shove each other
 (`World.can_target`: no hit is accepted between two peer-controlled
 entities); they can still be hit by a crate or monster another player sent
 flying. A player that dies is respawned at a start
@@ -151,8 +160,8 @@ keeps the test room usable). `R` on the host rebuilds the room for everyone.
 The sim runs at a fixed **10 Hz** (`World.TICK_RATE`), driven by an accumulator
 in `World._process`. At most 5 ticks run per frame; past that the sim slows
 down rather than spiralling. Every entity gets an **id** at spawn, ascending
-in spawn order: the host's own player, then `LEVEL_ENTITIES` in `main.gd` in
-order, then players as their peers join. Each tick (`World.step`), on the
+in spawn order: `LEVEL_ENTITIES` in `main.gd` in order (or the snapshot's
+entities), then the host's own player, then players as their peers join. Each tick (`World.step`), on the
 server only:
 
 1. `tick += 1`.

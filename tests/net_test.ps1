@@ -15,6 +15,10 @@ New-Item -ItemType Directory -Force $logs | Out-Null
 Remove-Item (Join-Path $logs '*') -Force -ErrorAction SilentlyContinue
 $port = 17777
 $token = 'test-secret'
+$state = Join-Path $logs 'world.json'
+# Fixed identities for the players whose return we check.
+$idC = 'c0ffee00-0000-4000-8000-00000000000c'
+$idD = 'd0d0d0d0-0000-4000-8000-00000000000d'
 
 function Start-Instance($name, $modeArgs) {
 	$arguments = @('--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$port")
@@ -23,7 +27,7 @@ function Start-Instance($name, $modeArgs) {
 		-RedirectStandardError (Join-Path $logs "$name.err")
 }
 
-$server = Start-Instance 'server' @('--server', "--token=$token", '--test-exit-after=16')
+$server = Start-Instance 'server' @('--server', "--token=$token", "--state=`"$state`"", '--test-exit-after=16')
 Start-Sleep -Seconds 2
 $client1 = Start-Instance 'client1' @('--client', '--address=127.0.0.1', "--token=$token", '--test-move=-3,0', '--test-contest=9,1,70', '--test-exit-after=9')
 # Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
@@ -39,7 +43,7 @@ Start-Sleep -Seconds 1
 $client3 = Start-Instance 'client3' @('--client', '--address=127.0.0.1', '--token=wrong-secret', '--test-move=0,1', '--test-exit-after=4')
 # A fourth joins with no mode argument, from a settings file like an exported client.
 $settings = Join-Path $logs 'settings.cfg'
-Set-Content $settings "address=127.0.0.1`nport=$port`ntoken=$token`n" -Encoding ascii
+Set-Content $settings "address=127.0.0.1`nport=$port`ntoken=$token`nplayer_id=$idC`nname=Casey`n" -Encoding ascii
 Start-Sleep -Seconds 1
 $client4 = Start-Instance 'client4' @("--settings=`"$settings`"", '--test-move=0,1', '--test-exit-after=4')
 # A fifth has the right token but claims another version: turned away as out of date.
@@ -48,6 +52,18 @@ $client5 = Start-Instance 'client5' @('--client', '--address=127.0.0.1', "--toke
 $all = @($server, $client1, $client2, $client3, $client4, $client5)
 $all | Wait-Process -Timeout 40 -ErrorAction SilentlyContinue
 $all | Where-Object { -not $_.HasExited } | Stop-Process -Force
+
+# Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
+# come back where she left, Dana is new, and a second Casey is turned away.
+$server2 = Start-Instance 'server2' @('--server', "--token=$token", "--state=`"$state`"", '--test-exit-after=10')
+Start-Sleep -Seconds 2
+$clientC = Start-Instance 'clientC' @("--settings=`"$settings`"", '--test-exit-after=6')
+Start-Sleep -Seconds 1
+$clientD = Start-Instance 'clientD' @('--client', '--address=127.0.0.1', "--token=$token", "--player-id=$idD", '--name=Dana', '--test-exit-after=4')
+$clientE = Start-Instance 'clientE' @('--client', '--address=127.0.0.1', "--token=$token", "--player-id=$idC", '--name=Impostor', '--test-exit-after=3')
+$phase2 = @($server2, $clientC, $clientD, $clientE)
+$phase2 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+$phase2 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
@@ -59,6 +75,10 @@ $client2Log = Read-Log 'client2'
 $client3Log = Read-Log 'client3'
 $client4Log = Read-Log 'client4'
 $client5Log = Read-Log 'client5'
+$server2Log = Read-Log 'server2'
+$clientCLog = Read-Log 'clientC'
+$clientDLog = Read-Log 'clientD'
+$clientELog = Read-Log 'clientE'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -66,7 +86,7 @@ function Assert($ok, $label) {
 	else { Write-Output "  FAIL  $label"; $script:failures++ }
 }
 
-$joined = @($serverLog | Select-String '\[net\] peer \d+ joined as Player')
+$joined = @($serverLog | Select-String '\[net\] .+ \(\w+\) joined as Player')
 $movers = @($serverLog | Select-String '\[net\] (Player[12]) \(peer \d+\) moved' |
 	ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
 $inconsistent = @(($serverLog + $client1Log + $client2Log) | Select-String 'occupancy_consistent=false')
@@ -102,6 +122,16 @@ $loser = @($display | Where-Object { $_ -notmatch 'server_tile=\(9, 1\)' -and $_
 Assert ($winner.Count -eq 1) 'the winner is on (9, 1) with no mispredictions'
 Assert ($loser.Count -eq 1) 'the loser is not on (9, 1) and counted exactly one misprediction'
 Assert (@($clientLogs | Select-String 'mispredict: Player\d+ predicted \(9, 1\)').Count -eq 1) 'the loser had predicted (9, 1) before snapping back'
+Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) joined as Player3 at ').Count -eq 1) 'phase 1: Casey joined as Player3'
+Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) left').Count -eq 1) 'phase 1: her leaving was logged with her name and id'
+Assert (@($server2Log | Select-String '\[state\] loaded 9 entities and 3 player records').Count -eq 1) 'phase 2: the restarted server loads three player records'
+$colorBefore = @($client4Log | Select-String 'display: Player3 .*color=([0-9a-f]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+$colorAfter = @($clientCLog | Select-String 'display: Player3 server_tile=\(11, 3\).*color=([0-9a-f]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+Assert ($colorBefore.Count -eq 1 -and $colorAfter.Count -eq 1 -and $colorAfter[0] -eq $colorBefore[0]) "phase 2: Casey is back on (11, 3) as Player3 in her colour (before $colorBefore, after $colorAfter)"
+Assert (@($server2Log | Select-String '\[net\] Casey \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)').Count -eq 1) 'phase 2: the server says she joined back'
+Assert (@($server2Log | Select-String '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \(\d+, \d+\)$').Count -eq 1) 'phase 2: a new id gets a fresh spawn as Player4'
+Assert (@($server2Log | Select-String '\[net\] rejected peer \d+ from \S+ \(already connected as c0ffee00\)').Count -eq 1) 'phase 2: a second connection with an online id is rejected'
+Assert (@($clientELog | Select-String '\[net\] already connected').Count -eq 1) 'phase 2: and told so'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

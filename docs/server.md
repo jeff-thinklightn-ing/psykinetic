@@ -158,8 +158,13 @@ that sends nothing is dropped after 5 seconds. The log line is
 authenticated at once; the rest are refused as `server full`.
 
 A rejected client is told why before it is cut off and shows it:
-`authentication failed`, `client out of date` (with both versions), or
-`server full`.
+`authentication failed`, `client out of date` (with both versions),
+`already connected` (that player id is online already), or `server full`.
+
+The hello also carries the client's `player_id` and name. The id is a UUID
+the client makes on its first run and keeps in `settings.cfg`; it is how the
+server knows a returning player. Deleting `settings.cfg` makes a new one, so
+that player starts over.
 
 `--server` refuses to start without `--token` (it logs why and exits 1).
 `--host` without a token is local play: anyone who connects is let in.
@@ -174,8 +179,10 @@ ticks (3 seconds) and on clean shutdown, and loads it when it starts.
 
 - **What is in it**: every level entity — monsters, crates, the boulder —
   with its type, name, tile, hp, stamina, facing and the static properties
-  it was spawned with (mass, material, colour). Not players: they belong to
-  whichever peer is connected and are respawned when a peer joins.
+  it was spawned with (mass, material, colour); and a record for every
+  player who has ever joined, keyed by their `player_id`: name, tile, hp,
+  stamina, facing, colour, last seen. A returning player is put back on
+  that tile (or the nearest free one) with those stats and that colour.
 - **What is not**: the room. Terrain always comes from the ASCII map in
   `main.gd`. An entity that died or broke is simply absent and stays gone.
 - **Writes are atomic**: the file is written as `<path>.tmp` and renamed, so

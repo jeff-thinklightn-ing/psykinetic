@@ -11,10 +11,13 @@ extends Node
 ##   --state=<path>               server/host: JSON snapshot of entity state, written every
 ##                                30 ticks and on clean shutdown, loaded on start if present
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
+##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
 ## With no mode argument: an exported build reads settings.cfg (address=,
-## port=, token=) next to the exe and joins as a client, or asks for those
-## once if the file is missing; a run from the project is a host.
+## port=, token=, player_id=, name=) next to the exe and joins as a client,
+## or asks for those once if the file is missing; a run from the project is
+## a host. player_id is a UUID made on first run; the server remembers each
+## player by it. A host run from the project uses a fixed dev id.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -41,15 +44,19 @@ const AUTH_TIMEOUT := 5.0
 ## Seconds between telling a peer why it is rejected and disconnecting it.
 const REJECT_GRACE := 0.25
 
-## A peer has sent the right token (or none was required) and may be given a
-## player. Main spawns players on this, never on peer_connected.
-signal peer_authenticated(peer: int)
+## A peer has sent a good hello and may be given a player. Main spawns
+## players on this, never on peer_connected.
+signal peer_authenticated(peer: int, player_id: String, player_name: String)
 ## Client: the server turned this peer away and said why, just before
 ## disconnecting it.
 signal join_rejected(reason: String, server_version: String)
 
 const SETTINGS_FILE := "settings.cfg"
 const UNKNOWN_VERSION := "0.0.0"
+## The identity a host run from the project uses, so its state persists too.
+const DEV_PLAYER_ID := "dev-host"
+const DEFAULT_NAME := "Player"
+const MAX_NAME_LENGTH := 24
 
 ## From version.txt at the project root. Sent on join; must match the server.
 var version := UNKNOWN_VERSION
@@ -61,8 +68,12 @@ var port := DEFAULT_PORT
 var state_path := ""
 ## Join token. Never written anywhere in the repo; see server/env.example.
 var token := ""
-## Server only: peers that have authenticated.
-var _authenticated: Dictionary[int, bool] = {}
+## Who this client says it is. From settings.cfg, --player-id/--name, or
+## for a project host the dev id.
+var player_id := ""
+var player_name := DEFAULT_NAME
+## Server only: authenticated peer -> its player_id.
+var _authenticated: Dictionary[int, String] = {}
 ## True when an exported build has no settings file and must ask for one.
 var needs_setup := false
 var _mode_given := false
@@ -90,6 +101,34 @@ func _enter_tree() -> void:
 	_parse_args()
 	if not _mode_given:
 		_apply_settings()
+	if player_id.is_empty():
+		# A client run from the command line gets a throwaway id; a host or
+		# server run from the project is always the same dev player.
+		player_id = new_uuid() if mode == Mode.CLIENT else DEV_PLAYER_ID
+	player_name = tidy_name(player_name)
+
+
+## A random UUID v4, as a player identity.
+static func new_uuid() -> String:
+	var bytes := PackedByteArray()
+	bytes.resize(16)
+	for i in 16:
+		bytes[i] = randi() & 0xFF
+	bytes[6] = (bytes[6] & 0x0F) | 0x40
+	bytes[8] = (bytes[8] & 0x3F) | 0x80
+	var hex := bytes.hex_encode()
+	return "%s-%s-%s-%s-%s" % [
+		hex.substr(0, 8), hex.substr(8, 4), hex.substr(12, 4), hex.substr(16, 4), hex.substr(20, 12)]
+
+
+static func tidy_name(raw: String) -> String:
+	var tidy := raw.strip_edges().substr(0, MAX_NAME_LENGTH)
+	return tidy if not tidy.is_empty() else DEFAULT_NAME
+
+
+## Server side: the player_id an authenticated peer presented, or "".
+func player_of(peer: int) -> String:
+	return _authenticated.get(peer, "")
 
 
 func _read_version() -> String:
@@ -123,6 +162,13 @@ func _apply_settings() -> void:
 	var settings := _read_settings(path)
 	configure_client(settings.get("address", address), int(settings.get("port", str(port))),
 			settings.get("token", ""))
+	player_name = tidy_name(settings.get("name", DEFAULT_NAME))
+	player_id = str(settings.get("player_id", "")).strip_edges()
+	if player_id.is_empty():
+		# First run with a hand-written file: give it an identity and keep it.
+		player_id = new_uuid()
+		save_settings(address, port, token, player_name)
+		print("[net] gave %s a new player id" % path)
 	print("[net] using %s" % path)
 
 
@@ -139,16 +185,22 @@ func _read_settings(path: String) -> Dictionary:
 	return settings
 
 
-## Writes the settings file the setup screen asked for. False if it cannot.
-func save_settings(new_address: String, new_port: int, new_token: String) -> bool:
+## Writes the settings file, keeping (or minting) this client's player id.
+## False if it cannot.
+func save_settings(new_address: String, new_port: int, new_token: String,
+		new_name: String) -> bool:
 	var path := settings_path()
 	if path == "":
 		return false
+	if player_id.is_empty():
+		player_id = new_uuid()
+	player_name = tidy_name(new_name)
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
-	file.store_string("address=%s\nport=%d\ntoken=%s\n" % [new_address, new_port, new_token])
+	file.store_string("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\n" % [
+		new_address, new_port, new_token, player_id, player_name])
 	file.close()
 	return true
 
@@ -222,24 +274,33 @@ func is_peer_authenticated(peer: int) -> bool:
 	return peer == local_id or _authenticated.has(peer)
 
 
-## Sent by a client right after it connects. On the server, a matching
-## version and (if one is required) the right token let the peer in;
-## anything else gets it told why and disconnected.
+## The hello a client sends right after it connects: {token, version,
+## player_id, name}. On the server, a matching version, the right token (if
+## one is required) and an id nobody else is using let the peer in; anything
+## else gets it told why and disconnected.
 @rpc("any_peer", "call_remote", "reliable")
-func authenticate(offered: String, client_version: String) -> void:
+func authenticate(hello: Dictionary) -> void:
 	if not is_authority():
 		return
 	var peer := multiplayer.get_remote_sender_id()
 	if peer == 0 or _authenticated.has(peer):
 		return
+	var offered := str(hello.get("token", ""))
+	var client_version := str(hello.get("version", ""))
+	var id := str(hello.get("player_id", "")).strip_edges()
+	var player_name_given := tidy_name(str(hello.get("name", "")))
 	if client_version != version:
 		_reject(peer, "client out of date", "client %s, server %s" % [client_version, version])
 	elif token != "" and offered != token:
 		_reject(peer, "authentication failed", "empty token" if offered == "" else "wrong token")
+	elif id.is_empty() or id.length() > 64:
+		_reject(peer, "authentication failed", "bad player id")
+	elif id in _authenticated.values():
+		_reject(peer, "already connected", "already connected as %s" % id.left(8))
 	elif _authenticated.size() >= MAX_PLAYERS:
 		_reject(peer, "server full")
 	else:
-		_admit(peer)
+		_admit(peer, id, player_name_given)
 
 
 func _on_peer_connected(peer: int) -> void:
@@ -259,10 +320,11 @@ func _on_peer_disconnected(peer: int) -> void:
 	_authenticated.erase(peer)
 
 
-func _admit(peer: int) -> void:
-	_authenticated[peer] = true
-	print("[net] peer %d authenticated (%d of %d)" % [peer, _authenticated.size(), MAX_PLAYERS])
-	peer_authenticated.emit(peer)
+func _admit(peer: int, id: String, player_name_given: String) -> void:
+	_authenticated[peer] = id
+	print("[net] peer %d authenticated as %s (%s) (%d of %d)" % [
+		peer, player_name_given, id.left(8), _authenticated.size(), MAX_PLAYERS])
+	peer_authenticated.emit(peer, id, player_name_given)
 
 
 ## [param reason] is what the player sees; [param detail] is for the log.
@@ -347,7 +409,8 @@ func start() -> void:
 
 func _on_connected_to_server() -> void:
 	print("[net] connected as peer %d" % multiplayer.get_unique_id())
-	authenticate.rpc_id(1, token, claimed_version())
+	authenticate.rpc_id(1, {
+		"token": token, "version": claimed_version(), "player_id": player_id, "name": player_name})
 
 
 func _on_server_disconnected() -> void:
@@ -377,7 +440,7 @@ func _parse_args() -> void:
 			"--client":
 				mode = Mode.CLIENT
 				_mode_given = true
-			"--address", "--port", "--state", "--token", "--settings", \
+			"--address", "--port", "--state", "--token", "--settings", "--player-id", "--name", \
 					"--test-move", "--test-contest", "--test-exit-after", "--test-version":
 				if not has_value and i + 1 < args.size():
 					i += 1
@@ -399,6 +462,10 @@ func _set_option(key: String, value: String) -> void:
 			token = value
 		"--settings":
 			_settings_override = value
+		"--player-id":
+			player_id = value.strip_edges()
+		"--name":
+			player_name = value
 		"--test-version":
 			_test_version = value
 		"--test-move":

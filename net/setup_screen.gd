@@ -3,11 +3,12 @@ extends CanvasLayer
 ## First-run screen for an exported client with no settings.cfg: asks for the
 ## server address and token once. Main writes the file and connects.
 
-signal submitted(address: String, port: int, token: String)
+signal submitted(address: String, port: int, token: String, player_name: String)
 
 var _address: LineEdit
 var _port: LineEdit
 var _token: LineEdit
+var _name: LineEdit
 var _error: Label
 
 
@@ -43,6 +44,8 @@ func _ready() -> void:
 	_port.text = str(Net.DEFAULT_PORT)
 	_token = _field(column, "Token", "")
 	_token.secret = true
+	_name = _field(column, "Your name", "Player")
+	_name.text = "Player"
 
 	_error = Label.new()
 	_error.modulate = Color(1.0, 0.5, 0.5)
@@ -54,7 +57,7 @@ func _ready() -> void:
 	column.add_child(button)
 
 	_address.grab_focus()
-	for field in [_address, _port, _token]:
+	for field in [_address, _port, _token, _name]:
 		field.text_submitted.connect(func(_text: String) -> void: _submit())
 
 
@@ -81,5 +84,8 @@ func _submit() -> void:
 	if token.is_empty():
 		_error.text = "The token is needed."
 		return
-	submitted.emit(address, port_text.to_int(), token)
+	var player_name := _name.text.strip_edges()
+	if player_name.is_empty():
+		player_name = "Player"
+	submitted.emit(address, port_text.to_int(), token, player_name)
 	queue_free()

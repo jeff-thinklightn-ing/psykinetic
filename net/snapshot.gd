@@ -2,10 +2,10 @@ class_name Snapshot
 extends RefCounted
 ## JSON snapshot of entity state for the dedicated server (--state=<path>).
 ##
-## Holds every entity the level owns (not players: those belong to peers and
-## are respawned when their peer comes back): the spawn spec it was built
-## from, its tile, hp, stamina and facing. The room itself always comes from
-## the ASCII map in main.gd; only entities are restored.
+## Holds every entity the level owns (the spawn spec it was built from, its
+## tile, hp, stamina and facing) and a PlayerRecord per player who has ever
+## joined, so a player comes back where they left off. The room itself
+## always comes from the ASCII map in main.gd.
 ##
 ## Written to <path>.tmp then renamed, so a crash mid-write cannot leave a
 ## half snapshot behind. Loading anything it cannot make sense of logs the
@@ -15,7 +15,8 @@ const VERSION := 1
 
 
 ## Writes [param entities] to [param path]. Returns false and logs on failure.
-static func save(path: String, tick: int, entities: Array[GridEntity]) -> bool:
+static func save(path: String, tick: int, entities: Array[GridEntity],
+		players: Array[PlayerRecord] = []) -> bool:
 	var list: Array[Dictionary] = []
 	for entity in entities:
 		if not is_instance_valid(entity) or not entity.spawned or entity.owner_peer != 0:
@@ -29,7 +30,11 @@ static func save(path: String, tick: int, entities: Array[GridEntity]) -> bool:
 			"facing": [entity.facing.x, entity.facing.y],
 			"props": JSON.from_native(entity.spawn_spec.get("props", {})),
 		})
-	var text := JSON.stringify({"version": VERSION, "tick": tick, "entities": list}, "\t")
+	var records: Array[Dictionary] = []
+	for record in players:
+		records.append(record.to_dict())
+	var text := JSON.stringify(
+			{"version": VERSION, "tick": tick, "entities": list, "players": records}, "\t")
 
 	var directory := path.get_base_dir()
 	if directory != "" and not DirAccess.dir_exists_absolute(directory):
@@ -53,7 +58,7 @@ static func save(path: String, tick: int, entities: Array[GridEntity]) -> bool:
 ## per restorable entity: {spec, hp, stamina, facing}. Entries that make no
 ## sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
-	var nothing := {"ok": false, "tick": 0, "entities": []}
+	var nothing := {"ok": false, "tick": 0, "entities": [], "players": []}
 	if not FileAccess.file_exists(path):
 		print("[state] no snapshot at %s; starting fresh" % path)
 		return nothing
@@ -78,16 +83,25 @@ static func load(path: String) -> Dictionary:
 			push_warning("[state] skipping an entry that makes no sense: %s" % [entry])
 			continue
 		entities.append(parsed)
-	return {"ok": true, "tick": int(data.get("tick", 0)), "entities": entities}
+	var players: Array[PlayerRecord] = []
+	var player_entries: Variant = data.get("players", [])
+	if player_entries is Array:
+		for entry in player_entries:
+			var record := PlayerRecord.from_dict(entry)
+			if record == null:
+				push_warning("[state] skipping a player record that makes no sense: %s" % [entry])
+				continue
+			players.append(record)
+	return {"ok": true, "tick": int(data.get("tick", 0)), "entities": entities, "players": players}
 
 
 static func _parse_entry(entry: Variant) -> Dictionary:
 	if entry is not Dictionary:
 		return {}
-	var tile: Variant = _vector(entry.get("tile"))
+	var tile: Variant = vector(entry.get("tile"))
 	if tile == null or entry.get("type") is not String or entry.get("name") is not String:
 		return {}
-	var facing: Variant = _vector(entry.get("facing"))
+	var facing: Variant = vector(entry.get("facing"))
 	var props: Variant = JSON.to_native(entry.get("props", {}))
 	return {
 		"spec": {
@@ -103,7 +117,7 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 
 
 ## A JSON [x, y] pair as a Vector2i, or null.
-static func _vector(value: Variant) -> Variant:
+static func vector(value: Variant) -> Variant:
 	if value is Array and value.size() == 2 \
 			and (value[0] is float or value[0] is int) and (value[1] is float or value[1] is int):
 		return Vector2i(int(value[0]), int(value[1]))

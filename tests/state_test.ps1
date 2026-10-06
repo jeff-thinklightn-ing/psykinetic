@@ -37,12 +37,15 @@ try { $json = Get-Content $state -Raw | ConvertFrom-Json } catch {}
 Assert ($null -ne $json -and $json.version -eq 1) 'snapshot is valid JSON with version 1'
 $crate = @($json.entities | Where-Object { $_.name -eq 'Crate1' })
 Assert ($crate.Count -eq 1 -and $crate[0].tile[0] -eq 7 -and $crate[0].tile[1] -eq 2) 'snapshot has Crate1 at [7, 2]'
-Assert (@($json.entities | Where-Object { $_.type -eq 'player' }).Count -eq 0) 'snapshot holds no players'
+Assert (@($json.entities | Where-Object { $_.type -eq 'player' }).Count -eq 0) 'players are not among the entities'
+$dev = @($json.players | Where-Object { $_.player_id -eq 'dev-host' })
+Assert ($json.players.Count -eq 1 -and $dev.Count -eq 1 -and $dev[0].tile[0] -eq 8 -and $dev[0].tile[1] -eq 2) "snapshot holds the dev host's player record at [8, 2]"
 Assert ($json.entities.Count -eq 9) "snapshot holds the 9 level entities (saw $($json.entities.Count))"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 $second = Run-Host 'second' @('--test-exit-after=2')
-Assert (@($second | Select-String '\[state\] loaded 9 entities').Count -eq 1) 'second run loads 9 entities from the snapshot'
+Assert (@($second | Select-String '\[state\] loaded 9 entities and 1 player records').Count -eq 1) 'second run loads 9 entities and 1 player record from the snapshot'
+Assert (@($second | Select-String '\[net\] Player \(dev-host\) joined as Player1 at \(8, 2\) \(back\)').Count -eq 1) 'the host comes back where it left off, as Player1'
 Assert (@($second | Select-String 'tiles: .*Crate1=\(7, 2\)').Count -eq 1) 'second run has Crate1 where the first left it'
 
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
@@ -50,6 +53,7 @@ Set-Content $state 'this is not json' -Encoding ascii
 $third = Run-Host 'third' @('--test-exit-after=2')
 Assert (@($third | Select-String 'does not parse.*starting fresh').Count -eq 1) 'a corrupt snapshot is logged and ignored'
 Assert (@($third | Select-String 'tiles: .*Crate1=\(8, 2\)').Count -eq 1) 'and the room is generated fresh (Crate1 back at (8, 2))'
+Assert (@($third | Select-String 'tiles: .*Player1=\(11, 2\)').Count -eq 1) 'with the host at a start tile'
 try { $json = Get-Content $state -Raw | ConvertFrom-Json } catch { $json = $null }
 Assert ($null -ne $json) 'the corrupt file was replaced by a good snapshot on exit'
 $errors = @(Get-ChildItem $dir -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })

@@ -111,3 +111,11 @@ them on start; terrain is regenerated from the map and players are never
 saved. Anything unreadable is logged and ignored rather than fatal. The
 server itself is a Dedicated Server export run as a systemd service on a
 Linux box (`docs/server.md`).
+
+## 16. Players are identified by a client-made UUID
+
+A client mints a `player_id` on first run and keeps it in `settings.cfg`;
+the server remembers each id (tile, stats, colour, name) in the snapshot and
+puts a returning player back as they were. No accounts, no passwords: the
+join token guards the server, the id only says which player you are. One
+connection per id at a time.

@@ -19,6 +19,10 @@ cd "$(dirname "$0")/.."
 LOGS="$(mktemp -d)"
 PORT=17777
 TOKEN=test-secret
+STATE="$LOGS/world.json"
+# Fixed identities for the players whose return we check.
+ID_C=c0ffee00-0000-4000-8000-00000000000c
+ID_D=d0d0d0d0-0000-4000-8000-00000000000d
 
 start() {
 	name="$1"
@@ -26,7 +30,7 @@ start() {
 	"$GODOT" --headless --path . "$@" "--port=$PORT" >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 }
 
-start server --server "--token=$TOKEN" --test-exit-after=16
+start server --server "--token=$TOKEN" "--state=$STATE" --test-exit-after=16
 sleep 2
 start client1 --client --address=127.0.0.1 "--token=$TOKEN" --test-move=-3,0 --test-contest=9,1,70 --test-exit-after=9
 # Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
@@ -41,11 +45,21 @@ start client2 --client --address=127.0.0.1 "--token=$TOKEN" --test-move=-2,0 --t
 sleep 1
 start client3 --client --address=127.0.0.1 --token=wrong-secret --test-move=0,1 --test-exit-after=4
 # A fourth joins with no mode argument, from a settings file like an exported client.
-printf 'address=127.0.0.1\nport=%s\ntoken=%s\n' "$PORT" "$TOKEN" >"$LOGS/settings.cfg"
+printf 'address=127.0.0.1\nport=%s\ntoken=%s\nplayer_id=%s\nname=Casey\n' "$PORT" "$TOKEN" "$ID_C" >"$LOGS/settings.cfg"
 sleep 1
 start client4 "--settings=$LOGS/settings.cfg" --test-move=0,1 --test-exit-after=4
 # A fifth has the right token but claims another version: turned away as out of date.
 start client5 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=0.0.1 --test-exit-after=4
+wait
+
+# Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
+# come back where she left, Dana is new, and a second Casey is turned away.
+start server2 --server "--token=$TOKEN" "--state=$STATE" --test-exit-after=10
+sleep 2
+start clientC "--settings=$LOGS/settings.cfg" --test-exit-after=6
+sleep 1
+start clientD --client --address=127.0.0.1 "--token=$TOKEN" "--player-id=$ID_D" --name=Dana --test-exit-after=4
+start clientE --client --address=127.0.0.1 "--token=$TOKEN" "--player-id=$ID_C" --name=Impostor --test-exit-after=3
 wait
 
 failures=0
@@ -59,7 +73,7 @@ check() {
 }
 count() { grep -cE "$1" "$2" 2>/dev/null || true; }
 
-joined=$(count '\[net\] peer [0-9]+ joined as Player' "$LOGS/server.log")
+joined=$(count '\[net\] .+ \([a-z0-9-]+\) joined as Player' "$LOGS/server.log")
 movers=$(grep -oE '\[net\] Player[12] \(peer [0-9]+\) moved' "$LOGS/server.log" 2>/dev/null |
 	grep -oE 'Player[0-9]+' | sort -u | wc -l | tr -d ' ')
 rejected=$(count 'rejected order' "$LOGS/server.log")
@@ -99,6 +113,16 @@ loser=$(cat $clients | grep -E 'display: .*mispredicts=1' | grep -vc 'server_til
 check "$loser" 1 "the loser is not on (9, 1) and counted exactly one misprediction"
 predicted=$(cat $clients | grep -cE 'mispredict: Player[0-9]+ predicted \(9, 1\)' || true)
 check "$predicted" 1 "the loser had predicted (9, 1) before snapping back"
+check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at ' "$LOGS/server.log")" 1 "phase 1: Casey joined as Player3"
+check "$(count '\[net\] Casey \(c0ffee00\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and id"
+check "$(count '\[state\] loaded 9 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"
+color_before=$(grep -oE 'display: Player3 .*color=[0-9a-f]+' "$LOGS/client4.log" | grep -oE 'color=[0-9a-f]+' | head -1)
+color_after=$(grep -oE 'display: Player3 server_tile=\(11, 3\).*color=[0-9a-f]+' "$LOGS/clientC.log" | grep -oE 'color=[0-9a-f]+' | head -1)
+check "$([ -n "$color_before" ] && echo "$color_after")" "$color_before" "phase 2: Casey is back on (11, 3) as Player3 in her colour"
+check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: the server says she joined back"
+check "$(count '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \([0-9]+, [0-9]+\)$' "$LOGS/server2.log")" 1 "phase 2: a new id gets a fresh spawn as Player4"
+check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(already connected as c0ffee00\)' "$LOGS/server2.log")" 1 "phase 2: a second connection with an online id is rejected"
+check "$(count '\[net\] already connected' "$LOGS/clientE.log")" 1 "phase 2: and told so"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 
