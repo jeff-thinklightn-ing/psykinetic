@@ -511,7 +511,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		return
 	var player := _spawn({
 		"scene": "player", "name": "Player%d" % record.index, "tile": tile, "peer": peer,
-		"props": {"tint": record.color},
+		"props": {"tint": record.color, "label": player_name},
 	}) as Player
 	if player == null:
 		return
