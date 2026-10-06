@@ -4,7 +4,8 @@
 
 | Path | Contents |
 | --- | --- |
-| `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `iso.gd` (grid ↔ pixel math). |
+| `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
+| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as a thin tall face), `fade.gd` (darkness beyond a distance). |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -271,10 +272,16 @@ Screen speed still differs by direction, as it does in any 2:1 isometric
 view: a sideways diagonal covers 32 px, an orthogonal step 18 px, an up/down
 diagonal 16 px.
 
-A diagonal is blocked if either of the two orthogonal neighbours it passes
-between is not open floor (wall or off-map). Entities on those neighbours do
-not block it. The same rule applies to walking, to bodies being pushed, to A*,
-and to melee reach (`World.can_melee`).
+**Walls are edges, not cells.** Every cell is floor (or fire, or nothing);
+blocking is a property of the edge you cross. Each cell has four edges, each
+open, a wall, or a door (a wall with an open/closed state, see Doors). A
+move checks the destination's occupancy as before plus the edge between
+source and destination. A diagonal is blocked if either of the two
+orthogonal neighbours it passes between is not floor, or if any of the four
+edges around that corner is shut: no cutting a wall corner, and no slipping
+past the end of a wall. Entities on those neighbours do not block it. The
+same rule applies to walking, to bodies being pushed, to A*, and to melee
+reach (`World.can_melee`): nothing hits through a wall or a closed door.
 
 Walking into a `pushable` entity shoves it one tile if the chain of pushables
 in that direction has total mass ≤ the walker's. This is the original push
@@ -283,8 +290,22 @@ rule; it carries no force and causes no impact.
 Pathfinding is 8-connected A* in `World.find_path` over walkable terrain minus
 occupied tiles, costed in ticks (a diagonal costs 1.5 orthogonal steps). Ties
 prefer fewer diagonals, and fire tiles are avoided when a detour of up to five steps exists. Line of
-sight is a Bresenham walk blocked by walls and by entities with
-`blocks_sight`.
+sight is a Bresenham walk blocked by a wall edge or closed door crossed on
+the way (a diagonal step of the walk needs one of its two orthogonal routes
+open) and by entities with `blocks_sight`. A creature's path may go through
+a closed door at the cost of one extra step; it opens it by walking into it.
+
+**Doors** (`sim/door.gd`) are nodes on door edges, spawned by the server
+with the level through the spawner, so every client has them; `open` and
+`hp` replicate. A creature standing on either side opens or closes one with
+`World.command("door", {edge})` (`World.try_toggle_door`, which takes the
+entity's step time); a creature walking into a closed door opens it and
+steps through, monsters included. A door is "held" only by standing in the
+doorway cell, which is plain occupancy. A crate cannot go through a closed
+door. A body pushed against a closed door stops and takes impact as against
+a wall, and the door takes the same impact: a wood door breaks once its hp
+is spent and is then open for good; stone takes nothing. Door state is not
+in the snapshot: a restart or reset closes and mends every door.
 
 ## Force pushes
 
@@ -305,7 +326,8 @@ push does nothing: no movement and no impact.
 | Stopped by | Result |
 | --- | --- |
 | nothing (ran out of force) | No impact. |
-| wall (or wall corner, or map edge) | The body takes impact. The wall takes nothing and never moves. |
+| wall edge (or wall corner, or map edge) | The body takes impact. The wall takes nothing and never moves. |
+| closed door | The body takes impact, and so does the door: wood breaks once its hp is spent. |
 | another entity | Both take impact. The push then continues into that entity with `remaining − 1` force, subject to the mass gate. |
 | fire (creatures only) | Landing on fire is a stop: the body takes impact there, then the hazard phase burns it. |
 
@@ -535,21 +557,30 @@ cube (crates) 0.8, barrel 0.9, sphere (the boulder) 1.2, slab 0.4, flat 0.1.
 texture's `foot` row sits on the tile centre; `WallBlock` draws to its.
 Nothing else states a size; a spec's `scale` multiplies on top.
 
-**Walls** (`render/wall_block.gd`) are one Node2D per `#` tile in the
-Y-sorted layer, drawn in code: a top face and whichever of the two
-camera-facing sides (+x, +y) have no wall neighbour. Adjacent blocks join
-into continuous walls; straight runs, corners and end caps come from the
-neighbours alone. Rims are drawn on top edges that border no wall. A block
-that would cover an entity (within its screen column, up to three tiles
-behind it) is drawn translucent for as long as it does, so nothing is lost
-behind a wall. The `Walls` TileMapLayer still holds the wall cells for
-`World.load_terrain`, hidden. Floor in front of a wall (the wall to its -x
-or -y side) uses a shaded alternative tile.
+**Walls** (`render/wall_edge.gd`) are one Node2D per wall edge in the
+Y-sorted layer, drawn in code as a thin face standing on the cell boundary,
+as tall as the scale table says, with the cell on its -x / -y side (a hair
+nearer the camera, so it is in front of what stands on that cell and behind
+the next). Where a wall ends, turns a corner, or meets a door, a post is
+drawn at that vertex; where it runs straight on, nothing, so a run reads as
+one wall. Posts and faces come from the neighbouring edges alone. A face or
+door that would draw over the local player's cell fades to 30% while it
+overlaps it. Floor with a wall on its -x or -y edge uses a shaded
+alternative tile. Doors draw themselves (`Door._draw`): a face on the edge
+that swings about one end when open; a broken door leaves its posts.
 
-**The map** is 48×36, `#` wall, `.` floor, `~` fire, space nothing. The
-first 14×14 is the original room, unchanged except for two openings
-(east at rows 11–12, south at x 3–4) onto two-wide corridors that bend out
-of view and end. Every tile the tests use is where it was.
+**The map** (`main.gd`, `LEVEL`; format in `sim/terrain.gd`) is written at
+double resolution: even coordinates are cells (`.` floor, `~` fire, space
+nothing), odd coordinates are the edges between them (`#` wall, `+` door,
+space open); (odd, odd) positions are corners and are ignored. An edge
+between floor and nothing is a wall whether or not it is written, so the
+outline comes for free. The room is 48×36 cells: the original chamber with
+its cells where they always were (what used to be wall cells is now
+nothing, with walls on its edges, so the west corridor is one cell wide
+walled on both sides and the two-wide passage is two cells walled on the
+outside) plus two corridors that bend out of view, the south one through
+a door at the edge above (4, 13). Every tile the tests use is where it was.
+Test rooms written as old cell maps go through `Terrain.expand`.
 
 **Camera and fade.** The camera eases toward the local player
 (`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. `render/fade.gd` sits

@@ -25,7 +25,7 @@ const BASE_SCRIPT := preload("res://sim/grid_entity.gd")
 const DEFAULT_SHAPE := "capsule"
 ## Bump when the meaning of a spawn spec changes in a way an older client
 ## would get wrong. Part of Net.protocol().
-const SPEC_VERSION := 2
+const SPEC_VERSION := 3
 ## Placeholder art per shape. Each sprite is scaled so it stands
 ## Iso.HEIGHTS[shape] tile heights tall, and placed so the texture row
 ## "foot" (where the body meets the ground) sits on the tile's centre.

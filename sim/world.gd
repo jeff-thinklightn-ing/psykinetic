@@ -17,6 +17,8 @@ signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
 signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity, cause: StringName)
 signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, tiles: int, impact: int, stopped_by: String)
 signal entity_despawned(entity: GridEntity)
+## A door opened, closed, was damaged or broke; [param by] did it.
+signal door_changed(door: Door, by: GridEntity)
 ## A player's command that is not a move, attack or shove: (name, args), for
 ## Main to act on. "order" {slot} is a companion order.
 signal command_received(entity: GridEntity, command: String, args: Dictionary)
@@ -52,6 +54,8 @@ const PATH_STEP_COST := 1000
 const PATH_DIAGONAL_COST := int(PATH_STEP_COST * DIAGONAL_TICK_SCALE)
 const PATH_DIAGONAL_EXTRA := 1
 const PATH_FIRE_EXTRA := 5000
+## A closed door on the way costs a step: it is opened by walking into it.
+const PATH_DOOR_EXTRA := PATH_STEP_COST
 
 ## Share of the shove force that a melee attack carries.
 const ATTACK_FORCE_FACTOR := 0.5
@@ -84,8 +88,13 @@ var tick := 0
 var tick_alpha := 0.0
 
 var _floor: Dictionary[Vector2i, bool] = {}
-var _walls: Dictionary[Vector2i, bool] = {}
 var _fire: Dictionary[Vector2i, bool] = {}
+## Walls and doors are edges between cells, keyed as Terrain.edge_key says;
+## open edges are absent. Blocking is a property of the edge you cross.
+var _edges: Dictionary[Vector3i, int] = {}
+## The Door node for each door edge, on every peer (doors register
+## themselves). A door edge with no node yet counts as a closed door.
+var _doors: Dictionary[Vector3i, Door] = {}
 var _occupancy: Dictionary[Vector2i, GridEntity] = {}
 ## Always in ascending id order: ids are handed out in spawn order.
 var _entities: Array[GridEntity] = []
@@ -162,27 +171,86 @@ func reset() -> void:
 	_occupancy.clear()
 	_hits.clear()
 	_floor.clear()
-	_walls.clear()
 	_fire.clear()
+	_edges.clear()
 	_next_id = 1
 	tick = 0
 	tick_alpha = 0.0
 	_accumulator = 0.0
 
 
-func load_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i],
-		fire_tiles: Array[Vector2i] = []) -> void:
+## [param terrain] is what Terrain.parse returns.
+func load_terrain(terrain: Dictionary) -> void:
 	if not Net.is_authority():
 		return
+	_set_terrain(terrain)
+
+
+func _set_terrain(terrain: Dictionary) -> void:
 	_floor.clear()
-	_walls.clear()
 	_fire.clear()
-	for t in floor_tiles:
+	_edges.clear()
+	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
-	for t in wall_tiles:
-		_walls[t] = true
-	for t in fire_tiles:
+	for t: Vector2i in terrain["fire"]:
 		_fire[t] = true
+	var edges: Dictionary = terrain["edges"]
+	for key: Vector3i in edges:
+		_edges[key] = edges[key]
+
+
+## Doors register on every peer: the server reads and changes them, a client
+## reads them for prediction and drawing.
+func register_door(door: Door) -> void:
+	_doors[door.key] = door
+
+
+func unregister_door(door: Door) -> void:
+	if _doors.get(door.key) == door:
+		_doors.erase(door.key)
+
+
+func get_doors() -> Array[Door]:
+	var doors: Array[Door] = []
+	doors.assign(_doors.values())
+	return doors
+
+
+## A creature standing on either side of a door opens or closes it. Takes
+## the entity's step time, like a move. False if it cannot.
+func try_toggle_door(entity: GridEntity, key: Vector3i) -> bool:
+	if not Net.is_authority():
+		return false
+	if not entity.spawned or not entity.is_creature() or is_stunned(entity) \
+			or tick < entity.next_move_tick:
+		return false
+	var door: Door = _doors.get(key)
+	if door == null or door.is_broken() or entity.tile not in Terrain.edge_cells(key):
+		return false
+	_set_door(door, not door.open, entity)
+	entity.next_move_tick = tick + entity.move_ticks
+	return true
+
+
+func _set_door(door: Door, open: bool, by: GridEntity) -> void:
+	if door.open == open:
+		return
+	door.open = open
+	_log("door: %s %s %s" % [by.name, "opened" if open else "closed", door.name])
+	door_changed.emit(door, by)
+
+
+## Impact on a door, from a push against it: wood breaks once its hp is
+## spent; anything else takes nothing.
+func _hit_door(door: Door, amount: int, by: GridEntity) -> void:
+	if door.is_broken() or door.body_material != GridEntity.BodyMaterial.WOOD or amount <= 0:
+		return
+	door.hp = maxi(door.hp - amount, 0)
+	_log("door: %s takes %d from %s (%d left)" % [door.name, amount, by.name, door.hp])
+	if door.is_broken():
+		_log("door: %s broke" % door.name)
+		door.open = true
+	door_changed.emit(door, by)
 
 
 func spawn(entity: GridEntity, at: Vector2i) -> bool:
@@ -476,26 +544,19 @@ func mirror_reset() -> void:
 	_entities.clear()
 	_occupancy.clear()
 	_floor.clear()
-	_walls.clear()
 	_fire.clear()
+	_edges.clear()
 	tick = 0
 	tick_alpha = 0.0
 	_accumulator = 0.0
 
 
-func mirror_terrain(floor_tiles: Array[Vector2i], wall_tiles: Array[Vector2i],
-		fire_tiles: Array[Vector2i] = []) -> void:
+## [param terrain] is what Terrain.parse returns; a client reads the same
+## map the server does.
+func mirror_terrain(terrain: Dictionary) -> void:
 	if Net.is_authority():
 		return
-	_floor.clear()
-	_walls.clear()
-	_fire.clear()
-	for t in floor_tiles:
-		_floor[t] = true
-	for t in wall_tiles:
-		_walls[t] = true
-	for t in fire_tiles:
-		_fire[t] = true
+	_set_terrain(terrain)
 
 
 func mirror_add(entity: GridEntity) -> void:
@@ -642,12 +703,14 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 					stopped = true
 					stopped_by = "fire"
 					max_tiles = 0
+		var door_hit: Door = null
 		while tiles < max_tiles:
 			var next: Vector2i = body.tile + direction
 			if _terrain_blocks_step(body.tile, direction):
 				stopped = true
 				collided = true
-				stopped_by = "wall"
+				door_hit = _closed_door_across(body.tile, direction)
+				stopped_by = "wall" if door_hit == null else door_hit.name
 				break
 			blocker = _occupancy.get(next)
 			if blocker != null:
@@ -675,6 +738,8 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		var next_body: GridEntity = null
 		if impact > 0:
 			_impact(body, impact, mover)
+			if door_hit != null:
+				_hit_door(door_hit, impact, mover)
 		# Running into something stuns, even with no force left to hurt.
 		if collided:
 			_stun(body, remaining)
@@ -740,7 +805,7 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 		duration: int) -> bool:
 	var from: Vector2i = entity.tile
 	var to: Vector2i = from + direction
-	if _terrain_blocks_step(from, direction):
+	if _terrain_blocks_step(from, direction, entity.is_creature()):
 		return false
 	var blocker: GridEntity = _occupancy.get(to)
 	if blocker != null:
@@ -748,6 +813,9 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 			return false
 		if not _shift(mover, blocker, direction, push_budget - blocker.mass, duration):
 			return false
+	var door := _closed_door_across(from, direction)
+	if door != null:
+		_set_door(door, true, entity)  # A creature; anything else was blocked above.
 	_relocate(entity, to)
 	entity._world_slide_from(from, tick, duration)
 	if entity != mover:
@@ -770,7 +838,54 @@ func _relocate(entity: GridEntity, to: Vector2i) -> void:
 # --- Queries (safe anywhere) --------------------------------------------------
 
 func is_walkable(at: Vector2i) -> bool:
-	return _floor.has(at) and not _walls.has(at)
+	return _floor.has(at)
+
+
+## What is on the edge leaving [param from] in orthogonal [param direction];
+## OPEN for a diagonal, which crosses a corner, not an edge.
+func edge_kind(from: Vector2i, direction: Vector2i) -> int:
+	if direction.x != 0 and direction.y != 0:
+		return Terrain.Edge.OPEN
+	return _edges.get(Terrain.edge_key(from, direction), Terrain.Edge.OPEN)
+
+
+## The door node on that edge, or null.
+func door_across(from: Vector2i, direction: Vector2i) -> Door:
+	if direction.x != 0 and direction.y != 0:
+		return null
+	return _doors.get(Terrain.edge_key(from, direction))
+
+
+func _closed_door_across(from: Vector2i, direction: Vector2i) -> Door:
+	var door := door_across(from, direction)
+	return door if door != null and not door.is_open() else null
+
+
+## True if the edge leaving [param from] in orthogonal [param direction]
+## cannot be crossed: a wall, or a closed door unless the crosser
+## [param opens_doors] (creatures do, by walking through). A door edge whose
+## node has not arrived yet counts as closed.
+func edge_blocks(from: Vector2i, direction: Vector2i, opens_doors := false) -> bool:
+	match edge_kind(from, direction):
+		Terrain.Edge.WALL:
+			return true
+		Terrain.Edge.DOOR:
+			var door := door_across(from, direction)
+			if door != null and door.is_open():
+				return false
+			return not opens_doors
+	return false
+
+
+## A closed door or a wall: what stops sight.
+func edge_blocks_sight(from: Vector2i, direction: Vector2i) -> bool:
+	match edge_kind(from, direction):
+		Terrain.Edge.WALL:
+			return true
+		Terrain.Edge.DOOR:
+			var door := door_across(from, direction)
+			return door == null or not door.is_open()
+	return false
 
 
 func is_free(at: Vector2i) -> bool:
@@ -825,9 +940,10 @@ func can_target(attacker: GridEntity, target: GridEntity) -> bool:
 	return attacker.owner_peer == 0 or target.owner_peer == 0
 
 
-## Adjacent, and not diagonally across a wall corner.
+## Adjacent, with no wall or closed door between: nothing hits through a wall
+## or diagonally past its corner.
 func can_melee(from: Vector2i, to: Vector2i) -> bool:
-	return are_adjacent(from, to) and not _cuts_corner(from, to - from)
+	return are_adjacent(from, to) and not _terrain_blocks_step(from, to - from)
 
 
 func mass_ratio(mover_mass: float, target_mass: float) -> float:
@@ -865,13 +981,14 @@ func impact_damage(remaining_force: float, ratio: float) -> int:
 
 
 func blocks_sight(at: Vector2i) -> bool:
-	if _walls.has(at):
-		return true
 	var occupant: GridEntity = _occupancy.get(at)
 	return occupant != null and occupant.blocks_sight
 
 
-## Bresenham walk between two tiles; the endpoints themselves never block.
+## Bresenham walk between two tiles. Sight is stopped by a wall edge or a
+## closed door crossed on the way, and by an entity that blocks sight on a
+## tile between; the endpoints themselves never block. A diagonal step of
+## the walk needs one of its two orthogonal routes open.
 func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	var d: Vector2i = (to - from).abs()
 	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
@@ -879,21 +996,37 @@ func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	var at: Vector2i = from
 	while at != to:
 		var e2: int = 2 * err
+		var step := Vector2i.ZERO
 		if e2 > -d.y:
 			err -= d.y
-			at.x += s.x
+			step.x = s.x
 		if e2 < d.x:
 			err += d.x
-			at.y += s.y
+			step.y = s.y
+		if _sight_crosses_edge(at, step):
+			return false
+		at += step
 		if at != to and blocks_sight(at):
 			return false
 	return true
 
 
-## A* over the occupancy grid, 8-connected, costed in ticks (see
+func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
+	if step.x == 0 or step.y == 0:
+		return edge_blocks_sight(from, step)
+	var via_x := Vector2i(step.x, 0)
+	var via_y := Vector2i(0, step.y)
+	var route_x := edge_blocks_sight(from, via_x) or edge_blocks_sight(from + via_x, via_y)
+	var route_y := edge_blocks_sight(from, via_y) or edge_blocks_sight(from + via_y, via_x)
+	return route_x and route_y
+
+
+## A* over the cells, 8-connected, costed in ticks (see
 ## [constant DIAGONAL_TICK_SCALE]).
 ## Returns the tiles to step through, excluding [param from] and including
-## [param to]; empty if unreachable. Diagonals never cut a wall corner. Fire is
+## [param to]; empty if unreachable. Walls are edges; diagonals never cut a
+## wall corner. Closed doors are walked through (every pathfinder is a
+## creature, and creatures open doors) at the cost of an extra step. Fire is
 ## walkable but avoided when a short detour exists.
 ## With [param ignore_goal_occupant] the goal may be occupied (walk up to a
 ## monster, push a crate), but occupied tiles along the way still block.
@@ -934,7 +1067,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 		closed[current] = true
 		for direction in DIRECTIONS:
 			var next: Vector2i = current + direction
-			if closed.has(next) or _terrain_blocks_step(current, direction):
+			if closed.has(next) or _terrain_blocks_step(current, direction, true):
 				continue
 			if _occupancy.has(next) and next != to and _occupancy[next] != ignore:
 				continue
@@ -943,6 +1076,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 				next_cost += PATH_DIAGONAL_COST + PATH_DIAGONAL_EXTRA
 			else:
 				next_cost += PATH_STEP_COST
+				if _closed_door_across(current, direction) != null:
+					next_cost += PATH_DOOR_EXTRA
 			if _fire.has(next):
 				next_cost += PATH_FIRE_EXTRA
 			if not cost.has(next) or next_cost < cost[next]:
@@ -962,18 +1097,23 @@ func _path_heuristic(a: Vector2i, b: Vector2i) -> int:
 
 
 ## True if terrain alone forbids stepping from [param from] in [param direction]:
-## the destination is not floor, or a diagonal would cut a wall corner.
-func _terrain_blocks_step(from: Vector2i, direction: Vector2i) -> bool:
-	return not is_walkable(from + direction) or _cuts_corner(from, direction)
-
-
-## A diagonal cuts a corner if either orthogonal neighbour it passes between is
-## not open floor. Entities standing there do not count.
-func _cuts_corner(from: Vector2i, direction: Vector2i) -> bool:
+## the destination is not floor, the edge between is a wall (or a closed door
+## and the stepper does not open doors), or, for a diagonal, either
+## orthogonal neighbour is not floor or any of the four edges around that
+## corner is shut: no cutting a wall corner. Entities standing there do not
+## count.
+func _terrain_blocks_step(from: Vector2i, direction: Vector2i, opens_doors := false) -> bool:
+	var to := from + direction
+	if not is_walkable(to):
+		return true
 	if direction.x == 0 or direction.y == 0:
-		return false
-	return not is_walkable(from + Vector2i(direction.x, 0)) \
-			or not is_walkable(from + Vector2i(0, direction.y))
+		return edge_blocks(from, direction, opens_doors)
+	var via_x := Vector2i(direction.x, 0)
+	var via_y := Vector2i(0, direction.y)
+	if not is_walkable(from + via_x) or not is_walkable(from + via_y):
+		return true
+	return edge_blocks(from, via_x) or edge_blocks(from + via_x, via_y) \
+			or edge_blocks(from, via_y) or edge_blocks(from + via_y, via_x)
 
 
 func _alive(entity: Variant) -> bool:

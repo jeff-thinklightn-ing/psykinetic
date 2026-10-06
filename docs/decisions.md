@@ -194,3 +194,16 @@ their neighbours instead of being picked from a tileset, so continuous
 walls, corners and end caps need no art and no autotile rules, and a wall
 that would hide something goes translucent while it does. Placeholder only:
 no lighting, no tileset, no sprites yet.
+
+## 26. Walls are edges between cells
+
+A wall used to be a cell nothing could enter. Now every cell is floor (or
+nothing) and blocking belongs to the edge you cross: wall, door, or open.
+Corridors are one cell wide with walls on their sides instead of three
+cells of wall-floor-wall; a door is a wall with a state, on an edge, and
+needs no cell of its own. The map is written at double resolution so edges
+have a place to be written. The old chamber kept its coordinates: its wall
+cells became nothing, walled on their sides, rather than being removed,
+which would have moved every tested tile. Blocking, pushes, sight, melee
+reach and pathfinding all read the same edge rule; a diagonal needs every
+edge around its corner open. Door state is not saved.

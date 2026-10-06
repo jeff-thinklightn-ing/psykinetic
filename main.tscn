@@ -17,10 +17,6 @@ polygon = PackedVector2Array(-16, 0, 0, -8, 16, 0, 0, 8)
 [node name="YSort" type="Node2D" parent="."]
 y_sort_enabled = true
 
-[node name="Walls" type="TileMapLayer" parent="YSort"]
-y_sort_enabled = true
-tile_set = ExtResource("2_tileset")
-
 [node name="Entities" type="Node2D" parent="YSort"]
 y_sort_enabled = true
 

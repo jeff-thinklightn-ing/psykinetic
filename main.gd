@@ -4,8 +4,8 @@ extends Node2D
 ## the MultiplayerSpawner to create entities; it never touches entity state.
 
 const FLOOR_SOURCE := 0
-const WALL_SOURCE := 1
 const FIRE_SOURCE := 2
+const DOOR := "res://sim/door.gd"
 ## Floor in front of a wall (the wall to its -x or -y side) is drawn darker.
 const SHADED_FLOOR := Color(0.7, 0.7, 0.76)
 ## Camera: the fraction of the remaining distance to the player closed per
@@ -17,42 +17,76 @@ const CHAMBER_CENTRE := Vector2i(6, 6)
 ## its dead end at x 1. Under the wall at row 10, rows 11-12 x 7..11 are a
 ## two-wide passage open at both ends, where two players can pass each other.
 const LEVEL: Array[String] = [
-	"##############                                  ",
-	"#............#                                  ",
-	"#............#                                  ",
-	"#............#                                  ",
-	"#............#                                  ",
-	"#......~~~...#                                  ",
-	"#............#                                  ",
-	"######.......#                                  ",
-	"#............#                                  ",
-	"######.......#                                  ",
-	"#......#####.##########                         ",
-	"#.....................#                         ",
-	"#.....................#                         ",
-	"###..###############..#                         ",
-	"  #..#             #..#                         ",
-	"  #..#             #..#                         ",
-	"  #..#             #..#                         ",
-	"  #..###############..##########                ",
-	"  #............................#                ",
-	"  #............................#                ",
-	"  ##################..#######..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   #..#     #..#                ",
-	"                   ####     #..#                ",
-	"                            #..#                ",
-	"                            #..#                ",
-	"                            #..#                ",
-	"                            ####                ",
+	"",
+	" #########################",
+	" #. . . . . . . . . . . .#",
+	" #                       #",
+	" #. . . . . . . . . . . .#",
+	" #                       #",
+	" #. . . . . . . . . . . .#",
+	" #                       #",
+	" #. . . . . . . . . . . .#",
+	" #                       #",
+	" #. . . . . . ~ ~ ~ . . .#",
+	" #                       #",
+	" #. . . . . . . . . . . .#",
+	" ###########             #",
+	"           #. . . . . . .#",
+	" ###########             #",
+	" #. . . . . . . . . . . .#",
+	" ###########             #",
+	"           #. . . . . . .#",
+	" ########### ########### #",
+	" #. . . . . .#         #.#",
+	" #           ########### ###################",
+	" #. . . . . . . . . . . . . . . . . . . . .#",
+	" #                                         #",
+	" #. . . . . . . . . . . . . . . . . . . . .#",
+	" #######+###############################   #",
+	"       #.#                             #. .#",
+	"     ### #                             #   #",
+	"     #. .#                             #. .#",
+	"     #   #                             #   #",
+	"     #. .#                             #. .#",
+	"     #   #                             #   #",
+	"     #. .#                             #. .#",
+	"     #   #                             #   #",
+	"     #. .#                             #. .#",
+	"     #   ###############################   ###################",
+	"     #. . . . . . . . . . . . . . . . . . . . . . . . . . . .#",
+	"     #                                                       #",
+	"     #. . . . . . . . . . . . . . . . . . . . . . . . . . . .#",
+	"     ###################################   ###############   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #   #             #   #",
+	"                                       #. .#             #. .#",
+	"                                       #####             #   #",
+	"                                                         #. .#",
+	"                                                         #   #",
+	"                                                         #. .#",
+	"                                                         #   #",
+	"                                                         #. .#",
+	"                                                         #   #",
+	"                                                         #. .#",
+	"                                                         #####",
 ]
 const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
@@ -152,7 +186,6 @@ var _toss_target: GridEntity
 var _toss_from := Vector2.ZERO
 
 @onready var ground: TileMapLayer = $Ground
-@onready var walls: TileMapLayer = $YSort/Walls
 @onready var entities: Node2D = $YSort/Entities
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var cursor: Polygon2D = $Cursor
@@ -161,8 +194,10 @@ var _toss_from := Vector2.ZERO
 @onready var debug_overlay: Label = $HUD/Debug
 @onready var toss_aim: Line2D = $TossAim
 @onready var fade: DistanceFade = $Fade
-## Every wall block, for the per-frame see-through check.
-var _wall_blocks: Array[WallBlock] = []
+## The map as parsed once at start: floor, fire, edges (see Terrain).
+var _terrain: Dictionary = {}
+## Every wall edge drawn, for the per-frame fade over the local player.
+var _wall_edges: Array[WallEdge] = []
 
 
 func _ready() -> void:
@@ -219,8 +254,7 @@ func _go_online() -> void:
 	else:
 		# Terrain is static level data, not replicated state.
 		World.mirror_reset()
-		World.mirror_terrain(ground.get_used_cells(), walls.get_used_cells(),
-				ground.get_used_cells_by_id(FIRE_SOURCE))
+		World.mirror_terrain(_terrain)
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		multiplayer.connection_failed.connect(
 				func() -> void: hud.text = "connection failed")
@@ -230,7 +264,7 @@ func _go_online() -> void:
 
 func _process(delta: float) -> void:
 	_follow_player(delta)
-	_reveal_behind_walls()
+	_fade_walls_over_player()
 	var hovered := _entity_under_mouse()
 	var tile := hovered.tile if hovered != null else _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
@@ -272,6 +306,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release_toss(player)
 		return
 	if not click.pressed:
+		return
+	# A door under the cursor: toggle it from beside it, or walk up to it.
+	var door := _door_under_mouse()
+	if door != null and click.button_index == MOUSE_BUTTON_LEFT:
+		var cells := Terrain.edge_cells(door.key)
+		if player.tile in cells:
+			World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
+		else:
+			World.command_move(player, cells[0] if World.distance(player.tile, cells[0]) <= World.distance(player.tile, cells[1]) else cells[1])
 		return
 	# A sprite under the cursor wins over the tile under the cursor.
 	var target := _entity_under_mouse()
@@ -340,21 +383,41 @@ func _update_toss_aim() -> void:
 		tail, tip, tip + along.rotated(2.6) * 7.0, tip, tip + along.rotated(-2.6) * 7.0])
 
 
-## A wall block that would hide an entity is drawn translucent while it does.
-func _reveal_behind_walls() -> void:
+## A wall or door face that would draw over the local player's cell fades
+## while it overlaps it: a face drawn after the player (lower on screen)
+## whose rectangle crosses the player's.
+func _fade_walls_over_player() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	var tiles: Array[Vector2i] = []
-	for entity in World.get_entities():
-		if entity.spawned:
-			tiles.append(entity.tile)
-	for block in _wall_blocks:
-		var covering := false
-		for tile in tiles:
-			if block.hides(tile):
-				covering = true
-				break
-		block.set_see_through(covering)
+	var player := _local_player()
+	var body := Rect2()
+	if player != null:
+		var height := Iso.height_px("capsule")
+		body = Rect2(player.position + Vector2(-Iso.HALF.x * 0.5, -height), Vector2(Iso.HALF.x, height + 2.0))
+	for wall in _wall_edges:
+		wall.set_hiding(player != null and _face_covers(wall, wall.face_polygon(), body))
+	for door in World.get_doors():
+		door.modulate.a = Door.HIDING_ALPHA if player != null and _face_covers(door, door.face_polygon(), body) else 1.0
+
+
+func _face_covers(face: Node2D, polygon: PackedVector2Array, body: Rect2) -> bool:
+	if face.position.y <= body.end.y - 2.0:
+		return false  # Drawn before the player: behind it.
+	var rect := Rect2(face.position + polygon[0], Vector2.ZERO)
+	for point in polygon:
+		rect = rect.expand(face.position + point)
+	return rect.intersects(body)
+
+
+## The door whose face is under the cursor, or null.
+func _door_under_mouse() -> Door:
+	if DisplayServer.get_name() == "headless":
+		return null
+	var mouse := get_global_mouse_position()
+	for door in World.get_doors():
+		if Geometry2D.is_point_in_polygon(door.to_local(mouse), door.face_polygon()):
+			return door
+	return null
 
 
 ## The camera eases toward the local player, a little behind it; the fade
@@ -408,39 +471,43 @@ func _mouse_tile() -> Vector2i:
 	return Iso.local_to_tile(ground.to_local(get_global_mouse_position()))
 
 
-## The map: "." floor, "~" fire, "#" wall, " " nothing. Floor and fire go
-## on the Ground layer; walls go on the (hidden) Walls layer, which is what
-## World reads, and are drawn as WallBlocks in the Y-sorted layer so they
-## stand in front of what is behind them.
+## The map (see Terrain for the format). Floor and fire go on the Ground
+## layer, shaded where a wall stands on the cell's -x or -y edge; wall
+## edges are drawn as WallEdges in the Y-sorted layer. Doors are spawned by
+## the server with the level (see _spawn_doors): they have state.
 func _paint_level() -> void:
+	_terrain = Terrain.parse(LEVEL)
 	var floor_source := ground.tile_set.get_source(FLOOR_SOURCE) as TileSetAtlasSource
 	var shaded := floor_source.create_alternative_tile(Vector2i.ZERO)
 	floor_source.get_tile_data(Vector2i.ZERO, shaded).modulate = SHADED_FLOOR
-	walls.visible = false
-	for y in LEVEL.size():
-		for x in LEVEL[y].length():
-			var tile := Vector2i(x, y)
-			match _symbol_at(tile):
-				"~":
-					ground.set_cell(tile, FIRE_SOURCE, Vector2i.ZERO)
-				".":
-					var in_front_of_wall := _symbol_at(tile + Vector2i(-1, 0)) == "#" \
-							or _symbol_at(tile + Vector2i(0, -1)) == "#"
-					ground.set_cell(tile, FLOOR_SOURCE, Vector2i.ZERO, shaded if in_front_of_wall else 0)
-				"#":
-					walls.set_cell(tile, WALL_SOURCE, Vector2i.ZERO)
-					var block := WallBlock.new()
-					block.name = "Wall_%d_%d" % [x, y]
-					$YSort.add_child(block)
-					block.setup(tile, func(at: Vector2i) -> bool: return _symbol_at(at) == "#")
-					_wall_blocks.append(block)
+	var edges: Dictionary = _terrain["edges"]
+	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
+	var fire: Array[Vector2i] = _terrain["fire"]
+	for cell: Vector2i in _terrain["floor"]:
+		if cell in fire:
+			ground.set_cell(cell, FIRE_SOURCE, Vector2i.ZERO)
+			continue
+		var behind_wall: bool = kind_at.call(Terrain.edge_key(cell, Vector2i(-1, 0))) == Terrain.Edge.WALL \
+				or kind_at.call(Terrain.edge_key(cell, Vector2i(0, -1))) == Terrain.Edge.WALL
+		ground.set_cell(cell, FLOOR_SOURCE, Vector2i.ZERO, shaded if behind_wall else 0)
+	for key: Vector3i in edges:
+		if edges[key] != Terrain.Edge.WALL:
+			continue
+		var wall := WallEdge.new()
+		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
+		$YSort.add_child(wall)
+		wall.setup(key, kind_at)
+		_wall_edges.append(wall)
 
 
-## The map symbol at [param tile]; " " outside the map.
-func _symbol_at(tile: Vector2i) -> String:
-	if tile.y < 0 or tile.y >= LEVEL.size() or tile.x < 0 or tile.x >= LEVEL[tile.y].length():
-		return " "
-	return LEVEL[tile.y][tile.x]
+## Server: one Door node per door edge, through the spawner so every client
+## gets it. Wood, 20 hp.
+func _spawn_doors() -> void:
+	var edges: Dictionary = _terrain["edges"]
+	for key: Vector3i in edges:
+		if edges[key] == Terrain.Edge.DOOR:
+			spawner.spawn({"script": DOOR, "name": "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"],
+				"edge": [key.x, key.y, key.z], "props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}})
 
 
 # --- Server: level and players ------------------------------------------------
@@ -461,8 +528,8 @@ func _start_level(from_snapshot := false) -> void:
 	for child in entities.get_children():
 		entities.remove_child(child)
 		child.queue_free()
-	World.load_terrain(ground.get_used_cells(), walls.get_used_cells(),
-			ground.get_used_cells_by_id(FIRE_SOURCE))
+	World.load_terrain(_terrain)
+	_spawn_doors()
 	_players.clear()
 	_peer_ids.clear()
 	_respawn_at.clear()
@@ -766,6 +833,10 @@ func _remember_companion(id: String) -> void:
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	if command_name == "order" and entity is Player:
 		handle_order(entity, int(args.get("slot", 0)))
+	elif command_name == "door":
+		var edge: Variant = args.get("edge")
+		if edge is Array and edge.size() == 3:
+			World.try_toggle_door(entity, Vector3i(int(edge[0]), int(edge[1]), int(edge[2])))
 	elif command_name == "reset" and entity is Player:
 		var who := _display_name(entity)  # The rebuild frees the entity.
 		if not Net.player_reset and entity.owner_peer != Net.local_id:
@@ -911,16 +982,17 @@ func _free_start_tile() -> Vector2i:
 	for tile in PLAYER_STARTS:
 		if World.is_free(tile):
 			return tile
-	for y in LEVEL.size():
-		for x in LEVEL[y].length():
-			if World.is_free(Vector2i(x, y)) and not World.is_fire(Vector2i(x, y)):
-				return Vector2i(x, y)
+	for cell: Vector2i in _terrain["floor"]:
+		if World.is_free(cell) and not World.is_fire(cell):
+			return cell
 	return PLAYER_STARTS[0]
 
 
 ## MultiplayerSpawner's spawn function: runs on the server and on every client
 ## with the same data, so static configuration never needs replicating.
 func _build_entity(spec: Dictionary) -> Node:
+	if spec.get("script") == DOOR:
+		return Door.build(spec)
 	return EntityFactory.build(spec)
 
 

@@ -83,7 +83,7 @@ func _test_prediction_does_not_walk_into_a_pinned_crate() -> void:
 	for x in 10:
 		for y in range(19, 22):
 			floor_tiles.append(Vector2i(x, y))
-	World.mirror_terrain(floor_tiles, [])
+	World.mirror_terrain({"floor": floor_tiles, "fire": [], "edges": {}})
 	_crate("Pinned", Vector2i(9, 20))   # Against the east edge.
 	_crate("Loose", Vector2i(3, 19))    # Two in a row with floor behind them:
 	_crate("Second", Vector2i(2, 19))   # 60 of the player's 80 mass budget.

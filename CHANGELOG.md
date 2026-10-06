@@ -3,6 +3,27 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.11
+
+Walls on edges, and a door.
+
+- Walls are now the edges between cells, not cells of their own: corridors
+  are one cell wide with walls on their sides, the passage two cells with
+  walls on the outside. Moving, pushing, sight and melee all respect the
+  edge between you and where you are going; diagonals cannot cut a wall
+  corner. A body pushed against a wall edge stops there and takes impact as
+  before.
+- One door, on the south exit of the chamber. Click it from beside it to
+  open or close it, or just walk through: creatures open doors on their
+  way, monsters included, unless someone stands in the doorway. A crate
+  cannot pass a closed door. A door takes impact like a wall and, being
+  wood, breaks once its hp is spent.
+- Walls are drawn as thin tall faces on the cell boundary with posts at
+  ends, corners and door jambs; a face over your own cell fades while it
+  covers you. Doors swing open.
+
+The server must be updated to v0.1.11 too; the map format changed.
+
 ## v0.1.10
 
 Scale and space pass, placeholder art only.

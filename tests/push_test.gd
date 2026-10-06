@@ -510,8 +510,9 @@ func _test_no_attack_mid_step() -> void:
 
 # --- helpers ------------------------------------------------------------------
 
-## '#' wall, '.' floor, '~' fire, 'P' player, 'm' imp (AI off), 'c' crate,
-## 'o' boulder.
+## A cell map: '#' a solid cell (nothing, walled on every side it meets
+## floor; see Terrain.expand), '.' floor, '~' fire, 'P' player, 'm' imp (AI
+## off), 'c' crate, 'o' boulder.
 ## Players spawn first so they hold the lowest ids.
 func _build(rows: Array[String]) -> Dictionary:
 	World.reset()
@@ -521,20 +522,19 @@ func _build(rows: Array[String]) -> Dictionary:
 	_room = Node2D.new()
 	add_child(_room)
 
-	var floor_tiles: Array[Vector2i] = []
-	var wall_tiles: Array[Vector2i] = []
-	var fire_tiles: Array[Vector2i] = []
+	var cell_rows: Array[String] = []
 	var spawns: Array[Array] = []
 	for y in rows.size():
+		var cells := ""
 		for x in rows[y].length():
-			var tile := Vector2i(x, y)
-			floor_tiles.append(tile)
-			match rows[y][x]:
-				"#": wall_tiles.append(tile)
-				"~": fire_tiles.append(tile)
-				".": pass
-				var symbol: spawns.append([symbol, tile])
-	World.load_terrain(floor_tiles, wall_tiles, fire_tiles)
+			var symbol := rows[y][x]
+			if symbol in ["#", ".", "~"]:
+				cells += symbol
+			else:
+				cells += "."
+				spawns.append([symbol, Vector2i(x, y)])
+		cell_rows.append(cells)
+	World.load_terrain(Terrain.parse(Terrain.expand(cell_rows)))
 
 	var out := {}
 	for kind: String in SPECS:

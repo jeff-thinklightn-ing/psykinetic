@@ -233,9 +233,10 @@ func _replan_from(i: int) -> void:
 ## be walked into. Every other entity's current tile, where it is or is
 ## heading, counts; a pushable one does not if it is within the mover's mass
 ## budget and has somewhere to go, chain and all. A crate against a wall is
-## as solid as the wall.
+## as solid as the wall. A closed door is walked through (the server opens
+## it on the way) unless a crate would have to go through it first.
 func _blocked(from: Vector2i, direction: Vector2i, budget := _entity.mass) -> bool:
-	if World._terrain_blocks_step(from, direction):
+	if World._terrain_blocks_step(from, direction, _entity.is_creature()):
 		return true
 	var to := from + direction
 	var occupant := World.get_entity_at(to)
