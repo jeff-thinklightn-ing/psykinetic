@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.7
+
+Companions come back where their owner is.
+
+- A companion brought back by `reset` was put on its owner's last saved
+  tile even when the owner was moved to a safe start tile, which could
+  leave it alone among the monsters, out of sight. It now always appears
+  beside its owner. The same goes for a living companion whose saved tile
+  has a monster within 5 tiles.
+- `reset` now says which companions it brought back, or that none were
+  dead.
+
+The server must be updated to v0.1.7 too.
+
 ## v0.1.6
 
 Smooth movement for everything you do not control, and a way to get a dead

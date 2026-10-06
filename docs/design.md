@@ -419,7 +419,10 @@ nearest free tile. When the owner disconnects the companion stays, idles,
 and monsters ignore it; when the owner is back it follows again. A dead
 companion stays dead in the record until the room is rebuilt (console
 `reset`, or `R` on a host), which brings every dead companion back at full
-stats beside its owner.
+stats beside its owner; `reset` replies with who came back. A returning
+companion appears where it was only if no monster is within
+`SPAWN_SAFE_DISTANCE` of that tile; otherwise, and always after a revive,
+it appears beside its owner, who has just been put somewhere safe.
 
 **The mind never acts.** This is a hard rule. A `CompanionMind`
 (`sim/companion_mind.gd`) is asked `decide(context) -> {intent, target,

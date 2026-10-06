@@ -91,6 +91,8 @@ var _records: Dictionary[String, PlayerRecord] = {}
 var _respawn_at: Dictionary[int, int] = {}
 ## Server only: player_id -> that player's live companion.
 var _companions: Dictionary[String, Companion] = {}
+## Server only: the companions the last room rebuild brought back, by name.
+var _revived: Array[String] = []
 ## Server only: what happened, in words, for companion minds and the log.
 var party_log := PartyLog.new()
 ## Which mind new decisions use: "scripted" or "ollama" (console: mind ...).
@@ -378,7 +380,7 @@ func _start_level(from_snapshot := false) -> void:
 	if from_snapshot:
 		_records.clear()
 	else:
-		_revive_companions()
+		_revived = _revive_companions()
 	if not (from_snapshot and _spawn_from_snapshot()):
 		for slot in LEVEL_ENTITIES.size():
 			_spawn(_slot_spec(slot))
@@ -594,8 +596,17 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not record.companion.get("alive", true):
 		print("[net] %s's companion %s died earlier; none spawned" % [record.name, record.companion["name"]])
 		return
+	# Where it was, unless that is no place to appear alone: it has no saved
+	# tile, or a hostile is close to it. Then beside its owner, who was put
+	# somewhere safe.
 	var saved: Variant = Snapshot.vector(record.companion.get("tile"))
-	var wanted: Vector2i = saved if saved != null and not is_new else player.tile
+	var wanted: Vector2i = player.tile
+	if saved != null and not is_new:
+		if _nearest_hostile_distance(saved) > SPAWN_SAFE_DISTANCE:
+			wanted = saved
+		else:
+			print("[spawn] %s's companion %s: hostile within %d of its saved tile %s; beside its owner instead" % [
+				record.name, record.companion["name"], SPAWN_SAFE_DISTANCE, saved])
 	var tile := _nearest_free(wanted)
 	if not World.is_free(tile):
 		print("[net] no free tile for %s's companion %s near %s" % [record.name, record.companion["name"], wanted])
@@ -621,15 +632,18 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 
 ## A rebuilt room starts whole: companions that died come back with it, at
 ## full stats, beside their owner the next time that player is put down.
-## Nothing else brings a dead companion back.
-func _revive_companions() -> void:
+## Nothing else brings a dead companion back. Returns who came back.
+func _revive_companions() -> Array[String]:
+	var revived: Array[String] = []
 	for record: PlayerRecord in _records.values():
 		if record.companion.is_empty() or record.companion.get("alive", true):
 			continue
 		record.companion["alive"] = true
 		record.companion["hp"] = 0  # Not a saved value: spawn at full stats.
-		record.companion["tile"] = [record.tile.x, record.tile.y]
+		record.companion["tile"] = null  # No place of its own: beside its owner.
+		revived.append("%s (%s's)" % [record.companion.get("name", "?"), record.name])
 		print("[world] %s's companion %s is back" % [record.name, record.companion.get("name", "")])
+	return revived
 
 
 func _make_mind() -> CompanionMind:
@@ -1011,7 +1025,9 @@ func admin_command(line: String) -> String:
 	match words[0].to_lower():
 		"reset":
 			_start_level()
-			return "room rebuilt from the map; %d player records kept" % _records.size()
+			return "room rebuilt from the map; %d player records kept; %s" % [_records.size(),
+				"no dead companions to bring back" if _revived.is_empty()
+				else "companions brought back: %s" % ", ".join(_revived)]
 		"respawn":
 			return "respawned %d" % _check_respawns(World.tick, true)
 		"players":

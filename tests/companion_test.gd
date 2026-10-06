@@ -267,6 +267,31 @@ func _test_old_record_gets_a_companion() -> void:
 	_check(pet != null and pet.keeper == _player() and pet.hp == pet.max_hp, "'reset' brings it back at full hp, with its owner")
 	_check(pet != null and World.distance(pet.tile, _player().tile) == 1 and record.companion.get("alive") == true,
 			"beside the owner, and alive in the record again")
+
+	# The owner was last seen among the imps' spawn tiles: a rebuilt room puts
+	# the owner on a safe start tile, and the companion must come too.
+	_kill_monsters()
+	_walk_to(_player(), Vector2i(4, 6))
+	var last_seen: Vector2i = _player().tile
+	World.damage(_companion(), 999)
+	_check(_companion() == null and record.companion.get("alive") == false, "it dies again, with its owner at %s" % last_seen)
+	var reply: String = _main.admin_command("reset")
+	_check("companions brought back: %s" % record.companion["name"] in reply, "'reset' says who it brought back (%s)" % reply)
+	pet = _companion()
+	_check(_player().tile in _main.PLAYER_STARTS and _player().tile != last_seen, "the owner is put on a start tile, away from the imps (at %s)" % _player().tile)
+	_check(pet != null and World.distance(pet.tile, _player().tile) == 1, "and the companion is beside the owner, not left by the imps (at %s)" % [pet.tile if pet else Vector2i(-1, -1)])
+	reply = _main.admin_command("reset")
+	_check("no dead companions" in reply, "a reset with none dead says so (%s)" % reply)
+
+	# A living companion left near monsters also returns beside its owner.
+	_main._on_peer_disconnected(Net.local_id)
+	record.companion["tile"] = [3, 6]
+	World.despawn(_companion())
+	record.companion["alive"] = true
+	_main._companions.clear()
+	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+	pet = _companion()
+	_check(pet != null and World.distance(pet.tile, _player().tile) == 1, "a companion saved next to an imp comes back beside its owner instead (at %s)" % [pet.tile if pet else Vector2i(-1, -1)])
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
 

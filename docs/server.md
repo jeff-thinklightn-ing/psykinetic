@@ -104,7 +104,7 @@ The unit restarts the server 5 seconds after any failure.
 
 The server takes four commands: `reset` (rebuild the room from the map;
 player records are kept, anyone online keeps their place, and companions
-that died come back), `respawn`
+that died come back; the reply names them), `respawn`
 (bring every dead monster and crate back now), `players` (who is connected,
 where, with what hp), `save` (write the snapshot now).
 

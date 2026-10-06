@@ -16,7 +16,7 @@ var color := Color.WHITE
 ## Unix time of the last join or leave.
 var last_seen := 0
 ## The player's companion: {name, card, hp, stamina, tile: [x, y], alive}.
-## Empty until one has been given.
+## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
 
 
@@ -70,7 +70,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			"card": str(pet.get("card", "")),
 			"hp": int(pet.get("hp", 0)),
 			"stamina": int(pet.get("stamina", 0)),
-			"tile": pet.get("tile", [0, 0]),
+			"tile": pet.get("tile"),
 			"alive": bool(pet.get("alive", true)),
 		}
 	return record
