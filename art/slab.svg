@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="14" viewBox="0 0 20 14">
+  <!-- A low extruded block. White so instances can tint it with modulate. -->
+  <polygon points="0,5 10,10 10,14 0,9" fill="#c8c8c8"/>
+  <polygon points="10,10 20,5 20,9 10,14" fill="#9a9a9a"/>
+  <polygon points="10,0 20,5 10,10 0,5" fill="#ffffff"/>
+</svg>

@@ -39,7 +39,7 @@ try { $json = Get-Content $state -Raw | ConvertFrom-Json } catch {}
 Assert ($null -ne $json -and $json.version -eq 1) 'snapshot is valid JSON with version 1'
 $crate = @($json.entities | Where-Object { $_.name -eq 'Crate1' })
 Assert ($crate.Count -eq 1 -and $crate[0].tile[0] -eq 7 -and $crate[0].tile[1] -eq 2) 'snapshot has Crate1 at [7, 2]'
-Assert (@($json.entities | Where-Object { $_.type -eq 'player' }).Count -eq 0) 'players are not among the entities'
+Assert (@($json.entities | Where-Object { $_.script -eq 'res://sim/player.gd' }).Count -eq 0) 'players are not among the entities'
 $dev = @($json.players | Where-Object { $_.player_id -eq 'dev-host' })
 Assert ($json.players.Count -eq 1 -and $dev.Count -eq 1 -and $dev[0].tile[0] -eq 8 -and $dev[0].tile[1] -eq 2) "snapshot holds the dev host's player record at [8, 2]"
 Assert ($json.entities.Count -eq 9) "snapshot holds the 9 level entities (saw $($json.entities.Count))"

@@ -45,9 +45,9 @@ check "$(count '"version": 1' "$STATE")" 1 "snapshot carries version 1"
 # is pretty-printed as "tile": [ then 7, then 2 on their own lines.
 crate_tile=$(sed -n '/"name": "Crate1"/,/"type": "pushable"/p' "$STATE" | grep -A2 '"tile"' | grep -cE '^[[:space:]]*7,$' || true)
 check "$crate_tile" 1 "snapshot has Crate1 at [7, 2]"
-check "$(count '"type": "player"' "$STATE")" 0 "players are not among the entities"
+check "$(count '"script": "res://sim/player.gd"' "$STATE")" 0 "players are not among the entities"
 check "$(count '"player_id": "dev-host"' "$STATE")" 1 "snapshot holds the dev host's player record"
-check "$(count '"type": "(monster|pushable)"' "$STATE")" 9 "snapshot holds the 9 level entities"
+check "$(count '"script": "res://sim/(monster|pushable).gd"' "$STATE")" 9 "snapshot holds the 9 level entities"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 run_host second --test-exit-after=2

@@ -12,11 +12,12 @@ extends Node
 ## scaled by the shover's stamina fraction. Regen is 2 per tick, starting 10
 ## ticks after the last exertion.
 
-const SCENES := {
-	"P": preload("res://entities/player.tscn"),
-	"m": preload("res://entities/monster.tscn"),
-	"c": preload("res://entities/pushable.tscn"),
-	"o": preload("res://entities/pushable.tscn"),
+const SPECS := {
+	"P": {"script": "res://sim/player.gd", "shape": "capsule"},
+	"m": {"script": "res://sim/monster.gd", "shape": "capsule"},
+	"c": {"script": "res://sim/pushable.gd", "shape": "cube"},
+	"o": {"script": "res://sim/pushable.gd", "shape": "sphere",
+		"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}},
 }
 const NAMES := {"P": "Player", "m": "Imp", "c": "Crate", "o": "Boulder"}
 
@@ -536,18 +537,17 @@ func _build(rows: Array[String]) -> Dictionary:
 	World.load_terrain(floor_tiles, wall_tiles, fire_tiles)
 
 	var out := {}
-	for kind: String in SCENES:
+	for kind: String in SPECS:
 		out[kind] = []
 		for spawn in spawns:
 			if spawn[0] != kind:
 				continue
-			var entity: GridEntity = SCENES[kind].instantiate()
+			var spec: Dictionary = SPECS[kind].duplicate(true)
+			spec["name"] = "%s%d" % [NAMES[kind], out[kind].size() + 1]
+			spec["tile"] = spawn[1]
+			var entity := EntityFactory.build(spec)
 			if entity is Monster:
 				entity.sight_range = 0  # Stands still unless a test turns it on.
-			if kind == "o":
-				entity.mass = 200.0
-				entity.body_material = GridEntity.BodyMaterial.STONE
-			entity.name = "%s%d" % [NAMES[kind], out[kind].size() + 1]
 			_room.add_child(entity)
 			World.spawn(entity, spawn[1])
 			out[kind].append(entity)

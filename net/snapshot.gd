@@ -22,10 +22,15 @@ static func save(path: String, tick: int, entities: Array[GridEntity],
 	for entity in entities:
 		if not is_instance_valid(entity) or not entity.spawned or entity.owner_peer != 0:
 			continue
-		if entity.spawn_spec.get("scene", "") == "companion":
+		if entity is Companion:
 			continue  # Kept in its owner's player record instead.
+		var spec := entity.spawn_spec
 		list.append({
-			"type": entity.spawn_spec.get("scene", ""),
+			"script": str(spec.get("script", "")),
+			"shape": str(spec.get("shape", EntityFactory.DEFAULT_SHAPE)),
+			"tint": spec["tint"].to_html(true) if spec.get("tint") is Color else "",
+			"scale": float(spec.get("scale", 1.0)),
+			"label": str(spec.get("label", "")),
 			"name": String(entity.name),
 			"tile": [entity.tile.x, entity.tile.y],
 			"hp": entity.hp,
@@ -107,20 +112,43 @@ static func load(path: String) -> Dictionary:
 		"players": players, "respawns": respawns}
 
 
+## Snapshots from before the generic entity scene named a scene type instead
+## of a script and shape.
+const LEGACY_TYPES := {
+	"monster": {"script": "res://sim/monster.gd", "shape": "capsule"},
+	"pushable": {"script": "res://sim/pushable.gd", "shape": "cube"},
+}
+
+
 static func _parse_entry(entry: Variant) -> Dictionary:
 	if entry is not Dictionary:
 		return {}
 	var tile: Variant = vector(entry.get("tile"))
-	if tile == null or entry.get("type") is not String or entry.get("name") is not String:
+	if tile == null or entry.get("name") is not String:
 		return {}
 	var facing: Variant = vector(entry.get("facing"))
-	var props: Variant = JSON.to_native(entry.get("props", {}))
+	# Props were written with JSON.from_native; a bare {} (no props) is not.
+	var raw_props: Variant = entry.get("props", {})
+	var props: Variant = JSON.to_native(raw_props) 			if raw_props is Dictionary and raw_props.has("type") else {}
 	var spec := {
-		"scene": entry["type"],
 		"name": entry["name"],
 		"tile": tile,
 		"props": props if props is Dictionary else {},
 	}
+	if entry.get("script") is String:
+		spec["script"] = entry["script"]
+		spec["shape"] = str(entry.get("shape", EntityFactory.DEFAULT_SHAPE))
+	elif entry.get("type") is String and LEGACY_TYPES.has(entry["type"]):
+		spec.merge(LEGACY_TYPES[entry["type"]])
+	else:
+		return {}
+	var tint := str(entry.get("tint", ""))
+	if Color.html_is_valid(tint):
+		spec["tint"] = Color.html(tint)
+	if entry.get("scale") is float and float(entry["scale"]) > 0.0:
+		spec["scale"] = float(entry["scale"])
+	if entry.get("label") is String and not entry["label"].is_empty():
+		spec["label"] = entry["label"]
 	if entry.get("spawn") is float and int(entry["spawn"]) >= 0:
 		spec["spawn"] = int(entry["spawn"])
 	return {

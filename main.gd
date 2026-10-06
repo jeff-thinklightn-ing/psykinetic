@@ -25,27 +25,25 @@ const LEVEL: Array[String] = [
 	"#............#",
 	"##############",
 ]
-const SCENES := {
-	"player": preload("res://entities/player.tscn"),
-	"monster": preload("res://entities/monster.tscn"),
-	"pushable": preload("res://entities/pushable.tscn"),
-	"companion": preload("res://entities/companion.tscn"),
-}
-## Spawned by the server in this order, which is also entity id order.
-## "props" are set on the instance on every peer before it enters the tree.
+const MONSTER := "res://sim/monster.gd"
+const PUSHABLE := "res://sim/pushable.gd"
+const PLAYER := "res://sim/player.gd"
+const COMPANION := "res://sim/companion.gd"
+## Spawned by the server in this order, which is also entity id order. Each
+## spec is built by EntityFactory on every peer: script, shape, tint, scale,
+## label, and "props" set on the instance before it enters the tree.
 const LEVEL_ENTITIES: Array[Dictionary] = [
 	# Imps come in different masses; Monster shades them darker as they get heavier.
-	{"scene": "monster", "name": "CorridorImp1", "tile": Vector2i(1, 8), "props": {"mass": 25.0}},
-	{"scene": "monster", "name": "CorridorImp2", "tile": Vector2i(2, 8), "props": {"mass": 40.0}},
-	{"scene": "monster", "name": "CorridorImp3", "tile": Vector2i(3, 8), "props": {"mass": 60.0}},
-	{"scene": "monster", "name": "Imp1", "tile": Vector2i(2, 6), "props": {"mass": 30.0}},
-	{"scene": "monster", "name": "Imp2", "tile": Vector2i(3, 6), "props": {"mass": 70.0}},
-	{"scene": "pushable", "name": "Crate1", "tile": Vector2i(8, 2)},
-	{"scene": "pushable", "name": "Crate2", "tile": Vector2i(8, 3)},
-	{"scene": "pushable", "name": "Crate3", "tile": Vector2i(4, 2)},
-	{"scene": "pushable", "name": "Boulder", "tile": Vector2i(6, 3), "props": {
-		"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE,
-		"modulate": Color(0.55, 0.55, 0.6)}},
+	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp1", "tile": Vector2i(1, 8), "props": {"mass": 25.0}},
+	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp2", "tile": Vector2i(2, 8), "props": {"mass": 40.0}},
+	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp3", "tile": Vector2i(3, 8), "props": {"mass": 60.0}},
+	{"script": MONSTER, "shape": "capsule", "name": "Imp1", "tile": Vector2i(2, 6), "props": {"mass": 30.0}},
+	{"script": MONSTER, "shape": "capsule", "name": "Imp2", "tile": Vector2i(3, 6), "props": {"mass": 70.0}},
+	{"script": PUSHABLE, "shape": "cube", "name": "Crate1", "tile": Vector2i(8, 2), "tint": Color(0.8, 0.6, 0.35)},
+	{"script": PUSHABLE, "shape": "cube", "name": "Crate2", "tile": Vector2i(8, 3), "tint": Color(0.8, 0.6, 0.35)},
+	{"script": PUSHABLE, "shape": "cube", "name": "Crate3", "tile": Vector2i(4, 2), "tint": Color(0.8, 0.6, 0.35)},
+	{"script": PUSHABLE, "shape": "sphere", "name": "Boulder", "tile": Vector2i(6, 3), "tint": Color(0.55, 0.55, 0.6),
+		"scale": 1.4, "props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}},
 ]
 ## A joining peer's player takes the first of these that is free.
 const PLAYER_STARTS: Array[Vector2i] = [
@@ -396,9 +394,6 @@ func _spawn_from_snapshot() -> bool:
 	var restored := 0
 	for entry: Dictionary in snapshot["entities"]:
 		var spec: Dictionary = entry["spec"]
-		if not SCENES.has(spec["scene"]):
-			push_warning("[state] skipping unknown entity type %s" % spec["scene"])
-			continue
 		var entity := _spawn(spec)
 		if entity == null:
 			continue
@@ -441,7 +436,7 @@ func _check_respawns(tick: int, force := false) -> int:
 		if _spawn(spec) == null:
 			continue
 		count += 1
-		print("[world] respawned %s at %s" % [spec["scene"], tile])
+		print("[world] respawned %s at %s" % [EntityFactory.type_name(spec), tile])
 	return count
 
 
@@ -510,8 +505,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
 		return
 	var player := _spawn({
-		"scene": "player", "name": "Player%d" % record.index, "tile": tile, "peer": peer,
-		"props": {"tint": record.color, "label": player_name},
+		"script": PLAYER, "shape": "capsule", "name": "Player%d" % record.index, "tile": tile,
+		"peer": peer, "tint": record.color, "label": player_name,
 	}) as Player
 	if player == null:
 		return
@@ -555,8 +550,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not World.is_free(tile):
 		return
 	var pet := _spawn({
-		"scene": "companion", "name": String(record.companion["name"]), "tile": tile,
-		"props": {"tint": COMPANION_TINT, "label": String(record.companion["name"])},
+		"script": COMPANION, "shape": "capsule", "name": String(record.companion["name"]), "tile": tile,
+		"tint": COMPANION_TINT, "label": String(record.companion["name"]),
 	}) as Companion
 	if pet == null:
 		return
@@ -717,19 +712,7 @@ func _free_start_tile() -> Vector2i:
 ## MultiplayerSpawner's spawn function: runs on the server and on every client
 ## with the same data, so static configuration never needs replicating.
 func _build_entity(spec: Dictionary) -> Node:
-	var entity: GridEntity = SCENES[spec["scene"]].instantiate()
-	entity.name = spec["name"]
-	var props: Dictionary = spec.get("props", {})
-	for property: String in props:
-		entity.set(property, props[property])
-	entity.owner_peer = spec.get("peer", 0)
-	entity.spawn_spec = spec
-	entity.start_tile = spec["tile"]
-	# Placeholders until World (server) or the synchronizer (client) says otherwise.
-	entity.tile = spec["tile"]
-	entity.hp = entity.max_hp
-	entity.stamina = entity.max_stamina
-	return entity
+	return EntityFactory.build(spec)
 
 
 func _on_peer_authenticated(peer: int, id: String, player_name: String) -> void:

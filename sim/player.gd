@@ -7,6 +7,17 @@ extends GridEntity
 ## ordered tile pushes whatever is on it, if World allows.
 
 
+func _init() -> void:
+	super()
+	mass = 80.0
+	move_ticks = 2
+	max_hp = 20
+	attack_damage = 2
+	strength = 10
+	max_stamina = 100
+	attack_ticks = 5
+
+
 func _sim_tick() -> void:
 	if action_order != Order.NONE:
 		_pursue_action()

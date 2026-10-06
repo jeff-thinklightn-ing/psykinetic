@@ -5,7 +5,7 @@
 | Path | Contents |
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `iso.gd` (grid ↔ pixel math). |
-| `entities/` | Entity scenes (`player.tscn`, `monster.tscn`, `pushable.tscn`). Scenes only add visuals and tuning values to a sim script. |
+| `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
 | `server/` | systemd unit, deploy script, and token file template for the dedicated server; see `docs/server.md`. |
@@ -68,9 +68,13 @@ opened it runs offline instead.
 **What crosses the network**
 
 - *Entity creation and removal*: the `MultiplayerSpawner` in `main.tscn`. The
-  server calls `spawner.spawn(spec)`; the same `spec` dictionary (scene, name,
-  start tile, owner peer, static property overrides) builds the same node on
-  every peer, so static configuration is never replicated.
+  server calls `spawner.spawn(spec)`; the same `spec` dictionary builds the
+  same node on every peer through `EntityFactory` (`entities/`): `script`
+  (which `GridEntity` subclass), `shape` (`capsule`, `cube`, `sphere`,
+  `slab`, `flat`; anything else draws a capsule and logs once), `tint`,
+  `scale`, `label`, start tile, owner peer, and `props`. So static
+  configuration is never replicated, and a new kind of thing needs no new
+  scene: a script the client has, a shape, and props.
 - *Per-entity state*: a `MultiplayerSynchronizer` on every `GridEntity`
   (built in `GridEntity._init`) sends `tile`, `hp`, `facing` and `stamina`,
   on change. Nothing else.

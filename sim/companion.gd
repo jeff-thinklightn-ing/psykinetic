@@ -45,6 +45,17 @@ var _known_hostiles: Dictionary[int, bool] = {}
 var _last_speech_tick := -1000
 
 
+func _init() -> void:
+	super()
+	mass = 75.0
+	move_ticks = 2
+	max_hp = 20
+	attack_damage = 2
+	strength = 8
+	max_stamina = 80
+	attack_ticks = 8
+
+
 func intent_name() -> String:
 	return INTENT_NAMES[current_intent]
 

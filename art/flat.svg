@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10" viewBox="0 0 20 10">
+  <!-- A rhombus lying on the floor. White so instances can tint it with modulate. -->
+  <polygon points="10,0 20,5 10,10 0,5" fill="#e0e0e0"/>
+  <polygon points="10,1 18,5 10,9 2,5" fill="#ffffff"/>
+</svg>

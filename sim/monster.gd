@@ -13,6 +13,17 @@ const SHADE_DARK := Color(0.33, 0.04, 0.08)
 @export var sight_range := 7
 
 
+func _init() -> void:
+	super()
+	mass = 40.0
+	move_ticks = 4
+	max_hp = 12
+	attack_damage = 1
+	strength = 6
+	max_stamina = 60
+	attack_ticks = 10
+
+
 func _ready() -> void:
 	super()
 	# An explicit tint wins; otherwise colour by mass.

@@ -179,7 +179,8 @@ func _companion() -> Companion:
 
 
 func _spawn_imp(tile: Vector2i) -> Monster:
-	var imp := _main._spawn({"scene": "monster", "name": "TestImp%d" % World.tick, "tile": tile}) as Monster
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "TestImp%d" % World.tick, "tile": tile}) as Monster
 	imp.sight_range = 0
 	return imp
 
