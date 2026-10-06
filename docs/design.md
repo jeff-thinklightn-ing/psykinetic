@@ -526,6 +526,40 @@ one even slide: every step's slide ends exactly as the next begins
 (`tests/mirror_test.gd` samples this). The local player's own walking is
 drawn by the prediction instead; see Networking.
 
+## Scale and space
+
+Every drawn size is in one table, `Iso.HEIGHTS`, in tile heights (16 px
+before camera zoom), keyed by shape: capsule (characters) 1.5, wall 3.0,
+cube (crates) 0.8, barrel 0.9, sphere (the boulder) 1.2, slab 0.4, flat 0.1.
+`EntityFactory` scales each sprite to its entry and sets it so the
+texture's `foot` row sits on the tile centre; `WallBlock` draws to its.
+Nothing else states a size; a spec's `scale` multiplies on top.
+
+**Walls** (`render/wall_block.gd`) are one Node2D per `#` tile in the
+Y-sorted layer, drawn in code: a top face and whichever of the two
+camera-facing sides (+x, +y) have no wall neighbour. Adjacent blocks join
+into continuous walls; straight runs, corners and end caps come from the
+neighbours alone. Rims are drawn on top edges that border no wall. A block
+that would cover an entity (within its screen column, up to three tiles
+behind it) is drawn translucent for as long as it does, so nothing is lost
+behind a wall. The `Walls` TileMapLayer still holds the wall cells for
+`World.load_terrain`, hidden. Floor in front of a wall (the wall to its -x
+or -y side) uses a shaded alternative tile.
+
+**The map** is 48×36, `#` wall, `.` floor, `~` fire, space nothing. The
+first 14×14 is the original room, unchanged except for two openings
+(east at rows 11–12, south at x 3–4) onto two-wide corridors that bend out
+of view and end. Every tile the tests use is where it was.
+
+**Camera and fade.** The camera eases toward the local player
+(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. `render/fade.gd` sits
+on the player and darkens everything beyond `CLEAR_TILES` (9) to black by
+`BLACK_TILES` (12), a ring of tile distance, drawn as an ellipse. It is not
+a lighting system: nothing else reads it.
+
+`--screenshot=<path>` with `--test-exit-after` saves the window as PNG on
+exit, for looking at a build without playing it.
+
 ## Grid ↔ screen
 
 Diamond-down isometric, tile 32×16:

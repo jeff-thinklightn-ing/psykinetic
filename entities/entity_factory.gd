@@ -6,10 +6,10 @@ extends RefCounted
 ##
 ##   script   which GridEntity subclass to attach ("res://sim/monster.gd");
 ##            missing or not a GridEntity: the base class, logged once
-##   shape    "capsule" | "cube" | "sphere" | "slab" | "flat"; anything else
-##            is drawn as a capsule and logged once
+##   shape    "capsule" | "cube" | "barrel" | "sphere" | "slab" | "flat";
+##            anything else is drawn as a capsule and logged once
 ##   tint     Color for the sprite (optional)
-##   scale    uniform float (optional, 1.0)
+##   scale    uniform float on top of the shape's size (optional, 1.0)
 ##   label    name drawn over the sprite (optional)
 ##   name     node name
 ##   tile     start tile
@@ -26,14 +26,17 @@ const DEFAULT_SHAPE := "capsule"
 ## Bump when the meaning of a spawn spec changes in a way an older client
 ## would get wrong. Part of Net.protocol().
 const SPEC_VERSION := 2
-## Placeholder art per shape, and where the sprite sits so its feet are on
-## the tile. Shapes with a face get the small facing pip.
+## Placeholder art per shape. Each sprite is scaled so it stands
+## Iso.HEIGHTS[shape] tile heights tall, and placed so the texture row
+## "foot" (where the body meets the ground) sits on the tile's centre.
+## Shapes with a face get the small facing pip.
 const SHAPES := {
-	"capsule": {"texture": preload("res://art/capsule.svg"), "offset": Vector2(0, -8), "facing": true},
-	"cube": {"texture": preload("res://art/crate.svg"), "offset": Vector2(0, -5), "facing": false},
-	"sphere": {"texture": preload("res://art/sphere.svg"), "offset": Vector2(0, -6), "facing": false},
-	"slab": {"texture": preload("res://art/slab.svg"), "offset": Vector2(0, -3), "facing": false},
-	"flat": {"texture": preload("res://art/flat.svg"), "offset": Vector2(0, 0), "facing": false},
+	"capsule": {"texture": preload("res://art/capsule.svg"), "foot": 18.0, "facing": true},
+	"cube": {"texture": preload("res://art/crate.svg"), "foot": 15.0, "facing": false},
+	"barrel": {"texture": preload("res://art/barrel.svg"), "foot": 16.0, "facing": false},
+	"sphere": {"texture": preload("res://art/sphere.svg"), "foot": 9.5, "facing": false},
+	"slab": {"texture": preload("res://art/slab.svg"), "foot": 10.0, "facing": false},
+	"flat": {"texture": preload("res://art/flat.svg"), "foot": 5.0, "facing": false},
 }
 
 static var _warned: Dictionary[String, bool] = {}
@@ -48,8 +51,11 @@ static func build(spec: Dictionary) -> GridEntity:
 
 	var shape := shape_for(spec)
 	var sprite: Sprite2D = entity.get_node("Sprite")
-	sprite.texture = shape["texture"]
-	sprite.position = shape["offset"]
+	var texture: Texture2D = shape["texture"]
+	sprite.texture = texture
+	var size := Iso.height_px(shape_name_for(spec)) / texture.get_height()
+	sprite.scale = Vector2(size, size)
+	sprite.position = Vector2(0, -(float(shape["foot"]) - texture.get_height() * 0.5) * size)
 	if shape["facing"]:
 		var pip := Polygon2D.new()
 		pip.name = "Facing"
@@ -110,6 +116,12 @@ static func shape_for(spec: Dictionary) -> Dictionary:
 		return SHAPES[shape]
 	_warn_once("shape " + shape, "[spawn] unknown shape %s; drawing a capsule" % shape)
 	return SHAPES[DEFAULT_SHAPE]
+
+
+## The SHAPES key a spec resolves to (DEFAULT_SHAPE for an unknown one).
+static func shape_name_for(spec: Dictionary) -> String:
+	var shape := str(spec.get("shape", DEFAULT_SHAPE))
+	return shape if SHAPES.has(shape) else DEFAULT_SHAPE
 
 
 ## The short type name for logs: "monster" for res://sim/monster.gd.

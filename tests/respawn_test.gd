@@ -162,7 +162,7 @@ func _test_old_snapshot_gets_current_looks() -> void:
 			"and is the map's tan cube, not a bare white one")
 	var boulder := _slot_entity(8)
 	_check(boulder != null and boulder.tile == Vector2i(9, 9), "the boulder is where the snapshot left it")
-	_check(boulder != null and boulder.spawn_spec.get("shape") == "sphere" and boulder.spawn_spec.get("scale") == 1.4
+	_check(boulder != null and boulder.spawn_spec.get("shape") == "sphere"
 			and boulder.mass == 200.0 and boulder.body_material == GridEntity.BodyMaterial.STONE,
 			"and is the map's round stone boulder, not a crate")
 	var stray: GridEntity = World.get_entity_at(Vector2i(10, 4))

@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.10
+
+Scale and space pass, placeholder art only.
+
+- Everything drawn has a size in tile heights, from one table: characters
+  1.5, walls 3, crates 0.8, barrels 0.9, the boulder 1.2.
+- Walls are continuous blocks with a top face; straight runs, corners and
+  end caps come from their neighbours. A wall that would hide something
+  turns translucent while it does. The floor in front of a wall is shaded.
+- The map is 48×36. The room you know is one chamber in it; two corridors
+  lead off it, east and south, and bend out of view.
+- The camera follows your player with a little lag, and everything beyond
+  about 12 tiles fades to black.
+- Nothing else: no lighting, no tileset, no sprites.
+
+The server must be updated to v0.1.10 too (the map is server data).
+
 ## v0.1.9
 
 No more rubber-banding into a crate that cannot move.

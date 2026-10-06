@@ -185,3 +185,12 @@ whether a crate has anywhere to go. And when the server has dropped a move
 order (a refused step into the destination, or silence past the deadline),
 the client drops it too. Guessing again after a correction is how a sprite
 ends up bouncing between the same guess and the same correction.
+
+## 25. One size table; walls drawn, not tiled
+
+Sizes live in `Iso.HEIGHTS`, in tile heights, and nowhere else; sprites and
+wall blocks are scaled to it at build time. Walls are drawn per tile from
+their neighbours instead of being picked from a tileset, so continuous
+walls, corners and end caps need no art and no autotile rules, and a wall
+that would hide something goes translucent while it does. Placeholder only:
+no lighting, no tileset, no sprites yet.

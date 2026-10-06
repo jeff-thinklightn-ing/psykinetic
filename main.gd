@@ -6,24 +6,53 @@ extends Node2D
 const FLOOR_SOURCE := 0
 const WALL_SOURCE := 1
 const FIRE_SOURCE := 2
+## Floor in front of a wall (the wall to its -x or -y side) is drawn darker.
+const SHADED_FLOOR := Color(0.7, 0.7, 0.76)
+## Camera: the fraction of the remaining distance to the player closed per
+## second, as an exponential rate. Higher is tighter.
+const CAMERA_FOLLOW_RATE := 6.0
+## Where the camera starts (and stays on a dedicated server): the chamber.
+const CHAMBER_CENTRE := Vector2i(6, 6)
 ## 14x14. '#' wall, '.' floor, '~' fire. The corridor is row 8, x 1..5, with
 ## its dead end at x 1. Under the wall at row 10, rows 11-12 x 7..11 are a
 ## two-wide passage open at both ends, where two players can pass each other.
 const LEVEL: Array[String] = [
-	"##############",
-	"#............#",
-	"#............#",
-	"#............#",
-	"#............#",
-	"#......~~~...#",
-	"#............#",
-	"######.......#",
-	"#............#",
-	"######.......#",
-	"#......#####.#",
-	"#............#",
-	"#............#",
-	"##############",
+	"##############                                  ",
+	"#............#                                  ",
+	"#............#                                  ",
+	"#............#                                  ",
+	"#............#                                  ",
+	"#......~~~...#                                  ",
+	"#............#                                  ",
+	"######.......#                                  ",
+	"#............#                                  ",
+	"######.......#                                  ",
+	"#......#####.##########                         ",
+	"#.....................#                         ",
+	"#.....................#                         ",
+	"###..###############..#                         ",
+	"  #..#             #..#                         ",
+	"  #..#             #..#                         ",
+	"  #..#             #..#                         ",
+	"  #..###############..##########                ",
+	"  #............................#                ",
+	"  #............................#                ",
+	"  ##################..#######..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   #..#     #..#                ",
+	"                   ####     #..#                ",
+	"                            #..#                ",
+	"                            #..#                ",
+	"                            #..#                ",
+	"                            ####                ",
 ]
 const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
@@ -44,7 +73,7 @@ const LEVEL_ENTITIES: Array[Dictionary] = [
 	{"script": PUSHABLE, "shape": "cube", "name": "Crate2", "tile": Vector2i(8, 3), "tint": Color(0.8, 0.6, 0.35)},
 	{"script": PUSHABLE, "shape": "cube", "name": "Crate3", "tile": Vector2i(4, 2), "tint": Color(0.8, 0.6, 0.35)},
 	{"script": PUSHABLE, "shape": "sphere", "name": "Boulder", "tile": Vector2i(6, 3), "tint": Color(0.55, 0.55, 0.6),
-		"scale": 1.4, "props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}},
+		"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}},
 ]
 ## A joining peer's player takes the first of these that is free.
 const PLAYER_STARTS: Array[Vector2i] = [
@@ -131,6 +160,9 @@ var _toss_from := Vector2.ZERO
 @onready var hud: Label = $HUD/Label
 @onready var debug_overlay: Label = $HUD/Debug
 @onready var toss_aim: Line2D = $TossAim
+@onready var fade: DistanceFade = $Fade
+## Every wall block, for the per-frame see-through check.
+var _wall_blocks: Array[WallBlock] = []
 
 
 func _ready() -> void:
@@ -140,8 +172,8 @@ func _ready() -> void:
 			Iso.tile_to_local(probe), ground.map_to_local(probe)])
 
 	_paint_level()
-	var last_tile := Vector2i(LEVEL[0].length() - 1, LEVEL.size() - 1)
-	camera.position = (Iso.tile_to_local(Vector2i.ZERO) + Iso.tile_to_local(last_tile)) * 0.5
+	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
+	fade.visible = false
 
 	# Every peer builds entities the same way; only the server decides when.
 	spawner.spawn_function = _build_entity
@@ -196,7 +228,9 @@ func _go_online() -> void:
 	Net.message_received.connect(_on_message)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_follow_player(delta)
+	_reveal_behind_walls()
 	var hovered := _entity_under_mouse()
 	var tile := hovered.tile if hovered != null else _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
@@ -306,6 +340,35 @@ func _update_toss_aim() -> void:
 		tail, tip, tip + along.rotated(2.6) * 7.0, tip, tip + along.rotated(-2.6) * 7.0])
 
 
+## A wall block that would hide an entity is drawn translucent while it does.
+func _reveal_behind_walls() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var tiles: Array[Vector2i] = []
+	for entity in World.get_entities():
+		if entity.spawned:
+			tiles.append(entity.tile)
+	for block in _wall_blocks:
+		var covering := false
+		for tile in tiles:
+			if block.hides(tile):
+				covering = true
+				break
+		block.set_see_through(covering)
+
+
+## The camera eases toward the local player, a little behind it; the fade
+## sits on it. With no player (dedicated server, dead) both stay put.
+func _follow_player(delta: float) -> void:
+	var player := _local_player()
+	if player == null:
+		return
+	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
+	camera.position = camera.position.lerp(player.position, rate)
+	fade.position = player.position
+	fade.visible = true
+
+
 ## The player this peer's input controls, or null (dedicated server, dead,
 ## or not spawned yet).
 func _local_player() -> Player:
@@ -345,14 +408,39 @@ func _mouse_tile() -> Vector2i:
 	return Iso.local_to_tile(ground.to_local(get_global_mouse_position()))
 
 
+## The map: "." floor, "~" fire, "#" wall, " " nothing. Floor and fire go
+## on the Ground layer; walls go on the (hidden) Walls layer, which is what
+## World reads, and are drawn as WallBlocks in the Y-sorted layer so they
+## stand in front of what is behind them.
 func _paint_level() -> void:
+	var floor_source := ground.tile_set.get_source(FLOOR_SOURCE) as TileSetAtlasSource
+	var shaded := floor_source.create_alternative_tile(Vector2i.ZERO)
+	floor_source.get_tile_data(Vector2i.ZERO, shaded).modulate = SHADED_FLOOR
+	walls.visible = false
 	for y in LEVEL.size():
 		for x in LEVEL[y].length():
 			var tile := Vector2i(x, y)
-			var symbol := LEVEL[y][x]
-			ground.set_cell(tile, FIRE_SOURCE if symbol == "~" else FLOOR_SOURCE, Vector2i.ZERO)
-			if symbol == "#":
-				walls.set_cell(tile, WALL_SOURCE, Vector2i.ZERO)
+			match _symbol_at(tile):
+				"~":
+					ground.set_cell(tile, FIRE_SOURCE, Vector2i.ZERO)
+				".":
+					var in_front_of_wall := _symbol_at(tile + Vector2i(-1, 0)) == "#" \
+							or _symbol_at(tile + Vector2i(0, -1)) == "#"
+					ground.set_cell(tile, FLOOR_SOURCE, Vector2i.ZERO, shaded if in_front_of_wall else 0)
+				"#":
+					walls.set_cell(tile, WALL_SOURCE, Vector2i.ZERO)
+					var block := WallBlock.new()
+					block.name = "Wall_%d_%d" % [x, y]
+					$YSort.add_child(block)
+					block.setup(tile, func(at: Vector2i) -> bool: return _symbol_at(at) == "#")
+					_wall_blocks.append(block)
+
+
+## The map symbol at [param tile]; " " outside the map.
+func _symbol_at(tile: Vector2i) -> String:
+	if tile.y < 0 or tile.y >= LEVEL.size() or tile.x < 0 or tile.x >= LEVEL[tile.y].length():
+		return " "
+	return LEVEL[tile.y][tile.x]
 
 
 # --- Server: level and players ------------------------------------------------
@@ -1130,6 +1218,10 @@ func _run_test_contest(player: Player, tick: int) -> void:
 
 
 func _on_test_exit() -> void:
+	if Net.screenshot_path != "":
+		var image := get_viewport().get_texture().get_image()
+		var error := image.save_png(Net.screenshot_path)
+		print("[test] screenshot %s: %s" % [Net.screenshot_path, "saved" if error == OK else error_string(error)])
 	print("[test] final tick=%d entities=%d occupancy_consistent=%s" % [
 		World.tick, World.get_entities().size(), World.is_occupancy_consistent()])
 	var player := _local_player()
