@@ -19,6 +19,8 @@ func _ready() -> void:
 	_test_a_fast_walker_slides_too()
 	_test_turning_a_corner()
 	_test_a_step_starts_after_the_display_delay()
+	_test_prediction_does_not_walk_into_a_pinned_crate()
+	_test_prediction_gives_up_when_the_server_has()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -73,7 +75,80 @@ func _test_a_step_starts_after_the_display_delay() -> void:
 	_check(still == World.display_delay_ticks * SAMPLES_PER_TICK + 1, "still for %d ticks first (%d samples)" % [World.display_delay_ticks, still])
 
 
+func _test_prediction_does_not_walk_into_a_pinned_crate() -> void:
+	print("
+== the local player's prediction treats a crate against a wall as a wall ==")
+	# A 10 x 3 strip of floor, y 19..21, x 0..9; everything else is off the map.
+	var floor_tiles: Array[Vector2i] = []
+	for x in 10:
+		for y in range(19, 22):
+			floor_tiles.append(Vector2i(x, y))
+	World.mirror_terrain(floor_tiles, [])
+	_crate("Pinned", Vector2i(9, 20))   # Against the east edge.
+	_crate("Loose", Vector2i(3, 19))    # Two in a row with floor behind them:
+	_crate("Second", Vector2i(2, 19))   # 60 of the player's 80 mass budget.
+	_crate("Stacked", Vector2i(1, 20))  # Two in a row...
+	_crate("Blocked", Vector2i(0, 20))  # ...ending at the west edge.
+
+	var me := _me(Vector2i(6, 20))
+	me.predict_move(Vector2i(9, 20))
+	_check(me._prediction.is_active() and _last_step(me) == Vector2i(8, 20),
+			"ordered onto the pinned crate: the walk shown stops beside it (last step to %s)" % _last_step(me))
+	me._prediction.clear()
+	me.predict_move(Vector2i(1, 20))
+	_check(_last_step(me) == Vector2i(2, 20), "nor into a crate whose chain ends at the edge (last step to %s)" % _last_step(me))
+	me._prediction.clear()
+	var other := _me(Vector2i(6, 19))
+	other.predict_move(Vector2i(3, 19))
+	_check(_last_step(other) == Vector2i(3, 19), "but two crates with room behind them, within the mass budget, are walked into (last step to %s)" % _last_step(other))
+	other._prediction.clear()
+
+
+func _test_prediction_gives_up_when_the_server_has() -> void:
+	print("
+== the prediction gives an order up when the server does ==")
+	var me := _me(Vector2i(6, 21))
+	me.predict_move(Vector2i(8, 21))
+	me._process(0.05)
+	_check(me._prediction.is_active() and me._prediction.has_target(), "a walk is being shown")
+	# The server refused the step into the destination: Player gives the order up.
+	me._on_move_refused(Vector2i(8, 21))
+	_check(not me._prediction.has_target(), "a refused step into the destination itself: the order is given up")
+	for i in 10:
+		me._process(0.1)
+	_check(not me._prediction.is_active() and me.position.is_equal_approx(Iso.tile_to_local(Vector2i(6, 21))),
+			"the sprite blends back to the server's tile and stays (at %s)" % Iso.local_to_tile(me.position))
+
+	me.predict_move(Vector2i(8, 21))
+	var mispredicts := Net.mispredicts_total
+	for i in 30:  # Well past the deadline; no tile ever arrives from the server.
+		me._process(0.1)
+	_check(Net.mispredicts_total == mispredicts + 1 and not me._prediction.has_target(),
+			"a shown step nobody confirms counts once and the order is given up, not re-planned for ever (%d mispredicts)" % (Net.mispredicts_total - mispredicts))
+	_check(not me._prediction.is_active() and me.position.is_equal_approx(Iso.tile_to_local(Vector2i(6, 21))),
+			"and the sprite is back on the server's tile")
+
+
 # --- helpers ------------------------------------------------------------------
+
+func _crate(crate_name: String, tile: Vector2i) -> GridEntity:
+	var crate := EntityFactory.build({"script": "res://sim/pushable.gd", "shape": "cube", "name": crate_name, "tile": tile})
+	add_child(crate)
+	return crate
+
+
+## The local player as a client sees it: a mirror that predicts its own walking.
+func _me(tile: Vector2i) -> GridEntity:
+	var me := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "Me", "tile": tile, "peer": 2})
+	add_child(me)
+	me._process(0.0)
+	me.enable_prediction()
+	return me
+
+
+func _last_step(me: GridEntity) -> Vector2i:
+	return me._prediction._steps.back().to if me._prediction.is_active() else Vector2i(-1, -1)
+
 
 func _mirror(entity_name: String, tile: Vector2i, move_ticks: int) -> GridEntity:
 	var entity := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": entity_name,

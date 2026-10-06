@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.9
+
+No more rubber-banding into a crate that cannot move.
+
+- Clicking a crate that is against a wall (or heavier than you can push,
+  or backed by other crates with nowhere to go) made your capsule bounce
+  between you and the crate for as long as the order stood. The client now
+  applies the same push rule as the server before showing a step, so the
+  walk stops beside the crate. The server was never moving you, which is
+  why nothing else reacted.
+- When the server has given a move order up (a refused step into the
+  destination, or no reply at all), the client stops predicting it instead
+  of guessing again.
+
+This is a client-only fix, but the server must still be updated to v0.1.9
+to accept the client.
+
 ## v0.1.8
 
 Anyone can reset the room.

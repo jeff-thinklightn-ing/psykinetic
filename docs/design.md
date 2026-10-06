@@ -129,10 +129,12 @@ sim state.
 - *The local player's own walking* is predicted (`net/prediction.gd`). On a
   move order the client computes the path against the replicated world —
   every other entity's current tile, which is where it is or is heading,
-  counts as taken; its own lagging tile does not — and starts showing it at
-  once, at the normal step timing. Just before each step begins it checks
-  that tile again and re-plans the rest if something has moved in, as the
-  server re-paths every step. Each replicated tile for that player is then
+  counts as taken, except a pushable within the mover's mass budget that has
+  somewhere to go (the chain rule of `World._shift`; a crate against a wall
+  is as solid as the wall); its own lagging tile does not — and starts
+  showing it at once, at the normal step timing. Just before each step
+  begins it checks that tile again and re-plans the rest if something has
+  moved in, as the server re-paths every step. Each replicated tile for that player is then
   compared with the steps already shown: if it is the next one, nothing
   happens. Anything else is a **misprediction**: if the error is at most
   `SNAP_TILES` (2), the sprite blends from where it is to the server's tile
@@ -141,7 +143,10 @@ sim state.
   confirms counts as a misprediction once it is `RECONCILE_GRACE_TICKS` (4)
   plus the round trip time overdue, and a step the server refuses outright
   is told to the client at once (`World.move_refused`) so it re-plans
-  without waiting. Only walking is predicted. Pushes of the local player are
+  without waiting. The prediction gives the order up, as the server has,
+  when the refused step was into the destination itself or when a shown
+  step draws no reply at all; the rest of that walk, if any, is drawn from
+  the server's tiles like any other entity's. Only walking is predicted. Pushes of the local player are
   never predicted, and neither are attacks, shoves, or anything about other
   entities; the server's result always wins.
 

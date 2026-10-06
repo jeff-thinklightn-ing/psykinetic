@@ -226,6 +226,8 @@ func is_breakable() -> bool:
 func _process(delta: float) -> void:
 	var shown_facing := facing
 	if _prediction != null and _prediction.advance(delta):
+		# Not a correction but silence: the server is not doing this walk.
+		_prediction.give_up()
 		_mispredicted("no confirmation from the server")
 	if spawned:
 		if _prediction != null and _prediction.is_active():
@@ -447,8 +449,13 @@ func _on_move_refused(refused: Vector2i) -> void:
 		return
 	Net.record_mispredict()
 	_mirror_rest()
+	# A refused step into the destination itself: the server has dropped the
+	# order (see Player._sim_tick), so there is nothing left to predict.
+	if refused == _prediction.target():
+		_prediction.give_up()
 	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
-	print("[net] mispredict: %s step into %s refused, server has %s: re-planned" % [name, refused, tile])
+	print("[net] mispredict: %s step into %s refused, server has %s: %s" % [
+		name, refused, tile, "re-planned" if _prediction.has_target() else "order given up"])
 
 
 # Cosmetic only: they replay feedback, they carry no sim state.

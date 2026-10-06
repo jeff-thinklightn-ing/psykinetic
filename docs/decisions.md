@@ -176,3 +176,12 @@ there; a reset needed a shell on the box. `R` is now a player command the
 authority honours from anyone. It rides the generic command RPC, so it adds
 nothing to the protocol. This is a testing convenience, not a rule of the
 game: `--no-player-reset` turns it off.
+
+## 24. The prediction applies the server's step rule, then gives up like it
+
+A predicted step must be one the server would make: the client checks the
+same things World._shift does, read off the replicated world, including
+whether a crate has anywhere to go. And when the server has dropped a move
+order (a refused step into the destination, or silence past the deadline),
+the client drops it too. Guessing again after a correction is how a sprite
+ends up bouncing between the same guess and the same correction.

@@ -18,6 +18,12 @@ extends RefCounted
 ##     a couple of ticks and the path is re-planned from there. Only an error
 ##     of more than SNAP_TILES is snapped (see GridEntity).
 ## Only walking is predicted. Being pushed is never predicted.
+##
+## The prediction gives its target up when the server evidently has: a step
+## into the target tile itself refused, or a shown step that no reply
+## confirms at all. From then on the server's moves are drawn as for any
+## other entity; predicting again would only bounce the sprite between the
+## same guess and the same correction.
 
 ## How long past its expected confirmation (start + round trip) a shown step
 ## may stay unconfirmed before it counts as a misprediction.
@@ -86,6 +92,19 @@ func clear() -> void:
 	_has_target = false
 
 
+func target() -> Vector2i:
+	return _target
+
+
+func has_target() -> bool:
+	return _has_target
+
+
+## Stop pursuing the target; steps already shown finish or blend away.
+func give_up() -> void:
+	_has_target = false
+
+
 ## The server put the entity on [param server_tile], not where this
 ## prediction had it. Blend the sprite there over [param blend_ticks] from
 ## wherever it is now, then carry on toward the target from that tile.
@@ -119,7 +138,7 @@ func advance(delta: float) -> bool:
 			continue
 		if step.start > _clock:
 			break
-		if _taken(step.to):
+		if _blocked(step.from, step.to - step.from):
 			_replan_from(i)
 			break
 		step.started = true
@@ -186,7 +205,7 @@ func _append_path(at: Vector2i, start: float) -> void:
 	for next in World.find_path(at, _target, true, _entity):
 		if next == _target and not _into_goal:
 			break
-		if _taken(next):
+		if _blocked(at, next - at):
 			break
 		var step := Step.new()
 		step.from = at
@@ -209,11 +228,19 @@ func _replan_from(i: int) -> void:
 	_append_path(at, maxf(start, _clock))
 
 
-## Occupied in the replicated world by something the server would not let
-## this entity walk into. Every other entity's current tile, where it is or
-## is heading, counts; only a crate light enough to shove does not.
-func _taken(tile: Vector2i) -> bool:
-	var occupant := World.get_entity_at(tile)
+## Would the server refuse this step? The same rule as World._shift, read
+## off the replicated world: terrain in the way, or an occupant that cannot
+## be walked into. Every other entity's current tile, where it is or is
+## heading, counts; a pushable one does not if it is within the mover's mass
+## budget and has somewhere to go, chain and all. A crate against a wall is
+## as solid as the wall.
+func _blocked(from: Vector2i, direction: Vector2i, budget := _entity.mass) -> bool:
+	if World._terrain_blocks_step(from, direction):
+		return true
+	var to := from + direction
+	var occupant := World.get_entity_at(to)
 	if occupant == null or occupant == _entity:
 		return false
-	return not (occupant.pushable and occupant.mass <= _entity.mass)
+	if not occupant.pushable or occupant.mass > budget:
+		return true
+	return _blocked(to, direction, budget - occupant.mass)
