@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.8
+
+Anyone can reset the room.
+
+- Press R to rebuild the room from the map: monsters, crates and the
+  boulder back in place, dead companions back beside their owners, players
+  where they stood. It used to work only when hosting, never on the
+  dedicated server. The server logs who did it.
+- This is on while the game is being tested; a server started with
+  `--no-player-reset` keeps resets to its console.
+
+The server must be updated to v0.1.8 too.
+
 ## v0.1.7
 
 Companions come back where their owner is.

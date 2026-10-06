@@ -73,6 +73,15 @@ sleep 1
 start clientG --client --address=127.0.0.1 "--token=$TOKEN" --name=Gus --test-move=1,9 --test-contest=5,12,70 --test-exit-after=11
 wait
 
+# Phase 4: any player may reset the room. Hal pushes Crate1 west as client 1
+# did; at tick 70 Ivy asks for a reset, as her R key would.
+start server4 --server --no-companions "--token=$TOKEN" --test-exit-after=13
+sleep 2
+start clientH --client --address=127.0.0.1 "--token=$TOKEN" --name=Hal --test-move=-3,0 --test-exit-after=10
+sleep 1
+start clientI --client --address=127.0.0.1 "--token=$TOKEN" --name=Ivy --test-reset=70 --test-exit-after=8
+wait
+
 failures=0
 check() {
 	if [ "$1" = "$2" ]; then
@@ -140,6 +149,11 @@ check "$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientF.log")$(count '\[te
 check "$(count '\[test\] display: .*server_tile=\(12, 12\)' "$LOGS/clientF.log")" 1 "phase 3: Fay crossed to (12, 12)"
 check "$(count '\[test\] display: .*server_tile=\(5, 12\)' "$LOGS/clientG.log")" 1 "phase 3: Gus crossed to (5, 12)"
 check "$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -c 'display: .*snaps=0 ' || true)" 2 "phase 3: neither client snapped more than 2 tiles"
+check "$(count 'push: Player1 -> Crate1' "$LOGS/server4.log")$(count '\[world\] Ivy reset the room' "$LOGS/server4.log")" 11 "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
+check "$(count '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' "$LOGS/server4.log")" 4 "phase 4: both players were put back into the rebuilt room"
+# Hal stood on the crate's spawn tile, so he is put on the nearest free one.
+check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=' "$LOGS/clientI.log")" 1 "phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself"
+check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)' "$LOGS/clientH.log")" 1 "phase 4: Hal, who did not ask, sees the same room"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

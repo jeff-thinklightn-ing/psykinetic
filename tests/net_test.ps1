@@ -84,6 +84,17 @@ $phase3 = @($server3, $clientF, $clientG)
 $phase3 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
 $phase3 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
+# Phase 4: any player may reset the room. Hal pushes Crate1 west as client 1
+# did; at tick 70 Ivy asks for a reset, as her R key would.
+$server4 = Start-Instance 'server4' @('--server', '--no-companions', "--token=$token", '--test-exit-after=13')
+Start-Sleep -Seconds 2
+$clientH = Start-Instance 'clientH' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Hal', '--test-move=-3,0', '--test-exit-after=10')
+Start-Sleep -Seconds 1
+$clientI = Start-Instance 'clientI' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Ivy', '--test-reset=70', '--test-exit-after=8')
+$phase4 = @($server4, $clientH, $clientI)
+$phase4 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+$phase4 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
 	if (Test-Path $path) { @(Get-Content $path) } else { @() }
@@ -102,6 +113,9 @@ $clientELog = Read-Log 'clientE'
 $server3Log = Read-Log 'server3'
 $clientFLog = Read-Log 'clientF'
 $clientGLog = Read-Log 'clientG'
+$server4Log = Read-Log 'server4'
+$clientHLog = Read-Log 'clientH'
+$clientILog = Read-Log 'clientI'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -163,6 +177,11 @@ $gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (
 Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "phase 3: Fay crossed to (12, 12) ($($fay | ForEach-Object { $_.Line }))"
 Assert ($gus.Count -eq 1 -and $gus[0].Line -match 'server_tile=\(5, 12\)') "phase 3: Gus crossed to (5, 12) ($($gus | ForEach-Object { $_.Line }))"
 Assert ($fay.Count -eq 1 -and $gus.Count -eq 1 -and $fay[0].Matches[0].Groups[3].Value -eq '0' -and $gus[0].Matches[0].Groups[3].Value -eq '0') 'phase 3: neither client snapped more than 2 tiles'
+Assert (@($server4Log | Select-String 'push: Player1 -> Crate1').Count -eq 1 -and @($server4Log | Select-String '\[world\] Ivy reset the room').Count -eq 1) "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
+Assert (@($server4Log | Select-String '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player').Count -eq 4) 'phase 4: both players were put back into the rebuilt room'
+# Hal stood on the crate's spawn tile, so he is put on the nearest free one.
+Assert (@($clientILog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=').Count -eq 1) 'phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself'
+Assert (@($clientHLog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)').Count -eq 1) 'phase 4: Hal, who did not ask, sees the same room'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

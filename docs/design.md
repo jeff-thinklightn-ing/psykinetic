@@ -175,6 +175,13 @@ players keep their places, dead companions come back), `respawn` brings
 every dead slot back at once,
 `players` lists who is connected, `save` writes the snapshot.
 
+**Reset from the game.** `R` sends `World.command("reset", {})` for the
+local player — the same generic command path as companion orders, so no RPC
+of its own. The authority rebuilds the room exactly as the console's
+`reset` does and logs who asked. While the game is only being tested any
+player may; `--no-player-reset` on the server limits it to the console and
+to a host's own player.
+
 **Persistence.** With `--state=<path>` the authority writes a JSON snapshot
 of every level entity (type, name, tile, hp, stamina, facing, spawn
 properties) and every player record every 30 ticks and on clean shutdown,

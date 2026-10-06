@@ -13,6 +13,7 @@ extends Node
 ##   --admin-port=<n>             server/host: accept console commands on 127.0.0.1:<n> (TCP)
 ##   --console                    read console commands from stdin (--server does this anyway)
 ##   --no-companions              server/host: players get no companion
+##   --no-player-reset            server/host: R from a client does not rebuild the room
 ##   --llm-model=<m>              companion minds ask this model...
 ##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
 ##                                a URL ending /chat/completions is spoken to OpenAI-style)
@@ -32,6 +33,7 @@ extends Node
 ## Test hooks (used by tests/net_test):
 ##   --test-move=<dx>,<dy>        once the local player exists, order it to move by this offset
 ##   --test-contest=<x>,<y>,<tick> at that server tick, order the local player to tile (x, y)
+##   --test-reset=<tick>          at that server tick, ask for a room reset as the R key does
 ##   --test-exit-after=<seconds>  quit after this long
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
@@ -90,6 +92,9 @@ var llm_url := DEFAULT_LLM_URL
 var llm_model := ""
 ## --no-companions: players get no companion (tests of other things, or ops).
 var companions := true
+## --no-player-reset turns this off: any player may rebuild the room with R.
+## On while the game is only being tested; the console's reset always works.
+var player_reset := true
 
 ## Server-to-everyone notices that are not sim state: ("speech", {entity, text}).
 signal message_received(kind: String, data: Dictionary)
@@ -118,6 +123,7 @@ var local_id := 1
 var test_move := Vector2i.ZERO
 var test_contest_tile := Vector2i.ZERO
 var test_contest_tick := 0
+var test_reset_tick := 0
 var test_exit_after := 0.0
 
 var mispredicts_total := 0
@@ -535,9 +541,11 @@ func _parse_args() -> void:
 				console = true
 			"--no-companions":
 				companions = false
+			"--no-player-reset":
+				player_reset = false
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--llm-url", "--llm-model", \
-					"--test-move", "--test-contest", "--test-exit-after", "--test-version", "--test-protocol":
+					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -582,5 +590,7 @@ func _set_option(key: String, value: String) -> void:
 			if parts.size() == 3:
 				test_contest_tile = Vector2i(parts[0].to_int(), parts[1].to_int())
 				test_contest_tick = parts[2].to_int()
+		"--test-reset":
+			test_reset_tick = value.to_int()
 		"--test-exit-after":
 			test_exit_after = value.to_float()

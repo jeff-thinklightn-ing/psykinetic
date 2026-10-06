@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_respawn_waits_for_time_and_distance()
 	_test_crate_respawns_at_its_spawn_tile()
 	_test_console()
+	_test_player_reset()
 	_test_old_snapshot_gets_current_looks()
 
 	print("")
@@ -116,6 +117,28 @@ func _test_console() -> void:
 	var fresh := _slot_entity(5)
 	_check(fresh != null and fresh.spawned and fresh.tile == Vector2i(8, 2), "the broken crate is back at its spawn tile")
 	_check(_player() != null and _player().tile == was_at, "the host player is back where it was, from its record")
+
+
+func _test_player_reset() -> void:
+	print("\n== a player's reset command rebuilds the room, while players may ==")
+	World.damage(_slot_entity(5), 999)
+	_check(_slot_entity(5) == null, "a crate is broken")
+	# Sent as a client's R would arrive: for a player some other peer owns.
+	_player().owner_peer = 77
+	World.command(_player(), "reset", {})
+	var crate := _slot_entity(5)
+	_check(crate != null and crate.tile == Vector2i(8, 2), "a player's 'reset' command brings the room back")
+	_check(_player() != null and _monsters() == 5, "with its player and all five monsters")
+
+	Net.player_reset = false
+	World.damage(_slot_entity(5), 999)
+	_player().owner_peer = 77
+	World.command(_player(), "reset", {})
+	_check(_slot_entity(5) == null, "with --no-player-reset another peer's command does nothing")
+	_player().owner_peer = Net.local_id
+	World.command(_player(), "reset", {})
+	_check(_slot_entity(5) != null, "but the authority's own player still can")
+	Net.player_reset = true
 
 
 func _test_old_snapshot_gets_current_looks() -> void:

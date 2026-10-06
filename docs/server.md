@@ -108,6 +108,12 @@ that died come back; the reply names them), `respawn`
 (bring every dead monster and crate back now), `players` (who is connected,
 where, with what hp), `save` (write the snapshot now).
 
+Players can also rebuild the room themselves: `R` in the game does what
+`reset` does, for whoever presses it, and the server logs
+`[world] <name> reset the room`. That is on while the game is only being
+tested; add `--no-player-reset` to the unit's `ExecStart` to leave it to the
+console.
+
 Under systemd the server's stdin is closed, so the unit runs it with
 `--admin-port=7778` and commands go over a localhost TCP connection, one
 per connection, reply written back. `server/admin.sh` wraps that with

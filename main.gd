@@ -111,6 +111,7 @@ var _test_target := Vector2i.ZERO
 var _test_ordered := false
 var _test_arrived := false
 var _test_contested := false
+var _test_reset_sent := false
 ## Client: whether this peer has ever had a player, to tell a rejected join
 ## from a later disconnect.
 var _had_player := false
@@ -212,7 +213,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		debug_overlay.visible = not debug_overlay.visible
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
-		if Net.is_authority():
+		# A command like any other, so it works from a client too; the
+		# authority decides. With no player to send it for (dead, respawning)
+		# only the authority's own window can still do it.
+		var me := _local_player()
+		if me != null:
+			World.command(me, "reset", {})
+		elif Net.is_authority():
 			_start_level()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
@@ -665,9 +672,20 @@ func _remember_companion(id: String) -> void:
 
 ## "order" {slot}: 1 follow, 2 hold here, 3 attack my current target,
 ## 4 fall back; 5..9 are accepted and ignored for now.
+## "reset": rebuild the room, as the console's reset does. From the
+## authority's own player always; from anyone else only while
+## Net.player_reset is on.
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	if command_name == "order" and entity is Player:
 		handle_order(entity, int(args.get("slot", 0)))
+	elif command_name == "reset" and entity is Player:
+		var who := _display_name(entity)  # The rebuild frees the entity.
+		if not Net.player_reset and entity.owner_peer != Net.local_id:
+			print("[world] %s asked for a reset; players may not (--no-player-reset)" % who)
+			return
+		print("[world] %s reset the room" % who)
+		_start_level()
+		party_log.add("%s reset the room." % who)
 
 
 func handle_order(player: Player, slot: int) -> void:
@@ -897,7 +915,7 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R restart (host)   F3 debug" % [
+	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R reset room   F3 debug" % [
 		mode_text, hp_text, tick]
 	if player != null:
 		_had_player = true
@@ -905,6 +923,7 @@ func _on_world_ticked(tick: int) -> void:
 		player.enable_prediction()
 	_run_test_move(player)
 	_run_test_contest(player, tick)
+	_run_test_reset(player, tick)
 
 
 func _debug_text() -> String:
@@ -1092,6 +1111,14 @@ func _run_test_move(player: Player) -> void:
 
 ## --test-contest: at a fixed server tick, order the local player to a given
 ## tile. Two clients doing this for the same tile race for it on the server.
+func _run_test_reset(player: Player, tick: int) -> void:
+	if Net.test_reset_tick <= 0 or _test_reset_sent or player == null or tick < Net.test_reset_tick:
+		return
+	_test_reset_sent = true
+	World.command(player, "reset", {})
+	print("[test] %s asked for a room reset at tick %d" % [player.name, tick])
+
+
 func _run_test_contest(player: Player, tick: int) -> void:
 	if Net.test_contest_tick <= 0 or _test_contested or player == null \
 			or tick < Net.test_contest_tick:

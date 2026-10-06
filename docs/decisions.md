@@ -168,3 +168,11 @@ a tile slid, the rest jumped, then a pause. Sampled in `tests/mirror_test`.
 Death still costs something: the companion stays dead across reconnects and
 server restarts. Rebuilding the room (`reset`, `R` on a host) starts whole,
 companions included. Before this there was no way to get one back at all.
+
+## 23. While testing, any player may reset the room
+
+The live server is headless, so nobody is ever its host and `R` did nothing
+there; a reset needed a shell on the box. `R` is now a player command the
+authority honours from anyone. It rides the generic command RPC, so it adds
+nothing to the protocol. This is a testing convenience, not a rule of the
+game: `--no-player-reset` turns it off.
