@@ -414,10 +414,16 @@ the current intent.
 Two minds. `ScriptedMind`: obey the last order; retreat toward the owner
 below 30% hp; attack the nearest hostile within 3 tiles; else follow. It is
 what every headless test uses and the fallback for everything else.
-`OllamaMind` (`net/ollama_mind.gd`): an asynchronous POST to an
-OpenAI-compatible chat endpoint (`--llm-url`, `--llm-model`, or the env
-file), with a system prompt demanding one JSON object, a 2-second timeout
-and one request in flight per companion. A window that has no answer yet
+`OllamaMind` (`net/ollama_mind.gd`): an asynchronous POST to Ollama's native
+chat endpoint (`--llm-model`, and `--llm-url` if it is not the local default
+`http://127.0.0.1:11434/api/chat`; or the env file). The body is `model`,
+`"think": false`, `"stream": false`, `"format": "json"`, `"keep_alive": -1`
+and the messages: a system prompt demanding one JSON object, then the
+context. The answer is read from `message.content`, with any `<think>` block
+stripped first in case a model reasons anyway. A URL ending in
+`/chat/completions` is spoken to OpenAI-style instead (no `format` or
+`keep_alive`; the answer read from `choices[0].message.content`). A 2-second
+timeout and one request in flight per companion. A window that has no answer yet
 uses the scripted one; the reply is applied when it arrives, if it parses.
 The tick never waits.
 

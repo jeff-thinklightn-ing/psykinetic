@@ -129,18 +129,24 @@ wait. Players still get their own 2-second respawn.
 ## Companion minds
 
 Every player gets a companion. Its decisions come from a *mind*: the
-scripted one by default, or a language model through any OpenAI-compatible
-chat endpoint, such as Ollama's. To use one, set in `/etc/psykinetic/env`:
+scripted one by default, or a language model served by Ollama. To use one,
+name the model in `/etc/psykinetic/env`; the URL is only needed if Ollama is
+not on the same box at its usual port:
 
 ```
-PSYKINETIC_LLM_URL=http://127.0.0.1:11434/v1/chat/completions
-PSYKINETIC_LLM_MODEL=llama3.2
+PSYKINETIC_LLM_URL=http://127.0.0.1:11434/api/chat
+PSYKINETIC_LLM_MODEL=qwen3
 ```
 
-(or pass `--llm-url=` and `--llm-model=`). Each decision is one request with
-a 2-second timeout; while it is out, or if it fails or answers nonsense, the
-scripted mind's answer is used, and the log says so (`[mind] ollama: ...`).
-The server never waits on it.
+(or pass `--llm-model=` and `--llm-url=`). The default URL is Ollama's native
+chat endpoint. The server asks it for JSON output with reasoning off and the
+model kept loaded (`"format": "json"`, `"think": false`, `"keep_alive": -1`),
+so the first decision does not pay a model load. A URL ending in
+`/chat/completions` is treated as an OpenAI-compatible endpoint instead.
+
+Each decision is one request with a 2-second timeout; while it is out, or if
+it fails or answers nonsense, the scripted mind's answer is used, and the log
+says so (`[mind] ollama: ...`). The server never waits on it.
 
 Console: `companions` lists each companion with its owner, intent and the
 mind that answered last; `mind scripted` / `mind ollama` switches every

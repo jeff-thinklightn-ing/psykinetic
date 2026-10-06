@@ -13,7 +13,9 @@ extends Node
 ##   --admin-port=<n>             server/host: accept console commands on 127.0.0.1:<n> (TCP)
 ##   --console                    read console commands from stdin (--server does this anyway)
 ##   --no-companions              server/host: players get no companion
-##   --llm-url=<url> --llm-model=<m>  companion minds ask this OpenAI-compatible endpoint
+##   --llm-model=<m>              companion minds ask this model...
+##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
+##                                a URL ending /chat/completions is spoken to OpenAI-style)
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
@@ -77,7 +79,10 @@ var admin_port := 0
 var console := false
 ## OpenAI-compatible chat endpoint and model for companion minds, from
 ## --llm-url / --llm-model or PSYKINETIC_LLM_URL / PSYKINETIC_LLM_MODEL.
-var llm_url := ""
+## The URL defaults to a local Ollama's native endpoint; a model must be
+## named for the language-model mind to be used at all.
+const DEFAULT_LLM_URL := "http://127.0.0.1:11434/api/chat"
+var llm_url := DEFAULT_LLM_URL
 var llm_model := ""
 ## --no-companions: players get no companion (tests of other things, or ops).
 var companions := true
@@ -119,7 +124,8 @@ var _mispredict_times: Array[int] = []
 
 func _enter_tree() -> void:
 	version = _read_version()
-	llm_url = OS.get_environment("PSYKINETIC_LLM_URL")
+	if OS.get_environment("PSYKINETIC_LLM_URL") != "":
+		llm_url = OS.get_environment("PSYKINETIC_LLM_URL")
 	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
 	_parse_args()
 	if not _mode_given:

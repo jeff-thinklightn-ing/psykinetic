@@ -21,6 +21,8 @@ func _ready() -> void:
 	_test_persists_and_resumes()
 	_test_idles_while_owner_offline()
 	_test_malformed_llm_reply_uses_scripted()
+	_test_llm_reasoning_is_off_and_stripped()
+	_test_native_ollama_endpoint()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -159,6 +161,78 @@ func _test_malformed_llm_reply_uses_scripted() -> void:
 	World.step()
 	World.step()
 	_check(pet.current_intent == Companion.Intent.HOLD and pet.last_mind == "ollama", "a well-formed reply is applied when it arrives (%s by %s)" % [pet.intent_name(), pet.last_mind])
+	pet.mind = ScriptedMind.new()
+
+
+func _test_llm_reasoning_is_off_and_stripped() -> void:
+	print("\n== reasoning is turned off in the request and stripped from the reply ==")
+	var pet := _companion()
+	var mind := OllamaMind.new("http://127.0.0.1:1/v1/chat/completions", "stub", _main)
+	var body: Variant = JSON.parse_string(mind.request_body({"hp": 1}))
+	_check(body is Dictionary and body.get("think") == false, "the request body carries \"think\": false")
+
+	# Back to FOLLOW first, so the reply below visibly changes something.
+	pet.mind = ScriptedMind.new()
+	pet.give_order("follow")
+	World.step()
+	_check(pet.current_intent == Companion.Intent.FOLLOW, "starting from FOLLOW (%s)" % pet.intent_name())
+
+	# A think block ahead of the answer, with a decoy JSON object inside it.
+	pet.mind = mind
+	var content := "<think>\nThe owner is fine. Maybe {\"intent\": \"ATTACK\", \"target\": \"nobody\"}? No.\n</think>\n" \
+			+ "{\"intent\": \"HOLD\", \"target\": null, \"say\": \"\"}"
+	mind.stub_next_reply(JSON.stringify({"choices": [{"message": {"content": content}}]}))
+	pet.request_decision("test")
+	World.step()
+	World.step()
+	_check(mind.last_error.is_empty(), "a reply with a <think> block parses (%s)" % mind.last_error)
+	_check(pet.current_intent == Companion.Intent.HOLD and pet.last_mind == "ollama",
+			"and the answer after the block is the one applied (%s by %s)" % [pet.intent_name(), pet.last_mind])
+
+	_check(OllamaMind.strip_think("reasoning...</think>{\"intent\": \"FOLLOW\"}") == "{\"intent\": \"FOLLOW\"}",
+			"a stray closing tag drops everything before it")
+	_check(OllamaMind.strip_think("{\"intent\": \"FOLLOW\"}<THINK>never closed") == "{\"intent\": \"FOLLOW\"}",
+			"an unclosed block drops everything after it, whatever the case")
+	_check(OllamaMind.strip_think("{\"intent\": \"FOLLOW\"}") == "{\"intent\": \"FOLLOW\"}", "a reply without one is untouched")
+	pet.mind = ScriptedMind.new()
+
+
+func _test_native_ollama_endpoint() -> void:
+	print("\n== Ollama's native /api/chat: request and reply shape ==")
+	var pet := _companion()
+	_check(Net.DEFAULT_LLM_URL == "http://127.0.0.1:11434/api/chat", "the default URL is the native endpoint")
+	var mind := OllamaMind.new(Net.DEFAULT_LLM_URL, "stub", _main)
+	_check(not mind.openai_shaped, "/api/chat is spoken to natively")
+	var body: Variant = JSON.parse_string(mind.request_body({"hp": 1}))
+	_check(body is Dictionary and body.get("model") == "stub" and body.get("think") == false
+			and body.get("stream") == false and body.get("format") == "json"
+			and int(body.get("keep_alive", 0)) == -1 and body.get("messages") is Array,
+			"the body is model, think false, stream false, format json, keep_alive -1, messages")
+	_check(body is Dictionary and not body.has("temperature") and not ("/no_think" in str(body["messages"][0]["content"])),
+			"with nothing else, and no /no_think in the prompt")
+
+	pet.mind = ScriptedMind.new()
+	pet.give_order("follow")
+	World.step()
+	pet.mind = mind
+	# What /api/chat sends back: the answer in message.content.
+	mind.stub_next_reply(JSON.stringify({
+		"model": "stub", "created_at": "2026-10-06T00:00:00Z", "done": true, "done_reason": "stop",
+		"message": {"role": "assistant", "content": "{\"intent\": \"HOLD\", \"target\": null, \"say\": \"\"}"},
+	}))
+	pet.request_decision("test")
+	World.step()
+	World.step()
+	_check(mind.last_error.is_empty() and pet.current_intent == Companion.Intent.HOLD and pet.last_mind == "ollama",
+			"a native reply is read from message.content and applied (%s by %s%s)" % [
+				pet.intent_name(), pet.last_mind, ", " + mind.last_error if not mind.last_error.is_empty() else ""])
+
+	# The same body on an OpenAI-style URL is not what that endpoint returns.
+	var openai := OllamaMind.new("http://127.0.0.1:11434/v1/chat/completions", "stub", _main)
+	_check(openai.openai_shaped, "a URL ending in /chat/completions is spoken to OpenAI-style")
+	var openai_body: Variant = JSON.parse_string(openai.request_body({"hp": 1}))
+	_check(openai_body is Dictionary and not openai_body.has("format") and not openai_body.has("keep_alive")
+			and openai_body.get("think") == false, "its body has no format or keep_alive, and still think false")
 	pet.mind = ScriptedMind.new()
 
 

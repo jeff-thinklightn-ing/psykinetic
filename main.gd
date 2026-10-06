@@ -957,7 +957,7 @@ func admin_command(line: String) -> String:
 			if words.size() < 2 or words[1] not in ["scripted", "ollama"]:
 				return "usage: mind scripted|ollama (now %s)" % mind_kind
 			if words[1] == "ollama" and (Net.llm_url == "" or Net.llm_model == ""):
-				return "no --llm-url / --llm-model configured"
+				return "no --llm-model configured"
 			mind_kind = words[1]
 			for pet: Companion in _companions.values():
 				if is_instance_valid(pet):
