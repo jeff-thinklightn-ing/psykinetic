@@ -35,7 +35,9 @@ const MAX_PUSH_SLIDE_TICKS := 3
 ## net_display_delay_ticks: how far in the past a client draws everything it
 ## does not predict. One tick means a replicated tile change is always in hand
 ## before its slide has to begin.
-const NET_DISPLAY_DELAY_TICKS := 1
+const NET_DISPLAY_DELAY_TICKS := 2
+## The live value: settings.cfg's display_delay overrides the default.
+var display_delay_ticks := NET_DISPLAY_DELAY_TICKS
 ## A diagonal step takes this many times the ticks of an orthogonal one (rounded
 ## up), so world speed is roughly constant in every direction. On screen a
 ## sideways diagonal covers 32 px against 18 px for an orthogonal step; at 1.0
@@ -376,6 +378,24 @@ func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vect
 	var target := _entity_at_path(target_path)
 	if entity != null and target != null:
 		order_shove(entity, target, direction)
+
+
+## Server: a player's step into [param tile] was refused this tick (someone
+## else got there first). Its client re-plans at once instead of waiting
+## for a position that is not going to change.
+func report_move_refused(entity: GridEntity, tile: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	if entity.owner_peer != 0 and entity.owner_peer != Net.local_id \
+			and entity.owner_peer in multiplayer.get_peers():
+		move_refused.rpc_id(entity.owner_peer, entity.get_path(), tile)
+
+
+@rpc("authority", "call_remote", "reliable")
+func move_refused(entity_path: NodePath, tile: Vector2i) -> void:
+	var entity := get_node_or_null(entity_path) as GridEntity
+	if entity != null:
+		entity._on_move_refused(tile)
 
 
 func _entity_at_path(path: NodePath) -> GridEntity:
@@ -840,11 +860,14 @@ func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 ## walkable but avoided when a short detour exists.
 ## With [param ignore_goal_occupant] the goal may be occupied (walk up to a
 ## monster, push a crate), but occupied tiles along the way still block.
-func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false) -> Array[Vector2i]:
+## [param ignore] is an entity whose own tile does not count as occupied
+## (a client predicting for itself, whose replicated tile lags behind).
+func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
+		ignore: GridEntity = null) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
-	if _occupancy.has(to) and not ignore_goal_occupant:
+	if _occupancy.has(to) and not ignore_goal_occupant and _occupancy[to] != ignore:
 		return path
 
 	var open: Array[Vector2i] = [from]
@@ -876,7 +899,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false) -> A
 			var next: Vector2i = current + direction
 			if closed.has(next) or _terrain_blocks_step(current, direction):
 				continue
-			if _occupancy.has(next) and next != to:
+			if _occupancy.has(next) and next != to and _occupancy[next] != ignore:
 				continue
 			var next_cost: int = cost[current]
 			if direction.x != 0 and direction.y != 0:

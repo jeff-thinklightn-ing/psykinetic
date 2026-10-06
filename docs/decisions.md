@@ -127,3 +127,12 @@ dead slot comes back on its own tile at full stats after a delay, but never
 while a player is nearby, so nothing appears on top of someone. Pushed
 things are alive and stay put. The server console is a localhost TCP port
 under systemd (stdin is closed there), stdin elsewhere.
+
+## 18. Mispredictions blend; only big ones snap (amends 13)
+
+Prediction plans against the replicated world and re-checks each step as
+it starts, so two players rarely predict into each other. When the server
+still disagrees, an error of up to 2 tiles is blended away over 2 ticks and
+re-planned from the server's tile; more than that snaps. A refused step is
+reported to the client at once. Other entities are drawn 2 ticks behind
+(`display_delay` in `settings.cfg`): 100 ms for no stutter.

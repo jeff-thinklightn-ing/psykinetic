@@ -70,6 +70,17 @@ $phase2 = @($server2, $clientC, $clientD, $clientE)
 $phase2 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
 $phase2 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
+# Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
+# the bottom of the room, then at tick 70 cross it toward each other.
+$server3 = Start-Instance 'server3' @('--server', "--token=$token", '--test-exit-after=15')
+Start-Sleep -Seconds 2
+$clientF = Start-Instance 'clientF' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Fay', '--test-move=-6,9', '--test-contest=12,12,70', '--test-exit-after=12')
+Start-Sleep -Seconds 1
+$clientG = Start-Instance 'clientG' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Gus', '--test-move=1,9', '--test-contest=5,12,70', '--test-exit-after=11')
+$phase3 = @($server3, $clientF, $clientG)
+$phase3 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+$phase3 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
 	if (Test-Path $path) { @(Get-Content $path) } else { @() }
@@ -84,6 +95,9 @@ $server2Log = Read-Log 'server2'
 $clientCLog = Read-Log 'clientC'
 $clientDLog = Read-Log 'clientD'
 $clientELog = Read-Log 'clientE'
+$server3Log = Read-Log 'server3'
+$clientFLog = Read-Log 'clientF'
+$clientGLog = Read-Log 'clientG'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -126,7 +140,7 @@ $winner = @($display | Where-Object { $_ -match 'server_tile=\(9, 1\) .*mispredi
 $loser = @($display | Where-Object { $_ -notmatch 'server_tile=\(9, 1\)' -and $_ -match 'mispredicts=1' })
 Assert ($winner.Count -eq 1) 'the winner is on (9, 1) with no mispredictions'
 Assert ($loser.Count -eq 1) 'the loser is not on (9, 1) and counted exactly one misprediction'
-Assert (@($clientLogs | Select-String 'mispredict: Player\d+ predicted \(9, 1\)').Count -eq 1) 'the loser had predicted (9, 1) before snapping back'
+Assert (@($clientLogs | Select-String 'mispredict: Player\d+ step into \(9, 1\) refused').Count -eq 1) 'the loser was told its step into (9, 1) was refused and re-planned'
 Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) joined as Player3 at ').Count -eq 1) 'phase 1: Casey joined as Player3'
 Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) left').Count -eq 1) 'phase 1: her leaving was logged with her name and id'
 Assert (@($server2Log | Select-String '\[state\] loaded 9 entities and 3 player records').Count -eq 1) 'phase 2: the restarted server loads three player records'
@@ -137,6 +151,12 @@ Assert (@($server2Log | Select-String '\[net\] Casey \(c0ffee00\) joined as Play
 Assert (@($server2Log | Select-String '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \(\d+, \d+\)$').Count -eq 1) 'phase 2: a new id gets a fresh spawn as Player4'
 Assert (@($server2Log | Select-String '\[net\] rejected peer \d+ from \S+ \(already connected as c0ffee00\)').Count -eq 1) 'phase 2: a second connection with an online id is rejected'
 Assert (@($clientELog | Select-String '\[net\] already connected').Count -eq 1) 'phase 2: and told so'
+Assert (@($clientFLog | Select-String '\[test\] Player\d+ arrived') | Measure-Object).Count -eq 1 -and (@($clientGLog | Select-String '\[test\] Player\d+ arrived') | Measure-Object).Count -eq 1 -and $true 'phase 3: both reached their ends of the passage'
+$fay = @($clientFLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
+$gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
+Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "phase 3: Fay crossed to (12, 12) ($($fay | ForEach-Object { $_.Line }))"
+Assert ($gus.Count -eq 1 -and $gus[0].Line -match 'server_tile=\(5, 12\)') "phase 3: Gus crossed to (5, 12) ($($gus | ForEach-Object { $_.Line }))"
+Assert ($fay.Count -eq 1 -and $gus.Count -eq 1 -and $fay[0].Matches[0].Groups[3].Value -eq '0' -and $gus[0].Matches[0].Groups[3].Value -eq '0') 'phase 3: neither client snapped more than 2 tiles'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

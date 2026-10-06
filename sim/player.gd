@@ -18,8 +18,15 @@ func _sim_tick() -> void:
 		has_move_order = false
 		return
 	var path := World.find_path(tile, move_order, true)
-	if path.is_empty() or not World.try_move(self, path[0] - tile):
+	if path.is_empty():
 		has_move_order = false
+	elif not World.try_move(self, path[0] - tile):
+		# Someone took that tile first this tick. If it was the destination
+		# itself the contest is decided: give up. Otherwise keep the order and
+		# path around it next tick. Either way the client re-plans now.
+		if path[0] == move_order:
+			has_move_order = false
+		World.report_move_refused(self, path[0])
 
 
 func _pursue_action() -> void:

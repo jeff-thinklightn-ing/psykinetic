@@ -18,7 +18,8 @@ extends Node
 ## With no mode argument: an exported build reads settings.cfg (address=,
 ## port=, token=, player_id=, name=) next to the exe and joins as a client,
 ## or asks for those once if the file is missing; a run from the project is
-## a host. player_id is a UUID made on first run; the server remembers each
+## a host. display_delay= (ticks, default 2) sets how far in the past other
+## entities are drawn. player_id is a UUID made on first run; the server remembers each
 ## player by it. A host run from the project uses a fixed dev id.
 ##
 ## The game version comes from version.txt at the project root. A client
@@ -98,6 +99,9 @@ var test_contest_tick := 0
 var test_exit_after := 0.0
 
 var mispredicts_total := 0
+var snaps_total := 0
+## Times (msec) of snaps in the last minute.
+var _snap_times: Array[int] = []
 ## Times (msec) of mispredictions in the last minute.
 var _mispredict_times: Array[int] = []
 
@@ -169,6 +173,9 @@ func _apply_settings() -> void:
 	configure_client(settings.get("address", address), int(settings.get("port", str(port))),
 			settings.get("token", ""))
 	player_name = tidy_name(settings.get("name", DEFAULT_NAME))
+	var delay := str(settings.get("display_delay", ""))
+	if delay.is_valid_int():
+		World.display_delay_ticks = clampi(delay.to_int(), 0, 10)
 	player_id = str(settings.get("player_id", "")).strip_edges()
 	if player_id.is_empty():
 		# First run with a hand-written file: give it an identity and keep it.
@@ -205,8 +212,8 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 	if file == null:
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
-	file.store_string("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\n" % [
-		new_address, new_port, new_token, player_id, player_name])
+	file.store_string("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n" % [
+		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks])
 	file.close()
 	return true
 
@@ -244,6 +251,19 @@ func record_mispredict() -> void:
 
 
 ## Mispredictions in the last 60 seconds.
+func record_snap() -> void:
+	snaps_total += 1
+	_snap_times.append(Time.get_ticks_msec())
+
+
+## Snaps (mispredictions too big to blend) in the last 60 seconds.
+func snaps_per_minute() -> int:
+	var cutoff := Time.get_ticks_msec() - 60000
+	while not _snap_times.is_empty() and _snap_times[0] < cutoff:
+		_snap_times.pop_front()
+	return _snap_times.size()
+
+
 func mispredicts_per_minute() -> int:
 	var cutoff := Time.get_ticks_msec() - 60000
 	while not _mispredict_times.is_empty() and _mispredict_times[0] < cutoff:

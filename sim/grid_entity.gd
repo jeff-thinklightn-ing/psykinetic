@@ -27,6 +27,10 @@ enum Order { NONE, ATTACK, SHOVE }
 
 ## The only state sent over the network, besides World's tick.
 const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina"]
+## Reconciliation: a misprediction this far off or less is blended away over
+## this many ticks; anything further is snapped.
+const SNAP_TILES := 2
+const RECONCILE_BLEND_TICKS := 2.0
 const HOP_HEIGHT := 6.0
 ## A body tossed overhead arcs this high instead, and for longer.
 const LOFT_HEIGHT := 20.0
@@ -214,7 +218,7 @@ func _process(delta: float) -> void:
 			# always known before its slide has to start.
 			var now := World.tick + World.tick_alpha
 			if _mirroring:
-				now -= World.NET_DISPLAY_DELAY_TICKS
+				now -= World.display_delay_ticks
 			var t := 1.0
 			if _move_duration > 0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
@@ -358,20 +362,20 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 ## client that controls it; everywhere else it does nothing.
 func enable_prediction() -> void:
 	if _mirroring and _prediction == null:
-		_prediction = MovePrediction.new()
+		_prediction = MovePrediction.new(self)
 
 
 ## The local player just ordered a move: start showing it now.
 func predict_move(target: Vector2i) -> void:
 	if _prediction != null:
-		_prediction.order(self, target)
+		_prediction.order(target)
 
 
 ## The local player just ordered an attack or shove on something standing on
 ## [param target_tile]: show the walk up to it. The hit itself is not predicted.
 func predict_approach(target_tile: Vector2i) -> void:
 	if _prediction != null:
-		_prediction.order(self, target_tile, false)
+		_prediction.order(target_tile, false)
 
 
 ## Tile the sprite is drawn on, which on the predicting client may be ahead
@@ -381,13 +385,36 @@ func shown_tile() -> Vector2i:
 
 
 ## The server's result wins: snap to its tile and forget the predicted path.
+## The server's result wins. A small error is blended away over
+## RECONCILE_BLEND_TICKS and the path re-planned from the server's tile; an
+## error of more than SNAP_TILES is snapped.
 func _mispredicted(reason: String) -> void:
 	var predicted := _prediction.predicted_tile()
-	_prediction.clear()
+	var error := World.distance(predicted, tile)
+	Net.record_mispredict()
 	_from_tile = tile
 	_move_duration = 0
+	if error > SNAP_TILES:
+		_prediction.clear()
+		Net.record_snap()
+		print("[net] mispredict: %s predicted %s, server has %s, %d tiles off: snapped (%s)" % [
+			name, predicted, tile, error, reason])
+	else:
+		_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
+		print("[net] mispredict: %s predicted %s, server has %s: blending (%s)" % [
+			name, predicted, tile, reason])
+
+
+## The server refused a step into [param refused] this tick. Re-plan from
+## its tile now rather than waiting out the deadline.
+func _on_move_refused(refused: Vector2i) -> void:
+	if _prediction == null or not _prediction.is_active():
+		return
 	Net.record_mispredict()
-	print("[net] mispredict: %s predicted %s, server has %s (%s)" % [name, predicted, tile, reason])
+	_from_tile = tile
+	_move_duration = 0
+	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
+	print("[net] mispredict: %s step into %s refused, server has %s: re-planned" % [name, refused, tile])
 
 
 # Cosmetic only: they replay feedback, they carry no sim state.

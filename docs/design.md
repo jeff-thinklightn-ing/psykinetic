@@ -107,26 +107,42 @@ no push resolution.
 **What a client draws.** Two cases, both presentation only — neither writes
 sim state.
 
-- *Everything except the local player's own walking* is interpolated one tick
-  in the past (`World.NET_DISPLAY_DELAY_TICKS`, the `net_display_delay_ticks`
-  setting). A replicated tile change is stamped with the tick it arrived in,
-  and its slide starts when the display clock, running one tick behind,
-  reaches that tick. The change is therefore always in hand before its slide
-  has to begin.
+- *Everything except the local player's own walking* is interpolated two
+  ticks in the past (`World.display_delay_ticks`, default
+  `NET_DISPLAY_DELAY_TICKS` = 2, overridable as `display_delay=` in
+  `settings.cfg`). A replicated tile change is stamped with the tick it
+  arrived in, and its slide starts when the display clock, running that far
+  behind, reaches that tick. The change is therefore in hand before its slide
+  has to begin, with a tick to spare for jitter: 100 ms of latency for no
+  visible stutter.
 - *The local player's own walking* is predicted (`net/prediction.gd`). On a
-  move order the client computes the path on its mirror and starts showing it
-  at once, at the normal step timing. Each replicated tile for that player is
-  then compared with the steps already shown: if it is the next one, nothing
-  happens; if it is anything else, the sprite snaps to the server's tile and
-  the predicted path is dropped. A shown step that the server never confirms
-  (it refused the move, so no tile change is ever sent) counts as a
-  misprediction once it is `RECONCILE_GRACE_TICKS` (4) plus the round trip
-  time overdue. Only walking is predicted. Pushes of the local player are
+  move order the client computes the path against the replicated world —
+  every other entity's current tile, which is where it is or is heading,
+  counts as taken; its own lagging tile does not — and starts showing it at
+  once, at the normal step timing. Just before each step begins it checks
+  that tile again and re-plans the rest if something has moved in, as the
+  server re-paths every step. Each replicated tile for that player is then
+  compared with the steps already shown: if it is the next one, nothing
+  happens. Anything else is a **misprediction**: if the error is at most
+  `SNAP_TILES` (2), the sprite blends from where it is to the server's tile
+  over `RECONCILE_BLEND_TICKS` (2) and the path is re-planned from there;
+  only a larger error is **snapped**. A shown step that the server never
+  confirms counts as a misprediction once it is `RECONCILE_GRACE_TICKS` (4)
+  plus the round trip time overdue, and a step the server refuses outright
+  is told to the client at once (`World.move_refused`) so it re-plans
+  without waiting. Only walking is predicted. Pushes of the local player are
   never predicted, and neither are attacks, shoves, or anything about other
   entities; the server's result always wins.
 
-`F3` toggles a debug overlay: peer id, round trip time (from ENet), and
-mispredictions in the last minute.
+**Contested tiles are decided once.** When two orders want the same tile in
+the same tick the act phase resolves them in entity id order: the first
+gets it and the second's `try_move` fails. The loser is sent
+`move_refused`. If the refused tile was its destination the order is
+dropped; if it was a tile on the way, the order stays and is re-pathed
+around next tick.
+
+`F3` toggles a debug overlay: peer id, round trip time (from ENet),
+mispredictions in the last minute, and snaps in the last minute.
 
 **Respawn.** `LEVEL_ENTITIES` in `main.gd` is the spawn table: one slot
 per monster, crate and boulder, with its tile, scene and properties. Every
@@ -396,7 +412,7 @@ position = lerp(Iso.tile_to_local(from_tile), Iso.tile_to_local(tile), t)
 
 The sim position jumps at the tick; the sprite slides after it.
 
-On a client the same code runs from mirrored values, one tick in the past:
+On a client the same code runs from mirrored values, two ticks in the past:
 `World.tick` is the last replicated tick and `tick_alpha` counts up locally
 since it arrived. A client is not told why a tile changed, so it picks the
 slide length from the size of the jump (one step: the entity's step time;

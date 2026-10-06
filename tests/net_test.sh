@@ -62,6 +62,15 @@ start clientD --client --address=127.0.0.1 "--token=$TOKEN" "--player-id=$ID_D" 
 start clientE --client --address=127.0.0.1 "--token=$TOKEN" "--player-id=$ID_C" --name=Impostor --test-exit-after=3
 wait
 
+# Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
+# the bottom of the room, then at tick 70 cross it toward each other.
+start server3 --server "--token=$TOKEN" --test-exit-after=15
+sleep 2
+start clientF --client --address=127.0.0.1 "--token=$TOKEN" --name=Fay --test-move=-6,9 --test-contest=12,12,70 --test-exit-after=12
+sleep 1
+start clientG --client --address=127.0.0.1 "--token=$TOKEN" --name=Gus --test-move=1,9 --test-contest=5,12,70 --test-exit-after=11
+wait
+
 failures=0
 check() {
 	if [ "$1" = "$2" ]; then
@@ -111,8 +120,8 @@ winner=$(cat $clients | grep -cE 'display: .*server_tile=\(9, 1\) .*mispredicts=
 check "$winner" 1 "the winner is on (9, 1) with no mispredictions"
 loser=$(cat $clients | grep -E 'display: .*mispredicts=1' | grep -vc 'server_tile=(9, 1)' || true)
 check "$loser" 1 "the loser is not on (9, 1) and counted exactly one misprediction"
-predicted=$(cat $clients | grep -cE 'mispredict: Player[0-9]+ predicted \(9, 1\)' || true)
-check "$predicted" 1 "the loser had predicted (9, 1) before snapping back"
+predicted=$(cat $clients | grep -cE 'mispredict: Player[0-9]+ step into \(9, 1\) refused' || true)
+check "$predicted" 1 "the loser was told its step into (9, 1) was refused and re-planned"
 check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at ' "$LOGS/server.log")" 1 "phase 1: Casey joined as Player3"
 check "$(count '\[net\] Casey \(c0ffee00\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and id"
 check "$(count '\[state\] loaded 9 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"
@@ -123,6 +132,10 @@ check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at \(11, 3\) \(back
 check "$(count '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \([0-9]+, [0-9]+\)$' "$LOGS/server2.log")" 1 "phase 2: a new id gets a fresh spawn as Player4"
 check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(already connected as c0ffee00\)' "$LOGS/server2.log")" 1 "phase 2: a second connection with an online id is rejected"
 check "$(count '\[net\] already connected' "$LOGS/clientE.log")" 1 "phase 2: and told so"
+check "$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientF.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientG.log")" 11 "phase 3: both reached their ends of the passage"
+check "$(count '\[test\] display: .*server_tile=\(12, 12\)' "$LOGS/clientF.log")" 1 "phase 3: Fay crossed to (12, 12)"
+check "$(count '\[test\] display: .*server_tile=\(5, 12\)' "$LOGS/clientG.log")" 1 "phase 3: Gus crossed to (5, 12)"
+check "$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -c 'display: .*snaps=0 ' || true)" 2 "phase 3: neither client snapped more than 2 tiles"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

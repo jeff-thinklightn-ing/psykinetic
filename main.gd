@@ -7,7 +7,8 @@ const FLOOR_SOURCE := 0
 const WALL_SOURCE := 1
 const FIRE_SOURCE := 2
 ## 14x14. '#' wall, '.' floor, '~' fire. The corridor is row 8, x 1..5, with
-## its dead end at x 1.
+## its dead end at x 1. Under the wall at row 10, rows 11-12 x 7..11 are a
+## two-wide passage open at both ends, where two players can pass each other.
 const LEVEL: Array[String] = [
 	"##############",
 	"#............#",
@@ -19,7 +20,7 @@ const LEVEL: Array[String] = [
 	"######.......#",
 	"#............#",
 	"######.......#",
-	"#............#",
+	"#......#####.#",
 	"#............#",
 	"#............#",
 	"##############",
@@ -36,8 +37,8 @@ const LEVEL_ENTITIES: Array[Dictionary] = [
 	{"scene": "monster", "name": "CorridorImp1", "tile": Vector2i(1, 8), "props": {"mass": 25.0}},
 	{"scene": "monster", "name": "CorridorImp2", "tile": Vector2i(2, 8), "props": {"mass": 40.0}},
 	{"scene": "monster", "name": "CorridorImp3", "tile": Vector2i(3, 8), "props": {"mass": 60.0}},
-	{"scene": "monster", "name": "Imp1", "tile": Vector2i(2, 11), "props": {"mass": 30.0}},
-	{"scene": "monster", "name": "Imp2", "tile": Vector2i(5, 12), "props": {"mass": 70.0}},
+	{"scene": "monster", "name": "Imp1", "tile": Vector2i(2, 6), "props": {"mass": 30.0}},
+	{"scene": "monster", "name": "Imp2", "tile": Vector2i(3, 6), "props": {"mass": 70.0}},
 	{"scene": "pushable", "name": "Crate1", "tile": Vector2i(8, 2)},
 	{"scene": "pushable", "name": "Crate2", "tile": Vector2i(8, 3)},
 	{"scene": "pushable", "name": "Crate3", "tile": Vector2i(4, 2)},
@@ -629,7 +630,8 @@ func _debug_text() -> String:
 		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))
 		lines.append("mispredicts: %d / min (%d total)" % [
 			Net.mispredicts_per_minute(), Net.mispredicts_total])
-		lines.append("display delay: %d tick" % World.NET_DISPLAY_DELAY_TICKS)
+		lines.append("snaps: %d / min (%d total)" % [Net.snaps_per_minute(), Net.snaps_total])
+		lines.append("display delay: %d ticks" % World.display_delay_ticks)
 	else:
 		lines.append("rtt: n/a (this peer is the authority)")
 		lines.append("mispredicts: n/a (nothing is predicted here)")
@@ -793,8 +795,9 @@ func _on_test_exit() -> void:
 		World.tick, World.get_entities().size(), World.is_occupancy_consistent()])
 	var player := _local_player()
 	if player != null and not Net.is_authority():
-		print("[test] display: %s server_tile=%s shown_tile=%s mispredicts=%d color=%s" % [
-			player.name, player.tile, player.shown_tile(), Net.mispredicts_total, player.tint.to_html(false)])
+		print("[test] display: %s server_tile=%s shown_tile=%s mispredicts=%d snaps=%d color=%s" % [
+			player.name, player.tile, player.shown_tile(), Net.mispredicts_total, Net.snaps_total,
+			player.tint.to_html(false)])
 	# This peer's view of where everything is, for comparing across instances.
 	var tiles: Array[String] = []
 	for entity in World.get_entities():
