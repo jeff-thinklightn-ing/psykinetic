@@ -23,6 +23,9 @@ extends RefCounted
 const SCENE := preload("res://entities/entity.tscn")
 const BASE_SCRIPT := preload("res://sim/grid_entity.gd")
 const DEFAULT_SHAPE := "capsule"
+## Bump when the meaning of a spawn spec changes in a way an older client
+## would get wrong. Part of Net.protocol().
+const SPEC_VERSION := 2
 ## Placeholder art per shape, and where the sprite sits so its feet are on
 ## the tile. Shapes with a face get the small facing pip.
 const SHAPES := {

@@ -34,6 +34,7 @@ extends Node
 ##   --test-contest=<x>,<y>,<tick> at that server tick, order the local player to tile (x, y)
 ##   --test-exit-after=<seconds>  quit after this long
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
+##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##
 ## Options are read from both the engine argument list and the user arguments
 ## after "--". Use the --name=value form: a bare value before "--" would be
@@ -58,6 +59,9 @@ signal peer_authenticated(peer: int, player_id: String, player_name: String)
 ## disconnecting it.
 signal join_rejected(reason: String, server_version: String)
 
+## Bump for a wire change that protocol() cannot see by itself (the
+## meaning of an existing RPC argument, say).
+const PROTOCOL_REVISION := 1
 const SETTINGS_FILE := "settings.cfg"
 const UNKNOWN_VERSION := "0.0.0"
 ## The identity a host run from the project uses, so its state persists too.
@@ -102,6 +106,8 @@ var needs_setup := false
 var _mode_given := false
 var _settings_override := ""
 var _test_version := ""
+var _test_protocol := ""
+var _protocol := ""
 ## True once an ENet peer is in place. False means offline single-player.
 var online := false
 
@@ -332,10 +338,15 @@ func authenticate(hello: Dictionary) -> void:
 		return
 	var offered := str(hello.get("token", ""))
 	var client_version := str(hello.get("version", ""))
+	var client_protocol := str(hello.get("protocol", ""))
 	var id := str(hello.get("player_id", "")).strip_edges()
 	var player_name_given := tidy_name(str(hello.get("name", "")))
 	if client_version != version:
 		_reject(peer, "client out of date", "client %s, server %s" % [client_version, version])
+	elif client_protocol != protocol():
+		# Same version number, different build: what goes over the wire differs.
+		_reject(peer, "build mismatch: this client and the server are different builds of v%s" % version,
+				"client protocol %s, server %s" % [client_protocol if client_protocol != "" else "none", protocol()])
 	elif token != "" and offered != token:
 		_reject(peer, "authentication failed", "empty token" if offered == "" else "wrong token")
 	elif id.is_empty() or id.length() > 64:
@@ -389,6 +400,28 @@ func _reject(peer: int, reason: String, detail := "") -> void:
 func rejected(reason: String, server_version: String) -> void:
 	print("[net] %s (server %s, this client %s)" % [reason, server_version, claimed_version()])
 	join_rejected.emit(reason, server_version)
+
+
+## A fingerprint of everything that goes over the wire: the replicated
+## properties, the RPC methods, the spawn spec format, and a hand-bumped
+## revision. Two builds with the same version.txt but different fingerprints
+## cannot talk to each other, and the server says so instead of letting the
+## client fall over on the first packet it does not understand.
+func protocol() -> String:
+	if _protocol.is_empty():
+		var parts: Array[String] = [
+			"rev%d" % PROTOCOL_REVISION, "spec%d" % EntityFactory.SPEC_VERSION]
+		parts.append_array(GridEntity.REPLICATED)
+		for path: String in ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd"]:
+			var config: Variant = (load(path) as Script).get_rpc_config()
+			if config is Dictionary:
+				var methods: Array[String] = []
+				for method: Variant in config.keys():
+					methods.append(str(method))
+				methods.sort()
+				parts.append_array(methods)
+		_protocol = "|".join(parts).sha256_text().left(12)
+	return _protocol
 
 
 ## What this client tells the server it is: the real version, unless a test
@@ -467,7 +500,8 @@ func start() -> void:
 func _on_connected_to_server() -> void:
 	print("[net] connected as peer %d" % multiplayer.get_unique_id())
 	authenticate.rpc_id(1, {
-		"token": token, "version": claimed_version(), "player_id": player_id, "name": player_name})
+		"token": token, "version": claimed_version(), "player_id": player_id, "name": player_name,
+		"protocol": _test_protocol if _test_protocol != "" else protocol()})
 
 
 func _on_server_disconnected() -> void:
@@ -503,7 +537,7 @@ func _parse_args() -> void:
 				companions = false
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--llm-url", "--llm-model", \
-					"--test-move", "--test-contest", "--test-exit-after", "--test-version":
+					"--test-move", "--test-contest", "--test-exit-after", "--test-version", "--test-protocol":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -537,6 +571,8 @@ func _set_option(key: String, value: String) -> void:
 			llm_model = value
 		"--test-version":
 			_test_version = value
+		"--test-protocol":
+			_test_protocol = value
 		"--test-move":
 			var parts := value.split(",")
 			if parts.size() == 2:

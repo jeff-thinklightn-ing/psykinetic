@@ -54,7 +54,10 @@ $client4 = Start-Instance 'client4' @("--settings=`"$settings`"", '--test-move=0
 # A fifth has the right token but claims another version: turned away as out of date.
 $client5 = Start-Instance 'client5' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=0.0.1', '--test-exit-after=4')
 
-$all = @($server, $client1, $client2, $client3, $client4, $client5)
+# A sixth has the right token and version number but is a different build.
+$client6 = Start-Instance 'client6' @('--client', '--address=127.0.0.1', "--token=$token", '--test-protocol=stale-build', '--test-exit-after=4')
+
+$all = @($server, $client1, $client2, $client3, $client4, $client5, $client6)
 $all | Wait-Process -Timeout 40 -ErrorAction SilentlyContinue
 $all | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
@@ -91,6 +94,7 @@ $client2Log = Read-Log 'client2'
 $client3Log = Read-Log 'client3'
 $client4Log = Read-Log 'client4'
 $client5Log = Read-Log 'client5'
+$client6Log = Read-Log 'client6'
 $server2Log = Read-Log 'server2'
 $clientCLog = Read-Log 'clientC'
 $clientDLog = Read-Log 'clientD'
@@ -115,6 +119,8 @@ Assert (@($serverLog | Select-String '\[net\] peer \d+ authenticated').Count -eq
 Assert (@($client4Log | Select-String '\[net\] using .*settings\.cfg').Count -eq 1 -and @($client4Log | Select-String '\[test\] Player\d+ arrived').Count -eq 1) 'a client with no arguments joins from settings.cfg and plays'
 Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client 0\.0\.1, server ').Count -eq 1) 'server rejected the out-of-date client, naming both versions'
 Assert (@($client5Log | Select-String '\[net\] client out of date').Count -eq 1) 'the out-of-date client was told so'
+Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client protocol stale-build, server [0-9a-f]+\)').Count -eq 1) 'server rejected the same-version, different-build client'
+Assert (@($client6Log | Select-String '\[net\] build mismatch: this client and the server are different builds').Count -eq 1 -and @($client6Log | Select-String '\[test\] Player').Count -eq 0) 'that client was told it is a build mismatch and never got a player'
 $rejected = @($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(wrong token\)')
 Assert ($rejected.Count -eq 1) "server rejected the wrong-token client with its address (saw $($rejected.Count))"
 Assert (@($client3Log | Select-String 'authentication failed').Count -eq 1) 'the wrong-token client reports authentication failed'

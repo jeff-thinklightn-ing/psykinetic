@@ -200,6 +200,12 @@ So before releasing: add a `## vX.Y.Z` section at the top of `CHANGELOG.md`
 and commit it. Then deploy the server (`server/deploy.sh`) from the same
 commit so the versions match.
 
+Deploying the server from a newer commit *without* releasing leaves clients
+on the old build with the same version number. The server refuses those with
+`build mismatch` (it compares a fingerprint of the wire format, shown as
+`build:` in the F3 overlay), so: every server deploy that changes what goes
+over the wire needs a client release from the same commit.
+
 Clients update themselves: `launch.bat` runs `update.ps1`, which asks the
 GitHub API for the latest release, and if its tag is newer than the local
 `version.txt`, downloads the zip and unpacks it over the client folder,
@@ -219,6 +225,8 @@ authenticated at once; the rest are refused as `server full`.
 
 A rejected client is told why before it is cut off and shows it:
 `authentication failed`, `client out of date` (with both versions),
+`build mismatch` (same version number, but the server was built from
+different code: release and deploy from the same commit),
 `already connected` (that player id is online already), or `server full`.
 
 The hello also carries the client's `player_id` and name. The id is a UUID

@@ -869,6 +869,7 @@ func _debug_text() -> String:
 			Net.mispredicts_per_minute(), Net.mispredicts_total])
 		lines.append("snaps: %d / min (%d total)" % [Net.snaps_per_minute(), Net.snaps_total])
 		lines.append("display delay: %d ticks" % World.display_delay_ticks)
+		lines.append("build: v%s %s" % [Net.version, Net.protocol()])
 	else:
 		lines.append("rtt: n/a (this peer is the authority)")
 		lines.append("mispredicts: n/a (nothing is predicted here)")

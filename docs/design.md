@@ -89,14 +89,19 @@ opened it runs offline instead.
   replay the hop, the flash and the stun reel on clients. They carry no sim
   state.
 
-**Joining.** A peer is admitted only once it has sent its version and, if
-the server has one, the token (`Net.authenticate`, an `any_peer` RPC the
+**Joining.** A peer is admitted only once it has sent its version, its
+build fingerprint and, if the server has one, the token (`Net.authenticate`, an `any_peer` RPC the
 client fires on connect). Unauthenticated peers get no player and their
 order RPCs are ignored; a version mismatch, a wrong or empty token, or
 nothing within 5 seconds, gets the peer told why (`Net.rejected`),
 disconnected, and logged with its address. Up to 4 authenticated peers.
 `--server` refuses to start without a token; `--host` without one lets any
-matching version in. The version is `version.txt` at the project root. An
+matching version in. The version is `version.txt` at the project root.
+The fingerprint (`Net.protocol()`) is a hash of everything on the wire —
+the replicated properties, the RPC methods, the spawn spec format and a
+hand-bumped revision — so two builds that share a version number but not a
+wire format are refused with `build mismatch` instead of failing on the
+first packet one of them cannot read. An
 exported client with no arguments joins from `settings.cfg` next to its exe,
 or asks for the address and token once (`net/setup_screen.gd`) and writes
 that file. Details in `docs/server.md`.

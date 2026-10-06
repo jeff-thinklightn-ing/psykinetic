@@ -50,6 +50,8 @@ sleep 1
 start client4 "--settings=$LOGS/settings.cfg" --test-move=0,1 --test-exit-after=4
 # A fifth has the right token but claims another version: turned away as out of date.
 start client5 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=0.0.1 --test-exit-after=4
+# A sixth has the right token and version number but is a different build.
+start client6 --client --address=127.0.0.1 "--token=$TOKEN" --test-protocol=stale-build --test-exit-after=4
 wait
 
 # Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
@@ -96,6 +98,8 @@ check "$(count '\[net\] peer [0-9]+ authenticated' "$LOGS/server.log")" 3 "serve
 check "$(count '\[net\] using .*settings\.cfg' "$LOGS/client4.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/client4.log")" 11 "a client with no arguments joins from settings.cfg and plays"
 check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client 0\.0\.1, server ' "$LOGS/server.log")" 1 "server rejected the out-of-date client, naming both versions"
 check "$(count '\[net\] client out of date' "$LOGS/client5.log")" 1 "the out-of-date client was told so"
+check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client protocol stale-build, server [0-9a-f]+\)' "$LOGS/server.log")" 1 "server rejected the same-version, different-build client"
+check "$(count '\[net\] build mismatch: this client and the server are different builds' "$LOGS/client6.log")$(count '\[test\] Player' "$LOGS/client6.log")" 10 "that client was told it is a build mismatch and never got a player"
 check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(wrong token\)' "$LOGS/server.log")" 1 "server rejected the wrong-token client with its address"
 check "$(count 'authentication failed' "$LOGS/client3.log")" 1 "the wrong-token client reports authentication failed"
 check "$(count '\[test\] Player' "$LOGS/client3.log")" 0 "and never got a player to order around"
