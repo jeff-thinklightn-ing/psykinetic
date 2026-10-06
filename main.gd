@@ -377,6 +377,8 @@ func _start_level(from_snapshot := false) -> void:
 	# Player records survive a rebuild; a snapshot brings its own.
 	if from_snapshot:
 		_records.clear()
+	else:
+		_revive_companions()
 	if not (from_snapshot and _spawn_from_snapshot()):
 		for slot in LEVEL_ENTITIES.size():
 			_spawn(_slot_spec(slot))
@@ -615,6 +617,19 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	_companions[record.player_id] = pet
 	print("[net] %s's companion %s is at %s%s" % [
 		record.name, pet.name, tile, " (new)" if is_new else ""])
+
+
+## A rebuilt room starts whole: companions that died come back with it, at
+## full stats, beside their owner the next time that player is put down.
+## Nothing else brings a dead companion back.
+func _revive_companions() -> void:
+	for record: PlayerRecord in _records.values():
+		if record.companion.is_empty() or record.companion.get("alive", true):
+			continue
+		record.companion["alive"] = true
+		record.companion["hp"] = 0  # Not a saved value: spawn at full stats.
+		record.companion["tile"] = [record.tile.x, record.tile.y]
+		print("[world] %s's companion %s is back" % [record.name, record.companion.get("name", "")])
 
 
 func _make_mind() -> CompanionMind:

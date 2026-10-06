@@ -260,6 +260,13 @@ func _test_old_record_gets_a_companion() -> void:
 	_main._on_peer_disconnected(Net.local_id)
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
 	_check(_companion() == null and record.companion.get("alive") == false, "a dead companion stays dead when the owner returns")
+
+	# Rebuilding the room (console 'reset', R on a host) is what brings it back.
+	_main.admin_command("reset")
+	pet = _companion()
+	_check(pet != null and pet.keeper == _player() and pet.hp == pet.max_hp, "'reset' brings it back at full hp, with its owner")
+	_check(pet != null and World.distance(pet.tile, _player().tile) == 1 and record.companion.get("alive") == true,
+			"beside the owner, and alive in the record again")
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
 

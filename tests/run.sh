@@ -18,7 +18,7 @@ esac
 
 cd "$(dirname "$0")/.."
 code=0
-for scene in tests/push_test.tscn tests/respawn_test.tscn tests/companion_test.tscn tests/spawn_test.tscn; do
+for scene in tests/push_test.tscn tests/respawn_test.tscn tests/companion_test.tscn tests/spawn_test.tscn tests/mirror_test.tscn; do
 	echo "### $scene"
 	# A script error aborts a test function without failing an assertion, so
 	# treat any engine error as a failure too.

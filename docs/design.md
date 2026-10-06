@@ -123,7 +123,9 @@ sim state.
   arrived in, and its slide starts when the display clock, running that far
   behind, reaches that tick. The change is therefore in hand before its slide
   has to begin, with a tick to spare for jitter: 100 ms of latency for no
-  visible stutter.
+  visible stutter. Changes wait in a queue until their turn: the next step
+  of a walk arrives while the slide for the one before is still on screen,
+  and must not replace it early.
 - *The local player's own walking* is predicted (`net/prediction.gd`). On a
   move order the client computes the path against the replicated world —
   every other entity's current tile, which is where it is or is heading,
@@ -169,7 +171,8 @@ remaining delay.
 `--console`) reads lines from stdin on a thread, and `--admin-port=<n>`
 accepts them on `127.0.0.1:<n>`, one command per connection, reply written
 back. `reset` rebuilds the room from the map keeping player records (online
-players keep their places), `respawn` brings every dead slot back at once,
+players keep their places, dead companions come back), `respawn` brings
+every dead slot back at once,
 `players` lists who is connected, `save` writes the snapshot.
 
 **Persistence.** With `--state=<path>` the authority writes a JSON snapshot
@@ -414,7 +417,9 @@ name, personality card, hp, stamina, tile and whether it is alive, and so
 goes into the snapshot. Every player gets one on first join, spawned on the
 nearest free tile. When the owner disconnects the companion stays, idles,
 and monsters ignore it; when the owner is back it follows again. A dead
-companion stays dead in the record.
+companion stays dead in the record until the room is rebuilt (console
+`reset`, or `R` on a host), which brings every dead companion back at full
+stats beside its owner.
 
 **The mind never acts.** This is a hard rule. A `CompanionMind`
 (`sim/companion_mind.gd`) is asked `decide(context) -> {intent, target,
@@ -500,8 +505,11 @@ On a client the same code runs from mirrored values, two ticks in the past:
 `World.tick` is the last replicated tick and `tick_alpha` counts up locally
 since it arrived. A client is not told why a tile changed, so it picks the
 slide length from the size of the jump (one step: the entity's step time;
-more: a push). The local player's own walking is drawn by the prediction
-instead; see Networking.
+more: a push). Each change is queued with the tick it arrived in and becomes
+the slide on screen when the delayed clock reaches that tick, so a walk is
+one even slide: every step's slide ends exactly as the next begins
+(`tests/mirror_test.gd` samples this). The local player's own walking is
+drawn by the prediction instead; see Networking.
 
 ## Grid ↔ screen
 

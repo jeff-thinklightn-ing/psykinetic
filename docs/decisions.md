@@ -154,3 +154,17 @@ tile, hp, stamina and facing from the snapshot. A server that restores an
 old file after a deploy would otherwise keep showing the old build's crates
 and boulder for ever, and differ from a fresh room for no visible reason.
 Snapshots from before slots are matched to the table by name.
+
+## 21. A mirror's slides are queued, never replaced
+
+A client draws other entities two ticks late, so the next step of a walk
+arrives while the slide for the previous one is half shown. Each tile change
+is queued with its arrival tick and shown when the delayed clock gets there.
+Overwriting the current slide instead made every walk a series of hops: half
+a tile slid, the rest jumped, then a pause. Sampled in `tests/mirror_test`.
+
+## 22. A dead companion returns only with a rebuilt room
+
+Death still costs something: the companion stays dead across reconnects and
+server restarts. Rebuilding the room (`reset`, `R` on a host) starts whole,
+companions included. Before this there was no way to get one back at all.

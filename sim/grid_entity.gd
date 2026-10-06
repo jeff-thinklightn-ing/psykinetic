@@ -113,6 +113,12 @@ var action_direction := Vector2i.ZERO
 var _from_tile := Vector2i.ZERO
 var _move_tick := 0.0
 var _move_duration := 0
+# Mirrors only. A mirror is drawn display_delay_ticks in the past, so by the
+# time a tile change arrives the slide for the one before it is still on
+# screen. Changes wait here ({from, to, tick, duration}) until the display
+# clock reaches them; _to_tile is where the slide being shown ends.
+var _slides: Array[Dictionary] = []
+var _to_tile := Vector2i.ZERO
 ## True on a client once this mirror is registered with World.
 var _mirroring := false
 ## Set only on the client that controls this entity. See MovePrediction.
@@ -230,12 +236,20 @@ func _process(delta: float) -> void:
 			# Mirrors are drawn slightly in the past, so a tile change is
 			# always known before its slide has to start.
 			var now := World.tick + World.tick_alpha
+			var to := tile
 			if _mirroring:
 				now -= World.display_delay_ticks
+				while not _slides.is_empty() and now >= _slides[0]["tick"]:
+					var slide: Dictionary = _slides.pop_front()
+					_from_tile = slide["from"]
+					_to_tile = slide["to"]
+					_move_tick = slide["tick"]
+					_move_duration = slide["duration"]
+				to = _to_tile
 			var t := 1.0
 			if _move_duration > 0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
-			position = Iso.tile_to_local(_from_tile).lerp(Iso.tile_to_local(tile), t)
+			position = Iso.tile_to_local(_from_tile).lerp(Iso.tile_to_local(to), t)
 	if _pip != null:
 		var screen_facing := Vector2(
 				(shown_facing.x - shown_facing.y) * Iso.HALF.x,
@@ -346,9 +360,16 @@ func _world_remove() -> void:
 
 ## Called by World.mirror_add on a client.
 func _mirror_attach() -> void:
-	_from_tile = tile
-	_move_duration = 0
+	_mirror_rest()
 	spawned = true
+
+
+## Draw the mirror standing on its tile, with no slide shown or waiting.
+func _mirror_rest() -> void:
+	_from_tile = tile
+	_to_tile = tile
+	_move_duration = 0
+	_slides.clear()
 
 
 ## A replicated tile arrived.
@@ -357,20 +378,20 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 	if _prediction != null and _prediction.is_active():
 		if _prediction.reconcile(tile):
 			# Already on screen: the prediction showed this step.
-			_from_tile = tile
-			_move_duration = 0
+			_mirror_rest()
 		else:
 			# Somewhere the prediction did not go (blocked, re-pathed, pushed).
 			_mispredicted("the server moved it elsewhere")
 		return
-	# Interpolate: slide from the old tile, starting on the tick it arrived in.
+	# Interpolate: slide from the old tile, starting when the display clock
+	# reaches the tick this arrived in. Until then the slide before it plays
+	# out; replacing it here would cut every step short and jump to its end.
 	# The client is not told why the entity moved, so the slide length comes
 	# from the size of the jump (one step, or a push).
 	var delta := tile - old
 	var steps := maxi(absi(delta.x), absi(delta.y))
-	_from_tile = old
-	_move_tick = World.tick
-	_move_duration = World.step_ticks(self, delta) if steps == 1 else clampi(steps, 1, 3)
+	_slides.append({"from": old, "to": tile, "tick": World.tick,
+		"duration": World.step_ticks(self, delta) if steps == 1 else clampi(steps, 1, 3)})
 
 
 ## Turns on prediction of this entity's own walking. Only meaningful on the
@@ -407,8 +428,7 @@ func _mispredicted(reason: String) -> void:
 	var predicted := _prediction.predicted_tile()
 	var error := World.distance(predicted, tile)
 	Net.record_mispredict()
-	_from_tile = tile
-	_move_duration = 0
+	_mirror_rest()
 	if error > SNAP_TILES:
 		_prediction.clear()
 		Net.record_snap()
@@ -426,8 +446,7 @@ func _on_move_refused(refused: Vector2i) -> void:
 	if _prediction == null or not _prediction.is_active():
 		return
 	Net.record_mispredict()
-	_from_tile = tile
-	_move_duration = 0
+	_mirror_rest()
 	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
 	print("[net] mispredict: %s step into %s refused, server has %s: re-planned" % [name, refused, tile])
 

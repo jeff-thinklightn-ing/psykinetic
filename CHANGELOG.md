@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.6
+
+Smooth movement for everything you do not control, and a way to get a dead
+companion back.
+
+- Monsters, companions and other players moved in hops on a client: half a
+  tile slid, the rest jumped, then a pause; companions and players simply
+  jumped from tile to tile. They now slide evenly, as on a host.
+- A companion that died was gone for good. Rebuilding the room (`reset` on
+  the server console, or R on a host) now brings dead companions back, at
+  full health, beside their owners.
+
+The server must be updated to v0.1.6 too: it refuses clients of any other
+version.
+
 ## v0.1.5
 
 Fixes a server looking different from a fresh room after an update.
