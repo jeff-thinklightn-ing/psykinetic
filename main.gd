@@ -400,7 +400,7 @@ func _spawn_from_snapshot() -> bool:
 		_records[record.player_id] = record
 	var restored := 0
 	for entry: Dictionary in snapshot["entities"]:
-		var spec: Dictionary = entry["spec"]
+		var spec := _level_spec_for(entry["spec"])
 		var entity := _spawn(spec)
 		if entity == null:
 			continue
@@ -416,6 +416,27 @@ func _spawn_from_snapshot() -> bool:
 	print("[state] loaded %d entities and %d player records from %s (saved at tick %d)" % [
 		restored, snapshot["players"].size(), Net.state_path, snapshot["tick"]])
 	return true
+
+
+## What a level entity is — script, shape, tint, scale, props — always comes
+## from the spawn table as it is now; a snapshot only says where it stands
+## (and, separately, its hp, stamina and facing). Otherwise an entity saved by
+## an older build would keep that build's looks for ever. The slot is the
+## saved one, or for a snapshot from before slots, the table entry of the
+## same name. Anything that is not a level entity is returned as saved.
+func _level_spec_for(saved: Dictionary) -> Dictionary:
+	var slot := int(saved.get("spawn", -1))
+	if slot < 0 or slot >= LEVEL_ENTITIES.size():
+		slot = -1
+		for i in LEVEL_ENTITIES.size():
+			if LEVEL_ENTITIES[i]["name"] == saved.get("name") and not _alive_slots.has(i):
+				slot = i
+				break
+	if slot == -1 or _alive_slots.has(slot):
+		return saved
+	var spec := _slot_spec(slot)
+	spec["tile"] = saved["tile"]
+	return spec
 
 
 ## The spawn table entry for [param slot], tagged with its index so the

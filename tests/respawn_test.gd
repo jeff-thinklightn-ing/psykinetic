@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_respawn_waits_for_time_and_distance()
 	_test_crate_respawns_at_its_spawn_tile()
 	_test_console()
+	_test_old_snapshot_gets_current_looks()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -115,6 +116,43 @@ func _test_console() -> void:
 	var fresh := _slot_entity(5)
 	_check(fresh != null and fresh.spawned and fresh.tile == Vector2i(8, 2), "the broken crate is back at its spawn tile")
 	_check(_player() != null and _player().tile == was_at, "the host player is back where it was, from its record")
+
+
+func _test_old_snapshot_gets_current_looks() -> void:
+	print("\n== level entities from an old snapshot look as the map says now ==")
+	# As builds before the generic entity scene wrote it: a type, no shape, no
+	# tint, no slot. The crate was pushed to (5, 5); the boulder to (9, 9).
+	Net.state_path = OS.get_user_data_dir().path_join("respawn_test_old_world.json")
+	var no_props := {"type": "Dictionary", "args": []}
+	var file := FileAccess.open(Net.state_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": 1, "tick": 0, "players": [], "respawns": [], "entities": [
+		{"type": "pushable", "name": "Crate1", "tile": [5, 5], "hp": 7, "stamina": 0, "facing": [0, 1], "props": no_props},
+		{"type": "pushable", "name": "Boulder", "tile": [9, 9], "hp": 0, "stamina": 0, "facing": [0, 1], "props": no_props},
+		{"type": "monster", "name": "Stray", "tile": [10, 4], "hp": 12, "stamina": 60, "facing": [0, 1], "props": no_props},
+	]}))
+	file.close()
+	_main._start_level(true)
+
+	var crate := _slot_entity(5)
+	_check(crate != null and crate.tile == Vector2i(5, 5) and crate.hp == 7, "the crate is where the snapshot left it, with its hp")
+	_check(crate != null and crate.spawn_spec.get("shape") == "cube" and crate.spawn_spec.get("tint") == Color(0.8, 0.6, 0.35),
+			"and is the map's tan cube, not a bare white one")
+	var boulder := _slot_entity(8)
+	_check(boulder != null and boulder.tile == Vector2i(9, 9), "the boulder is where the snapshot left it")
+	_check(boulder != null and boulder.spawn_spec.get("shape") == "sphere" and boulder.spawn_spec.get("scale") == 1.4
+			and boulder.mass == 200.0 and boulder.body_material == GridEntity.BodyMaterial.STONE,
+			"and is the map's round stone boulder, not a crate")
+	var stray: GridEntity = World.get_entity_at(Vector2i(10, 4))
+	_check(stray is Monster and not stray.spawn_spec.has("spawn"), "an entity that is not in the map is kept as saved")
+	for i in _main.RESPAWN_DELAY_TICKS + 5:
+		World.step()
+	var crates := 0
+	for entity in World.get_entities():
+		if entity is Pushable and entity.spawn_spec.get("spawn") == 5:
+			crates += 1
+	_check(crates == 1 and World.get_entity_at(Vector2i(8, 2)) == null, "the crate holds its slot, so no second one respawns at its spawn tile")
+	DirAccess.remove_absolute(Net.state_path)
+	Net.state_path = ""
 
 
 # --- helpers ------------------------------------------------------------------

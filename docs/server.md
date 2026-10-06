@@ -253,6 +253,11 @@ ticks (3 seconds) and on clean shutdown, and loads it when it starts.
   that tile (or the nearest free one) with those stats and that colour.
 - **What is not**: the room. Terrain always comes from the ASCII map in
   `main.gd`. An entity that died or broke is simply absent and stays gone.
+- **Looks follow the build, not the file**: the file says where a level
+  entity stands and how hurt it is; its shape, colour, size, mass and the
+  rest come from the map in the build that loads it. A deploy that changes
+  how a crate or the boulder looks shows up on the next start, with
+  everything still where it was left.
 - **Writes are atomic**: the file is written as `<path>.tmp` and renamed, so
   a crash mid-write leaves the previous snapshot intact.
 - **Bad or missing file**: logged (`[state] ... starting fresh`) and the

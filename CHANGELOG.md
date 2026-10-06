@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.5
+
+Fixes a server looking different from a fresh room after an update.
+
+- A server that restored its saved world kept the looks of the build that
+  saved it: white crates and a square boulder, where a fresh room had tan
+  crates and a round one. Level entities now take their shape, colour, size
+  and mass from the current map on every start, and only their position and
+  health from the saved world.
+- Crates and the boulder saved by an old build keep their place in the
+  level, so a second copy no longer respawns on their original tile.
+
 ## v0.1.4
 
 Fixes the client closing a few seconds after connecting.

@@ -176,7 +176,11 @@ players keep their places), `respawn` brings every dead slot back at once,
 of every level entity (type, name, tile, hp, stamina, facing, spawn
 properties) and every player record every 30 ticks and on clean shutdown,
 and rebuilds the room's entities and its memory of players from it on start.
-Terrain always comes from the ASCII map. A missing or unreadable snapshot is logged and the room is
+Terrain always comes from the ASCII map, and so does what a level entity
+*is*: on load its script, shape, tint, scale and properties are taken from
+its `LEVEL_ENTITIES` slot as the map says now (found by saved slot, or by
+name for snapshots older than slots), and only its tile, hp, stamina and
+facing from the file. A missing or unreadable snapshot is logged and the room is
 generated fresh. Restoring goes through the same path as spawning
 (`spawner.spawn` + `World.spawn`) plus `World.restore` for hp, stamina and
 facing, so it is gated like everything else. Details in `docs/server.md`.

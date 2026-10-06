@@ -145,3 +145,12 @@ mind — scripted, or a language model over HTTP — which can only return
 `{intent, target, say}`. The sim validates that and carries it out through
 the same calls everything else uses; the mind never moves anything or deals
 damage, and a missing, late or malformed answer means the scripted answer.
+
+## 20. A snapshot says where things are, not what they are
+
+On load a level entity is rebuilt from its slot in the spawn table as the
+map says now — script, shape, tint, scale, properties — and takes only its
+tile, hp, stamina and facing from the snapshot. A server that restores an
+old file after a deploy would otherwise keep showing the old build's crates
+and boulder for ever, and differ from a fresh room for no visible reason.
+Snapshots from before slots are matched to the table by name.
