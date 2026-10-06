@@ -37,8 +37,9 @@ const LEVEL_ENTITIES: Array[Dictionary] = [
 	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp1", "tile": Vector2i(1, 8), "props": {"mass": 25.0}},
 	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp2", "tile": Vector2i(2, 8), "props": {"mass": 40.0}},
 	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp3", "tile": Vector2i(3, 8), "props": {"mass": 60.0}},
-	{"script": MONSTER, "shape": "capsule", "name": "Imp1", "tile": Vector2i(2, 6), "props": {"mass": 30.0}},
-	{"script": MONSTER, "shape": "capsule", "name": "Imp2", "tile": Vector2i(3, 6), "props": {"mass": 70.0}},
+	# These two doze in the open: they only notice what comes within 3 tiles.
+	{"script": MONSTER, "shape": "capsule", "name": "Imp1", "tile": Vector2i(1, 6), "props": {"mass": 30.0, "sight_range": 3}},
+	{"script": MONSTER, "shape": "capsule", "name": "Imp2", "tile": Vector2i(2, 6), "props": {"mass": 70.0, "sight_range": 3}},
 	{"script": PUSHABLE, "shape": "cube", "name": "Crate1", "tile": Vector2i(8, 2), "tint": Color(0.8, 0.6, 0.35)},
 	{"script": PUSHABLE, "shape": "cube", "name": "Crate2", "tile": Vector2i(8, 3), "tint": Color(0.8, 0.6, 0.35)},
 	{"script": PUSHABLE, "shape": "cube", "name": "Crate3", "tile": Vector2i(4, 2), "tint": Color(0.8, 0.6, 0.35)},
@@ -65,6 +66,12 @@ const COMPANION_CARD := "A loyal, cautious companion who guards its friend and s
 const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
+## A player is not put down (on respawn or on coming back) with a hostile
+## this close to the intended tile; it goes to the safest start tile instead.
+const SPAWN_SAFE_DISTANCE := 5
+## Ticks a newly spawned player is ignored by monsters, unless it moves or
+## attacks first.
+const SPAWN_GRACE_TICKS := 30
 ## With --state, the server writes its snapshot this often.
 const SNAPSHOT_EVERY_TICKS := 30
 ## A dead level entity (monster killed, crate broken) comes back at its spawn
@@ -500,10 +507,23 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		record.color = PLAYER_TINTS[(record.index - 1) % PLAYER_TINTS.size()]
 		_records[id] = record
 	record.name = player_name
-	var tile := _nearest_free(record.tile) if known and not respawn else _free_start_tile()
+	var back := known and not respawn
+	var tile := _nearest_free(record.tile) if back else _free_start_tile()
 	if not World.is_free(tile):
 		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
 		return
+	# Spawn safety: not next to a hostile. Applies to coming back and to
+	# respawning; a first join is at a start tile anyway and gets the same check.
+	var intended := tile
+	var threat := _nearest_hostile_distance(intended)
+	if threat <= SPAWN_SAFE_DISTANCE:
+		tile = _safest_start_tile(intended)
+		print("[spawn] %s: hostile %d tiles from the %s tile %s; using start tile %s, %d from the nearest hostile" % [
+			player_name, threat, "saved" if back else "start", intended, tile, _nearest_hostile_distance(tile)])
+		back = false
+	else:
+		print("[spawn] %s: %s tile %s, no hostile within %d" % [
+			player_name, "saved" if back else "start", tile, SPAWN_SAFE_DISTANCE])
 	var player := _spawn({
 		"script": PLAYER, "shape": "capsule", "name": "Player%d" % record.index, "tile": tile,
 		"peer": peer, "tint": record.color, "label": player_name,
@@ -512,11 +532,12 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		return
 	if known and not respawn:
 		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
+	World.protect(player, SPAWN_GRACE_TICKS)
 	record.remember(player)
 	_players[peer] = player
 	_peer_ids[peer] = id
 	print("[net] %s (%s) joined as %s at %s%s" % [
-		player_name, id.left(8), player.name, tile, " (back)" if known and not respawn else ""])
+		player_name, id.left(8), player.name, tile, " (back)" if back else ""])
 	party_log.add("%s joined." % player_name)
 	_join_companion(record, player)
 
@@ -535,19 +556,26 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		existing.keeper = player
 		existing.current_intent = Companion.Intent.FOLLOW
 		existing.request_decision("owner back")
+		print("[net] %s's companion %s was waiting at %s and follows again" % [
+			record.name, existing.name, existing.tile])
 		return
-	if record.companion.is_empty():
+	# A record from before companions existed, or one that never got one,
+	# has none: give it one now.
+	var is_new := record.companion.is_empty() or not record.companion.get("name") is String
+	if is_new:
 		record.companion = {
-			"name": COMPANION_NAMES[(record.index - 1) % COMPANION_NAMES.size()],
+			"name": COMPANION_NAMES[posmod(record.index - 1, COMPANION_NAMES.size())],
 			"card": COMPANION_CARD, "hp": 0, "stamina": 0,
 			"tile": [player.tile.x, player.tile.y], "alive": true,
 		}
-	if not record.companion["alive"]:
+	if not record.companion.get("alive", true):
+		print("[net] %s's companion %s died earlier; none spawned" % [record.name, record.companion["name"]])
 		return
 	var saved: Variant = Snapshot.vector(record.companion.get("tile"))
-	var wanted: Vector2i = saved if saved != null else player.tile
+	var wanted: Vector2i = saved if saved != null and not is_new else player.tile
 	var tile := _nearest_free(wanted)
 	if not World.is_free(tile):
+		print("[net] no free tile for %s's companion %s near %s" % [record.name, record.companion["name"], wanted])
 		return
 	var pet := _spawn({
 		"script": COMPANION, "shape": "capsule", "name": String(record.companion["name"]), "tile": tile,
@@ -564,7 +592,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet
-	print("[net] %s's companion %s is at %s" % [record.name, pet.name, tile])
+	print("[net] %s's companion %s is at %s%s" % [
+		record.name, pet.name, tile, " (new)" if is_new else ""])
 
 
 func _make_mind() -> CompanionMind:
@@ -677,6 +706,30 @@ func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause:
 		for pet: Companion in _companions.values():
 			if is_instance_valid(pet) and pet.keeper == entity:
 				pet.request_decision("owner hurt")
+
+
+## Distance from [param tile] to the nearest monster, or a large number.
+func _nearest_hostile_distance(tile: Vector2i) -> int:
+	var nearest := 999
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned:
+			nearest = mini(nearest, World.distance(tile, entity.tile))
+	return nearest
+
+
+## The free start tile farthest from every monster; [param fallback] if no
+## start tile is free.
+func _safest_start_tile(fallback: Vector2i) -> Vector2i:
+	var best := fallback
+	var best_distance := -1
+	for start in PLAYER_STARTS:
+		if not World.is_free(start):
+			continue
+		var distance := _nearest_hostile_distance(start)
+		if distance > best_distance:
+			best = start
+			best_distance = distance
+	return best
 
 
 ## [param wanted] if it is free, else the closest free walkable tile that is

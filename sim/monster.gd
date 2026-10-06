@@ -45,10 +45,13 @@ func _sim_tick() -> void:
 
 
 ## The nearest player, or companion whose owner is online, in sight.
+## Entities still in their spawn grace are passed over.
 func _nearest_visible_target() -> GridEntity:
 	var nearest: GridEntity = null
 	var nearest_distance := sight_range + 1
 	for entity in World.get_entities():
+		if entity.protected:
+			continue  # Spawn grace.
 		if entity is Player or (entity is Companion and entity.keeper != null):
 			var d := World.distance(tile, entity.tile)
 			if d < nearest_distance and World.has_line_of_sight(tile, entity.tile):

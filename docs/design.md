@@ -187,7 +187,15 @@ on its recorded tile (nearest free one if taken) with its recorded stats and
 colour. On disconnect the record is updated from the entity and the entity
 is despawned. An id that is already online is refused with
 `already connected`. The log says `[net] <name> (<id prefix>) joined ...`
-and `... left`. Players cannot attack or shove each other
+and `... left`.
+
+*Spawn safety.* A player is never put down, coming back or respawning, with
+a monster within `SPAWN_SAFE_DISTANCE` (5) tiles of the intended tile; it
+goes to the free start tile farthest from every monster instead. A
+`[spawn]` log line says which rule applied. *Spawn grace.* A newly spawned
+player is `protected`: monsters do not target it for `SPAWN_GRACE_TICKS`
+(30), or until it moves or attacks, whichever comes first. The flag is
+replicated and the client draws a protected body faded. Players cannot attack or shove each other
 (`World.can_target`: no hit is accepted between two peer-controlled
 entities); they can still be hit by a crate or monster another player sent
 flying. A player that dies is respawned at a start

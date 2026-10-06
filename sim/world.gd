@@ -130,6 +130,9 @@ func step() -> void:
 	if not Net.is_authority():
 		return
 	tick += 1
+	for entity in _entities:
+		if entity.protected and tick >= entity.protected_until_tick:
+			entity.protected = false
 	# 1. Act, in ascending id. Iterate a copy: entities may despawn mid-tick.
 	for entity in _entities.duplicate():
 		# A stunned entity skips its turn; its orders wait for it.
@@ -207,6 +210,17 @@ func despawn(entity: GridEntity) -> void:
 	entity.queue_free()
 
 
+## Spawn grace: for [param ticks], or until it moves or attacks, monsters do
+## not target [param entity].
+func protect(entity: GridEntity, ticks: int) -> void:
+	if not Net.is_authority():
+		return
+	if not entity.spawned:
+		return
+	entity.protected = true
+	entity.protected_until_tick = tick + ticks
+
+
 ## Puts back state read from a snapshot, right after spawn. Values are clamped
 ## to what the entity allows; a facing that is not a direction is ignored.
 func restore(entity: GridEntity, hp: int, stamina: int, facing: Vector2i) -> void:
@@ -237,6 +251,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	entity.next_move_tick = tick + duration
 	entity._world_set_facing(direction)
+	entity.protected = false  # Moving ends spawn grace.
 	return true
 
 
@@ -533,6 +548,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	attacker.next_attack_tick = tick + attacker.attack_ticks
 	attacker._world_set_facing(target.tile - attacker.tile)
 	attacker._world_note_exertion(tick)
+	attacker.protected = false  # So does attacking or shoving.
 	var force := push_force(attacker, target)
 	if is_shove:
 		# Paid now, whatever the shove goes on to do. Short on stamina: the

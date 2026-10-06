@@ -30,7 +30,7 @@ func _test_respawn_waits_for_time_and_distance() -> void:
 	var player := _player()
 	var imp := _slot_entity(4)  # Imp2 in LEVEL_ENTITIES
 	var spawn_tile: Vector2i = imp.start_tile
-	_check(spawn_tile == Vector2i(3, 6), "slot 4 is the imp at (3, 6)")
+	_check(spawn_tile == Vector2i(2, 6), "slot 4 is the imp at (2, 6)")
 	_kill_monsters()  # So nothing interferes with the walk; they all become dead slots.
 	var died_at := World.tick
 	_check(_slot_entity(4) == null and _monsters() == 0, "killed")
@@ -42,7 +42,7 @@ func _test_respawn_waits_for_time_and_distance() -> void:
 	_check(_slot_entity(4) == null, "no respawn with a player on the tile, even %d ticks after death" % (World.tick - died_at))
 	_check(_monsters() == 0, "nor of any other monster within %d tiles (%d)" % [_main.RESPAWN_MIN_DISTANCE, _monsters()])
 
-	_walk_to(player, Vector2i(9, 6))
+	_walk_to(player, Vector2i(8, 6))
 	_check(World.distance(player.tile, spawn_tile) == _main.RESPAWN_MIN_DISTANCE and _slot_entity(4) == null,
 			"still nothing with the player exactly %d tiles away" % _main.RESPAWN_MIN_DISTANCE)
 	# Other slots are 7 or more tiles from here and come back; the imp next
@@ -51,10 +51,10 @@ func _test_respawn_waits_for_time_and_distance() -> void:
 		World.step()
 	_kill_monsters()
 	_check(_slot_entity(4) == null, "the slot under test is still dead")
-	World.order_move(player, Vector2i(10, 6))
+	World.order_move(player, Vector2i(9, 6))
 	World.step()
 	World.step()  # move_ticks: the step lands on the second tick.
-	_check(player.tile == Vector2i(10, 6), "player is 7 tiles from the spawn tile (at %s)" % player.tile)
+	_check(player.tile == Vector2i(9, 6), "player is 7 tiles from the spawn tile (at %s)" % player.tile)
 	var back := _slot_entity(4)
 	_check(back is Monster and back.start_tile == spawn_tile, "the imp respawned on its spawn tile that same tick")
 	_check(back != null and back.hp == back.max_hp and back.stamina == back.max_stamina, "at full stats")

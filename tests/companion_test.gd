@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_malformed_llm_reply_uses_scripted()
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
+	_test_old_record_gets_a_companion()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -234,6 +235,33 @@ func _test_native_ollama_endpoint() -> void:
 	_check(openai_body is Dictionary and not openai_body.has("format") and not openai_body.has("keep_alive")
 			and openai_body.get("think") == false, "its body has no format or keep_alive, and still think false")
 	pet.mind = ScriptedMind.new()
+
+
+func _test_old_record_gets_a_companion() -> void:
+	print("\n== a returning player whose record predates companions gets one ==")
+	# A snapshot as an older server wrote it: a player record, no companion.
+	Net.state_path = OS.get_user_data_dir().path_join("companion_test_old_world.json")
+	var file := FileAccess.open(Net.state_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": 1, "tick": 0, "entities": [], "respawns": [], "players": [{
+		"player_id": Net.player_id, "index": 1, "name": "Talos", "tile": [11, 2], "hp": 20, "stamina": 100,
+		"facing": [0, 1], "color": "59a6ff", "last_seen": 0,
+	}]}))
+	file.close()
+	_main._start_level(true)
+	var record: PlayerRecord = _main._records.get(Net.player_id)
+	var pet := _companion()
+	_check(record != null and _player() != null and _player().tile == Vector2i(11, 2), "the old record was loaded and its player is back")
+	_check(pet != null and pet.keeper == _player(), "a companion was created for it and follows")
+	_check(record != null and record.companion.get("name") is String and record.companion.get("alive") == true,
+			"and is now in the record (%s)" % [record.companion.get("name") if record else ""])
+
+	# A companion that died stays dead: the owner coming back does not bring it back.
+	World.damage(pet, 999)
+	_main._on_peer_disconnected(Net.local_id)
+	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+	_check(_companion() == null and record.companion.get("alive") == false, "a dead companion stays dead when the owner returns")
+	DirAccess.remove_absolute(Net.state_path)
+	Net.state_path = ""
 
 
 # --- helpers ------------------------------------------------------------------

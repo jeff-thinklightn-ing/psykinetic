@@ -26,7 +26,7 @@ enum BodyMaterial { FLESH, WOOD, STONE, METAL }
 enum Order { NONE, ATTACK, SHOVE }
 
 ## The only state sent over the network, besides World's tick.
-const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina"]
+const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected"]
 ## Reconciliation: a misprediction this far off or less is blended away over
 ## this many ticks; anything further is snapped.
 const SNAP_TILES := 2
@@ -89,6 +89,12 @@ var hp := 0:
 		if _mirroring and value < old:
 			_start_hurt_fade()
 var stamina := 0
+## Spawn grace: monsters do not target this entity. Set by World.protect();
+## ends after a while or as soon as the entity moves or attacks. Replicated
+## so clients can draw it faded.
+var protected := false
+## Server only: the tick the grace runs out.
+var protected_until_tick := 0
 ## Direction of the last step or attack.
 var facing := Vector2i(0, 1)
 var spawned := false
@@ -256,6 +262,8 @@ func _update_body() -> void:
 			var phase := Time.get_ticks_msec() / 1000.0 * TAU * BOB_HZ + get_instance_id() % 7
 			offset += sin(phase) * BOB_HEIGHT
 	body.position.y = _sprite_rest.y + offset
+	# Spawn grace reads as a faded body.
+	body.modulate.a = 0.5 if protected else 1.0
 	# Stunned: reel from side to side until it wears off.
 	if World.tick + World.tick_alpha < _reel_until:
 		body.rotation = sin(Time.get_ticks_msec() / 1000.0 * TAU * REEL_HZ) * REEL_ANGLE

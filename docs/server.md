@@ -80,6 +80,9 @@ of the `Linux Server` preset to `build/`; copies the binary to
 
 ## Logs
 
+The project sets `application/run/flush_stdout_on_print`, so every line
+reaches journald as it is printed, not when a buffer fills.
+
 ```sh
 journalctl -u psykinetic -f          # follow
 journalctl -u psykinetic -n 200      # the last 200 lines
