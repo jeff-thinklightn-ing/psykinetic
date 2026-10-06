@@ -17,7 +17,7 @@ $noStdin = Join-Path $dir 'stdin.empty'
 Set-Content $noStdin '' -NoNewline
 
 function Run-Host($name, $extra) {
-	$arguments = @('--headless', '--path', "`"$root`"", '--host', '--port=17781', "--state=`"$state`"") + $extra
+	$arguments = @('--headless', '--path', "`"$root`"", '--host', '--no-companions', '--port=17781', "--state=`"$state`"") + $extra
 	$p = Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru -Wait `
 		-RedirectStandardInput $noStdin -RedirectStandardOutput (Join-Path $dir "$name.log") -RedirectStandardError (Join-Path $dir "$name.err")
 	@(Get-Content (Join-Path $dir "$name.log"))

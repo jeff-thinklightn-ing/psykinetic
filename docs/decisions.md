@@ -136,3 +136,12 @@ still disagrees, an error of up to 2 tiles is blended away over 2 ticks and
 re-planned from the server's tile; more than that snaps. A refused step is
 reported to the client at once. Other entities are drawn 2 ticks behind
 (`display_delay` in `settings.cfg`): 100 ms for no stutter.
+
+## 19. A companion's mind only answers; the sim acts
+
+Companions are ordinary entities under every existing rule, owned by a
+player record and saved with it. Their behaviour is an intent chosen by a
+mind — scripted, or a language model over HTTP — which can only return
+`{intent, target, say}`. The sim validates that and carries it out through
+the same calls everything else uses; the mind never moves anything or deals
+damage, and a missing, late or malformed answer means the scripted answer.

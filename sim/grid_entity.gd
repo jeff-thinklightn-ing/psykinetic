@@ -66,6 +66,8 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 @export var attack_ticks := 10
 ## Sprite colour override; alpha 0 means keep the scene's colour.
 @export var tint := Color(0, 0, 0, 0)
+## Name shown above the sprite; "" for none. Static, set at spawn on every peer.
+@export var label := ""
 
 ## Assigned by World at spawn, ascending. Decides resolution order. Server only.
 var id := 0
@@ -126,6 +128,9 @@ var _moved_tick := -1
 var _moved_tiles := 0
 var _pip: Node2D
 var _pip_rest := Vector2.ZERO
+var _name_label: Label
+var _speech_label: Label
+var _speech_tween: Tween
 var _hop: Tween
 var _fade: Tween
 var _flash_pending := false
@@ -157,6 +162,8 @@ func _ready() -> void:
 	_pip = get_node_or_null("Sprite/Facing")
 	if _pip != null:
 		_pip_rest = _pip.position
+	if not label.is_empty():
+		_name_label = _make_caption(label, -34.0, Color(1, 1, 1, 0.9))
 	damaged.connect(_on_damaged)
 	pushed.connect(_on_pushed)
 	impacted.connect(_on_impacted)
@@ -432,6 +439,34 @@ func _net_impacted(amount: int) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_stunned(ticks: int) -> void:
 	_reel_until = World.tick + ticks
+
+
+## A line of speech over the sprite for a few seconds. Visual only.
+func say(text: String) -> void:
+	if _speech_label == null:
+		_speech_label = _make_caption("", -46.0, Color(1, 0.95, 0.6))
+	_speech_label.text = text
+	_speech_label.visible = true
+	if _speech_tween != null:
+		_speech_tween.kill()
+	_speech_tween = create_tween()
+	_speech_tween.tween_interval(3.0)
+	_speech_tween.tween_callback(func() -> void: _speech_label.visible = false)
+
+
+func _make_caption(text: String, y: float, color: Color) -> Label:
+	var caption := Label.new()
+	caption.text = text
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.add_theme_font_size_override("font_size", 8)
+	caption.add_theme_color_override("font_color", color)
+	caption.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	caption.add_theme_constant_override("outline_size", 2)
+	caption.size = Vector2(120, 12)
+	caption.position = Vector2(-60, y)
+	caption.z_index = 5
+	add_child(caption)
+	return caption
 
 
 # --- Feedback visuals ---------------------------------------------------------

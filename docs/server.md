@@ -126,6 +126,27 @@ Dead monsters and broken crates come back on their own after 60 seconds,
 once no player is within 6 tiles of the spawn tile; `respawn` skips the
 wait. Players still get their own 2-second respawn.
 
+## Companion minds
+
+Every player gets a companion. Its decisions come from a *mind*: the
+scripted one by default, or a language model through any OpenAI-compatible
+chat endpoint, such as Ollama's. To use one, set in `/etc/psykinetic/env`:
+
+```
+PSYKINETIC_LLM_URL=http://127.0.0.1:11434/v1/chat/completions
+PSYKINETIC_LLM_MODEL=llama3.2
+```
+
+(or pass `--llm-url=` and `--llm-model=`). Each decision is one request with
+a 2-second timeout; while it is out, or if it fails or answers nonsense, the
+scripted mind's answer is used, and the log says so (`[mind] ollama: ...`).
+The server never waits on it.
+
+Console: `companions` lists each companion with its owner, intent and the
+mind that answered last; `mind scripted` / `mind ollama` switches every
+companion's mind at once. Players give orders with keys 1 (follow), 2 (hold
+here), 3 (attack my target), 4 (fall back).
+
 ## Connecting a client
 
 On a machine on the tailnet, with the project:

@@ -1,0 +1,24 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://sim/companion.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/capsule.svg" id="2_capsule"]
+
+[node name="Companion" type="Node2D"]
+script = ExtResource("1_script")
+mass = 75.0
+move_ticks = 2
+max_hp = 20
+attack_damage = 2
+strength = 8
+max_stamina = 80
+attack_ticks = 8
+
+[node name="Sprite" type="Sprite2D" parent="."]
+modulate = Color(0.45, 0.95, 0.85, 1)
+position = Vector2(0, -8)
+texture = ExtResource("2_capsule")
+
+[node name="Facing" type="Polygon2D" parent="Sprite"]
+position = Vector2(0, -2)
+color = Color(0.05, 0.05, 0.1, 0.9)
+polygon = PackedVector2Array(-1.5, 0, 0, -1.5, 1.5, 0, 0, 1.5)

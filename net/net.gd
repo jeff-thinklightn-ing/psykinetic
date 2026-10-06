@@ -12,6 +12,8 @@ extends Node
 ##                                30 ticks and on clean shutdown, loaded on start if present
 ##   --admin-port=<n>             server/host: accept console commands on 127.0.0.1:<n> (TCP)
 ##   --console                    read console commands from stdin (--server does this anyway)
+##   --no-companions              server/host: players get no companion
+##   --llm-url=<url> --llm-model=<m>  companion minds ask this OpenAI-compatible endpoint
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
@@ -73,6 +75,15 @@ var state_path := ""
 var admin_port := 0
 ## Read console commands from stdin. Always on for --server.
 var console := false
+## OpenAI-compatible chat endpoint and model for companion minds, from
+## --llm-url / --llm-model or PSYKINETIC_LLM_URL / PSYKINETIC_LLM_MODEL.
+var llm_url := ""
+var llm_model := ""
+## --no-companions: players get no companion (tests of other things, or ops).
+var companions := true
+
+## Server-to-everyone notices that are not sim state: ("speech", {entity, text}).
+signal message_received(kind: String, data: Dictionary)
 ## Join token. Never written anywhere in the repo; see server/env.example.
 var token := ""
 ## Who this client says it is. From settings.cfg, --player-id/--name, or
@@ -108,6 +119,8 @@ var _mispredict_times: Array[int] = []
 
 func _enter_tree() -> void:
 	version = _read_version()
+	llm_url = OS.get_environment("PSYKINETIC_LLM_URL")
+	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
 	_parse_args()
 	if not _mode_given:
 		_apply_settings()
@@ -386,6 +399,18 @@ func _peer_address(peer: int) -> String:
 	return packet_peer.get_remote_address() if packet_peer != null else "?"
 
 
+## Server: tells every peer (and itself) something that is not sim state.
+func broadcast(kind: String, data: Dictionary) -> void:
+	message_received.emit(kind, data)
+	if online and not multiplayer.get_peers().is_empty():
+		message.rpc(kind, data)
+
+
+@rpc("authority", "call_remote", "reliable")
+func message(kind: String, data: Dictionary) -> void:
+	message_received.emit(kind, data)
+
+
 ## Closes the connection, if any. Safe to call more than once.
 func shutdown() -> void:
 	if online:
@@ -468,7 +493,10 @@ func _parse_args() -> void:
 				_mode_given = true
 			"--console":
 				console = true
+			"--no-companions":
+				companions = false
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
+					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-exit-after", "--test-version":
 				if not has_value and i + 1 < args.size():
 					i += 1
@@ -497,6 +525,10 @@ func _set_option(key: String, value: String) -> void:
 		"--admin-port":
 			if value.is_valid_int():
 				admin_port = value.to_int()
+		"--llm-url":
+			llm_url = value
+		"--llm-model":
+			llm_model = value
 		"--test-version":
 			_test_version = value
 		"--test-move":

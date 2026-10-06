@@ -17,6 +17,9 @@ signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
 signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity, cause: StringName)
 signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, tiles: int, impact: int, stopped_by: String)
 signal entity_despawned(entity: GridEntity)
+## A player's command that is not a move, attack or shove: (name, args), for
+## Main to act on. "order" {slot} is a companion order.
+signal command_received(entity: GridEntity, command: String, args: Dictionary)
 
 const TICK_RATE := 10
 const TICK_DT := 1.0 / TICK_RATE
@@ -396,6 +399,24 @@ func move_refused(entity_path: NodePath, tile: Vector2i) -> void:
 	var entity := get_node_or_null(entity_path) as GridEntity
 	if entity != null:
 		entity._on_move_refused(tile)
+
+
+## Any other player command, from input code on any peer. On the server it
+## is handed straight to command_received; on a client it goes by RPC.
+func command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
+	if Net.is_authority():
+		command_received.emit(entity, command_name, args)
+	else:
+		request_command.rpc_id(1, entity.get_path(), command_name, args)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_command(entity_path: NodePath, command_name: String, args: Dictionary) -> void:
+	if not Net.is_authority():
+		return
+	var entity := _entity_owned_by_sender(entity_path)
+	if entity != null:
+		command_received.emit(entity, command_name, args)
 
 
 func _entity_at_path(path: NodePath) -> GridEntity:

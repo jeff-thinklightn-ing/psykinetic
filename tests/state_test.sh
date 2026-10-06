@@ -21,7 +21,7 @@ STATE="$DIR/world.json"
 run_host() {
 	name="$1"
 	shift
-	"$GODOT" --headless --path . --host --port=17781 "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
+	"$GODOT" --headless --path . --host --no-companions --port=17781 "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
 }
 
 failures=0

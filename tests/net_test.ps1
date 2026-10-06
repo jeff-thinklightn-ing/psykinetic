@@ -32,7 +32,7 @@ function Start-Instance($name, $modeArgs) {
 		-RedirectStandardError (Join-Path $logs "$name.err")
 }
 
-$server = Start-Instance 'server' @('--server', "--token=$token", "--state=`"$state`"", '--test-exit-after=16')
+$server = Start-Instance 'server' @('--server', '--no-companions', "--token=$token", "--state=`"$state`"", '--test-exit-after=16')
 Start-Sleep -Seconds 2
 $client1 = Start-Instance 'client1' @('--client', '--address=127.0.0.1', "--token=$token", '--test-move=-3,0', '--test-contest=9,1,70', '--test-exit-after=9')
 # Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
@@ -60,7 +60,7 @@ $all | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
 # Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
 # come back where she left, Dana is new, and a second Casey is turned away.
-$server2 = Start-Instance 'server2' @('--server', "--token=$token", "--state=`"$state`"", '--test-exit-after=10')
+$server2 = Start-Instance 'server2' @('--server', '--no-companions', "--token=$token", "--state=`"$state`"", '--test-exit-after=10')
 Start-Sleep -Seconds 2
 $clientC = Start-Instance 'clientC' @("--settings=`"$settings`"", '--test-exit-after=6')
 Start-Sleep -Seconds 1
@@ -72,7 +72,7 @@ $phase2 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
 # Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
 # the bottom of the room, then at tick 70 cross it toward each other.
-$server3 = Start-Instance 'server3' @('--server', "--token=$token", '--test-exit-after=15')
+$server3 = Start-Instance 'server3' @('--server', '--no-companions', "--token=$token", '--test-exit-after=15')
 Start-Sleep -Seconds 2
 $clientF = Start-Instance 'clientF' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Fay', '--test-move=-6,9', '--test-contest=12,12,70', '--test-exit-after=12')
 Start-Sleep -Seconds 1

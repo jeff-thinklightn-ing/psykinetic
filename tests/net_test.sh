@@ -30,7 +30,7 @@ start() {
 	"$GODOT" --headless --path . "$@" "--port=$PORT" </dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 }
 
-start server --server "--token=$TOKEN" "--state=$STATE" --test-exit-after=16
+start server --server --no-companions "--token=$TOKEN" "--state=$STATE" --test-exit-after=16
 sleep 2
 start client1 --client --address=127.0.0.1 "--token=$TOKEN" --test-move=-3,0 --test-contest=9,1,70 --test-exit-after=9
 # Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
@@ -54,7 +54,7 @@ wait
 
 # Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
 # come back where she left, Dana is new, and a second Casey is turned away.
-start server2 --server "--token=$TOKEN" "--state=$STATE" --test-exit-after=10
+start server2 --server --no-companions "--token=$TOKEN" "--state=$STATE" --test-exit-after=10
 sleep 2
 start clientC "--settings=$LOGS/settings.cfg" --test-exit-after=6
 sleep 1
@@ -64,7 +64,7 @@ wait
 
 # Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
 # the bottom of the room, then at tick 70 cross it toward each other.
-start server3 --server "--token=$TOKEN" --test-exit-after=15
+start server3 --server --no-companions "--token=$TOKEN" --test-exit-after=15
 sleep 2
 start clientF --client --address=127.0.0.1 "--token=$TOKEN" --name=Fay --test-move=-6,9 --test-contest=12,12,70 --test-exit-after=12
 sleep 1

@@ -22,7 +22,7 @@ func _ready() -> void:
 
 
 func _sim_tick() -> void:
-	var target := _nearest_visible_player()
+	var target := _nearest_visible_target()
 	if target == null:
 		return
 	if World.can_melee(tile, target.tile):
@@ -33,11 +33,12 @@ func _sim_tick() -> void:
 			World.try_move(self, path[0] - tile)
 
 
-func _nearest_visible_player() -> Player:
-	var nearest: Player = null
+## The nearest player, or companion whose owner is online, in sight.
+func _nearest_visible_target() -> GridEntity:
+	var nearest: GridEntity = null
 	var nearest_distance := sight_range + 1
 	for entity in World.get_entities():
-		if entity is Player:
+		if entity is Player or (entity is Companion and entity.keeper != null):
 			var d := World.distance(tile, entity.tile)
 			if d < nearest_distance and World.has_line_of_sight(tile, entity.tile):
 				nearest = entity

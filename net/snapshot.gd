@@ -22,6 +22,8 @@ static func save(path: String, tick: int, entities: Array[GridEntity],
 	for entity in entities:
 		if not is_instance_valid(entity) or not entity.spawned or entity.owner_peer != 0:
 			continue
+		if entity.spawn_spec.get("scene", "") == "companion":
+			continue  # Kept in its owner's player record instead.
 		list.append({
 			"type": entity.spawn_spec.get("scene", ""),
 			"name": String(entity.name),

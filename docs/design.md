@@ -376,6 +376,63 @@ is thrown farther and an exhausted attacker cannot push at all.
 70% as its stamina falls, feet planted, and bobs slowly below 25%. The number
 is only in the F3 overlay. `stamina` is replicated so clients can draw this.
 
+## Companions
+
+A `Companion` (`sim/companion.gd`) is a creature that belongs to a player.
+Mass 75, strength 8, 80 stamina, 20 hp, teal, with its name over its head.
+It obeys every rule a monster does — occupancy, pushes, stamina, impact,
+fire, stun — and never respawns: it is not a level slot. It carries an
+**intent** (`FOLLOW`, `HOLD`, `ATTACK`, `SHOVE`, `RETREAT`, `IDLE`) with a
+target entity or hold tile, and each tick the sim carries that intent out
+through the same `find_path`, `try_move`, `try_attack` and `try_shove` as
+everything else; there is no movement code of its own. An intent whose
+target is gone or unreachable falls back to `FOLLOW`, logged.
+
+**Ownership.** The companion belongs to a `PlayerRecord`, which stores its
+name, personality card, hp, stamina, tile and whether it is alive, and so
+goes into the snapshot. Every player gets one on first join, spawned on the
+nearest free tile. When the owner disconnects the companion stays, idles,
+and monsters ignore it; when the owner is back it follows again. A dead
+companion stays dead in the record.
+
+**The mind never acts.** This is a hard rule. A `CompanionMind`
+(`sim/companion_mind.gd`) is asked `decide(context) -> {intent, target,
+say}` and nothing else: it never sets a position, deals damage, or touches
+any sim state. The companion validates the answer — the intent against the
+whitelist, the target against the live world — and anything that does not
+hold up becomes `FOLLOW` and is logged. A decision window opens every 30
+ticks, or at once when the owner is hurt, the companion is hurt or pushed, a
+hostile first comes into line of sight, or an order arrives. The context is
+the personality card, the last 20 party-log sentences, nearby entities with
+offsets and types, own and owner hp and stamina, the owner's last order and
+the current intent.
+
+Two minds. `ScriptedMind`: obey the last order; retreat toward the owner
+below 30% hp; attack the nearest hostile within 3 tiles; else follow. It is
+what every headless test uses and the fallback for everything else.
+`OllamaMind` (`net/ollama_mind.gd`): an asynchronous POST to an
+OpenAI-compatible chat endpoint (`--llm-url`, `--llm-model`, or the env
+file), with a system prompt demanding one JSON object, a 2-second timeout
+and one request in flight per companion. A window that has no answer yet
+uses the scripted one; the reply is applied when it arrives, if it parses.
+The tick never waits.
+
+**Party log** (`sim/party_log.gd`): the server keeps the last 200
+plain-English sentences — pushes, impacts, damage, deaths, fire, orders,
+joins and leaves — naming players by record name and companions by name.
+
+`--no-companions` turns companions off for a server or host. The network
+and snapshot tests use it so that their choreography stays deterministic;
+`tests/companion_test.tscn` covers companions themselves.
+
+**Orders.** Keys 1–9 send `World.command("order", {slot})`; the server maps
+1 follow, 2 hold here, 3 attack my current target (or the nearest monster),
+4 fall back, and ignores 5–9. An order is logged and opens a decision
+window. **Speech**: a mind's `say` is broadcast as `Net.message("speech",
+{entity, text})` and shown over the sprite for a moment, at most one line
+per companion per 5 seconds. Console: `companions` lists each with owner,
+intent and which mind answered last; `mind scripted|ollama` switches live.
+
 ## Hazards
 
 Fire is terrain (tile source 2 on the Ground layer). It is walkable. Any

@@ -29,6 +29,7 @@ const SCENES := {
 	"player": preload("res://entities/player.tscn"),
 	"monster": preload("res://entities/monster.tscn"),
 	"pushable": preload("res://entities/pushable.tscn"),
+	"companion": preload("res://entities/companion.tscn"),
 }
 ## Spawned by the server in this order, which is also entity id order.
 ## "props" are set on the instance on every peer before it enters the tree.
@@ -61,6 +62,9 @@ const PLAYER_TINTS: Array[Color] = [
 ## shove becomes an aimed toss.
 const TOSS_DRAG_MIN := 10.0
 const TOSS_AIM_LENGTH := 26.0
+const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
+const COMPANION_CARD := "A loyal, cautious companion who guards its friend and speaks little."
+const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
 ## With --state, the server writes its snapshot this often.
@@ -80,6 +84,12 @@ var _peer_ids: Dictionary[int, String] = {}
 var _records: Dictionary[String, PlayerRecord] = {}
 ## Server only: peer id -> tick at which its dead player comes back.
 var _respawn_at: Dictionary[int, int] = {}
+## Server only: player_id -> that player's live companion.
+var _companions: Dictionary[String, Companion] = {}
+## Server only: what happened, in words, for companion minds and the log.
+var party_log := PartyLog.new()
+## Which mind new decisions use: "scripted" or "ollama" (console: mind ...).
+var mind_kind := "scripted"
 ## Server only: LEVEL_ENTITIES index -> the entity holding that slot now.
 var _alive_slots: Dictionary[int, GridEntity] = {}
 ## Server only: LEVEL_ENTITIES index -> tick its entity died or broke.
@@ -157,6 +167,11 @@ func _go_online() -> void:
 		Net.peer_authenticated.connect(_on_peer_authenticated)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 		World.entity_despawned.connect(_on_entity_despawned)
+		World.entity_pushed.connect(_narrate_push)
+		World.entity_damaged.connect(_narrate_damage)
+		World.command_received.connect(_on_command)
+		if Net.llm_url != "" and Net.llm_model != "":
+			mind_kind = "ollama"
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		_start_level(true)
@@ -170,6 +185,7 @@ func _go_online() -> void:
 		multiplayer.connection_failed.connect(
 				func() -> void: hud.text = "connection failed")
 		Net.join_rejected.connect(_on_join_rejected)
+	Net.message_received.connect(_on_message)
 
 
 func _process(_delta: float) -> void:
@@ -191,6 +207,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
 		if Net.is_authority():
 			_start_level()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
+		var local := _local_player()
+		if local != null:
+			World.command(local, "order", {"slot": key.keycode - KEY_0})
 		return
 	var click := event as InputEventMouseButton
 	if click == null:
@@ -345,6 +366,7 @@ func _start_level(from_snapshot := false) -> void:
 	_respawn_at.clear()
 	_alive_slots.clear()
 	_dead_since.clear()
+	_companions.clear()
 	# Level entities first (from the snapshot if there is one), then the
 	# players: a returning player's tile must be known to be free or taken.
 	# Player records survive a rebuild; a snapshot brings its own.
@@ -437,6 +459,8 @@ func _save_state() -> void:
 		var player: Player = _players[peer]
 		if is_instance_valid(player) and player.spawned and _records.has(_peer_ids.get(peer, "")):
 			_records[_peer_ids[peer]].remember(player)
+	for id: String in _companions.keys():
+		_remember_companion(id)
 	var records: Array[PlayerRecord] = []
 	records.assign(_records.values())
 	var respawns: Array[Dictionary] = []
@@ -498,6 +522,166 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	_peer_ids[peer] = id
 	print("[net] %s (%s) joined as %s at %s%s" % [
 		player_name, id.left(8), player.name, tile, " (back)" if known and not respawn else ""])
+	party_log.add("%s joined." % player_name)
+	_join_companion(record, player)
+
+
+# --- Companions ----------------------------------------------------------------
+
+## Gives [param player] its record's companion: a new one on first join,
+## spawned adjacent; the remembered one, where it was, if it is alive; none
+## if it died. A companion that is already in the world (its owner was away)
+## just gets its owner back.
+func _join_companion(record: PlayerRecord, player: Player) -> void:
+	if not Net.companions:
+		return
+	var existing: Companion = _companions.get(record.player_id)
+	if is_instance_valid(existing) and existing.spawned:
+		existing.keeper = player
+		existing.current_intent = Companion.Intent.FOLLOW
+		existing.request_decision("owner back")
+		return
+	if record.companion.is_empty():
+		record.companion = {
+			"name": COMPANION_NAMES[(record.index - 1) % COMPANION_NAMES.size()],
+			"card": COMPANION_CARD, "hp": 0, "stamina": 0,
+			"tile": [player.tile.x, player.tile.y], "alive": true,
+		}
+	if not record.companion["alive"]:
+		return
+	var saved: Variant = Snapshot.vector(record.companion.get("tile"))
+	var wanted: Vector2i = saved if saved != null else player.tile
+	var tile := _nearest_free(wanted)
+	if not World.is_free(tile):
+		return
+	var pet := _spawn({
+		"scene": "companion", "name": String(record.companion["name"]), "tile": tile,
+		"props": {"tint": COMPANION_TINT, "label": String(record.companion["name"])},
+	}) as Companion
+	if pet == null:
+		return
+	pet.keeper_id = record.player_id
+	pet.keeper = player
+	pet.card = str(record.companion.get("card", COMPANION_CARD))
+	pet.party_log = party_log
+	pet.mind = _make_mind()
+	pet.said.connect(_on_companion_said.bind(pet))
+	if int(record.companion.get("hp", 0)) > 0:
+		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
+	_companions[record.player_id] = pet
+	print("[net] %s's companion %s is at %s" % [record.name, pet.name, tile])
+
+
+func _make_mind() -> CompanionMind:
+	if mind_kind == "ollama" and Net.llm_url != "" and Net.llm_model != "":
+		return OllamaMind.new(Net.llm_url, Net.llm_model, self)
+	return ScriptedMind.new()
+
+
+func _remember_companion(id: String) -> void:
+	var pet: Companion = _companions.get(id)
+	var record: PlayerRecord = _records.get(id)
+	if record == null or not is_instance_valid(pet) or not pet.spawned:
+		return
+	record.companion["hp"] = pet.hp
+	record.companion["stamina"] = pet.stamina
+	record.companion["tile"] = [pet.tile.x, pet.tile.y]
+	record.companion["alive"] = true
+
+
+## "order" {slot}: 1 follow, 2 hold here, 3 attack my current target,
+## 4 fall back; 5..9 are accepted and ignored for now.
+func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
+	if command_name == "order" and entity is Player:
+		handle_order(entity, int(args.get("slot", 0)))
+
+
+func handle_order(player: Player, slot: int) -> void:
+	var id: String = _peer_ids.get(player.owner_peer, "")
+	var pet: Companion = _companions.get(id)
+	if not is_instance_valid(pet) or not pet.spawned:
+		return
+	var record: PlayerRecord = _records.get(id)
+	var who := record.name if record != null else String(player.name)
+	match slot:
+		1:
+			pet.give_order("follow")
+		2:
+			pet.give_order("hold")
+		3:
+			var target: GridEntity = player.action_target
+			if not is_instance_valid(target) or not target.spawned:
+				target = _nearest_monster_to(pet)
+			pet.give_order("attack", target)
+		4:
+			pet.give_order("fallback")
+		_:
+			return
+	var order_names := {1: "follow", 2: "hold here", 3: "attack", 4: "fall back"}
+	party_log.add("%s ordered %s to %s." % [who, pet.name, order_names[slot]])
+	print("[order] %s -> %s: %s" % [who, pet.name, order_names[slot]])
+
+
+func _nearest_monster_to(entity: GridEntity) -> GridEntity:
+	var best: GridEntity = null
+	var best_distance := 99
+	for other in World.get_entities():
+		if other is Monster and other.spawned and World.distance(entity.tile, other.tile) < best_distance:
+			best = other
+			best_distance = World.distance(entity.tile, other.tile)
+	return best
+
+
+func _on_companion_said(text: String, pet: Companion) -> void:
+	Net.broadcast("speech", {"entity": String(pet.get_path()), "text": text})
+
+
+func _on_message(kind: String, data: Dictionary) -> void:
+	if kind == "speech":
+		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
+		if entity != null:
+			entity.say(str(data.get("text", "")))
+			print("[speech] %s: %s" % [entity.name, data.get("text", "")])
+
+
+## A name for the party log: players by record name, everything else by its
+## node name.
+func _display_name(entity: GridEntity) -> String:
+	if entity is Player:
+		var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
+		if record != null:
+			return record.name
+	return String(entity.name)
+
+
+func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, tiles: int, impact: int, stopped_by: String) -> void:
+	var line := "%s shoved %s" % [_display_name(by), _display_name(entity)]
+	if tiles > 0:
+		line += " %d tiles" % tiles
+	if not stopped_by.begins_with("nothing"):
+		line += " into %s" % stopped_by
+	if impact > 0:
+		line += " for %d" % impact
+	party_log.add(line + ".")
+	if entity is Companion:
+		entity.request_decision("pushed")
+
+
+func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
+	match cause:
+		&"fire":
+			party_log.add("%s burned for %d." % [_display_name(entity), amount])
+		&"impact":
+			party_log.add("%s took %d from the impact." % [_display_name(entity), amount])
+		_:
+			if source != null:
+				party_log.add("%s hit %s for %d." % [_display_name(source), _display_name(entity), amount])
+	if entity is Companion:
+		entity.request_decision("hurt")
+	elif entity is Player:
+		for pet: Companion in _companions.values():
+			if is_instance_valid(pet) and pet.keeper == entity:
+				pet.request_decision("owner hurt")
 
 
 ## [param wanted] if it is free, else the closest free walkable tile that is
@@ -568,7 +752,15 @@ func _on_peer_disconnected(peer: int) -> void:
 		World.despawn(player)
 	elif record != null:
 		record.last_seen = int(Time.get_unix_time_from_system())
+	# The companion stays, idle and of no interest to monsters, until its
+	# owner is back.
+	var pet: Companion = _companions.get(id)
+	if is_instance_valid(pet) and pet.spawned:
+		_remember_companion(id)
+		pet.keeper = null
+		pet.current_intent = Companion.Intent.IDLE
 	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
+	party_log.add("%s left." % (record.name if record != null else "someone"))
 
 
 ## A player that dies comes back after RESPAWN_TICKS, as long as its peer is
@@ -584,6 +776,15 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 		_players.erase(peer)
 		_respawn_at[peer] = World.tick + RESPAWN_TICKS
 		print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
+	if entity is Companion:
+		var record: PlayerRecord = _records.get(entity.keeper_id)
+		if record != null and not record.companion.is_empty():
+			record.companion["alive"] = false
+		_companions.erase(entity.keeper_id)
+	if entity.is_creature():
+		party_log.add("%s died." % _display_name(entity))
+	elif entity.body_material == GridEntity.BodyMaterial.WOOD:
+		party_log.add("%s broke." % _display_name(entity))
 
 
 func _respawn_due_players(tick: int) -> void:
@@ -757,8 +958,30 @@ func admin_command(line: String) -> String:
 				return "no --state file to save to"
 			_save_state()
 			return "saved %s at tick %d" % [Net.state_path, World.tick]
+		"companions":
+			var lines: Array[String] = []
+			for id: String in _companions:
+				var pet: Companion = _companions[id]
+				if not is_instance_valid(pet) or not pet.spawned:
+					continue
+				var record: PlayerRecord = _records.get(id)
+				lines.append("%s of %s (%s) at %s hp %d/%d intent %s%s mind %s, last answer %s" % [
+					pet.name, record.name if record != null else "?", id.left(8), pet.tile, pet.hp, pet.max_hp,
+					pet.intent_name(), " " + pet.intent_target.name if pet.intent_target != null else "",
+					pet.mind.kind if pet.mind != null else "none", pet.last_mind])
+			return "%d companions\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 companions"
+		"mind":
+			if words.size() < 2 or words[1] not in ["scripted", "ollama"]:
+				return "usage: mind scripted|ollama (now %s)" % mind_kind
+			if words[1] == "ollama" and (Net.llm_url == "" or Net.llm_model == ""):
+				return "no --llm-url / --llm-model configured"
+			mind_kind = words[1]
+			for pet: Companion in _companions.values():
+				if is_instance_valid(pet):
+					pet.mind = _make_mind()
+			return "companion minds: %s" % mind_kind
 		"help":
-			return "reset | respawn | players | save"
+			return "reset | respawn | players | companions | mind scripted|ollama | save"
 	return "unknown command %s (try help)" % words[0]
 
 

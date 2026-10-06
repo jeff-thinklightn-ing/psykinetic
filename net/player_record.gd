@@ -15,6 +15,9 @@ var facing := Vector2i(0, 1)
 var color := Color.WHITE
 ## Unix time of the last join or leave.
 var last_seen := 0
+## The player's companion: {name, card, hp, stamina, tile: [x, y], alive}.
+## Empty until one has been given.
+var companion: Dictionary = {}
 
 
 ## Copies the live state off the player's entity.
@@ -37,6 +40,7 @@ func to_dict() -> Dictionary:
 		"facing": [facing.x, facing.y],
 		"color": color.to_html(false),
 		"last_seen": last_seen,
+		"companion": companion.duplicate(),
 	}
 
 
@@ -59,4 +63,14 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	var html: String = str(entry.get("color", ""))
 	record.color = Color.html(html) if Color.html_is_valid(html) else Color.WHITE
 	record.last_seen = int(entry.get("last_seen", 0))
+	var pet: Variant = entry.get("companion", {})
+	if pet is Dictionary and pet.get("name") is String:
+		record.companion = {
+			"name": str(pet["name"]),
+			"card": str(pet.get("card", "")),
+			"hp": int(pet.get("hp", 0)),
+			"stamina": int(pet.get("stamina", 0)),
+			"tile": pet.get("tile", [0, 0]),
+			"alive": bool(pet.get("alive", true)),
+		}
 	return record
