@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.41
+
+The camera follows the character. Client (the server only for the version).
+
+- **Click scheme:** the 3D camera turns by itself to the diagonal view
+  that puts the way you are walking toward the top of the screen. It
+  waits until you have kept a new heading for 0.7 s, turns over a second,
+  never turns while you stand still, and never twice within 1.5 s.
+- **A/D** look round up to a quarter turn either way and spring back when
+  let go. **W/S** tilt and spring back, as before.
+- Your character is always the middle of the screen.
+- The camera's view is no longer saved.
+- **WASD scheme:** the middle-drag turn is no longer limited to a quarter
+  turn; otherwise unchanged.
+
+The server must be updated to v0.1.41 too, as it refuses any other version.
+
 ## v0.1.40
 
 Camera simplification. Client (the server only for the version).

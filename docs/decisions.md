@@ -570,3 +570,17 @@ the middle click does nothing. This replaces 54's four resting diamonds
 and the sticky tilt and zoom of 60 and 63. Home is yaw 0 rather than the
 yaw a session started at, so the range never drifts from launch to
 launch.
+
+## 65. The click scheme's camera home follows the character
+
+There is no fixed home. In the click scheme the camera's resting yaw is
+the diamond that puts the player's heading nearest the top of the
+screen, so the way ahead is the far side of the view, and it is damped
+so it never wanders: a heading must be walked for 0.7 s, turns are 1.5 s
+apart at least and take 1 s, it never turns standing, and a heading half
+way between two diamonds keeps the one it has. A/D are a look off that
+home that springs back; nothing about the camera is saved. The camera is
+locked on the player, so turns are about them. The WASD scheme keeps its
+own middle-drag turn and no home: there the keys are relative to the
+camera, and a home that followed the walk would turn the walk. This
+replaces 64's fixed home and saved yaw.

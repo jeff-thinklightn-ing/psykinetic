@@ -33,26 +33,28 @@ extends Node3D
 ## SPEECH_SECONDS.
 ##
 ## Camera: orthographic, tilted `pitch` from horizontal (CAMERA_PITCH at
-## rest), yawed by `yaw` about the local player: 0 matches the 2D diamond
-## (+x down-right, +y down-left). The yaw stays within TURN_LIMIT (90°) of
-## HOME_YAW, and rests only on the three diamond views in that range: home
-## and a quarter turn either side (home_diamond). The ortho size is
-## CAMERA_SIZE, times up to PEEK_PULL_BACK during a WASD pitch peek.
+## rest), yawed by `yaw` about the local player, who is kept at the middle
+## of the screen: 0 matches the 2D diamond (+x down-right, +y down-left).
+## The ortho size is CAMERA_SIZE, times up to PEEK_PULL_BACK during a WASD
+## pitch peek. Nothing about the camera is saved.
 ##
-## Click scheme, by keys (Main drives them): W/S tilt while held at
+## Click scheme: the yaw is a home plus a look. The home follows the
+## character (_update_home): it is the diamond view that puts the way the
+## player is going nearest the top of the screen, and it moves there only
+## once the player has kept that heading, walking, for HOME_HOLD_SECONDS,
+## and not within HOME_REST_SECONDS of its last turn; a turn eases over
+## HOME_TURN_SECONDS; standing still it never turns. A/D look up to
+## LOOK_LIMIT either side of the home while held, at TURN_RATE, and spring
+## back to it over LOOK_RETURN_SECONDS when let go. W/S tilt while held at
 ## TILT_RATE, between PITCH_MIN and PITCH_MAX, slowing into either end,
-## and spring back to CAMERA_PITCH over TILT_RETURN_SECONDS when let go;
-## A/D turn the yaw, screen-fixed, at TURN_RATE while held, never past the
-## range, and, let go, it carries on to the next diamond the way it was
-## turning if it was more than TURN_COMMIT past the last one it passed, or
-## goes back to that one, the settle starting at the turning speed so the
-## release flows into it. WASD scheme: a sideways middle drag turns the
-## yaw freely within the same range and, let go, settles on the nearest
-## diamond in it; a vertical one is a pitch peek, tilting toward
-## PEEK_PITCH in proportion to the drag (full over PEEK_DRAG_PX, eased) and
-## springing back over PEEK_RETURN_SECONDS. The diamond persists in
-## settings.cfg (Net.camera_yaw); a tilt never does. The near/far rule
-## reads only the yaw, so the near walls stay see-through through any tilt.
+## and spring back to CAMERA_PITCH over TILT_RETURN_SECONDS. WASD scheme
+## (no home: its keys are relative to the camera, so a home that followed
+## them would chase itself): a sideways middle drag turns the yaw freely
+## and, let go, settles on the nearest diamond; a vertical one is a pitch
+## peek, tilting toward PEEK_PITCH in proportion to the drag (full over
+## PEEK_DRAG_PX, eased) and springing back over PEEK_RETURN_SECONDS. The
+## near/far rule reads only the yaw, so the near walls stay see-through
+## through any tilt.
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
@@ -102,20 +104,22 @@ const CAMERA_DISTANCE := 40.0
 ## Orthographic height in units: a 1.5-unit character, foreshortened by
 ## cos(CAMERA_PITCH), is about a twelfth of it.
 const CAMERA_SIZE := 12.0
-const CAMERA_FOLLOW_RATE := 6.0
 ## The resting yaws are multiples of this: the diamond views.
 const ORBIT_STEP := 90.0
 ## A WASD middle drag let go: on to the nearest diamond, eased out.
 const SETTLE_SECONDS := 0.25
-## A/D let go: past the last diamond by more than this, on to the next.
-const TURN_COMMIT := 10.0
-## A/D let go back to the diamond it came from: the settle takes the time
-## a stop from the turning speed would, plus this, for the turn back.
-const TURN_RETURN_EXTRA := 0.15
-## The yaw's home and how far either side of it a turn goes (both
-## schemes).
-const HOME_YAW := 0.0
-const TURN_LIMIT := 90.0
+## Click scheme, the home that follows the character: a new heading must be
+## walked this long before the home turns to it, a turn takes this long,
+## and the home does not turn again this soon after the last; the player
+## counts as walking above MOVING_SPEED cells a second as shown.
+const HOME_HOLD_SECONDS := 0.7
+const HOME_TURN_SECONDS := 1.0
+const HOME_REST_SECONDS := 1.5
+const MOVING_SPEED := 0.5
+## Click scheme, A/D: a look this far either side of the home at most,
+## springing back over LOOK_RETURN_SECONDS.
+const LOOK_LIMIT := 90.0
+const LOOK_RETURN_SECONDS := 0.3
 ## Click scheme keys: A/D turn this fast (degrees a second); W/S tilt this
 ## fast between PITCH_MIN and PITCH_MAX, slowing over the last
 ## TILT_EASE_DEGREES at either end, and the tilt springs back over
@@ -230,24 +234,30 @@ var _shapes := {
 
 var _camera: Camera3D
 var _camera_target := Vector3.ZERO
-## The camera's yaw now, and the diamond it rests at (a multiple of
-## ORBIT_STEP).
+## The camera's yaw now, and (WASD) the diamond it rests at.
 var yaw := 0.0
 var _yaw_step := 0.0
+## Click scheme: the home (eased), the diamond it rests on or is turning
+## to, the turn's start and progress (1: not turning); the diamond the
+## heading asks for when that is not the home, and for how long; time
+## since the last turn began; where the player was last frame.
+var home_yaw := 0.0
+var _home_step := 0.0
+var _home_from := 0.0
+var _home_t := 1.0
+var _wanted_home := NAN
+var _wanted_for := 0.0
+var _since_turn := INF
+var _player_was := Vector3(NAN, NAN, NAN)
+## Click scheme, A/D: the look off the home, and its spring back.
+var look := 0.0
+var _look_from := 0.0
+var _look_t := 1.0
 ## The yaw easing toward a step: from, to, and how far along (1: at rest).
 ## Driven from _process, not a Tween, so it moves before Main's pick.
 var _ease_from := 0.0
 var _ease_to := 0.0
 var _ease_t := 1.0
-## How the ease runs: its length, and its curve (SINE_OUT for a settle,
-## FLOW for an A/D release: a cubic that starts at _ease_velocity degrees
-## a second and stops on the target).
-enum Ease { SINE_OUT, FLOW }
-var _ease_seconds := SETTLE_SECONDS
-var _ease_curve := Ease.SINE_OUT
-var _ease_velocity := 0.0
-## A/D: the way it is turning (0: not), for the release.
-var _turning := 0.0
 ## WASD's middle drag: the yaw it started from, how far it has gone, and
 ## whether a release came while frozen (it settles when they unfreeze).
 var _dragging := false
@@ -338,10 +348,11 @@ func setup(terrain: Dictionary) -> void:
 	_listener.name = "Listener"
 	add_child(_listener)
 	_listener.make_current()
-	# Net has the saved yaw on a diamond in range already; --test-yaw is
-	# taken exactly, for screenshots, and rests on its nearest diamond.
-	_yaw_step = home_diamond(Net.camera_yaw)
+	# 0, or --test-yaw exactly, for screenshots.
 	yaw = Net.camera_yaw
+	_yaw_step = nearest_diamond(yaw)
+	home_yaw = yaw
+	_home_step = yaw
 	pitch = CAMERA_PITCH
 	_apply_size()
 	_place_camera()
@@ -351,7 +362,10 @@ func setup(terrain: Dictionary) -> void:
 func _process(delta: float) -> void:
 	_sync_puppets()
 	_sync_doors()
-	_ease_yaw(delta)
+	if Net.controls == "click":
+		_update_home(delta)
+	else:
+		_ease_yaw(delta)
 	_ease_peek(delta)
 	_ease_tilt(delta)
 	_follow(delta)
@@ -416,6 +430,9 @@ func _place_camera() -> void:
 		_listener.global_transform = Transform3D(_camera.global_transform.basis, _camera_target + Vector3.UP)
 
 
+## The camera stays on the player (plus the WASD lean, which eases by
+## itself): the player is the middle of the screen, and the yaw turns
+## about them.
 func _follow(delta: float) -> void:
 	var player := _local_player()
 	if player == null:
@@ -425,8 +442,7 @@ func _follow(delta: float) -> void:
 		return
 	_local_name = String(player.name)
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
-	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
-	_camera_target = _camera_target.lerp(puppet.position + Vector3(_lead.x, 0.0, _lead.y), rate)
+	_camera_target = puppet.position + Vector3(_lead.x, 0.0, _lead.y)
 	_place_camera()
 
 
@@ -446,59 +462,87 @@ func _apply_size() -> void:
 			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn))
 
 
-## A yaw held to TURN_LIMIT either side of HOME_YAW.
-static func clamp_yaw(degrees: float) -> float:
-	return clampf(degrees, HOME_YAW - TURN_LIMIT, HOME_YAW + TURN_LIMIT)
+## Up the screen at [param yaw_degrees], on the ground, in grid units: away
+## from the camera (see _camera_offset).
+static func screen_up(yaw_degrees: float) -> Vector2:
+	var up := Vector3(-1, 0, -1).rotated(Vector3.UP, deg_to_rad(yaw_degrees))
+	return Vector2(up.x, up.z).normalized()
 
 
-## The diamond in range nearest [param degrees], read the short way round
-## from home: 270 is -90; anything further round than the range goes to
-## its nearer end.
-static func home_diamond(degrees: float) -> float:
-	return clamp_yaw(nearest_diamond(HOME_YAW + wrapf(degrees - HOME_YAW, -180.0, 180.0)))
+## The diamond, one of [param home] and the three others round from it,
+## that puts [param heading] (grid units) nearest the top of the screen.
+## Where two do equally (a heading along a grid axis lies half way between
+## two diamonds) the home stands, else the nearer turn.
+static func home_for(heading: Vector2, home: float) -> float:
+	var way := heading.normalized()
+	var best := home
+	var best_up := way.dot(screen_up(home))
+	for turn: float in [ORBIT_STEP, -ORBIT_STEP, 2.0 * ORBIT_STEP]:
+		var up := way.dot(screen_up(home + turn))
+		if up > best_up + 0.001:
+			best = home + turn
+			best_up = up
+	return best
 
 
-## Click scheme, A/D held: turn [param direction] (-1 or 1) for
-## [param delta] seconds at TURN_RATE, through any angle in range.
-func turn(direction: float, delta: float) -> void:
-	_ease_t = 1.0
-	_turning = signf(direction)
-	_set_yaw(clamp_yaw(yaw + TURN_RATE * _turning * delta))
+## Click scheme, each frame: the home follows the way the player is
+## walking, damped (HOME_HOLD_SECONDS walked, HOME_REST_SECONDS between
+## turns, never while standing), and eases there over
+## HOME_TURN_SECONDS; the look springs back when let go; the yaw is the two.
+func _update_home(delta: float) -> void:
+	_since_turn += delta
+	var player := _local_player()
+	var puppet: Node3D = _puppets.get(player.get_instance_id()) if player != null else null
+	if puppet != null and delta > 0.0:
+		var moved := puppet.position - _player_was if not is_nan(_player_was.x) else Vector3.ZERO
+		_player_was = puppet.position
+		var going := Vector2(moved.x, moved.z) / delta
+		if going.length() > MOVING_SPEED:
+			var wanted := home_for(going, _home_step)
+			if is_equal_approx(wanted, _home_step):
+				_wanted_home = NAN
+				_wanted_for = 0.0
+			elif is_equal_approx(wanted, _wanted_home):
+				_wanted_for += delta
+			else:
+				_wanted_home = wanted
+				_wanted_for = delta
+			if not is_nan(_wanted_home) and _wanted_for >= HOME_HOLD_SECONDS \
+					and _since_turn >= HOME_REST_SECONDS and _home_t >= 1.0:
+				_turn_home(_wanted_home)
+		else:
+			# Standing: nothing builds up toward a turn.
+			_wanted_home = NAN
+			_wanted_for = 0.0
+	if _home_t < 1.0:
+		_home_t = minf(_home_t + delta / HOME_TURN_SECONDS, 1.0)
+		home_yaw = lerpf(_home_from, _home_step, 0.5 - 0.5 * cos(_home_t * PI))
+	if _look_t < 1.0:
+		_look_t = minf(_look_t + delta / LOOK_RETURN_SECONDS, 1.0)
+		look = lerpf(_look_from, 0.0, sin(_look_t * PI * 0.5))
+	_set_yaw(home_yaw + look)
 
 
-## Click scheme, A/D let go: on to the next diamond the way it was
-## turning if it is more than TURN_COMMIT past the last one it passed, or
-## back to that one (settle_target), saved. The settle starts at the
-## turning speed and slows to a stop on the diamond: going on, in the
-## time that stop takes (twice the distance over the speed); going back,
-## it runs on a little, turns and comes back, TURN_RETURN_EXTRA longer.
-func end_turn() -> void:
-	var direction := _turning
-	_turning = 0.0
-	if direction == 0.0:
-		return
-	var target := clamp_yaw(settle_target(yaw, direction))
-	var distance := (target - yaw) * direction
-	_settle_on(target)
-	_ease_curve = Ease.FLOW
-	_ease_velocity = TURN_RATE * direction
-	if distance > 0.0:
-		_ease_seconds = 2.0 * distance / TURN_RATE
-	else:
-		_ease_seconds = 2.0 * absf(distance) / TURN_RATE + TURN_RETURN_EXTRA
-	if _ease_seconds <= 0.0:
-		_ease_t = 1.0
+func _turn_home(step: float) -> void:
+	_home_from = home_yaw
+	_home_step = step
+	_home_t = 0.0
+	_since_turn = 0.0
+	_wanted_home = NAN
+	_wanted_for = 0.0
 
 
-## Where an A/D turn let go at [param degrees], going [param direction],
-## settles: the last diamond it passed (or is on), or the next one along
-## if it is more than TURN_COMMIT past it.
-static func settle_target(degrees: float, direction: float) -> float:
-	var passed := floorf(degrees / ORBIT_STEP) * ORBIT_STEP if direction > 0.0 \
-			else ceilf(degrees / ORBIT_STEP) * ORBIT_STEP
-	if (degrees - passed) * direction > TURN_COMMIT:
-		return passed + ORBIT_STEP * direction
-	return passed
+## Click scheme, A/D held: look [param direction] (-1 or 1) off the home
+## for [param delta] seconds at TURN_RATE, up to LOOK_LIMIT either side.
+func look_by(direction: float, delta: float) -> void:
+	_look_t = 1.0
+	look = clampf(look + TURN_RATE * signf(direction) * delta, -LOOK_LIMIT, LOOK_LIMIT)
+
+
+## Click scheme, A/D let go: the look springs back to the home.
+func end_look() -> void:
+	_look_from = look
+	_look_t = 0.0
 
 
 ## Click scheme, W/S held: tilt [param direction] (1 up toward top-down,
@@ -593,9 +637,9 @@ func drag(degrees: float) -> void:
 	if frozen:
 		return
 	if _ease_t < 1.0:
-		_ease_to = clamp_yaw(_drag_base + degrees)
+		_ease_to = _drag_base + degrees
 	else:
-		_set_yaw(clamp_yaw(_drag_base + degrees))
+		_set_yaw(_drag_base + degrees)
 
 
 ## WASD: the middle button came up: settle on the nearest step, now or,
@@ -607,7 +651,7 @@ func end_drag() -> void:
 	if frozen:
 		_settle_pending = true
 	else:
-		_settle_on(home_diamond(clamp_yaw(_drag_base + _drag_offset)))
+		_settle_on(nearest_diamond(_drag_base + _drag_offset))
 
 
 ## Main: a movement key is (not) held. Held, the yaw stops where it is;
@@ -619,10 +663,10 @@ func set_frozen(on: bool) -> void:
 	if on:
 		return
 	if _dragging:
-		_ease_toward(clamp_yaw(_drag_base + _drag_offset))
+		_ease_toward(_drag_base + _drag_offset)
 	elif _settle_pending:
 		_settle_pending = false
-		_settle_on(home_diamond(clamp_yaw(_drag_base + _drag_offset)))
+		_settle_on(nearest_diamond(_drag_base + _drag_offset))
 
 
 ## The diamond view nearest [param degrees]; half way between two (an
@@ -631,12 +675,9 @@ static func nearest_diamond(degrees: float) -> float:
 	return snappedf(degrees, ORBIT_STEP)
 
 
-## Eases to the diamond [param step], which the yaw then rests on and the
-## settings file keeps.
+## WASD: eases to the diamond [param step], which the yaw then rests on.
 func _settle_on(step: float) -> void:
 	_yaw_step = step
-	Net.camera_yaw = fposmod(step, 360.0)
-	Net.save_view_settings()
 	_ease_toward(step)
 
 
@@ -644,24 +685,15 @@ func _ease_toward(degrees: float) -> void:
 	_ease_from = yaw
 	_ease_to = degrees
 	_ease_t = 0.0
-	_ease_seconds = SETTLE_SECONDS
-	_ease_curve = Ease.SINE_OUT
 
 
-## One frame of the ease; nothing while frozen.
+## WASD: one frame of the ease, a sine out over SETTLE_SECONDS; nothing
+## while frozen.
 func _ease_yaw(delta: float) -> void:
 	if frozen or _ease_t >= 1.0:
 		return
-	_ease_t = minf(_ease_t + delta / _ease_seconds, 1.0)
-	var s := _ease_t
-	match _ease_curve:
-		Ease.FLOW:
-			# Cubic Hermite: from _ease_from at _ease_velocity to _ease_to at rest.
-			var along := (-2.0 * s * s * s + 3.0 * s * s) * (_ease_to - _ease_from)
-			var carried := (s * s * s - 2.0 * s * s + s) * _ease_seconds * _ease_velocity
-			_set_yaw(_ease_from + along + carried)
-		_:
-			_set_yaw(lerpf(_ease_from, _ease_to, sin(s * PI * 0.5)))
+	_ease_t = minf(_ease_t + delta / SETTLE_SECONDS, 1.0)
+	_set_yaw(lerpf(_ease_from, _ease_to, sin(_ease_t * PI * 0.5)))
 
 
 func _set_yaw(degrees: float) -> void:
