@@ -310,12 +310,12 @@ func _test_diamonds() -> void:
 
 
 func _test_tilt_keys() -> void:
-	print("\n== click: Q/E tilt, sticky and saved, and never change the size ==")
+	print("\n== click: W/S tilt, sticky and saved, and never change the size ==")
 	var rig := _rig()
 	var yaw := rig.yaw
 	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "it starts at the default (%s)" % rig.pitch)
 	rig.tilt(1.0, 0.1)
-	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH + 6.0), "E for 100 ms: 6 degrees up, 60 a second (%s)" % rig.pitch)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH + 6.0), "W for 100 ms: 6 degrees up, 60 a second (%s)" % rig.pitch)
 	var last := rig.pitch
 	var slowest := INF
 	var fastest := 0.0
@@ -336,7 +336,7 @@ func _test_tilt_keys() -> void:
 	_check(is_equal_approx(Net.camera_pitch, Client3D.PITCH_MAX), "and is saved (%s)" % Net.camera_pitch)
 	for i in 60:
 		rig.tilt(-1.0, 0.05)
-	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MIN), "Q: down to %s" % rig.pitch)
+	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MIN), "S: down to %s" % rig.pitch)
 	rig.end_tilt()
 	_check(is_equal_approx(rig.yaw, yaw), "the yaw never moved (%s)" % rig.yaw)
 	_check(is_equal_approx(Net.saved_pitch("70", -1.0), 70.0) and is_equal_approx(Net.saved_pitch("120", -1.0), Client3D.PITCH_MAX)
@@ -347,11 +347,11 @@ func _test_tilt_keys() -> void:
 
 
 func _test_zoom_keys() -> void:
-	print("\n== click: W/S zoom on the player, sticky and saved; a middle click resets tilt and zoom ==")
+	print("\n== click: Q/E zoom on the player, sticky and saved; a middle click resets tilt and zoom ==")
 	var rig := _rig()
 	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "it starts at 1x")
 	rig.zoom_by(1.0, 1.0)
-	_check(is_equal_approx(rig.zoom, 1.0 / 1.5), "W for a second: in by 1.5x (%.4f)" % rig.zoom)
+	_check(is_equal_approx(rig.zoom, 1.0 / 1.5), "E for a second: in by 1.5x (%.4f)" % rig.zoom)
 	_check(is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE / 1.5), "the view that much smaller (%s)" % rig._camera.size)
 	var slowest := INF
 	var fastest := 0.0
@@ -373,7 +373,7 @@ func _test_zoom_keys() -> void:
 	var target := rig._camera_target
 	for i in 100:
 		rig.zoom_by(-1.0, 0.05)
-	_check(is_equal_approx(rig.zoom, Client3D.ZOOM_MAX), "S: out to %sx" % rig.zoom)
+	_check(is_equal_approx(rig.zoom, Client3D.ZOOM_MAX), "Q: out to %sx" % rig.zoom)
 	_check(rig._camera_target == target and rig._camera.position.is_equal_approx(rig._camera_target + rig._camera_offset()),
 			"zooming leaves the camera on the same centre, the player")
 	rig.end_zoom()
@@ -515,7 +515,7 @@ func _test_schemes_are_inert_outside() -> void:
 	var yaw := rig.yaw
 	var zoom := rig.zoom
 	_main._drive_camera_keys(0.1)
-	_check(rig.zoom < zoom and rig.pitch > pitch and rig.yaw > yaw, "click: W zooms in, E tilts up and D turns the camera")
+	_check(rig.zoom < zoom and rig.pitch > pitch and rig.yaw > yaw, "click: W tilts up, E zooms in and D turns the camera")
 	Net.controls = "wasd"
 	pitch = rig.pitch
 	yaw = rig.yaw

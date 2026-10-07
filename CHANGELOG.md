@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.39
+
+Click scheme camera keys swapped. Client (the server only for the version).
+
+- **W/S** tilt the 3D camera (W toward top-down, S toward level).
+- **Q/E** zoom (Q out, E in).
+- Everything else is as it was.
+
+The server must be updated to v0.1.39 too, as it refuses any other version.
+
 ## v0.1.38
 
 Combat readability (3D view). Server and client.

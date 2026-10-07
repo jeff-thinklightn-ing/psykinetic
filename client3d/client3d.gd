@@ -40,10 +40,10 @@ extends Node3D
 ## (ZOOM_MIN..ZOOM_MAX), and times up to PEEK_PULL_BACK during a WASD
 ## pitch peek; the tilt alone never changes it.
 ##
-## Click scheme, by keys (Main drives them): W/S zoom in and out at
+## Click scheme, by keys (Main drives them): Q/E zoom out and in at
 ## ZOOM_RATE while held, slowing into either end, centred on the player
 ## (the camera follows the player alone in this scheme), and the zoom stays
-## where it is left; Q/E tilt the resting pitch at TILT_RATE while held,
+## where it is left; W/S tilt the resting pitch at TILT_RATE while held,
 ## slowing into either end, and it stays where it is left; A/D turn the
 ## yaw, screen-fixed, at TURN_RATE while held and, let go, it carries on to
 ## the next diamond the way it was turning if it was more than TURN_COMMIT
@@ -117,9 +117,9 @@ const TURN_COMMIT := 10.0
 ## A/D let go back to the diamond it came from: the settle takes the time
 ## a stop from the turning speed would, plus this, for the turn back.
 const TURN_RETURN_EXTRA := 0.15
-## Click scheme keys: A/D turn this fast (degrees a second); Q/E tilt this
+## Click scheme keys: A/D turn this fast (degrees a second); W/S tilt this
 ## fast between PITCH_MIN and PITCH_MAX, slowing over the last
-## TILT_EASE_DEGREES at either end; W/S zoom by ZOOM_RATE a second (a
+## TILT_EASE_DEGREES at either end; Q/E zoom by ZOOM_RATE a second (a
 ## factor) between ZOOM_MIN and ZOOM_MAX times the default size, slowing
 ## over the last ZOOM_EASE (a factor) at either end; a middle click puts
 ## tilt and zoom back over RESET_SECONDS.
@@ -504,7 +504,7 @@ static func settle_target(degrees: float, direction: float) -> float:
 	return passed
 
 
-## Click scheme, Q/E held: tilt the resting pitch [param direction] (1 up
+## Click scheme, W/S held: tilt the resting pitch [param direction] (1 up
 ## toward top-down, -1 down) for [param delta] seconds at TILT_RATE,
 ## slowing over the last TILT_EASE_DEGREES before either end. It stays
 ## where it is left.
@@ -518,13 +518,13 @@ func tilt(direction: float, delta: float) -> void:
 	_set_rest_pitch(move_toward(rest_pitch, limit, speed * delta))
 
 
-## Click scheme, Q/E let go: the pitch is kept in the settings file.
+## Click scheme, W/S let go: the pitch is kept in the settings file.
 func end_tilt() -> void:
 	Net.camera_pitch = rest_pitch
 	Net.save_view_settings()
 
 
-## Click scheme, W/S held: zoom in ([param direction] 1: a smaller view,
+## Click scheme, Q/E held: zoom in ([param direction] 1: a smaller view,
 ## nearer the player) or out (-1) for [param delta] seconds, by ZOOM_RATE
 ## a second, slowing over the last ZOOM_EASE before either end. It stays
 ## where it is left. The camera is on the player, so that is the centre.
@@ -540,7 +540,7 @@ func zoom_by(direction: float, delta: float) -> void:
 	_apply_size()
 
 
-## Click scheme, W/S let go: the zoom is kept in the settings file.
+## Click scheme, Q/E let go: the zoom is kept in the settings file.
 func end_zoom() -> void:
 	Net.camera_zoom = zoom
 	Net.save_view_settings()

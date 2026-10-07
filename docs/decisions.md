@@ -552,3 +552,9 @@ pictures, never obstacles.
 from the file, as it was. Options a player sets by hand (`hp_bars=`,
 `master_volume=`, `sfx_volume=`, and anything a later build adds) survive
 the rewrite on a resize or a camera change.
+
+## 63. Click scheme: W/S tilt, Q/E zoom
+
+The pairs of 60 are swapped: W/S tilt (W toward top-down, S toward
+level), Q/E zoom (Q out, E in). A/D, the middle click and everything
+else are as in 60.

@@ -833,12 +833,12 @@ near/far wall rule reads only the yaw, so the same near walls stay
 see-through through any tilt or zoom. F3 shows the yaw, pitch and zoom.
 
 *Click scheme camera, on the keys* (`Main._drive_camera_keys`, before the
-pick): W/S zoom in and out while held (`Client3D.zoom_by`), by
+pick): Q/E zoom out and in while held (`Client3D.zoom_by`; Q out, E in), by
 `ZOOM_RATE` (1.5×) a second, slowing over the last `ZOOM_EASE` (a factor
 of 1.15) into either end, on the player (the camera follows the player
 alone in this scheme, so the middle of the screen is them), and the zoom
-stays where it is left (saved on release). Q/E tilt the resting pitch
-while held at `TILT_RATE` (60°/s; E up toward top-down, Q down), slowing
+stays where it is left (saved on release). W/S tilt the resting pitch
+while held at `TILT_RATE` (60°/s; W up toward top-down, S toward level), slowing
 over the last `TILT_EASE_DEGREES` (8°) into either end, and it stays
 where it is left (saved on release). There is no Q/E step any more.
 A/D are screen-fixed, for free sweeping: they turn the yaw while held at
@@ -937,8 +937,8 @@ orders, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
-verbs land on the clicked target. In 3D, W/S zoom the camera on the
-player and Q/E tilt it (both stay where you leave them), A/D turn it
+verbs land on the clicked target. In 3D, W/S tilt the camera and Q/E
+zoom it on the player (both stay where you leave them), A/D turn it
 freely (settling on a diamond), and a middle click resets tilt and zoom;
 middle drags do nothing (see the 3D view). The
 camera follows the player alone.

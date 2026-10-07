@@ -577,7 +577,7 @@ func _end_middle_drag() -> void:
 	_drag = Drag.UNDECIDED
 
 
-## Click scheme, 3D: W/S zoom, Q/E tilt (E up toward top-down, Q down)
+## Click scheme, 3D: W/S tilt (W up toward top-down, S down), Q/E zoom (Q out, E in)
 ## and A/D turn the camera while held; letting go keeps the zoom and the
 ## tilt and settles the turn on a diamond, all saved. The keys do nothing
 ## else in this scheme (and nothing at all in 2D).
@@ -585,8 +585,8 @@ func _drive_camera_keys(delta: float) -> void:
 	if _client3d == null or Net.controls != "click":
 		return
 	var keys := _held_letters([KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E])
-	var zoom := float("w" in keys) - float("s" in keys)
-	var tilt := float("e" in keys) - float("q" in keys)
+	var tilt := float("w" in keys) - float("s" in keys)
+	var zoom := float("e" in keys) - float("q" in keys)
 	var turn := float("d" in keys) - float("a" in keys)
 	if zoom != 0.0:
 		_client3d.zoom_by(zoom, delta)
@@ -1636,7 +1636,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   W/S zoom   Q/E tilt   A/D turn   MMB click reset view"
+			hints += "   W/S tilt   Q/E zoom   A/D turn   MMB click reset view"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
