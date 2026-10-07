@@ -29,6 +29,11 @@ func _ready() -> void:
 	_test_refused_step_and_stale_steps()
 	_test_order_walks_via_first()
 	_test_swing()
+	_test_scheme_default()
+	_test_screen_lean()
+	_test_drag_and_freeze()
+	_test_schemes_are_inert_outside()
+	_test_click_uses_the_frame_pick()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -175,7 +180,171 @@ func _test_swing() -> void:
 	_check(_swings.size() == 1, "a second swing waits for the cooldown")
 
 
+func _test_scheme_default() -> void:
+	print("
+== click is the default scheme ==")
+	_check(Net.controls_from("") == "click" and Net.controls_from("mouse") == "click", "nothing, or anything else: click")
+	_check(Net.controls_from("wasd") == "wasd" and Net.controls_from(" WASD ") == "wasd", "wasd: WASD")
+
+
+func _test_screen_lean() -> void:
+	print("
+== the WASD lean comes from the cursor's place on the screen ==")
+	var size := Vector2(1920, 1080)
+	_check(Main.screen_lean(size * 0.5, size) == Vector2.ZERO, "the middle: no lean")
+	_check(Main.screen_lean(size * 0.5 + Vector2(0.14 * 960, 0), size) == Vector2.ZERO,
+			"inside the dead zone (14% of half the width out): no lean")
+	var edge := Main.screen_lean(Vector2(1920, 540), size)
+	_check(edge.is_equal_approx(Vector2(1, 0)), "the right edge: a full lean right (%s)" % edge)
+	var corner := Main.screen_lean(Vector2(0, 0), size)
+	_check(is_equal_approx(corner.length(), 1.0), "a corner: no more than a full lean (%s)" % corner)
+	var right := Main.lean_to_ground(Vector2(1, 0), 0.0)
+	_check(Iso.project(right).x > 0.0 and is_zero_approx(Iso.project(right).y),
+			"yaw 0: a lean right is right on the 2D screen (%s)" % right)
+	var down := Main.lean_to_ground(Vector2(0, 1), 90.0)
+	_check(down.is_equal_approx(Main.lean_to_ground(Vector2(0, 1), 0.0).rotated(-PI * 0.5)),
+			"and it turns with the yaw (%s)" % down)
+
+
+func _test_drag_and_freeze() -> void:
+	print("
+== WASD: a middle drag turns the camera, never under a held key ==")
+	var rig := _rig()
+	var start := rig.yaw
+	rig.begin_drag()
+	rig.drag(20.0)
+	_check(is_equal_approx(rig.yaw, start + 20.0), "the drag turns it at once (%s)" % rig.yaw)
+	rig.end_drag()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start), "let go at 20: back to the nearest step (%s)" % rig.yaw)
+	rig.begin_drag()
+	rig.drag(30.0)
+	rig.end_drag()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start + 45.0) and is_equal_approx(Net.camera_yaw, start + 45.0),
+			"let go at 30: on to the next step, and kept (%s)" % rig.yaw)
+	start = rig.yaw
+	rig.set_frozen(true)
+	rig.begin_drag()
+	rig.drag(100.0)
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start), "a key held: the drag does not turn it (%s)" % rig.yaw)
+	rig.end_drag()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start), "nor does letting the button go (%s)" % rig.yaw)
+	rig.set_frozen(false)
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start + 90.0), "the keys let go: it settles where the drag was let go (%s)" % rig.yaw)
+	start = rig.yaw
+	rig.begin_drag()
+	rig.set_frozen(true)
+	rig.drag(50.0)
+	rig.set_frozen(false)
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start + 50.0), "a drag held through a run applies when the keys are let go (%s)" % rig.yaw)
+	rig.end_drag()
+	_ease(rig)
+	rig.set_frozen(true)
+	rig.orbit(1)
+	var held := rig.yaw
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, held), "frozen, nothing turns it, not even an ease under way (%s)" % rig.yaw)
+	rig.set_frozen(false)
+	_ease(rig)
+	_free_rig(rig)
+
+
+func _test_schemes_are_inert_outside() -> void:
+	print("
+== keys and buttons outside the active scheme do nothing ==")
+	var rig := _rig()
+	var saved: String = Net.controls
+	var step := rig._yaw_step
+	Net.controls = "wasd"
+	_main._unhandled_input(_key(KEY_Q))
+	_check(is_equal_approx(rig._yaw_step, step), "wasd: Q does nothing")
+	Net.controls = "click"
+	_main._unhandled_input(_key(KEY_Q))
+	_check(is_equal_approx(rig._yaw_step, step - 45.0), "click: Q turns a step")
+	_main._unhandled_input(_middle(true))
+	_check(not rig._dragging, "click: the middle button does nothing")
+	Net.controls = "wasd"
+	_main._unhandled_input(_middle(true))
+	_check(rig._dragging, "wasd: the middle button starts a drag")
+	_main._unhandled_input(_middle(false))
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	Net.test_walk = [{"keys": "s", "seconds": 5.0}] as Array[Dictionary]
+	_main._walk_index = -1
+	_main._drive_wasd()
+	_check(player.queued_steps.is_empty(), "click: a movement key held sends no step")
+	Net.controls = "wasd"
+	_main._drive_wasd()
+	_check(player.queued_steps.size() == 1, "wasd: it does")
+	Net.test_walk = [] as Array[Dictionary]
+	player.queued_steps.clear()
+	Net.controls = saved
+	_free_rig(rig)
+
+
+func _test_click_uses_the_frame_pick() -> void:
+	print("
+== a click goes to the cell the hover shows ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	_main._pick_grid = Vector2(9.2, 6.1)
+	_check(_main._mouse_tile() == Vector2i(9, 6), "the frame's pick is the hover cell")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	_main._unhandled_input(click)
+	click.pressed = false
+	_main._unhandled_input(click)
+	_check(player.has_move_order and player.move_order == Vector2i(9, 6),
+			"and the click sends the player there (%s)" % player.move_order)
+	player.has_move_order = false
+	Net.controls = saved
+
+
 # --- helpers ------------------------------------------------------------------
+
+## A 3D view on the room, hung on Main as its own would be, for the camera
+## and the scheme tests.
+func _rig() -> Client3D:
+	var rig: Client3D = preload("res://client3d/client3d.tscn").instantiate()
+	_main.add_child(rig)
+	rig.setup(_main._terrain)
+	rig.set_process(false)
+	_main._client3d = rig
+	return rig
+
+
+func _free_rig(rig: Client3D) -> void:
+	_main._client3d = null
+	rig.queue_free()
+
+
+## Long enough for any ease to finish.
+func _ease(rig: Client3D) -> void:
+	for i in 20:
+		rig._ease_yaw(0.05)
+
+
+func _key(code: Key) -> InputEventKey:
+	var key := InputEventKey.new()
+	key.keycode = code
+	key.pressed = true
+	return key
+
+
+func _middle(pressed: bool) -> InputEventMouseButton:
+	var button := InputEventMouseButton.new()
+	button.button_index = MOUSE_BUTTON_MIDDLE
+	button.pressed = pressed
+	return button
+
+
 
 func _player() -> Player:
 	for entity in World.get_entities():

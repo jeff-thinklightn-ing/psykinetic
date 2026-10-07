@@ -3,6 +3,30 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.29
+
+Control schemes as complete packages. Client (the server only for the
+version).
+
+- **Click is the default again** (`controls=click`, or no line): click
+  and hold-to-move, Q/E turn the 3D camera a step, the verbs land on what
+  you click. WASD and the middle button do nothing, and the camera just
+  follows you, with no lean toward the cursor.
+- **WASD** (`controls=wasd`): WASD walks relative to the camera, the mouse
+  aims, a middle-button drag turns the 3D camera freely and settles on the
+  nearest 45° step when you let go (eased over 250 ms). Q/E do nothing.
+- **The camera never turns under a held movement key**: a drag made while
+  you walk applies when you let go of the keys.
+- **The WASD lean** now comes from where the cursor is on the screen: past
+  a dead zone of 15% round the middle it leans up to 3 cells toward that
+  side, settling in about 300 ms. The camera moving cannot change it.
+- **The hover and the click always agree**: the cell under the cursor is
+  picked once a frame after the camera has moved, and a click goes to the
+  cell the square showed.
+- The HUD shows only the active scheme's controls.
+
+The server must be updated to v0.1.29 too, as it refuses any other version.
+
 ## v0.1.28
 
 Controls pass. Server and client.

@@ -13,15 +13,17 @@ const WALL_VALUE := 0.18
 ## Alpha of the near walls (the south and east edges of walkable cells,
 ## facing the camera), drawn as one layer so they never stack up opaque.
 const NEAR_WALL_ALPHA := 0.3
-## The camera leads toward the cursor: by this share of how far the cursor
-## is from the middle of the screen, in cells, up to CAMERA_LEAD_MAX, eased
-## at CAMERA_LEAD_RATE; with the cursor within CAMERA_LEAD_DEADZONE of the
-## player it eases back onto them, faster.
-const CAMERA_LEAD_SHARE := 0.5
-const CAMERA_LEAD_MAX := 3.0
-const CAMERA_LEAD_DEADZONE := 1.5
-const CAMERA_LEAD_RATE := 3.0
-const CAMERA_RETURN_RATE := 8.0
+## WASD only: the camera leans toward where the cursor is on the screen.
+## The cursor's offset from the middle, each axis over half the screen
+## (so -1..1), counts from the edge of a dead zone CAMERA_LEAN_DEADZONE
+## across (15% of the screen) out to the screen's edge, which leans
+## CAMERA_LEAN_CELLS; eased with a time constant of CAMERA_LEAN_EASE
+## (about 300 ms to settle).
+const CAMERA_LEAN_DEADZONE := 0.15
+const CAMERA_LEAN_CELLS := 3.0
+const CAMERA_LEAN_EASE := 0.1
+## WASD, 3D: degrees of yaw per screen pixel of middle drag.
+const DRAG_DEGREES_PER_PX := 0.25
 ## WASD: the facing sent for a player standing still changes at most this
 ## often (seconds).
 const FACE_SEND_INTERVAL := 0.15
@@ -213,8 +215,15 @@ var _rejected := false
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
 var _toss_from := Vector2.ZERO
-## The camera's lead toward the cursor, in grid units (see CAMERA_LEAD_*).
+## WASD: the camera's lean toward the cursor, in grid units (see
+## CAMERA_LEAN_*).
 var _lead := Vector2.ZERO
+## The ground point under the cursor this frame, picked once after the
+## camera has moved (see _update_pick): the hover shows it and every
+## click this frame uses it, so the two always agree.
+var _pick_grid := Vector2(NAN, NAN)
+## WASD, 3D: the screen x a middle drag went down at, or NAN.
+var _drag_from := NAN
 ## WASD: when the facing and the last bump were sent, in msec.
 var _face_sent_at := 0
 var _bump_sent_at := 0
@@ -247,6 +256,8 @@ var _terrain: Dictionary = {}
 
 
 func _ready() -> void:
+	# After every other node: see _process.
+	process_priority = 10
 	var probe := Vector2i(3, 5)
 	if not ground.map_to_local(probe).is_equal_approx(Iso.tile_to_local(probe)):
 		push_error("Iso math disagrees with the TileSet: %s vs %s" % [
@@ -318,8 +329,13 @@ func _go_online() -> void:
 	Net.message_received.connect(_on_message)
 
 
+## Main processes after everything else (process_priority, set in
+## _ready): the entities have placed themselves and the 3D view has moved
+## its camera, so the pick below is made against the frame as drawn.
 func _process(delta: float) -> void:
 	_follow_player(delta)
+	_drag_yaw()
+	_update_pick()
 	_test_hover()
 	_drive_wasd()
 	_run_test_steer()
@@ -358,8 +374,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_authority():
 			_start_level()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E] and _client3d != null:
-		_client3d.orbit(-1 if key.keycode == KEY_Q else 1)
+	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E]:
+		# Click scheme only; in WASD the middle drag turns the camera.
+		if _client3d != null and Net.controls == "click":
+			_client3d.orbit(-1 if key.keycode == KEY_Q else 1)
 		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var local := _local_player()
@@ -367,7 +385,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(local, "order", {"slot": key.keycode - KEY_0})
 		return
 	var click := event as InputEventMouseButton
-	if click == null or click.button_index == MOUSE_BUTTON_MIDDLE:
+	if click == null:
+		return
+	if click.button_index == MOUSE_BUTTON_MIDDLE:
+		# WASD scheme, 3D only: drag to turn, released to the nearest step.
+		if _client3d != null and Net.controls == "wasd":
+			if click.pressed:
+				_drag_from = DisplayServer.mouse_get_position().x
+				_client3d.begin_drag()
+			elif not is_nan(_drag_from):
+				_drag_from = NAN
+				_client3d.end_drag()
 		return
 	var player := _local_player()
 	if player == null:
@@ -455,16 +483,34 @@ static func grid_direction(vector: Vector2) -> Vector2i:
 	return Vector2i(roundi(cos(angle)), roundi(sin(angle)))
 
 
-## (D - A, W - S) from the keyboard, or from --test-walk while it runs.
-func _held_keys() -> Vector2:
-	var keys := ""
+## The movement keys held, as letters ("wd"), from the keyboard or from
+## --test-walk while it runs.
+func _held_key_names() -> String:
 	if not Net.test_walk.is_empty():
-		keys = _test_walk_keys()
-	elif DisplayServer.get_name() != "headless":
+		return _test_walk_keys()
+	var keys := ""
+	if DisplayServer.get_name() != "headless":
 		for key: Key in [KEY_W, KEY_A, KEY_S, KEY_D]:
 			if Input.is_physical_key_pressed(key):
 				keys += OS.get_keycode_string(key).to_lower()
+	return keys
+
+
+## (D - A, W - S) for [param keys] as _held_key_names gives them.
+static func key_vector(keys: String) -> Vector2:
 	return Vector2(float("d" in keys) - float("a" in keys), float("w" in keys) - float("s" in keys))
+
+
+## WASD, 3D: while the middle button is held the drag turns the camera,
+## and a missed release (the button let go outside the window) ends it.
+func _drag_yaw() -> void:
+	if _client3d == null or is_nan(_drag_from):
+		return
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
+		_drag_from = NAN
+		_client3d.end_drag()
+		return
+	_client3d.drag((DisplayServer.mouse_get_position().x - _drag_from) * DRAG_DEGREES_PER_PX)
 
 
 func _view_yaw() -> float:
@@ -476,15 +522,21 @@ func _view_yaw() -> float:
 ## the body faces the cursor.
 func _drive_wasd() -> void:
 	var player := _local_player()
-	if player == null:
-		return
-	if Net.controls != "wasd":
-		player.aim = Vector2.ZERO
+	if player == null or Net.controls != "wasd":
+		if _client3d != null:
+			_client3d.set_frozen(false)
+		if player != null:
+			player.aim = Vector2.ZERO
 		return
 	# Before the first step: a step sent before prediction is on would be
 	# taken by the server and never shown.
 	player.enable_prediction()
-	var direction := wasd_direction(_held_keys(), _view_yaw())
+	var keys := _held_key_names()
+	# The camera holds still under a held key, so a direction never turns
+	# under the hand; a middle drag meanwhile applies when they let go.
+	if _client3d != null:
+		_client3d.set_frozen(not keys.is_empty())
+	var direction := wasd_direction(key_vector(keys), _view_yaw())
 	_record_walk(player)
 	if direction == Vector2i.ZERO:
 		_aim_at_cursor(player)
@@ -610,13 +662,21 @@ func _mouse_point() -> Vector2:
 	return to_local(get_global_mouse_position())
 
 
-## The cursor's point on the ground plane in continuous grid units: the
-## 3D view's floor-plane ray, or the 2D projection inverted. NaN when the
-## cursor misses the ground (3D, looking past the plane).
+## The cursor's point on the ground plane in continuous grid units, as
+## picked this frame (see _update_pick). NaN when the cursor misses the
+## ground (3D, looking past the plane).
 func _mouse_grid() -> Vector2:
+	return _pick_grid
+
+
+## Picks the ground point under the cursor, once a frame, after the camera
+## has moved: the 3D view's floor-plane ray, or the 2D projection inverted.
+func _update_pick() -> void:
 	if _client3d != null:
-		return _client3d.mouse_grid()
-	return Iso.local_to_grid(_mouse_point())
+		_pick_grid = _client3d.mouse_grid()
+	else:
+		camera.force_update_scroll()
+		_pick_grid = Iso.local_to_grid(_mouse_point())
 
 
 ## The walkable cell nearest [param grid] (a ground-plane point in grid
@@ -725,33 +785,55 @@ func _door_under_mouse() -> Door:
 	return null
 
 
-## The camera eases toward the local player, a little behind it, led
-## toward the cursor (see camera_lead). With no player (dedicated server,
-## dead) it stays put. The 3D view follows by the same rule itself.
+## The camera eases toward the local player, a little behind it; in the
+## WASD scheme it also leans toward the cursor (camera_lean). With no
+## player (dedicated server, dead) it stays put. The 3D view follows by the
+## same rule itself.
 func _follow_player(delta: float) -> void:
 	var player := _local_player()
 	if player == null or _client3d != null:
 		return
+	_lead = Main.camera_lean(_lead, get_viewport(), 0.0, delta)
 	var player_grid := Iso.local_to_grid(player.position)
-	if DisplayServer.get_name() != "headless":
-		var cursor := Iso.local_to_grid(_mouse_point()) - Iso.local_to_grid(camera.position)
-		_lead = Main.camera_lead(_lead, cursor, player_grid - Iso.local_to_grid(camera.position), delta)
 	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
 	camera.position = camera.position.lerp(Iso.grid_to_local(player_grid + _lead), rate)
 
 
-## The camera's lead toward the cursor, eased one frame from [param lead].
-## [param cursor] is where the cursor is from the middle of the screen and
-## [param player] where the player is from it, both on the ground in grid
-## units: measured from the screen, not the player, so the camera moving
-## does not move what it chases. Near the player the lead goes, faster.
-static func camera_lead(lead: Vector2, cursor: Vector2, player: Vector2, delta: float) -> Vector2:
+## The cursor's place on the screen as a lean, each axis in -1..1 (x right,
+## y down): its offset from the middle over half the screen, counted from
+## the edge of the dead zone round the middle, and no longer than 1. Only
+## the cursor's place on the screen goes in, so the camera moving cannot
+## change it.
+static func screen_lean(mouse: Vector2, size: Vector2) -> Vector2:
+	if size.x <= 0.0 or size.y <= 0.0:
+		return Vector2.ZERO
+	var offset := (mouse - size * 0.5) / (size * 0.5)
+	var length := offset.length()
+	if length <= CAMERA_LEAN_DEADZONE:
+		return Vector2.ZERO
+	var out := minf((length - CAMERA_LEAN_DEADZONE) / (1.0 - CAMERA_LEAN_DEADZONE), 1.0)
+	return offset / length * out
+
+
+## A screen lean (screen_lean) as a vector on the ground, in grid units, at
+## a camera yaw: right on the screen is right, down is toward the camera.
+static func lean_to_ground(lean: Vector2, yaw_degrees: float) -> Vector2:
+	var yaw := deg_to_rad(yaw_degrees)
+	var right := Vector3(1, 0, -1).rotated(Vector3.UP, yaw).normalized()
+	var up := Vector3(-1, 0, -1).rotated(Vector3.UP, yaw).normalized()
+	var along := right * lean.x - up * lean.y
+	return Vector2(along.x, along.z)
+
+
+## One frame of the camera's lean from [param lean] toward where the cursor
+## is on [param viewport]'s screen: CAMERA_LEAN_CELLS at most, eased. Only
+## in the WASD scheme; in click the camera follows the player alone.
+static func camera_lean(lean: Vector2, viewport: Viewport, yaw_degrees: float, delta: float) -> Vector2:
 	var wanted := Vector2.ZERO
-	var rate := CAMERA_RETURN_RATE
-	if cursor.distance_to(player) > CAMERA_LEAD_DEADZONE:
-		wanted = (cursor * CAMERA_LEAD_SHARE).limit_length(CAMERA_LEAD_MAX)
-		rate = CAMERA_LEAD_RATE
-	return lead.lerp(wanted, 1.0 - exp(-rate * delta))
+	if Net.controls == "wasd" and DisplayServer.get_name() != "headless":
+		var on_screen := screen_lean(viewport.get_mouse_position(), viewport.get_visible_rect().size)
+		wanted = lean_to_ground(on_screen, yaw_degrees) * CAMERA_LEAN_CELLS
+	return lean.lerp(wanted, 1.0 - exp(-delta / CAMERA_LEAN_EASE))
 
 
 ## The player this peer's input controls, or null (dedicated server, dead,
@@ -1429,10 +1511,16 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	var hints := "WASD walk   mouse aim   LMB attack (far: walk)   RMB grab (drag to toss)" if Net.controls == "wasd" \
-			else "LMB move / attack   RMB shove (drag to toss)"
-	if _client3d != null:
-		hints += "   Q/E turn"
+	var hints := ""
+	if Net.controls == "wasd":
+		hints = "WASD walk   mouse aim   LMB attack (far: walk)   RMB grab (drag to toss)"
+		if _client3d != null:
+			hints += "   MMB drag turn"
+	else:
+		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
+		if _client3d != null:
+			hints += "   Q/E turn"
+	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
 	if player != null:

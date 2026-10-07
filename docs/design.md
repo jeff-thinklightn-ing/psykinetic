@@ -700,14 +700,17 @@ the tests use is where it was.
 Test rooms written as old cell maps go through `Terrain.expand`.
 
 **Camera.** The camera eases toward the local player
-(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`, led toward the
-cursor (`Main.camera_lead`): by `CAMERA_LEAD_SHARE` (half) of how far the
-cursor is from the middle of the screen, up to `CAMERA_LEAD_MAX` (3)
-cells, eased at `CAMERA_LEAD_RATE`; with the cursor within
-`CAMERA_LEAD_DEADZONE` (1.5 cells) of the player the lead eases back to
-nothing, faster. The lead is measured from the screen, not the player, so
-the camera moving does not move what it chases. There are no pan keys.
-The 3D view follows by the same rule. The hover highlight
+(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. In the click scheme
+that is all it does. In the WASD scheme it also leans toward the cursor
+(`Main.camera_lean`), from the cursor's place on the screen alone: its
+offset from the middle, each axis over half the screen, counted from the
+edge of a dead zone `CAMERA_LEAN_DEADZONE` (0.15, so 15% of the screen
+across) out to the edge, which leans `CAMERA_LEAN_CELLS` (3) along the
+screen's own right and down on the ground (`Main.lean_to_ground`, at the
+current yaw), eased with a 100 ms time constant (`CAMERA_LEAN_EASE`;
+settled in about 300 ms). The camera moving cannot change that input, so
+nothing feeds back. There are no pan keys. The 3D view follows by the
+same rule. The hover highlight
 is drawn above walls, so the target cell reads even behind a full-height
 wall.
 
@@ -817,8 +820,17 @@ height), pitched `CAMERA_PITCH` 50° from horizontal, on the +x +z side at
 yaw 0 so grid +x runs down-right and +y down-left as in the 2D diamond,
 following the local player. **Orbit**: Q/E step the yaw by `ORBIT_STEP`
 (45°) about the player, tweened over `ORBIT_SECONDS` (250 ms); that is
-the only way to turn it (the middle button does nothing). The step
-persists as `camera_yaw` in `settings.cfg`
+the click scheme's way to turn it. In the WASD scheme Q/E do nothing and a
+middle drag turns it instead: the yaw follows the horizontal drag
+(`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the button is held, and
+let go it settles on the nearest 45° step, eased over the same 250 ms.
+While any movement key is held the yaw is frozen (`Client3D.frozen`, set
+by `Main._drive_wasd`): nothing turns it, not a drag nor an ease under
+way, so a direction never changes under the hand; a drag made meanwhile
+applies when the keys are let go (eased there, or settled on its step if
+the button was let go too). The eases are run from `Client3D._process`,
+not Tweens, so the camera has moved before Main picks. The step persists
+as `camera_yaw` in `settings.cfg`
 (`Net.camera_yaw`, saved by `Net.save_view_settings`). F3 shows the yaw.
 Light: a `WorldEnvironment` with near-black background and ambient, one
 faint cool `DirectionalLight3D` (`SUN_ENERGY` 0.1) with shadows, the
@@ -838,8 +850,8 @@ the floor; the toss drag reads its screen directions from the camera
 screenshots.
 
 **Azimuth.** The 2D projection still takes an azimuth (`Iso.azimuth`),
-but nothing turns it any more: the middle-button peek is gone, and Q/E in
-the 3D view is the only camera rotation. `--test-azimuth=<deg>` starts
+but nothing turns it any more: the middle-button peek is gone; the 3D
+camera turns by Q/E (click) or a middle drag (WASD). `--test-azimuth=<deg>` starts
 with the view turned, for screenshots. F3 shows the angle.
 
 Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
@@ -871,13 +883,17 @@ knows its own by `GridEntity.keeper_peer`, set in her spawn spec.
 
 ## Controls
 
-Two schemes, `controls=wasd` (the default) or `controls=click` in
-`settings.cfg`, with `--controls=` overriding it for a run; read and kept
-as `renderer=` is. In both, Q/E turn the 3D camera, 1–4 are orders, R,
-F3 and F11 as ever.
+Two schemes, each a complete package: `controls=click` (the default) or
+`controls=wasd` in `settings.cfg`, with `--controls=` overriding it for a
+run; read and kept as `renderer=` is (`wasd` picks WASD, anything else is
+click). Keys and buttons that are not the active scheme's do nothing, and
+the HUD's hint line shows only the active scheme's. In both, 1–4 are
+orders, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
-hold-to-move retargets, right click (and drag) shoves and tosses.
+hold-to-move retargets, right click (and drag) shoves and tosses, the
+verbs land on the clicked target; Q/E turn the 3D camera a step. WASD
+and the middle button do nothing; the camera follows the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;
 key combinations give eight directions (`Main.wasd_direction`; at yaw 0,
@@ -895,7 +911,16 @@ way: whoever stands next to the player that way, or a swing at air
 (`World.command("swing")` -> `World.order_swing` -> `try_swing`: the
 attack's cooldown, facing and lunge, nothing hit). A right click grabs
 whoever stands next to the player the cursor's way; a drag from it
-tosses, as ever.
+tosses, as ever. A middle drag turns the 3D camera (see the 3D view); Q/E
+do nothing. The camera leans toward the cursor.
+
+**One pick a frame.** Main processes after every other node
+(`process_priority`), so by then the entities are placed and the 3D
+camera has moved; it picks the ground point under the cursor once
+(`Main._update_pick`, the 2D camera's scroll forced up to date first)
+and the hover square is drawn from that pick. Clicks, which arrive before
+the next frame's processing, use the same pick (`_mouse_grid`,
+`_mouse_tile`), so the cell a click goes to is the one the square showed.
 
 Test hooks: `--test-walk=<keys:secs,...>` holds keys in turn (and prints
 the shown speed frame by frame at exit), `--test-steer=<secs>` steers a

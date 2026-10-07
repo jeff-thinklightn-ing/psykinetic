@@ -418,3 +418,33 @@ views use `Main.camera_lead`.
 
 The middle-button peek (2D) and nudge (3D) are removed. `Iso.azimuth`
 stays, for `--test-azimuth`.
+
+## 49. Control schemes are complete packages; click is the default
+
+`controls=click` (the default) is click and hold-to-move, Q/E to turn
+the camera, the verbs on the clicked target. `controls=wasd` is WASD to
+walk, the mouse to aim, a middle drag to turn the camera, the cursor
+lean. Whatever is not the active scheme's is inert, and the HUD names
+only its controls. This replaces 48: Q/E are no longer the only rotation;
+in WASD the middle drag is.
+
+## 50. The camera never turns under a held movement key
+
+WASD directions are camera-relative, so a yaw change while a key is held
+would turn the walk. While any movement key is held the yaw is frozen,
+eases included; a drag made meanwhile applies when the keys are let go.
+
+## 51. The lean is the cursor's place on the screen, in WASD only
+
+This replaces 47. The lean is the cursor's offset from the middle of the
+screen, normalised, past a dead zone, laid on the ground along the
+screen's own axes: nothing about the world goes in, so the camera moving
+cannot feed back into it. In the click scheme there is no lean.
+
+## 52. One pick a frame, after the camera moves
+
+Main processes last (`process_priority`), picks the ground point under
+the cursor once, draws the hover from it, and clicks use that pick. The
+square on screen and the cell a click goes to are the same by
+construction. The 3D yaw eases run in the view's `_process` rather than
+Tweens so they are done before the pick.

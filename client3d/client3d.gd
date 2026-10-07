@@ -34,10 +34,14 @@ extends Node3D
 ##
 ## Camera: orthographic, tilted CAMERA_PITCH from horizontal, yawed by
 ## `yaw` about the local player: 0 matches the 2D diamond (+x down-right,
-## +y down-left). Q/E step the yaw by ORBIT_STEP, tweened, and are the only
-## way to turn it; the step persists in settings.cfg (Net.camera_yaw). It
-## follows the player led toward the cursor, as the 2D camera is (see
-## Main.camera_lead).
+## +y down-left). In the click scheme Q/E step the yaw by ORBIT_STEP; in
+## the WASD scheme a middle drag turns it freely and, let go, it settles
+## on the nearest step. Either way the move to a step is eased over
+## ORBIT_SECONDS, and the step persists in settings.cfg (Net.camera_yaw).
+## While a movement key is held (frozen, set by Main) the yaw does not
+## move at all; a drag meanwhile applies when the keys are let go. It
+## follows the player; in WASD it leans toward the cursor as the 2D camera
+## does (Main.camera_lean).
 ##
 ## Picking is by ray from the camera through the cursor: an entity or door
 ## Area3D first, else the floor plane, which Main snaps to the nearest
@@ -136,8 +140,20 @@ var _camera_target := Vector3.ZERO
 ## The camera's yaw now, and the step it rests at (a multiple of ORBIT_STEP).
 var yaw := 0.0
 var _yaw_step := 0.0
-var _yaw_tween: Tween
-## The camera's lead toward the cursor, in grid units (Main.camera_lead).
+## The yaw easing toward a step: from, to, and how far along (1: at rest).
+## Driven from _process, not a Tween, so it moves before Main's pick.
+var _ease_from := 0.0
+var _ease_to := 0.0
+var _ease_t := 1.0
+## WASD's middle drag: the yaw it started from, how far it has gone, and
+## whether a release came while frozen (it settles when they unfreeze).
+var _dragging := false
+var _drag_base := 0.0
+var _drag_offset := 0.0
+var _settle_pending := false
+## Held still by Main while a movement key is down.
+var frozen := false
+## WASD: the camera's lean toward the cursor, in grid units (Main.camera_lean).
 var _lead := Vector2.ZERO
 var _room: Node3D
 ## The kit's own material and a see-through copy of it; the flat stone
@@ -184,6 +200,7 @@ func setup(terrain: Dictionary) -> void:
 func _process(delta: float) -> void:
 	_sync_puppets()
 	_sync_doors()
+	_ease_yaw(delta)
 	_follow(delta)
 
 
@@ -245,10 +262,7 @@ func _follow(delta: float) -> void:
 	var puppet: Node3D = _puppets.get(player.get_instance_id())
 	if puppet == null:
 		return
-	var cursor := mouse_grid()
-	if not is_nan(cursor.x) and DisplayServer.get_name() != "headless":
-		var centre := Vector2(_camera_target.x, _camera_target.z)
-		_lead = Main.camera_lead(_lead, cursor - centre, Vector2(puppet.position.x, puppet.position.z) - centre, delta)
+	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
 	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
 	_camera_target = _camera_target.lerp(puppet.position + Vector3(_lead.x, 0.0, _lead.y), rate)
 	_place_camera()
@@ -263,19 +277,89 @@ func _local_player() -> Player:
 
 # --- Orbit ---------------------------------------------------------------------
 
-## Q/E: the next step round, tweened; kept in the settings file.
+## Q/E (click scheme): the next step round, eased; kept in the settings
+## file.
 func orbit(direction: int) -> void:
-	_yaw_step += ORBIT_STEP * signf(direction)
-	Net.camera_yaw = _yaw_step
+	_settle_on(_yaw_step + ORBIT_STEP * signf(direction))
+
+
+## WASD: the middle button went down; the drag turns from the yaw now.
+func begin_drag() -> void:
+	_dragging = true
+	_settle_pending = false
+	_drag_base = yaw
+	_drag_offset = 0.0
+	_ease_t = 1.0
+
+
+## WASD: the drag is [param degrees] from where it began. Followed at once,
+## unless frozen (then it waits) or easing back in after a freeze (then it
+## is where the ease is going).
+func drag(degrees: float) -> void:
+	if not _dragging:
+		return
+	_drag_offset = degrees
+	if frozen:
+		return
+	if _ease_t < 1.0:
+		_ease_to = _drag_base + degrees
+	else:
+		_set_yaw(_drag_base + degrees)
+
+
+## WASD: the middle button came up: settle on the nearest step, now or,
+## if frozen, when the keys are let go.
+func end_drag() -> void:
+	if not _dragging:
+		return
+	_dragging = false
+	if frozen:
+		_settle_pending = true
+	else:
+		_settle_on(_nearest_step(_drag_base + _drag_offset))
+
+
+## Main: a movement key is (not) held. Held, the yaw stops where it is;
+## let go, what the middle button did meanwhile applies.
+func set_frozen(on: bool) -> void:
+	if frozen == on:
+		return
+	frozen = on
+	if on:
+		return
+	if _dragging:
+		_ease_toward(_drag_base + _drag_offset)
+	elif _settle_pending:
+		_settle_pending = false
+		_settle_on(_nearest_step(_drag_base + _drag_offset))
+
+
+static func _nearest_step(degrees: float) -> float:
+	return roundf(degrees / ORBIT_STEP) * ORBIT_STEP
+
+
+## Eases to [param step], which the yaw then rests on and the settings
+## file keeps.
+func _settle_on(step: float) -> void:
+	_yaw_step = step
+	Net.camera_yaw = step
 	Net.save_view_settings()
-	_tween_yaw(_yaw_step, ORBIT_SECONDS)
+	_ease_toward(step)
 
 
-func _tween_yaw(to: float, seconds: float) -> void:
-	if _yaw_tween != null:
-		_yaw_tween.kill()
-	_yaw_tween = create_tween()
-	_yaw_tween.tween_method(_set_yaw, yaw, to, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+func _ease_toward(degrees: float) -> void:
+	_ease_from = yaw
+	_ease_to = degrees
+	_ease_t = 0.0
+
+
+## One frame of the ease, a sine out over ORBIT_SECONDS; nothing while
+## frozen.
+func _ease_yaw(delta: float) -> void:
+	if frozen or _ease_t >= 1.0:
+		return
+	_ease_t = minf(_ease_t + delta / ORBIT_SECONDS, 1.0)
+	_set_yaw(lerpf(_ease_from, _ease_to, sin(_ease_t * PI * 0.5)))
 
 
 func _set_yaw(degrees: float) -> void:

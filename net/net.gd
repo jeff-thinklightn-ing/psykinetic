@@ -20,7 +20,7 @@ extends Node
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
 ##   --renderer=2d|3d             client view: the 3D one (client3d/, default) or the 2D isometric one;
 ##                                overrides the settings file's renderer=
-##   --controls=wasd|click        WASD to walk and the mouse to aim (default), or click to move;
+##   --controls=click|wasd        click to move (default), or WASD to walk and the mouse to aim;
 ##                                overrides the settings file's controls=
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
@@ -34,9 +34,9 @@ extends Node
 ## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
 ## is the 3D view's orbit step as last left. renderer=2d picks the 2D view;
 ## anything else, or no line, is the 3D one. It is read whatever the mode,
-## and kept as written when the file is rewritten. controls=click is
-## click-to-move; anything else, or no line, is WASD; read and kept the
-## same way.
+## and kept as written when the file is rewritten. controls=wasd is WASD
+## with the mouse aiming; anything else, or no line, is click-to-move;
+## read and kept the same way.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -146,9 +146,10 @@ var _renderer_given := false
 ## The settings file's renderer= as written ("" for no line), written back
 ## as it was so that a --renderer run does not change the file.
 var _settings_renderer := ""
-## How the local player is driven: "wasd" (WASD walks, the mouse aims) or
-## "click" (click to move). Like renderer: settings controls=, --controls.
-var controls := "wasd"
+## How the local player is driven, and which keys and buttons do anything:
+## "click" (click to move, Q/E turn) or "wasd" (WASD walks, the mouse aims,
+## a middle drag turns). Like renderer: settings controls=, --controls.
+var controls := "click"
 var _controls_given := false
 var _settings_controls := ""
 ## The window as the settings file has it: its windowed size and whether it
@@ -296,9 +297,9 @@ func _apply_renderer_setting() -> void:
 			controls = controls_from(_settings_controls)
 
 
-## "click" is click-to-move; anything else is WASD.
+## "wasd" is WASD; anything else is click-to-move.
 static func controls_from(value: String) -> String:
-	return "click" if value.strip_edges().to_lower() == "click" else "wasd"
+	return "wasd" if value.strip_edges().to_lower() == "wasd" else "click"
 
 
 ## "2d" is the 2D view; anything else is the 3D one.
