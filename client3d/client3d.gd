@@ -32,32 +32,27 @@ extends Node3D
 ## Speech comes from the speech message (say) and shows for
 ## SPEECH_SECONDS.
 ##
-## Camera: orthographic, tilted `pitch` from horizontal (it rests at
-## `rest_pitch`, between PITCH_MIN and PITCH_MAX), yawed by `yaw` about
-## the local player: 0 matches the 2D diamond (+x down-right, +y
-## down-left). It rests only on the four diamond views: yaw 0 and each
-## ORBIT_STEP (90°) from it. The ortho size is CAMERA_SIZE times `zoom`
-## (ZOOM_MIN..ZOOM_MAX), and times up to PEEK_PULL_BACK during a WASD
-## pitch peek; the tilt alone never changes it.
+## Camera: orthographic, tilted `pitch` from horizontal (CAMERA_PITCH at
+## rest), yawed by `yaw` about the local player: 0 matches the 2D diamond
+## (+x down-right, +y down-left). The yaw stays within TURN_LIMIT (90°) of
+## HOME_YAW, and rests only on the three diamond views in that range: home
+## and a quarter turn either side (home_diamond). The ortho size is
+## CAMERA_SIZE, times up to PEEK_PULL_BACK during a WASD pitch peek.
 ##
-## Click scheme, by keys (Main drives them): Q/E zoom out and in at
-## ZOOM_RATE while held, slowing into either end, centred on the player
-## (the camera follows the player alone in this scheme), and the zoom stays
-## where it is left; W/S tilt the resting pitch at TILT_RATE while held,
-## slowing into either end, and it stays where it is left; A/D turn the
-## yaw, screen-fixed, at TURN_RATE while held and, let go, it carries on to
-## the next diamond the way it was turning if it was more than TURN_COMMIT
-## past the last one it passed, or goes back to that one, the settle
-## starting at the turning speed so the release flows into it; a middle
-## click puts tilt and zoom back to CAMERA_PITCH and 1 over
-## RESET_SECONDS. WASD scheme: a sideways middle drag turns
-## the yaw freely and, let go, settles on the nearest diamond; a vertical
-## one is a pitch peek, tilting from the resting pitch toward PEEK_PITCH in
-## proportion to the drag (full over PEEK_DRAG_PX, eased) and springing
-## back over PEEK_RETURN_SECONDS. The diamond, the resting pitch and the
-## zoom persist in settings.cfg (Net.camera_yaw, Net.camera_pitch,
-## Net.camera_zoom); a peek saves nothing. The near/far rule reads only the yaw, so the near walls stay
-## see-through through any tilt.
+## Click scheme, by keys (Main drives them): W/S tilt while held at
+## TILT_RATE, between PITCH_MIN and PITCH_MAX, slowing into either end,
+## and spring back to CAMERA_PITCH over TILT_RETURN_SECONDS when let go;
+## A/D turn the yaw, screen-fixed, at TURN_RATE while held, never past the
+## range, and, let go, it carries on to the next diamond the way it was
+## turning if it was more than TURN_COMMIT past the last one it passed, or
+## goes back to that one, the settle starting at the turning speed so the
+## release flows into it. WASD scheme: a sideways middle drag turns the
+## yaw freely within the same range and, let go, settles on the nearest
+## diamond in it; a vertical one is a pitch peek, tilting toward
+## PEEK_PITCH in proportion to the drag (full over PEEK_DRAG_PX, eased) and
+## springing back over PEEK_RETURN_SECONDS. The diamond persists in
+## settings.cfg (Net.camera_yaw); a tilt never does. The near/far rule
+## reads only the yaw, so the near walls stay see-through through any tilt.
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
@@ -117,22 +112,20 @@ const TURN_COMMIT := 10.0
 ## A/D let go back to the diamond it came from: the settle takes the time
 ## a stop from the turning speed would, plus this, for the turn back.
 const TURN_RETURN_EXTRA := 0.15
+## The yaw's home and how far either side of it a turn goes (both
+## schemes).
+const HOME_YAW := 0.0
+const TURN_LIMIT := 90.0
 ## Click scheme keys: A/D turn this fast (degrees a second); W/S tilt this
 ## fast between PITCH_MIN and PITCH_MAX, slowing over the last
-## TILT_EASE_DEGREES at either end; Q/E zoom by ZOOM_RATE a second (a
-## factor) between ZOOM_MIN and ZOOM_MAX times the default size, slowing
-## over the last ZOOM_EASE (a factor) at either end; a middle click puts
-## tilt and zoom back over RESET_SECONDS.
+## TILT_EASE_DEGREES at either end, and the tilt springs back over
+## TILT_RETURN_SECONDS when they are let go.
 const TURN_RATE := 180.0
 const TILT_RATE := 60.0
 const PITCH_MIN := 40.0
 const PITCH_MAX := 85.0
 const TILT_EASE_DEGREES := 8.0
-const ZOOM_RATE := 1.5
-const ZOOM_MIN := 0.6
-const ZOOM_MAX := 2.0
-const ZOOM_EASE := 1.15
-const RESET_SECONDS := 0.25
+const TILT_RETURN_SECONDS := 0.25
 ## The pitch peek: the tilt it goes to, the drag for all of it (screen
 ## px), how far it pulls back (ortho size), and the spring back.
 const PEEK_PITCH := 85.0
@@ -263,17 +256,11 @@ var _drag_offset := 0.0
 var _settle_pending := false
 ## Held still by Main while a movement key is down.
 var frozen := false
-## The camera's tilt from horizontal now, in degrees, and where it rests:
-## `pitch` is `rest_pitch` but during a pitch peek.
+## The camera's tilt from horizontal now, in degrees; CAMERA_PITCH at rest.
 var pitch := CAMERA_PITCH
-var rest_pitch := CAMERA_PITCH
-## The zoom: CAMERA_SIZE times this is the ortho size at rest.
-var zoom := 1.0
-## A middle click's reset: tilt and zoom from, and how far along (1: not
-## resetting).
-var _reset_pitch_from := CAMERA_PITCH
-var _reset_zoom_from := 1.0
-var _reset_t := 1.0
+## A W/S tilt springing back: from, and how far along (1: not springing).
+var _tilt_from := CAMERA_PITCH
+var _tilt_t := 1.0
 ## The pitch peek: held, how far in (0 at rest .. 1 full), and the spring
 ## back's start and progress (1: not springing).
 var _peeking := false
@@ -351,13 +338,11 @@ func setup(terrain: Dictionary) -> void:
 	_listener.name = "Listener"
 	add_child(_listener)
 	_listener.make_current()
-	# Net has the saved yaw rounded to a diamond already; --test-yaw is
+	# Net has the saved yaw on a diamond in range already; --test-yaw is
 	# taken exactly, for screenshots, and rests on its nearest diamond.
-	_yaw_step = nearest_diamond(Net.camera_yaw)
+	_yaw_step = home_diamond(Net.camera_yaw)
 	yaw = Net.camera_yaw
-	rest_pitch = clampf(Net.camera_pitch, PITCH_MIN, PITCH_MAX)
-	pitch = rest_pitch
-	zoom = clampf(Net.camera_zoom, ZOOM_MIN, ZOOM_MAX)
+	pitch = CAMERA_PITCH
 	_apply_size()
 	_place_camera()
 	_classify_walls()
@@ -368,7 +353,7 @@ func _process(delta: float) -> void:
 	_sync_doors()
 	_ease_yaw(delta)
 	_ease_peek(delta)
-	_ease_reset(delta)
+	_ease_tilt(delta)
 	_follow(delta)
 	_drop_departed()
 	_update_mourning(delta)
@@ -454,19 +439,31 @@ func _local_player() -> Player:
 
 # --- Orbit ---------------------------------------------------------------------
 
-## The ortho size: CAMERA_SIZE times the zoom, times the pitch peek's
-## pull back while there is one (eased as its tilt is).
+## The ortho size: CAMERA_SIZE, times the pitch peek's pull back while
+## there is one (eased as its tilt is).
 func _apply_size() -> void:
-	_camera.size = CAMERA_SIZE * zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
+	_camera.size = CAMERA_SIZE * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
 			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn))
 
 
+## A yaw held to TURN_LIMIT either side of HOME_YAW.
+static func clamp_yaw(degrees: float) -> float:
+	return clampf(degrees, HOME_YAW - TURN_LIMIT, HOME_YAW + TURN_LIMIT)
+
+
+## The diamond in range nearest [param degrees], read the short way round
+## from home: 270 is -90; anything further round than the range goes to
+## its nearer end.
+static func home_diamond(degrees: float) -> float:
+	return clamp_yaw(nearest_diamond(HOME_YAW + wrapf(degrees - HOME_YAW, -180.0, 180.0)))
+
+
 ## Click scheme, A/D held: turn [param direction] (-1 or 1) for
-## [param delta] seconds at TURN_RATE, through any angle.
+## [param delta] seconds at TURN_RATE, through any angle in range.
 func turn(direction: float, delta: float) -> void:
 	_ease_t = 1.0
 	_turning = signf(direction)
-	_set_yaw(yaw + TURN_RATE * _turning * delta)
+	_set_yaw(clamp_yaw(yaw + TURN_RATE * _turning * delta))
 
 
 ## Click scheme, A/D let go: on to the next diamond the way it was
@@ -480,7 +477,7 @@ func end_turn() -> void:
 	_turning = 0.0
 	if direction == 0.0:
 		return
-	var target := settle_target(yaw, direction)
+	var target := clamp_yaw(settle_target(yaw, direction))
 	var distance := (target - yaw) * direction
 	_settle_on(target)
 	_ease_curve = Ease.FLOW
@@ -504,75 +501,31 @@ static func settle_target(degrees: float, direction: float) -> float:
 	return passed
 
 
-## Click scheme, W/S held: tilt the resting pitch [param direction] (1 up
-## toward top-down, -1 down) for [param delta] seconds at TILT_RATE,
-## slowing over the last TILT_EASE_DEGREES before either end. It stays
-## where it is left.
+## Click scheme, W/S held: tilt [param direction] (1 up toward top-down,
+## -1 down toward level) for [param delta] seconds at TILT_RATE, slowing
+## over the last TILT_EASE_DEGREES before either end.
 func tilt(direction: float, delta: float) -> void:
 	if _peeking or direction == 0.0:
 		return
-	_reset_t = 1.0
+	_tilt_t = 1.0
 	var limit := PITCH_MAX if direction > 0.0 else PITCH_MIN
-	var left := absf(limit - rest_pitch)
+	var left := absf(limit - pitch)
 	var speed := TILT_RATE * clampf(left / TILT_EASE_DEGREES, 0.1, 1.0)
-	_set_rest_pitch(move_toward(rest_pitch, limit, speed * delta))
+	_set_pitch(move_toward(pitch, limit, speed * delta))
 
 
-## Click scheme, W/S let go: the pitch is kept in the settings file.
+## Click scheme, W/S let go: back to CAMERA_PITCH over
+## TILT_RETURN_SECONDS. Nothing is saved.
 func end_tilt() -> void:
-	Net.camera_pitch = rest_pitch
-	Net.save_view_settings()
+	_tilt_from = pitch
+	_tilt_t = 0.0
 
 
-## Click scheme, Q/E held: zoom in ([param direction] 1: a smaller view,
-## nearer the player) or out (-1) for [param delta] seconds, by ZOOM_RATE
-## a second, slowing over the last ZOOM_EASE before either end. It stays
-## where it is left. The camera is on the player, so that is the centre.
-func zoom_by(direction: float, delta: float) -> void:
-	if direction == 0.0:
+func _ease_tilt(delta: float) -> void:
+	if _tilt_t >= 1.0:
 		return
-	_reset_t = 1.0
-	var limit := ZOOM_MIN if direction > 0.0 else ZOOM_MAX
-	# In logs, so each second is the same factor whichever way.
-	var left := absf(log(limit) - log(zoom))
-	var speed := log(ZOOM_RATE) * clampf(left / log(ZOOM_EASE), 0.1, 1.0)
-	zoom = exp(move_toward(log(zoom), log(limit), speed * delta))
-	_apply_size()
-
-
-## Click scheme, Q/E let go: the zoom is kept in the settings file.
-func end_zoom() -> void:
-	Net.camera_zoom = zoom
-	Net.save_view_settings()
-
-
-## Click scheme, a middle click: tilt and zoom back to CAMERA_PITCH and 1
-## over RESET_SECONDS; saved.
-func reset_view() -> void:
-	if _peeking:
-		return
-	_reset_pitch_from = rest_pitch
-	_reset_zoom_from = zoom
-	_reset_t = 0.0
-	Net.camera_pitch = CAMERA_PITCH
-	Net.camera_zoom = 1.0
-	Net.save_view_settings()
-
-
-func _ease_reset(delta: float) -> void:
-	if _reset_t >= 1.0:
-		return
-	_reset_t = minf(_reset_t + delta / RESET_SECONDS, 1.0)
-	var eased := sin(_reset_t * PI * 0.5)
-	zoom = lerpf(_reset_zoom_from, 1.0, eased)
-	_set_rest_pitch(lerpf(_reset_pitch_from, CAMERA_PITCH, eased))
-	_apply_size()
-
-
-func _set_rest_pitch(degrees: float) -> void:
-	rest_pitch = degrees
-	if not _peeking and _peek_t >= 1.0:
-		_set_pitch(degrees)
+	_tilt_t = minf(_tilt_t + delta / TILT_RETURN_SECONDS, 1.0)
+	_set_pitch(lerpf(_tilt_from, CAMERA_PITCH, sin(_tilt_t * PI * 0.5)))
 
 
 func _set_pitch(degrees: float) -> void:
@@ -618,7 +571,7 @@ func _ease_peek(delta: float) -> void:
 func _set_peek(amount: float) -> void:
 	_peek = amount
 	var eased := smoothstep(0.0, 1.0, amount)
-	_set_pitch(lerpf(rest_pitch, PEEK_PITCH, eased))
+	_set_pitch(lerpf(CAMERA_PITCH, PEEK_PITCH, eased))
 
 
 ## WASD: the middle button went down; the drag turns from the yaw now.
@@ -640,9 +593,9 @@ func drag(degrees: float) -> void:
 	if frozen:
 		return
 	if _ease_t < 1.0:
-		_ease_to = _drag_base + degrees
+		_ease_to = clamp_yaw(_drag_base + degrees)
 	else:
-		_set_yaw(_drag_base + degrees)
+		_set_yaw(clamp_yaw(_drag_base + degrees))
 
 
 ## WASD: the middle button came up: settle on the nearest step, now or,
@@ -654,7 +607,7 @@ func end_drag() -> void:
 	if frozen:
 		_settle_pending = true
 	else:
-		_settle_on(nearest_diamond(_drag_base + _drag_offset))
+		_settle_on(home_diamond(clamp_yaw(_drag_base + _drag_offset)))
 
 
 ## Main: a movement key is (not) held. Held, the yaw stops where it is;
@@ -666,10 +619,10 @@ func set_frozen(on: bool) -> void:
 	if on:
 		return
 	if _dragging:
-		_ease_toward(_drag_base + _drag_offset)
+		_ease_toward(clamp_yaw(_drag_base + _drag_offset))
 	elif _settle_pending:
 		_settle_pending = false
-		_settle_on(nearest_diamond(_drag_base + _drag_offset))
+		_settle_on(home_diamond(clamp_yaw(_drag_base + _drag_offset)))
 
 
 ## The diamond view nearest [param degrees]; half way between two (an

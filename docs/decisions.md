@@ -558,3 +558,15 @@ the rewrite on a resize or a camera change.
 The pairs of 60 are swapped: W/S tilt (W toward top-down, S toward
 level), Q/E zoom (Q out, E in). A/D, the middle click and everything
 else are as in 60.
+
+## 64. The camera is kept close to home
+
+The yaw stays within a quarter turn of home (yaw 0, the 2D diamond) in
+both schemes, resting on home or a diamond either side; A/D and the WASD
+middle drag stop at the ends of that range. The click scheme's W/S tilt
+is a held look that springs back to 50° when let go, like the WASD pitch
+peek, and nothing about it is saved. Zoom is gone, Q/E are unbound and
+the middle click does nothing. This replaces 54's four resting diamonds
+and the sticky tilt and zoom of 60 and 63. Home is yaw 0 rather than the
+yaw a session started at, so the range never drifts from launch to
+launch.

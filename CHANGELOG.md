@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.40
+
+Camera simplification. Client (the server only for the version).
+
+- **A/D** (click scheme) turn the 3D camera up to a quarter turn either
+  side of its home view and settle on one of the three diagonal views in
+  that range. The WASD scheme's middle drag is held to the same range.
+- **W/S** (click scheme) tilt while held and spring back to 50° when let go.
+- **Zoom is gone**; Q/E and the middle click do nothing in the click scheme.
+- A saved view outside the range comes back as the nearest one in it; the
+  old saved tilt and zoom are dropped.
+
+The server must be updated to v0.1.40 too, as it refuses any other version.
+
 ## v0.1.39
 
 Click scheme camera keys swapped. Client (the server only for the version).

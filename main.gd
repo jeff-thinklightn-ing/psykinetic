@@ -234,10 +234,9 @@ var _pick_grid := Vector2(NAN, NAN)
 enum Drag { UNDECIDED, TURN, PITCH, MOVED }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
-## Click scheme, 3D: Q/E, W/S or A/D were held last frame (their release
-## saves).
+## Click scheme, 3D: W/S or A/D were held last frame (their release
+## springs the tilt back and settles the turn).
 var _tilting := false
-var _zooming := false
 var _turning := false
 ## WASD: when the facing and the last bump were sent, in msec.
 var _face_sent_at := 0
@@ -571,29 +570,21 @@ func _end_middle_drag() -> void:
 		Drag.PITCH:
 			_client3d.end_pitch_peek()
 		Drag.UNDECIDED:
-			# Let go without moving: in the click scheme, a middle click.
-			if Net.controls == "click":
-				_client3d.reset_view()
+			# Let go without moving: a middle click, which does nothing.
+			pass
 	_drag = Drag.UNDECIDED
 
 
-## Click scheme, 3D: W/S tilt (W up toward top-down, S down), Q/E zoom (Q out, E in)
-## and A/D turn the camera while held; letting go keeps the zoom and the
-## tilt and settles the turn on a diamond, all saved. The keys do nothing
-## else in this scheme (and nothing at all in 2D).
+## Click scheme, 3D: W/S tilt (W up toward top-down, S toward level) and
+## A/D turn the camera while held; letting go springs the tilt back and
+## settles the turn on a diamond in range (saved). The keys do nothing
+## else in this scheme (and nothing at all in 2D); Q/E are unbound.
 func _drive_camera_keys(delta: float) -> void:
 	if _client3d == null or Net.controls != "click":
 		return
-	var keys := _held_letters([KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E])
+	var keys := _held_letters([KEY_W, KEY_A, KEY_S, KEY_D])
 	var tilt := float("w" in keys) - float("s" in keys)
-	var zoom := float("e" in keys) - float("q" in keys)
 	var turn := float("d" in keys) - float("a" in keys)
-	if zoom != 0.0:
-		_client3d.zoom_by(zoom, delta)
-		_zooming = true
-	elif _zooming:
-		_zooming = false
-		_client3d.end_zoom()
 	if tilt != 0.0:
 		_client3d.tilt(tilt, delta)
 		_tilting = true
@@ -1636,7 +1627,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   W/S tilt   Q/E zoom   A/D turn   MMB click reset view"
+			hints += "   W/S tilt   A/D turn"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
@@ -1657,7 +1648,7 @@ func _debug_text() -> String:
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
 	if _client3d != null:
-		lines.append("yaw: %.1f deg   pitch: %.1f deg   zoom: %.2fx" % [_client3d.yaw, _client3d.pitch, _client3d.zoom])
+		lines.append("yaw: %.1f deg   pitch: %.1f deg" % [_client3d.yaw, _client3d.pitch])
 	else:
 		lines.append("azimuth: %.1f deg" % Iso.azimuth)
 	lines.append("controls: %s" % Net.controls)
