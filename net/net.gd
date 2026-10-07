@@ -14,6 +14,9 @@ extends Node
 ##   --console                    read console commands from stdin (--server does this anyway)
 ##   --no-companions              server/host: players get no companion
 ##   --no-player-reset            server/host: R from a client does not rebuild the room
+##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
+##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
+##   --mind-why                   ask the minds for a short "why" with each answer, for the log
 ##   --llm-model=<m>              companion minds ask this model...
 ##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
 ##                                a URL ending /chat/completions is spoken to OpenAI-style)
@@ -119,6 +122,13 @@ var console := false
 const DEFAULT_LLM_URL := "http://127.0.0.1:11434/api/chat"
 var llm_url := DEFAULT_LLM_URL
 var llm_model := ""
+## The mind log's file ("" for none); see MindLog. A dedicated server
+## writes /var/lib/psykinetic/mind.log by default when that directory is
+## there. --mind-why asks the minds for their reason as well.
+const DEFAULT_MIND_LOG := "/var/lib/psykinetic/mind.log"
+var mind_log_path := ""
+var _mind_log_given := false
+var mind_why := false
 ## --no-companions: players get no companion (tests of other things, or ops).
 var companions := true
 ## --no-player-reset turns this off: any player may rebuild the room with R.
@@ -228,6 +238,8 @@ func _enter_tree() -> void:
 		_apply_settings()
 	_apply_renderer_setting()
 	_apply_window_settings()
+	if mode == Mode.SERVER and not _mind_log_given and DirAccess.dir_exists_absolute(DEFAULT_MIND_LOG.get_base_dir()):
+		mind_log_path = DEFAULT_MIND_LOG
 	if player_id.is_empty():
 		# A client run from the command line gets a throwaway id; a host or
 		# server run from the project is always the same dev player.
@@ -841,8 +853,10 @@ func _parse_args() -> void:
 				companions = false
 			"--no-player-reset":
 				player_reset = false
+			"--mind-why":
+				mind_why = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", \
+					"--llm-url", "--llm-model", "--mind-log", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
@@ -893,6 +907,9 @@ func _set_option(key: String, value: String) -> void:
 			llm_url = value
 		"--llm-model":
 			llm_model = value
+		"--mind-log":
+			mind_log_path = value
+			_mind_log_given = true
 		"--test-version":
 			_test_version = value
 		"--test-protocol":

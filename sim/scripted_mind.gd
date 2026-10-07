@@ -16,6 +16,14 @@ func _init() -> void:
 func decide(context: Dictionary) -> Dictionary:
 	if str(context.get("trigger", "")) == Companion.BUMPED:
 		return {"intent": "YIELD", "target": null, "say": ""}
+	var answer := _decide(context)
+	if str(context.get("trigger", "")) == Companion.OWNER_SPOKE:
+		# Spoken to: a word back, and on with what it was going to do.
+		answer["say"] = "Hm?" if "?" in str(context.get("owner_said", "")) else "Mm."
+	return answer
+
+
+func _decide(context: Dictionary) -> Dictionary:
 	var hp := float(context.get("hp", 0))
 	var max_hp := float(context.get("max_hp", 1))
 	if max_hp > 0.0 and hp / max_hp < RETREAT_BELOW:

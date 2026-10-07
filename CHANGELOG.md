@@ -3,6 +3,36 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.44
+
+Companion mind, talking, speech history, housekeeping. Server and client.
+
+- **Talk to your companion**: Enter opens a line (Esc cancels). It goes to
+  every player as chat and to the party log, and your companion answers
+  and decides on it at once. At most 200 characters, one line per 2 s.
+- **Tab** shows the last 20 things said this session: speech, last words
+  and chat, with who and when.
+- **Every speech line** goes to the server log and the party log; a
+  companion's last words are always said.
+- **Companion decisions hold**: a language-model mind's choice stands until
+  its next, instead of the scripted mind's answer cutting in between.
+- **Reflexes**: below 30% hp with a monster next to her, a companion only
+  retreats, steps aside or holds, whatever her mind says.
+- **She knows about the fight**: the hp of everyone near her and the
+  recent blows on her and her owner are in what her mind is told, and the
+  reason she is asked (it was always blank before). Players are named as
+  the party log names them.
+- **Mind log**: every decision, with the full prompt and raw reply, one
+  JSON line each, to /var/lib/psykinetic/mind.log on the server
+  (`--mind-log=`; `--mind-why` asks for a reason too). Console: `mind log
+  on|off`, `mind last <name>`.
+- **Sounds** now come from art/audio/sfx/, files named for what they do;
+  the audio packs are no longer in the repo or the client.
+- `tools/ship.ps1` stops and lists untracked files unless given
+  `-IncludeUntracked`.
+
+The server must be updated to v0.1.44 too, as it refuses any other version.
+
 ## v0.1.43
 
 Mouse wheel zoom. Client (the server only for the version).

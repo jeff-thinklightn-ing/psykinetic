@@ -1,35 +1,28 @@
 class_name Sfx
 extends Node3D
 ## Spatial sound effects for the 3D view. Every sound is a named set of
-## files from Kenney's CC0 packs under art/audio/; play() picks one of the
-## set (never the same one twice running), varies its pitch and volume a
-## little so repeats do not machine-gun, and plays it once from a point in
-## the world on the SFX bus. Nothing here decides when a sound plays: the
-## view calls play() on events the server sent (see Client3D).
+## files in art/audio/sfx/, named by purpose (swing_1.ogg, hit_3.ogg, ...;
+## SOURCES.txt there says which file of Kenney's CC0 packs each one is);
+## play() picks one of the set (never the same one twice running), varies
+## its pitch and volume a little so repeats do not machine-gun, and plays it
+## once from a point in the world on the SFX bus. Nothing here decides when
+## a sound plays: the view calls play() on events the server sent (see
+## Client3D).
 ##
 ## Volumes come from settings.cfg: master_volume= (the Master bus) and
 ## sfx_volume= (the SFX bus), each 0..1.
 
-const PACK := "res://art/audio/"
+const PACK := "res://art/audio/sfx/"
 const BUS := "SFX"
-## Set name -> [volume in dB, files under PACK].
-var sets := {
-	"swing": [-8.0, ["kenney_rpg-audio/Audio/cloth1.ogg", "kenney_rpg-audio/Audio/cloth2.ogg",
-		"kenney_rpg-audio/Audio/cloth3.ogg", "kenney_rpg-audio/Audio/cloth4.ogg"]],
-	"hit": [-2.0, _numbered("kenney_impact-sounds/Audio/impactPunch_medium_%03d.ogg")],
-	"impact_stone": [-2.0, _numbered("kenney_impact-sounds/Audio/impactMining_%03d.ogg")],
-	"impact_wood": [-2.0, _numbered("kenney_impact-sounds/Audio/impactWood_heavy_%03d.ogg")],
-	"impact_body": [-2.0, _numbered("kenney_impact-sounds/Audio/impactPunch_heavy_%03d.ogg")],
-	"impact_body_soft": [-6.0, _numbered("kenney_impact-sounds/Audio/impactSoft_heavy_%03d.ogg")],
-	"break": [0.0, _numbered("kenney_impact-sounds/Audio/impactPlank_medium_%03d.ogg")],
-	"death_monster": [0.0, _numbered("kenney_impact-sounds/Audio/impactSoft_medium_%03d.ogg")],
-	"death_player": [0.0, _numbered("kenney_impact-sounds/Audio/impactSoft_heavy_%03d.ogg")],
-	"death_companion": [-2.0, ["kenney_rpg-audio/Audio/dropLeather.ogg"]],
-	"door_open": [-4.0, ["kenney_rpg-audio/Audio/doorOpen_1.ogg", "kenney_rpg-audio/Audio/doorOpen_2.ogg"]],
-	"door_close": [-4.0, ["kenney_rpg-audio/Audio/doorClose_1.ogg", "kenney_rpg-audio/Audio/doorClose_2.ogg",
-		"kenney_rpg-audio/Audio/doorClose_3.ogg", "kenney_rpg-audio/Audio/doorClose_4.ogg"]],
-	"footstep": [-16.0, _numbered("kenney_impact-sounds/Audio/footstep_concrete_%03d.ogg")],
+## Set name -> [volume in dB, how many files: <name>_1.ogg ... in PACK].
+const SET_SIZES := {
+	"swing": [-8.0, 4], "hit": [-2.0, 5], "impact_stone": [-2.0, 5], "impact_wood": [-2.0, 5],
+	"impact_body": [-2.0, 5], "impact_body_soft": [-6.0, 5], "break": [0.0, 5],
+	"death_monster": [0.0, 5], "death_player": [0.0, 5], "death_companion": [-2.0, 1],
+	"door_open": [-4.0, 2], "door_close": [-4.0, 4], "footstep": [-16.0, 5],
 }
+## Set name -> [volume in dB, its files under PACK].
+var sets := _sets()
 ## Each play: pitch times 1 ± this, volume from -VOLUME_JITTER_DB to half
 ## that above.
 const PITCH_JITTER := 0.07
@@ -47,11 +40,14 @@ var _last: Dictionary[String, int] = {}
 var played: Array[Array] = []
 
 
-static func _numbered(pattern: String) -> Array[String]:
-	var files: Array[String] = []
-	for i in 5:
-		files.append(pattern % i)
-	return files
+static func _sets() -> Dictionary:
+	var out := {}
+	for set_name: String in SET_SIZES:
+		var files: Array[String] = []
+		for i in range(1, int(SET_SIZES[set_name][1]) + 1):
+			files.append("%s_%d.ogg" % [set_name, i])
+		out[set_name] = [SET_SIZES[set_name][0], files]
+	return out
 
 
 func _ready() -> void:

@@ -18,9 +18,14 @@ extends RefCounted
 ##                   bump, "owner bumped into you", with
 ##   owner_direction {dx, dy}: the way the owner was walking ({} otherwise)
 ##   free_cells      [{dx, dy}]: free cells next to it ([] otherwise)
-## and answers {"intent": String, "target": String|null, "say": String},
-## or {} when it has no answer right now (an async mind still waiting), in
-## which case the scripted mind's answer is used for that window.
+##   recent_hits     [{on: "you"|"your owner", by, amount, cause, ticks_ago}]
+##   owner_said      what the owner just said, with trigger "your owner just
+##                   said to you" ("" otherwise)
+## and nearby entries carry hp and max_hp for anything that has them.
+## It answers {"intent": String, "target": String|null, "say": String,
+## optionally "why": String}, or {} when it has no answer right now (an
+## async mind still waiting): then the companion's last decision stands,
+## and only a companion with none yet takes the scripted mind's answer.
 
 ## For the console and logs: "scripted", "ollama".
 var kind := "mind"
@@ -30,6 +35,8 @@ func decide(_context: Dictionary) -> Dictionary:
 	return {}
 
 
-## Called every tick: an answer that arrived since, or {}.
-func poll() -> Dictionary:
-	return {}
+## Called every tick: the requests that came back since, answered or not
+## ({prompt, trigger, raw, answer, error, latency_ms}); [] for a mind that
+## answers at once.
+func take_results() -> Array[Dictionary]:
+	return []

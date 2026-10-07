@@ -6,6 +6,7 @@
 #   tools\ship.ps1 -Release 0.1.14                          nothing to commit; release and deploy
 #   -SkipTests                                              when they just ran
 #   -NoDeploy                                               leave the server alone
+#   -IncludeUntracked                                       commit untracked files too (see 2)
 # The box is $env:PSYKINETIC_BOX (user@host for ssh), default jequig@100.78.120.114.
 #
 # Order of work:
@@ -14,6 +15,9 @@
 #   2. a headless import, so Godot writes the .uid of any new script now;
 #      refuse if a script would be committed without its .uid (the box must
 #      never be the first to make one: its copy would block the next pull).
+#      Then stop and list any untracked file unless -IncludeUntracked: a file
+#      dropped into the project (an asset pack, say) is never swept into a
+#      release by accident.
 #      Then run tests\run.ps1, tests\net_test.ps1, tests\state_test.ps1
 #   3. with -Release: add "## v<version>" to the top of CHANGELOG.md with the
 #      message as its one bullet, unless that section already exists
@@ -26,7 +30,8 @@ param(
 	[string]$Message = '',
 	[string]$Release = '',
 	[switch]$SkipTests,
-	[switch]$NoDeploy
+	[switch]$NoDeploy,
+	[switch]$IncludeUntracked
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -67,6 +72,12 @@ $scripts = @(git ls-files --cached --others --exclude-standard -- '*.gd' '*.gdsh
 $known = @(git ls-files --cached --others --exclude-standard -- '*.uid')
 $missing = @($scripts | Where-Object { $known -notcontains "$_.uid" })
 if ($missing.Count -gt 0) { Fail "no .uid for $($missing -join ', ') after an import; open the project in the editor once" }
+$untracked = @(git ls-files --others --exclude-standard)
+if ($untracked.Count -gt 0 -and -not $IncludeUntracked) {
+	$shown = ($untracked | Select-Object -First 40) -join "`n  "
+	$more = if ($untracked.Count -gt 40) { "`n  ... and $($untracked.Count - 40) more" } else { '' }
+	Fail "untracked files would be committed:`n  $shown$more`nadd or ignore them, or pass -IncludeUntracked to commit them"
+}
 
 if (-not $SkipTests) {
 	Run 'sim tests' { & "$root\tests\run.ps1" | Select-String 'RESULT|FAIL|ERROR' | ForEach-Object { $_.Line } }

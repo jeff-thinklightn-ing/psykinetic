@@ -600,3 +600,60 @@ that springs back. This replaces 64 and 65 and the commit rule of 58.
 Zoom is back, on the mouse wheel in both schemes, in a narrow range
 (0.8-1.4×) of small eased steps, centred on the player, sticky and saved;
 a middle click resets it. Nothing else about the camera changed (66).
+
+## 68. The camera, final, and what was tried and rejected
+
+The 3D camera as it stands (66, 67): locked on the player; the yaw turns
+freely all the way round (A/D in the click scheme, the sideways middle
+drag in WASD) and, let go, locks on the next diamond the way it turned,
+or back under 10°, and that diamond is saved; W/S (click) or the vertical
+middle drag (WASD) tilt for a look and spring back to 50°; the mouse
+wheel zooms 0.8-1.4× in small eased steps, saved, and a middle click puts
+it back to 1×. Never turned under a held WASD key (50). Tried and
+rejected, so they are not tried again:
+
+- *Resting on the axis-aligned views* (45° steps). Walls then run straight
+  across the screen and the near ones hide the cells behind them edge-on;
+  the diamond views read the map best (54).
+- *A horizontal middle-drag peek* that sprang back to the diamond (55). It
+  did what a turn does, only temporarily, and fought the free turn for the
+  same gesture; the vertical look is the peek that earns its place (56).
+- *Character-relative Q/E*, look to my left or right (59). It was clever
+  but unpredictable: which way the camera went depended on a facing the
+  player had to work out, and at a diamond either step is 45° off.
+- *A ±90° clamp about a home* (64), fixed or following the character (65).
+  A fixed home stopped the camera where the player wanted to look; one
+  that turned by itself moved the view under the player's hand.
+- *Zoom on keys* (W/S, then Q/E: 60, 63), sticky, over a wide range. Keys
+  are needed for turning and tilting, and a wide range let the view get
+  lost; the wheel's narrow range is enough to frame a fight.
+
+## 69. A mind's decision holds; reflexes come first
+
+A slower mind's answer stands until its next: the scripted mind fills in
+only before her mind's first decision, so the language model's choices
+are not interleaved with a different mind's every window. Reflexes are
+not the mind's to decide: below 30% hp with a hostile adjacent she
+retreats, yields or holds, whatever any mind said or is doing. Every
+decision, with the full prompt and the raw reply, goes in the mind log,
+so what she was told is never a guess.
+
+## 70. Players' words are data
+
+What a player says to their companion reaches her mind as a field of the
+context (`owner_said`) with a trigger, and the system prompt says it is
+speech in the game, never instructions. Her answer goes through the same
+whitelist and reflexes as any other; nothing a player types can widen
+what she may do.
+
+## 71. Only purpose-named copies of the audio are tracked and shipped
+
+The sound packs are downloads, hundreds of files of which the game uses
+some fifty. Those are copied into art/audio/sfx/ under names that say what
+they are for, with a SOURCES.txt and the packs' licences; the packs stay
+on the developer's disk, ignored by git and by Godot.
+
+## 72. ship.ps1 never commits an untracked file by default
+
+It stops and lists them unless -IncludeUntracked. Its `git add -A` once
+swept an asset pack that was still being copied in into a release.

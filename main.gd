@@ -211,6 +211,18 @@ var _test_arrived := false
 var _test_contested := false
 var _test_reset_sent := false
 var _test_door_sent := false
+## Everything said this session (speech, last words, chat), shown with Tab.
+var talk: TalkPanel
+## The chat box (Enter opens it, Esc cancels); while it is open the game's
+## keys do nothing.
+var _chat_box: LineEdit
+## When this peer last sent a chat line (msec), and, on the server, when
+## each player last did (tick).
+var _chat_sent_at := -100000
+var _chat_tick: Dictionary[int, int] = {}
+## A chat line: at most this long, at most one per this many seconds.
+const CHAT_MAX_CHARS := 200
+const CHAT_INTERVAL := 2.0
 ## Client: whether this peer has ever had a player, to tell a rejected join
 ## from a later disconnect.
 var _had_player := false
@@ -278,6 +290,7 @@ func _ready() -> void:
 			Iso.tile_to_local(probe), ground.map_to_local(probe)])
 
 	near_walls.self_modulate.a = NEAR_WALL_ALPHA
+	_build_talk()
 	_paint_level()
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
@@ -377,6 +390,14 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
+	if is_typing():
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_TAB:
+		talk.visible = not talk.visible
+		return
+	if key != null and key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		_open_chat()
+		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_F3:
 		debug_overlay.visible = not debug_overlay.visible
 		return
@@ -511,6 +532,8 @@ func _held_key_names() -> String:
 func _held_letters(keys: Array[Key]) -> String:
 	if not Net.test_walk.is_empty():
 		return _test_walk_keys()
+	if is_typing():
+		return ""
 	var held := ""
 	if DisplayServer.get_name() != "headless":
 		for key in keys:
@@ -1330,6 +1353,8 @@ func _remember_companion(id: String) -> void:
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	if command_name == "order" and entity is Player:
 		handle_order(entity, int(args.get("slot", 0)))
+	elif command_name == "say" and entity is Player:
+		_player_said(entity, str(args.get("text", "")))
 	elif command_name == "swing" and entity is Player:
 		var swing := _direction_arg(args)
 		if swing != Vector2i.ZERO:
@@ -1361,6 +1386,69 @@ static func _direction_arg(args: Dictionary) -> Vector2i:
 	return direction if direction in World.DIRECTIONS else Vector2i.ZERO
 
 
+## The talk panel (Tab) and the chat box (Enter), on the HUD.
+func _build_talk() -> void:
+	talk = TalkPanel.new()
+	talk.anchor_left = 0.0
+	talk.anchor_top = 1.0
+	talk.anchor_bottom = 1.0
+	talk.offset_left = 30
+	talk.offset_bottom = -170
+	talk.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	$HUD.add_child(talk)
+	_chat_box = LineEdit.new()
+	_chat_box.name = "ChatBox"
+	_chat_box.max_length = CHAT_MAX_CHARS
+	_chat_box.placeholder_text = "say to your companion (Enter sends, Esc cancels)"
+	_chat_box.visible = false
+	_chat_box.anchor_top = 1.0
+	_chat_box.anchor_bottom = 1.0
+	_chat_box.offset_left = 30
+	_chat_box.offset_right = 1500
+	_chat_box.offset_top = -150
+	_chat_box.offset_bottom = -60
+	_chat_box.text_submitted.connect(_send_chat)
+	_chat_box.gui_input.connect(func(event: InputEvent) -> void:
+		var key := event as InputEventKey
+		if key != null and key.pressed and key.keycode == KEY_ESCAPE:
+			_close_chat()
+			get_viewport().set_input_as_handled())
+	$HUD.add_child(_chat_box)
+
+
+## The chat box is open: the game's keys are the box's.
+func is_typing() -> bool:
+	return _chat_box != null and _chat_box.visible
+
+
+func _open_chat() -> void:
+	if _local_player() == null:
+		return
+	_chat_box.text = ""
+	_chat_box.visible = true
+	_chat_box.grab_focus()
+
+
+func _close_chat() -> void:
+	_chat_box.release_focus()
+	_chat_box.visible = false
+
+
+## Enter in the chat box: send the line (as a command, so the server checks
+## and spreads it), at most one per CHAT_INTERVAL from here as well.
+func _send_chat(text: String) -> void:
+	_close_chat()
+	var me := _local_player()
+	var line := text.strip_edges().left(CHAT_MAX_CHARS)
+	if me == null or line.is_empty():
+		return
+	if Time.get_ticks_msec() - _chat_sent_at < CHAT_INTERVAL * 1000.0:
+		hud.text = "wait a moment before saying more"
+		return
+	_chat_sent_at = Time.get_ticks_msec()
+	World.command(me, "say", {"text": line})
+
+
 ## Server: a creature or a breakable thing was killed. Every view hears of
 ## it ("death"), with what it was and where, since its node goes at once;
 ## a companion says a last line.
@@ -1374,7 +1462,9 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 		kind = "monster"
 	var line := ""
 	if entity is Companion:
+		# Always said: last words never wait on the speech rate limit.
 		line = COMPANION_DEATH_LINES[randi() % COMPANION_DEATH_LINES.size()]
+		party_log.add("%s said: \"%s\"" % [entity.name, line])
 	Net.broadcast("death", {"entity": String(entity.name), "tile": [entity.tile.x, entity.tile.y],
 		"kind": kind, "cause": String(cause), "say": line})
 
@@ -1388,6 +1478,26 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 	if pet.bumped(direction):
 		party_log.add("%s bumped into %s." % [_display_name(mover), pet.name])
 		print("[mind] %s bumped into %s going %s" % [_display_name(mover), pet.name, direction])
+
+
+## Server: [param player] said [param text] (the chat box). At most
+## CHAT_MAX_CHARS, one line per CHAT_INTERVAL; to everyone as chat, into
+## the party log, and to their companion as a decision, the words as data.
+func _player_said(player: Player, text: String) -> void:
+	var line := text.strip_edges().left(CHAT_MAX_CHARS)
+	if line.is_empty():
+		return
+	var id := player.get_instance_id()
+	if World.tick - _chat_tick.get(id, -100000) < roundi(CHAT_INTERVAL * World.TICK_RATE):
+		print("[chat] %s: too soon after the last line; dropped" % _display_name(player))
+		return
+	_chat_tick[id] = World.tick
+	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
+	var to := String(pet.name) if is_instance_valid(pet) and pet.spawned else ""
+	party_log.add("%s said%s: \"%s\"" % [_display_name(player), " to " + to if to != "" else "", line])
+	Net.broadcast("chat", {"from": _display_name(player), "to": to, "text": line})
+	if to != "":
+		pet.owner_spoke(line)
 
 
 func handle_order(player: Player, slot: int) -> void:
@@ -1427,21 +1537,33 @@ func _nearest_monster_to(entity: GridEntity) -> GridEntity:
 
 
 func _on_companion_said(text: String, pet: Companion) -> void:
-	Net.broadcast("speech", {"entity": String(pet.get_path()), "text": text})
+	party_log.add("%s said: \"%s\"" % [pet.name, text])
+	Net.broadcast("speech", {"entity": String(pet.get_path()), "speaker": String(pet.name), "text": text})
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "death":
 		if _client3d != null:
 			_client3d.on_death(data)
+		var last_words := str(data.get("say", ""))
+		if not last_words.is_empty():
+			print("[speech] %s: %s" % [data.get("entity", ""), last_words])
+			talk.add_line(str(data.get("entity", "")), last_words)
+		return
+	if kind == "chat":
+		var heard := "%s%s" % [data.get("from", ""), " (to %s)" % data["to"] if str(data.get("to", "")) != "" else ""]
+		print("[chat] %s: %s" % [heard, data.get("text", "")])
+		talk.add_line(heard, str(data.get("text", "")), true)
 		return
 	if kind == "speech":
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
+		var speaker := str(data.get("speaker", entity.name if entity != null else "?"))
+		print("[speech] %s: %s" % [speaker, data.get("text", "")])
+		talk.add_line(speaker, str(data.get("text", "")))
 		if entity != null:
 			entity.say(str(data.get("text", "")))
 			if _client3d != null:
 				_client3d.say(entity, str(data.get("text", "")))
-			print("[speech] %s: %s" % [entity.name, data.get("text", "")])
 
 
 ## A name for the party log: players by record name, everything else by its
@@ -1476,11 +1598,14 @@ func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause:
 		_:
 			if source != null:
 				party_log.add("%s hit %s for %d." % [_display_name(source), _display_name(entity), amount])
+	var by := _display_name(source) if source != null else String(cause)
 	if entity is Companion:
+		entity.note_hit(true, by, amount, cause)
 		entity.request_decision("hurt")
 	elif entity is Player:
 		for pet: Companion in _companions.values():
 			if is_instance_valid(pet) and pet.keeper == entity:
+				pet.note_hit(false, by, amount, cause)
 				pet.request_decision("owner hurt")
 
 
@@ -1804,8 +1929,18 @@ func admin_command(line: String) -> String:
 					pet.mind.kind if pet.mind != null else "none", pet.last_mind])
 			return "%d companions\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 companions"
 		"mind":
+			if words.size() >= 2 and words[1] == "log":
+				if words.size() >= 3 and words[2] in ["on", "off"]:
+					MindLog.enabled = words[2] == "on"
+				return "mind log %s (%s)" % ["on" if MindLog.enabled else "off",
+					Net.mind_log_path if Net.mind_log_path != "" else "no file: --mind-log"]
+			if words.size() >= 2 and words[1] == "last":
+				var who := " ".join(words.slice(2))
+				if not MindLog.last.has(who):
+					return "no decision of %s's logged yet (companions: %s)" % [who, ", ".join(MindLog.last.keys())]
+				return JSON.stringify(MindLog.last[who], "  ")
 			if words.size() < 2 or words[1] not in ["scripted", "ollama"]:
-				return "usage: mind scripted|ollama (now %s)" % mind_kind
+				return "usage: mind scripted|ollama | mind log on|off | mind last <name> (now %s)" % mind_kind
 			if words[1] == "ollama" and (Net.llm_url == "" or Net.llm_model == ""):
 				return "no --llm-model configured"
 			mind_kind = words[1]
@@ -1814,7 +1949,7 @@ func admin_command(line: String) -> String:
 					pet.mind = _make_mind()
 			return "companion minds: %s" % mind_kind
 		"help":
-			return "reset | respawn | players | companions | mind scripted|ollama | save"
+			return "reset | respawn | players | companions | mind scripted|ollama | mind log on|off | mind last <name> | save"
 	return "unknown command %s (try help)" % words[0]
 
 

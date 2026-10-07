@@ -514,9 +514,12 @@ whitelist, the target against the live world — and anything that does not
 hold up becomes `FOLLOW` and is logged. A decision window opens every 30
 ticks, or at once when the owner is hurt, the companion is hurt or pushed, a
 hostile first comes into line of sight, or an order arrives. The context is
-the personality card, the last 20 party-log sentences, nearby entities with
-offsets and types, own and owner hp and stamina, the owner's last order and
-the current intent.
+the personality card, the `trigger` (why she is asked now), the last 20
+party-log sentences, nearby entities with offsets, types, hostility and hp,
+`recent_hits` (blows on her and her owner in the last 100 ticks: on, by,
+amount, cause, ticks ago), own and owner hp and stamina, the owner's last
+order, `owner_said` (see Talking) and the current intent. Players are named
+by their label, as the party log names them.
 
 Two minds. `ScriptedMind`: obey the last order; retreat toward the owner
 below 30% hp; attack the nearest hostile within 3 tiles; else follow. It is
@@ -530,9 +533,28 @@ context. The answer is read from `message.content`, with any `<think>` block
 stripped first in case a model reasons anyway. A URL ending in
 `/chat/completions` is spoken to OpenAI-style instead (no `format` or
 `keep_alive`; the answer read from `choices[0].message.content`). A 2-second
-timeout and one request in flight per companion. A window that has no answer yet
-uses the scripted one; the reply is applied when it arrives, if it parses.
-The tick never waits.
+timeout and one request in flight per companion. The tick never waits.
+
+**A decision holds.** An answer from her mind stands until its next one:
+while a slower mind thinks she goes on with its last decision, and the
+scripted mind fills in only when she has none of her mind's yet (a new
+companion, or a mind just switched). An answer that is not a valid
+intent and target is rejected and her decision stands. **Reflexes** come
+before any mind: below 30% of her hp with a hostile next to her, only
+RETREAT, YIELD and HOLD are taken; any other answer, or a decision she is
+carrying out when the reflex starts to hold, is overridden by the scripted
+RETREAT, at once.
+
+**Mind log** (`sim/mind_log.gd`): one JSON line per decision, in
+`Net.mind_log_path` (`--mind-log=<path>`; a dedicated server writes
+`/var/lib/psykinetic/mind.log` by default when that directory is there):
+time (UTC), tick, companion, mind, trigger, the full prompt (system prompt
+and context, as sent; for the scripted mind the context), the raw reply,
+the parsed intent and target, the outcome (applied, held, rejected, reflex
+override, scripted fill-in), a note on why, latency in ms, what she said,
+and with `--mind-why` the mind's own one-sentence reason (asked for in the
+reply's schema). Console: `mind log on|off`, `mind last <name>` (her last
+line, also kept with the log off).
 
 **Party log** (`sim/party_log.gd`): the server keeps the last 200
 plain-English sentences — pushes, impacts, damage, deaths, fire, orders,
@@ -559,9 +581,29 @@ is free, the scripted answer applies. The same bump again within
 1 follow, 2 hold here, 3 attack my current target (or the nearest monster),
 4 fall back, and ignores 5–9. An order is logged and opens a decision
 window. **Speech**: a mind's `say` is broadcast as `Net.message("speech",
-{entity, text})` and shown over the sprite for a moment, at most one line
-per companion per 5 seconds. Console: `companions` lists each with owner,
-intent and which mind answered last; `mind scripted|ollama` switches live.
+{entity, speaker, text})` and shown over the sprite for a moment, at most
+one line per companion per 5 seconds (an answer to her owner's words is
+always said); every line goes to the server log (`[speech] Pip: ...`) and
+the party log (`Pip said: "..."`). Last words are part of the death
+message and are always said, whatever the rate limit. Console:
+`companions` lists each with owner, intent and which mind answered last;
+`mind scripted|ollama` switches live.
+
+**Talking.** Enter opens a one-line box on the HUD (Esc cancels; while it
+is open the game's keys do nothing). A line, at most 200 characters and
+one per 2 seconds (checked on both ends), goes to the server as
+`World.command("say")`; the server broadcasts it as chat to every player,
+adds `Talos said to Pip: "..."` to the party log, and asks her companion
+for a decision at once with trigger "your owner just said to you" and the
+words in `owner_said`. The words are data in the context: the system
+prompt tells the mind they are something said to it in the game and never
+instructions about its rules or format, and her answer is checked against
+the whitelist and the reflexes as ever. She answers through `say` and her
+intents; the scripted mind says "Mm." (or "Hm?" to a question) and goes on.
+
+**Tab** shows and hides the talk panel (`render/talk_panel.gd`): the last 20
+lines said this session (companions' speech, last words, players' chat),
+each with who and when; kept for the session only.
 
 ## Hazards
 
@@ -1010,23 +1052,27 @@ both return in half a second. A broken thing (a crate) just breaks, with
 a sound.
 
 **Sound** (`client3d/sfx.gd`, `Sfx`): every sound a named set of files
-from Kenney's CC0 packs in `art/audio/`, played once from a point in the
+in `art/audio/sfx/`, named by purpose (`swing_1.ogg`, `hit_3.ogg`, ...),
+each an unchanged copy of a file from one of Kenney's CC0 packs
+(`art/audio/sfx/SOURCES.txt` says which, the packs' licences sit beside
+it and ship in the client). The packs themselves stay out of the repo and
+the build (`.gitignore`, and a `.gdignore` in each). Played once from a point in the
 world on an `SFX` bus, a different file each time where the set has more,
 with pitch ±7% and volume -2..+1 dB at random so repeats do not
 machine-gun. The listener sits on the ground under the camera's aim (the
 ortho camera is 40 units off). What plays, on what:
 
-| Event (from the server) | Set | Files |
+| Event (from the server) | Set | Copied from |
 |---|---|---|
-| Swing or attack (`swung`), pitched by the swinger's mass | `swing` | RPG Audio `cloth1-4` |
-| Hp lost to an attack (`struck`, attack) | `hit` | Impact Sounds `impactPunch_medium_000-004` |
-| Impact against a wall | `impact_stone` | `impactMining_000-004` |
-| Impact against wood | `impact_wood` | `impactWood_heavy_000-004` |
-| Impact against a body | `impact_body` + `impact_body_soft` | `impactPunch_heavy_000-004` + `impactSoft_heavy_000-004` |
-| A crate or other wooden thing broken | `break` | `impactPlank_medium_000-004` |
-| Death of a monster / player / companion | `death_monster` / `death_player` / `death_companion` | `impactSoft_medium_000-004` / `impactSoft_heavy_000-004` / RPG `dropLeather` |
-| A door opened / closed (its replicated state) | `door_open` / `door_close` | RPG `doorOpen_1-2` / `doorClose_1-4` |
-| A creature's replicated tile moves on by one | `footstep` (quiet) | `footstep_concrete_000-004` |
+| Swing or attack (`swung`), pitched by the swinger's mass | `swing_1-4` | RPG Audio `cloth1-4` |
+| Hp lost to an attack (`struck`, attack) | `hit_1-5` | Impact Sounds `impactPunch_medium_000-004` |
+| Impact against a wall | `impact_stone_1-5` | `impactMining_000-004` |
+| Impact against wood | `impact_wood_1-5` | `impactWood_heavy_000-004` |
+| Impact against a body | `impact_body_1-5` + `impact_body_soft_1-5` | `impactPunch_heavy_000-004` + `impactSoft_heavy_000-004` |
+| A crate or other wooden thing broken | `break_1-5` | `impactPlank_medium_000-004` |
+| Death of a monster / player / companion | `death_monster_1-5` / `death_player_1-5` / `death_companion_1` | `impactSoft_medium_000-004` / `impactSoft_heavy_000-004` / RPG `dropLeather` |
+| A door opened / closed (its replicated state) | `door_open_1-2` / `door_close_1-4` | RPG `doorOpen_1-2` / `doorClose_1-4` |
+| A creature's replicated tile moves on by one | `footstep_1-5` (quiet) | `footstep_concrete_000-004` |
 
 Not yet: fire (a crackle loop on fire tiles, a hiss on a burn), grunts on
 a body hit, and death cries: neither pack has them. `master_volume=` and

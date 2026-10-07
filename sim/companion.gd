@@ -15,6 +15,16 @@ extends GridEntity
 ## A mind that answers later (the language model) has one decision window
 ## to yield; if it has not by then and there is room, the scripted answer
 ## (YIELD) is applied.
+##
+## A decision holds: an answer from her mind stands until its next one. A
+## mind that answers later leaves her doing what she was while it thinks;
+## the scripted mind fills in only when she has no decision of her mind's
+## yet. Reflexes come first: below REFLEX_BELOW of her hp with a hostile
+## next to her, only RETREAT, YIELD and HOLD are taken, from any mind and
+## at any tick, and anything else is overridden by RETREAT. Her owner
+## speaking to her (owner_spoke) asks for a decision at once, with what
+## they said in the context as data. Every decision goes in the mind log
+## (MindLog).
 
 enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD }
 
@@ -35,6 +45,14 @@ const DECISION_INTERVAL_TICKS := 30
 const SPEECH_INTERVAL_TICKS := 50
 const SIGHT_RANGE := 7
 const LOG_LINES_FOR_MIND := 20
+## The context's trigger for her owner's words.
+const OWNER_SPOKE := "your owner just said to you"
+## Below this share of her hp with a hostile next to her, only these.
+const REFLEX_BELOW := 0.3
+const REFLEX_INTENTS: Array[Intent] = [Intent.RETREAT, Intent.YIELD, Intent.HOLD]
+## Blows on her and her owner within this many ticks go in the context.
+const RECENT_HIT_TICKS := 100
+const RECENT_HITS_KEPT := 10
 
 ## Emitted when the mind said something and the rate limit allows it.
 signal said(text: String)
@@ -70,6 +88,13 @@ var _bump_deadline := -1
 var _yield_tile := NONE
 var _known_hostiles: Dictionary[int, bool] = {}
 var _last_speech_tick := -1000
+## The mind whose decision she is carrying out; null while she has none of
+## her mind's (the scripted mind is filling in).
+var _decided_by: CompanionMind
+## What her owner just said, for the next decision only.
+var _owner_said := ""
+## Recent blows on her and her owner: {on, by, amount, cause, tick}.
+var _hits: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -104,6 +129,21 @@ func bumped(direction: Vector2i) -> bool:
 	return true
 
 
+## Her owner said [param text] to her: decide now, with it in the context.
+func owner_spoke(text: String) -> void:
+	_owner_said = text
+	request_decision(OWNER_SPOKE)
+	_decide()
+
+
+## A blow landed on her ([param on_her]) or her owner, for the context.
+func note_hit(on_her: bool, by: String, amount: int, cause: StringName) -> void:
+	_hits.append({"on": "you" if on_her else "your owner", "by": by, "amount": amount,
+		"cause": String(cause), "tick": World.tick})
+	if _hits.size() > RECENT_HITS_KEPT:
+		_hits.pop_front()
+
+
 ## The owner pressed an order key. Slots 1..4; others are accepted and ignored.
 func give_order(order: String, target: GridEntity = null) -> void:
 	last_order = order
@@ -118,43 +158,97 @@ func _sim_tick() -> void:
 		return
 	_notice_hostiles()
 	if mind != null:
-		var late := mind.poll()
-		if not late.is_empty():
-			_apply(late, mind.kind)
+		for result: Dictionary in mind.take_results():
+			_take_result(result)
 	if _bump_deadline != -1 and World.tick >= _bump_deadline:
 		# The mind had its window and did not yield: the scripted answer.
 		_bump_deadline = -1
 		if current_intent != Intent.YIELD and _find_yield_tile() != NONE:
 			print("[mind] %s: no yield from %s in time; the scripted answer" % [name, mind.kind])
-			_apply(ScriptedMind.new().decide(_context()), "scripted")
+			var context := _context(BUMPED)
+			_apply(ScriptedMind.new().decide(context), "scripted", {"trigger": BUMPED,
+				"prompt": JSON.stringify(context), "note": "no yield from the mind in time"}, true)
 		_bump_direction = Vector2i.ZERO
 	if not _decision_reason.is_empty() or World.tick >= _next_decision_tick:
 		_decide()
+	if _reflex_active() and current_intent not in REFLEX_INTENTS:
+		_reflex_override(intent_name(), {"trigger": "reflex"})
 	_execute()
 
 
 # --- Deciding -----------------------------------------------------------------
 
 func _decide() -> void:
+	var reason := _decision_reason
 	_next_decision_tick = World.tick + DECISION_INTERVAL_TICKS
 	_decision_reason = ""
-	var context := _context()
+	var context := _context(reason)
+	_owner_said = ""
 	var answer: Dictionary = mind.decide(context) if mind != null else {}
-	var source := mind.kind if mind != null else "none"
-	if answer.is_empty() and context["trigger"] == BUMPED and mind != null:
+	var entry := {"trigger": context["trigger"]}
+	if not answer.is_empty():
+		# A mind that answers at once: what it was told is the context.
+		entry["prompt"] = JSON.stringify(context)
+		entry["reply"] = JSON.stringify(answer)
+		entry["latency_ms"] = 0
+		_apply(answer, mind.kind, entry)
+		return
+	if mind != null and context["trigger"] == BUMPED:
 		# Waiting on a slower mind: it has one window to yield (see _sim_tick).
 		_bump_deadline = World.tick + DECISION_INTERVAL_TICKS
 		return
+	if mind != null and _decided_by == mind:
+		return  # Her mind's last decision stands while it thinks.
+	# No decision of her mind's yet: the scripted one fills in.
+	var scripted := ScriptedMind.new().decide(context)
+	entry["prompt"] = JSON.stringify(context)
+	entry["reply"] = JSON.stringify(scripted)
+	entry["latency_ms"] = 0
+	entry["note"] = "no decision yet; the scripted mind fills in"
+	_apply(scripted, "scripted", entry, true)
+
+
+## A slower mind's request came back: its answer is applied, or, with
+## none, her decision stands; either way it is logged.
+func _take_result(result: Dictionary) -> void:
+	var entry := {"trigger": result.get("trigger", ""), "prompt": result.get("prompt", ""),
+		"reply": result.get("raw", ""), "latency_ms": result.get("latency_ms", 0)}
+	var answer: Dictionary = result.get("answer", {})
 	if answer.is_empty():
-		answer = ScriptedMind.new().decide(context)
-		source = "scripted"
-	_apply(answer, source)
+		entry["companion"] = String(name)
+		entry["mind"] = mind.kind
+		entry["outcome"] = "held"
+		entry["note"] = "no answer (%s); %s stands" % [result.get("error", ""), intent_name()]
+		MindLog.record(entry)
+		return
+	_apply(answer, mind.kind, entry)
 
 
-## Validates a mind's answer against the whitelist and the live world and
-## adopts it. Anything that does not hold up becomes FOLLOW, and is logged.
-func _apply(answer: Dictionary, source: String) -> void:
-	last_mind = source
+## Below REFLEX_BELOW of her hp with a hostile next to her.
+func _reflex_active() -> bool:
+	if max_hp <= 0 or float(hp) / max_hp >= REFLEX_BELOW:
+		return false
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) == 1:
+			return true
+	return false
+
+
+## The reflex wins over [param rejected]: RETREAT, logged as an override.
+func _reflex_override(rejected: String, entry: Dictionary) -> void:
+	print("[mind] %s: reflex: %s rejected below %d%% hp with a hostile next to her; RETREAT" % [
+		name, rejected, roundi(REFLEX_BELOW * 100.0)])
+	entry["note"] = "reflex: %s rejected below %d%% hp with a hostile adjacent" % [rejected, roundi(REFLEX_BELOW * 100.0)]
+	entry["reflex"] = true
+	_apply({"intent": "RETREAT", "target": null, "say": ""}, "scripted", entry, true)
+
+
+## Validates a mind's answer against the whitelist, the reflexes and the
+## live world and adopts it. An answer that does not hold up is rejected:
+## her decision stands, or with none she follows. [param entry] is the
+## mind log line so far; [param filling_in] for the scripted mind standing
+## in, which does not count as her mind's decision.
+func _apply(answer: Dictionary, source: String, entry := {}, filling_in := false) -> void:
 	var intent_text := str(answer.get("intent", "")).strip_edges().to_upper()
 	var target_text := str(answer.get("target", "")) if answer.get("target") != null else ""
 	var intent := INTENT_NAMES.find(intent_text)
@@ -163,10 +257,33 @@ func _apply(answer: Dictionary, source: String) -> void:
 	if ok and (intent == Intent.ATTACK or intent == Intent.SHOVE):
 		target = _entity_named(target_text)
 		ok = target != null and target != self and target != keeper
+	entry["companion"] = String(name)
+	entry["mind"] = source
+	entry["intent"] = intent_text
+	entry["target"] = target_text
+	if answer.has("why"):
+		entry["why"] = str(answer["why"])
 	if not ok:
+		entry["outcome"] = "rejected"
+		if _decided_by != null:
+			entry["note"] = "not a valid intent and target; %s stands" % intent_name()
+			print("[mind] %s (%s): invalid answer %s; %s stands" % [name, source, answer, intent_name()])
+			MindLog.record(entry)
+			return
+		entry["note"] = "not a valid intent and target; following"
 		print("[mind] %s (%s): invalid answer %s; following" % [name, source, answer])
 		intent = Intent.FOLLOW
 		target = null
+	elif intent not in REFLEX_INTENTS and _reflex_active() and not entry.get("reflex", false):
+		entry["outcome"] = "reflex override"
+		_reflex_override(intent_text, entry)
+		return
+	if not entry.has("outcome"):
+		entry["outcome"] = "reflex override" if entry.get("reflex", false) \
+				else "scripted fill-in" if filling_in else "applied"
+	last_mind = source
+	if not filling_in or entry.get("reflex", false):
+		_decided_by = mind
 	var before := current_intent
 	current_intent = intent as Intent
 	intent_target = target
@@ -190,12 +307,18 @@ func _apply(answer: Dictionary, source: String) -> void:
 	if current_intent != before:
 		print("[mind] %s (%s): %s%s" % [
 			name, source, intent_name(), " " + target.name if target != null else ""])
-	if not line_said.is_empty() and World.tick - _last_speech_tick >= SPEECH_INTERVAL_TICKS:
+	entry["say"] = line_said
+	MindLog.record(entry)
+	# An answer to her owner's words is always said; otherwise one line a while.
+	var answering: bool = entry.get("trigger", "") == OWNER_SPOKE
+	if not line_said.is_empty() and (answering or World.tick - _last_speech_tick >= SPEECH_INTERVAL_TICKS):
 		_last_speech_tick = World.tick
 		said.emit(line_said.left(120))
 
 
-func _context() -> Dictionary:
+## What her mind is told. [param reason] is why it is asked now ("" for
+## an ordinary window).
+func _context(reason := "") -> Dictionary:
 	var nearby: Array[Dictionary] = []
 	for entity in World.get_entities():
 		if entity == self or not entity.spawned:
@@ -203,19 +326,28 @@ func _context() -> Dictionary:
 		var offset: Vector2i = entity.tile - tile
 		if maxi(absi(offset.x), absi(offset.y)) > SIGHT_RANGE:
 			continue
-		nearby.append({
-			"name": String(entity.name), "type": _type_of(entity),
+		var seen := {
+			"name": _name_of(entity), "type": _type_of(entity),
 			"dx": offset.x, "dy": offset.y, "hostile": entity is Monster,
-		})
+		}
+		if entity.max_hp > 0:
+			seen["hp"] = entity.hp
+			seen["max_hp"] = entity.max_hp
+		nearby.append(seen)
+	var recent_hits: Array[Dictionary] = []
+	for hit in _hits:
+		if World.tick - int(hit["tick"]) <= RECENT_HIT_TICKS:
+			recent_hits.append({"on": hit["on"], "by": hit["by"], "amount": hit["amount"],
+				"cause": hit["cause"], "ticks_ago": World.tick - int(hit["tick"])})
 	var owner_info := {}
 	if keeper != null and is_instance_valid(keeper) and keeper.spawned:
 		var offset: Vector2i = keeper.tile - tile
 		owner_info = {
-			"name": String(keeper.name), "hp": keeper.hp, "max_hp": keeper.max_hp,
+			"name": _name_of(keeper), "hp": keeper.hp, "max_hp": keeper.max_hp,
 			"stamina": keeper.stamina, "max_stamina": keeper.max_stamina,
 			"dx": offset.x, "dy": offset.y,
 		}
-	var trigger := _decision_reason
+	var trigger := reason
 	var owner_direction := {}
 	var free_cells: Array[Dictionary] = []
 	if _bump_direction != Vector2i.ZERO:
@@ -227,8 +359,10 @@ func _context() -> Dictionary:
 	return {
 		"card": card,
 		"trigger": trigger,
+		"owner_said": _owner_said,
 		"owner_direction": owner_direction,
 		"free_cells": free_cells,
+		"recent_hits": recent_hits,
 		"log": party_log.last(LOG_LINES_FOR_MIND) if party_log != null else [],
 		"nearby": nearby,
 		"hp": hp, "max_hp": max_hp, "stamina": stamina, "max_stamina": max_stamina,
@@ -236,8 +370,14 @@ func _context() -> Dictionary:
 		"last_order": last_order,
 		"order_target": String(order_target.name) if _alive(order_target) else "",
 		"intent": intent_name(),
-		"reason": _decision_reason,
+		"reason": reason,
 	}
+
+
+## What an entity is called in her context: its label (a player's name, as
+## the party log calls them) or, with none, its node name.
+static func _name_of(entity: GridEntity) -> String:
+	return entity.label if not entity.label.is_empty() else String(entity.name)
 
 
 static func _type_of(entity: GridEntity) -> String:
@@ -254,7 +394,7 @@ func _entity_named(entity_name: String) -> GridEntity:
 	if entity_name.is_empty():
 		return null
 	for entity in World.get_entities():
-		if entity.spawned and String(entity.name) == entity_name:
+		if entity.spawned and (String(entity.name) == entity_name or _name_of(entity) == entity_name):
 			return entity
 	return null
 

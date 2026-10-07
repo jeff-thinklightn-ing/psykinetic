@@ -87,7 +87,15 @@ output, then runs `admin.sh players` to show the server is up; `-NoDeploy`
 skips that. Its own pull before `deploy.sh` cleans the same way first.
 Before it commits, `ship.ps1` runs a headless import on the dev machine
 and refuses to go on if a script has no `.uid`, so every `.uid` is
-committed with its script and the box never generates one first. The ssh key must be set up: the script never prompts.
+committed with its script and the box never generates one first. It
+then stops and lists any untracked file, unless given `-IncludeUntracked`,
+so a file dropped into the project (an asset pack, say) is never swept
+into a release by accident. The ssh key must be set up: the script never prompts.
+
+The mind log: a dedicated server writes its companions' decisions to
+`/var/lib/psykinetic/mind.log` (one JSON line each; see docs/design.md),
+the service's state directory, without any flag. It grows; truncate it
+when it gets large (`sudo truncate -s 0 /var/lib/psykinetic/mind.log`).
 
 The sudo commands `deploy.sh` runs: `install` (three times),
 `systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the
