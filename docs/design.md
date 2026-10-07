@@ -6,6 +6,8 @@
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
 | `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face, near ones translucent), `click_ripple.gd` (the ring that answers a move click). |
+| `client3d/` | The 3D view (`--renderer=3d`): the room out of the Kenney Castle Kit, puppets for entities, a fixed orthographic camera. Shares everything with the 2D client but the drawing. |
+| `art/kenney-castle/` | Kenney's Castle Kit 2.0 (CC0), 1-unit GLB modules. |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -679,6 +681,41 @@ Sprites stay upright and Y-sort by projected depth, which is just
 position.y. The near/far wall rule reads `Iso.faces_camera`, so it would
 follow a wider range; within this one the east and south faces always
 point at the camera (edge-on at the limits).
+
+## The 3D view
+
+`client3d/client3d.gd` (`Client3D`), step 1: the room. With
+`--renderer=3d` (default `2d`; a server never has one) Main hides its 2D
+ground, walls, entities, cursor and ripple and adds a `Client3D` under the
+same tree, so the net code, the spawner, the entity specs, `settings.cfg`
+and the parsed map are the ones the 2D client uses: the 2D entity nodes go
+on being the replicated state, unseen, and the 3D view reads them. One
+tile is one unit; grid (x, y) is 3D (x, 0, y). No physics bodies: the sim
+is the physics.
+
+The room is built once from `Terrain.parse` out of the Kenney Castle Kit
+(1-unit modules, 1.31 tall): `ground` per floor cell; `wall-narrow` per
+wall edge, shifted to straddle the boundary line, thinned to
+`WALL_THICKNESS` (0.15) and stretched to `WALL_HEIGHT` (3); a
+`wall-narrow-corner` post at every vertex where walls meet at an angle or
+end (none along a straight run, the 2D corner rule); `wall-doorway` with
+the kit's `door` leaf hinged at the edge's start for each door, the leaf
+turning with the Door node's state; fire as an emissive quad and a small
+orange OmniLight3D. Entities get a puppet each (`_make_puppet`): a
+primitive at the scale table's height (capsule for characters, box, cylinder,
+sphere, slabs), coloured as the 2D sprite is (its modulate: tint or the
+monster's mass shade), a Label3D name on creatures, and a warm
+`OmniLight3D` with shadows on players and companions. Puppets follow the 2D
+nodes every frame through `Iso.local_to_grid` at azimuth 0.
+
+Camera: `Camera3D` orthographic, `CAMERA_SIZE` 12 units tall (a 1.5-unit
+character, foreshortened by cos 50°, is a twelfth of the height), pitched
+`CAMERA_PITCH` 50° from horizontal and placed on the +x +z side so grid +x
+runs down-right and +y down-left as in the 2D diamond; it follows the
+local player. Light: a `WorldEnvironment` with near-black background and
+ambient, one faint cool `DirectionalLight3D` with shadows, the lanterns,
+the fires. Fixed for this step: no orbit, no picking, no movement input
+(Main ignores mouse buttons in 3D).
 
 **Peek.** A middle-button drag turns the view: the azimuth follows the
 horizontal drag, the full range over `Main.PEEK_DRAG_PX` (400 screen px)

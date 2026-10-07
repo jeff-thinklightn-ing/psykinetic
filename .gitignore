@@ -4,6 +4,11 @@
 export/
 build/
 *.tmp
+# The Kenney Castle Kit ships three copies of its models; Godot reads the
+# GLB ones (the others carry .gdignore too).
+art/kenney-castle/Models/FBX format/
+art/kenney-castle/Models/OBJ format/
+art/kenney-castle/Previews/
 # A player's client settings and updater log, never the repo's.
 settings.cfg
 update.log

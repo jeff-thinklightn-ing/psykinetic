@@ -42,5 +42,6 @@ theme/default_theme_scale=3.0
 
 [rendering]
 
+renderer/rendering_method="forward_plus"
 textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"

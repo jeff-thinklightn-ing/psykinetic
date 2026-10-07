@@ -292,3 +292,13 @@ Prediction steps and entity slides are kept in grid units so the view can
 turn under a moving sprite. A middle-button peek drag is the first use;
 the sim is untouched. A prototype, to find out whether a turnable view
 earns its place before anything is built on it.
+
+## 35. The 3D view is a second drawing of the same client, not a second client
+
+`--renderer=3d` adds a `Client3D` under Main and hides the 2D drawing; the
+2D entity nodes stay as the replicated state and the 3D puppets read them.
+Nothing in the net code, the spawner, the specs or the settings file knows
+which view is up, so the two cannot drift apart, and a 2D client is
+untouched by the 3D one. The room is assembled from the Kenney Castle Kit
+by the same edge and corner rules the 2D renderer uses. The sim is the
+physics: no physics bodies anywhere in the 3D scene.

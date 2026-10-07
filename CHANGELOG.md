@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.22
+
+3D client, step 1: the room. Client only; opt in with `--renderer=3d`.
+
+- A 3D view of the same client: the test room built from the Kenney
+  Castle Kit (floor pieces, narrow wall segments on the edges at 3 units,
+  corner posts where walls meet or end, the kit's doorway and door leaf,
+  fire as an emissive quad with a light), entities as tinted primitives
+  at the scale table with Label3D names, lanterns on players and
+  companions, a fixed orthographic camera at 50° matching the 2D diamond.
+- The default view is unchanged; the renderer is Forward+ explicitly.
+- The kit (CC0) ships in `art/kenney-castle/`.
+
+The server must be updated to v0.1.22 too, as it refuses any other version.
+
 ## v0.1.21
 
 Peek rotation prototype. Client only.

@@ -18,6 +18,7 @@ extends Node
 ##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
 ##                                a URL ending /chat/completions is spoken to OpenAI-style)
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
+##   --renderer=2d|3d             client view: the 2D isometric one (default) or the 3D one (client3d/)
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
 ## With no mode argument: an exported build reads settings.cfg (address=,
@@ -121,6 +122,8 @@ var _leaving: Dictionary[int, bool] = {}
 var _authenticated: Dictionary[int, String] = {}
 ## True when an exported build has no settings file and must ask for one.
 var needs_setup := false
+## Which client view Main shows: "2d" or "3d". Nothing on a server.
+var renderer := "2d"
 ## The window as the settings file has it: its windowed size and whether it
 ## is fullscreen. Applied at start, kept up to date, saved with the rest.
 var window_size := DEFAULT_WINDOW_SIZE
@@ -638,7 +641,7 @@ func _parse_args() -> void:
 				companions = false
 			"--no-player-reset":
 				player_reset = false
-			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
+			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth":
@@ -662,6 +665,8 @@ func _set_option(key: String, value: String) -> void:
 			token = value
 		"--settings":
 			_settings_override = value
+		"--renderer":
+			renderer = "3d" if value == "3d" else "2d"
 		"--player-id":
 			player_id = value.strip_edges()
 		"--name":

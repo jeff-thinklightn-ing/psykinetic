@@ -211,6 +211,8 @@ var _walls: Array[WallEdge] = []
 const NONE := Vector2i(-1, -1)
 var _held_target := NONE
 
+## The 3D view, when running with --renderer=3d; the 2D nodes are hidden.
+var _client3d: Client3D
 @onready var ground: TileMapLayer = $Ground
 @onready var entities: Node2D = $YSort/Entities
 @onready var near_walls: CanvasGroup = $NearWalls
@@ -236,6 +238,8 @@ func _ready() -> void:
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
 	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
+	if Net.renderer == "3d" and DisplayServer.get_name() != "headless":
+		_show_3d()
 	RenderingServer.set_default_clear_color(VOID)
 
 	# Every peer builds entities the same way; only the server decides when.
@@ -336,7 +340,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(local, "order", {"slot": key.keycode - KEY_0})
 		return
 	var click := event as InputEventMouseButton
-	if click == null:
+	if click == null or _client3d != null:
 		return
 	if click.button_index == MOUSE_BUTTON_MIDDLE:
 		_peek_button(click.pressed)
@@ -382,6 +386,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			if targetable:
 				_toss_target = target
 				_toss_from = get_global_mouse_position()
+
+
+## --renderer=3d: the 3D view takes over drawing; the 2D ground, walls,
+## entities (still the replicated state, just unseen), cursor and ripple
+## are hidden. The HUD stays. Mouse input is ignored in this step.
+func _show_3d() -> void:
+	for node in [ground, near_walls, $YSort, cursor, ripple, toss_aim]:
+		node.visible = false
+	_client3d = preload("res://client3d/client3d.tscn").instantiate()
+	add_child(_client3d)
+	_client3d.setup(_terrain)
 
 
 # --- Peek -------------------------------------------------------------------------
