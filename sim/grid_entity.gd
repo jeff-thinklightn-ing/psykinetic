@@ -490,6 +490,23 @@ func ready_for_step() -> bool:
 	return _prediction == null or _prediction.ready_for_step()
 
 
+## The way the entity is heading: the step being shown while it walks
+## (on the predicting client), otherwise its facing, which every step and
+## blow sets. Grid units, one of the eight directions.
+func heading() -> Vector2i:
+	if _prediction != null and _prediction.is_active() and _prediction.facing() != Vector2i.ZERO:
+		return _prediction.facing()
+	return facing
+
+
+## The entity's left (side -1) or right (side 1) for [param direction]: a
+## quarter turn of it on the ground, as a body standing there sees it
+## (the world is Y-up, grid y is 3D z).
+static func side_of(direction: Vector2i, side: int) -> Vector2:
+	var left := Vector2(direction.y, -direction.x)
+	return left if side < 0 else -left
+
+
 ## Where the walk on screen ends: the last predicted step's tile, or the
 ## entity's own.
 func walk_end() -> Vector2i:

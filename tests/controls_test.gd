@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_drag_and_freeze()
 	_test_diamonds()
 	_test_tilt_keys()
+	_test_q_e_follow_the_character()
 	_test_pitch_peek()
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
@@ -312,6 +313,52 @@ func _test_diamonds() -> void:
 	_check(is_equal_approx(Net.saved_yaw("30", -1.0), 0.0), "anything else to the nearest diamond")
 	_check(is_equal_approx(Net.saved_yaw("", 90.0), 90.0) and is_equal_approx(Net.saved_yaw("north", 90.0), 90.0),
 			"no value, or a bad one: kept as it was")
+	_free_rig(rig)
+
+
+func _test_q_e_follow_the_character() -> void:
+	print("\n== click: Q/E look to the character's left and right, at the L corridor's corner ==")
+	var rig := _rig()
+	var saved: String = Net.controls
+	Net.controls = "click"
+	# The L: a leg north of (4, 18), x 3..4, and one east of it, rows 18..19.
+	var corner := Vector2i(4, 18)
+	var cases := [
+		{"from": Vector2i(4, 15), "step": Vector2i(0, 1), "key": KEY_Q, "leg": Vector2(1, 0),
+			"name": "walking south down the north leg, Q: the east leg, on the left"},
+		{"from": Vector2i(8, 18), "step": Vector2i(-1, 0), "key": KEY_E, "leg": Vector2(0, -1),
+			"name": "walking west along the east leg, E: the north leg, on the right"},
+	]
+	for entry: Dictionary in cases:
+		var all_ok := true
+		var seen: Array[String] = []
+		for diamond in [0.0, 90.0, 180.0, 270.0]:
+			var player := _place_player(entry["from"])
+			while player.tile != corner:
+				World.order_step(player, entry["step"], player.refusals, true)
+				World.step()
+				_wait_free(player)
+			rig._ease_t = 1.0
+			rig._yaw_step = diamond
+			rig._set_yaw(diamond)
+			_main._unhandled_input(_key(entry["key"]))
+			_ease(rig)
+			var up := Client3D.screen_up(rig.yaw)
+			var leg: Vector2 = entry["leg"]
+			var revealed := leg.dot(up) > 0.5
+			var turned := is_equal_approx(absf(rig.yaw - diamond), 90.0)
+			seen.append("%d->%d (up %s)" % [diamond, rig.yaw, up.snappedf(0.01)])
+			if not (revealed and turned):
+				all_ok = false
+		_check(all_ok, "%s, toward the top of the screen from every diamond: %s" % [entry["name"], ", ".join(seen)])
+	var player := _place_player(Vector2i(11, 3))
+	World.order_step(player, Vector2i(0, 1), player.refusals, true)
+	World.step()
+	_check(GridEntity.side_of(player.heading(), -1) == Vector2(1, 0) and GridEntity.side_of(player.heading(), 1) == Vector2(-1, 0),
+			"facing south (+y): left is east (+x), right is west")
+	_check(Client3D.turn_raising(0.0, Client3D.screen_up(0.0), -1) == -1 and Client3D.turn_raising(0.0, Client3D.screen_up(0.0), 1) == 1,
+			"a side already straight up the screen: Q turns one way, E the other")
+	Net.controls = saved
 	_free_rig(rig)
 
 

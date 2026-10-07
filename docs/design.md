@@ -833,9 +833,20 @@ through any tilt. F3 shows the yaw and the pitch.
 *Click scheme camera, on the keys* (`Main._drive_camera_keys`, before the
 pick): W/S tilt the resting pitch while held at `TILT_RATE` (60°/s),
 slowing over the last `TILT_EASE_DEGREES` (8°) into either end, and it
-stays where it is left (saved on release). Q/E step to the next diamond
-in one ease in and out over `ORBIT_SECONDS` (400 ms), through the
-axis-aligned view without stopping. A/D turn the yaw while held at
+stays where it is left (saved on release). Q/E look to the character's
+left and right, not the screen's: the local player's heading
+(`GridEntity.heading`: the step being shown while it walks, otherwise its
+facing, which every move and blow sets) turned a quarter
+(`GridEntity.side_of`) gives its left or right on the ground, and the
+camera steps to the next diamond whichever way round (±90°) brings that
+vector nearer the top of the screen, the far side of the view
+(`Client3D.turn_raising`, against `Client3D.screen_up`; when the side
+points straight up or down the screen now, Q turns one way and E the
+other). So at a corner the passage on the character's left comes into
+view with Q, whatever diamond the camera was on. The step is one ease in
+and out over `ORBIT_SECONDS` (400 ms), through the axis-aligned view
+without stopping. With no character, Q/E step the screen's way round.
+A/D are screen-fixed, for free sweeping: they turn the yaw while held at
 `TURN_RATE` (180°/s), through any angle; let go, it carries on to the next
 diamond the way it was turning if it is more than `TURN_COMMIT` (10°) past
 the last diamond it passed, and otherwise goes back to that one
@@ -931,7 +942,8 @@ orders, R, F3 and F11 as ever.
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
 verbs land on the clicked target. In 3D, W/S tilt the camera (it stays
-where you leave it), Q/E step it to the next diamond, A/D turn it freely
+where you leave it), Q/E look to the character's left and right (a step
+to the next diamond), A/D turn it freely
 (settling on a diamond), and a middle click levels it; middle drags do
 nothing (see the 3D view). The
 camera follows the player alone.

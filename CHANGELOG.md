@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.36
+
+Q/E relative to the character. Client (the server only for the version).
+
+- In the click scheme Q now means "look to my left" and E "look to my
+  right", left and right of where your character is heading (the way it
+  is walking, or last moved). The camera steps 90° to the diagonal view
+  that brings that side toward the top of the screen, so at a corner the
+  passage on that side comes into view, whatever view you started from.
+- A/D still turn the camera in the screen's sense, for free sweeping.
+
+The server must be updated to v0.1.36 too, as it refuses any other version.
+
 ## v0.1.35
 
 A/D feel; Q/E back. Client (the server only for the version).

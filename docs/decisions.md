@@ -512,3 +512,15 @@ and starts it again; going back it runs on a little before it turns.
 This amends 57, which left Q/E unbound and settled A/D on the nearest
 diamond in a fixed 250 ms. The WASD scheme's middle drag keeps its
 nearest-diamond settle, and its vertical drag stays a springy peek.
+
+## 59. Q/E are relative to the character, A/D to the screen
+
+Q means look to my left, E to my right: left and right of the local
+player's heading, not of the screen. Of the two 90° steps to a
+neighbouring diamond, Q/E take the one that brings that side of the
+character nearer the top of the screen, the far side of the view, so the
+passage it is about to turn into comes into view from wherever the camera
+was. The choice is between the two steps, not against staying, since in a
+diamond view an orthogonal side is always 45° off the top either way.
+A/D stay screen-fixed for free sweeping. Heading is the shown step while
+walking, else the replicated facing, which a blow sets too.

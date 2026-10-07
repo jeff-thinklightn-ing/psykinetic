@@ -387,9 +387,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			_start_level()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E]:
-		# Click scheme, 3D: a step to the next diamond. Nothing in WASD.
+		# Click scheme, 3D: look to the character's left (Q) or right (E),
+		# a step to the next diamond. With no character, a plain step that
+		# way round. Nothing in WASD.
 		if _client3d != null and Net.controls == "click":
-			_client3d.orbit(-1 if key.keycode == KEY_Q else 1)
+			var side := -1 if key.keycode == KEY_Q else 1
+			var me := _local_player()
+			if me == null:
+				_client3d.orbit(side)
+			else:
+				_client3d.look_toward(GridEntity.side_of(me.heading(), side), side)
 		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var local := _local_player()
@@ -1597,7 +1604,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   Q/E step   A/D turn   W/S tilt   MMB click level"
+			hints += "   Q/E look left/right   A/D turn   W/S tilt   MMB click level"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]

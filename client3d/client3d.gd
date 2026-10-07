@@ -42,8 +42,10 @@ extends Node3D
 ##
 ## Click scheme, by keys (Main drives them): W/S tilt the resting pitch at
 ## TILT_RATE while held, slowing into either end, and it stays where it is
-## left; Q/E step from one diamond to the next in one ease of
-## ORBIT_SECONDS; A/D turn the yaw at TURN_RATE while held and, let go, it
+## left; Q/E look to the local player's left and right: a step to the
+## next diamond, the way round that brings that side of the character
+## nearer the top of the screen (look_toward), in one ease of
+## ORBIT_SECONDS; A/D turn the yaw, screen-fixed, at TURN_RATE while held and, let go, it
 ## carries on to the next diamond the way it was turning if it was more
 ## than TURN_COMMIT past the last one it passed, or goes back to that one,
 ## the settle starting at the turning speed so the release flows into it;
@@ -356,8 +358,33 @@ static func size_for(degrees: float) -> float:
 	return CAMERA_SIZE * lerpf(1.0, PEEK_PULL_BACK, share)
 
 
-## Click scheme, Q/E: the next diamond round, in one ease in and out;
-## saved.
+## Up the screen at [param yaw_degrees], on the ground, in grid units: away
+## from the camera (see _camera_offset).
+static func screen_up(yaw_degrees: float) -> Vector2:
+	var up := Vector3(-1, 0, -1).rotated(Vector3.UP, deg_to_rad(yaw_degrees))
+	return Vector2(up.x, up.z).normalized()
+
+
+## Which way (-1 or 1) a step from the diamond [param step] puts
+## [param vector] (grid units) nearer the top of the screen; [param tie]
+## when both do equally (it points straight up or down the screen now).
+static func turn_raising(step: float, vector: Vector2, tie: int) -> int:
+	var back := vector.dot(screen_up(step - ORBIT_STEP))
+	var on := vector.dot(screen_up(step + ORBIT_STEP))
+	if is_equal_approx(back, on):
+		return tie
+	return -1 if back > on else 1
+
+
+## Click scheme, Q/E: look toward [param vector] (grid units, the
+## character's left or right): a step to the next diamond, whichever way
+## round brings it nearer the top of the screen, the far side of the view.
+## [param tie] when it is straight up or down the screen.
+func look_toward(vector: Vector2, tie: int) -> void:
+	orbit(turn_raising(_yaw_step, vector, tie))
+
+
+## The next diamond round, in one ease in and out; saved.
 func orbit(direction: int) -> void:
 	_settle_on(_yaw_step + ORBIT_STEP * signf(direction))
 	_ease_seconds = ORBIT_SECONDS
