@@ -63,6 +63,22 @@ extends Node3D
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
 ## does (Main.camera_lean).
 ##
+## Combat reads off the puppets. A creature with hp has an HP bar over it
+## (hp_bar.gdshader: billboarded, over everything, HP_BAR_PER_HP wide per
+## hp of its max, green, amber below HP_AMBER, red below HP_RED), shown
+## while it is hurt or has been in a fight in the last COMBAT_SECONDS, or
+## while Alt is held (show_all_bars, set by Main), and faded in and out;
+## hp_bars=0 in settings.cfg turns them off. A death (on_death, from the
+## server's "death" message) makes a corpse of the puppet: it tips onto its
+## side over FALL_SECONDS with a little bounce, flashes, drops its lantern,
+## lies CORPSE_SECONDS, then sinks over SINK_SECONDS. A companion says a
+## last line; the local player's own death pulls the camera back and
+## drains the colour until they are back. Sounds (Sfx) play on the
+## server's events only: swings, blows by cause, impacts by what was hit,
+## deaths by kind, doors opening and closing, and footsteps as tiles
+## change, from where they happen; the listener is on the player, not the
+## far-off camera.
+##
 ## Picking is by ray from the camera through the cursor: an entity or door
 ## Area3D first, else the floor plane, which Main snaps to the nearest
 ## walkable cell. The hover is a square outline of the cell, the click
@@ -146,6 +162,41 @@ const HOVER_LINE := 0.05
 const TOSS := Color(1.0, 0.85, 0.4, 0.85)
 const TOSS_LENGTH := 1.3
 const SPEECH_SECONDS := 4.0
+## HP bars: units wide per hp of max hp, how tall, how high over the head,
+## when the colour turns, how long after a fight one stays, how fast it fades.
+const HP_BAR_PER_HP := 0.045
+const HP_BAR_HEIGHT := 0.1
+const HP_BAR_ABOVE := 0.1
+const HP_AMBER := 0.5
+const HP_RED := 0.25
+const HP_GREEN_COLOR := Color(0.35, 0.85, 0.35)
+const HP_AMBER_COLOR := Color(0.95, 0.7, 0.2)
+const HP_RED_COLOR := Color(0.9, 0.2, 0.15)
+const COMBAT_SECONDS := 4.0
+const HP_BAR_FADE := 4.0
+## Death: the fall (with its bounce), the flash, how long the body lies,
+## the sink into the floor, and how far it sinks; a lantern's drop and how
+## long it takes to go out.
+const FALL_SECONDS := 0.3
+const FALL_LIFT := 0.28
+const FLASH := Color(3.0, 3.0, 3.0)
+const FLASH_SECONDS := 0.15
+const CORPSE_SECONDS := 8.0
+const SINK_SECONDS := 1.0
+const SINK_DEPTH := 1.4
+const LANTERN_OUT_SECONDS := 1.2
+## A puppet whose entity went keeps this long, still, in case its death
+## comes after it (the message and the despawn race).
+const DEPARTED_SECONDS := 0.5
+## The local player dead: the camera pulls back to this times its size and
+## the colour drains to this saturation, over these times; back faster.
+const MOURN_PULL_BACK := 1.4
+const MOURN_SATURATION := 0.15
+const MOURN_SECONDS := 3.0
+const MOURN_RETURN_SECONDS := 0.5
+## A swing's pitch: lighter bodies swing higher.
+const SWING_PITCH_LIGHT := 1.2
+const SWING_PITCH_HEAVY := 0.85
 ## A swing pushes the body this far out toward the blow, and back.
 const LUNGE := 0.3
 const LUNGE_SECONDS := 0.16
@@ -250,6 +301,30 @@ var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
 ## Entity instance id -> when its speech line goes (msec).
 var _speech_until: Dictionary[int, int] = {}
+## Main: Alt is held, so every HP bar shows.
+var show_all_bars := false
+## Entity instance id -> when it was last in a fight (msec), and its hp as
+## last seen.
+var _combat_at: Dictionary[int, int] = {}
+var _last_hp: Dictionary[int, int] = {}
+## Entity instance id -> its tile as last seen, for footsteps.
+var _last_tile: Dictionary[int, Vector2i] = {}
+## Entity name -> the "death" message, for an entity still here when it
+## came; it falls when it goes.
+var _pending_deaths: Dictionary[String, Dictionary] = {}
+## Entity name -> {"puppet", "at"}: puppets whose entity went, kept a moment.
+var _departed: Dictionary[String, Dictionary] = {}
+## Door edge key -> open, as last seen, for their sounds.
+var _door_open: Dictionary[Vector3i, bool] = {}
+## The local player's entity name while there is one.
+var _local_name := ""
+## The local player's death: 0 alive .. 1 fully mourned.
+var _mourning := false
+var _mourn := 0.0
+var _environment: Environment
+var _listener: AudioListener3D
+var sfx: Sfx
+var _hp_bar_shader: Shader
 var _terrain: Dictionary = {}
 
 
@@ -267,6 +342,15 @@ func setup(terrain: Dictionary) -> void:
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
+	_hp_bar_shader = preload("res://client3d/hp_bar.gdshader")
+	sfx = Sfx.new()
+	sfx.name = "Sfx"
+	add_child(sfx)
+	# Sounds are heard from the player's place: the camera is 40 units off.
+	_listener = AudioListener3D.new()
+	_listener.name = "Listener"
+	add_child(_listener)
+	_listener.make_current()
 	# Net has the saved yaw rounded to a diamond already; --test-yaw is
 	# taken exactly, for screenshots, and rests on its nearest diamond.
 	_yaw_step = nearest_diamond(Net.camera_yaw)
@@ -286,6 +370,8 @@ func _process(delta: float) -> void:
 	_ease_peek(delta)
 	_ease_reset(delta)
 	_follow(delta)
+	_drop_departed()
+	_update_mourning(delta)
 
 
 # --- Rig ---------------------------------------------------------------------
@@ -301,6 +387,8 @@ func _build_environment() -> void:
 	world_environment.name = "Environment"
 	world_environment.environment = environment
 	add_child(world_environment)
+	environment.adjustment_enabled = true
+	_environment = environment
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
@@ -337,6 +425,10 @@ func _camera_offset() -> Vector3:
 func _place_camera() -> void:
 	_camera.position = _camera_target + _camera_offset()
 	_camera.look_at(_camera_target, Vector3.UP)
+	if _listener != null:
+		# On the ground under the camera's aim, turned as the camera is, so
+		# left and right in the ears are left and right on the screen.
+		_listener.global_transform = Transform3D(_camera.global_transform.basis, _camera_target + Vector3.UP)
 
 
 func _follow(delta: float) -> void:
@@ -346,6 +438,7 @@ func _follow(delta: float) -> void:
 	var puppet: Node3D = _puppets.get(player.get_instance_id())
 	if puppet == null:
 		return
+	_local_name = String(player.name)
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
 	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
 	_camera_target = _camera_target.lerp(puppet.position + Vector3(_lead.x, 0.0, _lead.y), rate)
@@ -364,7 +457,8 @@ func _local_player() -> Player:
 ## The ortho size: CAMERA_SIZE times the zoom, times the pitch peek's
 ## pull back while there is one (eased as its tilt is).
 func _apply_size() -> void:
-	_camera.size = CAMERA_SIZE * zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek))
+	_camera.size = CAMERA_SIZE * zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
+			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn))
 
 
 ## Click scheme, A/D held: turn [param direction] (-1 or 1) for
@@ -1100,16 +1194,189 @@ func _sync_puppets() -> void:
 			var speech := puppet.get_node_or_null("Speech") as Label3D
 			if speech != null:
 				speech.visible = false
+		_sync_bar(entity, puppet, now)
+		_step_sound(entity, puppet)
 	for id in _puppets.keys():
 		if not seen.has(id):
-			_puppets[id].queue_free()
-			_puppets.erase(id)
-			_speech_until.erase(id)
+			_entity_went(id)
+
+
+## The entity of puppet [param id] is gone: it falls if its death has come;
+## otherwise it is kept still a moment in case its death is on its way.
+func _entity_went(id: int) -> void:
+	var puppet: Node3D = _puppets[id]
+	_puppets.erase(id)
+	_speech_until.erase(id)
+	_combat_at.erase(id)
+	_last_hp.erase(id)
+	_last_tile.erase(id)
+	var entity_name: String = puppet.get_meta("entity_name", "")
+	if _pending_deaths.has(entity_name):
+		_fall(puppet, _pending_deaths[entity_name])
+		_pending_deaths.erase(entity_name)
+	else:
+		_departed[entity_name] = {"puppet": puppet, "at": Time.get_ticks_msec()}
+
+
+func _drop_departed() -> void:
+	var now := Time.get_ticks_msec()
+	for entity_name: String in _departed.keys():
+		if now - int(_departed[entity_name]["at"]) >= DEPARTED_SECONDS * 1000.0:
+			(_departed[entity_name]["puppet"] as Node3D).queue_free()
+			_departed.erase(entity_name)
+
+
+## The HP bar: its fill and colour from the hp, and whether it shows: hurt,
+## in a fight lately, or Alt held; faded either way.
+func _sync_bar(entity: GridEntity, puppet: Node3D, now: int) -> void:
+	var bar := puppet.get_node_or_null("HpBar") as MeshInstance3D
+	if bar == null:
+		return
+	var id := entity.get_instance_id()
+	if _last_hp.get(id, entity.hp) != entity.hp:
+		_combat_at[id] = now
+	_last_hp[id] = entity.hp
+	var share := clampf(float(entity.hp) / maxf(entity.max_hp, 1.0), 0.0, 1.0)
+	var material := bar.material_override as ShaderMaterial
+	var wanted := 0.0
+	if Net.hp_bars and (show_all_bars or share < 1.0 or now - _combat_at.get(id, -100000) < COMBAT_SECONDS * 1000.0):
+		wanted = 1.0
+	var alpha := move_toward(float(material.get_shader_parameter("alpha")), wanted, get_process_delta_time() * HP_BAR_FADE)
+	material.set_shader_parameter("alpha", alpha)
+	material.set_shader_parameter("fill", share)
+	material.set_shader_parameter("fill_color", hp_color(share))
+	bar.visible = alpha > 0.001
+
+
+## The bar's colour for [param share] of hp left.
+static func hp_color(share: float) -> Color:
+	if share < HP_RED:
+		return HP_RED_COLOR
+	if share < HP_AMBER:
+		return HP_AMBER_COLOR
+	return HP_GREEN_COLOR
+
+
+## A footstep when a creature's replicated tile moves on by one.
+func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
+	var id := entity.get_instance_id()
+	var last: Vector2i = _last_tile.get(id, entity.tile)
+	_last_tile[id] = entity.tile
+	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
+		sfx.play("footstep", puppet.position)
+
+
+## A blow landed: a thud on flesh for an attack (an impact makes its own
+## sound, and fire has none yet).
+func _on_struck(_amount: int, cause: StringName, id: int) -> void:
+	_combat_at[id] = Time.get_ticks_msec()
+	var puppet: Node3D = _puppets.get(id)
+	if puppet != null and cause == &"attack":
+		sfx.play("hit", puppet.position + Vector3.UP * 0.8)
+
+
+## An impact: the sound of what it hit.
+func _on_impacted(_amount: int, against: StringName, id: int) -> void:
+	_combat_at[id] = Time.get_ticks_msec()
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null:
+		return
+	var at := puppet.position + Vector3.UP * 0.6
+	match against:
+		&"stone":
+			sfx.play("impact_stone", at)
+		&"wood":
+			sfx.play("impact_wood", at)
+		&"body":
+			sfx.play("impact_body", at)
+			sfx.play("impact_body_soft", at)
+
+
+## The server's "death" message: the puppet falls now if its entity has
+## gone, or when it goes. A broken thing just breaks.
+func on_death(data: Dictionary) -> void:
+	var entity_name := str(data.get("entity", ""))
+	if str(data.get("kind", "")) == "object":
+		var tile: Variant = data.get("tile")
+		var at := Vector3(tile[0], 0.4, tile[1]) if tile is Array and tile.size() == 2 else _camera_target
+		sfx.play("break", at)
+		return
+	if _departed.has(entity_name):
+		_fall(_departed[entity_name]["puppet"], data)
+		_departed.erase(entity_name)
+		return
+	for id: int in _puppets:
+		if _puppets[id].get_meta("entity_name", "") == entity_name:
+			_pending_deaths[entity_name] = data
+			return
+
+
+## A corpse: it tips onto its side with a bounce, flashes, drops its
+## lantern, lies a while, sinks into the floor and is gone. Nothing of it
+## can be picked; its name and bar go at once.
+func _fall(puppet: Node3D, data: Dictionary) -> void:
+	puppet.name = "Corpse_" + str(data.get("entity", ""))
+	puppet.set_meta("corpse", true)
+	for part: String in ["Pick", "HpBar", "Name", "Speech"]:
+		var node := puppet.get_node_or_null(part)
+		if node != null:
+			puppet.remove_child(node)
+			node.queue_free()
+	var kind := str(data.get("kind", "monster"))
+	sfx.play("death_" + kind, puppet.position + Vector3.UP * 0.5)
+	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
+	if lantern != null:
+		lantern.reparent(self)
+		var drop := create_tween().set_parallel(true)
+		drop.tween_property(lantern, "position:y", 0.2, FALL_SECONDS).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		drop.tween_property(lantern, "light_energy", 0.0, LANTERN_OUT_SECONDS)
+		drop.chain().tween_callback(lantern.queue_free)
+	var body := puppet.get_node_or_null("Body") as MeshInstance3D
+	if body != null and body.material_override is StandardMaterial3D:
+		var material := body.material_override as StandardMaterial3D
+		var glow := material.emission
+		material.emission = FLASH
+		create_tween().tween_property(material, "emission", glow, FLASH_SECONDS)
+	var line := str(data.get("say", ""))
+	if not line.is_empty():
+		var said := _label("LastWords", line, SPEECH, 1.6)
+		said.position = puppet.position + Vector3.UP * 1.6
+		add_child(said)
+		get_tree().create_timer(SPEECH_SECONDS).timeout.connect(said.queue_free)
+	# Over onto its side, a touch too far, back, and still.
+	var side := PI * 0.5
+	var fall := create_tween()
+	fall.set_parallel(true)
+	fall.tween_property(puppet, "rotation:z", side * 1.08, FALL_SECONDS * 0.75).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	fall.tween_property(puppet, "position:y", FALL_LIFT, FALL_SECONDS * 0.75)
+	fall.chain().tween_property(puppet, "rotation:z", side * 0.97, FALL_SECONDS * 0.15)
+	fall.chain().tween_property(puppet, "rotation:z", side, FALL_SECONDS * 0.1)
+	fall.chain().tween_interval(CORPSE_SECONDS)
+	fall.chain().tween_property(puppet, "position:y", FALL_LIFT - SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
+	fall.chain().tween_callback(puppet.queue_free)
+	if kind == "player" and str(data.get("entity", "")) == _local_name:
+		_mourning = true
+
+
+## The local player dead: pull back and drain the colour, slowly; back as
+## soon as they are.
+func _update_mourning(delta: float) -> void:
+	if _mourning and _local_player() != null and _puppets.has(_local_player().get_instance_id()):
+		_mourning = false
+	var target := 1.0 if _mourning else 0.0
+	var seconds := MOURN_SECONDS if _mourning else MOURN_RETURN_SECONDS
+	var before := _mourn
+	_mourn = move_toward(_mourn, target, delta / seconds)
+	if is_equal_approx(before, _mourn) and _mourn == 0.0:
+		return
+	_environment.adjustment_saturation = lerpf(1.0, MOURN_SATURATION, smoothstep(0.0, 1.0, _mourn))
+	_apply_size()
 
 
 func _make_puppet(entity: GridEntity) -> Node3D:
 	var puppet := Node3D.new()
 	puppet.name = entity.name
+	puppet.set_meta("entity_name", String(entity.name))
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
 	var height: float = Iso.HEIGHTS[shape]
 	var body := MeshInstance3D.new()
@@ -1149,7 +1416,15 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		nose.position = Vector3(0.3, height * 0.72, 0.0)
 		pivot.add_child(nose)
 		puppet.add_child(pivot)
-		entity.swung.connect(_on_swung.bind(entity.get_instance_id()))
+		var id := entity.get_instance_id()
+		entity.swung.connect(_on_swung.bind(id))
+		entity.struck.connect(_on_struck.bind(id))
+		entity.impacted.connect(_on_impacted.bind(id))
+		entity.pushed.connect(func(_tiles: int) -> void: _combat_at[id] = Time.get_ticks_msec())
+		if entity.max_hp > 0:
+			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
+	elif entity.is_breakable():
+		entity.impacted.connect(_on_impacted.bind(entity.get_instance_id()))
 	if entity is Player or entity is Companion:
 		var light := OmniLight3D.new()
 		light.name = "Lantern"
@@ -1165,11 +1440,34 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	return puppet
 
 
-## A swing: the body goes out toward the blow and back.
+## An HP bar [param max_hp] long, [param height] up.
+func _make_bar(max_hp: int, height: float) -> MeshInstance3D:
+	var bar := MeshInstance3D.new()
+	bar.name = "HpBar"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(HP_BAR_PER_HP * max_hp, HP_BAR_HEIGHT)
+	bar.mesh = quad
+	var material := ShaderMaterial.new()
+	material.shader = _hp_bar_shader
+	material.set_shader_parameter("alpha", 0.0)
+	material.render_priority = 10
+	bar.material_override = material
+	bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bar.position.y = height
+	bar.visible = false
+	return bar
+
+
+## A swing: the body goes out toward the blow and back, with a whoosh
+## pitched by the swinger's weight.
 func _on_swung(direction: Vector2i, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null:
 		return
+	_combat_at[id] = Time.get_ticks_msec()
+	var swinger := instance_from_id(id) as GridEntity
+	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
+	sfx.play("swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	var body := puppet.get_node("Body") as Node3D
 	var rest := Vector3(0.0, body.position.y, 0.0)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE
@@ -1222,6 +1520,9 @@ func _sync_doors() -> void:
 		if doorway == null:
 			continue
 		var hinge := doorway.get_node("Hinge") as Node3D
+		if _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
+			sfx.play("door_open" if door.is_open() else "door_close", doorway.position + Vector3.UP)
+		_door_open[door.key] = door.is_open()
 		hinge.visible = not door.is_broken()
 		var target: float = PI * 0.5 if door.is_open() else 0.0
 		hinge.rotation.y = move_toward(hinge.rotation.y, target, get_process_delta_time() / Door.SWING_SECONDS * PI * 0.5)

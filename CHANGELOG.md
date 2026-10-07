@@ -3,6 +3,26 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.38
+
+Combat readability (3D view). Server and client.
+
+- **HP bars** over creatures, longer for more max hp, green, amber below
+  half, red below a quarter. They show while a creature is hurt or has
+  been fighting in the last 4 s, and fade out otherwise; hold Alt to see
+  them all. `hp_bars=0` in `settings.cfg` turns them off.
+- **Deaths**: the body tips onto its side with a little bounce, flashes,
+  drops its lantern, lies for 8 s and sinks into the floor. Corpses never
+  block anything. A companion says a last line. When you die the camera
+  pulls back and the colour drains until you are back.
+- **Sounds**, placed where they happen: swings, blows, impacts against
+  walls, wood and bodies, crates breaking, deaths, doors, and quiet
+  footsteps, all from Kenney's CC0 Impact Sounds and RPG Audio packs.
+  `master_volume=` and `sfx_volume=` (0 to 1) in `settings.cfg`.
+- Lines you add to `settings.cfg` by hand are kept when the game rewrites it.
+
+The server must be updated to v0.1.38 too, as it refuses any other version.
+
 ## v0.1.37
 
 Click scheme camera keys, remapped. Client (the server only for the version).

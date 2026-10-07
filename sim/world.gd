@@ -17,6 +17,9 @@ signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
 signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity, cause: StringName)
 signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, tiles: int, impact: int, stopped_by: String)
 signal entity_despawned(entity: GridEntity)
+## Reduced to 0 hp by [param cause] (&"attack", &"impact", &"fire"), just
+## before it is removed.
+signal entity_died(entity: GridEntity, cause: StringName)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
 ## A player's command that is not a move, attack or shove: (name, args), for
@@ -400,9 +403,10 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
 	target.hp = maxi(target.hp - amount, 0)
-	target.damaged.emit(amount)
+	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
 	if target.hp == 0:
+		entity_died.emit(target, cause)
 		despawn(target)
 
 
@@ -860,7 +864,15 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		var note := ""
 		var next_body: GridEntity = null
 		if impact > 0:
-			_impact(body, impact, mover)
+			# What it hit, for the views: a wall's stone, a door's wood, a body.
+			var against := &""
+			if blocker != null:
+				against = &"body"
+			elif door_hit != null:
+				against = &"wood" if door_hit.body_material == GridEntity.BodyMaterial.WOOD else &"stone"
+			elif collided:
+				against = &"stone"
+			_impact(body, impact, mover, against)
 			if door_hit != null:
 				_hit_door(door_hit, impact, mover)
 		# Running into something stuns, even with no force left to hurt.
@@ -872,7 +884,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 					remaining, mass_ratio(mover_mass, pushed_mass(blocker)))
 			note = " (%s takes %d)" % [blocker.name, blocker_impact]
 			if blocker_impact > 0:
-				_impact(blocker, blocker_impact, mover)
+				_impact(blocker, blocker_impact, mover, &"body")
 			if _alive(blocker):
 				next_body = blocker
 		_log("push: %s -> %s dir=%s force=%.2f tiles=%d impact=%d stopped_by=%s%s" % [
@@ -901,8 +913,10 @@ func _stun(entity: GridEntity, remaining_force: float) -> void:
 		entity._world_stunned(tick + ticks, ticks)
 
 
-func _impact(entity: GridEntity, amount: int, source: GridEntity) -> void:
-	entity._world_impacted(amount)
+## [param against] is what it hit: &"stone", &"wood", &"body", or &"" (it
+## was stopped by fire, not by anything).
+func _impact(entity: GridEntity, amount: int, source: GridEntity, against: StringName) -> void:
+	entity._world_impacted(amount, against)
 	damage(entity, amount, source, &"impact")
 
 

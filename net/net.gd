@@ -37,7 +37,10 @@ extends Node
 ## anything else, or no line, is the 3D one. It is read whatever the mode,
 ## and kept as written when the file is rewritten. controls=wasd is WASD
 ## with the mouse aiming; anything else, or no line, is click-to-move;
-## read and kept the same way.
+## read and kept the same way. hp_bars=0 turns the 3D view's HP bars off;
+## master_volume= and sfx_volume= (0..1, default 1) set the sound. Any line
+## the game does not write itself (these, and keys it does not know) is
+## kept as written when it rewrites the file.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -87,7 +90,7 @@ signal join_rejected(reason: String, server_version: String)
 
 ## Bump for a wire change that protocol() cannot see by itself (the
 ## meaning of an existing RPC argument, say).
-const PROTOCOL_REVISION := 2
+const PROTOCOL_REVISION := 3
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -165,6 +168,17 @@ var camera_yaw := 0.0
 var camera_pitch := Client3D.CAMERA_PITCH
 ## The 3D camera's zoom (click scheme W/S), a factor on the default size.
 var camera_zoom := 1.0
+## settings.cfg hp_bars= (0 turns them off), master_volume=, sfx_volume=.
+var hp_bars := true
+var master_volume := 1.0
+var sfx_volume := 1.0
+## Lines of the settings file that save_settings does not write itself,
+## key -> value as read, written back as they were.
+var _settings_kept: Dictionary = {}
+## The keys save_settings writes; everything else in the file is kept.
+const WRITTEN_SETTINGS: Array[String] = ["address", "port", "token", "player_id", "name", "display_delay",
+	"window_width", "window_height", "window_mode", "camera_yaw", "camera_pitch", "camera_zoom",
+	"renderer", "controls"]
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -290,7 +304,9 @@ func _apply_settings() -> void:
 
 
 ## renderer= and controls= from the settings file, unless given on the
-## command line: only "2d" picks the 2D view, only "click" click-to-move.
+## command line: only "2d" picks the 2D view, only "wasd" WASD. Also
+## hp_bars=, master_volume= and sfx_volume=, and every line the game does
+## not write itself, to keep.
 func _apply_renderer_setting() -> void:
 	var path := settings_path()
 	if path != "" and FileAccess.file_exists(path):
@@ -301,6 +317,24 @@ func _apply_renderer_setting() -> void:
 		_settings_controls = str(settings.get("controls", ""))
 		if not _controls_given and _settings_controls != "":
 			controls = controls_from(_settings_controls)
+		apply_view_options(settings)
+
+
+## hp_bars=, master_volume= and sfx_volume= from [param settings], and the
+## lines to keep. A volume is held to 0..1; a bad one keeps the default.
+func apply_view_options(settings: Dictionary) -> void:
+	hp_bars = str(settings.get("hp_bars", "1")).strip_edges().to_lower() not in ["0", "false", "off", "no"]
+	master_volume = _volume(settings.get("master_volume", ""), master_volume)
+	sfx_volume = _volume(settings.get("sfx_volume", ""), sfx_volume)
+	_settings_kept.clear()
+	for key: String in settings:
+		if key not in WRITTEN_SETTINGS:
+			_settings_kept[key] = settings[key]
+
+
+static func _volume(text: Variant, otherwise: float) -> float:
+	var value := str(text).strip_edges()
+	return clampf(value.to_float(), 0.0, 1.0) if value.is_valid_float() else otherwise
 
 
 ## "wasd" is WASD; anything else is click-to-move.
@@ -440,6 +474,8 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		file.store_string("renderer=%s\n" % _settings_renderer)
 	if _settings_controls != "":
 		file.store_string("controls=%s\n" % _settings_controls)
+	for key: String in _settings_kept:
+		file.store_string("%s=%s\n" % [key, _settings_kept[key]])
 	file.close()
 	return true
 

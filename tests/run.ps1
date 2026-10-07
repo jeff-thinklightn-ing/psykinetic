@@ -10,7 +10,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 	if (Test-Path $console) { $godot = $console }
 }
 
-$scenes = @('tests/push_test.tscn', 'tests/respawn_test.tscn', 'tests/companion_test.tscn', 'tests/spawn_test.tscn', 'tests/mirror_test.tscn', 'tests/edge_test.tscn', 'tests/controls_test.tscn')
+$scenes = @('tests/push_test.tscn', 'tests/respawn_test.tscn', 'tests/companion_test.tscn', 'tests/spawn_test.tscn', 'tests/mirror_test.tscn', 'tests/edge_test.tscn', 'tests/controls_test.tscn', 'tests/view_test.tscn')
 $code = 0
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {

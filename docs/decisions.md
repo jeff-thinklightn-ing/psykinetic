@@ -534,3 +534,21 @@ the tilt no longer pulls the camera back; only the WASD pitch peek, which
 is unchanged, still pulls back while held. The Q/E 90° step and the
 character-relative Q/E (59) are gone. This replaces 59 and the key map
 of 57 and 58.
+
+## 61. Combat feedback is driven by what the server says, in the view
+
+Bars, corpses and sounds are the 3D view's, and every one of them is
+keyed to a server event or replicated state: hp, the relayed blow with
+its cause (`struck`), the impact with what it hit, the swing, a door's
+open state, a tile change, and a death message. A death is a message
+rather than a node RPC because the node is despawned in the same moment;
+the view keeps a gone puppet a moment so either can come first. The sim
+is untouched: a dead creature leaves occupancy at once, so corpses are
+pictures, never obstacles.
+
+## 62. The settings file keeps what the game does not write
+
+`save_settings` writes the keys it owns and then every other line it read
+from the file, as it was. Options a player sets by hand (`hp_bars=`,
+`master_volume=`, `sfx_volume=`, and anything a later build adds) survive
+the rewrite on a resize or a camera change.

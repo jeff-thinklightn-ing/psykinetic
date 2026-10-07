@@ -160,6 +160,8 @@ const SNAP_RANGE := 3.0
 const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
 const COMPANION_CARD := "A loyal, cautious companion who guards its friend and speaks little."
 const COMPANION_TINT := Color(0.45, 0.95, 0.85)
+## What a companion says as she falls.
+const COMPANION_DEATH_LINES: Array[String] = ["Go on... without me.", "I'm sorry.", "Tell them I tried.", "Keep... going."]
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
 ## A player is not put down (on respawn or on coming back) with a hostile
@@ -324,6 +326,7 @@ func _go_online() -> void:
 		World.entity_pushed.connect(_narrate_push)
 		World.entity_damaged.connect(_narrate_damage)
 		World.entity_bumped.connect(_on_bumped)
+		World.entity_died.connect(_on_entity_died)
 		World.command_received.connect(_on_command)
 		if Net.llm_url != "" and Net.llm_model != "":
 			mind_kind = "ollama"
@@ -347,6 +350,9 @@ func _go_online() -> void:
 ## its camera, so the pick below is made against the frame as drawn.
 func _process(delta: float) -> void:
 	_follow_player(delta)
+	if _client3d != null and DisplayServer.get_name() != "headless":
+		# Alt shows every HP bar; the view only reads it.
+		_client3d.show_all_bars = Input.is_key_pressed(KEY_ALT)
 	_drag_yaw()
 	_drive_camera_keys(delta)
 	_update_pick()
@@ -1359,6 +1365,24 @@ static func _direction_arg(args: Dictionary) -> Vector2i:
 	return direction if direction in World.DIRECTIONS else Vector2i.ZERO
 
 
+## Server: a creature or a breakable thing was killed. Every view hears of
+## it ("death"), with what it was and where, since its node goes at once;
+## a companion says a last line.
+func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
+	var kind := "object"
+	if entity is Player:
+		kind = "player"
+	elif entity is Companion:
+		kind = "companion"
+	elif entity.is_creature():
+		kind = "monster"
+	var line := ""
+	if entity is Companion:
+		line = COMPANION_DEATH_LINES[randi() % COMPANION_DEATH_LINES.size()]
+	Net.broadcast("death", {"entity": String(entity.name), "tile": [entity.tile.x, entity.tile.y],
+		"kind": kind, "cause": String(cause), "say": line})
+
+
 ## Server: a player walked into their own companion; she gets out of the
 ## way (see Companion.bumped). Logged once per bump, not per key repeat.
 func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) -> void:
@@ -1411,6 +1435,10 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
+	if kind == "death":
+		if _client3d != null:
+			_client3d.on_death(data)
+		return
 	if kind == "speech":
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
 		if entity != null:

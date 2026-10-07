@@ -16,8 +16,12 @@ extends Node2D
 signal damaged(amount: int)
 ## Shoved by a push; [param tiles] may be 0 if it was stopped at once.
 signal pushed(tiles: int)
-## Stopped with force left over, or hit by something that was.
-signal impacted(amount: int)
+## Stopped with force left over, or hit by something that was;
+## [param against] is what it hit: &"stone", &"wood", &"body", or &"".
+signal impacted(amount: int, against: StringName)
+## Lost [param amount] hp to [param cause] (&"attack", &"impact", &"fire").
+## On every peer (relayed to clients), for the views' sounds and bars.
+signal struck(amount: int, cause: StringName)
 ## An attack or a swing at air went [param direction]: views lunge.
 signal swung(direction: Vector2i)
 
@@ -388,10 +392,17 @@ func _world_pushed(tiles: int, lofted := false) -> void:
 		_net_pushed.rpc_id(peer, tiles, lofted)
 
 
-func _world_impacted(amount: int) -> void:
-	impacted.emit(amount)
+func _world_impacted(amount: int, against: StringName) -> void:
+	impacted.emit(amount, against)
 	for peer in Net.sendable_peers():
-		_net_impacted.rpc_id(peer, amount)
+		_net_impacted.rpc_id(peer, amount, against)
+
+
+func _world_damaged(amount: int, cause: StringName) -> void:
+	damaged.emit(amount)
+	struck.emit(amount, cause)
+	for peer in Net.sendable_peers():
+		_net_struck.rpc_id(peer, amount, cause)
 
 
 func _world_swung(direction: Vector2i) -> void:
@@ -565,8 +576,13 @@ func _net_pushed(tiles: int, lofted: bool) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _net_impacted(amount: int) -> void:
-	impacted.emit(amount)
+func _net_impacted(amount: int, against: StringName) -> void:
+	impacted.emit(amount, against)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_struck(amount: int, cause: StringName) -> void:
+	struck.emit(amount, cause)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -630,7 +646,7 @@ func _on_pushed(_tiles: int) -> void:
 			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 
 
-func _on_impacted(_amount: int) -> void:
+func _on_impacted(_amount: int, _against: StringName) -> void:
 	_flash_pending = true
 
 

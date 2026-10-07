@@ -975,6 +975,67 @@ the shown speed frame by frame at exit), `--test-steer=<secs>` steers a
 hold-to-move, `--test-lag=<secs>` holds every order that long before
 sending it (counted in the round trip).
 
+## Combat readability (3D)
+
+All of it is the 3D view's, from what the server sends; the 2D view has
+none of it.
+
+**What the server sends.** A loss of hp goes out with its cause
+(`GridEntity.struck(amount, cause)`, relayed by `_net_struck`), an impact
+with what was hit (`impacted(amount, against)`: `&"stone"` for a wall,
+`&"wood"` for a wooden door, `&"body"` for another body, `&""` when only
+fire stopped it), and a death as a message, since the node goes at once:
+`World.entity_died` -> `Net.broadcast("death", {entity, tile, kind,
+cause, say})`, `kind` one of player, companion, monster or object, `say` a
+companion's last line (`Main.COMPANION_DEATH_LINES`).
+
+**HP bars** (`client3d/hp_bar.gdshader`): a thin bar over each creature
+with hp, billboarded and drawn over everything, `HP_BAR_PER_HP` wide per
+hp of its max (a player's 20 is longer than an imp's 12); its fill is
+the hp left, green above half, amber to a quarter, red below. It shows
+while the creature is hurt or has been in a fight (hit, swung, pushed, an
+impact) in the last `COMBAT_SECONDS` (4), or while Alt is held (read by
+Main, `Client3D.show_all_bars`), fading in and out. `hp_bars=0` in
+`settings.cfg` turns them off, for later diegetic work.
+
+**Death.** The puppet becomes a corpse (`Client3D._fall`): nothing on it
+can be picked and its name and bar go; it tips onto its side over
+`FALL_SECONDS` (300 ms) a little too far and back, flashes, drops its
+lantern if it has one (which falls to the floor and goes out over 1.2 s),
+lies `CORPSE_SECONDS` (8) and sinks into the floor over `SINK_SECONDS`
+(1). The sim removed the creature at once, so a corpse never blocks
+anything. A companion's last line shows over it. The death message and
+the despawn can arrive either way round: a puppet whose entity went is
+kept still for `DEPARTED_SECONDS` in case its death follows, and one whose
+death came first falls when it goes. The local player's own death pulls
+the camera back (`MOURN_PULL_BACK`, 1.4 times) and drains the colour
+(`MOURN_SATURATION`) over `MOURN_SECONDS` (3), until they are back, when
+both return in half a second. A broken thing (a crate) just breaks, with
+a sound.
+
+**Sound** (`client3d/sfx.gd`, `Sfx`): every sound a named set of files
+from Kenney's CC0 packs in `art/audio/`, played once from a point in the
+world on an `SFX` bus, a different file each time where the set has more,
+with pitch ±7% and volume -2..+1 dB at random so repeats do not
+machine-gun. The listener sits on the ground under the camera's aim (the
+ortho camera is 40 units off). What plays, on what:
+
+| Event (from the server) | Set | Files |
+|---|---|---|
+| Swing or attack (`swung`), pitched by the swinger's mass | `swing` | RPG Audio `cloth1-4` |
+| Hp lost to an attack (`struck`, attack) | `hit` | Impact Sounds `impactPunch_medium_000-004` |
+| Impact against a wall | `impact_stone` | `impactMining_000-004` |
+| Impact against wood | `impact_wood` | `impactWood_heavy_000-004` |
+| Impact against a body | `impact_body` + `impact_body_soft` | `impactPunch_heavy_000-004` + `impactSoft_heavy_000-004` |
+| A crate or other wooden thing broken | `break` | `impactPlank_medium_000-004` |
+| Death of a monster / player / companion | `death_monster` / `death_player` / `death_companion` | `impactSoft_medium_000-004` / `impactSoft_heavy_000-004` / RPG `dropLeather` |
+| A door opened / closed (its replicated state) | `door_open` / `door_close` | RPG `doorOpen_1-2` / `doorClose_1-4` |
+| A creature's replicated tile moves on by one | `footstep` (quiet) | `footstep_concrete_000-004` |
+
+Not yet: fire (a crackle loop on fire tiles, a hiss on a burn), grunts on
+a body hit, and death cries: neither pack has them. `master_volume=` and
+`sfx_volume=` in `settings.cfg` (0..1) set the Master and SFX buses.
+
 ## Testing
 
 All sim behaviour is verified headless via `tests/run`, never through the editor.
