@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.35
+
+A/D feel; Q/E back. Client (the server only for the version).
+
+- **Q/E** step 90° to the next diagonal view again in the click scheme
+  (400 ms), alongside A/D.
+- **A/D** turn at 180° a second while held.
+- **Letting go of A/D** carries on to the next diagonal view the way you
+  were turning if you went more than 10° past the last one, and goes back
+  otherwise. The settle starts at the speed you were turning and slows to
+  a stop, so the camera never halts and starts again on release.
+- The WASD scheme is unchanged; its up/down middle drag still springs back.
+
+The server must be updated to v0.1.35 too, as it refuses any other version.
+
 ## v0.1.34
 
 Click scheme camera on WASD. Client (the server only for the version).

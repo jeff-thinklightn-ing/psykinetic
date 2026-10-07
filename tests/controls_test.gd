@@ -267,19 +267,44 @@ func _test_diamonds() -> void:
 	var start := rig.yaw
 	_check(is_equal_approx(fmod(start, 90.0), 0.0), "it starts on a diamond (%s)" % start)
 	for i in 6:
-		rig.turn(1.0, 0.1)
-	_check(is_equal_approx(rig.yaw, start + 54.0), "click, D held 600 ms: turned 54 degrees, through any angle (%s)" % rig.yaw)
+		rig.turn(1.0, 0.01)
+	_check(is_equal_approx(rig.yaw, start + 10.8), "click, D held 60 ms: 10.8 degrees at 180 a second (%s)" % rig.yaw)
+	var held := rig.yaw
 	rig.end_turn()
-	rig._ease_yaw(Client3D.SETTLE_SECONDS * 0.5)
-	_check(rig.yaw > start + 54.0 and rig.yaw < start + 90.0, "let go: easing on (%s)" % rig.yaw)
-	rig._ease_yaw(Client3D.SETTLE_SECONDS * 0.5)
-	_check(is_equal_approx(rig.yaw, start + 90.0), "on the nearest diamond at %d ms (%s)" % [roundi(Client3D.SETTLE_SECONDS * 1000.0), rig.yaw])
+	_check(is_equal_approx(rig._ease_to, start + 90.0), "let go more than 10 past: on to the next diamond (%s)" % rig._ease_to)
+	rig._ease_yaw(0.01)
+	_check(absf(rig.yaw - held - 1.8) < 0.1,
+			"the first frame after letting go still moves at the turning speed (%.2f degrees in 10 ms)" % (rig.yaw - held))
+	var last := rig.yaw
+	var steady := true
+	for i in 200:
+		rig._ease_yaw(0.01)
+		if rig.yaw < last - 0.0001:
+			steady = false
+		last = rig.yaw
+	_check(steady and is_equal_approx(rig.yaw, start + 90.0), "and slows onto it without stopping first (%s)" % rig.yaw)
 	_check(is_equal_approx(Net.camera_yaw, fposmod(start + 90.0, 360.0)), "saved as that diamond, within 0..360 (%s)" % Net.camera_yaw)
-	for i in 3:
-		rig.turn(-1.0, 0.1)
+	start = rig.yaw
+	for i in 5:
+		rig.turn(-1.0, 0.01)
 	rig.end_turn()
-	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 90.0), "A held 300 ms (27 degrees): back to the same diamond (%s)" % rig.yaw)
+	_check(is_equal_approx(rig._ease_to, start), "A held 50 ms (9 degrees, short of 10): back to the diamond it came from")
+	var furthest := rig.yaw
+	for i in 100:
+		rig._ease_yaw(0.01)
+		furthest = minf(furthest, rig.yaw)
+	_check(furthest < start - 9.0 and is_equal_approx(rig.yaw, start),
+			"running on a little the way it went, then back (%.1f at most, ends %s)" % [furthest - start, rig.yaw])
+	_check(is_equal_approx(Client3D.settle_target(95.0, 1.0), 90.0) and is_equal_approx(Client3D.settle_target(101.0, 1.0), 180.0)
+			and is_equal_approx(Client3D.settle_target(-11.0, -1.0), -90.0) and is_equal_approx(Client3D.settle_target(90.0, 1.0), 90.0),
+			"past a diamond, the 10 degrees count from the last one passed")
+	rig.orbit(1)
+	var seen: Array[float] = [rig.yaw]
+	for i in 8:
+		rig._ease_yaw(Client3D.ORBIT_SECONDS / 8.0)
+		seen.append(rig.yaw)
+	_check(is_equal_approx(seen[4], start + 45.0) and is_equal_approx(seen.back(), start + 90.0),
+			"Q/E: a step to the next diamond, half way at 200 ms, there at 400 ms (%s)" % [seen])
 	for yaw in [0.0, 90.0, 180.0, 270.0, -90.0]:
 		_check(is_equal_approx(Net.saved_yaw(str(yaw), -1.0), yaw), "a saved diamond loads as it is (%s)" % yaw)
 	_check(is_equal_approx(Net.saved_yaw("45", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("135", -1.0), 180.0)
@@ -441,8 +466,9 @@ func _test_schemes_are_inert_outside() -> void:
 	_check(is_equal_approx(rig._yaw_step, step), "wasd: Q does nothing")
 	Net.controls = "click"
 	_main._unhandled_input(_key(KEY_Q))
+	_check(is_equal_approx(rig._yaw_step, step - 90.0), "click: Q steps to the next diamond")
 	_main._unhandled_input(_key(KEY_E))
-	_check(is_equal_approx(rig._yaw_step, step), "click: Q and E do nothing either")
+	_check(is_equal_approx(rig._yaw_step, step), "and E back")
 	_main._unhandled_input(_middle(true))
 	_check(not rig._peeking and not rig._dragging, "click: the middle button neither peeks nor turns")
 	_main._unhandled_input(_middle(false))

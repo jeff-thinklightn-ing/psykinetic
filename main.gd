@@ -386,6 +386,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_authority():
 			_start_level()
 		return
+	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E]:
+		# Click scheme, 3D: a step to the next diamond. Nothing in WASD.
+		if _client3d != null and Net.controls == "click":
+			_client3d.orbit(-1 if key.keycode == KEY_Q else 1)
+		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var local := _local_player()
 		if local != null:
@@ -1592,7 +1597,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   W/S tilt   A/D turn   MMB click level"
+			hints += "   Q/E step   A/D turn   W/S tilt   MMB click level"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]

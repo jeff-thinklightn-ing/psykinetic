@@ -833,12 +833,20 @@ through any tilt. F3 shows the yaw and the pitch.
 *Click scheme camera, on the keys* (`Main._drive_camera_keys`, before the
 pick): W/S tilt the resting pitch while held at `TILT_RATE` (60°/s),
 slowing over the last `TILT_EASE_DEGREES` (8°) into either end, and it
-stays where it is left (saved on release); A/D turn the yaw while held at
-`TURN_RATE` (90°/s), through any angle, and let go it settles on the
-nearest diamond over `SETTLE_SECONDS` (250 ms; saved). A middle click (the
-button let go having moved less than `Main.DRAG_AXIS_PX`) levels the pitch
-to 50° over `LEVEL_SECONDS` (250 ms; saved); a middle drag does nothing.
-Q/E are unbound.
+stays where it is left (saved on release). Q/E step to the next diamond
+in one ease in and out over `ORBIT_SECONDS` (400 ms), through the
+axis-aligned view without stopping. A/D turn the yaw while held at
+`TURN_RATE` (180°/s), through any angle; let go, it carries on to the next
+diamond the way it was turning if it is more than `TURN_COMMIT` (10°) past
+the last diamond it passed, and otherwise goes back to that one
+(`Client3D.settle_target`), saved either way. The settle starts at the
+turning speed and slows to a stop on the diamond (a cubic, `Ease.FLOW`),
+so letting go flows into it: going on, it takes the time a stop from
+that speed would (twice the distance over the speed); going back, it
+runs on a few degrees, turns and comes back, `TURN_RETURN_EXTRA` (150 ms)
+longer. A middle click (the button let go having moved less than
+`Main.DRAG_AXIS_PX`) levels the pitch to 50° over `LEVEL_SECONDS`
+(250 ms; saved); a middle drag does nothing.
 
 *WASD scheme camera, on the middle button*: a drag is a turn or a **pitch
 peek** by whichever axis it first moves `Main.DRAG_AXIS_PX` (6 px) on, and
@@ -881,7 +889,7 @@ screenshots.
 
 **Azimuth.** The 2D projection still takes an azimuth (`Iso.azimuth`),
 but nothing turns it any more: the middle-button peek is gone; the 3D
-camera turns by A/D (click) or a middle drag (WASD). `--test-azimuth=<deg>` starts
+camera turns by Q/E and A/D (click) or a middle drag (WASD). `--test-azimuth=<deg>` starts
 with the view turned, for screenshots. F3 shows the angle.
 
 Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
@@ -923,8 +931,9 @@ orders, R, F3 and F11 as ever.
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
 verbs land on the clicked target. In 3D, W/S tilt the camera (it stays
-where you leave it), A/D turn it (settling on a diamond), and a middle
-click levels it; Q/E and middle drags do nothing (see the 3D view). The
+where you leave it), Q/E step it to the next diamond, A/D turn it freely
+(settling on a diamond), and a middle click levels it; middle drags do
+nothing (see the 3D view). The
 camera follows the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;

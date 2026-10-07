@@ -499,3 +499,16 @@ step. The resting pitch is now a setting, 40-85°, saved with the yaw, and
 the ortho size follows it; the WASD scheme's pitch peek springs back to
 that resting pitch. The WASD scheme is otherwise unchanged: its keys
 walk, and the middle button turns and peeks.
+
+## 58. A/D turns commit by direction and settle at the turning speed
+
+In the click scheme Q/E are back (a 400 ms step between diamonds) beside
+A/D, which turn at 180°/s. Let go, an A/D turn does not snap to the
+nearest diamond: it goes on to the next one the way it was turning once
+it is 10° past the last diamond it passed, and back otherwise, so a
+short tap still commits and a slip does not. The settle starts at the
+turning speed and slows to a stop, so release never stops the camera
+and starts it again; going back it runs on a little before it turns.
+This amends 57, which left Q/E unbound and settled A/D on the nearest
+diamond in a fixed 250 ms. The WASD scheme's middle drag keeps its
+nearest-diamond settle, and its vertical drag stays a springy peek.

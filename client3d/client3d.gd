@@ -42,9 +42,12 @@ extends Node3D
 ##
 ## Click scheme, by keys (Main drives them): W/S tilt the resting pitch at
 ## TILT_RATE while held, slowing into either end, and it stays where it is
-## left; A/D turn the yaw at TURN_RATE while held and, let go, it settles
-## on the nearest diamond over SETTLE_SECONDS; a middle click levels the
-## pitch back to CAMERA_PITCH. WASD scheme: a sideways middle drag turns
+## left; Q/E step from one diamond to the next in one ease of
+## ORBIT_SECONDS; A/D turn the yaw at TURN_RATE while held and, let go, it
+## carries on to the next diamond the way it was turning if it was more
+## than TURN_COMMIT past the last one it passed, or goes back to that one,
+## the settle starting at the turning speed so the release flows into it;
+## a middle click levels the pitch back to CAMERA_PITCH. WASD scheme: a sideways middle drag turns
 ## the yaw freely and, let go, settles on the nearest diamond; a vertical
 ## one is a pitch peek, tilting from the resting pitch toward PEEK_PITCH in
 ## proportion to the drag (full over PEEK_DRAG_PX, eased) and springing
@@ -88,14 +91,20 @@ const CAMERA_SIZE := 12.0
 const CAMERA_FOLLOW_RATE := 6.0
 ## The resting yaws are multiples of this: the diamond views.
 const ORBIT_STEP := 90.0
-## A turn let go (A/D, or a WASD middle drag): on to the nearest diamond,
-## eased out.
+## A WASD middle drag let go: on to the nearest diamond, eased out.
 const SETTLE_SECONDS := 0.25
+## Q/E: one diamond to the next, eased in and out.
+const ORBIT_SECONDS := 0.4
+## A/D let go: past the last diamond by more than this, on to the next.
+const TURN_COMMIT := 10.0
+## A/D let go back to the diamond it came from: the settle takes the time
+## a stop from the turning speed would, plus this, for the turn back.
+const TURN_RETURN_EXTRA := 0.15
 ## Click scheme keys: A/D turn this fast (degrees a second); W/S tilt this
 ## fast between PITCH_MIN and PITCH_MAX, slowing over the last
 ## TILT_EASE_DEGREES at either end; a middle click levels the pitch to
 ## CAMERA_PITCH over LEVEL_SECONDS.
-const TURN_RATE := 90.0
+const TURN_RATE := 180.0
 const TILT_RATE := 60.0
 const PITCH_MIN := 40.0
 const PITCH_MAX := 85.0
@@ -179,6 +188,15 @@ var _yaw_step := 0.0
 var _ease_from := 0.0
 var _ease_to := 0.0
 var _ease_t := 1.0
+## How the ease runs: its length, and its curve (SINE_OUT for a settle,
+## IN_OUT for Q/E, FLOW for an A/D release: a cubic that starts at
+## _ease_velocity degrees a second and stops on the target).
+enum Ease { SINE_OUT, IN_OUT, FLOW }
+var _ease_seconds := SETTLE_SECONDS
+var _ease_curve := Ease.SINE_OUT
+var _ease_velocity := 0.0
+## A/D: the way it is turning (0: not), for the release.
+var _turning := 0.0
 ## WASD's middle drag: the yaw it started from, how far it has gone, and
 ## whether a release came while frozen (it settles when they unfreeze).
 var _dragging := false
@@ -338,16 +356,55 @@ static func size_for(degrees: float) -> float:
 	return CAMERA_SIZE * lerpf(1.0, PEEK_PULL_BACK, share)
 
 
+## Click scheme, Q/E: the next diamond round, in one ease in and out;
+## saved.
+func orbit(direction: int) -> void:
+	_settle_on(_yaw_step + ORBIT_STEP * signf(direction))
+	_ease_seconds = ORBIT_SECONDS
+	_ease_curve = Ease.IN_OUT
+
+
 ## Click scheme, A/D held: turn [param direction] (-1 or 1) for
 ## [param delta] seconds at TURN_RATE, through any angle.
 func turn(direction: float, delta: float) -> void:
 	_ease_t = 1.0
-	_set_yaw(yaw + TURN_RATE * signf(direction) * delta)
+	_turning = signf(direction)
+	_set_yaw(yaw + TURN_RATE * _turning * delta)
 
 
-## Click scheme, A/D let go: settle on the nearest diamond, which is saved.
+## Click scheme, A/D let go: on to the next diamond the way it was
+## turning if it is more than TURN_COMMIT past the last one it passed, or
+## back to that one (settle_target), saved. The settle starts at the
+## turning speed and slows to a stop on the diamond: going on, in the
+## time that stop takes (twice the distance over the speed); going back,
+## it runs on a little, turns and comes back, TURN_RETURN_EXTRA longer.
 func end_turn() -> void:
-	_settle_on(nearest_diamond(yaw))
+	var direction := _turning
+	_turning = 0.0
+	if direction == 0.0:
+		return
+	var target := settle_target(yaw, direction)
+	var distance := (target - yaw) * direction
+	_settle_on(target)
+	_ease_curve = Ease.FLOW
+	_ease_velocity = TURN_RATE * direction
+	if distance > 0.0:
+		_ease_seconds = 2.0 * distance / TURN_RATE
+	else:
+		_ease_seconds = 2.0 * absf(distance) / TURN_RATE + TURN_RETURN_EXTRA
+	if _ease_seconds <= 0.0:
+		_ease_t = 1.0
+
+
+## Where an A/D turn let go at [param degrees], going [param direction],
+## settles: the last diamond it passed (or is on), or the next one along
+## if it is more than TURN_COMMIT past it.
+static func settle_target(degrees: float, direction: float) -> float:
+	var passed := floorf(degrees / ORBIT_STEP) * ORBIT_STEP if direction > 0.0 \
+			else ceilf(degrees / ORBIT_STEP) * ORBIT_STEP
+	if (degrees - passed) * direction > TURN_COMMIT:
+		return passed + ORBIT_STEP * direction
+	return passed
 
 
 ## Click scheme, W/S held: tilt the resting pitch [param direction] (1 up
@@ -510,15 +567,26 @@ func _ease_toward(degrees: float) -> void:
 	_ease_from = yaw
 	_ease_to = degrees
 	_ease_t = 0.0
+	_ease_seconds = SETTLE_SECONDS
+	_ease_curve = Ease.SINE_OUT
 
 
-## One frame of the ease, a sine out over SETTLE_SECONDS; nothing while
-## frozen.
+## One frame of the ease; nothing while frozen.
 func _ease_yaw(delta: float) -> void:
 	if frozen or _ease_t >= 1.0:
 		return
-	_ease_t = minf(_ease_t + delta / SETTLE_SECONDS, 1.0)
-	_set_yaw(lerpf(_ease_from, _ease_to, sin(_ease_t * PI * 0.5)))
+	_ease_t = minf(_ease_t + delta / _ease_seconds, 1.0)
+	var s := _ease_t
+	match _ease_curve:
+		Ease.IN_OUT:
+			_set_yaw(lerpf(_ease_from, _ease_to, 0.5 - 0.5 * cos(s * PI)))
+		Ease.FLOW:
+			# Cubic Hermite: from _ease_from at _ease_velocity to _ease_to at rest.
+			var along := (-2.0 * s * s * s + 3.0 * s * s) * (_ease_to - _ease_from)
+			var carried := (s * s * s - 2.0 * s * s + s) * _ease_seconds * _ease_velocity
+			_set_yaw(_ease_from + along + carried)
+		_:
+			_set_yaw(lerpf(_ease_from, _ease_to, sin(s * PI * 0.5)))
 
 
 func _set_yaw(degrees: float) -> void:
