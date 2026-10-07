@@ -5,7 +5,7 @@
 | Path | Contents |
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
-| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face with occlusion windows, `wall_cutout.gdshader`), `click_ripple.gd` (the ring that answers a move click). |
+| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face, near ones translucent), `click_ripple.gd` (the ring that answers a move click). |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -571,37 +571,42 @@ is near-black (`Main.VOID`). The floor is the brightest surface and the one
 the eye should land on.
 
 *Height.* Every wall stands full height (3 tile heights); there are no
-stubs. A wall hides what is behind it as it would in any fixed-angle view,
-except for creatures, which get windows.
+stubs and no cutouts.
 
-*Occlusion windows.* Each face has its own `ShaderMaterial` on
-`render/wall_cutout.gdshader`, with up to `WallEdge.MAX_CUTOUTS` (8)
-cutout centres. Every frame `Main._update_occlusion_windows` lists the
-creature sprites (players, companions, monsters: centre, extent and
-Y-sort position, in the YSort's space) and each wall (`update_cutouts`)
-takes those whose sprite overlaps the face's extent while the face is
-drawn in front of them (the wall's sort position is further down than
-the creature's). Such a creature gets a soft circular cutout centred on
-its sprite, `WallEdge.RADIUS` (a tile, 32 px) wide, fading the face to
-25% at the centre and back to opaque at the edge, so the creature shows
-through the wall. A cutout animates in over `CUTOUT_SECONDS` (150 ms)
-when the overlap begins and out again when it ends; the strongest eight
-reach the shader. Walls that are behind a creature are left alone, since
-the creature is drawn over them anyway. Pinned in `tests/edge_test.gd`.
-A drawing rule only: the sim knows nothing of it.
+*Near and far.* An edge is the south or east edge of its -x / -y cell and
+the north or west edge of the next. A wall on the south or east edge of a
+walkable cell faces the camera with that floor behind it: it is *near*
+(`WallEdge.is_near`) and drawn translucent at `Main.NEAR_WALL_ALPHA`
+(0.3), so what stands on that floor shows through. A wall whose -x / -y
+cell is nothing is the north or west edge of the floor beyond, faces away,
+and is opaque. An interior partition is near or far by the same cell: the
+half-wall between (5, 1) and (6, 1) is the east edge of (5, 1), so near.
+Near walls are children of one `CanvasGroup` (`Main/NearWalls`, above
+the Y-sorted layer) whose `self_modulate` alpha is the one alpha: the
+group draws as a single layer, so where near faces overlap on screen they
+still show at 0.3 and a row of them never stacks up toward opaque. Far
+walls stay in the Y-sorted layer. A near wall is therefore drawn above
+everything in the Y-sorted layer, including what stands on the camera
+side of it; with faces of no thickness that overlap is rare and faint.
+A far wall still hides what is behind it, as in any fixed-angle view: the
+north wall of a room hides the feet of someone in the corridor behind it.
+Pinned in `tests/edge_test.gd`. A drawing rule only: the sim knows nothing
+of it.
 
-*Corners.* Two faces of one value meeting at an L or a T would merge, so
-where another wall meets an end of this one at an angle (doors count as
-nothing) a 1 px line one step darker than the face (`WallEdge.CORNER_STEP`)
-runs up that end; a free end and a straight continuation get nothing. A
-wall meeting from behind the through wall is covered by it, line and all.
+*Lines.* A 1 px line one step darker than the face
+(`WallEdge.CORNER_STEP`) runs along the top of every face, and up an end
+where another wall meets it at an angle (doors count as nothing); a free
+end and a straight continuation get only the top line. The lines are
+drawn with the face, so on a near wall they take the same alpha.
 
 **Doors** draw themselves (`Door._draw`) as wall-height objects whatever
 the walls beside them do: a jamb post at each end of the edge to full wall
 height, and a panel between them that swings in the ground plane about the
 hinge post, its own top strip (`Door.PANEL_TOP`, 4 px) turning with it to
-show the panel's thickness. A broken door leaves its posts. Doors get no
-occlusion windows.
+show the panel's thickness. A broken door leaves its posts. The posts
+follow the near rule of the edge they stand on, translucent on a near
+edge (`Door._draw`); the panel is always opaque, so a door reads as an
+object.
 
 **The map** (`main.gd`, `LEVEL`; format in `sim/terrain.gd`) is written at
 double resolution: even coordinates are cells (`.` floor, `~` fire, space

@@ -3,6 +3,24 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.20
+
+Translucent near walls. Client only.
+
+- Every wall is full height; the occlusion windows and the stub rule are
+  gone.
+- Walls on the south or east edge of a walkable cell (facing the camera)
+  draw at `Main.NEAR_WALL_ALPHA` (0.3); walls on north or west edges draw
+  opaque. Interior partitions follow the cell they are the south or east
+  edge of.
+- Near walls draw as one layer with a single alpha, so where they overlap
+  on screen they never stack toward opaque.
+- A 1 px darker line along every wall top and up every corner, at the
+  wall's alpha.
+- Door posts follow the edge they stand on; the panel stays opaque.
+
+The server must be updated to v0.1.20 too, as it refuses any other version.
+
 ## v0.1.19
 
 Occlusion windows. Client only.

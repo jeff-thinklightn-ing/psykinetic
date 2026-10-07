@@ -8,8 +8,10 @@ extends Node2D
 ##
 ## Drawn here as a wall-height object: a jamb post at each end of the edge,
 ## full wall height whatever the walls beside it do, and a panel between
-## them that swings about the hinge post. World changes open and hp;
-## nothing else does.
+## them that swings about the hinge post. The posts follow the near rule of
+## the edge they stand on (WallEdge.is_near): translucent on a near edge,
+## opaque on a far one; the panel is always opaque, so a door reads as an
+## object. World changes open and hp; nothing else does.
 
 const REPLICATED := ["open", "hp"]
 const SWING_SECONDS := 0.25
@@ -113,6 +115,12 @@ func _draw() -> void:
 		WallEdge.draw_wall(self, face[0], face[1], WallEdge.full_height(), thickness, PANEL, PANEL_TOP)
 		draw_polyline(PackedVector2Array([face[0], face[1], face[2], face[3], face[0]]), PANEL_EDGE)
 	var half := Vector2(POST_WIDTH * 0.5, 0)
+	var near := WallEdge.is_near(key, World.is_walkable)
+	var post := POST
+	var post_top := POST_TOP
+	if near:
+		post.a = Main.NEAR_WALL_ALPHA
+		post_top.a = Main.NEAR_WALL_ALPHA
 	for end: Vector2 in ends:
-		draw_colored_polygon(PackedVector2Array([end - half, end + half, end + half + up, end - half + up]), POST)
-		draw_line(end - half + up, end + half + up, POST_TOP, 1.5)
+		draw_colored_polygon(PackedVector2Array([end - half, end + half, end + half + up, end - half + up]), post)
+		draw_line(end - half + up, end + half + up, post_top, 1.5)

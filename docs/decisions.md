@@ -270,3 +270,14 @@ is gone: it lowered walls by a map rule and still hid whatever was deep in
 a wall's shadow, while a window follows the one thing that matters, the
 creature. It is per face, in a shader with up to eight centres, so a crowd
 behind a wall costs nothing more. Doors are unchanged.
+
+## 33. Near walls are translucent; stubs and windows are gone
+
+Every wall is full height. A wall on the south or east edge of a walkable
+cell is drawn at one low alpha and the rest opaque: the camera-facing side
+of a room or corridor is see-through, its back solid. Stubs (27) lowered
+walls by a map rule; windows (32) followed creatures with a shader; both
+are reverted for this one rule, which is cheaper and reads the same
+everywhere. The near walls are one CanvasGroup with the alpha on the
+group, not on each face, so overlapping near faces never add up. Doors
+follow the edge they sit on but keep an opaque panel.

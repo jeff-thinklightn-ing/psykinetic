@@ -10,6 +10,9 @@ const DOOR := "res://sim/door.gd"
 ## The one grey every wall face is drawn in, 0..1: darker than the floor,
 ## a few steps above the void, the same whichever way the face points.
 const WALL_VALUE := 0.18
+## Alpha of the near walls (the south and east edges of walkable cells,
+## facing the camera), drawn as one layer so they never stack up opaque.
+const NEAR_WALL_ALPHA := 0.3
 ## Camera: the fraction of the remaining distance to the player closed per
 ## second, as an exponential rate. Higher is tighter.
 const CAMERA_FOLLOW_RATE := 6.0
@@ -200,6 +203,7 @@ var _held_target := NONE
 
 @onready var ground: TileMapLayer = $Ground
 @onready var entities: Node2D = $YSort/Entities
+@onready var near_walls: CanvasGroup = $NearWalls
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var cursor: Polygon2D = $Cursor
 @onready var ripple: ClickRipple = $Ripple
@@ -209,8 +213,6 @@ var _held_target := NONE
 @onready var toss_aim: Line2D = $TossAim
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
-## Every wall face, for the occlusion windows.
-var _walls: Array[WallEdge] = []
 
 
 func _ready() -> void:
@@ -219,6 +221,7 @@ func _ready() -> void:
 		push_error("Iso math disagrees with the TileSet: %s vs %s" % [
 			Iso.tile_to_local(probe), ground.map_to_local(probe)])
 
+	near_walls.self_modulate.a = NEAR_WALL_ALPHA
 	_paint_level()
 	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
 	RenderingServer.set_default_clear_color(VOID)
@@ -288,7 +291,6 @@ func _process(delta: float) -> void:
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
 	_retarget_held()
-	_update_occlusion_windows(delta)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -388,31 +390,6 @@ func _retarget_held() -> void:
 	var tile := _snap_to_floor(_mouse_point())
 	if tile != NONE and tile != _held_target:
 		_move_click(player, tile)
-
-
-## Every creature sprite on screen, as the walls want it (see
-## WallEdge.update_cutouts): its centre and extent in the YSort's space and
-## the y it sorts by. Walls drawn in front of a sprite open a window on it.
-func _update_occlusion_windows(delta: float) -> void:
-	if DisplayServer.get_name() == "headless":
-		return
-	var creatures: Array[Dictionary] = []
-	for entity in World.get_entities():
-		if not entity.is_creature() or not entity.spawned:
-			continue
-		var sprite := entity.get_node_or_null("Sprite") as Sprite2D
-		if sprite == null:
-			continue
-		var rect := sprite.get_rect()
-		var to_ysort: Transform2D = $YSort.get_global_transform().affine_inverse() * sprite.get_global_transform()
-		creatures.append({
-			"id": entity.get_instance_id(),
-			"center": to_ysort * rect.get_center(),
-			"rect": to_ysort * rect,
-			"y": entity.position.y,
-		})
-	for wall in _walls:
-		wall.update_cutouts(creatures, delta)
 
 
 ## The cursor's point on the ground plane, in the ground layer's space.
@@ -569,8 +546,9 @@ func _mouse_tile() -> Vector2i:
 
 ## The map (see Terrain for the format). Floor and fire go on the Ground
 ## layer, one surface right up to the walls; wall edges are drawn as
-## WallEdges in the Y-sorted layer. Doors are spawned by the server with
-## the level (see _spawn_doors): they have state.
+## WallEdges, the far ones in the Y-sorted layer and the near ones (see
+## WallEdge.is_near) in the translucent NearWalls group above it. Doors are
+## spawned by the server with the level (see _spawn_doors): they have state.
 func _paint_level() -> void:
 	_terrain = Terrain.parse(LEVEL)
 	var edges: Dictionary = _terrain["edges"]
@@ -583,9 +561,11 @@ func _paint_level() -> void:
 			continue
 		var wall := WallEdge.new()
 		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
-		$YSort.add_child(wall)
+		if WallEdge.is_near(key, func(cell: Vector2i) -> bool: return cell in _terrain["floor"]):
+			near_walls.add_child(wall)
+		else:
+			$YSort.add_child(wall)
 		wall.setup(key, kind_at, WALL_VALUE)
-		_walls.append(wall)
 
 
 ## Server: one Door node per door edge, through the spawner so every client

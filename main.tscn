@@ -25,6 +25,8 @@ y_sort_enabled = true
 [node name="Entities" type="Node2D" parent="YSort"]
 y_sort_enabled = true
 
+[node name="NearWalls" type="CanvasGroup" parent="."]
+
 [node name="Spawner" type="MultiplayerSpawner" parent="."]
 spawn_path = NodePath("../YSort/Entities")
 
