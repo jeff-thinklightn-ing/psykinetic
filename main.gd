@@ -13,13 +13,16 @@ const SHADED_FLOOR := Color(0.7, 0.7, 0.76)
 const CAMERA_FOLLOW_RATE := 6.0
 ## Where the camera starts (and stays on a dedicated server): the chamber.
 const CHAMBER_CENTRE := Vector2i(6, 6)
+## What is drawn where there is no map: near-black, so walls along the void
+## stand apart from it.
+const VOID := Color(0.05, 0.05, 0.06)
 ## 14x14. '#' wall, '.' floor, '~' fire. The corridor is row 8, x 1..5, with
 ## its dead end at x 1. Under the wall at row 10, rows 11-12 x 7..11 are a
 ## two-wide passage open at both ends, where two players can pass each other.
 const LEVEL: Array[String] = [
 	"",
 	" #########################",
-	" #. . . . . . . . . . . .#",
+	" #. . . . .#. . . . . . .#",
 	" #                       #",
 	" #. . . . . . . . . . . .#",
 	" #                       #",
@@ -175,6 +178,7 @@ var _test_ordered := false
 var _test_arrived := false
 var _test_contested := false
 var _test_reset_sent := false
+var _test_door_sent := false
 ## Client: whether this peer has ever had a player, to tell a rejected join
 ## from a later disconnect.
 var _had_player := false
@@ -193,13 +197,8 @@ var _toss_from := Vector2.ZERO
 @onready var hud: Label = $HUD/Label
 @onready var debug_overlay: Label = $HUD/Debug
 @onready var toss_aim: Line2D = $TossAim
-@onready var path_preview: PathPreview = $PathPreview
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
-## Every wall edge drawn.
-var _wall_edges: Array[WallEdge] = []
-## The path preview is hidden from a click until the cursor moves.
-var _preview_hidden_at := Vector2.INF
 
 
 func _ready() -> void:
@@ -210,6 +209,7 @@ func _ready() -> void:
 
 	_paint_level()
 	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
+	RenderingServer.set_default_clear_color(VOID)
 
 	# Every peer builds entities the same way; only the server decides when.
 	spawner.spawn_function = _build_entity
@@ -271,7 +271,6 @@ func _process(delta: float) -> void:
 	var tile := _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
-	_update_path_preview(tile)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -310,8 +309,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not click.pressed:
 		return
-	_preview_hidden_at = get_global_mouse_position()
-	path_preview.clear()
 	# A click resolves on the ground plane: the floor cell under the cursor,
 	# and whatever stands on it. The right button also takes a sprite under
 	# the cursor, for shoving something whose cell is hidden, and a door.
@@ -386,23 +383,6 @@ func _update_toss_aim() -> void:
 	var tip := tail + along * TOSS_AIM_LENGTH
 	toss_aim.points = PackedVector2Array([
 		tail, tip, tip + along.rotated(2.6) * 7.0, tip, tip + along.rotated(-2.6) * 7.0])
-
-
-## The dotted route from the local player to the hovered cell, as the client
-## would predict it (so through doors), until a click hides it and the
-## cursor moves again.
-func _update_path_preview(tile: Vector2i) -> void:
-	if DisplayServer.get_name() == "headless":
-		return
-	var player := _local_player()
-	if player == null or not World.is_walkable(tile) or get_global_mouse_position() == _preview_hidden_at:
-		path_preview.clear()
-		return
-	_preview_hidden_at = Vector2.INF
-	var points: Array[Vector2] = [player.position]
-	for step in World.find_path(player.tile, tile, true, player):
-		points.append(Iso.tile_to_local(step))
-	path_preview.show_path(points if points.size() > 1 else [])
 
 
 ## --test-hover: parks the cursor over a cell, for screenshots.
@@ -500,7 +480,6 @@ func _paint_level() -> void:
 		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 		$YSort.add_child(wall)
 		wall.setup(key, kind_at, func(cell: Vector2i) -> bool: return cell in _terrain["floor"])
-		_wall_edges.append(wall)
 
 
 ## Server: one Door node per door edge, through the spawner so every client
@@ -1087,6 +1066,7 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_move(player)
 	_run_test_contest(player, tick)
 	_run_test_reset(player, tick)
+	_run_test_door(player, tick)
 
 
 func _debug_text() -> String:
@@ -1274,6 +1254,18 @@ func _run_test_move(player: Player) -> void:
 
 ## --test-contest: at a fixed server tick, order the local player to a given
 ## tile. Two clients doing this for the same tile race for it on the server.
+## --test-door: at that tick, work the door the local player stands beside.
+func _run_test_door(player: Player, tick: int) -> void:
+	if Net.test_door_tick <= 0 or _test_door_sent or player == null or tick < Net.test_door_tick:
+		return
+	_test_door_sent = true
+	for door in World.get_doors():
+		if player.tile in Terrain.edge_cells(door.key):
+			World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
+			print("[test] %s works %s at tick %d" % [player.name, door.name, tick])
+			return
+
+
 func _run_test_reset(player: Player, tick: int) -> void:
 	if Net.test_reset_tick <= 0 or _test_reset_sent or player == null or tick < Net.test_reset_tick:
 		return

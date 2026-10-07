@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.13
+
+Wall tops that join, doors with height. Client only.
+
+- Wall top strips are 4 px ribbons that miter at corners, run through at
+  a T with the joining wall butting in, and end square at a free end with
+  a short end face. Stubs get the same at their height.
+- Doors stand at full wall height between two jamb posts, with a panel
+  that swings; a closed door reads as a door, not a plank.
+- Outside the map is near-black instead of wall grey.
+- The path preview is gone; the hover highlight stays.
+- A half-wall off the chamber's north wall, between (5, 1) and (6, 1).
+
+The server must be updated to v0.1.13 too, as it refuses any other version.
+
 ## v0.1.12
 
 Walls and picking: thin walls, low near walls, ground-plane clicks, a

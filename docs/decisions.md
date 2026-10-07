@@ -218,3 +218,12 @@ drawing rule per edge; the sim never knows. With that, clicks and hover
 read the ground plane only, so the target cell is always the one under the
 cursor, highlighted and previewed above whatever stands in front of it.
 Only a right click still picks a sprite or a door, for shoving and doors.
+
+## 28. Wall tops are ribbons that join; doors stand full height
+
+A wall's lit top is a 4 px ribbon on its far side, so corners can miter in
+plan and a T can butt, and joins are decided per end from the vertex's
+other walls, not from tiles. A door is a wall-height object (posts and a
+swinging panel) even between stubs, so a closed door reads as a door and
+not a plank. Outside the map is near-black. The path preview is gone: the
+hover highlight alone says where a click goes.

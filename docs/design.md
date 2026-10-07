@@ -5,7 +5,7 @@
 | Path | Contents |
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
-| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as a thin tall face), `fade.gd` (darkness beyond a distance). |
+| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as a face with a lit top strip). |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -558,21 +558,41 @@ texture's `foot` row sits on the tile centre; `WallEdge` draws to its.
 Nothing else states a size; a spec's `scale` multiplies on top.
 
 **Walls** (`render/wall_edge.gd`) are one Node2D per wall edge in the
-Y-sorted layer, drawn in code on the cell boundary line with no ground
-thickness: a face standing on the line and a 4 px lit strip along its top.
-Floor is never drawn under a wall; every floor cell draws fully to the base
-of its walls. The node sits with the cell on its -x / -y side, a hair nearer
-the camera, so it is in front of what stands on that cell and behind the
-next. *Near walls are low:* both edge faces point toward the camera as seen
-from that -x / -y cell, so when that cell is floor the wall is in front of
-it and is drawn as a stub a third of a tile tall; when that cell is nothing
-the wall is the far side of the cell beyond and stands full height (3 tile
-heights). Corners choose per edge. This is a drawing rule only. Where a
-wall ends, turns, or meets a door, a dark line marks the end. Floor with a
-wall on its -x or -y edge uses a shaded alternative tile. Doors draw
-themselves (`Door._draw`) at the same height rule: a face on the edge that
-swings about one end when open; a broken door leaves its jambs. There is
-no cutaway and no fade: a tall wall hides what is behind it.
+Y-sorted layer, drawn in code: a face standing on the cell boundary line
+and, along its top, a lit strip 4 px wide lying on the far side of the line
+(the top of a thin wall seen from above). Nothing is drawn on the ground
+beyond the line; every floor cell draws fully to the base of its walls. The
+node sits with the cell on its -x / -y side, a hair nearer the camera, so it
+is in front of what stands on that cell and behind the next. Outside the
+map is near-black (`Main.VOID`), so walls along the void stand apart from
+it.
+
+*Height.* Both faces drawn point toward the camera; the cell behind a face
+(the edge's -x / -y cell) is its far side. A wall whose far side is walkable
+stands in front of that floor and is drawn as a stub a third of a tile
+tall, whatever the near side is; one whose far side is nothing faces the
+exterior and stands full height (3 tile heights). Corners choose per edge.
+A drawing rule only: the sim knows nothing of it. A full-height exterior
+wall still hides floor beyond it that is further from the camera — the
+north wall of a corridor hides a parallel corridor behind it — as it would
+in any fixed-angle view.
+
+*Joins*, decided per end from the walls meeting at that vertex (doors count
+as nothing): straight on, the strip continues; at an L the two strips miter
+into one shared far vertex (`v + o1 + o2`, the far lines' crossing); at a T
+the through strip runs on and the joining wall butts into it, trimmed to
+the through wall's back when it comes from the far side; at a free end the
+strip ends square to the wall and a short end face closes the wall where
+that end faces the camera (the +y end of an east edge, the +x end of a
+south edge). Strip width is 4 px throughout; stubs get the same joins at
+their height. Floor with a wall on its -x or -y edge uses a shaded
+alternative tile.
+
+**Doors** draw themselves (`Door._draw`) as wall-height objects whatever
+the walls beside them do: a jamb post at each end of the edge to full wall
+height, and a panel between them that swings in the ground plane about the
+hinge post, its own top strip turning with it. A broken door leaves its
+posts. There is no cutaway and no fade: a tall wall hides what is behind it.
 
 **The map** (`main.gd`, `LEVEL`; format in `sim/terrain.gd`) is written at
 double resolution: even coordinates are cells (`.` floor, `~` fire, space
@@ -584,22 +604,20 @@ its cells where they always were (what used to be wall cells is now
 nothing, with walls on its edges, so the west corridor is one cell wide
 walled on both sides and the two-wide passage is two cells walled on the
 outside) plus two corridors that bend out of view, the south one through
-a door at the edge above (4, 13). Every tile the tests use is where it was.
+a door at the edge above (4, 13), and one half-wall off the north wall
+between (5, 1) and (6, 1), there so a T and a free end exist. Every tile
+the tests use is where it was.
 Test rooms written as old cell maps go through `Terrain.expand`.
 
 **Camera.** The camera eases toward the local player
-(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`.
-
-**Path preview** (`render/path_preview.gd`). While the cursor is over a
-floor cell, a faint dotted line runs from the local player to it along
-`World.find_path` as the client would predict it, through any door on the
-way. It and the hover highlight are drawn above walls, so the target reads
-even behind a full-height wall. A click hides the preview until the cursor
-moves.
+(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. The hover highlight
+is drawn above walls, so the target cell reads even behind a full-height
+wall.
 
 `--screenshot=<path>` with `--test-exit-after` saves the window as PNG on
 exit, for looking at a build without playing it; `--test-hover=<x>,<y>`
-parks the cursor over a cell for it.
+parks the cursor over a cell for it and `--test-door=<tick>` works the door
+the local player stands beside.
 
 ## Grid ↔ screen
 

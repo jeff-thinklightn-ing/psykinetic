@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="TileSet" path="res://art/tileset.tres" id="2_tileset"]
-[ext_resource type="Script" path="res://render/path_preview.gd" id="3_path"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -29,10 +28,6 @@ visible = false
 z_index = 10
 width = 2.0
 default_color = Color(1, 0.9, 0.3, 0.9)
-
-[node name="PathPreview" type="Node2D" parent="."]
-z_index = 15
-script = ExtResource("3_path")
 
 [node name="Camera" type="Camera2D" parent="."]
 zoom = Vector2(2, 2)

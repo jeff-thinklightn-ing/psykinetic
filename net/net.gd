@@ -37,6 +37,7 @@ extends Node
 ##   --test-exit-after=<seconds>  quit after this long
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
+##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##
@@ -129,6 +130,7 @@ var test_reset_tick := 0
 var test_exit_after := 0.0
 var screenshot_path := ""
 var test_hover_tile := Vector2i(-1, -1)
+var test_door_tick := 0
 
 var mispredicts_total := 0
 var snaps_total := 0
@@ -550,7 +552,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover":
+					"--screenshot", "--test-hover", "--test-door":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -601,6 +603,8 @@ func _set_option(key: String, value: String) -> void:
 			test_exit_after = value.to_float()
 		"--screenshot":
 			screenshot_path = value
+		"--test-door":
+			test_door_tick = value.to_int()
 		"--test-hover":
 			var parts := value.split(",")
 			if parts.size() == 2:
