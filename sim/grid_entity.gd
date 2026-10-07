@@ -18,12 +18,14 @@ signal damaged(amount: int)
 signal pushed(tiles: int)
 ## Stopped with force left over, or hit by something that was.
 signal impacted(amount: int)
+## An attack or a swing at air went [param direction]: views lunge.
+signal swung(direction: Vector2i)
 
 # Not called "Material"/"material": CanvasItem already owns that name.
 ## FLESH is a creature (hazards hurt it). WOOD takes impact and breaks at 0 hp.
 ## STONE and METAL never break.
 enum BodyMaterial { FLESH, WOOD, STONE, METAL }
-enum Order { NONE, ATTACK, SHOVE }
+enum Order { NONE, ATTACK, SHOVE, SWING }
 
 ## The only state sent over the network, besides World's tick.
 const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected"]
@@ -44,6 +46,11 @@ const BOB_HZ := 0.7
 const REEL_ANGLE := 0.35
 const REEL_HZ := 2.5
 const PIP_REACH := 4.0
+## How fast the shown facing turns toward where it should point: about
+## 100 ms to come round (an exponential ease at this rate per second).
+const TURN_RATE := 30.0
+## A refused or corrected step eases to a stop over this many ticks.
+const STOP_EASE_TICKS := 2.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)
 const HURT_TINT := Color(1.0, 0.3, 0.3)
 
@@ -53,8 +60,9 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 ## Can be shoved along by something walking into it. Force pushes ignore this.
 @export var pushable := false
 @export var blocks_sight := false
-## Ticks one step takes; also the cooldown before the next step.
-@export var move_ticks := 2
+## Ticks one step takes, maybe fractional; also the cooldown before the
+## next step.
+@export var move_ticks := 2.0
 ## 0 means indestructible.
 @export var max_hp := 0
 @export var attack_damage := 0
@@ -73,6 +81,9 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 var id := 0
 ## Peer whose input may order this entity; 0 for none. Same on every peer.
 var owner_peer := 0
+## A companion: the peer whose player it belongs to; 0 for anything else.
+## Set from the spawn spec on every peer, so a client knows its own.
+var keeper_peer := 0
 ## The MultiplayerSpawner spec this entity was built from, kept so a server
 ## snapshot can rebuild it. Set by Main on every peer.
 var spawn_spec: Dictionary = {}
@@ -98,12 +109,19 @@ var protected_until_tick := 0
 ## Direction of the last step or attack.
 var facing := Vector2i(0, 1)
 var spawned := false
-var next_move_tick := 0
+## The tick (maybe fractional) the next step may start; see World.try_move.
+var next_move_tick := 0.0
 var next_attack_tick := 0
 ## Set by World when a collision stuns this entity. Server only.
 var stunned_until_tick := 0
 var has_move_order := false
 var move_order := Vector2i.ZERO
+## Tiles to walk through, in order, before pathing to move_order: the steps
+## the ordering client was already showing. Server only.
+var move_via: Array[Vector2i] = []
+## Where the local client points the body while it stands still (WASD:
+## the cursor), in grid units from its tile; ZERO for none. Display only.
+var aim := Vector2.ZERO
 var action_order := Order.NONE
 var action_target: GridEntity
 ## For a shove: the way to toss the target, or ZERO for straight away.
@@ -112,7 +130,10 @@ var action_direction := Vector2i.ZERO
 # Render interpolation: slide from _from_tile to tile over _move_duration ticks.
 var _from_tile := Vector2i.ZERO
 var _move_tick := 0.0
-var _move_duration := 0
+var _move_duration := 0.0
+## The facing as shown, an angle in grid space, turning toward the wanted
+## one at TURN_RATE.
+var _shown_angle := NAN
 # Mirrors only. A mirror is drawn display_delay_ticks in the past, so by the
 # time a tile change arrives the slide for the one before it is still on
 # screen. Changes wait here ({from, to, tick, duration}) until the display
@@ -224,7 +245,7 @@ func is_breakable() -> bool:
 
 
 func _process(delta: float) -> void:
-	var shown_facing := facing
+	var wanted := Vector2(facing)
 	if _prediction != null and _prediction.advance(delta):
 		# Not a correction but silence: the server is not doing this walk.
 		_prediction.give_up()
@@ -233,7 +254,8 @@ func _process(delta: float) -> void:
 		if _prediction != null and _prediction.is_active():
 			# The local player's own walking: shown ahead of the server.
 			position = _prediction.position()
-			shown_facing = _prediction.facing()
+			if _prediction.facing() != Vector2i.ZERO:
+				wanted = Vector2(_prediction.facing())
 		else:
 			# Mirrors are drawn slightly in the past, so a tile change is
 			# always known before its slide has to start.
@@ -248,15 +270,42 @@ func _process(delta: float) -> void:
 					_move_tick = slide["tick"]
 					_move_duration = slide["duration"]
 				to = _to_tile
+			# Constant speed along the step, no easing at its ends: steps
+			# that follow one another join up into one steady walk.
 			var t := 1.0
-			if _move_duration > 0:
+			if _move_duration > 0.0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
 			position = Iso.grid_to_local(Vector2(_from_tile).lerp(Vector2(to), t))
+			if t < 1.0 and to != _from_tile:
+				wanted = Vector2(to - _from_tile)
+			elif aim != Vector2.ZERO:
+				wanted = aim
+	_turn_toward(wanted, delta)
 	if _pip != null:
-		var screen_facing := Iso.project(Vector2(shown_facing))
+		var screen_facing := Iso.project(shown_facing())
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH
 	_update_body()
 	_update_flash()
+
+
+## Eases the shown facing toward [param wanted] (grid units), the short
+## way round, at TURN_RATE.
+func _turn_toward(wanted: Vector2, delta: float) -> void:
+	if wanted == Vector2.ZERO:
+		return
+	var target := wanted.angle()
+	if is_nan(_shown_angle):
+		_shown_angle = target
+		return
+	var step := angle_difference(_shown_angle, target) * (1.0 - exp(-TURN_RATE * delta))
+	_shown_angle = wrapf(_shown_angle + step, -PI, PI)
+
+
+## The facing as shown: a unit vector in grid units, turning smoothly.
+func shown_facing() -> Vector2:
+	if is_nan(_shown_angle):
+		return Vector2(facing).normalized()
+	return Vector2.from_angle(_shown_angle)
 
 
 ## Stamina is read off the body: it sags toward TIRED_HEIGHT as stamina drops
@@ -312,7 +361,7 @@ func _world_set_facing(direction: Vector2i) -> void:
 
 
 ## Render hint: the entity just went from [param from] to its current tile.
-func _world_slide_from(from: Vector2i, at_tick: int, duration: int) -> void:
+func _world_slide_from(from: Vector2i, at_tick: float, duration: float) -> void:
 	_from_tile = from
 	_move_tick = at_tick
 	_move_duration = duration
@@ -345,6 +394,12 @@ func _world_impacted(amount: int) -> void:
 		_net_impacted.rpc_id(peer, amount)
 
 
+func _world_swung(direction: Vector2i) -> void:
+	swung.emit(direction)
+	for peer in Net.sendable_peers():
+		_net_swung.rpc_id(peer, direction)
+
+
 func _world_stunned(until_tick: int, ticks: int) -> void:
 	stunned_until_tick = until_tick
 	_reel_until = until_tick
@@ -368,7 +423,7 @@ func _mirror_attach() -> void:
 func _mirror_rest() -> void:
 	_from_tile = tile
 	_to_tile = tile
-	_move_duration = 0
+	_move_duration = 0.0
 	_slides.clear()
 
 
@@ -390,8 +445,17 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 	# from the size of the jump (one step, or a push).
 	var delta := tile - old
 	var steps := maxi(absi(delta.x), absi(delta.y))
-	_slides.append({"from": old, "to": tile, "tick": World.tick,
-		"duration": World.step_ticks(self, delta) if steps == 1 else clampi(steps, 1, 3)})
+	# A step that follows straight on from the one before starts where it
+	# ends, not on the tick it arrived in: the server takes a 2.5-tick step
+	# on a whole tick, and the walk would otherwise stutter by the fraction.
+	var start := float(World.tick)
+	var previous_end := _move_tick + _move_duration
+	if not _slides.is_empty():
+		previous_end = _slides.back()["tick"] + _slides.back()["duration"]
+	if steps == 1 and previous_end > start - 1.0 and previous_end < start + 1.0:
+		start = previous_end
+	_slides.append({"from": old, "to": tile, "tick": start,
+		"duration": World.step_ticks(self, delta) if steps == 1 else float(clampi(steps, 1, 3))})
 
 
 ## Turns on prediction of this entity's own walking. Only meaningful on the
@@ -401,10 +465,43 @@ func enable_prediction() -> void:
 		_prediction = MovePrediction.new(self)
 
 
-## The local player just ordered a move: start showing it now.
-func predict_move(target: Vector2i) -> void:
-	if _prediction != null:
-		_prediction.order(target)
+## The local player just ordered a move: start showing it now. Returns the
+## tiles of the steps already on screen that the server has not confirmed,
+## which it must walk first (see World.command_move).
+func predict_move(target: Vector2i) -> Array[Vector2i]:
+	var none: Array[Vector2i] = []
+	if _prediction == null:
+		return none
+	return _prediction.order(target)
+
+
+## WASD: the local player asked for one step that way. Shown at once
+## unless the replicated world refuses it; true if it is shown.
+func predict_step(direction: Vector2i) -> bool:
+	if _prediction == null:
+		return false
+	return _prediction.step(direction)
+
+
+## Whether the local player's walk is ready for its next WASD step: the
+## one on screen is ending. Always true without prediction (the server
+## queues and times the steps itself).
+func ready_for_step() -> bool:
+	return _prediction == null or _prediction.ready_for_step()
+
+
+## Where the walk on screen ends: the last predicted step's tile, or the
+## entity's own.
+func walk_end() -> Vector2i:
+	if _prediction != null and _prediction.is_active():
+		return _prediction._steps.back().to
+	return tile
+
+
+## Refusals of this entity's steps the client has heard of (see
+## World.order_step).
+func step_epoch() -> int:
+	return _prediction.epoch if _prediction != null else 0
 
 
 ## The local player just ordered an attack or shove on something standing on
@@ -441,9 +538,13 @@ func _mispredicted(reason: String) -> void:
 
 
 ## The server refused a step into [param refused] this tick. Re-plan from
-## its tile now rather than waiting out the deadline.
-func _on_move_refused(refused: Vector2i) -> void:
-	if _prediction == null or not _prediction.is_active():
+## its tile now rather than waiting out the deadline. [param epoch] is the
+## server's refusal count for WASD steps.
+func _on_move_refused(refused: Vector2i, epoch: int) -> void:
+	if _prediction == null:
+		return
+	_prediction.epoch = maxi(_prediction.epoch, epoch)
+	if not _prediction.is_active():
 		return
 	Net.record_mispredict()
 	_mirror_rest()
@@ -473,11 +574,9 @@ func _net_stunned(ticks: int) -> void:
 	_reel_until = World.tick + ticks
 
 
-## What the entity is saying right now, or "" (for other views of it).
-func speech() -> String:
-	if _speech_label == null or not _speech_label.visible:
-		return ""
-	return _speech_label.text
+@rpc("authority", "call_remote", "reliable")
+func _net_swung(direction: Vector2i) -> void:
+	swung.emit(direction)
 
 
 ## A line of speech over the sprite for a few seconds. Visual only.

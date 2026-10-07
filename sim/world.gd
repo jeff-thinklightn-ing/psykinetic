@@ -22,6 +22,10 @@ signal door_changed(door: Door, by: GridEntity)
 ## A player's command that is not a move, attack or shove: (name, args), for
 ## Main to act on. "order" {slot} is a companion order.
 signal command_received(entity: GridEntity, command: String, args: Dictionary)
+## A walking step into [param occupant] was refused: it would not be pushed.
+signal entity_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i)
+## An attack or a swing at air: [param direction] is where it went.
+signal entity_swung(entity: GridEntity, direction: Vector2i)
 
 const TICK_RATE := 10
 const TICK_DT := 1.0 / TICK_RATE
@@ -43,11 +47,15 @@ const MAX_PUSH_SLIDE_TICKS := 3
 const NET_DISPLAY_DELAY_TICKS := 2
 ## The live value: settings.cfg's display_delay overrides the default.
 var display_delay_ticks := NET_DISPLAY_DELAY_TICKS
-## A diagonal step takes this many times the ticks of an orthogonal one (rounded
-## up), so world speed is roughly constant in every direction. On screen a
-## sideways diagonal covers 32 px against 18 px for an orthogonal step; at 1.0
-## it would move nearly twice as fast as everything else.
+## A diagonal step takes this many times the ticks of an orthogonal one, so
+## world speed is roughly constant in every direction (a diagonal cell is
+## sqrt(2) as long). Steps may take a fraction of a tick: the movement
+## timer carries the fraction (see try_move), so a 2.5-tick step is
+## taken on ticks 0, 3, 5, 8, 10... and drawn at its exact times.
 const DIAGONAL_TICK_SCALE := 1.5
+## WASD steps queued on the server for one player at most; more are
+## dropped (the client never sends more than one ahead).
+const MAX_QUEUED_STEPS := 3
 # Path costs are integers proportional to ticks. The +1 only breaks ties in
 # favour of straight lines; fire is a detour worth five steps.
 const PATH_STEP_COST := 1000
@@ -315,12 +323,48 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	if tick < entity.next_move_tick or is_stunned(entity):
 		return false
 	var duration := step_ticks(entity, direction)
-	if not _shift(entity, entity, direction, entity.mass, duration):
+	# A walk in progress keeps its own clock: a step due at 12.5 and taken
+	# on tick 13 starts at 12.5, so the next is due at 15, not 15.5.
+	var start := float(tick)
+	if tick - entity.next_move_tick < 1.0:
+		start = entity.next_move_tick
+	if not _shift(entity, entity, direction, entity.mass, duration, start):
+		var ahead: GridEntity = _occupancy.get(entity.tile + direction)
+		if ahead != null and ahead.is_creature() \
+				and not _terrain_blocks_step(entity.tile, direction, true):
+			entity_bumped.emit(entity, ahead, direction)
 		return false
-	entity.next_move_tick = tick + duration
+	entity.next_move_tick = start + duration
 	entity._world_set_facing(direction)
 	entity.protected = false  # Moving ends spawn grace.
 	return true
+
+
+## A swing at nothing: the attack's cooldown, facing and lunge, with no
+## target. Refused like an attack while cooling down, mid-step or stunned.
+func try_swing(entity: GridEntity, direction: Vector2i) -> bool:
+	if not Net.is_authority():
+		return false
+	if not entity.spawned or direction not in DIRECTIONS or is_stunned(entity):
+		return false
+	if tick < entity.next_attack_tick or tick < entity.next_move_tick:
+		return false
+	entity.next_attack_tick = tick + entity.attack_ticks
+	entity._world_set_facing(direction)
+	entity.protected = false
+	entity._world_swung(direction)
+	entity_swung.emit(entity, direction)
+	return true
+
+
+## Turns a creature that is standing still to face [param direction]
+## (the cursor, in WASD). Refused while it is mid-step.
+func face(entity: GridEntity, direction: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	if not entity.spawned or direction not in DIRECTIONS or tick < entity.next_move_tick:
+		return
+	entity._world_set_facing(direction)
 
 
 ## Melee: attack_damage plus a push of half the shove force, at no stamina
@@ -362,17 +406,55 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		despawn(target)
 
 
-## Player intent: walk to [param target]. Server only; input code on any peer
-## goes through command_move().
-func order_move(entity: GridEntity, target: Vector2i) -> void:
+## Player intent: walk to [param target], by way of [param via] first
+## (the steps the ordering client is already showing). Server only; input
+## code on any peer goes through command_move().
+func order_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i] = []) -> void:
 	if not Net.is_authority():
 		return
 	if not entity.spawned:
 		return
 	entity.move_order = target
 	entity.has_move_order = true
+	entity.move_via = via.slice(0, MAX_QUEUED_STEPS)
+	if entity is Player:
+		(entity as Player).queued_steps.clear()
 	entity.action_order = GridEntity.Order.NONE
 	entity.action_target = null
+
+
+## Player intent (WASD): one step in [param direction], taken when the
+## movement timer allows, after any already queued. [param epoch] is the
+## client's count of refusals seen: a step sent before the client heard of
+## the latest refusal is stale and dropped (see Player.step_epoch). A
+## [param predicted] step is one the client is showing; only those are
+## reported back when refused.
+func order_step(entity: GridEntity, direction: Vector2i, epoch: int, predicted: bool) -> void:
+	if not Net.is_authority():
+		return
+	if not entity.spawned or direction not in DIRECTIONS or not entity is Player:
+		return
+	var player := entity as Player
+	if epoch != player.refusals or player.queued_steps.size() >= MAX_QUEUED_STEPS:
+		return
+	player.has_move_order = false
+	player.move_via.clear()
+	player.action_order = GridEntity.Order.NONE
+	player.action_target = null
+	player.queued_steps.append({"direction": direction, "predicted": predicted})
+
+
+## Player intent: swing toward [param direction] at the next free tick (an
+## attack with nothing there).
+func order_swing(entity: GridEntity, direction: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	if not entity.spawned or direction not in DIRECTIONS:
+		return
+	entity.action_order = GridEntity.Order.SWING
+	entity.action_target = null
+	entity.action_direction = direction
+	entity.has_move_order = false
 
 
 ## Player intent: attack [param target] on the entity's next free tick.
@@ -417,8 +499,12 @@ func command_move(entity: GridEntity, target: Vector2i) -> void:
 		order_move(entity, target)
 	else:
 		# Shown at once on this client; the server still decides what happens.
-		entity.predict_move(target)
-		request_move.rpc_id(1, entity.get_path(), target)
+		# The steps already on screen go with it: the server walks those first
+		# (see Player.move_via), or a new order arriving before the server
+		# has taken a step the client shows would set off from the tile
+		# before it and go another way.
+		var via := entity.predict_move(target)
+		_to_server(&"request_move", [entity.get_path(), target, via])
 
 
 func command_attack(entity: GridEntity, target: GridEntity) -> void:
@@ -426,7 +512,7 @@ func command_attack(entity: GridEntity, target: GridEntity) -> void:
 		order_attack(entity, target)
 	else:
 		entity.predict_approach(target.tile)
-		request_attack.rpc_id(1, entity.get_path(), target.get_path())
+		_to_server(&"request_attack", [entity.get_path(), target.get_path()])
 
 
 func command_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
@@ -434,16 +520,49 @@ func command_shove(entity: GridEntity, target: GridEntity, direction := Vector2i
 		order_shove(entity, target, direction)
 	else:
 		entity.predict_approach(target.tile)
-		request_shove.rpc_id(1, entity.get_path(), target.get_path(), direction)
+		_to_server(&"request_shove", [entity.get_path(), target.get_path(), direction])
+
+
+## WASD: one step in [param direction]. On a client it is predicted when
+## nothing in the replicated world refuses it, and sent either way, so a
+## step into someone who will not move still reaches the server (a bump).
+func command_step(entity: GridEntity, direction: Vector2i) -> void:
+	if Net.is_authority():
+		order_step(entity, direction, (entity as Player).refusals, false)
+	else:
+		var predicted := entity.predict_step(direction)
+		_to_server(&"request_step", [entity.get_path(), direction, entity.step_epoch(), predicted])
+
+
+## Sends [param method] to the server, after Net.test_lag seconds when that
+## test hook is set (to stand in for a long way to the server).
+func _to_server(method: StringName, args: Array) -> void:
+	if Net.test_lag > 0.0:
+		await get_tree().create_timer(Net.test_lag).timeout
+	callv("rpc_id", [1, method] + args)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_move(entity_path: NodePath, target: Vector2i) -> void:
+func request_move(entity_path: NodePath, target: Vector2i, via: Array) -> void:
+	if not Net.is_authority():
+		return
+	var entity := _entity_owned_by_sender(entity_path)
+	if entity == null:
+		return
+	var tiles: Array[Vector2i] = []
+	for at: Variant in via:
+		if at is Vector2i:
+			tiles.append(at)
+	order_move(entity, target, tiles)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predicted: bool) -> void:
 	if not Net.is_authority():
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity != null:
-		order_move(entity, target)
+		order_step(entity, direction, epoch, predicted)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -468,20 +587,21 @@ func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vect
 
 ## Server: a player's step into [param tile] was refused this tick (someone
 ## else got there first). Its client re-plans at once instead of waiting
-## for a position that is not going to change.
-func report_move_refused(entity: GridEntity, tile: Vector2i) -> void:
+## for a position that is not going to change. [param epoch] is the
+## player's refusal count after this one (see order_step).
+func report_move_refused(entity: GridEntity, tile: Vector2i, epoch := 0) -> void:
 	if not Net.is_authority():
 		return
 	if entity.owner_peer != 0 and entity.owner_peer != Net.local_id \
 			and entity.owner_peer in Net.sendable_peers():
-		move_refused.rpc_id(entity.owner_peer, entity.get_path(), tile)
+		move_refused.rpc_id(entity.owner_peer, entity.get_path(), tile, epoch)
 
 
 @rpc("authority", "call_remote", "reliable")
-func move_refused(entity_path: NodePath, tile: Vector2i) -> void:
+func move_refused(entity_path: NodePath, tile: Vector2i, epoch: int) -> void:
 	var entity := get_node_or_null(entity_path) as GridEntity
 	if entity != null:
-		entity._on_move_refused(tile)
+		entity._on_move_refused(tile, epoch)
 
 
 ## Any other player command, from input code on any peer. On the server it
@@ -608,6 +728,9 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 		return false
 	attacker.next_attack_tick = tick + attacker.attack_ticks
 	attacker._world_set_facing(target.tile - attacker.tile)
+	if not is_shove:
+		attacker._world_swung(aim)
+		entity_swung.emit(attacker, aim)
 	attacker._world_note_exertion(tick)
 	attacker.protected = false  # So does attacking or shoving.
 	var force := push_force(attacker, target)
@@ -800,9 +923,11 @@ func _apply_hazards() -> void:
 			damage(entity, FIRE_DAMAGE, null, &"fire")
 
 
-## One walking step for [param entity], shoving the pushable chain ahead of it.
+## One walking step for [param entity], shoving the pushable chain ahead of
+## it, drawn from [param start] (a tick, maybe fractional) for
+## [param duration] ticks.
 func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_budget: float,
-		duration: int) -> bool:
+		duration: float, start: float) -> bool:
 	var from: Vector2i = entity.tile
 	var to: Vector2i = from + direction
 	if _terrain_blocks_step(from, direction, entity.is_creature()):
@@ -811,13 +936,13 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	if blocker != null:
 		if not blocker.pushable or blocker.mass > push_budget:
 			return false
-		if not _shift(mover, blocker, direction, push_budget - blocker.mass, duration):
+		if not _shift(mover, blocker, direction, push_budget - blocker.mass, duration, start):
 			return false
 	var door := _closed_door_across(from, direction)
 	if door != null:
 		_set_door(door, true, entity)  # A creature; anything else was blocked above.
 	_relocate(entity, to)
-	entity._world_slide_from(from, tick, duration)
+	entity._world_slide_from(from, start, duration)
 	if entity != mover:
 		entity._world_pushed(1)
 		_log("push: %s -> %s dir=%s tiles=1 impact=0 stopped_by=nothing (walked into)" % [
@@ -921,10 +1046,11 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 
-## Ticks one walking step in [param direction] takes for [param entity].
-func step_ticks(entity: GridEntity, direction: Vector2i) -> int:
+## Ticks one walking step in [param direction] takes for [param entity];
+## may be fractional.
+func step_ticks(entity: GridEntity, direction: Vector2i) -> float:
 	if direction.x != 0 and direction.y != 0:
-		return ceili(entity.move_ticks * DIAGONAL_TICK_SCALE)
+		return entity.move_ticks * DIAGONAL_TICK_SCALE
 	return entity.move_ticks
 
 

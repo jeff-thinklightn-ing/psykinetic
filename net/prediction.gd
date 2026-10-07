@@ -19,6 +19,17 @@ extends RefCounted
 ##     of more than SNAP_TILES is snapped (see GridEntity).
 ## Only walking is predicted. Being pushed is never predicted.
 ##
+## A new move order keeps the steps already showing, and the order sent
+## to the server lists the ones it has not confirmed (order's result), so
+## the server walks them before re-pathing: otherwise an order that
+## arrives before the server has taken a shown step sets off from the tile
+## before it, often another way (hold-to-move steering, worst in 3D where
+## the camera moves the ground under a still cursor).
+##
+## WASD walks are predicted step by step (step()): each one starts where
+## the last ends, so the walk is one steady motion, and is sent to the
+## server as it starts; the server takes them in order on its own timer.
+##
 ## The prediction gives its target up when the server evidently has: a step
 ## into the target tile itself refused, or a shown step that no reply
 ## confirms at all. From then on the server's moves are drawn as for any
@@ -33,6 +44,9 @@ const RECONCILE_GRACE_TICKS := 4.0
 class Step:
 	var from := Vector2i.ZERO
 	var to := Vector2i.ZERO
+	## A correction (see rebase): eased out, so the body slows to a stop
+	## on the server's tile instead of halting dead.
+	var ease := false
 	## Where the sprite goes between, in grid units so the view can turn
 	## under it; usually the two tiles' centres.
 	var from_grid := Vector2.ZERO
@@ -54,6 +68,11 @@ var _clock := 0.0
 var _has_target := false
 var _target := Vector2i.ZERO
 var _into_goal := true
+## Refusals of WASD steps heard from the server (see World.order_step).
+var epoch := 0
+## When the last shown walk ended, on the clock, kept after its steps are
+## dropped: a WASD step held on from it starts there, not a frame late.
+var _ended_at := -INF
 
 
 func _init(entity: GridEntity) -> void:
@@ -68,11 +87,17 @@ func is_active() -> bool:
 ## Steps already being shown stay; steps not yet started are replaced.
 ## With [param into_goal] false the walk stops next to the target tile, which
 ## is what the server does when closing in to attack or shove.
-func order(target: Vector2i, into_goal := true) -> void:
+## Returns the tiles of the shown steps the server has not confirmed, in
+## order: the server must walk those first.
+func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	_has_target = true
 	_target = target
 	_into_goal = into_goal
 	cancel_unstarted()
+	var via: Array[Vector2i] = []
+	for step in _steps:
+		if step.started and not step.confirmed:
+			via.append(step.to)
 	var at: Vector2i = _entity.tile
 	var start := _clock
 	if is_active():
@@ -80,6 +105,49 @@ func order(target: Vector2i, into_goal := true) -> void:
 		at = last.to
 		start = maxf(_clock, last.start + last.duration)
 	_append_path(at, start)
+	return via
+
+
+## WASD: one step in [param direction] from where the shown walk ends,
+## starting as the step before it ends. Any move order is dropped (the
+## server drops it too). False, and nothing shown, if the replicated world
+## refuses the step.
+func step(direction: Vector2i) -> bool:
+	_has_target = false
+	cancel_unstarted()
+	var at: Vector2i = _entity.tile
+	# Straight on from the last step if it has only just ended, so a held
+	# key makes one steady walk; after a pause, from now.
+	var start := _ended_at
+	if is_active():
+		var last: Step = _steps.back()
+		at = last.to
+		start = last.start + last.duration
+	if start < _clock - 1.0:
+		start = _clock
+	if _blocked(at, direction):
+		return false
+	var next := Step.new()
+	next.from = at
+	next.to = at + direction
+	next.from_grid = Vector2(at)
+	next.to_grid = Vector2(next.to)
+	next.start = start
+	next.duration = World.step_ticks(_entity, direction)
+	next.deadline = start + Net.rtt_ticks() + RECONCILE_GRACE_TICKS
+	# Sent as it starts: never re-planned (see advance).
+	next.started = true
+	_steps.append(next)
+	return true
+
+
+## WASD: the shown walk has (nearly) run out, so the next held step should
+## go now. True with nothing showing.
+func ready_for_step() -> bool:
+	if not is_active():
+		return true
+	var last: Step = _steps.back()
+	return _clock >= last.start + last.duration
 
 
 ## Drops predicted steps that have not started showing (the order changed).
@@ -121,6 +189,7 @@ func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
 	blend.duration = maxf(blend_ticks, 0.01)
 	blend.started = true
 	blend.confirmed = true  # Not a guess: the server said so.
+	blend.ease = true
 	_steps.append(blend)
 	if _has_target:
 		_append_path(server_tile, _clock + blend.duration)
@@ -152,6 +221,7 @@ func advance(delta: float) -> bool:
 			return true
 	var last: Step = _steps.back()
 	if all_confirmed and _clock >= last.start + last.duration:
+		_ended_at = last.start + last.duration
 		_steps.clear()
 	return false
 
@@ -186,6 +256,8 @@ func facing() -> Vector2i:
 func position() -> Vector2:
 	var step := _current()
 	var t := clampf((_clock - step.start) / step.duration, 0.0, 1.0)
+	if step.ease:
+		t = 1.0 - (1.0 - t) * (1.0 - t)
 	return Iso.grid_to_local(step.from_grid.lerp(step.to_grid, t))
 
 

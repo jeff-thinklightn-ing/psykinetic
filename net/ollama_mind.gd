@@ -13,8 +13,9 @@ extends CompanionMind
 const TIMEOUT_SECONDS := 2.0
 const SYSTEM_PROMPT := """You are the mind of a companion creature in a small tactical game.
 You will be given the situation as JSON. Reply with a single JSON object and nothing else, of the form
-{"intent": "FOLLOW"|"HOLD"|"ATTACK"|"SHOVE"|"RETREAT"|"IDLE", "target": <entity name or null>, "say": <one short line or "">}.
-ATTACK and SHOVE need the name of a nearby entity as target. Stay in character for your personality card."""
+{"intent": "FOLLOW"|"HOLD"|"ATTACK"|"SHOVE"|"RETREAT"|"IDLE"|"YIELD", "target": <entity name or null>, "say": <one short line or "">}.
+ATTACK and SHOVE need the name of a nearby entity as target. YIELD steps aside out of your owner's way;
+answer it when the trigger is "owner bumped into you". Stay in character for your personality card."""
 
 var url := ""
 var model := ""

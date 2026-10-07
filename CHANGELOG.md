@@ -3,6 +3,47 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.28
+
+Controls pass. Server and client.
+
+- **Two control schemes.** `controls=wasd` (the default) or
+  `controls=click` in `settings.cfg`; `--controls=` overrides it for a run.
+- **WASD** walks relative to the camera (W is up the screen at the current
+  yaw), eight directions from key combinations; letting go stops on the
+  cell being entered. Clicking a far cell walks there until a key is
+  pressed.
+- **The mouse aims** in WASD: standing still you face the cursor; a left
+  click attacks whoever is next to you that way, or swings at air; a
+  right click grabs whoever is next to you that way, and a drag tosses. A
+  click on a sprite still goes to that sprite.
+- **Continuous motion.** The player walks at 4 cells a second, steadily,
+  with no pause at cell boundaries; monsters and companions are drawn the
+  same way. A refused step eases to a stop. Facing turns smoothly (about
+  100 ms) toward where you are going, or toward the cursor.
+- **The camera leads toward the cursor**, up to 3 cells, and settles back
+  on you when the cursor comes back near you. The middle-button peek and
+  nudge are gone: Q/E is the only camera rotation.
+- **Bumping your companion** makes her step aside at once (YIELD), or say
+  there is no room; it goes in the party log. A language-model mind gets
+  one decision window to do it before the scripted answer applies.
+  Clicking her walks into her rather than attacking her.
+- **3D:** the hover is a square cell outline; the toss aim is an arrow on
+  the floor; speech shows for 4 seconds from the speech message itself;
+  lanterns are warm white; creatures have a nose that shows their facing
+  and lunge when they swing.
+- **Mispredicts fixed.** A move order sent while a step was showing could
+  reach the server before it had taken that step, and the server would set
+  off from the tile before and go another way. Steering with the button
+  held did this constantly in 3D, where the following camera gives a new
+  target every few frames. Orders now carry the steps already shown and
+  the server walks those first: a steered walk with 50-200 ms of delay
+  went from about two mispredictions in ten seconds to none, and a WASD
+  walk round a corner shows none at 0, 120 and 200 ms.
+- A companion no longer steps aside onto fire.
+
+The server must be updated to v0.1.28 too, as it refuses any other version.
+
 ## v0.1.27
 
 The 3D view is the default. Client.

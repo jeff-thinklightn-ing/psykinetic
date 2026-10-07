@@ -20,6 +20,8 @@ extends Node
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
 ##   --renderer=2d|3d             client view: the 3D one (client3d/, default) or the 2D isometric one;
 ##                                overrides the settings file's renderer=
+##   --controls=wasd|click        WASD to walk and the mouse to aim (default), or click to move;
+##                                overrides the settings file's controls=
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
 ## With no mode argument: an exported build reads settings.cfg (address=,
@@ -32,7 +34,9 @@ extends Node
 ## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
 ## is the 3D view's orbit step as last left. renderer=2d picks the 2D view;
 ## anything else, or no line, is the 3D one. It is read whatever the mode,
-## and kept as written when the file is rewritten.
+## and kept as written when the file is rewritten. controls=click is
+## click-to-move; anything else, or no line, is WASD; read and kept the
+## same way.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -51,6 +55,9 @@ extends Node
 ##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
+##   --test-lag=<seconds>         client: hold every order this long before sending it
+##   --test-steer=<seconds>       hold-to-move with a cursor that swings a quarter turn this often
+##   --test-walk=<keys:secs,...>  WASD: hold these keys (e.g. w:1.5,wd:1) in turn, then let go
 ##
 ## Options are read from both the engine argument list and the user arguments
 ## after "--". Use the --name=value form: a bare value before "--" would be
@@ -79,7 +86,7 @@ signal join_rejected(reason: String, server_version: String)
 
 ## Bump for a wire change that protocol() cannot see by itself (the
 ## meaning of an existing RPC argument, say).
-const PROTOCOL_REVISION := 1
+const PROTOCOL_REVISION := 2
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -139,6 +146,11 @@ var _renderer_given := false
 ## The settings file's renderer= as written ("" for no line), written back
 ## as it was so that a --renderer run does not change the file.
 var _settings_renderer := ""
+## How the local player is driven: "wasd" (WASD walks, the mouse aims) or
+## "click" (click to move). Like renderer: settings controls=, --controls.
+var controls := "wasd"
+var _controls_given := false
+var _settings_controls := ""
 ## The window as the settings file has it: its windowed size and whether it
 ## is fullscreen. Applied at start, kept up to date, saved with the rest.
 var window_size := DEFAULT_WINDOW_SIZE
@@ -173,6 +185,10 @@ var test_azimuth := 0.0
 var test_yaw := 0.0
 var _test_yaw_given := false
 var test_door_tick := 0
+var test_lag := 0.0
+var test_steer := 0.0
+## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
+var test_walk: Array[Dictionary] = []
 
 var mispredicts_total := 0
 var snaps_total := 0
@@ -266,14 +282,23 @@ func _apply_settings() -> void:
 	print("[net] using %s" % path)
 
 
-## renderer= from the settings file, unless --renderer was given: only
-## "2d" picks the 2D view.
+## renderer= and controls= from the settings file, unless given on the
+## command line: only "2d" picks the 2D view, only "click" click-to-move.
 func _apply_renderer_setting() -> void:
 	var path := settings_path()
 	if path != "" and FileAccess.file_exists(path):
-		_settings_renderer = str(_read_settings(path).get("renderer", ""))
+		var settings := _read_settings(path)
+		_settings_renderer = str(settings.get("renderer", ""))
 		if not _renderer_given and _settings_renderer != "":
 			renderer = renderer_from(_settings_renderer)
+		_settings_controls = str(settings.get("controls", ""))
+		if not _controls_given and _settings_controls != "":
+			controls = controls_from(_settings_controls)
+
+
+## "click" is click-to-move; anything else is WASD.
+static func controls_from(value: String) -> String:
+	return "click" if value.strip_edges().to_lower() == "click" else "wasd"
 
 
 ## "2d" is the 2D view; anything else is the 3D one.
@@ -381,6 +406,8 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw)])
 	if _settings_renderer != "":
 		file.store_string("renderer=%s\n" % _settings_renderer)
+	if _settings_controls != "":
+		file.store_string("controls=%s\n" % _settings_controls)
 	file.close()
 	return true
 
@@ -409,7 +436,8 @@ func rtt_ms() -> float:
 
 ## The same in sim ticks, capped so a bad reading cannot stall reconciliation.
 func rtt_ticks() -> float:
-	return minf(rtt_ms() / 1000.0 * World.TICK_RATE, 10.0)
+	# --test-lag stands in for a longer way to the server, so it counts.
+	return minf((rtt_ms() / 1000.0 + test_lag) * World.TICK_RATE, 10.0)
 
 
 func record_mispredict() -> void:
@@ -754,10 +782,11 @@ func _parse_args() -> void:
 				companions = false
 			"--no-player-reset":
 				player_reset = false
-			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", \
+			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw":
+					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
+					"--test-lag", "--test-steer", "--test-walk":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -781,6 +810,19 @@ func _set_option(key: String, value: String) -> void:
 		"--renderer":
 			renderer = renderer_from(value)
 			_renderer_given = true
+		"--controls":
+			controls = controls_from(value)
+			_controls_given = true
+		"--test-lag":
+			test_lag = maxf(value.to_float(), 0.0)
+		"--test-steer":
+			test_steer = maxf(value.to_float(), 0.0)
+		"--test-walk":
+			test_walk.clear()
+			for part in value.split(","):
+				var pieces := part.split(":")
+				if pieces.size() == 2 and pieces[1].is_valid_float():
+					test_walk.append({"keys": pieces[0].to_lower(), "seconds": pieces[1].to_float()})
 		"--player-id":
 			player_id = value.strip_edges()
 		"--name":

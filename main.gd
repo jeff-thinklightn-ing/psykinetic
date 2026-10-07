@@ -13,11 +13,21 @@ const WALL_VALUE := 0.18
 ## Alpha of the near walls (the south and east edges of walkable cells,
 ## facing the camera), drawn as one layer so they never stack up opaque.
 const NEAR_WALL_ALPHA := 0.3
-## Peek: a middle-button drag turns the view (Iso.azimuth). The full range
-## is covered over this many screen px of horizontal drag, eased toward the
-## limits; on release the view tweens back to 0 over PEEK_RETURN_SECONDS.
-const PEEK_DRAG_PX := 400.0
-const PEEK_RETURN_SECONDS := 0.2
+## The camera leads toward the cursor: by this share of how far the cursor
+## is from the middle of the screen, in cells, up to CAMERA_LEAD_MAX, eased
+## at CAMERA_LEAD_RATE; with the cursor within CAMERA_LEAD_DEADZONE of the
+## player it eases back onto them, faster.
+const CAMERA_LEAD_SHARE := 0.5
+const CAMERA_LEAD_MAX := 3.0
+const CAMERA_LEAD_DEADZONE := 1.5
+const CAMERA_LEAD_RATE := 3.0
+const CAMERA_RETURN_RATE := 8.0
+## WASD: the facing sent for a player standing still changes at most this
+## often (seconds).
+const FACE_SEND_INTERVAL := 0.15
+## WASD into someone who will not move: the step (a bump) is sent at most
+## this often, and one into a wall not at all.
+const BUMP_SEND_INTERVAL := 0.25
 ## Camera: the fraction of the remaining distance to the player closed per
 ## second, as an exponential rate. Higher is tighter.
 const CAMERA_FOLLOW_RATE := 6.0
@@ -203,9 +213,16 @@ var _rejected := false
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
 var _toss_from := Vector2.ZERO
-## Middle button held: the screen x it went down at, or NAN when not.
-var _peek_from := NAN
-var _peek_return: Tween
+## The camera's lead toward the cursor, in grid units (see CAMERA_LEAD_*).
+var _lead := Vector2.ZERO
+## WASD: when the facing and the last bump were sent, in msec.
+var _face_sent_at := 0
+var _bump_sent_at := 0
+## --test-walk: which entry is held, and when it started (msec); samples
+## of the local player's shown position, [msec, grid], for the report.
+var _walk_index := -1
+var _walk_since := 0
+var _walk_samples: Array[Array] = []
 ## Every wall face, far and near, for turning the view.
 var _walls: Array[WallEdge] = []
 ## Left button held after a move click: the cell it last sent the player
@@ -282,6 +299,7 @@ func _go_online() -> void:
 		World.entity_despawned.connect(_on_entity_despawned)
 		World.entity_pushed.connect(_narrate_push)
 		World.entity_damaged.connect(_narrate_damage)
+		World.entity_bumped.connect(_on_bumped)
 		World.command_received.connect(_on_command)
 		if Net.llm_url != "" and Net.llm_model != "":
 			mind_kind = "ollama"
@@ -303,6 +321,8 @@ func _go_online() -> void:
 func _process(delta: float) -> void:
 	_follow_player(delta)
 	_test_hover()
+	_drive_wasd()
+	_run_test_steer()
 	# Hover is the floor cell under the cursor, on the ground plane alone:
 	# nothing standing on the map intercepts it.
 	var tile := _mouse_tile()
@@ -314,7 +334,6 @@ func _process(delta: float) -> void:
 		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
-	_peek(delta)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -348,13 +367,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(local, "order", {"slot": key.keycode - KEY_0})
 		return
 	var click := event as InputEventMouseButton
-	if click == null:
-		return
-	if click.button_index == MOUSE_BUTTON_MIDDLE:
-		if _client3d != null:
-			_client3d.nudge_button(click.pressed)
-		else:
-			_peek_button(click.pressed)
+	if click == null or click.button_index == MOUSE_BUTTON_MIDDLE:
 		return
 	var player := _local_player()
 	if player == null:
@@ -374,6 +387,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# cell under the cursor and whatever stands on it. The right button also
 	# takes a door face.
 	var target := _entity_under_mouse()
+	var on_sprite := target != null
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
@@ -383,11 +397,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
 			return
 	var targetable := target != null and target != player and World.can_target(player, target)
+	if Net.controls == "wasd" and not on_sprite:
+		_wasd_click(player, click.button_index)
+		return
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
 			# A creature: go to it and attack. Anything else: walk there (and
-			# push), to the nearest floor if the click was off it.
-			if targetable and target.is_creature():
+			# push), to the nearest floor if the click was off it. Your own
+			# companion is walked into, not hit: she steps aside.
+			if targetable and target.is_creature() and not _is_own_companion(target):
 				World.command_attack(player, target)
 			else:
 				_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
@@ -413,40 +431,131 @@ func _show_3d() -> void:
 	_client3d.setup(_terrain)
 
 
-# --- Peek -------------------------------------------------------------------------
+# --- WASD ---------------------------------------------------------------------------
 
-## Middle button down: the drag turns the view from here; up: it swings
-## back.
-func _peek_button(pressed: bool) -> void:
-	if pressed:
-		if _peek_return != null:
-			_peek_return.kill()
-			_peek_return = null
-		_peek_from = DisplayServer.mouse_get_position().x
+## The grid direction WASD keys point at a camera yaw: [param keys] is
+## (D - A, W - S); W is up the screen, D to its right. Eight directions;
+## ZERO for none. At yaw 0, the 2D view's, W is (-1, -1).
+static func wasd_direction(keys: Vector2, yaw_degrees: float) -> Vector2i:
+	var yaw := deg_to_rad(yaw_degrees)
+	# Up the screen is away from the camera along the ground; see
+	# Client3D._camera_offset, which puts the camera on the +x +z side.
+	var up := Vector3(-1, 0, -1).rotated(Vector3.UP, yaw)
+	var right := Vector3(1, 0, -1).rotated(Vector3.UP, yaw)
+	var along := up * keys.y + right * keys.x
+	return grid_direction(Vector2(along.x, along.z))
+
+
+## The nearest of the eight directions to [param vector] (grid units),
+## or ZERO for a vector too short to point anywhere.
+static func grid_direction(vector: Vector2) -> Vector2i:
+	if vector.length() < 0.01:
+		return Vector2i.ZERO
+	var angle := snappedf(vector.angle(), PI / 4.0)
+	return Vector2i(roundi(cos(angle)), roundi(sin(angle)))
+
+
+## (D - A, W - S) from the keyboard, or from --test-walk while it runs.
+func _held_keys() -> Vector2:
+	var keys := ""
+	if not Net.test_walk.is_empty():
+		keys = _test_walk_keys()
+	elif DisplayServer.get_name() != "headless":
+		for key: Key in [KEY_W, KEY_A, KEY_S, KEY_D]:
+			if Input.is_physical_key_pressed(key):
+				keys += OS.get_keycode_string(key).to_lower()
+	return Vector2(float("d" in keys) - float("a" in keys), float("w" in keys) - float("s" in keys))
+
+
+func _view_yaw() -> float:
+	return _client3d.yaw if _client3d != null else 0.0
+
+
+## WASD each frame: while a direction is held, the next step goes as the
+## one on screen ends (and any click walk is dropped); standing still,
+## the body faces the cursor.
+func _drive_wasd() -> void:
+	var player := _local_player()
+	if player == null:
 		return
-	_peek_from = NAN
-	_peek_return = create_tween()
-	_peek_return.tween_method(_set_azimuth, Iso.azimuth, 0.0, PEEK_RETURN_SECONDS) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-
-
-## While the middle button is held: the azimuth from the horizontal drag,
-## full range over PEEK_DRAG_PX with a sine ease into the limits.
-func _peek(_delta: float) -> void:
-	if is_nan(_peek_from):
+	if Net.controls != "wasd":
+		player.aim = Vector2.ZERO
 		return
-	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
-		_peek_button(false)
+	# Before the first step: a step sent before prediction is on would be
+	# taken by the server and never shown.
+	player.enable_prediction()
+	var direction := wasd_direction(_held_keys(), _view_yaw())
+	_record_walk(player)
+	if direction == Vector2i.ZERO:
+		_aim_at_cursor(player)
 		return
-	var drag := (DisplayServer.mouse_get_position().x - _peek_from) / (PEEK_DRAG_PX * 0.5)
-	_set_azimuth(Iso.AZIMUTH_LIMIT * sin(clampf(drag, -1.0, 1.0) * PI * 0.5))
+	player.aim = Vector2.ZERO
+	_held_target = NONE
+	if not player.ready_for_step():
+		return
+	if Net.is_authority() and (not player.queued_steps.is_empty() or World.tick + 1 < player.next_move_tick):
+		return  # The authority queues and times steps itself; one ahead at most.
+	var from := player.walk_end()
+	if World._terrain_blocks_step(from, direction, true):
+		_aim_at_cursor(player)
+		return
+	var ahead := World.get_entity_at(from + direction)
+	if ahead != null and ahead != player and ahead.is_creature():
+		if Time.get_ticks_msec() - _bump_sent_at < BUMP_SEND_INTERVAL * 1000.0:
+			return
+		_bump_sent_at = Time.get_ticks_msec()
+	World.command_step(player, direction)
 
 
-func _set_azimuth(degrees: float) -> void:
-	if is_equal_approx(degrees, Iso.azimuth):
+## WASD, standing still: the body turns to the cursor on this screen at
+## once, and the facing others see follows, a few times a second at most.
+func _aim_at_cursor(player: Player) -> void:
+	var cursor := _mouse_grid()
+	if is_nan(cursor.x) or DisplayServer.get_name() == "headless":
+		player.aim = Vector2.ZERO
 		return
-	Iso.set_azimuth(degrees)
-	_apply_azimuth()
+	player.aim = cursor - Iso.local_to_grid(player.position)
+	var direction := grid_direction(player.aim)
+	if direction == Vector2i.ZERO or direction == player.facing or not player.ready_for_step():
+		return
+	if Time.get_ticks_msec() - _face_sent_at < FACE_SEND_INTERVAL * 1000.0:
+		return
+	_face_sent_at = Time.get_ticks_msec()
+	World.command(player, "face", {"dir": [direction.x, direction.y]})
+
+
+## WASD, a click not on a sprite. Left: a far cell is walked to (until a
+## key is pressed); otherwise it is an attack the cursor's way, on whoever
+## stands next to the player there, or a swing at air. Right: grab whoever
+## stands next to the player the cursor's way; dragging tosses, as ever.
+func _wasd_click(player: Player, button: MouseButton) -> void:
+	var cursor := _mouse_grid()
+	if is_nan(cursor.x):
+		return
+	var at := player.shown_tile()
+	var direction := grid_direction(cursor - Iso.local_to_grid(player.position))
+	if direction == Vector2i.ZERO:
+		return
+	var next := World.get_entity_at(at + direction)
+	var reachable := next != null and next != player and World.can_target(player, next) \
+			and World.can_melee(at, at + direction)
+	if button == MOUSE_BUTTON_LEFT:
+		var tile := _snap_to_floor(cursor)
+		if tile != NONE and World.distance(at, tile) > 1:
+			_move_click(player, tile)
+			_held_target = NONE  # No hold-to-move in WASD: the keys steer.
+		elif reachable and next.is_creature() and not _is_own_companion(next):
+			World.command_attack(player, next)
+		else:
+			World.command(player, "swing", {"dir": [direction.x, direction.y]})
+	elif button == MOUSE_BUTTON_RIGHT and reachable:
+		_toss_target = next
+		_toss_from = get_global_mouse_position()
+
+
+## A companion that belongs to this peer's player.
+func _is_own_companion(entity: GridEntity) -> bool:
+	return entity is Companion and entity.keeper_peer != 0 and entity.keeper_peer == Net.local_id
 
 
 ## Turns everything on the ground to the current azimuth: the floor layer
@@ -572,6 +681,9 @@ func _update_toss_aim() -> void:
 		direction = _toss_direction()
 	else:
 		_toss_target = null
+	if _client3d != null:
+		_client3d.toss_aim(_toss_target, direction)
+		return
 	toss_aim.visible = direction != Vector2i.ZERO
 	if not toss_aim.visible:
 		return
@@ -613,14 +725,33 @@ func _door_under_mouse() -> Door:
 	return null
 
 
-## The camera eases toward the local player, a little behind it. With no
-## player (dedicated server, dead) it stays put.
+## The camera eases toward the local player, a little behind it, led
+## toward the cursor (see camera_lead). With no player (dedicated server,
+## dead) it stays put. The 3D view follows by the same rule itself.
 func _follow_player(delta: float) -> void:
 	var player := _local_player()
-	if player == null:
+	if player == null or _client3d != null:
 		return
+	var player_grid := Iso.local_to_grid(player.position)
+	if DisplayServer.get_name() != "headless":
+		var cursor := Iso.local_to_grid(_mouse_point()) - Iso.local_to_grid(camera.position)
+		_lead = Main.camera_lead(_lead, cursor, player_grid - Iso.local_to_grid(camera.position), delta)
 	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
-	camera.position = camera.position.lerp(player.position, rate)
+	camera.position = camera.position.lerp(Iso.grid_to_local(player_grid + _lead), rate)
+
+
+## The camera's lead toward the cursor, eased one frame from [param lead].
+## [param cursor] is where the cursor is from the middle of the screen and
+## [param player] where the player is from it, both on the ground in grid
+## units: measured from the screen, not the player, so the camera moving
+## does not move what it chases. Near the player the lead goes, faster.
+static func camera_lead(lead: Vector2, cursor: Vector2, player: Vector2, delta: float) -> Vector2:
+	var wanted := Vector2.ZERO
+	var rate := CAMERA_RETURN_RATE
+	if cursor.distance_to(player) > CAMERA_LEAD_DEADZONE:
+		wanted = (cursor * CAMERA_LEAD_SHARE).limit_length(CAMERA_LEAD_MAX)
+		rate = CAMERA_LEAD_RATE
+	return lead.lerp(wanted, 1.0 - exp(-rate * delta))
 
 
 ## The player this peer's input controls, or null (dedicated server, dead,
@@ -968,6 +1099,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var pet := _spawn({
 		"script": COMPANION, "shape": "capsule", "name": String(record.companion["name"]), "tile": tile,
 		"tint": COMPANION_TINT, "label": String(record.companion["name"]),
+		"props": {"keeper_peer": player.owner_peer},
 	}) as Companion
 	if pet == null:
 		return
@@ -1025,6 +1157,14 @@ func _remember_companion(id: String) -> void:
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	if command_name == "order" and entity is Player:
 		handle_order(entity, int(args.get("slot", 0)))
+	elif command_name == "swing" and entity is Player:
+		var swing := _direction_arg(args)
+		if swing != Vector2i.ZERO:
+			World.order_swing(entity, swing)
+	elif command_name == "face":
+		var facing := _direction_arg(args)
+		if facing != Vector2i.ZERO:
+			World.face(entity, facing)
 	elif command_name == "door":
 		var edge: Variant = args.get("edge")
 		if edge is Array and edge.size() == 3:
@@ -1037,6 +1177,26 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		print("[world] %s reset the room" % who)
 		_start_level()
 		party_log.add("%s reset the room." % who)
+
+
+## {"dir": [x, y]} as one of the eight directions, or ZERO.
+static func _direction_arg(args: Dictionary) -> Vector2i:
+	var raw: Variant = args.get("dir")
+	if raw is not Array or raw.size() != 2:
+		return Vector2i.ZERO
+	var direction := Vector2i(int(raw[0]), int(raw[1]))
+	return direction if direction in World.DIRECTIONS else Vector2i.ZERO
+
+
+## Server: a player walked into their own companion; she gets out of the
+## way (see Companion.bumped). Logged once per bump, not per key repeat.
+func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) -> void:
+	var pet := occupant as Companion
+	if pet == null or pet.keeper != mover:
+		return
+	if pet.bumped(direction):
+		party_log.add("%s bumped into %s." % [_display_name(mover), pet.name])
+		print("[mind] %s bumped into %s going %s" % [_display_name(mover), pet.name, direction])
 
 
 func handle_order(player: Player, slot: int) -> void:
@@ -1084,6 +1244,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
 		if entity != null:
 			entity.say(str(data.get("text", "")))
+			if _client3d != null:
+				_client3d.say(entity, str(data.get("text", "")))
 			print("[speech] %s: %s" % [entity.name, data.get("text", "")])
 
 
@@ -1267,8 +1429,12 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R reset room   F3 debug   F11 fullscreen" % [
-		mode_text, hp_text, tick]
+	var hints := "WASD walk   mouse aim   LMB attack (far: walk)   RMB grab (drag to toss)" if Net.controls == "wasd" \
+			else "LMB move / attack   RMB shove (drag to toss)"
+	if _client3d != null:
+		hints += "   Q/E turn"
+	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
+		mode_text, hp_text, tick, hints]
 	if player != null:
 		_had_player = true
 	if player != null:
@@ -1289,6 +1455,7 @@ func _debug_text() -> String:
 		lines.append("yaw: %.1f deg" % _client3d.yaw)
 	else:
 		lines.append("azimuth: %.1f deg" % Iso.azimuth)
+	lines.append("controls: %s" % Net.controls)
 	if Net.mode == Net.Mode.CLIENT:
 		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))
 		lines.append("mispredicts: %d / min (%d total)" % [
@@ -1498,7 +1665,81 @@ func _run_test_contest(player: Player, tick: int) -> void:
 		player.name, player.tile, Net.test_contest_tile, player.shown_tile()])
 
 
+## --test-steer: hold-to-move with the cursor kept three cells from the
+## player and swung a quarter turn every that many seconds, as a hand
+## steering does (the 3D camera following makes every frame a new target).
+func _run_test_steer() -> void:
+	var player := _local_player()
+	if Net.test_steer <= 0.0 or player == null:
+		return
+	var turns: Array[Vector2i] = [Vector2i(3, 0), Vector2i(0, 3), Vector2i(-3, 0), Vector2i(0, -3)]
+	var turn := int(Time.get_ticks_msec() / (Net.test_steer * 1000.0)) % turns.size()
+	var want := player.shown_tile() + turns[turn]
+	if World.is_walkable(want) and want != _test_target:
+		_test_target = want
+		World.command_move(player, want)
+
+
+## --test-walk: the keys of the entry being held, or "" once all are done.
+func _test_walk_keys() -> String:
+	if _local_player() == null:
+		return ""
+	if _walk_index == -1:
+		_walk_index = 0
+		_walk_since = Time.get_ticks_msec()
+	while _walk_index < Net.test_walk.size() \
+			and Time.get_ticks_msec() - _walk_since >= Net.test_walk[_walk_index]["seconds"] * 1000.0:
+		_walk_since += roundi(Net.test_walk[_walk_index]["seconds"] * 1000.0)
+		_walk_index += 1
+	if _walk_index >= Net.test_walk.size():
+		return ""
+	return Net.test_walk[_walk_index]["keys"]
+
+
+func _record_walk(player: Player) -> void:
+	if not Net.test_walk.is_empty() and _walk_index != -1:
+		_walk_samples.append([Time.get_ticks_msec(), Iso.local_to_grid(player.position)])
+
+
+## --test-walk's report: the shown speed over the walk, frame by frame
+## (cells per second), leaving out the first and last 150 ms, where the
+## walk speeds up from and slows to a stand.
+func _report_walk() -> void:
+	if _walk_samples.size() < 3:
+		return
+	var first: int = _walk_samples[0][0]
+	var last: int = _walk_samples.back()[0]
+	var speeds: Array[float] = []
+	var labels: Array[String] = []
+	for i in range(1, _walk_samples.size()):
+		var at: int = _walk_samples[i][0]
+		var dt := (at - int(_walk_samples[i - 1][0])) / 1000.0
+		if dt <= 0.0 or at - first < 150 or last - at < 150:
+			continue
+		var moved: float = (_walk_samples[i][1] as Vector2).distance_to(_walk_samples[i - 1][1])
+		if moved > 0.0 or speeds.size() > 0:
+			speeds.append(moved / dt)
+			labels.append("%d ms at %s" % [at - first, _walk_samples[i][1]])
+	while not speeds.is_empty() and speeds.back() == 0.0:
+		speeds.pop_back()
+		labels.pop_back()
+	if speeds.is_empty():
+		print("[test] walk: no motion")
+		return
+	var stops := 0
+	var total := 0.0
+	var slow_at: Array[String] = []
+	for i in speeds.size():
+		total += speeds[i]
+		if speeds[i] < 1.0:
+			stops += 1
+			slow_at.append(labels[i])
+	print("[test] walk: frames=%d speed min=%.2f max=%.2f mean=%.2f cells/s, frames under 1 cell/s=%d %s, ends at %s" % [
+		speeds.size(), speeds.min(), speeds.max(), total / speeds.size(), stops, slow_at, _walk_samples.back()[1]])
+
+
 func _on_test_exit() -> void:
+	_report_walk()
 	if Net.screenshot_path != "":
 		var image := get_viewport().get_texture().get_image()
 		var error := image.save_png(Net.screenshot_path)

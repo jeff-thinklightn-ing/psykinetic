@@ -112,7 +112,7 @@ func _test_prediction_gives_up_when_the_server_has() -> void:
 	me._process(0.05)
 	_check(me._prediction.is_active() and me._prediction.has_target(), "a walk is being shown")
 	# The server refused the step into the destination: Player gives the order up.
-	me._on_move_refused(Vector2i(8, 21))
+	me._on_move_refused(Vector2i(8, 21), 0)
 	_check(not me._prediction.has_target(), "a refused step into the destination itself: the order is given up")
 	for i in 10:
 		me._process(0.1)
@@ -165,7 +165,7 @@ func _walk(entity: GridEntity, steps: Array[Vector2i]) -> Array[float]:
 	var moves: Array[float] = []
 	for step in steps:
 		_run_tick(entity, moves, step)
-		for i in World.step_ticks(entity, step) - 1:
+		for i in int(World.step_ticks(entity, step)) - 1:
 			_run_tick(entity, moves)
 	for i in World.display_delay_ticks + 2:
 		_run_tick(entity, moves)

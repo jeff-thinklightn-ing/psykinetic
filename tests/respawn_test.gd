@@ -221,7 +221,7 @@ func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
 
 ## Shoves, waiting out the cooldown and the mid-step rule first.
 func _shove(attacker: GridEntity, target: GridEntity) -> void:
-	while World.tick < maxi(attacker.next_attack_tick, attacker.next_move_tick):
+	while World.tick < maxf(attacker.next_attack_tick, attacker.next_move_tick):
 		World.step()
 	World.order_shove(attacker, target)
 	World.step()

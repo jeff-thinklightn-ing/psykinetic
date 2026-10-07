@@ -7,10 +7,29 @@ extends GridEntity
 ##
 ## The mind only answers; this script validates the answer and acts. An
 ## intent whose target is gone or unreachable falls back to FOLLOW.
+##
+## The owner walking into her (bumped) asks for a decision at once, with
+## the trigger, the way the owner was going and the free cells around her.
+## YIELD steps to the nearest free cell off the owner's line and waits
+## there for a decision window; with no such cell she stays and says so.
+## A mind that answers later (the language model) has one decision window
+## to yield; if it has not by then and there is room, the scripted answer
+## (YIELD) is applied.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD"]
+## The context's trigger for a bump.
+const BUMPED := "owner bumped into you"
+## A bump this soon after the last one is the same bump (a held key).
+const BUMP_REPEAT_TICKS := 10
+## How far ahead of the owner, along the way they were going, counts as
+## their path.
+const YIELD_PATH_CELLS := 3
+## A yield cell is at most this many steps away.
+const YIELD_REACH := 2
+const NO_ROOM_LINE := "There's no room for me to move."
+const NONE := Vector2i(-1, -1)
 const DECISION_INTERVAL_TICKS := 30
 ## One line of speech per this many ticks.
 const SPEECH_INTERVAL_TICKS := 50
@@ -41,6 +60,14 @@ var last_mind := "none"
 
 var _next_decision_tick := 0
 var _decision_reason := ""
+## The way the owner was walking when they last bumped into her; ZERO
+## once that has been dealt with.
+var _bump_direction := Vector2i.ZERO
+var _last_bump_tick := -1000
+## Tick by which a later-answering mind must have yielded, or -1.
+var _bump_deadline := -1
+## Where YIELD goes; her own tile when there was nowhere.
+var _yield_tile := NONE
 var _known_hostiles: Dictionary[int, bool] = {}
 var _last_speech_tick := -1000
 
@@ -65,6 +92,18 @@ func request_decision(reason: String) -> void:
 	_decision_reason = reason
 
 
+## Her owner walked into her going [param direction]: decide now. False
+## (and nothing done) for the same bump again, or while already yielding.
+func bumped(direction: Vector2i) -> bool:
+	if World.tick - _last_bump_tick < BUMP_REPEAT_TICKS or current_intent == Intent.YIELD:
+		return false
+	_last_bump_tick = World.tick
+	_bump_direction = direction
+	request_decision(BUMPED)
+	_decide()
+	return true
+
+
 ## The owner pressed an order key. Slots 1..4; others are accepted and ignored.
 func give_order(order: String, target: GridEntity = null) -> void:
 	last_order = order
@@ -82,6 +121,13 @@ func _sim_tick() -> void:
 		var late := mind.poll()
 		if not late.is_empty():
 			_apply(late, mind.kind)
+	if _bump_deadline != -1 and World.tick >= _bump_deadline:
+		# The mind had its window and did not yield: the scripted answer.
+		_bump_deadline = -1
+		if current_intent != Intent.YIELD and _find_yield_tile() != NONE:
+			print("[mind] %s: no yield from %s in time; the scripted answer" % [name, mind.kind])
+			_apply(ScriptedMind.new().decide(_context()), "scripted")
+		_bump_direction = Vector2i.ZERO
 	if not _decision_reason.is_empty() or World.tick >= _next_decision_tick:
 		_decide()
 	_execute()
@@ -95,6 +141,10 @@ func _decide() -> void:
 	var context := _context()
 	var answer: Dictionary = mind.decide(context) if mind != null else {}
 	var source := mind.kind if mind != null else "none"
+	if answer.is_empty() and context["trigger"] == BUMPED and mind != null:
+		# Waiting on a slower mind: it has one window to yield (see _sim_tick).
+		_bump_deadline = World.tick + DECISION_INTERVAL_TICKS
+		return
 	if answer.is_empty():
 		answer = ScriptedMind.new().decide(context)
 		source = "scripted"
@@ -120,6 +170,19 @@ func _apply(answer: Dictionary, source: String) -> void:
 	var before := current_intent
 	current_intent = intent as Intent
 	intent_target = target
+	var line_said := str(answer.get("say", "")).strip_edges()
+	if intent == Intent.YIELD:
+		_bump_deadline = -1
+		_bump_direction = _bump_direction if _bump_direction != Vector2i.ZERO else facing
+		_yield_tile = _find_yield_tile()
+		_bump_direction = Vector2i.ZERO
+		# Stay out of the way for a window before thinking again.
+		_next_decision_tick = World.tick + DECISION_INTERVAL_TICKS
+		if _yield_tile == NONE:
+			_yield_tile = tile
+			if line_said.is_empty():
+				line_said = NO_ROOM_LINE
+			_last_speech_tick = -1000  # Said whatever the rate limit.
 	if intent == Intent.HOLD:
 		var tile_text := target_text.split(",")
 		hold_tile = Vector2i(tile_text[0].to_int(), tile_text[1].to_int()) \
@@ -127,7 +190,6 @@ func _apply(answer: Dictionary, source: String) -> void:
 	if current_intent != before:
 		print("[mind] %s (%s): %s%s" % [
 			name, source, intent_name(), " " + target.name if target != null else ""])
-	var line_said := str(answer.get("say", "")).strip_edges()
 	if not line_said.is_empty() and World.tick - _last_speech_tick >= SPEECH_INTERVAL_TICKS:
 		_last_speech_tick = World.tick
 		said.emit(line_said.left(120))
@@ -153,8 +215,20 @@ func _context() -> Dictionary:
 			"stamina": keeper.stamina, "max_stamina": keeper.max_stamina,
 			"dx": offset.x, "dy": offset.y,
 		}
+	var trigger := _decision_reason
+	var owner_direction := {}
+	var free_cells: Array[Dictionary] = []
+	if _bump_direction != Vector2i.ZERO:
+		trigger = BUMPED
+		owner_direction = {"dx": _bump_direction.x, "dy": _bump_direction.y}
+		for direction in World.DIRECTIONS:
+			if World.is_free(tile + direction) and not World._terrain_blocks_step(tile, direction, true):
+				free_cells.append({"dx": direction.x, "dy": direction.y})
 	return {
 		"card": card,
+		"trigger": trigger,
+		"owner_direction": owner_direction,
+		"free_cells": free_cells,
 		"log": party_log.last(LOG_LINES_FOR_MIND) if party_log != null else [],
 		"nearby": nearby,
 		"hp": hp, "max_hp": max_hp, "stamina": stamina, "max_stamina": max_stamina,
@@ -220,8 +294,41 @@ func _execute() -> void:
 				World.try_shove(self, intent_target)
 			else:
 				_approach(intent_target, 1)
+		Intent.YIELD:
+			if _yield_tile != NONE and tile != _yield_tile and World.is_free(_yield_tile):
+				_step_toward(_yield_tile, false)
 		Intent.IDLE:
 			pass
+
+
+## The nearest free cell that is not fire, at most YIELD_REACH steps away,
+## and not on the owner's line ahead (YIELD_PATH_CELLS along the way they were going);
+## of equally near ones, the least far along that line. NONE if there is
+## none.
+func _find_yield_tile() -> Vector2i:
+	if not _alive(keeper):
+		return NONE
+	var direction := _bump_direction if _bump_direction != Vector2i.ZERO else facing
+	var line: Dictionary[Vector2i, bool] = {}
+	for k in range(1, YIELD_PATH_CELLS + 1):
+		line[keeper.tile + direction * k] = true
+	var best := NONE
+	var best_steps := YIELD_REACH + 1
+	var best_ahead := INF
+	for dy in range(-YIELD_REACH, YIELD_REACH + 1):
+		for dx in range(-YIELD_REACH, YIELD_REACH + 1):
+			var cell := tile + Vector2i(dx, dy)
+			if cell == tile or line.has(cell) or not World.is_free(cell) or World.is_fire(cell):
+				continue
+			var path := World.find_path(tile, cell)
+			if path.is_empty() or path.size() > YIELD_REACH:
+				continue
+			var ahead := Vector2(cell - keeper.tile).dot(Vector2(direction))
+			if path.size() < best_steps or (path.size() == best_steps and ahead < best_ahead):
+				best = cell
+				best_steps = path.size()
+				best_ahead = ahead
+	return best
 
 
 ## Walks until within [param reach] of [param target].

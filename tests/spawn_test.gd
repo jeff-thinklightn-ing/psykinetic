@@ -91,7 +91,7 @@ func _test_spawn_grace() -> void:
 
 	World.protect(player, _main.SPAWN_GRACE_TICKS)
 	imp = _spawn_imp(player.tile + Vector2i(1, 0))
-	while World.tick < maxi(player.next_attack_tick, player.next_move_tick):
+	while World.tick < maxf(player.next_attack_tick, player.next_move_tick):
 		World.step()
 	_check(player.protected, "protected, with an imp beside it")
 	World.order_attack(player, imp)

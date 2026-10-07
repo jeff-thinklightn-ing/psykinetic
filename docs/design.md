@@ -169,6 +169,29 @@ sim state.
   the server's tiles like any other entity's. Only walking is predicted. Pushes of the local player are
   never predicted, and neither are attacks, shoves, or anything about other
   entities; the server's result always wins.
+- *A new order keeps the steps on screen.* A move order sent while a
+  predicted step is showing carries the tiles of the shown steps the
+  server has not confirmed (`via`, from `MovePrediction.order`), and the
+  server walks those first (`Player.move_via`) before re-pathing to the
+  new target. Without it an order that reached the server before it had
+  taken a shown step set off from the tile before and often went another
+  way: hold-to-move steering mispredicted, worst in 3D, where the camera
+  following the player gives a new target under a still cursor every few
+  frames. With 50-200 ms of delay on the orders (`--test-lag`) a steered
+  walk (`--test-steer`) went from about two mispredictions in ten seconds
+  to none.
+- *WASD walks* are predicted one step at a time (`MovePrediction.step`):
+  each starts where the last ends (kept across the steps being dropped
+  once confirmed), so a held key is one steady walk, and is sent as it
+  starts (`World.command_step`). The server takes them in order on its own
+  movement timer (`Player.queued_steps`, at most `World.MAX_QUEUED_STEPS`).
+  A refused step that was shown ends the walk: the server counts it
+  (`Player.refusals`), drops what is queued and tells the client the new
+  count with `move_refused`; steps the client sent before it heard carry
+  the old count and are dropped, so the server never walks on from a step
+  the client has already taken back. A step the replicated world refuses
+  is not shown; into a wall it is not sent at all, into a creature it is
+  sent (a bump, at most every `Main.BUMP_SEND_INTERVAL`) but not shown.
 
 **Contested tiles are decided once.** When two orders want the same tile in
 the same tick the act phase resolves them in entity id order: the first
@@ -178,7 +201,8 @@ dropped; if it was a tile on the way, the order stays and is re-pathed
 around next tick.
 
 `F3` toggles a debug overlay: peer id, round trip time (from ENet),
-mispredictions in the last minute, and snaps in the last minute.
+mispredictions in the last minute, and snaps in the last minute, and the
+control scheme.
 
 **Respawn.** `LEVEL_ENTITIES` in `main.gd` is the spawn table: one slot
 per monster, crate and boulder, with its tile, scene and properties. Every
@@ -285,8 +309,13 @@ Input orders are applied when they arrive and picked up by the player's next
 ## Movement
 
 Eight directions. An orthogonal step takes the entity's `move_ticks`; a
-diagonal step takes `ceil(move_ticks × World.DIAGONAL_TICK_SCALE)` (1.5, so 3
-ticks against 2 for the player). This keeps world speed roughly constant.
+diagonal step takes `move_ticks × World.DIAGONAL_TICK_SCALE` (1.5). Either
+may be a fraction of a tick: the player's `move_ticks` is 2.5, four cells
+a second, a diagonal 3.75. The movement timer (`next_move_tick`, a float)
+carries the fraction: a step due at 12.5 and taken on tick 13 is drawn
+from 12.5 and the next is due at 15, so steps fall on ticks 0, 3, 5, 8,
+10, ... and average out exactly (`World.try_move`). This keeps world speed
+roughly constant.
 Screen speed still differs by direction, as it does in any 2:1 isometric
 view: a sideways diagonal covers 32 px, an orthogonal step 18 px, an up/down
 diagonal 16 px.
@@ -513,6 +542,19 @@ joins and leaves — naming players by record name and companions by name.
 and snapshot tests use it so that their choreography stays deterministic;
 `tests/companion_test.tscn` covers companions themselves.
 
+**Bumps.** A player walking into their own companion (a refused step
+into her: `World.entity_bumped`) asks her mind for a decision at once
+(`Companion.bumped`), with `trigger` "owner bumped into you",
+`owner_direction` (the way the owner was walking) and `free_cells` (free
+cells next to her) in the context; it goes in the party log. `YIELD`
+steps to the nearest free cell that is not fire, at most two steps away
+and off the owner's line (three cells ahead along that way), and waits
+there a decision window; with nowhere to go she stays and says so. The
+scripted mind yields at once. A mind that answers later (the language
+model) has one decision window to yield: if it has not by then and a cell
+is free, the scripted answer applies. The same bump again within
+`BUMP_REPEAT_TICKS` (a held key) is ignored.
+
 **Orders.** Keys 1–9 send `World.command("order", {slot})`; the server maps
 1 follow, 2 hold here, 3 attack my current target (or the nearest monster),
 4 fall back, and ignores 5–9. An order is logged and opens a decision
@@ -555,7 +597,19 @@ t        = clamp((World.tick + World.tick_alpha - move_tick) / move_duration, 0,
 position = lerp(Iso.tile_to_local(from_tile), Iso.tile_to_local(tile), t)
 ```
 
-The sim position jumps at the tick; the sprite slides after it.
+The sim position jumps at the tick; the sprite slides after it. There is
+no easing at the ends of a slide: steps that follow one another join up
+into one walk at constant speed. A mirror's step that arrives within a
+tick of where the one before it ends starts exactly there
+(`_mirror_tile_changed`), so a 2.5-tick walk taken on whole ticks does not
+stutter by the fraction. A refused or corrected predicted step eases out
+to its stop over `RECONCILE_BLEND_TICKS` instead of halting dead.
+
+**Facing as shown** turns toward where the body is going: along the step
+being drawn, else the replicated `facing`, else (the local player in WASD,
+standing) the cursor (`GridEntity.aim`). It eases there at `TURN_RATE`
+(about 100 ms to come round, `GridEntity.shown_facing`), on the 2D pip and
+the 3D nose alike.
 
 On a client the same code runs from mirrored values, two ticks in the past:
 `World.tick` is the last replicated tick and `tick_alpha` counts up locally
@@ -646,7 +700,14 @@ the tests use is where it was.
 Test rooms written as old cell maps go through `Terrain.expand`.
 
 **Camera.** The camera eases toward the local player
-(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. The hover highlight
+(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`, led toward the
+cursor (`Main.camera_lead`): by `CAMERA_LEAD_SHARE` (half) of how far the
+cursor is from the middle of the screen, up to `CAMERA_LEAD_MAX` (3)
+cells, eased at `CAMERA_LEAD_RATE`; with the cursor within
+`CAMERA_LEAD_DEADZONE` (1.5 cells) of the player the lead eases back to
+nothing, faster. The lead is measured from the screen, not the player, so
+the camera moving does not move what it chases. There are no pan keys.
+The 3D view follows by the same rule. The hover highlight
 is drawn above walls, so the target cell reads even behind a full-height
 wall.
 
@@ -740,20 +801,24 @@ translucent meshes, so two overlapping ones do stack a little.
 **Entities** get a puppet each (`_make_puppet`): a primitive at the scale
 table's height (capsule for characters, box, cylinder, sphere, slabs),
 coloured as the 2D sprite is (its modulate: tint or the monster's mass
-shade), a Label3D name and speech line on creatures (the speech follows
-`GridEntity.speech`), a warm `OmniLight3D` with shadows on players and
-companions, and an `Area3D` of the body's shape for picking. Puppets
-follow the 2D nodes every frame through `Iso.local_to_grid` at azimuth 0.
+shade), a Label3D name and speech line on creatures, a nose on
+creatures that turns with `GridEntity.shown_facing` and a lunge toward the
+blow on a swing or attack (`GridEntity.swung`), a warm-white
+`OmniLight3D` with shadows on players and companions (`PLAYER_LIGHT`, the
+same whatever the body's colour), and an `Area3D` of the body's shape for
+picking. Puppets follow the 2D nodes every frame through
+`Iso.local_to_grid` at azimuth 0. The speech line is driven by the speech
+message itself (`Client3D.say`, from Main) and shows for
+`SPEECH_SECONDS` (4), not by the hidden 2D caption.
 
 **Camera**: `Camera3D` orthographic, `CAMERA_SIZE` 12 units tall (a
 1.5-unit character, foreshortened by cos 50°, is a twelfth of the
 height), pitched `CAMERA_PITCH` 50° from horizontal, on the +x +z side at
 yaw 0 so grid +x runs down-right and +y down-left as in the 2D diamond,
 following the local player. **Orbit**: Q/E step the yaw by `ORBIT_STEP`
-(45°) about the player, tweened over `ORBIT_SECONDS` (250 ms); a
-middle-button drag nudges it up to a step either way (full nudge over
-`NUDGE_DRAG_PX`, eased) and it springs back over `NUDGE_RETURN_SECONDS`
-on release; the step persists as `camera_yaw` in `settings.cfg`
+(45°) about the player, tweened over `ORBIT_SECONDS` (250 ms); that is
+the only way to turn it (the middle button does nothing). The step
+persists as `camera_yaw` in `settings.cfg`
 (`Net.camera_yaw`, saved by `Net.save_view_settings`). F3 shows the yaw.
 Light: a `WorldEnvironment` with near-black background and ambient, one
 faint cool `DirectionalLight3D` (`SUN_ENERGY` 0.1) with shadows, the
@@ -765,18 +830,17 @@ with a drag to toss, door, orders 1–4, R, F3, F11, hold-to-move with
 retargeting). Main asks the view for its picks: `entity_under_mouse` and
 `door_under_mouse` cast a ray from the camera through the cursor against
 the pick `Area3D`s; `mouse_grid` meets the floor plane and Main snaps it
-to the nearest walkable cell within three tiles as in 2D. The hover ring
-(`hover`) and the click ripple (`ripple`) are flat ring meshes on the
-floor; the toss drag reads its screen directions from the camera
+to the nearest walkable cell within three tiles as in 2D. The hover is a
+square outline of the cell (`hover`), the click ripple a ring (`ripple`)
+and the toss aim during a right drag an arrow (`toss_aim`), all flat on
+the floor; the toss drag reads its screen directions from the camera
 (`screen_vector`). `--test-yaw=<deg>` starts with the camera yawed, for
 screenshots.
 
-**Peek.** A middle-button drag turns the view: the azimuth follows the
-horizontal drag, the full range over `Main.PEEK_DRAG_PX` (400 screen px)
-with a sine ease into the limits; on release it tweens back to 0 over
-`PEEK_RETURN_SECONDS` (200 ms). F3 shows the angle. A prototype: the sim
-knows nothing of it, and nothing else reads it. `--test-azimuth=<deg>`
-starts with the view turned, for screenshots.
+**Azimuth.** The 2D projection still takes an azimuth (`Iso.azimuth`),
+but nothing turns it any more: the middle-button peek is gone, and Q/E in
+the 3D view is the only camera rotation. `--test-azimuth=<deg>` starts
+with the view turned, for screenshots. F3 shows the angle.
 
 Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
 → `ground.to_local()` → `Iso.local_to_tile()` gives the floor cell under
@@ -801,7 +865,42 @@ drawn above walls like the hover highlight. One ripple per click. Holding
 the button keeps retargeting from `_process` as the cursor moves to other
 cells (`_retarget_held`), each new cell with its own ripple; the hover
 highlight stays on the cell under the cursor. Pinned in
-`tests/respawn_test.gd`.
+`tests/respawn_test.gd`. Clicking your own companion walks into her
+rather than attacking her (she steps aside; see Companions); a client
+knows its own by `GridEntity.keeper_peer`, set in her spawn spec.
+
+## Controls
+
+Two schemes, `controls=wasd` (the default) or `controls=click` in
+`settings.cfg`, with `--controls=` overriding it for a run; read and kept
+as `renderer=` is. In both, Q/E turn the 3D camera, 1–4 are orders, R,
+F3 and F11 as ever.
+
+**Click** is the input described above: left click moves or attacks,
+hold-to-move retargets, right click (and drag) shoves and tosses.
+
+**WASD.** W is up the screen at the current camera yaw, D to its right;
+key combinations give eight directions (`Main.wasd_direction`; at yaw 0,
+the 2D view's, W is grid (-1, -1)). While a direction is held, the next
+step goes as the one on screen ends (`Main._drive_wasd`), with the same
+occupancy, edge-wall and push rules as any step; letting go stops on the
+cell being entered. The mouse aims: standing still, the body faces the
+cursor at once on this screen, and the facing everyone sees follows
+(`World.command("face")`, a few times a second at most; `World.face`
+turns only a creature that is not mid-step). A sprite under the cursor
+still wins any click, as in the click scheme. Otherwise a left click on a
+far cell (more than one away) walks there by path until a key is
+pressed, with no hold-to-move; a nearer left click attacks the cursor's
+way: whoever stands next to the player that way, or a swing at air
+(`World.command("swing")` -> `World.order_swing` -> `try_swing`: the
+attack's cooldown, facing and lunge, nothing hit). A right click grabs
+whoever stands next to the player the cursor's way; a drag from it
+tosses, as ever.
+
+Test hooks: `--test-walk=<keys:secs,...>` holds keys in turn (and prints
+the shown speed frame by frame at exit), `--test-steer=<secs>` steers a
+hold-to-move, `--test-lag=<secs>` holds every order that long before
+sending it (counted in the round trip).
 
 ## Testing
 

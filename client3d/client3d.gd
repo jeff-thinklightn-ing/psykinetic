@@ -25,20 +25,25 @@ extends Node3D
 ##
 ## Entities get a puppet each: a primitive at the scale table's size,
 ## coloured as the 2D sprite is, with a Label3D name and a speech line on
-## creatures, a warm light on players and companions, and an Area3D of the
-## same shape for picking. Puppets follow the 2D nodes every frame.
+## creatures, a warm-white light on players and companions, and an Area3D
+## of the same shape for picking. Puppets follow the 2D nodes every frame,
+## so they move as those do: at a steady speed along the walk. A creature
+## has a nose that turns with its shown facing, and lunges when it swings.
+## Speech comes from the speech message (say) and shows for
+## SPEECH_SECONDS.
 ##
 ## Camera: orthographic, tilted CAMERA_PITCH from horizontal, yawed by
 ## `yaw` about the local player: 0 matches the 2D diamond (+x down-right,
-## +y down-left). Q/E step the yaw by ORBIT_STEP, tweened; a middle-button
-## drag nudges it up to ORBIT_STEP either way and it springs back on
-## release. The step persists in settings.cfg (Net.camera_yaw).
+## +y down-left). Q/E step the yaw by ORBIT_STEP, tweened, and are the only
+## way to turn it; the step persists in settings.cfg (Net.camera_yaw). It
+## follows the player led toward the cursor, as the 2D camera is (see
+## Main.camera_lead).
 ##
 ## Picking is by ray from the camera through the cursor: an entity or door
 ## Area3D first, else the floor plane, which Main snaps to the nearest
-## walkable cell. The hover ring and the click ripple are flat ring meshes
-## on the floor. All input is Main's; this view only answers its picks and
-## draws what it is told.
+## walkable cell. The hover is a square outline of the cell, the click
+## ripple a ring, the toss aim an arrow, all flat on the floor. All input
+## is Main's; this view only answers its picks and draws what it is told.
 
 const KIT := "res://art/kenney-castle/Models/GLB format/"
 const WALL_HEIGHT := 3.0
@@ -65,10 +70,9 @@ const CAMERA_SIZE := 12.0
 const CAMERA_FOLLOW_RATE := 6.0
 const ORBIT_STEP := 45.0
 const ORBIT_SECONDS := 0.25
-const NUDGE_DRAG_PX := 400.0
-const NUDGE_RETURN_SECONDS := 0.2
 const PLAYER_LIGHT_RANGE := 6.0
-const PLAYER_LIGHT := Color(1.0, 0.82, 0.6)
+## Warm white, whatever the body's colour.
+const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
 const FIRE := Color(1.0, 0.45, 0.1)
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
@@ -83,6 +87,15 @@ const HOVER := Color(1, 1, 1, 0.35)
 const RIPPLE := Color(0.58, 0.76, 0.69)
 const RIPPLE_SECONDS := 0.25
 const RING_SEGMENTS := 40
+## The hover outline: a square this far from the cell's centre, this thick.
+const HOVER_HALF := 0.47
+const HOVER_LINE := 0.05
+const TOSS := Color(1.0, 0.85, 0.4, 0.85)
+const TOSS_LENGTH := 1.3
+const SPEECH_SECONDS := 4.0
+## A swing pushes the body this far out toward the blow, and back.
+const LUNGE := 0.3
+const LUNGE_SECONDS := 0.16
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
 
@@ -124,8 +137,8 @@ var _camera_target := Vector3.ZERO
 var yaw := 0.0
 var _yaw_step := 0.0
 var _yaw_tween: Tween
-## Middle button held: the screen x it went down at, or NAN when not.
-var _nudge_from := NAN
+## The camera's lead toward the cursor, in grid units (Main.camera_lead).
+var _lead := Vector2.ZERO
 var _room: Node3D
 ## The kit's own material and a see-through copy of it; the flat stone
 ## pair likewise.
@@ -141,7 +154,10 @@ var _doorways: Dictionary[Vector3i, Node3D] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
+var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
+## Entity instance id -> when its speech line goes (msec).
+var _speech_until: Dictionary[int, int] = {}
 var _terrain: Dictionary = {}
 
 
@@ -153,9 +169,12 @@ func setup(terrain: Dictionary) -> void:
 	_build_environment()
 	_build_camera()
 	_build_room()
-	_hover = _make_ring_instance(HOVER)
+	_hover = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), HOVER)
 	_hover.visible = false
 	add_child(_hover)
+	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
+	_toss.visible = false
+	add_child(_toss)
 	_yaw_step = roundf(Net.camera_yaw / ORBIT_STEP) * ORBIT_STEP
 	yaw = _yaw_step
 	_place_camera()
@@ -165,7 +184,6 @@ func setup(terrain: Dictionary) -> void:
 func _process(delta: float) -> void:
 	_sync_puppets()
 	_sync_doors()
-	_nudge()
 	_follow(delta)
 
 
@@ -227,8 +245,12 @@ func _follow(delta: float) -> void:
 	var puppet: Node3D = _puppets.get(player.get_instance_id())
 	if puppet == null:
 		return
+	var cursor := mouse_grid()
+	if not is_nan(cursor.x) and DisplayServer.get_name() != "headless":
+		var centre := Vector2(_camera_target.x, _camera_target.z)
+		_lead = Main.camera_lead(_lead, cursor - centre, Vector2(puppet.position.x, puppet.position.z) - centre, delta)
 	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
-	_camera_target = _camera_target.lerp(puppet.position, rate)
+	_camera_target = _camera_target.lerp(puppet.position + Vector3(_lead.x, 0.0, _lead.y), rate)
 	_place_camera()
 
 
@@ -247,29 +269,6 @@ func orbit(direction: int) -> void:
 	Net.camera_yaw = _yaw_step
 	Net.save_view_settings()
 	_tween_yaw(_yaw_step, ORBIT_SECONDS)
-
-
-## Middle button down: the drag nudges the yaw from here; up: it springs
-## back to the step.
-func nudge_button(pressed: bool) -> void:
-	if pressed:
-		if _yaw_tween != null:
-			_yaw_tween.kill()
-			_yaw_tween = null
-		_nudge_from = DisplayServer.mouse_get_position().x
-		return
-	_nudge_from = NAN
-	_tween_yaw(_yaw_step, NUDGE_RETURN_SECONDS)
-
-
-func _nudge() -> void:
-	if is_nan(_nudge_from):
-		return
-	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
-		nudge_button(false)
-		return
-	var drag := (DisplayServer.mouse_get_position().x - _nudge_from) / (NUDGE_DRAG_PX * 0.5)
-	_set_yaw(_yaw_step + ORBIT_STEP * sin(clampf(drag, -1.0, 1.0) * PI * 0.5))
 
 
 func _tween_yaw(to: float, seconds: float) -> void:
@@ -377,24 +376,91 @@ func _make_ring(inner: float, outer: float) -> ArrayMesh:
 	return surface.commit()
 
 
+## Flat quads in the ground plane, each [a, b, c, d] corner order.
+static func _flat_mesh(quads: Array[PackedVector2Array]) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for quad in quads:
+		for i: int in [0, 1, 2, 0, 2, 3]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(Vector3(quad[i].x, 0.0, quad[i].y))
+	return surface.commit()
+
+
+## A square outline round the cell's centre: the inner edge [param half]
+## minus [param line] out, the outer [param half].
+static func _make_square_outline(half: float, line: float) -> ArrayMesh:
+	var inner := half - line
+	var quads: Array[PackedVector2Array] = [
+		PackedVector2Array([Vector2(-half, -half), Vector2(half, -half), Vector2(half, -inner), Vector2(-half, -inner)]),
+		PackedVector2Array([Vector2(-half, inner), Vector2(half, inner), Vector2(half, half), Vector2(-half, half)]),
+		PackedVector2Array([Vector2(-half, -inner), Vector2(-inner, -inner), Vector2(-inner, inner), Vector2(-half, inner)]),
+		PackedVector2Array([Vector2(inner, -inner), Vector2(half, -inner), Vector2(half, inner), Vector2(inner, inner)]),
+	]
+	return _flat_mesh(quads)
+
+
+## An arrow along +x from the origin, [param length] long.
+static func _make_arrow(length: float) -> ArrayMesh:
+	var shaft := 0.07
+	var head := 0.3
+	var neck := length - head
+	var quads: Array[PackedVector2Array] = [
+		PackedVector2Array([Vector2(0.25, -shaft), Vector2(neck, -shaft), Vector2(neck, shaft), Vector2(0.25, shaft)]),
+		# The head as a quad with two corners at the tip.
+		PackedVector2Array([Vector2(neck, -head * 0.7), Vector2(length, 0.0), Vector2(length, 0.0), Vector2(neck, head * 0.7)]),
+	]
+	return _flat_mesh(quads)
+
+
 func _make_ring_instance(color: Color) -> MeshInstance3D:
-	var ring := MeshInstance3D.new()
-	ring.mesh = _ring_mesh
+	return _make_flat(_ring_mesh, color)
+
+
+func _make_flat(mesh: Mesh, color: Color) -> MeshInstance3D:
+	var flat := MeshInstance3D.new()
+	flat.mesh = mesh
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.albedo_color = color
-	ring.material_override = material
-	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return ring
+	flat.material_override = material
+	flat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return flat
 
 
-## The hover ring on [param tile], or hidden.
+## The hover outline on [param tile], or hidden.
 func hover(tile: Vector2i, show: bool) -> void:
 	_hover.visible = show
 	if show:
 		_hover.position = _tile_position(tile) + Vector3(0.0, ON_FLOOR, 0.0)
+
+
+## The toss aim during a right drag: an arrow on the floor from
+## [param target] the way it will go; hidden for ZERO or no target.
+func toss_aim(target: GridEntity, direction: Vector2i) -> void:
+	_toss.visible = direction != Vector2i.ZERO and is_instance_valid(target)
+	if not _toss.visible:
+		return
+	var puppet: Node3D = _puppets.get(target.get_instance_id())
+	var at := puppet.position if puppet != null else _tile_position(target.tile)
+	_toss.position = Vector3(at.x, ON_FLOOR * 3.0, at.z)
+	_toss.rotation.y = -Vector2(direction).angle()
+
+
+## A line of speech over [param entity]'s puppet for SPEECH_SECONDS.
+func say(entity: GridEntity, text: String) -> void:
+	var puppet: Node3D = _puppets.get(entity.get_instance_id())
+	if puppet == null:
+		puppet = _make_puppet(entity)
+		_puppets[entity.get_instance_id()] = puppet
+	var speech := puppet.get_node_or_null("Speech") as Label3D
+	if speech == null:
+		return
+	speech.text = text
+	speech.visible = not text.is_empty()
+	_speech_until[entity.get_instance_id()] = Time.get_ticks_msec() + roundi(SPEECH_SECONDS * 1000.0)
 
 
 ## The click ripple: a ring that grows from a few px to the cell and fades
@@ -672,10 +738,11 @@ func _set_stone(piece: Node3D, near: bool) -> void:
 # --- Entities ----------------------------------------------------------------
 
 ## One puppet per spawned entity, placed where its 2D node is (the grid
-## position under the azimuth-0 projection), removed when it goes; its
-## speech line follows the 2D one.
+## position under the azimuth-0 projection), turned to its shown facing,
+## removed when it goes. A speech line goes when its time is up.
 func _sync_puppets() -> void:
 	var seen: Dictionary[int, bool] = {}
+	var now := Time.get_ticks_msec()
 	for entity in World.get_entities():
 		if not entity.spawned:
 			continue
@@ -686,15 +753,19 @@ func _sync_puppets() -> void:
 		var puppet := _puppets[id]
 		var grid := Iso.local_to_grid(entity.position)
 		puppet.position = Vector3(grid.x, 0.0, grid.y)
-		var speech := puppet.get_node_or_null("Speech") as Label3D
-		if speech != null:
-			var line := entity.speech()
-			speech.visible = not line.is_empty()
-			speech.text = line
+		var facing := puppet.get_node_or_null("Facing") as Node3D
+		if facing != null:
+			facing.rotation.y = -entity.shown_facing().angle()
+		if _speech_until.has(id) and now >= _speech_until[id]:
+			_speech_until.erase(id)
+			var speech := puppet.get_node_or_null("Speech") as Label3D
+			if speech != null:
+				speech.visible = false
 	for id in _puppets.keys():
 		if not seen.has(id):
 			_puppets[id].queue_free()
 			_puppets.erase(id)
+			_speech_until.erase(id)
 
 
 func _make_puppet(entity: GridEntity) -> Node3D:
@@ -728,6 +799,18 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		var caption: String = entity.label if not entity.label.is_empty() else entity.name
 		puppet.add_child(_label("Name", caption, Color.WHITE, height + 0.35))
 		puppet.add_child(_label("Speech", "", SPEECH, height + 0.75))
+		# The nose: which way it faces, turned each frame (see _sync_puppets).
+		var pivot := Node3D.new()
+		pivot.name = "Facing"
+		var nose := MeshInstance3D.new()
+		var nose_mesh := BoxMesh.new()
+		nose_mesh.size = Vector3(0.18, 0.1, 0.14)
+		nose.mesh = nose_mesh
+		nose.material_override = material
+		nose.position = Vector3(0.3, height * 0.72, 0.0)
+		pivot.add_child(nose)
+		puppet.add_child(pivot)
+		entity.swung.connect(_on_swung.bind(entity.get_instance_id()))
 	if entity is Player or entity is Companion:
 		var light := OmniLight3D.new()
 		light.name = "Lantern"
@@ -741,6 +824,19 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		puppet.add_child(light)
 	add_child(puppet)
 	return puppet
+
+
+## A swing: the body goes out toward the blow and back.
+func _on_swung(direction: Vector2i, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null:
+		return
+	var body := puppet.get_node("Body") as Node3D
+	var rest := Vector3(0.0, body.position.y, 0.0)
+	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE
+	var tween := create_tween()
+	tween.tween_property(body, "position", out, LUNGE_SECONDS * 0.4).set_ease(Tween.EASE_OUT)
+	tween.tween_property(body, "position", rest, LUNGE_SECONDS * 0.6).set_ease(Tween.EASE_IN)
 
 
 func _pick_shape(shape_name: String, mesh: Mesh) -> Shape3D:

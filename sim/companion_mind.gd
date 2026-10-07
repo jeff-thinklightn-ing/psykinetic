@@ -14,6 +14,10 @@ extends RefCounted
 ##   last_order      "" | "follow" | "hold" | "attack" | "fallback"
 ##   order_target    name of the entity the attack order meant, or ""
 ##   intent          the current intent name
+##   trigger         why it is asked now ("" on an ordinary window); for a
+##                   bump, "owner bumped into you", with
+##   owner_direction {dx, dy}: the way the owner was walking ({} otherwise)
+##   free_cells      [{dx, dy}]: free cells next to it ([] otherwise)
 ## and answers {"intent": String, "target": String|null, "say": String},
 ## or {} when it has no answer right now (an async mind still waiting), in
 ## which case the scripted mind's answer is used for that window.

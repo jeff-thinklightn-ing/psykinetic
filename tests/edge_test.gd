@@ -259,7 +259,7 @@ func _door(key: Vector3i, hp: int, material := GridEntity.BodyMaterial.WOOD) -> 
 
 ## Lets a cooldown pass.
 func _wait(entity: GridEntity) -> void:
-	while World.tick < maxi(entity.next_move_tick, entity.next_attack_tick):
+	while World.tick < maxf(entity.next_move_tick, entity.next_attack_tick):
 		World.step()
 
 

@@ -23,6 +23,9 @@ func _ready() -> void:
 	_test_malformed_llm_reply_uses_scripted()
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
+	_test_yields_when_bumped()
+	_test_says_so_with_no_room()
+	_test_slow_mind_gets_the_scripted_yield()
 	_test_old_record_gets_a_companion()
 
 	print("")
@@ -296,7 +299,96 @@ func _test_old_record_gets_a_companion() -> void:
 	Net.state_path = ""
 
 
+func _test_yields_when_bumped() -> void:
+	print("\n== walking into her: she steps out of the way at once ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var log_size: int = _main.party_log.size()
+	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
+	World.step()
+	_check(owner.tile == Vector2i(9, 6), "the step into her is refused")
+	_check(pet.current_intent == Companion.Intent.YIELD and pet.last_mind == "scripted",
+			"the scripted mind answers YIELD on the spot (%s by %s)" % [pet.intent_name(), pet.last_mind])
+	_check(_main.party_log.size() > log_size and "bumped into %s" % pet.name in _main.party_log.last(1)[0],
+			"the bump is in the party log (%s)" % [_main.party_log.last(1)])
+	for i in 4:
+		World.step()
+	var line: Array[Vector2i] = [Vector2i(10, 6), Vector2i(11, 6), Vector2i(12, 6)]
+	_check(pet.tile not in line and World.distance(pet.tile, Vector2i(10, 6)) == 1,
+			"she is one step off the owner's line (at %s)" % pet.tile)
+	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
+	World.step()
+	_check(owner.tile == Vector2i(10, 6), "and the owner walks on through (%s)" % owner.tile)
+
+
+func _test_says_so_with_no_room() -> void:
+	print("\n== bumped in the dead end, with nowhere to go: she stays and says so ==")
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(pet, Vector2i(1, 8))
+	_put(owner, Vector2i(2, 8))
+	var heard: Array[String] = []
+	var listen := func(text: String) -> void: heard.append(text)
+	pet.said.connect(listen)
+	World.order_step(owner, Vector2i(-1, 0), owner.refusals, false)
+	World.step()
+	pet.said.disconnect(listen)
+	_check(pet.current_intent == Companion.Intent.YIELD and pet.tile == Vector2i(1, 8),
+			"YIELD, staying put (%s at %s)" % [pet.intent_name(), pet.tile])
+	_check(heard.size() == 1 and heard[0] == Companion.NO_ROOM_LINE, "and says there is no room (%s)" % [heard])
+
+
+func _test_slow_mind_gets_the_scripted_yield() -> void:
+	print("\n== a mind that has not yielded within a decision window: the scripted yield ==")
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	# An endpoint nobody answers on: the reply never comes in time.
+	pet.mind = OllamaMind.new("http://10.255.255.1:9/api/chat", "stub", _main)
+	var bumped_at := World.tick + 1
+	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
+	World.step()
+	_check(pet.current_intent != Companion.Intent.YIELD, "no yield yet: the mind is still thinking (%s)" % pet.intent_name())
+	_step_until(func() -> bool: return pet.current_intent == Companion.Intent.YIELD, Companion.DECISION_INTERVAL_TICKS + 2)
+	_check(pet.current_intent == Companion.Intent.YIELD and pet.last_mind == "scripted",
+			"YIELD by the scripted mind (%s by %s)" % [pet.intent_name(), pet.last_mind])
+	_check(World.tick - bumped_at == Companion.DECISION_INTERVAL_TICKS,
+			"one decision window after the bump (%d ticks)" % (World.tick - bumped_at))
+	pet.mind = ScriptedMind.new()
+
+
 # --- helpers ------------------------------------------------------------------
+
+## Lets a yield window and a bump's repeat guard run out, then has her
+## follow, so the next bump is a fresh one.
+func _settle(pet: Companion) -> void:
+	for i in Companion.BUMP_REPEAT_TICKS + Companion.DECISION_INTERVAL_TICKS + 1:
+		World.step()
+	pet.current_intent = Companion.Intent.FOLLOW
+	pet.intent_target = null
+	pet.hp = pet.max_hp
+
+
+## Moves [param entity] to [param tile] (a test's set-up, not a move).
+func _put(entity: GridEntity, tile: Vector2i) -> void:
+	if entity.tile == tile:
+		return
+	var occupant := World.get_entity_at(tile)
+	if occupant != null:
+		var aside: Vector2i = _main._nearest_free(tile + Vector2i(0, 2))
+		World._relocate(occupant, aside)
+	World._relocate(entity, tile)
+	if entity is Player:
+		entity.queued_steps.clear()
+		entity.has_move_order = false
 
 func _player() -> Player:
 	for entity in World.get_entities():

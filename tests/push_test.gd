@@ -151,9 +151,9 @@ func _test_diagonals() -> void:
 	_check(World.find_path(Vector2i(1, 1), Vector2i(3, 3)).size() == 2, "A* uses diagonals: 2 steps to (3, 3)")
 	_check(World.try_move(player, Vector2i(1, 1)), "diagonal between two creatures is allowed")
 	_check(player.tile == Vector2i(2, 2), "player is at (2, 2)")
-	_check(player.next_move_tick - World.tick == 3, "diagonal step takes 3 ticks (got %d)" % (player.next_move_tick - World.tick))
+	_check(is_equal_approx(player._move_duration, 3.75), "diagonal step takes 3.75 ticks (got %s)" % player._move_duration)
 	_walk_to(player, Vector2i(3, 2))
-	_check(player.next_move_tick - World.tick == 2, "orthogonal step takes 2 ticks (got %d)" % (player.next_move_tick - World.tick))
+	_check(is_equal_approx(player._move_duration, 2.5), "orthogonal step takes 2.5 ticks (got %s)" % player._move_duration)
 
 
 func _test_resolution_order() -> void:
@@ -555,7 +555,7 @@ func _build(rows: Array[String]) -> Dictionary:
 
 
 func _shove(attacker: GridEntity, target: GridEntity) -> void:
-	while World.tick < maxi(attacker.next_attack_tick, attacker.next_move_tick):
+	while World.tick < maxf(attacker.next_attack_tick, attacker.next_move_tick):
 		World.step()
 	World.order_shove(attacker, target)
 	World.step()

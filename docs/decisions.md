@@ -362,3 +362,59 @@ rewrite of the file (window resize, F11, orbit) writes back the file's own
 `renderer=` line, so a one-off `--renderer` never changes what the next
 plain launch shows. Main also never builds the view on a server, headless
 or not.
+
+## 42. WASD sends steps, not the held direction
+
+The spec was to send the held direction every tick as the move intent.
+Under latency that cannot line up with what the client shows: the server
+would take whatever extra steps fall due between the client letting go
+and the release arriving, and a mispredict on every stop. So the client
+sends one step each time its walk is ready for the next (the moment the
+held direction is read, on the same timer), and the server takes the
+queued steps in order on its own timer, with every rule a step has. A
+refused shown step bumps a refusal count that later steps must carry, so
+steps in flight when the client gave a walk up are dropped, not walked.
+
+## 43. The movement timer carries fractions of a tick
+
+Step times and `next_move_tick` are floats, and a step taken late by a
+fraction of a tick (it was due at 12.5, the tick is 13) is drawn from when
+it was due and times the next from there. The tick stays 10 Hz; walk
+speeds need not be whole ticks per cell, and the player walks four cells
+a second. Drawing never eases at the ends of a step, so one step joins
+the next.
+
+## 44. A move order carries the steps its client already shows
+
+`request_move` has a `via` list: the shown, unconfirmed steps. The server
+walks those first. This was the cause of the 3D client's mispredictions:
+re-targeting while a shown step was not yet taken on the server let the
+server set off from the tile before it. The server still checks every
+via step as a step; a via tile that is no longer one step away is dropped.
+
+## 45. A companion's owner is known on every peer
+
+The companion's spawn spec carries `keeper_peer`. It decides nothing on
+the server (orders still go by `keeper`); it lets a client treat a click
+on its own companion as walking into her, not attacking her.
+
+## 46. Bumping a companion is a mind decision with a scripted deadline
+
+Walking into your own companion asks her mind at once, with the bump in
+the context, and YIELD is an intent like any other, validated and carried
+out by the companion. The scripted mind yields; a slower mind gets one
+decision window, after which the scripted answer applies if there is
+room. The player is never moved through her and she is never moved by the
+bump itself: getting out of the way is her decision.
+
+## 47. The camera leads by the cursor's place on screen
+
+The lead toward the cursor is a share of the cursor's offset from the
+middle of the screen, not from the player: the camera moving does not
+move the thing it chases, so it settles instead of running off. Both
+views use `Main.camera_lead`.
+
+## 48. Q/E are the only camera rotation
+
+The middle-button peek (2D) and nudge (3D) are removed. `Iso.azimuth`
+stays, for `--test-azimuth`.

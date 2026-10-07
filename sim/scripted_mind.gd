@@ -1,8 +1,9 @@
 class_name ScriptedMind
 extends CompanionMind
-## The rule-based mind, and the fallback for every other one. Obeys the
-## owner's last order; otherwise retreats toward the owner when low on hp,
-## attacks the nearest hostile within reach, and follows.
+## The rule-based mind, and the fallback for every other one. Gets out of
+## the owner's way at once when they bump into it; obeys the owner's last
+## order; otherwise retreats toward the owner when low on hp, attacks the
+## nearest hostile within reach, and follows.
 
 const ATTACK_RANGE := 3
 const RETREAT_BELOW := 0.3
@@ -13,6 +14,8 @@ func _init() -> void:
 
 
 func decide(context: Dictionary) -> Dictionary:
+	if str(context.get("trigger", "")) == Companion.BUMPED:
+		return {"intent": "YIELD", "target": null, "say": ""}
 	var hp := float(context.get("hp", 0))
 	var max_hp := float(context.get("max_hp", 1))
 	if max_hp > 0.0 and hp / max_hp < RETREAT_BELOW:
