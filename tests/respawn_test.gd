@@ -21,6 +21,7 @@ func _ready() -> void:
 	_test_console()
 	_test_player_reset()
 	_test_old_snapshot_gets_current_looks()
+	_test_click_snaps_to_floor()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -223,6 +224,27 @@ func _shove(attacker: GridEntity, target: GridEntity) -> void:
 		World.step()
 	World.order_shove(attacker, target)
 	World.step()
+
+
+func _test_click_snaps_to_floor() -> void:
+	print("
+== a move click off the floor goes to the nearest walkable cell ==")
+	var on_floor := _grid_point(Vector2(3.0, 2.0))
+	_check(_main._snap_to_floor(on_floor) == Vector2i(3, 2), "a click on floor is that cell")
+	var across_the_wall := _grid_point(Vector2(0.3, 2.1))
+	_check(not World.is_walkable(Iso.local_to_tile(across_the_wall)), "the point past the west wall is void")
+	_check(_main._snap_to_floor(across_the_wall) == Vector2i(1, 2), "and snaps to the floor cell across the wall")
+	var corner := _grid_point(Vector2(-0.4, -0.6))
+	_check(_main._snap_to_floor(corner) == Vector2i(1, 1), "past the corner, the corner cell")
+	var far_out := _grid_point(Vector2(-2.6, 2.0))
+	_check(_main._snap_to_floor(far_out) == _main.NONE, "further than %.0f tiles from any floor: no target" % _main.SNAP_RANGE)
+	var just_in := _grid_point(Vector2(-1.9, 2.0))
+	_check(_main._snap_to_floor(just_in) == Vector2i(1, 2), "just inside that range: the nearest cell")
+
+
+## A point on the ground plane at continuous grid coordinates.
+func _grid_point(grid: Vector2) -> Vector2:
+	return Vector2((grid.x - grid.y) * Iso.HALF.x + Iso.HALF.x, (grid.x + grid.y) * Iso.HALF.y + Iso.HALF.y)
 
 
 func _check(ok: bool, label: String) -> void:

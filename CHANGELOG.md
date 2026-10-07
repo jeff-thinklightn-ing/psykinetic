@@ -3,6 +3,24 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.17
+
+Movement feedback. Client only.
+
+- A move click ripples at the target cell: a ring on the floor, a step
+  lighter than the floor, grows from 4 px to a tile across over 250 ms
+  and fades. One per click; holding the button retargets as the cursor
+  crosses cells, each new cell with its own ripple. The hover highlight
+  stays on the cell under the cursor.
+- A click off the floor (void, past a wall) goes to the nearest walkable
+  cell within three tiles of the click point and ripples there; further
+  out it is ignored.
+- A click on an entity sprite targets that entity with either button,
+  whatever cell is under the pixels.
+- `--test-click=<seconds>` test hook.
+
+The server must be updated to v0.1.17 too, as it refuses any other version.
+
 ## v0.1.16
 
 Quiet walls. Client only.

@@ -129,6 +129,9 @@ const PLAYER_TINTS: Array[Color] = [
 ## shove becomes an aimed toss.
 const TOSS_DRAG_MIN := 10.0
 const TOSS_AIM_LENGTH := 26.0
+## A move click off the floor goes to the nearest walkable cell within this
+## many tiles of the click point (Euclidean on the ground plane), or nowhere.
+const SNAP_RANGE := 3.0
 const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
 const COMPANION_CARD := "A loyal, cautious companion who guards its friend and speaks little."
 const COMPANION_TINT := Color(0.45, 0.95, 0.85)
@@ -190,11 +193,16 @@ var _rejected := false
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
 var _toss_from := Vector2.ZERO
+## Left button held after a move click: the cell it last sent the player
+## to. Moving the cursor to another cell retargets; NONE when not held.
+const NONE := Vector2i(-1, -1)
+var _held_target := NONE
 
 @onready var ground: TileMapLayer = $Ground
 @onready var entities: Node2D = $YSort/Entities
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var cursor: Polygon2D = $Cursor
+@onready var ripple: ClickRipple = $Ripple
 @onready var camera: Camera2D = $Camera
 @onready var hud: Label = $HUD/Label
 @onready var debug_overlay: Label = $HUD/Debug
@@ -218,6 +226,8 @@ func _ready() -> void:
 	World.ticked.connect(_on_world_ticked)
 	if Net.test_exit_after > 0.0:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
+	if Net.test_click_after > 0.0:
+		get_tree().create_timer(Net.test_click_after).timeout.connect(_test_click)
 
 	if Net.needs_setup:
 		# An exported client with no settings.cfg yet: ask once, then join.
@@ -273,6 +283,7 @@ func _process(delta: float) -> void:
 	var tile := _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
+	_retarget_held()
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -305,40 +316,98 @@ func _unhandled_input(event: InputEvent) -> void:
 	var player := _local_player()
 	if player == null:
 		_toss_target = null
+		_held_target = NONE
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
 		_release_toss(player)
 		return
+	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
+		_held_target = NONE
+		return
 	if not click.pressed:
 		return
-	# A click resolves on the ground plane: the floor cell under the cursor,
-	# and whatever stands on it. The right button also takes a sprite under
-	# the cursor, for shoving something whose cell is hidden, and a door.
-	var tile := _mouse_tile()
-	var target := World.get_entity_at(tile)
+	# A sprite under the cursor is the target whatever cell is under those
+	# pixels; otherwise the click resolves on the ground plane, to the floor
+	# cell under the cursor and whatever stands on it. The right button also
+	# takes a door face.
+	var target := _entity_under_mouse()
+	var tile := target.tile if target != null else _mouse_tile()
+	if target == null:
+		target = World.get_entity_at(tile)
 	if click.button_index == MOUSE_BUTTON_RIGHT:
 		var door := _door_under_mouse()
 		if door != null and player.tile in Terrain.edge_cells(door.key):
 			World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
 			return
-		var sprite_hit := _entity_under_mouse()
-		if sprite_hit != null:
-			target = sprite_hit
 	var targetable := target != null and target != player and World.can_target(player, target)
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
-			# A creature on that cell: go to it and attack. Anything else:
-			# walk there (and push).
+			# A creature: go to it and attack. Anything else: walk there (and
+			# push), to the nearest floor if the click was off it.
 			if targetable and target.is_creature():
 				World.command_attack(player, target)
 			else:
-				World.command_move(player, tile)
+				_move_click(player, tile if target != null else _snap_to_floor(_mouse_point()))
 		MOUSE_BUTTON_RIGHT:
 			# Any entity: go to it and shove. Sent on release, so that
 			# dragging first can aim it.
 			if targetable:
 				_toss_target = target
 				_toss_from = get_global_mouse_position()
+
+
+## A move click: sends the player to [param tile] (NONE: nowhere near the
+## floor, ignored) and ripples there. Holding the button keeps retargeting
+## from _process as the cursor moves to other cells.
+func _move_click(player: Player, tile: Vector2i) -> void:
+	_held_target = tile
+	if tile == NONE:
+		return
+	World.command_move(player, tile)
+	ripple.start(Iso.tile_to_local(tile))
+
+
+## Left button held after a move click: when the cursor reaches another
+## cell, that is the new target, with its own ripple.
+func _retarget_held() -> void:
+	if _held_target == NONE or not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_held_target = NONE
+		return
+	var player := _local_player()
+	if player == null:
+		_held_target = NONE
+		return
+	var tile := _snap_to_floor(_mouse_point())
+	if tile != NONE and tile != _held_target:
+		_move_click(player, tile)
+
+
+## The cursor's point on the ground plane, in the ground layer's space.
+func _mouse_point() -> Vector2:
+	return ground.to_local(get_global_mouse_position())
+
+
+## The walkable cell nearest [param point] (a ground-plane point, in grid
+## units once unprojected) within SNAP_RANGE tiles, or NONE. The cell under
+## the point itself wins when it is floor.
+func _snap_to_floor(point: Vector2) -> Vector2i:
+	var under := Iso.local_to_tile(point)
+	if World.is_walkable(under):
+		return under
+	var grid := Iso.local_to_grid(point)
+	var best := NONE
+	var best_distance := SNAP_RANGE * SNAP_RANGE
+	var reach := ceili(SNAP_RANGE)
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var cell := under + Vector2i(dx, dy)
+			if not World.is_walkable(cell):
+				continue
+			var distance := grid.distance_squared_to(Vector2(cell))
+			if distance < best_distance:
+				best = cell
+				best_distance = distance
+	return best
 
 
 func _release_toss(player: Player) -> void:
@@ -385,6 +454,15 @@ func _update_toss_aim() -> void:
 	var tip := tail + along * TOSS_AIM_LENGTH
 	toss_aim.points = PackedVector2Array([
 		tail, tip, tip + along.rotated(2.6) * 7.0, tip, tip + along.rotated(-2.6) * 7.0])
+
+
+## --test-click: a left click where the cursor is, as the mouse would send it.
+func _test_click() -> void:
+	for pressed in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = pressed
+		_unhandled_input(click)
 
 
 ## --test-hover: parks the cursor over a cell, for screenshots.

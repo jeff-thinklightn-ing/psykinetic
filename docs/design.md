@@ -5,7 +5,7 @@
 | Path | Contents |
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
-| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face). |
+| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face), `click_ripple.gd` (the ring that answers a move click). |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -622,8 +622,9 @@ wall.
 
 `--screenshot=<path>` with `--test-exit-after` saves the window as PNG on
 exit, for looking at a build without playing it; `--test-hover=<x>,<y>`
-parks the cursor over a cell for it and `--test-door=<tick>` works the door
-the local player stands beside.
+parks the cursor over a cell for it, `--test-click=<seconds>` left-clicks
+where the cursor is after that long, and `--test-door=<tick>` works the
+door the local player stands beside.
 
 ## Grid ↔ screen
 
@@ -637,14 +638,28 @@ tile = (round((u + v) / 2), round((v - u) / 2))
 
 Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
 → `ground.to_local()` → `Iso.local_to_tile()` gives the floor cell under
-the cursor, and nothing standing on the map (walls, doors, tall sprites)
-intercepts that. A left click walks to that cell, or attacks the creature
-standing on it. A right click additionally takes a sprite under the cursor
+the cursor, and nothing standing on the map (walls, doors) intercepts
+that. A sprite under the cursor comes first with either button
 (`_entity_under_mouse`: opaque pixels only, the sprite drawn in front wins,
-the local player is skipped), so something whose cell is hidden can still
-be shoved, and a door face under the cursor, which toggles the door when
-the player stands beside it. `main.gd` checks at startup that `Iso` agrees
-with the TileMapLayer's own `map_to_local`.
+the local player is skipped): a left click on a creature attacks it, on
+anything else walks to its cell (and pushes), whatever cell is under those
+pixels. A right click on a sprite shoves it, and a door face under the
+cursor toggles the door when the player stands beside it. `main.gd` checks
+at startup that `Iso` agrees with the TileMapLayer's own `map_to_local`.
+
+**Move clicks** (`_move_click`). A left click on no sprite walks to the
+cell under the cursor when it is floor; off the floor (void, past a wall)
+it walks to the nearest walkable cell to the click point, Euclidean on the
+ground plane in grid units (`Iso.local_to_grid`, `_snap_to_floor`), within
+`Main.SNAP_RANGE` (3) tiles, and is ignored beyond that. Where the player
+is going is shown by a ripple (`render/click_ripple.gd`): a ring on the
+floor at the target cell's centre, a step lighter than the floor with no
+fill, growing from 4 px to a tile across over 250 ms and fading out,
+drawn above walls like the hover highlight. One ripple per click. Holding
+the button keeps retargeting from `_process` as the cursor moves to other
+cells (`_retarget_held`), each new cell with its own ripple; the hover
+highlight stays on the cell under the cursor. Pinned in
+`tests/respawn_test.gd`.
 
 ## Testing
 

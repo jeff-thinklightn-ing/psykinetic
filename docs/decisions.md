@@ -238,3 +238,15 @@ not on the walls around it. The ribbons and joins of decision 28 are gone;
 the door keeps its own top strip, since a swinging panel needs to show its
 thickness. The value is one constant so it can be tuned without a release
 of its own.
+
+## 30. A move click answers with a ripple and lands on floor
+
+A move click draws a ring where the player is going instead of marking
+the target cell statically, so the answer is seen once and then gets out
+of the way; the hover highlight alone stays. A click off the floor goes to
+the nearest walkable cell within three tiles and ripples there, so a click
+past a wall or into the void still does something sensible and shows what
+it did; further out it does nothing. A sprite under the cursor takes the
+click first with either button, so a tall body is never clicked through
+to the cell behind it. A held button retargets as the cursor crosses
+cells. Client only: the server sees ordinary move commands.

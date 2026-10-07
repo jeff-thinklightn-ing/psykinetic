@@ -34,8 +34,15 @@ static func tile_to_local(tile: Vector2i) -> Vector2:
 	)
 
 
-## Tile whose diamond contains [param local].
-static func local_to_tile(local: Vector2) -> Vector2i:
+## [param local] in continuous grid units: a tile's centre is its integer
+## coordinates, its diamond the unit square around them.
+static func local_to_grid(local: Vector2) -> Vector2:
 	var u: float = (local.x - HALF.x) / HALF.x
 	var v: float = (local.y - HALF.y) / HALF.y
-	return Vector2i(roundi((u + v) * 0.5), roundi((v - u) * 0.5))
+	return Vector2((u + v) * 0.5, (v - u) * 0.5)
+
+
+## Tile whose diamond contains [param local].
+static func local_to_tile(local: Vector2) -> Vector2i:
+	var grid := local_to_grid(local)
+	return Vector2i(roundi(grid.x), roundi(grid.y))
