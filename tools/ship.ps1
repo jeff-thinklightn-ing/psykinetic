@@ -16,8 +16,8 @@
 #      message as its one bullet, unless that section already exists
 #   4. commit everything with the message (if there is anything), push
 #   5. with -Release: tools\release_client.ps1 -Version <version>
-#   6. ssh to the box: ~/psykinetic/server/deploy.sh (pull, export, install,
-#      restart), output streamed; then admin.sh players to show it is up
+#   6. ssh to the box: git pull, then ~/psykinetic/server/deploy.sh (export,
+#      install, restart), output streamed; then admin.sh players to show it is up
 param(
 	[string]$Message = '',
 	[string]$Release = '',
@@ -98,7 +98,9 @@ $box = if ($env:PSYKINETIC_BOX) { $env:PSYKINETIC_BOX } else { 'jequig@100.78.12
 Write-Output "--- deploying on $box"
 # BatchMode: never hang on a password prompt. stderr merged so git's and
 # systemctl's progress reads in order; the exit code decides.
-ssh -o BatchMode=yes -o ConnectTimeout=15 $box '~/psykinetic/server/deploy.sh' 2>&1 | ForEach-Object { "$_" }
+# Pull before running deploy.sh, so a deploy.sh changed by this very push
+# is the one that runs (its own pull is then a no-op).
+ssh -o BatchMode=yes -o ConnectTimeout=15 $box 'cd ~/psykinetic && git pull --ff-only && ~/psykinetic/server/deploy.sh' 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { Fail "deploy on $box failed (ssh exit $LASTEXITCODE)" }
 Write-Output '--- server console: players'
 # The admin port opens a moment after the restart.
