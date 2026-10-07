@@ -401,6 +401,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	var click := event as InputEventMouseButton
 	if click == null:
 		return
+	if click.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		# 3D, both schemes: the wheel zooms, up nearer.
+		if _client3d != null and click.pressed:
+			_client3d.zoom_by(1 if click.button_index == MOUSE_BUTTON_WHEEL_UP else -1)
+		return
 	if click.button_index == MOUSE_BUTTON_MIDDLE:
 		# 3D only: a pitch peek, or in WASD a horizontal drag turns.
 		if _client3d != null:
@@ -570,8 +575,8 @@ func _end_middle_drag() -> void:
 		Drag.PITCH:
 			_client3d.end_pitch_peek()
 		Drag.UNDECIDED:
-			# Let go without moving: a middle click, which does nothing.
-			pass
+			# Let go without moving: a middle click, which resets the zoom.
+			_client3d.reset_zoom()
 	_drag = Drag.UNDECIDED
 
 
@@ -1623,11 +1628,11 @@ func _on_world_ticked(tick: int) -> void:
 	if Net.controls == "wasd":
 		hints = "WASD walk   mouse aim   LMB attack (far: walk)   RMB grab (drag to toss)"
 		if _client3d != null:
-			hints += "   MMB drag: sideways turn, up/down look"
+			hints += "   MMB drag: sideways turn, up/down look   wheel zoom, MMB click 1x"
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   W/S tilt   A/D turn"
+			hints += "   W/S tilt   A/D turn   wheel zoom, MMB click 1x"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
@@ -1648,7 +1653,7 @@ func _debug_text() -> String:
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
 	if _client3d != null:
-		lines.append("yaw: %.1f deg   pitch: %.1f deg" % [_client3d.yaw, _client3d.pitch])
+		lines.append("yaw: %.1f deg   pitch: %.1f deg   zoom: %.2fx" % [_client3d.yaw, _client3d.pitch, _client3d.zoom])
 	else:
 		lines.append("azimuth: %.1f deg" % Iso.azimuth)
 	lines.append("controls: %s" % Net.controls)

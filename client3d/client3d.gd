@@ -35,8 +35,11 @@ extends Node3D
 ## Camera: orthographic, tilted `pitch` from horizontal (CAMERA_PITCH at
 ## rest), yawed by `yaw` about the local player, who is kept at the middle
 ## of the screen: 0 matches the 2D diamond (+x down-right, +y down-left).
-## The ortho size is CAMERA_SIZE, times up to PEEK_PULL_BACK during a WASD
-## pitch peek.
+## The ortho size is CAMERA_SIZE times `zoom`, and times up to
+## PEEK_PULL_BACK during a WASD pitch peek. The mouse wheel zooms in either
+## scheme, a ZOOM_STEP a notch between ZOOM_MIN and ZOOM_MAX, eased
+## (ZOOM_RATE), on the player; a middle click puts it back to 1. The zoom
+## is saved (Net.camera_zoom).
 ##
 ## Turning, in both schemes: the yaw turns freely, all the way round, and
 ## rests only on the diamond views (multiples of ORBIT_STEP from 0). Let
@@ -103,6 +106,13 @@ const CAMERA_DISTANCE := 40.0
 const CAMERA_SIZE := 12.0
 ## The resting yaws are multiples of this: the diamond views.
 const ORBIT_STEP := 90.0
+## The wheel's zoom: a factor on CAMERA_SIZE (smaller is nearer), this
+## much a notch, held to ZOOM_MIN..ZOOM_MAX, eased toward at ZOOM_RATE (an
+## exponential rate a second: a notch is all but done in a quarter second).
+const ZOOM_STEP := 1.1
+const ZOOM_MIN := 0.8
+const ZOOM_MAX := 1.4
+const ZOOM_RATE := 14.0
 ## A WASD middle drag let go: on to its diamond, eased out.
 const SETTLE_SECONDS := 0.25
 ## A turn of less than this, let go, goes back to the diamond it set off
@@ -253,6 +263,9 @@ var _settle_pending := false
 var frozen := false
 ## The camera's tilt from horizontal now, in degrees; CAMERA_PITCH at rest.
 var pitch := CAMERA_PITCH
+## The wheel's zoom now and where it is easing to.
+var zoom := 1.0
+var _zoom_to := 1.0
 ## A W/S tilt springing back: from, and how far along (1: not springing).
 var _tilt_from := CAMERA_PITCH
 var _tilt_t := 1.0
@@ -337,6 +350,8 @@ func setup(terrain: Dictionary) -> void:
 	yaw = Net.camera_yaw
 	_yaw_step = nearest_diamond(yaw)
 	pitch = CAMERA_PITCH
+	zoom = clampf(Net.camera_zoom, ZOOM_MIN, ZOOM_MAX)
+	_zoom_to = zoom
 	_apply_size()
 	_place_camera()
 	_classify_walls()
@@ -348,6 +363,7 @@ func _process(delta: float) -> void:
 	_ease_yaw(delta)
 	_ease_peek(delta)
 	_ease_tilt(delta)
+	_ease_zoom(delta)
 	_follow(delta)
 	_drop_departed()
 	_update_mourning(delta)
@@ -438,8 +454,36 @@ func _local_player() -> Player:
 ## The ortho size: CAMERA_SIZE, times the pitch peek's pull back while
 ## there is one (eased as its tilt is).
 func _apply_size() -> void:
-	_camera.size = CAMERA_SIZE * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
+	_camera.size = CAMERA_SIZE * zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
 			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn))
+
+
+## The mouse wheel, [param notches] of it (positive in, nearer the player;
+## negative out): ZOOM_STEP a notch, held to ZOOM_MIN..ZOOM_MAX, eased
+## there; saved. The camera is on the player, so that is the centre.
+func zoom_by(notches: int) -> void:
+	_zoom_to = clampf(_zoom_to / pow(ZOOM_STEP, notches), ZOOM_MIN, ZOOM_MAX)
+	_save_zoom()
+
+
+## A middle click: the zoom back to 1, eased; saved.
+func reset_zoom() -> void:
+	_zoom_to = 1.0
+	_save_zoom()
+
+
+func _save_zoom() -> void:
+	Net.camera_zoom = _zoom_to
+	Net.save_view_settings()
+
+
+func _ease_zoom(delta: float) -> void:
+	if is_equal_approx(zoom, _zoom_to):
+		return
+	zoom = lerpf(zoom, _zoom_to, 1.0 - exp(-ZOOM_RATE * delta))
+	if absf(zoom - _zoom_to) < 0.0005:
+		zoom = _zoom_to
+	_apply_size()
 
 
 ## Click scheme, A/D held: turn [param direction] (-1 or 1) for

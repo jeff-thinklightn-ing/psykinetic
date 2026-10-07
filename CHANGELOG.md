@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.43
+
+Mouse wheel zoom. Client (the server only for the version).
+
+- The mouse wheel zooms the 3D camera in small eased steps, between 0.8×
+  and 1.4× of the usual size, centred on your character, in both schemes.
+  It stays where you leave it and is saved.
+- A middle click (no drag) puts the zoom back to 1×.
+- Nothing else about the camera changes.
+
+The server must be updated to v0.1.43 too, as it refuses any other version.
+
 ## v0.1.42
 
 Camera: free turn, lock on a diamond. Client (the server only for the version).

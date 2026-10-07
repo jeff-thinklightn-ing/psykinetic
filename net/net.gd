@@ -32,7 +32,7 @@ extends Node
 ## player by it. A host run from the project uses a fixed dev id.
 ## window_width=, window_height= and window_mode= (windowed, fullscreen)
 ## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
-## is the 3D view's diamond as last left. renderer=2d picks the 2D view;
+## is the 3D view's diamond as last left, camera_zoom= its wheel zoom. renderer=2d picks the 2D view;
 ## anything else, or no line, is the 3D one. It is read whatever the mode,
 ## and kept as written when the file is rewritten. controls=wasd is WASD
 ## with the mouse aiming; anything else, or no line, is click-to-move;
@@ -162,6 +162,9 @@ var fullscreen := false
 ## The 3D camera's diamond in degrees (a multiple of Client3D.ORBIT_STEP,
 ## 0..360), kept with the window settings; --test-yaw for a run.
 var camera_yaw := 0.0
+## The 3D camera's wheel zoom, a factor on its default size, kept with the
+## yaw.
+var camera_zoom := 1.0
 ## settings.cfg hp_bars= (0 turns them off), master_volume=, sfx_volume=.
 var hp_bars := true
 var master_volume := 1.0
@@ -170,8 +173,8 @@ var sfx_volume := 1.0
 ## key -> value as read, written back as they were.
 var _settings_kept: Dictionary = {}
 ## The keys save_settings writes; everything else in the file is kept.
-## camera_pitch and camera_zoom were written by older builds and are no
-## longer: listed so that a rewrite drops them.
+## camera_pitch was written by older builds and is no longer: listed so
+## that a rewrite drops it.
 const WRITTEN_SETTINGS: Array[String] = ["address", "port", "token", "player_id", "name", "display_delay",
 	"window_width", "window_height", "window_mode", "camera_yaw", "camera_pitch", "camera_zoom",
 	"renderer", "controls"]
@@ -358,6 +361,7 @@ func _apply_window_settings() -> void:
 			window_size = Vector2i(width.to_int(), height.to_int())
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
 		camera_yaw = saved_yaw(str(settings.get("camera_yaw", "")), camera_yaw)
+		camera_zoom = saved_zoom(str(settings.get("camera_zoom", "")), camera_zoom)
 	if _test_yaw_given:
 		camera_yaw = test_yaw
 	var window := get_window()
@@ -376,6 +380,15 @@ static func saved_yaw(text: String, otherwise: float) -> float:
 	if not text.strip_edges().is_valid_float():
 		return otherwise
 	return fposmod(Client3D.nearest_diamond(text.to_float()), 360.0)
+
+
+## camera_zoom= as read from the settings file: held to the wheel's range
+## (an older build's wider zoom comes back at its nearer end).
+## [param otherwise] for a missing or bad value.
+static func saved_zoom(text: String, otherwise: float) -> float:
+	if not text.strip_edges().is_valid_float():
+		return otherwise
+	return clampf(text.to_float(), Client3D.ZOOM_MIN, Client3D.ZOOM_MAX)
 
 
 ## F11: borderless fullscreen at the monitor's native size, or back to the
@@ -445,9 +458,9 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
 	file.store_string(("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n"
-			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\n") % [
+			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\ncamera_zoom=%.3f\n") % [
 		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks,
-		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw)])
+		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw), camera_zoom])
 	if _settings_renderer != "":
 		file.store_string("renderer=%s\n" % _settings_renderer)
 	if _settings_controls != "":

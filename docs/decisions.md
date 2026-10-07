@@ -594,3 +594,9 @@ from if it turned less than 10°, and stays there; that diamond is saved.
 The 10° counts from where the turn set off, not from the last diamond
 passed, so a turn of 95° goes on to 180°. The W/S tilt stays a held look
 that springs back. This replaces 64 and 65 and the commit rule of 58.
+
+## 67. The mouse wheel zooms, a little
+
+Zoom is back, on the mouse wheel in both schemes, in a narrow range
+(0.8-1.4×) of small eased steps, centred on the player, sticky and saved;
+a middle click resets it. Nothing else about the camera changed (66).

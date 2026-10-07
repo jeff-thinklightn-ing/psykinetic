@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_drag_and_freeze()
 	_test_diamonds()
 	_test_tilt_keys()
+	_test_wheel_zoom()
 	_test_pitch_peek()
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
@@ -327,6 +328,69 @@ func _test_diamonds() -> void:
 	_free_rig(rig)
 
 
+func _test_wheel_zoom() -> void:
+	print("
+== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.4x, saved; a middle click puts it to 1x ==")
+	var saved: String = Net.controls
+	var rig := _rig()
+	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "it starts at 1x")
+	for scheme: String in ["click", "wasd"]:
+		Net.controls = scheme
+		rig.zoom = 1.0
+		rig._zoom_to = 1.0
+		_main._unhandled_input(_wheel(MOUSE_BUTTON_WHEEL_UP))
+		_check(is_equal_approx(rig._zoom_to, 1.0 / Client3D.ZOOM_STEP), "%s: a notch up, in by %.1fx (%.3f)" % [scheme, Client3D.ZOOM_STEP, rig._zoom_to])
+	rig._ease_zoom(1.0 / 60.0)
+	_check(rig.zoom < 1.0 and rig.zoom > rig._zoom_to, "eased, not at once (%.3f a frame in)" % rig.zoom)
+	for i in 30:
+		rig._ease_zoom(1.0 / 60.0)
+	_check(is_equal_approx(rig.zoom, rig._zoom_to) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE * rig.zoom),
+			"there within half a second (size %.2f)" % rig._camera.size)
+	for i in 10:
+		rig.zoom_by(1)
+	_check(is_equal_approx(rig._zoom_to, Client3D.ZOOM_MIN), "in no nearer than %sx" % rig._zoom_to)
+	for i in 20:
+		rig.zoom_by(-1)
+	_check(is_equal_approx(rig._zoom_to, Client3D.ZOOM_MAX) and is_equal_approx(Net.camera_zoom, Client3D.ZOOM_MAX),
+			"out no further than %sx, and saved" % rig._zoom_to)
+	for i in 60:
+		rig._ease_zoom(1.0 / 60.0)
+	var target := rig._camera_target
+	_check(rig._camera_target == target and rig._camera.position.is_equal_approx(rig._camera_target + rig._camera_offset()),
+			"zooming leaves the camera on the player")
+	var yaw := rig.yaw
+	var pitch := rig.pitch
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._end_middle_drag()
+	for i in 60:
+		rig._ease_zoom(1.0 / 60.0)
+	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(Net.camera_zoom, 1.0) and is_equal_approx(rig.yaw, yaw)
+			and is_equal_approx(rig.pitch, pitch), "%s: a middle click, back to 1x, nothing else moved" % Net.controls)
+	_check(is_equal_approx(Net.saved_zoom("1.2", -1.0), 1.2) and is_equal_approx(Net.saved_zoom("2", -1.0), Client3D.ZOOM_MAX)
+			and is_equal_approx(Net.saved_zoom("0.6", -1.0), Client3D.ZOOM_MIN) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
+			"a saved zoom loads held to 0.8..1.4; none keeps 1x")
+	Net.camera_zoom = 1.25
+	var again := _rig()
+	_free_rig(again)
+	Net.camera_zoom = 1.25
+	var reload: Client3D = preload("res://client3d/client3d.tscn").instantiate()
+	_main.add_child(reload)
+	reload.setup(_main._terrain)
+	_check(is_equal_approx(reload.zoom, 1.25) and is_equal_approx(reload._camera.size, Client3D.CAMERA_SIZE * 1.25),
+			"a saved zoom is where a new view starts (%s)" % reload.zoom)
+	reload.queue_free()
+	Net.camera_zoom = 1.0
+	Net.controls = saved
+	_free_rig(rig)
+
+
+func _wheel(button: MouseButton) -> InputEventMouseButton:
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = button
+	wheel.pressed = true
+	return wheel
+
+
 func _test_tilt_keys() -> void:
 	print("\n== click: W/S tilt while held and spring back to 50 when let go ==")
 	var rig := _rig()
@@ -436,7 +500,8 @@ func _test_middle_drag_axis() -> void:
 	_main._begin_middle_drag(Vector2(500, 500))
 	_main._middle_drag(Vector2(2, 1))
 	_main._end_middle_drag()
-	_check(is_equal_approx(rig.pitch, before) and rig._tilt_t >= 1.0, "a middle click does nothing either")
+	_check(is_equal_approx(rig.pitch, before) and rig._tilt_t >= 1.0 and is_equal_approx(rig._zoom_to, 1.0),
+			"a middle click tilts nothing; it puts the zoom to 1x")
 	Net.controls = saved
 	_free_rig(rig)
 
@@ -527,6 +592,7 @@ func _test_click_uses_the_frame_pick() -> void:
 func _rig() -> Client3D:
 	var rig: Client3D = preload("res://client3d/client3d.tscn").instantiate()
 	Net.camera_yaw = 0.0
+	Net.camera_zoom = 1.0
 	_main.add_child(rig)
 	rig.setup(_main._terrain)
 	rig.set_process(false)
