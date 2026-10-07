@@ -228,6 +228,8 @@ func _ready() -> void:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
 	if Net.test_click_after > 0.0:
 		get_tree().create_timer(Net.test_click_after).timeout.connect(_test_click)
+	if Net.test_fullscreen_after > 0.0:
+		get_tree().create_timer(Net.test_fullscreen_after).timeout.connect(Net.toggle_fullscreen)
 
 	if Net.needs_setup:
 		# An exported client with no settings.cfg yet: ask once, then join.
@@ -294,6 +296,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_F3:
 		debug_overlay.visible = not debug_overlay.visible
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_F11:
+		Net.toggle_fullscreen()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
 		# A command like any other, so it works from a client too; the
@@ -1129,7 +1134,7 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R reset room   F3 debug" % [
+	hud.text = "%s   %s   tick %d   LMB move / attack   RMB shove (drag to toss)   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick]
 	if player != null:
 		_had_player = true

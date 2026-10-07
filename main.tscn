@@ -35,19 +35,19 @@ width = 2.0
 default_color = Color(1, 0.9, 0.3, 0.9)
 
 [node name="Camera" type="Camera2D" parent="."]
-zoom = Vector2(2, 2)
+zoom = Vector2(6, 6)
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
 [node name="Label" type="Label" parent="HUD"]
-offset_left = 12.0
-offset_top = 8.0
-offset_right = 900.0
-offset_bottom = 31.0
+offset_left = 40.0
+offset_top = 24.0
+offset_right = 3000.0
+offset_bottom = 96.0
 
 [node name="Debug" type="Label" parent="HUD"]
 visible = false
-offset_left = 12.0
-offset_top = 40.0
-offset_right = 500.0
-offset_bottom = 140.0
+offset_left = 40.0
+offset_top = 130.0
+offset_right = 1700.0
+offset_bottom = 470.0

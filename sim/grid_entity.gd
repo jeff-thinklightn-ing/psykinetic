@@ -488,15 +488,21 @@ func say(text: String) -> void:
 	_speech_tween.tween_callback(func() -> void: _speech_label.visible = false)
 
 
+## A caption 8 world px tall. Fonts are rasterised at the viewport's
+## scale, not the camera's, so the label is set in a font the camera zoom
+## times larger and scaled back down, to come out sharp on screen.
 func _make_caption(text: String, y: float, color: Color) -> Label:
 	var caption := Label.new()
+	var camera := get_viewport().get_camera_2d() if is_inside_tree() else null
+	var zoom := camera.zoom.x if camera != null else 1.0
 	caption.text = text
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	caption.add_theme_font_size_override("font_size", 8)
+	caption.add_theme_font_size_override("font_size", roundi(8 * zoom))
 	caption.add_theme_color_override("font_color", color)
 	caption.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	caption.add_theme_constant_override("outline_size", 2)
-	caption.size = Vector2(120, 12)
+	caption.add_theme_constant_override("outline_size", roundi(2 * zoom))
+	caption.size = Vector2(120, 12) * zoom
+	caption.scale = Vector2.ONE / zoom
 	caption.position = Vector2(-60, y)
 	caption.z_index = 5
 	add_child(caption)

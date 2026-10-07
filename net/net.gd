@@ -26,6 +26,8 @@ extends Node
 ## a host. display_delay= (ticks, default 2) sets how far in the past other
 ## entities are drawn. player_id is a UUID made on first run; the server remembers each
 ## player by it. A host run from the project uses a fixed dev id.
+## window_width=, window_height= and window_mode= (windowed, fullscreen)
+## are the window as it was last left; F11 toggles fullscreen.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -38,6 +40,7 @@ extends Node
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
+##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
 ##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
@@ -69,6 +72,9 @@ signal join_rejected(reason: String, server_version: String)
 ## meaning of an existing RPC argument, say).
 const PROTOCOL_REVISION := 1
 const SETTINGS_FILE := "settings.cfg"
+## First launch: half the 3840x2160 base, windowed.
+const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
+const WINDOW_SAVE_DELAY := 0.5
 const UNKNOWN_VERSION := "0.0.0"
 ## The identity a host run from the project uses, so its state persists too.
 const DEV_PLAYER_ID := "dev-host"
@@ -114,6 +120,12 @@ var _leaving: Dictionary[int, bool] = {}
 var _authenticated: Dictionary[int, String] = {}
 ## True when an exported build has no settings file and must ask for one.
 var needs_setup := false
+## The window as the settings file has it: its windowed size and whether it
+## is fullscreen. Applied at start, kept up to date, saved with the rest.
+var window_size := DEFAULT_WINDOW_SIZE
+var fullscreen := false
+## Saves the window settings a moment after the last resize, not on each.
+var _window_save: SceneTreeTimer
 var _mode_given := false
 var _settings_override := ""
 var _test_version := ""
@@ -134,6 +146,7 @@ var test_exit_after := 0.0
 var screenshot_path := ""
 var test_hover_tile := Vector2i(-1, -1)
 var test_click_after := 0.0
+var test_fullscreen_after := 0.0
 var test_door_tick := 0
 
 var mispredicts_total := 0
@@ -152,6 +165,7 @@ func _enter_tree() -> void:
 	_parse_args()
 	if not _mode_given:
 		_apply_settings()
+	_apply_window_settings()
 	if player_id.is_empty():
 		# A client run from the command line gets a throwaway id; a host or
 		# server run from the project is always the same dev player.
@@ -226,6 +240,64 @@ func _apply_settings() -> void:
 	print("[net] using %s" % path)
 
 
+## The window as the settings file last saw it, applied before the first
+## frame; the defaults where there is no file. Nothing on a server or in
+## tests (headless). Resizes and F11 from then on are saved back.
+func _apply_window_settings() -> void:
+	if DisplayServer.get_name() == "headless" or mode == Mode.SERVER:
+		return
+	var path := settings_path()
+	if path != "" and FileAccess.file_exists(path):
+		var settings := _read_settings(path)
+		var width := str(settings.get("window_width", ""))
+		var height := str(settings.get("window_height", ""))
+		if width.is_valid_int() and height.is_valid_int() and width.to_int() > 0 and height.to_int() > 0:
+			window_size = Vector2i(width.to_int(), height.to_int())
+		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
+	var window := get_window()
+	window.size = window_size
+	if fullscreen:
+		window.mode = Window.MODE_FULLSCREEN
+	else:
+		window.move_to_center()
+	window.size_changed.connect(_on_window_size_changed)
+
+
+## F11: borderless fullscreen at the monitor's native size, or back to the
+## window as it was.
+func toggle_fullscreen() -> void:
+	fullscreen = not fullscreen
+	var window := get_window()
+	if fullscreen:
+		window.mode = Window.MODE_FULLSCREEN
+	else:
+		window.mode = Window.MODE_WINDOWED
+		window.size = window_size
+		window.move_to_center()
+	_save_window_settings()
+
+
+## Remembers the windowed size (fullscreen is the monitor's, not a choice)
+## and saves it once the resizing settles.
+func _on_window_size_changed() -> void:
+	var window := get_window()
+	if window.mode != Window.MODE_WINDOWED or window.size == window_size:
+		return
+	window_size = window.size
+	if _window_save != null and _window_save.time_left > 0.0:
+		return
+	_window_save = get_tree().create_timer(WINDOW_SAVE_DELAY)
+	_window_save.timeout.connect(_save_window_settings)
+
+
+## Rewrites the settings file with the window as it is, where there is one
+## (never before the setup screen has written it).
+func _save_window_settings() -> void:
+	var path := settings_path()
+	if path != "" and FileAccess.file_exists(path):
+		save_settings(address, port, token, player_name)
+
+
 ## Plain key=value lines; blank lines, comments and [sections] are ignored.
 func _read_settings(path: String) -> Dictionary:
 	var settings := {}
@@ -253,8 +325,10 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 	if file == null:
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
-	file.store_string("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n" % [
-		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks])
+	file.store_string(("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n"
+			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\n") % [
+		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks,
+		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed"])
 	file.close()
 	return true
 
@@ -565,7 +639,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover", "--test-door", "--test-click":
+					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -620,6 +694,8 @@ func _set_option(key: String, value: String) -> void:
 			test_door_tick = value.to_int()
 		"--test-click":
 			test_click_after = value.to_float()
+		"--test-fullscreen":
+			test_fullscreen_after = value.to_float()
 		"--test-hover":
 			var parts := value.split(",")
 			if parts.size() == 2:

@@ -21,17 +21,18 @@ func _ready() -> void:
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(420, 0)
-	panel.position = Vector2(-210, -120)
+	# Laid out at the 3840x2160 base; the stretch scales it to the window.
+	panel.custom_minimum_size = Vector2(1300, 0)
+	panel.position = Vector2(-650, -400)
 	add_child(panel)
 
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 30)
 	panel.add_child(column)
 
 	var title := Label.new()
 	title.text = "Join a Psykinetic server"
-	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_font_size_override("font_size", 66)
 	column.add_child(title)
 
 	var hint := Label.new()

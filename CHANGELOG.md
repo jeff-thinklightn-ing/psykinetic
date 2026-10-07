@@ -3,6 +3,22 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.18
+
+Window and resolution. Client only.
+
+- The project is laid out at a 3840×2160 base viewport (canvas_items
+  stretch, expand, hidpi): one to one on a 4K monitor, half-scale at
+  1080p. The world and the UI look as before.
+- First launch is a resizable 1920×1080 window. F11 toggles borderless
+  fullscreen at the monitor's native resolution.
+- The windowed size and the mode are kept in settings.cfg (window_width,
+  window_height, window_mode) and restored on the next launch.
+- Entity name and speech captions are rasterised sharp at the camera zoom.
+- `--test-fullscreen=<seconds>` test hook.
+
+The server must be updated to v0.1.18 too, as it refuses any other version.
+
 ## v0.1.17
 
 Movement feedback. Client only.

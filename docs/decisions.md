@@ -250,3 +250,13 @@ it did; further out it does nothing. A sprite under the cursor takes the
 click first with either button, so a tall body is never clicked through
 to the cell behind it. A held button retargets as the cursor crosses
 cells. Client only: the server sees ordinary move commands.
+
+## 31. A 4K base viewport, half-scale by default
+
+The project is laid out at 3840×2160 with `canvas_items` stretch, so a 4K
+monitor gets the base one to one and a 1080p window exactly half; the
+camera zoom (6) and the theme scale (×3) are chosen so the world and the UI
+look as they did at the old 1152×648 base. First launch is a 1920×1080
+window; F11 is borderless fullscreen at the monitor's own size, never
+exclusive, and the window as last left is kept in `settings.cfg` with the
+rest of the client's settings rather than in a second file.

@@ -620,11 +620,29 @@ Test rooms written as old cell maps go through `Terrain.expand`.
 is drawn above walls, so the target cell reads even behind a full-height
 wall.
 
+**Window.** The project is laid out at a 3840×2160 base viewport
+(`project.godot`: stretch `canvas_items`, aspect `expand`, hidpi on), so
+one window pixel is one base pixel on a 4K monitor and half of one at
+1080p; the camera zoom is 6, which puts a 32 px tile at 96 screen px at
+1080p and 192 at 4K. UI is laid out at the base size with the default
+theme scaled ×3 (`gui/theme/default_theme_scale`). Entity captions are
+set in a font the camera zoom times larger and scaled back down
+(`GridEntity._make_caption`), since fonts are rasterised at the viewport's
+scale, not the camera's, and would otherwise come out blocky. First launch
+is a resizable 1920×1080 window (`Net.DEFAULT_WINDOW_SIZE`); F11 toggles
+borderless fullscreen at the monitor's native size
+(`Net.toggle_fullscreen`). The windowed size and the mode are saved to
+`settings.cfg` (`window_width`, `window_height`, `window_mode`) a moment
+after a resize and on every toggle, and applied before the first frame
+(`Net._apply_window_settings`); a project run, with no settings file, uses
+the defaults each time. Nothing of this on a server or in headless tests.
+
 `--screenshot=<path>` with `--test-exit-after` saves the window as PNG on
 exit, for looking at a build without playing it; `--test-hover=<x>,<y>`
 parks the cursor over a cell for it, `--test-click=<seconds>` left-clicks
-where the cursor is after that long, and `--test-door=<tick>` works the
-door the local player stands beside.
+where the cursor is after that long, `--test-fullscreen=<seconds>` toggles
+fullscreen as F11 does, and `--test-door=<tick>` works the door the local
+player stands beside.
 
 ## Grid ↔ screen
 
