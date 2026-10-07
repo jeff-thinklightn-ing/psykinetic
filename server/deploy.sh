@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
-# Deploys the dedicated server on this box: pull, export, install, restart.
+# Deploys the dedicated server on this box: clean, pull, import, export,
+# install, restart.
 # Expects the repo at ~/psykinetic (or $PSYKINETIC_REPO), a Linux Godot
 # editor binary with the Linux export templates installed (GODOT_PATH, or
 # the newest ~/godot/Godot_v*_linux.x86_64 when that is not set, as over a
@@ -17,7 +18,14 @@ PRESET="Linux Server"
 INSTALL_DIR=/opt/psykinetic
 
 cd "$REPO"
+# Untracked files the engine generates (a .uid or .import left by an
+# import here) would block the pull as soon as the repo brings its own
+# copy. Only untracked ones go; tracked and ignored files are untouched.
+git clean -f -- '*.uid' '*.import'
 git pull --ff-only
+# Import only now, on the pulled tree, never before: anything generated
+# here is then for files the repo already has as they are.
+"$GODOT" --headless --path . --import
 
 mkdir -p build
 "$GODOT" --headless --path . --export-release "$PRESET" build/psykinetic-server.x86_64

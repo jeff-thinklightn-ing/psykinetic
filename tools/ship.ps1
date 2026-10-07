@@ -11,13 +11,17 @@
 # Order of work:
 #   1. refuse if project.godot carries run args (the editor writes the join
 #      token there); refuse a version that CHANGELOG.md or a tag already has
-#   2. run tests\run.ps1, tests\net_test.ps1, tests\state_test.ps1
+#   2. a headless import, so Godot writes the .uid of any new script now;
+#      refuse if a script would be committed without its .uid (the box must
+#      never be the first to make one: its copy would block the next pull).
+#      Then run tests\run.ps1, tests\net_test.ps1, tests\state_test.ps1
 #   3. with -Release: add "## v<version>" to the top of CHANGELOG.md with the
 #      message as its one bullet, unless that section already exists
 #   4. commit everything with the message (if there is anything), push
 #   5. with -Release: tools\release_client.ps1 -Version <version>
-#   6. ssh to the box: git pull, then ~/psykinetic/server/deploy.sh (export,
-#      install, restart), output streamed; then admin.sh players to show it is up
+#   6. ssh to the box: clean the engine's untracked files, git pull, then
+#      ~/psykinetic/server/deploy.sh (clean, pull, import, export, install,
+#      restart), output streamed; then admin.sh players to show it is up
 param(
 	[string]$Message = '',
 	[string]$Release = '',
@@ -49,7 +53,21 @@ $dirty = @(git status --porcelain)
 if ($dirty.Count -gt 0 -and $Message -eq '') { Fail 'there are changes to commit; give a -Message' }
 if ($dirty.Count -eq 0 -and $Release -eq '') { Write-Output 'nothing to commit and no release asked for'; exit 0 }
 
-# --- 2. tests -------------------------------------------------------------------
+# --- 2. uids, then tests ---------------------------------------------------------
+# Godot gives a script its .uid on import. Import now, so a new script's
+# .uid exists and goes into this same commit with it (git add -A below).
+$godot = if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'godot' }
+if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
+	$console = $godot -replace '\.exe$', '_console.exe'
+	if (Test-Path $console) { $godot = $console }
+}
+Write-Output '--- import'
+& $godot --headless --path $root --import 2>&1 | Out-Null
+$scripts = @(git ls-files --cached --others --exclude-standard -- '*.gd' '*.gdshader')
+$known = @(git ls-files --cached --others --exclude-standard -- '*.uid')
+$missing = @($scripts | Where-Object { $known -notcontains "$_.uid" })
+if ($missing.Count -gt 0) { Fail "no .uid for $($missing -join ', ') after an import; open the project in the editor once" }
+
 if (-not $SkipTests) {
 	Run 'sim tests' { & "$root\tests\run.ps1" | Select-String 'RESULT|FAIL|ERROR' | ForEach-Object { $_.Line } }
 	Run 'network test' { & "$root\tests\net_test.ps1" | Select-String 'RESULT|FAIL' | ForEach-Object { $_.Line } }
@@ -99,8 +117,10 @@ Write-Output "--- deploying on $box"
 # BatchMode: never hang on a password prompt. stderr merged so git's and
 # systemctl's progress reads in order; the exit code decides.
 # Pull before running deploy.sh, so a deploy.sh changed by this very push
-# is the one that runs (its own pull is then a no-op).
-ssh -o BatchMode=yes -o ConnectTimeout=15 $box 'cd ~/psykinetic && git pull --ff-only && ~/psykinetic/server/deploy.sh' 2>&1 | ForEach-Object { "$_" }
+# is the one that runs (its own clean and pull are then no-ops); clean the
+# engine's untracked files first, as deploy.sh does, or this pull is the
+# one they block.
+ssh -o BatchMode=yes -o ConnectTimeout=15 $box 'cd ~/psykinetic && git clean -f -- "*.uid" "*.import" && git pull --ff-only && ~/psykinetic/server/deploy.sh' 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { Fail "deploy on $box failed (ssh exit $LASTEXITCODE)" }
 Write-Output '--- server console: players'
 # The admin port opens a moment after the restart.

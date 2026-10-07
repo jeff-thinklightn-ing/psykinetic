@@ -448,3 +448,12 @@ the cursor once, draws the hover from it, and clicks use that pick. The
 square on screen and the cell a click goes to are the same by
 construction. The 3D yaw eases run in the view's `_process` rather than
 Tweens so they are done before the pick.
+
+## 53. Engine-generated files come from the dev machine, never the box
+
+A script's `.uid` is committed in the same commit as the script:
+`ship.ps1` imports headless before committing and refuses a script
+without one. On the box `deploy.sh` (and `ship.ps1`'s pull before it)
+first removes untracked `.uid` and `.import` files, pulls, and only then
+imports, so a file the box generated can never block a pull, and the box
+never generates one before the repo's copy arrives.

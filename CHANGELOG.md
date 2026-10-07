@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.30
+
+Deploys. Tooling only; no game change.
+
+- `deploy.sh` removes untracked `.uid` and `.import` files before it
+  pulls, and runs the headless import after the pull, never before. The
+  v0.1.29 deploy stopped on a `.uid` the box had generated itself.
+- `ship.ps1` cleans the same way before its own pull on the box, and
+  before committing imports headless and refuses a script that has no
+  `.uid`, so each `.uid` goes in with its script.
+
+The server must be updated to v0.1.30 too, as it refuses any other version.
+
 ## v0.1.29
 
 Control schemes as complete packages. Client (the server only for the
