@@ -70,8 +70,14 @@ try {
 	if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 	New-Item -ItemType Directory -Force $out | Out-Null
 
-	& $godot --headless --path $root --export-release 'Windows Client' (Join-Path $out 'psykinetic.exe')
-	if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'psykinetic.exe'))) {
+	# Godot reports warnings (a file's metadata, say) on stderr; under 'Stop'
+	# the first one would end the release. The exit code and the exe decide.
+	$ErrorActionPreference = 'Continue'
+	& $godot --headless --path $root --export-release 'Windows Client' (Join-Path $out 'psykinetic.exe') 2>&1 |
+		ForEach-Object { "$_" } | Where-Object { $_ -match 'ERROR|WARNING' } | Write-Output
+	$exported = $LASTEXITCODE
+	$ErrorActionPreference = 'Stop'
+	if ($exported -ne 0 -or -not (Test-Path (Join-Path $out 'psykinetic.exe'))) {
 		throw 'export failed'
 	}
 	foreach ($name in 'launch.bat', 'update.ps1', 'settings.example.cfg', 'README.txt') {
