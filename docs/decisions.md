@@ -281,3 +281,14 @@ are reverted for this one rule, which is cheaper and reads the same
 everywhere. The near walls are one CanvasGroup with the alpha on the
 group, not on each face, so overlapping near faces never add up. Doors
 follow the edge they sit on but keep an opaque panel.
+
+## 34. The projection is one function of an azimuth
+
+`Iso` is no longer a fixed 2:1 formula but a projection parameterised by
+an azimuth, with the diamond view at 0 and the axis-aligned view at ±45,
+and everything on the ground is drawn through it, including the floor
+layer, which gets the change as a transform rather than a second tileset.
+Prediction steps and entity slides are kept in grid units so the view can
+turn under a moving sprite. A middle-button peek drag is the first use;
+the sim is untouched. A prototype, to find out whether a turnable view
+earns its place before anything is built on it.

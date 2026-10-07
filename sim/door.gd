@@ -54,10 +54,16 @@ static func build(spec: Dictionary) -> Door:
 	for property: String in props:
 		door.set(property, props[property])
 	door.hp = door.max_hp
-	# Drawn with its -x / -y cell, a hair nearer the camera than what stands
-	# on that cell, so the face is in front of it and behind the next cell.
-	door.position = Iso.tile_to_local(Vector2i(door.key.x, door.key.y)) + Vector2(0, 0.5)
+	door.refresh()
 	return door
+
+
+## Places and redraws the door for the current azimuth: with its -x / -y
+## cell, a hair nearer the camera than what stands on that cell, so the
+## face is in front of it and behind the next cell.
+func refresh() -> void:
+	position = Iso.tile_to_local(Vector2i(key.x, key.y)) + Vector2(0, 0.5)
+	queue_redraw()
 
 
 func _ready() -> void:

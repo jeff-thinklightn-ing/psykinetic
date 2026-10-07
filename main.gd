@@ -13,6 +13,11 @@ const WALL_VALUE := 0.18
 ## Alpha of the near walls (the south and east edges of walkable cells,
 ## facing the camera), drawn as one layer so they never stack up opaque.
 const NEAR_WALL_ALPHA := 0.3
+## Peek: a middle-button drag turns the view (Iso.azimuth). The full range
+## is covered over this many screen px of horizontal drag, eased toward the
+## limits; on release the view tweens back to 0 over PEEK_RETURN_SECONDS.
+const PEEK_DRAG_PX := 400.0
+const PEEK_RETURN_SECONDS := 0.2
 ## Camera: the fraction of the remaining distance to the player closed per
 ## second, as an exponential rate. Higher is tighter.
 const CAMERA_FOLLOW_RATE := 6.0
@@ -196,6 +201,11 @@ var _rejected := false
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
 var _toss_from := Vector2.ZERO
+## Middle button held: the screen x it went down at, or NAN when not.
+var _peek_from := NAN
+var _peek_return: Tween
+## Every wall face, far and near, for turning the view.
+var _walls: Array[WallEdge] = []
 ## Left button held after a move click: the cell it last sent the player
 ## to. Moving the cursor to another cell retargets; NONE when not held.
 const NONE := Vector2i(-1, -1)
@@ -223,6 +233,8 @@ func _ready() -> void:
 
 	near_walls.self_modulate.a = NEAR_WALL_ALPHA
 	_paint_level()
+	Iso.set_azimuth(Net.test_azimuth)
+	_apply_azimuth()
 	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
 	RenderingServer.set_default_clear_color(VOID)
 
@@ -290,7 +302,10 @@ func _process(delta: float) -> void:
 	var tile := _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
+	cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
+			Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
+	_peek(delta)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -322,6 +337,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var click := event as InputEventMouseButton
 	if click == null:
+		return
+	if click.button_index == MOUSE_BUTTON_MIDDLE:
+		_peek_button(click.pressed)
 		return
 	var player := _local_player()
 	if player == null:
@@ -366,6 +384,59 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toss_from = get_global_mouse_position()
 
 
+# --- Peek -------------------------------------------------------------------------
+
+## Middle button down: the drag turns the view from here; up: it swings
+## back.
+func _peek_button(pressed: bool) -> void:
+	if pressed:
+		if _peek_return != null:
+			_peek_return.kill()
+			_peek_return = null
+		_peek_from = DisplayServer.mouse_get_position().x
+		return
+	_peek_from = NAN
+	_peek_return = create_tween()
+	_peek_return.tween_method(_set_azimuth, Iso.azimuth, 0.0, PEEK_RETURN_SECONDS) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+## While the middle button is held: the azimuth from the horizontal drag,
+## full range over PEEK_DRAG_PX with a sine ease into the limits.
+func _peek(_delta: float) -> void:
+	if is_nan(_peek_from):
+		return
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
+		_peek_button(false)
+		return
+	var drag := (DisplayServer.mouse_get_position().x - _peek_from) / (PEEK_DRAG_PX * 0.5)
+	_set_azimuth(Iso.AZIMUTH_LIMIT * sin(clampf(drag, -1.0, 1.0) * PI * 0.5))
+
+
+func _set_azimuth(degrees: float) -> void:
+	if is_equal_approx(degrees, Iso.azimuth):
+		return
+	Iso.set_azimuth(degrees)
+	_apply_azimuth()
+
+
+## Turns everything on the ground to the current azimuth: the floor layer
+## (laid out at azimuth 0 by its TileSet, so it gets the change of
+## projection as a transform), the walls, with their near/far layer, and
+## the doors. Entities place themselves each frame.
+func _apply_azimuth() -> void:
+	ground.transform = Iso.ground_transform() * Transform2D(Vector2(Iso.HALF.x, Iso.HALF.y),
+			Vector2(-Iso.HALF.x, Iso.HALF.y), Vector2.ZERO).affine_inverse()
+	var floor_at := func(cell: Vector2i) -> bool: return cell in _terrain["floor"]
+	for wall in _walls:
+		var layer: Node = near_walls if WallEdge.is_near(wall.key, floor_at) else $YSort
+		if wall.get_parent() != layer:
+			wall.reparent(layer, false)
+		wall.refresh()
+	for door in World.get_doors():
+		door.refresh()
+
+
 ## A move click: sends the player to [param tile] (NONE: nowhere near the
 ## floor, ignored) and ripples there. Holding the button keeps retargeting
 ## from _process as the cursor moves to other cells.
@@ -392,9 +463,10 @@ func _retarget_held() -> void:
 		_move_click(player, tile)
 
 
-## The cursor's point on the ground plane, in the ground layer's space.
+## The cursor's point on the ground plane, in this node's space (the
+## space Iso projects into).
 func _mouse_point() -> Vector2:
-	return ground.to_local(get_global_mouse_position())
+	return to_local(get_global_mouse_position())
 
 
 ## The walkable cell nearest [param point] (a ground-plane point, in grid
@@ -446,7 +518,7 @@ func _toss_direction() -> Vector2i:
 
 ## Where a grid direction points on screen.
 func _screen_vector(direction: Vector2i) -> Vector2:
-	return Vector2((direction.x - direction.y) * Iso.HALF.x, (direction.x + direction.y) * Iso.HALF.y)
+	return Iso.project(Vector2(direction))
 
 
 ## An arrow from the held target showing which way it will be tossed.
@@ -480,7 +552,7 @@ func _test_hover() -> void:
 	if Net.test_hover_tile == Vector2i(-1, -1) or DisplayServer.get_name() == "headless":
 		return
 	# Cell -> viewport (camera) -> window (stretch).
-	var on_screen := get_viewport().get_screen_transform() * ground.get_global_transform_with_canvas() 			* Iso.tile_to_local(Net.test_hover_tile)
+	var on_screen := get_viewport().get_screen_transform() * get_global_transform_with_canvas() 			* Iso.tile_to_local(Net.test_hover_tile)
 	Input.warp_mouse(on_screen)
 
 
@@ -539,9 +611,9 @@ func _entity_under_mouse() -> GridEntity:
 
 
 ## Screen -> grid: the canvas transform (camera, stretch) is undone by
-## get_global_mouse_position(), then Iso inverts the diamond projection.
+## get_global_mouse_position(), then Iso inverts the projection.
 func _mouse_tile() -> Vector2i:
-	return Iso.local_to_tile(ground.to_local(get_global_mouse_position()))
+	return Iso.local_to_tile(_mouse_point())
 
 
 ## The map (see Terrain for the format). Floor and fire go on the Ground
@@ -566,6 +638,7 @@ func _paint_level() -> void:
 		else:
 			$YSort.add_child(wall)
 		wall.setup(key, kind_at, WALL_VALUE)
+		_walls.append(wall)
 
 
 ## Server: one Door node per door edge, through the spawner so every client
@@ -1161,6 +1234,7 @@ func _debug_text() -> String:
 	var player := _local_player()
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
+	lines.append("azimuth: %.1f deg" % Iso.azimuth)
 	if Net.mode == Net.Mode.CLIENT:
 		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))
 		lines.append("mispredicts: %d / min (%d total)" % [

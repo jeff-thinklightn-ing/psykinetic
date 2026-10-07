@@ -6,12 +6,15 @@ extends Node2D
 ## top and up a corner. Nothing is drawn on the ground.
 ##
 ## Near and far. An edge is the south or east edge of its -x / -y cell and
-## the north or west edge of the next. A wall on the south or east edge of
-## a walkable cell faces the camera with that floor behind it (is_near):
-## it is drawn translucent, at `Main.NEAR_WALL_ALPHA`, so what stands on
-## that floor shows through. A wall whose -x / -y cell is nothing is the
-## north or west edge of the floor beyond, faces away, and is opaque. An
-## interior partition is near or far by the same cell. Main puts near walls
+## the north or west edge of the next. A wall whose camera-facing side has
+## walkable floor behind it is near (is_near): it is drawn translucent, at
+## `Main.NEAR_WALL_ALPHA`, so what stands on that floor shows through. At
+## any azimuth in Iso's range that side is the +x / +y one, so a near wall
+## is the south or east edge of a walkable cell; a wall whose -x / -y cell
+## is nothing is the north or west edge of the floor beyond, faces away,
+## and is opaque. An interior partition is near or far by the same cell.
+## The classification follows Iso.faces_camera, so a wider range would
+## swap sides with the view. Main puts near walls
 ## in one CanvasGroup (`NearWalls`) with the alpha on the group, so where
 ## near faces overlap on screen they still show at that one alpha and a
 ## row of them never stacks up to opaque; far walls go in the Y-sorted
@@ -37,17 +40,19 @@ var _corner: Array[bool] = [false, false]
 
 # --- Geometry shared with Door ----------------------------------------------
 
-## A grid vector on screen.
+## A grid vector on screen, at the current azimuth.
 static func screen(grid: Vector2) -> Vector2:
-	return Vector2((grid.x - grid.y) * Iso.HALF.x, (grid.x + grid.y) * Iso.HALF.y)
+	return Iso.project(grid)
 
 
 ## Where an edge runs, in the local space of its -x / -y cell's centre:
-## the two corners of that cell's diamond it joins, start to end.
+## the two corners of that cell it joins, start to end (the cell's south
+## and east corners for an east edge, west and south for a south edge, as
+## named in the azimuth-0 view).
 static func endpoints(edge: Vector3i) -> Array[Vector2]:
-	var e := Vector2(Iso.HALF.x, 0)
-	var s := Vector2(0, Iso.HALF.y)
-	var w := Vector2(-Iso.HALF.x, 0)
+	var e := Iso.project(Vector2(0.5, -0.5))
+	var s := Iso.project(Vector2(0.5, 0.5))
+	var w := Iso.project(Vector2(-0.5, 0.5))
 	if edge.z == Terrain.EAST:
 		return [s, e]
 	return [w, s]
@@ -67,11 +72,16 @@ static func full_height() -> float:
 	return Iso.height_px("wall")
 
 
-## The near rule: a wall on the south or east edge of a walkable cell
-## faces the camera and is drawn translucent. [param floor_at] says
+## The near rule: a wall with walkable floor behind its camera-facing
+## side is drawn translucent. That side is the +x / +y one while the
+## edge's outward face points at the camera (Iso.faces_camera), with the
+## -x / -y cell behind it; otherwise the other. [param floor_at] says
 ## whether a cell is walkable.
 static func is_near(edge: Vector3i, floor_at: Callable) -> bool:
-	return floor_at.call(Vector2i(edge.x, edge.y))
+	var behind := Vector2i(edge.x, edge.y)
+	if not Iso.faces_camera(edge.z):
+		behind += Vector2i(1, 0) if edge.z == Terrain.EAST else Vector2i(0, 1)
+	return floor_at.call(behind)
 
 
 ## Position of the vertex (shared diamond corner) an edge end sits on, as
@@ -115,9 +125,14 @@ static func draw_wall(on: CanvasItem, a: Vector2, b: Vector2, h: float, offset: 
 func setup(edge: Vector3i, kind_at: Callable, grey: float) -> void:
 	key = edge
 	value = grey
-	position = Iso.tile_to_local(Vector2i(edge.x, edge.y)) + Vector2(0, 0.5)
 	for end in 2:
 		_corner[end] = _meets_wall_at(end, kind_at)
+	refresh()
+
+
+## Places and redraws the face for the current azimuth.
+func refresh() -> void:
+	position = Iso.tile_to_local(Vector2i(key.x, key.y)) + Vector2(0, 0.5)
 	queue_redraw()
 
 

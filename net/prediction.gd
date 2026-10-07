@@ -33,9 +33,10 @@ const RECONCILE_GRACE_TICKS := 4.0
 class Step:
 	var from := Vector2i.ZERO
 	var to := Vector2i.ZERO
-	## Where the sprite goes between; usually the two tiles' centres.
-	var from_pos := Vector2.ZERO
-	var to_pos := Vector2.ZERO
+	## Where the sprite goes between, in grid units so the view can turn
+	## under it; usually the two tiles' centres.
+	var from_grid := Vector2.ZERO
+	var to_grid := Vector2.ZERO
 	## On the prediction clock, in ticks.
 	var start := 0.0
 	var duration := 1.0
@@ -109,13 +110,13 @@ func give_up() -> void:
 ## prediction had it. Blend the sprite there over [param blend_ticks] from
 ## wherever it is now, then carry on toward the target from that tile.
 func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
-	var from_pos := position() if is_active() else _entity.position
+	var from_grid := Iso.local_to_grid(position() if is_active() else _entity.position)
 	_steps.clear()
 	var blend := Step.new()
 	blend.from = server_tile
 	blend.to = server_tile
-	blend.from_pos = from_pos
-	blend.to_pos = Iso.tile_to_local(server_tile)
+	blend.from_grid = from_grid
+	blend.to_grid = Vector2(server_tile)
 	blend.start = _clock
 	blend.duration = maxf(blend_ticks, 0.01)
 	blend.started = true
@@ -181,10 +182,11 @@ func facing() -> Vector2i:
 	return step.to - step.from
 
 
+## Where the sprite is shown now, projected at the current azimuth.
 func position() -> Vector2:
 	var step := _current()
 	var t := clampf((_clock - step.start) / step.duration, 0.0, 1.0)
-	return step.from_pos.lerp(step.to_pos, t)
+	return Iso.grid_to_local(step.from_grid.lerp(step.to_grid, t))
 
 
 ## The latest step that has started; the first one if none has yet.
@@ -210,8 +212,8 @@ func _append_path(at: Vector2i, start: float) -> void:
 		var step := Step.new()
 		step.from = at
 		step.to = next
-		step.from_pos = Iso.tile_to_local(at)
-		step.to_pos = Iso.tile_to_local(next)
+		step.from_grid = Vector2(at)
+		step.to_grid = Vector2(next)
 		step.start = start
 		step.duration = World.step_ticks(_entity, next - at)
 		step.deadline = start + latency + RECONCILE_GRACE_TICKS

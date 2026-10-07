@@ -6,9 +6,10 @@ extends Node2D
 ## where the click landed. Drawing only.
 
 const SECONDS := 0.25
-const RADIUS_FROM := 4.0
-## Tile-sized at the end: a diamond's half extents.
-const RADIUS_TO := float(Iso.HALF.x)
+## Ground-plane radii in grid units: a few px to a tile across. A circle on
+## the ground projects to the same 2:1 ellipse at every azimuth.
+const RADIUS_FROM := 4.0 / Iso.UNIT
+const RADIUS_TO := 0.5 * sqrt(2.0)
 ## A step lighter than the floor, no fill.
 const COLOR := Color(0.58, 0.76, 0.69)
 const SEGMENTS := 32
@@ -38,9 +39,9 @@ func _draw() -> void:
 	var radius := lerpf(RADIUS_FROM, RADIUS_TO, t)
 	var color := COLOR
 	color.a = 1.0 - t
-	# A ring lying on the floor is an ellipse at the tile's 2:1 aspect.
+	# A ring lying on the floor, projected like the floor.
 	var points := PackedVector2Array()
 	for i in SEGMENTS + 1:
 		var angle := TAU * i / SEGMENTS
-		points.append(Vector2(cos(angle) * radius, sin(angle) * radius * 0.5))
+		points.append(Iso.project(Vector2(cos(angle), sin(angle)) * radius))
 	draw_polyline(points, color, 1.5)

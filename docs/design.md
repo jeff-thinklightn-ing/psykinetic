@@ -648,19 +648,44 @@ the defaults each time. Nothing of this on a server or in headless tests.
 `--screenshot=<path>` with `--test-exit-after` saves the window as PNG on
 exit, for looking at a build without playing it; `--test-hover=<x>,<y>`
 parks the cursor over a cell for it, `--test-click=<seconds>` left-clicks
-where the cursor is after that long, `--test-fullscreen=<seconds>` toggles
+where the cursor is after that long, `--test-azimuth=<degrees>` starts
+with the view turned, `--test-fullscreen=<seconds>` toggles
 fullscreen as F11 does, and `--test-door=<tick>` works the door the local
 player stands beside.
 
 ## Grid ↔ screen
 
-Diamond-down isometric, tile 32×16:
+`sim/iso.gd` is a fixed-elevation projection of the ground plane (vertical
+foreshortened to a half, `Iso.ELEVATION`) turned about the vertical by
+`Iso.azimuth`, −45..45 degrees. At 0 it is the diamond-down isometric of
+the TileSet, tile 32×16; at ±45 the grid is axis-aligned and a cell an
+upright 2:1 rectangle (22.6×11.3 px). With `h = 45° − azimuth`:
 
 ```
-local = ((x - y) * 16 + 16, (x + y) * 8 + 8)          # tile centre
-u = (lx - 16) / 16;  v = (ly - 8) / 8
-tile = (round((u + v) / 2), round((v - u) / 2))
+axis_x = UNIT * (cos h, sin h / 2);  axis_y = UNIT * (-sin h, cos h / 2)   # UNIT = 16√2
+local  = (grid + ORIGIN) * [axis_x axis_y]                                 # ORIGIN = (1, 0), the TileSet's layout
+tile   = round(inverse(local))
 ```
+
+At 0 that is `local = ((x − y)·16 + 16, (x + y)·8 + 8)`, which `main.gd`
+checks against the TileMapLayer's `map_to_local` at startup. Heights are
+vertical and never turn. Everything on the ground goes through `Iso`: the
+floor layer (laid out at 0 by its TileSet, so `Main._apply_azimuth` gives
+it the change of projection as a transform), wall edges (`WallEdge.
+endpoints`, `screen`), door posts and panels, the click ripple, the hover
+cell, and every sprite anchor (`GridEntity` places itself from grid
+coordinates each frame; `Prediction` keeps its steps in grid units).
+Sprites stay upright and Y-sort by projected depth, which is just
+position.y. The near/far wall rule reads `Iso.faces_camera`, so it would
+follow a wider range; within this one the east and south faces always
+point at the camera (edge-on at the limits).
+
+**Peek.** A middle-button drag turns the view: the azimuth follows the
+horizontal drag, the full range over `Main.PEEK_DRAG_PX` (400 screen px)
+with a sine ease into the limits; on release it tweens back to 0 over
+`PEEK_RETURN_SECONDS` (200 ms). F3 shows the angle. A prototype: the sim
+knows nothing of it, and nothing else reads it. `--test-azimuth=<deg>`
+starts with the view turned, for screenshots.
 
 Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
 → `ground.to_local()` → `Iso.local_to_tile()` gives the floor cell under

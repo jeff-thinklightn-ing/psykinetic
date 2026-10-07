@@ -251,11 +251,9 @@ func _process(delta: float) -> void:
 			var t := 1.0
 			if _move_duration > 0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
-			position = Iso.tile_to_local(_from_tile).lerp(Iso.tile_to_local(to), t)
+			position = Iso.grid_to_local(Vector2(_from_tile).lerp(Vector2(to), t))
 	if _pip != null:
-		var screen_facing := Vector2(
-				(shown_facing.x - shown_facing.y) * Iso.HALF.x,
-				(shown_facing.x + shown_facing.y) * Iso.HALF.y)
+		var screen_facing := Iso.project(Vector2(shown_facing))
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH
 	_update_body()
 	_update_flash()

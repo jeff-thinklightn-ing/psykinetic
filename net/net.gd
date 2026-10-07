@@ -41,6 +41,7 @@ extends Node
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
 ##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
+##   --test-azimuth=<degrees>     start with the view turned by this (for screenshots)
 ##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
@@ -147,6 +148,7 @@ var screenshot_path := ""
 var test_hover_tile := Vector2i(-1, -1)
 var test_click_after := 0.0
 var test_fullscreen_after := 0.0
+var test_azimuth := 0.0
 var test_door_tick := 0
 
 var mispredicts_total := 0
@@ -639,7 +641,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen":
+					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -696,6 +698,8 @@ func _set_option(key: String, value: String) -> void:
 			test_click_after = value.to_float()
 		"--test-fullscreen":
 			test_fullscreen_after = value.to_float()
+		"--test-azimuth":
+			test_azimuth = value.to_float()
 		"--test-hover":
 			var parts := value.split(",")
 			if parts.size() == 2:

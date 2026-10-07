@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_sight_through_edges()
 	_test_doors()
 	_test_door_breaks()
+	_test_projection()
 	_test_near_walls()
 
 	print("")
@@ -186,6 +187,34 @@ func _test_door_breaks() -> void:
 	World.order_shove(player, imp)
 	World.step()
 	_check(stone.hp == 3 and not stone.is_broken(), "a stone door takes nothing (hp %d)" % stone.hp)
+
+
+func _test_projection() -> void:
+	print("
+== drawing: the projection turns with the azimuth; 0 is the 2:1 diamond, 45 the axis-aligned view ==")
+	Iso.set_azimuth(0.0)
+	var tile := Vector2i(3, 5)
+	_check(Iso.tile_to_local(tile).is_equal_approx(Vector2((3 - 5) * 16 + 16, (3 + 5) * 8 + 8)), "at 0 a tile centre is where the diamond TileSet puts it")
+	_check(Iso.axis_x().is_equal_approx(Vector2(16, 8)) and Iso.axis_y().is_equal_approx(Vector2(-16, 8)), "at 0 the axes run down-right and down-left")
+	Iso.set_azimuth(45.0)
+	_check(Iso.axis_x().is_equal_approx(Vector2(Iso.UNIT, 0)) and Iso.axis_y().is_equal_approx(Vector2(0, Iso.UNIT * 0.5)),
+			"at +45 x runs right and y down: an upright 2:1 cell")
+	Iso.set_azimuth(-45.0)
+	_check(Iso.axis_x().is_equal_approx(Vector2(0, Iso.UNIT * 0.5)) and Iso.axis_y().is_equal_approx(Vector2(-Iso.UNIT, 0)),
+			"at -45 x runs down and y left")
+	Iso.set_azimuth(22.0)
+	var grid := Vector2(2.3, -1.7)
+	_check(Iso.local_to_grid(Iso.grid_to_local(grid)).is_equal_approx(grid), "grid -> local -> grid round-trips at 22")
+	_check(Iso.local_to_tile(Iso.tile_to_local(tile)) == tile, "and a tile centre comes back as that tile")
+	_check(Iso.faces_camera(Terrain.EAST) and Iso.faces_camera(Terrain.SOUTH), "east and south faces point at the camera at 22")
+	Iso.set_azimuth(60.0)
+	_check(Iso.azimuth == 45.0, "the azimuth is clamped to the range")
+	var floor_at := func(cell: Vector2i) -> bool: return cell == Vector2i(1, 1)
+	for degrees in [-45.0, 0.0, 45.0]:
+		Iso.set_azimuth(degrees)
+		_check(WallEdge.is_near(Vector3i(1, 1, Terrain.SOUTH), floor_at) and not WallEdge.is_near(Vector3i(1, 0, Terrain.SOUTH), floor_at),
+				"at %d the walkable cell's south edge is near and its north edge far" % int(degrees))
+	Iso.set_azimuth(0.0)
 
 
 func _test_near_walls() -> void:

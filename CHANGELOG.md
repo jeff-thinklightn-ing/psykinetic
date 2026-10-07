@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.21
+
+Peek rotation prototype. Client only.
+
+- The projection takes an azimuth, −45..45°: 0 is the 2:1 diamond view,
+  ±45 the axis-aligned view. Floor, walls, doors, ripples, the hover cell
+  and every sprite anchor follow it; sprites stay upright and sort by
+  projected depth. Near/far walls are classified from the azimuth.
+- Middle-button drag turns the view, the full range over about 400 px,
+  eased near the limits; release swings it back over 200 ms.
+- F3 shows the angle. `--test-azimuth=<deg>` test hook.
+
+The server must be updated to v0.1.21 too, as it refuses any other version.
+
 ## v0.1.20
 
 Translucent near walls. Client only.
