@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_screen_lean()
 	_test_drag_and_freeze()
 	_test_diamonds()
+	_test_tilt_keys()
 	_test_pitch_peek()
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
@@ -250,7 +251,7 @@ func _test_drag_and_freeze() -> void:
 	rig.end_drag()
 	_ease(rig)
 	rig.set_frozen(true)
-	rig.orbit(1)
+	rig._settle_on(rig._yaw_step + 90.0)
 	var held := rig.yaw
 	_ease(rig)
 	_check(is_equal_approx(rig.yaw, held), "frozen, nothing turns it, not even an ease under way (%s)" % rig.yaw)
@@ -265,19 +266,20 @@ func _test_diamonds() -> void:
 	_ease(rig)
 	var start := rig.yaw
 	_check(is_equal_approx(fmod(start, 90.0), 0.0), "it starts on a diamond (%s)" % start)
-	rig.orbit(1)
-	var seen: Array[float] = [rig.yaw]
-	for i in 8:
-		rig._ease_yaw(Client3D.ORBIT_SECONDS / 8.0)
-		seen.append(rig.yaw)
-	var rising := true
-	for i in range(1, seen.size()):
-		if seen[i] <= seen[i - 1]:
-			rising = false
-	_check(rising, "E: turning all the way, never still, through the axis view at 45 (%s)" % [seen])
-	_check(is_equal_approx(seen.back(), start + 90.0) and is_equal_approx(seen[4], start + 45.0),
-			"half way at 200 ms, on the next diamond at 400 ms (%s, %s)" % [seen[4], seen.back()])
+	for i in 6:
+		rig.turn(1.0, 0.1)
+	_check(is_equal_approx(rig.yaw, start + 54.0), "click, D held 600 ms: turned 54 degrees, through any angle (%s)" % rig.yaw)
+	rig.end_turn()
+	rig._ease_yaw(Client3D.SETTLE_SECONDS * 0.5)
+	_check(rig.yaw > start + 54.0 and rig.yaw < start + 90.0, "let go: easing on (%s)" % rig.yaw)
+	rig._ease_yaw(Client3D.SETTLE_SECONDS * 0.5)
+	_check(is_equal_approx(rig.yaw, start + 90.0), "on the nearest diamond at %d ms (%s)" % [roundi(Client3D.SETTLE_SECONDS * 1000.0), rig.yaw])
 	_check(is_equal_approx(Net.camera_yaw, fposmod(start + 90.0, 360.0)), "saved as that diamond, within 0..360 (%s)" % Net.camera_yaw)
+	for i in 3:
+		rig.turn(-1.0, 0.1)
+	rig.end_turn()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start + 90.0), "A held 300 ms (27 degrees): back to the same diamond (%s)" % rig.yaw)
 	for yaw in [0.0, 90.0, 180.0, 270.0, -90.0]:
 		_check(is_equal_approx(Net.saved_yaw(str(yaw), -1.0), yaw), "a saved diamond loads as it is (%s)" % yaw)
 	_check(is_equal_approx(Net.saved_yaw("45", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("135", -1.0), 180.0)
@@ -286,6 +288,61 @@ func _test_diamonds() -> void:
 	_check(is_equal_approx(Net.saved_yaw("", 90.0), 90.0) and is_equal_approx(Net.saved_yaw("north", 90.0), 90.0),
 			"no value, or a bad one: kept as it was")
 	_free_rig(rig)
+
+
+func _test_tilt_keys() -> void:
+	print("\n== click: W/S tilt, sticky and saved; a middle click levels ==")
+	var rig := _rig()
+	var yaw := rig.yaw
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "it starts level (%s)" % rig.pitch)
+	rig.tilt(1.0, 0.1)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH + 6.0), "W for 100 ms: 6 degrees up, 60 a second (%s)" % rig.pitch)
+	_check(rig._camera.size > Client3D.CAMERA_SIZE, "and pulled back a little (%s)" % rig._camera.size)
+	var last := rig.pitch
+	var slowest := INF
+	var fastest := 0.0
+	for i in 40:
+		rig.tilt(1.0, 0.05)
+		var moved := rig.pitch - last
+		if moved > 0.0:
+			slowest = minf(slowest, moved)
+			fastest = maxf(fastest, moved)
+		last = rig.pitch
+	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MAX), "held on: it stops at the top, %s" % rig.pitch)
+	_check(slowest < fastest * 0.5, "slowing into the end (fastest %.2f, slowest %.2f a frame)" % [fastest, slowest])
+	_check(is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE * Client3D.PEEK_PULL_BACK),
+			"pulled back in step with the tilt, %s at the top" % rig._camera.size)
+	rig.end_tilt()
+	for i in 10:
+		rig._process(0.05)
+	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MAX), "let go: it stays (%s)" % rig.pitch)
+	_check(is_equal_approx(Net.camera_pitch, Client3D.PITCH_MAX), "and is saved (%s)" % Net.camera_pitch)
+	for i in 60:
+		rig.tilt(-1.0, 0.05)
+	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MIN) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE),
+			"S: down to %s, at the usual size" % rig.pitch)
+	rig.end_tilt()
+	rig.level_pitch()
+	_check(is_equal_approx(Net.camera_pitch, Client3D.CAMERA_PITCH), "a middle click saves the level pitch")
+	rig._ease_level(Client3D.LEVEL_SECONDS * 0.5)
+	_check(rig.pitch > Client3D.PITCH_MIN and rig.pitch < Client3D.CAMERA_PITCH, "and eases there (%s)" % rig.pitch)
+	rig._ease_level(Client3D.LEVEL_SECONDS * 0.5)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "level at %d ms (%s)" % [roundi(Client3D.LEVEL_SECONDS * 1000.0), rig.pitch])
+	_check(is_equal_approx(rig.yaw, yaw), "the yaw never moved (%s)" % rig.yaw)
+	_check(is_equal_approx(Net.saved_pitch("70", -1.0), 70.0) and is_equal_approx(Net.saved_pitch("120", -1.0), Client3D.PITCH_MAX)
+			and is_equal_approx(Net.saved_pitch("10", -1.0), Client3D.PITCH_MIN) and is_equal_approx(Net.saved_pitch("", 50.0), 50.0),
+			"a saved pitch loads held to 40..85; none keeps the default")
+	_free_rig(rig)
+	_free_rig(_rig_with_pitch(72.0))
+
+
+## A rig set up with a saved pitch: it must start there.
+func _rig_with_pitch(degrees: float) -> Client3D:
+	var rig := _rig(degrees)
+	_check(is_equal_approx(rig.pitch, degrees) and is_equal_approx(rig._camera.size, Client3D.size_for(degrees)),
+			"a saved pitch of %s is where a new view starts (%s)" % [degrees, rig.pitch])
+	Net.camera_pitch = Client3D.CAMERA_PITCH
+	return rig
 
 
 func _test_pitch_peek() -> void:
@@ -349,10 +406,18 @@ func _test_middle_drag_axis() -> void:
 	Net.controls = "click"
 	_main._begin_middle_drag(Vector2(500, 500))
 	_main._middle_drag(Vector2(300, 0))
-	_check(is_equal_approx(rig.yaw, yaw) and not rig._dragging, "click: sideways does nothing (%s)" % rig.yaw)
-	_main._middle_drag(Vector2(300, -150))
-	_check(rig.pitch > Client3D.CAMERA_PITCH and is_equal_approx(rig.yaw, yaw), "up and down tilts (%s), the yaw stays" % rig.pitch)
+	_check(is_equal_approx(rig.yaw, yaw) and not rig._dragging, "click: a sideways middle drag does nothing (%s)" % rig.yaw)
 	_main._end_middle_drag()
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(0, -150))
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig._peeking, "nor does an up and down one (%s)" % rig.pitch)
+	rig.tilt(1.0, 0.2)
+	_main._end_middle_drag()
+	_check(rig._level_t >= 1.0, "and a drag let go is no middle click: the tilt stays (%s)" % rig.pitch)
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(2, 1))
+	_main._end_middle_drag()
+	_check(rig._level_t < 1.0, "a middle click (a few px at most) levels the pitch")
 	Net.controls = saved
 	_free_rig(rig)
 
@@ -376,11 +441,25 @@ func _test_schemes_are_inert_outside() -> void:
 	_check(is_equal_approx(rig._yaw_step, step), "wasd: Q does nothing")
 	Net.controls = "click"
 	_main._unhandled_input(_key(KEY_Q))
-	_check(is_equal_approx(rig._yaw_step, step - 90.0), "click: Q turns to the next diamond, 90 degrees round")
+	_main._unhandled_input(_key(KEY_E))
+	_check(is_equal_approx(rig._yaw_step, step), "click: Q and E do nothing either")
 	_main._unhandled_input(_middle(true))
-	_check(rig._peeking and not rig._dragging, "click: the middle button is a pitch peek, never a turn")
+	_check(not rig._peeking and not rig._dragging, "click: the middle button neither peeks nor turns")
 	_main._unhandled_input(_middle(false))
-	_check(not rig._peeking, "and let go, the peek ends")
+	Net.test_walk = [{"keys": "wd", "seconds": 5.0}] as Array[Dictionary]
+	_main._walk_index = -1
+	var pitch := rig.pitch
+	var yaw := rig.yaw
+	_main._drive_camera_keys(0.1)
+	_check(rig.pitch > pitch and rig.yaw > yaw, "click: W tilts and D turns the camera")
+	Net.controls = "wasd"
+	pitch = rig.pitch
+	yaw = rig.yaw
+	_main._drive_camera_keys(0.1)
+	_check(is_equal_approx(rig.pitch, pitch) and is_equal_approx(rig.yaw, yaw), "wasd: they leave the camera alone")
+	Net.test_walk = [] as Array[Dictionary]
+	Net.controls = "click"
+	_main._drive_camera_keys(0.1)
 	Net.controls = "wasd"
 	_main._unhandled_input(_middle(true))
 	_main._middle_drag(Vector2(20, 0))
@@ -424,8 +503,9 @@ func _test_click_uses_the_frame_pick() -> void:
 
 ## A 3D view on the room, hung on Main as its own would be, for the camera
 ## and the scheme tests.
-func _rig() -> Client3D:
+func _rig(saved_pitch := Client3D.CAMERA_PITCH) -> Client3D:
 	var rig: Client3D = preload("res://client3d/client3d.tscn").instantiate()
+	Net.camera_pitch = saved_pitch
 	_main.add_child(rig)
 	rig.setup(_main._terrain)
 	rig.set_process(false)

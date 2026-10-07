@@ -816,27 +816,38 @@ message itself (`Client3D.say`, from Main) and shows for
 
 **Camera**: `Camera3D` orthographic, `CAMERA_SIZE` 12 units tall (a
 1.5-unit character, foreshortened by cos 50°, is a twelfth of the
-height), pitched `CAMERA_PITCH` 50° from horizontal, on the +x +z side at
+height), pitched `CAMERA_PITCH` 50° from horizontal by default, on the +x +z side at
 yaw 0 so grid +x runs down-right and +y down-left as in the 2D diamond,
 following the local player. **Orbit**: the camera rests only on the four
 diamond views, yaw 0 (the 2D diamond) and each `ORBIT_STEP` (90°) from
-it (`Client3D.nearest_diamond`; half way between two, the higher). Q/E
-step from one diamond to the next about the player in one ease in and out
-over `ORBIT_SECONDS` (400 ms), through the axis-aligned view half way
-without stopping; that is the click scheme's way to turn it. A vertical
-middle drag, in either scheme, is a **pitch peek**: the camera tilts from
-its resting `CAMERA_PITCH` (50°) toward `PEEK_PITCH` (85°, near
-top-down) in proportion to the drag either way, all of it over
-`PEEK_DRAG_PX` (300 px), eased in and out (smoothstep), and pulls back to
-`PEEK_PULL_BACK` (1.2) times its ortho size so more shows round the
-player; let go, pitch and size spring back over `PEEK_RETURN_SECONDS`
-(250 ms). A peek never changes the yaw and saves nothing. The near/far
+it (`Client3D.nearest_diamond`; half way between two, the higher).
+**Tilt**: the pitch rests at `rest_pitch`, between `PITCH_MIN` (40°) and
+`PITCH_MAX` (85°, near top-down), saved as `camera_pitch` in
+`settings.cfg` (`Net.camera_pitch`, held to that range on load,
+`Net.saved_pitch`). The ortho size follows the tilt (`size_for`):
+`CAMERA_SIZE` up to 50°, growing to `PEEK_PULL_BACK` (1.2) times it at
+85°, so a steeper view also shows more round the player. The near/far
 wall rule reads only the yaw, so the same near walls stay see-through
-through the tilt. In the click scheme every middle drag is a pitch peek;
-a sideways one does nothing. In WASD a middle drag is a turn or a pitch
-peek by whichever axis it first moves `Main.DRAG_AXIS_PX` (6 px) on, and
-stays that until let go. F3 shows the yaw and the pitch. In the WASD
-scheme Q/E do nothing and a sideways middle drag turns it instead: the yaw
+through any tilt. F3 shows the yaw and the pitch.
+
+*Click scheme camera, on the keys* (`Main._drive_camera_keys`, before the
+pick): W/S tilt the resting pitch while held at `TILT_RATE` (60°/s),
+slowing over the last `TILT_EASE_DEGREES` (8°) into either end, and it
+stays where it is left (saved on release); A/D turn the yaw while held at
+`TURN_RATE` (90°/s), through any angle, and let go it settles on the
+nearest diamond over `SETTLE_SECONDS` (250 ms; saved). A middle click (the
+button let go having moved less than `Main.DRAG_AXIS_PX`) levels the pitch
+to 50° over `LEVEL_SECONDS` (250 ms; saved); a middle drag does nothing.
+Q/E are unbound.
+
+*WASD scheme camera, on the middle button*: a drag is a turn or a **pitch
+peek** by whichever axis it first moves `Main.DRAG_AXIS_PX` (6 px) on, and
+stays that until let go. The pitch peek tilts from the resting pitch
+toward `PEEK_PITCH` (85°) in proportion to the drag either way, all of
+it over `PEEK_DRAG_PX` (300 px), eased in and out (smoothstep), the size
+following; let go, it springs back to the resting pitch over
+`PEEK_RETURN_SECONDS` (250 ms), never changing the yaw and saving
+nothing. Q/E do nothing, and the sideways drag turns the camera: the yaw
 follows the horizontal drag (`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the
 button is held, through any angle, and let go it settles on the nearest
 diamond, eased out over `SETTLE_SECONDS` (250 ms).
@@ -870,7 +881,7 @@ screenshots.
 
 **Azimuth.** The 2D projection still takes an azimuth (`Iso.azimuth`),
 but nothing turns it any more: the middle-button peek is gone; the 3D
-camera turns by Q/E (click) or a middle drag (WASD). `--test-azimuth=<deg>` starts
+camera turns by A/D (click) or a middle drag (WASD). `--test-azimuth=<deg>` starts
 with the view turned, for screenshots. F3 shows the angle.
 
 Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
@@ -911,10 +922,10 @@ orders, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
-verbs land on the clicked target; Q/E turn the 3D camera a step, a
-middle drag up or down tilts it for a look (the pitch peek; see the 3D
-view). WASD do nothing; the camera follows
-the player alone.
+verbs land on the clicked target. In 3D, W/S tilt the camera (it stays
+where you leave it), A/D turn it (settling on a diamond), and a middle
+click levels it; Q/E and middle drags do nothing (see the 3D view). The
+camera follows the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;
 key combinations give eight directions (`Main.wasd_direction`; at yaw 0,

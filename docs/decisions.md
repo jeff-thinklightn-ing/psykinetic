@@ -488,3 +488,14 @@ turn). In WASD a middle drag locks to the axis it first moves on: across
 is the turn, up and down the pitch peek, so one gesture never does both.
 The pitch is the camera's alone; picking, the near/far wall rule and the
 WASD directions read the yaw, so none of them changes during a tilt.
+
+## 57. The click scheme's camera is on the keys
+
+The click scheme leaves WASD free, so they drive its camera: W/S tilt
+(sticky, saved), A/D turn (settling on a diamond), and a middle click
+levels the tilt. Q/E and middle drags are unbound there. This replaces
+the click-scheme part of 56 (its middle-drag pitch peek) and 49's Q/E
+step. The resting pitch is now a setting, 40-85°, saved with the yaw, and
+the ortho size follows it; the WASD scheme's pitch peek springs back to
+that resting pitch. The WASD scheme is otherwise unchanged: its keys
+walk, and the middle button turns and peeks.

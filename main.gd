@@ -226,11 +226,15 @@ var _lead := Vector2.ZERO
 ## click this frame uses it, so the two always agree.
 var _pick_grid := Vector2(NAN, NAN)
 ## 3D: the screen point a middle drag went down at (x NAN when none), and
-## what it is: UNDECIDED until it has moved, then TURN (WASD, horizontal)
-## or PITCH (a vertical drag; in the click scheme, every drag).
-enum Drag { UNDECIDED, TURN, PITCH }
+## what it is: UNDECIDED until it has moved (let go so, in the click
+## scheme, a middle click), then TURN or PITCH (WASD) or MOVED (click: a
+## drag, which does nothing).
+enum Drag { UNDECIDED, TURN, PITCH, MOVED }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
+## Click scheme, 3D: W/S or A/D were held last frame (their release saves).
+var _tilting := false
+var _turning := false
 ## WASD: when the facing and the last bump were sent, in msec.
 var _face_sent_at := 0
 var _bump_sent_at := 0
@@ -342,6 +346,7 @@ func _go_online() -> void:
 func _process(delta: float) -> void:
 	_follow_player(delta)
 	_drag_yaw()
+	_drive_camera_keys(delta)
 	_update_pick()
 	_test_hover()
 	_drive_wasd()
@@ -380,11 +385,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(me, "reset", {})
 		elif Net.is_authority():
 			_start_level()
-		return
-	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E]:
-		# Click scheme only; in WASD the middle drag turns the camera.
-		if _client3d != null and Net.controls == "click":
-			_client3d.orbit(-1 if key.keycode == KEY_Q else 1)
 		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var local := _local_player()
@@ -518,21 +518,24 @@ func _drag_yaw() -> void:
 	_middle_drag(Vector2(DisplayServer.mouse_get_position()) - _drag_from)
 
 
-## The middle button went down at [param at] (screen px). In the click
-## scheme it is a pitch peek from the start: a horizontal drag does
-## nothing. In WASD it waits to see which way it moves.
+## The middle button went down at [param at] (screen px). What it is
+## waits on which way, if any, it moves.
 func _begin_middle_drag(at: Vector2) -> void:
 	_drag_from = at
 	_drag = Drag.UNDECIDED
-	if Net.controls == "click":
-		_drag = Drag.PITCH
-		_client3d.begin_pitch_peek()
 
 
-## The drag is [param offset] (screen px) from where it went down.
+## The drag is [param offset] (screen px) from where it went down. In the
+## click scheme a drag does nothing (it is then no middle click); in WASD
+## it is a turn or a pitch peek by the axis it first moves on.
 func _middle_drag(offset: Vector2) -> void:
+	if _drag == Drag.MOVED:
+		return
 	if _drag == Drag.UNDECIDED:
 		if absf(offset.x) < DRAG_AXIS_PX and absf(offset.y) < DRAG_AXIS_PX:
+			return
+		if Net.controls == "click":
+			_drag = Drag.MOVED
 			return
 		if absf(offset.x) >= absf(offset.y):
 			_drag = Drag.TURN
@@ -553,7 +556,34 @@ func _end_middle_drag() -> void:
 			_client3d.end_drag()
 		Drag.PITCH:
 			_client3d.end_pitch_peek()
+		Drag.UNDECIDED:
+			# Let go without moving: in the click scheme, a middle click.
+			if Net.controls == "click":
+				_client3d.level_pitch()
 	_drag = Drag.UNDECIDED
+
+
+## Click scheme, 3D: W/S tilt and A/D turn the camera while held; letting
+## go keeps the tilt and settles the turn on a diamond, both saved. The
+## keys do nothing else in this scheme (and nothing at all in 2D).
+func _drive_camera_keys(delta: float) -> void:
+	if _client3d == null or Net.controls != "click":
+		return
+	var keys := _held_key_names()
+	var tilt := float("w" in keys) - float("s" in keys)
+	var turn := float("d" in keys) - float("a" in keys)
+	if tilt != 0.0:
+		_client3d.tilt(tilt, delta)
+		_tilting = true
+	elif _tilting:
+		_tilting = false
+		_client3d.end_tilt()
+	if turn != 0.0:
+		_client3d.turn(turn, delta)
+		_turning = true
+	elif _turning:
+		_turning = false
+		_client3d.end_turn()
 
 
 func _view_yaw() -> float:
@@ -1562,7 +1592,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   Q/E turn   MMB drag up/down look"
+			hints += "   W/S tilt   A/D turn   MMB click level"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]

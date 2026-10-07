@@ -31,7 +31,8 @@ extends Node
 ## entities are drawn. player_id is a UUID made on first run; the server remembers each
 ## player by it. A host run from the project uses a fixed dev id.
 ## window_width=, window_height= and window_mode= (windowed, fullscreen)
-## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
+## are the window as it was last left; F11 toggles fullscreen. camera_pitch=
+## is the 3D view's resting tilt. camera_yaw=
 ## is the 3D view's orbit step as last left. renderer=2d picks the 2D view;
 ## anything else, or no line, is the 3D one. It is read whatever the mode,
 ## and kept as written when the file is rewritten. controls=wasd is WASD
@@ -159,6 +160,9 @@ var fullscreen := false
 ## The 3D camera's resting yaw in degrees, a diamond view (a multiple of
 ## Client3D.ORBIT_STEP), kept with the window settings.
 var camera_yaw := 0.0
+## The 3D camera's resting tilt in degrees (click scheme W/S), kept with
+## the yaw.
+var camera_pitch := Client3D.CAMERA_PITCH
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -322,6 +326,7 @@ func _apply_window_settings() -> void:
 			window_size = Vector2i(width.to_int(), height.to_int())
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
 		camera_yaw = saved_yaw(str(settings.get("camera_yaw", "")), camera_yaw)
+		camera_pitch = saved_pitch(str(settings.get("camera_pitch", "")), camera_pitch)
 	if _test_yaw_given:
 		camera_yaw = test_yaw
 	var window := get_window()
@@ -340,6 +345,14 @@ static func saved_yaw(text: String, otherwise: float) -> float:
 	if not text.strip_edges().is_valid_float():
 		return otherwise
 	return Client3D.nearest_diamond(text.to_float())
+
+
+## camera_pitch= as read from the settings file, held to the tilt keys'
+## range. [param otherwise] for a missing or bad value.
+static func saved_pitch(text: String, otherwise: float) -> float:
+	if not text.strip_edges().is_valid_float():
+		return otherwise
+	return clampf(text.to_float(), Client3D.PITCH_MIN, Client3D.PITCH_MAX)
 
 
 ## F11: borderless fullscreen at the monitor's native size, or back to the
@@ -409,9 +422,9 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
 	file.store_string(("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n"
-			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\n") % [
+			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\ncamera_pitch=%.1f\n") % [
 		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks,
-		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw)])
+		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw), camera_pitch])
 	if _settings_renderer != "":
 		file.store_string("renderer=%s\n" % _settings_renderer)
 	if _settings_controls != "":

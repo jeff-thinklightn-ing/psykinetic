@@ -3,6 +3,22 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.34
+
+Click scheme camera on WASD. Client (the server only for the version).
+
+- **W/S** tilt the 3D camera while held, between 40° and 85° (near
+  top-down), slowing into either end. It stays where you leave it and is
+  saved; the camera pulls back a little as it tilts up.
+- **A/D** turn the camera while held; let go and it eases onto the
+  nearest diagonal view over 250 ms (the saved view is always one of
+  those).
+- **A middle click** levels the tilt back to 50°.
+- Q/E and middle-button drags do nothing in the click scheme now.
+- The WASD scheme is unchanged.
+
+The server must be updated to v0.1.34 too, as it refuses any other version.
+
 ## v0.1.33
 
 Pitch peek. Client (the server only for the version).
