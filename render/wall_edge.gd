@@ -7,12 +7,16 @@ extends Node2D
 ## edge's -x / -y side, a hair nearer the camera, so it is in front of what
 ## stands on that cell and behind the next.
 ##
-## Height. For every walkable cell, a wall on its south or east edge is a
-## stub a third of a tile tall; a wall on its north or west edge is full
-## height. A wall between two walkable cells is the south/east edge of one
-## of them, so a stub. Void cells have no say. An edge is the east or south
-## edge of its -x / -y cell, so the test is simply whether that cell is
-## walkable (is_stub). A drawing rule only: the sim knows nothing of it.
+## Height. A wall that would hide floor is a stub a third of a tile tall;
+## one that hides nothing stands full height. A full wall hides the cells
+## straight behind it (toward -x for an east edge, -y for a south edge) for
+## as many cells as it has rows of height, LOOK_BEHIND, so: stub if any of
+## those cells is walkable, full if they are all void or off the map. For a
+## wall with floor directly behind it this is "a wall on a walkable cell's
+## south or east edge is a stub"; walls on the far side of a one-cell void
+## strip, where a thick wall used to be, are stubs too, since the floor
+## beyond is in their shadow. A drawing rule only: the sim knows nothing of
+## it.
 ##
 ## Joins, from the walls meeting at each end (doors count as nothing):
 ## straight on, the strip simply continues; at an L the two strips miter
@@ -27,6 +31,9 @@ const END_FACE := Color(0.31, 0.325, 0.4)
 const TOP := Color(0.6, 0.625, 0.72)
 const STRIP := 4.0
 const STUB_FRACTION := 1.0 / 3.0
+## Cells straight behind a wall that a full-height one would hide: one per
+## row of its height (a cell further back is half a tile height up on screen).
+const LOOK_BEHIND := int(Iso.HEIGHTS["wall"] * 2)
 
 enum Join { STRAIGHT, MITER, BUTT, TRIM, FREE }
 
@@ -76,7 +83,13 @@ static func full_height() -> float:
 
 ## The stub rule. [param floor_at] says whether a cell is walkable.
 static func is_stub(edge: Vector3i, floor_at: Callable) -> bool:
-	return floor_at.call(Vector2i(edge.x, edge.y))
+	var behind := Vector2i(-1, 0) if edge.z == Terrain.EAST else Vector2i(0, -1)
+	var cell := Vector2i(edge.x, edge.y)
+	for i in LOOK_BEHIND:
+		if floor_at.call(cell):
+			return true
+		cell += behind
+	return false
 
 
 static func height_for(stub: bool) -> float:

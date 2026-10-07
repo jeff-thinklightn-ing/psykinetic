@@ -3,7 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
-## v0.1.14
+## v0.1.15
+
+Low walls wherever floor is behind them. Client only.
+
+- A wall is a stub whenever a full-height one would hide floor: any
+  walkable cell straight behind it within six cells counts, void cells
+  between skipped. The walls on the near side of the old thick wall rows,
+  which stood full and hid the room behind them, are stubs now. Only walls
+  with nothing behind them stand full.
+
 
 - stub rule: south/east edges of walkable cells are stubs
 

@@ -190,14 +190,19 @@ func _test_door_breaks() -> void:
 
 func _test_stub_rule() -> void:
 	print("
-== drawing: a wall on a walkable cell's south or east edge is a stub, on its north or west edge full height ==")
-	# One floor cell at (1, 1) in a void, and a second at (2, 1) beside it.
-	var floor_at := func(cell: Vector2i) -> bool: return cell == Vector2i(1, 1) or cell == Vector2i(2, 1)
-	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.SOUTH), floor_at), "its south edge: stub")
-	_check(WallEdge.is_stub(Vector3i(2, 1, Terrain.EAST), floor_at), "the east edge of the cell beside it: stub")
-	_check(not WallEdge.is_stub(Vector3i(1, 0, Terrain.SOUTH), floor_at), "its north edge (the south edge of the void above): full height")
-	_check(not WallEdge.is_stub(Vector3i(0, 1, Terrain.EAST), floor_at), "its west edge (the east edge of the void beside): full height")
-	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.EAST), floor_at), "a wall between the two walkable cells: stub, the east edge of the first")
+== drawing: a wall with floor in its shadow is a stub; one with nothing behind it is full height ==")
+	# Floor at (1, 1) and (2, 1) in a void, and a lone cell at (1, 3): a
+	# one-cell void strip (row 2) lies between it and the first.
+	var floor_at := func(cell: Vector2i) -> bool: return cell in [Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 3)]
+	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.SOUTH), floor_at), "a walkable cell's south edge: stub")
+	_check(WallEdge.is_stub(Vector3i(2, 1, Terrain.EAST), floor_at), "a walkable cell's east edge: stub")
+	_check(not WallEdge.is_stub(Vector3i(1, 0, Terrain.SOUTH), floor_at), "its north edge, nothing behind: full height")
+	_check(not WallEdge.is_stub(Vector3i(0, 1, Terrain.EAST), floor_at), "its west edge, nothing behind: full height")
+	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.EAST), floor_at), "a wall between two walkable cells: stub")
+	_check(WallEdge.is_stub(Vector3i(1, 2, Terrain.SOUTH), floor_at), "the near face of a one-cell void strip, floor beyond it: stub")
+	_check(not WallEdge.is_stub(Vector3i(0, 3, Terrain.EAST), floor_at), "the lone cell's west edge, void all the way back: full height")
+	_check(WallEdge.is_stub(Vector3i(1, 7, Terrain.SOUTH), floor_at), "a wall with floor 5 cells behind it, still in its shadow: stub")
+	_check(not WallEdge.is_stub(Vector3i(1, 9, Terrain.SOUTH), floor_at), "a wall %d or more cells past the last floor: full height" % WallEdge.LOOK_BEHIND)
 	_check(WallEdge.height_for(true) < WallEdge.height_for(false) and WallEdge.height_for(false) == Iso.height_px("wall"),
 			"a stub is lower than full height, which is the scale table's wall")
 

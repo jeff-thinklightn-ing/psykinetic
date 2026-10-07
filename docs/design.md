@@ -567,13 +567,18 @@ is in front of what stands on that cell and behind the next. Outside the
 map is near-black (`Main.VOID`), so walls along the void stand apart from
 it.
 
-*Height.* For every walkable cell, a wall on its south or east edge is a
-stub a third of a tile tall; a wall on its north or west edge is full
-height (3 tile heights). A wall between two walkable cells is the
-south/east edge of one of them, so a stub. Void cells have no say. Since an
-edge is the east or south edge of its -x / -y cell, `WallEdge.is_stub` is
-just "is that cell walkable" (pinned in `tests/edge_test.gd`). Corners
-choose per edge. A drawing rule only: the sim knows nothing of it. A full-height exterior
+*Height.* A wall that would hide floor is a stub a third of a tile tall;
+one that hides nothing stands full height (3 tile heights). A full wall
+hides the cells straight behind it (toward -x for an east edge, -y for a
+south edge) for as many cells as it has rows of height
+(`WallEdge.LOOK_BEHIND`, 6): `WallEdge.is_stub` is "is any of those cells
+walkable", void cells skipped. With floor directly behind, that is "a wall
+on a walkable cell's south or east edge is a stub"; the walls on the far
+side of the one-cell void strips that replaced the old thick wall rows are
+stubs too, since the floor beyond is in their shadow; the map's outer
+walls, with nothing behind them, stand full. Pinned in
+`tests/edge_test.gd`. Corners choose per edge. A drawing rule only: the
+sim knows nothing of it. A full-height exterior
 wall still hides floor beyond it that is further from the camera — the
 north wall of a corridor hides a parallel corridor behind it — as it would
 in any fixed-angle view.
