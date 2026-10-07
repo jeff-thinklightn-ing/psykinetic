@@ -477,3 +477,14 @@ diamond when let go, nothing saved. Q/E remain the only way to change the
 resting view there. The WASD scheme's middle drag is unchanged: a short
 one already falls back to its diamond. This amends 49, which had the
 middle button inert in the click scheme.
+
+## 56. The peek is a pitch peek
+
+This replaces 55. A vertical middle drag tilts the camera toward top-down
+and pulls it back a little, for a look round, and springs back when let
+go; it never touches the yaw and saves nothing. The click scheme has only
+this on the middle button (the horizontal peek is gone: Q/E are its only
+turn). In WASD a middle drag locks to the axis it first moves on: across
+is the turn, up and down the pitch peek, so one gesture never does both.
+The pitch is the camera's alone; picking, the near/far wall rule and the
+WASD directions read the yaw, so none of them changes during a tilt.

@@ -32,7 +32,7 @@ extends Node3D
 ## Speech comes from the speech message (say) and shows for
 ## SPEECH_SECONDS.
 ##
-## Camera: orthographic, tilted CAMERA_PITCH from horizontal, yawed by
+## Camera: orthographic, tilted `pitch` (CAMERA_PITCH at rest) from horizontal, yawed by
 ## `yaw` about the local player: 0 matches the 2D diamond (+x down-right,
 ## +y down-left). It rests only on the four diamond views: yaw 0 and each
 ## ORBIT_STEP (90°) from it. In the click scheme Q/E step from one diamond
@@ -40,9 +40,13 @@ extends Node3D
 ## between without stopping; in the WASD scheme a middle drag turns it
 ## freely and, let go, it settles on the nearest diamond over
 ## SETTLE_SECONDS. The diamond persists in settings.cfg (Net.camera_yaw).
-## In the click scheme a middle drag peeks: up to PEEK_LIMIT either side of
-## the diamond, and let go it springs back to that same diamond over
-## PEEK_RETURN_SECONDS, nothing saved.
+## A vertical middle drag is a pitch peek, in either scheme: the camera
+## tilts from CAMERA_PITCH toward PEEK_PITCH (near top-down) in proportion
+## to the drag, full over PEEK_DRAG_PX, eased, and pulls back to
+## PEEK_PULL_BACK times its size; let go it springs back over
+## PEEK_RETURN_SECONDS. A peek never touches the yaw, and nothing is saved.
+## The near/far rule reads only the yaw, so the near walls stay see-through
+## through the tilt.
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
@@ -83,10 +87,12 @@ const ORBIT_STEP := 90.0
 const ORBIT_SECONDS := 0.4
 ## A middle drag let go: on to the nearest diamond, eased out.
 const SETTLE_SECONDS := 0.25
-## Click scheme, a peek: how far either side of the diamond, and the spring
-## back when let go.
-const PEEK_LIMIT := 45.0
-const PEEK_RETURN_SECONDS := 0.2
+## The pitch peek: the tilt it goes to, the drag for all of it (screen
+## px), how far it pulls back (ortho size), and the spring back.
+const PEEK_PITCH := 85.0
+const PEEK_DRAG_PX := 300.0
+const PEEK_PULL_BACK := 1.2
+const PEEK_RETURN_SECONDS := 0.25
 const PLAYER_LIGHT_RANGE := 6.0
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
@@ -170,10 +176,15 @@ var _drag_offset := 0.0
 var _settle_pending := false
 ## Held still by Main while a movement key is down.
 var frozen := false
-## Click scheme: a peek is held (a middle drag off the resting diamond),
-## this far off it.
+## The camera's tilt from horizontal now, in degrees: CAMERA_PITCH but
+## during a pitch peek.
+var pitch := CAMERA_PITCH
+## The pitch peek: held, how far in (0 at rest .. 1 full), and the spring
+## back's start and progress (1: not springing).
 var _peeking := false
-var _peek_offset := 0.0
+var _peek := 0.0
+var _peek_from := 0.0
+var _peek_t := 1.0
 ## WASD: the camera's lean toward the cursor, in grid units (Main.camera_lean).
 var _lead := Vector2.ZERO
 var _room: Node3D
@@ -224,6 +235,7 @@ func _process(delta: float) -> void:
 	_sync_puppets()
 	_sync_doors()
 	_ease_yaw(delta)
+	_ease_peek(delta)
 	_follow(delta)
 
 
@@ -263,13 +275,13 @@ func _build_camera() -> void:
 	_camera.current = true
 
 
-## The camera's offset from its target: CAMERA_PITCH above the ground on
-## the +x +z side (grid +x toward the viewer down-right, +y down-left, as
-## in the 2D view), turned about the vertical by the yaw.
+## The camera's offset from its target: `pitch` above the ground on the
+## +x +z side (grid +x toward the viewer down-right, +y down-left, as in
+## the 2D view), turned about the vertical by the yaw.
 func _camera_offset() -> Vector3:
-	var pitch := deg_to_rad(CAMERA_PITCH)
-	var horizontal := CAMERA_DISTANCE * cos(pitch)
-	var offset := Vector3(horizontal / sqrt(2.0), CAMERA_DISTANCE * sin(pitch), horizontal / sqrt(2.0))
+	var tilt := deg_to_rad(pitch)
+	var horizontal := CAMERA_DISTANCE * cos(tilt)
+	var offset := Vector3(horizontal / sqrt(2.0), CAMERA_DISTANCE * sin(tilt), horizontal / sqrt(2.0))
 	return offset.rotated(Vector3.UP, deg_to_rad(yaw))
 
 
@@ -304,37 +316,48 @@ func _local_player() -> Player:
 ## kept in the settings file.
 func orbit(direction: int) -> void:
 	_settle_on(_yaw_step + ORBIT_STEP * signf(direction), ORBIT_SECONDS, true)
-	if _peeking:
-		_ease_to += _peek_offset  # The peek held on rides on the new diamond.
 
 
-## Click: the middle button went down; the drag peeks off the diamond the
-## camera rests on (or is easing to).
-func begin_peek() -> void:
+## The middle button went down on a vertical drag: a pitch peek from
+## wherever the camera is now (a spring back under way stops there).
+func begin_pitch_peek() -> void:
 	_peeking = true
-	_peek_offset = 0.0
+	_peek_t = 1.0
 
 
-## Click: the peek is [param degrees] of drag, held to PEEK_LIMIT either
-## side of the diamond. During a Q/E ease, it is where that ease is going.
-func peek(degrees: float) -> void:
-	if not _peeking:
-		return
-	_peek_offset = clampf(degrees, -PEEK_LIMIT, PEEK_LIMIT)
-	var target := _yaw_step + _peek_offset
-	if _ease_t < 1.0:
-		_ease_to = target
-	else:
-		_set_yaw(target)
+## The peek is [param pixels] of vertical drag, either way: that share of
+## PEEK_DRAG_PX of the full tilt and pull back.
+func pitch_peek(pixels: float) -> void:
+	if _peeking:
+		_set_peek(clampf(absf(pixels) / PEEK_DRAG_PX, 0.0, 1.0))
 
 
-## Click: the middle button came up: back to the same diamond. The saved
-## yaw never moved.
-func end_peek() -> void:
+## The middle button came up: back to the resting pitch and size over
+## PEEK_RETURN_SECONDS.
+func end_pitch_peek() -> void:
 	if not _peeking:
 		return
 	_peeking = false
-	_ease_toward(_yaw_step, PEEK_RETURN_SECONDS, false)
+	_peek_from = _peek
+	_peek_t = 0.0
+
+
+## The spring back, a sine out.
+func _ease_peek(delta: float) -> void:
+	if _peek_t >= 1.0:
+		return
+	_peek_t = minf(_peek_t + delta / PEEK_RETURN_SECONDS, 1.0)
+	_set_peek(lerpf(_peek_from, 0.0, sin(_peek_t * PI * 0.5)))
+
+
+## How far in the peek is, 0..1: the pitch and size it gives, eased in
+## and out (smoothstep), so the tilt starts and ends gently.
+func _set_peek(amount: float) -> void:
+	_peek = amount
+	var eased := smoothstep(0.0, 1.0, amount)
+	pitch = lerpf(CAMERA_PITCH, PEEK_PITCH, eased)
+	_camera.size = CAMERA_SIZE * lerpf(1.0, PEEK_PULL_BACK, eased)
+	_place_camera()
 
 
 ## WASD: the middle button went down; the drag turns from the yaw now.

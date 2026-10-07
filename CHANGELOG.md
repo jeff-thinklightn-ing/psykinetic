@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.33
+
+Pitch peek. Client (the server only for the version).
+
+- Hold the middle button and drag up or down to tilt the 3D camera from
+  its usual 50° toward top-down (85°), further the further you drag (all
+  of it over 300 px), while it pulls back a little to show more round you.
+  Let go and it springs back over 250 ms. The camera's turn never changes.
+- The click scheme's sideways middle-drag peek is gone; Q/E still turn.
+- In the WASD scheme a middle drag turns the camera if it first moves
+  sideways and tilts it if it first moves up or down.
+- Near walls stay see-through while tilted. F3 shows the pitch.
+
+The server must be updated to v0.1.33 too, as it refuses any other version.
+
 ## v0.1.32
 
 Peek in the click scheme. Client (the server only for the version).

@@ -823,14 +823,21 @@ diamond views, yaw 0 (the 2D diamond) and each `ORBIT_STEP` (90°) from
 it (`Client3D.nearest_diamond`; half way between two, the higher). Q/E
 step from one diamond to the next about the player in one ease in and out
 over `ORBIT_SECONDS` (400 ms), through the axis-aligned view half way
-without stopping; that is the click scheme's way to turn it. The click
-scheme's middle drag is a **peek**: the yaw follows the drag up to
-`PEEK_LIMIT` (45°) either side of the diamond the camera rests on, and let
-go it springs back to that same diamond over `PEEK_RETURN_SECONDS`
-(200 ms); the resting and saved yaw never move. Q/E still step during a
-peek, which then rides on the new diamond. In the WASD
-scheme Q/E do nothing and a middle drag turns it instead: the yaw follows
-the horizontal drag (`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the
+without stopping; that is the click scheme's way to turn it. A vertical
+middle drag, in either scheme, is a **pitch peek**: the camera tilts from
+its resting `CAMERA_PITCH` (50°) toward `PEEK_PITCH` (85°, near
+top-down) in proportion to the drag either way, all of it over
+`PEEK_DRAG_PX` (300 px), eased in and out (smoothstep), and pulls back to
+`PEEK_PULL_BACK` (1.2) times its ortho size so more shows round the
+player; let go, pitch and size spring back over `PEEK_RETURN_SECONDS`
+(250 ms). A peek never changes the yaw and saves nothing. The near/far
+wall rule reads only the yaw, so the same near walls stay see-through
+through the tilt. In the click scheme every middle drag is a pitch peek;
+a sideways one does nothing. In WASD a middle drag is a turn or a pitch
+peek by whichever axis it first moves `Main.DRAG_AXIS_PX` (6 px) on, and
+stays that until let go. F3 shows the yaw and the pitch. In the WASD
+scheme Q/E do nothing and a sideways middle drag turns it instead: the yaw
+follows the horizontal drag (`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the
 button is held, through any angle, and let go it settles on the nearest
 diamond, eased out over `SETTLE_SECONDS` (250 ms).
 While any movement key is held the yaw is frozen (`Client3D.frozen`, set
@@ -905,7 +912,8 @@ orders, R, F3 and F11 as ever.
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
 verbs land on the clicked target; Q/E turn the 3D camera a step, a
-middle drag peeks (see the 3D view). WASD do nothing; the camera follows
+middle drag up or down tilts it for a look (the pitch peek; see the 3D
+view). WASD do nothing; the camera follows
 the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;
@@ -924,8 +932,8 @@ way: whoever stands next to the player that way, or a swing at air
 (`World.command("swing")` -> `World.order_swing` -> `try_swing`: the
 attack's cooldown, facing and lunge, nothing hit). A right click grabs
 whoever stands next to the player the cursor's way; a drag from it
-tosses, as ever. A middle drag turns the 3D camera (see the 3D view); Q/E
-do nothing. The camera leans toward the cursor.
+tosses, as ever. A sideways middle drag turns the 3D camera, an up or down
+one tilts it for a look (see the 3D view); Q/E do nothing. The camera leans toward the cursor.
 
 **One pick a frame.** Main processes after every other node
 (`process_priority`), so by then the entities are placed and the 3D

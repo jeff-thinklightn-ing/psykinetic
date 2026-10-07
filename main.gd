@@ -22,8 +22,11 @@ const NEAR_WALL_ALPHA := 0.3
 const CAMERA_LEAN_DEADZONE := 0.15
 const CAMERA_LEAN_CELLS := 3.0
 const CAMERA_LEAN_EASE := 0.1
-## WASD, 3D: degrees of yaw per screen pixel of middle drag.
+## WASD, 3D: degrees of yaw per screen pixel of horizontal middle drag.
 const DRAG_DEGREES_PER_PX := 0.25
+## 3D, WASD: a middle drag is a turn or a pitch peek by whichever axis it
+## first moves this far on, and stays that for the rest of the drag.
+const DRAG_AXIS_PX := 6.0
 ## WASD: the facing sent for a player standing still changes at most this
 ## often (seconds).
 const FACE_SEND_INTERVAL := 0.15
@@ -222,10 +225,12 @@ var _lead := Vector2.ZERO
 ## camera has moved (see _update_pick): the hover shows it and every
 ## click this frame uses it, so the two always agree.
 var _pick_grid := Vector2(NAN, NAN)
-## 3D: the screen x a middle drag went down at, or NAN, and whether it is
-## the click scheme's peek or the WASD scheme's turn.
-var _drag_from := NAN
-var _drag_peeks := false
+## 3D: the screen point a middle drag went down at (x NAN when none), and
+## what it is: UNDECIDED until it has moved, then TURN (WASD, horizontal)
+## or PITCH (a vertical drag; in the click scheme, every drag).
+enum Drag { UNDECIDED, TURN, PITCH }
+var _drag_from := Vector2(NAN, NAN)
+var _drag := Drag.UNDECIDED
 ## WASD: when the facing and the last bump were sent, in msec.
 var _face_sent_at := 0
 var _bump_sent_at := 0
@@ -390,17 +395,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if click == null:
 		return
 	if click.button_index == MOUSE_BUTTON_MIDDLE:
-		# 3D only. Click scheme: drag to peek, released back to the diamond.
-		# WASD: drag to turn, released to the nearest diamond.
+		# 3D only: a pitch peek, or in WASD a horizontal drag turns.
 		if _client3d != null:
 			if click.pressed:
-				_drag_from = DisplayServer.mouse_get_position().x
-				_drag_peeks = Net.controls == "click"
-				if _drag_peeks:
-					_client3d.begin_peek()
-				else:
-					_client3d.begin_drag()
-			elif not is_nan(_drag_from):
+				_begin_middle_drag(Vector2(DisplayServer.mouse_get_position()))
+			elif not is_nan(_drag_from.x):
 				_end_middle_drag()
 		return
 	var player := _local_player()
@@ -507,28 +506,54 @@ static func key_vector(keys: String) -> Vector2:
 	return Vector2(float("d" in keys) - float("a" in keys), float("w" in keys) - float("s" in keys))
 
 
-## 3D: while the middle button is held the drag peeks (click) or turns
-## (WASD) the camera, and a missed release (the button let go outside the
-## window) ends it.
+## 3D: while the middle button is held the drag tilts or turns the
+## camera, and a missed release (the button let go outside the window)
+## ends it.
 func _drag_yaw() -> void:
-	if _client3d == null or is_nan(_drag_from):
+	if _client3d == null or is_nan(_drag_from.x):
 		return
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
 		_end_middle_drag()
 		return
-	var degrees := (DisplayServer.mouse_get_position().x - _drag_from) * DRAG_DEGREES_PER_PX
-	if _drag_peeks:
-		_client3d.peek(degrees)
+	_middle_drag(Vector2(DisplayServer.mouse_get_position()) - _drag_from)
+
+
+## The middle button went down at [param at] (screen px). In the click
+## scheme it is a pitch peek from the start: a horizontal drag does
+## nothing. In WASD it waits to see which way it moves.
+func _begin_middle_drag(at: Vector2) -> void:
+	_drag_from = at
+	_drag = Drag.UNDECIDED
+	if Net.controls == "click":
+		_drag = Drag.PITCH
+		_client3d.begin_pitch_peek()
+
+
+## The drag is [param offset] (screen px) from where it went down.
+func _middle_drag(offset: Vector2) -> void:
+	if _drag == Drag.UNDECIDED:
+		if absf(offset.x) < DRAG_AXIS_PX and absf(offset.y) < DRAG_AXIS_PX:
+			return
+		if absf(offset.x) >= absf(offset.y):
+			_drag = Drag.TURN
+			_client3d.begin_drag()
+		else:
+			_drag = Drag.PITCH
+			_client3d.begin_pitch_peek()
+	if _drag == Drag.TURN:
+		_client3d.drag(offset.x * DRAG_DEGREES_PER_PX)
 	else:
-		_client3d.drag(degrees)
+		_client3d.pitch_peek(offset.y)
 
 
 func _end_middle_drag() -> void:
-	_drag_from = NAN
-	if _drag_peeks:
-		_client3d.end_peek()
-	else:
-		_client3d.end_drag()
+	_drag_from = Vector2(NAN, NAN)
+	match _drag:
+		Drag.TURN:
+			_client3d.end_drag()
+		Drag.PITCH:
+			_client3d.end_pitch_peek()
+	_drag = Drag.UNDECIDED
 
 
 func _view_yaw() -> float:
@@ -1533,11 +1558,11 @@ func _on_world_ticked(tick: int) -> void:
 	if Net.controls == "wasd":
 		hints = "WASD walk   mouse aim   LMB attack (far: walk)   RMB grab (drag to toss)"
 		if _client3d != null:
-			hints += "   MMB drag turn"
+			hints += "   MMB drag: sideways turn, up/down look"
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   Q/E turn   MMB drag peek"
+			hints += "   Q/E turn   MMB drag up/down look"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
@@ -1558,7 +1583,7 @@ func _debug_text() -> String:
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
 	if _client3d != null:
-		lines.append("yaw: %.1f deg" % _client3d.yaw)
+		lines.append("yaw: %.1f deg   pitch: %.1f deg" % [_client3d.yaw, _client3d.pitch])
 	else:
 		lines.append("azimuth: %.1f deg" % Iso.azimuth)
 	lines.append("controls: %s" % Net.controls)

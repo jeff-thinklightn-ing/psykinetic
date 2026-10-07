@@ -33,7 +33,8 @@ func _ready() -> void:
 	_test_screen_lean()
 	_test_drag_and_freeze()
 	_test_diamonds()
-	_test_peek()
+	_test_pitch_peek()
+	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
 
@@ -183,15 +184,13 @@ func _test_swing() -> void:
 
 
 func _test_scheme_default() -> void:
-	print("
-== click is the default scheme ==")
+	print("\n== click is the default scheme ==")
 	_check(Net.controls_from("") == "click" and Net.controls_from("mouse") == "click", "nothing, or anything else: click")
 	_check(Net.controls_from("wasd") == "wasd" and Net.controls_from(" WASD ") == "wasd", "wasd: WASD")
 
 
 func _test_screen_lean() -> void:
-	print("
-== the WASD lean comes from the cursor's place on the screen ==")
+	print("\n== the WASD lean comes from the cursor's place on the screen ==")
 	var size := Vector2(1920, 1080)
 	_check(Main.screen_lean(size * 0.5, size) == Vector2.ZERO, "the middle: no lean")
 	_check(Main.screen_lean(size * 0.5 + Vector2(0.14 * 960, 0), size) == Vector2.ZERO,
@@ -209,8 +208,7 @@ func _test_screen_lean() -> void:
 
 
 func _test_drag_and_freeze() -> void:
-	print("
-== WASD: a middle drag turns the camera, never under a held key ==")
+	print("\n== WASD: a middle drag turns the camera, never under a held key ==")
 	var rig := _rig()
 	var start := rig.yaw
 	rig.begin_drag()
@@ -262,8 +260,7 @@ func _test_drag_and_freeze() -> void:
 
 
 func _test_diamonds() -> void:
-	print("
-== the camera rests only on the four diamond views ==")
+	print("\n== the camera rests only on the four diamond views ==")
 	var rig := _rig()
 	_ease(rig)
 	var start := rig.yaw
@@ -291,38 +288,86 @@ func _test_diamonds() -> void:
 	_free_rig(rig)
 
 
-func _test_peek() -> void:
-	print("\n== click: a middle drag peeks off the diamond and springs back ==")
+func _test_pitch_peek() -> void:
+	print("\n== a vertical middle drag tilts toward top-down and springs back ==")
 	var rig := _rig()
 	_ease(rig)
-	var diamond := rig._yaw_step
+	var yaw := rig.yaw
 	var saved := Net.camera_yaw
-	rig.begin_peek()
-	rig.peek(30.0)
-	_check(is_equal_approx(rig.yaw, diamond + 30.0), "it follows the drag (%s)" % rig.yaw)
-	rig.peek(-120.0)
-	_check(is_equal_approx(rig.yaw, diamond - 45.0), "no further than 45 either side (%s)" % rig.yaw)
-	rig.end_peek()
-	rig._ease_yaw(0.1)
-	_check(rig.yaw > diamond - 45.0 and rig.yaw < diamond, "let go: on its way back (%s at 100 ms)" % rig.yaw)
-	rig._ease_yaw(0.1)
-	_check(is_equal_approx(rig.yaw, diamond), "back on the same diamond at 200 ms (%s)" % rig.yaw)
-	_check(is_equal_approx(rig._yaw_step, diamond) and is_equal_approx(Net.camera_yaw, saved),
-			"the resting and saved yaw never moved (%s, %s)" % [rig._yaw_step, Net.camera_yaw])
-	rig.begin_peek()
-	rig.peek(40.0)
-	rig.orbit(1)
-	_ease(rig)
-	_check(is_equal_approx(rig.yaw, diamond + 90.0 + 40.0), "Q/E still step while peeking; the peek rides on the new diamond (%s)" % rig.yaw)
-	rig.end_peek()
-	_ease(rig)
-	_check(is_equal_approx(rig.yaw, diamond + 90.0), "and let go, back to that diamond (%s)" % rig.yaw)
+	var near_before := _near_walls(rig)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE),
+			"at rest: pitch %s, size %s" % [rig.pitch, rig._camera.size])
+	rig.begin_pitch_peek()
+	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * 0.5)
+	_check(is_equal_approx(rig.pitch, (Client3D.CAMERA_PITCH + Client3D.PEEK_PITCH) * 0.5),
+			"half the drag: half way up, eased in and out (%s)" % rig.pitch)
+	var quarter := rig.pitch
+	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * 0.25)
+	_check(rig.pitch < quarter and rig.pitch - Client3D.CAMERA_PITCH < (quarter - Client3D.CAMERA_PITCH) * 0.5,
+			"a quarter of it: less than half that, the ease starts gently (%s)" % rig.pitch)
+	rig.pitch_peek(Client3D.PEEK_DRAG_PX * 2.0)
+	_check(is_equal_approx(rig.pitch, Client3D.PEEK_PITCH)
+			and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE * Client3D.PEEK_PULL_BACK),
+			"past the full drag, either way: top-down at %s and pulled back to %s" % [rig.pitch, rig._camera.size])
+	_check(is_equal_approx(rig.yaw, yaw), "the yaw never moves (%s)" % rig.yaw)
+	_check(_near_walls(rig) == near_before, "the same walls are near, and see-through, at the full tilt")
+	rig.end_pitch_peek()
+	rig._ease_peek(Client3D.PEEK_RETURN_SECONDS * 0.5)
+	_check(rig.pitch > Client3D.CAMERA_PITCH and rig.pitch < Client3D.PEEK_PITCH, "let go: springing back (%s)" % rig.pitch)
+	rig._ease_peek(Client3D.PEEK_RETURN_SECONDS * 0.5)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE),
+			"back at rest after %d ms (pitch %s, size %s)" % [roundi(Client3D.PEEK_RETURN_SECONDS * 1000.0), rig.pitch, rig._camera.size])
+	_check(is_equal_approx(rig.yaw, yaw) and is_equal_approx(Net.camera_yaw, saved), "yaw and saved yaw as they were")
 	_free_rig(rig)
 
 
+func _test_middle_drag_axis() -> void:
+	print("\n== a middle drag is a turn or a tilt by the axis it moves on first ==")
+	var rig := _rig()
+	_ease(rig)
+	var saved: String = Net.controls
+	Net.controls = "wasd"
+	var yaw := rig.yaw
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(3, 2))
+	_check(not rig._dragging and not rig._peeking, "wasd: under %d px it is not yet either" % Main.DRAG_AXIS_PX)
+	_main._middle_drag(Vector2(40, 10))
+	_check(rig._dragging and is_equal_approx(rig.yaw, yaw + 40.0 * Main.DRAG_DEGREES_PER_PX), "sideways first: a turn (%s)" % rig.yaw)
+	_main._middle_drag(Vector2(40, 300))
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "and it stays a turn: moving up and down then does not tilt")
+	_main._end_middle_drag()
+	_ease(rig)
+	yaw = rig.yaw
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(2, -20))
+	_check(rig._peeking and not rig._dragging and rig.pitch > Client3D.CAMERA_PITCH, "up and down first: a tilt (%s)" % rig.pitch)
+	_main._middle_drag(Vector2(300, -20))
+	_check(is_equal_approx(rig.yaw, yaw), "and it stays a tilt: moving sideways then does not turn (%s)" % rig.yaw)
+	_main._end_middle_drag()
+	for i in 10:
+		rig._ease_peek(0.05)
+	Net.controls = "click"
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(300, 0))
+	_check(is_equal_approx(rig.yaw, yaw) and not rig._dragging, "click: sideways does nothing (%s)" % rig.yaw)
+	_main._middle_drag(Vector2(300, -150))
+	_check(rig.pitch > Client3D.CAMERA_PITCH and is_equal_approx(rig.yaw, yaw), "up and down tilts (%s), the yaw stays" % rig.pitch)
+	_main._end_middle_drag()
+	Net.controls = saved
+	_free_rig(rig)
+
+
+## Wall edge keys the 3D view has see-through now.
+func _near_walls(rig: Client3D) -> Array[Vector3i]:
+	var near: Array[Vector3i] = []
+	for key: Vector3i in rig._walls:
+		if rig._is_near(key):
+			near.append(key)
+	return near
+
+
 func _test_schemes_are_inert_outside() -> void:
-	print("
-== keys and buttons outside the active scheme do nothing ==")
+	print("\n== keys and buttons outside the active scheme do nothing ==")
 	var rig := _rig()
 	var saved: String = Net.controls
 	var step := rig._yaw_step
@@ -333,12 +378,13 @@ func _test_schemes_are_inert_outside() -> void:
 	_main._unhandled_input(_key(KEY_Q))
 	_check(is_equal_approx(rig._yaw_step, step - 90.0), "click: Q turns to the next diamond, 90 degrees round")
 	_main._unhandled_input(_middle(true))
-	_check(rig._peeking and not rig._dragging, "click: the middle button peeks, it does not turn")
+	_check(rig._peeking and not rig._dragging, "click: the middle button is a pitch peek, never a turn")
 	_main._unhandled_input(_middle(false))
 	_check(not rig._peeking, "and let go, the peek ends")
 	Net.controls = "wasd"
 	_main._unhandled_input(_middle(true))
-	_check(rig._dragging, "wasd: the middle button starts a drag")
+	_main._middle_drag(Vector2(20, 0))
+	_check(rig._dragging, "wasd: a sideways middle drag turns")
 	_main._unhandled_input(_middle(false))
 	Net.controls = "click"
 	var player := _place_player(Vector2i(11, 3))
@@ -356,8 +402,7 @@ func _test_schemes_are_inert_outside() -> void:
 
 
 func _test_click_uses_the_frame_pick() -> void:
-	print("
-== a click goes to the cell the hover shows ==")
+	print("\n== a click goes to the cell the hover shows ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(11, 3))
