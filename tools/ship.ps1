@@ -63,6 +63,9 @@ if ($Release -ne '') {
 }
 
 # --- 4. commit and push -----------------------------------------------------------
+# git reports on stderr; under 'Stop' a successful push would count as an
+# error. Exit codes are checked instead from here on.
+$ErrorActionPreference = 'Continue'
 $dirty = @(git status --porcelain)
 if ($dirty.Count -gt 0) {
 	git add -A

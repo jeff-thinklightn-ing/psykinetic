@@ -110,9 +110,16 @@ elseif ($end) { $lines[$start..($end - 2)] | Set-Content $notes }
 else { $lines[$start..($lines.Count - 1)] | Set-Content $notes }
 
 if (Get-Command gh -ErrorAction SilentlyContinue) {
+	# git and gh report progress on stderr; under 'Stop' that would abort a
+	# push that succeeded. Only the exit codes matter here.
+	$ErrorActionPreference = 'Continue'
 	git push
+	if ($LASTEXITCODE -ne 0) { Fail 'git push failed' }
 	git push origin $tag
+	if ($LASTEXITCODE -ne 0) { Fail "git push origin $tag failed" }
 	gh release create $tag $zip --title $tag --notes-file $notes
+	if ($LASTEXITCODE -ne 0) { Fail 'gh release create failed' }
+	$ErrorActionPreference = 'Stop'
 	Write-Output "released $tag"
 } else {
 	Write-Output ''
