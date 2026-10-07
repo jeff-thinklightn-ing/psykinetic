@@ -209,29 +209,35 @@ func _test_screen_lean() -> void:
 
 
 func _test_drag_and_freeze() -> void:
-	print("\n== WASD: a middle drag turns the camera, settles on a diamond, never under a held key ==")
+	print("\n== WASD: a middle drag turns freely and locks on the next diamond, never under a held key ==")
 	var saved: String = Net.controls
 	Net.controls = "wasd"
 	var rig := _rig()
-	var start := rig.yaw
+	_check(is_equal_approx(rig.yaw, 0.0), "it starts on the saved diamond (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(20.0)
-	_check(is_equal_approx(rig.yaw, start + 20.0), "the drag turns it at once (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 20.0), "the drag turns it at once (%s)" % rig.yaw)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start), "let go at 20: back to the nearest diamond (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 90.0) and is_equal_approx(Net.camera_yaw, 90.0),
+			"let go 20 round: on to the next diamond that way, and saved (%s)" % rig.yaw)
 	rig.begin_drag()
-	rig.drag(50.0)
+	rig.drag(5.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 90.0), "let go at 50: on to the next diamond (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 90.0), "let go 5 round, under 10: back where it set off (%s)" % rig.yaw)
 	rig.begin_drag()
-	rig.drag(170.0)
-	_check(is_equal_approx(rig.yaw, start + 260.0), "a drag goes as far round as it likes (%s)" % rig.yaw)
+	rig.drag(-100.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 270.0), "and settles on the nearest diamond (%s)" % rig.yaw)
-	start = rig.yaw
+	_check(is_equal_approx(rig.yaw, -90.0), "100 the other way, past 0: on to -90 (%s)" % rig.yaw)
+	rig.begin_drag()
+	rig.drag(300.0)
+	rig.end_drag()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, 270.0) and is_equal_approx(Net.camera_yaw, 270.0),
+			"300 round: as far as it goes, then the next diamond (%s)" % rig.yaw)
+	var start := rig.yaw
 	rig.set_frozen(true)
 	rig.begin_drag()
 	rig.drag(100.0)
@@ -242,7 +248,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start), "nor does letting the button go (%s)" % rig.yaw)
 	rig.set_frozen(false)
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 90.0), "the keys let go: it settles on the diamond nearest where the drag was let go (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start + 180.0), "the keys let go: it settles past where the drag was let go (%s)" % rig.yaw)
 	start = rig.yaw
 	rig.begin_drag()
 	rig.set_frozen(true)
@@ -252,6 +258,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start + 40.0), "a drag held through a run applies when the keys are let go (%s)" % rig.yaw)
 	rig.end_drag()
 	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start + 90.0), "and locks on the next diamond (%s)" % rig.yaw)
 	rig.set_frozen(true)
 	rig._settle_on(rig._yaw_step + 90.0)
 	var held := rig.yaw
@@ -264,86 +271,60 @@ func _test_drag_and_freeze() -> void:
 
 
 func _test_diamonds() -> void:
-	print("\n== click: the camera's home follows the way the player walks, damped; A/D look and spring back ==")
+	print("\n== click: A/D turn freely, all the way round, and lock on the next diamond ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var rig := _rig()
-	var player := _place_player(Vector2i(11, 3))
-	rig._process(0.0)
-	var puppet: Node3D = rig._puppets[player.get_instance_id()]
-	var step := 1.0 / 60.0
-	_check(is_equal_approx(rig.yaw, 0.0), "it starts on the 2D diamond (%s)" % rig.yaw)
-	# Walking +x, down-right on screen at yaw 0: -90 puts that up the screen.
-	_check(is_equal_approx(Client3D.home_for(Vector2(1, 0), 0.0), -90.0), "walking +x, the home that puts it up is -90")
-	_walk(rig, puppet, Vector2(1, 0), 0.6, step)
-	_check(is_equal_approx(rig.yaw, 0.0), "walking that way 0.6 s: not yet (%s)" % rig.yaw)
-	var walked := 0.6
-	while rig._home_t >= 1.0 and walked < 2.0:
-		_walk(rig, puppet, Vector2(1, 0), step, step)
-		walked += step
-	_check(absf(walked - Client3D.HOME_HOLD_SECONDS) < step * 1.5 and is_equal_approx(rig._home_step, -90.0),
-			"it turns toward -90 after %.2f s of that heading" % walked)
-	# Straight away a new heading, held well past 0.7 s: the turn just begun
-	# blocks another until 1.5 s after it.
-	_walk(rig, puppet, Vector2(0, 1), 0.5, step)
-	_check(absf(rig.yaw + 45.0) < 3.0, "half a second into the turn: half way (%.1f)" % rig.yaw)
-	_walk(rig, puppet, Vector2(0, 1), 0.5, step)
-	_check(is_equal_approx(rig.yaw, -90.0) and is_equal_approx(rig._home_step, -90.0),
-			"a second in: there, and no new turn yet though the new heading is 1 s old (%s)" % rig.yaw)
-	_check(rig._camera_target.is_equal_approx(puppet.position), "the player is the middle of the screen")
-	_walk(rig, puppet, Vector2(0, 1), 0.45, step)
-	_check(is_equal_approx(rig._home_step, -90.0), "1.45 s after the last turn began: still none")
-	_walk(rig, puppet, Vector2(0, 1), 0.1, step)
-	_check(rig._home_t < 1.0 and is_equal_approx(rig._home_step, -180.0),
-			"1.5 s after it: the next turn (to %s)" % rig._home_step)
-	_walk(rig, puppet, Vector2(0, 1), 1.1, step)
-	_check(is_equal_approx(rig.yaw, -180.0), "on to -180 (%s)" % rig.yaw)
-	_walk(rig, puppet, Vector2(-1, 0), 0.65, step)
-	_walk(rig, puppet, Vector2.ZERO, 3.0, step)
-	_check(is_equal_approx(rig.yaw, -180.0) and is_nan(rig._wanted_home),
-			"a new heading walked 0.65 s, then standing 3 s: it never turns standing (%s)" % rig.yaw)
-	_walk(rig, puppet, Vector2(-1, 0), 0.65, step)
-	_check(is_equal_approx(rig._home_step, -180.0), "walking again: the count starts over (0.65 s, no turn)")
-	_check(is_equal_approx(Client3D.home_for(Vector2(1, 0), -90.0), -90.0) and is_equal_approx(Client3D.home_for(Vector2(1, 0), 180.0), 180.0),
-			"a heading half way between two diamonds keeps the home it has")
-	_walk(rig, puppet, Vector2.ZERO, 2.0, step)
-	var home := rig.home_yaw
-	for i in 15:
-		rig.look_by(1.0, 0.05)
-		rig._update_home(0.05)
-	_check(is_equal_approx(rig.look, 90.0) and is_equal_approx(rig.yaw, home + 90.0), "D held: a look up to 90 off the home (%s)" % rig.look)
-	rig.end_look()
-	rig._update_home(Client3D.LOOK_RETURN_SECONDS * 0.5)
-	_check(rig.look > 0.0 and rig.look < 90.0, "let go: springing back (%.1f)" % rig.look)
-	rig._update_home(Client3D.LOOK_RETURN_SECONDS * 0.5)
-	_check(is_equal_approx(rig.yaw, home) and is_equal_approx(rig.look, 0.0), "back on the home at %d ms (%s)" % [
-			roundi(Client3D.LOOK_RETURN_SECONDS * 1000.0), rig.yaw])
-	for i in 15:
-		rig.look_by(-1.0, 0.05)
-	_check(is_equal_approx(rig.look, -90.0), "A: the other way, up to -90 (%s)" % rig.look)
-	rig.end_look()
-	rig._update_home(1.0)
-	var path := OS.get_user_data_dir().path_join("home_test.cfg")
-	var kept := [Net._settings_override, Net.player_id]
-	Net._settings_override = path
-	Net.save_settings("127.0.0.1", 17788, "", "Tester")
-	_check(not "camera_yaw" in FileAccess.get_file_as_string(path), "no yaw is saved")
-	DirAccess.remove_absolute(path)
-	Net._settings_override = kept[0]
-	Net.player_id = kept[1]
+	_check(is_equal_approx(rig.yaw, 0.0), "it starts on the saved diamond (%s)" % rig.yaw)
+	for i in 6:
+		rig.turn(1.0, 0.01)
+	_check(is_equal_approx(rig.yaw, 10.8), "D held 60 ms: 10.8 degrees at 180 a second (%s)" % rig.yaw)
+	var held := rig.yaw
+	rig.end_turn()
+	_check(is_equal_approx(rig._ease_to, 90.0), "let go 10.8 round: on to the next diamond (%s)" % rig._ease_to)
+	rig._ease_yaw(0.01)
+	_check(absf(rig.yaw - held - 1.8) < 0.1,
+			"the first frame after letting go still moves at the turning speed (%.2f degrees in 10 ms)" % (rig.yaw - held))
+	var last := rig.yaw
+	var steady := true
+	for i in 200:
+		rig._ease_yaw(0.01)
+		if rig.yaw < last - 0.0001:
+			steady = false
+		last = rig.yaw
+	_check(steady and is_equal_approx(rig.yaw, 90.0), "and slows onto it without stopping first (%s)" % rig.yaw)
+	_check(is_equal_approx(Net.camera_yaw, 90.0), "saved as that diamond (%s)" % Net.camera_yaw)
+	for i in 250:
+		rig.turn(1.0, 0.01)
+	_check(is_equal_approx(rig.yaw, 540.0), "D held 2.5 s: 450 degrees round, no limit (%s)" % rig.yaw)
+	rig.end_turn()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, 540.0) and is_equal_approx(Net.camera_yaw, 180.0),
+			"let go on a diamond: it stays, saved as %s" % Net.camera_yaw)
+	for i in 5:
+		rig.turn(-1.0, 0.01)
+	rig.end_turn()
+	_check(is_equal_approx(rig._ease_to, 540.0), "A held 50 ms (9 degrees, under 10): back where it set off")
+	var furthest := rig.yaw
+	for i in 100:
+		rig._ease_yaw(0.01)
+		furthest = minf(furthest, rig.yaw)
+	_check(furthest < 531.0 and is_equal_approx(rig.yaw, 540.0),
+			"running on a little the way it went, then back (%.1f at most, ends %s)" % [furthest - 540.0, rig.yaw])
+	for i in 30:
+		rig.turn(-1.0, 0.01)
+	rig.end_turn()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, 450.0), "A held 300 ms (54 degrees): on to the next diamond that way (%s)" % rig.yaw)
+	_check(is_equal_approx(Client3D.settle_target(0.0, 5.0, 1.0), 0.0) and is_equal_approx(Client3D.settle_target(0.0, 12.0, 1.0), 90.0)
+			and is_equal_approx(Client3D.settle_target(0.0, 95.0, 1.0), 180.0) and is_equal_approx(Client3D.settle_target(90.0, 95.0, 1.0), 90.0) and is_equal_approx(Client3D.settle_target(0.0, -12.0, -1.0), -90.0)
+			and is_equal_approx(Client3D.settle_target(0.0, 180.0, 1.0), 180.0),
+			"settle: under 10 back, else the next diamond ahead (0 to 95 goes on to 180; 90 to 95 is back), or the one it is on")
+	_check(is_equal_approx(Net.saved_yaw("180", -1.0), 180.0) and is_equal_approx(Net.saved_yaw("-90", -1.0), 270.0)
+			and is_equal_approx(Net.saved_yaw("45", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("", 90.0), 90.0),
+			"a saved diamond loads as it is (0..360); an old axis yaw rounds up; none keeps what it had")
 	Net.controls = saved
 	_free_rig(rig)
-
-
-## Moves [param puppet] along [param way] (grid units, at 4 cells a second;
-## ZERO: standing) for [param seconds], a frame of [param step] at a time,
-## letting the home follow.
-func _walk(rig: Client3D, puppet: Node3D, way: Vector2, seconds: float, step: float) -> void:
-	for i in roundi(seconds / step):
-		puppet.position += Vector3(way.x, 0.0, way.y) * 4.0 * step
-		rig._update_home(step)
-		rig._camera_target = puppet.position
-		rig._follow(step)
 
 
 func _test_tilt_keys() -> void:
@@ -490,9 +471,8 @@ func _test_schemes_are_inert_outside() -> void:
 	var yaw := rig.yaw
 	var size := rig._camera.size
 	_main._drive_camera_keys(0.1)
-	rig._update_home(0.0)
 	_check(rig.pitch > pitch and rig.yaw > yaw and is_equal_approx(rig._camera.size, size),
-			"click: W tilts up and D looks round; Q and E do nothing")
+			"click: W tilts up and D turns the camera; Q and E do nothing")
 	Net.controls = "wasd"
 	pitch = rig.pitch
 	yaw = rig.yaw

@@ -235,7 +235,7 @@ enum Drag { UNDECIDED, TURN, PITCH, MOVED }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
 ## Click scheme, 3D: W/S or A/D were held last frame (their release
-## springs the tilt and the look back).
+## springs the tilt back and settles the turn).
 var _tilting := false
 var _turning := false
 ## WASD: when the facing and the last bump were sent, in msec.
@@ -576,9 +576,9 @@ func _end_middle_drag() -> void:
 
 
 ## Click scheme, 3D: W/S tilt (W up toward top-down, S toward level) and
-## A/D look off the camera's home while held; letting go springs both
-## back. The keys do nothing else in this scheme (and nothing at all in
-## 2D); Q/E are unbound.
+## A/D turn the camera while held; letting go springs the tilt back and
+## settles the turn on a diamond (saved). The keys do nothing else in this
+## scheme (and nothing at all in 2D); Q/E are unbound.
 func _drive_camera_keys(delta: float) -> void:
 	if _client3d == null or Net.controls != "click":
 		return
@@ -592,11 +592,11 @@ func _drive_camera_keys(delta: float) -> void:
 		_tilting = false
 		_client3d.end_tilt()
 	if turn != 0.0:
-		_client3d.look_by(turn, delta)
+		_client3d.turn(turn, delta)
 		_turning = true
 	elif _turning:
 		_turning = false
-		_client3d.end_look()
+		_client3d.end_turn()
 
 
 func _view_yaw() -> float:
@@ -1627,7 +1627,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   W/S tilt   A/D look"
+			hints += "   W/S tilt   A/D turn"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]

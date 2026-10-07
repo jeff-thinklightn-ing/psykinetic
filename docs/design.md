@@ -823,43 +823,43 @@ screen and every turn is about them. The ortho size is `CAMERA_SIZE`;
 only the WASD pitch peek pulls it back for a moment
 (`Client3D._apply_size`), and the local player's death. The near/far
 wall rule reads only the yaw, so the same near walls stay see-through
-through any tilt. Nothing about the camera is saved: it starts at yaw 0
-(or `--test-yaw`, for screenshots) each time; a `camera_yaw=`,
-`camera_pitch=` or `camera_zoom=` line from an older build is dropped on
-the next rewrite. F3 shows the yaw and the pitch.
+through any tilt. F3 shows the yaw and the pitch.
 
-*Click scheme camera.* The yaw is a **home** plus a **look**. The home
-follows the character (`Client3D._update_home`): it is the diamond view
-that puts the way the player is walking (as shown, so the predicted walk
-on a client) nearest the top of the screen (`Client3D.home_for`, against
-`screen_up`; a heading along a grid axis lies half way between two
-diamonds, and then the home it has stands). It turns there only once the
-player has walked that heading for `HOME_HOLD_SECONDS` (0.7 s), never
-within `HOME_REST_SECONDS` (1.5 s) of its last turn beginning, and never
-while standing (standing resets the count); a turn eases in and out over
-`HOME_TURN_SECONDS` (1 s), and may be a half turn when the player
-reverses. A/D look off the home while held, at `TURN_RATE` (180°/s), up
-to `LOOK_LIMIT` (90°) either way, and spring back to it over
-`LOOK_RETURN_SECONDS` (300 ms) when let go (`look_by`, `end_look`). W/S
-tilt while held at `TILT_RATE` (60°/s; W up toward top-down, S toward
+**Turning, in both schemes**: the yaw turns freely, all the way round, and
+rests only on the diamond views (multiples of `ORBIT_STEP`, 90°, from 0).
+Let go, it settles on the next diamond the way it was turning, or back on
+the one it set off from if it turned less than `TURN_COMMIT` (10°)
+(`Client3D.settle_target`; let go exactly on a diamond, it stays there),
+and stays there. That diamond is saved as `camera_yaw` in `settings.cfg`
+(`Net.camera_yaw`, 0..360, saved by `Net.save_view_settings`); an older
+file's axis yaw (a 45° step) is read as the nearest diamond
+(`Net.saved_yaw`). `--test-yaw` alone sets any angle, for screenshots, and
+is never saved; `camera_pitch=` and `camera_zoom=` lines from older builds
+are dropped on the next rewrite.
+
+*Click scheme camera, on the keys* (`Main._drive_camera_keys`, before the
+pick): A/D turn while held at `TURN_RATE` (180°/s). The settle starts at
+that speed and slows to a stop on the diamond (a cubic, `Ease.FLOW`), so
+letting go flows into it: going on, it takes the time a stop from that
+speed would (twice the distance over the speed); going back, it runs on
+a few degrees, turns and comes back, `TURN_RETURN_EXTRA` (150 ms) longer.
+W/S tilt while held at `TILT_RATE` (60°/s; W up toward top-down, S toward
 level), between `PITCH_MIN` (40°) and `PITCH_MAX` (85°), slowing over the
 last `TILT_EASE_DEGREES` (8°) into either end, and spring back to
-`CAMERA_PITCH` (50°) over `TILT_RETURN_SECONDS` (250 ms). Q/E and the
-middle button do nothing.
+`CAMERA_PITCH` (50°) over `TILT_RETURN_SECONDS` (250 ms); the tilt is
+never saved. There is no zoom; Q/E and the middle button do nothing.
 
-*WASD scheme camera, on the middle button.* There is no home: WASD
-directions are the camera's, so a home that followed the walk would
-chase itself. A drag is a turn or a **pitch peek** by whichever axis it
-first moves `Main.DRAG_AXIS_PX` (6 px) on, and stays that until let go.
-The pitch peek tilts from 50° toward `PEEK_PITCH` (85°) in proportion to
-the drag either way, all of it over `PEEK_DRAG_PX` (300 px), eased in and
-out (smoothstep), pulling back to `PEEK_PULL_BACK` (1.2) times the size
-as it goes; let go, it springs back over `PEEK_RETURN_SECONDS` (250 ms),
-never changing the yaw. Q/E do nothing, and the sideways drag turns the
-camera: the yaw follows the horizontal drag (`Main.DRAG_DEGREES_PER_PX`,
-0.25° a pixel) while the button is held, as far round as it goes, and let
-go it settles on the nearest diamond, eased out over `SETTLE_SECONDS`
-(250 ms).
+*WASD scheme camera, on the middle button*: a drag is a turn or a **pitch
+peek** by whichever axis it first moves `Main.DRAG_AXIS_PX` (6 px) on, and
+stays that until let go. The sideways drag turns the yaw with it
+(`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel), as far round as it goes, and
+let go settles as above, the way it was dragged, eased out over
+`SETTLE_SECONDS` (250 ms). The pitch peek tilts from 50° toward
+`PEEK_PITCH` (85°) in proportion to the drag either way, all of it over
+`PEEK_DRAG_PX` (300 px), eased in and out (smoothstep), pulling back to
+`PEEK_PULL_BACK` (1.2) times the size as it goes; let go, it springs back
+over `PEEK_RETURN_SECONDS` (250 ms), never changing the yaw. Q/E do
+nothing.
 While any movement key is held the yaw is frozen (`Client3D.frozen`, set
 by `Main._drive_wasd`): nothing turns it, not a drag nor an ease under
 way, so a direction never changes under the hand; a drag made meanwhile
@@ -926,10 +926,10 @@ orders, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
-verbs land on the clicked target. In 3D the camera turns by itself to
-look the way the character walks; W/S tilt it while held and A/D look
-round up to a quarter turn, both springing back when let go; Q/E and the
-middle button do nothing (see the 3D view). The
+verbs land on the clicked target. In 3D, A/D turn the camera freely and
+lock it on the next diamond when let go (saved); W/S tilt it while held,
+springing back to 50° when let go; Q/E and the middle button do nothing
+(see the 3D view). The
 camera follows the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;

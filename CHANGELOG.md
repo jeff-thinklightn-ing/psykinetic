@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.42
+
+Camera: free turn, lock on a diamond. Client (the server only for the version).
+
+- **A/D** (click scheme) turn the 3D camera freely, all the way round.
+  Let go and it locks on the next diagonal view the way you were turning,
+  or goes back if you turned less than 10°, and stays there. That view is
+  saved again.
+- **WASD scheme:** the sideways middle drag does the same.
+- **W/S** tilt while held and spring back to 50°. No zoom; Q/E do nothing.
+- The camera no longer turns by itself to follow your character.
+
+The server must be updated to v0.1.42 too, as it refuses any other version.
+
 ## v0.1.41
 
 The camera follows the character. Client (the server only for the version).

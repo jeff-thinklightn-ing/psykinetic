@@ -584,3 +584,13 @@ locked on the player, so turns are about them. The WASD scheme keeps its
 own middle-drag turn and no home: there the keys are relative to the
 camera, and a home that followed the walk would turn the walk. This
 replaces 64's fixed home and saved yaw.
+
+## 66. Free turn, locked on a diamond
+
+No home, fixed or following: the yaw turns freely all the way round (A/D
+in the click scheme, the sideways middle drag in WASD) and, let go, locks
+on the next diamond the way it was turning, or back on the one it set off
+from if it turned less than 10°, and stays there; that diamond is saved.
+The 10° counts from where the turn set off, not from the last diamond
+passed, so a turn of 95° goes on to 180°. The W/S tilt stays a held look
+that springs back. This replaces 64 and 65 and the commit rule of 58.
