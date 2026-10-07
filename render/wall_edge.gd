@@ -1,22 +1,20 @@
 class_name WallEdge
 extends Node2D
-## One wall edge: a face standing on the cell boundary line, one flat
-## neutral grey (`Main.WALL_VALUE`) whatever way it faces, with no top
-## strip, no end face and nothing drawn on the ground. The top of a wall is
-## where the face ends. The node sits in the Y-sorted layer with the cell on
-## the edge's -x / -y side, a hair nearer the camera, so it is in front of
-## what stands on that cell and behind the next.
+## One wall edge: a face standing on the cell boundary line, full height,
+## one flat neutral grey (`Main.WALL_VALUE`) whatever way it faces, with no
+## top strip, no end face and nothing drawn on the ground. The top of a
+## wall is where the face ends. The node sits in the Y-sorted layer with
+## the cell on the edge's -x / -y side, a hair nearer the camera, so it is
+## in front of what stands on that cell and behind the next.
 ##
-## Height. A wall that would hide floor is a stub a third of a tile tall;
-## one that hides nothing stands full height. A full wall hides the cells
-## straight behind it (toward -x for an east edge, -y for a south edge) for
-## as many cells as it has rows of height, LOOK_BEHIND, so: stub if any of
-## those cells is walkable, full if they are all void or off the map. For a
-## wall with floor directly behind it this is "a wall on a walkable cell's
-## south or east edge is a stub"; walls on the far side of a one-cell void
-## strip, where a thick wall used to be, are stubs too, since the floor
-## beyond is in their shadow. A drawing rule only: the sim knows nothing of
-## it.
+## Occlusion windows. A creature a face is drawn in front of shows through
+## it: the face gets a soft circular cutout centred on the creature's
+## sprite, RADIUS wide, fading the face to a quarter at the centre and
+## back to opaque at the edge (render/wall_cutout.gdshader, one material
+## per face, up to MAX_CUTOUTS centres). A cutout fades in over
+## CUTOUT_SECONDS when the sprite comes to overlap the face and out again
+## when it leaves. Main feeds every wall the creatures each frame
+## (update_cutouts); nothing here reads the sim.
 ##
 ## Corners. Two faces of one value meeting at an L or a T would merge, so
 ## where another wall meets an end of this one at an angle (doors count as
@@ -25,19 +23,23 @@ extends Node2D
 
 ## Thickness of a door panel's top, in px (walls have none).
 const STRIP := 4.0
-const STUB_FRACTION := 1.0 / 3.0
 ## How much darker than the face a corner line is.
 const CORNER_STEP := 0.05
-## Cells straight behind a wall that a full-height one would hide: one per
-## row of its height (a cell further back is half a tile height up on screen).
-const LOOK_BEHIND := int(Iso.HEIGHTS["wall"] * 2)
+## Cutout radius in world px: about a tile.
+const RADIUS := float(Iso.TILE_SIZE.x)
+const CUTOUT_SECONDS := 0.15
+const MAX_CUTOUTS := 8
+const SHADER := preload("res://render/wall_cutout.gdshader")
 
 var key := Vector3i.ZERO
-var far_side_floor := false
 ## The face's grey, 0..1.
 var value := 0.18
 ## Per end: whether another wall meets it at an angle.
 var _corner: Array[bool] = [false, false]
+## Creature instance id -> {"center": Vector2, "strength": float, "in": bool}.
+var _cutouts: Dictionary[int, Dictionary] = {}
+## The face's extent in the parent's space, for the overlap test.
+var _bounds := Rect2()
 
 
 # --- Geometry shared with Door ----------------------------------------------
@@ -70,21 +72,6 @@ static func across_grid(edge: Vector3i) -> Vector2:
 
 static func full_height() -> float:
 	return Iso.height_px("wall")
-
-
-## The stub rule. [param floor_at] says whether a cell is walkable.
-static func is_stub(edge: Vector3i, floor_at: Callable) -> bool:
-	var behind := Vector2i(-1, 0) if edge.z == Terrain.EAST else Vector2i(0, -1)
-	var cell := Vector2i(edge.x, edge.y)
-	for i in LOOK_BEHIND:
-		if floor_at.call(cell):
-			return true
-		cell += behind
-	return false
-
-
-static func height_for(stub: bool) -> float:
-	return Iso.TILE_SIZE.y * STUB_FRACTION if stub else full_height()
 
 
 ## Position of the vertex (shared diamond corner) an edge end sits on, as
@@ -125,13 +112,20 @@ static func draw_wall(on: CanvasItem, a: Vector2, b: Vector2, h: float, offset: 
 
 # --- This edge -----------------------------------------------------------------
 
-func setup(edge: Vector3i, kind_at: Callable, floor_at: Callable, grey: float) -> void:
+func setup(edge: Vector3i, kind_at: Callable, grey: float) -> void:
 	key = edge
 	value = grey
 	position = Iso.tile_to_local(Vector2i(edge.x, edge.y)) + Vector2(0, 0.5)
-	far_side_floor = is_stub(edge, floor_at)
 	for end in 2:
 		_corner[end] = _meets_wall_at(end, kind_at)
+	var ends := endpoints(edge)
+	var up := Vector2(0, -full_height())
+	_bounds = Rect2(position + ends[0], Vector2.ZERO).expand(position + ends[1]) \
+			.expand(position + ends[0] + up).expand(position + ends[1] + up)
+	var material := ShaderMaterial.new()
+	material.shader = SHADER
+	material.set_shader_parameter("radius", RADIUS)
+	self.material = material
 	queue_redraw()
 
 
@@ -148,9 +142,56 @@ func _meets_wall_at(end: int, kind_at: Callable) -> bool:
 	return false
 
 
+## Once a frame, from Main: [param creatures] are the creature sprites on
+## screen as {"id", "center", "rect", "y"} in the parent's space. A sprite
+## whose rect overlaps this face while the face is drawn in front of it
+## (further down the Y-sort) gets a cutout; it animates in, and out once
+## the overlap ends.
+func update_cutouts(creatures: Array[Dictionary], delta: float) -> void:
+	var seen: Dictionary[int, bool] = {}
+	for creature in creatures:
+		if creature["y"] >= position.y or not _bounds.intersects(creature["rect"]):
+			continue
+		var id: int = creature["id"]
+		seen[id] = true
+		if not _cutouts.has(id):
+			_cutouts[id] = {"center": creature["center"], "strength": 0.0, "in": true}
+		_cutouts[id]["center"] = creature["center"]
+		_cutouts[id]["in"] = true
+	if _cutouts.is_empty():
+		return
+	var step := delta / CUTOUT_SECONDS
+	for id in _cutouts.keys():
+		var cutout: Dictionary = _cutouts[id]
+		if not seen.has(id):
+			cutout["in"] = false
+		cutout["strength"] = move_toward(cutout["strength"], 1.0 if cutout["in"] else 0.0, step)
+		if not cutout["in"] and cutout["strength"] <= 0.0:
+			_cutouts.erase(id)
+	_push_cutouts()
+
+
+## The strongest MAX_CUTOUTS cutouts to the shader.
+func _push_cutouts() -> void:
+	var cutouts := _cutouts.values()
+	cutouts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["strength"] > b["strength"])
+	var centers := PackedVector2Array()
+	var strengths := PackedFloat32Array()
+	for cutout: Dictionary in cutouts.slice(0, MAX_CUTOUTS):
+		centers.append(cutout["center"])
+		strengths.append(cutout["strength"])
+	var count := centers.size()
+	centers.resize(MAX_CUTOUTS)
+	strengths.resize(MAX_CUTOUTS)
+	var shader_material := material as ShaderMaterial
+	shader_material.set_shader_parameter("count", count)
+	shader_material.set_shader_parameter("centers", centers)
+	shader_material.set_shader_parameter("strengths", strengths)
+
+
 func _draw() -> void:
 	var ends := endpoints(key)
-	var up := Vector2(0, -height_for(far_side_floor))
+	var up := Vector2(0, -full_height())
 	var face := Color(value, value, value)
 	draw_colored_polygon(PackedVector2Array([ends[0], ends[1], ends[1] + up, ends[0] + up]), face)
 	var step := maxf(value - CORNER_STEP, 0.0)

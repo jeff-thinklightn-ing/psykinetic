@@ -36,7 +36,7 @@ func _ready() -> void:
 	_test_sight_through_edges()
 	_test_doors()
 	_test_door_breaks()
-	_test_stub_rule()
+	_test_occlusion_windows()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -188,23 +188,42 @@ func _test_door_breaks() -> void:
 	_check(stone.hp == 3 and not stone.is_broken(), "a stone door takes nothing (hp %d)" % stone.hp)
 
 
-func _test_stub_rule() -> void:
+func _test_occlusion_windows() -> void:
 	print("
-== drawing: a wall with floor in its shadow is a stub; one with nothing behind it is full height ==")
-	# Floor at (1, 1) and (2, 1) in a void, and a lone cell at (1, 3): a
-	# one-cell void strip (row 2) lies between it and the first.
-	var floor_at := func(cell: Vector2i) -> bool: return cell in [Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 3)]
-	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.SOUTH), floor_at), "a walkable cell's south edge: stub")
-	_check(WallEdge.is_stub(Vector3i(2, 1, Terrain.EAST), floor_at), "a walkable cell's east edge: stub")
-	_check(not WallEdge.is_stub(Vector3i(1, 0, Terrain.SOUTH), floor_at), "its north edge, nothing behind: full height")
-	_check(not WallEdge.is_stub(Vector3i(0, 1, Terrain.EAST), floor_at), "its west edge, nothing behind: full height")
-	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.EAST), floor_at), "a wall between two walkable cells: stub")
-	_check(WallEdge.is_stub(Vector3i(1, 2, Terrain.SOUTH), floor_at), "the near face of a one-cell void strip, floor beyond it: stub")
-	_check(not WallEdge.is_stub(Vector3i(0, 3, Terrain.EAST), floor_at), "the lone cell's west edge, void all the way back: full height")
-	_check(WallEdge.is_stub(Vector3i(1, 7, Terrain.SOUTH), floor_at), "a wall with floor 5 cells behind it, still in its shadow: stub")
-	_check(not WallEdge.is_stub(Vector3i(1, 9, Terrain.SOUTH), floor_at), "a wall %d or more cells past the last floor: full height" % WallEdge.LOOK_BEHIND)
-	_check(WallEdge.height_for(true) < WallEdge.height_for(false) and WallEdge.height_for(false) == Iso.height_px("wall"),
-			"a stub is lower than full height, which is the scale table's wall")
+== drawing: a creature behind a wall face cuts a window in it ==")
+	var wall := WallEdge.new()
+	wall.setup(Vector3i(3, 3, Terrain.SOUTH), func(_key: Vector3i) -> int: return Terrain.Edge.OPEN, 0.18)
+	var shader_material := wall.material as ShaderMaterial
+	_check(shader_material != null and shader_material.shader == WallEdge.SHADER, "each face has its own cutout material")
+	# A sprite standing on the cell behind the face, overlapping it.
+	var behind := {"id": 1, "center": wall.position + Vector2(0, -12), "rect": Rect2(wall.position + Vector2(-6, -30), Vector2(12, 32)), "y": wall.position.y - 1.0}
+	# The same sprite drawn in front of the face (further down the Y-sort).
+	var in_front := {"id": 2, "center": behind["center"], "rect": behind["rect"], "y": wall.position.y + 1.0}
+	# One off to the side, nowhere near the face.
+	var away := {"id": 3, "center": wall.position + Vector2(200, 0), "rect": Rect2(wall.position + Vector2(194, -30), Vector2(12, 32)), "y": wall.position.y - 1.0}
+	var creatures: Array[Dictionary] = [behind, in_front, away]
+	wall.update_cutouts(creatures, WallEdge.CUTOUT_SECONDS * 0.5)
+	var strengths: PackedFloat32Array = shader_material.get_shader_parameter("strengths")
+	_check(shader_material.get_shader_parameter("count") == 1, "only the sprite behind the face and overlapping it gets a cutout (%s)" % shader_material.get_shader_parameter("count"))
+	_check(is_equal_approx(strengths[0], 0.5), "halfway through CUTOUT_SECONDS it is half strength (%.2f)" % strengths[0])
+	_check(shader_material.get_shader_parameter("centers")[0] == behind["center"], "centred on the sprite")
+	wall.update_cutouts(creatures, WallEdge.CUTOUT_SECONDS)
+	strengths = shader_material.get_shader_parameter("strengths")
+	_check(is_equal_approx(strengths[0], 1.0), "then full")
+	var none: Array[Dictionary] = []
+	wall.update_cutouts(none, WallEdge.CUTOUT_SECONDS * 0.5)
+	strengths = shader_material.get_shader_parameter("strengths")
+	_check(shader_material.get_shader_parameter("count") == 1 and is_equal_approx(strengths[0], 0.5), "gone from behind it, the cutout fades out (%.2f)" % strengths[0])
+	wall.update_cutouts(none, WallEdge.CUTOUT_SECONDS)
+	_check(shader_material.get_shader_parameter("count") == 0, "and is removed")
+	var crowd: Array[Dictionary] = []
+	for i in 12:
+		var one := behind.duplicate()
+		one["id"] = 100 + i
+		crowd.append(one)
+	wall.update_cutouts(crowd, 1.0)
+	_check(shader_material.get_shader_parameter("count") == WallEdge.MAX_CUTOUTS, "at most %d cutouts reach the shader" % WallEdge.MAX_CUTOUTS)
+	wall.free()
 
 
 # --- helpers ------------------------------------------------------------------

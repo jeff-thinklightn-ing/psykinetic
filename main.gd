@@ -209,6 +209,8 @@ var _held_target := NONE
 @onready var toss_aim: Line2D = $TossAim
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
+## Every wall face, for the occlusion windows.
+var _walls: Array[WallEdge] = []
 
 
 func _ready() -> void:
@@ -286,6 +288,7 @@ func _process(delta: float) -> void:
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
 	_retarget_held()
+	_update_occlusion_windows(delta)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -385,6 +388,31 @@ func _retarget_held() -> void:
 	var tile := _snap_to_floor(_mouse_point())
 	if tile != NONE and tile != _held_target:
 		_move_click(player, tile)
+
+
+## Every creature sprite on screen, as the walls want it (see
+## WallEdge.update_cutouts): its centre and extent in the YSort's space and
+## the y it sorts by. Walls drawn in front of a sprite open a window on it.
+func _update_occlusion_windows(delta: float) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var creatures: Array[Dictionary] = []
+	for entity in World.get_entities():
+		if not entity.is_creature() or not entity.spawned:
+			continue
+		var sprite := entity.get_node_or_null("Sprite") as Sprite2D
+		if sprite == null:
+			continue
+		var rect := sprite.get_rect()
+		var to_ysort: Transform2D = $YSort.get_global_transform().affine_inverse() * sprite.get_global_transform()
+		creatures.append({
+			"id": entity.get_instance_id(),
+			"center": to_ysort * rect.get_center(),
+			"rect": to_ysort * rect,
+			"y": entity.position.y,
+		})
+	for wall in _walls:
+		wall.update_cutouts(creatures, delta)
 
 
 ## The cursor's point on the ground plane, in the ground layer's space.
@@ -556,7 +584,8 @@ func _paint_level() -> void:
 		var wall := WallEdge.new()
 		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 		$YSort.add_child(wall)
-		wall.setup(key, kind_at, func(cell: Vector2i) -> bool: return cell in _terrain["floor"], WALL_VALUE)
+		wall.setup(key, kind_at, WALL_VALUE)
+		_walls.append(wall)
 
 
 ## Server: one Door node per door edge, through the spawner so every client

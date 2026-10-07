@@ -260,3 +260,13 @@ look as they did at the old 1152×648 base. First launch is a 1920×1080
 window; F11 is borderless fullscreen at the monitor's own size, never
 exclusive, and the window as last left is kept in `settings.cfg` with the
 rest of the client's settings rather than in a second file.
+
+## 32. Full walls with occlusion windows, not stubs
+
+Every wall stands full height, and a creature behind a face shows through
+a soft window in it, centred on its sprite and a tile across, that fades
+in and out as it passes. The stub rule (decisions 27 and its later forms)
+is gone: it lowered walls by a map rule and still hid whatever was deep in
+a wall's shadow, while a window follows the one thing that matters, the
+creature. It is per face, in a shader with up to eight centres, so a crowd
+behind a wall costs nothing more. Doors are unchanged.

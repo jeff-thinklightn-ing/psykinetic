@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.19
+
+Occlusion windows. Client only.
+
+- Every wall stands full height; the stub rule is gone.
+- A creature (player, companion, monster) behind a wall face shows
+  through a soft circular window in it, a tile across, centred on its
+  sprite: the face fades to 25% at the centre and back to opaque at the
+  edge, animating in and out over 150 ms as the creature passes. A
+  shader per face, up to eight windows each.
+- Doors are unchanged.
+
+The server must be updated to v0.1.19 too, as it refuses any other version.
+
 ## v0.1.18
 
 Window and resolution. Client only.

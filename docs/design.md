@@ -5,7 +5,7 @@
 | Path | Contents |
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
-| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face), `click_ripple.gd` (the ring that answers a move click). |
+| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face with occlusion windows, `wall_cutout.gdshader`), `click_ripple.gd` (the ring that answers a move click). |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -570,35 +570,38 @@ in front of what stands on that cell and behind the next. Outside the map
 is near-black (`Main.VOID`). The floor is the brightest surface and the one
 the eye should land on.
 
-*Height.* A wall that would hide floor is a stub a third of a tile tall;
-one that hides nothing stands full height (3 tile heights). A full wall
-hides the cells straight behind it (toward -x for an east edge, -y for a
-south edge) for as many cells as it has rows of height
-(`WallEdge.LOOK_BEHIND`, 6): `WallEdge.is_stub` is "is any of those cells
-walkable", void cells skipped. With floor directly behind, that is "a wall
-on a walkable cell's south or east edge is a stub"; the walls on the far
-side of the one-cell void strips that replaced the old thick wall rows are
-stubs too, since the floor beyond is in their shadow; the map's outer
-walls, with nothing behind them, stand full. Pinned in
-`tests/edge_test.gd`. Corners choose per edge. A drawing rule only: the
-sim knows nothing of it. A full-height exterior
-wall still hides floor beyond it that is further from the camera — the
-north wall of a corridor hides a parallel corridor behind it — as it would
-in any fixed-angle view.
+*Height.* Every wall stands full height (3 tile heights); there are no
+stubs. A wall hides what is behind it as it would in any fixed-angle view,
+except for creatures, which get windows.
+
+*Occlusion windows.* Each face has its own `ShaderMaterial` on
+`render/wall_cutout.gdshader`, with up to `WallEdge.MAX_CUTOUTS` (8)
+cutout centres. Every frame `Main._update_occlusion_windows` lists the
+creature sprites (players, companions, monsters: centre, extent and
+Y-sort position, in the YSort's space) and each wall (`update_cutouts`)
+takes those whose sprite overlaps the face's extent while the face is
+drawn in front of them (the wall's sort position is further down than
+the creature's). Such a creature gets a soft circular cutout centred on
+its sprite, `WallEdge.RADIUS` (a tile, 32 px) wide, fading the face to
+25% at the centre and back to opaque at the edge, so the creature shows
+through the wall. A cutout animates in over `CUTOUT_SECONDS` (150 ms)
+when the overlap begins and out again when it ends; the strongest eight
+reach the shader. Walls that are behind a creature are left alone, since
+the creature is drawn over them anyway. Pinned in `tests/edge_test.gd`.
+A drawing rule only: the sim knows nothing of it.
 
 *Corners.* Two faces of one value meeting at an L or a T would merge, so
 where another wall meets an end of this one at an angle (doors count as
 nothing) a 1 px line one step darker than the face (`WallEdge.CORNER_STEP`)
 runs up that end; a free end and a straight continuation get nothing. A
 wall meeting from behind the through wall is covered by it, line and all.
-Stubs follow the same rules at their height.
 
 **Doors** draw themselves (`Door._draw`) as wall-height objects whatever
 the walls beside them do: a jamb post at each end of the edge to full wall
 height, and a panel between them that swings in the ground plane about the
 hinge post, its own top strip (`Door.PANEL_TOP`, 4 px) turning with it to
-show the panel's thickness. A broken door leaves its posts. There is no
-cutaway and no fade: a tall wall hides what is behind it.
+show the panel's thickness. A broken door leaves its posts. Doors get no
+occlusion windows.
 
 **The map** (`main.gd`, `LEVEL`; format in `sim/terrain.gd`) is written at
 double resolution: even coordinates are cells (`.` floor, `~` fire, space
