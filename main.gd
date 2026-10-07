@@ -232,8 +232,10 @@ var _pick_grid := Vector2(NAN, NAN)
 enum Drag { UNDECIDED, TURN, PITCH, MOVED }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
-## Click scheme, 3D: W/S or A/D were held last frame (their release saves).
+## Click scheme, 3D: Q/E, W/S or A/D were held last frame (their release
+## saves).
 var _tilting := false
+var _zooming := false
 var _turning := false
 ## WASD: when the facing and the last bump were sent, in msec.
 var _face_sent_at := 0
@@ -386,18 +388,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_authority():
 			_start_level()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E]:
-		# Click scheme, 3D: look to the character's left (Q) or right (E),
-		# a step to the next diamond. With no character, a plain step that
-		# way round. Nothing in WASD.
-		if _client3d != null and Net.controls == "click":
-			var side := -1 if key.keycode == KEY_Q else 1
-			var me := _local_player()
-			if me == null:
-				_client3d.orbit(side)
-			else:
-				_client3d.look_toward(GridEntity.side_of(me.heading(), side), side)
-		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var local := _local_player()
 		if local != null:
@@ -503,14 +493,20 @@ static func grid_direction(vector: Vector2) -> Vector2i:
 ## The movement keys held, as letters ("wd"), from the keyboard or from
 ## --test-walk while it runs.
 func _held_key_names() -> String:
+	return _held_letters([KEY_W, KEY_A, KEY_S, KEY_D])
+
+
+## Which of [param keys] are held, as lower-case letters, from the
+## keyboard or from --test-walk while it runs (which may name any).
+func _held_letters(keys: Array[Key]) -> String:
 	if not Net.test_walk.is_empty():
 		return _test_walk_keys()
-	var keys := ""
+	var held := ""
 	if DisplayServer.get_name() != "headless":
-		for key: Key in [KEY_W, KEY_A, KEY_S, KEY_D]:
+		for key in keys:
 			if Input.is_physical_key_pressed(key):
-				keys += OS.get_keycode_string(key).to_lower()
-	return keys
+				held += OS.get_keycode_string(key).to_lower()
+	return held
 
 
 ## (D - A, W - S) for [param keys] as _held_key_names gives them.
@@ -571,19 +567,27 @@ func _end_middle_drag() -> void:
 		Drag.UNDECIDED:
 			# Let go without moving: in the click scheme, a middle click.
 			if Net.controls == "click":
-				_client3d.level_pitch()
+				_client3d.reset_view()
 	_drag = Drag.UNDECIDED
 
 
-## Click scheme, 3D: W/S tilt and A/D turn the camera while held; letting
-## go keeps the tilt and settles the turn on a diamond, both saved. The
-## keys do nothing else in this scheme (and nothing at all in 2D).
+## Click scheme, 3D: W/S zoom, Q/E tilt (E up toward top-down, Q down)
+## and A/D turn the camera while held; letting go keeps the zoom and the
+## tilt and settles the turn on a diamond, all saved. The keys do nothing
+## else in this scheme (and nothing at all in 2D).
 func _drive_camera_keys(delta: float) -> void:
 	if _client3d == null or Net.controls != "click":
 		return
-	var keys := _held_key_names()
-	var tilt := float("w" in keys) - float("s" in keys)
+	var keys := _held_letters([KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E])
+	var zoom := float("w" in keys) - float("s" in keys)
+	var tilt := float("e" in keys) - float("q" in keys)
 	var turn := float("d" in keys) - float("a" in keys)
+	if zoom != 0.0:
+		_client3d.zoom_by(zoom, delta)
+		_zooming = true
+	elif _zooming:
+		_zooming = false
+		_client3d.end_zoom()
 	if tilt != 0.0:
 		_client3d.tilt(tilt, delta)
 		_tilting = true
@@ -1604,7 +1608,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   Q/E look left/right   A/D turn   W/S tilt   MMB click level"
+			hints += "   W/S zoom   Q/E tilt   A/D turn   MMB click reset view"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
@@ -1625,7 +1629,7 @@ func _debug_text() -> String:
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
 	if _client3d != null:
-		lines.append("yaw: %.1f deg   pitch: %.1f deg" % [_client3d.yaw, _client3d.pitch])
+		lines.append("yaw: %.1f deg   pitch: %.1f deg   zoom: %.2fx" % [_client3d.yaw, _client3d.pitch, _client3d.zoom])
 	else:
 		lines.append("azimuth: %.1f deg" % Iso.azimuth)
 	lines.append("controls: %s" % Net.controls)

@@ -36,26 +36,27 @@ extends Node3D
 ## `rest_pitch`, between PITCH_MIN and PITCH_MAX), yawed by `yaw` about
 ## the local player: 0 matches the 2D diamond (+x down-right, +y
 ## down-left). It rests only on the four diamond views: yaw 0 and each
-## ORBIT_STEP (90°) from it. The ortho size grows with the tilt above
-## CAMERA_PITCH, up to PEEK_PULL_BACK times at PITCH_MAX (size_for), so a
-## steeper view also shows more round the player.
+## ORBIT_STEP (90°) from it. The ortho size is CAMERA_SIZE times `zoom`
+## (ZOOM_MIN..ZOOM_MAX), and times up to PEEK_PULL_BACK during a WASD
+## pitch peek; the tilt alone never changes it.
 ##
-## Click scheme, by keys (Main drives them): W/S tilt the resting pitch at
-## TILT_RATE while held, slowing into either end, and it stays where it is
-## left; Q/E look to the local player's left and right: a step to the
-## next diamond, the way round that brings that side of the character
-## nearer the top of the screen (look_toward), in one ease of
-## ORBIT_SECONDS; A/D turn the yaw, screen-fixed, at TURN_RATE while held and, let go, it
-## carries on to the next diamond the way it was turning if it was more
-## than TURN_COMMIT past the last one it passed, or goes back to that one,
-## the settle starting at the turning speed so the release flows into it;
-## a middle click levels the pitch back to CAMERA_PITCH. WASD scheme: a sideways middle drag turns
+## Click scheme, by keys (Main drives them): W/S zoom in and out at
+## ZOOM_RATE while held, slowing into either end, centred on the player
+## (the camera follows the player alone in this scheme), and the zoom stays
+## where it is left; Q/E tilt the resting pitch at TILT_RATE while held,
+## slowing into either end, and it stays where it is left; A/D turn the
+## yaw, screen-fixed, at TURN_RATE while held and, let go, it carries on to
+## the next diamond the way it was turning if it was more than TURN_COMMIT
+## past the last one it passed, or goes back to that one, the settle
+## starting at the turning speed so the release flows into it; a middle
+## click puts tilt and zoom back to CAMERA_PITCH and 1 over
+## RESET_SECONDS. WASD scheme: a sideways middle drag turns
 ## the yaw freely and, let go, settles on the nearest diamond; a vertical
 ## one is a pitch peek, tilting from the resting pitch toward PEEK_PITCH in
 ## proportion to the drag (full over PEEK_DRAG_PX, eased) and springing
-## back over PEEK_RETURN_SECONDS. The diamond and the resting pitch persist
-## in settings.cfg (Net.camera_yaw, Net.camera_pitch); a peek saves
-## nothing. The near/far rule reads only the yaw, so the near walls stay
+## back over PEEK_RETURN_SECONDS. The diamond, the resting pitch and the
+## zoom persist in settings.cfg (Net.camera_yaw, Net.camera_pitch,
+## Net.camera_zoom); a peek saves nothing. The near/far rule reads only the yaw, so the near walls stay
 ## see-through through any tilt.
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
@@ -95,23 +96,27 @@ const CAMERA_FOLLOW_RATE := 6.0
 const ORBIT_STEP := 90.0
 ## A WASD middle drag let go: on to the nearest diamond, eased out.
 const SETTLE_SECONDS := 0.25
-## Q/E: one diamond to the next, eased in and out.
-const ORBIT_SECONDS := 0.4
 ## A/D let go: past the last diamond by more than this, on to the next.
 const TURN_COMMIT := 10.0
 ## A/D let go back to the diamond it came from: the settle takes the time
 ## a stop from the turning speed would, plus this, for the turn back.
 const TURN_RETURN_EXTRA := 0.15
-## Click scheme keys: A/D turn this fast (degrees a second); W/S tilt this
+## Click scheme keys: A/D turn this fast (degrees a second); Q/E tilt this
 ## fast between PITCH_MIN and PITCH_MAX, slowing over the last
-## TILT_EASE_DEGREES at either end; a middle click levels the pitch to
-## CAMERA_PITCH over LEVEL_SECONDS.
+## TILT_EASE_DEGREES at either end; W/S zoom by ZOOM_RATE a second (a
+## factor) between ZOOM_MIN and ZOOM_MAX times the default size, slowing
+## over the last ZOOM_EASE (a factor) at either end; a middle click puts
+## tilt and zoom back over RESET_SECONDS.
 const TURN_RATE := 180.0
 const TILT_RATE := 60.0
 const PITCH_MIN := 40.0
 const PITCH_MAX := 85.0
 const TILT_EASE_DEGREES := 8.0
-const LEVEL_SECONDS := 0.25
+const ZOOM_RATE := 1.5
+const ZOOM_MIN := 0.6
+const ZOOM_MAX := 2.0
+const ZOOM_EASE := 1.15
+const RESET_SECONDS := 0.25
 ## The pitch peek: the tilt it goes to, the drag for all of it (screen
 ## px), how far it pulls back (ortho size), and the spring back.
 const PEEK_PITCH := 85.0
@@ -191,9 +196,9 @@ var _ease_from := 0.0
 var _ease_to := 0.0
 var _ease_t := 1.0
 ## How the ease runs: its length, and its curve (SINE_OUT for a settle,
-## IN_OUT for Q/E, FLOW for an A/D release: a cubic that starts at
-## _ease_velocity degrees a second and stops on the target).
-enum Ease { SINE_OUT, IN_OUT, FLOW }
+## FLOW for an A/D release: a cubic that starts at _ease_velocity degrees
+## a second and stops on the target).
+enum Ease { SINE_OUT, FLOW }
 var _ease_seconds := SETTLE_SECONDS
 var _ease_curve := Ease.SINE_OUT
 var _ease_velocity := 0.0
@@ -211,9 +216,13 @@ var frozen := false
 ## `pitch` is `rest_pitch` but during a pitch peek.
 var pitch := CAMERA_PITCH
 var rest_pitch := CAMERA_PITCH
-## A middle click's levelling: from, and how far along (1: not levelling).
-var _level_from := CAMERA_PITCH
-var _level_t := 1.0
+## The zoom: CAMERA_SIZE times this is the ortho size at rest.
+var zoom := 1.0
+## A middle click's reset: tilt and zoom from, and how far along (1: not
+## resetting).
+var _reset_pitch_from := CAMERA_PITCH
+var _reset_zoom_from := 1.0
+var _reset_t := 1.0
 ## The pitch peek: held, how far in (0 at rest .. 1 full), and the spring
 ## back's start and progress (1: not springing).
 var _peeking := false
@@ -264,7 +273,8 @@ func setup(terrain: Dictionary) -> void:
 	yaw = Net.camera_yaw
 	rest_pitch = clampf(Net.camera_pitch, PITCH_MIN, PITCH_MAX)
 	pitch = rest_pitch
-	_camera.size = size_for(pitch)
+	zoom = clampf(Net.camera_zoom, ZOOM_MIN, ZOOM_MAX)
+	_apply_size()
 	_place_camera()
 	_classify_walls()
 
@@ -274,7 +284,7 @@ func _process(delta: float) -> void:
 	_sync_doors()
 	_ease_yaw(delta)
 	_ease_peek(delta)
-	_ease_level(delta)
+	_ease_reset(delta)
 	_follow(delta)
 
 
@@ -351,44 +361,10 @@ func _local_player() -> Player:
 
 # --- Orbit ---------------------------------------------------------------------
 
-## The ortho size at [param degrees] of tilt: CAMERA_SIZE up to
-## CAMERA_PITCH, growing to PEEK_PULL_BACK times it at PITCH_MAX.
-static func size_for(degrees: float) -> float:
-	var share := clampf(inverse_lerp(CAMERA_PITCH, PITCH_MAX, degrees), 0.0, 1.0)
-	return CAMERA_SIZE * lerpf(1.0, PEEK_PULL_BACK, share)
-
-
-## Up the screen at [param yaw_degrees], on the ground, in grid units: away
-## from the camera (see _camera_offset).
-static func screen_up(yaw_degrees: float) -> Vector2:
-	var up := Vector3(-1, 0, -1).rotated(Vector3.UP, deg_to_rad(yaw_degrees))
-	return Vector2(up.x, up.z).normalized()
-
-
-## Which way (-1 or 1) a step from the diamond [param step] puts
-## [param vector] (grid units) nearer the top of the screen; [param tie]
-## when both do equally (it points straight up or down the screen now).
-static func turn_raising(step: float, vector: Vector2, tie: int) -> int:
-	var back := vector.dot(screen_up(step - ORBIT_STEP))
-	var on := vector.dot(screen_up(step + ORBIT_STEP))
-	if is_equal_approx(back, on):
-		return tie
-	return -1 if back > on else 1
-
-
-## Click scheme, Q/E: look toward [param vector] (grid units, the
-## character's left or right): a step to the next diamond, whichever way
-## round brings it nearer the top of the screen, the far side of the view.
-## [param tie] when it is straight up or down the screen.
-func look_toward(vector: Vector2, tie: int) -> void:
-	orbit(turn_raising(_yaw_step, vector, tie))
-
-
-## The next diamond round, in one ease in and out; saved.
-func orbit(direction: int) -> void:
-	_settle_on(_yaw_step + ORBIT_STEP * signf(direction))
-	_ease_seconds = ORBIT_SECONDS
-	_ease_curve = Ease.IN_OUT
+## The ortho size: CAMERA_SIZE times the zoom, times the pitch peek's
+## pull back while there is one (eased as its tilt is).
+func _apply_size() -> void:
+	_camera.size = CAMERA_SIZE * zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek))
 
 
 ## Click scheme, A/D held: turn [param direction] (-1 or 1) for
@@ -434,42 +410,69 @@ static func settle_target(degrees: float, direction: float) -> float:
 	return passed
 
 
-## Click scheme, W/S held: tilt the resting pitch [param direction] (1 up
+## Click scheme, Q/E held: tilt the resting pitch [param direction] (1 up
 ## toward top-down, -1 down) for [param delta] seconds at TILT_RATE,
 ## slowing over the last TILT_EASE_DEGREES before either end. It stays
 ## where it is left.
 func tilt(direction: float, delta: float) -> void:
 	if _peeking or direction == 0.0:
 		return
-	_level_t = 1.0
+	_reset_t = 1.0
 	var limit := PITCH_MAX if direction > 0.0 else PITCH_MIN
 	var left := absf(limit - rest_pitch)
 	var speed := TILT_RATE * clampf(left / TILT_EASE_DEGREES, 0.1, 1.0)
 	_set_rest_pitch(move_toward(rest_pitch, limit, speed * delta))
 
 
-## Click scheme, W/S let go: the pitch is kept in the settings file.
+## Click scheme, Q/E let go: the pitch is kept in the settings file.
 func end_tilt() -> void:
 	Net.camera_pitch = rest_pitch
 	Net.save_view_settings()
 
 
-## Click scheme, a middle click: level the pitch back to CAMERA_PITCH over
-## LEVEL_SECONDS; saved.
-func level_pitch() -> void:
-	if _peeking:
+## Click scheme, W/S held: zoom in ([param direction] 1: a smaller view,
+## nearer the player) or out (-1) for [param delta] seconds, by ZOOM_RATE
+## a second, slowing over the last ZOOM_EASE before either end. It stays
+## where it is left. The camera is on the player, so that is the centre.
+func zoom_by(direction: float, delta: float) -> void:
+	if direction == 0.0:
 		return
-	_level_from = rest_pitch
-	_level_t = 0.0
-	Net.camera_pitch = CAMERA_PITCH
+	_reset_t = 1.0
+	var limit := ZOOM_MIN if direction > 0.0 else ZOOM_MAX
+	# In logs, so each second is the same factor whichever way.
+	var left := absf(log(limit) - log(zoom))
+	var speed := log(ZOOM_RATE) * clampf(left / log(ZOOM_EASE), 0.1, 1.0)
+	zoom = exp(move_toward(log(zoom), log(limit), speed * delta))
+	_apply_size()
+
+
+## Click scheme, W/S let go: the zoom is kept in the settings file.
+func end_zoom() -> void:
+	Net.camera_zoom = zoom
 	Net.save_view_settings()
 
 
-func _ease_level(delta: float) -> void:
-	if _level_t >= 1.0:
+## Click scheme, a middle click: tilt and zoom back to CAMERA_PITCH and 1
+## over RESET_SECONDS; saved.
+func reset_view() -> void:
+	if _peeking:
 		return
-	_level_t = minf(_level_t + delta / LEVEL_SECONDS, 1.0)
-	_set_rest_pitch(lerpf(_level_from, CAMERA_PITCH, sin(_level_t * PI * 0.5)))
+	_reset_pitch_from = rest_pitch
+	_reset_zoom_from = zoom
+	_reset_t = 0.0
+	Net.camera_pitch = CAMERA_PITCH
+	Net.camera_zoom = 1.0
+	Net.save_view_settings()
+
+
+func _ease_reset(delta: float) -> void:
+	if _reset_t >= 1.0:
+		return
+	_reset_t = minf(_reset_t + delta / RESET_SECONDS, 1.0)
+	var eased := sin(_reset_t * PI * 0.5)
+	zoom = lerpf(_reset_zoom_from, 1.0, eased)
+	_set_rest_pitch(lerpf(_reset_pitch_from, CAMERA_PITCH, eased))
+	_apply_size()
 
 
 func _set_rest_pitch(degrees: float) -> void:
@@ -480,7 +483,7 @@ func _set_rest_pitch(degrees: float) -> void:
 
 func _set_pitch(degrees: float) -> void:
 	pitch = degrees
-	_camera.size = size_for(degrees)
+	_apply_size()
 	_place_camera()
 
 
@@ -605,8 +608,6 @@ func _ease_yaw(delta: float) -> void:
 	_ease_t = minf(_ease_t + delta / _ease_seconds, 1.0)
 	var s := _ease_t
 	match _ease_curve:
-		Ease.IN_OUT:
-			_set_yaw(lerpf(_ease_from, _ease_to, 0.5 - 0.5 * cos(s * PI)))
 		Ease.FLOW:
 			# Cubic Hermite: from _ease_from at _ease_velocity to _ease_to at rest.
 			var along := (-2.0 * s * s * s + 3.0 * s * s) * (_ease_to - _ease_from)

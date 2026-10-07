@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.37
+
+Click scheme camera keys, remapped. Client (the server only for the version).
+
+- **W/S** zoom in and out on your character while held (1.5× a second),
+  between 0.6× and 2×, slowing into either end. The zoom stays where you
+  leave it and is saved.
+- **Q/E** tilt the camera while held (E up toward top-down, Q down),
+  between 40° and 85°, sticky and saved. Tilting no longer zooms out on
+  its own.
+- **A/D** turn as before.
+- **A middle click** resets both tilt and zoom over 250 ms.
+- The Q/E 90° step and "look left/right" are gone.
+- The WASD scheme is unchanged.
+
+The server must be updated to v0.1.37 too, as it refuses any other version.
+
 ## v0.1.36
 
 Q/E relative to the character. Client (the server only for the version).

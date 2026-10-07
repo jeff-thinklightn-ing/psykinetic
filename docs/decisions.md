@@ -524,3 +524,13 @@ was. The choice is between the two steps, not against staying, since in a
 diamond view an orthogonal side is always 45° off the top either way.
 A/D stay screen-fixed for free sweeping. Heading is the shown step while
 walking, else the replicated facing, which a blow sets too.
+
+## 60. Click scheme: W/S zoom, Q/E tilt, A/D turn
+
+The click scheme's camera keys are remapped: W/S zoom on the player
+(0.6-2×, sticky, saved), Q/E tilt (40-85°, sticky, saved), A/D turn as in
+58, and a middle click resets tilt and zoom. Zoom is its own control, so
+the tilt no longer pulls the camera back; only the WASD pitch peek, which
+is unchanged, still pulls back while held. The Q/E 90° step and the
+character-relative Q/E (59) are gone. This replaces 59 and the key map
+of 57 and 58.

@@ -824,28 +824,23 @@ it (`Client3D.nearest_diamond`; half way between two, the higher).
 **Tilt**: the pitch rests at `rest_pitch`, between `PITCH_MIN` (40°) and
 `PITCH_MAX` (85°, near top-down), saved as `camera_pitch` in
 `settings.cfg` (`Net.camera_pitch`, held to that range on load,
-`Net.saved_pitch`). The ortho size follows the tilt (`size_for`):
-`CAMERA_SIZE` up to 50°, growing to `PEEK_PULL_BACK` (1.2) times it at
-85°, so a steeper view also shows more round the player. The near/far
-wall rule reads only the yaw, so the same near walls stay see-through
-through any tilt. F3 shows the yaw and the pitch.
+`Net.saved_pitch`). **Zoom**: the ortho size is `CAMERA_SIZE` times
+`zoom`, between `ZOOM_MIN` (0.6) and `ZOOM_MAX` (2), saved as
+`camera_zoom` (`Net.camera_zoom`, held to that range on load,
+`Net.saved_zoom`); the tilt never changes the size, and only the WASD
+pitch peek adds a pull-back of its own (`Client3D._apply_size`). The
+near/far wall rule reads only the yaw, so the same near walls stay
+see-through through any tilt or zoom. F3 shows the yaw, pitch and zoom.
 
 *Click scheme camera, on the keys* (`Main._drive_camera_keys`, before the
-pick): W/S tilt the resting pitch while held at `TILT_RATE` (60°/s),
-slowing over the last `TILT_EASE_DEGREES` (8°) into either end, and it
-stays where it is left (saved on release). Q/E look to the character's
-left and right, not the screen's: the local player's heading
-(`GridEntity.heading`: the step being shown while it walks, otherwise its
-facing, which every move and blow sets) turned a quarter
-(`GridEntity.side_of`) gives its left or right on the ground, and the
-camera steps to the next diamond whichever way round (±90°) brings that
-vector nearer the top of the screen, the far side of the view
-(`Client3D.turn_raising`, against `Client3D.screen_up`; when the side
-points straight up or down the screen now, Q turns one way and E the
-other). So at a corner the passage on the character's left comes into
-view with Q, whatever diamond the camera was on. The step is one ease in
-and out over `ORBIT_SECONDS` (400 ms), through the axis-aligned view
-without stopping. With no character, Q/E step the screen's way round.
+pick): W/S zoom in and out while held (`Client3D.zoom_by`), by
+`ZOOM_RATE` (1.5×) a second, slowing over the last `ZOOM_EASE` (a factor
+of 1.15) into either end, on the player (the camera follows the player
+alone in this scheme, so the middle of the screen is them), and the zoom
+stays where it is left (saved on release). Q/E tilt the resting pitch
+while held at `TILT_RATE` (60°/s; E up toward top-down, Q down), slowing
+over the last `TILT_EASE_DEGREES` (8°) into either end, and it stays
+where it is left (saved on release). There is no Q/E step any more.
 A/D are screen-fixed, for free sweeping: they turn the yaw while held at
 `TURN_RATE` (180°/s), through any angle; let go, it carries on to the next
 diamond the way it was turning if it is more than `TURN_COMMIT` (10°) past
@@ -856,15 +851,16 @@ so letting go flows into it: going on, it takes the time a stop from
 that speed would (twice the distance over the speed); going back, it
 runs on a few degrees, turns and comes back, `TURN_RETURN_EXTRA` (150 ms)
 longer. A middle click (the button let go having moved less than
-`Main.DRAG_AXIS_PX`) levels the pitch to 50° over `LEVEL_SECONDS`
-(250 ms; saved); a middle drag does nothing.
+`Main.DRAG_AXIS_PX`) puts tilt and zoom back to 50° and 1× together over
+`RESET_SECONDS` (250 ms; saved, `Client3D.reset_view`); a middle drag
+does nothing.
 
 *WASD scheme camera, on the middle button*: a drag is a turn or a **pitch
 peek** by whichever axis it first moves `Main.DRAG_AXIS_PX` (6 px) on, and
 stays that until let go. The pitch peek tilts from the resting pitch
 toward `PEEK_PITCH` (85°) in proportion to the drag either way, all of
-it over `PEEK_DRAG_PX` (300 px), eased in and out (smoothstep), the size
-following; let go, it springs back to the resting pitch over
+it over `PEEK_DRAG_PX` (300 px), eased in and out (smoothstep), pulling
+back to `PEEK_PULL_BACK` (1.2) times the zoomed size as it goes; let go, it springs back to the resting pitch over
 `PEEK_RETURN_SECONDS` (250 ms), never changing the yaw and saving
 nothing. Q/E do nothing, and the sideways drag turns the camera: the yaw
 follows the horizontal drag (`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the
@@ -941,11 +937,10 @@ orders, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
-verbs land on the clicked target. In 3D, W/S tilt the camera (it stays
-where you leave it), Q/E look to the character's left and right (a step
-to the next diamond), A/D turn it freely
-(settling on a diamond), and a middle click levels it; middle drags do
-nothing (see the 3D view). The
+verbs land on the clicked target. In 3D, W/S zoom the camera on the
+player and Q/E tilt it (both stay where you leave them), A/D turn it
+freely (settling on a diamond), and a middle click resets tilt and zoom;
+middle drags do nothing (see the 3D view). The
 camera follows the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;
