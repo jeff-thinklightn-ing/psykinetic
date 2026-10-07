@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_player_reset()
 	_test_old_snapshot_gets_current_looks()
 	_test_click_snaps_to_floor()
+	_test_renderer_setting()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -242,6 +243,38 @@ func _test_click_snaps_to_floor() -> void:
 ## A point on the ground plane at continuous grid coordinates.
 func _grid_point(grid: Vector2) -> Vector2:
 	return Vector2((grid.x - grid.y) * Iso.HALF.x + Iso.HALF.x, (grid.x + grid.y) * Iso.HALF.y + Iso.HALF.y)
+
+
+func _test_renderer_setting() -> void:
+	print("
+== renderer: 3D unless 2d is asked for; the command line wins over the file ==")
+	_check(Net.renderer_from("2d") == "2d" and Net.renderer_from(" 2D ") == "2d", "2d is the 2D view")
+	_check(Net.renderer_from("3d") == "3d" and Net.renderer_from("") == "3d" and Net.renderer_from("iso") == "3d",
+			"3d, nothing or anything else is the 3D view")
+	var path := OS.get_user_data_dir().path_join("renderer_test.cfg")
+	var saved := [Net._settings_override, Net.renderer, Net._renderer_given, Net._settings_renderer, Net.player_id]
+	Net._settings_override = path
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string("address=127.0.0.1
+renderer=2d
+")
+	file.close()
+	Net.renderer = "3d"
+	Net._renderer_given = false
+	Net._apply_renderer_setting()
+	_check(Net.renderer == "2d", "renderer=2d in the file picks the 2D view")
+	Net.renderer = "3d"
+	Net._renderer_given = true
+	Net._apply_renderer_setting()
+	_check(Net.renderer == "3d", "--renderer on the command line wins over the file")
+	Net.save_settings("127.0.0.1", 17782, "", "Tester")
+	_check("renderer=2d" in FileAccess.get_file_as_string(path), "a rewrite keeps the file's renderer=, not the command line's")
+	DirAccess.remove_absolute(path)
+	Net._settings_override = saved[0]
+	Net.renderer = saved[1]
+	Net._renderer_given = saved[2]
+	Net._settings_renderer = saved[3]
+	Net.player_id = saved[4]
 
 
 func _check(ok: bool, label: String) -> void:

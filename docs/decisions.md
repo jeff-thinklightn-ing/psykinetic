@@ -351,3 +351,14 @@ Main and anything else that reacts to a player going listens to
 `Net.peer_left`, emitted once per peer, not to the multiplayer's
 `peer_disconnected`, which fires twice for a peer dropped early (once from
 `Net._drop`, once from ENet).
+
+## 41. The 3D view is the default; 2D is the opt-out
+
+A client shows the 3D view unless it asks for the 2D one with
+`--renderer=2d` or `renderer=2d` in `settings.cfg`; any other value, or
+none, is 3D, so a typo lands on the view being developed rather than on
+the old one. The command line wins over the file for that run only: a
+rewrite of the file (window resize, F11, orbit) writes back the file's own
+`renderer=` line, so a one-off `--renderer` never changes what the next
+plain launch shows. Main also never builds the view on a server, headless
+or not.

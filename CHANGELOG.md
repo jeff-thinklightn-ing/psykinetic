@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.27
+
+The 3D view is the default. Client.
+
+- A client now starts in the 3D view. `--renderer=2d`, or a line
+  `renderer=2d` in `settings.cfg`, picks the 2D view; anything else, or
+  nothing, is 3D.
+- `renderer=` in `settings.cfg` is now honoured (it was ignored, and wiped
+  when the file was rewritten on a resize). The command line overrides it
+  for that run without changing the file.
+
+The server must be updated to v0.1.27 too, as it refuses any other version.
+
 ## v0.1.26
 
 Docs only; no code change.

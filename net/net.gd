@@ -18,7 +18,8 @@ extends Node
 ##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
 ##                                a URL ending /chat/completions is spoken to OpenAI-style)
 ##   --settings=<path>            client settings file to use instead of the one next to the exe
-##   --renderer=2d|3d             client view: the 2D isometric one (default) or the 3D one (client3d/)
+##   --renderer=2d|3d             client view: the 3D one (client3d/, default) or the 2D isometric one;
+##                                overrides the settings file's renderer=
 ##   --player-id=<id> --name=<s>  client: identity to present instead of the settings file's
 ##
 ## With no mode argument: an exported build reads settings.cfg (address=,
@@ -29,7 +30,9 @@ extends Node
 ## player by it. A host run from the project uses a fixed dev id.
 ## window_width=, window_height= and window_mode= (windowed, fullscreen)
 ## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
-## is the 3D view's orbit step as last left.
+## is the 3D view's orbit step as last left. renderer=2d picks the 2D view;
+## anything else, or no line, is the 3D one. It is read whatever the mode,
+## and kept as written when the file is rewritten.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -130,7 +133,12 @@ var _authenticated: Dictionary[int, String] = {}
 ## True when an exported build has no settings file and must ask for one.
 var needs_setup := false
 ## Which client view Main shows: "2d" or "3d". Nothing on a server.
-var renderer := "2d"
+var renderer := "3d"
+## --renderer was on the command line; it wins over the settings file.
+var _renderer_given := false
+## The settings file's renderer= as written ("" for no line), written back
+## as it was so that a --renderer run does not change the file.
+var _settings_renderer := ""
 ## The window as the settings file has it: its windowed size and whether it
 ## is fullscreen. Applied at start, kept up to date, saved with the rest.
 var window_size := DEFAULT_WINDOW_SIZE
@@ -182,6 +190,7 @@ func _enter_tree() -> void:
 	_parse_args()
 	if not _mode_given:
 		_apply_settings()
+	_apply_renderer_setting()
 	_apply_window_settings()
 	if player_id.is_empty():
 		# A client run from the command line gets a throwaway id; a host or
@@ -255,6 +264,21 @@ func _apply_settings() -> void:
 		save_settings(address, port, token, player_name)
 		print("[net] gave %s a new player id" % path)
 	print("[net] using %s" % path)
+
+
+## renderer= from the settings file, unless --renderer was given: only
+## "2d" picks the 2D view.
+func _apply_renderer_setting() -> void:
+	var path := settings_path()
+	if path != "" and FileAccess.file_exists(path):
+		_settings_renderer = str(_read_settings(path).get("renderer", ""))
+		if not _renderer_given and _settings_renderer != "":
+			renderer = renderer_from(_settings_renderer)
+
+
+## "2d" is the 2D view; anything else is the 3D one.
+static func renderer_from(value: String) -> String:
+	return "2d" if value.strip_edges().to_lower() == "2d" else "3d"
 
 
 ## The window as the settings file last saw it, applied before the first
@@ -355,6 +379,8 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\n") % [
 		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks,
 		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw)])
+	if _settings_renderer != "":
+		file.store_string("renderer=%s\n" % _settings_renderer)
 	file.close()
 	return true
 
@@ -753,7 +779,8 @@ func _set_option(key: String, value: String) -> void:
 		"--settings":
 			_settings_override = value
 		"--renderer":
-			renderer = "3d" if value == "3d" else "2d"
+			renderer = renderer_from(value)
+			_renderer_given = true
 		"--player-id":
 			player_id = value.strip_edges()
 		"--name":

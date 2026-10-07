@@ -213,7 +213,7 @@ var _walls: Array[WallEdge] = []
 const NONE := Vector2i(-1, -1)
 var _held_target := NONE
 
-## The 3D view, when running with --renderer=3d; the 2D nodes are hidden.
+## The 3D view (the default; see Net.renderer); the 2D nodes are hidden.
 var _client3d: Client3D
 @onready var ground: TileMapLayer = $Ground
 @onready var entities: Node2D = $YSort/Entities
@@ -240,7 +240,7 @@ func _ready() -> void:
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
 	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
-	if Net.renderer == "3d" and DisplayServer.get_name() != "headless":
+	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
 		_show_3d()
 	RenderingServer.set_default_clear_color(VOID)
 
@@ -399,7 +399,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toss_from = get_global_mouse_position()
 
 
-## --renderer=3d: the 3D view takes over drawing and picking; the 2D
+## The 3D view (unless renderer is 2d) takes over drawing and picking; the 2D
 ## ground, walls, entities (still the replicated state, just unseen),
 ## cursor, ripple and toss arrow are hidden. The HUD stays. Input is
 ## handled here as for the 2D view, with the picks and the hover and

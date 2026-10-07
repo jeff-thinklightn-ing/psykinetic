@@ -6,7 +6,7 @@
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
 | `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face, near ones translucent), `click_ripple.gd` (the ring that answers a move click). |
-| `client3d/` | The 3D view (`--renderer=3d`): the room out of the Kenney Castle Kit, puppets for entities, a fixed orthographic camera. Shares everything with the 2D client but the drawing. |
+| `client3d/` | The 3D view (the default; `--renderer=2d` for the 2D one): the room out of the Kenney Castle Kit, puppets for entities, a fixed orthographic camera. Shares everything with the 2D client but the drawing. |
 | `art/kenney-castle/` | Kenney's Castle Kit 2.0 (CC0), 1-unit GLB modules. |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
@@ -705,8 +705,10 @@ point at the camera (edge-on at the limits).
 
 ## The 3D view
 
-`client3d/client3d.gd` (`Client3D`). With `--renderer=3d` (default `2d`;
-a server never has one) Main hides its 2D ground, walls, entities, cursor,
+`client3d/client3d.gd` (`Client3D`). Unless the client asks for the 2D
+view (`--renderer=2d`, or `renderer=2d` in `settings.cfg`; the command
+line wins, and anything but `2d` is 3D; a server never has a view) Main
+hides its 2D ground, walls, entities, cursor,
 ripple and toss arrow and adds a `Client3D` under the same tree, so the
 net code, the spawner, the entity specs, `settings.cfg` and the parsed map
 are the ones the 2D client uses: the 2D entity nodes go on being the

@@ -1,7 +1,7 @@
 class_name Client3D
 extends Node3D
 ## The 3D view of the game. Instanced by Main under the same tree as the 2D
-## view when the client runs with --renderer=3d, so all the net code, the
+## view unless the client runs with renderer 2d (see Net.renderer), so all the net code, the
 ## entity specs, the settings file and the map data are the ones the 2D
 ## client uses; the 2D nodes are simply hidden and go on being the
 ## replicated state. One tile is one unit: grid (x, y) is 3D (x, 0, y). The
