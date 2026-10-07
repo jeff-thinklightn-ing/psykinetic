@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.16
+
+Quiet walls. Client only.
+
+- Every wall face is one flat neutral grey (`Main.WALL_VALUE`, 0.18),
+  darker than the floor and a few steps above the void, the same whichever
+  way it faces: no lit side, no gradient, no blue tint.
+- No lit top strip and no end faces; the top of a wall is where the face
+  ends. Corners get a 1 px line one step darker than the face.
+- No shaded floor beside walls: the floor is one surface up to the wall
+  base and stays the brightest thing on screen.
+- Stubs follow the same rules at their height. Doors are unchanged.
+
+The server must be updated to v0.1.16 too, as it refuses any other version.
+
 ## v0.1.15
 
 Low walls wherever floor is behind them. Client only.
@@ -13,6 +28,7 @@ Low walls wherever floor is behind them. Client only.
   which stood full and hid the room behind them, are stubs now. Only walls
   with nothing behind them stand full.
 
+## v0.1.14
 
 - stub rule: south/east edges of walkable cells are stubs
 

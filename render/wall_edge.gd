@@ -1,11 +1,11 @@
 class_name WallEdge
 extends Node2D
-## One wall edge: a face standing on the cell boundary line and, along its
-## top, a lit strip 4 px wide lying on the far side of the line (the top of
-## a thin wall seen from above). Nothing is drawn on the ground beyond the
-## line itself. The node sits in the Y-sorted layer with the cell on the
-## edge's -x / -y side, a hair nearer the camera, so it is in front of what
-## stands on that cell and behind the next.
+## One wall edge: a face standing on the cell boundary line, one flat
+## neutral grey (`Main.WALL_VALUE`) whatever way it faces, with no top
+## strip, no end face and nothing drawn on the ground. The top of a wall is
+## where the face ends. The node sits in the Y-sorted layer with the cell on
+## the edge's -x / -y side, a hair nearer the camera, so it is in front of
+## what stands on that cell and behind the next.
 ##
 ## Height. A wall that would hide floor is a stub a third of a tile tall;
 ## one that hides nothing stands full height. A full wall hides the cells
@@ -18,30 +18,26 @@ extends Node2D
 ## beyond is in their shadow. A drawing rule only: the sim knows nothing of
 ## it.
 ##
-## Joins, from the walls meeting at each end (doors count as nothing):
-## straight on, the strip simply continues; at an L the two strips miter
-## into one shared far vertex; at a T the through strip runs on and the
-## joining wall butts into it (trimmed to the through wall's back when it
-## comes from the far side); at a free end the strip ends square and a
-## short end face closes the wall where that end faces the camera.
+## Corners. Two faces of one value meeting at an L or a T would merge, so
+## where another wall meets an end of this one at an angle (doors count as
+## nothing), a 1 px line one step darker than the face runs up that end. A
+## free end and a straight continuation get nothing.
 
-const FACE_EAST := Color(0.263, 0.278, 0.353)  # The south-east side of a cell.
-const FACE_SOUTH := Color(0.353, 0.373, 0.45)  # The south-west side, lit.
-const END_FACE := Color(0.31, 0.325, 0.4)
-const TOP := Color(0.6, 0.625, 0.72)
+## Thickness of a door panel's top, in px (walls have none).
 const STRIP := 4.0
 const STUB_FRACTION := 1.0 / 3.0
+## How much darker than the face a corner line is.
+const CORNER_STEP := 0.05
 ## Cells straight behind a wall that a full-height one would hide: one per
 ## row of its height (a cell further back is half a tile height up on screen).
 const LOOK_BEHIND := int(Iso.HEIGHTS["wall"] * 2)
 
-enum Join { STRAIGHT, MITER, BUTT, TRIM, FREE }
-
 var key := Vector3i.ZERO
 var far_side_floor := false
-## Per end: the join, and the other wall's strip offset where one matters.
-var _join: Array[int] = [Join.FREE, Join.FREE]
-var _other_offset: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]
+## The face's grey, 0..1.
+var value := 0.18
+## Per end: whether another wall meets it at an angle.
+var _corner: Array[bool] = [false, false]
 
 
 # --- Geometry shared with Door ----------------------------------------------
@@ -70,11 +66,6 @@ static func along_grid(edge: Vector3i) -> Vector2:
 
 static func across_grid(edge: Vector3i) -> Vector2:
 	return Vector2(-1, 0) if edge.z == Terrain.EAST else Vector2(0, -1)
-
-
-## The strip's offset from the line: STRIP px across, on the far side.
-static func strip_offset(edge: Vector3i) -> Vector2:
-	return screen(across_grid(edge)).normalized() * STRIP
 
 
 static func full_height() -> float:
@@ -122,76 +113,48 @@ static func away_from(edge: Vector3i, end: int) -> Vector2:
 	return (ends[1] - ends[0] if end == 0 else ends[0] - ends[1]).normalized()
 
 
-## Draws a face from line [param a]-[param b] up [param h] px, with its lit
-## strip along the top offset by [param offset]; the strip's far corners
-## may be moved for joins.
-static func draw_wall(on: CanvasItem, a: Vector2, b: Vector2, h: float, offset: Vector2, color: Color,
-		far_a := Vector2.INF, far_b := Vector2.INF) -> void:
+## Draws a face from line [param a]-[param b] up [param h] px with a top
+## [param offset] px thick in [param top] along it: a door panel, which
+## unlike a wall shows its thickness as it turns.
+static func draw_wall(on: CanvasItem, a: Vector2, b: Vector2, h: float, offset: Vector2,
+		color: Color, top: Color) -> void:
 	var up := Vector2(0, -h)
 	on.draw_colored_polygon(PackedVector2Array([a, b, b + up, a + up]), color)
-	var qa := far_a if far_a != Vector2.INF else a + offset
-	var qb := far_b if far_b != Vector2.INF else b + offset
-	on.draw_colored_polygon(PackedVector2Array([a + up, b + up, qb + up, qa + up]), TOP)
+	on.draw_colored_polygon(PackedVector2Array([a + up, b + up, b + offset + up, a + offset + up]), top)
 
 
 # --- This edge -----------------------------------------------------------------
 
-func setup(edge: Vector3i, kind_at: Callable, floor_at: Callable) -> void:
+func setup(edge: Vector3i, kind_at: Callable, floor_at: Callable, grey: float) -> void:
 	key = edge
+	value = grey
 	position = Iso.tile_to_local(Vector2i(edge.x, edge.y)) + Vector2(0, 0.5)
 	far_side_floor = is_stub(edge, floor_at)
 	for end in 2:
-		_classify_end(end, kind_at)
+		_corner[end] = _meets_wall_at(end, kind_at)
 	queue_redraw()
 
 
-func _classify_end(end: int, kind_at: Callable) -> void:
+## Whether a wall that is not this one's continuation meets its [param end].
+func _meets_wall_at(end: int, kind_at: Callable) -> bool:
 	var v := vertex_at(key, end)
 	var mine := away_from(key, end)
-	var collinear_wall := false
-	var crossing: Array[Vector3i] = []
 	for entry: Array in edges_at_vertex(v):
 		var other: Vector3i = entry[0]
 		if other == key or kind_at.call(other) != Terrain.Edge.WALL:
 			continue
-		if away_from(other, entry[1]).dot(mine) < -0.9:
-			collinear_wall = true
-		else:
-			crossing.append(other)
-	_other_offset[end] = Vector2.ZERO
-	if collinear_wall:
-		_join[end] = Join.STRAIGHT
-	elif crossing.size() == 1:
-		_join[end] = Join.MITER
-		_other_offset[end] = strip_offset(crossing[0])
-	elif crossing.size() == 2:
-		# The through wall's strip lies on its far side; this wall comes in
-		# from that side or from the near side.
-		var through := strip_offset(crossing[0])
-		_other_offset[end] = through
-		_join[end] = Join.TRIM if mine.dot(through) > 0.0 else Join.BUTT
-	else:
-		_join[end] = Join.FREE
+		if away_from(other, entry[1]).dot(mine) > -0.9:
+			return true
+	return false
 
 
 func _draw() -> void:
 	var ends := endpoints(key)
-	var h := height_for(far_side_floor)
-	var up := Vector2(0, -h)
-	var offset := strip_offset(key)
-	var line: Array[Vector2] = [ends[0], ends[1]]
-	var far: Array[Vector2] = [Vector2.INF, Vector2.INF]
+	var up := Vector2(0, -height_for(far_side_floor))
+	var face := Color(value, value, value)
+	draw_colored_polygon(PackedVector2Array([ends[0], ends[1], ends[1] + up, ends[0] + up]), face)
+	var step := maxf(value - CORNER_STEP, 0.0)
+	var line := Color(step, step, step)
 	for end in 2:
-		var v := ends[end]
-		match _join[end]:
-			Join.MITER:
-				far[end] = v + offset + _other_offset[end]
-			Join.TRIM:
-				line[end] = v + _other_offset[end]
-			Join.FREE:
-				# The end face shows where the end points toward the camera:
-				# the +y end of an east edge, the +x end of a south edge.
-				var faces_camera := (key.z == Terrain.EAST) == (end == 0)
-				if faces_camera:
-					draw_colored_polygon(PackedVector2Array([v, v + offset, v + offset + up, v + up]), END_FACE)
-	draw_wall(self, line[0], line[1], h, offset, FACE_EAST if key.z == Terrain.EAST else FACE_SOUTH, far[0], far[1])
+		if _corner[end]:
+			draw_line(ends[end], ends[end] + up, line, 1.0)

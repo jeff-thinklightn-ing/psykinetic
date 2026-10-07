@@ -5,7 +5,7 @@
 | Path | Contents |
 | --- | --- |
 | `sim/` | The simulation: `world.gd` (autoload `World`), `grid_entity.gd`, `player.gd`, `monster.gd`, `pushable.gd`, `terrain.gd` (the map format: cells and edges), `door.gd` (a door on an edge), `iso.gd` (grid ↔ pixel math). |
-| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as a face with a lit top strip). |
+| `render/` | Drawing only, never sim state: `wall_edge.gd` (a wall edge as one flat face). |
 | `entities/` | `entity.tscn`, the one generic entity scene (a Node2D with a Sprite), and `entity_factory.gd`, which builds any entity from a spawn spec: script, shape, tint, scale, label, props. Tuning values live in the scripts' `_init`. |
 | `art/` | Placeholder SVGs and `tileset.tres` (isometric, diamond-down, 32×16; sources: 0 floor, 1 wall, 2 fire). |
 | `net/` | `net.gd` (autoload `Net`): launch mode, ENet setup, the authority gate. `prediction.gd`: client-side prediction of the local player's walking. `snapshot.gd`: the server's JSON state file (`--state`). |
@@ -558,14 +558,17 @@ texture's `foot` row sits on the tile centre; `WallEdge` draws to its.
 Nothing else states a size; a spec's `scale` multiplies on top.
 
 **Walls** (`render/wall_edge.gd`) are one Node2D per wall edge in the
-Y-sorted layer, drawn in code: a face standing on the cell boundary line
-and, along its top, a lit strip 4 px wide lying on the far side of the line
-(the top of a thin wall seen from above). Nothing is drawn on the ground
-beyond the line; every floor cell draws fully to the base of its walls. The
-node sits with the cell on its -x / -y side, a hair nearer the camera, so it
-is in front of what stands on that cell and behind the next. Outside the
-map is near-black (`Main.VOID`), so walls along the void stand apart from
-it.
+Y-sorted layer, drawn in code as a single flat face standing on the cell
+boundary line. Walls are the quietest thing on screen: every face is the
+one neutral grey `Main.WALL_VALUE` (0.18, a few steps above the void,
+darker than the floor) whichever way it points, with no lit side, no
+gradient, no tint, no top strip and no end face; the top of a wall is
+where the face ends. Nothing is drawn on the ground: the floor is one
+surface right up to the wall base, with no shading beside walls. The node
+sits with the cell on its -x / -y side, a hair nearer the camera, so it is
+in front of what stands on that cell and behind the next. Outside the map
+is near-black (`Main.VOID`). The floor is the brightest surface and the one
+the eye should land on.
 
 *Height.* A wall that would hide floor is a stub a third of a tile tall;
 one that hides nothing stands full height (3 tile heights). A full wall
@@ -583,22 +586,19 @@ wall still hides floor beyond it that is further from the camera — the
 north wall of a corridor hides a parallel corridor behind it — as it would
 in any fixed-angle view.
 
-*Joins*, decided per end from the walls meeting at that vertex (doors count
-as nothing): straight on, the strip continues; at an L the two strips miter
-into one shared far vertex (`v + o1 + o2`, the far lines' crossing); at a T
-the through strip runs on and the joining wall butts into it, trimmed to
-the through wall's back when it comes from the far side; at a free end the
-strip ends square to the wall and a short end face closes the wall where
-that end faces the camera (the +y end of an east edge, the +x end of a
-south edge). Strip width is 4 px throughout; stubs get the same joins at
-their height. Floor with a wall on its -x or -y edge uses a shaded
-alternative tile.
+*Corners.* Two faces of one value meeting at an L or a T would merge, so
+where another wall meets an end of this one at an angle (doors count as
+nothing) a 1 px line one step darker than the face (`WallEdge.CORNER_STEP`)
+runs up that end; a free end and a straight continuation get nothing. A
+wall meeting from behind the through wall is covered by it, line and all.
+Stubs follow the same rules at their height.
 
 **Doors** draw themselves (`Door._draw`) as wall-height objects whatever
 the walls beside them do: a jamb post at each end of the edge to full wall
 height, and a panel between them that swings in the ground plane about the
-hinge post, its own top strip turning with it. A broken door leaves its
-posts. There is no cutaway and no fade: a tall wall hides what is behind it.
+hinge post, its own top strip (`Door.PANEL_TOP`, 4 px) turning with it to
+show the panel's thickness. A broken door leaves its posts. There is no
+cutaway and no fade: a tall wall hides what is behind it.
 
 **The map** (`main.gd`, `LEVEL`; format in `sim/terrain.gd`) is written at
 double resolution: even coordinates are cells (`.` floor, `~` fire, space

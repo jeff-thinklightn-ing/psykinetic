@@ -15,6 +15,7 @@ const REPLICATED := ["open", "hp"]
 const SWING_SECONDS := 0.25
 const PANEL := Color(0.62, 0.45, 0.28)
 const PANEL_EDGE := Color(0.25, 0.17, 0.1, 0.9)
+const PANEL_TOP := Color(0.6, 0.625, 0.72)
 const POST := Color(0.36, 0.3, 0.26)
 const POST_TOP := Color(0.5, 0.43, 0.37)
 const POST_WIDTH := 3.0
@@ -109,7 +110,7 @@ func _draw() -> void:
 		# along it when open.
 		var thickness := WallEdge.screen(
 				WallEdge.across_grid(key) * cos(angle) - WallEdge.along_grid(key) * sin(angle)).normalized() * WallEdge.STRIP
-		WallEdge.draw_wall(self, face[0], face[1], WallEdge.full_height(), thickness, PANEL)
+		WallEdge.draw_wall(self, face[0], face[1], WallEdge.full_height(), thickness, PANEL, PANEL_TOP)
 		draw_polyline(PackedVector2Array([face[0], face[1], face[2], face[3], face[0]]), PANEL_EDGE)
 	var half := Vector2(POST_WIDTH * 0.5, 0)
 	for end: Vector2 in ends:

@@ -227,3 +227,14 @@ other walls, not from tiles. A door is a wall-height object (posts and a
 swinging panel) even between stubs, so a closed door reads as a door and
 not a plank. Outside the map is near-black. The path preview is gone: the
 hover highlight alone says where a click goes.
+
+## 29. Walls are the quietest thing on screen
+
+Every wall face is one flat neutral grey, `Main.WALL_VALUE`, with no lit
+side, no top ribbon, no end face and no shadow on the floor beside it; the
+only mark beyond the face itself is a 1 px darker line up a corner. The
+floor stays the brightest surface, so the eye lands on where play happens,
+not on the walls around it. The ribbons and joins of decision 28 are gone;
+the door keeps its own top strip, since a swinging panel needs to show its
+thickness. The value is one constant so it can be tuned without a release
+of its own.

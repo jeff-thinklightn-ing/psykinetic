@@ -1,3 +1,4 @@
+class_name Main
 extends Node2D
 ## Builds the test room, starts networking, and turns clicks into orders.
 ## This is view/input glue plus level setup: on the server it asks World and
@@ -6,8 +7,9 @@ extends Node2D
 const FLOOR_SOURCE := 0
 const FIRE_SOURCE := 2
 const DOOR := "res://sim/door.gd"
-## Floor in front of a wall (the wall to its -x or -y side) is drawn darker.
-const SHADED_FLOOR := Color(0.7, 0.7, 0.76)
+## The one grey every wall face is drawn in, 0..1: darker than the floor,
+## a few steps above the void, the same whichever way the face points.
+const WALL_VALUE := 0.18
 ## Camera: the fraction of the remaining distance to the player closed per
 ## second, as an exponential rate. Higher is tighter.
 const CAMERA_FOLLOW_RATE := 6.0
@@ -455,31 +457,23 @@ func _mouse_tile() -> Vector2i:
 
 
 ## The map (see Terrain for the format). Floor and fire go on the Ground
-## layer, shaded where a wall stands on the cell's -x or -y edge; wall
-## edges are drawn as WallEdges in the Y-sorted layer. Doors are spawned by
-## the server with the level (see _spawn_doors): they have state.
+## layer, one surface right up to the walls; wall edges are drawn as
+## WallEdges in the Y-sorted layer. Doors are spawned by the server with
+## the level (see _spawn_doors): they have state.
 func _paint_level() -> void:
 	_terrain = Terrain.parse(LEVEL)
-	var floor_source := ground.tile_set.get_source(FLOOR_SOURCE) as TileSetAtlasSource
-	var shaded := floor_source.create_alternative_tile(Vector2i.ZERO)
-	floor_source.get_tile_data(Vector2i.ZERO, shaded).modulate = SHADED_FLOOR
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in _terrain["floor"]:
-		if cell in fire:
-			ground.set_cell(cell, FIRE_SOURCE, Vector2i.ZERO)
-			continue
-		var behind_wall: bool = kind_at.call(Terrain.edge_key(cell, Vector2i(-1, 0))) == Terrain.Edge.WALL \
-				or kind_at.call(Terrain.edge_key(cell, Vector2i(0, -1))) == Terrain.Edge.WALL
-		ground.set_cell(cell, FLOOR_SOURCE, Vector2i.ZERO, shaded if behind_wall else 0)
+		ground.set_cell(cell, FIRE_SOURCE if cell in fire else FLOOR_SOURCE, Vector2i.ZERO)
 	for key: Vector3i in edges:
 		if edges[key] != Terrain.Edge.WALL:
 			continue
 		var wall := WallEdge.new()
 		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 		$YSort.add_child(wall)
-		wall.setup(key, kind_at, func(cell: Vector2i) -> bool: return cell in _terrain["floor"])
+		wall.setup(key, kind_at, func(cell: Vector2i) -> bool: return cell in _terrain["floor"], WALL_VALUE)
 
 
 ## Server: one Door node per door edge, through the spawner so every client
