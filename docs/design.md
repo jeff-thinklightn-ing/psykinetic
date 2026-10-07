@@ -818,20 +818,27 @@ message itself (`Client3D.say`, from Main) and shows for
 1.5-unit character, foreshortened by cos 50°, is a twelfth of the
 height), pitched `CAMERA_PITCH` 50° from horizontal, on the +x +z side at
 yaw 0 so grid +x runs down-right and +y down-left as in the 2D diamond,
-following the local player. **Orbit**: Q/E step the yaw by `ORBIT_STEP`
-(45°) about the player, tweened over `ORBIT_SECONDS` (250 ms); that is
-the click scheme's way to turn it. In the WASD scheme Q/E do nothing and a
-middle drag turns it instead: the yaw follows the horizontal drag
-(`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the button is held, and
-let go it settles on the nearest 45° step, eased over the same 250 ms.
+following the local player. **Orbit**: the camera rests only on the four
+diamond views, yaw 0 (the 2D diamond) and each `ORBIT_STEP` (90°) from
+it (`Client3D.nearest_diamond`; half way between two, the higher). Q/E
+step from one diamond to the next about the player in one ease in and out
+over `ORBIT_SECONDS` (400 ms), through the axis-aligned view half way
+without stopping; that is the click scheme's way to turn it. In the WASD
+scheme Q/E do nothing and a middle drag turns it instead: the yaw follows
+the horizontal drag (`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the
+button is held, through any angle, and let go it settles on the nearest
+diamond, eased out over `SETTLE_SECONDS` (250 ms).
 While any movement key is held the yaw is frozen (`Client3D.frozen`, set
 by `Main._drive_wasd`): nothing turns it, not a drag nor an ease under
 way, so a direction never changes under the hand; a drag made meanwhile
-applies when the keys are let go (eased there, or settled on its step if
-the button was let go too). The eases are run from `Client3D._process`,
-not Tweens, so the camera has moved before Main picks. The step persists
-as `camera_yaw` in `settings.cfg`
-(`Net.camera_yaw`, saved by `Net.save_view_settings`). F3 shows the yaw.
+applies when the keys are let go (eased there, or settled on its diamond
+if the button was let go too). The eases are run from `Client3D._process`,
+not Tweens, so the camera has moved before Main picks. The diamond
+persists as `camera_yaw` in `settings.cfg` (`Net.camera_yaw`, 0..360,
+saved by `Net.save_view_settings`): only ever a diamond, and an older
+file's axis-aligned yaw (a 45° step) is read as the nearest diamond
+(`Net.saved_yaw`). `--test-yaw` alone sets any angle, for screenshots, and
+is never saved. F3 shows the yaw.
 Light: a `WorldEnvironment` with near-black background and ambient, one
 faint cool `DirectionalLight3D` (`SUN_ENERGY` 0.1) with shadows, the
 lanterns, the fires.

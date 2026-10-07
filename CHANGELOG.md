@@ -3,6 +3,22 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.31
+
+The 3D camera rests only on diagonal views. Client (the server only for
+the version).
+
+- The four resting yaws are the diamond views: the default and each 90°
+  from it.
+- Q/E step 90° from one to the next in one smooth 400 ms ease, through
+  the axis-aligned view without stopping there.
+- In the WASD scheme a middle drag still turns freely while held, and on
+  release settles on the nearest diamond.
+- The saved yaw is always a diamond; an axis yaw saved by an older build
+  is read as the nearest diamond.
+
+The server must be updated to v0.1.31 too, as it refuses any other version.
+
 ## v0.1.30
 
 Deploys. Tooling only; no game change.

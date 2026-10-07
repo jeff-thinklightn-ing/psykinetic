@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_scheme_default()
 	_test_screen_lean()
 	_test_drag_and_freeze()
+	_test_diamonds()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
 
@@ -218,11 +219,16 @@ func _test_drag_and_freeze() -> void:
 	_ease(rig)
 	_check(is_equal_approx(rig.yaw, start), "let go at 20: back to the nearest step (%s)" % rig.yaw)
 	rig.begin_drag()
-	rig.drag(30.0)
+	rig.drag(40.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 45.0) and is_equal_approx(Net.camera_yaw, start + 45.0),
-			"let go at 30: on to the next step, and kept (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start), "let go at 40, short of the axis view: back to the diamond (%s)" % rig.yaw)
+	rig.begin_drag()
+	rig.drag(50.0)
+	rig.end_drag()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, start + 90.0) and is_equal_approx(Net.camera_yaw, fposmod(start + 90.0, 360.0)),
+			"let go at 50: on to the next diamond, and kept (%s)" % rig.yaw)
 	start = rig.yaw
 	rig.set_frozen(true)
 	rig.begin_drag()
@@ -234,7 +240,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start), "nor does letting the button go (%s)" % rig.yaw)
 	rig.set_frozen(false)
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 90.0), "the keys let go: it settles where the drag was let go (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start + 90.0), "the keys let go: it settles on the diamond nearest where the drag was let go (%s)" % rig.yaw)
 	start = rig.yaw
 	rig.begin_drag()
 	rig.set_frozen(true)
@@ -254,6 +260,36 @@ func _test_drag_and_freeze() -> void:
 	_free_rig(rig)
 
 
+func _test_diamonds() -> void:
+	print("
+== the camera rests only on the four diamond views ==")
+	var rig := _rig()
+	_ease(rig)
+	var start := rig.yaw
+	_check(is_equal_approx(fmod(start, 90.0), 0.0), "it starts on a diamond (%s)" % start)
+	rig.orbit(1)
+	var seen: Array[float] = [rig.yaw]
+	for i in 8:
+		rig._ease_yaw(Client3D.ORBIT_SECONDS / 8.0)
+		seen.append(rig.yaw)
+	var rising := true
+	for i in range(1, seen.size()):
+		if seen[i] <= seen[i - 1]:
+			rising = false
+	_check(rising, "E: turning all the way, never still, through the axis view at 45 (%s)" % [seen])
+	_check(is_equal_approx(seen.back(), start + 90.0) and is_equal_approx(seen[4], start + 45.0),
+			"half way at 200 ms, on the next diamond at 400 ms (%s, %s)" % [seen[4], seen.back()])
+	_check(is_equal_approx(Net.camera_yaw, fposmod(start + 90.0, 360.0)), "saved as that diamond, within 0..360 (%s)" % Net.camera_yaw)
+	for yaw in [0.0, 90.0, 180.0, 270.0, -90.0]:
+		_check(is_equal_approx(Net.saved_yaw(str(yaw), -1.0), yaw), "a saved diamond loads as it is (%s)" % yaw)
+	_check(is_equal_approx(Net.saved_yaw("45", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("135", -1.0), 180.0)
+			and is_equal_approx(Net.saved_yaw("-45", -1.0), 0.0), "an old axis yaw rounds to a diamond on load (half way: up)")
+	_check(is_equal_approx(Net.saved_yaw("30", -1.0), 0.0), "anything else to the nearest diamond")
+	_check(is_equal_approx(Net.saved_yaw("", 90.0), 90.0) and is_equal_approx(Net.saved_yaw("north", 90.0), 90.0),
+			"no value, or a bad one: kept as it was")
+	_free_rig(rig)
+
+
 func _test_schemes_are_inert_outside() -> void:
 	print("
 == keys and buttons outside the active scheme do nothing ==")
@@ -265,7 +301,7 @@ func _test_schemes_are_inert_outside() -> void:
 	_check(is_equal_approx(rig._yaw_step, step), "wasd: Q does nothing")
 	Net.controls = "click"
 	_main._unhandled_input(_key(KEY_Q))
-	_check(is_equal_approx(rig._yaw_step, step - 45.0), "click: Q turns a step")
+	_check(is_equal_approx(rig._yaw_step, step - 90.0), "click: Q turns to the next diamond, 90 degrees round")
 	_main._unhandled_input(_middle(true))
 	_check(not rig._dragging, "click: the middle button does nothing")
 	Net.controls = "wasd"

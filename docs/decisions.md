@@ -457,3 +457,14 @@ without one. On the box `deploy.sh` (and `ship.ps1`'s pull before it)
 first removes untracked `.uid` and `.import` files, pulls, and only then
 imports, so a file the box generated can never block a pull, and the box
 never generates one before the repo's copy arrives.
+
+## 54. The camera rests only on the diamond views
+
+The four resting yaws are 0 (the 2D diamond) and each 90° from it. Q/E
+go from one to the next in one 400 ms ease, through the axis-aligned view
+without stopping; a WASD middle drag still turns through any angle while
+held and settles on the nearest diamond when let go. The saved yaw is
+always a diamond, and an axis yaw saved by an older build is read as the
+nearest one (half way, the higher). The axis view reads poorly for this
+map: walls run straight across the screen and the near ones cover the
+cells behind them edge-on.

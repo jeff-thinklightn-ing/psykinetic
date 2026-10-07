@@ -34,10 +34,12 @@ extends Node3D
 ##
 ## Camera: orthographic, tilted CAMERA_PITCH from horizontal, yawed by
 ## `yaw` about the local player: 0 matches the 2D diamond (+x down-right,
-## +y down-left). In the click scheme Q/E step the yaw by ORBIT_STEP; in
-## the WASD scheme a middle drag turns it freely and, let go, it settles
-## on the nearest step. Either way the move to a step is eased over
-## ORBIT_SECONDS, and the step persists in settings.cfg (Net.camera_yaw).
+## +y down-left). It rests only on the four diamond views: yaw 0 and each
+## ORBIT_STEP (90°) from it. In the click scheme Q/E step from one diamond
+## to the next in one ease of ORBIT_SECONDS, through the axis-aligned view
+## between without stopping; in the WASD scheme a middle drag turns it
+## freely and, let go, it settles on the nearest diamond over
+## SETTLE_SECONDS. The diamond persists in settings.cfg (Net.camera_yaw).
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
@@ -72,8 +74,12 @@ const CAMERA_DISTANCE := 40.0
 ## cos(CAMERA_PITCH), is about a twelfth of it.
 const CAMERA_SIZE := 12.0
 const CAMERA_FOLLOW_RATE := 6.0
-const ORBIT_STEP := 45.0
-const ORBIT_SECONDS := 0.25
+## The resting yaws are multiples of this: the diamond views.
+const ORBIT_STEP := 90.0
+## Q/E: one diamond to the next, eased in and out.
+const ORBIT_SECONDS := 0.4
+## A middle drag let go: on to the nearest diamond, eased out.
+const SETTLE_SECONDS := 0.25
 const PLAYER_LIGHT_RANGE := 6.0
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
@@ -137,7 +143,8 @@ var _shapes := {
 
 var _camera: Camera3D
 var _camera_target := Vector3.ZERO
-## The camera's yaw now, and the step it rests at (a multiple of ORBIT_STEP).
+## The camera's yaw now, and the diamond it rests at (a multiple of
+## ORBIT_STEP).
 var yaw := 0.0
 var _yaw_step := 0.0
 ## The yaw easing toward a step: from, to, and how far along (1: at rest).
@@ -145,6 +152,9 @@ var _yaw_step := 0.0
 var _ease_from := 0.0
 var _ease_to := 0.0
 var _ease_t := 1.0
+var _ease_seconds := SETTLE_SECONDS
+## Q/E's ease starts slow as well as ending slow; a settle is already moving.
+var _ease_in_out := false
 ## WASD's middle drag: the yaw it started from, how far it has gone, and
 ## whether a release came while frozen (it settles when they unfreeze).
 var _dragging := false
@@ -191,8 +201,10 @@ func setup(terrain: Dictionary) -> void:
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
-	_yaw_step = roundf(Net.camera_yaw / ORBIT_STEP) * ORBIT_STEP
-	yaw = _yaw_step
+	# Net has the saved yaw rounded to a diamond already; --test-yaw is
+	# taken exactly, for screenshots, and rests on its nearest diamond.
+	_yaw_step = nearest_diamond(Net.camera_yaw)
+	yaw = Net.camera_yaw
 	_place_camera()
 	_classify_walls()
 
@@ -277,10 +289,10 @@ func _local_player() -> Player:
 
 # --- Orbit ---------------------------------------------------------------------
 
-## Q/E (click scheme): the next step round, eased; kept in the settings
-## file.
+## Q/E (click scheme): the next diamond round, in one ease in and out;
+## kept in the settings file.
 func orbit(direction: int) -> void:
-	_settle_on(_yaw_step + ORBIT_STEP * signf(direction))
+	_settle_on(_yaw_step + ORBIT_STEP * signf(direction), ORBIT_SECONDS, true)
 
 
 ## WASD: the middle button went down; the drag turns from the yaw now.
@@ -316,7 +328,7 @@ func end_drag() -> void:
 	if frozen:
 		_settle_pending = true
 	else:
-		_settle_on(_nearest_step(_drag_base + _drag_offset))
+		_settle_on(nearest_diamond(_drag_base + _drag_offset))
 
 
 ## Main: a movement key is (not) held. Held, the yaw stops where it is;
@@ -328,38 +340,43 @@ func set_frozen(on: bool) -> void:
 	if on:
 		return
 	if _dragging:
-		_ease_toward(_drag_base + _drag_offset)
+		_ease_toward(_drag_base + _drag_offset, SETTLE_SECONDS, false)
 	elif _settle_pending:
 		_settle_pending = false
-		_settle_on(_nearest_step(_drag_base + _drag_offset))
+		_settle_on(nearest_diamond(_drag_base + _drag_offset))
 
 
-static func _nearest_step(degrees: float) -> float:
-	return roundf(degrees / ORBIT_STEP) * ORBIT_STEP
+## The diamond view nearest [param degrees]; half way between two (an
+## axis view), the higher.
+static func nearest_diamond(degrees: float) -> float:
+	return snappedf(degrees, ORBIT_STEP)
 
 
-## Eases to [param step], which the yaw then rests on and the settings
-## file keeps.
-func _settle_on(step: float) -> void:
+## Eases to the diamond [param step], which the yaw then rests on and the
+## settings file keeps.
+func _settle_on(step: float, seconds := SETTLE_SECONDS, in_out := false) -> void:
 	_yaw_step = step
-	Net.camera_yaw = step
+	Net.camera_yaw = fposmod(step, 360.0)
 	Net.save_view_settings()
-	_ease_toward(step)
+	_ease_toward(step, seconds, in_out)
 
 
-func _ease_toward(degrees: float) -> void:
+func _ease_toward(degrees: float, seconds: float, in_out: bool) -> void:
 	_ease_from = yaw
 	_ease_to = degrees
 	_ease_t = 0.0
+	_ease_seconds = seconds
+	_ease_in_out = in_out
 
 
-## One frame of the ease, a sine out over ORBIT_SECONDS; nothing while
-## frozen.
+## One frame of the ease: a sine in and out (Q/E) or out (a settle), with
+## no stop on the way; nothing while frozen.
 func _ease_yaw(delta: float) -> void:
 	if frozen or _ease_t >= 1.0:
 		return
-	_ease_t = minf(_ease_t + delta / ORBIT_SECONDS, 1.0)
-	_set_yaw(lerpf(_ease_from, _ease_to, sin(_ease_t * PI * 0.5)))
+	_ease_t = minf(_ease_t + delta / _ease_seconds, 1.0)
+	var eased := 0.5 - 0.5 * cos(_ease_t * PI) if _ease_in_out else sin(_ease_t * PI * 0.5)
+	_set_yaw(lerpf(_ease_from, _ease_to, eased))
 
 
 func _set_yaw(degrees: float) -> void:

@@ -156,8 +156,8 @@ var _settings_controls := ""
 ## is fullscreen. Applied at start, kept up to date, saved with the rest.
 var window_size := DEFAULT_WINDOW_SIZE
 var fullscreen := false
-## The 3D camera's yaw step in degrees (a multiple of 45), kept with the
-## window settings.
+## The 3D camera's resting yaw in degrees, a diamond view (a multiple of
+## Client3D.ORBIT_STEP), kept with the window settings.
 var camera_yaw := 0.0
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
@@ -321,9 +321,7 @@ func _apply_window_settings() -> void:
 		if width.is_valid_int() and height.is_valid_int() and width.to_int() > 0 and height.to_int() > 0:
 			window_size = Vector2i(width.to_int(), height.to_int())
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
-		var yaw := str(settings.get("camera_yaw", ""))
-		if yaw.is_valid_float():
-			camera_yaw = yaw.to_float()
+		camera_yaw = saved_yaw(str(settings.get("camera_yaw", "")), camera_yaw)
 	if _test_yaw_given:
 		camera_yaw = test_yaw
 	var window := get_window()
@@ -333,6 +331,15 @@ func _apply_window_settings() -> void:
 	else:
 		window.move_to_center()
 	window.size_changed.connect(_on_window_size_changed)
+
+
+## camera_yaw= as read from the settings file: only a diamond view is a
+## resting yaw, so an older file's axis-aligned one (a 45° step) goes to
+## the nearest diamond. [param otherwise] for a missing or bad value.
+static func saved_yaw(text: String, otherwise: float) -> float:
+	if not text.strip_edges().is_valid_float():
+		return otherwise
+	return Client3D.nearest_diamond(text.to_float())
 
 
 ## F11: borderless fullscreen at the monitor's native size, or back to the
