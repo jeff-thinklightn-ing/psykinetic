@@ -7,11 +7,12 @@ extends Node2D
 ## edge's -x / -y side, a hair nearer the camera, so it is in front of what
 ## stands on that cell and behind the next.
 ##
-## Height. Both faces drawn here point toward the camera; the cell behind a
-## face (the edge's -x / -y cell) is its far side. A wall whose far side is
-## walkable stands in front of that floor and is drawn as a stub a third of
-## a tile tall; one whose far side is nothing faces the exterior and stands
-## full height. A drawing rule only: the sim knows nothing of it.
+## Height. For every walkable cell, a wall on its south or east edge is a
+## stub a third of a tile tall; a wall on its north or west edge is full
+## height. A wall between two walkable cells is the south/east edge of one
+## of them, so a stub. Void cells have no say. An edge is the east or south
+## edge of its -x / -y cell, so the test is simply whether that cell is
+## walkable (is_stub). A drawing rule only: the sim knows nothing of it.
 ##
 ## Joins, from the walls meeting at each end (doors count as nothing):
 ## straight on, the strip simply continues; at an L the two strips miter
@@ -73,8 +74,13 @@ static func full_height() -> float:
 	return Iso.height_px("wall")
 
 
-static func height_for(far_side_is_floor: bool) -> float:
-	return Iso.TILE_SIZE.y * STUB_FRACTION if far_side_is_floor else full_height()
+## The stub rule. [param floor_at] says whether a cell is walkable.
+static func is_stub(edge: Vector3i, floor_at: Callable) -> bool:
+	return floor_at.call(Vector2i(edge.x, edge.y))
+
+
+static func height_for(stub: bool) -> float:
+	return Iso.TILE_SIZE.y * STUB_FRACTION if stub else full_height()
 
 
 ## Position of the vertex (shared diamond corner) an edge end sits on, as
@@ -120,7 +126,7 @@ static func draw_wall(on: CanvasItem, a: Vector2, b: Vector2, h: float, offset: 
 func setup(edge: Vector3i, kind_at: Callable, floor_at: Callable) -> void:
 	key = edge
 	position = Iso.tile_to_local(Vector2i(edge.x, edge.y)) + Vector2(0, 0.5)
-	far_side_floor = floor_at.call(Vector2i(edge.x, edge.y))
+	far_side_floor = is_stub(edge, floor_at)
 	for end in 2:
 		_classify_end(end, kind_at)
 	queue_redraw()

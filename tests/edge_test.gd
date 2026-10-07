@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_sight_through_edges()
 	_test_doors()
 	_test_door_breaks()
+	_test_stub_rule()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -185,6 +186,20 @@ func _test_door_breaks() -> void:
 	World.order_shove(player, imp)
 	World.step()
 	_check(stone.hp == 3 and not stone.is_broken(), "a stone door takes nothing (hp %d)" % stone.hp)
+
+
+func _test_stub_rule() -> void:
+	print("
+== drawing: a wall on a walkable cell's south or east edge is a stub, on its north or west edge full height ==")
+	# One floor cell at (1, 1) in a void, and a second at (2, 1) beside it.
+	var floor_at := func(cell: Vector2i) -> bool: return cell == Vector2i(1, 1) or cell == Vector2i(2, 1)
+	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.SOUTH), floor_at), "its south edge: stub")
+	_check(WallEdge.is_stub(Vector3i(2, 1, Terrain.EAST), floor_at), "the east edge of the cell beside it: stub")
+	_check(not WallEdge.is_stub(Vector3i(1, 0, Terrain.SOUTH), floor_at), "its north edge (the south edge of the void above): full height")
+	_check(not WallEdge.is_stub(Vector3i(0, 1, Terrain.EAST), floor_at), "its west edge (the east edge of the void beside): full height")
+	_check(WallEdge.is_stub(Vector3i(1, 1, Terrain.EAST), floor_at), "a wall between the two walkable cells: stub, the east edge of the first")
+	_check(WallEdge.height_for(true) < WallEdge.height_for(false) and WallEdge.height_for(false) == Iso.height_px("wall"),
+			"a stub is lower than full height, which is the scale table's wall")
 
 
 # --- helpers ------------------------------------------------------------------
