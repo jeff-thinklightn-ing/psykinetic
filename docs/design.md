@@ -104,7 +104,24 @@ The fingerprint (`Net.protocol()`) is a hash of everything on the wire —
 the replicated properties, the RPC methods, the spawn spec format and a
 hand-bumped revision — so two builds that share a version number but not a
 wire format are refused with `build mismatch` instead of failing on the
-first packet one of them cannot read. An
+first packet one of them cannot read.
+
+**Leaving.** ENet frees a peer's channels the moment either side begins a
+disconnect, up to a round trip before Godot reports the peer gone; any
+send into that window logs `Unable to send packet on channel 0, max
+channels: 0`. So the authority polls the network itself
+(`SceneTree.multiplayer_poll` off, `Net._process`): the ENet poll first,
+then every listed peer whose link has no channels is dropped from the
+multiplayer by raising its disconnect early (`Net._drop`, which sends
+nothing; ENet's own event later is swallowed), then the multiplayer's
+poll with the replication pass. Net's `_process` runs before every other
+node's, so the frame's RPCs never see the peer either; the server's
+broadcasts and per-peer RPCs go through `Net.sendable_peers`, which also
+skips peers marked as leaving by a rejection, and Main learns of
+departures from `Net.peer_left`, once per peer. `SceneMultiplayer.
+server_relay` is off: clients talk to the server only, and the server
+never announces one peer's coming or going to the others, which was the
+main sender into a closing link. An
 exported client with no arguments joins from `settings.cfg` next to its exe,
 or asks for the address and token once (`net/setup_screen.gd`) and writes
 that file. Details in `docs/server.md`.

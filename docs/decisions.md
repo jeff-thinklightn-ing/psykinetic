@@ -312,3 +312,14 @@ different things for the same click, and a rule such as snap-to-floor
 lives in one place. The 3D walls are plain boxes in the kit's stone
 rather than kit wall pieces: the kit is an exterior castle kit and its
 walls carry battlements and walkways that read wrong indoors.
+
+## 37. The server drops a closing link before anything else can send to it
+
+ENet's disconnect handshake leaves a peer listed but unsendable for up to
+a round trip, and Godot's multiplayer keeps replicating to it, which
+logged an error on nearly every departure under load. Rather than gate
+each sender, the authority polls the network itself and forgets any peer
+whose link has no channels before the replication pass of the frame; the
+server relay is off, so there are no peer announcements to forward into
+such a link either. Clients only ever talk to the server, so the relay
+bought nothing.

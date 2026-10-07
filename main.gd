@@ -278,7 +278,7 @@ func _go_online() -> void:
 	if Net.is_authority():
 		# Players are spawned for authenticated peers only.
 		Net.peer_authenticated.connect(_on_peer_authenticated)
-		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+		Net.peer_left.connect(_on_peer_disconnected)
 		World.entity_despawned.connect(_on_entity_despawned)
 		World.entity_pushed.connect(_narrate_push)
 		World.entity_damaged.connect(_narrate_damage)

@@ -335,21 +335,21 @@ func _world_note_moved(on_tick: int) -> void:
 func _world_pushed(tiles: int, lofted := false) -> void:
 	_lofted = lofted
 	pushed.emit(tiles)
-	if not multiplayer.get_peers().is_empty():
-		_net_pushed.rpc(tiles, lofted)
+	for peer in Net.sendable_peers():
+		_net_pushed.rpc_id(peer, tiles, lofted)
 
 
 func _world_impacted(amount: int) -> void:
 	impacted.emit(amount)
-	if not multiplayer.get_peers().is_empty():
-		_net_impacted.rpc(amount)
+	for peer in Net.sendable_peers():
+		_net_impacted.rpc_id(peer, amount)
 
 
 func _world_stunned(until_tick: int, ticks: int) -> void:
 	stunned_until_tick = until_tick
 	_reel_until = until_tick
-	if not multiplayer.get_peers().is_empty():
-		_net_stunned.rpc(ticks)
+	for peer in Net.sendable_peers():
+		_net_stunned.rpc_id(peer, ticks)
 
 
 func _world_remove() -> void:

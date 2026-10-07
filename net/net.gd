@@ -65,6 +65,8 @@ const AUTH_TIMEOUT := 5.0
 ## Seconds between telling a peer why it is rejected and disconnecting it.
 const REJECT_GRACE := 0.25
 
+## Server: a peer is gone, once per peer, before anything else is sent.
+signal peer_left(peer: int)
 ## A peer has sent a good hello and may be given a player. Main spawns
 ## players on this, never on peer_connected.
 signal peer_authenticated(peer: int, player_id: String, player_name: String)
@@ -120,6 +122,9 @@ var player_id := ""
 var player_name := DEFAULT_NAME
 ## Server only: peers told to go that have not yet gone.
 var _leaving: Dictionary[int, bool] = {}
+## Server only: peers dropped early (see _drop) whose ENet disconnect event
+## is still to come.
+var _dropped: Dictionary[int, bool] = {}
 ## Server only: authenticated peer -> its player_id.
 var _authenticated: Dictionary[int, String] = {}
 ## True when an exported build has no settings file and must ask for one.
@@ -407,6 +412,39 @@ func mispredicts_per_minute() -> int:
 	return _mispredict_times.size()
 
 
+## Server: polls the network itself, so that a peer whose ENet link is
+## already closing is dropped from the multiplayer before the replication
+## pass of the same frame. ENet frees a peer's channels the moment either
+## side starts a disconnect (its reset_queues), up to a round trip before
+## Godot's disconnect event; a send in that window logs "Unable to send
+## packet on channel 0, max channels: 0". The tree's own poll is off on
+## the authority (see start) and done here: the ENet poll first, then any
+## listed peer with no channels is told to the multiplayer as gone, which
+## sends nothing, then the multiplayer's poll (packets, replication).
+## Net's _process runs before every other node's, so the RPCs sent this
+## frame never see the peer either.
+func _process(_delta: float) -> void:
+	if not online or not is_authority():
+		return
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	if enet == null:
+		return
+	enet.poll()
+	for peer in multiplayer.get_peers():
+		var link := enet.get_peer(peer)
+		if link == null or link.get_channels() == 0:
+			_drop(peer)
+	multiplayer.poll()
+
+
+## Server: forgets [param peer] at the multiplayer level before ENet
+## reports it gone, by raising the peer's disconnect itself; the real
+## event later is swallowed (see _on_peer_disconnected).
+func _drop(peer: int) -> void:
+	multiplayer.multiplayer_peer.emit_signal("peer_disconnected", peer)
+	_dropped[peer] = true
+
+
 func _notification(what: int) -> void:
 	# Leave cleanly when the window is closed so the other side sees it at once.
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -484,8 +522,13 @@ func _on_auth_timeout(peer: int) -> void:
 
 
 func _on_peer_disconnected(peer: int) -> void:
+	if _dropped.has(peer):
+		# ENet's own event for a peer already dropped early.
+		_dropped.erase(peer)
+		return
 	_authenticated.erase(peer)
 	_leaving.erase(peer)
+	peer_left.emit(peer)
 
 
 func _admit(peer: int, id: String, player_name_given: String) -> void:
@@ -501,9 +544,10 @@ func _reject(peer: int, reason: String, detail := "") -> void:
 		peer, _peer_address(peer), reason if detail == "" else detail])
 	# Tell it why first. Disconnecting at once would drop that packet, so
 	# give the message a moment to go out, then disconnect gracefully (an
-	# outright cut leaves the peer in the multiplayer list for good). Until
-	# the handshake ends the peer is listed but cannot be sent to, so it is
-	# marked as leaving and the tick RPC skips it; see World.step.
+	# outright cut leaves the peer in the multiplayer list for good). From
+	# the disconnect on the peer is listed but cannot be sent to; it is
+	# marked as leaving so sends this frame skip it (sendable_peers), and
+	# the next frame's poll drops it (see _process).
 	rejected.rpc_id(peer, reason, version)
 	get_tree().create_timer(REJECT_GRACE).timeout.connect(func() -> void:
 		if online and peer in multiplayer.get_peers():
@@ -514,6 +558,23 @@ func _reject(peer: int, reason: String, detail := "") -> void:
 ## Server: is [param peer] being disconnected (still listed, not sendable)?
 func is_leaving(peer: int) -> bool:
 	return _leaving.has(peer)
+
+
+## Server: the peers an RPC may go to now: every connected peer whose
+## link is whole and that is not being disconnected. Broadcasts go peer
+## by peer through this.
+func sendable_peers() -> Array[int]:
+	var peers: Array[int] = []
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	for peer in multiplayer.get_peers():
+		if _leaving.has(peer):
+			continue
+		if enet != null:
+			var link := enet.get_peer(peer)
+			if link == null or link.get_channels() == 0:
+				continue
+		peers.append(peer)
+	return peers
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -561,8 +622,9 @@ func _peer_address(peer: int) -> String:
 ## Server: tells every peer (and itself) something that is not sim state.
 func broadcast(kind: String, data: Dictionary) -> void:
 	message_received.emit(kind, data)
-	if online and not multiplayer.get_peers().is_empty():
-		message.rpc(kind, data)
+	if online:
+		for peer in sendable_peers():
+			message.rpc_id(peer, kind, data)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -574,6 +636,7 @@ func message(kind: String, data: Dictionary) -> void:
 func shutdown() -> void:
 	if online:
 		online = false
+		get_tree().multiplayer_poll = true
 		multiplayer.multiplayer_peer.close()
 
 
@@ -598,6 +661,12 @@ func start() -> void:
 			push_error("[net] --server needs --token=<string>: refusing to run an open server")
 			get_tree().quit(1)
 			return
+		# No relay: clients talk to the server only, so the server never
+		# forwards packets or announces one peer's coming and going to the
+		# others. Those announcements were the main sender into a closing
+		# link (two clients leaving in one poll: the second, already without
+		# channels, was told about the first).
+		(multiplayer as SceneMultiplayer).server_relay = false
 		var error := peer.create_server(port, MAX_CLIENTS)
 		if error != OK:
 			if mode == Mode.SERVER:
@@ -612,6 +681,8 @@ func start() -> void:
 			", token required" if token != "" else ", no token: open to anyone"])
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+		# The authority polls the network itself; see _process.
+		get_tree().multiplayer_poll = false
 	multiplayer.multiplayer_peer = peer
 	local_id = multiplayer.get_unique_id()
 	online = true

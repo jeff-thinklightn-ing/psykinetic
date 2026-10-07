@@ -155,9 +155,8 @@ func step() -> void:
 	_regen_stamina()
 	ticked.emit(tick)
 	# 5. The tick counter goes to clients once per tick.
-	for peer in multiplayer.get_peers():
-		if not Net.is_leaving(peer):
-			_net_tick.rpc_id(peer, tick)
+	for peer in Net.sendable_peers():
+		_net_tick.rpc_id(peer, tick)
 
 
 # --- Mutations (server only) --------------------------------------------------
@@ -474,7 +473,7 @@ func report_move_refused(entity: GridEntity, tile: Vector2i) -> void:
 	if not Net.is_authority():
 		return
 	if entity.owner_peer != 0 and entity.owner_peer != Net.local_id \
-			and entity.owner_peer in multiplayer.get_peers():
+			and entity.owner_peer in Net.sendable_peers():
 		move_refused.rpc_id(entity.owner_peer, entity.get_path(), tile)
 
 

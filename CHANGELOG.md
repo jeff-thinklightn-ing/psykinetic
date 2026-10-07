@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.25
+
+The max-channels flake. Server and client.
+
+- A peer whose ENet link is closing is dropped from the multiplayer
+  before the frame's replication pass, and the server relay is off, so
+  nothing is sent into a closing link any more: `Unable to send packet on
+  channel 0, max channels: 0` is gone from the network test (six clean
+  runs where it failed two or three in six).
+
+The server must be updated to v0.1.25 too, as it refuses any other version.
+
 ## v0.1.24
 
 Kit walls back; two-wide corridors.
