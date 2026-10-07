@@ -313,13 +313,41 @@ lives in one place. The 3D walls are plain boxes in the kit's stone
 rather than kit wall pieces: the kit is an exterior castle kit and its
 walls carry battlements and walkways that read wrong indoors.
 
-## 37. The server drops a closing link before anything else can send to it
+## 37. The authority polls the network itself
 
-ENet's disconnect handshake leaves a peer listed but unsendable for up to
-a round trip, and Godot's multiplayer keeps replicating to it, which
-logged an error on nearly every departure under load. Rather than gate
-each sender, the authority polls the network itself and forgets any peer
-whose link has no channels before the replication pass of the frame; the
-server relay is off, so there are no peer announcements to forward into
-such a link either. Clients only ever talk to the server, so the relay
-bought nothing.
+On the server (and a host) `SceneTree.multiplayer_poll` is off and
+`Net._process` does the poll: the ENet poll, then every listed peer whose
+link has no channels is dropped from the multiplayer by raising its
+`peer_disconnected` early (`Net._drop`; ENet's own event later is
+swallowed), then `multiplayer.poll()` with the replication pass. ENet
+frees a peer's channels the moment a disconnect starts, up to a round trip
+before Godot reports the peer gone, and any send in that window logs
+`max channels: 0`. Dropping the peer before the replication pass is one
+rule that covers every sender (synchronizers, spawner, RPCs) instead of
+gating each; hiding synchronizers from a leaving peer was tried and does
+not work, since hiding sends a despawn. Net's `_process` runs before every
+other node's, so the frame's RPCs never see a dropped peer.
+
+## 38. The server relay is off
+
+`SceneMultiplayer.server_relay = false`. Clients only ever talk to the
+server (every client RPC is `rpc_id(1, ...)`, every `get_peers()` is
+server-side), so the relay bought nothing, and its announcements of one
+peer's coming and going to the others were the main sender into closing
+links. A feature that needs client-to-client traffic goes through a
+server RPC, where it is gated like any other.
+
+## 39. Server sends go peer by peer through `Net.sendable_peers`
+
+No server RPC is broadcast with a bare `.rpc()`: the tick, messages, the
+pushed/impacted/stunned effects and `move_refused` go with `rpc_id` to each
+of `Net.sendable_peers()`, which skips peers a rejection has marked as
+leaving and any whose link has no channels. One place decides who may be
+sent to, between the poll's drop and a disconnect started mid-frame.
+
+## 40. Departures come from `Net.peer_left`
+
+Main and anything else that reacts to a player going listens to
+`Net.peer_left`, emitted once per peer, not to the multiplayer's
+`peer_disconnected`, which fires twice for a peer dropped early (once from
+`Net._drop`, once from ENet).

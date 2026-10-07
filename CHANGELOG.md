@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.26
+
+Docs only; no code change.
+
+- docs/decisions.md records each of v0.1.25's architectural choices on its
+  own: the authority polls the network itself (37), the server relay is
+  off (38), server sends go peer by peer through `Net.sendable_peers`
+  (39), departures come from `Net.peer_left` (40).
+
+The server must be updated to v0.1.26 too, as it refuses any other version.
+
 ## v0.1.25
 
 The max-channels flake. Server and client.
