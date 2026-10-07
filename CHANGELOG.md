@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.24
+
+Kit walls back; two-wide corridors.
+
+- 3D: walls, posts, doorway, gate and floor are the Kenney kit's own
+  pieces again at the kit's proportions, scaled in height only; the
+  flat-colour boxes stay available for interior walls later. Everything
+  else from step 2 as it was.
+- Map: corridors are two cells wide. The west corridor keeps a single-cell
+  dead end at (1..2, 8) as the one chokepoint; the links down to the
+  passage and the cells inside the door are two wide, with (3, 13)
+  walled on its north so the door is still the only way in.
+
+The server must be updated to v0.1.24 too, as it refuses any other version.
+
 ## v0.1.23
 
 3D client, step 2. Client only; `--renderer=3d`.

@@ -26,9 +26,11 @@ const CHAMBER_CENTRE := Vector2i(6, 6)
 ## What is drawn where there is no map: near-black, so walls along the void
 ## stand apart from it.
 const VOID := Color(0.05, 0.05, 0.06)
-## 14x14. '#' wall, '.' floor, '~' fire. The corridor is row 8, x 1..5, with
-## its dead end at x 1. Under the wall at row 10, rows 11-12 x 7..11 are a
-## two-wide passage open at both ends, where two players can pass each other.
+## Double resolution (see Terrain): '#' wall, '+' door, '.' floor, '~' fire.
+## The west corridor is rows 8-9, x 3..5, two wide, narrowing to the one
+## cell (1..2, 8) at its dead end: the one chokepoint. Rows 11-12 are a
+## two-wide passage; the corridors south and east of it are two wide too,
+## and the door above (4, 13) is the only way into the south one.
 const LEVEL: Array[String] = [
 	"",
 	" #########################",
@@ -47,17 +49,17 @@ const LEVEL: Array[String] = [
 	"           #. . . . . . .#",
 	" ###########             #",
 	" #. . . . . . . . . . . .#",
-	" ###########             #",
-	"           #. . . . . . .#",
-	" ########### ########### #",
-	" #. . . . . .#         #.#",
-	" #           ########### ###################",
+	" ##### # # #             #",
+	"      . . . . . . . . . .#",
+	" ########### # ####### # #",
+	" #          . .       . .#",
+	" #           # ####### # ###################",
 	" #. . . . . . . . . . . . . . . . . . . . .#",
 	" #                                         #",
 	" #. . . . . . . . . . . . . . . . . . . . .#",
 	" #######+###############################   #",
-	"       #.#                             #. .#",
-	"     ### #                             #   #",
+	"      . .#                             #. .#",
+	"     # # #                             #   #",
 	"     #. .#                             #. .#",
 	"     #   #                             #   #",
 	"     #. .#                             #. .#",

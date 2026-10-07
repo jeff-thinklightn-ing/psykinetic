@@ -8,14 +8,15 @@ extends Node3D
 ## sim is the physics: there are no physics bodies here, only meshes and,
 ## for picking, Area3Ds.
 ##
-## The room is built once from the parsed map (Terrain): a flat stone-grey
-## quad per floor cell in the 2D floor's colour; a plain box per wall edge,
-## the kit's 0.5 thickness centred on the boundary line, WALL_HEIGHT tall,
-## in the Kenney Castle Kit's stone (sampled from its colormap); a 0.5
-## post at every vertex where walls meet at an angle or end; for a door,
-## two jambs and a lintel with the kit's gate leaf scaled to the opening,
-## hinged at the edge's start and turning with the Door node. Fire is an
-## emissive quad with a small light.
+## The room is built once from the parsed map (Terrain) out of the Kenney
+## Castle Kit (1-unit modules, KIT_WALL_HEIGHT tall), at the kit's own
+## proportions and scaled only in height to WALL_HEIGHT: the ground piece
+## per floor cell; the narrow wall segment per wall edge, centred on the
+## boundary line; the narrow corner post at every vertex where walls meet
+## at an angle or end; the doorway piece with the gate leaf hinged at the
+## edge's start for a door, turning with the Door node. Fire is an emissive
+## quad with a small light. Flat-colour boxes in the kit's stone (_box,
+## _stone) stay available for interior walls later (BOX_WALLS).
 ##
 ## Near and far, as in 2D: a wall whose camera-facing side has walkable
 ## floor behind it is near and drawn at NEAR_ALPHA, so what stands there
@@ -41,17 +42,19 @@ extends Node3D
 
 const KIT := "res://art/kenney-castle/Models/GLB format/"
 const WALL_HEIGHT := 3.0
+const KIT_WALL_HEIGHT := 1.31
+## The kit's walls are this thick and occupy x in [-0.5, 0] of their
+## module; they are shifted to straddle the edge.
 const WALL_THICKNESS := 0.5
 const POST_SIZE := 0.5
-## The doorway: an opening this wide and tall between two jambs under a
-## lintel, in a wall of the same thickness.
-const DOOR_WIDTH := 0.6
-const DOOR_HEIGHT := 2.4
-## The kit's gate leaf, in kit units: thickness x, height y, width z.
+## The kit's gate leaf, in kit units: thickness x, height y, width z. It
+## fits the kit's doorway as is.
 const GATE_SIZE := Vector3(0.1516, 0.910339, 0.662151)
+## Flat-colour walls instead of the kit pieces (for interiors later).
+const BOX_WALLS := false
 ## The kit's stone, sampled from its colormap at the wall mesh's UVs.
 const STONE := Color("ebb48e")
-## The 2D floor tile's colour.
+## The 2D floor tile's colour (the box floor).
 const FLOOR := Color("4b7164")
 const NEAR_ALPHA := 0.3
 const CAMERA_PITCH := 50.0
@@ -124,11 +127,15 @@ var _yaw_tween: Tween
 ## Middle button held: the screen x it went down at, or NAN when not.
 var _nudge_from := NAN
 var _room: Node3D
+## The kit's own material and a see-through copy of it; the flat stone
+## pair likewise.
+var _kit_opaque: Material
+var _kit_near: Material
 var _stone_opaque: StandardMaterial3D
 var _stone_near: StandardMaterial3D
-## Wall edge key -> its box; vertex -> its post.
-var _walls: Dictionary[Vector3i, MeshInstance3D] = {}
-var _posts: Dictionary[Vector2i, MeshInstance3D] = {}
+## Wall edge key -> its piece; vertex -> its post.
+var _walls: Dictionary[Vector3i, Node3D] = {}
+var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge).
 var _doorways: Dictionary[Vector3i, Node3D] = {}
 ## Entity instance id -> its puppet.
@@ -424,25 +431,41 @@ func _stone(alpha: float) -> StandardMaterial3D:
 	return material
 
 
+## The kit pieces share one material (a colormap); the see-through copy
+## is it with alpha.
+func _load_kit_materials() -> void:
+	var sample := _kit("wall-narrow")
+	for node in _descendants(sample):
+		if node is MeshInstance3D:
+			_kit_opaque = (node as MeshInstance3D).mesh.surface_get_material(0)
+			break
+	sample.free()
+	var near := _kit_opaque.duplicate() as BaseMaterial3D
+	near.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	near.albedo_color = Color(near.albedo_color, NEAR_ALPHA)
+	_kit_near = near
+
+
+func _descendants(node: Node) -> Array[Node]:
+	var out: Array[Node] = [node]
+	for child in node.get_children():
+		out.append_array(_descendants(child))
+	return out
+
+
 func _build_room() -> void:
 	_room = Node3D.new()
 	_room.name = "Room"
 	add_child(_room)
+	_load_kit_materials()
 	_stone_opaque = _stone(1.0)
 	_stone_near = _stone(NEAR_ALPHA)
-	var floor_material := StandardMaterial3D.new()
-	floor_material.albedo_color = FLOOR
-	floor_material.roughness = 1.0
-	var floor_mesh := PlaneMesh.new()
-	floor_mesh.size = Vector2.ONE
-	floor_mesh.material = floor_material
 	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in _terrain["floor"]:
-		var quad := MeshInstance3D.new()
-		quad.name = "Floor_%d_%d" % [cell.x, cell.y]
-		quad.mesh = floor_mesh
-		quad.position = _tile_position(cell)
-		_room.add_child(quad)
+		var ground := _kit("ground")
+		ground.name = "Floor_%d_%d" % [cell.x, cell.y]
+		ground.position = _tile_position(cell)
+		_room.add_child(ground)
 		if cell in fire:
 			_add_fire(cell)
 	var edges: Dictionary = _terrain["edges"]
@@ -475,49 +498,61 @@ static func _edge_yaw(key: Vector3i) -> float:
 	return 0.0 if key.z == Terrain.EAST else PI * 0.5
 
 
-func _box(size: Vector3, material: Material) -> MeshInstance3D:
+## A flat-colour box standing on the ground, its origin at its base.
+func _box(size: Vector3, material: Material) -> Node3D:
+	var holder := Node3D.new()
 	var box := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	box.mesh = mesh
 	box.material_override = material
 	box.position.y = size.y * 0.5
-	return box
+	holder.add_child(box)
+	return holder
+
+
+## A kit wall module (narrow wall or doorway) on an edge: the piece sits
+## in x [-0.5, 0] of its module, so it is shifted to straddle the line,
+## and stretched in height only.
+func _kit_wall(piece: String) -> Node3D:
+	var holder := Node3D.new()
+	var mesh := _kit(piece)
+	mesh.position.x = WALL_THICKNESS * 0.5
+	holder.scale = Vector3(1.0, WALL_HEIGHT / KIT_WALL_HEIGHT, 1.0)
+	holder.add_child(mesh)
+	return holder
 
 
 func _add_wall(key: Vector3i) -> void:
-	var wall := _box(Vector3(WALL_THICKNESS, WALL_HEIGHT, 1.0), _stone_opaque)
+	var wall: Node3D
+	if BOX_WALLS:
+		wall = _box(Vector3(WALL_THICKNESS, WALL_HEIGHT, 1.0), _stone_opaque)
+	else:
+		wall = _kit_wall("wall-narrow")
 	wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
-	wall.position = _edge_midpoint(key) + Vector3(0.0, WALL_HEIGHT * 0.5, 0.0)
+	wall.position = _edge_midpoint(key)
 	wall.rotation.y = _edge_yaw(key)
 	_room.add_child(wall)
 	_walls[key] = wall
 
 
-## Two jambs and a lintel around a DOOR_WIDTH x DOOR_HEIGHT opening, the
-## gate leaf scaled to the opening and hinged at the edge's start end, and
-## an Area3D over the frame for picking.
+## The kit's doorway on the edge with its gate leaf, hinged at the edge's
+## start end and swinging with the Door node, and an Area3D over the
+## module for picking.
 func _add_doorway(key: Vector3i) -> void:
 	var doorway := Node3D.new()
 	doorway.name = "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 	doorway.position = _edge_midpoint(key)
 	doorway.rotation.y = _edge_yaw(key)
-	var jamb_width := (1.0 - DOOR_WIDTH) * 0.5
-	for side in [-1.0, 1.0]:
-		var jamb := _box(Vector3(WALL_THICKNESS, WALL_HEIGHT, jamb_width), _stone_opaque)
-		jamb.name = "Jamb"
-		jamb.position.z = side * (0.5 - jamb_width * 0.5)
-		doorway.add_child(jamb)
-	var lintel := _box(Vector3(WALL_THICKNESS, WALL_HEIGHT - DOOR_HEIGHT, DOOR_WIDTH), _stone_opaque)
-	lintel.name = "Lintel"
-	lintel.position.y = DOOR_HEIGHT + (WALL_HEIGHT - DOOR_HEIGHT) * 0.5
-	doorway.add_child(lintel)
+	var frame := _kit_wall("wall-doorway")
+	frame.name = "Frame"
+	doorway.add_child(frame)
 	var hinge := Node3D.new()
 	hinge.name = "Hinge"
-	hinge.position.z = -DOOR_WIDTH * 0.5
+	hinge.position.z = -GATE_SIZE.z * 0.5
 	var leaf := _kit("gate")
-	leaf.scale = Vector3(1.0, DOOR_HEIGHT / GATE_SIZE.y, DOOR_WIDTH / GATE_SIZE.z)
-	leaf.position.z = DOOR_WIDTH * 0.5
+	leaf.scale = Vector3(1.0, WALL_HEIGHT / KIT_WALL_HEIGHT, 1.0)
+	leaf.position.z = GATE_SIZE.z * 0.5
 	hinge.add_child(leaf)
 	doorway.add_child(hinge)
 	var area := Area3D.new()
@@ -549,9 +584,14 @@ static func _needs_post(vertex: Vector2i, kind_at: Callable) -> bool:
 
 
 func _add_post(vertex: Vector2i) -> void:
-	var post := _box(Vector3(POST_SIZE, WALL_HEIGHT, POST_SIZE), _stone_opaque)
+	var post: Node3D
+	if BOX_WALLS:
+		post = _box(Vector3(POST_SIZE, WALL_HEIGHT, POST_SIZE), _stone_opaque)
+	else:
+		post = _kit("wall-narrow-corner")
+		post.scale = Vector3(1.0, WALL_HEIGHT / KIT_WALL_HEIGHT, 1.0)
 	post.name = "Post_%d_%d" % [vertex.x, vertex.y]
-	post.position = Vector3(vertex.x - 0.5, WALL_HEIGHT * 0.5, vertex.y - 0.5)
+	post.position = Vector3(vertex.x - 0.5, 0.0, vertex.y - 0.5)
 	_room.add_child(post)
 	_posts[vertex] = post
 
@@ -602,9 +642,7 @@ func _classify_walls() -> void:
 	for key in _doorways:
 		var near := _is_near(key)
 		near_keys[key] = near
-		for child in _doorways[key].get_children():
-			if child is MeshInstance3D:
-				_set_stone(child, near)
+		_set_stone(_doorways[key].get_node("Frame"), near)
 	var edges: Dictionary = _terrain["edges"]
 	for vertex in _posts:
 		var all_near := true
@@ -615,11 +653,20 @@ func _classify_walls() -> void:
 
 
 ## A near piece is see-through and casts no shadow, so a lantern behind it
-## still lights the floor in front.
-func _set_stone(piece: MeshInstance3D, near: bool) -> void:
-	piece.material_override = _stone_near if near else _stone_opaque
-	piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if near \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+## still lights the floor in front. Every mesh under [param piece] takes
+## the kit material pair, or the flat stone pair for a box.
+func _set_stone(piece: Node3D, near: bool) -> void:
+	for node in _descendants(piece):
+		var mesh := node as MeshInstance3D
+		if mesh == null:
+			continue
+		var boxed := mesh.mesh is BoxMesh
+		if boxed:
+			mesh.material_override = _stone_near if near else _stone_opaque
+		else:
+			mesh.material_override = _kit_near if near else _kit_opaque
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if near \
+				else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
 # --- Entities ----------------------------------------------------------------

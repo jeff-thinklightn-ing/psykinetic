@@ -617,11 +617,14 @@ space open); (odd, odd) positions are corners and are ignored. An edge
 between floor and nothing is a wall whether or not it is written, so the
 outline comes for free. The room is 48×36 cells: the original chamber with
 its cells where they always were (what used to be wall cells is now
-nothing, with walls on its edges, so the west corridor is one cell wide
-walled on both sides and the two-wide passage is two cells walled on the
-outside) plus two corridors that bend out of view, the south one through
-a door at the edge above (4, 13), and one half-wall off the north wall
-between (5, 1) and (6, 1), there so a T and a free end exist. Every tile
+nothing, with walls on its edges) plus two corridors that bend out of
+view, the south one through a door at the edge above (4, 13), and one
+half-wall off the north wall between (5, 1) and (6, 1), there so a T and
+a free end exist. Corridors are two cells wide: the west corridor is rows
+8–9 at x 3..5, narrowing to the single cells (1..2, 8) at its dead end,
+the one chokepoint kept on purpose; the links from row 9 down to the
+passage are (6..7, 10) and (11..12, 10); the door opens onto (3..4, 13),
+(3, 13) walled on its north so the door stays the only way in. Every tile
 the tests use is where it was.
 Test rooms written as old cell maps go through `Terrain.expand`.
 
@@ -694,17 +697,18 @@ replicated state, unseen, and the 3D view reads them. One tile is one
 unit; grid (x, y) is 3D (x, 0, y). No physics bodies: the sim is the
 physics; the only collision objects are `Area3D`s for picking.
 
-**Room**, built once from `Terrain.parse`: a flat quad per floor cell in
-the 2D floor's green-grey (`FLOOR`); a plain box per wall edge, the
-Kenney kit's 0.5 thickness (`WALL_THICKNESS`) centred on the boundary
-line, `WALL_HEIGHT` (3) tall, in the kit's stone colour (`STONE`, sampled
-from its colormap; the kit has no interior wall piece without
-battlements); a 0.5 post at every vertex where walls meet at an angle or
-end (none along a straight run, the 2D corner rule); for a door, two
-jambs and a lintel round a `DOOR_WIDTH` × `DOOR_HEIGHT` opening with the
-kit's `gate` leaf scaled to it, hinged at the edge's start and turning
-with the Door node's state; fire as an emissive quad and a small orange
-OmniLight3D.
+**Room**, built once from `Terrain.parse` out of the Kenney Castle Kit at
+its own proportions (1-unit modules, `KIT_WALL_HEIGHT` 1.31 tall), scaled
+in height only to `WALL_HEIGHT` (3): the `ground` piece per floor cell;
+`wall-narrow` per wall edge, shifted so its 0.5 thickness straddles the
+boundary line; `wall-narrow-corner` at every vertex where walls meet at
+an angle or end (none along a straight run, the 2D corner rule);
+`wall-doorway` with the kit's `gate` leaf for a door, hinged at the edge's
+start and turning with the Door node's state; fire as an emissive quad
+and a small orange OmniLight3D. The kit's one material (a colormap) is
+reused as is, with a see-through copy for near pieces. Flat-colour boxes
+in the kit's stone (`_box`, `_stone`, `STONE`) stay available for interior
+walls later (`BOX_WALLS`).
 
 **Near and far**, the 2D rule for this camera (`_is_near`): the cell
 behind an edge's camera-facing side is its -x / -y cell when that face
