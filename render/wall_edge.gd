@@ -1,24 +1,31 @@
 class_name WallEdge
 extends Node2D
-## One wall edge drawn as a thin face standing on the cell boundary, as tall
-## as the scale table says, in the Y-sorted layer with the cell on its
-## -x / -y side. Where the wall ends, turns a corner, or meets a door, a post
-## is drawn at that end; where it runs straight on, nothing, so runs read as
-## one wall. Placeholder colours, no texture.
+## One wall edge, drawn on the cell boundary line with no ground thickness:
+## a face standing on the line and a lit strip along its top. It is in the
+## Y-sorted layer with the cell on its -x / -y side, a hair nearer the camera
+## than what stands on that cell, so it is in front of that and behind the
+## next cell. Floor is never drawn under a wall; a wall stands on the line
+## between two floors.
 ##
-## Main fades a face that would draw over the local player's cell.
+## Near walls are low. Both edges drawn here face the camera as seen from
+## their -x / -y cell; when that cell is floor the wall is in front of it and
+## would hide it, so it is drawn as a stub a third of a tile tall. When that
+## cell is nothing the wall is the far side of the cell beyond, and stands
+## full height. A drawing rule only: the sim knows nothing of it.
+##
+## Where a wall ends, turns, or meets a door, a dark line marks the end.
 
 const FACE_EAST := Color(0.263, 0.278, 0.353)  # The south-east side of a cell.
 const FACE_SOUTH := Color(0.353, 0.373, 0.45)  # The south-west side, lit.
-const TOP := Color(0.54, 0.565, 0.66)
-const EDGE := Color(0.12, 0.12, 0.16, 0.8)
-const POST := Color(0.3, 0.3, 0.38)
-const POST_WIDTH := 3.0
-const HIDING_ALPHA := 0.3
+const TOP := Color(0.6, 0.625, 0.72)
+const END := Color(0.12, 0.12, 0.16, 0.9)
+const TOP_STRIP := 4.0
+const STUB_FRACTION := 1.0 / 3.0
 
 var key := Vector3i.ZERO
-var post_at_start := false
-var post_at_end := false
+var near := false
+var end_at_start := false
+var end_at_end := false
 
 
 ## Where an edge runs, in the local space of its -x / -y cell's centre:
@@ -32,14 +39,18 @@ static func endpoints(edge: Vector3i) -> Array[Vector2]:
 	return [w, s]
 
 
+## Drawn height of an edge whose -x / -y cell is or is not floor.
+static func height(near_side_is_floor: bool) -> float:
+	var full := Iso.height_px("wall")
+	return Iso.TILE_SIZE.y * STUB_FRACTION if near_side_is_floor else full
+
+
 ## Position of the vertex (shared diamond corner) an edge end sits on, as
 ## the cell whose north corner it is.
 static func vertex_at(edge: Vector3i, end: int) -> Vector2i:
 	var c := Vector2i(edge.x, edge.y)
 	if edge.z == Terrain.EAST:
-		# South corner of c is the north corner of c + (1, 1); east corner, of c + (1, 0).
 		return c + (Vector2i(1, 1) if end == 0 else Vector2i(1, 0))
-	# West corner of c is the north corner of c + (0, 1); south corner, of c + (1, 1).
 	return c + (Vector2i(0, 1) if end == 0 else Vector2i(1, 1))
 
 
@@ -52,10 +63,10 @@ static func edges_at_vertex(v: Vector2i) -> Array:
 	]
 
 
-## A post is drawn where the edges meeting at a vertex are not exactly two
+## An end mark goes where the edges meeting at a vertex are not exactly two
 ## walls running straight through it. [param kind_at] gives Terrain.Edge for
 ## a key (OPEN if none).
-static func needs_post(v: Vector2i, kind_at: Callable) -> bool:
+static func needs_end(v: Vector2i, kind_at: Callable) -> bool:
 	var walls := 0
 	var doors := 0
 	var straight := false
@@ -72,39 +83,30 @@ static func needs_post(v: Vector2i, kind_at: Callable) -> bool:
 	return doors > 0 or not (straight and walls == 2)
 
 
-static func draw_post(on: CanvasItem, at: Vector2, up: Vector2, color: Color) -> void:
-	var half := Vector2(POST_WIDTH * 0.5, 0)
-	on.draw_colored_polygon(PackedVector2Array([at - half, at + half, at + half + up, at - half + up]), color)
-	on.draw_line(at - half + up, at + half + up, TOP)
+## Draws a face of [param h] pixels standing on the line [param a]-[param b]
+## with the lit strip along its top. Shared with Door.
+static func draw_face(on: CanvasItem, a: Vector2, b: Vector2, h: float, color: Color) -> void:
+	var up := Vector2(0, -h)
+	var strip := Vector2(0, -maxf(h - TOP_STRIP, 0.0))
+	on.draw_colored_polygon(PackedVector2Array([a, b, b + strip, a + strip]), color)
+	on.draw_colored_polygon(PackedVector2Array([a + strip, b + strip, b + up, a + up]), TOP)
 
 
-func setup(edge: Vector3i, kind_at: Callable) -> void:
+func setup(edge: Vector3i, kind_at: Callable, floor_at: Callable) -> void:
 	key = edge
 	position = Iso.tile_to_local(Vector2i(edge.x, edge.y)) + Vector2(0, 0.5)
-	post_at_start = needs_post(vertex_at(edge, 0), kind_at)
-	post_at_end = needs_post(vertex_at(edge, 1), kind_at)
+	near = floor_at.call(Vector2i(edge.x, edge.y))
+	end_at_start = needs_end(vertex_at(edge, 0), kind_at)
+	end_at_end = needs_end(vertex_at(edge, 1), kind_at)
 	queue_redraw()
-
-
-## The face in local space.
-func face_polygon() -> PackedVector2Array:
-	var ends := endpoints(key)
-	var up := Vector2(0, -Iso.height_px("wall"))
-	return PackedVector2Array([ends[0], ends[1], ends[1] + up, ends[0] + up])
-
-
-func set_hiding(on: bool) -> void:
-	modulate.a = HIDING_ALPHA if on else 1.0
 
 
 func _draw() -> void:
 	var ends := endpoints(key)
-	var up := Vector2(0, -Iso.height_px("wall"))
-	var face := face_polygon()
-	draw_colored_polygon(face, FACE_EAST if key.z == Terrain.EAST else FACE_SOUTH)
-	draw_line(face[3], face[2], TOP, 2.0)
-	draw_line(face[0], face[1], EDGE)
-	if post_at_start:
-		draw_post(self, ends[0], up, POST)
-	if post_at_end:
-		draw_post(self, ends[1], up, POST)
+	var h := height(near)
+	draw_face(self, ends[0], ends[1], h, FACE_EAST if key.z == Terrain.EAST else FACE_SOUTH)
+	var up := Vector2(0, -h)
+	if end_at_start:
+		draw_line(ends[0], ends[0] + up, END)
+	if end_at_end:
+		draw_line(ends[1], ends[1] + up, END)

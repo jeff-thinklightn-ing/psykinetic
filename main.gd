@@ -193,11 +193,13 @@ var _toss_from := Vector2.ZERO
 @onready var hud: Label = $HUD/Label
 @onready var debug_overlay: Label = $HUD/Debug
 @onready var toss_aim: Line2D = $TossAim
-@onready var fade: DistanceFade = $Fade
+@onready var path_preview: PathPreview = $PathPreview
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
-## Every wall edge drawn, for the per-frame fade over the local player.
+## Every wall edge drawn.
 var _wall_edges: Array[WallEdge] = []
+## The path preview is hidden from a click until the cursor moves.
+var _preview_hidden_at := Vector2.INF
 
 
 func _ready() -> void:
@@ -208,7 +210,6 @@ func _ready() -> void:
 
 	_paint_level()
 	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
-	fade.visible = false
 
 	# Every peer builds entities the same way; only the server decides when.
 	spawner.spawn_function = _build_entity
@@ -264,11 +265,13 @@ func _go_online() -> void:
 
 func _process(delta: float) -> void:
 	_follow_player(delta)
-	_fade_walls_over_player()
-	var hovered := _entity_under_mouse()
-	var tile := hovered.tile if hovered != null else _mouse_tile()
+	_test_hover()
+	# Hover is the floor cell under the cursor, on the ground plane alone:
+	# nothing standing on the map intercepts it.
+	var tile := _mouse_tile()
 	cursor.visible = World.is_walkable(tile)
 	cursor.position = Iso.tile_to_local(tile)
+	_update_path_preview(tile)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -307,24 +310,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not click.pressed:
 		return
-	# A door under the cursor: toggle it from beside it, or walk up to it.
-	var door := _door_under_mouse()
-	if door != null and click.button_index == MOUSE_BUTTON_LEFT:
-		var cells := Terrain.edge_cells(door.key)
-		if player.tile in cells:
+	_preview_hidden_at = get_global_mouse_position()
+	path_preview.clear()
+	# A click resolves on the ground plane: the floor cell under the cursor,
+	# and whatever stands on it. The right button also takes a sprite under
+	# the cursor, for shoving something whose cell is hidden, and a door.
+	var tile := _mouse_tile()
+	var target := World.get_entity_at(tile)
+	if click.button_index == MOUSE_BUTTON_RIGHT:
+		var door := _door_under_mouse()
+		if door != null and player.tile in Terrain.edge_cells(door.key):
 			World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
-		else:
-			World.command_move(player, cells[0] if World.distance(player.tile, cells[0]) <= World.distance(player.tile, cells[1]) else cells[1])
-		return
-	# A sprite under the cursor wins over the tile under the cursor.
-	var target := _entity_under_mouse()
-	var tile := target.tile if target != null else _mouse_tile()
-	if target == null:
-		target = World.get_entity_at(tile)
+			return
+		var sprite_hit := _entity_under_mouse()
+		if sprite_hit != null:
+			target = sprite_hit
 	var targetable := target != null and target != player and World.can_target(player, target)
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
-			# A creature: go to it and attack. Anything else: walk there (and push).
+			# A creature on that cell: go to it and attack. Anything else:
+			# walk there (and push).
 			if targetable and target.is_creature():
 				World.command_attack(player, target)
 			else:
@@ -383,30 +388,30 @@ func _update_toss_aim() -> void:
 		tail, tip, tip + along.rotated(2.6) * 7.0, tip, tip + along.rotated(-2.6) * 7.0])
 
 
-## A wall or door face that would draw over the local player's cell fades
-## while it overlaps it: a face drawn after the player (lower on screen)
-## whose rectangle crosses the player's.
-func _fade_walls_over_player() -> void:
+## The dotted route from the local player to the hovered cell, as the client
+## would predict it (so through doors), until a click hides it and the
+## cursor moves again.
+func _update_path_preview(tile: Vector2i) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	var player := _local_player()
-	var body := Rect2()
-	if player != null:
-		var height := Iso.height_px("capsule")
-		body = Rect2(player.position + Vector2(-Iso.HALF.x * 0.5, -height), Vector2(Iso.HALF.x, height + 2.0))
-	for wall in _wall_edges:
-		wall.set_hiding(player != null and _face_covers(wall, wall.face_polygon(), body))
-	for door in World.get_doors():
-		door.modulate.a = Door.HIDING_ALPHA if player != null and _face_covers(door, door.face_polygon(), body) else 1.0
+	if player == null or not World.is_walkable(tile) or get_global_mouse_position() == _preview_hidden_at:
+		path_preview.clear()
+		return
+	_preview_hidden_at = Vector2.INF
+	var points: Array[Vector2] = [player.position]
+	for step in World.find_path(player.tile, tile, true, player):
+		points.append(Iso.tile_to_local(step))
+	path_preview.show_path(points if points.size() > 1 else [])
 
 
-func _face_covers(face: Node2D, polygon: PackedVector2Array, body: Rect2) -> bool:
-	if face.position.y <= body.end.y - 2.0:
-		return false  # Drawn before the player: behind it.
-	var rect := Rect2(face.position + polygon[0], Vector2.ZERO)
-	for point in polygon:
-		rect = rect.expand(face.position + point)
-	return rect.intersects(body)
+## --test-hover: parks the cursor over a cell, for screenshots.
+func _test_hover() -> void:
+	if Net.test_hover_tile == Vector2i(-1, -1) or DisplayServer.get_name() == "headless":
+		return
+	# Cell -> viewport (camera) -> window (stretch).
+	var on_screen := get_viewport().get_screen_transform() * ground.get_global_transform_with_canvas() 			* Iso.tile_to_local(Net.test_hover_tile)
+	Input.warp_mouse(on_screen)
 
 
 ## The door whose face is under the cursor, or null.
@@ -420,16 +425,14 @@ func _door_under_mouse() -> Door:
 	return null
 
 
-## The camera eases toward the local player, a little behind it; the fade
-## sits on it. With no player (dedicated server, dead) both stay put.
+## The camera eases toward the local player, a little behind it. With no
+## player (dedicated server, dead) it stays put.
 func _follow_player(delta: float) -> void:
 	var player := _local_player()
 	if player == null:
 		return
 	var rate := 1.0 - exp(-CAMERA_FOLLOW_RATE * delta)
 	camera.position = camera.position.lerp(player.position, rate)
-	fade.position = player.position
-	fade.visible = true
 
 
 ## The player this peer's input controls, or null (dedicated server, dead,
@@ -496,7 +499,7 @@ func _paint_level() -> void:
 		var wall := WallEdge.new()
 		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 		$YSort.add_child(wall)
-		wall.setup(key, kind_at)
+		wall.setup(key, kind_at, func(cell: Vector2i) -> bool: return cell in _terrain["floor"])
 		_wall_edges.append(wall)
 
 

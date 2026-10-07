@@ -3,6 +3,26 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.12
+
+Walls and picking: thin walls, low near walls, ground-plane clicks, a
+path preview. Client only.
+
+- Walls are drawn on the cell boundary with no footprint: a face and a lit
+  top strip. Floor draws fully to the base of its walls.
+- Walls in front of a floor cell (its south and east edges) are low stubs;
+  walls behind stand full height. The fade-to-black ring and the see-through
+  wall effect are gone.
+- Clicks and hover resolve to the floor cell under the cursor on the
+  ground plane; walls, doors and tall sprites never intercept a move. The
+  hover highlight shows the target cell even behind a tall wall. A right
+  click still picks a sprite to shove, and a door face to open or close
+  it from beside it.
+- A faint dotted path from you to the hovered cell, through any door on
+  the way; it disappears on click.
+
+The server must be updated to v0.1.12 too, as it refuses any other version.
+
 ## v0.1.11
 
 Walls on edges, and a door.

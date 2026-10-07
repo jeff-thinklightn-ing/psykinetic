@@ -207,3 +207,14 @@ cells became nothing, walled on their sides, rather than being removed,
 which would have moved every tested tile. Blocking, pushes, sight, melee
 reach and pathfinding all read the same edge rule; a diagonal needs every
 edge around its corner open. Door state is not saved.
+
+## 27. Near walls are stubs; clicks hit the ground
+
+A tall wall between the camera and a cell hides the cell. Rather than
+fading or cutting walls away, the wall in front of a floor cell (the
+south and east edges of walkable cells in this projection) is drawn as a
+stub a third of a tile tall and the wall behind it at full height. It is a
+drawing rule per edge; the sim never knows. With that, clicks and hover
+read the ground plane only, so the target cell is always the one under the
+cursor, highlighted and previewed above whatever stands in front of it.
+Only a right click still picks a sprite or a door, for shoving and doors.

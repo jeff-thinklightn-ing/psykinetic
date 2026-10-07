@@ -554,20 +554,25 @@ Every drawn size is in one table, `Iso.HEIGHTS`, in tile heights (16 px
 before camera zoom), keyed by shape: capsule (characters) 1.5, wall 3.0,
 cube (crates) 0.8, barrel 0.9, sphere (the boulder) 1.2, slab 0.4, flat 0.1.
 `EntityFactory` scales each sprite to its entry and sets it so the
-texture's `foot` row sits on the tile centre; `WallBlock` draws to its.
+texture's `foot` row sits on the tile centre; `WallEdge` draws to its.
 Nothing else states a size; a spec's `scale` multiplies on top.
 
 **Walls** (`render/wall_edge.gd`) are one Node2D per wall edge in the
-Y-sorted layer, drawn in code as a thin face standing on the cell boundary,
-as tall as the scale table says, with the cell on its -x / -y side (a hair
-nearer the camera, so it is in front of what stands on that cell and behind
-the next). Where a wall ends, turns a corner, or meets a door, a post is
-drawn at that vertex; where it runs straight on, nothing, so a run reads as
-one wall. Posts and faces come from the neighbouring edges alone. A face or
-door that would draw over the local player's cell fades to 30% while it
-overlaps it. Floor with a wall on its -x or -y edge uses a shaded
-alternative tile. Doors draw themselves (`Door._draw`): a face on the edge
-that swings about one end when open; a broken door leaves its posts.
+Y-sorted layer, drawn in code on the cell boundary line with no ground
+thickness: a face standing on the line and a 4 px lit strip along its top.
+Floor is never drawn under a wall; every floor cell draws fully to the base
+of its walls. The node sits with the cell on its -x / -y side, a hair nearer
+the camera, so it is in front of what stands on that cell and behind the
+next. *Near walls are low:* both edge faces point toward the camera as seen
+from that -x / -y cell, so when that cell is floor the wall is in front of
+it and is drawn as a stub a third of a tile tall; when that cell is nothing
+the wall is the far side of the cell beyond and stands full height (3 tile
+heights). Corners choose per edge. This is a drawing rule only. Where a
+wall ends, turns, or meets a door, a dark line marks the end. Floor with a
+wall on its -x or -y edge uses a shaded alternative tile. Doors draw
+themselves (`Door._draw`) at the same height rule: a face on the edge that
+swings about one end when open; a broken door leaves its jambs. There is
+no cutaway and no fade: a tall wall hides what is behind it.
 
 **The map** (`main.gd`, `LEVEL`; format in `sim/terrain.gd`) is written at
 double resolution: even coordinates are cells (`.` floor, `~` fire, space
@@ -582,14 +587,19 @@ outside) plus two corridors that bend out of view, the south one through
 a door at the edge above (4, 13). Every tile the tests use is where it was.
 Test rooms written as old cell maps go through `Terrain.expand`.
 
-**Camera and fade.** The camera eases toward the local player
-(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. `render/fade.gd` sits
-on the player and darkens everything beyond `CLEAR_TILES` (9) to black by
-`BLACK_TILES` (12), a ring of tile distance, drawn as an ellipse. It is not
-a lighting system: nothing else reads it.
+**Camera.** The camera eases toward the local player
+(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`.
+
+**Path preview** (`render/path_preview.gd`). While the cursor is over a
+floor cell, a faint dotted line runs from the local player to it along
+`World.find_path` as the client would predict it, through any door on the
+way. It and the hover highlight are drawn above walls, so the target reads
+even behind a full-height wall. A click hides the preview until the cursor
+moves.
 
 `--screenshot=<path>` with `--test-exit-after` saves the window as PNG on
-exit, for looking at a build without playing it.
+exit, for looking at a build without playing it; `--test-hover=<x>,<y>`
+parks the cursor over a cell for it.
 
 ## Grid ↔ screen
 
@@ -601,12 +611,16 @@ u = (lx - 16) / 16;  v = (ly - 8) / 8
 tile = (round((u + v) / 2), round((v - u) / 2))
 ```
 
-A click first looks for an entity whose sprite is under the cursor
-(`main.gd`, `_entity_under_mouse`: opaque pixels only, the sprite drawn in
-front wins, the local player is skipped) and targets that entity and its
-tile. Otherwise it goes `get_global_mouse_position()` → `ground.to_local()` →
-`Iso.local_to_tile()`. The hover highlight follows the same rule. `main.gd` checks at startup that `Iso` agrees with the
-TileMapLayer's own `map_to_local`.
+Clicks and hover resolve on the ground plane: `get_global_mouse_position()`
+→ `ground.to_local()` → `Iso.local_to_tile()` gives the floor cell under
+the cursor, and nothing standing on the map (walls, doors, tall sprites)
+intercepts that. A left click walks to that cell, or attacks the creature
+standing on it. A right click additionally takes a sprite under the cursor
+(`_entity_under_mouse`: opaque pixels only, the sprite drawn in front wins,
+the local player is skipped), so something whose cell is hidden can still
+be shoved, and a door face under the cursor, which toggles the door when
+the player stands beside it. `main.gd` checks at startup that `Iso` agrees
+with the TileMapLayer's own `map_to_local`.
 
 ## Testing
 

@@ -6,15 +6,14 @@ extends Node2D
 ## replicate. It is not a GridEntity: it occupies no cell, it is a property
 ## of the edge, and World consults it through its registry.
 ##
-## Drawn here as a thin tall face on the edge that swings about one end.
+## Drawn here as a thin face on the edge that swings about one end, at the
+## height WallEdge gives that edge (a stub when it is in front of floor).
 ## World changes open and hp; nothing else does.
 
 const REPLICATED := ["open", "hp"]
 const SWING_SECONDS := 0.25
 const FACE := Color(0.62, 0.45, 0.28)
-const FACE_EDGE := Color(0.25, 0.17, 0.1, 0.9)
-const POST := Color(0.3, 0.3, 0.38)
-const HIDING_ALPHA := 0.3
+const JAMB := Color(0.25, 0.17, 0.1, 0.9)
 
 var key := Vector3i.ZERO
 var open := false
@@ -23,6 +22,8 @@ var max_hp := 20
 var body_material := GridEntity.BodyMaterial.WOOD
 ## 0 closed .. 1 fully open, eased toward the state each frame.
 var _swing := 0.0
+## Drawn low when the cell on its -x / -y side is floor (see WallEdge).
+var near := false
 
 
 func _init() -> void:
@@ -56,6 +57,7 @@ static func build(spec: Dictionary) -> Door:
 
 func _ready() -> void:
 	World.register_door(self)
+	near = World.is_walkable(Vector2i(key.x, key.y))
 	_swing = 1.0 if is_open() else 0.0
 
 
@@ -90,17 +92,17 @@ func face_polygon() -> PackedVector2Array:
 	var across := Vector2(along.x, -along.y)  # The other cell axis, same length.
 	var angle := _swing * PI * 0.5
 	var free := hinge + along * cos(angle) + across * sin(angle)
-	var up := Vector2(0, -Iso.height_px("wall"))
+	var up := Vector2(0, -WallEdge.height(near))
 	return PackedVector2Array([hinge, free, free + up, hinge + up])
 
 
 func _draw() -> void:
 	var ends := WallEdge.endpoints(key)
-	var up := Vector2(0, -Iso.height_px("wall"))
+	var up := Vector2(0, -WallEdge.height(near))
 	for end: Vector2 in ends:
-		WallEdge.draw_post(self, end, up, POST)
+		draw_line(end, end + up, JAMB)
 	if is_broken():
 		return
 	var face := face_polygon()
-	draw_colored_polygon(face, FACE)
-	draw_polyline(PackedVector2Array([face[0], face[1], face[2], face[3], face[0]]), FACE_EDGE)
+	WallEdge.draw_face(self, face[0], face[1], WallEdge.height(near), FACE)
+	draw_polyline(PackedVector2Array([face[0], face[1], face[2], face[3], face[0]]), JAMB)

@@ -36,6 +36,7 @@ extends Node
 ##   --test-reset=<tick>          at that server tick, ask for a room reset as the R key does
 ##   --test-exit-after=<seconds>  quit after this long
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
+##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##
@@ -127,6 +128,7 @@ var test_contest_tick := 0
 var test_reset_tick := 0
 var test_exit_after := 0.0
 var screenshot_path := ""
+var test_hover_tile := Vector2i(-1, -1)
 
 var mispredicts_total := 0
 var snaps_total := 0
@@ -548,7 +550,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot":
+					"--screenshot", "--test-hover":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -599,3 +601,7 @@ func _set_option(key: String, value: String) -> void:
 			test_exit_after = value.to_float()
 		"--screenshot":
 			screenshot_path = value
+		"--test-hover":
+			var parts := value.split(",")
+			if parts.size() == 2:
+				test_hover_tile = Vector2i(parts[0].to_int(), parts[1].to_int())
