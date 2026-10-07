@@ -823,7 +823,12 @@ diamond views, yaw 0 (the 2D diamond) and each `ORBIT_STEP` (90°) from
 it (`Client3D.nearest_diamond`; half way between two, the higher). Q/E
 step from one diamond to the next about the player in one ease in and out
 over `ORBIT_SECONDS` (400 ms), through the axis-aligned view half way
-without stopping; that is the click scheme's way to turn it. In the WASD
+without stopping; that is the click scheme's way to turn it. The click
+scheme's middle drag is a **peek**: the yaw follows the drag up to
+`PEEK_LIMIT` (45°) either side of the diamond the camera rests on, and let
+go it springs back to that same diamond over `PEEK_RETURN_SECONDS`
+(200 ms); the resting and saved yaw never move. Q/E still step during a
+peek, which then rides on the new diamond. In the WASD
 scheme Q/E do nothing and a middle drag turns it instead: the yaw follows
 the horizontal drag (`Main.DRAG_DEGREES_PER_PX`, 0.25° a pixel) while the
 button is held, through any angle, and let go it settles on the nearest
@@ -899,8 +904,9 @@ orders, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the
-verbs land on the clicked target; Q/E turn the 3D camera a step. WASD
-and the middle button do nothing; the camera follows the player alone.
+verbs land on the clicked target; Q/E turn the 3D camera a step, a
+middle drag peeks (see the 3D view). WASD do nothing; the camera follows
+the player alone.
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;
 key combinations give eight directions (`Main.wasd_direction`; at yaw 0,

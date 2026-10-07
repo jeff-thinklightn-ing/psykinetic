@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_screen_lean()
 	_test_drag_and_freeze()
 	_test_diamonds()
+	_test_peek()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
 
@@ -290,6 +291,35 @@ func _test_diamonds() -> void:
 	_free_rig(rig)
 
 
+func _test_peek() -> void:
+	print("\n== click: a middle drag peeks off the diamond and springs back ==")
+	var rig := _rig()
+	_ease(rig)
+	var diamond := rig._yaw_step
+	var saved := Net.camera_yaw
+	rig.begin_peek()
+	rig.peek(30.0)
+	_check(is_equal_approx(rig.yaw, diamond + 30.0), "it follows the drag (%s)" % rig.yaw)
+	rig.peek(-120.0)
+	_check(is_equal_approx(rig.yaw, diamond - 45.0), "no further than 45 either side (%s)" % rig.yaw)
+	rig.end_peek()
+	rig._ease_yaw(0.1)
+	_check(rig.yaw > diamond - 45.0 and rig.yaw < diamond, "let go: on its way back (%s at 100 ms)" % rig.yaw)
+	rig._ease_yaw(0.1)
+	_check(is_equal_approx(rig.yaw, diamond), "back on the same diamond at 200 ms (%s)" % rig.yaw)
+	_check(is_equal_approx(rig._yaw_step, diamond) and is_equal_approx(Net.camera_yaw, saved),
+			"the resting and saved yaw never moved (%s, %s)" % [rig._yaw_step, Net.camera_yaw])
+	rig.begin_peek()
+	rig.peek(40.0)
+	rig.orbit(1)
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, diamond + 90.0 + 40.0), "Q/E still step while peeking; the peek rides on the new diamond (%s)" % rig.yaw)
+	rig.end_peek()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, diamond + 90.0), "and let go, back to that diamond (%s)" % rig.yaw)
+	_free_rig(rig)
+
+
 func _test_schemes_are_inert_outside() -> void:
 	print("
 == keys and buttons outside the active scheme do nothing ==")
@@ -303,7 +333,9 @@ func _test_schemes_are_inert_outside() -> void:
 	_main._unhandled_input(_key(KEY_Q))
 	_check(is_equal_approx(rig._yaw_step, step - 90.0), "click: Q turns to the next diamond, 90 degrees round")
 	_main._unhandled_input(_middle(true))
-	_check(not rig._dragging, "click: the middle button does nothing")
+	_check(rig._peeking and not rig._dragging, "click: the middle button peeks, it does not turn")
+	_main._unhandled_input(_middle(false))
+	_check(not rig._peeking, "and let go, the peek ends")
 	Net.controls = "wasd"
 	_main._unhandled_input(_middle(true))
 	_check(rig._dragging, "wasd: the middle button starts a drag")

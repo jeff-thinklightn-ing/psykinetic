@@ -40,6 +40,9 @@ extends Node3D
 ## between without stopping; in the WASD scheme a middle drag turns it
 ## freely and, let go, it settles on the nearest diamond over
 ## SETTLE_SECONDS. The diamond persists in settings.cfg (Net.camera_yaw).
+## In the click scheme a middle drag peeks: up to PEEK_LIMIT either side of
+## the diamond, and let go it springs back to that same diamond over
+## PEEK_RETURN_SECONDS, nothing saved.
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
@@ -80,6 +83,10 @@ const ORBIT_STEP := 90.0
 const ORBIT_SECONDS := 0.4
 ## A middle drag let go: on to the nearest diamond, eased out.
 const SETTLE_SECONDS := 0.25
+## Click scheme, a peek: how far either side of the diamond, and the spring
+## back when let go.
+const PEEK_LIMIT := 45.0
+const PEEK_RETURN_SECONDS := 0.2
 const PLAYER_LIGHT_RANGE := 6.0
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
@@ -163,6 +170,10 @@ var _drag_offset := 0.0
 var _settle_pending := false
 ## Held still by Main while a movement key is down.
 var frozen := false
+## Click scheme: a peek is held (a middle drag off the resting diamond),
+## this far off it.
+var _peeking := false
+var _peek_offset := 0.0
 ## WASD: the camera's lean toward the cursor, in grid units (Main.camera_lean).
 var _lead := Vector2.ZERO
 var _room: Node3D
@@ -293,6 +304,37 @@ func _local_player() -> Player:
 ## kept in the settings file.
 func orbit(direction: int) -> void:
 	_settle_on(_yaw_step + ORBIT_STEP * signf(direction), ORBIT_SECONDS, true)
+	if _peeking:
+		_ease_to += _peek_offset  # The peek held on rides on the new diamond.
+
+
+## Click: the middle button went down; the drag peeks off the diamond the
+## camera rests on (or is easing to).
+func begin_peek() -> void:
+	_peeking = true
+	_peek_offset = 0.0
+
+
+## Click: the peek is [param degrees] of drag, held to PEEK_LIMIT either
+## side of the diamond. During a Q/E ease, it is where that ease is going.
+func peek(degrees: float) -> void:
+	if not _peeking:
+		return
+	_peek_offset = clampf(degrees, -PEEK_LIMIT, PEEK_LIMIT)
+	var target := _yaw_step + _peek_offset
+	if _ease_t < 1.0:
+		_ease_to = target
+	else:
+		_set_yaw(target)
+
+
+## Click: the middle button came up: back to the same diamond. The saved
+## yaw never moved.
+func end_peek() -> void:
+	if not _peeking:
+		return
+	_peeking = false
+	_ease_toward(_yaw_step, PEEK_RETURN_SECONDS, false)
 
 
 ## WASD: the middle button went down; the drag turns from the yaw now.

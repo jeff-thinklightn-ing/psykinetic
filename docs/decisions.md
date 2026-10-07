@@ -468,3 +468,12 @@ always a diamond, and an axis yaw saved by an older build is read as the
 nearest one (half way, the higher). The axis view reads poorly for this
 map: walls run straight across the screen and the near ones cover the
 cells behind them edge-on.
+
+## 55. The click scheme's middle drag is a peek
+
+In the click scheme the middle button turns the camera only for a look:
+up to 45° either side of the resting diamond while held, back to the same
+diamond when let go, nothing saved. Q/E remain the only way to change the
+resting view there. The WASD scheme's middle drag is unchanged: a short
+one already falls back to its diamond. This amends 49, which had the
+middle button inert in the click scheme.

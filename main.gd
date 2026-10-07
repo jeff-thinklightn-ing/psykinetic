@@ -222,8 +222,10 @@ var _lead := Vector2.ZERO
 ## camera has moved (see _update_pick): the hover shows it and every
 ## click this frame uses it, so the two always agree.
 var _pick_grid := Vector2(NAN, NAN)
-## WASD, 3D: the screen x a middle drag went down at, or NAN.
+## 3D: the screen x a middle drag went down at, or NAN, and whether it is
+## the click scheme's peek or the WASD scheme's turn.
 var _drag_from := NAN
+var _drag_peeks := false
 ## WASD: when the facing and the last bump were sent, in msec.
 var _face_sent_at := 0
 var _bump_sent_at := 0
@@ -388,14 +390,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if click == null:
 		return
 	if click.button_index == MOUSE_BUTTON_MIDDLE:
-		# WASD scheme, 3D only: drag to turn, released to the nearest step.
-		if _client3d != null and Net.controls == "wasd":
+		# 3D only. Click scheme: drag to peek, released back to the diamond.
+		# WASD: drag to turn, released to the nearest diamond.
+		if _client3d != null:
 			if click.pressed:
 				_drag_from = DisplayServer.mouse_get_position().x
-				_client3d.begin_drag()
+				_drag_peeks = Net.controls == "click"
+				if _drag_peeks:
+					_client3d.begin_peek()
+				else:
+					_client3d.begin_drag()
 			elif not is_nan(_drag_from):
-				_drag_from = NAN
-				_client3d.end_drag()
+				_end_middle_drag()
 		return
 	var player := _local_player()
 	if player == null:
@@ -501,16 +507,28 @@ static func key_vector(keys: String) -> Vector2:
 	return Vector2(float("d" in keys) - float("a" in keys), float("w" in keys) - float("s" in keys))
 
 
-## WASD, 3D: while the middle button is held the drag turns the camera,
-## and a missed release (the button let go outside the window) ends it.
+## 3D: while the middle button is held the drag peeks (click) or turns
+## (WASD) the camera, and a missed release (the button let go outside the
+## window) ends it.
 func _drag_yaw() -> void:
 	if _client3d == null or is_nan(_drag_from):
 		return
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
-		_drag_from = NAN
-		_client3d.end_drag()
+		_end_middle_drag()
 		return
-	_client3d.drag((DisplayServer.mouse_get_position().x - _drag_from) * DRAG_DEGREES_PER_PX)
+	var degrees := (DisplayServer.mouse_get_position().x - _drag_from) * DRAG_DEGREES_PER_PX
+	if _drag_peeks:
+		_client3d.peek(degrees)
+	else:
+		_client3d.drag(degrees)
+
+
+func _end_middle_drag() -> void:
+	_drag_from = NAN
+	if _drag_peeks:
+		_client3d.end_peek()
+	else:
+		_client3d.end_drag()
 
 
 func _view_yaw() -> float:
@@ -1519,7 +1537,7 @@ func _on_world_ticked(tick: int) -> void:
 	else:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
-			hints += "   Q/E turn"
+			hints += "   Q/E turn   MMB drag peek"
 	hints += "   1-4 orders"
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]

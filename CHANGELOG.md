@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.32
+
+Peek in the click scheme. Client (the server only for the version).
+
+- Hold the middle button and drag sideways to turn the 3D camera up to
+  45° either way from the view it rests on; let go and it springs back to
+  that view over 200 ms. The saved view never changes. Q/E still step
+  between views, even mid-peek.
+- The WASD scheme is unchanged.
+
+The server must be updated to v0.1.32 too, as it refuses any other version.
+
 ## v0.1.31
 
 The 3D camera rests only on diagonal views. Client (the server only for
