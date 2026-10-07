@@ -107,6 +107,8 @@ var token := ""
 ## for a project host the dev id.
 var player_id := ""
 var player_name := DEFAULT_NAME
+## Server only: peers told to go that have not yet gone.
+var _leaving: Dictionary[int, bool] = {}
 ## Server only: authenticated peer -> its player_id.
 var _authenticated: Dictionary[int, String] = {}
 ## True when an exported build has no settings file and must ask for one.
@@ -386,6 +388,7 @@ func _on_auth_timeout(peer: int) -> void:
 
 func _on_peer_disconnected(peer: int) -> void:
 	_authenticated.erase(peer)
+	_leaving.erase(peer)
 
 
 func _admit(peer: int, id: String, player_name_given: String) -> void:
@@ -399,13 +402,21 @@ func _admit(peer: int, id: String, player_name_given: String) -> void:
 func _reject(peer: int, reason: String, detail := "") -> void:
 	print("[net] rejected peer %d from %s (%s)" % [
 		peer, _peer_address(peer), reason if detail == "" else detail])
-	# Tell it why first. Disconnecting at once would drop that packet, and a
-	# deferred ENet disconnect leaves the peer in a state replication cannot
-	# send to, so give the message a moment to go out, then cut the peer.
+	# Tell it why first. Disconnecting at once would drop that packet, so
+	# give the message a moment to go out, then disconnect gracefully (an
+	# outright cut leaves the peer in the multiplayer list for good). Until
+	# the handshake ends the peer is listed but cannot be sent to, so it is
+	# marked as leaving and the tick RPC skips it; see World.step.
 	rejected.rpc_id(peer, reason, version)
 	get_tree().create_timer(REJECT_GRACE).timeout.connect(func() -> void:
 		if online and peer in multiplayer.get_peers():
+			_leaving[peer] = true
 			multiplayer.multiplayer_peer.disconnect_peer(peer))
+
+
+## Server: is [param peer] being disconnected (still listed, not sendable)?
+func is_leaving(peer: int) -> bool:
+	return _leaving.has(peer)
 
 
 @rpc("authority", "call_remote", "reliable")

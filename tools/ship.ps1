@@ -1,9 +1,12 @@
-# Ships a change: tests, commit, push, CHANGELOG section, release. One
-# command for the whole chain, so a change never sits at "committed".
-#   tools\ship.ps1 -Message "what changed"                  tests, commit, push
-#   tools\ship.ps1 -Message "what changed" -Release 0.1.14  ...then CHANGELOG + release
-#   tools\ship.ps1 -Release 0.1.14                          nothing to commit; just release
+# Ships a change: tests, commit, push, CHANGELOG section, release, and the
+# server deploy. One command for the whole chain, so a change never sits at
+# "committed" or "released but not on the box".
+#   tools\ship.ps1 -Message "what changed"                  tests, commit, push, deploy
+#   tools\ship.ps1 -Message "what changed" -Release 0.1.14  ...with CHANGELOG + release before the deploy
+#   tools\ship.ps1 -Release 0.1.14                          nothing to commit; release and deploy
 #   -SkipTests                                              when they just ran
+#   -NoDeploy                                               leave the server alone
+# The box is $env:PSYKINETIC_BOX (user@host for ssh), default jequig@100.78.120.114.
 #
 # Order of work:
 #   1. refuse if project.godot carries run args (the editor writes the join
@@ -13,10 +16,13 @@
 #      message as its one bullet, unless that section already exists
 #   4. commit everything with the message (if there is anything), push
 #   5. with -Release: tools\release_client.ps1 -Version <version>
+#   6. ssh to the box: ~/psykinetic/server/deploy.sh (pull, export, install,
+#      restart), output streamed; then admin.sh players to show it is up
 param(
 	[string]$Message = '',
 	[string]$Release = '',
-	[switch]$SkipTests
+	[switch]$SkipTests,
+	[switch]$NoDeploy
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -82,3 +88,26 @@ if ($Release -ne '') {
 	& "$root\tools\release_client.ps1" -Version $Release
 	if ($LASTEXITCODE -ne 0) { Fail 'release failed' }
 }
+
+# --- 6. deploy --------------------------------------------------------------------
+if ($NoDeploy) {
+	Write-Output 'deploy skipped (-NoDeploy)'
+	exit 0
+}
+$box = if ($env:PSYKINETIC_BOX) { $env:PSYKINETIC_BOX } else { 'jequig@100.78.120.114' }
+Write-Output "--- deploying on $box"
+# BatchMode: never hang on a password prompt. stderr merged so git's and
+# systemctl's progress reads in order; the exit code decides.
+ssh -o BatchMode=yes -o ConnectTimeout=15 $box '~/psykinetic/server/deploy.sh' 2>&1 | ForEach-Object { "$_" }
+if ($LASTEXITCODE -ne 0) { Fail "deploy on $box failed (ssh exit $LASTEXITCODE)" }
+Write-Output '--- server console: players'
+# The admin port opens a moment after the restart.
+$players = $null
+foreach ($attempt in 1..5) {
+	$players = ssh -o BatchMode=yes -o ConnectTimeout=15 $box '~/psykinetic/server/admin.sh players' 2>&1 | ForEach-Object { "$_" }
+	if ($LASTEXITCODE -eq 0) { break }
+	Start-Sleep -Seconds 2
+}
+if ($LASTEXITCODE -ne 0) { Fail "admin.sh players on $box failed after the deploy: $players" }
+$players | Write-Output
+Write-Output "deployed on $box"

@@ -155,8 +155,9 @@ func step() -> void:
 	_regen_stamina()
 	ticked.emit(tick)
 	# 5. The tick counter goes to clients once per tick.
-	if not multiplayer.get_peers().is_empty():
-		_net_tick.rpc(tick)
+	for peer in multiplayer.get_peers():
+		if not Net.is_leaving(peer):
+			_net_tick.rpc_id(peer, tick)
 
 
 # --- Mutations (server only) --------------------------------------------------

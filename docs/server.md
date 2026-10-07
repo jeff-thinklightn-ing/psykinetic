@@ -74,7 +74,18 @@ If the box has a firewall, open UDP 7777 to the tailnet.
 It does, in order: `git pull --ff-only` in `~/psykinetic`; a headless export
 of the `Linux Server` preset to `build/`; copies the binary to
 `/opt/psykinetic/psykinetic-server` and the `.pck` next to it;
-`systemctl restart psykinetic`; prints the service status.
+`systemctl restart psykinetic`; prints the service status. Without
+`GODOT_PATH` set (as over a non-interactive ssh, where `.bashrc` is not
+read) it uses the newest `~/godot/Godot_v*_linux.x86_64`.
+
+From the dev machine, `tools\ship.ps1` runs it over ssh as its last step
+(`$env:PSYKINETIC_BOX`, default `jequig@100.78.120.114`), streams its
+output, then runs `admin.sh players` to show the server is up; `-NoDeploy`
+skips that. The ssh key must be set up: the script never prompts.
+
+The sudo commands `deploy.sh` runs: `install` (three times),
+`systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the
+ones `/etc/sudoers.d/psykinetic-deploy` allows without a password.
 
 `PSYKINETIC_REPO` overrides the repo location.
 
