@@ -304,10 +304,13 @@ func _process(delta: float) -> void:
 	# Hover is the floor cell under the cursor, on the ground plane alone:
 	# nothing standing on the map intercepts it.
 	var tile := _mouse_tile()
-	cursor.visible = World.is_walkable(tile)
-	cursor.position = Iso.tile_to_local(tile)
-	cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
-			Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
+	if _client3d != null:
+		_client3d.hover(tile, World.is_walkable(tile))
+	else:
+		cursor.visible = World.is_walkable(tile)
+		cursor.position = Iso.tile_to_local(tile)
+		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
+				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
 	_peek(delta)
 	if debug_overlay.visible:
@@ -334,16 +337,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_authority():
 			_start_level()
 		return
+	if key != null and key.pressed and not key.echo and key.keycode in [KEY_Q, KEY_E] and _client3d != null:
+		_client3d.orbit(-1 if key.keycode == KEY_Q else 1)
+		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
 		var local := _local_player()
 		if local != null:
 			World.command(local, "order", {"slot": key.keycode - KEY_0})
 		return
 	var click := event as InputEventMouseButton
-	if click == null or _client3d != null:
+	if click == null:
 		return
 	if click.button_index == MOUSE_BUTTON_MIDDLE:
-		_peek_button(click.pressed)
+		if _client3d != null:
+			_client3d.nudge_button(click.pressed)
+		else:
+			_peek_button(click.pressed)
 		return
 	var player := _local_player()
 	if player == null:
@@ -379,7 +388,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if targetable and target.is_creature():
 				World.command_attack(player, target)
 			else:
-				_move_click(player, tile if target != null else _snap_to_floor(_mouse_point()))
+				_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
 		MOUSE_BUTTON_RIGHT:
 			# Any entity: go to it and shove. Sent on release, so that
 			# dragging first can aim it.
@@ -388,9 +397,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toss_from = get_global_mouse_position()
 
 
-## --renderer=3d: the 3D view takes over drawing; the 2D ground, walls,
-## entities (still the replicated state, just unseen), cursor and ripple
-## are hidden. The HUD stays. Mouse input is ignored in this step.
+## --renderer=3d: the 3D view takes over drawing and picking; the 2D
+## ground, walls, entities (still the replicated state, just unseen),
+## cursor, ripple and toss arrow are hidden. The HUD stays. Input is
+## handled here as for the 2D view, with the picks and the hover and
+## ripple drawing routed to the view (see _mouse_grid,
+## _entity_under_mouse, _door_under_mouse).
 func _show_3d() -> void:
 	for node in [ground, near_walls, $YSort, cursor, ripple, toss_aim]:
 		node.visible = false
@@ -460,7 +472,10 @@ func _move_click(player: Player, tile: Vector2i) -> void:
 	if tile == NONE:
 		return
 	World.command_move(player, tile)
-	ripple.start(Iso.tile_to_local(tile))
+	if _client3d != null:
+		_client3d.ripple(tile)
+	else:
+		ripple.start(Iso.tile_to_local(tile))
 
 
 ## Left button held after a move click: when the cursor reaches another
@@ -473,7 +488,7 @@ func _retarget_held() -> void:
 	if player == null:
 		_held_target = NONE
 		return
-	var tile := _snap_to_floor(_mouse_point())
+	var tile := _snap_to_floor(_mouse_grid())
 	if tile != NONE and tile != _held_target:
 		_move_click(player, tile)
 
@@ -484,14 +499,24 @@ func _mouse_point() -> Vector2:
 	return to_local(get_global_mouse_position())
 
 
-## The walkable cell nearest [param point] (a ground-plane point, in grid
-## units once unprojected) within SNAP_RANGE tiles, or NONE. The cell under
-## the point itself wins when it is floor.
-func _snap_to_floor(point: Vector2) -> Vector2i:
-	var under := Iso.local_to_tile(point)
+## The cursor's point on the ground plane in continuous grid units: the
+## 3D view's floor-plane ray, or the 2D projection inverted. NaN when the
+## cursor misses the ground (3D, looking past the plane).
+func _mouse_grid() -> Vector2:
+	if _client3d != null:
+		return _client3d.mouse_grid()
+	return Iso.local_to_grid(_mouse_point())
+
+
+## The walkable cell nearest [param grid] (a ground-plane point in grid
+## units) within SNAP_RANGE tiles, or NONE. The cell under the point
+## itself wins when it is floor.
+func _snap_to_floor(grid: Vector2) -> Vector2i:
+	if is_nan(grid.x) or is_nan(grid.y):
+		return NONE
+	var under := Vector2i(roundi(grid.x), roundi(grid.y))
 	if World.is_walkable(under):
 		return under
-	var grid := Iso.local_to_grid(point)
 	var best := NONE
 	var best_distance := SNAP_RANGE * SNAP_RANGE
 	var reach := ceili(SNAP_RANGE)
@@ -533,6 +558,8 @@ func _toss_direction() -> Vector2i:
 
 ## Where a grid direction points on screen.
 func _screen_vector(direction: Vector2i) -> Vector2:
+	if _client3d != null:
+		return _client3d.screen_vector(direction)
 	return Iso.project(Vector2(direction))
 
 
@@ -567,14 +594,16 @@ func _test_hover() -> void:
 	if Net.test_hover_tile == Vector2i(-1, -1) or DisplayServer.get_name() == "headless":
 		return
 	# Cell -> viewport (camera) -> window (stretch).
-	var on_screen := get_viewport().get_screen_transform() * get_global_transform_with_canvas() 			* Iso.tile_to_local(Net.test_hover_tile)
-	Input.warp_mouse(on_screen)
+	var in_viewport: Vector2 = _client3d.screen_of_tile(Net.test_hover_tile) if _client3d != null 			else get_global_transform_with_canvas() * Iso.tile_to_local(Net.test_hover_tile)
+	Input.warp_mouse(get_viewport().get_screen_transform() * in_viewport)
 
 
 ## The door whose face is under the cursor, or null.
 func _door_under_mouse() -> Door:
 	if DisplayServer.get_name() == "headless":
 		return null
+	if _client3d != null:
+		return _client3d.door_under_mouse()
 	var mouse := get_global_mouse_position()
 	for door in World.get_doors():
 		if Geometry2D.is_point_in_polygon(door.to_local(mouse), door.face_polygon()):
@@ -608,6 +637,8 @@ func _local_player() -> Player:
 func _entity_under_mouse() -> GridEntity:
 	if DisplayServer.get_name() == "headless":
 		return null
+	if _client3d != null:
+		return _client3d.entity_under_mouse()
 	var mouse := get_global_mouse_position()
 	var own := _local_player()
 	var best: GridEntity = null
@@ -625,10 +656,13 @@ func _entity_under_mouse() -> GridEntity:
 	return best
 
 
-## Screen -> grid: the canvas transform (camera, stretch) is undone by
-## get_global_mouse_position(), then Iso inverts the projection.
+## Screen -> grid: the cell under the cursor on the ground plane (NONE
+## when the cursor misses the ground).
 func _mouse_tile() -> Vector2i:
-	return Iso.local_to_tile(_mouse_point())
+	var grid := _mouse_grid()
+	if is_nan(grid.x) or is_nan(grid.y):
+		return NONE
+	return Vector2i(roundi(grid.x), roundi(grid.y))
 
 
 ## The map (see Terrain for the format). Floor and fire go on the Ground
@@ -1249,7 +1283,10 @@ func _debug_text() -> String:
 	var player := _local_player()
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
-	lines.append("azimuth: %.1f deg" % Iso.azimuth)
+	if _client3d != null:
+		lines.append("yaw: %.1f deg" % _client3d.yaw)
+	else:
+		lines.append("azimuth: %.1f deg" % Iso.azimuth)
 	if Net.mode == Net.Mode.CLIENT:
 		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))
 		lines.append("mispredicts: %d / min (%d total)" % [

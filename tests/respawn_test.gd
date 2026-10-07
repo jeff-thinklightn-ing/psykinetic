@@ -229,17 +229,14 @@ func _shove(attacker: GridEntity, target: GridEntity) -> void:
 func _test_click_snaps_to_floor() -> void:
 	print("
 == a move click off the floor goes to the nearest walkable cell ==")
-	var on_floor := _grid_point(Vector2(3.0, 2.0))
-	_check(_main._snap_to_floor(on_floor) == Vector2i(3, 2), "a click on floor is that cell")
-	var across_the_wall := _grid_point(Vector2(0.3, 2.1))
-	_check(not World.is_walkable(Iso.local_to_tile(across_the_wall)), "the point past the west wall is void")
+	_check(_main._snap_to_floor(Vector2(3.0, 2.0)) == Vector2i(3, 2), "a click on floor is that cell")
+	var across_the_wall := Vector2(0.3, 2.1)
+	_check(not World.is_walkable(Iso.local_to_tile(_grid_point(across_the_wall))), "the point past the west wall is void")
 	_check(_main._snap_to_floor(across_the_wall) == Vector2i(1, 2), "and snaps to the floor cell across the wall")
-	var corner := _grid_point(Vector2(-0.4, -0.6))
-	_check(_main._snap_to_floor(corner) == Vector2i(1, 1), "past the corner, the corner cell")
-	var far_out := _grid_point(Vector2(-2.6, 2.0))
-	_check(_main._snap_to_floor(far_out) == _main.NONE, "further than %.0f tiles from any floor: no target" % _main.SNAP_RANGE)
-	var just_in := _grid_point(Vector2(-1.9, 2.0))
-	_check(_main._snap_to_floor(just_in) == Vector2i(1, 2), "just inside that range: the nearest cell")
+	_check(_main._snap_to_floor(Vector2(-0.4, -0.6)) == Vector2i(1, 1), "past the corner, the corner cell")
+	_check(_main._snap_to_floor(Vector2(-2.6, 2.0)) == _main.NONE, "further than %.0f tiles from any floor: no target" % _main.SNAP_RANGE)
+	_check(_main._snap_to_floor(Vector2(-1.9, 2.0)) == Vector2i(1, 2), "just inside that range: the nearest cell")
+	_check(_main._snap_to_floor(Vector2(NAN, NAN)) == _main.NONE, "a point off the ground plane: no target")
 
 
 ## A point on the ground plane at continuous grid coordinates.

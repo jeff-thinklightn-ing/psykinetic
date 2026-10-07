@@ -302,3 +302,13 @@ which view is up, so the two cannot drift apart, and a 2D client is
 untouched by the 3D one. The room is assembled from the Kenney Castle Kit
 by the same edge and corner rules the 2D renderer uses. The sim is the
 physics: no physics bodies anywhere in the 3D scene.
+
+## 36. The 3D client's input is the 2D client's input
+
+Main keeps the one input handler and asks whichever view is up for its
+picks (entity, door, ground point) and tells it what to draw (hover,
+ripple); the view never sends a command. So the two clients cannot send
+different things for the same click, and a rule such as snap-to-floor
+lives in one place. The 3D walls are plain boxes in the kit's stone
+rather than kit wall pieces: the kit is an exterior castle kit and its
+walls carry battlements and walkways that read wrong indoors.

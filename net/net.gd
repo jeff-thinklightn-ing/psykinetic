@@ -28,7 +28,8 @@ extends Node
 ## entities are drawn. player_id is a UUID made on first run; the server remembers each
 ## player by it. A host run from the project uses a fixed dev id.
 ## window_width=, window_height= and window_mode= (windowed, fullscreen)
-## are the window as it was last left; F11 toggles fullscreen.
+## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
+## is the 3D view's orbit step as last left.
 ##
 ## The game version comes from version.txt at the project root. A client
 ## sends it with its token and a server rejects any other version.
@@ -43,6 +44,7 @@ extends Node
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
 ##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
 ##   --test-azimuth=<degrees>     start with the view turned by this (for screenshots)
+##   --test-yaw=<degrees>         3D: start with the camera yawed by this (for screenshots)
 ##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
@@ -128,6 +130,9 @@ var renderer := "2d"
 ## is fullscreen. Applied at start, kept up to date, saved with the rest.
 var window_size := DEFAULT_WINDOW_SIZE
 var fullscreen := false
+## The 3D camera's yaw step in degrees (a multiple of 45), kept with the
+## window settings.
+var camera_yaw := 0.0
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -152,6 +157,8 @@ var test_hover_tile := Vector2i(-1, -1)
 var test_click_after := 0.0
 var test_fullscreen_after := 0.0
 var test_azimuth := 0.0
+var test_yaw := 0.0
+var _test_yaw_given := false
 var test_door_tick := 0
 
 var mispredicts_total := 0
@@ -259,6 +266,11 @@ func _apply_window_settings() -> void:
 		if width.is_valid_int() and height.is_valid_int() and width.to_int() > 0 and height.to_int() > 0:
 			window_size = Vector2i(width.to_int(), height.to_int())
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
+		var yaw := str(settings.get("camera_yaw", ""))
+		if yaw.is_valid_float():
+			camera_yaw = yaw.to_float()
+	if _test_yaw_given:
+		camera_yaw = test_yaw
 	var window := get_window()
 	window.size = window_size
 	if fullscreen:
@@ -295,8 +307,12 @@ func _on_window_size_changed() -> void:
 	_window_save.timeout.connect(_save_window_settings)
 
 
-## Rewrites the settings file with the window as it is, where there is one
-## (never before the setup screen has written it).
+## Rewrites the settings file with the window and the view as they are,
+## where there is one (never before the setup screen has written it).
+func save_view_settings() -> void:
+	_save_window_settings()
+
+
 func _save_window_settings() -> void:
 	var path := settings_path()
 	if path != "" and FileAccess.file_exists(path):
@@ -331,9 +347,9 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
 	file.store_string(("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n"
-			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\n") % [
+			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\n") % [
 		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks,
-		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed"])
+		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw)])
 	file.close()
 	return true
 
@@ -644,7 +660,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", \
 					"--llm-url", "--llm-model", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth":
+					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -705,6 +721,9 @@ func _set_option(key: String, value: String) -> void:
 			test_fullscreen_after = value.to_float()
 		"--test-azimuth":
 			test_azimuth = value.to_float()
+		"--test-yaw":
+			test_yaw = value.to_float()
+			_test_yaw_given = true
 		"--test-hover":
 			var parts := value.split(",")
 			if parts.size() == 2:

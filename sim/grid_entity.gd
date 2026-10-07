@@ -473,6 +473,13 @@ func _net_stunned(ticks: int) -> void:
 	_reel_until = World.tick + ticks
 
 
+## What the entity is saying right now, or "" (for other views of it).
+func speech() -> String:
+	if _speech_label == null or not _speech_label.visible:
+		return ""
+	return _speech_label.text
+
+
 ## A line of speech over the sprite for a few seconds. Visual only.
 func say(text: String) -> void:
 	if _speech_label == null:

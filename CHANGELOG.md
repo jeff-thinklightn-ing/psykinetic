@@ -3,6 +3,29 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.23
+
+3D client, step 2. Client only; `--renderer=3d`.
+
+- Kit mapping: flat stone floor in the 2D floor's green-grey; walls as
+  plain boxes in the kit's stone at the kit's 0.5 thickness centred on the
+  edge, 3 tall; posts at 0.5; the kit's gate leaf scaled to a doorway of
+  jambs and lintel; sun down to 0.1.
+- Near/far walls as in 2D: the camera-facing side of walkable cells at
+  0.3 alpha, recomputed when the camera yaw changes.
+- Orbit: Q/E turn the camera 45° about the player, tweened; a middle
+  drag nudges up to 45° and springs back; the yaw persists in
+  settings.cfg.
+- Picking by ray: entity and door colliders first (Area3Ds, no physics
+  bodies), then the floor plane, snapped to the nearest walkable cell.
+  Hover ring and click ripple as flat rings on the floor.
+- Left click move/attack, right drag shove, hold-to-move, keys 1–4, R, F3,
+  F11: the same commands the 2D client sends.
+- Speech lines as Label3D above the speaker.
+- `--test-yaw=<deg>` test hook.
+
+The server must be updated to v0.1.23 too, as it refuses any other version.
+
 ## v0.1.22
 
 3D client, step 1: the room. Client only; opt in with `--renderer=3d`.

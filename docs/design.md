@@ -651,7 +651,8 @@ the defaults each time. Nothing of this on a server or in headless tests.
 exit, for looking at a build without playing it; `--test-hover=<x>,<y>`
 parks the cursor over a cell for it, `--test-click=<seconds>` left-clicks
 where the cursor is after that long, `--test-azimuth=<degrees>` starts
-with the view turned, `--test-fullscreen=<seconds>` toggles
+with the view turned, `--test-yaw=<degrees>` starts the 3D camera yawed,
+`--test-fullscreen=<seconds>` toggles
 fullscreen as F11 does, and `--test-door=<tick>` works the door the local
 player stands beside.
 
@@ -684,38 +685,68 @@ point at the camera (edge-on at the limits).
 
 ## The 3D view
 
-`client3d/client3d.gd` (`Client3D`), step 1: the room. With
-`--renderer=3d` (default `2d`; a server never has one) Main hides its 2D
-ground, walls, entities, cursor and ripple and adds a `Client3D` under the
-same tree, so the net code, the spawner, the entity specs, `settings.cfg`
-and the parsed map are the ones the 2D client uses: the 2D entity nodes go
-on being the replicated state, unseen, and the 3D view reads them. One
-tile is one unit; grid (x, y) is 3D (x, 0, y). No physics bodies: the sim
-is the physics.
+`client3d/client3d.gd` (`Client3D`). With `--renderer=3d` (default `2d`;
+a server never has one) Main hides its 2D ground, walls, entities, cursor,
+ripple and toss arrow and adds a `Client3D` under the same tree, so the
+net code, the spawner, the entity specs, `settings.cfg` and the parsed map
+are the ones the 2D client uses: the 2D entity nodes go on being the
+replicated state, unseen, and the 3D view reads them. One tile is one
+unit; grid (x, y) is 3D (x, 0, y). No physics bodies: the sim is the
+physics; the only collision objects are `Area3D`s for picking.
 
-The room is built once from `Terrain.parse` out of the Kenney Castle Kit
-(1-unit modules, 1.31 tall): `ground` per floor cell; `wall-narrow` per
-wall edge, shifted to straddle the boundary line, thinned to
-`WALL_THICKNESS` (0.15) and stretched to `WALL_HEIGHT` (3); a
-`wall-narrow-corner` post at every vertex where walls meet at an angle or
-end (none along a straight run, the 2D corner rule); `wall-doorway` with
-the kit's `door` leaf hinged at the edge's start for each door, the leaf
-turning with the Door node's state; fire as an emissive quad and a small
-orange OmniLight3D. Entities get a puppet each (`_make_puppet`): a
-primitive at the scale table's height (capsule for characters, box, cylinder,
-sphere, slabs), coloured as the 2D sprite is (its modulate: tint or the
-monster's mass shade), a Label3D name on creatures, and a warm
-`OmniLight3D` with shadows on players and companions. Puppets follow the 2D
-nodes every frame through `Iso.local_to_grid` at azimuth 0.
+**Room**, built once from `Terrain.parse`: a flat quad per floor cell in
+the 2D floor's green-grey (`FLOOR`); a plain box per wall edge, the
+Kenney kit's 0.5 thickness (`WALL_THICKNESS`) centred on the boundary
+line, `WALL_HEIGHT` (3) tall, in the kit's stone colour (`STONE`, sampled
+from its colormap; the kit has no interior wall piece without
+battlements); a 0.5 post at every vertex where walls meet at an angle or
+end (none along a straight run, the 2D corner rule); for a door, two
+jambs and a lintel round a `DOOR_WIDTH` × `DOOR_HEIGHT` opening with the
+kit's `gate` leaf scaled to it, hinged at the edge's start and turning
+with the Door node's state; fire as an emissive quad and a small orange
+OmniLight3D.
 
-Camera: `Camera3D` orthographic, `CAMERA_SIZE` 12 units tall (a 1.5-unit
-character, foreshortened by cos 50°, is a twelfth of the height), pitched
-`CAMERA_PITCH` 50° from horizontal and placed on the +x +z side so grid +x
-runs down-right and +y down-left as in the 2D diamond; it follows the
-local player. Light: a `WorldEnvironment` with near-black background and
-ambient, one faint cool `DirectionalLight3D` with shadows, the lanterns,
-the fires. Fixed for this step: no orbit, no picking, no movement input
-(Main ignores mouse buttons in 3D).
+**Near and far**, the 2D rule for this camera (`_is_near`): the cell
+behind an edge's camera-facing side is its -x / -y cell when that face
+points toward the camera, else the other; the wall is near when that cell
+is walkable, and near walls, doorway pieces and posts (a post when all
+its walls are) take the `NEAR_ALPHA` (0.3) stone and cast no shadow.
+Recomputed whenever the yaw changes. Near pieces blend as ordinary
+translucent meshes, so two overlapping ones do stack a little.
+
+**Entities** get a puppet each (`_make_puppet`): a primitive at the scale
+table's height (capsule for characters, box, cylinder, sphere, slabs),
+coloured as the 2D sprite is (its modulate: tint or the monster's mass
+shade), a Label3D name and speech line on creatures (the speech follows
+`GridEntity.speech`), a warm `OmniLight3D` with shadows on players and
+companions, and an `Area3D` of the body's shape for picking. Puppets
+follow the 2D nodes every frame through `Iso.local_to_grid` at azimuth 0.
+
+**Camera**: `Camera3D` orthographic, `CAMERA_SIZE` 12 units tall (a
+1.5-unit character, foreshortened by cos 50°, is a twelfth of the
+height), pitched `CAMERA_PITCH` 50° from horizontal, on the +x +z side at
+yaw 0 so grid +x runs down-right and +y down-left as in the 2D diamond,
+following the local player. **Orbit**: Q/E step the yaw by `ORBIT_STEP`
+(45°) about the player, tweened over `ORBIT_SECONDS` (250 ms); a
+middle-button drag nudges it up to a step either way (full nudge over
+`NUDGE_DRAG_PX`, eased) and it springs back over `NUDGE_RETURN_SECONDS`
+on release; the step persists as `camera_yaw` in `settings.cfg`
+(`Net.camera_yaw`, saved by `Net.save_view_settings`). F3 shows the yaw.
+Light: a `WorldEnvironment` with near-black background and ambient, one
+faint cool `DirectionalLight3D` (`SUN_ENERGY` 0.1) with shadows, the
+lanterns, the fires.
+
+**Picking and input.** Input stays in `Main._unhandled_input`, so the 3D
+client sends exactly the commands the 2D one does (move, attack, shove
+with a drag to toss, door, orders 1–4, R, F3, F11, hold-to-move with
+retargeting). Main asks the view for its picks: `entity_under_mouse` and
+`door_under_mouse` cast a ray from the camera through the cursor against
+the pick `Area3D`s; `mouse_grid` meets the floor plane and Main snaps it
+to the nearest walkable cell within three tiles as in 2D. The hover ring
+(`hover`) and the click ripple (`ripple`) are flat ring meshes on the
+floor; the toss drag reads its screen directions from the camera
+(`screen_vector`). `--test-yaw=<deg>` starts with the camera yawed, for
+screenshots.
 
 **Peek.** A middle-button drag turns the view: the azimuth follows the
 horizontal drag, the full range over `Main.PEEK_DRAG_PX` (400 screen px)
