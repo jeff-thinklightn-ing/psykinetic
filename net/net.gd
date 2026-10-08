@@ -40,7 +40,9 @@ extends Node
 ## and kept as written when the file is rewritten. controls=wasd is WASD
 ## with the mouse aiming; anything else, or no line, is click-to-move;
 ## read and kept the same way. hp_bars=0 turns the 3D view's HP bars off;
-## master_volume= and sfx_volume= (0..1, default 1) set the sound. Any line
+## master_volume= and sfx_volume= (0..1, default 1) set the sound.
+## phrase1= ... phrase4= are the quick phrases keys 1-4 say (written back,
+## the defaults where there is none). Any line
 ## the game does not write itself (these, and keys it does not know) is
 ## kept as written when it rewrites the file.
 ##
@@ -179,6 +181,9 @@ var camera_zoom := 1.0
 var hp_bars := true
 var master_volume := 1.0
 var sfx_volume := 1.0
+## The quick phrases, keys 1-4; settings.cfg phrase1= ... phrase4=.
+const DEFAULT_PHRASES: Array[String] = ["With me!", "Stay back!", "Get them!", "Fall back!"]
+var phrases: Array[String] = DEFAULT_PHRASES.duplicate()
 ## Lines of the settings file that save_settings does not write itself,
 ## key -> value as read, written back as they were.
 var _settings_kept: Dictionary = {}
@@ -187,7 +192,7 @@ var _settings_kept: Dictionary = {}
 ## that a rewrite drops it.
 const WRITTEN_SETTINGS: Array[String] = ["address", "port", "token", "player_id", "name", "display_delay",
 	"window_width", "window_height", "window_mode", "camera_yaw", "camera_pitch", "camera_zoom",
-	"renderer", "controls"]
+	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4"]
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -337,10 +342,21 @@ func apply_view_options(settings: Dictionary) -> void:
 	hp_bars = str(settings.get("hp_bars", "1")).strip_edges().to_lower() not in ["0", "false", "off", "no"]
 	master_volume = _volume(settings.get("master_volume", ""), master_volume)
 	sfx_volume = _volume(settings.get("sfx_volume", ""), sfx_volume)
+	phrases = phrases_from(settings)
 	_settings_kept.clear()
 	for key: String in settings:
 		if key not in WRITTEN_SETTINGS:
 			_settings_kept[key] = settings[key]
+
+
+## phrase1= ... phrase4= from [param settings], each cut to a chat line's
+## length; a missing or empty one is its default.
+static func phrases_from(settings: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for i in DEFAULT_PHRASES.size():
+		var text := str(settings.get("phrase%d" % (i + 1), "")).strip_edges().left(200)
+		out.append(text if not text.is_empty() else DEFAULT_PHRASES[i])
+	return out
 
 
 static func _volume(text: Variant, otherwise: float) -> float:
@@ -477,6 +493,8 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		file.store_string("renderer=%s\n" % _settings_renderer)
 	if _settings_controls != "":
 		file.store_string("controls=%s\n" % _settings_controls)
+	for i in phrases.size():
+		file.store_string("phrase%d=%s\n" % [i + 1, phrases[i]])
 	for key: String in _settings_kept:
 		file.store_string("%s=%s\n" % [key, _settings_kept[key]])
 	file.close()

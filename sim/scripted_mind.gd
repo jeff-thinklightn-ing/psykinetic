@@ -1,9 +1,9 @@
 class_name ScriptedMind
 extends CompanionMind
 ## The rule-based mind, and the fallback for every other one. Gets out of
-## the owner's way at once when they bump into it; obeys the owner's last
-## order; otherwise retreats toward the owner when low on hp, attacks the
-## nearest hostile within reach, and follows.
+## its companion's way at once when they bump into it; otherwise retreats
+## toward them when low on hp, attacks the nearest hostile within reach,
+## and follows. What it is told it answers with a word, and goes on.
 
 const ATTACK_RANGE := 3
 const RETREAT_BELOW := 0.3
@@ -14,12 +14,14 @@ func _init() -> void:
 
 
 func decide(context: Dictionary) -> Dictionary:
-	if str(context.get("trigger", "")) == Companion.BUMPED:
+	var bumped: Variant = context.get("companion_direction", {})
+	if bumped is Dictionary and not bumped.is_empty():
 		return {"intent": "YIELD", "target": null, "say": ""}
 	var answer := _decide(context)
-	if str(context.get("trigger", "")) == Companion.OWNER_SPOKE:
+	var said := str(context.get("companion_said", ""))
+	if not said.is_empty():
 		# Spoken to: a word back, and on with what it was going to do.
-		answer["say"] = "Hm?" if "?" in str(context.get("owner_said", "")) else "Mm."
+		answer["say"] = "Hm?" if "?" in said else "Mm."
 	return answer
 
 
@@ -28,15 +30,6 @@ func _decide(context: Dictionary) -> Dictionary:
 	var max_hp := float(context.get("max_hp", 1))
 	if max_hp > 0.0 and hp / max_hp < RETREAT_BELOW:
 		return {"intent": "RETREAT", "target": null, "say": ""}
-	match str(context.get("last_order", "")):
-		"hold":
-			return {"intent": "HOLD", "target": null, "say": ""}
-		"fallback":
-			return {"intent": "RETREAT", "target": null, "say": ""}
-		"attack":
-			var ordered := str(context.get("order_target", ""))
-			if not ordered.is_empty():
-				return {"intent": "ATTACK", "target": ordered, "say": ""}
 	var nearest := _nearest_hostile(context.get("nearby", []))
 	if not nearest.is_empty() and int(nearest["distance"]) <= ATTACK_RANGE:
 		return {"intent": "ATTACK", "target": nearest["name"], "say": ""}

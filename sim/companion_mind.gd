@@ -6,22 +6,22 @@ extends RefCounted
 ## world before acting on it (see docs/design.md, "The mind never acts").
 ##
 ## decide() is asked on a decision window with a context Dictionary:
+## The player a companion belongs to is, in everything its mind reads, its
+## companion, by name: never an owner.
 ##   card            personality card (String)
-##   log             last 20 party-log sentences (Array[String])
-##   nearby          [{name, type, dx, dy, hostile}] within sight
+##   together        "Jeff is your companion. You travel together by choice."
+##   log             the party log's tail, repeats collapsed (Array[String])
+##   nearby          [{name, type, dx, dy, hostile, hp, max_hp}], at most 6
 ##   hp, max_hp, stamina, max_stamina
-##   owner           {name, hp, max_hp, stamina, max_stamina, dx, dy} or {}
-##   last_order      "" | "follow" | "hold" | "attack" | "fallback"
-##   order_target    name of the entity the attack order meant, or ""
+##   companion       {name, hp, max_hp, stamina, max_stamina, dx, dy} or {}
 ##   intent          the current intent name
 ##   trigger         why it is asked now ("" on an ordinary window); for a
-##                   bump, "owner bumped into you", with
-##   owner_direction {dx, dy}: the way the owner was walking ({} otherwise)
+##                   bump, "Jeff bumped into you", with
+##   companion_direction {dx, dy}: the way they were walking ({} otherwise)
 ##   free_cells      [{dx, dy}]: free cells next to it ([] otherwise)
-##   recent_hits     [{on: "you"|"your owner", by, amount, cause, ticks_ago}]
-##   owner_said      what the owner just said, with trigger "your owner just
-##                   said to you" ("" otherwise)
-## and nearby entries carry hp and max_hp for anything that has them.
+##   recent_hits     [{on: "you"|"Jeff", by, amount, cause, ticks_ago}]
+##   companion_said  what they just said, with trigger "Jeff just said to
+##                   you" ("" otherwise)
 ## It answers {"intent": String, "target": String|null, "say": String,
 ## optionally "why": String}, or {} when it has no answer right now (an
 ## async mind still waiting): then the companion's last decision stands,

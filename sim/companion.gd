@@ -29,8 +29,9 @@ extends GridEntity
 enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD }
 
 const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD"]
-## The context's trigger for a bump.
-const BUMPED := "owner bumped into you"
+## Why she is asked, as kept internally; _trigger_text turns each into
+## what her mind reads, the player named ("Jeff bumped into you").
+const BUMPED := "bumped"
 ## A bump this soon after the last one is the same bump (a held key).
 const BUMP_REPEAT_TICKS := 10
 ## How far ahead of the owner, along the way they were going, counts as
@@ -45,8 +46,8 @@ const DECISION_INTERVAL_TICKS := 30
 const SPEECH_INTERVAL_TICKS := 50
 const SIGHT_RANGE := 7
 const LOG_LINES_FOR_MIND := 20
-## The context's trigger for her owner's words.
-const OWNER_SPOKE := "your owner just said to you"
+const OWNER_SPOKE := "spoke"
+const OWNER_BACK := "back"
 ## Below this share of her hp with a hostile next to her, only these.
 const REFLEX_BELOW := 0.3
 const REFLEX_INTENTS: Array[Intent] = [Intent.RETREAT, Intent.YIELD, Intent.HOLD]
@@ -57,7 +58,11 @@ const RECENT_HITS_KEPT := 10
 ## decision and only if the fight changed since then (_what_changed);
 ## otherwise her decision holds.
 const HIT := "you were hit"
-const OWNER_HIT := "owner hurt"
+const OWNER_HIT := "keeper hit"
+const TRIGGER_TEXTS := {
+	BUMPED: "%s bumped into you", OWNER_SPOKE: "%s just said to you",
+	OWNER_HIT: "%s was hit", OWNER_BACK: "%s is back",
+}
 const HURT_TRIGGERS: Array[String] = [HIT, OWNER_HIT]
 const HURT_REASK_TICKS := 30
 ## Crossing one of these fractions of her or her owner's hp, either way, is
@@ -89,8 +94,6 @@ var intent_target: GridEntity
 ## Where HOLD stands.
 var hold_tile := Vector2i.ZERO
 ## "" | "follow" | "hold" | "attack" | "fallback"
-var last_order := ""
-var order_target: GridEntity
 ## Which mind's answer was last applied: "scripted", "ollama", "none".
 var last_mind := "none"
 
@@ -156,7 +159,8 @@ func bumped(direction: Vector2i) -> bool:
 	return true
 
 
-## Her owner said [param text] to her: decide now, with it in the context.
+## Her owner said [param text] to her (typed or a quick phrase): decide
+## now, with it in the context.
 func owner_spoke(text: String) -> void:
 	_owner_said = text
 	request_decision(OWNER_SPOKE)
@@ -165,17 +169,25 @@ func owner_spoke(text: String) -> void:
 
 ## A blow landed on her ([param on_her]) or her owner, for the context.
 func note_hit(on_her: bool, by: String, amount: int, cause: StringName) -> void:
-	_hits.append({"on": "you" if on_her else "your owner", "by": by, "amount": amount,
+	_hits.append({"on": "you" if on_her else keeper_name(), "by": by, "amount": amount,
 		"cause": String(cause), "tick": World.tick})
 	if _hits.size() > RECENT_HITS_KEPT:
 		_hits.pop_front()
 
 
-## The owner pressed an order key. Slots 1..4; others are accepted and ignored.
-func give_order(order: String, target: GridEntity = null) -> void:
-	last_order = order
-	order_target = target
-	request_decision("order %s" % order)
+## The player she travels with, by name, as her mind reads them.
+func keeper_name() -> String:
+	return _name_of(keeper) if keeper != null and is_instance_valid(keeper) else "your companion"
+
+
+## What her mind reads for [param reason]: a trigger's words, the player
+## named; anything else as it is.
+func _trigger_text(reason: String) -> String:
+	var head := reason.get_slice(": ", 0)
+	if not TRIGGER_TEXTS.has(head):
+		return reason
+	var text: String = TRIGGER_TEXTS[head] % keeper_name()
+	return text + reason.substr(head.length())
 
 
 func _sim_tick() -> void:
@@ -193,7 +205,7 @@ func _sim_tick() -> void:
 		if current_intent != Intent.YIELD and _find_yield_tile() != NONE:
 			print("[mind] %s: no yield from %s in time; the scripted answer" % [name, mind.kind])
 			var context := _context(BUMPED)
-			_apply(ScriptedMind.new().decide(context), "scripted", {"trigger": BUMPED,
+			_apply(ScriptedMind.new().decide(context), "scripted", {"trigger": _trigger_text(BUMPED),
 				"prompt": JSON.stringify(context), "note": "no yield from the mind in time"}, true)
 		_bump_direction = Vector2i.ZERO
 	if not _hurt_pending.is_empty() and World.tick - _last_decision_tick >= HURT_REASK_TICKS:
@@ -227,7 +239,7 @@ func _decide() -> void:
 		entry["latency_ms"] = 0
 		_apply(answer, mind.kind, entry)
 		return
-	if mind != null and context["trigger"] == BUMPED:
+	if mind != null and _bump_direction != Vector2i.ZERO:
 		# Waiting on a slower mind: it has one window to yield (see _sim_tick).
 		_bump_deadline = World.tick + DECISION_INTERVAL_TICKS
 		return
@@ -283,19 +295,19 @@ static func _hp_band(entity: GridEntity) -> int:
 
 
 ## What changed in the fight since her last decision, in words for the
-## trigger, or "" for nothing that calls for a new one. Orders, her owner's
+## trigger, or "" for nothing that calls for a new one. Her player's
 ## words and bumps ask her at once and need no change.
 func _what_changed() -> String:
 	var now := _situation_now()
 	var before := _situation
 	for id: int in now["adjacent"]:
 		if id not in before.get("adjacent", []):
-			return "a new hostile next to you or your owner"
+			return "a new hostile next to you or %s" % keeper_name()
 	if now["hp_band"] != before.get("hp_band", now["hp_band"]):
 		return "your hp crossed %s" % _threshold_crossed(before.get("hp_band", 0), now["hp_band"])
 	if now["owner_hp_band"] != before.get("owner_hp_band", now["owner_hp_band"]) and now["owner_hp_band"] != -1 \
 			and before.get("owner_hp_band", -1) != -1:
-		return "your owner's hp crossed %s" % _threshold_crossed(before["owner_hp_band"], now["owner_hp_band"])
+		return "%s's hp crossed %s" % [keeper_name(), _threshold_crossed(before["owner_hp_band"], now["owner_hp_band"])]
 	if before.get("target", false) and not now["target"]:
 		return "your target is gone"
 	return ""
@@ -392,7 +404,7 @@ func _apply(answer: Dictionary, source: String, entry := {}, filling_in := false
 	entry["say"] = line_said
 	MindLog.record(entry)
 	# An answer to her owner's words is always said; otherwise one line a while.
-	var answering: bool = entry.get("trigger", "") == OWNER_SPOKE
+	var answering: bool = entry.get("trigger", "") == _trigger_text(OWNER_SPOKE)
 	if not line_said.is_empty() and (answering or World.tick - _last_speech_tick >= SPEECH_INTERVAL_TICKS):
 		_last_speech_tick = World.tick
 		said.emit(line_said.left(120))
@@ -404,7 +416,7 @@ func _context(reason := "") -> Dictionary:
 	var nearby: Array[Dictionary] = []
 	for entity in World.get_entities():
 		if entity == self or entity == keeper or not entity.spawned:
-			continue  # Her owner has a field of their own.
+			continue  # The player she travels with has a field of their own.
 		var offset: Vector2i = entity.tile - tile
 		var distance := maxi(absi(offset.x), absi(offset.y))
 		if entity is Monster:
@@ -432,38 +444,37 @@ func _context(reason := "") -> Dictionary:
 		if World.tick - int(hit["tick"]) <= RECENT_HIT_TICKS:
 			recent_hits.append({"on": hit["on"], "by": hit["by"], "amount": hit["amount"],
 				"cause": hit["cause"], "ticks_ago": World.tick - int(hit["tick"])})
-	var owner_info := {}
+	var companion_info := {}
 	if keeper != null and is_instance_valid(keeper) and keeper.spawned:
 		var offset: Vector2i = keeper.tile - tile
-		owner_info = {
+		companion_info = {
 			"name": _name_of(keeper), "hp": keeper.hp, "max_hp": keeper.max_hp,
 			"stamina": keeper.stamina, "max_stamina": keeper.max_stamina,
 			"dx": offset.x, "dy": offset.y,
 		}
-	var trigger := reason
-	var owner_direction := {}
+	var trigger := _trigger_text(reason)
+	var companion_direction := {}
 	var free_cells: Array[Dictionary] = []
 	if _bump_direction != Vector2i.ZERO:
-		trigger = BUMPED
-		owner_direction = {"dx": _bump_direction.x, "dy": _bump_direction.y}
+		trigger = _trigger_text(BUMPED)
+		companion_direction = {"dx": _bump_direction.x, "dy": _bump_direction.y}
 		for direction in World.DIRECTIONS:
 			if World.is_free(tile + direction) and not World._terrain_blocks_step(tile, direction, true):
 				free_cells.append({"dx": direction.x, "dy": direction.y})
 	return {
 		"card": card,
+		"together": "%s is your companion. You travel together by choice." % keeper_name(),
 		"trigger": trigger,
-		"owner_said": _owner_said,
-		"owner_direction": owner_direction,
+		"companion_said": _owner_said,
+		"companion_direction": companion_direction,
 		"free_cells": free_cells,
 		"recent_hits": recent_hits,
 		"log": collapse_log(party_log.last(LOG_LINES_SCANNED)).slice(-LOG_LINES_FOR_MIND) if party_log != null else [],
 		"nearby": nearby,
 		"hp": hp, "max_hp": max_hp, "stamina": stamina, "max_stamina": max_stamina,
-		"owner": owner_info,
-		"last_order": last_order,
-		"order_target": String(order_target.name) if _alive(order_target) else "",
+		"companion": companion_info,
 		"intent": intent_name(),
-		"reason": reason,
+		"reason": trigger if not reason.is_empty() else "",
 	}
 
 
@@ -606,9 +617,6 @@ func _fall_back(why: String) -> void:
 	print("[mind] %s: %s; following" % [name, why])
 	current_intent = Intent.FOLLOW
 	intent_target = null
-	if last_order == "attack":
-		last_order = ""
-		order_target = null
 	request_decision("fell back")
 
 

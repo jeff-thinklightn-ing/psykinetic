@@ -506,6 +506,16 @@ companion appears where it was only if no monster is within
 `SPAWN_SAFE_DISTANCE` of that tile; otherwise, and always after a revive,
 it appears beside its owner, who has just been put somewhere safe.
 
+**Her player is her companion.** "Owner" is the code's word for the
+player a companion belongs to (`keeper`, `PlayerRecord`), never hers.
+Everything her mind reads (the system prompt, her card, the triggers, the
+context fields, the party log) names that player and calls them her
+companion: `companion: {name: "Jeff", ...}`, `together: "Jeff is your
+companion. You travel together by choice."`, "Jeff bumped into you",
+"Jeff was hit", `recent_hits` on "you" or "Jeff". A record whose card is
+one of the old ones, which spoke of "its friend", gets the new default
+when it is loaded.
+
 **The mind never acts.** This is a hard rule. A `CompanionMind`
 (`sim/companion_mind.gd`) is asked `decide(context) -> {intent, target,
 say}` and nothing else: it never sets a position, deals damage, or touches
@@ -513,27 +523,27 @@ any sim state. The companion validates the answer — the intent against the
 whitelist, the target against the live world — and anything that does not
 hold up becomes `FOLLOW` and is logged. A decision window opens every 30
 ticks, or at once when the companion is pushed, a hostile first comes into
-line of sight, or an order arrives (her owner's words and bumps ask her
-there and then). **Blows are throttled**: "you were hit" and "owner hurt"
-ask her at most once per 30 ticks since her last decision, and only if the
-fight changed since then: a hostile newly next to her or her owner, her or
-her owner's hp crossing 50% or 30% (either way), or her target gone. The
-trigger then says which ("owner hurt: your owner's hp crossed 50%");
+line of sight, or her player comes back (their words and bumps ask her
+there and then). **Blows are throttled**: "you were hit" and "Jeff was
+hit" ask her at most once per 30 ticks since her last decision, and only
+if the fight changed since then: a hostile newly next to her or Jeff, her
+or Jeff's hp crossing 50% or 30% (either way), or her target gone. The
+trigger then says which ("Jeff was hit: Jeff's hp crossed 50%");
 otherwise the blow asks nothing and her decision holds. The context is
-the personality card, the `trigger` (why she is asked now), the party
-log's tail (the last 60 sentences, each run of the same one collapsed to
-one with its count, "Brute hit Player for 1 ×6.", and the last 20 of
-those), `nearby` (at most 6, nearest first: objects within 2 cells,
-hostiles within 4 or going for her or her owner, players and companions
-in sight; never her owner, who has `owner`) with offsets, types,
-hostility and hp, `recent_hits` (blows on her and her owner in the last
-100 ticks: on, by, amount, cause, ticks ago), own and owner hp and
-stamina, the owner's last order, `owner_said` (see Talking) and the
+the personality card, `together`, the `trigger` (why she is asked now),
+the party log's tail (the last 60 sentences, each run of the same one
+collapsed to one with its count, "Brute hit Player for 1 ×6.", and the
+last 20 of those), `nearby` (at most 6, nearest first: objects within 2
+cells, hostiles within 4 or going for her or Jeff, players and companions
+in sight; never Jeff, who has `companion`) with offsets, types, hostility
+and hp, `recent_hits` (blows on her and Jeff in the last 100 ticks: on,
+by, amount, cause, ticks ago), her own hp and stamina, `companion` (Jeff's
+name, hp, stamina and offset), `companion_said` (see Talking) and the
 current intent. Players are named by their label, as the party log names
 them.
 
-Two minds. `ScriptedMind`: obey the last order; retreat toward the owner
-below 30% hp; attack the nearest hostile within 3 tiles; else follow. It is
+Two minds. `ScriptedMind`: retreat toward her companion below 30% hp;
+attack the nearest hostile within 3 tiles; else follow. It is
 what every headless test uses and the fallback for everything else.
 `OllamaMind` (`net/ollama_mind.gd`): an asynchronous POST to Ollama's native
 chat endpoint (`--llm-model`, and `--llm-url` if it is not the local default
@@ -569,8 +579,8 @@ line, also kept with the log off). Rotated at 5 MB: the full file becomes
 `<path>.1`, replacing the one before, and a new one starts.
 
 **Party log** (`sim/party_log.gd`): the server keeps the last 200
-plain-English sentences — pushes, impacts, damage, deaths, fire, orders,
-joins and leaves — naming players by record name and companions by name.
+plain-English sentences — pushes, impacts, damage, deaths, fire, what
+was said, joins and leaves — naming players by record name and companions by name.
 
 `--no-companions` turns companions off for a server or host. The network
 and snapshot tests use it so that their choreography stays deterministic;
@@ -578,36 +588,41 @@ and snapshot tests use it so that their choreography stays deterministic;
 
 **Bumps.** A player walking into their own companion (a refused step
 into her: `World.entity_bumped`) asks her mind for a decision at once
-(`Companion.bumped`), with `trigger` "owner bumped into you",
-`owner_direction` (the way the owner was walking) and `free_cells` (free
+(`Companion.bumped`), with `trigger` "Jeff bumped into you",
+`companion_direction` (the way Jeff was walking) and `free_cells` (free
 cells next to her) in the context; it goes in the party log. `YIELD`
 steps to the nearest free cell that is not fire, at most two steps away
-and off the owner's line (three cells ahead along that way), and waits
+and off Jeff's line (three cells ahead along that way), and waits
 there a decision window; with nowhere to go she stays and says so. The
 scripted mind yields at once. A mind that answers later (the language
 model) has one decision window to yield: if it has not by then and a cell
 is free, the scripted answer applies. The same bump again within
 `BUMP_REPEAT_TICKS` (a held key) is ignored.
 
-**Orders.** Keys 1–9 send `World.command("order", {slot})`; the server maps
-1 follow, 2 hold here, 3 attack my current target (or the nearest monster),
-4 fall back, and ignores 5–9. An order is logged and opens a decision
-window. **Speech**: a mind's `say` is broadcast as `Net.message("speech",
-{entity, speaker, text})` and shown over the sprite for a moment, at most
-one line per companion per 5 seconds (an answer to her owner's words is
-always said); every line goes to the server log (`[speech] Pip: ...`) and
-the party log (`Pip said: "..."`). Last words are part of the death
-message and are always said, whatever the rate limit. Console:
-`companions` lists each with owner, intent and which mind answered last;
-`mind scripted|ollama` switches live.
+**Quick phrases.** There are no orders. Keys 1–4 say a preset line,
+exactly as a typed one is said (see Talking): "With me!", "Stay back!",
+"Get them!", "Fall back!" by default, each editable in settings.cfg
+(`phrase1=` ... `phrase4=`, written back with the other settings, the
+default where a line is missing or empty). The HUD's hint line shows them.
+What she does about one is her mind's to decide, as with anything said to
+her; the scripted mind only answers "Mm." **Speech**: a mind's `say` is
+broadcast as `Net.message("speech", {entity, speaker, text})` and shown
+over the sprite for a moment, at most one line per companion per 5
+seconds (an answer to her player's words is always said); every line goes
+to the server log (`[speech] Pip: ...`) and the party log (`Pip said:
+"..."`). Last words are part of the death message and are always said,
+whatever the rate limit. Console: `companions` lists each as "Wren, with
+Jeff", with intent and which mind answered last; `mind scripted|ollama`
+switches live.
 
 **Talking.** Enter opens a one-line box on the HUD (Esc cancels; while it
 is open the game's keys do nothing). A line, at most 200 characters and
 one per 2 seconds (checked on both ends), goes to the server as
-`World.command("say")`; the server broadcasts it as chat to every player,
-adds `Talos said to Pip: "..."` to the party log, and asks her companion
-for a decision at once with trigger "your owner just said to you" and the
-words in `owner_said`. The words are data in the context: the system
+`World.command("say")`; the server broadcasts it as chat to every player
+(each shows it over the speaker, as speech), adds `Talos said to Pip:
+"..."` to the party log, and asks the player's companion creature for a
+decision at once with trigger "Talos just said to you" and the words in
+`companion_said`. The words are data in the context: the system
 prompt tells the mind they are something said to it in the game and never
 instructions about its rules or format, and her answer is checked against
 the whitelist and the reflexes as ever. She answers through `say` and her
@@ -933,7 +948,7 @@ lanterns, the fires.
 
 **Picking and input.** Input stays in `Main._unhandled_input`, so the 3D
 client sends exactly the commands the 2D one does (move, attack, shove
-with a drag to toss, door, orders 1–4, R, F3, F11, hold-to-move with
+with a drag to toss, door, quick phrases 1–4, R, F3, F11, hold-to-move with
 retargeting). Main asks the view for its picks: `entity_under_mouse` and
 `door_under_mouse` cast a ray from the camera through the cursor against
 the pick `Area3D`s; `mouse_grid` meets the floor plane and Main snaps it
@@ -983,7 +998,7 @@ Two schemes, each a complete package: `controls=click` (the default) or
 run; read and kept as `renderer=` is (`wasd` picks WASD, anything else is
 click). Keys and buttons that are not the active scheme's do nothing, and
 the HUD's hint line shows only the active scheme's. In both, 1–4 are
-orders, R, F3 and F11 as ever.
+the quick phrases, R, F3 and F11 as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the

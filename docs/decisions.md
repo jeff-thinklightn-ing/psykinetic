@@ -682,3 +682,22 @@ model reads a short, relevant context better than a room's inventory.
 A running server must not need anyone to truncate its log. Renaming the
 full file to .1 is the least that keeps recent history (the last 5 MB or
 more) and bounds the disk at about twice that.
+
+## 76. No orders: keys 1-4 say quick phrases
+
+The hard-wired orders (follow, hold, attack, fall back) made a companion
+a unit to command, and gave her mind a channel beside speech that told it
+what to do. Keys 1-4 now say a preset line through the same path as typed
+chat (rate limit, broadcast, party log, a decision at once), so what she
+hears is words and what she does is her mind's choice, checked as ever.
+The scripted mind does not act on them: a fallback that parsed phrases
+would be the orders again.
+
+## 77. Her player is her companion, by name; never her owner
+
+What a mind reads frames the relationship. "Owner" told the model she is
+property and the player commands; the prompt, card, triggers, context
+fields and console now name the player and call them her companion
+("Jeff is your companion. You travel together by choice."). The code
+keeps `keeper` and `owner_peer`: renaming internals would be churn for
+nothing she reads.

@@ -17,7 +17,7 @@ func _ready() -> void:
 	_test_attacks_a_hostile_in_range()
 	_test_falls_back_when_the_target_dies()
 	_test_retreats_on_low_hp()
-	_test_holds_on_order()
+	_test_quick_phrases()
 	_test_persists_and_resumes()
 	_test_idles_while_owner_offline()
 	_test_malformed_llm_reply_uses_scripted()
@@ -97,24 +97,49 @@ func _test_retreats_on_low_hp() -> void:
 	pet.hp = pet.max_hp
 
 
-func _test_holds_on_order() -> void:
-	print("\n== holds position on order while a monster approaches ==")
+func _test_quick_phrases() -> void:
+	print("
+== keys 1-4: quick phrases, said the way typed chat is ==")
 	var owner := _player()
 	var pet := _companion()
-	_main.handle_order(owner, 2)
+	pet.mind = ScriptedMind.new()
+	_check(Net.phrases == ["With me!", "Stay back!", "Get them!", "Fall back!"], "the defaults: %s" % [Net.phrases])
+	_check(Net.phrases_from({"phrase2": "  Hold here.  ", "phrase3": ""}) == ["With me!", "Hold here.", "Get them!", "Fall back!"],
+			"phrase2= in settings.cfg replaces the second; an empty one keeps its default")
 	World.step()
-	_check(pet.current_intent == Companion.Intent.HOLD, "order 2: HOLD (%s)" % pet.intent_name())
-	var held := pet.tile
-	var imp := _spawn_imp(Vector2i(8, 11))
-	imp.sight_range = 7
-	for i in 20:
+	_check("1 With me!" in _main.hud.text and "4 Fall back!" in _main.hud.text, "the HUD hint shows them")
+	var log_size: int = _main.party_log.size()
+	var key := InputEventKey.new()
+	key.keycode = KEY_2
+	key.pressed = true
+	_main._unhandled_input(key)
+	World.step()
+	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - log_size)
+	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"Stay back!\"" % pet.name, "key 2: in the party log as chat (%s)" % [lines])
+	_check(owner._speech_label != null and owner._speech_label.visible and owner._speech_label.text == "Stay back!",
+			"shown over the player as speech")
+	var entry: Dictionary = MindLog.last[String(pet.name)]
+	var prompt := str(entry["prompt"])
+	var context: Variant = JSON.parse_string(prompt)
+	_check(entry["trigger"] == "Player just said to you" and context is Dictionary and context.get("companion_said") == "Stay back!",
+			"she is asked at once, as when spoken to (trigger: %s)" % entry["trigger"])
+	var system := OllamaMind.system_prompt().to_lower()
+	_check(context is Dictionary and context["companion"].get("name") == "Player"
+			and context["together"] == "Player is your companion. You travel together by choice."
+			and not "owner" in prompt.to_lower() and not "order" in prompt.to_lower()
+			and not "owner" in system and not "order" in system,
+			"her context and the system prompt name the player and say companion: never owner, and no orders%s" % (
+				"" if not "owner" in prompt.to_lower() else ": " + prompt))
+	var before: int = _main.party_log.size()
+	key.keycode = KEY_3
+	_main._unhandled_input(key)
+	World.step()
+	_check(_main.party_log.size() == before, "key 3 within 2 s: dropped, as chat is")
+	_check(_main.admin_command("companions").contains("%s, with Player" % pet.name),
+			"the console: %s" % _main.admin_command("companions").get_slice("
+", 1))
+	for i in Companion.DECISION_INTERVAL_TICKS:
 		World.step()
-	_check(pet.tile == held, "it did not move (at %s)" % pet.tile)
-	_check(World.distance(imp.tile, pet.tile) <= 2 or World.distance(imp.tile, owner.tile) <= 2, "while the imp closed in (at %s)" % imp.tile)
-	World.damage(imp, 999)
-	_main.handle_order(owner, 1)
-	World.step()
-	_check(pet.current_intent == Companion.Intent.FOLLOW, "order 1: FOLLOW again (%s)" % pet.intent_name())
 
 
 func _test_persists_and_resumes() -> void:
@@ -186,7 +211,7 @@ func _test_llm_reasoning_is_off_and_stripped() -> void:
 
 	# Back to FOLLOW first, so the reply below visibly changes something.
 	pet.mind = ScriptedMind.new()
-	pet.give_order("follow")
+	pet.request_decision("test")
 	World.step()
 	_check(pet.current_intent == Companion.Intent.FOLLOW, "starting from FOLLOW (%s)" % pet.intent_name())
 
@@ -225,7 +250,7 @@ func _test_native_ollama_endpoint() -> void:
 			"with nothing else, and no /no_think in the prompt")
 
 	pet.mind = ScriptedMind.new()
-	pet.give_order("follow")
+	pet.request_decision("test")
 	World.step()
 	pet.mind = mind
 	# What /api/chat sends back: the answer in message.content.
@@ -445,8 +470,8 @@ func _test_owner_speaks() -> void:
 	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - log_size)
 	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"%s\"" % [pet.name, said], "the party log: %s" % [lines])
 	var entry: Dictionary = MindLog.last[String(pet.name)]
-	_check(entry["trigger"] == Companion.OWNER_SPOKE and said in str(entry["prompt"]) and "\"owner_said\"" in str(entry["prompt"]),
-			"a decision at once, the words in the context as owner_said (trigger: %s)" % entry["trigger"])
+	_check(entry["trigger"] == "Player just said to you" and said in str(entry["prompt"]) and "\"companion_said\"" in str(entry["prompt"]),
+			"a decision at once, the words in the context as companion_said (trigger: %s)" % entry["trigger"])
 	_check(pet.current_intent != Companion.Intent.ATTACK and entry["outcome"] == "applied",
 			"the whitelist and her mind decide, not the words (%s)" % pet.intent_name())
 	_check("%s said: \"Hm?\"" % pet.name in lines, "she answers through say, and that is logged: %s" % [lines])
@@ -530,7 +555,7 @@ func _test_hurt_throttle() -> void:
 	owner.hp = roundi(owner.max_hp * 0.45)
 	pet.request_decision(Companion.OWNER_HIT)
 	_step_until(func() -> bool: return pet._last_decision_tick != decided, Companion.HURT_REASK_TICKS + 2)
-	_check(MindLog.last[String(pet.name)]["trigger"] == "owner hurt: your owner's hp crossed 50%",
+	_check(MindLog.last[String(pet.name)]["trigger"] == "Player was hit: Player's hp crossed 50%",
 			"her owner below half: asked, and told why (%s)" % MindLog.last[String(pet.name)]["trigger"])
 	# The other changes, against the situation at her last decision.
 	var imp := _spawn_imp(Vector2i(9, 9))
@@ -538,7 +563,7 @@ func _test_hurt_throttle() -> void:
 	pet._situation = pet._situation_now()
 	_check(pet._what_changed() == "", "the same fight: no change")
 	_put(imp, Vector2i(9, 7))
-	_check(pet._what_changed() == "a new hostile next to you or your owner", "a hostile comes up next to her owner: %s" % pet._what_changed())
+	_check(pet._what_changed() == "a new hostile next to you or Player", "a hostile comes up next to her owner: %s" % pet._what_changed())
 	pet._situation = pet._situation_now()
 	pet.hp = roundi(pet.max_hp * 0.25)
 	_check(pet._what_changed() == "your hp crossed 30%", "her hp from full to a quarter: %s" % pet._what_changed())

@@ -158,7 +158,11 @@ const TOSS_AIM_LENGTH := 26.0
 ## many tiles of the click point (Euclidean on the ground plane), or nowhere.
 const SNAP_RANGE := 3.0
 const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
-const COMPANION_CARD := "A loyal, cautious companion who guards its friend and speaks little."
+const COMPANION_CARD := "Loyal and cautious. Guards the one she travels with, and speaks little."
+## Cards earlier builds gave every companion, which spoke of "its friend":
+## a record that still has one gets COMPANION_CARD.
+const OLD_COMPANION_CARDS: Array[String] = ["A loyal, cautious companion who guards its friend and speaks little.",
+	"A loyal, cautious companion who guards its friend."]
 const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 ## What a companion says as she falls.
 const COMPANION_DEATH_LINES: Array[String] = ["Go on... without me.", "I'm sorry.", "Tell them I tried.", "Keep... going."]
@@ -414,10 +418,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_authority():
 			_start_level()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_9:
-		var local := _local_player()
-		if local != null:
-			World.command(local, "order", {"slot": key.keycode - KEY_0})
+	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_4:
+		say_phrase(key.keycode - KEY_0)
 		return
 	var click := event as InputEventMouseButton
 	if click == null:
@@ -1261,7 +1263,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if is_instance_valid(existing) and existing.spawned:
 		existing.keeper = player
 		existing.current_intent = Companion.Intent.FOLLOW
-		existing.request_decision("owner back")
+		existing.request_decision(Companion.OWNER_BACK)
 		print("[net] %s's companion %s was waiting at %s and follows again" % [
 			record.name, existing.name, existing.tile])
 		return
@@ -1302,6 +1304,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.keeper_id = record.player_id
 	pet.keeper = player
 	pet.card = str(record.companion.get("card", COMPANION_CARD))
+	if pet.card in OLD_COMPANION_CARDS:
+		pet.card = COMPANION_CARD
+		record.companion["card"] = COMPANION_CARD
 	pet.party_log = party_log
 	pet.mind = _make_mind()
 	pet.said.connect(_on_companion_said.bind(pet))
@@ -1345,15 +1350,12 @@ func _remember_companion(id: String) -> void:
 	record.companion["alive"] = true
 
 
-## "order" {slot}: 1 follow, 2 hold here, 3 attack my current target,
-## 4 fall back; 5..9 are accepted and ignored for now.
+## "say" {text}: chat, typed or a quick phrase (_player_said).
 ## "reset": rebuild the room, as the console's reset does. From the
 ## authority's own player always; from anyone else only while
 ## Net.player_reset is on.
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
-	if command_name == "order" and entity is Player:
-		handle_order(entity, int(args.get("slot", 0)))
-	elif command_name == "say" and entity is Player:
+	if command_name == "say" and entity is Player:
 		_player_said(entity, str(args.get("text", "")))
 	elif command_name == "swing" and entity is Player:
 		var swing := _direction_arg(args)
@@ -1495,45 +1497,16 @@ func _player_said(player: Player, text: String) -> void:
 	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
 	var to := String(pet.name) if is_instance_valid(pet) and pet.spawned else ""
 	party_log.add("%s said%s: \"%s\"" % [_display_name(player), " to " + to if to != "" else "", line])
-	Net.broadcast("chat", {"from": _display_name(player), "to": to, "text": line})
+	Net.broadcast("chat", {"entity": String(player.get_path()), "from": _display_name(player), "to": to, "text": line})
 	if to != "":
 		pet.owner_spoke(line)
 
 
-func handle_order(player: Player, slot: int) -> void:
-	var id: String = _peer_ids.get(player.owner_peer, "")
-	var pet: Companion = _companions.get(id)
-	if not is_instance_valid(pet) or not pet.spawned:
-		return
-	var record: PlayerRecord = _records.get(id)
-	var who := record.name if record != null else String(player.name)
-	match slot:
-		1:
-			pet.give_order("follow")
-		2:
-			pet.give_order("hold")
-		3:
-			var target: GridEntity = player.action_target
-			if not is_instance_valid(target) or not target.spawned:
-				target = _nearest_monster_to(pet)
-			pet.give_order("attack", target)
-		4:
-			pet.give_order("fallback")
-		_:
-			return
-	var order_names := {1: "follow", 2: "hold here", 3: "attack", 4: "fall back"}
-	party_log.add("%s ordered %s to %s." % [who, pet.name, order_names[slot]])
-	print("[order] %s -> %s: %s" % [who, pet.name, order_names[slot]])
-
-
-func _nearest_monster_to(entity: GridEntity) -> GridEntity:
-	var best: GridEntity = null
-	var best_distance := 99
-	for other in World.get_entities():
-		if other is Monster and other.spawned and World.distance(entity.tile, other.tile) < best_distance:
-			best = other
-			best_distance = World.distance(entity.tile, other.tile)
-	return best
+## Keys 1-4: the quick phrase in that slot (settings.cfg phrase1= ...),
+## said exactly as a typed line is, rate limit and all.
+func say_phrase(slot: int) -> void:
+	if slot >= 1 and slot <= Net.phrases.size():
+		_send_chat(Net.phrases[slot - 1])
 
 
 func _on_companion_said(text: String, pet: Companion) -> void:
@@ -1554,6 +1527,12 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var heard := "%s%s" % [data.get("from", ""), " (to %s)" % data["to"] if str(data.get("to", "")) != "" else ""]
 		print("[chat] %s: %s" % [heard, data.get("text", "")])
 		talk.add_line(heard, str(data.get("text", "")), true)
+		# Shown over the speaker, as a companion's speech is.
+		var speaker := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
+		if speaker != null:
+			speaker.say(str(data.get("text", "")))
+			if _client3d != null:
+				_client3d.say(speaker, str(data.get("text", "")))
 		return
 	if kind == "speech":
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
@@ -1758,7 +1737,8 @@ func _on_world_ticked(tick: int) -> void:
 		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
 		if _client3d != null:
 			hints += "   W/S tilt   A/D turn   wheel zoom, MMB click 1x"
-	hints += "   1-4 orders"
+	for i in Net.phrases.size():
+		hints += "   %d %s" % [i + 1, Net.phrases[i]]
 	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
 		mode_text, hp_text, tick, hints]
 	if player != null:
@@ -1923,7 +1903,7 @@ func admin_command(line: String) -> String:
 				if not is_instance_valid(pet) or not pet.spawned:
 					continue
 				var record: PlayerRecord = _records.get(id)
-				lines.append("%s of %s (%s) at %s hp %d/%d intent %s%s mind %s, last answer %s" % [
+				lines.append("%s, with %s (%s) at %s hp %d/%d intent %s%s mind %s, last answer %s" % [
 					pet.name, record.name if record != null else "?", id.left(8), pet.tile, pet.hp, pet.max_hp,
 					pet.intent_name(), " " + pet.intent_target.name if pet.intent_target != null else "",
 					pet.mind.kind if pet.mind != null else "none", pet.last_mind])

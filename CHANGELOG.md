@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.46
+
+Quick phrases; companions are companions. Server and client.
+
+- **Keys 1-4 say quick phrases** instead of giving orders: "With me!",
+  "Stay back!", "Get them!", "Fall back!". They go exactly as typed chat
+  does: over your head, to every player, into the party log, and to your
+  companion as something you said. Edit them in settings.cfg
+  (`phrase1=` ... `phrase4=`). The HUD shows them.
+- **Typed chat** now shows over the speaker's head too.
+- **The old orders are gone**: what your companion does about what you
+  say is up to her.
+- **No more "owner"**: her mind is told your name and that you travel
+  together by choice; the console lists companions as "Wren, with Jeff".
+
+The server must be updated to v0.1.46 too, as it refuses any other version.
+
 ## v0.1.45
 
 Companion mind follow-ups. Server.

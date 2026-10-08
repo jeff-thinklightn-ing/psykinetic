@@ -23,7 +23,7 @@ signal entity_died(entity: GridEntity, cause: StringName)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
 ## A player's command that is not a move, attack or shove: (name, args), for
-## Main to act on. "order" {slot} is a companion order.
+## Main to act on. "say" {text} is chat.
 signal command_received(entity: GridEntity, command: String, args: Dictionary)
 ## A walking step into [param occupant] was refused: it would not be pushed.
 signal entity_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i)
