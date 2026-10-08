@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.45
+
+Companion mind follow-ups. Server.
+
+- **Fewer second thoughts in a fight**: a blow on her or her owner asks
+  her mind again at most once per 30 ticks, and only if the fight changed
+  (a new monster next to either of you, either's hp crossing 50% or 30%,
+  her target gone). Otherwise her decision holds.
+- **A shorter, sharper context**: only objects within 2 cells, monsters
+  within 4 or coming for her or her owner, six entries at most, nearest
+  first; repeated log lines collapse ("Brute hit Player for 1 ×6.").
+- **The mind log rotates** at 5 MB, keeping one older file.
+
+The server must be updated to v0.1.45 too, as it refuses any other version.
+
 ## v0.1.44
 
 Companion mind, talking, speech history, housekeeping. Server and client.

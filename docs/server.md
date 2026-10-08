@@ -94,8 +94,9 @@ into a release by accident. The ssh key must be set up: the script never prompts
 
 The mind log: a dedicated server writes its companions' decisions to
 `/var/lib/psykinetic/mind.log` (one JSON line each; see docs/design.md),
-the service's state directory, without any flag. It grows; truncate it
-when it gets large (`sudo truncate -s 0 /var/lib/psykinetic/mind.log`).
+the service's state directory, without any flag. At 5 MB it is moved to
+`mind.log.1` (replacing the one before) and a new one is started, so at
+most about 10 MB is ever on disk.
 
 The sudo commands `deploy.sh` runs: `install` (three times),
 `systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the

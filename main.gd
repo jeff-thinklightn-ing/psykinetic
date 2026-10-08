@@ -1601,12 +1601,12 @@ func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause:
 	var by := _display_name(source) if source != null else String(cause)
 	if entity is Companion:
 		entity.note_hit(true, by, amount, cause)
-		entity.request_decision("hurt")
+		entity.request_decision(Companion.HIT)
 	elif entity is Player:
 		for pet: Companion in _companions.values():
 			if is_instance_valid(pet) and pet.keeper == entity:
 				pet.note_hit(false, by, amount, cause)
-				pet.request_decision("owner hurt")
+				pet.request_decision(Companion.OWNER_HIT)
 
 
 ## Distance from [param tile] to the nearest monster, or a large number.

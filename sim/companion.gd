@@ -53,6 +53,24 @@ const REFLEX_INTENTS: Array[Intent] = [Intent.RETREAT, Intent.YIELD, Intent.HOLD
 ## Blows on her and her owner within this many ticks go in the context.
 const RECENT_HIT_TICKS := 100
 const RECENT_HITS_KEPT := 10
+## Blows ask her again, but at most once per HURT_REASK_TICKS since her last
+## decision and only if the fight changed since then (_what_changed);
+## otherwise her decision holds.
+const HIT := "you were hit"
+const OWNER_HIT := "owner hurt"
+const HURT_TRIGGERS: Array[String] = [HIT, OWNER_HIT]
+const HURT_REASK_TICKS := 30
+## Crossing one of these fractions of her or her owner's hp, either way, is
+## a change.
+const HP_THRESHOLDS: Array[float] = [0.5, 0.3]
+## Her context names objects this close, hostiles this close or going for
+## her or her owner, others in sight; at most NEARBY_KEPT, nearest first.
+const OBJECT_RANGE := 2
+const HOSTILE_RANGE := 4
+const NEARBY_KEPT := 6
+## The party log's tail is read this far back, runs of the same line
+## collapsed, and the last LOG_LINES_FOR_MIND of those kept.
+const LOG_LINES_SCANNED := 60
 
 ## Emitted when the mind said something and the rate limit allows it.
 signal said(text: String)
@@ -95,6 +113,11 @@ var _decided_by: CompanionMind
 var _owner_said := ""
 ## Recent blows on her and her owner: {on, by, amount, cause, tick}.
 var _hits: Array[Dictionary] = []
+## When she last decided and how the fight stood then (_situation_now).
+var _last_decision_tick := -1000
+var _situation := {}
+## A blow's trigger waiting for HURT_REASK_TICKS to pass, or "".
+var _hurt_pending := ""
 
 
 func _init() -> void:
@@ -112,8 +135,12 @@ func intent_name() -> String:
 	return INTENT_NAMES[current_intent]
 
 
-## Something happened that deserves a fresh decision at the next tick.
+## Something happened that deserves a fresh decision at the next tick. A
+## blow (HURT_TRIGGERS) waits on the throttle instead (see _sim_tick).
 func request_decision(reason: String) -> void:
+	if reason in HURT_TRIGGERS:
+		_hurt_pending = reason
+		return
 	_decision_reason = reason
 
 
@@ -169,6 +196,11 @@ func _sim_tick() -> void:
 			_apply(ScriptedMind.new().decide(context), "scripted", {"trigger": BUMPED,
 				"prompt": JSON.stringify(context), "note": "no yield from the mind in time"}, true)
 		_bump_direction = Vector2i.ZERO
+	if not _hurt_pending.is_empty() and World.tick - _last_decision_tick >= HURT_REASK_TICKS:
+		var change := _what_changed()
+		if not change.is_empty() and _decision_reason.is_empty():
+			_decision_reason = "%s: %s" % [_hurt_pending, change]
+		_hurt_pending = ""
 	if not _decision_reason.is_empty() or World.tick >= _next_decision_tick:
 		_decide()
 	if _reflex_active() and current_intent not in REFLEX_INTENTS:
@@ -182,6 +214,8 @@ func _decide() -> void:
 	var reason := _decision_reason
 	_next_decision_tick = World.tick + DECISION_INTERVAL_TICKS
 	_decision_reason = ""
+	_last_decision_tick = World.tick
+	_situation = _situation_now()
 	var context := _context(reason)
 	_owner_said = ""
 	var answer: Dictionary = mind.decide(context) if mind != null else {}
@@ -222,6 +256,54 @@ func _take_result(result: Dictionary) -> void:
 		MindLog.record(entry)
 		return
 	_apply(answer, mind.kind, entry)
+
+
+## How the fight stands, to tell later whether it changed: the hostiles
+## next to her or her owner, which HP_THRESHOLDS band each of them is in,
+## whether her target lives.
+func _situation_now() -> Dictionary:
+	var owner_here := keeper != null and is_instance_valid(keeper) and keeper.spawned
+	var adjacent: Array[int] = []
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned and (World.distance(tile, entity.tile) == 1
+				or owner_here and World.distance(keeper.tile, entity.tile) == 1):
+			adjacent.append(entity.get_instance_id())
+	return {"adjacent": adjacent, "hp_band": _hp_band(self),
+		"owner_hp_band": _hp_band(keeper) if owner_here else -1,
+		"target": intent_target != null and _alive(intent_target)}
+
+
+## How many of HP_THRESHOLDS [param entity]'s hp is below.
+static func _hp_band(entity: GridEntity) -> int:
+	var band := 0
+	for threshold in HP_THRESHOLDS:
+		if entity.max_hp > 0 and float(entity.hp) / entity.max_hp < threshold:
+			band += 1
+	return band
+
+
+## What changed in the fight since her last decision, in words for the
+## trigger, or "" for nothing that calls for a new one. Orders, her owner's
+## words and bumps ask her at once and need no change.
+func _what_changed() -> String:
+	var now := _situation_now()
+	var before := _situation
+	for id: int in now["adjacent"]:
+		if id not in before.get("adjacent", []):
+			return "a new hostile next to you or your owner"
+	if now["hp_band"] != before.get("hp_band", now["hp_band"]):
+		return "your hp crossed %s" % _threshold_crossed(before.get("hp_band", 0), now["hp_band"])
+	if now["owner_hp_band"] != before.get("owner_hp_band", now["owner_hp_band"]) and now["owner_hp_band"] != -1 \
+			and before.get("owner_hp_band", -1) != -1:
+		return "your owner's hp crossed %s" % _threshold_crossed(before["owner_hp_band"], now["owner_hp_band"])
+	if before.get("target", false) and not now["target"]:
+		return "your target is gone"
+	return ""
+
+
+static func _threshold_crossed(before: int, now: int) -> String:
+	var threshold: float = HP_THRESHOLDS[maxi(before, now) - 1]
+	return "%d%%" % roundi(threshold * 100.0)
 
 
 ## Below REFLEX_BELOW of her hp with a hostile next to her.
@@ -321,10 +403,16 @@ func _apply(answer: Dictionary, source: String, entry := {}, filling_in := false
 func _context(reason := "") -> Dictionary:
 	var nearby: Array[Dictionary] = []
 	for entity in World.get_entities():
-		if entity == self or not entity.spawned:
-			continue
+		if entity == self or entity == keeper or not entity.spawned:
+			continue  # Her owner has a field of their own.
 		var offset: Vector2i = entity.tile - tile
-		if maxi(absi(offset.x), absi(offset.y)) > SIGHT_RANGE:
+		var distance := maxi(absi(offset.x), absi(offset.y))
+		if entity is Monster:
+			var monster := entity as Monster
+			var after_us := monster.target != null and (monster.target == self or monster.target == keeper)
+			if distance > HOSTILE_RANGE and not after_us:
+				continue
+		elif distance > (OBJECT_RANGE if _type_of(entity) == "object" else SIGHT_RANGE):
 			continue
 		var seen := {
 			"name": _name_of(entity), "type": _type_of(entity),
@@ -334,6 +422,11 @@ func _context(reason := "") -> Dictionary:
 			seen["hp"] = entity.hp
 			seen["max_hp"] = entity.max_hp
 		nearby.append(seen)
+	nearby.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var da := maxi(absi(int(a["dx"])), absi(int(a["dy"])))
+		var db := maxi(absi(int(b["dx"])), absi(int(b["dy"])))
+		return da < db or da == db and str(a["name"]) < str(b["name"]))
+	nearby = nearby.slice(0, NEARBY_KEPT)
 	var recent_hits: Array[Dictionary] = []
 	for hit in _hits:
 		if World.tick - int(hit["tick"]) <= RECENT_HIT_TICKS:
@@ -363,7 +456,7 @@ func _context(reason := "") -> Dictionary:
 		"owner_direction": owner_direction,
 		"free_cells": free_cells,
 		"recent_hits": recent_hits,
-		"log": party_log.last(LOG_LINES_FOR_MIND) if party_log != null else [],
+		"log": collapse_log(party_log.last(LOG_LINES_SCANNED)).slice(-LOG_LINES_FOR_MIND) if party_log != null else [],
 		"nearby": nearby,
 		"hp": hp, "max_hp": max_hp, "stamina": stamina, "max_stamina": max_stamina,
 		"owner": owner_info,
@@ -372,6 +465,23 @@ func _context(reason := "") -> Dictionary:
 		"intent": intent_name(),
 		"reason": reason,
 	}
+
+
+## [param lines] with each run of the same line made one, its count added:
+## "Brute hit Player for 1. ×6".
+static func collapse_log(lines: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	var run := 0
+	for i in lines.size():
+		run += 1
+		if i + 1 < lines.size() and lines[i + 1] == lines[i]:
+			continue
+		var line := lines[i]
+		if run > 1:
+			line = "%s ×%d." % [line.trim_suffix("."), run] if line.ends_with(".") else "%s ×%d" % [line, run]
+		out.append(line)
+		run = 0
+	return out
 
 
 ## What an entity is called in her context: its label (a player's name, as

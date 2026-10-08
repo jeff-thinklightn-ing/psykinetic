@@ -512,14 +512,25 @@ say}` and nothing else: it never sets a position, deals damage, or touches
 any sim state. The companion validates the answer — the intent against the
 whitelist, the target against the live world — and anything that does not
 hold up becomes `FOLLOW` and is logged. A decision window opens every 30
-ticks, or at once when the owner is hurt, the companion is hurt or pushed, a
-hostile first comes into line of sight, or an order arrives. The context is
-the personality card, the `trigger` (why she is asked now), the last 20
-party-log sentences, nearby entities with offsets, types, hostility and hp,
-`recent_hits` (blows on her and her owner in the last 100 ticks: on, by,
-amount, cause, ticks ago), own and owner hp and stamina, the owner's last
-order, `owner_said` (see Talking) and the current intent. Players are named
-by their label, as the party log names them.
+ticks, or at once when the companion is pushed, a hostile first comes into
+line of sight, or an order arrives (her owner's words and bumps ask her
+there and then). **Blows are throttled**: "you were hit" and "owner hurt"
+ask her at most once per 30 ticks since her last decision, and only if the
+fight changed since then: a hostile newly next to her or her owner, her or
+her owner's hp crossing 50% or 30% (either way), or her target gone. The
+trigger then says which ("owner hurt: your owner's hp crossed 50%");
+otherwise the blow asks nothing and her decision holds. The context is
+the personality card, the `trigger` (why she is asked now), the party
+log's tail (the last 60 sentences, each run of the same one collapsed to
+one with its count, "Brute hit Player for 1 ×6.", and the last 20 of
+those), `nearby` (at most 6, nearest first: objects within 2 cells,
+hostiles within 4 or going for her or her owner, players and companions
+in sight; never her owner, who has `owner`) with offsets, types,
+hostility and hp, `recent_hits` (blows on her and her owner in the last
+100 ticks: on, by, amount, cause, ticks ago), own and owner hp and
+stamina, the owner's last order, `owner_said` (see Talking) and the
+current intent. Players are named by their label, as the party log names
+them.
 
 Two minds. `ScriptedMind`: obey the last order; retreat toward the owner
 below 30% hp; attack the nearest hostile within 3 tiles; else follow. It is
@@ -554,7 +565,8 @@ the parsed intent and target, the outcome (applied, held, rejected, reflex
 override, scripted fill-in), a note on why, latency in ms, what she said,
 and with `--mind-why` the mind's own one-sentence reason (asked for in the
 reply's schema). Console: `mind log on|off`, `mind last <name>` (her last
-line, also kept with the log off).
+line, also kept with the log off). Rotated at 5 MB: the full file becomes
+`<path>.1`, replacing the one before, and a new one starts.
 
 **Party log** (`sim/party_log.gd`): the server keeps the last 200
 plain-English sentences — pushes, impacts, damage, deaths, fire, orders,

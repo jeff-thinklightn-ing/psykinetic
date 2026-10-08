@@ -30,7 +30,11 @@ func _ready() -> void:
 	_test_reflex_override()
 	_test_owner_speaks()
 	_test_mind_log_file()
-	_test_last_words()
+	_test_hurt_throttle()
+	_test_context_trimmed()
+	_test_log_collapsed()
+	_test_mind_log_rotates()
+	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
 	print("")
@@ -83,8 +87,8 @@ func _test_retreats_on_low_hp() -> void:
 	for i in 8:
 		World.step()
 	pet.hp = 5
-	pet.request_decision("hurt")
-	World.step()
+	pet.request_decision(Companion.HIT)
+	_step_until(func() -> bool: return pet.current_intent == Companion.Intent.RETREAT, Companion.HURT_REASK_TICKS + 2)
 	_check(pet.current_intent == Companion.Intent.RETREAT, "intent is RETREAT (%s)" % pet.intent_name())
 	_walk_to(owner, Vector2i(12, 12))
 	for i in 10:
@@ -499,6 +503,124 @@ func _test_last_words() -> void:
 	_check(words.size() == 1, "the party log has her last words (%s)" % [lines])
 	_check(_main.talk.lines.size() == talk_lines + 1 and _main.talk.lines.back()[1] == String(pet.name),
 			"and so does the Tab panel")
+
+
+func _test_hurt_throttle() -> void:
+	print("\n== blows ask her again at most once per 30 ticks, and only if the fight changed ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	pet.mind = ScriptedMind.new()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	owner.hp = owner.max_hp
+	pet.request_decision("test")
+	World.step()
+	var decided: int = pet._last_decision_tick
+	pet.request_decision(Companion.OWNER_HIT)
+	for i in Companion.HURT_REASK_TICKS - 2:
+		World.step()
+	_check(pet._last_decision_tick == decided, "her owner hit, within 30 ticks of her last decision: not asked")
+	_step_until(func() -> bool: return pet._last_decision_tick != decided, 4)
+	_check(MindLog.last[String(pet.name)]["trigger"] == "",
+			"30 ticks on, nothing changed: the blow asks nothing, only her ordinary window comes (trigger '%s')"
+			% MindLog.last[String(pet.name)]["trigger"])
+	decided = pet._last_decision_tick
+	owner.hp = roundi(owner.max_hp * 0.45)
+	pet.request_decision(Companion.OWNER_HIT)
+	_step_until(func() -> bool: return pet._last_decision_tick != decided, Companion.HURT_REASK_TICKS + 2)
+	_check(MindLog.last[String(pet.name)]["trigger"] == "owner hurt: your owner's hp crossed 50%",
+			"her owner below half: asked, and told why (%s)" % MindLog.last[String(pet.name)]["trigger"])
+	# The other changes, against the situation at her last decision.
+	var imp := _spawn_imp(Vector2i(9, 9))
+	pet.intent_target = imp
+	pet._situation = pet._situation_now()
+	_check(pet._what_changed() == "", "the same fight: no change")
+	_put(imp, Vector2i(9, 7))
+	_check(pet._what_changed() == "a new hostile next to you or your owner", "a hostile comes up next to her owner: %s" % pet._what_changed())
+	pet._situation = pet._situation_now()
+	pet.hp = roundi(pet.max_hp * 0.25)
+	_check(pet._what_changed() == "your hp crossed 30%", "her hp from full to a quarter: %s" % pet._what_changed())
+	pet.hp = pet.max_hp
+	World.despawn(imp)
+	_check(pet._what_changed() == "your target is gone", "her target dies: %s" % pet._what_changed())
+	pet.intent_target = null
+	owner.hp = owner.max_hp
+
+
+func _test_context_trimmed() -> void:
+	print("\n== her context: objects within 2, hostiles within 4 or after her or her owner, 6 at most, nearest first ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var near := _spawn_imp(Vector2i(10, 9))
+	near.name = "NearImp"
+	var far := _spawn_imp(Vector2i(10, 12))
+	far.name = "FarImp"
+	var hunter := _spawn_imp(Vector2i(13, 12))
+	hunter.name = "HunterImp"
+	hunter.target = owner
+	var context: Dictionary = pet._context("")
+	var nearby: Array = context["nearby"]
+	var names := nearby.map(func(seen: Dictionary) -> String: return str(seen["name"]))
+	var reach := func(seen: Dictionary) -> int: return maxi(absi(int(seen["dx"])), absi(int(seen["dy"])))
+	_check("NearImp" in names and not "FarImp" in names and "HunterImp" in names,
+			"the imp 3 away and the one going for her owner 6 away, not the idle one 6 away: %s" % [names])
+	_check(nearby.all(func(seen: Dictionary) -> bool: return seen["type"] != "object" or reach.call(seen) <= 2),
+			"objects only within 2 cells")
+	_check(nearby.size() <= Companion.NEARBY_KEPT, "at most 6 (%d)" % nearby.size())
+	var ordered := true
+	for i in range(1, nearby.size()):
+		ordered = ordered and reach.call(nearby[i - 1]) <= reach.call(nearby[i])
+	_check(ordered, "nearest first")
+	_check(not Companion._name_of(owner) in names, "her owner is not among them: they have the owner field")
+	for imp: Monster in [near, far, hunter]:
+		World.despawn(imp)
+
+
+func _test_log_collapsed() -> void:
+	print("\n== repeated log lines collapse ==")
+	var lines: Array[String] = ["Pip hit Imp for 2.", "Brute hit Player for 1.", "Brute hit Player for 1.",
+		"Brute hit Player for 1.", "Brute hit Player for 1.", "Brute hit Player for 1.", "Brute hit Player for 1.",
+		"Imp died.", "Brute hit Player for 1."]
+	var collapsed := Companion.collapse_log(lines)
+	_check(collapsed == ["Pip hit Imp for 2.", "Brute hit Player for 1 ×6.", "Imp died.", "Brute hit Player for 1."],
+			"runs of the same line become one with its count: %s" % [collapsed])
+	var pet := _companion()
+	for i in 25:
+		_main.party_log.add("Brute hit Player for 1.")
+	var log_lines: Array = pet._context("")["log"]
+	_check(log_lines.back() == "Brute hit Player for 1 ×25.", "and so in her context (%s)" % log_lines.back())
+
+
+func _test_mind_log_rotates() -> void:
+	print("\n== the mind log rotates: the last 5 MB and one file before it ==")
+	var path := OS.get_user_data_dir().path_join("mind_rotate_test.log")
+	for old: String in [path, path + ".1"]:
+		if FileAccess.file_exists(old):
+			DirAccess.remove_absolute(old)
+	var saved := Net.mind_log_path
+	var saved_max := MindLog.max_bytes
+	_check(MindLog.max_bytes == 5 * 1024 * 1024, "at 5 MB")
+	Net.mind_log_path = path
+	MindLog.max_bytes = 2000
+	var entry := {"companion": "Rotor", "prompt": "x".repeat(300)}
+	for i in 20:
+		entry["n"] = i
+		MindLog.record(entry)
+	var current := FileAccess.get_file_as_string(path)
+	var rotated := FileAccess.get_file_as_string(path + ".1")
+	_check(FileAccess.file_exists(path + ".1") and current.length() < 2000 + 400,
+			"rotated: the current file under the limit (%d bytes), one file before it" % current.length())
+	_check("\"n\":19" in current and not "\"n\":0," in rotated and not FileAccess.file_exists(path + ".2"),
+			"the newest lines kept, the oldest gone, never a second rotated file")
+	for old: String in [path, path + ".1"]:
+		DirAccess.remove_absolute(old)
+	Net.mind_log_path = saved
+	MindLog.max_bytes = saved_max
 
 
 # --- helpers ------------------------------------------------------------------

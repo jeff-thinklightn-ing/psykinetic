@@ -657,3 +657,28 @@ on the developer's disk, ignored by git and by Godot.
 
 It stops and lists them unless -IncludeUntracked. Its `git add -A` once
 swept an asset pack that was still being copied in into a release.
+
+## 73. Blows ask a companion again only when the fight changed
+
+A blow in a fight lands every few ticks; asking her mind on each made a
+slow mind's decisions last ten ticks and flip between ATTACK, FOLLOW and
+RETREAT. "You were hit" and "owner hurt" now wait at least 30 ticks after
+her last decision and then ask only if something that should change her
+mind happened: a hostile newly next to her or her owner, an hp threshold
+(50%, 30%) crossed by either, or her target gone; the trigger names it.
+Orders, her owner's words and bumps still ask at once. The ordinary
+30-tick window is unchanged.
+
+## 74. A companion's context is trimmed to what bears on her choice
+
+Nearby lists objects within 2 cells, hostiles within 4 or going for her or
+her owner (a monster's target is kept on it for this), others in sight, at
+most 6, nearest first; her owner is left out of it, having a field of
+their own. Repeated party-log lines are collapsed with their count. A
+model reads a short, relevant context better than a room's inventory.
+
+## 75. The mind log rotates at 5 MB, one old file kept
+
+A running server must not need anyone to truncate its log. Renaming the
+full file to .1 is the least that keeps recent history (the last 5 MB or
+more) and bounds the disk at about twice that.

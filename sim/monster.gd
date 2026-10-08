@@ -11,6 +11,8 @@ const SHADE_LIGHT := Color(1.0, 0.62, 0.55)
 const SHADE_DARK := Color(0.33, 0.04, 0.08)
 
 @export var sight_range := 7
+## Who it went for this tick (null for nobody), for the companions' minds.
+var target: GridEntity
 
 
 func _init() -> void:
@@ -33,7 +35,7 @@ func _ready() -> void:
 
 
 func _sim_tick() -> void:
-	var target := _nearest_visible_target()
+	target = _nearest_visible_target()
 	if target == null:
 		return
 	if World.can_melee(tile, target.tile):
