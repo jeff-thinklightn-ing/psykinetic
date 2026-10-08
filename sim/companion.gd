@@ -69,16 +69,13 @@ const CALM_TICKS := 50
 const HEAL_EVERY := 10
 ## This long after a fight without a word from her: a speaking moment.
 const SILENCE_TICKS := 100
-## Something her player says that reads as an instruction (is_instruction),
-## or a quick phrase, stands for INSTRUCTION_TICKS or until another; for
-## INSTRUCTION_LOCK_TICKS after it only an hp threshold asks the hands.
+## Her player's words become a standing instruction only when her voice,
+## reading them, answers with a stance ([STANCE: ...]): it stands for
+## INSTRUCTION_TICKS or until another, and for INSTRUCTION_LOCK_TICKS after
+## it only an hp threshold asks the hands. Anything else they say, a warning
+## or an exclamation, is just speech.
 const INSTRUCTION_TICKS := 600
 const INSTRUCTION_LOCK_TICKS := 60
-const IMPERATIVES: Array[String] = ["stay", "come", "follow", "go", "get", "attack", "hit", "kill", "fight",
-	"fall", "back", "retreat", "run", "flee", "wait", "hold", "stop", "help", "guard", "protect", "defend",
-	"keep", "move", "leave", "push", "shove", "step", "let", "don't", "dont", "do", "watch", "take",
-	"hide", "charge", "rest", "heal", "look", "with", "behind", "here", "over", "out", "away",
-	"save", "cover", "split", "regroup", "careful", "be", "never", "always", "please"]
 ## The quick phrases' defaults reach her as what they mean, never quoted.
 const PHRASE_MEANINGS := {
 	"With me!": "%s wants you to stay close.", "Stay back!": "%s wants you to stay back.",
@@ -108,10 +105,11 @@ PULL_BACK: get away from the monsters, to safety. Follow the standing instructio
 ## events as bracketed narration. She answers in plain words; when her
 ## player has just asked something of her, she may end with a [STANCE: ...]
 ## line (VOICE_ASKED), the one place the stances are named.
-const VOICE_WORLD := """You are underground, in rooms and corridors of old stone, lit by lanterns and by fires. Monsters
-prowl here, imps and brutes and worse, and they attack whoever they see. Fire burns whoever stands in it. Crates and
-boulders can be shoved; doors open and close. Whoever falls down here rises again after a while, but it hurts, and
-no one wants to fall."""
+const VOICE_WORLD := """You walk the old stone places and the land around them: rooms and corridors lit by lanterns and
+by fires, and the open ground beyond. Monsters prowl there, imps and brutes and worse, and they attack whoever they
+see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
+Wounds close slowly when you rest away from danger.
+Whoever falls rises again after a while, but it hurts, and no one wants to fall."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
 words are enough. When %s speaks to you, answer. Never say again what you have already said, and never repeat %s's
 words back. Only if there is truly nothing worth saying, answer with just: ...
@@ -197,9 +195,6 @@ var _heard: Array[Dictionary] = []
 ## What the voice sees of the recent exchange: {role: "user" | "assistant",
 ## text}; her player's words and narration as the user's, her lines as hers.
 var _exchange: Array[Dictionary] = []
-## Her player's last words asked something of her (a quick phrase, or a
-## line that reads as an instruction): only then may her voice set a stance.
-var _words_ask := false
 ## The fight, for healing and the silence after it.
 var _calm_since := 0
 var _was_in_fight := false
@@ -259,17 +254,13 @@ func bumped(direction: Vector2i) -> bool:
 
 
 ## Her player said [param text] to her, typed or a quick phrase: the voice
-## is asked at once. A quick phrase reaches her as what it means; an
-## instruction stands (standing_instruction).
+## is asked at once, and may read it as asking something of her (a stance
+## in its reply), which then stands (standing_instruction). A quick phrase
+## reaches her as what it means.
 func owner_spoke(text: String) -> void:
 	_heard.append({"text": text, "tick": World.tick})
 	var meaning := meaning_of(text, keeper_name())
 	var heard := meaning if not meaning.is_empty() else "%s just said to you: \"%s\"" % [keeper_name(), text]
-	_words_ask = not meaning.is_empty() or is_instruction(text)
-	if _words_ask:
-		_instruction = heard
-		_instruction_tick = World.tick
-		_instruction_stance = ""
 	if meaning.is_empty():
 		_add_turn("user", text)
 	else:
@@ -293,17 +284,6 @@ func note_death(who: String, her_player := false) -> void:
 static func meaning_of(text: String, who: String) -> String:
 	var meaning: String = PHRASE_MEANINGS.get(text.strip_edges(), "")
 	return meaning % who if not meaning.is_empty() else ""
-
-
-## Whether [param text] reads as an instruction: not a question, and it
-## starts with an imperative ("Stay back!", "Get them", "Don't...") or is
-## exclaimed. A plain heuristic; the voice reads the words themselves.
-static func is_instruction(text: String) -> bool:
-	var line := text.strip_edges()
-	if line.is_empty() or line.ends_with("?"):
-		return false
-	var first := line.get_slice(" ", 0).to_lower().rstrip("!.,;:")
-	return first in IMPERATIVES or line.ends_with("!")
 
 
 ## The instruction standing now, as she reads it, or "" (none, or older
@@ -546,7 +526,7 @@ func _ask_voice(trigger: String, heard := "", always := false) -> void:
 			_pending_voice = {"trigger": trigger, "heard": heard, "always": always}
 		return
 	_serial += 1
-	var asked := not heard.is_empty() and _words_ask
+	var asked := not heard.is_empty()
 	var messages := voice_messages(asked)
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger, "messages": messages, "speaker": _name_of(self),
@@ -563,6 +543,7 @@ static func _sync_result(ask: Dictionary, answer: Dictionary) -> Dictionary:
 		"prompt": render(ask["messages"]) if ask.has("messages") else "%s\n\n%s" % [ask["system"], ask["user"]],
 		"raw": JSON.stringify(answer),
 		"answer": answer, "error": "", "latency_ms": 0, "spoken_to": ask.get("spoken_to", false), "asked": ask.get("asked", false),
+		"heard": ask.get("heard", ""),
 		"always": ask.get("always", false)}
 
 
@@ -780,12 +761,12 @@ func _take_result(result: Dictionary) -> void:
 			entry["stance_ignored"] = stance_text
 	elif wanted != -1:
 		if serial >= _stance_serial:
+			# Her voice read her player's words as asking this of her: it stands.
 			_set_stance(wanted, serial, entry["mind"])
-			if not standing_instruction().is_empty():
-				_instruction_stance = stance_text
-				entry["note"] = "stance %s applied and kept with the instruction" % stance_text
-			else:
-				entry["note"] = "stance %s applied" % stance_text
+			_instruction = str(result.get("heard", ""))
+			_instruction_tick = World.tick
+			_instruction_stance = stance_text
+			entry["note"] = "stance %s applied; %s's words stand as an instruction" % [stance_text, keeper_name()]
 		else:
 			entry["note"] = "stance %s superseded by a newer ask" % stance_text
 	var line := trim_line(str(answer.get("say", "")))

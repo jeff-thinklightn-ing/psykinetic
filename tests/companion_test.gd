@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_death_and_respawn()
 	_test_reset_restores_the_player()
 	_test_healing()
+	_test_players_heal()
 	_test_mind_log_file()
 	_test_standing_instruction()
 	_test_run_summary()
@@ -342,6 +343,7 @@ func _test_quick_phrases() -> void:
 	World.step()
 	_check("1 With me!" in _main.hud.text and "4 Fall back!" in _main.hud.text, "the HUD hint shows them")
 	var log_size: int = _main.party_log.size()
+	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
 	var key := InputEventKey.new()
 	key.keycode = KEY_2
 	key.pressed = true
@@ -354,7 +356,8 @@ func _test_quick_phrases() -> void:
 	var user := str(ask.get("user", ""))
 	_check("Player wants you to stay back." in user and not "Stay back!" in user,
 			"her voice is asked, and reads what it means, not the quote")
-	_check(pet.standing_instruction() == "Player wants you to stay back.", "and it stands: %s" % pet.standing_instruction())
+	_check(pet.standing_instruction() == "Player wants you to stay back." and pet.stance == Companion.Stance.PULL_BACK,
+			"her voice answers with a stance, so it stands: %s" % pet.standing_instruction())
 	var before: int = _main.party_log.size()
 	key.keycode = KEY_3
 	_main._unhandled_input(key)
@@ -515,7 +518,9 @@ func _test_stance_events() -> void:
 	_check("[Sneak fell.]" in str(mind.voice_asks.back()["user"]), "the voice sees it as narration: [Sneak fell.]")
 	# Words ask the voice only; for 60 ticks after an instruction only an hp threshold asks the hands.
 	mind.clear()
+	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
+	mind.voice_answer = {"say": "", "stance": ""}
 	_check(mind.stance_asks.is_empty() and mind.triggers("voice") == ["Player just spoke to you."],
 			"%s speaks: the voice is asked, the hands skip it" % owner.label)
 	var other := _spawn_imp(Vector2i(9, 7))
@@ -624,8 +629,8 @@ func _test_owner_speaks() -> void:
 	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"%s\"" % [pet.name, said], "the party log: %s" % [lines])
 	var entry: Dictionary = MindLog.last[String(pet.name)]
 	_check(entry["kind"] == "voice" and entry["trigger"] == "Player just spoke to you."
-			and ("Player just said to you: \"%s\"" % said) in str(entry["prompt"]),
-			"her voice is asked at once, the words quoted as said (trigger: %s)" % entry["trigger"])
+			and (str(entry["prompt"]).ends_with("\n" + said) or str(entry["prompt"]).ends_with("user: " + said)),
+			"her voice is asked at once, the words as Player's turn (trigger: %s)" % entry["trigger"])
 	_check(pet.stance == Companion.Stance.GUARD, "the words set nothing by themselves (%s)" % pet.stance_name())
 	_check("%s said: \"Hm?\"" % pet.name in lines, "she answers, and that is logged: %s" % [lines])
 	_check(_main.talk.lines.size() >= talk_lines + 2, "chat and her answer are in the Tab panel (%d lines)" % _main.talk.lines.size())
@@ -657,7 +662,7 @@ func _test_voice() -> void:
 	var entry: Dictionary = MindLog.last[String(pet.name)]
 	_check(entry["outcome"] == "said" and entry["say"] == "Behind you." and entry.has("latency_ms"),
 			"the line is said and logged with its latency (%s)" % entry["outcome"])
-	_check(Companion.CARD_INSTRUCTED % ["Player", "Player"] in str(mind.voice_asks.back()["system"]),
+	_check(Companion.CARD_INSTRUCTED % ["Player", "Player"] in pet.voice_prompt(),
 			"with an instruction standing, the card says to do what Player asks")
 	for i in 21:
 		World.step()
@@ -805,7 +810,9 @@ func _test_her_own_lapse() -> void:
 	World.step()
 	for i in 21:
 		World.step()
+	mind.voice_answer = {"say": "", "stance": "HOLD"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
+	mind.voice_answer = {"say": "", "stance": ""}
 	mind.clear()
 	pet.hp = 5
 	World.step()
@@ -972,6 +979,26 @@ func _test_healing() -> void:
 	_check(_companion() != null and _companion().hp == _companion().max_hp, "a reset brings her back at full hp (%d)" % (_companion().hp if _companion() else -1))
 
 
+func _test_players_heal() -> void:
+	print("\n== players heal out of combat at the companions' rate ==")
+	_kill_monsters()
+	var owner := _player()
+	_put(owner, Vector2i(9, 6))
+	var imp := _spawn_imp(Vector2i(9, 11))
+	owner.hp = 10
+	for i in Companion.CALM_TICKS + 30:
+		World.step()
+	_check(owner.hp == 10, "a monster 5 away: no healing (%d)" % owner.hp)
+	World.despawn(imp)
+	for i in Companion.CALM_TICKS + Companion.HEAL_EVERY * 3:
+		World.step()
+	_check(owner.hp >= 12 and owner.hp <= 14, "calm for 50 ticks, then a point every 10 (%d)" % owner.hp)
+	_check("Wounds close slowly when you rest away from danger." in Companion.VOICE_WORLD
+			and "the old stone places and the land around them" in Companion.VOICE_WORLD and not "underground" in Companion.VOICE_WORLD,
+			"her world says so, and is not only underground")
+	owner.hp = owner.max_hp
+
+
 func _test_mind_log_file() -> void:
 	print("\n== the mind log: one JSON line per answer ==")
 	var path := OS.get_user_data_dir().path_join("mind_test.log")
@@ -1006,22 +1033,28 @@ func _test_standing_instruction() -> void:
 	var owner := _player()
 	var pet := _companion()
 	_settle(pet)
-	pet.mind = ScriptedMind.new()
-	_check(Companion.is_instruction("Stay back!") and Companion.is_instruction("get them") and Companion.is_instruction("Fall back!")
-			and not Companion.is_instruction("Are you hurt?") and not Companion.is_instruction("nice weather"),
-			"instructions: 'Stay back!', 'get them'; not 'Are you hurt?' or 'nice weather'")
+	var mind := CountingMind.new()
+	pet.mind = mind
 	for i in 21:
 		World.step()
+	_main._on_command(owner, "say", {"text": "Watch out! A brute!"})
+	_check(pet.standing_instruction().is_empty(), "a warning her voice answers without a stance is just speech")
+	_check("[STANCE: HOLD]" in str(mind.voice_asks.back()["system"]), "though her voice was asked whether it asks something of her")
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
-	_check(pet.standing_instruction() == "Player wants you to stay back.", pet.standing_instruction())
+	mind.voice_answer = {"say": "", "stance": ""}
+	_check(pet.standing_instruction() == "Player wants you to stay back.", "her voice answered with a stance: it stands (%s)" % pet.standing_instruction())
 	_check("Standing instruction: Player wants you to stay back (0 seconds ago)." in pet.stance_prompt(), "the hands are told: %s" % pet.stance_prompt())
 	for i in 100:
 		World.step()
 	_main._on_command(owner, "say", {"text": "Are you hurt?"})
-	_check(pet.standing_instruction() == "Player wants you to stay back.", "a question does not replace it")
+	_check(pet.standing_instruction() == "Player wants you to stay back.", "words answered without a stance do not replace it")
 	for i in Companion.INSTRUCTION_TICKS:
 		World.step()
 	_check(pet.standing_instruction().is_empty() and "No standing instruction." in pet.stance_prompt(), "600 ticks on: gone")
+	pet.mind = ScriptedMind.new()
 
 
 func _test_run_summary() -> void:

@@ -864,3 +864,21 @@ conversation and its own past lines sit where it can see them. She
 answers in plain words; the one structured thing left, a [STANCE: ...]
 line, is asked for only when Jeff has asked her to do something. The
 stance prompt stays as it was: it is a classification, and plain.
+
+## 101. Standing instructions come from the voice's reading, not a heuristic
+
+"Ends with !" or "starts with stay" made "Watch out!" an order. Whether
+Jeff asked something of her is the voice's to read: only when its reply
+names a stance do the words stand as an instruction. Warnings and
+exclamations are just speech.
+
+## 102. Players heal out of combat too
+
+At the companions' rate and by the same rule, so a session does not end
+in a slow walk at 3 hp, and her world says so ("Wounds close slowly when
+you rest away from danger.").
+
+## 103. Her world is not only underground
+
+The next maps go above ground; the primer speaks of "the old stone places
+and the land around them" so it does not have to change with them.

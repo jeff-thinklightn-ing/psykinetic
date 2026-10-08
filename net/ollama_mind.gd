@@ -153,7 +153,8 @@ func _result(what: String, raw: String, answer: Dictionary, error: String) -> vo
 		"prompt": Companion.render(ask["messages"]) if ask.has("messages") else "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")],
 		"raw": raw, "answer": answer,
 		"error": error, "latency_ms": Time.get_ticks_msec() - int(sent.get("at", Time.get_ticks_msec())),
-		"spoken_to": ask.get("spoken_to", false), "asked": ask.get("asked", false), "always": ask.get("always", false)})
+		"spoken_to": ask.get("spoken_to", false), "asked": ask.get("asked", false), "always": ask.get("always", false),
+		"heard": ask.get("heard", "")})
 
 
 ## Test hook: the next ask gets this as the endpoint's response body.

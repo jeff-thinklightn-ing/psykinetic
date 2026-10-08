@@ -563,9 +563,11 @@ no game, players, stances or JSON in it, and sent as a chat
 
 - **system**: who she is and her card ("You are Pip. You travel with Jeff
   by choice. ..."; the "Do what Jeff asks" line while an instruction
-  stands), a short primer on the world (`VOICE_WORLD`: stone rooms lit by
-  lanterns and fires, monsters that attack on sight, fire that burns,
-  things that can be shoved, the fallen rising again), and **now**: the
+  stands), a short primer on the world (`VOICE_WORLD`: the old stone
+  places and the land around them, lit by lanterns and fires, monsters
+  that attack on sight, fire that burns, things that can be shoved,
+  wounds that close slowly away from danger, the fallen rising again),
+  and **now**: the
   situation in her words (`voice_situation`: health as unhurt, a little
   hurt, badly hurt or close to falling; paces for cells; who is in
   danger), what she is set on and doing ("You are keeping beside Jeff and
@@ -583,11 +585,11 @@ no game, players, stances or JSON in it, and sent as a chat
 
 She replies in plain text (no JSON format asked, temperature 0.8; quotes
 and her own name taken off the front, "..." as silence, a line longer
-than 120 characters cut at the end of a sentence). Only when Jeff has just
-asked something of her (a quick phrase, or words that read as an
-instruction) does the system message add how to name what she will do, a
-last line `[STANCE: STAY_CLOSE]` and so on; only then is it applied, when
-the reply arrives, and kept with the standing instruction. Any other
+than 120 characters cut at the end of a sentence). Whenever Jeff has just
+spoken to her, the system message adds how to name what she will do if
+Jeff asked something of her, a last line `[STANCE: STAY_CLOSE]` and so on;
+when her reply has one, it is applied as it arrives and Jeff's words
+become the standing instruction. Any other
 reply's stance is logged as `stance_ignored`. Jeff's words never ask the
 hands. The echo filter is as before. Every line's latency is in the mind
 log, with the whole chat as its prompt.
@@ -596,10 +598,11 @@ log, with the whole chat as its prompt.
 older ask than the one whose stance stands is logged as superseded. The
 reflexes win over any stance.
 
-**A standing instruction.** A quick phrase, or a typed line that reads as
-an instruction (`Companion.is_instruction`: not a question, and it starts
-with an imperative or is exclaimed), stands for 600 ticks or until
-another, or until her HP or Jeff's falls below 30%: then it lapses, the
+**A standing instruction** comes only from her voice's reading of Jeff's
+words: when its reply to them names a stance, those words (a quick
+phrase as what it means) stand, from when the reply arrives, for 600
+ticks or until another such reply; a warning or an exclamation answered
+without one is just speech. It lapses early when her HP or Jeff's falls below 30%: then the
 hands are asked again ("Jeff's HP fell below 30%, so Jeff's instruction
 no longer holds."), and if the new stance differs from the one she had,
 her voice is asked to say why, and says it whatever the rate limit. The hands are told it ("Standing instruction: Jeff wants you to
@@ -629,7 +632,8 @@ what it echoed). Her last 20 lines are kept in her record (`said`), so
 they carry across sessions and restarts.
 
 **Healing.** Out of combat (no hostile within 6 cells of her or Jeff for
-50 ticks) she regains 1 hp every 10 ticks (`World.heal`). A room rebuilt
+50 ticks) she regains 1 hp every 10 ticks (`World.heal`); a player does
+the same, out of combat by their own surroundings (`Main._heal_players`). A room rebuilt
 by `reset` (R on a host) heals every living companion fully, as it brings
 back the dead, and puts every player at full hp and stamina.
 

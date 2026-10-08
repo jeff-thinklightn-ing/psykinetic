@@ -221,6 +221,8 @@ var _test_reset_sent := false
 var _test_door_sent := false
 ## Everything said this session (speech, last words, chat), shown with Tab.
 var talk: TalkPanel
+## Server: since when each player (instance id) has had no hostile near.
+var _player_calm_since: Dictionary[int, int] = {}
 ## Speech bubbles over the speakers, in either view.
 var bubbles: SpeechBubbles
 ## 2D: a bubble's tail this many world px over an entity (above its name).
@@ -1769,9 +1771,27 @@ func _respawn_due_players(tick: int) -> void:
 
 # --- HUD, logging, test hooks -------------------------------------------------
 
+## Server: out of combat (no hostile within Companion.CALM_RANGE for
+## CALM_TICKS) a player heals 1 hp every HEAL_EVERY ticks, as a companion
+## does.
+func _heal_players(tick: int) -> void:
+	for player: Player in _players.values():
+		if not is_instance_valid(player) or not player.spawned:
+			continue
+		var id := player.get_instance_id()
+		if not _player_calm_since.has(id) or Companion._hostile_near(player.tile, Companion.CALM_RANGE):
+			_player_calm_since[id] = tick
+			continue
+		var calm := tick - _player_calm_since[id]
+		if calm >= Companion.CALM_TICKS and player.hp < player.max_hp \
+				and (calm - Companion.CALM_TICKS) % Companion.HEAL_EVERY == 0:
+			World.heal(player, 1)
+
+
 func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
 		_respawn_due_players(tick)
+		_heal_players(tick)
 		_check_respawns(tick)
 		if tick % SNAPSHOT_EVERY_TICKS == 0:
 			_save_state()

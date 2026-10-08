@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.52
+
+Healing and instructions. Server.
+
+- **You heal out of combat** now too, at your companion's rate: a point a
+  second after five calm seconds.
+- **Only real requests stick**: your companion takes your words as an
+  instruction only when she understands them as asking something of her;
+  a warning or a shout is just talk.
+- Her sense of the world now includes the land outside the old stone
+  places.
+
+The server must be updated to v0.1.52 too, as it refuses any other version.
+
 ## v0.1.51
 
 Companion voice, rewritten. Server.
