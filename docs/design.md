@@ -567,9 +567,10 @@ the event itself in a sentence ("What just happened: Brute came up next
 to Jeff.", "Your HP fell below 50%.", "Sneak died."), and her own last 5
 lines with "Never repeat these. Usually say nothing." It is asked at
 temperature 0.8, the stance at 0.2. It answers
-`{"say": ..., "stance": ...}`; the stance only counts as an answer to
-Jeff's words, where it applies when the reply arrives and is kept with the
-standing instruction. Jeff's words never ask the hands. Every line's
+`{"say": ...}`; only when the trigger is Jeff speaking is a stance asked
+for too (`{"say": ..., "stance": ...}`), and only then applied, when the
+reply arrives, kept with the standing instruction if there is one. Any
+other reply's stance is logged as `stance_ignored`. Jeff's words never ask the hands. Every line's
 latency is in the mind log.
 
 **The newest stance wins**: each ask has a serial, and an answer to an
@@ -579,19 +580,27 @@ reflexes win over any stance.
 **A standing instruction.** A quick phrase, or a typed line that reads as
 an instruction (`Companion.is_instruction`: not a question, and it starts
 with an imperative or is exclaimed), stands for 600 ticks or until
-another, or until Jeff's HP falls below 30%: then it lapses, the hands
-are asked again ("Jeff's HP fell below 30%, so Jeff's instruction no
-longer holds."), and if the new stance differs from the one she had, her
-voice is asked to say why, and says it whatever the rate limit. The hands are told it ("Standing instruction: Jeff wants you to
+another, or until her HP or Jeff's falls below 30%: then it lapses, the
+hands are asked again ("Jeff's HP fell below 30%, so Jeff's instruction
+no longer holds."), and if the new stance differs from the one she had,
+her voice is asked to say why, and says it whatever the rate limit. The hands are told it ("Standing instruction: Jeff wants you to
 stay back (12 seconds ago)."), and for 60 ticks after a new one only an hp
 threshold asks them. While one stands the voice's card ends "Do what Jeff
 asks. Go against it only to save Jeff's life or yours, and say why when
 you do."; with none, it does not say so.
 
-**The situation**: two to four plain sentences the server writes ("Two
+**The situation**: a few plain sentences the server writes ("Two
 monsters are next to you. You have 3 of 20 HP. Jeff is 7 cells away with
-2 of 20 HP. You are both in danger."; in danger is below 30% hp, or below
-half with a monster next to them), in both asks.
+2 of 20 HP. You are both in danger."), in both asks. In danger is below
+half hp with a hostile within 2 cells; below 30% with none that near
+reads "You are badly hurt, but nothing is near you." While Jeff is dead
+it says "Jeff has fallen." and gives no HP for Jeff.
+
+**Death and respawn** are separate events. Jeff's death asks her voice at
+once ("Jeff died.", with "Jeff has fallen." in the situation), even
+though she stands idle until Jeff is back; the respawn is its own event
+for the hands ("Jeff respawned."), with Jeff's restored HP and no word
+of the death beside it.
 
 **No parroting.** A quick phrase reaches her as what it means ("Jeff wants
 you to stay back."), never quoted; a typed line is quoted as said. The
@@ -602,8 +611,8 @@ they carry across sessions and restarts.
 
 **Healing.** Out of combat (no hostile within 6 cells of her or Jeff for
 50 ticks) she regains 1 hp every 10 ticks (`World.heal`). A room rebuilt
-by `reset` heals every living companion fully, as it brings back the
-dead.
+by `reset` (R on a host) heals every living companion fully, as it brings
+back the dead, and puts every player at full hp and stamina.
 
 Two minds. `ScriptedMind`: stance PULL_BACK below 30% hp, GUARD otherwise;
 voice "Hm?" to a question, "Mm." to anything else said to her, silence

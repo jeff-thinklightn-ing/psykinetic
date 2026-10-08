@@ -830,3 +830,25 @@ wants variety (0.8).
 dies. Below 30% the instruction lapses and the hands re-decide; if she
 changes course her voice says why, so the player is never left wondering
 why she disobeyed.
+
+## 96. Death and respawn are separate moments, and the situation says so
+
+Her player's death was processed only once they came back, so her voice
+heard "Jeff died." beside Jeff's restored HP. The death is now spoken to at
+once, while she stands idle, with "Jeff has fallen." for a situation, and
+the respawn is an event of its own.
+
+## 97. "In danger" means a hostile within 2 cells
+
+Low hp in an empty room is not danger; calling it so made her react to
+nothing. Danger needs a hostile within 2 cells; low hp without one is
+"badly hurt, nothing near".
+
+## 98. An instruction lapses when either of them is badly hurt
+
+Her own life is as much a reason to stop obeying "stay put" as Jeff's.
+
+## 99. Reset makes the players whole as well
+
+A rebuilt room healed the companions but left the players as they were,
+so the first thing after R was another low-hp event.

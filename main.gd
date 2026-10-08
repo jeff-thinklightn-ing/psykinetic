@@ -1086,6 +1086,14 @@ func _start_level(from_snapshot := false) -> void:
 		var id := Net.player_of(peer)
 		if id != "":
 			_join_player(peer, id, _records[id].name if _records.has(id) else Net.DEFAULT_NAME)
+	if not from_snapshot:
+		# A rebuilt room starts whole: every player at full hp and stamina.
+		for player: Player in _players.values():
+			if is_instance_valid(player) and player.spawned:
+				World.restore(player, player.max_hp, player.max_stamina, player.facing)
+				var record: PlayerRecord = _records.get(_peer_ids.get(player.owner_peer, ""))
+				if record != null:
+					record.remember(player)
 
 
 ## True if a usable snapshot was found; its entities are then in the room and
@@ -1519,7 +1527,7 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and pet != entity and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
 				and entity.is_creature():
-			pet.note_death(_display_name(entity))
+			pet.note_death(_display_name(entity), entity == pet.keeper)
 	var line := ""
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.

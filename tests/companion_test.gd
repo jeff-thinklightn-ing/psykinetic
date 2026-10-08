@@ -35,6 +35,11 @@ func _ready() -> void:
 	_test_voice_knows()
 	_test_lapse()
 	_test_said_persists()
+	_test_danger_words()
+	_test_her_own_lapse()
+	_test_voice_stance_only_to_words()
+	_test_death_and_respawn()
+	_test_reset_restores_the_player()
 	_test_healing()
 	_test_mind_log_file()
 	_test_standing_instruction()
@@ -205,8 +210,8 @@ func _test_last_words() -> void:
 	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - before)
 	var words := lines.filter(func(line: String) -> bool: return line.begins_with("%s said:" % pet.name))
 	_check(words.size() == 1, "the party log has her last words (%s)" % [lines])
-	_check(_main.talk.lines.size() == talk_lines + 1 and _main.talk.lines.back()[1] == String(pet.name),
-			"and so does the Tab panel")
+	_check(_main.talk.lines.size() >= mini(talk_lines + 1, TalkPanel.MAX_LINES) and _main.talk.lines.back()[1] == String(pet.name)
+			and not words.is_empty() and str(_main.talk.lines.back()[2]) in str(words[0]), "and so does the Tab panel")
 
 
 func _test_log_collapsed() -> void:
@@ -765,6 +770,118 @@ func _test_said_persists() -> void:
 	_check(pet._echo_of("Line 6!") == "her own line" and pet._echo_of("line 3") == "", "line 6 of 20 is not said again; one long gone may be")
 	var user := pet.voice_prompt("test")
 	_check("\"line 24\"" in user and not "\"line 19\"" in user, "the voice is shown the last 5")
+
+
+func _test_danger_words() -> void:
+	print("\n== in danger only with a hostile within 2; low hp alone is badly hurt, nothing near ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	pet.hp = 3
+	_check(pet.situation_text() == "No monsters are next to you. You have 3 of 20 HP. Player is next to you with 20 of 20 HP. You are badly hurt, but nothing is near you.",
+			pet.situation_text())
+	pet.hp = pet.max_hp
+	owner.hp = 5
+	var imp := _spawn_imp(Vector2i(9, 9))
+	_check(pet.situation_text().ends_with("Player is badly hurt, but nothing is near Player."), "a monster 3 away is not near: %s" % pet.situation_text())
+	_put(imp, Vector2i(9, 8))
+	_check(pet.situation_text().ends_with("Player is in danger."), "2 away is: %s" % pet.situation_text())
+	World.despawn(imp)
+	owner.hp = owner.max_hp
+
+
+func _test_her_own_lapse() -> void:
+	print("\n== an instruction lapses when she drops below 30% too ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	World.step()
+	for i in 21:
+		World.step()
+	_main._on_command(owner, "say", {"text": "Stay back!"})
+	mind.clear()
+	pet.hp = 5
+	World.step()
+	_check(mind.triggers("stance") == ["Your HP fell below 30%, so Player's instruction no longer holds."] and pet.standing_instruction().is_empty(),
+			"her own HP: the instruction lapses (%s)" % [mind.triggers("stance")])
+	pet.hp = pet.max_hp
+	for i in 21:
+		World.step()
+	pet.mind = ScriptedMind.new()
+	pet.stance = Companion.Stance.GUARD
+
+
+func _test_voice_stance_only_to_words() -> void:
+	print("\n== the voice's stance counts only when the player spoke to her ==")
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
+	pet.note_death("Sneak")
+	World.step()
+	var entry: Dictionary = MindLog.last[String(pet.name)]
+	_check(pet.stance == Companion.Stance.GUARD and entry.get("stance_ignored") == "PULL_BACK" and not entry.has("stance"),
+			"a death's line with a stance: the stance is not applied (%s; %s)" % [pet.stance_name(), entry.get("stance_ignored", "")])
+	_check(not "\"stance\"" in str(mind.voice_asks.back()["system"]), "nor asked for")
+	for i in 21:
+		World.step()
+	_main._on_command(_player(), "say", {"text": "Fall back!"})
+	_check(pet.stance == Companion.Stance.PULL_BACK and "\"stance\"" in str(mind.voice_asks.back()["system"]),
+			"to the player's words it is asked for and applied (%s)" % pet.stance_name())
+	for i in 21:
+		World.step()
+	pet._instruction = ""
+	pet.mind = ScriptedMind.new()
+	pet.stance = Companion.Stance.GUARD
+
+
+func _test_death_and_respawn() -> void:
+	print("\n== her player's death and respawn are separate events ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	World.step()
+	mind.clear()
+	pet._last_speech_tick = -1000
+	World.damage(_player(), 999, null, &"attack")
+	World.step()
+	var death: Dictionary = mind.voice_asks.back() if not mind.voice_asks.is_empty() else {}
+	_check(death.get("trigger") == "Player died.", "her voice is asked: %s" % death.get("trigger", "nothing"))
+	_check("Player has fallen." in str(death.get("user", "")) and not "Player is next to you with" in str(death.get("user", ""))
+			and not "of 20 HP. Neither" in str(death.get("user", "")).get_slice("Player has fallen", 1),
+			"the situation says Player has fallen, with no HP of theirs")
+	mind.clear()
+	_step_until(func() -> bool: return _player() != null, 60)
+	World.step()
+	World.step()
+	_check(_player() != null and mind.triggers("stance") == ["Player respawned."], "the respawn is its own event (%s)" % [mind.triggers("stance")])
+	_check(mind.stance_asks.is_empty() or not "Player died" in str(mind.stance_asks.back()["user"]), "with no word of the death beside the restored HP")
+	pet.mind = ScriptedMind.new()
+
+
+func _test_reset_restores_the_player() -> void:
+	print("\n== R reset: the player is whole again too ==")
+	var owner := _player()
+	owner.hp = 4
+	owner.stamina = 10
+	_main.admin_command("reset")
+	var back := _player()
+	_check(back != null and back.hp == back.max_hp and back.stamina == back.max_stamina,
+			"full hp and stamina (%d/%d, %d/%d)" % [back.hp, back.max_hp, back.stamina, back.max_stamina])
+	var record: PlayerRecord = _main._records.get(Net.player_id)
+	_check(record != null and record.hp == back.max_hp, "and so in the record")
+	var pet := _companion()
+	pet._last_speech_tick = -1000
+	_check(pet != null and pet.hp == pet.max_hp and pet.situation_text().ends_with("Neither of you is in danger."),
+			"her too, and nothing low lingers: %s" % pet.situation_text())
 
 
 func _test_names() -> void:

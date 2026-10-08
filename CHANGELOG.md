@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.50
+
+Companion fixes. Server.
+
+- **Death and respawn**: your companion reacts to your death when it
+  happens, and to your return as a separate moment.
+- **"In danger"** now means a monster within 2 cells; low HP with nothing
+  near is "badly hurt".
+- **Instructions lapse** when either of you drops below 30% HP.
+- **Her voice** only changes her stance when you are the one talking.
+- **R reset** also brings you back to full HP and stamina.
+
+The server must be updated to v0.1.50 too, as it refuses any other version.
+
 ## v0.1.49
 
 Companion voice. Server.
