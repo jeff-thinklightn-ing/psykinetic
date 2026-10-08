@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_owner_speaks()
 	_test_voice()
 	_test_names()
+	_test_voice_in_world()
 	_test_voice_knows()
 	_test_lapse()
 	_test_said_persists()
@@ -511,7 +512,7 @@ func _test_stance_events() -> void:
 	pet.note_death("Sneak")
 	World.step()
 	_check(mind.triggers("stance") == ["Sneak died."] and mind.triggers("voice") == ["Sneak died."], "a death: both (%s)" % [mind.triggers("voice")])
-	_check("What just happened: Sneak died." in str(mind.voice_asks.back()["user"]), "the voice is told the event in a sentence")
+	_check("[Sneak fell.]" in str(mind.voice_asks.back()["user"]), "the voice sees it as narration: [Sneak fell.]")
 	# Words ask the voice only; for 60 ticks after an instruction only an hp threshold asks the hands.
 	mind.clear()
 	_main._on_command(owner, "say", {"text": "Stay back!"})
@@ -656,7 +657,7 @@ func _test_voice() -> void:
 	var entry: Dictionary = MindLog.last[String(pet.name)]
 	_check(entry["outcome"] == "said" and entry["say"] == "Behind you." and entry.has("latency_ms"),
 			"the line is said and logged with its latency (%s)" % entry["outcome"])
-	_check(Companion.CARD_INSTRUCTED % ["Player", "Player"] in str(mind.voice_asks.back()["user"]),
+	_check(Companion.CARD_INSTRUCTED % ["Player", "Player"] in str(mind.voice_asks.back()["system"]),
 			"with an instruction standing, the card says to do what Player asks")
 	for i in 21:
 		World.step()
@@ -672,7 +673,9 @@ func _test_voice() -> void:
 	entry = MindLog.last[String(pet.name)]
 	_check(entry["outcome"] == "dropped" and "her own line" in str(entry["note"]), "so is her own line again (%s)" % entry.get("note", ""))
 	var user := str(mind.voice_asks.back()["user"])
-	_check("\"Behind you.\"" in user and "Never repeat these. Usually say nothing." in user, "she is told her own last lines")
+	var turns: Array = mind.voice_asks.back()["messages"]
+	_check("assistant: Behind you." in user and turns.back()["role"] == "user" and str(turns.back()["content"]).ends_with("Good."),
+			"her lines are her turns, Player's words theirs, last: %s" % str(turns.back()["content"]).right(80))
 	pet._instruction = ""
 	_check(not ("Do what Player asks" in pet.voice_prompt("test")), "with no instruction standing, no such card line")
 	for i in 21:
@@ -691,10 +694,11 @@ func _test_voice_knows() -> void:
 	_put(pet, Vector2i(10, 6))
 	var imp := _spawn_imp(Vector2i(11, 6))
 	pet._act()
-	var prompt := pet.voice_prompt("Brute died.")
-	_check(("Right now your stance is GUARD (keeping beside Player and fighting whatever comes at either of you), and you are attacking %s." % imp.name) in prompt,
-			"her stance and action: %s" % pet.doing())
-	_check("What just happened: Brute died." in prompt, "and the event, in a sentence")
+	pet._narrate("Brute fell.")
+	var prompt := pet.voice_prompt()
+	_check(("You are keeping beside Player and fighting whatever comes at either of you; right now you are attacking %s." % imp.name) in prompt,
+			"what she is set on and doing, in her world's words: %s" % pet.doing())
+	_check(prompt.ends_with("[Brute fell.]"), "and the event, narrated last")
 	World.despawn(imp)
 	_check(Main.companion_card("Pip").length() > 200 and Main.companion_card("Nobody").is_empty(),
 			"cards are paragraphs in levels/companions.json, by name")
@@ -768,8 +772,6 @@ func _test_said_persists() -> void:
 	pet.restore_said([])
 	pet.restore_said(back.companion["said"])
 	_check(pet._echo_of("Line 6!") == "her own line" and pet._echo_of("line 3") == "", "line 6 of 20 is not said again; one long gone may be")
-	var user := pet.voice_prompt("test")
-	_check("\"line 24\"" in user and not "\"line 19\"" in user, "the voice is shown the last 5")
 
 
 func _test_danger_words() -> void:
@@ -828,11 +830,11 @@ func _test_voice_stance_only_to_words() -> void:
 	var entry: Dictionary = MindLog.last[String(pet.name)]
 	_check(pet.stance == Companion.Stance.GUARD and entry.get("stance_ignored") == "PULL_BACK" and not entry.has("stance"),
 			"a death's line with a stance: the stance is not applied (%s; %s)" % [pet.stance_name(), entry.get("stance_ignored", "")])
-	_check(not "\"stance\"" in str(mind.voice_asks.back()["system"]), "nor asked for")
+	_check(not "[STANCE:" in str(mind.voice_asks.back()["system"]), "nor asked for")
 	for i in 21:
 		World.step()
 	_main._on_command(_player(), "say", {"text": "Fall back!"})
-	_check(pet.stance == Companion.Stance.PULL_BACK and "\"stance\"" in str(mind.voice_asks.back()["system"]),
+	_check(pet.stance == Companion.Stance.PULL_BACK and "[STANCE: PULL_BACK]" in str(mind.voice_asks.back()["system"]),
 			"to the player's words it is asked for and applied (%s)" % pet.stance_name())
 	for i in 21:
 		World.step()
@@ -855,9 +857,9 @@ func _test_death_and_respawn() -> void:
 	World.step()
 	var death: Dictionary = mind.voice_asks.back() if not mind.voice_asks.is_empty() else {}
 	_check(death.get("trigger") == "Player died.", "her voice is asked: %s" % death.get("trigger", "nothing"))
-	_check("Player has fallen." in str(death.get("user", "")) and not "Player is next to you with" in str(death.get("user", ""))
-			and not "of 20 HP. Neither" in str(death.get("user", "")).get_slice("Player has fallen", 1),
-			"the situation says Player has fallen, with no HP of theirs")
+	_check("Player has fallen." in str(death.get("system", "")) and not "Player is beside you" in str(death.get("system", ""))
+			and not "Player is next to you with" in str(death.get("system", "")),
+			"the situation says Player has fallen, with nothing of their health")
 	mind.clear()
 	_step_until(func() -> bool: return _player() != null, 60)
 	World.step()
@@ -884,18 +886,67 @@ func _test_reset_restores_the_player() -> void:
 			"her too, and nothing low lingers: %s" % pet.situation_text())
 
 
+func _test_voice_in_world() -> void:
+	print("\n== the voice: in her world, a chat; she answers in plain words ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "Not a chance.", "stance": ""}
+	_main._on_command(owner, "say", {"text": "Can you see the way out?"})
+	pet._last_speech_tick = -1000
+	pet.note_death("Sneak")
+	World.step()
+	var messages: Array = mind.voice_asks.back()["messages"]
+	var system := str(messages[0]["content"])
+	_check(messages[0]["role"] == "system" and system.begins_with(pet.identity() + " " + pet.card) and Companion.VOICE_WORLD in system
+			and "Now: " in system, "the system message: her card, the world, now")
+	var roles: Array[String] = []
+	for message: Dictionary in messages.slice(1):
+		roles.append(str(message["role"]))
+	var alternating: bool = roles.back() == "user"
+	for i in range(1, roles.size()):
+		alternating = alternating and roles[i] != roles[i - 1]
+	_check(alternating, "then alternating turns, Player's last: %s" % [roles])
+	var text := Companion.render(messages)
+	_check("Can you see the way out?" in text and "assistant: Not a chance." in text and text.ends_with("[Sneak fell.]"),
+			"Player's words as theirs, her line as hers, the death as narration")
+	var bad: Array[String] = []
+	for word in ["game", "player", "stance", "json", "hp", "tick"]:
+		if RegEx.create_from_string("(?i)\\b%s\\b" % word).search(text.replace("Player", "Jeff")) != null:
+			bad.append(word)
+	_check(bad.is_empty(), "nothing of the game in it: no game, player, stance, JSON, HP (%s)" % [bad])
+	_check(OllamaMind.parse_voice("Stay close, Jeff.\n[STANCE: STAY_CLOSE]") == {"say": "Stay close, Jeff.", "stance": "STAY_CLOSE"}
+			and OllamaMind.parse_voice("\"Hm.\"") == {"say": "Hm.", "stance": ""} and OllamaMind.parse_voice("...")["say"] == ""
+			and OllamaMind.parse_voice("Pip: There.", "Pip")["say"] == "There.",
+			"her reply: plain words, a [STANCE: ...] line taken out, quotes and her name off, ... as silence")
+	var long := "You're not staying back. Not ever. Not when you're the only thing standing between me and the thing that just tried to kill you."
+	_check(Companion.trim_line(long) == "You're not staying back. Not ever.", "a long line ends at a sentence: %s" % Companion.trim_line(long))
+	var ollama := OllamaMind.new(Net.DEFAULT_LLM_URL, "stub", _main)
+	var body: Variant = JSON.parse_string(ollama.request_messages(messages, "voice"))
+	_check(body is Dictionary and not body.has("format") and body["messages"].size() == messages.size(),
+			"sent as those messages, not as JSON")
+	pet.mind = ScriptedMind.new()
+	for i in 21:
+		World.step()
+
+
 func _test_names() -> void:
 	print("\n== names: she is Pip and travels with Player; nothing calls them owner or companion ==")
 	var pet := _companion()
 	_check(pet.identity() == "You are %s. You travel with Player by choice." % pet.name, pet.identity())
-	var texts := [Companion.STANCE_SYSTEM, Companion.VOICE_SYSTEM, pet.stance_prompt(), pet.voice_prompt("test", "Player wants you to stay close.")]
+	var texts := [Companion.STANCE_SYSTEM, Companion.VOICE_WORLD, pet.stance_prompt(), pet.voice_prompt("test", "Player wants you to stay close.")]
 	var bad: Array[String] = []
 	for text: String in texts:
 		for word in ["owner", "companion"]:
 			if word in text.to_lower():
 				bad.append(word)
 	_check(bad.is_empty(), "no owner, no companion in what she reads (%s)" % [bad])
-	_check(pet.stance_prompt().begins_with(pet.identity()) and pet.voice_prompt("test").begins_with(pet.identity()),
+	_check(pet.stance_prompt().begins_with(pet.identity()) and pet.voice_prompt("test").begins_with("system: " + pet.identity()),
 			"both asks begin with it")
 
 

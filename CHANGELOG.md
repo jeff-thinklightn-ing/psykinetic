@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.51
+
+Companion voice, rewritten. Server.
+
+- **She talks like someone in the dungeon with you**: her voice is told
+  only her world and what is happening, never about a game, and sees your
+  recent exchange as a conversation.
+- She answers when you talk to her, keeps quiet when there is nothing to
+  say, and only changes what she is doing when you have asked her to.
+- Long lines end at a sentence instead of being cut off mid-word.
+
+The server must be updated to v0.1.51 too, as it refuses any other version.
+
 ## v0.1.50
 
 Companion fixes. Server.

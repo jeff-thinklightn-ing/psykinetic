@@ -77,8 +77,12 @@ func _send(what: String, ask: Dictionary) -> void:
 		_stubbed_body = ""
 		_on_request_completed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), body.to_utf8_buffer(), what)
 		return
+	var messages: Array = ask.get("messages", [
+		{"role": "system", "content": str(ask.get("system", ""))},
+		{"role": "user", "content": str(ask.get("user", ""))},
+	])
 	var error := _http[what].request(url, PackedStringArray(["Content-Type: application/json"]),
-			HTTPClient.METHOD_POST, request_body(str(ask.get("system", "")), str(ask.get("user", "")), what))
+			HTTPClient.METHOD_POST, request_messages(messages, what))
 	if error != OK:
 		_fail(what, "request not sent: %s" % error_string(error))
 
@@ -87,23 +91,51 @@ func _send(what: String, ask: Dictionary) -> void:
 ## false): there is no room for it. The native endpoint is also asked for
 ## JSON output, a short answer and to keep the model loaded.
 func request_body(system: String, user: String, what := "stance") -> String:
-	var messages := [
+	return request_messages([
 		{"role": "system", "content": system},
 		{"role": "user", "content": user},
-	]
+	], what)
+
+
+## The JSON body for [param messages]. A stance is asked for as JSON; the
+## voice answers in plain words, so it is not.
+func request_messages(messages: Array, what := "stance") -> String:
 	if openai_shaped:
 		return JSON.stringify({
 			"model": model, "think": false, "stream": false, "temperature": TEMPERATURE.get(what, 0.5),
 			"max_tokens": max_tokens(what), "messages": messages,
 		})
-	return JSON.stringify({
-		"model": model, "think": false, "stream": false, "format": "json", "keep_alive": -1,
+	var body := {
+		"model": model, "think": false, "stream": false, "keep_alive": -1,
 		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5)}, "messages": messages,
-	})
+	}
+	if what == "stance":
+		body["format"] = "json"
+	return JSON.stringify(body)
 
 
 static func max_tokens(what: String) -> int:
-	return int(MAX_TOKENS.get(what, 64)) + (WHY_TOKENS if Net.mind_why else 0)
+	return int(MAX_TOKENS.get(what, 64)) + (WHY_TOKENS if Net.mind_why and what == "stance" else 0)
+
+
+## Her plain-words reply as {say, stance}: an optional [STANCE: X] line
+## taken out, quotes and her own name off the front, "..." as silence.
+static func parse_voice(content: String, speaker := "") -> Dictionary:
+	var text := content
+	var stance := ""
+	var tag := RegEx.create_from_string("(?i)\\[\\s*STANCE\\s*:\\s*([A-Z_]+)\\s*\\]")
+	var found := tag.search(text)
+	if found != null:
+		stance = found.get_string(1).to_upper()
+		text = tag.sub(text, "", true)
+	text = text.strip_edges()
+	if not speaker.is_empty() and text.begins_with(speaker + ":"):
+		text = text.substr(speaker.length() + 1).strip_edges()
+	if text.length() >= 2 and text.begins_with("\"") and text.ends_with("\""):
+		text = text.substr(1, text.length() - 2).strip_edges()
+	if text.replace(".", "").replace("…", "").strip_edges().is_empty():
+		text = ""
+	return {"say": text, "stance": stance}
 
 
 ## Requests that came back since last asked (see CompanionMind).
@@ -118,11 +150,10 @@ func _result(what: String, raw: String, answer: Dictionary, error: String) -> vo
 	var ask: Dictionary = sent.get("ask", {})
 	_sent[what] = {}
 	_results.append({"kind": what, "serial": ask.get("serial", 0), "trigger": ask.get("trigger", ""),
-		"prompt": "%s
-
-%s" % [ask.get("system", ""), ask.get("user", "")], "raw": raw, "answer": answer,
+		"prompt": Companion.render(ask["messages"]) if ask.has("messages") else "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")],
+		"raw": raw, "answer": answer,
 		"error": error, "latency_ms": Time.get_ticks_msec() - int(sent.get("at", Time.get_ticks_msec())),
-		"spoken_to": ask.get("spoken_to", false), "always": ask.get("always", false)})
+		"spoken_to": ask.get("spoken_to", false), "asked": ask.get("asked", false), "always": ask.get("always", false)})
 
 
 ## Test hook: the next ask gets this as the endpoint's response body.
@@ -143,6 +174,10 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 	var content := _openai_content_of(response) if openai_shaped else _native_content_of(response)
 	if content.is_empty():
 		_fail(what, "no message content in the response", text)
+		return
+	if what == "voice":
+		last_error = ""
+		_result(what, content, parse_voice(strip_think(content), str(_sent[what].get("ask", {}).get("speaker", ""))), "")
 		return
 	var answer: Variant = _parse(_strip_fences(strip_think(content)))
 	if answer == null and what == "stance":

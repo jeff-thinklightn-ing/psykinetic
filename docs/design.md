@@ -557,21 +557,40 @@ rejected and hers stands.
 *The voice* is a separate ask, in the background, only at speaking
 moments: Jeff speaks to her, a death in sight, an hp threshold crossed,
 and once, 100 ticks after a fight ends, if she has not spoken since it
-did. It reads (`voice_prompt`) who she is and her card, a short run
-summary (how long they have travelled together, who fell near her, the
-party log's last few lines collapsed, without what she said or was told),
-the situation, her stance and what the hands have her doing ("Right now
-your stance is GUARD (keeping beside Jeff and fighting whatever comes at
-either of you), and you are attacking Brute."), what Jeff said to her,
-the event itself in a sentence ("What just happened: Brute came up next
-to Jeff.", "Your HP fell below 50%.", "Sneak died."), and her own last 5
-lines with "Never repeat these. Usually say nothing." It is asked at
-temperature 0.8, the stance at 0.2. It answers
-`{"say": ...}`; only when the trigger is Jeff speaking is a stance asked
-for too (`{"say": ..., "stance": ...}`), and only then applied, when the
-reply arrives, kept with the standing instruction if there is one. Any
-other reply's stance is logged as `stance_ignored`. Jeff's words never ask the hands. Every line's
-latency is in the mind log.
+did. It is written entirely inside her world, in the second person, with
+no game, players, stances or JSON in it, and sent as a chat
+(`voice_messages`):
+
+- **system**: who she is and her card ("You are Pip. You travel with Jeff
+  by choice. ..."; the "Do what Jeff asks" line while an instruction
+  stands), a short primer on the world (`VOICE_WORLD`: stone rooms lit by
+  lanterns and fires, monsters that attack on sight, fire that burns,
+  things that can be shoved, the fallen rising again), and **now**: the
+  situation in her words (`voice_situation`: health as unhurt, a little
+  hurt, badly hurt or close to falling; paces for cells; who is in
+  danger), what she is set on and doing ("You are keeping beside Jeff and
+  fighting whatever comes at either of you; right now you are attacking
+  Brute."), what Jeff asked that still stands, how long they have
+  travelled together and who fell near her; then how to answer
+  (`VOICE_RULES`: out loud, a sentence or two, answer Jeff, never repeat
+  herself or Jeff, "..." only when there is truly nothing to say).
+- **the exchange** (`_exchange`, the last 16 entries of this session):
+  Jeff's typed words as the user's turns, her lines as the assistant's,
+  and what happens as brief bracketed narration in the user's turns
+  ("[Brute came up next to Jeff.]", "[Jeff is badly hurt now.]", "[Sneak
+  fell.]", "[Jeff calls out to you. Jeff wants you to stay back.]"),
+  consecutive ones merged, the user's last.
+
+She replies in plain text (no JSON format asked, temperature 0.8; quotes
+and her own name taken off the front, "..." as silence, a line longer
+than 120 characters cut at the end of a sentence). Only when Jeff has just
+asked something of her (a quick phrase, or words that read as an
+instruction) does the system message add how to name what she will do, a
+last line `[STANCE: STAY_CLOSE]` and so on; only then is it applied, when
+the reply arrives, and kept with the standing instruction. Any other
+reply's stance is logged as `stance_ignored`. Jeff's words never ask the
+hands. The echo filter is as before. Every line's latency is in the mind
+log, with the whole chat as its prompt.
 
 **The newest stance wins**: each ask has a serial, and an answer to an
 older ask than the one whose stance stands is logged as superseded. The

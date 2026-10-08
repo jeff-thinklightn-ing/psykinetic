@@ -852,3 +852,15 @@ Her own life is as much a reason to stop obeying "stay put" as Jeff's.
 
 A rebuilt room healed the companions but left the players as they were,
 so the first thing after R was another low-hp event.
+
+## 100. The voice is in-world, and a chat
+
+Told about a game, players and a JSON schema, the model answered like an
+assistant filling a form. Now it is told only her world, in the second
+person: her card, a primer, what is happening; and the recent exchange
+comes as real turns (Jeff's words as the user's, her lines as hers),
+with events as bracketed narration, so a reply is a turn in a
+conversation and its own past lines sit where it can see them. She
+answers in plain words; the one structured thing left, a [STANCE: ...]
+line, is asked for only when Jeff has asked her to do something. The
+stance prompt stays as it was: it is a classification, and plain.
