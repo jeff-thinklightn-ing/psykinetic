@@ -17,6 +17,7 @@ extends Node
 ##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
 ##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
+##                                (or PSYKINETIC_MIND_WHY=1)
 ##   --llm-model=<m>              companion minds ask this model...
 ##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
 ##                                a URL ending /chat/completions is spoken to OpenAI-style)
@@ -238,6 +239,8 @@ func _enter_tree() -> void:
 	if OS.get_environment("PSYKINETIC_LLM_URL") != "":
 		llm_url = OS.get_environment("PSYKINETIC_LLM_URL")
 	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
+	if OS.get_environment("PSYKINETIC_MIND_WHY") in ["1", "true", "on", "yes"]:
+		mind_why = true
 	_parse_args()
 	if not _mode_given:
 		_apply_settings()

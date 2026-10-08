@@ -166,8 +166,6 @@ var _moved_tiles := 0
 var _pip: Node2D
 var _pip_rest := Vector2.ZERO
 var _name_label: Label
-var _speech_label: Label
-var _speech_tween: Tween
 var _hop: Tween
 var _fade: Tween
 var _flash_pending := false
@@ -593,19 +591,6 @@ func _net_stunned(ticks: int) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_swung(direction: Vector2i) -> void:
 	swung.emit(direction)
-
-
-## A line of speech over the sprite for a few seconds. Visual only.
-func say(text: String) -> void:
-	if _speech_label == null:
-		_speech_label = _make_caption("", -46.0, Color(1, 0.95, 0.6))
-	_speech_label.text = text
-	_speech_label.visible = true
-	if _speech_tween != null:
-		_speech_tween.kill()
-	_speech_tween = create_tween()
-	_speech_tween.tween_interval(3.0)
-	_speech_tween.tween_callback(func() -> void: _speech_label.visible = false)
 
 
 ## A caption 8 world px tall. Fonts are rasterised at the viewport's

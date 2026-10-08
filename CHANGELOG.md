@@ -3,6 +3,27 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.47
+
+Companions keep their heads in a fight; speech bubbles. Server and client.
+
+- **Speech bubbles** for everyone: a small dark bubble over the speaker,
+  wrapped, readable through walls, scaled with the zoom; a new line
+  replaces the speaker's last, and two speakers' bubbles move apart.
+- **No dithering mid-fight**: in a fight your companion is only asked
+  again when the fight changes (a new monster next to either of you, an
+  HP threshold, her target dead), and never leaves a live target in reach
+  for a routine rethink.
+- **She does what you ask**: an instruction (typed or a quick phrase)
+  stands for a minute or until you say another, and she goes against it
+  only to save a life, saying why.
+- **She talks less**: only when spoken to, at a death, or when someone's
+  HP crosses a threshold, and she does not repeat herself.
+- **Reflex**: badly hurt with a monster next to her, she always retreats.
+- Her mind now gets the situation in plain sentences first.
+
+The server must be updated to v0.1.47 too, as it refuses any other version.
+
 ## v0.1.46
 
 Quick phrases; companions are companions. Server and client.

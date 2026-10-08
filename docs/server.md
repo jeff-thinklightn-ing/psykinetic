@@ -171,10 +171,12 @@ not on the same box at its usual port:
 
 ```
 PSYKINETIC_LLM_URL=http://127.0.0.1:11434/api/chat
-PSYKINETIC_LLM_MODEL=qwen3
+PSYKINETIC_LLM_MODEL=qwen3:14b
+PSYKINETIC_MIND_WHY=1
 ```
 
-(or pass `--llm-model=` and `--llm-url=`). The default URL is Ollama's native
+(or pass `--llm-model=`, `--llm-url=` and `--mind-why`). The box runs
+qwen3:14b, with each answer's reason in the mind log. The default URL is Ollama's native
 chat endpoint. The server asks it for JSON output with reasoning off and the
 model kept loaded (`"format": "json"`, `"think": false`, `"keep_alive": -1`),
 so the first decision does not pay a model load. A URL ending in

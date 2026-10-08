@@ -701,3 +701,49 @@ fields and console now name the player and call them her companion
 ("Jeff is your companion. You travel together by choice."). The code
 keeps `keeper` and `owner_peer`: renaming internals would be churn for
 nothing she reads.
+
+## 78. In a fight, the routine window asks only when the fight changed
+
+Decision 73 throttled blows, but the 30-tick window still re-asked mid-fight
+and a slow mind flipped ATTACK to RETREAT to FOLLOW with nothing changed.
+While a hostile is within 4 cells of her or her player, the window now asks
+only on the same changes (a new hostile adjacent, an hp threshold, her
+target dead); out of a fight, never while she is going for a live target
+in reach. Every decision names its trigger, "routine" included.
+
+## 79. Reflexes allow only RETREAT
+
+HOLD and YIELD next to a hostile at under 30% hp are no escape: holding is
+standing in the blows, yielding a step that may be no safer. RETREAT
+(toward her player) is the one answer that moves her out.
+
+## 80. The situation in sentences, first
+
+A model weighs a few plain sentences more reliably than it reads the same
+facts out of JSON numbers. The server computes them (monsters next to her,
+both hp, the distance, who is in danger) and sends them before the details.
+
+## 81. A standing instruction, and a short lock after it
+
+Her player's instruction must outlast the next routine window: it is kept
+and shown in every decision for 600 ticks or until replaced, and for 60
+ticks after it only the reflexes, an hp threshold, new words or a bump
+can ask her again. Whether a line is an instruction is a plain heuristic
+(not a question; an imperative or an exclamation); the model reads the
+words themselves. Her card tells her to do as asked unless a life is at
+stake, and to say why when she does not.
+
+## 82. She speaks only when there is something to speak to
+
+Asked for a line every decision she filled every one, repeating herself.
+"say" is in the schema only for her player's words, a death or an hp
+threshold, her own lines are taken out of the log and given back as
+you_said_recently with "Never repeat these", and any other line is dropped.
+
+## 83. Speech bubbles on the HUD, laid out in screen space
+
+A bubble must read over walls and beside another speaker's. Drawn as a
+Control on the HUD from each speaker's screen point it needs no depth
+test, can be kept clear of other bubbles and names by plain rectangles,
+and is the same code for the 2D and 3D views; it is set at the view's
+px per tile, font and all, rather than scaled, so the text stays sharp.

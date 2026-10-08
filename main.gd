@@ -217,6 +217,10 @@ var _test_reset_sent := false
 var _test_door_sent := false
 ## Everything said this session (speech, last words, chat), shown with Tab.
 var talk: TalkPanel
+## Speech bubbles over the speakers, in either view.
+var bubbles: SpeechBubbles
+## 2D: a bubble's tail this many world px over an entity (above its name).
+const BUBBLE_OVER_2D := 40.0
 ## The chat box (Enter opens it, Esc cancels); while it is open the game's
 ## keys do nothing.
 var _chat_box: LineEdit
@@ -497,6 +501,7 @@ func _show_3d() -> void:
 	_client3d = preload("res://client3d/client3d.tscn").instantiate()
 	add_child(_client3d)
 	_client3d.setup(_terrain)
+	_client3d.bubbles = bubbles
 
 
 # --- WASD ---------------------------------------------------------------------------
@@ -1390,6 +1395,12 @@ static func _direction_arg(args: Dictionary) -> Vector2i:
 
 ## The talk panel (Tab) and the chat box (Enter), on the HUD.
 func _build_talk() -> void:
+	bubbles = SpeechBubbles.new()
+	bubbles.name = "Bubbles"
+	bubbles.anchor_of = _bubble_anchor
+	bubbles.tile_px = _bubble_tile_px
+	$HUD.add_child(bubbles)
+	$HUD.move_child(bubbles, 0)
 	talk = TalkPanel.new()
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
@@ -1416,6 +1427,23 @@ func _build_talk() -> void:
 			_close_chat()
 			get_viewport().set_input_as_handled())
 	$HUD.add_child(_chat_box)
+
+
+## Where speaker [param key]'s bubble points on screen (see SpeechBubbles).
+func _bubble_anchor(key: int) -> Variant:
+	if _client3d != null:
+		return _client3d.bubble_anchor(key)
+	var entity := instance_from_id(key) as GridEntity
+	if entity == null or not entity.is_inside_tree() or not entity.visible:
+		return null
+	return entity.get_global_transform_with_canvas() * Vector2(0.0, -BUBBLE_OVER_2D)
+
+
+func _bubble_tile_px() -> float:
+	if _client3d != null:
+		return _client3d.tile_px()
+	var camera := get_viewport().get_camera_2d()
+	return Iso.TILE_SIZE.x * (camera.zoom.x if camera != null else 1.0)
 
 
 ## The chat box is open: the game's keys are the box's.
@@ -1462,6 +1490,10 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 		kind = "companion"
 	elif entity.is_creature():
 		kind = "monster"
+	for pet: Companion in _companions.values():
+		if is_instance_valid(pet) and pet.spawned and pet != entity and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
+				and entity.is_creature():
+			pet.request_decision("%s died" % _display_name(entity))
 	var line := ""
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.
@@ -1530,9 +1562,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		# Shown over the speaker, as a companion's speech is.
 		var speaker := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
 		if speaker != null:
-			speaker.say(str(data.get("text", "")))
-			if _client3d != null:
-				_client3d.say(speaker, str(data.get("text", "")))
+			bubbles.show_line(speaker.get_instance_id(), str(data.get("text", "")))
 		return
 	if kind == "speech":
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
@@ -1540,9 +1570,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		print("[speech] %s: %s" % [speaker, data.get("text", "")])
 		talk.add_line(speaker, str(data.get("text", "")))
 		if entity != null:
-			entity.say(str(data.get("text", "")))
-			if _client3d != null:
-				_client3d.say(entity, str(data.get("text", "")))
+			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
 
 
 ## A name for the party log: players by record name, everything else by its

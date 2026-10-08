@@ -521,19 +521,41 @@ when it is loaded.
 say}` and nothing else: it never sets a position, deals damage, or touches
 any sim state. The companion validates the answer — the intent against the
 whitelist, the target against the live world — and anything that does not
-hold up becomes `FOLLOW` and is logged. A decision window opens every 30
-ticks, or at once when the companion is pushed, a hostile first comes into
-line of sight, or her player comes back (their words and bumps ask her
-there and then). **Blows are throttled**: "you were hit" and "Jeff was
+hold up becomes `FOLLOW` and is logged. Every decision has a trigger. The
+**routine window** comes every 30 ticks (trigger "routine"). In a fight
+(a hostile within 4 cells of her or Jeff) it asks only if the fight
+changed since her last decision (see below; trigger "fight changed: ...");
+out of one it asks unless she is going for a target that lives and is in
+sight range, which no routine window replaces. She is also asked at once
+when she is pushed, a hostile first comes into line of sight, a creature
+dies in her sight ("Brute died"), or her player comes back (their words
+and bumps ask her there and then). **Blows are throttled**: "you were hit" and "Jeff was
 hit" ask her at most once per 30 ticks since her last decision, and only
 if the fight changed since then: a hostile newly next to her or Jeff, her
 or Jeff's hp crossing 50% or 30% (either way), or her target gone. The
 trigger then says which ("Jeff was hit: Jeff's hp crossed 50%");
-otherwise the blow asks nothing and her decision holds. The context is
-the personality card, `together`, the `trigger` (why she is asked now),
-the party log's tail (the last 60 sentences, each run of the same one
-collapsed to one with its count, "Brute hit Player for 1 ×6.", and the
-last 20 of those), `nearby` (at most 6, nearest first: objects within 2
+otherwise the blow asks nothing and her decision holds.
+
+**A standing instruction.** A line from her player that reads as an
+instruction (`Companion.is_instruction`: not a question, and it starts
+with an imperative or is exclaimed; typed or a quick phrase) is kept as
+`standing_instruction` (`said`, `ticks_ago`) in every decision until they
+give another or 600 ticks pass. For 60 ticks after a new one only the
+reflexes, an hp threshold crossed, their words and bumps ask her again.
+Her card always ends "Do what Jeff asks. Go against it only to save
+Jeff's life or yours, and say why when you do."
+
+The context is, first, `situation`: two to four plain sentences the server
+writes ("Two monsters are next to you. You have 3 of 20 HP. Jeff is 7
+cells away with 2 of 20 HP. You are both in danger."; in danger is below
+30% hp, or below half with a monster next to them), sent before the JSON
+of the rest. Then the personality card, `together`, `standing_instruction`,
+the `trigger` (why she is asked now), the party log's tail without her own
+lines (the last 60 sentences, each run of the same one collapsed to one
+with its count, "Brute hit Player for 1 ×6.", and of two taking turns,
+"Pip hit Brute for 2 ×4, shoved Brute ×4.", and the last 20 of those),
+`you_said_recently` (her last 5 lines, with "Never repeat these. Usually
+say nothing."), `nearby` (at most 6, nearest first: objects within 2
 cells, hostiles within 4 or going for her or Jeff, players and companions
 in sight; never Jeff, who has `companion`) with offsets, types, hostility
 and hp, `recent_hits` (blows on her and Jeff in the last 100 ticks: on,
@@ -541,6 +563,11 @@ by, amount, cause, ticks ago), her own hp and stamina, `companion` (Jeff's
 name, hp, stamina and offset), `companion_said` (see Talking) and the
 current intent. Players are named by their label, as the party log names
 them.
+
+**When she speaks.** Her mind is asked for `say` only when the trigger is
+her player's words, a death, or an hp threshold crossed
+(`Companion.may_speak`); otherwise the field is not in the reply's schema,
+and a line she gives anyway is dropped (logged as `say_dropped`).
 
 Two minds. `ScriptedMind`: retreat toward her companion below 30% hp;
 attack the nearest hostile within 3 tiles; else follow. It is
@@ -562,7 +589,7 @@ scripted mind fills in only when she has none of her mind's yet (a new
 companion, or a mind just switched). An answer that is not a valid
 intent and target is rejected and her decision stands. **Reflexes** come
 before any mind: below 30% of her hp with a hostile next to her, only
-RETREAT, YIELD and HOLD are taken; any other answer, or a decision she is
+RETREAT is taken; any other answer, or a decision she is
 carrying out when the reflex starts to hold, is overridden by the scripted
 RETREAT, at once.
 
@@ -607,7 +634,7 @@ default where a line is missing or empty). The HUD's hint line shows them.
 What she does about one is her mind's to decide, as with anything said to
 her; the scripted mind only answers "Mm." **Speech**: a mind's `say` is
 broadcast as `Net.message("speech", {entity, speaker, text})` and shown
-over the sprite for a moment, at most one line per companion per 5
+over her in a speech bubble (below), at most one line per companion per 5
 seconds (an answer to her player's words is always said); every line goes
 to the server log (`[speech] Pip: ...`) and the party log (`Pip said:
 "..."`). Last words are part of the death message and are always said,
@@ -873,15 +900,27 @@ translucent meshes, so two overlapping ones do stack a little.
 **Entities** get a puppet each (`_make_puppet`): a primitive at the scale
 table's height (capsule for characters, box, cylinder, sphere, slabs),
 coloured as the 2D sprite is (its modulate: tint or the monster's mass
-shade), a Label3D name and speech line on creatures, a nose on
+shade), a Label3D name on creatures, a nose on
 creatures that turns with `GridEntity.shown_facing` and a lunge toward the
 blow on a swing or attack (`GridEntity.swung`), a warm-white
 `OmniLight3D` with shadows on players and companions (`PLAYER_LIGHT`, the
 same whatever the body's colour), and an `Area3D` of the body's shape for
 picking. Puppets follow the 2D nodes every frame through
-`Iso.local_to_grid` at azimuth 0. The speech line is driven by the speech
-message itself (`Client3D.say`, from Main) and shows for
-`SPEECH_SECONDS` (4), not by the hidden 2D caption.
+`Iso.local_to_grid` at azimuth 0.
+
+**Speech bubbles** (`render/speech_bubbles.gd`, on the HUD, the same in
+both views and for players and companions): a rounded dark panel at 70%
+opacity, light text, a short tail pointing down at the speaker, at most 3
+tiles wide with the words wrapped, its tail just above the speaker's name.
+It fades in over 100 ms, holds 4 s and 1 s more per 40 characters, and
+fades out over 300 ms. A new line from the same speaker replaces their
+bubble; different speakers' bubbles are kept clear of each other and of
+every speaker's name, nudged sideways when half their width is enough,
+otherwise up. Being on the HUD it has no depth test; the view gives each
+speaker's screen point (`Client3D.bubble_anchor`, or the 2D node's canvas
+position) and the px per tile, and the bubble is set at that size (its
+font too, so it stays sharp) as the zoom changes. Last words are a bubble
+over the corpse.
 
 **Camera**: `Camera3D` orthographic, `CAMERA_SIZE` 12 units tall (a
 1.5-unit character, foreshortened by cos 50°, is a twelfth of the

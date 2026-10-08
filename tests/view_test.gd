@@ -20,6 +20,7 @@ func _ready() -> void:
 	_main.add_child(_rig)
 	_rig.setup(_main._terrain)
 	_main._client3d = _rig
+	_rig.bubbles = _main.bubbles
 	_rig._process(0.0)
 
 	_test_every_sound_has_its_files()
@@ -169,8 +170,8 @@ func _test_companion_death() -> void:
 	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
 	var heard := _heard(func() -> void: World.damage(pet, 999, null, &"attack"); _rig._process(0.0))
 	_check("death_companion" in heard, "her death sound (%s)" % [heard])
-	var words := _rig.get_node_or_null("LastWords") as Label3D
-	_check(words != null and words.text in Main.COMPANION_DEATH_LINES, "a last line: %s" % (words.text if words != null else "none"))
+	var words: String = _main.bubbles.text_of(puppet.get_instance_id())
+	_check(words in Main.COMPANION_DEATH_LINES, "a last line, in a bubble over her body: %s" % words)
 	_check(lantern != null and lantern.get_parent() == _rig, "her lantern is dropped, off the body")
 	await get_tree().create_timer(Client3D.LANTERN_OUT_SECONDS + 0.2).timeout
 	_check(not is_instance_valid(lantern), "and goes out")

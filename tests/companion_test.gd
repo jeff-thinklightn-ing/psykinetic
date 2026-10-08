@@ -34,6 +34,12 @@ func _ready() -> void:
 	_test_context_trimmed()
 	_test_log_collapsed()
 	_test_mind_log_rotates()
+	_test_fight_holds()
+	_test_reflex_only_retreat()
+	_test_situation()
+	_test_standing_instruction()
+	_test_speech_rules()
+	_test_bubbles()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -116,8 +122,7 @@ func _test_quick_phrases() -> void:
 	World.step()
 	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - log_size)
 	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"Stay back!\"" % pet.name, "key 2: in the party log as chat (%s)" % [lines])
-	_check(owner._speech_label != null and owner._speech_label.visible and owner._speech_label.text == "Stay back!",
-			"shown over the player as speech")
+	_check(_main.bubbles.text_of(owner.get_instance_id()) == "Stay back!", "shown over the player in a speech bubble")
 	var entry: Dictionary = MindLog.last[String(pet.name)]
 	var prompt := str(entry["prompt"])
 	var context: Variant = JSON.parse_string(prompt)
@@ -425,7 +430,7 @@ func _test_decision_holds() -> void:
 
 
 func _test_reflex_override() -> void:
-	print("\n== reflexes: below 30% hp with a hostile next to her, only RETREAT, YIELD or HOLD ==")
+	print("\n== reflexes: below 30% hp with a hostile next to her, the mind's ATTACK is overridden ==")
 	var pet := _companion()
 	_settle(pet)
 	_put(_player(), Vector2i(9, 6))
@@ -495,6 +500,7 @@ func _test_mind_log_file() -> void:
 	var saved := Net.mind_log_path
 	Net.mind_log_path = path
 	var pet := _companion()
+	pet._instruction = ""  # The words of the test before stand; not here.
 	pet.request_decision("test")
 	World.step()
 	MindLog.enabled = false
@@ -548,7 +554,7 @@ func _test_hurt_throttle() -> void:
 		World.step()
 	_check(pet._last_decision_tick == decided, "her owner hit, within 30 ticks of her last decision: not asked")
 	_step_until(func() -> bool: return pet._last_decision_tick != decided, 4)
-	_check(MindLog.last[String(pet.name)]["trigger"] == "",
+	_check(MindLog.last[String(pet.name)]["trigger"] == Companion.ROUTINE,
 			"30 ticks on, nothing changed: the blow asks nothing, only her ordinary window comes (trigger '%s')"
 			% MindLog.last[String(pet.name)]["trigger"])
 	decided = pet._last_decision_tick
@@ -619,6 +625,196 @@ func _test_log_collapsed() -> void:
 		_main.party_log.add("Brute hit Player for 1.")
 	var log_lines: Array = pet._context("")["log"]
 	_check(log_lines.back() == "Brute hit Player for 1 ×25.", "and so in her context (%s)" % log_lines.back())
+
+
+func _test_fight_holds() -> void:
+	print("\n== in a fight the routine window asks only if the fight changed; a live target in reach holds ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	pet.mind = ScriptedMind.new()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	owner.hp = owner.max_hp
+	var imp := _spawn_imp(Vector2i(10, 9))
+	World.step()
+	World.step()
+	_check(pet.in_fight(), "an imp 3 away: in a fight")
+	pet._apply({"intent": "HOLD", "target": null, "say": ""}, "scripted", {"trigger": "test"})
+	pet._last_decision_tick = World.tick
+	pet._situation = pet._situation_now()
+	var decided: int = pet._last_decision_tick
+	for i in Companion.DECISION_INTERVAL_TICKS * 2 + 2:
+		World.step()
+	_check(pet._last_decision_tick == decided, "two routine windows, nothing changed: not asked, HOLD holds (%s)" % pet.intent_name())
+	pet.hp = roundi(pet.max_hp * 0.45)
+	_step_until(func() -> bool: return pet._last_decision_tick != decided, Companion.DECISION_INTERVAL_TICKS + 2)
+	_check(MindLog.last[String(pet.name)]["trigger"] == "fight changed: your hp crossed 50%",
+			"her hp below half: the window asks, and says why (%s)" % MindLog.last[String(pet.name)]["trigger"])
+	pet.hp = pet.max_hp
+	World.despawn(imp)
+	# Out of a fight, a live target in reach is not replaced by a routine window.
+	_kill_monsters()
+	World.step()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var far := _spawn_imp(Vector2i(10, 12))
+	World.step()
+	var close: Array[String] = []
+	for e in World.get_entities():
+		if e is Monster and e.spawned and (World.distance(e.tile, pet.tile) <= 4 or World.distance(e.tile, owner.tile) <= 4):
+			close.append("%s %s" % [e.name, e.tile])
+	_check(not pet.in_fight(), "an imp 6 away: no fight (%s; she at %s)" % [close, pet.tile])
+	pet._apply({"intent": "ATTACK", "target": String(far.name), "say": ""}, "scripted", {"trigger": "test"})
+	decided = World.tick
+	pet._last_decision_tick = decided
+	for i in Companion.DECISION_INTERVAL_TICKS + 2:
+		World.step()
+		if pet.current_intent != Companion.Intent.ATTACK:
+			break
+	_check(pet.current_intent != Companion.Intent.ATTACK or pet._last_decision_tick == decided,
+			"going for a live target in reach: the routine window leaves it")
+	World.despawn(far)
+	_kill_monsters()
+
+
+func _test_reflex_only_retreat() -> void:
+	print("\n== reflex: below 30% hp with a hostile next to her, only RETREAT ==")
+	var pet := _companion()
+	_settle(pet)
+	_put(_player(), Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var imp := _spawn_imp(Vector2i(11, 6))
+	pet.hp = 4
+	for intent: String in ["HOLD", "YIELD"]:
+		pet._apply({"intent": intent, "target": null, "say": ""}, "scripted", {"trigger": "test"})
+		_check(pet.current_intent == Companion.Intent.RETREAT, "%s at 4 of 20, an imp next to her: RETREAT (%s)" % [intent, pet.intent_name()])
+	World.despawn(imp)
+	pet.hp = pet.max_hp
+
+
+func _test_situation() -> void:
+	print("\n== the situation, in plain sentences, first ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var a := _spawn_imp(Vector2i(11, 6))
+	a.name = "SituationImpA"
+	var b := _spawn_imp(Vector2i(11, 7))
+	b.name = "SituationImpB"
+	pet.hp = 3
+	owner.hp = 2
+	var expected := "Two monsters are next to you. You have 3 of 20 HP. Player is next to you with 2 of 20 HP. You are both in danger."
+	_check(pet.situation_text() == expected, pet.situation_text())
+	var context: Dictionary = pet._context("test")
+	_check(OllamaMind.user_message(context).begins_with(expected + "\n\n{"), "it comes first, before the JSON details")
+	World.despawn(a)
+	World.despawn(b)
+	pet.hp = pet.max_hp
+	owner.hp = owner.max_hp
+	_check(pet.situation_text() == "No monsters are next to you. You have 20 of 20 HP. Player is next to you with 20 of 20 HP. Neither of you is in danger.",
+			pet.situation_text())
+
+
+func _test_standing_instruction() -> void:
+	print("\n== an instruction stands; for 60 ticks only reflexes, hp thresholds and new words re-ask ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	pet.mind = ScriptedMind.new()
+	_check(Companion.is_instruction("Stay back!") and Companion.is_instruction("get them") and Companion.is_instruction("Fall back!")
+			and not Companion.is_instruction("Are you hurt?") and not Companion.is_instruction("nice weather"),
+			"instructions: 'Stay back!', 'get them'; not 'Are you hurt?' or 'nice weather'")
+	for i in 21:
+		World.step()
+	_main._on_command(owner, "say", {"text": "Stay back!"})
+	var context: Dictionary = pet._context("test")
+	_check(context["standing_instruction"].get("said") == "Stay back!" and int(context["standing_instruction"]["ticks_ago"]) == 0,
+			"standing_instruction: %s" % [context["standing_instruction"]])
+	_check("Do what Player asks. Go against it only to save Player's life or yours, and say why when you do." in str(context["card"]),
+			"the card: %s" % context["card"])
+	var decided: int = pet._last_decision_tick
+	pet.request_decision("hostile in sight: Nobody")
+	World.step()
+	_check(pet._last_decision_tick == decided, "a hostile in sight within 60 ticks: not asked")
+	for i in Companion.DECISION_INTERVAL_TICKS + 1:
+		World.step()
+	_check(pet._last_decision_tick == decided, "nor by the routine window")
+	pet.hp = roundi(pet.max_hp * 0.45)
+	pet.request_decision(Companion.HIT)
+	_step_until(func() -> bool: return pet._last_decision_tick != decided, Companion.HURT_REASK_TICKS + 2)
+	_check(pet._last_decision_tick != decided and "hp crossed" in str(MindLog.last[String(pet.name)]["trigger"]),
+			"an hp threshold still asks (%s)" % MindLog.last[String(pet.name)]["trigger"])
+	pet.hp = pet.max_hp
+	for i in 100:
+		World.step()
+	_check(pet._context("test")["standing_instruction"].get("said") == "Stay back!", "still in every decision 100+ ticks on")
+	_main._on_command(owner, "say", {"text": "Are you hurt?"})
+	_check(pet._context("test")["standing_instruction"].get("said") == "Stay back!", "a question does not replace it")
+	for i in Companion.INSTRUCTION_TICKS:
+		World.step()
+	_check(pet._context("test")["standing_instruction"].is_empty(), "600 ticks on: gone")
+
+
+func _test_speech_rules() -> void:
+	print("\n== speech: her own lines apart, never repeated; asked for only to words, a death, an hp threshold ==")
+	var pet := _companion()
+	pet.mind = ScriptedMind.new()
+	pet.remember_said("Hrrr")
+	_main.party_log.add("%s said: \"Hrrr\"" % pet.name)
+	_main.party_log.add("Imp hit Player for 1.")
+	var context: Dictionary = pet._context(Companion.ROUTINE)
+	_check(not ("%s said: \"Hrrr\"" % pet.name) in context["log"], "her own lines are not in log")
+	_check(context["you_said_recently"]["lines"].back() == "Hrrr" and context["you_said_recently"]["rule"] == "Never repeat these. Usually say nothing.",
+			"but in you_said_recently: %s" % [context["you_said_recently"]])
+	_check(not context["_say"] and not "\"say\": <" in OllamaMind.system_prompt(false) and "\"say\": <" in OllamaMind.system_prompt(true),
+			"a routine window: no say in the schema")
+	_check(pet.may_speak("Player just said to you") and pet.may_speak("Brute died") and pet.may_speak("you were hit: your hp crossed 30%")
+			and not pet.may_speak(Companion.ROUTINE) and not pet.may_speak("hostile in sight: Imp"),
+			"say is asked for to her companion's words, a death, an hp threshold")
+	var heard: Array[String] = []
+	var listen := func(text: String) -> void: heard.append(text)
+	pet.said.connect(listen)
+	pet._last_speech_tick = -1000
+	pet._apply({"intent": "FOLLOW", "target": null, "say": "Lovely day."}, "ollama", {"trigger": Companion.ROUTINE})
+	_check(heard.is_empty() and MindLog.last[String(pet.name)].get("say_dropped") == "Lovely day.", "a line on a routine window is dropped")
+	pet._apply({"intent": "FOLLOW", "target": null, "say": "On it."}, "ollama", {"trigger": "Player just said to you"})
+	_check(heard == ["On it."], "and said when she was spoken to")
+	pet.said.disconnect(listen)
+	var turns: Array[String] = []
+	for i in 4:
+		turns.append_array(["Pip hit Brute for 2.", "Pip shoved Brute."])
+	_check(Companion.collapse_log(turns) == ["Pip hit Brute for 2 ×4, shoved Brute ×4."],
+			"alternating repeats collapse: %s" % [Companion.collapse_log(turns)])
+
+
+func _test_bubbles() -> void:
+	print("\n== speech bubbles: one per speaker, the same for all, nudged apart ==")
+	var bubbles := SpeechBubbles.new()
+	bubbles.anchor_of = func(_key: int) -> Variant: return Vector2(400, 300)
+	bubbles.tile_px = func() -> float: return 64.0
+	add_child(bubbles)
+	bubbles.show_line(1, "Stay back!")
+	bubbles.show_line(1, "Fall back!")
+	_check(bubbles.count() == 1 and bubbles.text_of(1) == "Fall back!", "a new line replaces the speaker's bubble")
+	bubbles.show_line(2, "Hrrr. I am here, and I will not leave you while the Brute still stands.")
+	bubbles._layout()
+	bubbles._layout()
+	var one := bubbles.rect_of(1)
+	var two := bubbles.rect_of(2)
+	_check(not one.intersects(two), "two speakers at one spot: nudged apart (%s, %s)" % [one, two])
+	_check(two.size.x <= SpeechBubbles.MAX_WIDTH_TILES * 64.0 + 1.0 and two.size.y > one.size.y,
+			"a long line wraps within 3 tiles (%s)" % two.size)
+	_check(is_equal_approx(SpeechBubbles.hold_seconds("x".repeat(80)), 6.0), "held 4 s and 1 s per 40 characters")
+	bubbles.tile_px = func() -> float: return 128.0
+	bubbles._layout()
+	var ratio := bubbles.rect_of(1).size.x / one.size.x
+	_check(ratio > 1.8 and ratio < 2.2, "and set at the zoom: twice the px per tile, about twice as wide (%.2f)" % ratio)
+	bubbles.queue_free()
 
 
 func _test_mind_log_rotates() -> void:

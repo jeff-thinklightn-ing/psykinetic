@@ -24,13 +24,12 @@ extends Node3D
 ## are. Recomputed whenever the camera yaw changes.
 ##
 ## Entities get a puppet each: a primitive at the scale table's size,
-## coloured as the 2D sprite is, with a Label3D name and a speech line on
-## creatures, a warm-white light on players and companions, and an Area3D
+## coloured as the 2D sprite is, with a Label3D name on creatures, a warm-white light on players and companions, and an Area3D
 ## of the same shape for picking. Puppets follow the 2D nodes every frame,
 ## so they move as those do: at a steady speed along the walk. A creature
 ## has a nose that turns with its shown facing, and lunges when it swings.
-## Speech comes from the speech message (say) and shows for
-## SPEECH_SECONDS.
+## Speech is a bubble on the HUD (SpeechBubbles), placed through
+## bubble_anchor and tile_px.
 ##
 ## Camera: orthographic, tilted `pitch` from horizontal (CAMERA_PITCH at
 ## rest), yawed by `yaw` about the local player, who is kept at the middle
@@ -159,7 +158,9 @@ const HOVER_HALF := 0.47
 const HOVER_LINE := 0.05
 const TOSS := Color(1.0, 0.85, 0.4, 0.85)
 const TOSS_LENGTH := 1.3
-const SPEECH_SECONDS := 4.0
+## A speech bubble's tail sits this far over a creature's head (just
+## above its name).
+const BUBBLE_OVER_HEAD := 0.55
 ## HP bars: units wide per hp of max hp, how tall, how high over the head,
 ## when the colour turns, how long after a fight one stays, how fast it fades.
 const HP_BAR_PER_HP := 0.045
@@ -294,8 +295,8 @@ var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
 var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
-## Entity instance id -> when its speech line goes (msec).
-var _speech_until: Dictionary[int, int] = {}
+## Main's speech bubbles, for last words.
+var bubbles: SpeechBubbles
 ## Main: Alt is held, so every HP bar shows.
 var show_all_bars := false
 ## Entity instance id -> when it was last in a fight (msec), and its hp as
@@ -869,18 +870,26 @@ func toss_aim(target: GridEntity, direction: Vector2i) -> void:
 	_toss.rotation.y = -Vector2(direction).angle()
 
 
-## A line of speech over [param entity]'s puppet for SPEECH_SECONDS.
-func say(entity: GridEntity, text: String) -> void:
-	var puppet: Node3D = _puppets.get(entity.get_instance_id())
+## Where a speech bubble of [param key] points on screen: just above the
+## name of the entity with that instance id, or over a corpse puppet with
+## that one; null when there is none or it is behind the camera.
+func bubble_anchor(key: int) -> Variant:
+	var puppet: Node3D = _puppets.get(key)
 	if puppet == null:
-		puppet = _make_puppet(entity)
-		_puppets[entity.get_instance_id()] = puppet
-	var speech := puppet.get_node_or_null("Speech") as Label3D
-	if speech == null:
-		return
-	speech.text = text
-	speech.visible = not text.is_empty()
-	_speech_until[entity.get_instance_id()] = Time.get_ticks_msec() + roundi(SPEECH_SECONDS * 1000.0)
+		puppet = instance_from_id(key) as Node3D
+	if puppet == null or not puppet.is_inside_tree() or _camera == null:
+		return null
+	var at := puppet.global_position + Vector3.UP * float(puppet.get_meta("bubble_height", 1.0))
+	if _camera.is_position_behind(at):
+		return null
+	return _camera.unproject_position(at)
+
+
+## Screen px per tile now: the ortho size is the view's height in units.
+func tile_px() -> float:
+	if _camera == null or _camera.size <= 0.0:
+		return SpeechBubbles.REFERENCE_TILE_PX
+	return get_viewport().get_visible_rect().size.y / _camera.size
 
 
 ## The click ripple: a ring that grows from a few px to the cell and fades
@@ -1159,7 +1168,7 @@ func _set_stone(piece: Node3D, near: bool) -> void:
 
 ## One puppet per spawned entity, placed where its 2D node is (the grid
 ## position under the azimuth-0 projection), turned to its shown facing,
-## removed when it goes. A speech line goes when its time is up.
+## removed when it goes.
 func _sync_puppets() -> void:
 	var seen: Dictionary[int, bool] = {}
 	var now := Time.get_ticks_msec()
@@ -1176,11 +1185,6 @@ func _sync_puppets() -> void:
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		if facing != null:
 			facing.rotation.y = -entity.shown_facing().angle()
-		if _speech_until.has(id) and now >= _speech_until[id]:
-			_speech_until.erase(id)
-			var speech := puppet.get_node_or_null("Speech") as Label3D
-			if speech != null:
-				speech.visible = false
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
 	for id in _puppets.keys():
@@ -1193,7 +1197,6 @@ func _sync_puppets() -> void:
 func _entity_went(id: int) -> void:
 	var puppet: Node3D = _puppets[id]
 	_puppets.erase(id)
-	_speech_until.erase(id)
 	_combat_at.erase(id)
 	_last_hp.erase(id)
 	_last_tile.erase(id)
@@ -1304,7 +1307,7 @@ func on_death(data: Dictionary) -> void:
 func _fall(puppet: Node3D, data: Dictionary) -> void:
 	puppet.name = "Corpse_" + str(data.get("entity", ""))
 	puppet.set_meta("corpse", true)
-	for part: String in ["Pick", "HpBar", "Name", "Speech"]:
+	for part: String in ["Pick", "HpBar", "Name"]:
 		var node := puppet.get_node_or_null(part)
 		if node != null:
 			puppet.remove_child(node)
@@ -1325,11 +1328,9 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 		material.emission = FLASH
 		create_tween().tween_property(material, "emission", glow, FLASH_SECONDS)
 	var line := str(data.get("say", ""))
-	if not line.is_empty():
-		var said := _label("LastWords", line, SPEECH, 1.6)
-		said.position = puppet.position + Vector3.UP * 1.6
-		add_child(said)
-		get_tree().create_timer(SPEECH_SECONDS).timeout.connect(said.queue_free)
+	if not line.is_empty() and bubbles != null:
+		puppet.set_meta("bubble_height", 1.0)
+		bubbles.show_line(puppet.get_instance_id(), line)
 	# Over onto its side, a touch too far, back, and still.
 	var side := PI * 0.5
 	var fall := create_tween()
@@ -1391,7 +1392,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	if entity.is_creature():
 		var caption: String = entity.label if not entity.label.is_empty() else entity.name
 		puppet.add_child(_label("Name", caption, Color.WHITE, height + 0.35))
-		puppet.add_child(_label("Speech", "", SPEECH, height + 0.75))
+		puppet.set_meta("bubble_height", height + BUBBLE_OVER_HEAD)
 		# The nose: which way it faces, turned each frame (see _sync_puppets).
 		var pivot := Node3D.new()
 		pivot.name = "Facing"

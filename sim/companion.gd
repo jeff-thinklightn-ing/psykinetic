@@ -48,9 +48,29 @@ const SIGHT_RANGE := 7
 const LOG_LINES_FOR_MIND := 20
 const OWNER_SPOKE := "spoke"
 const OWNER_BACK := "back"
-## Below this share of her hp with a hostile next to her, only these.
+## Below this share of her hp with a hostile next to her, only RETREAT.
 const REFLEX_BELOW := 0.3
-const REFLEX_INTENTS: Array[Intent] = [Intent.RETREAT, Intent.YIELD, Intent.HOLD]
+const REFLEX_INTENTS: Array[Intent] = [Intent.RETREAT]
+## The trigger of an ordinary window. While a hostile is within
+## COMBAT_RANGE of her or her player the window only asks if the fight
+## changed (_what_changed); out of a fight it asks unless she is going for a
+## target that lives and is in reach (SIGHT_RANGE).
+const ROUTINE := "routine"
+const COMBAT_RANGE := 4
+## Something her player says that reads as an instruction (is_instruction)
+## stands for INSTRUCTION_TICKS or until they give another; for
+## INSTRUCTION_LOCK_TICKS after a new one only reflexes, hp thresholds,
+## their words and bumps ask her again.
+const INSTRUCTION_TICKS := 600
+const INSTRUCTION_LOCK_TICKS := 60
+const IMPERATIVES: Array[String] = ["stay", "come", "follow", "go", "get", "attack", "hit", "kill", "fight",
+	"fall", "back", "retreat", "run", "flee", "wait", "hold", "stop", "help", "guard", "protect", "defend",
+	"keep", "move", "leave", "push", "shove", "step", "let", "don't", "dont", "do", "watch", "take",
+	"hide", "charge", "rest", "heal", "look", "with", "behind", "here", "over", "out", "away", "kill",
+	"save", "cover", "split", "regroup", "careful", "be", "never", "always", "please"]
+## Her own last lines, kept for the context (you_said_recently).
+const SAID_KEPT := 5
+const SAID_RULE := "Never repeat these. Usually say nothing."
 ## Blows on her and her owner within this many ticks go in the context.
 const RECENT_HIT_TICKS := 100
 const RECENT_HITS_KEPT := 10
@@ -121,6 +141,11 @@ var _last_decision_tick := -1000
 var _situation := {}
 ## A blow's trigger waiting for HURT_REASK_TICKS to pass, or "".
 var _hurt_pending := ""
+## Her player's standing instruction and when it was given.
+var _instruction := ""
+var _instruction_tick := -100000
+## Her own last lines, newest last.
+var _said: Array[String] = []
 
 
 func _init() -> void:
@@ -139,10 +164,13 @@ func intent_name() -> String:
 
 
 ## Something happened that deserves a fresh decision at the next tick. A
-## blow (HURT_TRIGGERS) waits on the throttle instead (see _sim_tick).
+## blow (HURT_TRIGGERS) waits on the throttle instead (see _sim_tick); a
+## reason she may speak to is not overwritten by one she may not.
 func request_decision(reason: String) -> void:
 	if reason in HURT_TRIGGERS:
 		_hurt_pending = reason
+		return
+	if may_speak(_trigger_text(_decision_reason)) and not may_speak(_trigger_text(reason)):
 		return
 	_decision_reason = reason
 
@@ -163,8 +191,18 @@ func bumped(direction: Vector2i) -> bool:
 ## now, with it in the context.
 func owner_spoke(text: String) -> void:
 	_owner_said = text
+	if is_instruction(text):
+		_instruction = text
+		_instruction_tick = World.tick
 	request_decision(OWNER_SPOKE)
 	_decide()
+
+
+## A line she said, for you_said_recently.
+func remember_said(line: String) -> void:
+	_said.append(line)
+	if _said.size() > SAID_KEPT:
+		_said.pop_front()
 
 
 ## A blow landed on her ([param on_her]) or her owner, for the context.
@@ -213,8 +251,13 @@ func _sim_tick() -> void:
 		if not change.is_empty() and _decision_reason.is_empty():
 			_decision_reason = "%s: %s" % [_hurt_pending, change]
 		_hurt_pending = ""
-	if not _decision_reason.is_empty() or World.tick >= _next_decision_tick:
+	if not _decision_reason.is_empty() and not _may_reask(_decision_reason):
+		print("[mind] %s: %s; %s's instruction stands" % [name, _trigger_text(_decision_reason), keeper_name()])
+		_decision_reason = ""
+	if not _decision_reason.is_empty():
 		_decide()
+	elif World.tick >= _next_decision_tick:
+		_routine_window()
 	if _reflex_active() and current_intent not in REFLEX_INTENTS:
 		_reflex_override(intent_name(), {"trigger": "reflex"})
 	_execute()
@@ -222,8 +265,78 @@ func _sim_tick() -> void:
 
 # --- Deciding -----------------------------------------------------------------
 
+## The ordinary window, every DECISION_INTERVAL_TICKS: in a fight it asks
+## only if the fight changed, out of one unless she has a live target in
+## reach; not at all just after an instruction, but for an hp threshold.
+func _routine_window() -> void:
+	_next_decision_tick = World.tick + DECISION_INTERVAL_TICKS
+	var change := _what_changed()
+	if in_fight():
+		if change.is_empty() or not _may_reask(change):
+			return
+		_decision_reason = "fight changed: %s" % change
+	else:
+		if _instruction_locked() or _target_in_reach():
+			return
+		_decision_reason = ROUTINE
+	_decide()
+
+
+## A hostile within COMBAT_RANGE of her or her player.
+func in_fight() -> bool:
+	var player_here := keeper != null and is_instance_valid(keeper) and keeper.spawned
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned and (World.distance(tile, entity.tile) <= COMBAT_RANGE
+				or player_here and World.distance(keeper.tile, entity.tile) <= COMBAT_RANGE):
+			return true
+	return false
+
+
+func _target_in_reach() -> bool:
+	return current_intent in [Intent.ATTACK, Intent.SHOVE] and intent_target != null and _alive(intent_target) \
+			and World.distance(tile, intent_target.tile) <= SIGHT_RANGE
+
+
+## Within INSTRUCTION_LOCK_TICKS of a new instruction.
+func _instruction_locked() -> bool:
+	return not _instruction.is_empty() and World.tick - _instruction_tick < INSTRUCTION_LOCK_TICKS
+
+
+## Whether [param reason] may ask her now: always, but in the lock after an
+## instruction, when only her player's words, a bump or an hp threshold may.
+func _may_reask(reason: String) -> bool:
+	if not _instruction_locked():
+		return true
+	return reason.get_slice(": ", 0) in [OWNER_SPOKE, BUMPED] or "hp crossed" in reason
+
+
+## The instruction standing now, or "" (none, or older than INSTRUCTION_TICKS).
+func standing_instruction() -> String:
+	if _instruction.is_empty() or World.tick - _instruction_tick > INSTRUCTION_TICKS:
+		return ""
+	return _instruction
+
+
+## Whether [param text] reads as an instruction: not a question, and it
+## starts with an imperative ("Stay back!", "Get them", "Don't...") or is
+## exclaimed. A plain heuristic; the mind reads the words themselves.
+static func is_instruction(text: String) -> bool:
+	var line := text.strip_edges()
+	if line.is_empty() or line.ends_with("?"):
+		return false
+	var first := line.get_slice(" ", 0).to_lower().rstrip("!.,;:")
+	return first in IMPERATIVES or line.ends_with("!")
+
+
+## Whether her mind is asked for a line with this trigger (its words): to
+## her player's words, a death, an hp threshold. Otherwise "say" is not in
+## the reply's schema, and any line she gives is dropped.
+func may_speak(trigger: String) -> bool:
+	return trigger == _trigger_text(OWNER_SPOKE) or trigger.ends_with(" died") or "hp crossed" in trigger
+
+
 func _decide() -> void:
-	var reason := _decision_reason
+	var reason := _decision_reason if not _decision_reason.is_empty() else ROUTINE
 	_next_decision_tick = World.tick + DECISION_INTERVAL_TICKS
 	_decision_reason = ""
 	_last_decision_tick = World.tick
@@ -382,6 +495,9 @@ func _apply(answer: Dictionary, source: String, entry := {}, filling_in := false
 	current_intent = intent as Intent
 	intent_target = target
 	var line_said := str(answer.get("say", "")).strip_edges()
+	if not line_said.is_empty() and not may_speak(str(entry.get("trigger", ""))):
+		entry["say_dropped"] = line_said
+		line_said = ""
 	if intent == Intent.YIELD:
 		_bump_deadline = -1
 		_bump_direction = _bump_direction if _bump_direction != Vector2i.ZERO else facing
@@ -407,6 +523,7 @@ func _apply(answer: Dictionary, source: String, entry := {}, filling_in := false
 	var answering: bool = entry.get("trigger", "") == _trigger_text(OWNER_SPOKE)
 	if not line_said.is_empty() and (answering or World.tick - _last_speech_tick >= SPEECH_INTERVAL_TICKS):
 		_last_speech_tick = World.tick
+		remember_said(line_said.left(120))
 		said.emit(line_said.left(120))
 
 
@@ -461,15 +578,28 @@ func _context(reason := "") -> Dictionary:
 		for direction in World.DIRECTIONS:
 			if World.is_free(tile + direction) and not World._terrain_blocks_step(tile, direction, true):
 				free_cells.append({"dx": direction.x, "dy": direction.y})
+	var log_lines: Array[String] = []
+	if party_log != null:
+		var own := "%s said: " % name
+		for line in party_log.last(LOG_LINES_SCANNED):
+			if not line.begins_with(own):
+				log_lines.append(line)
+	var instruction := standing_instruction()
 	return {
-		"card": card,
+		"situation": situation_text(),
+		"card": "%s Do what %s asks. Go against it only to save %s's life or yours, and say why when you do." % [
+			card, keeper_name(), keeper_name()],
+		"standing_instruction": {"said": instruction, "ticks_ago": World.tick - _instruction_tick} \
+				if not instruction.is_empty() else {},
+		"you_said_recently": {"lines": _said.duplicate(), "rule": SAID_RULE},
+		"_say": may_speak(trigger),
 		"together": "%s is your companion. You travel together by choice." % keeper_name(),
 		"trigger": trigger,
 		"companion_said": _owner_said,
 		"companion_direction": companion_direction,
 		"free_cells": free_cells,
 		"recent_hits": recent_hits,
-		"log": collapse_log(party_log.last(LOG_LINES_SCANNED)).slice(-LOG_LINES_FOR_MIND) if party_log != null else [],
+		"log": collapse_log(log_lines).slice(-LOG_LINES_FOR_MIND),
 		"nearby": nearby,
 		"hp": hp, "max_hp": max_hp, "stamina": stamina, "max_stamina": max_stamina,
 		"companion": companion_info,
@@ -478,21 +608,84 @@ func _context(reason := "") -> Dictionary:
 	}
 
 
-## [param lines] with each run of the same line made one, its count added:
-## "Brute hit Player for 1. ×6".
+## [param lines] with each run of the same line made one, its count added
+## ("Brute hit Player for 1 ×6."), and each run of two lines taking turns
+## too ("Pip hit Brute for 2 ×4, shoved Brute ×4."; the second's subject
+## dropped when it is the first's).
 static func collapse_log(lines: Array[String]) -> Array[String]:
 	var out: Array[String] = []
-	var run := 0
-	for i in lines.size():
-		run += 1
-		if i + 1 < lines.size() and lines[i + 1] == lines[i]:
-			continue
-		var line := lines[i]
+	var i := 0
+	while i < lines.size():
+		var run := 1
+		while i + run < lines.size() and lines[i + run] == lines[i]:
+			run += 1
 		if run > 1:
-			line = "%s ×%d." % [line.trim_suffix("."), run] if line.ends_with(".") else "%s ×%d" % [line, run]
-		out.append(line)
-		run = 0
+			out.append("%s ×%d." % [lines[i].trim_suffix("."), run])
+			i += run
+			continue
+		var pairs := 0
+		if i + 1 < lines.size():
+			while i + 2 * pairs + 1 < lines.size() and lines[i + 2 * pairs] == lines[i] \
+					and lines[i + 2 * pairs + 1] == lines[i + 1]:
+				pairs += 1
+		if pairs >= 2:
+			var first := lines[i].trim_suffix(".")
+			var second := lines[i + 1].trim_suffix(".")
+			var subject := first.get_slice(" ", 0) + " "
+			if second.begins_with(subject):
+				second = second.substr(subject.length())
+			out.append("%s ×%d, %s ×%d." % [first, pairs, second, pairs])
+			i += 2 * pairs
+			continue
+		out.append(lines[i])
+		i += 1
 	return out
+
+
+## The situation in two to four plain sentences, first in her context: the
+## monsters next to her, her hp, her player's distance and hp, who is in
+## danger (below 30% hp, or below half with a monster next to them).
+func situation_text() -> String:
+	const NUMBERS: Array[String] = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"]
+	var next_to_her := _monsters_next_to(tile)
+	var sentences: Array[String] = []
+	var count := NUMBERS[mini(next_to_her, NUMBERS.size() - 1)]
+	sentences.append("%s monster%s next to you." % [count, " is" if next_to_her == 1 else "s are"])
+	sentences.append("You have %d of %d HP." % [hp, max_hp])
+	var her_danger := _in_danger(self, next_to_her)
+	var their_danger := false
+	var who := keeper_name()
+	if keeper != null and is_instance_valid(keeper) and keeper.spawned:
+		var distance := World.distance(tile, keeper.tile)
+		sentences.append("%s is %s with %d of %d HP." % [who,
+			"next to you" if distance <= 1 else "%d cells away" % distance, keeper.hp, keeper.max_hp])
+		their_danger = _in_danger(keeper, _monsters_next_to(keeper.tile))
+	else:
+		sentences.append("%s is not here." % who)
+	if her_danger and their_danger:
+		sentences.append("You are both in danger.")
+	elif her_danger:
+		sentences.append("You are in danger.")
+	elif their_danger:
+		sentences.append("%s is in danger." % who)
+	else:
+		sentences.append("Neither of you is in danger.")
+	return " ".join(sentences)
+
+
+static func _monsters_next_to(at: Vector2i) -> int:
+	var count := 0
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned and World.distance(at, entity.tile) == 1:
+			count += 1
+	return count
+
+
+static func _in_danger(entity: GridEntity, monsters_next: int) -> bool:
+	if entity.max_hp <= 0:
+		return false
+	var share := float(entity.hp) / entity.max_hp
+	return share < REFLEX_BELOW or share < 0.5 and monsters_next > 0
 
 
 ## What an entity is called in her context: its label (a player's name, as
