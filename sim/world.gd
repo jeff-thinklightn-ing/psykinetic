@@ -315,6 +315,16 @@ func restore(entity: GridEntity, hp: int, stamina: int, facing: Vector2i) -> voi
 		entity._world_set_facing(facing)
 
 
+## Gives [param entity] back [param amount] hp, up to its max (a
+## companion resting out of combat). Server only.
+func heal(entity: GridEntity, amount: int) -> void:
+	if not Net.is_authority():
+		return
+	if not entity.spawned or amount <= 0 or entity.max_hp <= 0:
+		return
+	entity.hp = mini(entity.hp + amount, entity.max_hp)
+
+
 ## Moves [param entity] one tile in [param direction] (one of [constant DIRECTIONS]),
 ## pushing any chain of pushable entities whose total mass does not exceed the
 ## mover's. Resolves immediately. Diagonals may not cut a wall corner.

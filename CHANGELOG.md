@@ -3,6 +3,26 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.48
+
+Companions: hands and voice. Server and client.
+
+- **She acts at once**: a scripted tactical layer runs her every tick from
+  a stance (stay close, hold, press, guard, pull back); her mind only
+  picks the stance when the fight changes, in a few hundred ms.
+- **She speaks for herself, separately**: when you talk to her, someone
+  dies, someone's HP crosses a threshold, or after a fight goes quiet.
+  When you tell her something, her answer can change her stance.
+- **Retreating means getting out of danger**: she steps clear of the
+  monsters, near you if she can, and fights back when cornered.
+- **She heals** out of combat, a point a second; a reset heals her fully.
+- **No parroting**: quick phrases reach her as what you mean, and she never
+  says your words or her own last lines back.
+- She is told who she is and who you are, by name.
+- The test runner fails a scene that hangs instead of waiting forever.
+
+The server must be updated to v0.1.48 too, as it refuses any other version.
+
 ## v0.1.47
 
 Companions keep their heads in a fight; speech bubbles. Server and client.

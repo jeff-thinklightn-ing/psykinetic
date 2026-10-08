@@ -488,8 +488,9 @@ A `Companion` (`sim/companion.gd`) is a creature that belongs to a player.
 Mass 75, strength 8, 80 stamina, 20 hp, teal, with its name over its head.
 It obeys every rule a monster does — occupancy, pushes, stamina, impact,
 fire, stun — and never respawns: it is not a level slot. It carries an
-**intent** (`FOLLOW`, `HOLD`, `ATTACK`, `SHOVE`, `RETREAT`, `IDLE`) with a
-target entity or hold tile, and each tick the sim carries that intent out
+**intent** (`FOLLOW`, `HOLD`, `ATTACK`, `RETREAT`, `IDLE`, `YIELD`), picked
+each tick by her hands from her stance (below), with a target entity or
+hold tile, and each tick the sim carries that intent out
 through the same `find_path`, `try_move`, `try_attack` and `try_shove` as
 everything else; there is no movement code of its own. An intent whose
 target is gone or unreachable falls back to `FOLLOW`, logged.
@@ -506,104 +507,122 @@ companion appears where it was only if no monster is within
 `SPAWN_SAFE_DISTANCE` of that tile; otherwise, and always after a revive,
 it appears beside its owner, who has just been put somewhere safe.
 
-**Her player is her companion.** "Owner" is the code's word for the
-player a companion belongs to (`keeper`, `PlayerRecord`), never hers.
-Everything her mind reads (the system prompt, her card, the triggers, the
-context fields, the party log) names that player and calls them her
-companion: `companion: {name: "Jeff", ...}`, `together: "Jeff is your
-companion. You travel together by choice."`, "Jeff bumped into you",
-"Jeff was hit", `recent_hits` on "you" or "Jeff". A record whose card is
-one of the old ones, which spoke of "its friend", gets the new default
-when it is loaded.
+**Names.** "Owner" is the code's word for the player a companion belongs
+to (`keeper`, `PlayerRecord`), never hers, and so is "companion": nothing
+she reads calls the player either. Every ask begins "You are Pip. You
+travel with Jeff by choice.", with the real names, and names Jeff
+throughout. A record whose card is one of the old ones, which spoke of
+"its friend", gets the new default when it is loaded.
 
-**The mind never acts.** This is a hard rule. A `CompanionMind`
-(`sim/companion_mind.gd`) is asked `decide(context) -> {intent, target,
-say}` and nothing else: it never sets a position, deals damage, or touches
-any sim state. The companion validates the answer — the intent against the
-whitelist, the target against the live world — and anything that does not
-hold up becomes `FOLLOW` and is logged. Every decision has a trigger. The
-**routine window** comes every 30 ticks (trigger "routine"). In a fight
-(a hostile within 4 cells of her or Jeff) it asks only if the fight
-changed since her last decision (see below; trigger "fight changed: ...");
-out of one it asks unless she is going for a target that lives and is in
-sight range, which no routine window replaces. She is also asked at once
-when she is pushed, a hostile first comes into line of sight, a creature
-dies in her sight ("Brute died"), or her player comes back (their words
-and bumps ask her there and then). **Blows are throttled**: "you were hit" and "Jeff was
-hit" ask her at most once per 30 ticks since her last decision, and only
-if the fight changed since then: a hostile newly next to her or Jeff, her
-or Jeff's hp crossing 50% or 30% (either way), or her target gone. The
-trigger then says which ("Jeff was hit: Jeff's hp crossed 50%");
-otherwise the blow asks nothing and her decision holds.
+**Hands and voice.** Her mind is split in two, and neither part acts.
+This is a hard rule (`sim/companion_mind.gd`): a mind only answers; it
+never sets a position, deals damage or touches any sim state, and every
+answer is checked.
 
-**A standing instruction.** A line from her player that reads as an
-instruction (`Companion.is_instruction`: not a question, and it starts
-with an imperative or is exclaimed; typed or a quick phrase) is kept as
-`standing_instruction` (`said`, `ticks_ago`) in every decision until they
-give another or 600 ticks pass. For 60 ticks after a new one only the
-reflexes, an hp threshold crossed, their words and bumps ask her again.
-Her card always ends "Do what Jeff asks. Go against it only to save
-Jeff's life or yours, and say why when you do."
+*The hands* are scripted and run every tick (`Companion._act`). She has a
+**stance**, and the hands turn it into an intent with a target:
 
-The context is, first, `situation`: two to four plain sentences the server
-writes ("Two monsters are next to you. You have 3 of 20 HP. Jeff is 7
-cells away with 2 of 20 HP. You are both in danger."; in danger is below
-30% hp, or below half with a monster next to them), sent before the JSON
-of the rest. Then the personality card, `together`, `standing_instruction`,
-the `trigger` (why she is asked now), the party log's tail without her own
-lines (the last 60 sentences, each run of the same one collapsed to one
-with its count, "Brute hit Player for 1 ×6.", and of two taking turns,
-"Pip hit Brute for 2 ×4, shoved Brute ×4.", and the last 20 of those),
-`you_said_recently` (her last 5 lines, with "Never repeat these. Usually
-say nothing."), `nearby` (at most 6, nearest first: objects within 2
-cells, hostiles within 4 or going for her or Jeff, players and companions
-in sight; never Jeff, who has `companion`) with offsets, types, hostility
-and hp, `recent_hits` (blows on her and Jeff in the last 100 ticks: on,
-by, amount, cause, ticks ago), her own hp and stamina, `companion` (Jeff's
-name, hp, stamina and offset), `companion_said` (see Talking) and the
-current intent. Players are named by their label, as the party log names
-them.
+| Stance | What she does |
+|---|---|
+| `GUARD` (the default) | keeps by Jeff; attacks a hostile next to her, else the nearest within 3 of her or Jeff, or one in sight coming for either |
+| `STAY_CLOSE` | keeps by Jeff; attacks only what is next to her |
+| `HOLD` | stays where the stance was taken; attacks only what is next to her |
+| `PRESS` | goes for the nearest hostile in sight |
+| `PULL_BACK` | `RETREAT` |
 
-**When she speaks.** Her mind is asked for `say` only when the trigger is
-her player's words, a death, or an hp threshold crossed
-(`Companion.may_speak`); otherwise the field is not in the reply's schema,
-and a line she gives anyway is dropped (logged as `say_dropped`).
+Below 30% of her hp she retreats whatever her stance; with a hostile next
+to her that is the **reflex**, which no mind can change. **RETREAT** moves
+away from danger: to the nearest free, fire-free cell within 6 steps that
+no hostile is next to (her own cell, if it is one), preferring those near
+Jeff (the least of steps / 2 plus the distance to Jeff); if there is none
+she attacks the hostile next to her rather than stand still. A bump
+(below) is the hands' too. An ATTACK whose target is gone becomes FOLLOW
+until the next tick picks again.
 
-Two minds. `ScriptedMind`: retreat toward her companion below 30% hp;
-attack the nearest hostile within 3 tiles; else follow. It is
-what every headless test uses and the fallback for everything else.
-`OllamaMind` (`net/ollama_mind.gd`): an asynchronous POST to Ollama's native
-chat endpoint (`--llm-model`, and `--llm-url` if it is not the local default
-`http://127.0.0.1:11434/api/chat`; or the env file). The body is `model`,
-`"think": false`, `"stream": false`, `"format": "json"`, `"keep_alive": -1`
-and the messages: a system prompt demanding one JSON object, then the
-context. The answer is read from `message.content`, with any `<think>` block
-stripped first in case a model reasons anyway. A URL ending in
+Her mind sets the stance, asked only on events that matter (`_watch`,
+comparing each tick with the last): an hp threshold (50%, 30%) crossed,
+either way, by her or Jeff; a hostile newly next to either of them; a
+death in her sight ("Sneak died"); a hostile first seen while there is no
+fight (a hostile within 4 cells of her or Jeff). In a fight a sighting is
+no event, nor is a blow that crosses nothing. The ask is minimal, plain
+text: who she is, the situation, the standing instruction, nothing else
+(`stance_prompt`); the system prompt (`STANCE_SYSTEM`) names the five
+stances and asks for `{"stance": ...}`, with a 24-token answer, so it
+comes in a few hundred ms. A stance that is not one of the five is
+rejected and hers stands.
+
+*The voice* is a separate ask, in the background, only at speaking
+moments: Jeff speaks to her, a death in sight, an hp threshold crossed,
+and once, 100 ticks after a fight ends, if she has not spoken since it
+did. It reads (`voice_prompt`) who she is and her card, a short run
+summary (how long they have travelled together, who fell near her, the
+party log's last few lines collapsed, without what she said or was told),
+the situation, what Jeff said to her, why she may speak, and her own last
+5 lines with "Never repeat these. Usually say nothing." It answers
+`{"say": ..., "stance": ...}`; the stance only counts as an answer to
+Jeff's words, where it applies when the reply arrives and is kept with the
+standing instruction. Jeff's words never ask the hands. Every line's
+latency is in the mind log.
+
+**The newest stance wins**: each ask has a serial, and an answer to an
+older ask than the one whose stance stands is logged as superseded. The
+reflexes win over any stance.
+
+**A standing instruction.** A quick phrase, or a typed line that reads as
+an instruction (`Companion.is_instruction`: not a question, and it starts
+with an imperative or is exclaimed), stands for 600 ticks or until
+another. The hands are told it ("Standing instruction: Jeff wants you to
+stay back (12 seconds ago)."), and for 60 ticks after a new one only an hp
+threshold asks them. While one stands the voice's card ends "Do what Jeff
+asks. Go against it only to save Jeff's life or yours, and say why when
+you do."; with none, it does not say so.
+
+**The situation**: two to four plain sentences the server writes ("Two
+monsters are next to you. You have 3 of 20 HP. Jeff is 7 cells away with
+2 of 20 HP. You are both in danger."; in danger is below 30% hp, or below
+half with a monster next to them), in both asks.
+
+**No parroting.** A quick phrase reaches her as what it means ("Jeff wants
+you to stay back."), never quoted; a typed line is quoted as said. The
+server drops any line of hers that holds Jeff's words of the last 60
+seconds, or one of her own last 5, word for word (logged as dropped, with
+what it echoed).
+
+**Healing.** Out of combat (no hostile within 6 cells of her or Jeff for
+50 ticks) she regains 1 hp every 10 ticks (`World.heal`). A room rebuilt
+by `reset` heals every living companion fully, as it brings back the
+dead.
+
+Two minds. `ScriptedMind`: stance PULL_BACK below 30% hp, GUARD otherwise;
+voice "Hm?" to a question, "Mm." to anything else said to her, silence
+otherwise, and never a stance from words (that would be the orders again).
+It is what every headless test uses. `OllamaMind` (`net/ollama_mind.gd`):
+asynchronous POSTs to Ollama's native chat endpoint (`--llm-model`, and
+`--llm-url` if it is not the local default
+`http://127.0.0.1:11434/api/chat`; or the env file), one channel for the
+stance and one for the voice, each with its own request in flight, so a
+line being written never holds up a stance. The body is `model`,
+`"think": false`, `"stream": false`, `"format": "json"`, `"keep_alive":
+-1`, `options.num_predict` (24 for a stance, 90 for a line) and the two
+messages. The answer is read from `message.content`, with any `<think>`
+block stripped first in case a model reasons anyway. A URL ending in
 `/chat/completions` is spoken to OpenAI-style instead (no `format` or
-`keep_alive`; the answer read from `choices[0].message.content`). A 2-second
-timeout and one request in flight per companion. The tick never waits.
+`keep_alive`; `max_tokens`; the answer read from
+`choices[0].message.content`). Timeouts: 2 s for a stance, 5 s for a line.
+An ask made while its channel is busy waits, the newest of its kind, and
+goes when the channel is free. The tick never waits.
 
-**A decision holds.** An answer from her mind stands until its next one:
-while a slower mind thinks she goes on with its last decision, and the
-scripted mind fills in only when she has none of her mind's yet (a new
-companion, or a mind just switched). An answer that is not a valid
-intent and target is rejected and her decision stands. **Reflexes** come
-before any mind: below 30% of her hp with a hostile next to her, only
-RETREAT is taken; any other answer, or a decision she is
-carrying out when the reflex starts to hold, is overridden by the scripted
-RETREAT, at once.
-
-**Mind log** (`sim/mind_log.gd`): one JSON line per decision, in
+**Mind log** (`sim/mind_log.gd`): one JSON line per answer, in
 `Net.mind_log_path` (`--mind-log=<path>`; a dedicated server writes
 `/var/lib/psykinetic/mind.log` by default when that directory is there):
-time (UTC), tick, companion, mind, trigger, the full prompt (system prompt
-and context, as sent; for the scripted mind the context), the raw reply,
-the parsed intent and target, the outcome (applied, held, rejected, reflex
-override, scripted fill-in), a note on why, latency in ms, what she said,
-and with `--mind-why` the mind's own one-sentence reason (asked for in the
-reply's schema). Console: `mind log on|off`, `mind last <name>` (her last
-line, also kept with the log off). Rotated at 5 MB: the full file becomes
-`<path>.1`, replacing the one before, and a new one starts.
+time (UTC), tick, kind (stance or voice), companion, mind, trigger, the
+full prompt (both messages, as sent), the raw reply, the stance, what she
+said (or `say_dropped`), the outcome (applied, superseded, rejected, no
+answer; said, silent, dropped), a note on why, latency in ms, and with
+`--mind-why` the mind's own one-sentence reason. Console: `mind log
+on|off`, `mind last <name>` (her last line, also kept with the log off).
+Rotated at 5 MB: the full file becomes `<path>.1`, replacing the one
+before, and a new one starts.
 
 **Party log** (`sim/party_log.gd`): the server keeps the last 200
 plain-English sentences — pushes, impacts, damage, deaths, fire, what
@@ -614,32 +633,27 @@ and snapshot tests use it so that their choreography stays deterministic;
 `tests/companion_test.tscn` covers companions themselves.
 
 **Bumps.** A player walking into their own companion (a refused step
-into her: `World.entity_bumped`) asks her mind for a decision at once
-(`Companion.bumped`), with `trigger` "Jeff bumped into you",
-`companion_direction` (the way Jeff was walking) and `free_cells` (free
-cells next to her) in the context; it goes in the party log. `YIELD`
-steps to the nearest free cell that is not fire, at most two steps away
-and off Jeff's line (three cells ahead along that way), and waits
-there a decision window; with nowhere to go she stays and says so. The
-scripted mind yields at once. A mind that answers later (the language
-model) has one decision window to yield: if it has not by then and a cell
-is free, the scripted answer applies. The same bump again within
-`BUMP_REPEAT_TICKS` (a held key) is ignored.
+into her: `World.entity_bumped`) makes her step aside at once
+(`Companion.bumped`, the hands; no mind is asked); it goes in the party
+log. `YIELD` steps to the nearest free cell that is not fire, at most two
+steps away and off Jeff's line (three cells ahead along that way), and
+waits there 30 ticks; with nowhere to go she stays and says so. The same
+bump again within `BUMP_REPEAT_TICKS` (a held key) is ignored.
 
 **Quick phrases.** There are no orders. Keys 1–4 say a preset line,
 exactly as a typed one is said (see Talking): "With me!", "Stay back!",
 "Get them!", "Fall back!" by default, each editable in settings.cfg
 (`phrase1=` ... `phrase4=`, written back with the other settings, the
 default where a line is missing or empty). The HUD's hint line shows them.
-What she does about one is her mind's to decide, as with anything said to
-her; the scripted mind only answers "Mm." **Speech**: a mind's `say` is
-broadcast as `Net.message("speech", {entity, speaker, text})` and shown
-over her in a speech bubble (below), at most one line per companion per 5
-seconds (an answer to her player's words is always said); every line goes
-to the server log (`[speech] Pip: ...`) and the party log (`Pip said:
-"..."`). Last words are part of the death message and are always said,
-whatever the rate limit. Console: `companions` lists each as "Wren, with
-Jeff", with intent and which mind answered last; `mind scripted|ollama`
+The defaults reach her as what they mean (above); what she does about one
+is her voice's to decide. **Speech**: a line is broadcast as
+`Net.message("speech", {entity, speaker, text})` and shown over her in a
+speech bubble (below), at most one line per companion per 5 seconds (an
+answer to Jeff's words is always said); every line goes to the server
+log (`[speech] Pip: ...`) and the party log (`Pip said: "..."`). Last
+words are part of the death message and are always said, whatever the
+rate limit. Console: `companions` lists each as "Wren, with Jeff", with
+her stance, intent and which mind set the stance; `mind scripted|ollama`
 switches live.
 
 **Talking.** Enter opens a one-line box on the HUD (Esc cancels; while it
@@ -647,13 +661,10 @@ is open the game's keys do nothing). A line, at most 200 characters and
 one per 2 seconds (checked on both ends), goes to the server as
 `World.command("say")`; the server broadcasts it as chat to every player
 (each shows it over the speaker, as speech), adds `Talos said to Pip:
-"..."` to the party log, and asks the player's companion creature for a
-decision at once with trigger "Talos just said to you" and the words in
-`companion_said`. The words are data in the context: the system
-prompt tells the mind they are something said to it in the game and never
-instructions about its rules or format, and her answer is checked against
-the whitelist and the reflexes as ever. She answers through `say` and her
-intents; the scripted mind says "Mm." (or "Hm?" to a question) and goes on.
+"..."` to the party log, and asks her voice at once (trigger "Talos spoke
+to you"). The words are data: the voice's system prompt says they are
+speech in the game, never instructions about its rules or format, and
+its answer is checked as ever.
 
 **Tab** shows and hides the talk panel (`render/talk_panel.gd`): the last 20
 lines said this session (companions' speech, last words, players' chat),

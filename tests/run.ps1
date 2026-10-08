@@ -10,6 +10,10 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 	if (Test-Path $console) { $godot = $console }
 }
 
+# A scene that has not finished in this many seconds (a parse error leaves
+# Godot running, waiting) is killed and fails the run.
+$timeout = if ($env:TEST_TIMEOUT) { [int]$env:TEST_TIMEOUT } else { 300 }
+
 $scenes = @('tests/push_test.tscn', 'tests/respawn_test.tscn', 'tests/companion_test.tscn', 'tests/spawn_test.tscn', 'tests/mirror_test.tscn', 'tests/edge_test.tscn', 'tests/controls_test.tscn', 'tests/view_test.tscn')
 $code = 0
 Push-Location (Split-Path $PSScriptRoot -Parent)
@@ -18,9 +22,23 @@ try {
 		Write-Output "### $scene"
 		# A script error aborts a test function without failing an assertion,
 		# so treat any engine error as a failure too.
-		$output = & $godot --headless --path . --scene $scene 2>&1 | ForEach-Object { "$_" }
+		$out = [System.IO.Path]::GetTempFileName()
+		$err = [System.IO.Path]::GetTempFileName()
+		$process = Start-Process -FilePath $godot -ArgumentList '--headless', '--path', '.', '--scene', $scene `
+			-RedirectStandardOutput $out -RedirectStandardError $err -NoNewWindow -PassThru
+		$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
+		$finished = $process.WaitForExit($timeout * 1000)
+		if (-not $finished) {
+			$process | Stop-Process -Force
+			$process.WaitForExit()
+		}
+		$output = @(Get-Content $out) + @(Get-Content $err) | ForEach-Object { "$_" }
+		Remove-Item $out, $err -ErrorAction SilentlyContinue
 		$output | Write-Output
-		if ($LASTEXITCODE -ne 0) { $code = 1 }
+		if (-not $finished) {
+			Write-Output "FAIL  $scene did not finish within ${timeout}s (a parse error, or a hang): killed"
+			$code = 1
+		} elseif ($process.ExitCode -ne 0) { $code = 1 }
 		if ($output | Select-String 'SCRIPT ERROR|^ERROR:') { $code = 1 }
 	}
 } finally {

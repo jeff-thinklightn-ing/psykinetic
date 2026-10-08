@@ -1069,6 +1069,10 @@ func _start_level(from_snapshot := false) -> void:
 		_records.clear()
 	else:
 		_revived = _revive_companions()
+		# A rebuilt room starts whole: the living come back healed too.
+		for record: PlayerRecord in _records.values():
+			if not record.companion.is_empty():
+				record.companion["hp"] = 0  # 0: spawn at full stats.
 	if not (from_snapshot and _spawn_from_snapshot()):
 		for slot in LEVEL_ENTITIES.size():
 			_spawn(_slot_spec(slot))
@@ -1268,7 +1272,6 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if is_instance_valid(existing) and existing.spawned:
 		existing.keeper = player
 		existing.current_intent = Companion.Intent.FOLLOW
-		existing.request_decision(Companion.OWNER_BACK)
 		print("[net] %s's companion %s was waiting at %s and follows again" % [
 			record.name, existing.name, existing.tile])
 		return
@@ -1493,7 +1496,7 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and pet != entity and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
 				and entity.is_creature():
-			pet.request_decision("%s died" % _display_name(entity))
+			pet.note_death(_display_name(entity))
 	var line := ""
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.
@@ -1592,8 +1595,6 @@ func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, til
 	if impact > 0:
 		line += " for %d" % impact
 	party_log.add(line + ".")
-	if entity is Companion:
-		entity.request_decision("pushed")
 
 
 func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
@@ -1605,15 +1606,6 @@ func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause:
 		_:
 			if source != null:
 				party_log.add("%s hit %s for %d." % [_display_name(source), _display_name(entity), amount])
-	var by := _display_name(source) if source != null else String(cause)
-	if entity is Companion:
-		entity.note_hit(true, by, amount, cause)
-		entity.request_decision(Companion.HIT)
-	elif entity is Player:
-		for pet: Companion in _companions.values():
-			if is_instance_valid(pet) and pet.keeper == entity:
-				pet.note_hit(false, by, amount, cause)
-				pet.request_decision(Companion.OWNER_HIT)
 
 
 ## Distance from [param tile] to the nearest monster, or a large number.
@@ -1931,9 +1923,9 @@ func admin_command(line: String) -> String:
 				if not is_instance_valid(pet) or not pet.spawned:
 					continue
 				var record: PlayerRecord = _records.get(id)
-				lines.append("%s, with %s (%s) at %s hp %d/%d intent %s%s mind %s, last answer %s" % [
+				lines.append("%s, with %s (%s) at %s hp %d/%d stance %s intent %s%s mind %s, stance set by %s" % [
 					pet.name, record.name if record != null else "?", id.left(8), pet.tile, pet.hp, pet.max_hp,
-					pet.intent_name(), " " + pet.intent_target.name if pet.intent_target != null else "",
+					pet.stance_name(), pet.intent_name(), " " + pet.intent_target.name if pet.intent_target != null else "",
 					pet.mind.kind if pet.mind != null else "none", pet.last_mind])
 			return "%d companions\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 companions"
 		"mind":

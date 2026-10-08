@@ -1,42 +1,42 @@
 class_name CompanionMind
 extends RefCounted
-## What decides a companion's intent. A mind only ever answers a question;
-## it never touches positions, damage, or anything else in the sim. The
-## companion validates the answer against the intent whitelist and the live
-## world before acting on it (see docs/design.md, "The mind never acts").
+## What sets a companion's stance and speaks for her. A mind only ever
+## answers a question; it never touches positions, damage, or anything
+## else in the sim. The companion's hands (Companion._act) carry out the
+## stance every tick, and the companion checks every answer (see
+## docs/design.md, "The mind never acts").
 ##
-## decide() is asked on a decision window with a context Dictionary:
-## The player a companion belongs to is, in everything its mind reads, its
-## companion, by name: never an owner.
-##   card            personality card (String)
-##   together        "Jeff is your companion. You travel together by choice."
-##   log             the party log's tail, repeats collapsed (Array[String])
-##   nearby          [{name, type, dx, dy, hostile, hp, max_hp}], at most 6
-##   hp, max_hp, stamina, max_stamina
-##   companion       {name, hp, max_hp, stamina, max_stamina, dx, dy} or {}
-##   intent          the current intent name
-##   trigger         why it is asked now ("" on an ordinary window); for a
-##                   bump, "Jeff bumped into you", with
-##   companion_direction {dx, dy}: the way they were walking ({} otherwise)
-##   free_cells      [{dx, dy}]: free cells next to it ([] otherwise)
-##   recent_hits     [{on: "you"|"Jeff", by, amount, cause, ticks_ago}]
-##   companion_said  what they just said, with trigger "Jeff just said to
-##                   you" ("" otherwise)
-## It answers {"intent": String, "target": String|null, "say": String,
-## optionally "why": String}, or {} when it has no answer right now (an
-## async mind still waiting): then the companion's last decision stands,
-## and only a companion with none yet takes the scripted mind's answer.
+## Two asks, each a Dictionary with kind, serial, trigger, system and user
+## (the prompt's two messages, as text), and for a mind that reads facts
+## rather than text hp, max_hp, spoken_to and heard:
+##   stance(ask)  on an event that matters: answers {"stance": name} (one
+##                of Companion.STANCE_NAMES), optionally "why".
+##   voice(ask)   at a speaking moment: answers {"say": line or "",
+##                "stance": name or ""}, optionally "why".
+## Either answers {} when its answer comes later, through take_results().
+## The player a companion travels with is named in what it reads, never
+## called an owner or a companion.
 
 ## For the console and logs: "scripted", "ollama".
 var kind := "mind"
 
 
-func decide(_context: Dictionary) -> Dictionary:
+func stance(_ask: Dictionary) -> Dictionary:
 	return {}
 
 
-## Called every tick: the requests that came back since, answered or not
-## ({prompt, trigger, raw, answer, error, latency_ms}); [] for a mind that
-## answers at once.
+func voice(_ask: Dictionary) -> Dictionary:
+	return {}
+
+
+## Whether an ask of [param _what] ("stance", "voice") is still out; a busy
+## kind is asked again by the companion once it is free.
+func busy(_what: String) -> bool:
+	return false
+
+
+## Called every tick: the asks that came back since, answered or not
+## ({kind, serial, prompt, trigger, raw, answer, error, latency_ms,
+## spoken_to}); [] for a mind that answers at once.
 func take_results() -> Array[Dictionary]:
 	return []

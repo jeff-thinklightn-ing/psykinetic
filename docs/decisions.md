@@ -747,3 +747,55 @@ Control on the HUD from each speaker's screen point it needs no depth
 test, can be kept clear of other bubbles and names by plain rectangles,
 and is the same code for the 2D and 3D views; it is set at the view's
 px per tile, font and all, rather than scaled, so the text stays sharp.
+
+## 84. Hands and voice: a scripted tactical layer, a model for stance and speech
+
+Asking one model for an intent, a target and a line on every decision
+made her slow to act, prone to flip and chatty, and the fixes (73, 78, 81,
+82) kept narrowing when to ask without changing what was asked. Now the
+tactics are scripted and run every tick (hands), the model only picks one
+of five stances on the events that change a fight, from a few sentences
+(fast, and nothing to misread), and speaking is a separate ask with the
+character and the run behind it (voice), at moments worth a line. A slow
+or failed answer leaves her fighting sensibly, never standing still.
+This supersedes the context fields of 74 and 80's JSON details, the
+routine window of 78 and the say rules of 82.
+
+## 85. The newest-asked stance wins; Jeff's words set it through the voice
+
+Answers come back out of order across two channels. Ordering them by when
+they were asked, not when they arrived, means a slow answer about an old
+event cannot undo a newer one, in particular the stance her voice gave to
+what Jeff just said, which is kept with his instruction.
+
+## 86. RETREAT moves away from danger, and fights when cornered
+
+Retreating to Jeff (79) left her standing in the blows when he was already
+beside her and the monster beside them both. RETREAT now steps to the
+nearest cell no hostile is next to, near Jeff when such a cell is; with
+none, she attacks the hostile next to her.
+
+## 87. Companions heal out of combat, and a reset heals them
+
+A companion carried every scratch until she died. A point every 10 ticks
+after 50 calm ones keeps a long session going without a free heal in a
+fight; a rebuilt room starts whole, the living included.
+
+## 88. No parroting: phrases reach her as meaning; echoes are dropped
+
+Given "Stay back!" a model said "Stay back!" back. The default phrases now
+reach her as what they mean, and the server drops any line that repeats
+Jeff's recent words or her own last lines: a rule the server keeps, not a
+request to the model.
+
+## 89. Her prompt names both of them and calls Jeff neither owner nor companion
+
+"Companion" in her own prompt was ambiguous (she is one) and still a role.
+"You are Pip. You travel with Jeff by choice." says who and what, and the
+rest names Jeff.
+
+## 90. Each test scene has a timeout
+
+A parse error leaves Godot waiting rather than exiting, which hung the
+test run, and with it ship.ps1. Each scene now gets 300 s (TEST_TIMEOUT
+overrides), after which it is killed and the run fails.
