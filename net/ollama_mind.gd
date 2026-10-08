@@ -17,6 +17,8 @@ extends CompanionMind
 ## take longer, in the background.
 const TIMEOUT_SECONDS := {"stance": 2.0, "voice": 5.0}
 const MAX_TOKENS := {"stance": 24, "voice": 90}
+## A stance wants the likeliest answer; a line wants some life.
+const TEMPERATURE := {"stance": 0.2, "voice": 0.8}
 ## More with --mind-why, for the reason after the answer.
 const WHY_TOKENS := 40
 
@@ -91,12 +93,12 @@ func request_body(system: String, user: String, what := "stance") -> String:
 	]
 	if openai_shaped:
 		return JSON.stringify({
-			"model": model, "think": false, "stream": false, "temperature": 0.7,
+			"model": model, "think": false, "stream": false, "temperature": TEMPERATURE.get(what, 0.5),
 			"max_tokens": max_tokens(what), "messages": messages,
 		})
 	return JSON.stringify({
 		"model": model, "think": false, "stream": false, "format": "json", "keep_alive": -1,
-		"options": {"num_predict": max_tokens(what)}, "messages": messages,
+		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5)}, "messages": messages,
 	})
 
 
@@ -120,7 +122,7 @@ func _result(what: String, raw: String, answer: Dictionary, error: String) -> vo
 
 %s" % [ask.get("system", ""), ask.get("user", "")], "raw": raw, "answer": answer,
 		"error": error, "latency_ms": Time.get_ticks_msec() - int(sent.get("at", Time.get_ticks_msec())),
-		"spoken_to": ask.get("spoken_to", false)})
+		"spoken_to": ask.get("spoken_to", false), "always": ask.get("always", false)})
 
 
 ## Test hook: the next ask gets this as the endpoint's response body.

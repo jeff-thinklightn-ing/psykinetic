@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.49
+
+Companion voice. Server.
+
+- **She talks about what is happening**: her voice knows her stance, what
+  she is doing and what just happened.
+- **Characters**: each companion's personality is a paragraph, written per
+  companion (Pip and Wren first).
+- **Fewer repeats**: she remembers her last 20 lines across sessions and
+  does not say them again; her lines are livelier.
+- **When you are in real danger** (below 30% HP) your last instruction
+  lapses, she decides afresh, and if she changes course she tells you why.
+
+The server must be updated to v0.1.49 too, as it refuses any other version.
+
 ## v0.1.48
 
 Companions: hands and voice. Server and client.

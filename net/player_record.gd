@@ -15,7 +15,8 @@ var facing := Vector2i(0, 1)
 var color := Color.WHITE
 ## Unix time of the last join or leave.
 var last_seen := 0
-## The player's companion: {name, card, hp, stamina, tile: [x, y], alive}.
+## The player's companion: {name, card, hp, stamina, tile: [x, y], alive,
+## said: her last lines, newest last}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
 
@@ -40,7 +41,7 @@ func to_dict() -> Dictionary:
 		"facing": [facing.x, facing.y],
 		"color": color.to_html(false),
 		"last_seen": last_seen,
-		"companion": companion.duplicate(),
+		"companion": companion.duplicate(true),
 	}
 
 
@@ -72,5 +73,15 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			"stamina": int(pet.get("stamina", 0)),
 			"tile": pet.get("tile"),
 			"alive": bool(pet.get("alive", true)),
+			"said": _lines(pet.get("said", [])),
 		}
 	return record
+
+
+## [param value] as lines of text, or none.
+static func _lines(value: Variant) -> Array[String]:
+	var lines: Array[String] = []
+	if value is Array:
+		for line: Variant in value:
+			lines.append(str(line))
+	return lines

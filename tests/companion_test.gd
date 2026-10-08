@@ -32,6 +32,9 @@ func _ready() -> void:
 	_test_owner_speaks()
 	_test_voice()
 	_test_names()
+	_test_voice_knows()
+	_test_lapse()
+	_test_said_persists()
 	_test_healing()
 	_test_mind_log_file()
 	_test_standing_instruction()
@@ -489,7 +492,7 @@ func _test_stance_events() -> void:
 	_check(mind.stance_asks.is_empty(), "a monster first seen in a fight (3 away) is no event")
 	_put(imp, Vector2i(11, 6))
 	World.step()
-	_check(mind.triggers("stance") == ["a new monster next to you or Player"], "one next to her: asked (%s)" % [mind.triggers("stance")])
+	_check(mind.triggers("stance") == ["%s came up next to you." % imp.name], "one next to her: asked, in a sentence (%s)" % [mind.triggers("stance")])
 	_check(mind.voice_asks.is_empty(), "and no line for it")
 	var ask: Dictionary = mind.stance_asks.back()
 	_check(str(ask["user"]) == "%s\n%s\nNo standing instruction." % [pet.identity(), pet.situation_text()],
@@ -497,24 +500,26 @@ func _test_stance_events() -> void:
 	mind.clear()
 	owner.hp = 9
 	World.step()
-	_check(mind.triggers("stance") == ["Player's HP crossed 50%"] and mind.triggers("voice") == ["Player's HP crossed 50%"],
+	_check(mind.triggers("stance") == ["Player's HP fell below 50%."] and mind.triggers("voice") == ["Player's HP fell below 50%."],
 			"Player below half: the hands and the voice (%s / %s)" % [mind.triggers("stance"), mind.triggers("voice")])
 	mind.clear()
 	pet.note_death("Sneak")
 	World.step()
-	_check(mind.triggers("stance") == ["Sneak died"] and mind.triggers("voice") == ["Sneak died"], "a death: both (%s)" % [mind.triggers("voice")])
+	_check(mind.triggers("stance") == ["Sneak died."] and mind.triggers("voice") == ["Sneak died."], "a death: both (%s)" % [mind.triggers("voice")])
+	_check("What just happened: Sneak died." in str(mind.voice_asks.back()["user"]), "the voice is told the event in a sentence")
 	# Words ask the voice only; for 60 ticks after an instruction only an hp threshold asks the hands.
 	mind.clear()
 	_main._on_command(owner, "say", {"text": "Stay back!"})
-	_check(mind.stance_asks.is_empty() and mind.triggers("voice") == ["Player spoke to you"],
+	_check(mind.stance_asks.is_empty() and mind.triggers("voice") == ["Player just spoke to you."],
 			"%s speaks: the voice is asked, the hands skip it" % owner.label)
 	var other := _spawn_imp(Vector2i(9, 7))
 	World.step()
 	_check(mind.stance_asks.is_empty(), "a new monster next to them, just after the instruction: not asked")
 	owner.hp = 5
 	World.step()
-	_check(mind.triggers("stance") == ["a new monster next to you or Player; Player's HP crossed 30%"] or mind.triggers("stance") == ["Player's HP crossed 30%"],
-			"but an hp threshold is (%s)" % [mind.triggers("stance")])
+	_check(mind.triggers("stance") == ["Player's HP fell below 30%, so Player's instruction no longer holds."],
+			"but an hp threshold is, and below 30%% the instruction lapses (%s)" % [mind.triggers("stance")])
+	_check(pet.standing_instruction().is_empty(), "it is gone")
 	World.despawn(imp)
 	World.despawn(other)
 	owner.hp = owner.max_hp
@@ -612,7 +617,7 @@ func _test_owner_speaks() -> void:
 	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - log_size)
 	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"%s\"" % [pet.name, said], "the party log: %s" % [lines])
 	var entry: Dictionary = MindLog.last[String(pet.name)]
-	_check(entry["kind"] == "voice" and entry["trigger"] == "Player spoke to you"
+	_check(entry["kind"] == "voice" and entry["trigger"] == "Player just spoke to you."
 			and ("Player just said to you: \"%s\"" % said) in str(entry["prompt"]),
 			"her voice is asked at once, the words quoted as said (trigger: %s)" % entry["trigger"])
 	_check(pet.stance == Companion.Stance.GUARD, "the words set nothing by themselves (%s)" % pet.stance_name())
@@ -669,6 +674,97 @@ func _test_voice() -> void:
 		World.step()
 	pet.mind = ScriptedMind.new()
 	pet.stance = Companion.Stance.GUARD
+
+
+func _test_voice_knows() -> void:
+	print("\n== the voice knows her stance, what she is doing, the event; her card is authored; warm, the stance cool ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var imp := _spawn_imp(Vector2i(11, 6))
+	pet._act()
+	var prompt := pet.voice_prompt("Brute died.")
+	_check(("Right now your stance is GUARD (keeping beside Player and fighting whatever comes at either of you), and you are attacking %s." % imp.name) in prompt,
+			"her stance and action: %s" % pet.doing())
+	_check("What just happened: Brute died." in prompt, "and the event, in a sentence")
+	World.despawn(imp)
+	_check(Main.companion_card("Pip").length() > 200 and Main.companion_card("Nobody").is_empty(),
+			"cards are paragraphs in levels/companions.json, by name")
+	_check(pet.card == Main.companion_card(String(pet.name)) and pet.card in pet.voice_prompt("test"),
+			"her card is her authored one, and her voice reads it")
+	var mind := OllamaMind.new(Net.DEFAULT_LLM_URL, "stub", _main)
+	var voice: Variant = JSON.parse_string(mind.request_body("s", "u", "voice"))
+	var stance: Variant = JSON.parse_string(mind.request_body("s", "u", "stance"))
+	_check(is_equal_approx(float(voice["options"]["temperature"]), 0.8) and is_equal_approx(float(stance["options"]["temperature"]), 0.2),
+			"the voice at temperature 0.8, the stance at 0.2")
+
+
+func _test_lapse() -> void:
+	print("\n== Player below 30%: the instruction lapses, she re-decides, and her voice says why if she changes course ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	owner.hp = owner.max_hp
+	var mind := CountingMind.new()
+	pet.mind = mind
+	World.step()
+	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
+	_main._on_command(owner, "say", {"text": "Stay back!"})
+	_check(pet.stance == Companion.Stance.STAY_CLOSE and not pet.standing_instruction().is_empty(), "Stay back!: STAY_CLOSE, standing")
+	mind.clear()
+	mind.stance_answer = {"stance": "GUARD"}
+	mind.voice_answer = {"say": "You're hurt. I'm coming in.", "stance": ""}
+	var heard: Array[String] = []
+	var listen := func(text: String) -> void: heard.append(text)
+	pet.said.connect(listen)
+	pet._last_speech_tick = World.tick  # The rate limit would hold an ordinary line.
+	owner.hp = 5
+	World.step()
+	pet.said.disconnect(listen)
+	_check(pet.standing_instruction().is_empty() and pet.stance == Companion.Stance.GUARD, "the instruction lapses; she re-decides: GUARD")
+	_check(mind.voice_asks.size() == 1 and "you changed course: from STAY_CLOSE to GUARD" in str(mind.voice_asks[0]["trigger"]),
+			"her voice is asked to say why (%s)" % [mind.triggers("voice")])
+	_check(heard == ["You're hurt. I'm coming in."], "and it is said whatever the rate limit (%s)" % [heard])
+	mind.clear()
+	owner.hp = owner.max_hp
+	World.step()
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
+	_main._on_command(owner, "say", {"text": "Stay back!"})
+	mind.clear()
+	mind.stance_answer = {"stance": "STAY_CLOSE"}
+	owner.hp = 5
+	World.step()
+	_check(mind.stance_asks.size() == 1 and mind.voice_asks.is_empty(), "the same stance again: no explaining")
+	owner.hp = owner.max_hp
+	for i in 21:
+		World.step()
+	pet.mind = ScriptedMind.new()
+	pet.stance = Companion.Stance.GUARD
+
+
+func _test_said_persists() -> void:
+	print("\n== her last 20 lines persist in her record and are never said again ==")
+	var pet := _companion()
+	for i in 25:
+		pet.remember_said("line %d" % i)
+	_check(pet.said_lines().size() == 20 and pet.said_lines()[0] == "line 5", "20 kept, newest last")
+	_main._remember_companion(pet.keeper_id)
+	var record: PlayerRecord = _main._records[pet.keeper_id]
+	var back := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(back.companion.get("said") == pet.said_lines(), "through her record's save and load")
+	pet.restore_said([])
+	pet.restore_said(back.companion["said"])
+	_check(pet._echo_of("Line 6!") == "her own line" and pet._echo_of("line 3") == "", "line 6 of 20 is not said again; one long gone may be")
+	var user := pet.voice_prompt("test")
+	_check("\"line 24\"" in user and not "\"line 19\"" in user, "the voice is shown the last 5")
 
 
 func _test_names() -> void:

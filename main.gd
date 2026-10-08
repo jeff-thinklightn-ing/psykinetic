@@ -159,6 +159,10 @@ const TOSS_AIM_LENGTH := 26.0
 const SNAP_RANGE := 3.0
 const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
 const COMPANION_CARD := "Loyal and cautious. Guards the one she travels with, and speaks little."
+## Companions' cards, a paragraph each, by name; any companion not in it
+## keeps the card in its record (COMPANION_CARD for a new one).
+const COMPANION_CARDS := "res://levels/companions.json"
+static var _cards: Dictionary[String, String] = {}
 ## Cards earlier builds gave every companion, which spoke of "its friend":
 ## a record that still has one gets COMPANION_CARD.
 const OLD_COMPANION_CARDS: Array[String] = ["A loyal, cautious companion who guards its friend and speaks little.",
@@ -1314,7 +1318,12 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.card = str(record.companion.get("card", COMPANION_CARD))
 	if pet.card in OLD_COMPANION_CARDS:
 		pet.card = COMPANION_CARD
-		record.companion["card"] = COMPANION_CARD
+	# An authored card (levels/companions.json) wins over the record's.
+	var authored := companion_card(String(record.companion["name"]))
+	if not authored.is_empty():
+		pet.card = authored
+	record.companion["card"] = pet.card
+	pet.restore_said(record.companion.get("said", []))
 	pet.party_log = party_log
 	pet.mind = _make_mind()
 	pet.said.connect(_on_companion_said.bind(pet))
@@ -1341,6 +1350,19 @@ func _revive_companions() -> Array[String]:
 	return revived
 
 
+## The card written for companion [param pet_name] in COMPANION_CARDS, or "".
+static func companion_card(pet_name: String) -> String:
+	if _cards.is_empty() and FileAccess.file_exists(COMPANION_CARDS):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(COMPANION_CARDS))
+		if parsed is Dictionary:
+			for key: String in parsed:
+				if not key.begins_with("_") and parsed[key] is Dictionary:
+					_cards[key] = str(parsed[key].get("card", ""))
+		if _cards.is_empty():
+			_cards["_none"] = ""  # Read once, even when empty.
+	return str(_cards.get(pet_name, ""))
+
+
 func _make_mind() -> CompanionMind:
 	if mind_kind == "ollama" and Net.llm_url != "" and Net.llm_model != "":
 		return OllamaMind.new(Net.llm_url, Net.llm_model, self)
@@ -1356,6 +1378,7 @@ func _remember_companion(id: String) -> void:
 	record.companion["stamina"] = pet.stamina
 	record.companion["tile"] = [pet.tile.x, pet.tile.y]
 	record.companion["alive"] = true
+	record.companion["said"] = pet.said_lines()
 
 
 ## "say" {text}: chat, typed or a quick phrase (_player_said).
@@ -1546,6 +1569,9 @@ func say_phrase(slot: int) -> void:
 
 func _on_companion_said(text: String, pet: Companion) -> void:
 	party_log.add("%s said: \"%s\"" % [pet.name, text])
+	var record: PlayerRecord = _records.get(pet.keeper_id)
+	if record != null:
+		record.companion["said"] = pet.said_lines()
 	Net.broadcast("speech", {"entity": String(pet.get_path()), "speaker": String(pet.name), "text": text})
 
 

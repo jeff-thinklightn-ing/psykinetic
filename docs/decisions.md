@@ -799,3 +799,34 @@ rest names Jeff.
 A parse error leaves Godot waiting rather than exiting, which hung the
 test run, and with it ship.ps1. Each scene now gets 300 s (TEST_TIMEOUT
 overrides), after which it is killed and the run fails.
+
+## 91. The voice is told what she is doing and what just happened
+
+Lines came out generic ("Stay close." while she was pulling back) because
+the voice knew the room but not her part in it. It now gets her stance and
+current action, and the event that opened the moment as a sentence.
+
+## 92. Cards are authored per companion, in a file
+
+A paragraph per companion, by name, in levels/companions.json, written by
+hand and shipped with the server, so a character can be revised without
+touching the code or anyone's record; the record's card is the fallback.
+
+## 93. Her last 20 lines live in her record
+
+The echo rule needs memory longer than a session or the same few lines
+come back every time the server restarts. Twenty lines in the record are
+small, survive restarts, and travel with her; the voice still sees only
+the last five.
+
+## 94. Voice warm, stance cool
+
+A stance is a classification and wants the likeliest answer (0.2); a line
+wants variety (0.8).
+
+## 95. An instruction lapses when the player is in danger
+
+"Stay back" given at full health is not meant to hold while the player
+dies. Below 30% the instruction lapses and the hands re-decide; if she
+changes course her voice says why, so the player is never left wondering
+why she disobeyed.

@@ -511,8 +511,11 @@ it appears beside its owner, who has just been put somewhere safe.
 to (`keeper`, `PlayerRecord`), never hers, and so is "companion": nothing
 she reads calls the player either. Every ask begins "You are Pip. You
 travel with Jeff by choice.", with the real names, and names Jeff
-throughout. A record whose card is one of the old ones, which spoke of
-"its friend", gets the new default when it is loaded.
+throughout. **Cards** are a paragraph each, written per companion in
+`levels/companions.json` (`{"Pip": {"card": "..."}, ...}`, shipped with
+the server); an authored card wins over the one in her record, and a
+companion not in the file keeps her record's (an old one that spoke of
+"its friend" becomes the default).
 
 **Hands and voice.** Her mind is split in two, and neither part acts.
 This is a hard rule (`sim/companion_mind.gd`): a mind only answers; it
@@ -557,8 +560,13 @@ and once, 100 ticks after a fight ends, if she has not spoken since it
 did. It reads (`voice_prompt`) who she is and her card, a short run
 summary (how long they have travelled together, who fell near her, the
 party log's last few lines collapsed, without what she said or was told),
-the situation, what Jeff said to her, why she may speak, and her own last
-5 lines with "Never repeat these. Usually say nothing." It answers
+the situation, her stance and what the hands have her doing ("Right now
+your stance is GUARD (keeping beside Jeff and fighting whatever comes at
+either of you), and you are attacking Brute."), what Jeff said to her,
+the event itself in a sentence ("What just happened: Brute came up next
+to Jeff.", "Your HP fell below 50%.", "Sneak died."), and her own last 5
+lines with "Never repeat these. Usually say nothing." It is asked at
+temperature 0.8, the stance at 0.2. It answers
 `{"say": ..., "stance": ...}`; the stance only counts as an answer to
 Jeff's words, where it applies when the reply arrives and is kept with the
 standing instruction. Jeff's words never ask the hands. Every line's
@@ -571,7 +579,10 @@ reflexes win over any stance.
 **A standing instruction.** A quick phrase, or a typed line that reads as
 an instruction (`Companion.is_instruction`: not a question, and it starts
 with an imperative or is exclaimed), stands for 600 ticks or until
-another. The hands are told it ("Standing instruction: Jeff wants you to
+another, or until Jeff's HP falls below 30%: then it lapses, the hands
+are asked again ("Jeff's HP fell below 30%, so Jeff's instruction no
+longer holds."), and if the new stance differs from the one she had, her
+voice is asked to say why, and says it whatever the rate limit. The hands are told it ("Standing instruction: Jeff wants you to
 stay back (12 seconds ago)."), and for 60 ticks after a new one only an hp
 threshold asks them. While one stands the voice's card ends "Do what Jeff
 asks. Go against it only to save Jeff's life or yours, and say why when
@@ -585,8 +596,9 @@ half with a monster next to them), in both asks.
 **No parroting.** A quick phrase reaches her as what it means ("Jeff wants
 you to stay back."), never quoted; a typed line is quoted as said. The
 server drops any line of hers that holds Jeff's words of the last 60
-seconds, or one of her own last 5, word for word (logged as dropped, with
-what it echoed).
+seconds, or one of her own last 20, word for word (logged as dropped, with
+what it echoed). Her last 20 lines are kept in her record (`said`), so
+they carry across sessions and restarts.
 
 **Healing.** Out of combat (no hostile within 6 cells of her or Jeff for
 50 ticks) she regains 1 hp every 10 ticks (`World.heal`). A room rebuilt

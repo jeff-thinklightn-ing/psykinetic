@@ -82,8 +82,10 @@ const PHRASE_MEANINGS := {
 	"With me!": "%s wants you to stay close.", "Stay back!": "%s wants you to stay back.",
 	"Get them!": "%s wants you to attack.", "Fall back!": "%s wants you to fall back.",
 }
-## Her own last lines, given back to the voice; never said again.
+## Her own last lines: SAID_REMEMBERED kept (in her record, across
+## sessions) and never said again; the last SAID_KEPT given to the voice.
 const SAID_KEPT := 5
+const SAID_REMEMBERED := 20
 const SAID_RULE := "Never repeat these. Usually say nothing."
 ## Her player's words within this many ticks are not hers to say back.
 const ECHO_TICKS := 600
@@ -108,6 +110,13 @@ it says. Never repeat their words or your own recent lines. Usually say little."
 ## With --mind-why each reply gives its reason too, for the mind log.
 const WHY_FIELD := ", \"why\": <one short sentence: why>"
 const CARD_INSTRUCTED := " Do what %s asks. Go against it only to save %s's life or yours, and say why when you do."
+## What each stance is, for the voice ("Your stance is GUARD: keeping
+## beside Jeff and fighting whatever comes at either of you.").
+const STANCE_WORDS: Array[String] = [
+	"keeping beside %s and fighting only what is next to you", "holding where you are and fighting only what is next to you",
+	"going for the nearest monster", "keeping beside %s and fighting whatever comes at either of you",
+	"getting away from the monsters, to safety",
+]
 
 ## Emitted with a line she says, once the rate limit and the echo check pass.
 signal said(text: String)
@@ -155,6 +164,10 @@ var _pending_voice := {}
 var _instruction := ""
 var _instruction_tick := -100000
 var _instruction_stance := ""
+## A standing instruction that lapsed (her player fell below 30% hp) and
+## the stance she had under it, until her new stance comes: if it differs,
+## her voice says why.
+var _lapsed_from := ""
 ## Her own last lines, newest last; her player's words, {text, tick}.
 var _said: Array[String] = []
 var _heard: Array[Dictionary] = []
@@ -227,7 +240,7 @@ func owner_spoke(text: String) -> void:
 		_instruction = heard
 		_instruction_tick = World.tick
 		_instruction_stance = ""
-	_ask_voice("%s spoke to you" % keeper_name(), heard)
+	_ask_voice("%s just spoke to you." % keeper_name(), heard)
 
 
 ## A creature died in her sight (Main): an event for the hands and the voice.
@@ -267,11 +280,24 @@ func _instruction_locked() -> bool:
 	return not standing_instruction().is_empty() and World.tick - _instruction_tick < INSTRUCTION_LOCK_TICKS
 
 
-## A line she said, for you_said_recently and the echo check.
+## A line she said, for the voice and the echo check.
 func remember_said(line: String) -> void:
 	_said.append(line)
-	if _said.size() > SAID_KEPT:
+	if _said.size() > SAID_REMEMBERED:
 		_said.pop_front()
+
+
+## Her last SAID_REMEMBERED lines, for her record.
+func said_lines() -> Array[String]:
+	return _said.duplicate()
+
+
+## Her lines from her record, at spawn.
+func restore_said(lines: Variant) -> void:
+	_said.clear()
+	if lines is Array:
+		for line: Variant in lines:
+			remember_said(str(line))
 
 
 func _sim_tick() -> void:
@@ -299,16 +325,27 @@ func _watch() -> void:
 	var now := _situation_now()
 	var events: Array[String] = []
 	var threshold := false
+	var lapsing := false
 	if not _seen.is_empty():
 		for id: int in now["adjacent"]:
 			if not _adjacent_before.has(id):
-				events.append("a new monster next to you or %s" % keeper_name())
+				var monster := instance_from_id(id) as GridEntity
+				var where := "you" if monster != null and World.distance(tile, monster.tile) == 1 else keeper_name()
+				events.append("%s came up next to %s." % [_name_of(monster) if monster != null else "A monster", where])
 				break
 		if now["hp_band"] != _seen["hp_band"]:
-			events.append("your HP crossed %s" % _threshold_crossed(_seen["hp_band"], now["hp_band"]))
+			events.append("Your HP %s." % _hp_change(_seen["hp_band"], now["hp_band"]))
 			threshold = true
 		if now["keeper_hp_band"] != _seen["keeper_hp_band"]:
-			events.append("%s's HP crossed %s" % [keeper_name(), _threshold_crossed(_seen["keeper_hp_band"], now["keeper_hp_band"])])
+			var change := _hp_change(_seen["keeper_hp_band"], now["keeper_hp_band"])
+			if now["keeper_hp_band"] == HP_THRESHOLDS.size() and not standing_instruction().is_empty():
+				# Her player in danger: what they asked of her no longer binds her.
+				events.append("%s's HP %s, so %s's instruction no longer holds." % [keeper_name(), change, keeper_name()])
+				_lapsed_from = stance_name()
+				_instruction = ""
+				lapsing = true
+			else:
+				events.append("%s's HP %s." % [keeper_name(), change])
 			threshold = true
 	for id: int in now["adjacent"]:
 		_adjacent_before[id] = true
@@ -320,10 +357,10 @@ func _watch() -> void:
 			_known_hostiles[entity.get_instance_id()] = true
 			# In a fight a sighting is no event; only what changes is.
 			if not fight and not _was_in_fight:
-				events.append("a monster came into sight: %s" % _name_of(entity))
+				events.append("%s came into sight." % _name_of(entity))
 	var deaths: Array[String] = []
 	for who in _deaths:
-		deaths.append("%s died" % who)
+		deaths.append("%s died." % who)
 	_deaths.clear()
 	events.append_array(deaths)
 	if _was_in_fight and not fight:
@@ -332,13 +369,14 @@ func _watch() -> void:
 		_adjacent_before.clear()
 	_was_in_fight = fight
 	if not events.is_empty() and (threshold or not _instruction_locked()):
-		_ask_stance("; ".join(events))
-	if threshold or not deaths.is_empty():
-		_ask_voice("; ".join(deaths if not deaths.is_empty() else events))
+		_ask_stance(" ".join(events))
+	# A lapse is spoken to once her new stance is known (_take_result).
+	if (threshold or not deaths.is_empty()) and not lapsing and _lapsed_from.is_empty():
+		_ask_voice(" ".join(deaths if not deaths.is_empty() else events))
 	if _silence_due and not fight and World.tick - _fight_ended_tick >= SILENCE_TICKS:
 		_silence_due = false
 		if _last_speech_tick < _fight_ended_tick:
-			_ask_voice("the fight is over, and you have said nothing since")
+			_ask_voice("The fight is over, and you have said nothing since.")
 	if not _pending_stance.is_empty() and mind != null and not mind.busy("stance"):
 		var trigger := _pending_stance
 		_pending_stance = ""
@@ -346,7 +384,7 @@ func _watch() -> void:
 	if not _pending_voice.is_empty() and mind != null and not mind.busy("voice"):
 		var waiting := _pending_voice
 		_pending_voice = {}
-		_ask_voice(waiting["trigger"], waiting["heard"])
+		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false))
 
 
 ## A hostile within COMBAT_RANGE of her or her player.
@@ -385,6 +423,11 @@ static func _hp_band(entity: GridEntity) -> int:
 	return band
 
 
+## "fell below 30%" / "rose above 50%", from HP_THRESHOLDS bands.
+static func _hp_change(before: int, now: int) -> String:
+	return "%s %s" % ["fell below" if now > before else "rose above", _threshold_crossed(before, now)]
+
+
 static func _threshold_crossed(before: int, now: int) -> String:
 	var threshold: float = HP_THRESHOLDS[maxi(before, now) - 1]
 	return "%d%%" % roundi(threshold * 100.0)
@@ -413,21 +456,23 @@ func _ask_stance(trigger: String) -> void:
 
 ## Asks her voice for a line, on [param trigger]; [param heard] is what her
 ## player said, as she reads it ("" when they said nothing).
-func _ask_voice(trigger: String, heard := "") -> void:
+## [param always]: the line is said whatever the rate limit (her player's
+## words make it so too).
+func _ask_voice(trigger: String, heard := "", always := false) -> void:
 	if mind == null:
 		return
-	if heard.is_empty() and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
+	if heard.is_empty() and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return  # She could not say it: the rate limit.
 	if mind.busy("voice"):
 		# Her player's words come first; otherwise the newest moment.
-		if not heard.is_empty() or str(_pending_voice.get("heard", "")).is_empty():
-			_pending_voice = {"trigger": trigger, "heard": heard}
+		if not heard.is_empty() or always or str(_pending_voice.get("heard", "")).is_empty():
+			_pending_voice = {"trigger": trigger, "heard": heard, "always": always}
 		return
 	_serial += 1
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger,
 		"system": VOICE_SYSTEM % (WHY_FIELD if Net.mind_why else ""), "user": voice_prompt(trigger, heard),
-		"hp": hp, "max_hp": max_hp, "spoken_to": not heard.is_empty(), "heard": heard,
+		"hp": hp, "max_hp": max_hp, "spoken_to": not heard.is_empty(), "heard": heard, "always": always,
 	}
 	var answer := mind.voice(ask)
 	if not answer.is_empty():
@@ -437,7 +482,8 @@ func _ask_voice(trigger: String, heard := "") -> void:
 static func _sync_result(ask: Dictionary, answer: Dictionary) -> Dictionary:
 	return {"kind": ask["kind"], "serial": ask["serial"], "trigger": ask["trigger"],
 		"prompt": "%s\n\n%s" % [ask["system"], ask["user"]], "raw": JSON.stringify(answer),
-		"answer": answer, "error": "", "latency_ms": 0, "spoken_to": ask.get("spoken_to", false)}
+		"answer": answer, "error": "", "latency_ms": 0, "spoken_to": ask.get("spoken_to", false),
+		"always": ask.get("always", false)}
 
 
 ## The hands' ask: who she is, the situation, the standing instruction.
@@ -453,17 +499,40 @@ func voice_prompt(trigger: String, heard := "") -> String:
 	lines.append("%s %s%s" % [identity(), card, instructed])
 	lines.append("What has happened: %s" % run_summary())
 	lines.append("Now: %s" % situation_text())
+	lines.append("Right now %s" % doing())
 	if not heard.is_empty():
 		lines.append(heard)
-	lines.append("You may speak because: %s." % trigger)
+	lines.append("What just happened: %s" % trigger)
 	if _said.is_empty():
 		lines.append("You have said nothing yet. Usually say nothing.")
 	else:
 		var quoted: Array[String] = []
-		for line in _said:
+		for line in _said.slice(-SAID_KEPT):
 			quoted.append("\"%s\"" % line)
 		lines.append("You said recently: %s. %s" % [" / ".join(quoted), SAID_RULE])
 	return "\n".join(lines)
+
+
+## Her stance and what the hands have her doing, in a sentence: "your
+## stance is GUARD (keeping beside Jeff and fighting whatever comes at
+## either of you), and you are attacking Brute."
+func doing() -> String:
+	var words := STANCE_WORDS[stance] % keeper_name() if "%s" in STANCE_WORDS[stance] else STANCE_WORDS[stance]
+	var action := ""
+	match current_intent:
+		Intent.ATTACK:
+			action = "attacking %s" % (_name_of(intent_target) if _alive(intent_target) else "a monster")
+		Intent.RETREAT:
+			action = "pulling away from the monsters"
+		Intent.HOLD:
+			action = "holding your ground"
+		Intent.YIELD:
+			action = "stepping out of %s's way" % keeper_name()
+		Intent.IDLE:
+			action = "waiting"
+		_:
+			action = "keeping by %s" % keeper_name()
+	return "your stance is %s (%s), and you are %s." % [stance_name(), words, action]
 
 
 func _instruction_line() -> String:
@@ -531,9 +600,16 @@ func _take_result(result: Dictionary) -> void:
 			_set_stance(wanted, serial, entry["mind"])
 			entry["outcome"] = "applied"
 		MindLog.record(entry)
+		if not _lapsed_from.is_empty():
+			var was := _lapsed_from
+			_lapsed_from = ""
+			if stance_name() != was:
+				_ask_voice("%s is in danger, so %s's instruction no longer holds, and you changed course: from %s to %s. Say why, briefly." % [
+					keeper_name(), keeper_name(), was, stance_name()], "", true)
 		return
 	# The voice: to her player's words its stance is theirs to keep.
 	var spoken_to: bool = result.get("spoken_to", false)
+	var always: bool = spoken_to or result.get("always", false)
 	entry["outcome"] = "said"
 	if spoken_to and wanted != -1:
 		if serial >= _stance_serial:
@@ -551,7 +627,7 @@ func _take_result(result: Dictionary) -> void:
 		entry["say_dropped"] = line
 		entry["note"] = "echoes %s" % echo
 		line = ""
-	elif not _say(line, spoken_to):
+	elif not _say(line, always):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
 		entry["note"] = "within %d ticks of her last line" % SPEECH_INTERVAL_TICKS
