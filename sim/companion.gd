@@ -170,8 +170,7 @@ truly nothing worth saying, answer with just: ...
 Speak to %s as "you"; say the name only to call out. In what anyone says, "I" and "me" are the one speaking.
 Never repeat back what you were asked to do, and never describe yourself or recite who you are.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
-If you don't know what something is, say so. If you haven't seen something, never say it isn't there: ask about it
-instead, as you would ("What door?")."""
+If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there."""
 ## Who her player's words were for, as the server knows it (addressed):
 ## said her name, or no one else near enough to hear ("certain"); others
 ## near ("maybe"). Then VOICE_ASKED, the stances.
@@ -191,6 +190,12 @@ If %s asked nothing of you, leave that line out."""
 const EXCHANGE_KEPT := 16
 ## With --mind-why each reply gives its reason too, for the mind log.
 const WHY_FIELD := ", \"why\": <one short sentence: why>"
+## The instruction check: on her player's words alone, whether they ask her
+## to change how she fights or moves with them (a stance), nothing else.
+const CHECK_SYSTEM := """You read one line a player said to their companion in a game, and say whether it asks the companion
+to change how they fight or move alongside the player: stay close, stay where they are, attack, guard, or get away to
+safety. A question, a remark, or a request for anything else (moving or fetching things, opening doors, looking for
+something) does not. Reply with one JSON object and nothing else: {"asked": true} or {"asked": false}."""
 const CARD_INSTRUCTED := " Do what %s asks. Go against it only to save %s's life or yours, and say why when you do."
 ## What each stance is, for the voice ("Your stance is GUARD: keeping
 ## beside Jeff and fighting whatever comes at either of you.").
@@ -233,6 +238,9 @@ var _phrase_serials: Dictionary[int, bool] = {}
 ## What she has seen, kind -> {at, point, tick, open}: the nearest of each
 ## when she last saw one (_remember_sights), for knowledge_of.
 var _memory: Dictionary[String, Dictionary] = {}
+## Stances her voice read into her player's words, by serial, waiting on
+## the instruction check: {stance, heard}.
+var _checks: Dictionary[int, Dictionary] = {}
 ## Voice asks (by serial) to her player's words that were certainly for her.
 var _certain_serials: Dictionary[int, bool] = {}
 ## The way her player was walking when they last bumped into her.
@@ -462,6 +470,7 @@ func knowledge_of(kinds: Array[String]) -> String:
 		"crate": "a crate", "boulder": "a boulder", "cart": "a cart", "door": "a door"}
 	var seen := sightings()
 	var sentences: Array[String] = []
+	var unseen := 0
 	for kind in kinds:
 		var word: String = NAMES.get(kind, "a " + kind)
 		if seen.has(kind):
@@ -476,8 +485,10 @@ func knowledge_of(kinds: Array[String]) -> String:
 		elif kind == "fire" and World.heat_at(tile) >= HEAT_FELT and not World.heat_from(tile).is_empty():
 			sentences.append("You feel heat from the %s, from something you cannot see." % World.heat_from(tile))
 		else:
-			sentences.append("You haven't seen %s here and know of none: don't say there isn't one; ask, as you would (\"What %s?\")." % [
-				word, word.trim_prefix("a ").trim_prefix("an ")])
+			unseen += 1
+	if unseen > 0:
+		sentences.append(("%s mentioned something you haven't seen, so you don't know whether it exists. Find out what %s "
+			+ "means, or offer to look for it, in your own words.") % [keeper_name(), keeper_name()])
 	return " ".join(sentences)
 
 
@@ -1529,6 +1540,48 @@ func _lately() -> Array[String]:
 	return collapse_log(lines).slice(-SUMMARY_LINES)
 
 
+## Asks the instruction check about [param heard] (her player's words, as
+## she was told them): does it ask her to change how she fights or moves?
+## Only then does [param wanted], her voice's reading, stand. The words
+## alone are asked, nothing of the scene.
+func _check_instruction(wanted: int, serial: int, heard: String) -> void:
+	_checks[serial] = {"stance": wanted, "heard": heard}
+	if mind == null or mind.busy("check"):
+		_log({"kind": "check", "companion": String(name), "trigger": heard, "outcome": "not asked",
+			"note": "the check is busy; %s stands" % stance_name()})
+		_checks.erase(serial)
+		return
+	var ask := {"kind": "check", "serial": serial, "trigger": heard, "system": CHECK_SYSTEM,
+		"user": _quoted(heard), "heard": heard}
+	var answer := mind.check(ask)
+	if not answer.is_empty():
+		_take_result(_sync_result(ask, answer))
+
+
+func _take_check(result: Dictionary, answer: Dictionary, entry: Dictionary) -> void:
+	var serial := int(result.get("serial", 0))
+	var waiting: Dictionary = _checks.get(serial, {})
+	_checks.erase(serial)
+	if waiting.is_empty():
+		return
+	var wanted: int = waiting["stance"]
+	entry["stance"] = STANCE_NAMES[wanted]
+	if answer.get("asked") != true:
+		entry["outcome"] = "not an instruction"
+		entry["note"] = "%s's words ask nothing of how she fights or moves: %s not taken" % [keeper_name(), STANCE_NAMES[wanted]]
+	elif serial < _stance_serial:
+		entry["outcome"] = "superseded"
+		entry["note"] = "a newer ask's %s stands" % stance_name()
+	else:
+		_set_stance(wanted, serial, entry["mind"])
+		_instruction = str(waiting["heard"])
+		_instruction_tick = World.tick
+		_instruction_stance = STANCE_NAMES[wanted]
+		entry["outcome"] = "applied"
+		entry["note"] = "an instruction: %s, and %s's words stand" % [STANCE_NAMES[wanted], keeper_name()]
+	_log(entry)
+
+
 ## A mind's answer came back (or was there at once): a stance applied
 ## unless a newer ask's stands, a line said unless it echoes; logged.
 func _take_result(result: Dictionary) -> void:
@@ -1548,6 +1601,9 @@ func _take_result(result: Dictionary) -> void:
 	var stance_text := str(answer.get("stance", "")).strip_edges().to_upper()
 	var wanted := STANCE_NAMES.find(stance_text)
 	entry["stance"] = stance_text
+	if kind == "check":
+		_take_check(result, answer, entry)
+		return
 	if kind == "stance":
 		if wanted == -1:
 			entry["outcome"] = "rejected"
@@ -1584,15 +1640,12 @@ func _take_result(result: Dictionary) -> void:
 		entry["stance_ignored"] = stance_text
 		entry["note"] = "a stance with no words, to a line that may not have been for her: not taken"
 	elif wanted != -1:
-		if serial >= _stance_serial:
-			# Her voice read her player's words as asking this of her: it stands.
-			_set_stance(wanted, serial, entry["mind"])
-			_instruction = str(result.get("heard", ""))
-			_instruction_tick = World.tick
-			_instruction_stance = stance_text
-			entry["note"] = "stance %s applied; %s's words stand as an instruction" % [stance_text, keeper_name()]
-		else:
-			entry["note"] = "stance %s superseded by a newer ask" % stance_text
+		# Her voice read a stance into her player's words: it counts only if
+		# the instruction check, on the words alone, says they asked her.
+		entry.erase("stance")
+		entry["stance_waiting"] = stance_text
+		entry["note"] = "stance %s waits on the instruction check" % stance_text
+		_check_instruction(wanted, serial, str(result.get("heard", "")))
 	_certain_serials.erase(serial)
 	var line := trim_line(str(answer.get("say", "")))
 	var echo := _echo_of(line)

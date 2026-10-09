@@ -888,9 +888,19 @@ answer, what she knows of it: in sight, where ("A door is a few paces to
 the south, closed."); else remembered, where and how long ago, from her
 memory of the zone (`_remember_sights` every `MEMORY_EVERY` ticks: "You saw
 fire some way off to the north-east just now."); else sensed (heat from
-fire she cannot see); else that she has not seen one here and knows of
-none, so she asks about it as she would ("What door?"), never saying there
-is none.
+fire she cannot see); else "Jeff mentioned something you haven't seen,
+so you don't know whether it exists. Find out what Jeff means, or offer to
+look for it, in your own words." No example phrasing: her prompts say what
+is true and what to do, never what to say (docs/decisions.md 136).
+
+**The instruction check**: a stance in her voice's reply to her player's
+words counts only if a separate yes/no ask on those words alone
+(`CHECK_SYSTEM`, the "check" channel, JSON `{"asked": true|false}`,
+temperature 0) says they ask her to change how she fights or moves: stay
+close, hold, attack, guard, pull back. A question, a remark, or a request
+her hands cannot carry out ("push the cart over here") never sets a
+stance; the reply's stance is logged as waiting, then applied or "not an
+instruction". Quick phrases set theirs directly, unchecked.
 
 **How she speaks** (`VOICE_RULES`): to her player as "you", the name only
 to call out; "I" and "me" in what anyone says are the one speaking; she

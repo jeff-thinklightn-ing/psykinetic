@@ -13,6 +13,9 @@ extends RefCounted
 ##                of Companion.STANCE_NAMES), optionally "why".
 ##   voice(ask)   at a speaking moment: answers {"say": line or "",
 ##                "stance": name or ""}, optionally "why".
+##   check(ask)   the instruction check, on her player's words alone (user):
+##                answers {"asked": true} if they ask her to change how she
+##                fights or moves with them, {"asked": false} otherwise.
 ## Either answers {} when its answer comes later, through take_results().
 ## The player a companion travels with is named in what it reads, never
 ## called an owner or a companion.
@@ -26,6 +29,10 @@ func stance(_ask: Dictionary) -> Dictionary:
 
 
 func voice(_ask: Dictionary) -> Dictionary:
+	return {}
+
+
+func check(_ask: Dictionary) -> Dictionary:
 	return {}
 
 

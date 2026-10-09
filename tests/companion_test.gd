@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_surroundings_when_new()
 	_test_what_she_knows()
 	_test_how_she_speaks()
+	_test_instruction_check()
 	_test_fields()
 	_test_compass()
 	_test_transcript()
@@ -1344,7 +1345,9 @@ func _test_what_she_knows() -> void:
 	_check("You saw fire " in known and "just now" in known, "remembered: where and how long ago (%s)" % known)
 	_check("A door is a few paces to the south, closed." in known or "A door is a few paces to the south, open." in known,
 			"a door in sight, and whether it is open (%s)" % known)
-	_check("You haven't seen water here" in known and not "no water" in known.to_lower(), "unknown: not seen here, never 'there is none'")
+	_check("Player mentioned something you haven't seen, so you don't know whether it exists. Find out what Player means, or offer to look for it, in your own words." in known
+			and not "no water" in known.to_lower() and not "\"" in known,
+			"unknown: she doesn't know whether it exists, and is told what to do, never what to say")
 	pet._memory.clear()
 	_put(pet, Vector2i(9, 7))
 	World._set_terrain({"floor": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)], "fire": [Vector2i(0, 0)],
@@ -1354,7 +1357,7 @@ func _test_what_she_knows() -> void:
 	var sensed := pet.knowledge_of(["fire"] as Array[String])
 	pet.tile = was
 	World._set_terrain(_main._terrain)
-	_check(sensed.begins_with("You feel heat from the west") or sensed.begins_with("You haven't seen fire"),
+	_check(sensed.begins_with("You feel heat from the west") or sensed.begins_with("Player mentioned something you haven't seen"),
 			"behind a wall: felt, not seen (%s)" % sensed)
 	pet._exchange.clear()
 	pet._add_turn("user", "Is the door open?")
@@ -1365,6 +1368,48 @@ func _test_what_she_knows() -> void:
 	_put(owner, Vector2i(11, 2))
 	_put(pet, Vector2i(11, 3))
 	pet._exchange.clear()
+	_settle(pet)
+
+
+func _test_instruction_check() -> void:
+	print("\n== a stance in her reply counts only if the instruction check, on the words alone, says she was asked ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	for i in 21:
+		World.step()
+	var cases := [
+		["Stay close to me.", "STAY_CLOSE", true],
+		["Is the door open?", "GUARD", false],
+		["Push the cart over here.", "STAY_CLOSE", false],
+	]
+	for c: Array in cases:
+		pet._instruction = ""
+		pet.stance = Companion.Stance.PRESS
+		mind.clear()
+		mind.check_asks.clear()
+		mind.voice_answer = {"say": "Right.", "stance": c[1]}
+		mind.check_answer = {"asked": c[2]}
+		_main._chat_tick.clear()
+		_main._on_command(owner, "say", {"text": c[0]})
+		var checked: Dictionary = mind.check_asks.back() if not mind.check_asks.is_empty() else {}
+		_check(checked.get("user") == c[0] and checked.get("system") == Companion.CHECK_SYSTEM,
+				"%s: the check is asked on the words alone (%s)" % [c[0], checked.get("user", "not asked")])
+		var applied: bool = pet.stance == Companion.STANCE_NAMES.find(c[1]) and not pet.standing_instruction().is_empty()
+		_check(applied == c[2], "%s: %s" % [c[0], "an instruction: %s stands" % c[1] if c[2] else "no instruction: %s not taken (%s)" % [
+			c[1], MindLog.last[String(pet.name)].get("outcome", "")]])
+	mind.check_asks.clear()
+	_main._chat_tick.clear()
+	_main._on_command(owner, "say", {"text": "Stay back!", "phrase": 2})
+	_check(mind.check_asks.is_empty() and pet.stance == Companion.Stance.PULL_BACK, "a quick phrase needs no check")
+	var scripted := ScriptedMind.new()
+	_check(scripted.check({"user": "Stay close to me."})["asked"] and not scripted.check({"user": "Is the door open?"})["asked"]
+			and not scripted.check({"user": "Push the cart over here."})["asked"], "the scripted mind's check reads the same three right")
+	pet._instruction = ""
+	pet.mind = ScriptedMind.new()
 	_settle(pet)
 
 
@@ -1859,6 +1904,8 @@ class CountingMind:
 	var voice_asks: Array[Dictionary] = []
 	var stance_answer := {"stance": "GUARD"}
 	var voice_answer := {"say": "", "stance": ""}
+	var check_answer := {"asked": true}
+	var check_asks: Array[Dictionary] = []
 
 	func _init() -> void:
 		kind = "counting"
@@ -1870,6 +1917,10 @@ class CountingMind:
 	func voice(ask: Dictionary) -> Dictionary:
 		voice_asks.append(ask)
 		return voice_answer.duplicate()
+
+	func check(ask: Dictionary) -> Dictionary:
+		check_asks.append(ask)
+		return check_answer.duplicate()
 
 	func clear() -> void:
 		stance_asks.clear()

@@ -15,10 +15,11 @@ extends CompanionMind
 
 ## A stance must come quickly (aim: under 300 ms) and is short; a line may
 ## take longer, in the background.
-const TIMEOUT_SECONDS := {"stance": 2.0, "voice": 5.0}
-const MAX_TOKENS := {"stance": 24, "voice": 90}
-## A stance wants the likeliest answer; a line wants some life.
-const TEMPERATURE := {"stance": 0.2, "voice": 0.8}
+const TIMEOUT_SECONDS := {"stance": 2.0, "voice": 5.0, "check": 2.0}
+const MAX_TOKENS := {"stance": 24, "voice": 90, "check": 12}
+## A stance wants the likeliest answer, the check the surest; a line wants
+## some life.
+const TEMPERATURE := {"stance": 0.2, "voice": 0.8, "check": 0.0}
 ## More with --mind-why, for the reason after the answer.
 const WHY_TOKENS := 40
 
@@ -44,7 +45,7 @@ func _init(endpoint: String, model_name: String, host: Node) -> void:
 	url = endpoint
 	model = model_name
 	openai_shaped = endpoint.trim_suffix("/").ends_with("/chat/completions")
-	for what: String in ["stance", "voice"]:
+	for what: String in ["stance", "voice", "check"]:
 		var http := HTTPRequest.new()
 		http.timeout = TIMEOUT_SECONDS[what]
 		http.request_completed.connect(_on_request_completed.bind(what))
@@ -60,6 +61,11 @@ func stance(ask: Dictionary) -> Dictionary:
 
 func voice(ask: Dictionary) -> Dictionary:
 	_send("voice", ask)
+	return {}
+
+
+func check(ask: Dictionary) -> Dictionary:
+	_send("check", ask)
 	return {}
 
 
@@ -109,7 +115,7 @@ func request_messages(messages: Array, what := "stance") -> String:
 		"model": model, "think": false, "stream": false, "keep_alive": -1,
 		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5)}, "messages": messages,
 	}
-	if what == "stance":
+	if what in ["stance", "check"]:
 		body["format"] = "json"
 	return JSON.stringify(body)
 
@@ -187,7 +193,7 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 		var found := RegEx.create_from_string("\"stance\"\\s*:\\s*\"([A-Z_]+)\"").search(content)
 		if found != null:
 			answer = {"stance": found.get_string(1)}
-	var needs := "stance" if what == "stance" else "say"
+	var needs: String = {"stance": "stance", "check": "asked"}.get(what, "say")
 	if answer is not Dictionary or not answer.has(needs):
 		_fail(what, "reply is not a JSON object with a %s: %s" % [needs, content.left(80)], content)
 		return

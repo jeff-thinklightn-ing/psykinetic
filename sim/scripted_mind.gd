@@ -21,6 +21,14 @@ func stance(ask: Dictionary) -> Dictionary:
 	return {"stance": "GUARD"}
 
 
+## Its instruction check: words of staying, holding, fighting or falling
+## back ask; anything else does not.
+func check(ask: Dictionary) -> Dictionary:
+	var words := str(ask.get("user", "")).to_lower()
+	var asks := RegEx.create_from_string("\\b(stay|keep|hold|wait here|guard|protect|cover|attack|fight|get them|charge|back|retreat|run|follow|with me|close)\\b")
+	return {"asked": asks.search(words) != null}
+
+
 func voice(ask: Dictionary) -> Dictionary:
 	if not ask.get("spoken_to", false):
 		return {"say": "", "stance": ""}

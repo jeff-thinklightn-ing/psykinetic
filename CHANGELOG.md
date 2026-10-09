@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.69
+
+Companions. Server.
+
+- **Questions don't change what she does**: only something you actually ask
+  her to do (stay close, hold, attack, guard, fall back) changes her
+  stance. Questions, remarks and things she can't do with her hands don't.
+- Asked about something she hasn't seen, she is left to find out what you
+  mean in her own words.
+
+The server must be updated to v0.1.69 too, as it refuses any other version.
+
 ## v0.1.68
 
 Companions. Server.

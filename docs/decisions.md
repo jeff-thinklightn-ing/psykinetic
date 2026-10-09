@@ -1162,3 +1162,23 @@ haven't seen a door here, so you cannot tell anything about one". Against
 qwen3:14b that took the invented door away (4 of 4 "No door here."), and a
 fire in sight is placed right ("A few paces to the south-west", 4 of 4).
 Distances are words in her ask, so she speaks them as words.
+
+## 136. Prompts say what is true and what to do, never what to say
+
+A standing rule for every prompt the companion gets. An example line in a
+prompt ("What door?") comes back word for word: it is her voice, not
+hers. Her prompts state facts (what she sees, what she knows, who is
+near) and tasks (find out what he means, answer in words, stay quiet if
+it was not for you), and leave the words to her. Grammar the parser
+needs, the [STANCE: ...] line, is the one exception, being no speech.
+
+## 137. A stance from words needs a separate yes/no check
+
+Her voice tacked stances onto questions ("Is the door open?" came back
+with GUARD, applied as an instruction). Telling the voice not to did not
+hold; a separate, single-purpose ask on the player's words alone does:
+does this ask her to change how she fights or moves? qwen3:14b, at
+temperature 0, said no to the three probe lines 12 of 12, yes to stay
+close, get behind me, hold this spot and kill that imp, no to "we should
+rest here" and "can you open that door". Only a yes lets her reply's
+stance stand. Quick phrases need no check: their key is the instruction.
