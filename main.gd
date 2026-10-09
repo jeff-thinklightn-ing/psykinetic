@@ -1376,13 +1376,17 @@ func _spawn_saved(section: Dictionary) -> bool:
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
 		if entry.get("slots") != null:
 			World.set_slots(entity, entry["slots"])
-	# Slots with no entity are dead: pick up their timers, or start one now.
+	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
 		if not _alive_slots.has(respawn["spawn"]):
 			_dead_since[respawn["spawn"]] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
+	# Slots with neither are new in the level since the save (every dead
+	# slot's timer is saved): there now, or dead from now if their tile is taken.
 	for slot in level_entities.size():
 		if not _alive_slots.has(slot) and not _dead_since.has(slot):
-			_dead_since[slot] = World.tick
+			print("[state] %s is new in the level since the save" % level_entities[slot]["name"])
+			if _spawn(_slot_spec(slot)) == null:
+				_dead_since[slot] = World.tick
 	return true
 
 

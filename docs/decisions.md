@@ -1206,3 +1206,13 @@ every change, so death, travel and a restart keep them; a chest's are in
 its snapshot entry. A room reset rebuilds a chest from the level while
 players keep what they hold, so a reset can make a second kit: the reset
 is a test-room tool, and that is accepted for now.
+
+## 140. A level entity the snapshot does not know is new, and spawns now
+
+Loading a snapshot used to treat a level slot with no saved entity and no
+saved respawn timer as dead from that moment: it came back only after the
+respawn delay, with no player within 6 tiles. The chest sits beside the
+start tiles, so on the box, whose snapshot predates it, it would never
+have appeared. Every dead slot's timer is saved, so a slot with neither is
+one the level gained since the save: it spawns at once (dead from now only
+if its tile is taken).

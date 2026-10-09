@@ -368,7 +368,9 @@ boxes show what the server says, not what was dropped).
 
 **Persistence**: a chest's slots are saved with its entry in the snapshot
 (`slots`) and put back on load (`World.set_slots`); an entry with none
-saved keeps the level's. A player's slots are kept in their record
+saved keeps the level's. A chest (or anything) added to a level after the
+server last saved has neither an entry nor a respawn timer in the
+snapshot, and is spawned at once as the level has it. A player's slots are kept in their record
 (`PlayerRecord.slots`), updated the moment they change
 (`World.slots_changed`), so they survive a death, a trip to another zone,
 leaving and a restart. A room reset (R) rebuilds its chests from the

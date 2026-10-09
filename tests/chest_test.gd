@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_two_players()
 	await _test_restart()
 	await _test_click_from_afar()
+	await _test_new_in_the_level()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -202,6 +203,30 @@ func _test_click_from_afar() -> void:
 	World._relocate(host, Vector2i(6, 1))
 	await get_tree().process_frame
 	_check(panel.chest == null, "away from it: closed")
+
+
+func _test_new_in_the_level() -> void:
+	print("\n== a snapshot from before the chest: it is there at once, kit and all ==")
+	# The server stops (and saves); its file is then as an older build left it.
+	remove_child(_main)
+	_main.free()
+	World.clear_zones()
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
+	var room: Dictionary = data["zones"]["test_room"]
+	room["entities"] = (room["entities"] as Array).filter(func(entry: Dictionary) -> bool: return entry["name"] != "Chest1")
+	for record: Dictionary in data["players"]:
+		record.erase("slots")
+	var file := FileAccess.open(Net.state_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify(data, "\t"))
+	file.close()
+	_main = preload("res://main.tscn").instantiate()
+	add_child(_main)
+	await get_tree().process_frame
+	var chest := _chest()
+	_check(chest != null and chest.tile == Vector2i(10, 3) and Array(chest.slots) == [KIT, "", "", ""],
+			"the chest is at (10, 3) with the kit (%s)" % [Array(chest.slots) if chest else "none"])
+	_check(not _main._dead_since.has(chest.spawn_spec.get("spawn", -1)) if chest else false, "not waiting to respawn")
+	_check(Array(_player(Net.local_id).slots) == ["", "", "", ""], "a record from before slots has four empty ones")
 
 
 func _chest() -> Chest:

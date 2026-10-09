@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.72
+
+Server.
+
+- The test room's new chest is there straight away on a server that was
+  running before it was added, rather than turning up a minute later only
+  once nobody was near the start.
+
+The server must be updated to v0.1.72 too, as it refuses any other version.
+
 ## v0.1.71
 
 Slots and chests. Server.
