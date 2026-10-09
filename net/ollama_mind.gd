@@ -123,7 +123,8 @@ static func max_tokens(what: String) -> int:
 static func parse_voice(content: String, speaker := "") -> Dictionary:
 	var text := content
 	var stance := ""
-	var tag := RegEx.create_from_string("(?i)\\[\\s*STANCE\\s*:\\s*([A-Z_]+)\\s*\\]")
+	# Brackets or not: the model drops them now and then.
+	var tag := RegEx.create_from_string("(?i)\\[?\\s*\\bSTANCE\\s*:\\s*([A-Z_]+)\\s*\\]?")
 	var found := tag.search(text)
 	if found != null:
 		stance = found.get_string(1).to_upper()

@@ -874,6 +874,34 @@ stance, and a stance with no words counts only when the line was certainly
 hers. A fallen player hears from where they fell until they rise, but has
 no body to speak with.
 
+**Whom a line is for** (`addressed_to`): a line that says her name is
+hers; one that names someone else (another player or companion there) is
+not, and she is told so ("spoken to Bo, not to you"; another's line
+naming someone else is not even an ask); one that names no one is open to
+anyone near (`VOICE_OPEN`), answered if she has something useful; her own
+player's, with no one else near, is hers.
+
+**What she knows of what is mentioned** (`knowledge_of`): when her
+player's words name a kind of thing (door, fire, water, crate, boulder,
+cart, stair, ledge, torch), the ask says, right by the instruction to
+answer, what she knows of it: in sight, where ("A door is a few paces to
+the south, closed."); else remembered, where and how long ago, from her
+memory of the zone (`_remember_sights` every `MEMORY_EVERY` ticks: "You saw
+fire some way off to the north-east just now."); else sensed (heat from
+fire she cannot see); else that she has not seen one here, and cannot tell
+anything about it, never that there is none.
+
+**How she speaks** (`VOICE_RULES`): to her player as "you", the name only
+to call out; "I" and "me" in what anyone says are the one speaking; she
+never repeats back what she was asked or recites who she is (the echo
+filter also drops a line that is her card's or her instruction's words).
+Distances in the voice's ask are words, never numbers (`distance_words`:
+close by, a few paces, some way off, at the edge of sight). She is told
+what she carries (her lantern, nothing else yet). The dead are no threat:
+monsters leave the world as they die, and those she saw fall are "lying
+dead near you, no threat now". A stance line is read with or without its
+brackets, and never spoken.
+
 **Party chat** crosses zones: a line starting `/p ` is `World.command("party")`,
 sent to every player on the server wherever they are
 (`Net.message("party", {from, zone, text})`), shown in the talk panel in

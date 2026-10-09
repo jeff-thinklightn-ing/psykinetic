@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.67
+
+Companions. Server and client.
+
+- **She knows what she has seen**: ask about a door, fire, water or a
+  crate and she answers from what she can see, what she saw earlier, or
+  what she can feel; if she hasn't seen one, she says so instead of making
+  it up.
+- **Talks to you, not about you**: she calls you "you", never repeats your
+  instructions back or describes herself, and says distances as "close by",
+  "a few paces", "some way off".
+- **Names matter**: a line naming someone else isn't for her; a line
+  naming no one, she answers only if she has something useful.
+- The controls list has a darker backing, easier to read.
+
+The server must be updated to v0.1.67 too, as it refuses any other version.
+
 ## v0.1.66
 
 Companions. Server.

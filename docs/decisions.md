@@ -1150,3 +1150,15 @@ bare stance with no words when named (5 of 5); so the facts the server has,
 her name in the line and who else is near enough to hear, go into the ask
 as facts. Run against qwen3:14b: a line to Bo, silent 5/5; "Pip, stay with
 me", answered 5/5; Jeff's question with no one near, answered 5/5.
+
+## 135. She is told what she knows of what was asked, and that not seeing is not absence
+
+Asked "Is the door open?" with no door in sight, she answered "No, the
+door is closed" (4 of 4): the question takes a door for granted and the
+model goes along. The server knows what she has seen, so it says so beside
+the instruction to answer: where it is if in sight, where and when if she
+saw one earlier, felt if it is fire behind a wall, and otherwise "you
+haven't seen a door here, so you cannot tell anything about one". Against
+qwen3:14b that took the invented door away (4 of 4 "No door here."), and a
+fire in sight is placed right ("A few paces to the south-west", 4 of 4).
+Distances are words in her ask, so she speaks them as words.

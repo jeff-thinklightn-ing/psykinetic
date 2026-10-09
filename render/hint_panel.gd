@@ -5,7 +5,7 @@ extends PanelContainer
 ## as hints=). Sizes in the HUD's 3840 x 2160 units.
 
 const FONT_SIZE := 30
-const BACKING := Color(0.04, 0.04, 0.06, 0.42)
+const BACKING := Color(0.04, 0.04, 0.06, 0.78)
 const TEXT := Color(0.93, 0.92, 0.88, 0.92)
 const KEY := Color(1.0, 0.86, 0.55, 0.95)
 

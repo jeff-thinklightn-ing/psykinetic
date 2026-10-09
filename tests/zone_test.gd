@@ -268,24 +268,33 @@ func _test_overheard() -> void:
 	var nix_ask: Dictionary = nix_mind.voice_asks.back() if not nix_mind.voice_asks.is_empty() else {}
 	var pip_text := Companion.render(pip_ask.get("messages", []))
 	var nix_text := Companion.render(nix_ask.get("messages", []))
-	_check(pip_text.ends_with("%s: Bo, take the left side." % Net.player_name) and nix_text.ends_with("%s: Bo, take the left side." % Net.player_name),
-		"both companions get the line, labelled with who said it")
+	_check(pip_text.ends_with("%s: Bo, take the left side." % Net.player_name)
+			and ("%s: Bo, take the left side." % Net.player_name) in Companion.render(nix.voice_messages()),
+		"both companions hear the line, labelled with who said it")
 	_check("Not everything said near you is meant for you" in pip_text and "Bo is " in pip_text,
 		"Pip is told a line may not be for her, and that Bo is there to be spoken to")
 	_check(MindLog.last[String(pip.name)].get("outcome") == "silent" and pip._said.is_empty() and pip.stance != Companion.Stance.PRESS
 			and MindLog.last[String(pip.name)].get("stance_ignored") == "PRESS",
 		"meant for Bo: she answers \"...\", says nothing, and the stance with it is not taken (%s)" % MindLog.last[String(pip.name)].get("note", ""))
-	_check(not "[STANCE:" in str(nix_ask.get("system", "")) and nix.stance != Companion.Stance.PRESS,
-		"Nix: someone else's player's words never set her stance, nor is she offered one")
+	_check("spoken to Bo, not to you" in pip_text, "Pip is told it named Bo, not her")
+	_check(nix_mind.voice_asks.is_empty() and nix_text.is_empty() and nix.stance != Companion.Stance.PRESS,
+		"Nix: someone else's player's words, naming Bo: hers to hear, not to answer, never a stance")
 	# A line to her: she answers.
 	pip_mind.voice_answer = {"say": "Right here, Jeff.", "stance": ""}
 	nix_mind.voice_answer = {"say": "...", "stance": ""}
 	_main._chat_tick.clear()
 	_main._player_said(host, "%s, stay with me." % pip.name)
 	_check(pip._said.back() == "Right here, Jeff." if not pip._said.is_empty() else false, "a line to Pip by name: she answers (%s)" % [pip._said])
-	_check(MindLog.last[String(nix.name)].get("outcome") == "silent", "and Nix, not named, keeps quiet")
+	_check(nix_mind.voice_asks.is_empty(), "and Nix, the line naming Pip, is not asked")
 	_check("%s: Right here, Jeff." % pip.name in Companion.render(nix.voice_messages()), "Nix heard Pip's answer too, labelled")
-	_check(nix_mind.voice_asks.size() == 2, "a companion's words are no ask for another (only the two lines of Jeff's)")
+	_check(nix_mind.voice_asks.is_empty(), "nor is a companion's line an ask for another")
+	# A line naming no one, with others near: open to anyone; both are asked.
+	pip_mind.voice_asks.clear()
+	_main._chat_tick.clear()
+	_main._player_said(host, "Anyone see a way out?")
+	var open_text := Companion.render(nix_mind.voice_asks.back()["messages"]) if not nix_mind.voice_asks.is_empty() else ""
+	_check(not pip_mind.voice_asks.is_empty() and "naming no one" in open_text and "it is open to anyone" in open_text,
+		"a line naming no one: both are asked, told it is open to anyone")
 	# The fallen hear, but cannot speak.
 	World.damage(bo, 999)
 	_check(_player(BO) == null and BO in _main.hearers(host.tile), "Bo, fallen, still hears what is said near where he fell")

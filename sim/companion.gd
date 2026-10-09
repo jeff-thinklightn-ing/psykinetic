@@ -108,6 +108,8 @@ const PERCEPTION_NEAR := 2
 const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
+## She notes where she has seen things every so many ticks (_remember_sights).
+const MEMORY_EVERY := 10
 ## Speech carries this far (cells, in its own zone): what anyone says
 ## reaches the players and companions within it (Main.hearers).
 const HEARING_RANGE := 10
@@ -159,18 +161,23 @@ Wounds close slowly when you rest away from danger.
 Whoever falls rises again after a while, but it hurts, and no one wants to fall.
 Directions are spoken as north, south, east and west."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
-words are enough. Not everything said near you is meant for you: a line is for you if it says your name, asks you
-something or tells you to do something, or comes from %s when no one else is near. When a line is meant for you,
-always answer in words, even if only to say you don't know; when it is not, you usually stay quiet and answer with
-just: ... Never say again what you have already said, and never repeat anyone's words back. Only when nothing has
-been said to you and there is truly nothing worth saying, answer with just: ...
+words are enough. Not everything said near you is meant for you: a line that says your name is for you; a line that
+names someone else is not; a line that names no one is open to anyone near, and you answer it if you have something
+useful to say; from %s with no one else near, it is for you. When a line is meant for you, always answer in words,
+even if only to say you don't know; when it is not, you usually stay quiet and answer with just: ... Never say again
+what you have already said, and never repeat anyone's words back. Only when nothing has been said to you and there is
+truly nothing worth saying, answer with just: ...
+Speak to %s as "you"; say the name only to call out. In what anyone says, "I" and "me" are the one speaking.
+Never repeat back what you were asked to do, and never describe yourself or recite who you are.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
-If you don't know what something is, say so."""
+If you don't know what something is, say so. If you haven't seen something, say you haven't seen it; never say
+it isn't there."""
 ## Who her player's words were for, as the server knows it (addressed):
 ## said her name, or no one else near enough to hear ("certain"); others
 ## near ("maybe"). Then VOICE_ASKED, the stances.
 const VOICE_FOR_HER := """%s has just spoken to you%s: it was meant for you. Answer out loud in words first, never with just "...", even if only to say you don't know."""
-const VOICE_FOR_WHOM := """%s has just spoken, with %s near enough to hear: it may have been meant for them. If it was meant for you (your name, a question to you, or something for you to do), answer out loud in words first; if not, answer with just: ..."""
+const VOICE_FOR_OTHER := """%s has just spoken to %s, not to you: answer with just: ..."""
+const VOICE_OPEN := """%s has just spoken, naming no one, with %s near enough to hear: it is open to anyone. Answer out loud in words if you have something useful to say; if not, answer with just: ..."""
 const VOICE_NAMED := """%s has just said your name: it was meant for you. Answer out loud in words."""
 const VOICE_ASKED := """Then, only if %s asked you to do something, add one more line saying
 what you will do, exactly one of:
@@ -223,6 +230,9 @@ var _serial := 0
 var _catching_up := false
 ## Voice asks (by serial) answering a quick phrase, whose stance is set.
 var _phrase_serials: Dictionary[int, bool] = {}
+## What she has seen, kind -> {at, point, tick, open}: the nearest of each
+## when she last saw one (_remember_sights), for knowledge_of.
+var _memory: Dictionary[String, Dictionary] = {}
 ## Voice asks (by serial) to her player's words that were certainly for her.
 var _certain_serials: Dictionary[int, bool] = {}
 ## The way her player was walking when they last bumped into her.
@@ -340,8 +350,10 @@ func bumped(direction: Vector2i) -> bool:
 func overheard(speaker: String, text: String, ask := true) -> void:
 	_heard.append({"text": text, "tick": World.tick})
 	_add_turn("user", text, false, speaker)
-	if ask:
-		_ask_voice("%s spoke near you." % speaker, "%s just said: \"%s\"" % [speaker, text], false, false, false)
+	var heard := "%s just said: \"%s\"" % [speaker, text]
+	# A line naming someone else is theirs: in her exchange, no ask.
+	if ask and addressed_to(heard) != "other":
+		_ask_voice("%s spoke near you." % speaker, heard, false, false, false)
 
 
 ## The others (players and companions, by name) near enough to hear her
@@ -358,8 +370,119 @@ func others_near() -> Array[String]:
 ## Whether [param heard] (as she is told it: 'Jeff just said to you: "..."')
 ## says her name.
 func _says_name(heard: String) -> bool:
-	var quoted := heard.get_slice("\"", 1) if "\"" in heard else heard
-	return RegEx.create_from_string("(?i)\\b%s\\b" % _name_of(self)).search(quoted) != null
+	return _named(_quoted(heard), _name_of(self))
+
+
+## The words in [param heard], without who said them.
+static func _quoted(heard: String) -> String:
+	return heard.get_slice("\"", 1) if "\"" in heard else heard
+
+
+static func _named(words: String, who: String) -> bool:
+	return not who.is_empty() and RegEx.create_from_string("(?i)\\b%s\\b" % who).search(words) != null
+
+
+## The others in her zone [param heard] names (not her, not who said it).
+func _others_named(heard: String) -> Array[String]:
+	var words := _quoted(heard)
+	var speaker := heard.get_slice(" ", 0)
+	var named: Array[String] = []
+	for entity in World.get_entities():
+		if entity != self and entity.spawned and (entity is Player or entity is Companion):
+			var who := _name_of(entity)
+			if who != speaker and _named(words, who):
+				named.append(who)
+	return named
+
+
+## Whom [param heard] was for, as far as the server can tell: "her" (her
+## name; or her player's words, a quick phrase's meaning, with no one else
+## near), "other" (names someone else, not her), "open" (names no one,
+## others near), "" for nothing heard.
+func addressed_to(heard: String) -> String:
+	if heard.is_empty():
+		return ""
+	if _says_name(heard) or not "\"" in heard:
+		return "her"
+	if not _others_named(heard).is_empty():
+		return "other"
+	if heard.begins_with(keeper_name() + " ") and others_near().is_empty():
+		return "her"
+	return "open"
+
+
+## The nearest of each kind of thing she can see now: kind -> {at, point,
+## open (a door's)}. Fire, water, stairs, ledges, torches, crates,
+## boulders, carts, doors.
+func sightings() -> Dictionary[String, Dictionary]:
+	var seen: Dictionary[String, Dictionary] = {}
+	for cell in _cells_within(PERCEPTION_RANGE):
+		if not _sees(cell):
+			continue
+		var kinds: Array[String] = []
+		if World.is_fire(cell):
+			kinds.append("fire")
+		if World.is_water(cell):
+			kinds.append("water")
+		if World.stair_at(cell) != Vector2i.ZERO:
+			kinds.append("stair")
+		if World.is_torch(cell):
+			kinds.append("torch")
+		if World.is_walkable(cell) and _ledge_at(cell) != 0:
+			kinds.append("ledge")
+		var entity := World.get_entity_at(cell)
+		if entity != null and entity.pushable and entity.spawned:
+			kinds.append(object_word(entity))
+		for kind in kinds:
+			if not seen.has(kind):
+				seen[kind] = {"at": cell, "point": Vector2(cell)}
+	for door: Door in World.get_doors():
+		var sides := Terrain.edge_cells(door.key)
+		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
+		if World.distance(tile, near) <= PERCEPTION_RANGE and (_sees(sides[0]) or _sees(sides[1])):
+			if not seen.has("door") or _nearer(near, seen["door"]["at"]):
+				seen["door"] = {"at": near, "point": Vector2(sides[0] + sides[1]) / 2.0, "open": door.is_open()}
+	return seen
+
+
+## Notes where she has seen each kind of thing, now: her memory of the zone.
+func _remember_sights() -> void:
+	var seen := sightings()
+	for kind: String in seen:
+		_memory[kind] = seen[kind]
+		_memory[kind]["tick"] = World.tick
+
+
+## What she knows of each of [param kinds] (what her player's words
+## mentioned): in sight, where it is; remembered, where and how long ago;
+## sensed, from where; else that she has not seen one here, never that
+## there is none.
+func knowledge_of(kinds: Array[String]) -> String:
+	const NAMES := {"fire": "fire", "water": "water", "stair": "a stair", "ledge": "a ledge", "torch": "a torch",
+		"crate": "a crate", "boulder": "a boulder", "cart": "a cart", "door": "a door"}
+	var seen := sightings()
+	var sentences: Array[String] = []
+	for kind in kinds:
+		var word: String = NAMES.get(kind, "a " + kind)
+		if seen.has(kind):
+			var where := "where you stand" if seen[kind]["at"] == tile else _paces_toward(seen[kind]["point"])
+			var state := ", %s" % ("open" if seen[kind]["open"] else "closed") if kind == "door" else ""
+			sentences.append("%s is %s%s." % [word.capitalize() if word == "fire" or word == "water" else word[0].to_upper() + word.substr(1),
+				where, state])
+		elif _memory.has(kind):
+			var ago := (World.tick - int(_memory[kind]["tick"])) / float(World.TICK_RATE)
+			var when := "just now" if ago < 20.0 else "a little while ago" if ago < 120.0 else "a while ago"
+			sentences.append("You saw %s %s %s." % [word, _paces_toward(_memory[kind]["point"]), when])
+		elif kind == "fire" and World.heat_at(tile) >= HEAT_FELT and not World.heat_from(tile).is_empty():
+			sentences.append("You feel heat from the %s, from something you cannot see." % World.heat_from(tile))
+		else:
+			sentences.append("You haven't seen %s here, so you cannot tell anything about one: say so." % word)
+	return " ".join(sentences)
+
+
+## What she carries, in a sentence.
+func carried() -> String:
+	return "You carry a lantern, and nothing else of note." if emit_light > 0.0 else "You carry nothing of note."
 
 
 ## Who else is in her zone, where, and who is near enough to hear: the other
@@ -557,6 +680,8 @@ func _sim_tick() -> void:
 	if _joined_tick == -1:
 		_joined_tick = World.tick
 	_watch()
+	if World.tick % MEMORY_EVERY == 0:
+		_remember_sights()
 	_calm()
 	_heal()
 	_act()
@@ -794,7 +919,7 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 	_phrase_serials[_serial] = phrase
 	var asked := not heard.is_empty() and own
 	# Certainly hers: then a stance with no words still counts.
-	_certain_serials[_serial] = asked and (others_near().is_empty() or _says_name(heard))
+	_certain_serials[_serial] = asked and addressed_to(heard) == "her"
 	var messages := voice_messages(asked, heard)
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger, "messages": messages, "speaker": _name_of(self),
@@ -829,7 +954,7 @@ func stance_prompt() -> String:
 func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
-	var now: Array[String] = [voice_situation(), others_here(), doing()]
+	var now: Array[String] = [voice_situation(), others_here(), carried(), doing()]
 	var topics := mentioned_topics()
 	if not topics.is_empty():
 		now.append("You have already mentioned: %s." % ", ".join(topics))
@@ -838,24 +963,35 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	now.append(run_summary(false))
 	var around := perception() if surroundings_keys() != _around_said or asks_about_surroundings(heard) else ""
 	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
-		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % who]
+		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
+	var addressed := addressed_to(heard)
+	var speaker := heard.get_slice(" ", 0)
 	if asked:
-		var near := others_near()
-		if near.is_empty() or _says_name(heard):
-			system += "\n\n" + VOICE_FOR_HER % [who, " by name" if _says_name(heard) else ", and no one else is near"]
-		else:
-			system += "\n\n" + VOICE_FOR_WHOM % [who, " and ".join(near)]
-		system += "\n" + VOICE_ASKED % [who, who, who, who]
-	elif _says_name(heard):
-		system += "\n\n" + VOICE_NAMED % heard.get_slice(" ", 0)
+		match addressed:
+			"her":
+				system += "\n\n" + VOICE_FOR_HER % [who, " by name" if _says_name(heard) else ", and no one else is near"]
+			"other":
+				system += "\n\n" + VOICE_FOR_OTHER % [who, " and ".join(_others_named(heard))]
+			_:
+				system += "\n\n" + VOICE_OPEN % [who, " and ".join(others_near())]
+		var kinds := asked_about()
+		if not kinds.is_empty() and addressed != "other":
+			# What she knows of what was mentioned, right by the answer it is for.
+			system += "\nWhat you know of what %s mentioned: %s" % [who, knowledge_of(kinds)]
+		if addressed != "other":
+			system += "\n" + VOICE_ASKED % [who, who, who, who]
+	elif addressed == "her":
+		system += "\n\n" + VOICE_NAMED % speaker
+	elif addressed == "open":
+		system += "\n\n" + VOICE_OPEN % [speaker, " and ".join(others_near())]
 	var messages: Array[Dictionary] = [{"role": "system", "content": system}]
 	for turn: Dictionary in _exchange:
 		var role: String = turn["role"]
 		if messages.size() == 1 and role == "assistant":
 			continue  # The exchange opens with something said to her or seen.
 		# What anyone said is labelled with who said it: "Bo: over here!".
-		var speaker := str(turn.get("speaker", ""))
-		var text := "%s: %s" % [speaker, turn["text"]] if role == "user" and not speaker.is_empty() else str(turn["text"])
+		var who_said := str(turn.get("speaker", ""))
+		var text := "%s: %s" % [who_said, turn["text"]] if role == "user" and not who_said.is_empty() else str(turn["text"])
 		if messages.back()["role"] == role:
 			messages.back()["content"] += "\n" + text
 		else:
@@ -988,8 +1124,7 @@ func perception_list() -> String:
 	var lines: Array[String] = []
 	for thing in perceived():
 		var paces: int = thing["paces"]
-		var where := "where you stand" if paces == 0 else "%d pace%s %s" % [paces, "" if paces == 1 else "s",
-			_direction(thing["point"])]
+		var where := "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]
 		var relations: Array[String] = thing["relations"]
 		lines.append("- %s, %s%s" % [thing["word"], where, ": " + ", ".join(relations) if not relations.is_empty() else ""])
 	if lines.is_empty():
@@ -1058,7 +1193,7 @@ func perceived() -> Array[Dictionary]:
 		var entity := World.get_entity_at(cell)
 		if entity == null or entity == self or entity == keeper:
 			continue
-		if entity is Monster and entity.spawned:
+		if entity is Monster and entity.spawned and entity.hp > 0:
 			var monster := _thing(kind_of(entity), cell, Vector2(cell))
 			monster["monster"] = true
 			found.append(monster)
@@ -1090,11 +1225,12 @@ func asked_about() -> Array[String]:
 	const WORDS := {
 		"fire": "fire|flame|burn", "water": "water|pool|lake|river", "stair": "stair|steps",
 		"ledge": "ledge|drop|edge|cliff", "door": "door", "crate": "crate|box", "boulder": "boulder|rock",
-		"cart": "cart",
+		"cart": "cart", "torch": "torch",
 	}
 	var said := ""
 	for turn in _exchange:
-		if turn["role"] == "user" and not str(turn["text"]).begins_with("["):
+		if turn["role"] == "user" and not str(turn["text"]).begins_with("[") \
+				and str(turn.get("speaker", keeper_name())) == keeper_name():
 			said = str(turn["text"]).to_lower()
 	var kinds: Array[String] = []
 	for kind: String in WORDS:
@@ -1311,9 +1447,19 @@ func _direction(point: Vector2) -> String:
 func _paces_toward(point: Vector2) -> String:
 	var offset := point - Vector2(tile)
 	var paces := roundi(maxf(absf(offset.x), absf(offset.y)))
+	return "%s to the %s" % [distance_words(paces), World.compass(offset)]
+
+
+## How far, in words, never a number: "close by", "a few paces", "some way
+## off", "at the edge of sight".
+static func distance_words(paces: int) -> String:
 	if paces <= 1:
-		return "beside you to the %s" % World.compass(offset)
-	return "%d paces to the %s" % [paces, World.compass(offset)]
+		return "close by"
+	if paces <= 3:
+		return "a few paces"
+	if paces <= 6:
+		return "some way off"
+	return "at the edge of sight"
 
 
 ## What the heat and the light around her say, a sentence each at most:
@@ -1361,7 +1507,7 @@ func run_summary(with_lately := true) -> String:
 	parts.append("You have travelled with %s for %s." % [keeper_name(),
 		"%d seconds" % together if together < 120 else "%d minutes" % int(together / 60.0)])
 	if not _fallen.is_empty():
-		parts.append("Fallen near you: %s." % _fallen_words())
+		parts.append("Lying dead near you, no threat now: %s." % _fallen_words())
 	var lately: Array[String] = []
 	if with_lately:
 		lately = _lately()
@@ -1500,6 +1646,11 @@ func _echo_of(line: String) -> String:
 	for own in _said:
 		if _same_words(said_now, _plain(own)):
 			return "her own line"
+	if not _instruction.is_empty() and _same_words(said_now, _plain(_quoted(_instruction))):
+		return "the instruction she was given"
+	for sentence in card.split(".", false):
+		if sentence.strip_edges().length() >= 12 and _same_words(said_now, _plain(sentence)):
+			return "her card"
 	return ""
 
 

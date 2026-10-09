@@ -38,6 +38,8 @@ func _ready() -> void:
 	_test_voice_in_world()
 	_test_surroundings()
 	_test_surroundings_when_new()
+	_test_what_she_knows()
+	_test_how_she_speaks()
 	_test_fields()
 	_test_compass()
 	_test_transcript()
@@ -1092,7 +1094,8 @@ func _test_voice_in_world() -> void:
 	_check(bad.is_empty(), "nothing of the game in it: no game, player, stance, JSON, HP (%s)" % [bad])
 	_check(OllamaMind.parse_voice("Stay close, Jeff.\n[STANCE: STAY_CLOSE]") == {"say": "Stay close, Jeff.", "stance": "STAY_CLOSE"}
 			and OllamaMind.parse_voice("\"Hm.\"") == {"say": "Hm.", "stance": ""} and OllamaMind.parse_voice("...")["say"] == ""
-			and OllamaMind.parse_voice("Pip: There.", "Pip")["say"] == "There.",
+			and OllamaMind.parse_voice("Pip: There.", "Pip")["say"] == "There."
+			and OllamaMind.parse_voice("No door here.\nSTANCE: GUARD") == {"say": "No door here.", "stance": "GUARD"},
 			"her reply: plain words, a [STANCE: ...] line taken out, quotes and her name off, ... as silence")
 	var long := "You're not staying back. Not ever. Not when you're the only thing standing between me and the thing that just tried to kill you."
 	_check(Companion.trim_line(long) == "You're not staying back. Not ever.", "a long line ends at a sentence: %s" % Companion.trim_line(long))
@@ -1116,20 +1119,20 @@ func _test_surroundings() -> void:
 	_put(pet, Vector2i(7, 7))
 	pet.facing = Vector2i(0, -1)
 	var around := pet.perception_list()
-	_check(around.begins_with("Around you, what you can see, nearest first:\n- fire, 2 paces to the north"), "by the compass: %s" % around)
+	_check(around.begins_with("Around you, what you can see, nearest first:\n- fire, a few paces to the north"), "by the compass: %s" % around)
 	pet.facing = Vector2i(1, 0)
 	around = pet.perception_list()
-	_check("- fire, 2 paces to the north" in around, "whichever way she faces: %s" % around)
+	_check("- fire, a few paces to the north" in around, "whichever way she faces: %s" % around)
 	_check(around.count("fire") == 1, "the fire told once, though it is three cells")
 	_check("crate" not in around and "boulder" not in around, "crates and the boulder 4-5 paces off are not told: %s" % around)
 	var far_imp := _spawn_imp(Vector2i(7, 1))
 	around = pet.perception_list()
-	_check(around.ends_with("- an imp, 6 paces to the north"), "a monster is told however far: %s" % around)
+	_check(around.ends_with("- an imp, some way off to the north"), "a monster is told however far: %s" % around)
 	World.damage(far_imp, 999)
 	pet._exchange.clear()
 	pet._add_turn("user", "Is that a crate?")
 	around = pet.perception_list()
-	_check("- a crate, 4 paces" in around and "boulder" not in around, "what her player asks about is told, if far: %s" % around)
+	_check("- a crate, some way off" in around and "boulder" not in around, "what her player asks about is told, if far: %s" % around)
 	pet._narrate("Jeff sees a boulder.")
 	_check("boulder" not in pet.perception_list(), "his words, not narration, say what was asked")
 	pet._exchange.clear()
@@ -1149,7 +1152,7 @@ func _test_surroundings() -> void:
 	var door := World.door_across(Vector2i(4, 12), Vector2i(0, 1))
 	World._set_door(door, false, owner)
 	around = pet.perception_list()
-	_check("- a closed door, 2 paces to the south: on the far side of Player\n" in around + "\n",
+	_check("- a closed door, a few paces to the south: on the far side of Player\n" in around + "\n",
 			"a door past her player: on the far side of them (%s)" % around)
 	var grid := pet.perception_grid()
 	var rows := grid.split("\n")
@@ -1172,9 +1175,9 @@ func _test_surroundings() -> void:
 	var imp := _spawn_imp(Vector2i(9, 7))
 	var crate: GridEntity = _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "TestCrate", "tile": Vector2i(6, 7)})
 	around = pet.perception_list()
-	_check("- an imp, 1 pace to the east: adjacent to you, between you and Player" in around,
+	_check("- an imp, close by to the east: adjacent to you, between you and Player" in around,
 		"an imp between them: %s" % around)
-	_check("- a crate, 2 paces to the west" in around, "a crate, by the compass: %s" % around)
+	_check("- a crate, a few paces to the west" in around, "a crate, by the compass: %s" % around)
 	grid = pet.perception_grid()
 	_check(grid.split("\n")[1 + centre].split(" ").slice(centre - 2, centre + 3) == PackedStringArray(["c", ".", "P", "i", "&"]),
 		"on the map too: %s" % grid.split("\n")[1 + centre])
@@ -1186,7 +1189,7 @@ func _test_surroundings() -> void:
 	_check(pet.perception_list() == "", "nothing worth telling in an empty corner")
 	var prompt := pet.voice_prompt("test")
 	_check("If you don't know what something is, say so." in prompt, "and she is told to say when she does not know a thing")
-	_check("Only when nothing has\nbeen said to you" in prompt and "Not everything said near you is meant for you" in prompt,
+	_check("Only when nothing has been said to you" in prompt and "Not everything said near you is meant for you" in prompt,
 			"silence only when nothing was said to her, or it was not meant for her")
 	_check("Answer out loud in words first, never with just \"...\"" in pet.voice_prompt("test", "Player just said to you: \"Is the door open?\""),
 		"and spoken to, she is told to answer in words")
@@ -1214,7 +1217,7 @@ func _test_surroundings() -> void:
 	var below := pet.perception_grid().split("\n")[1 + centre].split(" ")[centre - 1]
 	pet.tile = was
 	World._set_terrain(_main._terrain)
-	_check("- a ledge, the ground rising, 1 pace to the east: adjacent to you" in ledge and "torch" not in ledge,
+	_check("- a ledge, the ground rising, close by to the east: adjacent to you" in ledge and "torch" not in ledge,
 		"a ledge (and no torch: the map has none either): %s" % ledge)
 	_check("on the ledge above you" in above, "higher ground: on the ledge above her (%s)" % [above])
 	_check(below == "v", "and from up there, the drop on the map (%s)" % below)
@@ -1322,6 +1325,68 @@ func _test_compass() -> void:
 	_check("Directions are spoken as north, south, east and west." in Companion.VOICE_WORLD, "and the primer says so")
 
 
+func _test_what_she_knows() -> void:
+	print("\n== what her player mentions: in sight, remembered, sensed, or not seen; never 'there is none' ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	pet._memory.clear()
+	# The test room's fire is (7..9, 5); its west door is between (4, 12) and (4, 13).
+	_put(owner, Vector2i(8, 8))
+	_put(pet, Vector2i(7, 7))
+	var known := pet.knowledge_of(["fire"] as Array[String])
+	_check(known == "Fire is a few paces to the north.", "in sight: where it is, in words (%s)" % known)
+	pet._remember_sights()
+	_put(pet, Vector2i(4, 11))
+	_put(owner, Vector2i(5, 11))
+	known = pet.knowledge_of(["fire", "door", "water"] as Array[String])
+	_check("You saw fire " in known and "just now" in known, "remembered: where and how long ago (%s)" % known)
+	_check("A door is a few paces to the south, closed." in known or "A door is a few paces to the south, open." in known,
+			"a door in sight, and whether it is open (%s)" % known)
+	_check("You haven't seen water here" in known and not "no water" in known.to_lower(), "unknown: not seen here, never 'there is none'")
+	pet._memory.clear()
+	_put(pet, Vector2i(9, 7))
+	World._set_terrain({"floor": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)], "fire": [Vector2i(0, 0)],
+		"edges": {Terrain.edge_key(Vector2i(0, 0), Vector2i(1, 0)): Terrain.Edge.WALL}})
+	var was := pet.tile
+	pet.tile = Vector2i(1, 0)
+	var sensed := pet.knowledge_of(["fire"] as Array[String])
+	pet.tile = was
+	World._set_terrain(_main._terrain)
+	_check(sensed.begins_with("You feel heat from the west") or sensed.begins_with("You haven't seen fire"),
+			"behind a wall: felt, not seen (%s)" % sensed)
+	pet._exchange.clear()
+	pet._add_turn("user", "Is the door open?")
+	var prompt := pet.voice_prompt("test", "Player just said to you: \"Is the door open?\"")
+	_put(pet, Vector2i(4, 11))
+	prompt = pet.voice_prompt("test", "Player just said to you: \"Is the door open?\"")
+	_check("A door is a few paces to the south" in prompt, "it is in her voice's now when her player's words mention it")
+	_put(owner, Vector2i(11, 2))
+	_put(pet, Vector2i(11, 3))
+	pet._exchange.clear()
+	_settle(pet)
+
+
+func _test_how_she_speaks() -> void:
+	print("\n== distances in words; what she carries; the dead no threat; no reciting her card or her instruction ==")
+	_check(Companion.distance_words(1) == "close by" and Companion.distance_words(3) == "a few paces"
+			and Companion.distance_words(5) == "some way off" and Companion.distance_words(7) == "at the edge of sight",
+			"close by, a few paces, some way off, at the edge of sight")
+	var pet := _companion()
+	var prompt := pet.voice_prompt("test")
+	_check(not RegEx.create_from_string("\\d+ paces?").search(prompt), "no number of paces anywhere in her voice's prompt")
+	_check("You carry a lantern, and nothing else of note." in prompt, "what she carries")
+	_check("Speak to Player as \"you\"" in prompt and "\"I\" and \"me\" are the one speaking" in prompt
+			and "never describe yourself or recite who you are" in prompt, "speak to her player as you; I and me are the speaker; no reciting")
+	pet.card = "She thinks before she moves and before she speaks. She is gentle."
+	_check(pet._echo_of("She thinks before she moves and before she speaks.") == "her card", "a line reciting her card is dropped")
+	pet._instruction = "Player just said to you: \"Stay close to the wall\""
+	_check(pet._echo_of("Stay close to the wall.") != "", "and one repeating her instruction")
+	pet._instruction = ""
+	pet.card = Main.companion_card(String(pet.name)) if not Main.companion_card(String(pet.name)).is_empty() else Main.COMPANION_CARD
+
+
 func _test_surroundings_when_new() -> void:
 	print("\n== surroundings only when they changed since her last line, or are asked about; what she has mentioned ==")
 	_kill_monsters()
@@ -1345,7 +1410,7 @@ func _test_surroundings_when_new() -> void:
 	_check(not ("- fire, " in pet.voice_prompt("test", "Player just said to you: \"thanks\"")),
 			"Player says something else: not told")
 	var crate: GridEntity = _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "TestCrate2", "tile": Vector2i(8, 7)})
-	_check("- a crate, 1 pace" in pet.voice_prompt("test"), "something new beside her: told (%s)" % pet.perception())
+	_check("- a crate, close by" in pet.voice_prompt("test"), "something new beside her: told (%s)" % pet.perception())
 	World.despawn(crate)
 	crate.queue_free()
 	_check("You have already mentioned: the fire, resting." in pet.voice_prompt("test"),
@@ -1429,10 +1494,11 @@ func _test_monsters_by_kind() -> void:
 	_put(pet, Vector2i(6, 1))
 	var mind := CountingMind.new()
 	pet.mind = mind
-	var imp_a := _spawn_imp(Vector2i(3, 3))
-	var imp_b := _spawn_imp(Vector2i(4, 3))
+	# Out of the fight (more than 4 from either of them), so they are sighted.
+	var imp_a := _spawn_imp(Vector2i(1, 4))
+	var imp_b := _spawn_imp(Vector2i(1, 5))
 	var brute := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "TestBrute%d" % World.tick,
-		"tile": Vector2i(10, 3), "kind": "brute", "props": {"mass": 70.0, "sight_range": 0}}) as Monster
+		"tile": Vector2i(12, 6), "kind": "brute", "props": {"mass": 70.0, "sight_range": 0}}) as Monster
 	_check(Companion.kind_of(imp_a) == "imp" and Companion.kind_of(brute) == "brute", "kinds from the level marker or the name")
 	_check(pet.refer(imp_a, true) == "An imp" and pet.refer(brute) == "the brute", "an imp, with two in sight; the brute, the only one")
 	var level: Dictionary = Level.load_level("sample")
@@ -1453,10 +1519,10 @@ func _test_monsters_by_kind() -> void:
 	_check("attacking the imp" in pet.doing(), "what she is doing: %s" % pet.doing())
 	var ids := RegEx.create_from_string("(TestImp|TestBrute|Imp\\d|Brute\\b|CorridorImp)")
 	_check(ids.search(text) == null, "no entity name anywhere in what the voice sees")
-	_check(RegEx.create_from_string("\\[(An|The) imp came into sight, \\d paces to the (north|south|east|west)").search(text) != null,
+	_check(RegEx.create_from_string("\\[(An|The) imp came into sight, (close by|a few paces|some way off|at the edge of sight) to the (north|south|east|west)").search(text) != null,
 			"sightings by kind, with paces and a compass point")
 	_check("The brute fell." in text and "An imp fell." in text, "deaths by kind")
-	_check("Fallen near you: " in text and "a brute" in text, "who fell, counted by kind: %s" % pet.run_summary(false))
+	_check("Lying dead near you, no threat now: " in text and "a brute" in text, "who fell, counted by kind: %s" % pet.run_summary(false))
 	World.damage(imp_b, 999)
 	pet._fallen.clear()
 	pet.note_death("Player", true)
