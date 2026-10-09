@@ -13,6 +13,8 @@ var hp := 0
 var stamina := 0
 var facing := Vector2i(0, 1)
 var color := Color.WHITE
+## The zone (map) the player is in: where they come back to.
+var zone := ""
 ## Unix time of the last join or leave.
 var last_seen := 0
 ## The player's companion: {name, card, hp, stamina, tile: [x, y], alive,
@@ -24,6 +26,8 @@ var companion: Dictionary = {}
 ## Copies the live state off the player's entity.
 func remember(entity: GridEntity) -> void:
 	tile = entity.tile
+	if not entity.zone.is_empty():
+		zone = entity.zone
 	hp = entity.hp
 	stamina = entity.stamina
 	facing = entity.facing
@@ -40,6 +44,7 @@ func to_dict() -> Dictionary:
 		"stamina": stamina,
 		"facing": [facing.x, facing.y],
 		"color": color.to_html(false),
+		"zone": zone,
 		"last_seen": last_seen,
 		"companion": companion.duplicate(true),
 	}
@@ -64,6 +69,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	var html: String = str(entry.get("color", ""))
 	record.color = Color.html(html) if Color.html_is_valid(html) else Color.WHITE
 	record.last_seen = int(entry.get("last_seen", 0))
+	record.zone = str(entry.get("zone", ""))
 	var pet: Variant = entry.get("companion", {})
 	if pet is Dictionary and pet.get("name") is String:
 		record.companion = {

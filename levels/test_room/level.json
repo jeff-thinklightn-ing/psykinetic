@@ -13,6 +13,6 @@
 		{"at": [4, 2], "name": "Crate3"},
 		{"at": [6, 3], "name": "Boulder"}
 	],
-	"spawn_points": {},
-	"links": []
+	"spawn_points": {"from_sample": [2, 1]},
+	"links": [{"at": [1, 1], "to_map": "sample", "to_spawn": "path_end"}]
 }

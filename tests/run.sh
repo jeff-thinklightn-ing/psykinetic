@@ -22,7 +22,7 @@ TIMEOUT="${TEST_TIMEOUT:-300}"
 
 cd "$(dirname "$0")/.."
 code=0
-for scene in tests/push_test.tscn tests/respawn_test.tscn tests/companion_test.tscn tests/spawn_test.tscn tests/mirror_test.tscn tests/edge_test.tscn tests/controls_test.tscn tests/view_test.tscn tests/level_test.tscn; do
+for scene in tests/push_test.tscn tests/respawn_test.tscn tests/companion_test.tscn tests/spawn_test.tscn tests/mirror_test.tscn tests/edge_test.tscn tests/controls_test.tscn tests/view_test.tscn tests/level_test.tscn tests/zone_test.tscn; do
 	echo "### $scene"
 	# A script error aborts a test function without failing an assertion, so
 	# treat any engine error as a failure too.

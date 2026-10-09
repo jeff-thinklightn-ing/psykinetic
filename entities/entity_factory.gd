@@ -75,6 +75,7 @@ static func build(spec: Dictionary) -> GridEntity:
 		entity.set(property, props[property])
 
 	entity.owner_peer = int(spec.get("peer", 0))
+	entity.zone = str(spec.get("zone", ""))
 	entity.spawn_spec = spec
 	entity.start_tile = spec.get("tile", Vector2i.ZERO)
 	# Placeholders until World (server) or the synchronizer (client) says otherwise.

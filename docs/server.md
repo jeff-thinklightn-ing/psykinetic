@@ -153,7 +153,11 @@ player records are kept, anyone online keeps their place, and companions
 that died come back; the reply names them), `respawn`
 (bring every dead monster and crate back now), `players` (who is connected,
 where, with what hp), `save` (write the snapshot now). Also `companions`,
-`mind ...` (see the mind log), `map` and `map load <name>`, and
+`mind ...` (see the mind log), `zones` (each loaded zone, awake or
+asleep, its tick and who is in it), `zone reset <name>` (rebuild that zone
+from its map, loading it if need be; `reset` alone rebuilds the default
+zone), `zone move <player> <zone>` (send a player and their companion
+there), and
 `transcript <name> [<YYYY-MM-DD>]` (a companion's transcript, today's by
 default); `help` lists them.
 
@@ -317,9 +321,10 @@ ticks (3 seconds) and on clean shutdown, and loads it when it starts.
   stamina, facing, colour, last seen. A returning player is put back on
   that tile (or the nearest free one) with those stats and that colour.
 - **What is not**: the room. Terrain always comes from the level
-  (`levels/<name>/`, docs/levels.md). The file records which map it was
-  saved on: a server started without `--map` comes back on that map, and
-  one started on another map takes only the player records from it. An entity that died or broke is simply absent and stays gone.
+  (`levels/<name>/`, docs/levels.md). The file (version 2) holds every
+  loaded zone, and each player's zone: a restart loads those zones again
+  as saved and puts each player back in theirs. `--map` only says where new
+  players start. An entity that died or broke is simply absent and stays gone.
 - **Looks follow the build, not the file**: the file says where a level
   entity stands and how hurt it is; its shape, colour, size, mass and the
   rest come from the map in the build that loads it. A deploy that changes

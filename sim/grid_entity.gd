@@ -64,6 +64,11 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 ## Can be shoved along by something walking into it. Force pushes ignore this.
 @export var pushable := false
 @export var blocks_sight := false
+## The zone (World.zones) this entity is in; its spawn spec says, and
+## World.spawn makes sure. "" on a client, which has one.
+var zone := ""
+## Its synchronizer, whose visibility filter keeps it to its zone's clients.
+var sync: MultiplayerSynchronizer
 ## Light and heat this body gives off where it stands (Fields): a carried
 ## lantern, a burning thing.
 @export var emit_light := 0.0
@@ -188,7 +193,15 @@ func _init() -> void:
 	var synchronizer := MultiplayerSynchronizer.new()
 	synchronizer.name = "Sync"
 	synchronizer.replication_config = config
+	# Spawned on, and synchronized to, only the clients in its zone.
+	synchronizer.add_visibility_filter(_visible_to)
 	add_child(synchronizer)
+	sync = synchronizer
+
+
+## Whether the client [param peer] is sent this entity (World.peer_sees).
+func _visible_to(peer: int) -> bool:
+	return World.peer_sees(peer, zone)
 
 
 func _ready() -> void:

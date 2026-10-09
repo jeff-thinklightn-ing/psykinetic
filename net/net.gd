@@ -14,7 +14,7 @@ extends Node
 ##   --console                    read console commands from stdin (--server does this anyway)
 ##   --no-companions              server/host: players get no companion
 ##   --no-player-reset            server/host: R from a client does not rebuild the room
-##   --map=<name>                 server/host: play levels/<name> (default test_room)
+##   --map=<name>                 server/host: new players start in zone levels/<name> (default test_room)
 ##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
 ##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
 ##   --transcripts=<dir>          server/host: keep what is said to and by each companion here, a
@@ -138,8 +138,7 @@ var llm_model := ""
 ## there. --mind-why asks the minds for their reason as well.
 const DEFAULT_MIND_LOG := "/var/lib/psykinetic/mind.log"
 var mind_log_path := ""
-## --map=<name>: the level to play ("" for the default, or the one the
-## snapshot was saved on).
+## --map=<name>: the zone new players start in ("" for the default map).
 var map_name := ""
 var _mind_log_given := false
 ## Where the companions' transcripts go ("" for none); see Transcript.
@@ -793,6 +792,23 @@ func broadcast(kind: String, data: Dictionary) -> void:
 	if online:
 		for peer in sendable_peers():
 			message.rpc_id(peer, kind, data)
+
+
+## Server: tells only [param peers] (a zone's, World.peers_in); itself
+## too when its own player is among them.
+func broadcast_to(peers: Array[int], kind: String, data: Dictionary) -> void:
+	if local_id in peers:
+		message_received.emit(kind, data)
+	if online:
+		var sendable := sendable_peers()
+		for peer in peers:
+			if peer in sendable:
+				message.rpc_id(peer, kind, data)
+
+
+## Server: tells one [param peer] (itself, for its own player).
+func message_to(peer: int, kind: String, data: Dictionary) -> void:
+	broadcast_to([peer], kind, data)
 
 
 @rpc("authority", "call_remote", "reliable")

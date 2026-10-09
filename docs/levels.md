@@ -8,10 +8,10 @@ A level is a folder `levels/<name>/` (loaded by `sim/level.gd`):
 | `height.png` | optional: how high each cell stands, in grey |
 | `level.json` | its name, legend overrides, the entities' names and props, the start order, spawn points, level links |
 
-`--map=<name>` plays it (on a server or host; clients are told the map by
-the server). On a server's console, `map` says which map is loaded and
-`map load <name>` loads another live, every player brought along. A server
-restarted without `--map` comes back on the map its snapshot was saved on.
+Every level is a zone on the server (docs/design.md, Zones): loaded on
+its first visit, kept loaded. `--map=<name>` is where new players start;
+everyone else is in the zone they were last in. On a server's console,
+`zones` lists them and `zone reset <name>` rebuilds one from its map.
 `levels/test_room` is the original room; `levels/sample` uses every entry in
 the legend, with heights, stairs and a link back to the test room.
 
@@ -59,7 +59,7 @@ In the order of the swatches above:
 | `#7a3cb4` | cart | cell | a low cart, mass 60 |
 | `#ffe000` | torch | cell | a torch on a post: light, and a little heat |
 | `#fff0b0` | lantern | cell | a lantern on a short post: light only |
-| `#ff00ff` | level link | cell | stepping onto it takes the party to another map |
+| `#ff00ff` | level link | cell | stepping onto it takes that player (and companion) to another zone |
 
 A marker's cell (start, monster, crate, boulder, cart, torch, lantern, link) is
 walkable, and its ground is the kind most of its four neighbours are
@@ -142,13 +142,12 @@ All of it is optional.
 
 ## Level links
 
-A player stepping onto a link marker takes the whole party to `to_map`:
-the server loads it, rebuilds the room there with its own entities, and
-places every online player at `to_spawn` (the nearest free cell to it),
-companions beside them. Travel does not heal or revive, as a reset does;
-it is announced in the party log and to every client, which loads the same
-map. The server's state file records the map, so a restart comes back on
-it.
+A player stepping onto a link marker goes to the zone `to_map`, loaded
+if nobody has been there yet, at `to_spawn` (the nearest free cell to it;
+a safe start if a monster is close), their companion beside them. Nobody
+else moves. Travel does not heal or revive, as a reset does. Their record
+keeps the zone, so a restart brings them back there. The test room's link
+is in its top-left corner, (1, 1), to the sample; the sample's leads back.
 
 ## Making a level
 

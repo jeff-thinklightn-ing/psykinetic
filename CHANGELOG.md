@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.62
+
+Zones. Server and client.
+
+- **Many maps at once**: every map is its own place on the server, with
+  its own monsters and things, and stays as you left it.
+- **Links take you, not everyone**: step on a link and you and your
+  companion go to the other map; the others stay where they are. The test
+  room has a link in its top-left corner to the sample map, and back.
+- You see only the map you are on. A map nobody is on sleeps until
+  someone arrives.
+- The server remembers which map you were on, and puts you back there.
+
+The server must be updated to v0.1.62 too, as it refuses any other version.
+
 ## v0.1.61
 
 Light, heat and directions. Server and client.

@@ -241,7 +241,7 @@ func _test_sight_over_walls() -> void:
 
 
 func _test_level_links() -> void:
-	print("\n== level links: the party goes through together ==")
+	print("\n== level links: the player who steps on one goes through ==")
 	_main.load_map("test_link_a")
 	var player := _player()
 	_put(player, Vector2i(3, 1))
@@ -252,15 +252,17 @@ func _test_level_links() -> void:
 	var arrived := _player()
 	_check(_main.map_name == "test_link_b", "the map is now test_link_b (%s)" % _main.map_name)
 	_check(arrived != null and arrived.tile == Vector2i(2, 2), "and Player arrives at its spawn point gate, (2, 2) (%s)" % [arrived.tile if arrived else "none"])
+	_check(World.zones.has("test_link_a") and arrived != null and arrived.zone == "test_link_b",
+		"in the zone test_link_b; test_link_a stays loaded")
 
 
 func _test_console() -> void:
-	print("\n== the console: map, map load ==")
-	_check(_main.admin_command("map").begins_with("map test_link_b"), _main.admin_command("map"))
-	_check(_main.admin_command("map load nowhere").begins_with("no map nowhere"), "an unknown map is refused")
-	var reply: String = _main.admin_command("map load test_room")
-	_check(reply.begins_with("map test_room loaded") and _main.map_name == "test_room" and World.is_walkable(Vector2i(6, 6)),
-			"map load test_room reloads it live: %s" % reply)
+	print("\n== the console: map load is zone reset now ==")
+	_check(_main.admin_command("map").begins_with("map load is now zone reset"), _main.admin_command("map"))
+	_check(_main.admin_command("zone reset nowhere").begins_with("no map nowhere"), "an unknown map is refused")
+	var reply: String = _main.admin_command("zone reset test_room")
+	_check(reply.begins_with("zone test_room rebuilt: 275 cells") and World.zone.name == "test_link_b",
+			"zone reset test_room rebuilds it, the host's zone untouched: %s" % reply)
 
 
 # --- Helpers ---------------------------------------------------------------------

@@ -277,12 +277,57 @@ A level is a folder `levels/<name>/` of `layout.png` (the map in the same
 double resolution as the ASCII maps: cells at even pixels, edges at odd
 ones), an optional `height.png` and `level.json`, read by `sim/level.gd`
 into the terrain the World and both views take; the format, the legend
-and how to make one are in docs/levels.md. `--map=<name>` picks it (default
-`test_room`, the original room, unchanged); the server tells every client
-its map (`Net.message("map")`), and `map load <name>` on its console
-reloads live. The terrain now has ground kinds (stone, grass, dirt), water
-(not walkable, no wall), heights 0-6 with stairs between them, torches,
-and level links, which take the party to another map.
+and how to make one are in docs/levels.md. `--map=<name>` picks the zone
+new players start in (default `test_room`, the original room, unchanged).
+The terrain has ground kinds (stone, grass, dirt), water (not walkable, no
+wall), heights 0-6 with stairs between them, torches, lanterns, and level
+links, which take the player who steps on one to another zone.
+
+## Zones
+
+The server holds many maps at once. Each loaded map is a **zone**
+(`sim/zone.gd`, `World.zones`): its own terrain, doors, entities,
+occupancy, heat and light, tick, and, in Main, its own spawn table and
+respawn timers (`Zone.main`). A zone is loaded on its first visit
+(`Main._open_zone`) and stays loaded.
+
+**World works on one zone at a time** (`World.zone`, switched by
+`World.enter`, which swaps the zone's state into World's own fields; Main
+swaps its per-zone state on `zone_switched`). So everything that asks
+World anything asks the zone it is in, and the sim's code is the same as
+with one map. `step()` runs each awake zone in turn; an order from a
+client runs in the zone of the entity it is for, and may only target what
+is in that zone; a join, a disconnect, the console enter the zone they are
+about. Outside those, World is in `home()`: the zone of the local player,
+so a host's input and views are their own zone's.
+
+**Players belong to one zone**: `World.peer_zone` (peer -> zone) and the
+record's `zone`. A level link moves the player who steps on it, and their
+companion, to the linked zone's spawn point (`Main.travel`): both are
+despawned where they were and spawned there, keeping hp, stamina and the
+companion's lines; nobody else moves. (The spawn safety rule still
+applies: with a monster near the spawn point, a safe start instead.)
+
+**Clients see only their zone**. Each zone's entities live under their own
+node (`$YSort/Entities/<zone>`) with their own MultiplayerSpawner, made
+the same on a client; every entity's and door's synchronizer has a
+visibility filter (`World.peer_sees`), so a client is spawned and synced
+only what is in its player's zone, and gets only that zone's tick. Moving
+a player: their old zone's entities are taken from their client, the
+client is told the new zone's name (`map`; it frees the old node and
+spawner and loads the map), then the new zone's entities are spawned on it.
+A host draws only its own zone's node.
+
+**Empty zones sleep**: a zone with no player in it (none standing there,
+no connected peer belonging there) does not step: monsters freeze, fire
+holds, respawn timers wait. It wakes when someone arrives
+(`World._woke`, the place to catch up on the time it slept; nothing
+there yet).
+
+**Persistence**: the snapshot (version 2) has every loaded zone's
+entities and respawn timers, and each player's zone in their record. On a
+restart every saved zone is loaded again as saved, and each player comes
+back in theirs. A version 1 file loads as its one map's zone.
 
 **Heights** (World): a step between cells of different heights needs a
 stair on the lower cell climbing toward the other, one level; otherwise

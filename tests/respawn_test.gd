@@ -115,7 +115,7 @@ func _test_console() -> void:
 	var player := _player()
 	var was_at: Vector2i = player.tile
 	reply = _main.admin_command("reset")
-	_check(reply.begins_with("room rebuilt"), "'reset' rebuilds the room (%s)" % reply)
+	_check(reply.begins_with("test_room rebuilt"), "'reset' rebuilds the room (%s)" % reply)
 	var fresh := _slot_entity(5)
 	_check(fresh != null and fresh.spawned and fresh.tile == Vector2i(8, 2), "the broken crate is back at its spawn tile")
 	_check(_player() != null and _player().tile == was_at, "the host player is back where it was, from its record")

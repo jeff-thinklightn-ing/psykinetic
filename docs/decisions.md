@@ -1066,3 +1066,35 @@ given. So every direction she is given is one of eight compass points from
 the level's fixed north, computed from cell offsets; the model never
 derives one. The HUD compass shows north turning with the camera, so the
 same words are usable on the player's side of the screen.
+
+## 125. Zones are swapped into World, not World made many
+
+Every map live at once could have meant a World per zone and every
+`World.` call (about nine hundred) taught to find its own. Instead World
+holds every zone's state and works on one at a time: entering a zone swaps
+its containers into World's fields, and Main's per-zone state with them.
+The sim's code is unchanged; what changed is who enters which zone and when
+(a step, an order, a join, the console), and that World is always back in
+the local player's zone in between. A client still has exactly one.
+
+## 126. A zone's clients are chosen by the synchronizers' visibility
+
+Each zone's entities are under their own node with their own spawner, and
+each synchronizer has a visibility filter, peer in this zone. The engine's
+spawner then spawns, despawns and syncs per peer, which is the whole of
+"a client sees only its zone"; moving a player is a visibility update,
+the zone's name in between, and another update. Node paths stay unique
+(two zones may both have an Imp1) without renaming anything.
+
+## 127. Empty zones sleep
+
+A zone nobody is in does not tick. That costs nothing while no one is
+there and keeps it as it was left; a monster that was chasing someone is
+where it stood when they went. Catching up on the time slept is left as a
+hook.
+
+## 128. A link moves one player
+
+With zones, the party-wide link (one map, everyone moved) is gone: the
+player who steps on a link goes, with their companion, and everyone else
+stays where they are.

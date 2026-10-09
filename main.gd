@@ -191,9 +191,15 @@ var _held_target := NONE
 ## The 3D view (the default; see Net.renderer); the 2D nodes are hidden.
 var _client3d: Client3D
 @onready var ground: TileMapLayer = $Ground
-@onready var entities: Node2D = $YSort/Entities
+## The node the zone World is in keeps its entities under (one per zone,
+## under $YSort/Entities, named for it), and its spawner: both per zone.
+var entities: Node2D
 @onready var near_walls: CanvasGroup = $NearWalls
-@onready var spawner: MultiplayerSpawner = $Spawner
+var spawner: MultiplayerSpawner
+## The zone the views draw (a host's own player's), and the travel under way
+## (a despawn that is no death).
+var _view_zone := ""
+var _travelling := false
 @onready var cursor: Polygon2D = $Cursor
 @onready var ripple: ClickRipple = $Ripple
 @onready var camera: Camera2D = $Camera
@@ -215,6 +221,7 @@ func _ready() -> void:
 			Iso.tile_to_local(probe), ground.map_to_local(probe)])
 
 	near_walls.self_modulate.a = NEAR_WALL_ALPHA
+	World.zone_switched.connect(_on_zone_switched)
 	_build_talk()
 	_load_level(Net.map_name if not Net.map_name.is_empty() else Level.DEFAULT_MAP)
 	_paint_level()
@@ -225,9 +232,8 @@ func _ready() -> void:
 		_show_3d()
 	RenderingServer.set_default_clear_color(VOID)
 
-	# Every peer builds entities the same way; only the server decides when.
-	spawner.spawn_function = _build_entity
 	World.ticked.connect(_on_world_ticked)
+	World.stepped.connect(_on_world_stepped)
 	if Net.test_exit_after > 0.0:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
 	if Net.test_click_after > 0.0:
@@ -271,16 +277,12 @@ func _go_online() -> void:
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		World.entity_moved.connect(_on_entity_moved)
-		# A server comes back on the map its snapshot was saved on, unless
-		# --map names one.
-		var saved_map := Snapshot.map_of(Net.state_path) if Net.state_path != "" else ""
-		if Net.map_name.is_empty() and saved_map != "" and saved_map != map_name and Level.exists(saved_map):
-			_load_level(saved_map)
-			_repaint()
-		_start_level(true)
+		_boot()
 		_start_console()
 	else:
-		# Terrain is static level data, not replicated state.
+		# Terrain is static level data, not replicated state. The zone's
+		# entities arrive through its spawner; the server says which zone.
+		_zone_nodes(map_name)
 		World.mirror_reset()
 		World.mirror_terrain(_terrain)
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
@@ -294,6 +296,7 @@ func _go_online() -> void:
 ## _ready): the entities have placed themselves and the 3D view has moved
 ## its camera, so the pick below is made against the frame as drawn.
 func _process(delta: float) -> void:
+	_show_home_zone()
 	_follow_player(delta)
 	if _client3d != null and DisplayServer.get_name() != "headless":
 		# Alt shows every HP bar; the view only reads it.
@@ -1017,32 +1020,231 @@ func _repaint() -> void:
 		_client3d.rebuild(_terrain, level_centre)
 
 
-## Server: loads map [param level_name] and rebuilds the room on it; every
-## online player arrives at [param arrival] ("" for the map's first start;
-## a spawn point's name otherwise), and every client is told the map.
-## [param whole]: heal and revive as a reset does (not on travel).
-func load_map(level_name: String, arrival := "", whole := true) -> bool:
-	if not Net.is_authority() or not Level.exists(level_name):
-		return false
-	_load_level(level_name)
+# --- Zones (server) -------------------------------------------------------------
+
+## The zone a player with no zone of their own goes to: --map's, or the
+## default map.
+func default_zone() -> String:
+	return Net.map_name if not Net.map_name.is_empty() and Level.exists(Net.map_name) else Level.DEFAULT_MAP
+
+
+## Server start: every zone the snapshot holds, back as it was saved, and
+## the default zone; the player records; and a host's own player.
+func _boot() -> void:
+	var snapshot := Snapshot.load(Net.state_path) if Net.state_path != "" else {"ok": false, "zones": {}, "players": []}
+	_records.clear()
+	for record: PlayerRecord in snapshot["players"]:
+		_records[record.player_id] = record
+	var saved: Dictionary = snapshot["zones"]
+	var restored := 0
+	for zone_name: String in saved:
+		if not Level.exists(zone_name):
+			print("[state] the snapshot's zone %s is no map here; left out" % zone_name)
+			continue
+		_open_zone(zone_name, saved[zone_name])
+		restored += saved[zone_name]["entities"].size()
+	_open_zone(default_zone())
+	if snapshot["ok"]:
+		print("[state] loaded %d entities and %d player records from %s (zones: %s)" % [
+			restored, snapshot["players"].size(), Net.state_path, ", ".join(saved.keys())])
+	World.enter(World.zones[default_zone()])
+	if Net.mode != Net.Mode.SERVER:
+		_admit(Net.local_id, Net.player_id, Net.player_name)
+
+
+## Loads zone [param zone_name] if it is not loaded yet: its map, its doors,
+## its level entities (as [param saved], a snapshot's section for it, has
+## them, if it does). Zones stay loaded. Null for a map that is not there.
+func _open_zone(zone_name: String, saved := {}) -> Zone:
+	if World.zones.has(zone_name):
+		return World.zones[zone_name]
+	if not Level.exists(zone_name):
+		return null
+	var opened := World.add_zone(zone_name)
+	var was := World.enter(opened)
+	_load_level(zone_name)
+	_zone_nodes(zone_name)
+	World.load_terrain(_terrain)
+	_spawn_doors()
+	if saved.is_empty() or not _spawn_saved(saved):
+		for slot in level_entities.size():
+			_spawn(_slot_spec(slot))
+	print("[zone] %s loaded%s" % [zone_name, " from the snapshot" if not saved.is_empty() else ""])
+	World.enter(was)
+	return opened
+
+
+## The node zone [param zone_name]'s entities live under and its spawner,
+## made the same on the server and on a client, which has the one.
+func _zone_nodes(zone_name: String) -> void:
+	var holder := Node2D.new()
+	holder.name = zone_name
+	holder.y_sort_enabled = true
+	$YSort/Entities.add_child(holder)
+	var made := MultiplayerSpawner.new()
+	made.name = "Spawner_" + zone_name
+	add_child(made)
+	made.spawn_path = made.get_path_to(holder)
+	# Every peer builds entities the same way; only the server decides when.
+	made.spawn_function = _build_entity
+	spawner = made
+	entities = holder
+
+
+## Main's own state for the zone World is in (its level, spawn table,
+## respawn timers, entity node and spawner), swapped as World switches.
+func _on_zone_switched(from: Zone, to: Zone) -> void:
+	from.main = {"level": level, "level_entities": level_entities, "player_starts": player_starts,
+		"level_centre": level_centre, "map_name": map_name, "terrain": _terrain, "alive_slots": _alive_slots,
+		"dead_since": _dead_since, "spawner": spawner, "entities": entities}
+	if to.main.is_empty():
+		# A zone being opened: fresh state, until its level loads.
+		level = {}
+		level_entities = []
+		player_starts = []
+		_terrain = {}
+		_alive_slots = {}
+		_dead_since = {}
+		return
+	level = to.main["level"]
+	level_entities = to.main["level_entities"]
+	player_starts = to.main["player_starts"]
+	level_centre = to.main["level_centre"]
+	map_name = to.main["map_name"]
+	_terrain = to.main["terrain"]
+	_alive_slots = to.main["alive_slots"]
+	_dead_since = to.main["dead_since"]
+	spawner = to.main["spawner"]
+	entities = to.main["entities"]
+
+
+## A host: World back in the zone of its own player, the views drawing that
+## zone (the room redrawn when it changed) and only its entities shown.
+func _show_home_zone() -> void:
+	if not Net.is_authority() or World.zones.is_empty():
+		return
+	World.enter(World.home())
+	if World.zone.name != _view_zone:
+		_view_zone = World.zone.name
+		_repaint()
+		camera.position = Iso.tile_to_local(level_centre)
+	for each: Zone in World.zones.values():
+		var holder: Node2D = entities if each == World.zone else each.main.get("entities")
+		if holder != null:
+			holder.visible = each == World.zone
+
+
+## A client: its player is now in zone [param zone_name]. The last zone's
+## node and spawner go (its entities with them), the new map loads, and the
+## new zone's entities arrive under its own node.
+func _client_zone(zone_name: String) -> void:
+	if entities != null:
+		entities.free()
+	if spawner != null:
+		spawner.free()
+	World.mirror_reset()
+	_load_level(zone_name)
+	_zone_nodes(zone_name)
+	World.mirror_terrain(_terrain)
 	_repaint()
+	print("[zone] now in %s" % zone_name)
+
+
+## Server: [param peer]'s player joins the game in their own zone (the
+## record's, else the default), opened if need be.
+func _admit(peer: int, id: String, player_name: String) -> void:
+	var record: PlayerRecord = _records.get(id)
+	var wanted := record.zone if record != null and Level.exists(record.zone) else default_zone()
+	var into := _open_zone(wanted)
+	if into == null:
+		into = _open_zone(default_zone())
+	_show_zone_to(peer, into.name)
+	var was := World.enter(into)
+	_join_player(peer, id, player_name)
+	World.enter(was)
+
+
+## Server: [param peer]'s player is in zone [param zone_name] now. A client
+## is sent the zone's name, between losing the old zone's entities and
+## getting the new one's (the spawner does both, by visibility), so they land
+## under the right node. A host's own view follows in _show_home_zone.
+## [param leaving]: the player's own body and their companion's, despawned
+## but freed only at the end of the frame: taken from that client now, or
+## their despawn would reach it after it has left the zone.
+func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []) -> void:
+	var old: String = World.peer_zone.get(peer, "")
+	World.peer_zone[peer] = zone_name
+	if peer == Net.local_id:
+		return
+	if peer in multiplayer.get_peers():
+		for entity in leaving:
+			if is_instance_valid(entity) and entity.sync != null and entity.is_inside_tree():
+				entity.sync.update_visibility(peer)
+	if not old.is_empty() and old != zone_name:
+		World.update_visibility(peer, old)
+	Net.message_to(peer, "map", {"name": zone_name})
+	World.update_visibility(peer, zone_name)
+
+
+## Server: [param peer]'s player (and their companion) go to zone
+## [param to_map], at its spawn point [param to_spawn] ("" for its first
+## start); nobody else moves. The zone is opened if need be. False if there
+## is no such map or no such player.
+func travel(peer: int, to_map: String, to_spawn := "") -> bool:
+	var id: String = _peer_ids.get(peer, "")
+	var record: PlayerRecord = _records.get(id)
+	if record == null or not Level.exists(to_map):
+		return false
+	var target := _open_zone(to_map)
+	var from_name: String = World.peer_zone.get(peer, record.zone)
+	World.enter_named(from_name)
+	var player: Player = _players.get(peer)
+	var pet: Companion = _companions.get(id)
+	var leaving: Array[GridEntity] = [player, pet]
+	_travelling = true
+	if is_instance_valid(player) and player.spawned:
+		record.remember(player)
+		World.despawn(player)
+	if is_instance_valid(pet) and pet.spawned:
+		_remember_companion(id)
+		World.despawn(pet)
+	_travelling = false
+	_players.erase(peer)
+	_companions.erase(id)
+	_respawn_at.erase(peer)
+	World.enter(target)
 	var spawns: Dictionary = level.get("spawn_points", {})
-	var tile: Vector2i = spawns.get(arrival, player_starts[0] if not player_starts.is_empty() else NONE)
-	_start_level(false, tile, whole)
-	Net.broadcast("map", {"name": map_name})
+	record.tile = spawns.get(to_spawn, player_starts[0] if not player_starts.is_empty() else Vector2i.ZERO)
+	record.zone = to_map
+	if not record.companion.is_empty():
+		record.companion["tile"] = null  # Beside their player.
+	_show_zone_to(peer, to_map, leaving)
+	_join_player(peer, id, record.name)
+	print("[zone] %s went from %s to %s" % [record.name, from_name, to_map])
+	party_log.add("%s went to %s." % [record.name, str(level.get("display_name", to_map))])
+	World.enter(World.home())
 	return true
 
 
-## Server: a player stepping onto a level link takes the whole party there.
+## Tests and the eval: the host's player into zone [param level_name], the
+## zone rebuilt fresh.
+func load_map(level_name: String) -> bool:
+	if not travel(Net.local_id, level_name):
+		return false
+	_start_level()
+	return true
+
+
+## Server: a player stepping onto a level link goes to the zone it leads
+## to, with their companion; nobody else moves.
 func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
 	if not entity is Player:
 		return
 	for link: Dictionary in level.get("links", []):
 		if link["tile"] == to:
 			print("[level] %s took the link at %s to %s (%s)" % [_display_name(entity), to, link["to_map"], link["to_spawn"]])
-			party_log.add("%s led the way to %s." % [_display_name(entity), link["to_map"]])
-			# After the tick: the room is rebuilt, not mid-step.
-			load_map.call_deferred(str(link["to_map"]), str(link["to_spawn"]), false)
+			# After the tick: not mid-step.
+			travel.call_deferred(entity.owner_peer, str(link["to_map"]), str(link["to_spawn"]))
 			return
 
 
@@ -1053,104 +1255,100 @@ func _spawn_doors() -> void:
 	for key: Vector3i in edges:
 		if edges[key] == Terrain.Edge.DOOR:
 			spawner.spawn({"script": DOOR, "name": "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"],
-				"edge": [key.x, key.y, key.z], "props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}})
+				"edge": [key.x, key.y, key.z], "zone": World.zone.name,
+				"props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}})
 
 
 # --- Server: level and players ------------------------------------------------
 
-## (Re)builds the room. Also the R restart: removing the old entities and
-## spawning new ones replicates to every client through the spawner.
-## With [param from_snapshot], entities come from the --state file when it
-## has one; the room itself is always the level. Coming into a new map
-## ([param arrival]), every online player is placed there; without
-## [param whole] (travel) nobody is healed or revived.
-func _start_level(from_snapshot := false, arrival := NONE, whole := true) -> void:
+## (Re)builds the zone World is in, from its level: the R restart, and
+## the console's reset and zone reset. Removing the old entities and spawning
+## new ones replicates to its clients through its spawner. With
+## [param from_snapshot], entities (and every player record) come from the
+## --state file when it has this zone; otherwise the room starts whole
+## ([param whole]): its players healed and dead companions back. Everyone in
+## the zone keeps their place; nobody in another zone is touched.
+func _start_level(from_snapshot := false, whole := true) -> void:
 	if not Net.is_authority():
 		return
-	# Whoever is online keeps their place through the rebuild, or, coming
-	# into a new map, arrives at [param arrival] with their companion.
-	for peer: int in _players:
-		var player: Player = _players[peer]
-		if is_instance_valid(player) and player.spawned and _records.has(_peer_ids.get(peer, "")):
-			var record: PlayerRecord = _records[_peer_ids[peer]]
-			record.remember(player)
-			if arrival != NONE:
-				record.tile = arrival
-				if not record.companion.is_empty():
-					record.companion["tile"] = null
+	var here := World.zone.name
+	var peers := World.peers_in(here)
+	if Net.mode != Net.Mode.SERVER and not World.peer_zone.has(Net.local_id) and Net.local_id not in peers:
+		peers.append(Net.local_id)  # A host with no player yet comes in here.
+	var ids: Dictionary[int, String] = {}
+	for peer in peers:
+		var id: String = _peer_ids.get(peer, Net.player_id if peer == Net.local_id else Net.player_of(peer))
+		ids[peer] = id
+		var player: Player = _players.get(peer)
+		if is_instance_valid(player) and player.spawned and _records.has(id):
+			_records[id].remember(player)
+	for id: String in _companions.keys():
+		var pet: Companion = _companions[id]
+		if not is_instance_valid(pet) or pet.zone == here:
+			_companions.erase(id)
 	World.reset()
 	for child in entities.get_children():
 		entities.remove_child(child)
 		child.queue_free()
 	World.load_terrain(_terrain)
 	_spawn_doors()
-	_players.clear()
-	_peer_ids.clear()
-	_respawn_at.clear()
+	for peer in peers:
+		_players.erase(peer)
+		_peer_ids.erase(peer)
+		_respawn_at.erase(peer)
 	_alive_slots.clear()
 	_dead_since.clear()
-	_companions.clear()
-	# Level entities first (from the snapshot if there is one), then the
-	# players: a returning player's tile must be known to be free or taken.
-	# Player records survive a rebuild; a snapshot brings its own.
-	if from_snapshot:
-		_records.clear()
+	var saved := {}
+	if from_snapshot and Net.state_path != "":
+		var snapshot := Snapshot.load(Net.state_path)
+		if snapshot["ok"]:
+			_records.clear()
+			for record: PlayerRecord in snapshot["players"]:
+				_records[record.player_id] = record
+			saved = snapshot["zones"].get(here, {})
 	elif whole:
-		_revived = _revive_companions()
+		_revived = _revive_companions(here)
 		# A rebuilt room starts whole: the living come back healed too.
 		for record: PlayerRecord in _records.values():
-			if not record.companion.is_empty():
+			if not record.companion.is_empty() and record.zone in [here, ""]:
 				record.companion["hp"] = 0  # 0: spawn at full stats.
-	if not (from_snapshot and _spawn_from_snapshot()):
+	if saved.is_empty() or not _spawn_saved(saved):
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
-	if Net.mode != Net.Mode.SERVER:
-		_join_player(Net.local_id, Net.player_id, Net.player_name)
-	for peer in multiplayer.get_peers():
-		var id := Net.player_of(peer)
+	for peer in peers:
+		var id: String = ids[peer]
 		if id != "":
-			_join_player(peer, id, _records[id].name if _records.has(id) else Net.DEFAULT_NAME)
+			_join_player(peer, id, _records[id].name if _records.has(id) else (Net.player_name if peer == Net.local_id
+				else Net.DEFAULT_NAME))
 	if not from_snapshot and whole:
 		# A rebuilt room starts whole: every player at full hp and stamina.
 		for player: Player in _players.values():
-			if is_instance_valid(player) and player.spawned:
+			if is_instance_valid(player) and player.spawned and player.zone == here:
 				World.restore(player, player.max_hp, player.max_stamina, player.facing)
 				var record: PlayerRecord = _records.get(_peer_ids.get(player.owner_peer, ""))
 				if record != null:
 					record.remember(player)
 
 
-## True if a usable snapshot was found; its entities are then in the room and
-## its player records are known, so players joining next come back as they were.
-func _spawn_from_snapshot() -> bool:
-	if Net.state_path == "":
+## A snapshot's section for the zone World is in ({entities, respawns}): its
+## entities in the room again. False if it has none to restore.
+func _spawn_saved(section: Dictionary) -> bool:
+	var saved: Array = section.get("entities", [])
+	if saved.is_empty() and section.get("respawns", []).is_empty():
 		return false
-	var snapshot := Snapshot.load(Net.state_path)
-	if not snapshot["ok"]:
-		return false
-	for record: PlayerRecord in snapshot["players"]:
-		_records[record.player_id] = record
-	if str(snapshot.get("map", Level.DEFAULT_MAP)) != map_name:
-		# Saved on another map: its people come, its things do not.
-		print("[state] %s was saved on %s, not %s: player records only" % [Net.state_path, snapshot["map"], map_name])
-		return false
-	var restored := 0
-	for entry: Dictionary in snapshot["entities"]:
+	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
 		var entity := _spawn(spec)
 		if entity == null:
 			continue
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
-		restored += 1
 	# Slots with no entity are dead: pick up their timers, or start one now.
-	for respawn: Dictionary in snapshot["respawns"]:
+	for respawn: Dictionary in section.get("respawns", []):
 		if not _alive_slots.has(respawn["spawn"]):
 			_dead_since[respawn["spawn"]] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
 	for slot in level_entities.size():
 		if not _alive_slots.has(slot) and not _dead_since.has(slot):
 			_dead_since[slot] = World.tick
-	print("[state] loaded %d entities and %d player records from %s (saved at tick %d)" % [
-		restored, snapshot["players"].size(), Net.state_path, snapshot["tick"]])
 	return true
 
 
@@ -1206,7 +1404,8 @@ func _check_respawns(tick: int, force := false) -> int:
 
 func _player_within(tile: Vector2i, distance: int) -> bool:
 	for player: Player in _players.values():
-		if is_instance_valid(player) and player.spawned and World.distance(player.tile, tile) <= distance:
+		if is_instance_valid(player) and player.spawned and player.zone == World.zone.name \
+				and World.distance(player.tile, tile) <= distance:
 			return true
 	return false
 
@@ -1222,11 +1421,23 @@ func _save_state() -> void:
 		_remember_companion(id)
 	var records: Array[PlayerRecord] = []
 	records.assign(_records.values())
-	var respawns: Array[Dictionary] = []
-	for slot: int in _dead_since:
-		respawns.append({"spawn": slot,
-			"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
-	Snapshot.save(Net.state_path, World.tick, World.get_entities(), records, respawns, map_name)
+	var zones := {}
+	var was := World.zone
+	for each: Zone in World.zones.values():
+		World.enter(each)
+		var respawns: Array[Dictionary] = []
+		for slot: int in _dead_since:
+			respawns.append({"spawn": slot,
+				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
+		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns}
+	World.enter(was)
+	Snapshot.save(Net.state_path, zones, records)
+
+
+## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.
+func _on_world_stepped() -> void:
+	if Net.is_authority() and World.steps % SNAPSHOT_EVERY_TICKS == 0:
+		_save_state()
 
 
 func _exit_tree() -> void:
@@ -1239,6 +1450,7 @@ func _exit_tree() -> void:
 
 
 func _spawn(spec: Dictionary) -> GridEntity:
+	spec["zone"] = World.zone.name
 	var entity := spawner.spawn(spec) as GridEntity
 	if not World.spawn(entity, spec["tile"]):
 		entities.remove_child(entity)
@@ -1291,6 +1503,9 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
 	World.protect(player, SPAWN_GRACE_TICKS)
 	record.remember(player)
+	record.zone = World.zone.name
+	if not World.peer_zone.has(peer):
+		World.peer_zone[peer] = World.zone.name
 	_players[peer] = player
 	_peer_ids[peer] = id
 	print("[net] %s (%s) joined as %s at %s%s" % [
@@ -1373,11 +1588,13 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 ## A rebuilt room starts whole: companions that died come back with it, at
 ## full stats, beside their owner the next time that player is put down.
 ## Nothing else brings a dead companion back. Returns who came back.
-func _revive_companions() -> Array[String]:
+func _revive_companions(zone_name := "") -> Array[String]:
 	var revived: Array[String] = []
 	for record: PlayerRecord in _records.values():
 		if record.companion.is_empty() or record.companion.get("alive", true):
 			continue
+		if not zone_name.is_empty() and record.zone not in [zone_name, ""]:
+			continue  # Another zone's rebuild brings them back.
 		record.companion["alive"] = true
 		record.companion["hp"] = 0  # Not a saved value: spawn at full stats.
 		record.companion["tile"] = null  # No place of its own: beside its owner.
@@ -1564,8 +1781,8 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 		# Always said: last words never wait on the speech rate limit.
 		line = COMPANION_DEATH_LINES[randi() % COMPANION_DEATH_LINES.size()]
 		party_log.add("%s said: \"%s\"" % [entity.name, line])
-	Net.broadcast("death", {"entity": String(entity.name), "tile": [entity.tile.x, entity.tile.y],
-		"kind": kind, "cause": String(cause), "say": line})
+	Net.broadcast_to(World.peers_in(World.zone.name), "death", {"entity": String(entity.name),
+		"tile": [entity.tile.x, entity.tile.y], "kind": kind, "cause": String(cause), "say": line})
 
 
 ## Server: a player walked into their own companion; she gets out of the
@@ -1616,11 +1833,11 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "map":
-		# The server's map: a client draws and predicts on the same one.
+		# The zone this client's player is in: it draws and predicts on that
+		# map, and its entities arrive under that zone's node.
 		var wanted := str(data.get("name", ""))
-		if not Net.is_authority() and wanted != map_name and _load_level(wanted):
-			World.mirror_terrain(_terrain)
-			_repaint()
+		if not Net.is_authority() and wanted != map_name and Level.exists(wanted):
+			_client_zone(wanted)
 		return
 	if kind == "death":
 		if _client3d != null:
@@ -1742,13 +1959,19 @@ func _build_entity(spec: Dictionary) -> Node:
 
 
 func _on_peer_authenticated(peer: int, id: String, player_name: String) -> void:
-	Net.broadcast("map", {"name": map_name})
-	_join_player(peer, id, player_name)
+	_admit(peer, id, player_name)
 
 
 func _on_peer_disconnected(peer: int) -> void:
 	var player: Player = _players.get(peer)
 	var id: String = _peer_ids.get(peer, "")
+	var was := World.enter_named(World.peer_zone.get(peer, World.zone.name))
+	_leave(peer, player, id)
+	World.peer_zone.erase(peer)
+	World.enter(was)
+
+
+func _leave(peer: int, player: Player, id: String) -> void:
 	_players.erase(peer)
 	_peer_ids.erase(peer)
 	_respawn_at.erase(peer)
@@ -1776,6 +1999,8 @@ func _on_peer_disconnected(peer: int) -> void:
 ## A player that dies comes back after RESPAWN_TICKS, as long as its peer is
 ## still here. Placeholder rule so the test room stays usable.
 func _on_entity_despawned(entity: GridEntity) -> void:
+	if _travelling:
+		return  # Gone to another zone, not dead.
 	if entity.spawn_spec.has("spawn"):
 		var slot: int = entity.spawn_spec["spawn"]
 		if _alive_slots.get(slot) == entity:
@@ -1799,6 +2024,8 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 
 func _respawn_due_players(tick: int) -> void:
 	for peer: int in _respawn_at.keys():
+		if World.peer_zone.get(peer, World.zone.name) != World.zone.name:
+			continue  # Its own zone's tick brings it back.
 		if tick >= _respawn_at[peer]:
 			_respawn_at.erase(peer)
 			var id: String = _peer_ids.get(peer, "")
@@ -1813,7 +2040,7 @@ func _respawn_due_players(tick: int) -> void:
 ## does.
 func _heal_players(tick: int) -> void:
 	for player: Player in _players.values():
-		if not is_instance_valid(player) or not player.spawned:
+		if not is_instance_valid(player) or not player.spawned or player.zone != World.zone.name:
 			continue
 		var id := player.get_instance_id()
 		if not _player_calm_since.has(id) or Companion._hostile_near(player.tile, Companion.CALM_RANGE):
@@ -1830,8 +2057,8 @@ func _on_world_ticked(tick: int) -> void:
 		_respawn_due_players(tick)
 		_heal_players(tick)
 		_check_respawns(tick)
-		if tick % SNAPSHOT_EVERY_TICKS == 0:
-			_save_state()
+	if World.zone != World.home():
+		return  # Another zone's tick: the HUD and the test hooks are this view's.
 	var player := _local_player()
 	var hp_text := "no player" if Net.mode == Net.Mode.SERVER else "dead, respawning"
 	if player != null:
@@ -1993,19 +2220,25 @@ func admin_command(line: String) -> String:
 		return ""
 	match words[0].to_lower():
 		"map":
-			if words.size() >= 3 and words[1] == "load":
-				if not Level.exists(words[2]):
-					return "no map %s in %s" % [words[2], Level.DIR]
-				load_map(words[2])
-				return "map %s loaded: %d cells, %d entities" % [map_name, _terrain["floor"].size(), level_entities.size()]
-			return "map %s (map load <name> loads another)" % map_name
+			return "map load is now zone reset <name>; zones: %s" % ", ".join(World.zones.keys())
+		"zones":
+			return _zones_text()
+		"zone":
+			return _zone_command(words)
 		"reset":
+			var reset_zone := World.zone.name
 			_start_level()
-			return "room rebuilt from the map; %d player records kept; %s" % [_records.size(),
+			return "%s rebuilt from the map; %d player records kept; %s" % [reset_zone, _records.size(),
 				"no dead companions to bring back" if _revived.is_empty()
 				else "companions brought back: %s" % ", ".join(_revived)]
 		"respawn":
-			return "respawned %d" % _check_respawns(World.tick, true)
+			var count := 0
+			var was := World.zone
+			for each: Zone in World.zones.values():
+				World.enter(each)
+				count += _check_respawns(World.tick, true)
+			World.enter(was)
+			return "respawned %d" % count
 		"players":
 			var lines: Array[String] = []
 			for peer: int in _players:
@@ -2014,8 +2247,8 @@ func admin_command(line: String) -> String:
 					continue
 				var id: String = _peer_ids.get(peer, "")
 				var record: PlayerRecord = _records.get(id)
-				lines.append("%s %s (%s) peer %d at %s hp %d/%d" % [
-					player.name, record.name if record != null else "?", id.left(8), peer,
+				lines.append("%s %s (%s) peer %d in %s at %s hp %d/%d" % [
+					player.name, record.name if record != null else "?", id.left(8), peer, player.zone,
 					player.tile, player.hp, player.max_hp])
 			return "%d connected\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 connected"
 		"save":
@@ -2030,8 +2263,8 @@ func admin_command(line: String) -> String:
 				if not is_instance_valid(pet) or not pet.spawned:
 					continue
 				var record: PlayerRecord = _records.get(id)
-				lines.append("%s, with %s (%s) at %s hp %d/%d stance %s intent %s%s mind %s, stance set by %s" % [
-					pet.name, record.name if record != null else "?", id.left(8), pet.tile, pet.hp, pet.max_hp,
+				lines.append("%s, with %s (%s) in %s at %s hp %d/%d stance %s intent %s%s mind %s, stance set by %s" % [
+					pet.name, record.name if record != null else "?", id.left(8), pet.zone, pet.tile, pet.hp, pet.max_hp,
 					pet.stance_name(), pet.intent_name(), " " + pet.intent_target.name if pet.intent_target != null else "",
 					pet.mind.kind if pet.mind != null else "none", pet.last_mind])
 			return "%d companions\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 companions"
@@ -2075,9 +2308,57 @@ func admin_command(line: String) -> String:
 					who = String(pet.name)
 			return Transcript.show(who, words[2] if words.size() >= 3 else "")
 		"help":
-			return "reset | respawn | players | companions | mind scripted|ollama | mind log on|off | mind last <name> | " \
-				+ "perception list|grid|both | transcript <name> [<date>] | map | map load <name> | save"
+			return "reset | respawn | players | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
+				+ "transcript <name> [<date>] | save"
 	return "unknown command %s (try help)" % words[0]
+
+
+## The console's zones: each loaded zone, awake or asleep, its tick, and who
+## is in it.
+func _zones_text() -> String:
+	var lines: Array[String] = []
+	for each: Zone in World.zones.values():
+		var who: Array[String] = []
+		for peer in World.peers_in(each.name):
+			var record: PlayerRecord = _records.get(_peer_ids.get(peer, ""))
+			who.append(record.name if record != null else "peer %d" % peer)
+		var count := World.get_entities().size() if each == World.zone else each.entities.size()
+		lines.append("%s: %s, tick %d, %d entities, %s" % [each.name, "awake" if each.awake else "asleep",
+			each.tick if each != World.zone else World.tick, count, ", ".join(who) if not who.is_empty() else "nobody"])
+	return "%d zones\n%s" % [lines.size(), "\n".join(lines)]
+
+
+## zone reset <name>: that zone rebuilt from its map (loaded if it was not);
+## zone move <player> <zone>: that player (by name, or PlayerN) and their
+## companion to that zone's first start.
+func _zone_command(words: PackedStringArray) -> String:
+	if words.size() >= 3 and words[1] == "reset":
+		if not Level.exists(words[2]):
+			return "no map %s in %s" % [words[2], Level.DIR]
+		var opened := World.zones.has(words[2])
+		var was := World.enter(_open_zone(words[2]))
+		if opened:
+			_start_level()
+		var reply := "zone %s %s: %d cells, %d entities" % [words[2], "rebuilt" if opened else "loaded",
+			_terrain["floor"].size(), level_entities.size()]
+		World.enter(was)
+		return reply
+	if words.size() >= 4 and words[1] == "move":
+		var wanted := words[2].to_lower()
+		var to := words[3]
+		if not Level.exists(to):
+			return "no map %s in %s" % [to, Level.DIR]
+		for peer: int in _peer_ids:
+			var record: PlayerRecord = _records.get(_peer_ids[peer])
+			var player: Player = _players.get(peer)
+			if record != null and (record.name.to_lower() == wanted
+					or is_instance_valid(player) and String(player.name).to_lower() == wanted):
+				if not travel(peer, to):
+					return "could not move %s to %s" % [record.name, to]
+				return "%s moved to %s" % [record.name, to]
+		return "no player %s online" % words[2]
+	return "usage: zone reset <name> | zone move <player> <zone>"
 
 
 ## --test-move: order the local player once, then report when the move shows

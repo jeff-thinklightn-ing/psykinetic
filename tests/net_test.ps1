@@ -95,6 +95,18 @@ $phase4 = @($server4, $clientH, $clientI)
 $phase4 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
 $phase4 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
+# Phase 5: zones. Jo walks onto the test room's link at (1, 1) and goes to
+# the sample with her companion; Kim stays. Each client must be sent only
+# its own zone's entities.
+$server5 = Start-Instance 'server5' @('--server', "--token=$token", '--test-exit-after=16')
+Start-Sleep -Seconds 2
+$clientJ = Start-Instance 'clientJ' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Jo', '--test-move=-10,-1', '--test-exit-after=12')
+Start-Sleep -Seconds 1
+$clientK = Start-Instance 'clientK' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Kim', '--test-exit-after=11')
+$phase5 = @($server5, $clientJ, $clientK)
+$phase5 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+$phase5 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
 	if (Test-Path $path) { @(Get-Content $path) } else { @() }
@@ -116,6 +128,9 @@ $clientGLog = Read-Log 'clientG'
 $server4Log = Read-Log 'server4'
 $clientHLog = Read-Log 'clientH'
 $clientILog = Read-Log 'clientI'
+$server5Log = Read-Log 'server5'
+$clientJLog = Read-Log 'clientJ'
+$clientKLog = Read-Log 'clientK'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -182,6 +197,13 @@ Assert (@($server4Log | Select-String '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined a
 # Hal stood on the crate's spawn tile, so he is put on the nearest free one.
 Assert (@($clientILog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=').Count -eq 1) 'phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself'
 Assert (@($clientHLog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)').Count -eq 1) 'phase 4: Hal, who did not ask, sees the same room'
+Assert (@($server5Log | Select-String '\[zone\] Jo went from test_room to sample').Count -eq 1) 'phase 5: Jo took the link to the sample; the server says so'
+Assert (@($clientJLog | Select-String '\[zone\] now in sample').Count -eq 1) 'phase 5: her client switched to the sample'
+$joTiles = @($clientJLog | Select-String '\[test\] tiles: ')
+$kimTiles = @($clientKLog | Select-String '\[test\] tiles: ')
+Assert ($joTiles.Count -eq 1 -and $joTiles[0].Line -match 'Sneak=' -and $joTiles[0].Line -match 'Player1=' -and $joTiles[0].Line -match 'Pip=' -and $joTiles[0].Line -notmatch 'CorridorImp|Player2=|Nix=') "phase 5: Jo sees the sample, herself and her companion Pip, nothing of the test room ($($joTiles | ForEach-Object { $_.Line }))"
+Assert ($kimTiles.Count -eq 1 -and $kimTiles[0].Line -match 'CorridorImp1=' -and $kimTiles[0].Line -match 'Player2=' -and $kimTiles[0].Line -match 'Nix=' -and $kimTiles[0].Line -notmatch 'Sneak=|Player1=|Pip=') "phase 5: Kim, who stayed, sees the test room and not Jo or Pip ($($kimTiles | ForEach-Object { $_.Line }))"
+Assert (@($clientKLog | Select-String '\[zone\] now in').Count -eq 0) 'phase 5: and Kim never left it'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

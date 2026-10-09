@@ -23,6 +23,9 @@ const POST_TOP := Color(0.5, 0.43, 0.37)
 const POST_WIDTH := 3.0
 
 var key := Vector3i.ZERO
+## Its zone, as an entity's (GridEntity.zone), and its synchronizer.
+var zone := ""
+var sync: MultiplayerSynchronizer
 var open := false:
 	set(value):
 		if open != value:
@@ -45,7 +48,9 @@ func _init() -> void:
 	var synchronizer := MultiplayerSynchronizer.new()
 	synchronizer.name = "Sync"
 	synchronizer.replication_config = config
+	synchronizer.add_visibility_filter(func(peer: int) -> bool: return World.peer_sees(peer, zone))
 	add_child(synchronizer)
+	sync = synchronizer
 
 
 ## Builds one from a spawn spec: {script, name, edge: [x, y, side], props}.
@@ -54,6 +59,7 @@ static func build(spec: Dictionary) -> Door:
 	door.name = str(spec.get("name", "Door"))
 	var edge: Array = spec.get("edge", [0, 0, 0])
 	door.key = Vector3i(int(edge[0]), int(edge[1]), int(edge[2]))
+	door.zone = str(spec.get("zone", ""))
 	var props: Dictionary = spec.get("props", {})
 	for property: String in props:
 		door.set(property, props[property])

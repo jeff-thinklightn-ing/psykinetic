@@ -10,6 +10,14 @@ extends Node
 ## tick arrives by RPC, entities arrive through MultiplayerSpawner /
 ## MultiplayerSynchronizer, and occupancy is rebuilt from their tiles. The
 ## mirror_* functions are the only writers and refuse to run on the server.
+##
+## Zones: the server holds every loaded map as a Zone (zones), and World
+## works on one at a time (zone, switched by enter): terrain, doors,
+## entities, occupancy, fields and the tick are the zone's. step() runs each
+## awake zone in turn; an order from a client is carried out in the zone of
+## the entity it is for. Outside those, the zone is the one the local
+## player is in (home), so a host's view and input see their own zone. A
+## client has the one zone its player is in, and never switches.
 
 signal ticked(tick: int)
 signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
@@ -142,6 +150,19 @@ var _hits: Array[Hit] = []
 var _next_id := 1
 var _accumulator := 0.0
 
+## Server: every loaded zone by name, and the one World is working on.
+var zones: Dictionary[String, Zone] = {}
+var zone := Zone.new()
+## Server: which zone each peer's player is in: what that client is sent
+## (peer_sees) and which zone's tick it gets.
+var peer_zone: Dictionary[int, String] = {}
+## World switched from one zone to another (Main swaps its per-zone state).
+signal zone_switched(from: Zone, to: Zone)
+## Every awake zone has stepped once (Main's snapshot timer).
+signal stepped
+## So many steps, all zones together.
+var steps := 0
+
 
 ## An attack or shove accepted this tick, waiting for the resolve phase.
 class Hit:
@@ -174,10 +195,52 @@ func _process(delta: float) -> void:
 	tick_alpha = _accumulator / TICK_DT
 
 
-## Advances the sim one tick. Driven by _process; tests call it directly.
+## Advances the sim one tick: every awake zone (one with a player in it)
+## steps once, in turn; a zone with nobody sleeps. Driven by _process;
+## tests call it directly.
 func step() -> void:
 	if not Net.is_authority():
 		return
+	var was := zone
+	if zones.is_empty():
+		_step_zone()
+	for each: Zone in zones.values():
+		var awake := _is_awake(each)
+		if awake and not each.awake:
+			_woke(each, (Time.get_ticks_msec() - each.asleep_since) / 1000.0)
+			each.asleep_since = -1
+		elif not awake and each.awake:
+			each.asleep_since = Time.get_ticks_msec()
+		each.awake = awake
+		if awake:
+			enter(each)
+			_step_zone()
+	enter(was)
+	steps += 1
+	stepped.emit()
+
+
+## Whether [param each] has a player in it: one standing there, or a
+## connected peer whose player belongs there (dead, waiting to respawn).
+func _is_awake(each: Zone) -> bool:
+	if each.name in peer_zone.values():
+		return true
+	var entities: Array[GridEntity] = each.entities if each != zone else _entities
+	for entity in entities:
+		if entity is Player and entity.spawned:
+			return true
+	return false
+
+
+## [param each] wakes after [param seconds] asleep. The place to catch up
+## on the time it slept (monsters wandering, fires burning down); nothing
+## yet: a zone comes back as it was left.
+func _woke(each: Zone, seconds: float) -> void:
+	print("[zone] %s wakes after %.0f s asleep" % [each.name, seconds])
+
+
+## One tick of the zone World is in.
+func _step_zone() -> void:
 	tick += 1
 	for entity in _entities:
 		if entity.protected and tick >= entity.protected_until_tick:
@@ -194,9 +257,113 @@ func step() -> void:
 	# 4. Stamina comes back for whoever did not exert themselves this tick.
 	_regen_stamina()
 	ticked.emit(tick)
-	# 5. The tick counter goes to clients once per tick.
+	# 5. The tick counter goes once per tick to the clients in this zone.
 	for peer in Net.sendable_peers():
-		_net_tick.rpc_id(peer, tick)
+		if peer_sees(peer, zone.name):
+			_net_tick.rpc_id(peer, tick)
+
+
+# --- Zones (server) -----------------------------------------------------------
+
+## Forgets every zone (a server restart, in a test): World back to one
+## empty zone of no name.
+func clear_zones() -> void:
+	enter(Zone.new())
+	reset()
+	zones.clear()
+	peer_zone.clear()
+
+
+## A new, empty zone called [param zone_name] (Main fills it).
+func add_zone(zone_name: String) -> Zone:
+	var made := Zone.new(zone_name)
+	zones[zone_name] = made
+	return made
+
+
+## Works on [param to] from now on: its state swapped into World's fields,
+## the zone left keeping its own. Returns the zone World was in, to go back
+## to (enter(was)).
+func enter(to: Zone) -> Zone:
+	var from := zone
+	if to == null or to == from:
+		return from
+	from.tick = tick
+	from.floor = _floor
+	from.fire = _fire
+	from.height = _height
+	from.stairs = _stairs
+	from.water = _water
+	from.torches = _torches
+	from.fields = fields
+	from.north = north
+	from.edges = _edges
+	from.doors = _doors
+	from.occupancy = _occupancy
+	from.entities = _entities
+	from.hits = _hits.duplicate()
+	zone = to
+	tick = to.tick
+	_floor = to.floor
+	_fire = to.fire
+	_height = to.height
+	_stairs = to.stairs
+	_water = to.water
+	_torches = to.torches
+	fields = to.fields
+	north = to.north
+	_edges = to.edges
+	_doors = to.doors
+	_occupancy = to.occupancy
+	_entities = to.entities
+	_hits.assign(to.hits)
+	zone_switched.emit(from, to)
+	return from
+
+
+## enter() by name; null and no change for a zone that is not loaded.
+func enter_named(zone_name: String) -> Zone:
+	return enter(zones[zone_name]) if zones.has(zone_name) else zone
+
+
+## The zone the local player is in (a host's own view), else the one World
+## is in.
+func home() -> Zone:
+	var mine: String = peer_zone.get(Net.local_id, "")
+	return zones.get(mine, zone)
+
+
+## Whether [param peer] is sent what is in zone [param zone_name]: its
+## player is there. Something in no zone (a client's, or before zones) is
+## everyone's.
+func peer_sees(peer: int, zone_name: String) -> bool:
+	return zone_name.is_empty() or peer_zone.get(peer, "") == zone_name
+
+
+## The peers whose players are in zone [param zone_name].
+func peers_in(zone_name: String) -> Array[int]:
+	var peers: Array[int] = []
+	for peer: int in peer_zone:
+		if peer_zone[peer] == zone_name:
+			peers.append(peer)
+	return peers
+
+
+## Asks every entity and door of zone [param zone_name] whether
+## [param peer] may see it now (after peer_zone changed): the spawner then
+## spawns or despawns them on that client.
+func update_visibility(peer: int, zone_name: String) -> void:
+	var each: Zone = zones.get(zone_name)
+	if each == null or peer not in multiplayer.get_peers():
+		return
+	var entities: Array[GridEntity] = _entities if each == zone else each.entities
+	var doors: Dictionary[Vector3i, Door] = _doors if each == zone else each.doors
+	for entity in entities:
+		if is_instance_valid(entity) and entity.sync != null:
+			entity.sync.update_visibility(peer)
+	for door: Door in doors.values():
+		if is_instance_valid(door) and door.sync != null:
+			door.sync.update_visibility(peer)
 
 
 # --- Mutations (server only) --------------------------------------------------
@@ -364,6 +531,7 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 		return false
 	_occupancy[at] = entity
 	_entities.append(entity)
+	entity.zone = zone.name
 	entity._world_place(_next_id, at)
 	_next_id += 1
 	return true
@@ -659,7 +827,9 @@ func request_move(entity_path: NodePath, target: Vector2i, via: Array) -> void:
 	for at: Variant in via:
 		if at is Vector2i:
 			tiles.append(at)
+	var was := enter_named(entity.zone)
 	order_move(entity, target, tiles)
+	enter(was)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -668,7 +838,9 @@ func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predic
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity != null:
+		var was := enter_named(entity.zone)
 		order_step(entity, direction, epoch, predicted)
+		enter(was)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -677,8 +849,10 @@ func request_attack(entity_path: NodePath, target_path: NodePath) -> void:
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
-	if entity != null and target != null:
+	if entity != null and target != null and target.zone == entity.zone:
+		var was := enter_named(entity.zone)
 		order_attack(entity, target)
+		enter(was)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -687,8 +861,10 @@ func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vect
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
-	if entity != null and target != null:
+	if entity != null and target != null and target.zone == entity.zone:
+		var was := enter_named(entity.zone)
 		order_shove(entity, target, direction)
+		enter(was)
 
 
 ## Server: a player's step into [param tile] was refused this tick (someone
@@ -725,7 +901,9 @@ func request_command(entity_path: NodePath, command_name: String, args: Dictiona
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity != null:
+		var was := enter_named(entity.zone)
 		command_received.emit(entity, command_name, args)
+		enter(was)
 
 
 func _entity_at_path(path: NodePath) -> GridEntity:

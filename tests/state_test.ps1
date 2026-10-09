@@ -36,13 +36,14 @@ Assert (@($first | Select-String 'tiles: .*Crate1=\(7, 2\)').Count -eq 1) 'first
 Assert (Test-Path $state) 'snapshot file was written'
 $json = $null
 try { $json = Get-Content $state -Raw | ConvertFrom-Json } catch {}
-Assert ($null -ne $json -and $json.version -eq 1) 'snapshot is valid JSON with version 1'
-$crate = @($json.entities | Where-Object { $_.name -eq 'Crate1' })
+Assert ($null -ne $json -and $json.version -eq 2 -and $null -ne $json.zones.test_room) 'snapshot is valid JSON, version 2, with the test room zone'
+$room = $json.zones.test_room
+$crate = @($room.entities | Where-Object { $_.name -eq 'Crate1' })
 Assert ($crate.Count -eq 1 -and $crate[0].tile[0] -eq 7 -and $crate[0].tile[1] -eq 2) 'snapshot has Crate1 at [7, 2]'
-Assert (@($json.entities | Where-Object { $_.script -eq 'res://sim/player.gd' }).Count -eq 0) 'players are not among the entities'
+Assert (@($room.entities | Where-Object { $_.script -eq 'res://sim/player.gd' }).Count -eq 0) 'players are not among the entities'
 $dev = @($json.players | Where-Object { $_.player_id -eq 'dev-host' })
-Assert ($json.players.Count -eq 1 -and $dev.Count -eq 1 -and $dev[0].tile[0] -eq 8 -and $dev[0].tile[1] -eq 2) "snapshot holds the dev host's player record at [8, 2]"
-Assert ($json.entities.Count -eq 9) "snapshot holds the 9 level entities (saw $($json.entities.Count))"
+Assert ($json.players.Count -eq 1 -and $dev.Count -eq 1 -and $dev[0].tile[0] -eq 8 -and $dev[0].tile[1] -eq 2 -and $dev[0].zone -eq 'test_room') "snapshot holds the dev host's player record at [8, 2] in the test room"
+Assert ($room.entities.Count -eq 9) "snapshot holds the 9 level entities (saw $($room.entities.Count))"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 $second = Run-Host 'second' @('--test-exit-after=2')
