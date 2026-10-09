@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.58
+
+Server.
+
+- Rebuilt transcripts no longer repeat stretches of the conversation, and
+  their times run in order.
+
+The server must be updated to v0.1.58 too, as it refuses any other version.
+
 ## v0.1.57
 
 Companions. Server.
