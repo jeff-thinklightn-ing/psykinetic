@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.60
+
+Companions. Server.
+
+- **She answers when asked**: a question to a companion always gets words
+  back, never silence; "..." is only for moments nobody spoke to her.
+- **Sharper sense of what is around her**: she is told what she can see as
+  a short list, each thing with how far it is and where (beside you,
+  between you and Jeff, behind Jeff, up on the ledge): monsters, anything
+  within two paces, and whatever you just asked about.
+- **Perception is a setting**: `--perception=list|grid|both` (or
+  `perception` on the console) can give her a small map of what she sees
+  instead of, or as well as, the list. The list stays the default; see
+  docs/perception_eval.md for how the three compare.
+
+The server must be updated to v0.1.60 too, as it refuses any other version.
+
 ## v0.1.59
 
 Companions. Server.
