@@ -112,17 +112,25 @@ static func rebuild(paths: Array[String]) -> String:
 			var stamp := str(entry.get("time", "")).trim_suffix("Z")
 			var at := Time.get_datetime_string_from_unix_time(Time.get_unix_time_from_datetime_string(stamp) + bias)
 			var seen := exchange_in(str(entry["prompt"]), companion)
-			var said := str(entry.get("say", ""))
-			if entry.get("outcome") == "said" and not said.is_empty():
-				seen.append("%s: %s" % [companion, said])
 			if not lines_of.has(companion):
 				lines_of[companion] = []
 			_join(lines_of[companion], seen, at)
+			var said := str(entry.get("say", ""))
+			if entry.get("outcome") == "said" and not said.is_empty():
+				# Placed by the next ask, where it stands in its true order
+				# (events may come in while she answers); kept as it is
+				# if no later ask shows it.
+				lines_of[companion].append({"text": "%s: %s" % [companion, said], "at": at, "pending": true})
 	var oldest := Time.get_date_string_from_unix_time(
 			Time.get_unix_time_from_datetime_string(Time.get_date_string_from_system()) - KEEP_DAYS * 86400)
 	var files := 0
 	var written_lines := 0
 	for companion: String in lines_of:
+		# A line first seen later than one after it happened no later than that one.
+		var lines: Array = lines_of[companion]
+		for i in range(lines.size() - 2, -1, -1):
+			if str(lines[i]["at"]) > str(lines[i + 1]["at"]):
+				lines[i]["at"] = lines[i + 1]["at"]
 		var by_day: Dictionary[String, Array] = {}
 		for line: Dictionary in lines_of[companion]:
 			var day := str(line["at"]).left(10)
@@ -190,7 +198,25 @@ static func exchange_in(prompt: String, companion: String) -> Array[String]:
 ## Adds to [param have] what [param seen] holds past the overlap of its
 ## start with have's end, timed [param at].
 static func _join(have: Array, seen: Array[String], at: String) -> void:
-	var overlap := 0
+	var pending: Array = []
+	while not have.is_empty() and have.back().get("pending", false):
+		pending.push_front(have.pop_back())
+	var said: Dictionary[String, String] = {}
+	for line: Dictionary in pending:
+		said[str(line["text"])] = str(line["at"])
+	var overlap := _overlap(have, seen)
+	if overlap == 0 and not pending.is_empty():
+		# No overlap: a new exchange (a restart). Her last line stands as logged.
+		for line: Dictionary in pending:
+			have.append({"text": line["text"], "at": line["at"]})
+		overlap = _overlap(have, seen)
+	for line in seen.slice(overlap):
+		# Her pending line, now in its place, keeps the time she said it.
+		have.append({"text": line, "at": said.get(line, at)})
+
+
+## The most lines [param seen] starts with that [param have] ends with.
+static func _overlap(have: Array, seen: Array[String]) -> int:
 	for k in range(mini(have.size(), seen.size()), 0, -1):
 		var same := true
 		for j in k:
@@ -198,10 +224,8 @@ static func _join(have: Array, seen: Array[String], at: String) -> void:
 				same = false
 				break
 		if same:
-			overlap = k
-			break
-	for line in seen.slice(overlap):
-		have.append({"text": line, "at": at})
+			return k
+	return 0
 
 
 ## A day's file without its rebuilt part: the lines written live.

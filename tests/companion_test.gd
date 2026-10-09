@@ -1223,7 +1223,7 @@ func _test_transcript_rebuild() -> void:
 			"prompt": system + "\n\nuser: [An imp came into sight.]\nLook there\n\nassistant: Hm.\n\nuser: Is it coming?"},
 		{"kind": "stance", "companion": "Pip", "time": stamp + "Z", "prompt": "You are Pip."},
 		{"kind": "voice", "companion": "Pip", "time": stamp + "Z", "outcome": "silent", "say": "",
-			"prompt": system + "\n\nuser: Look there\n\nassistant: Hm.\n\nuser: Is it coming?\n\nassistant: I see it.\n\nuser: [An imp fell.]\nGood\n[A moment passes.]"},
+			"prompt": system + "\n\nuser: Look there\n\nassistant: Hm.\n\nuser: Is it coming?\n[It came up next to you.]\n\nassistant: I see it.\n\nuser: [An imp fell.]\nGood\n[A moment passes.]"},
 	]
 	var file := FileAccess.open(log_path, FileAccess.WRITE)
 	for ask: Dictionary in asks:
@@ -1236,8 +1236,8 @@ func _test_transcript_rebuild() -> void:
 	for line in FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n"):
 		lines.append(line.substr(9))
 	var expected: Array[String] = [Transcript.REBUILT_START, "[An imp came into sight.]", "Jeff: Look there", "Pip: Hm.",
-		"Jeff: Is it coming?", "Pip: I see it.", "[An imp fell.]", "Jeff: Good", Transcript.REBUILT_END]
-	_check(lines == expected, "the asks joined, every line once, Jeff's lines kept (%s): %s" % [reply, lines])
+		"Jeff: Is it coming?", "[It came up next to you.]", "Pip: I see it.", "[An imp fell.]", "Jeff: Good", Transcript.REBUILT_END]
+	_check(lines == expected, "the asks joined, every line once and in order, though an event came in while she answered; Jeff's lines kept (%s): %s" % [reply, lines])
 	Transcript.rebuild(logs)
 	var again := FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n").size()
 	_check(again == expected.size(), "rebuilding again replaces what was rebuilt (%d lines)" % again)
