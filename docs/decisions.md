@@ -970,7 +970,17 @@ included, for the days before. Rebuilt lines are marked off in the file
 and replaced on a rebuild, so it can be run any time without doubling
 what was written live.
 
-## 115. What she sees is a switch: list, grid or both
+## 115. Surroundings are told when they are news
+
+Told every time, the same fire two paces off became the thing she talked
+about. Now the voice hears her surroundings only when they changed since
+her last line (by what is there and where, not by how she faces) or when
+Jeff's words ask about them. And she is told the topics of her own last
+five lines ("You have already mentioned: the fire, resting."), a cheaper
+and surer guard against harping than the echo filter, which only catches
+repeated words.
+
+## 116. What she sees is a switch: list, grid or both
 
 Whether a small model understands a scene better from a list of things
 with their relations already worked out, or from a map it has to read
@@ -980,7 +990,7 @@ console), the same in the voice's ask and the stance's, and an eval that
 asks the real model. The list is the default: it is what the voice had
 before, in a richer form, and the cheapest in tokens.
 
-## 116. The list says where things are, so the model need not work it out
+## 117. The list says where things are, so the model need not work it out
 
 Supersedes 111's "a sentence or two". Up to five things within six paces,
 each with paces, her bearing, and its relation to her and Jeff ("between
@@ -990,7 +1000,7 @@ repeat a relation it is given. Monsters are chosen before ground: a ledge
 and a stair at her feet must not push the sneak next to Jeff off the end.
 Torches are left out, as they are of the grid's key.
 
-## 117. The grid draws walls and doors on cells
+## 118. The grid draws walls and doors on cells
 
 The sim's walls and doors are thin, on the edges between cells; a
 character map has only cells. Drawing at double resolution would be a
@@ -1000,7 +1010,7 @@ it from her ("D" closed, "d" open). Behind a wall she cannot see anyway,
 so nothing she could see is hidden; and the characters are spaced so
 each is its own token, or "....." reads as one.
 
-## 118. The perception eval scores against the sim, by keyword
+## 119. The perception eval scores against the sim, by keyword
 
 The truth for each question (what is next to her, where the nearest
 fire is, whether the nearest door is open, what is near Jeff) is worked
@@ -1011,7 +1021,7 @@ an answer that names a thing as next to her when it is not fails, so
 reciting the whole list does not pass. It runs on the dev machine against
 the box's Ollama through a tunnel, so testing never means deploying.
 
-## 119. Spoken to, she always answers in words
+## 120. Spoken to, she always answers in words
 
 "..." was her way to say nothing when nothing was worth saying, but the
 model took it as leave to ignore a plain question: asked "Is the door
@@ -1019,7 +1029,7 @@ open?", it answered "..." 64 times in 72. Silence is now only for the
 moments no one spoke to her; when Jeff speaks she answers, if only to
 say she doesn't know.
 
-## 120. The list tells what is close, what is dangerous, and what was asked
+## 121. The list tells what is close, what is dangerous, and what was asked
 
 Five things nearest first still put a crate four paces off in front of
 the model, and asked "What's next to you?" it read the list out. Now the
@@ -1028,9 +1038,9 @@ words named, and the rest within two paces. Asking is how he points at
 something far, so the fire he asks about is told wherever it is in
 sight; the crate he does not mention is not news.
 
-## 121. The list stays the default; both is a setting
+## 122. The list stays the default; both is a setting
 
-Run two of the eval (5 runs a cell, after 119 and 120): both 80%, list
+Run two of the eval (5 runs a cell, after 120 and 121): both 80%, list
 79%, grid 55%. Within five points the cheaper prompt wins: the list is
 about 250 tokens shorter on every voice and stance ask, and its one clear
 loss to both is placing the fire (85% against 100%). Both stays behind

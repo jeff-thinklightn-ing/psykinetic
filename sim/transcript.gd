@@ -95,6 +95,9 @@ static func rebuild(paths: Array[String]) -> String:
 		return "no transcripts kept: --transcripts=<dir>"
 	var bias := int(Time.get_time_zone_from_system().get("bias", 0)) * 60
 	var lines_of: Dictionary[String, Array] = {}
+	# Her player's name, as last known: asks made while they were down
+	# named them "the one you travel with".
+	var keepers: Dictionary[String, String] = {}
 	var asks := 0
 	for path in paths:
 		if not FileAccess.file_exists(path):
@@ -111,7 +114,10 @@ static func rebuild(paths: Array[String]) -> String:
 			asks += 1
 			var stamp := str(entry.get("time", "")).trim_suffix("Z")
 			var at := Time.get_datetime_string_from_unix_time(Time.get_unix_time_from_datetime_string(stamp) + bias)
-			var seen := exchange_in(str(entry["prompt"]), companion)
+			var keeper := keeper_in(str(entry["prompt"]))
+			if not keeper.is_empty():
+				keepers[companion] = keeper
+			var seen := exchange_in(str(entry["prompt"]), companion, keepers.get(companion, ""))
 			if not lines_of.has(companion):
 				lines_of[companion] = []
 			_join(lines_of[companion], seen, at)
@@ -168,10 +174,11 @@ static func rebuild(paths: Array[String]) -> String:
 ## The exchange in a voice ask's [param prompt] (Companion.render), a
 ## transcript line each: "Jeff: ...", "Pip: ...", "[An imp fell.]". An ask
 ## from before the voice was a chat gives only her player's words, if any.
-static func exchange_in(prompt: String, companion: String) -> Array[String]:
+static func exchange_in(prompt: String, companion: String, known_keeper := "") -> Array[String]:
 	var lines: Array[String] = []
-	var keeper_match := RegEx.create_from_string("You travel with (.+?) by choice\\.").search(prompt)
-	var keeper := keeper_match.get_string(1) if keeper_match != null else ""
+	var keeper := keeper_in(prompt)
+	if keeper.is_empty():
+		keeper = known_keeper
 	var turns := RegEx.create_from_string("\\n\\n(user|assistant): ").search_all(prompt)
 	if turns.is_empty():
 		var words := RegEx.create_from_string("just said to you: \"(.*)\"").search_all(prompt)
@@ -193,6 +200,15 @@ static func exchange_in(prompt: String, companion: String) -> Array[String]:
 			elif not keeper.is_empty():
 				lines.append("%s: %s" % [keeper, text])
 	return lines
+
+
+## Her player's name in a voice ask's [param prompt], or "" when it does
+## not say (or said only "the one you travel with", while they were down).
+static func keeper_in(prompt: String) -> String:
+	var found := RegEx.create_from_string("You travel with (.+?) by choice\\.").search(prompt)
+	if found == null or found.get_string(1) == "the one you travel with":
+		return ""
+	return found.get_string(1)
 
 
 ## Adds to [param have] what [param seen] holds past the overlap of its

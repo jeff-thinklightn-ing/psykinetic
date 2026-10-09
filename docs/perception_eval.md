@@ -40,12 +40,12 @@
 Run on 2026-10-08 against qwen3:14b on the box (RTX 5080), from the dev
 machine through an ssh tunnel, with the voice's own prompt and request
 body, after two changes from round 1: spoken to, she always answers in
-words (decision 119), and the list holds only monsters, what Jeff asked
-about and things within 2 paces (decision 120).
+words (decision 120), and the list holds only monsters, what Jeff asked
+about and things within 2 paces (decision 121).
 
 - **list 79%, both 80%, grid 55%.** List and both are within five
   points, so the list stays the default and both a setting (decision
-  121): the list's voice ask is about 250 tokens shorter.
+  122): the list's voice ask is about 250 tokens shorter.
 - **The door question works now**: 88% for list and both, against 0-13%
   in round 1, when 64 of 72 answers were "...". Silences fell from 68 of
   288 answers to 15 of 480.
@@ -60,6 +60,6 @@ about and things within 2 paces (decision 120).
 
 ## Round 1, for comparison
 
-3 runs a cell, 288 answers, before decisions 119 and 120: list 52%,
+3 runs a cell, 288 answers, before decisions 120 and 121: list 52%,
 grid 45%, both 61%; the door question 0% / 4% / 13%, nearly all silence;
 voice prompt tokens 552 / 728 / 804.

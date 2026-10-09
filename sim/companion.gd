@@ -101,6 +101,29 @@ const PERCEPTION_NEAR := 2
 const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
+## Words in her player's that ask about what is around them.
+const SURROUNDINGS_WORDS := "\\b(where|see|look|around|near|next|here|this|that|fire|flames?|burn\\w*|glow\\w*|warm|water|door|crates?|box\\w*|boulders?|rocks?|carts?|ledges?|edge|drop|stairs?|torch\\w*|light)\\b"
+## "You have already mentioned: ...": the topics of her last so many lines,
+## each found by the start of a word.
+const MENTIONED_LINES := 5
+const MENTIONED_TOPICS := {
+	"the fire": "fire|flame|burn",
+	"the water": "water",
+	"the door": "door",
+	"the crates": "crate",
+	"the boulder": "boulder|rock",
+	"the cart": "cart",
+	"the ledge": "ledge|edge|drop",
+	"the torches": "torch",
+	"the imps": "imp",
+	"the brute": "brute",
+	"the sneak": "sneak",
+	"%s's wounds": "hurt|wound|blood|bleed|heal",
+	"resting": "rest|breathe",
+	"keeping close": "stay close|keep close|beside|behind me",
+	"moving on": "move|forward|onward|keep going",
+	"the way out": "way out|exit|portal|escape",
+}
 const LOG_LINES_SCANNED := 60
 
 const STANCE_SYSTEM := """You choose how a creature fights beside the player she travels with, in a small tactical game.
@@ -154,6 +177,8 @@ signal said(text: String)
 var keeper_id := ""
 ## Her player's live entity while they are online; null while away.
 var keeper: GridEntity
+## Her player's name as last known (keeper_name).
+var keeper_label := ""
 var card := "Loyal and cautious. Guards the one she travels with, and speaks little."
 var mind: CompanionMind
 var party_log: PartyLog
@@ -204,6 +229,9 @@ var _keeper_down := false
 var _keeper_back := false
 ## Her own last lines, newest last; her player's words, {text, tick}.
 var _said: Array[String] = []
+## What was around her (surroundings_keys) when she last spoke: the voice
+## is told her surroundings again only once they change, or when asked.
+var _around_said: Array[String] = []
 var _heard: Array[Dictionary] = []
 ## What the voice sees of the recent exchange: {role: "user" | "assistant",
 ## text}; her player's words and narration as the user's, her lines as hers.
@@ -238,9 +266,12 @@ func stance_name() -> String:
 	return STANCE_NAMES[stance]
 
 
-## The player she travels with, by name.
+## The player she travels with, by name, also while they are down or
+## away (the name last known; "the one you travel with" only before any).
 func keeper_name() -> String:
-	return _name_of(keeper) if keeper != null and is_instance_valid(keeper) else "the one you travel with"
+	if keeper != null and is_instance_valid(keeper):
+		keeper_label = _name_of(keeper)
+	return keeper_label if not keeper_label.is_empty() else "the one you travel with"
 
 
 ## Who she is and with whom, the first line of every ask.
@@ -626,7 +657,7 @@ func _ask_voice(trigger: String, heard := "", always := false) -> void:
 		return
 	_serial += 1
 	var asked := not heard.is_empty()
-	var messages := voice_messages(asked)
+	var messages := voice_messages(asked, heard)
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger, "messages": messages, "speaker": _name_of(self),
 		"system": messages[0]["content"], "user": render(messages.slice(1)),
@@ -657,14 +688,17 @@ func stance_prompt() -> String:
 ## The voice's ask, as chat messages: the system message (her card, the
 ## world, now), then the exchange, a user's turn last. [param asked]: her
 ## player has just spoken to her, so she may answer with a stance.
-func voice_messages(asked := false) -> Array[Dictionary]:
+func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
 	var now: Array[String] = [voice_situation(), doing()]
+	var topics := mentioned_topics()
+	if not topics.is_empty():
+		now.append("You have already mentioned: %s." % ", ".join(topics))
 	if not standing_instruction().is_empty():
 		now.append("What %s asked of you still stands: %s" % [who, standing_instruction()])
 	now.append(run_summary(false))
-	var around := perception()
+	var around := perception() if surroundings_keys() != _around_said or asks_about_surroundings(heard) else ""
 	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who, who]]
 	if asked:
@@ -685,7 +719,7 @@ func voice_messages(asked := false) -> Array[Dictionary]:
 
 ## The voice's messages as one text, for the log and the tests.
 func voice_prompt(_trigger := "", heard := "") -> String:
-	return render(voice_messages(not heard.is_empty()))
+	return render(voice_messages(not heard.is_empty(), heard))
 
 
 static func render(messages: Array) -> String:
@@ -804,6 +838,31 @@ func perception_list() -> String:
 	if lines.is_empty():
 		return ""
 	return "Around you, what you can see, nearest first:\n" + "\n".join(lines)
+
+
+## What the list tells (perceived), as "kind@cell" keys: the same while
+## nothing around her changes, however she turns. The voice is told what
+## she sees only when these changed since her last line, or when asked.
+func surroundings_keys() -> Array[String]:
+	var keys: Array[String] = []
+	for thing: Dictionary in perceived():
+		keys.append("%s@%s" % [thing["kind"], thing["at"]])
+	return keys
+
+
+## Whether her player's words ([param heard]) ask about what is around them.
+static func asks_about_surroundings(heard: String) -> bool:
+	return not heard.is_empty() and RegEx.create_from_string(SURROUNDINGS_WORDS).search(heard.to_lower()) != null
+
+
+## The topics of her last MENTIONED_LINES lines (MENTIONED_TOPICS), in order.
+func mentioned_topics() -> Array[String]:
+	var topics: Array[String] = []
+	var lines := " ".join(_said.slice(-MENTIONED_LINES)).to_lower()
+	for topic: String in MENTIONED_TOPICS:
+		if RegEx.create_from_string("\\b(%s)" % MENTIONED_TOPICS[topic]).search(lines) != null:
+			topics.append(topic % keeper_name() if "%s" in topic else topic)
+	return topics
 
 
 ## The things worth telling that she can see within PERCEPTION_RANGE paces,
@@ -1222,6 +1281,7 @@ func _say(line: String, always: bool) -> bool:
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return false
 	_last_speech_tick = World.tick
+	_around_said = surroundings_keys()
 	remember_said(line)
 	_add_turn("assistant", line)
 	said.emit(line)

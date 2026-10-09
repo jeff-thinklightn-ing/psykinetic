@@ -603,9 +603,14 @@ from its name.
   hurt, badly hurt or close to falling; paces for cells; who is in
   danger), what she is set on and doing ("You are keeping beside Jeff
   and fighting whatever comes at either of you; right now you are
-  attacking Brute."), what Jeff asked that still stands, how long they
+  attacking Brute."), what she has already mentioned in her last 5 lines
+  ("You have already mentioned: the fire, resting.", by
+  `MENTIONED_TOPICS`), what Jeff asked that still stands, how long they
   have travelled together and who fell near her; then what she can see
-  around her (`perception`, below); then how to answer
+  around her (`perception`, below), only when it is new to her (what the
+  list tells, thing and cell, differs from when she last spoke; turning
+  does not count) or Jeff's words ask about it (where, see, look, near,
+  next, fire, door, ...: `SURROUNDINGS_WORDS`); then how to answer
   (`VOICE_RULES`: out loud, a sentence or two, answer Jeff, never repeat
   herself or Jeff, always words when Jeff has spoken to her, "..." only
   when no one has and there is truly nothing to say, and

@@ -13,7 +13,7 @@ var _rig: Client3D
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17789  # Not 7777: the editor may be hosting there.
+	Net.port = 17791  # Not 7777 (the editor may be hosting there), nor any other test's or eval's.
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	_rig = preload("res://client3d/client3d.tscn").instantiate()

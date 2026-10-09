@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.59
+
+Companions. Server.
+
+- A companion stops going on about the same fire or crate: she mentions
+  her surroundings when something there is new, or when you ask about them,
+  and knows what she has already talked about.
+- While you are down she still knows your name (the transcript no longer
+  calls you "the one you travel with").
+- Rebuilt transcripts no longer repeat the stretch around a fall.
+
+The server must be updated to v0.1.59 too, as it refuses any other version.
+
 ## v0.1.58
 
 Server.
