@@ -88,13 +88,16 @@ static func show(companion: String, date := "") -> String:
 		date = Time.get_date_string_from_system()
 	elif not is_date(date):
 		return "a date is YYYY-MM-DD"
-	var path := path_of(dir, companion, date)
-	if FileAccess.file_exists(path):
-		return FileAccess.get_file_as_string(path).strip_edges(false, true)
+	# The name as typed, in any case: she need not be here to be looked up.
+	var wanted := path_of(dir, companion, date).get_file().to_lower()
+	var files := DirAccess.get_files_at(dir) if DirAccess.dir_exists_absolute(dir) else PackedStringArray()
+	for file in files:
+		if file.to_lower() == wanted:
+			return FileAccess.get_file_as_string(dir.path_join(file)).strip_edges(false, true)
 	var dates: Array[String] = []
-	var prefix := companion.validate_filename() + "-"
-	for file in DirAccess.get_files_at(dir) if DirAccess.dir_exists_absolute(dir) else PackedStringArray():
-		if file.begins_with(prefix) and file.length() == prefix.length() + 14 and not date_in(file).is_empty():
+	var prefix := (companion.validate_filename() + "-").to_lower()
+	for file in files:
+		if file.to_lower().begins_with(prefix) and file.length() == prefix.length() + 14 and not date_in(file).is_empty():
 			dates.append(date_in(file))
 	dates.sort()
 	return "no transcript of %s on %s%s" % [companion, date,

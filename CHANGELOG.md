@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.56
+
+Server.
+
+- The console finds a companion's transcript by name in any case, even while
+  she is not in the world.
+
+The server must be updated to v0.1.56 too, as it refuses any other version.
+
 ## v0.1.55
 
 Companions. Server.

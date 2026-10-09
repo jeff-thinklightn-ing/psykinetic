@@ -1041,6 +1041,8 @@ func _test_transcript() -> void:
 		file.close()
 	_check(_main.admin_command("transcript %s %s" % [pet.name, kept_day]) == "12:00:00 [An old day.]",
 			"transcript %s <date> prints that day's" % pet.name)
+	_check(Transcript.show(String(pet.name).to_upper(), kept_day) == "12:00:00 [An old day.]",
+			"found by name in any case, whether or not she is here")
 	_check(_main.admin_command("transcript %s 2001-01-01" % pet.name).begins_with("no transcript of %s on 2001-01-01 (there are: " % pet.name),
 			"a day with none says which days there are")
 	_check(_main.admin_command("transcript %s ../x" % pet.name) == "a date is YYYY-MM-DD", "a date that is not one is refused")
