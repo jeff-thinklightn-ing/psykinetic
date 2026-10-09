@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.70
+
+Companions. Server.
+
+- A server can give companions' voices a model of their own, on another
+  machine (`PSYKINETIC_VOICE_URL`, `PSYKINETIC_VOICE_MODEL`), while their
+  quick decisions stay where they are.
+- Asked about something she hasn't seen, she is reminded that a flat "no"
+  would claim she knows.
+
+The server must be updated to v0.1.70 too, as it refuses any other version.
+
 ## v0.1.69
 
 Companions. Server.

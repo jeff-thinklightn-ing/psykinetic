@@ -216,6 +216,18 @@ model kept loaded (`"format": "json"`, `"think": false`, `"keep_alive": -1`),
 so the first decision does not pay a model load. A URL ending in
 `/chat/completions` is treated as an OpenAI-compatible endpoint instead.
 
+Her voice can run on its own endpoint and model, a bigger model on a bigger
+card, while stances and the instruction check stay on the first (they want
+speed, the voice wants words):
+
+```
+PSYKINETIC_VOICE_URL=http://<rig>:11434/api/chat
+PSYKINETIC_VOICE_MODEL=qwen3:32b
+```
+
+(or `--voice-url=` and `--voice-model=`). Either left out is the same as
+the `LLM` one.
+
 Each decision is one request with a 2-second timeout; while it is out, or if
 it fails or answers nonsense, the scripted mind's answer is used, and the log
 says so (`[mind] ollama: ...`). The server never waits on it.

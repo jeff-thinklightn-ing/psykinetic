@@ -776,8 +776,10 @@ It is what every headless test uses. `OllamaMind` (`net/ollama_mind.gd`):
 asynchronous POSTs to Ollama's native chat endpoint (`--llm-model`, and
 `--llm-url` if it is not the local default
 `http://127.0.0.1:11434/api/chat`; or the env file), one channel for the
-stance and one for the voice, each with its own request in flight, so a
-line being written never holds up a stance. The body is `model`,
+stance, one for the voice and one for the instruction check, each with its
+own request in flight, so a line being written never holds up a stance.
+The voice's channel may have its own endpoint and model (`--voice-url`,
+`--voice-model`). The body is `model`,
 `"think": false`, `"stream": false`, `"format": "json"`, `"keep_alive":
 -1`, `options.num_predict` (24 for a stance, 90 for a line) and the two
 messages. The answer is read from `message.content`, with any `<think>`

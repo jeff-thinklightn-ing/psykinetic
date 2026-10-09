@@ -28,6 +28,11 @@ var model := ""
 ## True when the URL is an OpenAI-compatible endpoint (.../chat/completions)
 ## rather than Ollama's native /api/chat.
 var openai_shaped := false
+## Each channel's endpoint, model and shape: the voice's may be its own
+## (--voice-url, --voice-model), the stance's and the check's are url, model.
+var _urls: Dictionary[String, String] = {}
+var _models: Dictionary[String, String] = {}
+var _openai: Dictionary[String, bool] = {}
 ## What went wrong last time, for the console. "" when the last reply was fine.
 var last_error := ""
 
@@ -40,11 +45,18 @@ var _results: Array[Dictionary] = []
 
 
 ## [param host] is a node to hang the HTTPRequests under.
-func _init(endpoint: String, model_name: String, host: Node) -> void:
+## [param voice_endpoint], [param voice_model_name]: the voice's own ("" for
+## the same).
+func _init(endpoint: String, model_name: String, host: Node, voice_endpoint := "", voice_model_name := "") -> void:
 	kind = "ollama"
 	url = endpoint
 	model = model_name
 	openai_shaped = endpoint.trim_suffix("/").ends_with("/chat/completions")
+	for what: String in ["stance", "voice", "check"]:
+		var own := what == "voice"
+		_urls[what] = voice_endpoint if own and not voice_endpoint.is_empty() else endpoint
+		_models[what] = voice_model_name if own and not voice_model_name.is_empty() else model_name
+		_openai[what] = _urls[what].trim_suffix("/").ends_with("/chat/completions")
 	for what: String in ["stance", "voice", "check"]:
 		var http := HTTPRequest.new()
 		http.timeout = TIMEOUT_SECONDS[what]
@@ -87,7 +99,7 @@ func _send(what: String, ask: Dictionary) -> void:
 		{"role": "system", "content": str(ask.get("system", ""))},
 		{"role": "user", "content": str(ask.get("user", ""))},
 	])
-	var error := _http[what].request(url, PackedStringArray(["Content-Type: application/json"]),
+	var error := _http[what].request(_urls[what], PackedStringArray(["Content-Type: application/json"]),
 			HTTPClient.METHOD_POST, request_messages(messages, what))
 	if error != OK:
 		_fail(what, "request not sent: %s" % error_string(error))
@@ -106,13 +118,14 @@ func request_body(system: String, user: String, what := "stance") -> String:
 ## The JSON body for [param messages]. A stance is asked for as JSON; the
 ## voice answers in plain words, so it is not.
 func request_messages(messages: Array, what := "stance") -> String:
-	if openai_shaped:
+	var channel_model: String = _models.get(what, model)
+	if _openai.get(what, openai_shaped):
 		return JSON.stringify({
-			"model": model, "think": false, "stream": false, "temperature": TEMPERATURE.get(what, 0.5),
+			"model": channel_model, "think": false, "stream": false, "temperature": TEMPERATURE.get(what, 0.5),
 			"max_tokens": max_tokens(what), "messages": messages,
 		})
 	var body := {
-		"model": model, "think": false, "stream": false, "keep_alive": -1,
+		"model": channel_model, "think": false, "stream": false, "keep_alive": -1,
 		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5)}, "messages": messages,
 	}
 	if what in ["stance", "check"]:
@@ -179,7 +192,7 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 		_fail(what, "HTTP %d" % code, text)
 		return
 	var response: Variant = _parse(text)
-	var content := _openai_content_of(response) if openai_shaped else _native_content_of(response)
+	var content := _openai_content_of(response) if _openai.get(what, openai_shaped) else _native_content_of(response)
 	if content.is_empty():
 		_fail(what, "no message content in the response", text)
 		return

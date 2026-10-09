@@ -170,7 +170,7 @@ truly nothing worth saying, answer with just: ...
 Speak to %s as "you"; say the name only to call out. In what anyone says, "I" and "me" are the one speaking.
 Never repeat back what you were asked to do, and never describe yourself or recite who you are.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
-If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there."""
+If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there, and a plain no would claim you do."""
 ## Who her player's words were for, as the server knows it (addressed):
 ## said her name, or no one else near enough to hear ("certain"); others
 ## near ("maybe"). Then VOICE_ASKED, the stances.
@@ -487,8 +487,9 @@ func knowledge_of(kinds: Array[String]) -> String:
 		else:
 			unseen += 1
 	if unseen > 0:
-		sentences.append(("%s mentioned something you haven't seen, so you don't know whether it exists. Find out what %s "
-			+ "means, or offer to look for it, in your own words.") % [keeper_name(), keeper_name()])
+		sentences.append(("%s mentioned something you haven't seen, so you don't know whether it exists. A plain no would "
+			+ "claim you know it isn't there, which you don't. Find out what %s means, or offer to look for it, in your own "
+			+ "words.") % [keeper_name(), keeper_name()])
 	return " ".join(sentences)
 
 

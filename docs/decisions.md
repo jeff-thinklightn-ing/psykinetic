@@ -1182,3 +1182,11 @@ temperature 0, said no to the three probe lines 12 of 12, yes to stay
 close, get behind me, hold this spot and kill that imp, no to "we should
 rest here" and "can you open that door". Only a yes lets her reply's
 stance stand. Quick phrases need no check: their key is the instruction.
+
+## 138. Her voice may run on a model of its own
+
+The stance and the instruction check are short JSON answers that must be
+quick; the voice is words, where a bigger model is better. So the voice's
+channel takes its own endpoint and model (--voice-url, --voice-model), and
+a server can send it to a bigger card while the rest stays on the box.
+Unset, all three share --llm-url and --llm-model.

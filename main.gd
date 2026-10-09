@@ -1636,7 +1636,7 @@ static func companion_card(pet_name: String) -> String:
 
 func _make_mind() -> CompanionMind:
 	if mind_kind == "ollama" and Net.llm_url != "" and Net.llm_model != "":
-		return OllamaMind.new(Net.llm_url, Net.llm_model, self)
+		return OllamaMind.new(Net.llm_url, Net.llm_model, self, Net.voice_url, Net.voice_model)
 	return ScriptedMind.new()
 
 

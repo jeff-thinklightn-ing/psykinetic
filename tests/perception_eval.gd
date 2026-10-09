@@ -378,7 +378,8 @@ static func score(question: String, say: String, truth: Dictionary) -> Dictionar
 				return {"pass": _has(text, UNSEEN), "why": "wanted: none seen"}
 			if _has(text, UNSEEN):
 				return {"pass": false, "why": "said she cannot see it"}
-			var placed := _number_near(text, int(truth["paces"]))
+			# A number near it, or its distance as the voice is told it (Companion.distance_words).
+			var placed := _number_near(text, int(truth["paces"])) 					or text.contains(Companion.distance_words(int(truth["paces"])))
 			for words: String in truth["words"]:
 				placed = placed or _has(text, words)
 			return {"pass": placed, "why": "wanted %d paces or one of %s" % [truth["paces"], truth["words"]]}

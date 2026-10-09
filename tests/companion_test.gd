@@ -598,6 +598,15 @@ func _test_native_ollama_endpoint() -> void:
 	_check(mind.last_error.is_empty() and pet.stance == Companion.Stance.STAY_CLOSE and pet.last_mind == "ollama",
 			"a native reply is read from message.content and applied (%s by %s)" % [pet.stance_name(), pet.last_mind])
 	World.despawn(foe)
+	var split := OllamaMind.new(Net.DEFAULT_LLM_URL, "small", _main, "http://10.0.0.9:11434/api/chat", "big")
+	var voice_body: Variant = JSON.parse_string(split.request_messages([{"role": "user", "content": "hi"}], "voice"))
+	var stance_body: Variant = JSON.parse_string(split.request_messages([{"role": "user", "content": "hi"}], "stance"))
+	var check_body: Variant = JSON.parse_string(split.request_messages([{"role": "user", "content": "hi"}], "check"))
+	_check(voice_body["model"] == "big" and stance_body["model"] == "small" and check_body["model"] == "small"
+			and split._urls["voice"] == "http://10.0.0.9:11434/api/chat" and split._urls["stance"] == Net.DEFAULT_LLM_URL,
+			"--voice-url / --voice-model: her voice on its own endpoint and model; stances and the check stay")
+	var same := OllamaMind.new(Net.DEFAULT_LLM_URL, "one", _main)
+	_check(same._urls["voice"] == Net.DEFAULT_LLM_URL and same._models["voice"] == "one", "unset, the voice uses --llm-url / --llm-model")
 	var openai := OllamaMind.new("http://127.0.0.1:11434/v1/chat/completions", "stub", _main)
 	_check(openai.openai_shaped, "a URL ending in /chat/completions is spoken to OpenAI-style")
 	var openai_body: Variant = JSON.parse_string(openai.request_body("system", "user"))
@@ -1345,7 +1354,8 @@ func _test_what_she_knows() -> void:
 	_check("You saw fire " in known and "just now" in known, "remembered: where and how long ago (%s)" % known)
 	_check("A door is a few paces to the south, closed." in known or "A door is a few paces to the south, open." in known,
 			"a door in sight, and whether it is open (%s)" % known)
-	_check("Player mentioned something you haven't seen, so you don't know whether it exists. Find out what Player means, or offer to look for it, in your own words." in known
+	_check("Player mentioned something you haven't seen, so you don't know whether it exists." in known
+			and "Find out what Player means, or offer to look for it, in your own words." in known
 			and not "no water" in known.to_lower() and not "\"" in known,
 			"unknown: she doesn't know whether it exists, and is told what to do, never what to say")
 	pet._memory.clear()

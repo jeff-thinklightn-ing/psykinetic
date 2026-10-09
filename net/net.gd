@@ -20,6 +20,8 @@ extends Node
 ##   --transcripts=<dir>          server/host: keep what is said to and by each companion here, a
 ##                                text file each a day (a dedicated server:
 ##                                /var/lib/psykinetic/transcripts when it can); see Transcript
+##   --voice-url=<url>            her voice on this endpoint instead (stances and the check stay on
+##   --voice-model=<m>            --llm-url); and this model (or PSYKINETIC_VOICE_URL / _MODEL)
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
 ##                                (or PSYKINETIC_MIND_WHY=1)
 ##   --perception=list|grid|both  what the minds are told she sees around her: a list of the
@@ -133,6 +135,12 @@ var console := false
 const DEFAULT_LLM_URL := "http://127.0.0.1:11434/api/chat"
 var llm_url := DEFAULT_LLM_URL
 var llm_model := ""
+## Her voice on an endpoint and model of its own (a bigger model on a
+## bigger card, say), from --voice-url / --voice-model or
+## PSYKINETIC_VOICE_URL / PSYKINETIC_VOICE_MODEL; "" for the same as
+## --llm-url / --llm-model. Stances and the instruction check stay there.
+var voice_url := ""
+var voice_model := ""
 ## The mind log's file ("" for none); see MindLog. A dedicated server
 ## writes /var/lib/psykinetic/mind.log by default when that directory is
 ## there. --mind-why asks the minds for their reason as well.
@@ -258,6 +266,8 @@ func _enter_tree() -> void:
 	if OS.get_environment("PSYKINETIC_LLM_URL") != "":
 		llm_url = OS.get_environment("PSYKINETIC_LLM_URL")
 	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
+	voice_url = OS.get_environment("PSYKINETIC_VOICE_URL")
+	voice_model = OS.get_environment("PSYKINETIC_VOICE_MODEL")
 	if OS.get_environment("PSYKINETIC_MIND_WHY") in ["1", "true", "on", "yes"]:
 		mind_why = true
 	if OS.get_environment("PSYKINETIC_PERCEPTION") != "":
@@ -919,7 +929,7 @@ func _parse_args() -> void:
 			"--mind-why":
 				mind_why = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--perception", "--mind-log", "--map", "--transcripts", \
+					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
@@ -970,6 +980,10 @@ func _set_option(key: String, value: String) -> void:
 			llm_url = value
 		"--llm-model":
 			llm_model = value
+		"--voice-url":
+			voice_url = value
+		"--voice-model":
+			voice_model = value
 		"--perception":
 			if value.to_lower() in PERCEPTIONS:
 				perception = value.to_lower()
