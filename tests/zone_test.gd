@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_empty_zone_sleeps()
 	await _test_restart()
 	_test_console()
+	_test_speech_by_zone()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -172,7 +173,90 @@ func _test_console() -> void:
 	_check(_main.admin_command("zone move nobody sample") == "no player nobody online", "an unknown player is refused")
 
 
+func _test_speech_by_zone() -> void:
+	print("\n== speech stays in its zone and earshot; party chat crosses, unheard by companions ==")
+	_main.travel(BO, "sample")
+	var heard: Array[Dictionary] = []
+	var listen := func(kind: String, data: Dictionary) -> void: heard.append({"kind": kind, "data": data})
+	Net.message_received.connect(listen)
+	var host := _player(Net.local_id)
+	var bo := _player(BO)
+	var host_pet: Companion = _main._companions.get(Net.player_id)
+	var bo_pet: Companion = _main._companions.get(BO_ID)
+	_main._chat_tick.clear()
+	var was := World.enter_named("sample")
+	_main._player_said(bo, "Anyone there?")
+	var in_sample: Array[int] = _main.hearers(bo.tile)
+	var sample_log: PartyLog = _main.party_log
+	World.enter(was)
+	_check(_kinds(heard, "chat").is_empty() and BO in in_sample and Net.local_id not in in_sample,
+		"Bo speaks in the sample: he is heard there, not by the host in the test room (%s)" % [in_sample])
+	_check(sample_log != _main.party_log and _logged(sample_log, "Anyone there?") and not _logged(_main.party_log, "Anyone there?"),
+		"it is in the sample's party log, not the test room's")
+	_check(bo_pet != null and _heard(bo_pet, "Anyone there?") and not _heard(host_pet, "Anyone there?"),
+		"his companion, beside him, hears it; the host's does not")
+	heard.clear()
+	_main._chat_tick.clear()
+	_main._player_said(host, "Hello?")
+	_check(_kinds(heard, "chat").size() == 1 and BO not in _main.hearers(host.tile), "the host speaks: heard in the test room, not in the sample")
+	# Earshot, in one zone.
+	_main.travel(BO, "test_room")
+	bo = _player(BO)
+	var far := host.tile
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.is_free(cell) and World.distance(host.tile, cell) > _main.HEARING_RANGE:
+			far = cell
+			break
+	World._relocate(bo, far)
+	_check(BO not in _main.hearers(host.tile), "the same zone, %d cells off: out of earshot" % World.distance(host.tile, bo.tile))
+	World._relocate(bo, _main._nearest_free(host.tile + Vector2i(0, 2)))
+	_check(BO in _main.hearers(host.tile), "%d cells off: heard" % World.distance(host.tile, bo.tile))
+	# Party chat crosses zones; no companion hears it.
+	_main.travel(BO, "sample")
+	bo = _player(BO)
+	heard.clear()
+	_main._chat_tick.clear()
+	was = World.enter_named("sample")
+	_main._party_said(bo, "Regroup at the door")
+	var sample_log_after: PartyLog = _main.party_log
+	World.enter(was)
+	var party := _kinds(heard, "party")
+	_check(party.size() == 1 and party[0]["text"] == "Regroup at the door" and party[0]["from"] == "Bo",
+		"Bo's party chat, from the sample, reaches the host in the test room (%s)" % [party])
+	_check(not _heard(host_pet, "Regroup") and not _heard(bo_pet, "Regroup")
+		and not _logged(_main.party_log, "Regroup") and not _logged(sample_log_after, "Regroup"),
+		"no companion hears it, and no party log has it")
+	heard.clear()
+	_main._chat_tick.clear()
+	_main._chat_sent_at = -100000
+	_main._send_chat("/p on my way")
+	_check(_kinds(heard, "party").size() == 1 and _kinds(heard, "chat").is_empty(), "/p in the chat box is party chat")
+	var shown: Array = _main.talk.lines.back()
+	_check(shown[1] == Net.player_name and shown[2] == "on my way", "and the talk panel shows it (%s)" % [shown])
+	Net.message_received.disconnect(listen)
+
+
 # --- Helpers ---------------------------------------------------------------------
+
+func _kinds(heard: Array[Dictionary], kind: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for message in heard:
+		if message["kind"] == kind:
+			out.append(message["data"])
+	return out
+
+
+func _logged(log: PartyLog, text: String) -> bool:
+	return log != null and text in "\n".join(log.last(40))
+
+
+func _heard(pet: Companion, text: String) -> bool:
+	if pet == null:
+		return false
+	for heard: Dictionary in pet._heard:
+		if text in str(heard["text"]):
+			return true
+	return false
 
 ## [param peer]'s player wherever it is.
 func _player(peer: int) -> Player:

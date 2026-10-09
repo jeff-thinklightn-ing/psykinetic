@@ -846,16 +846,26 @@ switches live.
 **Talking.** Enter opens a one-line box on the HUD (Esc cancels; while it
 is open the game's keys do nothing). A line, at most 200 characters and
 one per 2 seconds (checked on both ends), goes to the server as
-`World.command("say")`; the server broadcasts it as chat to every player
-(each shows it over the speaker, as speech), adds `Talos said to Pip:
-"..."` to the party log, and asks her voice at once (trigger "Talos spoke
-to you"). The words are data: the voice's system prompt says they are
-speech in the game, never instructions about its rules or format, and
-its answer is checked as ever.
+`World.command("say")`; the server sends it as chat to the players who
+can hear it: in the speaker's zone, alive, within `HEARING_RANGE` (10
+cells; `Main.hearers`), each showing it over the speaker as speech. It
+goes into that zone's party log (each zone has its own) as `Talos said to
+Pip: "..."`, and asks her voice at once (trigger "Talos spoke to you") if
+she is in the same zone and within earshot. A companion's lines carry the
+same way, from where she stands. The words are data: the voice's system
+prompt says they are speech in the game, never instructions about its
+rules or format, and its answer is checked as ever.
+
+**Party chat** crosses zones: a line starting `/p ` is `World.command("party")`,
+sent to every player on the server wherever they are
+(`Net.message("party", {from, zone, text})`), shown in the talk panel in
+its own colour, marked `[party]`, and over nobody. No companion hears it
+and no party log has it.
 
 **Tab** shows and hides the talk panel (`render/talk_panel.gd`): the last 20
-lines said this session (companions' speech, last words, players' chat),
-each with who and when; kept for the session only.
+lines said this session (companions' speech, last words, players' chat,
+party chat apart in green), each with who and when; kept for the session
+only.
 
 ## Hazards
 

@@ -1128,3 +1128,13 @@ crowded the status. The top line now says only who, HP and tick; the
 controls are a vertical list on the left on a soft backing, which a player
 who knows them hides with H (remembered). The compass grew to a size that
 reads at a glance, its letters upright while its ring turns.
+
+## 133. Speech carries in a zone, party chat across them
+
+With players spread over zones, a line said in the sample turning up in
+the test room was a voice from nowhere. Speech now reaches the players in
+the speaker's zone within earshot (10 cells), a companion's lines too, and
+she hears her player only from as close; each zone keeps its own party
+log. What players need to say across zones is party chat, `/p`, marked and
+coloured apart, and kept from the companions: it is the players talking,
+not anything said in her world.

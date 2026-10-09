@@ -8,6 +8,8 @@ extends PanelContainer
 const MAX_LINES := 20
 const SPEAKER := Color(1, 0.95, 0.6)
 const CHAT := Color(0.7, 0.85, 1.0)
+## Party chat, which crosses zones: its own colour, and marked.
+const PARTY := Color(0.72, 1.0, 0.7)
 
 var _list: VBoxContainer
 ## [time, speaker, text, is_chat] each, oldest first.
@@ -27,7 +29,9 @@ func _init() -> void:
 	add_child(_list)
 
 
-func add_line(speaker: String, text: String, is_chat := false) -> void:
+## [param party]: a party chat line (Main), shown apart from what is said
+## around the player.
+func add_line(speaker: String, text: String, is_chat := false, party := false) -> void:
 	var at := Time.get_time_string_from_system().substr(0, 8)
 	lines.append([at, speaker, text, is_chat])
 	if lines.size() > MAX_LINES:
@@ -35,8 +39,8 @@ func add_line(speaker: String, text: String, is_chat := false) -> void:
 	var label := Label.new()
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = 900
-	label.text = "%s  %s: %s" % [at, speaker, text]
-	label.add_theme_color_override("font_color", CHAT if is_chat else SPEAKER)
+	label.text = "%s  %s%s: %s" % [at, "[party] " if party else "", speaker, text]
+	label.add_theme_color_override("font_color", PARTY if party else CHAT if is_chat else SPEAKER)
 	_list.add_child(label)
 	while _list.get_child_count() > MAX_LINES:
 		var oldest := _list.get_child(0)

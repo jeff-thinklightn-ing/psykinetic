@@ -110,6 +110,13 @@ var _companions: Dictionary[String, Companion] = {}
 var _revived: Array[String] = []
 ## Server only: what happened, in words, for companion minds and the log.
 var party_log := PartyLog.new()
+## Speech carries this far (cells, in its own zone): chat and a companion's
+## lines reach the players within it, and a companion hears her player's
+## words only from this close.
+const HEARING_RANGE := 10
+## A chat line that starts with this is party chat: to every player on the
+## server, whatever their zone; no companion hears it.
+const PARTY_PREFIX := "/p "
 ## Which mind new decisions use: "scripted" or "ollama" (console: mind ...).
 var mind_kind := "scripted"
 ## Server only: level_entities index -> the entity holding that slot now.
@@ -1101,7 +1108,7 @@ func _zone_nodes(zone_name: String) -> void:
 func _on_zone_switched(from: Zone, to: Zone) -> void:
 	from.main = {"level": level, "level_entities": level_entities, "player_starts": player_starts,
 		"level_centre": level_centre, "map_name": map_name, "terrain": _terrain, "alive_slots": _alive_slots,
-		"dead_since": _dead_since, "spawner": spawner, "entities": entities}
+		"dead_since": _dead_since, "spawner": spawner, "entities": entities, "party_log": party_log}
 	if to.main.is_empty():
 		# A zone being opened: fresh state, until its level loads.
 		level = {}
@@ -1110,6 +1117,7 @@ func _on_zone_switched(from: Zone, to: Zone) -> void:
 		_terrain = {}
 		_alive_slots = {}
 		_dead_since = {}
+		party_log = PartyLog.new()
 		return
 	level = to.main["level"]
 	level_entities = to.main["level_entities"]
@@ -1121,6 +1129,7 @@ func _on_zone_switched(from: Zone, to: Zone) -> void:
 	_dead_since = to.main["dead_since"]
 	spawner = to.main["spawner"]
 	entities = to.main["entities"]
+	party_log = to.main["party_log"]
 
 
 ## A host: World back in the zone of its own player, the views drawing that
@@ -1646,6 +1655,8 @@ func _remember_companion(id: String) -> void:
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	if command_name == "say" and entity is Player:
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
+	elif command_name == "party" and entity is Player:
+		_party_said(entity, str(args.get("text", "")))
 	elif command_name == "swing" and entity is Player:
 		var swing := _direction_arg(args)
 		if swing != Vector2i.ZERO:
@@ -1703,7 +1714,7 @@ func _build_talk() -> void:
 	_chat_box = LineEdit.new()
 	_chat_box.name = "ChatBox"
 	_chat_box.max_length = CHAT_MAX_CHARS
-	_chat_box.placeholder_text = "say to your companion (Enter sends, Esc cancels)"
+	_chat_box.placeholder_text = "say it aloud; /p for party chat (Enter sends, Esc cancels)"
 	_chat_box.visible = false
 	_chat_box.anchor_top = 1.0
 	_chat_box.anchor_bottom = 1.0
@@ -1768,6 +1779,11 @@ func _send_chat(text: String, phrase := 0) -> void:
 		hud.text = "wait a moment before saying more"
 		return
 	_chat_sent_at = Time.get_ticks_msec()
+	if line.begins_with(PARTY_PREFIX.strip_edges()) and (line.length() == 2 or line[2] == " "):
+		var words := line.substr(2).strip_edges()
+		if not words.is_empty():
+			World.command(me, "party", {"text": words})
+		return
 	World.command(me, "say", {"text": line, "phrase": phrase})
 
 
@@ -1819,11 +1835,45 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 		return
 	_chat_tick[id] = World.tick
 	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
-	var to := String(pet.name) if is_instance_valid(pet) and pet.spawned else ""
+	# She hears it only in the same zone and within earshot.
+	var hears := is_instance_valid(pet) and pet.spawned and pet.zone == player.zone \
+			and World.distance(pet.tile, player.tile) <= HEARING_RANGE
+	var to := String(pet.name) if hears else ""
 	party_log.add("%s said%s: \"%s\"" % [_display_name(player), " to " + to if to != "" else "", line])
-	Net.broadcast("chat", {"entity": String(player.get_path()), "from": _display_name(player), "to": to, "text": line})
+	Net.broadcast_to(hearers(player.tile), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
+		"to": to, "text": line})
 	if to != "":
 		pet.owner_spoke(line, phrase)
+
+
+## The peers whose players can hear something said at [param at] in the
+## zone World is in: there, alive, within HEARING_RANGE.
+func hearers(at: Vector2i) -> Array[int]:
+	var peers: Array[int] = []
+	for peer in World.peers_in(World.zone.name):
+		var player: Player = _players.get(peer)
+		if is_instance_valid(player) and player.spawned and player.zone == World.zone.name \
+				and World.distance(player.tile, at) <= HEARING_RANGE:
+			peers.append(peer)
+	return peers
+
+
+## Server: [param player]'s party chat (/p): to every player on the server
+## in every zone, marked as party chat; never to a companion, nor into a
+## zone's party log. The same rate limit as speech.
+func _party_said(player: Player, text: String) -> void:
+	var line := text.strip_edges().left(CHAT_MAX_CHARS)
+	if line.is_empty():
+		return
+	var id := player.get_instance_id()
+	if World.tick - _chat_tick.get(id, -100000) < roundi(CHAT_INTERVAL * World.TICK_RATE):
+		print("[party] %s: too soon after the last line; dropped" % _display_name(player))
+		return
+	_chat_tick[id] = World.tick
+	var everyone: Array[int] = []
+	everyone.assign(World.peer_zone.keys())
+	print("[party] %s: %s" % [_display_name(player), line])
+	Net.broadcast_to(everyone, "party", {"from": _display_name(player), "zone": player.zone, "text": line})
 
 
 ## Keys 1-4: the quick phrase in that slot (settings.cfg phrase1= ...),
@@ -1838,7 +1888,7 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 	var record: PlayerRecord = _records.get(pet.keeper_id)
 	if record != null:
 		record.companion["said"] = pet.said_lines()
-	Net.broadcast("speech", {"entity": String(pet.get_path()), "speaker": String(pet.name), "text": text})
+	Net.broadcast_to(hearers(pet.tile), "speech", {"entity": String(pet.get_path()), "speaker": String(pet.name), "text": text})
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
@@ -1865,6 +1915,10 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var speaker := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
 		if speaker != null:
 			bubbles.show_line(speaker.get_instance_id(), str(data.get("text", "")))
+		return
+	if kind == "party":
+		print("[party] %s: %s" % [data.get("from", ""), data.get("text", "")])
+		talk.add_line(str(data.get("from", "")), str(data.get("text", "")), true, true)
 		return
 	if kind == "speech":
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity

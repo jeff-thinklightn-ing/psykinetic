@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.65
+
+Chat. Server and client.
+
+- **Speech carries, but not far**: what you say, and what companions say,
+  is heard only by players on the same map within about ten steps. Your
+  companion hears you only from that close too.
+- **Party chat**: start a line with `/p` to reach every player on the
+  server, on any map. It shows in green in the talk panel, and companions
+  never hear it.
+
+The server must be updated to v0.1.65 too, as it refuses any other version.
+
 ## v0.1.64
 
 HUD. Client.
