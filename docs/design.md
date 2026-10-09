@@ -577,11 +577,20 @@ comes in a few hundred ms. A stance that is not one of the five is
 rejected and hers stands.
 
 *The voice* is a separate ask, in the background, only at speaking
-moments: Jeff speaks to her, a death in sight, an hp threshold crossed,
-and once, 100 ticks after a fight ends, if she has not spoken since it
-did. It is written entirely inside her world, in the second person, with
-no game, players, stances or JSON in it, and sent as a chat
-(`voice_messages`):
+moments: Jeff speaks to her, a death in sight that matters, an hp
+threshold crossed, and once, 100 ticks after a fight ends, if she has not
+spoken since it did. An ally's death always matters; a monster's only if
+it was a brute or heavier (`BIG_MONSTER_MASS`), it died next to Jeff, or
+it was the last of the fight (no monster left within `COMBAT_RANGE`).
+Every death is still narrated in the exchange, and one that does not ask
+the voice is logged as "not asked". It is written entirely inside her
+world, in the second person, with no game, players, stances or JSON in
+it, and sent as a chat (`voice_messages`). Monsters in it are named by
+kind, never by entity name (`refer`): "the brute" when it is the only one
+of its kind in her sight, "an imp" when there are more; the fallen are
+counted ("three imps, a brute and Jeff, who has risen again"). A level
+monster's kind is its marker's (`spawn_spec.kind`); any other's is read
+from its name.
 
 - **system**: who she is and her card ("You are Pip. You travel with Jeff
   by choice. ..."; the "Do what Jeff asks" line while an instruction
@@ -628,7 +637,13 @@ is also a line in her transcript, a plain-text file per companion per day
 by default `/var/lib/psykinetic/transcripts` on a dedicated server):
 the time, then Jeff's words as `Jeff: ...`, hers as `Pip: ...`, events as
 the bracketed notes the voice sees. Files older than 30 days are deleted.
-The console's `transcript <name> [<date>]` prints one.
+The console's `transcript <name> [<date>]` prints one. `transcript
+rebuild` makes them from the mind log as well, for the time before
+transcripts were written or past what a live file holds: each voice ask
+logged the exchange as it stood, so overlapping asks are joined and every
+line, Jeff's included, is kept once, timed when it was first seen. The
+rebuilt lines head the day's file between two bracketed markers, and
+rebuilding again replaces them.
 
 **The newest stance wins**: each ask has a serial, and an answer to an
 older ask than the one whose stance stands is logged as superseded. The

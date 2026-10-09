@@ -1551,7 +1551,7 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and pet != entity and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
 				and entity.is_creature():
-			pet.note_death(_display_name(entity), entity == pet.keeper)
+			pet.note_death(_display_name(entity), entity == pet.keeper, entity)
 	var line := ""
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.
@@ -2040,7 +2040,12 @@ func admin_command(line: String) -> String:
 			return "companion minds: %s" % mind_kind
 		"transcript":
 			if words.size() < 2:
-				return "usage: transcript <name> [<YYYY-MM-DD>]"
+				return "usage: transcript <name> [<YYYY-MM-DD>] | transcript rebuild"
+			if words[1] == "rebuild":
+				if Net.mind_log_path.is_empty():
+					return "no mind log to rebuild from"
+				var logs: Array[String] = [Net.mind_log_path + ".1", Net.mind_log_path]
+				return Transcript.rebuild(logs)
 			var who := words[1]
 			for pet: Companion in _companions.values():
 				if is_instance_valid(pet) and String(pet.name).to_lower() == who.to_lower():

@@ -78,6 +78,148 @@ static func is_date(text: String) -> bool:
 			and parts[2].length() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int() and parts[2].is_valid_int()
 
 
+const REBUILT_START := "[Rebuilt from the mind log: each line is timed when it was first seen.]"
+const REBUILT_END := "[End of what was rebuilt.]"
+
+
+## Rebuilds the transcripts from the mind logs at [param paths] (oldest
+## first): every voice ask carries the exchange as it stood, so her
+## player's words and the events are all there, though only the last few
+## of each ask; overlapping asks are joined. Each day's rebuilt lines go at
+## the top of that day's file, between REBUILT_START and REBUILT_END,
+## before anything written live; rebuilding again replaces them. The
+## console's transcript rebuild.
+static func rebuild(paths: Array[String]) -> String:
+	var dir: String = Net.transcripts_dir
+	if dir.is_empty():
+		return "no transcripts kept: --transcripts=<dir>"
+	var bias := int(Time.get_time_zone_from_system().get("bias", 0)) * 60
+	var lines_of: Dictionary[String, Array] = {}
+	var asks := 0
+	for path in paths:
+		if not FileAccess.file_exists(path):
+			continue
+		var file := FileAccess.open(path, FileAccess.READ)
+		while file != null and not file.eof_reached():
+			var json := JSON.new()
+			if json.parse(file.get_line()) != OK or json.data is not Dictionary:
+				continue
+			var entry: Dictionary = json.data
+			var companion := str(entry.get("companion", ""))
+			if entry.get("kind") != "voice" or companion.is_empty() or entry.get("prompt") is not String:
+				continue
+			asks += 1
+			var stamp := str(entry.get("time", "")).trim_suffix("Z")
+			var at := Time.get_datetime_string_from_unix_time(Time.get_unix_time_from_datetime_string(stamp) + bias)
+			var seen := exchange_in(str(entry["prompt"]), companion)
+			var said := str(entry.get("say", ""))
+			if entry.get("outcome") == "said" and not said.is_empty():
+				seen.append("%s: %s" % [companion, said])
+			if not lines_of.has(companion):
+				lines_of[companion] = []
+			_join(lines_of[companion], seen, at)
+	var oldest := Time.get_date_string_from_unix_time(
+			Time.get_unix_time_from_datetime_string(Time.get_date_string_from_system()) - KEEP_DAYS * 86400)
+	var files := 0
+	var written_lines := 0
+	for companion: String in lines_of:
+		var by_day: Dictionary[String, Array] = {}
+		for line: Dictionary in lines_of[companion]:
+			var day := str(line["at"]).left(10)
+			if day >= oldest:
+				if not by_day.has(day):
+					by_day[day] = []
+				by_day[day].append("%s %s" % [str(line["at"]).substr(11), line["text"]])
+		for day: String in by_day:
+			if not DirAccess.dir_exists_absolute(dir):
+				DirAccess.make_dir_recursive_absolute(dir)
+			var path := path_of(dir, companion, day)
+			var live := _live_lines(path)
+			var first_live := live[0].left(8) if not live.is_empty() else "99:99:99"
+			var rebuilt: Array[String] = []
+			for line: String in by_day[day]:
+				if line.left(8) < first_live:
+					rebuilt.append(line)
+			if rebuilt.is_empty():
+				continue
+			var out := FileAccess.open(path, FileAccess.WRITE)
+			if out == null:
+				return "cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())]
+			out.store_line("%s %s" % [rebuilt[0].left(8), REBUILT_START])
+			for line in rebuilt:
+				out.store_line(line)
+			out.store_line("%s %s" % [rebuilt.back().left(8), REBUILT_END])
+			for line in live:
+				out.store_line(line)
+			out.close()
+			files += 1
+			written_lines += rebuilt.size()
+	return "rebuilt %d lines into %d files from %d voice asks" % [written_lines, files, asks]
+
+
+## The exchange in a voice ask's [param prompt] (Companion.render), a
+## transcript line each: "Jeff: ...", "Pip: ...", "[An imp fell.]". An ask
+## from before the voice was a chat gives only her player's words, if any.
+static func exchange_in(prompt: String, companion: String) -> Array[String]:
+	var lines: Array[String] = []
+	var keeper_match := RegEx.create_from_string("You travel with (.+?) by choice\\.").search(prompt)
+	var keeper := keeper_match.get_string(1) if keeper_match != null else ""
+	var turns := RegEx.create_from_string("\\n\\n(user|assistant): ").search_all(prompt)
+	if turns.is_empty():
+		var words := RegEx.create_from_string("just said to you: \"(.*)\"").search_all(prompt)
+		if not words.is_empty() and not keeper.is_empty():
+			lines.append("%s: %s" % [keeper, words.back().get_string(1)])
+		return lines
+	for i in turns.size():
+		var end := turns[i + 1].get_start() if i + 1 < turns.size() else prompt.length()
+		var content := prompt.substr(turns[i].get_end(), end - turns[i].get_end())
+		var mine := turns[i].get_string(1) == "assistant"
+		for line in content.split("\n", false):
+			var text := line.strip_edges()
+			if text.is_empty() or text == "[A moment passes.]":
+				continue
+			if mine:
+				lines.append("%s: %s" % [companion, text])
+			elif text.begins_with("["):
+				lines.append(text)
+			elif not keeper.is_empty():
+				lines.append("%s: %s" % [keeper, text])
+	return lines
+
+
+## Adds to [param have] what [param seen] holds past the overlap of its
+## start with have's end, timed [param at].
+static func _join(have: Array, seen: Array[String], at: String) -> void:
+	var overlap := 0
+	for k in range(mini(have.size(), seen.size()), 0, -1):
+		var same := true
+		for j in k:
+			if have[have.size() - k + j]["text"] != seen[j]:
+				same = false
+				break
+		if same:
+			overlap = k
+			break
+	for line in seen.slice(overlap):
+		have.append({"text": line, "at": at})
+
+
+## A day's file without its rebuilt part: the lines written live.
+static func _live_lines(path: String) -> Array[String]:
+	var live: Array[String] = []
+	if not FileAccess.file_exists(path):
+		return live
+	var inside := false
+	for line in FileAccess.get_file_as_string(path).split("\n", false):
+		if line.ends_with(REBUILT_START):
+			inside = true
+		elif line.ends_with(REBUILT_END):
+			inside = false
+		elif not inside:
+			live.append(line)
+	return live
+
+
 ## The console's transcript command: [param companion]'s transcript of
 ## [param date] (today for ""), or why there is none.
 static func show(companion: String, date := "") -> String:

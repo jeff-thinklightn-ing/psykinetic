@@ -95,6 +95,8 @@ const SUMMARY_LINES := 6
 ## this many paces, at most SURROUNDINGS_MAX of them, nearest first.
 const SURROUNDINGS_RANGE := 4
 const SURROUNDINGS_MAX := 2
+## A monster this heavy or heavier (a brute) is worth her voice when it dies.
+const BIG_MONSTER_MASS := 70.0
 const LOG_LINES_SCANNED := 60
 
 const STANCE_SYSTEM := """You choose how a creature fights beside the player she travels with, in a small tactical game.
@@ -176,8 +178,9 @@ var _adjacent_before: Dictionary[int, bool] = {}
 var _last_speech_tick := -1000
 ## How things stood last tick (_situation_now), to see what changed.
 var _seen := {}
-## Deaths in sight, from Main, not yet watched.
-var _deaths: Array[String] = []
+## Deaths in sight, from Main, not yet watched: {who (its name, for the
+## log), told (as the voice is told it), speak (worth her voice), monster}.
+var _deaths: Array[Dictionary] = []
 ## Asks waiting for a busy mind: the newest event of each.
 var _pending_stance := ""
 var _pending_voice := {}
@@ -205,9 +208,10 @@ var _calm_since := 0
 var _was_in_fight := false
 var _fight_ended_tick := -100000
 var _silence_due := false
-## For the run summary: when she joined, who fell near her.
+## For the run summary: when she joined, who fell near her ({word: a
+## monster's kind or an ally's name, monster}).
 var _joined_tick := -1
-var _fallen: Array[String] = []
+var _fallen: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -273,16 +277,84 @@ func owner_spoke(text: String) -> void:
 	_ask_voice("%s just spoke to you." % keeper_name(), heard)
 
 
-## A creature died in her sight (Main): an event for the hands and the
-## voice. [param her_player]: it was the player she travels with, who is
-## down until they respawn (its own event).
-func note_death(who: String, her_player := false) -> void:
+## A creature died in her sight (Main): an event for the hands, told to
+## the voice as narration. [param her_player]: it was the player she
+## travels with, who is down until they respawn (its own event). Her voice
+## speaks to an ally's death; to a monster's only if it was a big one
+## (BIG_MONSTER_MASS), next to her player, or the last of a fight (_watch).
+func note_death(who: String, her_player := false, entity: GridEntity = null) -> void:
 	if her_player:
 		_keeper_down = true
-	_deaths.append(who)
-	_fallen.append(who)
+	var monster := entity is Monster
+	var big := monster and entity.mass >= BIG_MONSTER_MASS
+	var by_them := monster and _alive(keeper) and World.distance(entity.tile, keeper.tile) <= 1
+	_deaths.append({"who": who, "told": refer(entity, true) if monster else who,
+		"speak": not monster or big or by_them, "monster": monster})
+	_fallen.append({"word": kind_of(entity) if monster else who, "monster": monster})
 	if _fallen.size() > 8:
 		_fallen.pop_front()
+
+
+## A monster's kind ("imp", "brute"), from its level marker or, for one
+## made otherwise, its name; "monster" when neither says.
+static func kind_of(entity: GridEntity) -> String:
+	var kind := str(entity.spawn_spec.get("kind", ""))
+	if not kind.is_empty():
+		return kind
+	var plain := String(entity.name).to_lower()
+	for known: String in Level.MONSTER_TYPES:
+		if known in plain:
+			return known
+	return "monster"
+
+
+## How the voice is told of [param entity]: a monster by its kind, "the
+## brute" when it is the only one of its kind she can see, "an imp" when
+## there are more; anyone else by name.
+func refer(entity: GridEntity, capital := false) -> String:
+	if entity is not Monster:
+		return _name_of(entity)
+	var kind := kind_of(entity)
+	var others := false
+	for other in World.get_entities():
+		if other is Monster and other != entity and other.spawned and kind_of(other) == kind \
+				and World.distance(tile, other.tile) <= SIGHT_RANGE:
+			others = true
+			break
+	var words := ("the " if not others else "an " if kind[0] in "aeiou" else "a ") + kind
+	return words[0].to_upper() + words.substr(1) if capital else words
+
+
+## [param count] of [param kind], in words: "an imp", "three brutes".
+static func counted(kind: String, count: int) -> String:
+	const NUMBERS: Array[String] = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"]
+	if count == 1:
+		return ("an " if kind[0] in "aeiou" else "a ") + kind
+	return "%s %ss" % [NUMBERS[mini(count, NUMBERS.size() - 1)], kind]
+
+
+## Who fell near her, monsters counted by kind: "three imps, a brute and
+## Jeff, who has risen again".
+func _fallen_words() -> String:
+	var kinds: Array[String] = []
+	var counts: Dictionary[String, int] = {}
+	var allies: Array[String] = []
+	for fallen: Dictionary in _fallen:
+		var word := str(fallen["word"])
+		if fallen["monster"]:
+			if not counts.has(word):
+				kinds.append(word)
+			counts[word] = counts.get(word, 0) + 1
+		elif word not in allies:
+			allies.append(word)
+	var parts: Array[String] = []
+	for kind in kinds:
+		parts.append(counted(kind, counts[kind]))
+	for ally in allies:
+		parts.append("%s, who has risen again" % ally if ally == keeper_name() and _alive(keeper) else ally)
+	if parts.size() == 1:
+		return parts[0]
+	return "%s and %s" % [", ".join(parts.slice(0, -1)), parts.back()]
 
 
 ## What a default quick phrase means, said by [param who]; "" for any other line.
@@ -347,12 +419,9 @@ func _sim_tick() -> void:
 		current_intent = Intent.IDLE
 		_seen = {}
 		if not _deaths.is_empty():
-			var deaths: Array[String] = []
-			for who in _deaths:
-				deaths.append("%s died." % who)
-				_narrate("%s fell." % who)
-			_deaths.clear()
-			_ask_voice(" ".join(deaths))
+			var deaths := _take_deaths(not _hostile_within(COMBAT_RANGE))
+			if not deaths.is_empty():
+				_ask_voice(" ".join(deaths))
 		return
 	if _keeper_down:
 		_keeper_down = false
@@ -380,7 +449,7 @@ func _watch() -> void:
 				var monster := instance_from_id(id) as GridEntity
 				var where := "you" if monster != null and World.distance(tile, monster.tile) == 1 else keeper_name()
 				events.append("%s came up next to %s." % [_name_of(monster) if monster != null else "A monster", where])
-				_narrate(events.back())
+				_narrate("%s came up next to %s." % [refer(monster, true) if monster != null else "A monster", where])
 				break
 		for whose: String in ["hp_band", "keeper_hp_band"]:
 			if now[whose] == _seen[whose]:
@@ -417,13 +486,13 @@ func _watch() -> void:
 			# In a fight a sighting is no event; only what changes is.
 			if not fight and not _was_in_fight:
 				events.append("%s came into sight." % _name_of(entity))
-				_narrate(events.back())
-	var deaths: Array[String] = []
-	for who in _deaths:
-		deaths.append("%s died." % who)
-		_narrate("%s fell." % who)
-	_deaths.clear()
-	events.append_array(deaths)
+				_narrate("%s came into sight." % refer(entity, true))
+	var had_deaths := not _deaths.is_empty()
+	var dead_names: Array[String] = []
+	for death: Dictionary in _deaths:
+		dead_names.append("%s died." % death["who"])
+	var deaths := _take_deaths(not fight)
+	events.append_array(dead_names)
 	if _was_in_fight and not fight:
 		_fight_ended_tick = World.tick
 		_silence_due = true
@@ -434,6 +503,9 @@ func _watch() -> void:
 	# A lapse is spoken to once her new stance is known (_take_result).
 	if (threshold or not deaths.is_empty()) and not lapsing and _lapsed_from.is_empty():
 		_ask_voice(" ".join(deaths if not deaths.is_empty() else events))
+	elif had_deaths and deaths.is_empty():
+		MindLog.record({"kind": "voice", "companion": String(name), "trigger": " ".join(dead_names),
+			"outcome": "not asked", "note": "a monster's death: not big, not by %s, not the last" % keeper_name()})
 	if _silence_due and not fight and World.tick - _fight_ended_tick >= SILENCE_TICKS:
 		_silence_due = false
 		if _last_speech_tick < _fight_ended_tick:
@@ -447,6 +519,23 @@ func _watch() -> void:
 		var waiting := _pending_voice
 		_pending_voice = {}
 		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false))
+
+
+## Narrates the deaths seen and clears them; returns those her voice is
+## asked about ("Imp2 died."): an ally's, a big monster's, one by her
+## player, or, with [param fight_over], the last monster of a fight.
+func _take_deaths(fight_over: bool) -> Array[String]:
+	var spoken: Array[String] = []
+	var any_monster := false
+	for death: Dictionary in _deaths:
+		_narrate("%s fell." % death["told"])
+		any_monster = any_monster or death["monster"]
+		if death["speak"]:
+			spoken.append("%s died." % death["who"])
+	if spoken.is_empty() and any_monster and fight_over:
+		spoken.append("%s died, the last of them." % _deaths.back()["who"])
+	_deaths.clear()
+	return spoken
 
 
 ## A hostile within COMBAT_RANGE of her or her player.
@@ -622,7 +711,7 @@ func doing() -> String:
 	var action := ""
 	match current_intent:
 		Intent.ATTACK:
-			action = "attacking %s" % (_name_of(intent_target) if _alive(intent_target) else "a monster")
+			action = "attacking %s" % (refer(intent_target) if _alive(intent_target) else "a monster")
 		Intent.RETREAT:
 			action = "pulling away from the monsters"
 		Intent.HOLD:
@@ -821,7 +910,7 @@ func run_summary(with_lately := true) -> String:
 	parts.append("You have travelled with %s for %s." % [keeper_name(),
 		"%d seconds" % together if together < 120 else "%d minutes" % int(together / 60.0)])
 	if not _fallen.is_empty():
-		parts.append("Fallen near you: %s." % ", ".join(_fallen))
+		parts.append("Fallen near you: %s." % _fallen_words())
 	var lately: Array[String] = []
 	if with_lately:
 		lately = _lately()

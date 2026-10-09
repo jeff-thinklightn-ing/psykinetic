@@ -110,6 +110,14 @@ older one; or read the files directly:
 sudo tail -f /var/lib/psykinetic/transcripts/Pip-$(date +%F).txt
 ```
 
+`transcript rebuild` makes transcripts from the mind log too (`mind.log.1`
+and `mind.log`), for the days before transcripts were kept: every voice
+ask logged the recent exchange, so Jeff's lines, hers and the events are
+all recovered, each timed when it was first seen. They head the day's
+file between `[Rebuilt from the mind log ...]` and `[End of what was
+rebuilt.]`; running it again replaces them, and lines written live are
+kept.
+
 The sudo commands `deploy.sh` runs: `install` (three times),
 `systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the
 ones `/etc/sudoers.d/psykinetic-deploy` allows without a password.

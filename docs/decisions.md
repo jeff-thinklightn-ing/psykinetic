@@ -943,3 +943,29 @@ sight, in words she might use: paces, and left or right as she faces, or
 "behind Jeff" when that says it better. Grid positions and compass
 directions mean nothing to someone standing there. Each kind of ground is
 told once, so a pool of fire is one sentence, not nine.
+
+## 112. The voice names monsters by kind
+
+"Imp2" is a label on our side of the screen; to her it is an imp. Entity
+names in the exchange made her say "Imp1 is down." The voice gets kinds
+with an article that does the work a name did: "the brute" when it is the
+only one of its kind she can see, "an imp" when there are more. The
+kind comes from the level marker, carried in the spawn spec, so a level
+author's new monster type names itself. The hands' prompt and the mind
+log keep entity names, where telling two imps apart matters.
+
+## 113. Most monster deaths are not worth a word
+
+Every imp falling asked her voice, so she spent her lines on kill
+commentary. Now only deaths that change things ask: an ally's, a brute or
+heavier, one next to Jeff, the last of a fight. The rest are still
+narrated, so she knows they happened and can speak of them when asked.
+
+## 114. Transcripts can be rebuilt from the mind log
+
+Transcripts start when they were introduced, but the mind log holds every
+voice ask with the exchange as it stood, which is the same text. Joining
+the overlapping windows gives the conversation back, Jeff's lines
+included, for the days before. Rebuilt lines are marked off in the file
+and replaced on a rebuild, so it can be run any time without doubling
+what was written live.

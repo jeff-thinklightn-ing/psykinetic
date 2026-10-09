@@ -424,7 +424,7 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 	if type_props is Dictionary:
 		for key: String in type_props:
 			props[key] = _prop(key, type_props[key])
-	return {"script": MONSTER, "shape": "capsule", "props": props}
+	return {"script": MONSTER, "shape": "capsule", "props": props, "kind": type}
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except

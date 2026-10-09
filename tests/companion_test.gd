@@ -35,6 +35,9 @@ func _ready() -> void:
 	_test_voice_in_world()
 	_test_surroundings()
 	_test_transcript()
+	_test_transcript_rebuild()
+	_test_monsters_by_kind()
+	_test_death_triggers()
 	_test_voice_knows()
 	_test_lapse()
 	_test_said_persists()
@@ -703,7 +706,7 @@ func _test_voice_knows() -> void:
 	pet._act()
 	pet._narrate("Brute fell.")
 	var prompt := pet.voice_prompt()
-	_check(("You are keeping beside Player and fighting whatever comes at either of you; right now you are attacking %s." % imp.name) in prompt,
+	_check(("You are keeping beside Player and fighting whatever comes at either of you; right now you are attacking the imp.") in prompt,
 			"what she is set on and doing, in her world's words: %s" % pet.doing())
 	_check(prompt.ends_with("[Brute fell.]"), "and the event, narrated last")
 	World.despawn(imp)
@@ -1057,6 +1060,134 @@ func _test_transcript() -> void:
 	pet.mind = ScriptedMind.new()
 	for i in 21:
 		World.step()
+
+
+func _test_monsters_by_kind() -> void:
+	print("\n== the voice calls monsters by kind: an imp, the brute, never Imp2 ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(7, 1))
+	_put(pet, Vector2i(6, 1))
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var imp_a := _spawn_imp(Vector2i(3, 3))
+	var imp_b := _spawn_imp(Vector2i(4, 3))
+	var brute := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "TestBrute%d" % World.tick,
+		"tile": Vector2i(10, 3), "kind": "brute", "props": {"mass": 70.0, "sight_range": 0}}) as Monster
+	_check(Companion.kind_of(imp_a) == "imp" and Companion.kind_of(brute) == "brute", "kinds from the level marker or the name")
+	_check(pet.refer(imp_a, true) == "An imp" and pet.refer(brute) == "the brute", "an imp, with two in sight; the brute, the only one")
+	var level: Dictionary = Level.load_level("sample")
+	var kinds: Array[String] = []
+	for entity: Dictionary in level["entities"]:
+		if entity["script"] == Level.MONSTER:
+			kinds.append(str(entity.get("kind", "")))
+	_check(not kinds.is_empty() and "" not in kinds, "a level's monsters carry their marker's kind (%s)" % [kinds])
+	for i in 3:
+		World.step()
+	World.damage(imp_a, 999)
+	World.damage(brute, 999)
+	for i in 2:
+		World.step()
+	pet.intent_target = imp_b
+	pet.current_intent = Companion.Intent.ATTACK
+	var text := pet.voice_prompt("test")
+	_check("attacking the imp" in pet.doing(), "what she is doing: %s" % pet.doing())
+	var ids := RegEx.create_from_string("(TestImp|TestBrute|Imp\\d|Brute\\b|CorridorImp)")
+	_check(ids.search(text) == null, "no entity name anywhere in what the voice sees")
+	_check("[An imp came into sight.]" in text or "[The imp came into sight.]" in text, "sightings by kind")
+	_check("The brute fell." in text and "An imp fell." in text, "deaths by kind")
+	_check("Fallen near you: " in text and "a brute" in text, "who fell, counted by kind: %s" % pet.run_summary(false))
+	World.damage(imp_b, 999)
+	pet._fallen.clear()
+	pet.note_death("Player", true)
+	for kind in ["imp", "imp", "brute"]:
+		pet._fallen.append({"word": kind, "monster": true})
+	_check(pet._fallen_words() == "two imps, a brute and Player, who has risen again",
+			"three imps, a brute and Jeff (%s)" % pet._fallen_words())
+	pet._deaths.clear()
+	pet._keeper_down = false
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _test_death_triggers() -> void:
+	print("\n== a monster's death speaks only if big, by her player, or the last; an ally's always ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(7, 1))
+	_put(pet, Vector2i(6, 1))
+	for i in 3:
+		World.step()
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var imps: Array[Monster] = [_spawn_imp(Vector2i(3, 2)), _spawn_imp(Vector2i(4, 3)), _spawn_imp(Vector2i(7, 2))]
+	var brute := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Brute%d" % World.tick,
+		"tile": Vector2i(10, 2), "kind": "brute", "props": {"mass": 70.0, "sight_range": 0}}) as Monster
+	for i in 3:
+		World.step()
+	pet._last_speech_tick = -1000
+	mind.clear()
+	World.damage(imps[0], 999)
+	World.step()
+	_check(mind.triggers("voice").is_empty(), "an imp dies away from Player, others left: no voice (%s)" % [mind.triggers("voice")])
+	_check("[An imp fell.]" in pet.voice_prompt("test") or "[The imp fell.]" in pet.voice_prompt("test"), "but it is in the exchange")
+	World.damage(imps[2], 999)
+	World.step()
+	_check(mind.triggers("voice").size() == 1, "an imp dies next to Player: her voice (%s)" % [mind.triggers("voice")])
+	World.damage(brute, 999)
+	World.step()
+	_check(mind.triggers("voice").size() == 2 and "Brute" in mind.triggers("voice").back(), "the brute dies: her voice (%s)" % [mind.triggers("voice")])
+	World.damage(imps[1], 999)
+	World.step()
+	_check(mind.triggers("voice").size() == 3 and "the last of them" in mind.triggers("voice").back(),
+			"the last of the fight: her voice (%s)" % [mind.triggers("voice")])
+	pet.note_death("Talos")
+	World.step()
+	_check(mind.triggers("voice").size() == 4, "an ally's death: her voice")
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _test_transcript_rebuild() -> void:
+	print("\n== transcript rebuild: the exchange from the mind log, her player's lines kept ==")
+	var dir := OS.get_user_data_dir().path_join("transcripts_rebuild_test")
+	var saved := Net.transcripts_dir
+	Net.transcripts_dir = dir
+	var log_path := OS.get_user_data_dir().path_join("rebuild_test.log")
+	var stamp := Time.get_datetime_string_from_system(true)
+	var system := "system: You are Pip. You travel with Jeff by choice. A card.\n\nNow: things."
+	var asks := [
+		{"kind": "voice", "companion": "Pip", "time": stamp + "Z", "outcome": "said", "say": "I see it.",
+			"prompt": system + "\n\nuser: [An imp came into sight.]\nLook there\n\nassistant: Hm.\n\nuser: Is it coming?"},
+		{"kind": "stance", "companion": "Pip", "time": stamp + "Z", "prompt": "You are Pip."},
+		{"kind": "voice", "companion": "Pip", "time": stamp + "Z", "outcome": "silent", "say": "",
+			"prompt": system + "\n\nuser: Look there\n\nassistant: Hm.\n\nuser: Is it coming?\n\nassistant: I see it.\n\nuser: [An imp fell.]\nGood\n[A moment passes.]"},
+	]
+	var file := FileAccess.open(log_path, FileAccess.WRITE)
+	for ask: Dictionary in asks:
+		file.store_line(JSON.stringify(ask))
+	file.close()
+	var logs: Array[String] = [log_path + ".1", log_path]
+	var reply := Transcript.rebuild(logs)
+	var day := Time.get_date_string_from_system()
+	var lines: Array[String] = []
+	for line in FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n"):
+		lines.append(line.substr(9))
+	var expected: Array[String] = [Transcript.REBUILT_START, "[An imp came into sight.]", "Jeff: Look there", "Pip: Hm.",
+		"Jeff: Is it coming?", "Pip: I see it.", "[An imp fell.]", "Jeff: Good", Transcript.REBUILT_END]
+	_check(lines == expected, "the asks joined, every line once, Jeff's lines kept (%s): %s" % [reply, lines])
+	Transcript.rebuild(logs)
+	var again := FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n").size()
+	_check(again == expected.size(), "rebuilding again replaces what was rebuilt (%d lines)" % again)
+	for f in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir.path_join(f))
+	DirAccess.remove_absolute(dir)
+	DirAccess.remove_absolute(log_path)
+	Net.transcripts_dir = saved
 
 
 func _test_names() -> void:

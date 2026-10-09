@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.57
+
+Companions. Server.
+
+- **Monsters by kind**: companions now speak of "an imp" or "the brute",
+  never "Imp2".
+- **Fewer kill calls**: a companion comments on a monster's death only if
+  it was a brute or bigger, it fell next to you, or it was the last one
+  of the fight. An ally falling always gets a word.
+- **Transcripts rebuilt**: the server can rebuild past conversations from
+  its log, your lines included (`transcript rebuild` on the console).
+
+The server must be updated to v0.1.57 too, as it refuses any other version.
+
 ## v0.1.56
 
 Server.
