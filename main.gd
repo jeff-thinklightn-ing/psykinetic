@@ -2216,7 +2216,7 @@ func hint_lines() -> Array[String]:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "Wheel\tzoom (MMB click: 1x)"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
-	lines.append_array(["RMB chest\topen it (drag items)", "RMB companion\ther pack", "I\tyour pack",
+	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",
 		"Enter\ttalk", "Tab\ttalk log",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	return lines
@@ -2237,8 +2237,12 @@ func toggle_pack() -> void:
 
 ## A right click on a chest, or on the player's own companion: open it
 ## within reach (World.reaches); from afar, walk to the nearest free cell
-## beside it, and open on arrival (_update_pack).
+## beside it, and open on arrival (_update_pack). On the one already open,
+## it closes.
 func _open_pack(player: Player, target: GridEntity) -> void:
+	if pack_panel != null and pack_panel.other == target:
+		close_other()
+		return
 	if World.reaches(player, target):
 		open_other(target)
 		return

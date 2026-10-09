@@ -369,16 +369,17 @@ a bandaging kit.").
 titled with their name, shown and hidden with I; a right click on a
 chest, or on your own companion, opens its row above it ("Chest",
 "Wren's Pack"; from afar you walk to the nearest free cell beside it and
-it opens on arrival); out of reach it closes, as it does on I. A left
+it opens on arrival); out of reach it closes, as it does on I or a right
+click on it again. A left
 click on a chest walks you beside it. Drag an item onto another slot to
 move it there (Godot's own drag and drop; the boxes show what the server
 says, not what was dropped).
 
 **Sounds** (3D view, from where the thing is drawn): a creak when a chest
-opens (`chest_open`), a leather rustle when a pack opens, yours on I or
-your companion's (`pack_open`), and a clunk when an item lands in a row
-on show (`item_place`, once a frame; it plays on the server's word, so
-everyone with that row open hears it).
+opens (`chest_open`), a soft thud when a pack opens, yours on I or your
+companion's (`pack_open`), and the chest's creak again when an item lands
+in a row on show (`item_place`, once a frame; it plays on the server's
+word, so everyone with that row open hears it).
 
 **Persistence**: a chest's slots are saved with its entry in the snapshot
 (`slots`) and put back on load (`World.set_slots`); an entry with none
@@ -1520,8 +1521,8 @@ ortho camera is 40 units off). What plays, on what:
 | A door opened / closed (its replicated state) | `door_open_1-2` / `door_close_1-4` | RPG `doorOpen_1-2` / `doorClose_1-4` |
 | A creature's replicated tile moves on by one | `footstep_1-5` (quiet) | `footstep_concrete_000-004` |
 | A chest opened (this player's panel) | `chest_open_1-3` | RPG `creak1-3` |
-| A pack opened, your own (I) or your companion's | `pack_open_1-4` | RPG `handleSmallLeather`, `handleSmallLeather2`, `clothBelt`, `clothBelt2` |
-| An item lands in a row of the panel on show | `item_place_1-3` | RPG `bookPlace1-3` |
+| A pack opened, your own (I) or your companion's | `pack_open_1-3` | RPG `bookPlace1-3` |
+| An item lands in a row of the panel on show | `item_place_1-3` | RPG `creak1-3` (the chest's sound) |
 
 Not yet: fire (a crackle loop on fire tiles, a hiss on a burn), grunts on
 a body hit, and death cries: neither pack has them. `master_volume=` and

@@ -60,10 +60,9 @@ footstep_5.ogg           Kenney Impact Sounds, footstep_concrete_004.ogg
 chest_open_1.ogg         Kenney RPG Audio, creak1.ogg
 chest_open_2.ogg         Kenney RPG Audio, creak2.ogg
 chest_open_3.ogg         Kenney RPG Audio, creak3.ogg
-pack_open_1.ogg          Kenney RPG Audio, handleSmallLeather.ogg
-pack_open_2.ogg          Kenney RPG Audio, handleSmallLeather2.ogg
-pack_open_3.ogg          Kenney RPG Audio, clothBelt.ogg
-pack_open_4.ogg          Kenney RPG Audio, clothBelt2.ogg
-item_place_1.ogg         Kenney RPG Audio, bookPlace1.ogg
-item_place_2.ogg         Kenney RPG Audio, bookPlace2.ogg
-item_place_3.ogg         Kenney RPG Audio, bookPlace3.ogg
+pack_open_1.ogg          Kenney RPG Audio, bookPlace1.ogg
+pack_open_2.ogg          Kenney RPG Audio, bookPlace2.ogg
+pack_open_3.ogg          Kenney RPG Audio, bookPlace3.ogg
+item_place_1.ogg         Kenney RPG Audio, creak1.ogg
+item_place_2.ogg         Kenney RPG Audio, creak2.ogg
+item_place_3.ogg         Kenney RPG Audio, creak3.ogg

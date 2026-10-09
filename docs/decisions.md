@@ -1233,3 +1233,10 @@ clunk plays when the server's contents show an item has landed, not on
 the drop, so it means the move happened. World.reaches tells a companion
 by keeper_peer rather than by its class: world.gd naming Companion, whose
 script uses World, made a reference cycle that leaked scripts at exit.
+
+## 142. Pack sounds swapped; a right click closes what it opened
+
+By ear: the thud first used for an item landing (bookPlace) is the pack
+opening, and an item landing makes the chest's creak. The leather sounds
+are dropped. A right click on the chest or companion whose pack is open
+closes it, so the button that opens it also puts it away.

@@ -77,6 +77,10 @@ func _test_there_and_back() -> void:
 	_main._open_pack(host, chest)
 	await get_tree().process_frame
 	_check(_main.sounds == ["chest_open Chest1"], "with the chest's creak (%s)" % [_main.sounds])
+	_main._open_pack(host, chest)
+	_check(panel.other == null, "a second right click closes it")
+	_main._open_pack(host, chest)
+	_check(panel.other == chest, "and a third opens it again")
 	_check(panel.other == chest and panel.shown_in(false, 0) == "Bandages", "a right click opens it: the kit in its first slot")
 	_check(panel.title_shown(false) == "Chest" and panel.title_shown(true) == "%s's Pack" % Net.player_name,
 			"titled Chest, and %s's Pack below it" % Net.player_name)

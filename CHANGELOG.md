@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.74
+
+Packs and chests. Server.
+
+- Right click an open chest (or your companion, with her pack open) to
+  close it again.
+- New sounds: opening a pack now makes the soft thud, and moving an item
+  makes the chest's creak.
+
+The server must be updated to v0.1.74 too, as it refuses any other version.
+
 ## v0.1.73
 
 Packs and chests. Companions. Server.
