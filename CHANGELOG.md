@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.75
+
+Packs and chests. Server.
+
+- New sounds: a chest opens with a soft thud (no more creak), a pack opens
+  with a leather rustle, and moving an item makes the chest's thud.
+
+The server must be updated to v0.1.75 too, as it refuses any other version.
+
 ## v0.1.74
 
 Packs and chests. Server.

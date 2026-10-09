@@ -1240,3 +1240,10 @@ By ear: the thud first used for an item landing (bookPlace) is the pack
 opening, and an item landing makes the chest's creak. The leather sounds
 are dropped. A right click on the chest or companion whose pack is open
 closes it, so the button that opens it also puts it away.
+
+## 143. Chest and pack sounds, by ear again
+
+The creak is gone. A chest opens with the thud (bookPlace), and an item
+landing keeps the chest's sound, so it is the thud too; a pack opens
+with the leather rustle (handleSmallLeather, clothBelt). Supersedes the
+sounds in 141 and 142.
