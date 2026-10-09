@@ -101,6 +101,10 @@ const PERCEPTION_NEAR := 2
 const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
+## Heat she feels and tells of (World.heat_at; a fire cell gives 10), and
+## light under which it is dark (World.light_at, 0..1).
+const HEAT_FELT := 1.0
+const DARK := 0.35
 ## Words in her player's that ask about what is around them.
 const SURROUNDINGS_WORDS := "\\b(where|see|look|around|near|next|here|this|that|fire|flames?|burn\\w*|glow\\w*|warm|water|door|crates?|box\\w*|boulders?|rocks?|carts?|ledges?|edge|drop|stairs?|torch\\w*|light)\\b"
 ## "You have already mentioned: ...": the topics of her last so many lines,
@@ -142,7 +146,8 @@ const VOICE_WORLD := """You walk the old stone places and the land around them: 
 by fires, and the open ground beyond. Monsters prowl there, imps and brutes and worse, and they attack whoever they
 see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
 Wounds close slowly when you rest away from danger.
-Whoever falls rises again after a while, but it hurts, and no one wants to fall."""
+Whoever falls rises again after a while, but it hurts, and no one wants to fall.
+Directions are spoken as north, south, east and west."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
 words are enough. When %s speaks to you, always answer in words, even if only to say you don't know. Never say
 again what you have already said, and never repeat %s's words back. Only when no one has spoken to you and there is
@@ -250,6 +255,7 @@ var _fallen: Array[Dictionary] = []
 func _init() -> void:
 	super()
 	mass = 75.0
+	emit_light = 0.9  # Her lantern.
 	move_ticks = 2
 	max_hp = 20
 	attack_damage = 2
@@ -485,7 +491,9 @@ func _watch() -> void:
 				var monster := instance_from_id(id) as GridEntity
 				var where := "you" if monster != null and World.distance(tile, monster.tile) == 1 else keeper_name()
 				events.append("%s came up next to %s." % [_name_of(monster) if monster != null else "A monster", where])
-				_narrate("%s came up next to %s." % [refer(monster, true) if monster != null else "A monster", where])
+				var beside: GridEntity = self if where == "you" else keeper
+				_narrate("%s came up next to %s, from the %s." % [refer(monster, true) if monster != null else "A monster", where,
+					World.compass(Vector2(monster.tile - beside.tile)) if monster != null and beside != null else "side"])
 				break
 		for whose: String in ["hp_band", "keeper_hp_band"]:
 			if now[whose] == _seen[whose]:
@@ -522,7 +530,7 @@ func _watch() -> void:
 			# In a fight a sighting is no event; only what changes is.
 			if not fight and not _was_in_fight:
 				events.append("%s came into sight." % _name_of(entity))
-				_narrate("%s came into sight." % refer(entity, true))
+				_narrate("%s came into sight, %s." % [refer(entity, true), _paces_toward(Vector2(entity.tile))])
 	var had_deaths := not _deaths.is_empty()
 	var dead_names: Array[String] = []
 	for death: Dictionary in _deaths:
@@ -791,7 +799,7 @@ func voice_situation() -> String:
 	var low := _badly_hurt(self)
 	if _alive(keeper):
 		var distance := World.distance(tile, keeper.tile)
-		sentences.append("%s is %s and %s." % [who, "beside you" if distance <= 1 else "%d paces away" % distance,
+		sentences.append("%s is %s and %s." % [who, _paces_toward(Vector2(keeper.tile)),
 			health_words(keeper)])
 		their_danger = _in_danger(keeper)
 		low = low or _badly_hurt(keeper)
@@ -814,15 +822,22 @@ func voice_situation() -> String:
 
 ## What she can see around her, for the voice and the stance (the "around
 ## you" block), as Net.perception has it: "list" (perception_list), "grid"
-## (perception_grid) or "both", the grid first. "" when the list has nothing.
+## (perception_grid) or "both", the grid first; then what the heat and the
+## light tell her (field_sentences). "" when there is nothing to tell.
 func perception() -> String:
+	var told := ""
 	match Net.perception:
 		"grid":
-			return perception_grid()
+			told = perception_grid()
 		"both":
 			var listed := perception_list()
-			return perception_grid() + ("\n" + listed if not listed.is_empty() else "")
-	return perception_list()
+			told = perception_grid() + ("\n" + listed if not listed.is_empty() else "")
+		_:
+			told = perception_list()
+	var felt := " ".join(field_sentences(perceived()))
+	if felt.is_empty():
+		return told
+	return felt if told.is_empty() else told + "\n" + felt
 
 
 ## What she can see (perceived), a line each, nearest first: "- an imp, 2
@@ -845,8 +860,10 @@ func perception_list() -> String:
 ## she sees only when these changed since her last line, or when asked.
 func surroundings_keys() -> Array[String]:
 	var keys: Array[String] = []
-	for thing: Dictionary in perceived():
+	var things := perceived()
+	for thing: Dictionary in things:
 		keys.append("%s@%s" % [thing["kind"], thing["at"]])
+	keys.append_array(field_sentences(things))
 	return keys
 
 
@@ -962,7 +979,7 @@ func _thing(kind: String, at: Vector2i, point: Vector2) -> Dictionary:
 
 ## Where [param at] ([param point] for a door, its edge's middle) is, said
 ## against her and her player: "adjacent to you", "between you and Jeff",
-## "behind Jeff", "next to Jeff", "where Jeff stands", "on the ledge above
+## "on the far side of Jeff", "next to Jeff", "where Jeff stands", "on the ledge above
 ## you", "below you, down off the ledge"; none, or several. Measured from
 ## [param point], so a door is adjacent only on the edge of her own cell.
 func relations_of(at: Vector2i, point: Vector2) -> Array[String]:
@@ -982,7 +999,7 @@ func relations_of(at: Vector2i, point: Vector2) -> Array[String]:
 		elif along > 0.0 and along < 1.0 and off <= 0.75 and point != her:
 			relations.append("between you and %s" % who)
 		elif along >= 1.0 and off <= 1.5:
-			relations.append("behind %s" % who)
+			relations.append("on the far side of %s" % who)
 		elif near_them <= 1.0:
 			relations.append("next to %s" % who)
 	var rise := World.height_at(at) - World.height_at(tile)
@@ -1063,11 +1080,14 @@ func perception_grid() -> String:
 				kinds.append(kind)
 		elif entity.pushable:
 			glyphs[cell] = "o" if object_word(entity) == "boulder" else "c"
+	# The level's north at the top, its east on the right.
+	var up := World.north
+	var east := Vector2i(-up.y, up.x)
 	var rows: Array[String] = []
-	for dy in range(-half, half + 1):
+	for row_at in range(-half, half + 1):
 		var row: Array[String] = []
-		for dx in range(-half, half + 1):
-			row.append(glyphs[tile + Vector2i(dx, dy)])
+		for column in range(-half, half + 1):
+			row.append(glyphs[tile + east * column - up * row_at])
 		rows.append(" ".join(row))
 	var key: Array[String] = ["%s you" % me]
 	if not them.is_empty():
@@ -1138,16 +1158,49 @@ func _nearer(a: Vector2i, b: Vector2i) -> bool:
 	return (a - tile).length_squared() < (b - tile).length_squared()
 
 
-## Which way [param point] is from her, as she faces: "ahead of you", "to
-## your left", "behind you to your right".
+## Which way [param point] is from her, by the level's compass (World.compass,
+## worked out here, never by the model): "to the north-east".
 func _direction(point: Vector2) -> String:
-	var ahead := Vector2(facing) if facing != Vector2i.ZERO else Vector2(0, 1)
-	var to_it := point - Vector2(tile)
-	# Screen coordinates (y down): a positive cross product is to her right.
-	var angle := rad_to_deg(atan2(ahead.cross(to_it), ahead.dot(to_it)))
-	const BEARINGS: Array[String] = ["ahead of you", "ahead to your right", "to your right", "behind you to your right",
-		"behind you", "behind you to your left", "to your left", "ahead to your left"]
-	return BEARINGS[posmod(roundi(angle / 45.0), 8)]
+	return "to the " + World.compass(point - Vector2(tile))
+
+
+## [param point] from her for a sentence's end: "beside you to the east",
+## "three paces to the north-east".
+func _paces_toward(point: Vector2) -> String:
+	var offset := point - Vector2(tile)
+	var paces := roundi(maxf(absf(offset.x), absf(offset.y)))
+	if paces <= 1:
+		return "beside you to the %s" % World.compass(offset)
+	return "%d paces to the %s" % [paces, World.compass(offset)]
+
+
+## What the heat and the light around her say, a sentence each at most:
+## heat felt from where no fire she is told of burns ("You feel heat from
+## the north-east."), the dark where she stands, or past an open door
+## ("It is dark past the door to the east."). [param told]: the things
+## perceived tells of.
+func field_sentences(told: Array[Dictionary]) -> Array[String]:
+	var sentences: Array[String] = []
+	var heat := World.heat_at(tile)
+	var fire_told := told.any(func(thing: Dictionary) -> bool: return thing["kind"] == "fire")
+	if heat >= HEAT_FELT and not fire_told and not World.is_fire(tile):
+		var from := World.heat_from(tile)
+		if not from.is_empty():
+			sentences.append("You feel heat from the %s." % from)
+	if World.light_at(tile) < DARK:
+		sentences.append("It is dark where you stand.")
+		return sentences
+	for door: Door in World.get_doors():
+		if not door.open:
+			continue
+		var sides := Terrain.edge_cells(door.key)
+		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
+		var far: Vector2i = sides[1] if near == sides[0] else sides[0]
+		if World.distance(tile, near) <= PERCEPTION_RANGE and (near == tile or World.has_line_of_sight(tile, near)) \
+				and World.light_at(far) < DARK and World.light_at(near) >= DARK:
+			sentences.append("It is dark past the door to the %s." % World.compass(Vector2(far - tile)))
+			break
+	return sentences
 
 
 func _instruction_line() -> String:
@@ -1479,7 +1532,7 @@ func safe_cell() -> Vector2i:
 			continue
 		for direction in World.DIRECTIONS:
 			var next: Vector2i = cell + direction
-			if steps.has(next) or not World.is_free(next) or World.is_fire(next) \
+			if steps.has(next) or not World.is_free(next) or World.is_burning(next) \
 					or World._terrain_blocks_step(cell, direction, true):
 				continue
 			steps[next] = steps[cell] + 1
@@ -1504,7 +1557,7 @@ func _find_yield_tile() -> Vector2i:
 	for dy in range(-YIELD_REACH, YIELD_REACH + 1):
 		for dx in range(-YIELD_REACH, YIELD_REACH + 1):
 			var cell := tile + Vector2i(dx, dy)
-			if cell == tile or line.has(cell) or not World.is_free(cell) or World.is_fire(cell):
+			if cell == tile or line.has(cell) or not World.is_free(cell) or World.is_burning(cell):
 				continue
 			var path := World.find_path(tile, cell)
 			if path.is_empty() or path.size() > YIELD_REACH:

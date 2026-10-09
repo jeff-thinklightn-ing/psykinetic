@@ -59,10 +59,13 @@ const LEGEND := {
 	"boulder": "#5a5a78",
 	"cart": "#7a3cb4",
 	"torch": "#ffe000",
+	"lantern": "#fff0b0",
 	"link": "#ff00ff",
 }
 const GROUNDS: Array[String] = ["stone", "grass", "dirt"]
-const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "torch", "link"]
+const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "torch", "lantern", "link"]
+## level.json "north": which way in layout.png is north.
+const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## What a marker spawns, before level.json's props for that tile.
 const MONSTER_TYPES := {
 	"imp": {"mass": 40.0},
@@ -192,6 +195,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var markers: Array[Dictionary] = []
 	var stair_cells: Array[Vector2i] = []
 	var torches: Array[Vector2i] = []
+	var lanterns: Array[Vector2i] = []
 	for y in cells.y:
 		for x in cells.x:
 			var cell := Vector2i(x, y)
@@ -213,6 +217,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 					stair_cells.append(cell)
 				"torch":
 					torches.append(cell)
+				"lantern":
+					lanterns.append(cell)
 				_:
 					markers.append({"tile": cell, "marker": meaning})
 	# Edges: from -1, as in Terrain, so the outline along the top and left is there.
@@ -266,7 +272,9 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var level := {
 		"terrain": {
 			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water,
-			"heights": heights, "stairs": stairs, "torches": torches,
+			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
+			"ambient": clampf(float(config.get("ambient", 1.0)), 0.0, 1.0),
+			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
 		},
 		"warnings": warnings,
 	}

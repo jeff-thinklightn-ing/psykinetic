@@ -147,6 +147,12 @@ const PLAYER_LIGHT_RANGE := 6.0
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
 const FIRE := Color(1.0, 0.45, 0.1)
+## The floor where there is no light at all (Fields), as a share of its
+## colour; the glow it takes on near heat, at most WARM_MOST of the way.
+const FLOOR_DARKEST := 0.3
+const WARM := Color(1.0, 0.5, 0.2)
+const WARM_MOST := 0.45
+const LANTERN := Color(1.0, 0.93, 0.7)
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
@@ -290,6 +296,11 @@ var _room: Node3D
 var _centre := Vector2i.ZERO
 ## Kit floor material per ground kind, made once.
 var _ground_materials: Dictionary[String, Material] = {}
+## Each floor cell's ground and kind, shaded by the light and heat fields
+## (_shade_floor) whenever World says they changed.
+var _grounds: Dictionary[Vector2i, Node3D] = {}
+var _ground_kinds: Dictionary[Vector2i, String] = {}
+var _shade_due := false
 ## The kit's own material and a see-through copy of it; the flat stone
 ## pair likewise.
 var _kit_opaque: Material
@@ -428,6 +439,16 @@ func _camera_offset() -> Vector3:
 	var horizontal := CAMERA_DISTANCE * cos(tilt)
 	var offset := Vector3(horizontal / sqrt(2.0), CAMERA_DISTANCE * sin(tilt), horizontal / sqrt(2.0))
 	return offset.rotated(Vector3.UP, deg_to_rad(yaw))
+
+
+## Which way a grid offset [param offset] runs on screen at the camera's
+## aim (unit, y down): the HUD compass's north.
+func screen_direction(offset: Vector2) -> Vector2:
+	if _camera == null:
+		return Vector2.UP
+	var from := _camera.unproject_position(_camera_target)
+	var to := _camera.unproject_position(_camera_target + Vector3(offset.x, 0.0, offset.y))
+	return (to - from).normalized() if from.distance_to(to) > 0.001 else Vector2.UP
 
 
 func _place_camera() -> void:
@@ -963,6 +984,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_walls.clear()
 	_posts.clear()
 	_doorways.clear()
+	_grounds.clear()
+	_ground_kinds.clear()
 	_build_room()
 	_classify_walls()
 	_camera_target = _tile_position(_centre)
@@ -1019,6 +1042,8 @@ func _build_room() -> void:
 		ground.position = _tile_position(cell)
 		_tint_ground(ground, str(kinds.get(cell, "stone")))
 		_room.add_child(ground)
+		_grounds[cell] = ground
+		_ground_kinds[cell] = str(kinds.get(cell, "stone"))
 		if cell in fire:
 			_add_fire(cell)
 	for cell: Vector2i in _terrain.get("water", []):
@@ -1029,6 +1054,11 @@ func _build_room() -> void:
 		_add_stair(cell, stairs[cell])
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
+	for cell: Vector2i in _terrain.get("lanterns", []):
+		_add_lantern(cell)
+	if not World.fields_changed_signal.is_connected(_on_fields_changed):
+		World.fields_changed_signal.connect(_on_fields_changed)
+	_on_fields_changed()
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
@@ -1148,6 +1178,70 @@ func _add_stair(cell: Vector2i, up: Vector2i) -> void:
 		step.position.z = -0.5 + (i + 0.5) / STAIR_STEPS
 		holder.add_child(step)
 	_room.add_child(holder)
+
+
+## The heat and light changed (the map, a door): the floor is shaded
+## again at the end of the frame, once however many changes came.
+func _on_fields_changed() -> void:
+	if not _shade_due:
+		_shade_due = true
+		_shade_floor.call_deferred()
+
+
+## Each floor cell darkened by the light it lacks (fixed sources and the
+## level's ambient light; the carried lanterns are real lights here) and
+## warmed by the heat on it: the glow around a fire.
+func _shade_floor() -> void:
+	_shade_due = false
+	for cell: Vector2i in _grounds:
+		var ground := _grounds[cell]
+		if not is_instance_valid(ground):
+			continue
+		var light := World.light_at(cell, false)
+		var warmth := clampf((World.heat_at(cell) - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
+		var bright := snappedf(lerpf(FLOOR_DARKEST, 1.0, light), 0.1)
+		var warm := snappedf(warmth * WARM_MOST, 0.05)
+		var kind := _ground_kinds[cell]
+		if bright >= 1.0 and warm <= 0.0:
+			_restore_ground(ground, kind)
+			continue
+		var key := "%s_%.1f_%.2f" % [kind, bright, warm]
+		if not _ground_materials.has(key):
+			var material := _kit_opaque.duplicate() as BaseMaterial3D
+			var colour: Color = material.albedo_color * GROUND_TINTS.get(kind, Color.WHITE) * bright
+			material.albedo_color = colour.lerp(WARM, warm)
+			if warm > 0.0:
+				material.emission_enabled = true
+				material.emission = WARM * warm
+			_ground_materials[key] = material
+		for node in _descendants(ground):
+			if node is MeshInstance3D:
+				(node as MeshInstance3D).material_override = _ground_materials[key]
+
+
+## A floor back to its plain colour: its kind's tint, or the kit's own.
+func _restore_ground(ground: Node3D, kind: String) -> void:
+	if GROUND_TINTS.has(kind):
+		_tint_ground(ground, kind)
+		return
+	for node in _descendants(ground):
+		if node is MeshInstance3D:
+			(node as MeshInstance3D).material_override = null
+
+
+## A lantern hung on a short post, and its pale light.
+func _add_lantern(cell: Vector2i) -> void:
+	var at := _tile_position(cell)
+	var post := _box(Vector3(0.06, 0.8, 0.06), _stone_opaque)
+	post.name = "Lantern_%d_%d" % [cell.x, cell.y]
+	post.position = at
+	_room.add_child(post)
+	var light := OmniLight3D.new()
+	light.light_color = LANTERN
+	light.light_energy = 1.1
+	light.omni_range = 4.0
+	light.position = at + Vector3(0.0, 0.95, 0.0)
+	_room.add_child(light)
 
 
 ## A torch on a post, and its warm light.

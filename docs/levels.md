@@ -57,10 +57,11 @@ In the order of the swatches above:
 | `#f0b070` | crate | cell | a wooden crate to push |
 | `#5a5a78` | boulder | cell | a stone boulder, mass 200 |
 | `#7a3cb4` | cart | cell | a low cart, mass 60 |
-| `#ffe000` | torch | cell | a torch on a post, with its light (drawn in 3D) |
+| `#ffe000` | torch | cell | a torch on a post: light, and a little heat |
+| `#fff0b0` | lantern | cell | a lantern on a short post: light only |
 | `#ff00ff` | level link | cell | stepping onto it takes the party to another map |
 
-A marker's cell (start, monster, crate, boulder, cart, torch, link) is
+A marker's cell (start, monster, crate, boulder, cart, torch, lantern, link) is
 walkable, and its ground is the kind most of its four neighbours are
 (stone if none). A colour not in the legend is void, and the server says so
 when it loads the map.
@@ -96,6 +97,17 @@ No `height.png` means everything is at 0.
   faces down its sides, and draws stairs as four steps; walls and doors
   stand on the higher of their two cells. The 2D view draws higher cells
   lighter.
+
+## Light, heat and north
+
+- `"ambient"` (0 to 1, default 1): the light everywhere before any
+  source. At 1 the level is fully lit; below `Companion.DARK` (0.35) a cell
+  with nothing near is dark: drawn darker in 3D, and a companion says so.
+  Fire, torches, lanterns and the lantern every player and companion
+  carries light it (docs/design.md, Heat and light).
+- `"north"` (`"up"`, `"down"`, `"left"` or `"right"`, default `"up"`):
+  which way in layout.png is north. Every direction a companion hears is a
+  compass point from it, and the HUD compass shows it.
 
 ## level.json
 

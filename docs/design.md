@@ -800,8 +800,54 @@ each with who and when; kept for the session only.
 ## Hazards
 
 Fire is terrain (tile source 2 on the Ground layer). It is walkable. Any
-creature (`FLESH`) on a fire tile at the end of a tick takes
-`World.FIRE_DAMAGE` (2). Non-creatures slide across it unaffected.
+creature (`FLESH`) standing where the heat (below) is at least
+`World.HEAT_BURN` (9) at the end of a tick takes `World.FIRE_DAMAGE` (2):
+every fire cell (one gives 10), and a cell hemmed in by fire though it is
+none itself. A pushed creature stops where it would burn; pathfinding
+costs it as fire. Non-creatures slide across unaffected.
+
+## Heat and light
+
+`sim/fields.gd` (`Fields`, owned by World, on every peer: a client works
+it out from the same map and doors). Each cell has a heat and a light,
+from sources: fire cells (heat 10, light 0.8, reach 4), torches (heat 2,
+light 1, reach 5), lanterns hung in a level (light 0.9, reach 4), and what
+a body carries (`GridEntity.emit_light` / `emit_heat`: every player and
+companion carries a lantern, 0.9, reach 4). A source reaches what it can
+see within its reach (`World.has_clear_line`: walls and closed doors stop
+it, bodies do not); heat falls off by `HEAT_FALLOFF` (0.35) a pace and
+adds up, light falls off linearly and adds to the level's ambient light
+(level.json `ambient`, default 1: fully lit), capped at 1. The fixed
+sources are worked out again when the map or a door changes
+(`World.fields_changed`, which a Door's `open` calls on every peer, so a
+client's view follows the replicated door); carried ones are added at each
+look, so they move with their bearer. `World.heat_at`, `light_at`,
+`is_burning`, `heat_from` (the compass point the heat comes from).
+
+The 3D view shades each floor cell by its fixed light (darker toward
+`FLOOR_DARKEST`; carried lanterns are real lights there) and warms it
+with the heat on it, the glow around a fire. Her perception tells of heat
+she feels from no fire she is told of ("You feel heat from the
+north-east."), the dark where she stands, and the dark past an open door
+("It is dark past the door to the east."). Sight for monsters and nerve
+are not affected yet.
+
+## Directions
+
+Every level has a fixed north (level.json `north`: up, down, left or
+right in layout.png; up by default), `World.north`. Every direction a
+companion is given, in her perception, the grid (north at its top) and the
+narration ("An imp came into sight, 3 paces to the north-east."), is one
+of the eight compass points, worked out by the server from cell offsets
+(`World.compass`); the model never works one out, and the primer says
+"Directions are spoken as north, south, east and west." Nothing she is
+told depends on which way she faces. The perception eval scores
+directions the same way.
+
+The HUD has a small compass at the top right (`render/compass.gd`,
+`HudCompass`): N where the level's north is on screen, turning with the 3D
+camera's yaw (Main.screen_north, from the camera or the 2D projection).
+F3's overlay shows the camera's facing as a compass point.
 
 ## Behaviours
 

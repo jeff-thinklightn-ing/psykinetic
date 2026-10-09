@@ -35,6 +35,8 @@ func _ready() -> void:
 	_test_voice_in_world()
 	_test_surroundings()
 	_test_surroundings_when_new()
+	_test_fields()
+	_test_compass()
 	_test_transcript()
 	_test_transcript_rebuild()
 	_test_monsters_by_kind()
@@ -959,15 +961,15 @@ func _test_surroundings() -> void:
 	_put(pet, Vector2i(7, 7))
 	pet.facing = Vector2i(0, -1)
 	var around := pet.perception_list()
-	_check(around.begins_with("Around you, what you can see, nearest first:\n- fire, 2 paces ahead of you"), "facing it: %s" % around)
+	_check(around.begins_with("Around you, what you can see, nearest first:\n- fire, 2 paces to the north"), "by the compass: %s" % around)
 	pet.facing = Vector2i(1, 0)
 	around = pet.perception_list()
-	_check("- fire, 2 paces to your left" in around, "facing east, it is to her left: %s" % around)
+	_check("- fire, 2 paces to the north" in around, "whichever way she faces: %s" % around)
 	_check(around.count("fire") == 1, "the fire told once, though it is three cells")
 	_check("crate" not in around and "boulder" not in around, "crates and the boulder 4-5 paces off are not told: %s" % around)
 	var far_imp := _spawn_imp(Vector2i(7, 1))
 	around = pet.perception_list()
-	_check(around.ends_with("- an imp, 6 paces to your left"), "a monster is told however far: %s" % around)
+	_check(around.ends_with("- an imp, 6 paces to the north"), "a monster is told however far: %s" % around)
 	World.damage(far_imp, 999)
 	pet._exchange.clear()
 	pet._add_turn("user", "Is that a crate?")
@@ -992,9 +994,8 @@ func _test_surroundings() -> void:
 	var door := World.door_across(Vector2i(4, 12), Vector2i(0, 1))
 	World._set_door(door, false, owner)
 	around = pet.perception_list()
-	_check("- a closed door, 2 paces ahead of you: behind Player
-" in around + "
-", "a door past her player: behind them (%s)" % around)
+	_check("- a closed door, 2 paces to the south: on the far side of Player\n" in around + "\n",
+			"a door past her player: on the far side of them (%s)" % around)
 	var grid := pet.perception_grid()
 	var rows := grid.split("\n")
 	_check(rows.size() == Companion.GRID_SIZE + 2, "the map: a heading, 13 rows, the key (%d lines)" % rows.size())
@@ -1016,9 +1017,9 @@ func _test_surroundings() -> void:
 	var imp := _spawn_imp(Vector2i(9, 7))
 	var crate: GridEntity = _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "TestCrate", "tile": Vector2i(6, 7)})
 	around = pet.perception_list()
-	_check("- an imp, 1 pace to your left: adjacent to you, between you and Player" in around,
+	_check("- an imp, 1 pace to the east: adjacent to you, between you and Player" in around,
 		"an imp between them: %s" % around)
-	_check("- a crate, 2 paces to your right" in around, "a crate, by her bearing: %s" % around)
+	_check("- a crate, 2 paces to the west" in around, "a crate, by the compass: %s" % around)
 	grid = pet.perception_grid()
 	_check(grid.split("\n")[1 + centre].split(" ").slice(centre - 2, centre + 3) == PackedStringArray(["c", ".", "P", "i", "&"]),
 		"on the map too: %s" % grid.split("\n")[1 + centre])
@@ -1057,11 +1058,112 @@ func _test_surroundings() -> void:
 	var below := pet.perception_grid().split("\n")[1 + centre].split(" ")[centre - 1]
 	pet.tile = was
 	World._set_terrain(_main._terrain)
-	_check("- a ledge, the ground rising, 1 pace ahead of you: adjacent to you" in ledge and "torch" not in ledge,
+	_check("- a ledge, the ground rising, 1 pace to the east: adjacent to you" in ledge and "torch" not in ledge,
 		"a ledge (and no torch: the map has none either): %s" % ledge)
 	_check("on the ledge above you" in above, "higher ground: on the ledge above her (%s)" % [above])
 	_check(below == "v", "and from up there, the drop on the map (%s)" % below)
 	_settle(pet)
+
+
+func _test_fields() -> void:
+	print("\n== heat and light: from fire, torches, lanterns; walls and closed doors stop them; burning by heat ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	# The test room's fire is (7..9, 5).
+	_check(World.heat_at(Vector2i(8, 5)) >= World.HEAT_BURN and World.is_burning(Vector2i(7, 5)), "a fire cell burns (heat %.1f)" % World.heat_at(Vector2i(8, 5)))
+	_check(World.heat_at(Vector2i(8, 6)) > 1.0 and not World.is_burning(Vector2i(8, 6)),
+			"beside it, warm but not burning (%.1f)" % World.heat_at(Vector2i(8, 6)))
+	_check(World.heat_at(Vector2i(8, 9)) < World.heat_at(Vector2i(8, 7)), "heat falls off with distance")
+	_check(not World.has_clear_line(Vector2i(7, 5), Vector2i(4, 8)) and World.heat_at(Vector2i(4, 8)) == 0.0,
+			"within reach but behind the room's south wall: none (%.2f)" % World.heat_at(Vector2i(4, 8)))
+	_check(World.light_at(Vector2i(1, 1)) == 1.0, "the test room is fully lit (ambient 1)")
+	# A small level of its own: a ring of fire, a wall, a door, in the dark.
+	var floor_cells: Array[Vector2i] = []
+	for y in 5:
+		for x in 7:
+			floor_cells.append(Vector2i(x, y))
+	var ring: Array[Vector2i] = [Vector2i(0, 1), Vector2i(1, 0), Vector2i(2, 1), Vector2i(1, 2), Vector2i(0, 0), Vector2i(2, 0)]
+	var edges := {}
+	for y in 5:
+		if y != 2:
+			edges[Terrain.edge_key(Vector2i(4, y), Vector2i(1, 0))] = Terrain.Edge.WALL
+	var door_key := Terrain.edge_key(Vector2i(4, 2), Vector2i(1, 0))
+	edges[door_key] = Terrain.Edge.DOOR
+	var was := pet.tile
+	var owner_was := owner.tile
+	World._set_terrain({"floor": floor_cells, "fire": ring, "edges": edges, "torches": [Vector2i(3, 3)], "ambient": 0.0})
+	var hemmed := World.heat_at(Vector2i(1, 1))
+	_check(hemmed >= World.HEAT_BURN and World.is_burning(Vector2i(1, 1)),
+			"a cell hemmed in by fire burns, though it is no fire itself (%.1f)" % hemmed)
+	_check(World.heat_at(Vector2i(5, 2)) == 0.0, "the closed door stops the heat")
+	_check(World.light_at(Vector2i(5, 2), false) == 0.0 and World.light_at(Vector2i(3, 2), false) > 0.5,
+			"and the light: dark past it, lit before it (%.2f)" % World.light_at(Vector2i(3, 2), false))
+	var door: Door = load("res://sim/door.gd").new()
+	door.key = door_key
+	World.register_door(door)
+	door.open = true
+	_check(World.light_at(Vector2i(5, 2), false) > 0.0, "an open door lets the light through (%.2f)" % World.light_at(Vector2i(5, 2), false))
+	pet.emit_light = 0.0  # Her own lantern would light the room past the door.
+	owner.emit_light = 0.0
+	var hemmed_terrain: Dictionary = {"floor": floor_cells, "fire": ring, "edges": edges, "torches": [Vector2i(3, 3)], "ambient": 0.0}
+	# Lit only by a torch three paces west of the open door: too dim past it.
+	World._set_terrain({"floor": floor_cells, "fire": [], "edges": edges, "torches": [Vector2i(1, 2)], "ambient": 0.0})
+	pet.tile = Vector2i(3, 2)
+	pet.facing = Vector2i(0, 1)
+	var told := pet.perception()
+	World._set_terrain(hemmed_terrain)
+	_check("It is dark past the door to the east." in told, "she tells of the dark past the open door: %s" % told)
+	pet.tile = Vector2i(3, 4)
+	_check(World.light_at(Vector2i(6, 4)) == 0.0, "far from any light, dark")
+	pet.tile = Vector2i(6, 4)
+	owner.tile = Vector2i(6, 0)
+	pet.emit_light = 0.9
+	_check(World.light_at(Vector2i(6, 4)) > 0.0, "her own lantern lights where she stands (%.2f)" % World.light_at(Vector2i(6, 4)))
+	pet.emit_light = 0.0
+	_check("It is dark where you stand." in pet.perception(), "without it, dark: %s" % pet.perception())
+	pet.tile = Vector2i(3, 1)
+	var hot := pet.perception()
+	pet.tile = Vector2i(3, 4)
+	_check("- fire, " in hot, "fire in sight is told as fire: %s" % hot)
+	World.unregister_door(door)
+	door.free()
+	pet.emit_light = 0.9
+	owner.emit_light = 0.9
+	pet.tile = was
+	owner.tile = owner_was
+	World._set_terrain(_main._terrain)
+	# Heat felt from fire she cannot see: round a corner, through an open door.
+	World._set_terrain({"floor": floor_cells, "fire": [Vector2i(0, 2)], "edges": {}, "torches": []})
+	pet.tile = Vector2i(1, 2)
+	World.get_entity_at(Vector2i(0, 2))
+	_check(World.heat_from(Vector2i(1, 2)) == "west", "heat comes from the fire's way (%s)" % World.heat_from(Vector2i(1, 2)))
+	_check(str(pet.field_sentences([])) == str(["You feel heat from the west."]), "told as felt heat when the fire is not told: %s" % [pet.field_sentences([])])
+	pet.tile = was
+	World._set_terrain(_main._terrain)
+	# A creature hemmed in by fire takes fire damage.
+	_check(not World.is_burning(owner.tile), "her player stands clear of any heat")
+	_settle(pet)
+
+
+func _test_compass() -> void:
+	print("\n== compass directions: the level's north, the HUD compass, the primer ==")
+	_check(World.north == Vector2i(0, -1) and World.compass(Vector2(1, -1)) == "north-east" and World.compass(Vector2(0, 2)) == "south"
+			and World.compass(Vector2(-3, 0)) == "west", "north is up in layout.png: (1,-1) north-east, (0,2) south, (-3,0) west")
+	World.north = Vector2i(1, 0)
+	_check(World.compass(Vector2(1, 0)) == "north" and World.compass(Vector2(0, 1)) == "east" and World.compass(Vector2(0, -1)) == "west",
+			"with north to the right, east is down")
+	World.north = Vector2i(0, -1)
+	var level: Dictionary = Level.parse(Level.image_from_rows(["S."], {}, {}), null, {"north": "down", "ambient": 0.4})
+	_check(level["terrain"]["north"] == Vector2i(0, 1) and is_equal_approx(float(level["terrain"]["ambient"]), 0.4),
+			"level.json sets north and ambient (%s, %s)" % [level["terrain"]["north"], level["terrain"]["ambient"]])
+	_check(HudCompass.facing(Vector2.UP) == "north" and HudCompass.facing(Vector2.RIGHT) == "west"
+			and HudCompass.facing(Vector2.DOWN) == "south" and HudCompass.facing(Vector2(-1, -1).normalized()) == "north-east",
+			"the camera faces where screen-up is: north on the right means facing west")
+	_check(_main.compass != null and _main.compass.get_parent() == _main.get_node("HUD"), "the compass is on the HUD")
+	_check("camera facing: " in _main._debug_text(), "F3 shows the camera's facing: %s" % _main._debug_text().split("\n")[2])
+	_check("Directions are spoken as north, south, east and west." in Companion.VOICE_WORLD, "and the primer says so")
 
 
 func _test_surroundings_when_new() -> void:
@@ -1195,7 +1297,8 @@ func _test_monsters_by_kind() -> void:
 	_check("attacking the imp" in pet.doing(), "what she is doing: %s" % pet.doing())
 	var ids := RegEx.create_from_string("(TestImp|TestBrute|Imp\\d|Brute\\b|CorridorImp)")
 	_check(ids.search(text) == null, "no entity name anywhere in what the voice sees")
-	_check("[An imp came into sight.]" in text or "[The imp came into sight.]" in text, "sightings by kind")
+	_check(RegEx.create_from_string("\\[(An|The) imp came into sight, \\d paces to the (north|south|east|west)").search(text) != null,
+			"sightings by kind, with paces and a compass point")
 	_check("The brute fell." in text and "An imp fell." in text, "deaths by kind")
 	_check("Fallen near you: " in text and "a brute" in text, "who fell, counted by kind: %s" % pet.run_summary(false))
 	World.damage(imp_b, 999)

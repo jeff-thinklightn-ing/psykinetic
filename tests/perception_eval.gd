@@ -306,8 +306,8 @@ static func truth_of(pet: Companion) -> Dictionary:
 
 
 ## Each way of placing [param cell] that is right, as a regex: its compass
-## direction from her, her bearing as she faces, its relations to her and
-## Jeff.
+## direction from her (by the level's north, World.compass, as she is told
+## it), its relations to her and Jeff.
 static func _placing(pet: Companion, cell: Vector2i) -> Array[String]:
 	var words: Array[String] = []
 	var offset := cell - pet.tile
@@ -315,34 +315,32 @@ static func _placing(pet: Companion, cell: Vector2i) -> Array[String]:
 		return ["\\b(under|beneath|where (i|you) stand|standing in|in it|in the fire|i'?m in|on fire|burning me)"]
 	# Its compass point; for a diagonal, both halves together, or the half
 	# that is most of it alone ("north" for two north and one east).
-	var vertical := "north" if offset.y < 0 else "south" if offset.y > 0 else ""
-	var across := "east" if offset.x > 0 else "west" if offset.x < 0 else ""
+	var up := World.north
+	var northward := offset.x * up.x + offset.y * up.y
+	var eastward := offset.x * -up.y + offset.y * up.x
+	var vertical := "north" if northward > 0 else "south" if northward < 0 else ""
+	var across := "east" if eastward > 0 else "west" if eastward < 0 else ""
 	if vertical.is_empty() or across.is_empty():
 		words.append("\\b" + vertical + across)
 	else:
 		words.append("\\b%s[- ]?%s" % [vertical, across])
-		if absi(offset.y) > absi(offset.x):
+		if absi(northward) > absi(eastward):
 			words.append("\\b%s\\b(?![- ]?(east|west))" % vertical)
-		elif absi(offset.x) > absi(offset.y):
+		elif absi(eastward) > absi(northward):
 			words.append("(?<!north|south)(?<!north-|south-)\\b%s" % across)
-	var bearing := pet._direction(Vector2(cell))
-	var parts: Array[String] = []
-	for key: String in ["ahead", "behind", "left", "right"]:
-		if key in bearing:
-			parts.append({"ahead": "(ahead|in front|before)", "behind": "(behind|back)", "left": "left", "right": "right"}[key])
-	words.append("(?s)" + "".join(parts.map(func(p: String) -> String: return "(?=.*\\b%s)" % p)))
 	for relation in pet.relations_of(cell, Vector2(cell)):
 		match relation.get_slice(" ", 0):
 			"adjacent":
 				words.append("\\b(next to|beside|by) (me|you)\\b|\\bright here\\b")
 			"between":
 				words.append("\\bbetween\\b")
-			"behind":
-				words.append("\\bbehind (you|jeff)\\b")
 			"next":
 				words.append("\\b(next to|beside|near|by) (you|jeff)\\b")
 			"on":
-				words.append("\\b(above|up on|higher)\\b")
+				if "far side" in relation:
+					words.append("\\b(far side of|past|beyond|behind) (you|jeff)\\b")
+				else:
+					words.append("\\b(above|up on|higher)\\b")
 			"below":
 				words.append("\\b(below|down)\\b")
 	return words

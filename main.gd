@@ -199,6 +199,8 @@ var _client3d: Client3D
 @onready var camera: Camera2D = $Camera
 @onready var hud: Label = $HUD/Label
 @onready var debug_overlay: Label = $HUD/Debug
+## The HUD's compass (top right), turned so N is the level's north on screen.
+var compass: HudCompass
 @onready var toss_aim: Line2D = $TossAim
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
@@ -313,6 +315,8 @@ func _process(delta: float) -> void:
 		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
+	if compass != null:
+		compass.north_on_screen = screen_north()
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -1459,6 +1463,9 @@ func _build_talk() -> void:
 	bubbles.tile_px = _bubble_tile_px
 	$HUD.add_child(bubbles)
 	$HUD.move_child(bubbles, 0)
+	compass = HudCompass.new()
+	compass.name = "Compass"
+	$HUD.add_child(compass)
 	talk = TalkPanel.new()
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
@@ -1704,7 +1711,7 @@ func _nearest_free(wanted: Vector2i) -> Vector2i:
 	var seen: Dictionary[Vector2i, bool] = {wanted: true}
 	while not queue.is_empty():
 		var tile: Vector2i = queue.pop_front()
-		if World.is_free(tile) and not World.is_fire(tile):
+		if World.is_free(tile) and not World.is_burning(tile):
 			return tile
 		if seen.size() > 200:
 			break
@@ -1721,7 +1728,7 @@ func _free_start_tile() -> Vector2i:
 		if World.is_free(tile):
 			return tile
 	for cell: Vector2i in _terrain["floor"]:
-		if World.is_free(cell) and not World.is_fire(cell):
+		if World.is_free(cell) and not World.is_burning(cell):
 			return cell
 	return player_starts[0] if not player_starts.is_empty() else Vector2i.ZERO
 
@@ -1855,6 +1862,15 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_door(player, tick)
 
 
+## Which way the level's north points on screen (unit, y down), in
+## whichever view is showing.
+func screen_north() -> Vector2:
+	var north := Vector2(World.north)
+	if _client3d != null:
+		return _client3d.screen_direction(north)
+	return (Iso.project(north) - Iso.project(Vector2.ZERO)).normalized()
+
+
 func _debug_text() -> String:
 	var lines: Array[String] = ["peer id: %d (%s)" % [
 		Net.local_id, Net.Mode.keys()[Net.mode].to_lower() if Net.online else "offline"]]
@@ -1865,6 +1881,7 @@ func _debug_text() -> String:
 		lines.append("yaw: %.1f deg   pitch: %.1f deg   zoom: %.2fx" % [_client3d.yaw, _client3d.pitch, _client3d.zoom])
 	else:
 		lines.append("azimuth: %.1f deg" % Iso.azimuth)
+	lines.append("camera facing: %s" % HudCompass.facing(screen_north()))
 	lines.append("controls: %s" % Net.controls)
 	if Net.mode == Net.Mode.CLIENT:
 		lines.append("rtt: %d ms" % roundi(Net.rtt_ms()))

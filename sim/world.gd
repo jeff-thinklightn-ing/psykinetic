@@ -22,6 +22,9 @@ signal entity_despawned(entity: GridEntity)
 signal entity_died(entity: GridEntity, cause: StringName)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
+## The fixed heat and light changed (the map, a door): views that draw
+## them redraw.
+signal fields_changed_signal
 ## A player's command that is not a move, attack or shove: (name, args), for
 ## Main to act on. "say" {text} is chat.
 signal command_received(entity: GridEntity, command: String, args: Dictionary)
@@ -40,6 +43,11 @@ const DIRECTIONS: Array[Vector2i] = [
 	Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1),
 ]
 const FIRE_DAMAGE := 2
+## A creature burns where the heat (Fields) is at least this: in fire, or
+## hemmed in by it. A fire cell alone gives Fields.FIRE.heat.
+const HEAT_BURN := 9.0
+## The eight compass points, clockwise from north.
+const COMPASS: Array[String] = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
 ## A body pushed off a ledge takes this much impact per level it falls.
 const FALL_IMPACT_PER_LEVEL := 3
 ## Clamp on mover_mass / target_mass when scaling push travel and impact.
@@ -110,6 +118,14 @@ var _stairs: Dictionary[Vector2i, Vector2i] = {}
 var _water: Dictionary[Vector2i, bool] = {}
 ## Torches on their posts (cells), for what a companion sees around her.
 var _torches: Dictionary[Vector2i, bool] = {}
+## Heat and light per cell (Fields).
+var fields := Fields.new()
+## The level's north, as a cell offset (level.json "north"; up in the
+## layout by default). Every direction told to a companion is a compass
+## point worked out from it (compass).
+var north := Vector2i(0, -1)
+## Light a body through on a line (has_clear_line): bodies do not stop it.
+var _through_bodies := false
 ## The eye height of the line of sight being walked (has_line_of_sight), -1
 ## when none: a wall lower than the eye does not stop it.
 var _eye := -1
@@ -223,6 +239,9 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_torches.clear()
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
+	north = terrain.get("north", Vector2i(0, -1))
+	fields.load(terrain)
+	fields_changed()
 	var heights: Dictionary = terrain.get("heights", {})
 	for cell: Vector2i in heights:
 		_height[cell] = int(heights[cell])
@@ -244,11 +263,54 @@ func _set_terrain(terrain: Dictionary) -> void:
 ## reads them for prediction and drawing.
 func register_door(door: Door) -> void:
 	_doors[door.key] = door
+	fields_changed()
 
 
 func unregister_door(door: Door) -> void:
 	if _doors.get(door.key) == door:
 		_doors.erase(door.key)
+		fields_changed()
+
+
+## The fixed heat and light must be worked out again (a door, the map).
+func fields_changed() -> void:
+	fields.mark_dirty()
+	fields_changed_signal.emit()
+
+
+## Heat at [param at] (Fields): at least HEAT_BURN burns.
+func heat_at(at: Vector2i) -> float:
+	return fields.heat_at(self, at)
+
+
+## Light at [param at], 0 dark to 1; [param carried]: with carried lanterns.
+func light_at(at: Vector2i, carried := true) -> float:
+	return fields.light_at(self, at, carried)
+
+
+## Whether a creature standing at [param at] burns.
+func is_burning(at: Vector2i) -> bool:
+	return heat_at(at) >= HEAT_BURN
+
+
+## Which way the heat at [param at] comes from, as a compass point ("" for none).
+func heat_from(at: Vector2i) -> String:
+	var toward := fields.heat_from(self, at)
+	return compass(toward) if toward.length() > 0.01 else ""
+
+
+## The compass point [param offset] (a cell offset) lies toward, by the
+## level's north: "north-east".
+func compass(offset: Vector2) -> String:
+	return COMPASS[bearing_index(offset)]
+
+
+## 0 north .. 7 north-west, clockwise, for [param offset].
+func bearing_index(offset: Vector2) -> int:
+	var up := Vector2(north)
+	var east := Vector2(-up.y, up.x)  # A quarter turn clockwise on the map.
+	var degrees := rad_to_deg(atan2(offset.dot(east), offset.dot(up)))
+	return posmod(roundi(degrees / 45.0), 8)
 
 
 func get_doors() -> Array[Door]:
@@ -869,7 +931,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 				body._world_note_moved(tick)
 				_relocate(body, landing)
 				tiles = 2
-				if _fire.has(landing) and body.is_creature():
+				if is_burning(landing) and body.is_creature():
 					stopped = true
 					stopped_by = "fire"
 					max_tiles = 0
@@ -909,7 +971,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 				stopped = true
 				stopped_by = "a fall of %d" % drop
 				break
-			if _fire.has(next) and body.is_creature():
+			if is_burning(next) and body.is_creature():
 				stopped = true
 				stopped_by = "fire"
 				break
@@ -996,10 +1058,10 @@ func _regen_stamina() -> void:
 
 
 func _apply_hazards() -> void:
-	if _fire.is_empty():
+	if not fields.has_heat():
 		return
 	for entity in _entities.duplicate():
-		if _alive(entity) and entity.is_creature() and _fire.has(entity.tile):
+		if _alive(entity) and entity.is_creature() and is_burning(entity.tile):
 			damage(entity, FIRE_DAMAGE, null, &"fire")
 
 
@@ -1232,6 +1294,8 @@ func impact_damage(remaining_force: float, ratio: float) -> int:
 
 
 func blocks_sight(at: Vector2i) -> bool:
+	if _through_bodies:
+		return false
 	var occupant: GridEntity = _occupancy.get(at)
 	return occupant != null and occupant.blocks_sight
 
@@ -1244,6 +1308,14 @@ func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	_eye = height_at(from)
 	var seen := _line_of_sight(from, to)
 	_eye = -1
+	return seen
+
+
+## A line of sight that bodies do not stop: how light and heat travel.
+func has_clear_line(from: Vector2i, to: Vector2i) -> bool:
+	_through_bodies = true
+	var seen := has_line_of_sight(from, to)
+	_through_bodies = false
 	return seen
 
 
@@ -1338,7 +1410,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 				next_cost += PATH_STEP_COST
 				if _closed_door_across(current, direction) != null:
 					next_cost += PATH_DOOR_EXTRA
-			if _fire.has(next):
+			if is_burning(next):
 				next_cost += PATH_FIRE_EXTRA
 			if not cost.has(next) or next_cost < cost[next]:
 				cost[next] = next_cost

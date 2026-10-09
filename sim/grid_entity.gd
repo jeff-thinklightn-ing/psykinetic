@@ -64,6 +64,10 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 ## Can be shoved along by something walking into it. Force pushes ignore this.
 @export var pushable := false
 @export var blocks_sight := false
+## Light and heat this body gives off where it stands (Fields): a carried
+## lantern, a burning thing.
+@export var emit_light := 0.0
+@export var emit_heat := 0.0
 ## Ticks one step takes, maybe fractional; also the cooldown before the
 ## next step.
 @export var move_ticks := 2.0

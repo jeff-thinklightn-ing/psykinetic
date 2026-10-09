@@ -23,7 +23,11 @@ const POST_TOP := Color(0.5, 0.43, 0.37)
 const POST_WIDTH := 3.0
 
 var key := Vector3i.ZERO
-var open := false
+var open := false:
+	set(value):
+		if open != value:
+			open = value
+			World.fields_changed()  # Light and heat pass an open door.
 var hp := 20
 var max_hp := 20
 var body_material := GridEntity.BodyMaterial.WOOD

@@ -3,6 +3,24 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.61
+
+Light, heat and directions. Server and client.
+
+- **Heat and light**: fires, torches, lanterns and the lantern everyone
+  carries give off light and heat that fall off with distance and stop at
+  walls and closed doors. Standing in fire, or hemmed in by it, burns. In
+  3D the floor glows warm around fires, and dark levels get darker away
+  from the lights.
+- **Compass**: every map has a north. A small compass on the screen shows
+  it, turning with the camera; F3 shows which way the camera faces.
+- **Companions speak in compass directions**: "the fire is two paces to
+  the north", never "to my left". She also says when she feels heat, or
+  when it's dark past a door.
+- Levels can set their light (`ambient`) and north, and hang lanterns.
+
+The server must be updated to v0.1.61 too, as it refuses any other version.
+
 ## v0.1.60
 
 Companions. Server.

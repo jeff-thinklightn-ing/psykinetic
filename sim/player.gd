@@ -22,6 +22,7 @@ var refusals := 0
 func _init() -> void:
 	super()
 	mass = 80.0
+	emit_light = 0.9  # The lantern the 3D view draws above the head.
 	# 4 cells a second.
 	move_ticks = 2.5
 	max_hp = 20

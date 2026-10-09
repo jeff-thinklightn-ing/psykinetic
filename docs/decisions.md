@@ -1046,3 +1046,23 @@ about 250 tokens shorter on every voice and stance ask, and its one clear
 loss to both is placing the fire (85% against 100%). Both stays behind
 --perception for when that is worth the tokens.
 
+## 123. Heat and light are fields, from sources
+
+Fire was a set of cells that hurt; light was only drawn. Now each cell
+has a heat and a light worked out from what gives them off (fire, torches,
+lanterns, what bodies carry), falling off with distance and stopped by
+walls and closed doors, the same on every peer from the same map and
+doors. Fire damage comes from the heat, above a threshold set so a fire
+cell always burns and a cell beside one does not, but a cell hemmed in by
+fire does. The fixed sources are worked out on a change, the carried ones
+at each look: cheap, and never stale. Monsters' sight and nerve are left
+for later.
+
+## 124. Directions are compass points, worked out by the server
+
+Her bearing as she faces meant nothing to Jeff, who cannot see her
+facing, and the A/Bs showed the model repeats whatever wording it is
+given. So every direction she is given is one of eight compass points from
+the level's fixed north, computed from cell offsets; the model never
+derives one. The HUD compass shows north turning with the camera, so the
+same words are usable on the player's side of the screen.
