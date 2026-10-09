@@ -1098,3 +1098,25 @@ hook.
 With zones, the party-wide link (one map, everyone moved) is gone: the
 player who steps on a link goes, with their companion, and everyone else
 stays where they are.
+
+## 129. A quick phrase sets its stance itself
+
+"Stay back!" is a button; reading it through the voice model made a button
+sometimes not work. The server maps each key to a stance and applies it
+at once as the standing instruction, by key, so custom words keep their
+key's meaning. The voice is still asked, so she answers in words, but its
+stance is not taken. Reflexes still override.
+
+## 130. Calm, she guards; the stance model is for fights
+
+Out of a fight the model's choices were noise (HOLD after a remark, PRESS
+with nothing to press), and every sighting and heal cost an ask. Now
+calm with no instruction is GUARD, set by the hands; the model is asked
+only in a fight, only on events, and only on hp falling. HOLD is no longer
+the model's to choose: standing still is something Jeff asks for.
+
+## 131. Following has slack
+
+Stepping after Jeff at every cell of distance made her jitter at his heel.
+She now waits while he is within 2 cells, sets off at 3, closes to 1 with
+a fresh path each step, and waits again.

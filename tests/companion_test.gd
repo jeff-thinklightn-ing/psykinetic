@@ -19,6 +19,9 @@ func _ready() -> void:
 	_test_falls_back_when_the_target_dies()
 	_test_retreats_on_low_hp()
 	_test_quick_phrases()
+	_test_phrase_stances()
+	_test_calm_guards()
+	_test_following()
 	_test_persists_and_resumes()
 	_test_idles_while_owner_offline()
 	_test_malformed_llm_reply()
@@ -90,6 +93,134 @@ func _test_attacks_a_hostile_in_range() -> void:
 	_check(pet.current_intent == Companion.Intent.ATTACK and pet.intent_target == imp, "intent is ATTACK on the imp (%s)" % pet.intent_name())
 	_step_until(func() -> bool: return imp.hp < imp.max_hp, 40)
 	_check(imp.hp < imp.max_hp, "and it hits (imp hp %d/%d)" % [imp.hp, imp.max_hp])
+
+
+func _test_phrase_stances() -> void:
+	print("\n== a quick phrase sets its stance at once and stands; her voice still answers ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "Right behind you.", "stance": "PRESS"}
+	var want := {1: Companion.Stance.STAY_CLOSE, 2: Companion.Stance.PULL_BACK, 3: Companion.Stance.PRESS, 4: Companion.Stance.PULL_BACK}
+	var got: Array[String] = []
+	for slot: int in [1, 2, 3, 4]:
+		mind.clear()
+		_main._chat_tick.clear()
+		_main._on_command(owner, "say", {"text": Net.DEFAULT_PHRASES[slot - 1], "phrase": slot})
+		got.append(pet.stance_name())
+		_check(pet.stance == want[slot] and not pet.standing_instruction().is_empty() and mind.stance_asks.is_empty()
+				and mind.voice_asks.size() == 1,
+				"%d %s: %s at once, standing as the instruction, no stance model; her voice asked" % [
+					slot, Net.DEFAULT_PHRASES[slot - 1], pet.stance_name()])
+	var entry: Dictionary = MindLog.last[String(pet.name)]
+	_check(entry.get("kind") == "voice" and entry.get("stance_ignored") == "PRESS" or pet.stance == Companion.Stance.PULL_BACK,
+			"her voice's own stance (PRESS) is not taken: %s stands" % pet.stance_name())
+	mind.clear()
+	_main._chat_tick.clear()
+	_main._on_command(owner, "say", {"text": "Charge them!", "phrase": 3})
+	_check(pet.stance == Companion.Stance.PRESS, "a phrase of the player's own words, in slot 3: PRESS all the same")
+	World.step()
+	_check(pet.stance == Companion.Stance.PRESS, "and calm does not undo it while it stands")
+	pet.hp = 3
+	var foe := _spawn_imp(pet.tile + Vector2i(1, 0) if World.is_free(pet.tile + Vector2i(1, 0)) else _free_tile_between(pet, 1, 1))
+	pet._act()
+	_check(pet.current_intent == Companion.Intent.RETREAT, "the reflex still wins: low and next to a monster, RETREAT (%s)" % pet.intent_name())
+	World.despawn(foe)
+	pet.hp = pet.max_hp
+	_forget(pet)
+	_settle(pet)
+
+
+## What the tests above left in her: lines, the exchange, an instruction.
+func _forget(pet: Companion) -> void:
+	pet._instruction = ""
+	pet._said.clear()
+	pet._exchange.clear()
+	pet._heard.clear()
+	pet._last_speech_tick = -1000
+	pet.mind = ScriptedMind.new()
+	_main._chat_tick.clear()
+
+
+func _test_calm_guards() -> void:
+	print("\n== calm and nothing asked: she guards, without asking; HOLD is only by request ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	pet._instruction = ""
+	pet.stance = Companion.Stance.PRESS
+	World.step()
+	_check(pet.stance == Companion.Stance.GUARD and mind.stance_asks.is_empty() and MindLog.last[String(pet.name)].get("mind") == "calm",
+			"PRESS with nothing near and no instruction: GUARD at once, the model not asked (%s)" % pet.stance_name())
+	mind.clear()
+	var far := _spawn_imp(_free_tile_between(pet, 6, 7))
+	far.sight_range = 0
+	for i in 3:
+		World.step()
+	_check(mind.stance_asks.is_empty() and pet.stance == Companion.Stance.GUARD, "a monster seen 6 away, out of the fight: not asked (%s)" % [mind.triggers("stance")])
+	World.despawn(far)
+	mind.clear()
+	owner.hp = 5
+	World.step()
+	mind.clear()
+	owner.hp = owner.max_hp
+	World.step()
+	_check(mind.stance_asks.is_empty() and mind.voice_asks.is_empty(), "HP rising past a threshold asks nothing")
+	var foe := _foe_nearby(pet)
+	mind.stance_answer = {"stance": "HOLD"}
+	pet._ask_stance("test")
+	_check(pet.stance != Companion.Stance.HOLD and not "HOLD" in Companion.STANCE_SYSTEM,
+			"the stance model is not offered HOLD, and its HOLD is refused (%s)" % pet.stance_name())
+	mind.voice_answer = {"say": "Holding.", "stance": "HOLD"}
+	_main._chat_tick.clear()
+	_main._on_command(owner, "say", {"text": "Hold this spot."})
+	_check(pet.stance == Companion.Stance.HOLD, "her player's words can ask for HOLD (%s)" % pet.stance_name())
+	World.despawn(foe)
+	_forget(pet)
+	_settle(pet)
+
+
+func _test_following() -> void:
+	print("\n== following: within 2 she waits; at 3 she sets off and closes in ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	# The long corridor along the bottom (y 11-12): nothing to push there.
+	_put(owner, Vector2i(5, 11))
+	_put(pet, Vector2i(5, 12))
+	pet._catching_up = false
+	_put(owner, Vector2i(7, 11))
+	var was := pet.tile
+	for i in 8:
+		World.step()
+	_check(pet.tile == was, "her player 2 away: she stays put (%s, they are at %s)" % [pet.tile, owner.tile])
+	_put(owner, Vector2i(8, 11))
+	var distances: Array[int] = []
+	for i in 12:
+		World.step()
+		distances.append(World.distance(pet.tile, owner.tile))
+	_check(pet.tile != was and distances.back() <= Companion.FOLLOW_CLOSE, "3 away: she sets off and closes in (%s)" % [distances])
+	# Walking away from her: she keeps within 3, finding her way each step.
+	var far: Array[int] = []
+	World.order_move(owner, Vector2i(18, 11))
+	for i in 40:
+		World.step()
+		far.append(World.distance(pet.tile, owner.tile))
+	_check(far.max() <= Companion.FOLLOW_START and far.back() <= 2, "following a walk: never more than 3 behind (%s)" % [far])
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
 
 
 func _test_persists_and_resumes() -> void:
@@ -384,6 +515,7 @@ func _test_malformed_llm_reply() -> void:
 	_settle(pet)
 	var mind := OllamaMind.new("http://127.0.0.1:1/v1/chat/completions", "stub", _main)
 	pet.mind = mind
+	var foe := _foe_nearby(pet)  # The stance model is asked only in a fight.
 	mind.stub_next_reply("this is { not json")
 	pet._ask_stance("test")
 	World.step()
@@ -398,7 +530,13 @@ func _test_malformed_llm_reply() -> void:
 	mind.stub_next_reply(JSON.stringify({"choices": [{"message": {"content": '{"stance": "HOLD"}'}}]}))
 	pet._ask_stance("test")
 	World.step()
-	_check(pet.stance == Companion.Stance.HOLD and pet.last_mind == "ollama", "a well-formed one is applied when it arrives (%s by %s)" % [pet.stance_name(), pet.last_mind])
+	_check(pet.stance == Companion.Stance.GUARD and MindLog.last[String(pet.name)]["outcome"] == "rejected",
+			"HOLD from the model: rejected, HOLD is only by her player's word (%s)" % MindLog.last[String(pet.name)].get("note", ""))
+	mind.stub_next_reply(JSON.stringify({"choices": [{"message": {"content": '{"stance": "PRESS"}'}}]}))
+	pet._ask_stance("test")
+	World.step()
+	_check(pet.stance == Companion.Stance.PRESS and pet.last_mind == "ollama", "a well-formed one is applied when it arrives (%s by %s)" % [pet.stance_name(), pet.last_mind])
+	World.despawn(foe)
 	pet.mind = ScriptedMind.new()
 	pet.stance = Companion.Stance.GUARD
 
@@ -410,12 +548,14 @@ func _test_llm_reasoning_is_off_and_stripped() -> void:
 	var body: Variant = JSON.parse_string(mind.request_body("system", "user"))
 	_check(body is Dictionary and body.get("think") == false, "the request body carries \"think\": false")
 	pet.mind = mind
-	var content := "<think>\nMaybe {\"stance\": \"PRESS\"}? No.\n</think>\n{\"stance\": \"HOLD\"}"
+	var foe := _foe_nearby(pet)
+	var content := "<think>\nMaybe {\"stance\": \"GUARD\"}? No.\n</think>\n{\"stance\": \"PRESS\"}"
 	mind.stub_next_reply(JSON.stringify({"choices": [{"message": {"content": content}}]}))
 	pet._ask_stance("test")
 	World.step()
 	_check(mind.last_error.is_empty(), "a reply with a <think> block parses (%s)" % mind.last_error)
-	_check(pet.stance == Companion.Stance.HOLD, "and the answer after the block is the one applied (%s)" % pet.stance_name())
+	_check(pet.stance == Companion.Stance.PRESS, "and the answer after the block is the one applied (%s)" % pet.stance_name())
+	World.despawn(foe)
 	_check(OllamaMind.strip_think("reasoning...</think>{\"stance\": \"GUARD\"}") == "{\"stance\": \"GUARD\"}",
 			"a stray closing tag drops everything before it")
 	_check(OllamaMind.strip_think("{\"stance\": \"GUARD\"}<THINK>never closed") == "{\"stance\": \"GUARD\"}",
@@ -437,6 +577,7 @@ func _test_native_ollama_endpoint() -> void:
 			and int(body["options"]["num_predict"]) == OllamaMind.MAX_TOKENS["stance"],
 			"the body is model, think false, stream false, format json, keep_alive -1, a short answer, messages")
 	pet.mind = mind
+	var foe := _foe_nearby(pet)
 	mind.stub_next_reply(JSON.stringify({
 		"model": "stub", "created_at": "2026-10-06T00:00:00Z", "done": true, "done_reason": "stop",
 		"message": {"role": "assistant", "content": "{\"stance\": \"STAY_CLOSE\"}"},
@@ -445,6 +586,7 @@ func _test_native_ollama_endpoint() -> void:
 	World.step()
 	_check(mind.last_error.is_empty() and pet.stance == Companion.Stance.STAY_CLOSE and pet.last_mind == "ollama",
 			"a native reply is read from message.content and applied (%s by %s)" % [pet.stance_name(), pet.last_mind])
+	World.despawn(foe)
 	var openai := OllamaMind.new("http://127.0.0.1:11434/v1/chat/completions", "stub", _main)
 	_check(openai.openai_shaped, "a URL ending in /chat/completions is spoken to OpenAI-style")
 	var openai_body: Variant = JSON.parse_string(openai.request_body("system", "user"))
@@ -583,7 +725,7 @@ func _test_stances() -> void:
 	pet.stance = Companion.Stance.GUARD
 	# The newest ask's stance wins, whenever its answer comes.
 	pet._take_result({"kind": "stance", "serial": 1000, "answer": {"stance": "PRESS"}})
-	pet._take_result({"kind": "stance", "serial": 999, "answer": {"stance": "HOLD"}})
+	pet._take_result({"kind": "stance", "serial": 999, "answer": {"stance": "STAY_CLOSE"}})
 	_check(pet.stance == Companion.Stance.PRESS and MindLog.last[String(pet.name)]["outcome"] == "superseded",
 			"an older ask's answer, come late, is superseded (%s)" % pet.stance_name())
 	pet._stance_serial = 0
@@ -735,6 +877,7 @@ func _test_lapse() -> void:
 	owner.hp = owner.max_hp
 	var mind := CountingMind.new()
 	pet.mind = mind
+	var foe := _foe_nearby(pet)
 	World.step()
 	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
@@ -765,6 +908,7 @@ func _test_lapse() -> void:
 	owner.hp = 5
 	World.step()
 	_check(mind.stance_asks.size() == 1 and mind.voice_asks.is_empty(), "the same stance again: no explaining")
+	World.despawn(foe)
 	owner.hp = owner.max_hp
 	for i in 21:
 		World.step()
@@ -818,6 +962,7 @@ func _test_her_own_lapse() -> void:
 	World.step()
 	for i in 21:
 		World.step()
+	var foe := _foe_nearby(pet)
 	mind.voice_answer = {"say": "", "stance": "HOLD"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
 	mind.voice_answer = {"say": "", "stance": ""}
@@ -826,6 +971,7 @@ func _test_her_own_lapse() -> void:
 	World.step()
 	_check(mind.triggers("stance") == ["Your HP fell below 30%, so Player's instruction no longer holds."] and pet.standing_instruction().is_empty(),
 			"her own HP: the instruction lapses (%s)" % [mind.triggers("stance")])
+	World.despawn(foe)
 	pet.hp = pet.max_hp
 	for i in 21:
 		World.step()
@@ -879,7 +1025,8 @@ func _test_death_and_respawn() -> void:
 	_step_until(func() -> bool: return _player() != null, 60)
 	World.step()
 	World.step()
-	_check(_player() != null and mind.triggers("stance") == ["Player respawned."], "the respawn is its own event (%s)" % [mind.triggers("stance")])
+	_check(_player() != null and mind.triggers("stance").is_empty() and pet.stance == Companion.Stance.GUARD,
+			"the respawn, all calm: no stance asked, she guards (%s)" % [mind.triggers("stance")])
 	_check(mind.stance_asks.is_empty() or not "Player died" in str(mind.stance_asks.back()["user"]), "with no word of the death beside the restored HP")
 	pet.mind = ScriptedMind.new()
 
@@ -1582,6 +1729,12 @@ func _spawn_imp(tile: Vector2i) -> Monster:
 	_imps += 1
 	imp.sight_range = 0
 	return imp
+
+
+## A monster 3-4 cells from her that does not move or attack (sight 0):
+## enough for a fight, in which the stance model is asked.
+func _foe_nearby(pet: Companion) -> Monster:
+	return _spawn_imp(_free_tile_between(pet, 3, 4))
 
 
 ## A free tile [param low]..[param high] from [param pet] and from her

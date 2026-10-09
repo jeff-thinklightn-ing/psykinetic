@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.63
+
+Companions. Server.
+
+- **Quick phrases always work**: 1 With me!, 2 Stay back!, 3 Get them!,
+  4 Fall back! change what your companion does at once, and she still
+  answers you.
+- **Calm, she follows**: with nothing hostile near and nothing asked of
+  her, she keeps with you; she only weighs up what to do in a fight.
+- She only holds a spot when you ask her to.
+- **Smoother following**: she lets you get a couple of steps ahead, then
+  catches up, instead of stepping at your heel.
+
+The server must be updated to v0.1.63 too, as it refuses any other version.
+
 ## v0.1.62
 
 Zones. Server and client.

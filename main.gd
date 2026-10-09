@@ -1640,7 +1640,7 @@ func _remember_companion(id: String) -> void:
 ## Net.player_reset is on.
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	if command_name == "say" and entity is Player:
-		_player_said(entity, str(args.get("text", "")))
+		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "swing" and entity is Player:
 		var swing := _direction_arg(args)
 		if swing != Vector2i.ZERO:
@@ -1748,7 +1748,8 @@ func _close_chat() -> void:
 
 ## Enter in the chat box: send the line (as a command, so the server checks
 ## and spreads it), at most one per CHAT_INTERVAL from here as well.
-func _send_chat(text: String) -> void:
+## [param phrase]: the quick phrase it is (1-4), 0 for typed words.
+func _send_chat(text: String, phrase := 0) -> void:
 	_close_chat()
 	var me := _local_player()
 	var line := text.strip_edges().left(CHAT_MAX_CHARS)
@@ -1758,7 +1759,7 @@ func _send_chat(text: String) -> void:
 		hud.text = "wait a moment before saying more"
 		return
 	_chat_sent_at = Time.get_ticks_msec()
-	World.command(me, "say", {"text": line})
+	World.command(me, "say", {"text": line, "phrase": phrase})
 
 
 ## Server: a creature or a breakable thing was killed. Every view hears of
@@ -1799,7 +1800,7 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 ## Server: [param player] said [param text] (the chat box). At most
 ## CHAT_MAX_CHARS, one line per CHAT_INTERVAL; to everyone as chat, into
 ## the party log, and to their companion as a decision, the words as data.
-func _player_said(player: Player, text: String) -> void:
+func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var line := text.strip_edges().left(CHAT_MAX_CHARS)
 	if line.is_empty():
 		return
@@ -1813,14 +1814,14 @@ func _player_said(player: Player, text: String) -> void:
 	party_log.add("%s said%s: \"%s\"" % [_display_name(player), " to " + to if to != "" else "", line])
 	Net.broadcast("chat", {"entity": String(player.get_path()), "from": _display_name(player), "to": to, "text": line})
 	if to != "":
-		pet.owner_spoke(line)
+		pet.owner_spoke(line, phrase)
 
 
 ## Keys 1-4: the quick phrase in that slot (settings.cfg phrase1= ...),
 ## said exactly as a typed line is, rate limit and all.
 func say_phrase(slot: int) -> void:
 	if slot >= 1 and slot <= Net.phrases.size():
-		_send_chat(Net.phrases[slot - 1])
+		_send_chat(Net.phrases[slot - 1], slot)
 
 
 func _on_companion_said(text: String, pet: Companion) -> void:

@@ -609,12 +609,16 @@ she attacks the hostile next to her rather than stand still. A bump
 (below) is the hands' too. An ATTACK whose target is gone becomes FOLLOW
 until the next tick picks again.
 
-Her mind sets the stance, asked only on events that matter (`_watch`,
-comparing each tick with the last): an hp threshold (50%, 30%) crossed,
-either way, by her or Jeff; a hostile newly next to either of them; a
-death in her sight ("Sneak died"); a hostile first seen while there is no
-fight (a hostile within 4 cells of her or Jeff). In a fight a sighting is
-no event, nor is a blow that crosses nothing. The ask is minimal, plain
+**Calm means follow**: with no standing instruction and nothing hostile
+within 4 cells (`COMBAT_RANGE`) of her or Jeff, she is in GUARD, set by
+the hands (`_calm`, logged as mind "calm"), no mind asked. Her mind sets
+the stance only in a fight, and only on events that matter (`_watch`,
+comparing each tick with the last): an hp threshold (50%, 30%) crossed
+downward by her or Jeff (healing back past one is narrated, no more); a
+hostile newly next to either of them; a death in her sight ("Sneak
+died"). A sighting is no event, nor is a blow that crosses nothing. HOLD is
+not the stance model's to choose (it is not offered, and refused if
+given): only Jeff's instruction sets it. The ask is minimal, plain
 text: who she is, the situation, the standing instruction, nothing else
 (`stance_prompt`); the system prompt (`STANCE_SYSTEM`) names the five
 stances and asks for `{"stance": ...}`, with a 24-token answer, so it
@@ -812,13 +816,24 @@ steps away and off Jeff's line (three cells ahead along that way), and
 waits there 30 ticks; with nowhere to go she stays and says so. The same
 bump again within `BUMP_REPEAT_TICKS` (a held key) is ignored.
 
+**Following** (FOLLOW, in STAY_CLOSE and GUARD): she stays put while Jeff
+is within 2 cells; once he is `FOLLOW_START` (3) away she sets off, the
+path found afresh every step, and closes to `FOLLOW_CLOSE` (1), then waits
+again. Each setting off and closing in is in the mind log (`kind`
+"follow"), and every entry she logs carries her stance and her distance to
+Jeff (`stance_now`, `keeper_distance`).
+
 **Quick phrases.** There are no orders. Keys 1–4 say a preset line,
 exactly as a typed one is said (see Talking): "With me!", "Stay back!",
 "Get them!", "Fall back!" by default, each editable in settings.cfg
 (`phrase1=` ... `phrase4=`, written back with the other settings, the
 default where a line is missing or empty). The HUD's hint line shows them.
-The defaults reach her as what they mean (above); what she does about one
-is her voice's to decide. **Speech**: a line is broadcast as
+Each sets its stance at once, by its key whatever its words (1 → STAY_CLOSE,
+2 → PULL_BACK, 3 → PRESS, 4 → PULL_BACK, `PHRASE_STANCES`), which stands as
+the instruction; no mind decides it (logged as mind "phrase"), and her
+voice is still asked so she answers in words, its own stance not taken.
+The reflex still overrides. The defaults reach her as what they mean
+(above). **Speech**: a line is broadcast as
 `Net.message("speech", {entity, speaker, text})` and shown over her in a
 speech bubble (below), at most one line per companion per 5 seconds (an
 answer to Jeff's words is always said); every line goes to the server

@@ -81,6 +81,13 @@ const PHRASE_MEANINGS := {
 	"With me!": "%s wants you to stay close.", "Stay back!": "%s wants you to stay back.",
 	"Get them!": "%s wants you to attack.", "Fall back!": "%s wants you to fall back.",
 }
+## What each quick phrase (keys 1-4, whatever its words) sets, at once and
+## as the standing instruction: no model reads it.
+const PHRASE_STANCES := {1: Stance.STAY_CLOSE, 2: Stance.PULL_BACK, 3: Stance.PRESS, 4: Stance.PULL_BACK}
+## Following (STAY_CLOSE, GUARD): she lets her player get this far before
+## she moves, then closes in to FOLLOW_CLOSE, finding her way afresh each step.
+const FOLLOW_START := 3
+const FOLLOW_CLOSE := 1
 ## Her own last lines: SAID_REMEMBERED kept (in her record, across
 ## sessions) and never said again.
 const SAID_REMEMBERED := 20
@@ -131,9 +138,9 @@ const MENTIONED_TOPICS := {
 const LOG_LINES_SCANNED := 60
 
 const STANCE_SYSTEM := """You choose how a creature fights beside the player she travels with, in a small tactical game.
-Reply with one JSON object and nothing else: {"stance": "STAY_CLOSE"|"HOLD"|"PRESS"|"GUARD"|"PULL_BACK"%s}.
-STAY_CLOSE: keep beside them and fight only what is next to you. HOLD: stay where you are and fight only what is
-next to you. PRESS: go for the nearest monster. GUARD: keep beside them and fight whatever comes at either of you.
+Reply with one JSON object and nothing else: {"stance": "STAY_CLOSE"|"PRESS"|"GUARD"|"PULL_BACK"%s}.
+STAY_CLOSE: keep beside them and fight only what is next to you. PRESS: go for the nearest monster.
+GUARD: keep beside them and fight whatever comes at either of you.
 PULL_BACK: get away from the monsters, to safety. Follow the standing instruction unless a life is at stake."""
 ## The voice is written entirely inside her world, in the second person:
 ## no game, no players, no stances, no JSON. Its system message is her card,
@@ -200,6 +207,11 @@ var last_mind := "default"
 ## The ask whose stance stands; a stance from an older ask is superseded.
 var _stance_serial := 0
 var _serial := 0
+## Following: she has set off after her player (FOLLOW_START) and not yet
+## closed in (FOLLOW_CLOSE).
+var _catching_up := false
+## Voice asks (by serial) answering a quick phrase, whose stance is set.
+var _phrase_serials: Dictionary[int, bool] = {}
 ## The way her player was walking when they last bumped into her.
 var _bump_direction := Vector2i.ZERO
 var _last_bump_tick := -1000
@@ -308,7 +320,10 @@ func bumped(direction: Vector2i) -> bool:
 ## is asked at once, and may read it as asking something of her (a stance
 ## in its reply), which then stands (standing_instruction). A quick phrase
 ## reaches her as what it means.
-func owner_spoke(text: String) -> void:
+## A quick phrase ([param phrase], 1-4) sets its stance at once
+## (PHRASE_STANCES) and stands as the instruction; her voice still answers
+## it, but its stance, if any, is not taken.
+func owner_spoke(text: String, phrase := 0) -> void:
 	_heard.append({"text": text, "tick": World.tick})
 	var meaning := meaning_of(text, keeper_name())
 	var heard := meaning if not meaning.is_empty() else "%s just said to you: \"%s\"" % [keeper_name(), text]
@@ -316,7 +331,16 @@ func owner_spoke(text: String) -> void:
 		_add_turn("user", text)
 	else:
 		_narrate("%s calls out to you. %s" % [keeper_name(), meaning])
-	_ask_voice("%s just spoke to you." % keeper_name(), heard)
+	if PHRASE_STANCES.has(phrase):
+		_serial += 1
+		var wanted: int = PHRASE_STANCES[phrase]
+		_set_stance(wanted, _serial, "phrase")
+		_instruction = heard
+		_instruction_tick = World.tick
+		_instruction_stance = STANCE_NAMES[wanted]
+		_log({"kind": "stance", "companion": String(name), "mind": "phrase", "trigger": "quick phrase %d: %s" % [phrase, text],
+			"stance": STANCE_NAMES[wanted], "outcome": "applied", "note": "a quick phrase: its stance at once, standing as the instruction"})
+	_ask_voice("%s just spoke to you." % keeper_name(), heard, false, PHRASE_STANCES.has(phrase))
 
 
 ## A creature died in her sight (Main): an event for the hands, told to
@@ -471,6 +495,7 @@ func _sim_tick() -> void:
 	if _joined_tick == -1:
 		_joined_tick = World.tick
 	_watch()
+	_calm()
 	_heal()
 	_act()
 	_execute()
@@ -498,12 +523,15 @@ func _watch() -> void:
 		for whose: String in ["hp_band", "keeper_hp_band"]:
 			if now[whose] == _seen[whose]:
 				continue
+			if now[whose] < _seen[whose]:
+				# Healing past a threshold: told, but no moment to decide anything.
+				_narrate("%s a little stronger now." % ["You are" if whose == "hp_band" else "%s is" % keeper_name()])
+				continue
 			threshold = true
 			var mine := whose == "hp_band"
 			var event := "%s %s" % ["Your HP" if mine else "%s's HP" % keeper_name(), _hp_change(_seen[whose], now[whose])]
 			var body: GridEntity = self if mine else keeper
-			var told := "%s %s" % ["You are" if mine else "%s is" % keeper_name(),
-				"%s now" % health_words(body) if now[whose] > _seen[whose] else "a little stronger now"]
+			var told := "%s %s now" % ["You are" if mine else "%s is" % keeper_name(), health_words(body)]
 			if now[whose] == HP_THRESHOLDS.size() and not standing_instruction().is_empty():
 				# Either of them badly hurt: what was asked no longer binds her.
 				_narrate("%s, and what %s asked of you no longer binds you." % [told, keeper_name()])
@@ -542,19 +570,23 @@ func _watch() -> void:
 		_silence_due = true
 		_adjacent_before.clear()
 	_was_in_fight = fight
-	if not events.is_empty() and (threshold or not _instruction_locked()):
+	# The stance model only in a fight (or danger, which is closer still);
+	# calm, she guards (_calm).
+	if not events.is_empty() and fight and (threshold or not _instruction_locked()):
 		_ask_stance(" ".join(events))
 	# A lapse is spoken to once her new stance is known (_take_result).
 	if (threshold or not deaths.is_empty()) and not lapsing and _lapsed_from.is_empty():
 		_ask_voice(" ".join(deaths if not deaths.is_empty() else events))
 	elif had_deaths and deaths.is_empty():
-		MindLog.record({"kind": "voice", "companion": String(name), "trigger": " ".join(dead_names),
+		_log({"kind": "voice", "companion": String(name), "trigger": " ".join(dead_names),
 			"outcome": "not asked", "note": "a monster's death: not big, not by %s, not the last" % keeper_name()})
 	if _silence_due and not fight and World.tick - _fight_ended_tick >= SILENCE_TICKS:
 		_silence_due = false
 		if _last_speech_tick < _fight_ended_tick:
 			_narrate("The fighting is over. It is quiet.")
 			_ask_voice("The fight is over, and you have said nothing since.")
+	if not fight:
+		_pending_stance = ""
 	if not _pending_stance.is_empty() and mind != null and not mind.busy("stance"):
 		var trigger := _pending_stance
 		_pending_stance = ""
@@ -562,7 +594,7 @@ func _watch() -> void:
 	if not _pending_voice.is_empty() and mind != null and not mind.busy("voice"):
 		var waiting := _pending_voice
 		_pending_voice = {}
-		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false))
+		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false), waiting.get("phrase", false))
 
 
 ## Narrates the deaths seen and clears them; returns those her voice is
@@ -580,6 +612,35 @@ func _take_deaths(fight_over: bool) -> Array[String]:
 		spoken.append("%s died, the last of them." % _deaths.back()["who"])
 	_deaths.clear()
 	return spoken
+
+
+## Calm (nothing hostile within COMBAT_RANGE of her or her player) and no
+## standing instruction: she guards, following her player, without asking
+## anyone.
+func _calm() -> void:
+	if in_fight() or not standing_instruction().is_empty():
+		return
+	if stance != Stance.GUARD:
+		_serial += 1
+		var was := stance_name()
+		_set_stance(Stance.GUARD, _serial, "calm")
+		_log({"kind": "stance", "companion": String(name), "mind": "calm", "trigger": "calm, no instruction",
+			"stance": "GUARD", "outcome": "applied", "note": "from %s: nothing hostile near and nothing asked" % was})
+	_explain_lapse()
+
+
+## An instruction lapsed (her or her player below 30%%) and her stance is
+## known again: if it changed, her voice is asked to say why.
+func _explain_lapse() -> void:
+	if _lapsed_from.is_empty():
+		return
+	var was := _lapsed_from
+	_lapsed_from = ""
+	if stance_name() != was:
+		var now_words := STANCE_WORDS[stance] % keeper_name() if "%s" in STANCE_WORDS[stance] else STANCE_WORDS[stance]
+		_narrate("You have changed what you are doing: you are %s now. Tell %s why." % [now_words, keeper_name()])
+		_ask_voice("%s, so %s's instruction no longer holds, and you changed course: from %s to %s. Say why, briefly." % [
+			_lapse_why[0].to_upper() + _lapse_why.substr(1), keeper_name(), was, stance_name()], "", true)
 
 
 ## A hostile within COMBAT_RANGE of her or her player.
@@ -653,7 +714,9 @@ func _ask_stance(trigger: String) -> void:
 ## player said, as she reads it ("" when they said nothing).
 ## [param always]: the line is said whatever the rate limit (her player's
 ## words make it so too).
-func _ask_voice(trigger: String, heard := "", always := false) -> void:
+## [param phrase]: a quick phrase's, whose stance is already set: the
+## reply's stance is not taken.
+func _ask_voice(trigger: String, heard := "", always := false, phrase := false) -> void:
 	if mind == null:
 		return
 	if heard.is_empty() and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
@@ -661,9 +724,10 @@ func _ask_voice(trigger: String, heard := "", always := false) -> void:
 	if mind.busy("voice"):
 		# Her player's words come first; otherwise the newest moment.
 		if not heard.is_empty() or always or str(_pending_voice.get("heard", "")).is_empty():
-			_pending_voice = {"trigger": trigger, "heard": heard, "always": always}
+			_pending_voice = {"trigger": trigger, "heard": heard, "always": always, "phrase": phrase}
 		return
 	_serial += 1
+	_phrase_serials[_serial] = phrase
 	var asked := not heard.is_empty()
 	var messages := voice_messages(asked, heard)
 	var ask := {
@@ -1253,7 +1317,7 @@ func _take_result(result: Dictionary) -> void:
 	if answer.is_empty():
 		entry["outcome"] = "no answer"
 		entry["note"] = "%s; %s stands" % [result.get("error", ""), stance_name()]
-		MindLog.record(entry)
+		_log(entry)
 		return
 	var serial := int(result.get("serial", 0))
 	var stance_text := str(answer.get("stance", "")).strip_edges().to_upper()
@@ -1263,25 +1327,24 @@ func _take_result(result: Dictionary) -> void:
 		if wanted == -1:
 			entry["outcome"] = "rejected"
 			entry["note"] = "not a stance; %s stands" % stance_name()
+		elif wanted == Stance.HOLD:
+			entry["outcome"] = "rejected"
+			entry["note"] = "HOLD is only by %s's word; %s stands" % [keeper_name(), stance_name()]
 		elif serial < _stance_serial:
 			entry["outcome"] = "superseded"
 			entry["note"] = "a newer ask's %s stands" % stance_name()
 		else:
 			_set_stance(wanted, serial, entry["mind"])
 			entry["outcome"] = "applied"
-		MindLog.record(entry)
-		if not _lapsed_from.is_empty():
-			var was := _lapsed_from
-			_lapsed_from = ""
-			if stance_name() != was:
-				var now_words := STANCE_WORDS[stance] % keeper_name() if "%s" in STANCE_WORDS[stance] else STANCE_WORDS[stance]
-				_narrate("You have changed what you are doing: you are %s now. Tell %s why." % [now_words, keeper_name()])
-				_ask_voice("%s, so %s's instruction no longer holds, and you changed course: from %s to %s. Say why, briefly." % [
-					_lapse_why[0].to_upper() + _lapse_why.substr(1), keeper_name(), was, stance_name()], "", true)
+		_log(entry)
+		_explain_lapse()
 		return
 	# The voice: to her player's words its stance is theirs to keep.
 	var spoken_to: bool = result.get("spoken_to", false)
 	var asked: bool = result.get("asked", false)
+	if _phrase_serials.get(serial, false):
+		asked = false  # A quick phrase's stance is set already.
+	_phrase_serials.erase(serial)
 	var always: bool = spoken_to or result.get("always", false)
 	entry["outcome"] = "said"
 	if not asked:
@@ -1314,7 +1377,7 @@ func _take_result(result: Dictionary) -> void:
 		entry["note"] = "within %d ticks of her last line" % SPEECH_INTERVAL_TICKS
 		line = ""
 	entry["say"] = line
-	MindLog.record(entry)
+	_log(entry)
 
 
 func _set_stance(wanted: int, serial: int, source: String) -> void:
@@ -1468,7 +1531,7 @@ func _heal() -> void:
 func _execute() -> void:
 	match current_intent:
 		Intent.FOLLOW:
-			_approach(keeper, 1)
+			_follow()
 		Intent.RETREAT:
 			_retreat()
 		Intent.HOLD:
@@ -1579,6 +1642,34 @@ func _approach(target: Variant, reach: int) -> void:
 		print("[mind] %s: cannot reach %s; following" % [name, target.name])
 		current_intent = Intent.FOLLOW
 		intent_target = null
+
+
+## [param entry] in the mind log, with her stance and how far her player is
+## as it is written.
+func _log(entry: Dictionary) -> void:
+	entry["stance_now"] = stance_name()
+	entry["keeper_distance"] = World.distance(tile, keeper.tile) if _alive(keeper) else -1
+	MindLog.record(entry)
+
+
+## FOLLOW: still while her player is within FOLLOW_START - 1 cells; once
+## they are FOLLOW_START away she sets off and closes to FOLLOW_CLOSE, the
+## path found afresh every step (they keep moving).
+func _follow() -> void:
+	if not _alive(keeper):
+		_catching_up = false
+		return
+	var distance := World.distance(tile, keeper.tile)
+	if distance >= FOLLOW_START and not _catching_up:
+		_catching_up = true
+		_log({"kind": "follow", "companion": String(name), "mind": "hands", "trigger": "%s %d away" % [keeper_name(), distance],
+			"outcome": "set off"})
+	if _catching_up and distance <= FOLLOW_CLOSE:
+		_catching_up = false
+		_log({"kind": "follow", "companion": String(name), "mind": "hands", "trigger": "%s %d away" % [keeper_name(), distance],
+			"outcome": "closed in"})
+	if _catching_up:
+		_approach(keeper, FOLLOW_CLOSE)
 
 
 ## One A* step toward [param goal]. False if there is no way there.
