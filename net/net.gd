@@ -195,6 +195,8 @@ var camera_yaw := 0.0
 ## The 3D camera's wheel zoom, a factor on its default size, kept with the
 ## yaw.
 var camera_zoom := 1.0
+## The HUD's list of controls shown (H toggles it); settings.cfg hints=on|off.
+var hints := true
 ## settings.cfg hp_bars= (0 turns them off), master_volume=, sfx_volume=.
 var hp_bars := true
 var master_volume := 1.0
@@ -210,7 +212,7 @@ var _settings_kept: Dictionary = {}
 ## that a rewrite drops it.
 const WRITTEN_SETTINGS: Array[String] = ["address", "port", "token", "player_id", "name", "display_delay",
 	"window_width", "window_height", "window_mode", "camera_yaw", "camera_pitch", "camera_zoom",
-	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4"]
+	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4", "hints"]
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -414,6 +416,7 @@ func _apply_window_settings() -> void:
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
 		camera_yaw = saved_yaw(str(settings.get("camera_yaw", "")), camera_yaw)
 		camera_zoom = saved_zoom(str(settings.get("camera_zoom", "")), camera_zoom)
+		hints = str(settings.get("hints", "on")) != "off"
 	if _test_yaw_given:
 		camera_yaw = test_yaw
 	var window := get_window()
@@ -519,6 +522,7 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		file.store_string("controls=%s\n" % _settings_controls)
 	for i in phrases.size():
 		file.store_string("phrase%d=%s\n" % [i + 1, phrases[i]])
+	file.store_string("hints=%s\n" % ("on" if hints else "off"))
 	for key: String in _settings_kept:
 		file.store_string("%s=%s\n" % [key, _settings_kept[key]])
 	file.close()

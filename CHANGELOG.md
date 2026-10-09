@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.64
+
+HUD. Client.
+
+- **A proper compass**: bigger, with a ring of ticks that turns with the
+  camera and N, E, S, W that stay upright (N in red).
+- **Controls list**: the controls are now a tidy list down the left side.
+  Press H to hide or show it; the game remembers.
+- The top line shows just who you are, your HP and the tick.
+
+The server must be updated to v0.1.64 too, as it refuses any other version.
+
 ## v0.1.63
 
 Companions. Server.

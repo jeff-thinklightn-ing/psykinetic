@@ -480,7 +480,15 @@ func _test_quick_phrases() -> void:
 	_check(Net.phrases_from({"phrase2": "  Hold here.  ", "phrase3": ""}) == ["With me!", "Hold here.", "Get them!", "Fall back!"],
 			"phrase2= in settings.cfg replaces the second; an empty one keeps its default")
 	World.step()
-	_check("1 With me!" in _main.hud.text and "4 Fall back!" in _main.hud.text, "the HUD hint shows them")
+	_check("1\tWith me!" in _main.hint_panel.lines() and "4\tFall back!" in _main.hint_panel.lines(), "the HUD's list shows them")
+	_check(RegEx.create_from_string("^\\w+   (HP \\d+/\\d+|no player|dead, respawning)   tick \\d+$").search(_main.hud.text) != null,
+			"the top line is only the client, HP and tick: %s" % _main.hud.text)
+	var shown: bool = Net.hints
+	_main.toggle_hints()
+	_check(_main.hint_panel.visible != shown and Net.hints != shown, "H hides the list (and it is remembered: Net.hints)")
+	_main.toggle_hints()
+	_check(_main.hint_panel.visible == shown, "and shows it again")
+	_check(is_equal_approx(HudCompass.RADIUS * 2.0, 220.0), "the compass is 220 HUD units across: about 110 px at 1080p")
 	var log_size: int = _main.party_log.size()
 	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
 	var key := InputEventKey.new()

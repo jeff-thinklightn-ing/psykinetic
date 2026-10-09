@@ -207,6 +207,8 @@ var _travelling := false
 @onready var debug_overlay: Label = $HUD/Debug
 ## The HUD's compass (top right), turned so N is the level's north on screen.
 var compass: HudCompass
+## The controls, down the left (H shows and hides them).
+var hint_panel: HintPanel
 @onready var toss_aim: Line2D = $TossAim
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
@@ -341,6 +343,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_F11:
 		Net.toggle_fullscreen()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_H:
+		toggle_hints()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
 		# A command like any other, so it works from a client too; the
@@ -1683,6 +1688,10 @@ func _build_talk() -> void:
 	compass = HudCompass.new()
 	compass.name = "Compass"
 	$HUD.add_child(compass)
+	hint_panel = HintPanel.new()
+	hint_panel.name = "Hints"
+	hint_panel.visible = Net.hints
+	$HUD.add_child(hint_panel)
 	talk = TalkPanel.new()
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
@@ -2067,19 +2076,9 @@ func _on_world_ticked(tick: int) -> void:
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
-	var hints := ""
-	if Net.controls == "wasd":
-		hints = "WASD walk   mouse aim   LMB attack (far: walk)   RMB grab (drag to toss)"
-		if _client3d != null:
-			hints += "   MMB drag: sideways turn, up/down look   wheel zoom, MMB click 1x"
-	else:
-		hints = "LMB move / attack (hold to steer)   RMB shove (drag to toss)"
-		if _client3d != null:
-			hints += "   W/S tilt   A/D turn   wheel zoom, MMB click 1x"
-	for i in Net.phrases.size():
-		hints += "   %d %s" % [i + 1, Net.phrases[i]]
-	hud.text = "%s   %s   tick %d   %s   R reset room   F3 debug   F11 fullscreen" % [
-		mode_text, hp_text, tick, hints]
+	hud.text = "%s   %s   tick %d" % [mode_text, hp_text, tick]
+	if hint_panel != null:
+		hint_panel.set_lines(hint_lines())
 	if player != null:
 		_had_player = true
 	if player != null:
@@ -2088,6 +2087,32 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_contest(player, tick)
 	_run_test_reset(player, tick)
 	_run_test_door(player, tick)
+
+
+## The controls for the HUD's list, a line each, "key\twhat it does".
+func hint_lines() -> Array[String]:
+	var lines: Array[String] = []
+	if Net.controls == "wasd":
+		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk)", "RMB\tgrab (drag to toss)"])
+		if _client3d != null:
+			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
+	else:
+		lines.append_array(["LMB\tmove / attack (hold to steer)", "RMB\tshove (drag to toss)"])
+		if _client3d != null:
+			lines.append_array(["W / S\ttilt", "A / D\tturn", "Wheel\tzoom (MMB click: 1x)"])
+	for i in Net.phrases.size():
+		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
+	lines.append_array(["Enter\ttalk", "Tab\ttalk log", "R\treset the room", "F3\tdebug", "F11\tfullscreen",
+		"H\thide these"])
+	return lines
+
+
+## H: the controls list shown or hidden, and remembered.
+func toggle_hints() -> void:
+	Net.hints = not Net.hints
+	if hint_panel != null:
+		hint_panel.visible = Net.hints
+	Net.save_view_settings()
 
 
 ## Which way the level's north points on screen (unit, y down), in

@@ -1,16 +1,23 @@
 class_name HudCompass
 extends Control
-## A small compass in the HUD's top-right corner: N (and E, S, W, smaller)
-## where the level's north is on screen, so it turns with the 3D camera's
-## yaw. Main sets north_on_screen each frame from the view.
+## The HUD's compass, top right: a dark translucent disc with a ring of
+## ticks that turns with the camera so the level's north is where it is on
+## screen, and N, E, S, W in bold outlined letters (N red) that move round
+## with the ring but stay upright. Main sets north_on_screen each frame
+## from the view. Sizes are in the HUD's units (the 3840 x 2160 canvas, so
+## half as many pixels at 1080p): about 110 px across at 1080p.
 
-const RADIUS := 34.0
-const MARGIN := 24.0
-const TOP := 90.0
-const RING := Color(0.85, 0.82, 0.74, 0.55)
-const BACK := Color(0.08, 0.07, 0.06, 0.45)
-const NORTH := Color(0.95, 0.35, 0.25)
-const LETTER := Color(0.95, 0.92, 0.85)
+const RADIUS := 110.0
+const MARGIN := 40.0
+const DISC := Color(0.06, 0.06, 0.08, 0.62)
+const RING := Color(0.86, 0.83, 0.74, 0.85)
+const TICK := Color(0.86, 0.83, 0.74, 0.7)
+const NORTH := Color(0.93, 0.22, 0.18)
+const LETTER := Color(0.96, 0.94, 0.88)
+const OUTLINE := Color(0.02, 0.02, 0.03, 0.95)
+const NORTH_SIZE := 46
+const LETTER_SIZE := 36
+const OUTLINE_SIZE := 9
 
 ## The screen direction of the level's north (unit; y down).
 var north_on_screen := Vector2.UP:
@@ -18,32 +25,44 @@ var north_on_screen := Vector2.UP:
 		if value.length() > 0.001 and not value.normalized().is_equal_approx(north_on_screen):
 			north_on_screen = value.normalized()
 			queue_redraw()
+var _bold: FontVariation
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Below the hint line, in from the right edge, whatever the window's size.
 	set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	offset_left = -RADIUS * 2.0 - MARGIN
 	offset_right = -MARGIN
-	offset_top = TOP
-	offset_bottom = TOP + RADIUS * 2.0
+	offset_top = MARGIN
+	offset_bottom = MARGIN + RADIUS * 2.0
+	_bold = FontVariation.new()
+	_bold.base_font = get_theme_default_font()
+	_bold.variation_embolden = 0.9
 
 
 func _draw() -> void:
 	var centre := Vector2.ONE * RADIUS
-	draw_circle(centre, RADIUS, BACK)
-	draw_arc(centre, RADIUS, 0.0, TAU, 48, RING, 2.0, true)
-	var font := get_theme_default_font()
-	var points := [["N", 0.0, 18, NORTH], ["E", 90.0, 12, LETTER], ["S", 180.0, 12, LETTER], ["W", 270.0, 12, LETTER]]
-	for point: Array in points:
-		var toward := north_on_screen.rotated(deg_to_rad(point[1]))
+	draw_circle(centre, RADIUS, DISC)
+	draw_arc(centre, RADIUS - 4.0, 0.0, TAU, 96, RING, 4.0, true)
+	# Sixteen ticks, turning with north: long at the four points, middling
+	# between them, short between those.
+	for i in 16:
+		var toward := north_on_screen.rotated(deg_to_rad(i * 22.5))
+		var length := 26.0 if i % 4 == 0 else 16.0 if i % 2 == 0 else 9.0
+		var width := 4.0 if i % 4 == 0 else 3.0
+		draw_line(centre + toward * (RADIUS - 6.0), centre + toward * (RADIUS - 6.0 - length), TICK, width, true)
+	# The letters ride the ring but stay upright.
+	for point: Array in [["N", 0.0, NORTH_SIZE, NORTH], ["E", 90.0, LETTER_SIZE, LETTER],
+			["S", 180.0, LETTER_SIZE, LETTER], ["W", 270.0, LETTER_SIZE, LETTER]]:
+		var text: String = point[0]
 		var font_size: int = point[2]
-		var text_size := font.get_string_size(point[0], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-		var at := centre + toward * (RADIUS - font_size * 0.75)
-		draw_string(font, at + Vector2(-text_size.x / 2.0, font_size * 0.35), point[0], HORIZONTAL_ALIGNMENT_LEFT, -1,
-			font_size, point[3])
-	draw_line(centre, centre + north_on_screen * (RADIUS * 0.45), NORTH, 3.0, true)
+		var toward := north_on_screen.rotated(deg_to_rad(point[1]))
+		var size := _bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+		var at := centre + toward * (RADIUS - 62.0)
+		var baseline := at + Vector2(-size.x / 2.0, _bold.get_ascent(font_size) - size.y / 2.0)
+		draw_string_outline(_bold, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, OUTLINE_SIZE, OUTLINE)
+		draw_string(_bold, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, point[3])
+	draw_circle(centre, 6.0, RING)
 
 
 ## The compass point the camera faces (the way up the screen goes), for

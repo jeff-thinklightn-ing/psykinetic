@@ -827,7 +827,7 @@ Jeff (`stance_now`, `keeper_distance`).
 exactly as a typed one is said (see Talking): "With me!", "Stay back!",
 "Get them!", "Fall back!" by default, each editable in settings.cfg
 (`phrase1=` ... `phrase4=`, written back with the other settings, the
-default where a line is missing or empty). The HUD's hint line shows them.
+default where a line is missing or empty). The HUD's controls list shows them.
 Each sets its stance at once, by its key whatever its words (1 → STAY_CLOSE,
 2 → PULL_BACK, 3 → PRESS, 4 → PULL_BACK, `PHRASE_STANCES`), which stands as
 the instruction; no mind decides it (logged as mind "phrase"), and her
@@ -904,10 +904,18 @@ of the eight compass points, worked out by the server from cell offsets
 told depends on which way she faces. The perception eval scores
 directions the same way.
 
-The HUD has a small compass at the top right (`render/compass.gd`,
-`HudCompass`): N where the level's north is on screen, turning with the 3D
-camera's yaw (Main.screen_north, from the camera or the 2D projection).
-F3's overlay shows the camera's facing as a compass point.
+The HUD has a compass at the top right (`render/compass.gd`,
+`HudCompass`), about 110 px across at 1080p (220 of the HUD's 3840 x 2160
+units): a dark translucent disc, a ring of sixteen ticks that turns with
+the 3D camera's yaw so the level's north is where it is on screen
+(Main.screen_north, from the camera or the 2D projection), and N, E, S, W
+in bold outlined letters (N red) riding the ring but always upright. F3's
+overlay shows the camera's facing as a compass point.
+
+**The HUD**: the top line is only the client, HP and tick. The controls
+are a list down the left (`render/hint_panel.gd`, `HintPanel`), a line
+each, key then what it does, small text on a soft backing; H shows and
+hides it, remembered in settings.cfg (`hints=on|off`).
 
 ## Behaviours
 
@@ -1280,8 +1288,8 @@ Two schemes, each a complete package: `controls=click` (the default) or
 `controls=wasd` in `settings.cfg`, with `--controls=` overriding it for a
 run; read and kept as `renderer=` is (`wasd` picks WASD, anything else is
 click). Keys and buttons that are not the active scheme's do nothing, and
-the HUD's hint line shows only the active scheme's. In both, 1–4 are
-the quick phrases, R, F3 and F11 as ever.
+the HUD's controls list shows only the active scheme's. In both, 1–4 are
+the quick phrases, R, F3, F11 and H as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets, right click (and drag) shoves and tosses, the

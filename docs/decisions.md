@@ -1120,3 +1120,11 @@ the model's to choose: standing still is something Jeff asks for.
 Stepping after Jeff at every cell of distance made her jitter at his heel.
 She now waits while he is within 2 cells, sets off at 3, closes to 1 with
 a fresh path each step, and waits again.
+
+## 132. The controls are a list, out of the way
+
+One long hint line across the top of the screen was hard to read and
+crowded the status. The top line now says only who, HP and tick; the
+controls are a vertical list on the left on a soft backing, which a player
+who knows them hides with H (remembered). The compass grew to a size that
+reads at a glance, its letters upright while its ring turns.
