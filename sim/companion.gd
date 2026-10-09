@@ -296,8 +296,14 @@ var _joined_tick := -1
 var _fallen: Array[Dictionary] = []
 
 
+## Slots in her pack (Items), empty at first; her player can get at them.
+const SLOTS := 4
+
+
 func _init() -> void:
 	super()
+	slots = Items.tidy([], SLOTS)
+	replicate("slots")
 	mass = 75.0
 	emit_light = 0.9  # Her lantern.
 	move_ticks = 2
@@ -496,9 +502,16 @@ func knowledge_of(kinds: Array[String]) -> String:
 	return " ".join(sentences)
 
 
-## What she carries, in a sentence.
+## What she carries, in a sentence: her lantern, and what is in her pack.
 func carried() -> String:
-	return "You carry a lantern, and nothing else of note." if emit_light > 0.0 else "You carry nothing of note."
+	var items: Array[String] = []
+	for item in slots:
+		if not item.is_empty():
+			items.append("a " + Items.name_of(item))
+	var pack := "nothing" if items.is_empty() else ", ".join(items)
+	if emit_light > 0.0:
+		return "You carry a lantern, and in your pack %s." % pack
+	return "In your pack you carry %s." % pack
 
 
 ## Who else is in her zone, where, and who is near enough to hear: the other

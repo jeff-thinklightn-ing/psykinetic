@@ -337,48 +337,64 @@ stunned) and is stopped by one up. Sight: a wall stops it only if the eye
 stands no higher than both cells beside the wall; ground higher than both
 ends blocks it.
 
-## Chests and slots
+## Chests and packs
 
 Things (`sim/items.gd`, `Items`: an id, a name, what a slot shows) live in
 **slots**: `GridEntity.slots`, a `PackedStringArray` of item ids, `""` for
-an empty slot. Most entities have none. Every player has `Player.SLOTS`
-(4), empty at first; a **chest** (`sim/chest.gd`, the `chest` marker) has
+an empty slot. Most entities have none. Every player has a **pack** of
+`Player.SLOTS` (4) and every companion one of `Companion.SLOTS` (4), both
+empty at first; a **chest** (`sim/chest.gd`, the `chest` marker) has
 `Chest.SLOTS` (4), filled from its `level.json` props (`"slots":
 ["bandaging_kit"]`). A chest stands on its tile, is not pushed by walking
 into it, does not break and is no creature. The bandaging kit is the
-first item and does nothing yet: it exists to be moved.
+first item and does nothing yet: it exists to be moved. To players a
+pack is "Jeff's Pack", "Wren's Pack"; "slots" is the code's word only.
 
 **Only World moves things** (`World.try_transfer(by, from, from_slot, to,
 to_slot)`): the item in one slot goes to another, swapping with what is
-there. Each side must be the player doing it or a chest in their zone
-next to them with no wall or closed door between (`World.reaches`, the
-reach of a hand, `can_melee`); the slot taken from must hold something.
-Anything else is refused and nothing moves. A client asks with the
-`transfer` command (entity paths and slot numbers); the server decides.
-Slots replicate like hp and tiles (`GridEntity.replicate("slots")`, on
-change, to the zone's clients), so the chest and both players show every
-peer the same contents.
+there. Each side must be within the hand of the player doing it
+(`World.reaches`): their own pack; a chest in their zone next to them
+with no wall or closed door between (`can_melee`); or their own
+companion's pack, within `World.COMPANION_REACH` (2) and in sight, since
+she follows a couple of cells off. Nobody reaches another player's pack
+or another player's companion's. The slot taken from must hold
+something. Anything else is refused and nothing moves. A client asks
+with the `transfer` command (entity paths and slot numbers); the server
+decides. Slots replicate like hp and tiles (`GridEntity.replicate("slots")`,
+on change, to the zone's clients), so every peer shows the same contents.
+Her pack is in her voice's prompt ("You carry a lantern, and in your pack
+a bandaging kit.").
 
-**The panel** (`render/slots_panel.gd`, bottom right): the player's four
-slots, shown and hidden with I; a left click on a chest beside you opens
-its row above them (from afar, you walk to the nearest free cell beside
-it and it opens on arrival); walking away closes it, as does I. Drag an
-item onto another slot to move it there (Godot's own drag and drop; the
-boxes show what the server says, not what was dropped).
+**The panel** (`render/pack_panel.gd`, bottom right): the player's pack,
+titled with their name, shown and hidden with I; a right click on a
+chest, or on your own companion, opens its row above it ("Chest",
+"Wren's Pack"; from afar you walk to the nearest free cell beside it and
+it opens on arrival); out of reach it closes, as it does on I. A left
+click on a chest walks you beside it. Drag an item onto another slot to
+move it there (Godot's own drag and drop; the boxes show what the server
+says, not what was dropped).
+
+**Sounds** (3D view, from where the thing is drawn): a creak when a chest
+opens (`chest_open`), a leather rustle when a pack opens, yours on I or
+your companion's (`pack_open`), and a clunk when an item lands in a row
+on show (`item_place`, once a frame; it plays on the server's word, so
+everyone with that row open hears it).
 
 **Persistence**: a chest's slots are saved with its entry in the snapshot
 (`slots`) and put back on load (`World.set_slots`); an entry with none
 saved keeps the level's. A chest (or anything) added to a level after the
 server last saved has neither an entry nor a respawn timer in the
-snapshot, and is spawned at once as the level has it. A player's slots are kept in their record
-(`PlayerRecord.slots`), updated the moment they change
+snapshot, and is spawned at once as the level has it. A player's pack is
+kept in their record (`PlayerRecord.slots`), their companion's in the
+record's `companion.slots`, each updated the moment it changes
 (`World.slots_changed`), so they survive a death, a trip to another zone,
 leaving and a restart. A room reset (R) rebuilds its chests from the
-level, as it does the crates; players keep what they hold.
+level, as it does the crates; players and companions keep what they hold.
 
 Test hook: `--test-chest=take|put` walks the local player to the nearest
-chest and drags its first item into their first empty slot, or theirs
-into it, through the panel; at exit every peer prints `[test] slots:`.
+chest and drags its first item into their pack's first empty slot, or
+theirs into it, through the panel; at exit every peer prints `[test]
+slots:`.
 
 ## Tick order
 
@@ -1503,6 +1519,9 @@ ortho camera is 40 units off). What plays, on what:
 | Death of a monster / player / companion | `death_monster_1-5` / `death_player_1-5` / `death_companion_1` | `impactSoft_medium_000-004` / `impactSoft_heavy_000-004` / RPG `dropLeather` |
 | A door opened / closed (its replicated state) | `door_open_1-2` / `door_close_1-4` | RPG `doorOpen_1-2` / `doorClose_1-4` |
 | A creature's replicated tile moves on by one | `footstep_1-5` (quiet) | `footstep_concrete_000-004` |
+| A chest opened (this player's panel) | `chest_open_1-3` | RPG `creak1-3` |
+| A pack opened, your own (I) or your companion's | `pack_open_1-4` | RPG `handleSmallLeather`, `handleSmallLeather2`, `clothBelt`, `clothBelt2` |
+| An item lands in a row of the panel on show | `item_place_1-3` | RPG `bookPlace1-3` |
 
 Not yet: fire (a crackle loop on fire tiles, a hiss on a burn), grunts on
 a body hit, and death cries: neither pack has them. `master_volume=` and

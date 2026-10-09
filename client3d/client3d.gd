@@ -912,6 +912,12 @@ func hover(tile: Vector2i, show: bool) -> void:
 
 ## The toss aim during a right drag: an arrow on the floor from
 ## [param target] the way it will go; hidden for ZERO or no target.
+## Sound [param set_name] from where [param entity] is drawn (Sfx).
+func play_at(set_name: String, entity: GridEntity) -> void:
+	var puppet: Node3D = _puppets.get(entity.get_instance_id())
+	sfx.play(set_name, (puppet.position if puppet != null else _tile_position(entity.tile)) + Vector3.UP * 0.5)
+
+
 func toss_aim(target: GridEntity, direction: Vector2i) -> void:
 	_toss.visible = direction != Vector2i.ZERO and is_instance_valid(target)
 	if not _toss.visible:

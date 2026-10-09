@@ -18,7 +18,7 @@ var zone := ""
 ## Unix time of the last join or leave.
 var last_seen := 0
 ## The player's companion: {name, card, hp, stamina, tile: [x, y], alive,
-## said: her last lines, newest last}.
+## said: her last lines, newest last, slots: her pack}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
 ## What is in the player's slots (Items ids, "" empty), kept through
@@ -86,6 +86,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			"tile": pet.get("tile"),
 			"alive": bool(pet.get("alive", true)),
 			"said": _lines(pet.get("said", [])),
+			"slots": Array(Items.tidy(pet.get("slots", []), Companion.SLOTS)),
 		}
 	return record
 

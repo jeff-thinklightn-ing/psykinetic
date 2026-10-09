@@ -91,6 +91,8 @@ const PATH_DOOR_EXTRA := PATH_STEP_COST
 
 ## Share of the shove force that a melee attack carries.
 const ATTACK_FORCE_FACTOR := 0.5
+## How far off a player can still get at their companion's pack (cells).
+const COMPANION_REACH := 2
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
@@ -562,13 +564,21 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	return true
 
 
-## Whether [param by] can get at [param entity]'s slots: its own, or a
-## chest in its zone next to it with no wall or closed door between.
+## Whether [param by] can get at [param entity]'s slots: its own; a chest
+## in its zone next to it with no wall or closed door between; or its own
+## companion's pack, within COMPANION_REACH and in sight (she follows a
+## couple of cells off).
 func reaches(by: GridEntity, entity: GridEntity) -> bool:
 	if entity == by:
 		return true
-	return entity is Chest and is_instance_valid(entity) and entity.spawned and entity.zone == by.zone \
-			and can_melee(by.tile, entity.tile)
+	if not is_instance_valid(entity) or not entity.spawned or entity.zone != by.zone:
+		return false
+	if entity is Chest:
+		return can_melee(by.tile, entity.tile)
+	if entity.keeper_peer != 0:  # A companion (not named: companion.gd uses World).
+		return by.owner_peer != 0 and entity.keeper_peer == by.owner_peer and entity.hp > 0 \
+				and distance(by.tile, entity.tile) <= COMPANION_REACH and has_line_of_sight(by.tile, entity.tile)
+	return false
 
 
 ## Puts saved contents back into [param entity]'s slots (unknown items

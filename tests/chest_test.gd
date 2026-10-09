@@ -1,10 +1,11 @@
 extends Node
-## Chests and slots: the test room's chest holds a bandaging kit; it moves
-## chest -> a player's slots -> chest through the slots panel's drop, as a
+## Chests and packs: the test room's chest holds a bandaging kit; it moves
+## chest -> a player's pack -> chest through the pack panel's drop, as a
 ## drag does; World refuses what a hand could not do; two players get at
-## the same chest and see the same contents; a click opens a chest beside
-## you, and from afar walks you there first; and a restart keeps the chest's
-## contents and every player's slots.
+## the same chest and see the same contents; a right click opens a chest
+## within reach, and from afar walks you there first; a restart keeps the
+## chest's contents and every pack; a player's own companion has a pack
+## they can reach and nobody else can; an item landing clunks.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -35,6 +36,7 @@ func _ready() -> void:
 	await _test_restart()
 	await _test_click_from_afar()
 	await _test_new_in_the_level()
+	await _test_companion_pack()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -59,25 +61,34 @@ func _test_there_and_back() -> void:
 	print("\n== the kit: chest -> slots -> chest, by drag and drop ==")
 	var chest := _chest()
 	var host := _player(Net.local_id)
-	var panel: SlotsPanel = _main.slots_panel
+	var panel: PackPanel = _main.pack_panel
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(panel.visible and panel.chest == null, "the slots panel shows the player's slots, no chest")
-	_main.toggle_slots()
+	_check(panel.visible and panel.other == null, "the slots panel shows the player's slots, no chest")
+	_main.toggle_pack()
 	await get_tree().process_frame
 	_check(not panel.visible, "I hides it")
-	_main.toggle_slots()
+	_main.sounds.clear()
+	_main.toggle_pack()
 	await get_tree().process_frame
-	_check(panel.visible, "and shows it again")
+	_check(panel.visible and _main.sounds == ["pack_open %s" % host.name], "and shows it again, with a rustle (%s)" % [_main.sounds])
 	_check(World.can_melee(host.tile, chest.tile), "the host, at %s, is beside it" % host.tile)
-	_main._click_chest(host, chest)
+	_main.sounds.clear()
+	_main._open_pack(host, chest)
 	await get_tree().process_frame
-	_check(panel.chest == chest and panel.shown_in(false, 0) == "Bandages", "a click opens it: the kit in its first slot")
+	_check(_main.sounds == ["chest_open Chest1"], "with the chest's creak (%s)" % [_main.sounds])
+	_check(panel.other == chest and panel.shown_in(false, 0) == "Bandages", "a right click opens it: the kit in its first slot")
+	_check(panel.title_shown(false) == "Chest" and panel.title_shown(true) == "%s's Pack" % Net.player_name,
+			"titled Chest, and %s's Pack below it" % Net.player_name)
+	_main.sounds.clear()
 	panel.drop(chest, 0, host, 0)
 	_check(Array(host.slots) == [KIT, "", "", ""] and Array(chest.slots) == ["", "", "", ""],
 			"dragged to the player's first slot: theirs now, the chest empty (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	await get_tree().process_frame
 	_check(panel.shown_in(true, 0) == "Bandages" and panel.shown_in(false, 0) == "", "the panel shows it moved")
+	_check(_main.sounds == ["item_place %s" % host.name], "and it clunks, once, in the pack it landed in (%s)" % [_main.sounds])
+	await get_tree().process_frame
+	_check(_main.sounds.size() == 1, "once only (%s)" % [_main.sounds])
 	panel.drop(host, 0, host, 3)
 	_check(Array(host.slots) == ["", "", "", KIT], "moved along the player's own slots (%s)" % [Array(host.slots)])
 	panel.drop(host, 3, chest, 2)
@@ -119,7 +130,7 @@ func _test_two_players() -> void:
 	World.command(bo, "transfer", {"from": str(chest.get_path()), "from_slot": 0, "to": str(bo.get_path()), "to_slot": 1})
 	_check(Array(bo.slots) == ["", KIT, "", ""] and Array(chest.slots) == ["", "", "", ""], "Bo takes the kit (%s)" % [Array(bo.slots)])
 	_main._process(0.0)
-	_check(_main.slots_panel.chest == chest and _main.slots_panel.shown_in(false, 0) == "", "the host's open chest shows it gone")
+	_check(_main.pack_panel.other == chest and _main.pack_panel.shown_in(false, 0) == "", "the host's open chest shows it gone")
 	World.command(host, "transfer", {"from": str(bo.get_path()), "from_slot": 1, "to": str(host.get_path()), "to_slot": 0})
 	_check(Array(bo.slots) == ["", KIT, "", ""], "the host cannot take it from Bo's slots")
 	World.command(bo, "transfer", {"from": str(bo.get_path()), "from_slot": 1, "to": str(chest.get_path()), "to_slot": 3})
@@ -188,21 +199,21 @@ func _test_click_from_afar() -> void:
 	print("\n== a chest clicked from afar: walk there, then it opens; walk off, it closes ==")
 	var host := _player(Net.local_id)
 	var chest := _chest()
-	var panel: SlotsPanel = _main.slots_panel
-	_main.close_chest()
+	var panel: PackPanel = _main.pack_panel
+	_main.close_other()
 	World._relocate(host, Vector2i(6, 1))
-	_main._click_chest(host, chest)
+	_main._open_pack(host, chest)
 	await get_tree().process_frame
-	_check(panel.chest == null and host.has_move_order, "not beside it: not open, walking (to %s)" % host.move_order)
+	_check(panel.other == null and host.has_move_order, "not beside it: not open, walking (to %s)" % host.move_order)
 	for i in 40:
 		World.step()
 		if World.can_melee(host.tile, chest.tile):
 			break
 	await get_tree().process_frame
-	_check(World.can_melee(host.tile, chest.tile) and panel.chest == chest, "beside it at %s: open" % host.tile)
+	_check(World.can_melee(host.tile, chest.tile) and panel.other == chest, "beside it at %s: open" % host.tile)
 	World._relocate(host, Vector2i(6, 1))
 	await get_tree().process_frame
-	_check(panel.chest == null, "away from it: closed")
+	_check(panel.other == null, "away from it: closed")
 
 
 func _test_new_in_the_level() -> void:
@@ -227,6 +238,49 @@ func _test_new_in_the_level() -> void:
 			"the chest is at (10, 3) with the kit (%s)" % [Array(chest.slots) if chest else "none"])
 	_check(not _main._dead_since.has(chest.spawn_spec.get("spawn", -1)) if chest else false, "not waiting to respawn")
 	_check(Array(_player(Net.local_id).slots) == ["", "", "", ""], "a record from before slots has four empty ones")
+
+
+func _test_companion_pack() -> void:
+	print("\n== a companion's pack: her player can reach it, nobody else ==")
+	Net.companions = true
+	var host := _player(Net.local_id)
+	World.set_slots(host, [KIT])
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_main._join_companion(record, host)
+	var pet: Companion = _main._companions.get(Net.player_id)
+	_check(pet != null and Array(pet.slots) == ["", "", "", ""], "she has a pack of 4, empty")
+	_check(World.reaches(host, pet), "her player, %d away, reaches it" % World.distance(host.tile, pet.tile))
+	_main._admit(BO, BO_ID, "Bo")
+	var bo := _player(BO)
+	World._relocate(bo, pet.tile + Vector2i(1, 0) if World.is_free(pet.tile + Vector2i(1, 0)) else pet.tile + Vector2i(-1, 0))
+	_check(not World.reaches(bo, pet), "Bo, beside her, does not")
+	_main.sounds.clear()
+	_main._open_pack(host, pet)
+	var panel: PackPanel = _main.pack_panel
+	await get_tree().process_frame
+	_check("pack_open %s" % pet.name in _main.sounds, "with a sack's rustle (%s)" % [_main.sounds])
+	_check(panel.other == pet and panel.title_shown(false) == "%s's Pack" % pet.name, "a right click on her opens %s's Pack" % pet.name)
+	var held := Array(host.slots).find(KIT)
+	panel.drop(host, held, pet, 0)
+	_check(Array(pet.slots) == [KIT, "", "", ""] and Array(record.companion["slots"]) == [KIT, "", "", ""],
+			"the kit goes into her pack, and her player's record has it (%s)" % [Array(pet.slots)])
+	_check("in your pack a bandaging kit" in pet.carried(), "she knows she carries it: %s" % pet.carried())
+	World.command(bo, "transfer", {"from": str(pet.get_path()), "from_slot": 0, "to": str(bo.get_path()), "to_slot": 0})
+	_check(Array(pet.slots)[0] == KIT, "Bo cannot take it")
+	_main._leave(BO, bo, BO_ID)
+	# A restart: she comes back with it.
+	remove_child(_main)
+	_main.free()
+	World.clear_zones()
+	_main = preload("res://main.tscn").instantiate()
+	add_child(_main)
+	await get_tree().process_frame
+	pet = _main._companions.get(Net.player_id)
+	_check(pet != null and Array(pet.slots) == [KIT, "", "", ""], "after a restart she still has it (%s)" % [Array(pet.slots) if pet else "no companion"])
+	host = _player(Net.local_id)
+	World._relocate(pet, host.tile + Vector2i(-4, 0) if World.is_free(host.tile + Vector2i(-4, 0)) else host.tile + Vector2i(-5, 0))
+	_check(not World.reaches(host, pet), "4 cells off, out of reach")
+	Net.companions = false
 
 
 func _chest() -> Chest:

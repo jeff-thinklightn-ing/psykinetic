@@ -219,10 +219,13 @@ var _fell_at: Dictionary[int, Vector2i] = {}
 var compass: HudCompass
 ## The controls, down the left (H shows and hides them).
 var hint_panel: HintPanel
-## The player's slots and an open chest's (I; a click on a chest beside you).
-var slots_panel: SlotsPanel
-## A chest clicked from afar: opened once the player is beside it.
-var _chest_wanted: GridEntity
+## The player's pack, and an open chest or companion's pack (I; a right
+## click on a chest or your companion).
+var pack_panel: PackPanel
+## A chest or companion right-clicked from afar: opened once in reach.
+var _pack_wanted: GridEntity
+## The pack sounds asked for, "set entity" each, newest last (tests).
+var sounds: Array[String] = []
 var _test_chest_done := false
 var _test_chest_walking := false
 @onready var toss_aim: Line2D = $TossAim
@@ -337,7 +340,7 @@ func _process(delta: float) -> void:
 		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
-	_update_chest()
+	_update_pack()
 	if compass != null:
 		compass.north_on_screen = screen_north()
 	if debug_overlay.visible:
@@ -366,7 +369,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_hints()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_I:
-		toggle_slots()
+		toggle_pack()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
 		# A command like any other, so it works from a client too; the
@@ -419,8 +422,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
+	# Right: a chest, or your own companion, opens. Left: a chest is walked to.
+	if click.button_index == MOUSE_BUTTON_RIGHT and (target is Chest or _is_own_companion(target)):
+		_open_pack(player, target)
+		return
 	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
-		_click_chest(player, target)
+		_walk_to_chest(player, target)
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT:
 		var door := _door_under_mouse()
@@ -711,7 +718,7 @@ func _apply_azimuth() -> void:
 ## floor, ignored) and ripples there. Holding the button keeps retargeting
 ## from _process as the cursor moves to other cells.
 func _move_click(player: Player, tile: Vector2i) -> void:
-	_chest_wanted = null
+	_pack_wanted = null
 	_held_target = tile
 	if tile == NONE:
 		return
@@ -1615,6 +1622,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		pet.card = authored
 	record.companion["card"] = pet.card
 	pet.restore_said(record.companion.get("said", []))
+	World.set_slots(pet, record.companion.get("slots", []))
 	pet.party_log = party_log
 	pet.mind = _make_mind()
 	pet.said.connect(_on_companion_said.bind(pet))
@@ -1672,6 +1680,7 @@ func _remember_companion(id: String) -> void:
 	record.companion["tile"] = [pet.tile.x, pet.tile.y]
 	record.companion["alive"] = true
 	record.companion["said"] = pet.said_lines()
+	record.companion["slots"] = Array(pet.slots)
 
 
 ## "say" {text}: chat, typed or a quick phrase (_player_said).
@@ -1734,10 +1743,11 @@ func _build_talk() -> void:
 	hint_panel.name = "Hints"
 	hint_panel.visible = Net.hints
 	$HUD.add_child(hint_panel)
-	slots_panel = SlotsPanel.new()
-	slots_panel.name = "Slots"
-	slots_panel.transfer = _transfer
-	$HUD.add_child(slots_panel)
+	pack_panel = PackPanel.new()
+	pack_panel.name = "Pack"
+	pack_panel.transfer = _transfer
+	pack_panel.sound = _sound
+	$HUD.add_child(pack_panel)
 	talk = TalkPanel.new()
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
@@ -2206,32 +2216,46 @@ func hint_lines() -> Array[String]:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "Wheel\tzoom (MMB click: 1x)"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
-	lines.append_array(["LMB chest\topen it (drag items)", "I\tyour slots", "Enter\ttalk", "Tab\ttalk log",
+	lines.append_array(["RMB chest\topen it (drag items)", "RMB companion\ther pack", "I\tyour pack",
+		"Enter\ttalk", "Tab\ttalk log",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	return lines
 
 
-## I: the slots panel shown or hidden; with a chest open, the chest closed.
-func toggle_slots() -> void:
-	if slots_panel == null:
+## I: the player's pack shown or hidden (with its sack sound); with a
+## chest or a companion's pack open, that closed.
+func toggle_pack() -> void:
+	if pack_panel == null:
 		return
-	if slots_panel.chest != null:
-		close_chest()
+	if pack_panel.other != null:
+		close_other()
 		return
-	slots_panel.shown = not slots_panel.shown
+	pack_panel.shown = not pack_panel.shown
+	if pack_panel.shown and _local_player() != null:
+		_sound("pack_open", _local_player())
 
 
-## A left click on [param chest]: open beside it; from afar, walk to the
-## nearest free cell beside it, and open on arrival (_update_chest).
-func _click_chest(player: Player, chest: GridEntity) -> void:
-	if World.can_melee(player.tile, chest.tile):
-		open_chest(chest)
+## A right click on a chest, or on the player's own companion: open it
+## within reach (World.reaches); from afar, walk to the nearest free cell
+## beside it, and open on arrival (_update_pack).
+func _open_pack(player: Player, target: GridEntity) -> void:
+	if World.reaches(player, target):
+		open_other(target)
 		return
-	var beside := _beside(chest.tile, player.tile)
+	var beside := _beside(target.tile, player.tile)
 	if beside == NONE:
 		return
 	_move_click(player, beside)
-	_chest_wanted = chest
+	_pack_wanted = target
+
+
+## A left click on a chest: walk to the nearest free cell beside it.
+func _walk_to_chest(player: Player, chest: GridEntity) -> void:
+	if World.can_melee(player.tile, chest.tile):
+		return
+	var beside := _beside(chest.tile, player.tile)
+	if beside != NONE:
+		_move_click(player, beside)
 
 
 ## The free floor cell next to [param at], reachable from it for a hand
@@ -2247,36 +2271,46 @@ func _beside(at: Vector2i, from: Vector2i) -> Vector2i:
 	return best
 
 
-func open_chest(chest: GridEntity) -> void:
-	_chest_wanted = null
-	if slots_panel != null:
-		slots_panel.open(chest)
+## Opens [param target]'s row (a chest, or a companion's pack), with its sound.
+func open_other(target: GridEntity) -> void:
+	_pack_wanted = null
+	if pack_panel != null:
+		if pack_panel.other != target:
+			_sound("chest_open" if target is Chest else "pack_open", target)
+		pack_panel.open(target)
 
 
-func close_chest() -> void:
-	_chest_wanted = null
-	if slots_panel != null:
-		slots_panel.open(null)
+func close_other() -> void:
+	_pack_wanted = null
+	if pack_panel != null:
+		pack_panel.open(null)
 
 
-## Each frame: the panel follows the local player; a chest walked to opens,
-## and an open one closes once the player is no longer beside it.
-func _update_chest() -> void:
-	if slots_panel == null:
+## Each frame: the panel follows the local player; a chest or companion
+## walked to opens, and an open one closes once out of reach.
+func _update_pack() -> void:
+	if pack_panel == null:
 		return
 	var player := _local_player()
-	slots_panel.player = player
+	pack_panel.player = player
 	if player == null:
-		close_chest()
+		close_other()
 		return
-	if is_instance_valid(_chest_wanted) and World.can_melee(player.tile, _chest_wanted.tile):
-		open_chest(_chest_wanted)
-	var chest := slots_panel.chest
-	if chest != null and (not is_instance_valid(chest) or not World.can_melee(player.tile, chest.tile)):
-		close_chest()
+	if is_instance_valid(_pack_wanted) and World.reaches(player, _pack_wanted):
+		open_other(_pack_wanted)
+	var other := pack_panel.other
+	if other != null and (not is_instance_valid(other) or not World.reaches(player, other)):
+		close_other()
 
 
-## The slots panel's drop: a command, so the server decides (World.try_transfer).
+## A sound from [param entity], in the 3D view (the 2D one has none).
+func _sound(set_name: String, entity: GridEntity) -> void:
+	sounds.append("%s %s" % [set_name, entity.name])
+	if _client3d != null and is_instance_valid(entity) and DisplayServer.get_name() != "headless":
+		_client3d.play_at(set_name, entity)
+
+
+## The pack panel's drop: a command, so the server decides (World.try_transfer).
 func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> void:
 	var player := _local_player()
 	if player == null:
@@ -2285,14 +2319,17 @@ func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -
 		"to": str(to.get_path()), "to_slot": to_slot})
 
 
-## Server: a player's slots changed: their record has it at once, so it
-## survives a death, a trip and a restart.
+## Server: a player's or a companion's pack changed: their record has it at
+## once, so it survives a death, a trip and a restart.
 func _on_slots_changed(entity: GridEntity) -> void:
-	if not entity is Player:
-		return
-	var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
-	if record != null and _players.get(entity.owner_peer) == entity:
-		record.slots = entity.slots.duplicate()
+	if entity is Player:
+		var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
+		if record != null and _players.get(entity.owner_peer) == entity:
+			record.slots = entity.slots.duplicate()
+	elif entity is Companion:
+		var keeper: PlayerRecord = _records.get((entity as Companion).keeper_id)
+		if keeper != null and _companions.get(keeper.player_id) == entity:
+			keeper.companion["slots"] = Array(entity.slots)
 
 
 ## H: the controls list shown or hidden, and remembered.
@@ -2606,11 +2643,11 @@ func _run_test_door(player: Player, tick: int) -> void:
 
 
 ## --test-chest=take|put: walk to the chest nearest the local player, open
-## it, and drag its first item into the player's first empty slot (take),
-## or the player's first item into the chest's first empty slot (put),
-## through the slots panel as a drag would.
+## it, and drag its first item into the player's pack's first empty slot
+## (take), or the player's first item into the chest's first empty slot
+## (put), through the pack panel as a drag would.
 func _run_test_chest(player: Player) -> void:
-	if Net.test_chest.is_empty() or _test_chest_done or player == null or slots_panel == null:
+	if Net.test_chest.is_empty() or _test_chest_done or player == null or pack_panel == null:
 		return
 	var chest: GridEntity = null
 	for entity in World.get_entities():
@@ -2621,10 +2658,10 @@ func _run_test_chest(player: Player) -> void:
 	if not World.can_melee(player.tile, chest.tile):
 		if not _test_chest_walking:
 			_test_chest_walking = true
-			_click_chest(player, chest)
+			_open_pack(player, chest)
 			print("[test] %s walks to %s" % [player.name, chest.name])
 		return
-	open_chest(chest)
+	open_other(chest)
 	var take := Net.test_chest == "take"
 	var from: GridEntity = chest if take else player
 	var to: GridEntity = player if take else chest
@@ -2635,7 +2672,7 @@ func _run_test_chest(player: Player) -> void:
 		print("[test] %s: nothing to %s (%s, %s)" % [player.name, Net.test_chest, Array(from.slots), Array(to.slots)])
 		return
 	print("[test] %s drags %s from %s %d to %s %d" % [player.name, from.slots[from_slot], from.name, from_slot, to.name, to_slot])
-	slots_panel.drop(from, from_slot, to, to_slot)
+	pack_panel.drop(from, from_slot, to, to_slot)
 
 
 func _run_test_reset(player: Player, tick: int) -> void:

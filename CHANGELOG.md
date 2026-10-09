@@ -3,6 +3,22 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.73
+
+Packs and chests. Companions. Server.
+
+- **Right click** a chest to open it (from further off you walk over
+  first). A left click on a chest now just walks you to it.
+- **Your pack**: what was "slots" is now your pack, titled with your name
+  ("Jeff's Pack"). I still shows and hides it.
+- **Your companion's pack**: right click your companion to open hers
+  ("Wren's Pack") and drag things between your packs. Only you can get at
+  it, and she knows what she's carrying.
+- **Sounds**: a chest creaks open, a pack rustles open, and an item
+  clunks as it lands.
+
+The server must be updated to v0.1.73 too, as it refuses any other version.
+
 ## v0.1.72
 
 Server.

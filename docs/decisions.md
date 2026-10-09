@@ -1216,3 +1216,20 @@ start tiles, so on the box, whose snapshot predates it, it would never
 have appeared. Every dead slot's timer is saved, so a slot with neither is
 one the level gained since the save: it spawns at once (dead from now only
 if its tile is taken).
+
+## 141. Packs: a right click opens, a companion has one, nothing names World's cycle
+
+The player's slots are "Jeff's Pack" to a player, and their companion
+has a pack too ("Wren's Pack"), both four slots. A right click opens a
+chest or your own companion's pack (left on a chest only walks there):
+the right button already means doing something to a thing, and a
+companion is never shoved by her own player now. A companion's pack is
+reached within 2 cells in sight, not only beside: she follows a couple of
+cells off, and a pack that closed every time she shuffled would be no
+use. Her pack is kept in her player's record beside theirs, and is in her
+voice's prompt as a fact. Sounds come from the CC0 Kenney RPG pack the
+game already ships (creak, leather, a book set down for the clunk). The
+clunk plays when the server's contents show an item has landed, not on
+the drop, so it means the move happened. World.reaches tells a companion
+by keeper_peer rather than by its class: world.gd naming Companion, whose
+script uses World, made a reference cycle that leaked scripts at exit.
