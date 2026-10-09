@@ -22,6 +22,10 @@ extends Node
 ##                                /var/lib/psykinetic/transcripts when it can); see Transcript
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
 ##                                (or PSYKINETIC_MIND_WHY=1)
+##   --perception=list|grid|both  what the minds are told she sees around her: a list of the
+##                                nearest things with where each is (default), a map of the
+##                                cells around her, or the map then the list (or
+##                                PSYKINETIC_PERCEPTION); see Companion.perception
 ##   --llm-model=<m>              companion minds ask this model...
 ##   --llm-url=<url>              ...at this endpoint (default: local Ollama /api/chat;
 ##                                a URL ending /chat/completions is spoken to OpenAI-style)
@@ -143,6 +147,9 @@ const DEFAULT_TRANSCRIPTS := "/var/lib/psykinetic/transcripts"
 var transcripts_dir := ""
 var _transcripts_given := false
 var mind_why := false
+## --perception: "list", "grid" or "both" (Companion.perception).
+const PERCEPTIONS: Array[String] = ["list", "grid", "both"]
+var perception := "list"
 ## --no-companions: players get no companion (tests of other things, or ops).
 var companions := true
 ## --no-player-reset turns this off: any player may rebuild the room with R.
@@ -252,6 +259,8 @@ func _enter_tree() -> void:
 	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
 	if OS.get_environment("PSYKINETIC_MIND_WHY") in ["1", "true", "on", "yes"]:
 		mind_why = true
+	if OS.get_environment("PSYKINETIC_PERCEPTION") != "":
+		_set_option("--perception", OS.get_environment("PSYKINETIC_PERCEPTION"))
 	_parse_args()
 	if not _mode_given:
 		_apply_settings()
@@ -890,7 +899,7 @@ func _parse_args() -> void:
 			"--mind-why":
 				mind_why = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--mind-log", "--map", "--transcripts", \
+					"--llm-url", "--llm-model", "--perception", "--mind-log", "--map", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
@@ -941,6 +950,11 @@ func _set_option(key: String, value: String) -> void:
 			llm_url = value
 		"--llm-model":
 			llm_model = value
+		"--perception":
+			if value.to_lower() in PERCEPTIONS:
+				perception = value.to_lower()
+			else:
+				print("[net] --perception=%s: not one of %s; keeping %s" % [value, "|".join(PERCEPTIONS), perception])
 		"--map":
 			map_name = value
 		"--mind-log":

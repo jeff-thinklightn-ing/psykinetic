@@ -601,18 +601,42 @@ from its name.
   and **now**: the
   situation in her words (`voice_situation`: health as unhurt, a little
   hurt, badly hurt or close to falling; paces for cells; who is in
-  danger), what is worth noticing around her (`surroundings`: fire,
-  water, doors open or closed, crates, boulders, carts, ledges and
-  torches she can see within 4 paces, the nearest two, a sentence each,
-  by her bearing as she faces or as "behind Jeff" / "beside Jeff": "Fire
-  is burning two paces to your left. A closed door is behind Jeff."),
-  what she is set on and doing ("You are keeping beside Jeff and
-  fighting whatever comes at either of you; right now you are attacking
-  Brute."), what Jeff asked that still stands, how long they have
-  travelled together and who fell near her; then how to answer
+  danger), what she is set on and doing ("You are keeping beside Jeff
+  and fighting whatever comes at either of you; right now you are
+  attacking Brute."), what Jeff asked that still stands, how long they
+  have travelled together and who fell near her; then what she can see
+  around her (`perception`, below); then how to answer
   (`VOICE_RULES`: out loud, a sentence or two, answer Jeff, never repeat
   herself or Jeff, "..." only when there is truly nothing to say, and
   "If you don't know what something is, say so.").
+
+What she can see around her, the "around you" block, goes in the voice's
+system message and in the stance's ask alike, in one of three forms set
+by `--perception=list|grid|both` (default list; `perception` on the
+console switches it live):
+
+- **list** (`perception_list`): up to 5 things she can see within 6
+  paces, nearest first, monsters chosen before ground so a ledge never
+  crowds out an imp; each with its paces, her bearing as she faces, and
+  its relations as the server works them out: "adjacent to you",
+  "between you and Jeff", "behind Jeff", "next to Jeff", "where Jeff
+  stands", "on the ledge above you", "below you, down off the ledge".
+  ("- an imp, 1 pace to your left: adjacent to you, between you and
+  Jeff".) Things: monsters by kind, crates, boulders, carts, doors open
+  or closed, and the nearest fire, water, stair and ledge.
+- **grid** (`perception_grid`): a 13 x 13 map, her at the centre, north
+  at the top, characters spaced, then a one-line key: her initial for her
+  (W), her player's (J), monsters by their kind's first letter, f fire,
+  ~ water, # wall, D / d door closed / open, c crate or cart, o boulder,
+  ^ stair, v drop, . floor, ? out of sight. Walls and doors are edges in
+  the sim, so a wall is drawn on the unseen cell behind it where she sees
+  its face, and a door on its doorway (the cell beyond it from her).
+- **both**: the grid, then the list.
+
+Line of sight decides what is in it in every mode (`World.has_line_of_sight`:
+walls and closed doors stop it; higher ground sees over lower walls).
+`tests/perception_eval.gd` measures the three against the real model
+(docs/server.md, "Perception eval").
 - **the exchange** (`_exchange`, the last 16 entries of this session):
   Jeff's typed words as the user's turns, her lines as the assistant's,
   and what happens as brief bracketed narration in the user's turns

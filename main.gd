@@ -2038,6 +2038,12 @@ func admin_command(line: String) -> String:
 				if is_instance_valid(pet):
 					pet.mind = _make_mind()
 			return "companion minds: %s" % mind_kind
+		"perception":
+			if words.size() >= 2:
+				if words[1] not in Net.PERCEPTIONS:
+					return "usage: perception list|grid|both (now %s)" % Net.perception
+				Net.perception = words[1]
+			return "perception: %s" % Net.perception
 		"transcript":
 			if words.size() < 2:
 				return "usage: transcript <name> [<YYYY-MM-DD>] | transcript rebuild"
@@ -2053,7 +2059,7 @@ func admin_command(line: String) -> String:
 			return Transcript.show(who, words[2] if words.size() >= 3 else "")
 		"help":
 			return "reset | respawn | players | companions | mind scripted|ollama | mind log on|off | mind last <name> | " \
-				+ "transcript <name> [<date>] | map | map load <name> | save"
+				+ "perception list|grid|both | transcript <name> [<date>] | map | map load <name> | save"
 	return "unknown command %s (try help)" % words[0]
 
 

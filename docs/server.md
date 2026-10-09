@@ -182,6 +182,12 @@ It must run on the box; the port only listens on localhost. By hand:
 A server started in a terminal (or any mode with `--console`) also reads
 the same commands from stdin.
 
+`perception list|grid|both` switches what the companions are told they
+see around them (see docs/design.md), for every companion at once, until
+the next restart; `perception` alone says which. `--perception=` on the
+command line (or `PSYKINETIC_PERCEPTION` in `/etc/psykinetic/env`) sets it
+from the start.
+
 Dead monsters and broken crates come back on their own after 60 seconds,
 once no player is within 6 tiles of the spawn tile; `respawn` skips the
 wait. Players still get their own 2-second respawn.
@@ -338,3 +344,20 @@ start it again.
 
 `tests/state_test.ps1` / `tests/state_test.sh` check the save, load and
 bad-file paths headless.
+
+## Perception eval
+
+`tools\perception_eval.ps1`, on the dev machine, measures how well her
+voice answers questions about what is around her in each perception mode,
+against the box's model: it opens an ssh tunnel to the box's Ollama (port
+11434 is not open to the tailnet), runs `tests/perception_eval.tscn`
+headless through it, and closes the tunnel. Nothing is deployed and the
+server is not touched, but it shares the box's Ollama with the server,
+so its latency is only clean while nobody is playing. Eight fixed scenes
+(test room and sample level) x four questions asked as Jeff x three modes
+x `-Runs` (default 3); each answer is scored by keyword against the truth
+the sim gives. The report (accuracy per mode and per question, latency,
+prompt tokens) goes to `build\perception_eval.md`, every answer to
+`build\perception_eval.jsonl`. `-Preview` prints the scenes, their maps,
+lists and truth without asking the model. The first results are in
+`docs/perception_eval.md`.

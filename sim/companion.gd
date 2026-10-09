@@ -91,10 +91,12 @@ const ECHO_TICKS := 600
 ## The run summary: so many of the party log's last LOG_LINES_SCANNED
 ## lines (collapsed, without what she said or was told).
 const SUMMARY_LINES := 6
-## What she notices around her for the voice (surroundings): things within
-## this many paces, at most SURROUNDINGS_MAX of them, nearest first.
-const SURROUNDINGS_RANGE := 4
-const SURROUNDINGS_MAX := 2
+## What she sees around her (perceived): things within this many paces,
+## at most PERCEPTION_MAX of them, nearest first; and the size of the grid
+## around her (perception_grid).
+const PERCEPTION_RANGE := 6
+const PERCEPTION_MAX := 5
+const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
 const LOG_LINES_SCANNED := 60
@@ -641,9 +643,12 @@ static func _sync_result(ask: Dictionary, answer: Dictionary) -> Dictionary:
 		"always": ask.get("always", false)}
 
 
-## The hands' ask: who she is, the situation, the standing instruction.
+## The hands' ask: who she is, the situation, what she sees around her,
+## the standing instruction.
 func stance_prompt() -> String:
-	return "%s\n%s\n%s" % [identity(), situation_text(), _instruction_line()]
+	var around := perception()
+	return "%s\n%s\n%s%s" % [identity(), situation_text(), around + "\n" if not around.is_empty() else "",
+		_instruction_line()]
 
 
 ## The voice's ask, as chat messages: the system message (her card, the
@@ -652,16 +657,13 @@ func stance_prompt() -> String:
 func voice_messages(asked := false) -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
-	var now: Array[String] = [voice_situation()]
-	var around := surroundings()
-	if not around.is_empty():
-		now.append(around)
-	now.append(doing())
+	var now: Array[String] = [voice_situation(), doing()]
 	if not standing_instruction().is_empty():
 		now.append("What %s asked of you still stands: %s" % [who, standing_instruction()])
 	now.append(run_summary(false))
-	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
-		VOICE_RULES % [who, who, who, who]]
+	var around := perception()
+	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
+		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who, who]]
 	if asked:
 		system += "\n\n" + VOICE_ASKED % [who, who, who, who, who]
 	var messages: Array[Dictionary] = [{"role": "system", "content": system}]
@@ -773,57 +775,260 @@ func voice_situation() -> String:
 	return " ".join(sentences)
 
 
-## What is worth noticing within SURROUNDINGS_RANGE paces that she can
-## see: fire, water, doors, crates, boulders, carts, ledges, torches, in a
-## sentence each, nearest first, the way she would put it ("Fire is burning
-## two paces to your left. A closed door is behind Jeff."); "" for nothing.
-## Fire, water, a ledge and a torch are told once each, the nearest.
-func surroundings() -> String:
+## What she can see around her, for the voice and the stance (the "around
+## you" block), as Net.perception has it: "list" (perception_list), "grid"
+## (perception_grid) or "both", the grid first. "" when the list has nothing.
+func perception() -> String:
+	match Net.perception:
+		"grid":
+			return perception_grid()
+		"both":
+			var listed := perception_list()
+			return perception_grid() + ("\n" + listed if not listed.is_empty() else "")
+	return perception_list()
+
+
+## What she can see (perceived), a line each, nearest first: "- an imp, 2
+## paces ahead to your left: between you and Jeff". "" for nothing.
+func perception_list() -> String:
+	var lines: Array[String] = []
+	for thing in perceived():
+		var paces: int = thing["paces"]
+		var where := "where you stand" if paces == 0 else "%d pace%s %s" % [paces, "" if paces == 1 else "s",
+			_direction(thing["point"])]
+		var relations: Array[String] = thing["relations"]
+		lines.append("- %s, %s%s" % [thing["word"], where, ": " + ", ".join(relations) if not relations.is_empty() else ""])
+	if lines.is_empty():
+		return ""
+	return "Around you, what you can see, nearest first:\n" + "\n".join(lines)
+
+
+## The things worth telling that she can see within PERCEPTION_RANGE paces,
+## at most PERCEPTION_MAX, nearest first, each {kind, word, at, point,
+## paces, relations, monster}: monsters, crates, boulders and carts, doors,
+## and the nearest cell each of fire, water, a stair and a ledge (what the
+## grid's key has). Monsters are chosen first, so ground never crowds out
+## the imp beside Jeff; then the nearest of the rest. Line of
+## sight decides (World.has_line_of_sight: walls and closed doors stop it,
+## higher ground sees over lower walls); a door is seen when a cell on
+## either side of it is. Relations are worked out here (relations_of), not
+## left to the model.
+func perceived() -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	var told_once: Dictionary[String, bool] = {}
-	var cells: Array[Vector2i] = []
-	for dy in range(-SURROUNDINGS_RANGE, SURROUNDINGS_RANGE + 1):
-		for dx in range(-SURROUNDINGS_RANGE, SURROUNDINGS_RANGE + 1):
-			cells.append(tile + Vector2i(dx, dy))
-	cells.sort_custom(_nearer)
-	for cell in cells:
-		if cell != tile and not World.has_line_of_sight(tile, cell):
+	for cell in _cells_within(PERCEPTION_RANGE):
+		if not _sees(cell):
 			continue
 		var kinds: Array[String] = []
 		if World.is_fire(cell):
 			kinds.append("fire")
 		if World.is_water(cell):
 			kinds.append("water")
-		if World.is_torch(cell):
-			kinds.append("torch")
-		if World.height_at(cell) == World.height_at(tile) and World.is_walkable(cell):
-			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				var beyond := cell + direction
-				if World.is_walkable(beyond) and World.height_step(cell, direction) != 0 \
-						and World.distance(tile, beyond) <= SURROUNDINGS_RANGE:
-					kinds.append("drop" if World.height_at(beyond) < World.height_at(cell) else "rise")
-					break
+		if World.stair_at(cell) != Vector2i.ZERO:
+			kinds.append("stair")
+		if World.is_walkable(cell) and _ledge_at(cell) != 0:
+			kinds.append("ledge")
 		for kind in kinds:
-			var once := "ledge" if kind in ["drop", "rise"] else kind
-			if not told_once.has(once):
-				told_once[once] = true
-				found.append({"kind": kind, "at": cell, "point": Vector2(cell)})
-		var thing := World.get_entity_at(cell)
-		if thing != null and thing.pushable and thing != self:
-			found.append({"kind": object_word(thing), "at": cell, "point": Vector2(cell)})
+			if not told_once.has(kind):
+				told_once[kind] = true
+				found.append(_thing(kind, cell, Vector2(cell)))
+		var entity := World.get_entity_at(cell)
+		if entity == null or entity == self or entity == keeper:
+			continue
+		if entity is Monster and entity.spawned:
+			var monster := _thing(kind_of(entity), cell, Vector2(cell))
+			monster["monster"] = true
+			found.append(monster)
+		elif entity.pushable:
+			found.append(_thing(object_word(entity), cell, Vector2(cell)))
 	for door: Door in World.get_doors():
 		var sides := Terrain.edge_cells(door.key)
 		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
-		if World.distance(tile, near) <= SURROUNDINGS_RANGE \
-				and (near == tile or World.has_line_of_sight(tile, near)):
-			var at := Vector2(sides[0] + sides[1]) / 2.0
-			found.append({"kind": "open door" if door.open else "closed door", "at": near, "point": at})
+		if World.distance(tile, near) <= PERCEPTION_RANGE and (_sees(sides[0]) or _sees(sides[1])):
+			found.append(_thing("open door" if door.is_open() else "closed door", near,
+				Vector2(sides[0] + sides[1]) / 2.0))
 	found.sort_custom(_nearer_found)
-	var sentences: Array[String] = []
-	for thing: Dictionary in found.slice(0, SURROUNDINGS_MAX):
-		var point: Vector2 = thing["point"]
-		sentences.append(_noticed(str(thing["kind"]), thing["at"], point))
-	return " ".join(sentences)
+	var chosen := found.filter(func(thing: Dictionary) -> bool: return thing["monster"]).slice(0, PERCEPTION_MAX)
+	chosen.append_array(found.filter(func(thing: Dictionary) -> bool: return not thing["monster"]) 		.slice(0, PERCEPTION_MAX - chosen.size()))
+	chosen.sort_custom(_nearer_found)
+	var things: Array[Dictionary] = []
+	things.assign(chosen)
+	return things
+
+
+## One thing seen: its words ("an imp", "fire", "a closed door"), how many
+## paces off, and where it is (relations_of).
+func _thing(kind: String, at: Vector2i, point: Vector2) -> Dictionary:
+	const WORDS := {"fire": "fire", "water": "water", "stair": "a stair"}
+	var word: String = WORDS.get(kind, ("an " if kind[0] in "aeiou" else "a ") + kind)
+	if kind == "ledge":
+		word = "a ledge, the ground dropping away" if _ledge_at(at) > 0 else "a ledge, the ground rising"
+	var paces := World.distance(tile, at)
+	if kind.ends_with("door"):
+		# From her to the middle of its edge, rounded up: a door on her own
+		# cell's edge is 1 pace off, one past the cell beside her 2.
+		paces = ceili(maxf(absf(point.x - tile.x), absf(point.y - tile.y)))
+	return {"kind": kind, "word": word, "at": at, "point": point, "paces": paces,
+		"relations": relations_of(at, point), "monster": false}
+
+
+## Where [param at] ([param point] for a door, its edge's middle) is, said
+## against her and her player: "adjacent to you", "between you and Jeff",
+## "behind Jeff", "next to Jeff", "where Jeff stands", "on the ledge above
+## you", "below you, down off the ledge"; none, or several. Measured from
+## [param point], so a door is adjacent only on the edge of her own cell.
+func relations_of(at: Vector2i, point: Vector2) -> Array[String]:
+	var relations: Array[String] = []
+	var her := Vector2(tile)
+	var reach := maxf(absf(point.x - her.x), absf(point.y - her.y))
+	if reach > 0.0 and reach <= 1.0:
+		relations.append("adjacent to you")
+	if _alive(keeper) and keeper.tile != tile:
+		var who := keeper_name()
+		var them := Vector2(keeper.tile)
+		var along := (point - her).dot(them - her) / (them - her).length_squared()
+		var off := point.distance_to(her + (them - her) * clampf(along, 0.0, 1.0))
+		var near_them := maxf(absf(point.x - them.x), absf(point.y - them.y))
+		if point == them:
+			relations.append("where %s stands" % who)
+		elif along > 0.0 and along < 1.0 and off <= 0.75 and point != her:
+			relations.append("between you and %s" % who)
+		elif along >= 1.0 and off <= 1.5:
+			relations.append("behind %s" % who)
+		elif near_them <= 1.0:
+			relations.append("next to %s" % who)
+	var rise := World.height_at(at) - World.height_at(tile)
+	if rise > 0:
+		relations.append("on the ledge above you")
+	elif rise < 0:
+		relations.append("below you, down off the ledge")
+	return relations
+
+
+## 1 where the ground drops away from [param cell] to a neighbour off a
+## ledge, -1 where it rises in one, 0 for neither (a stair is no ledge).
+static func _ledge_at(cell: Vector2i) -> int:
+	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_walkable(cell + direction) and not World.edge_blocks(cell, direction):
+			var step := World.height_step(cell, direction)
+			if step != 0:
+				return 1 if step > 0 else -1
+	return 0
+
+
+## The cells within [param reach] paces of her, nearest first.
+func _cells_within(reach: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			cells.append(tile + Vector2i(dx, dy))
+	cells.sort_custom(_nearer)
+	return cells
+
+
+func _sees(cell: Vector2i) -> bool:
+	return cell == tile or World.has_line_of_sight(tile, cell)
+
+
+## A map of the GRID_SIZE x GRID_SIZE cells around her, her at the centre,
+## north at the top, a character a cell (spaced, so each is a token of its
+## own), then the key. What she cannot see is "?". Walls and doors are
+## edges, not cells, so a wall is drawn on the cell behind it where she
+## sees its face (an unseen cell beside a seen one, across a wall or out in
+## the void), and a door on its doorway, the cell beyond it from her ("D"
+## closed, "d" open; the near cell if something stands in the doorway).
+func perception_grid() -> String:
+	var half := GRID_SIZE / 2
+	var me := _initial(_name_of(self), "@")
+	var them := ""
+	if _alive(keeper):
+		them = _initial(keeper_name(), "&")
+		if them == me:
+			them = "&"
+	var glyphs: Dictionary[Vector2i, String] = {}
+	for dy in range(-half, half + 1):
+		for dx in range(-half, half + 1):
+			var cell := tile + Vector2i(dx, dy)
+			glyphs[cell] = _ground_glyph(cell) if _sees(cell) else _unseen_glyph(cell)
+	for door: Door in World.get_doors():
+		var sides := Terrain.edge_cells(door.key)
+		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
+		var far: Vector2i = sides[1] if near == sides[0] else sides[0]
+		if not (_sees(near) or _sees(far)):
+			continue
+		var at := far if World.get_entity_at(far) == null else near
+		if glyphs.has(at) and World.get_entity_at(at) == null:
+			glyphs[at] = "d" if door.is_open() else "D"
+	var kinds: Array[String] = []
+	for cell: Vector2i in glyphs:
+		var entity := World.get_entity_at(cell)
+		if entity == null or not _sees(cell):
+			continue
+		if entity == self:
+			glyphs[cell] = me
+		elif entity == keeper:
+			glyphs[cell] = them
+		elif entity is Monster and entity.spawned:
+			var kind := kind_of(entity)
+			glyphs[cell] = kind[0]
+			if kind not in kinds:
+				kinds.append(kind)
+		elif entity.pushable:
+			glyphs[cell] = "o" if object_word(entity) == "boulder" else "c"
+	var rows: Array[String] = []
+	for dy in range(-half, half + 1):
+		var row: Array[String] = []
+		for dx in range(-half, half + 1):
+			row.append(glyphs[tile + Vector2i(dx, dy)])
+		rows.append(" ".join(row))
+	var key: Array[String] = ["%s you" % me]
+	if not them.is_empty():
+		key.append("%s %s" % [them, keeper_name()])
+	for kind: String in Level.MONSTER_TYPES:
+		if kind not in kinds:
+			kinds.append(kind)
+	for kind in kinds:
+		key.append("%s %s" % [kind[0], kind])
+	key.append_array(["f fire", "~ water", "# wall", "D closed door", "d open door", "c crate or cart", "o boulder",
+		"^ stair", "v drop to lower ground", ". floor", "? out of sight"])
+	return "A map of what you can see, you at the centre, north at the top, one character a pace:\n%s\nKey: %s." % [
+		"\n".join(rows), ", ".join(key)]
+
+
+## How [param cell] shows on the grid when she can see it.
+func _ground_glyph(cell: Vector2i) -> String:
+	if World.is_fire(cell):
+		return "f"
+	if World.is_water(cell):
+		return "~"
+	if not World.is_walkable(cell):
+		return "#"
+	if World.stair_at(cell) != Vector2i.ZERO:
+		return "^"
+	if World.height_at(cell) < World.height_at(tile) and _ledge_at(cell) < 0:
+		return "v"
+	return "."
+
+
+## How [param cell] shows when she cannot see it: "#" where she sees the
+## wall in front of it (from a neighbour she sees, across a wall edge or
+## into the void), "?" otherwise.
+func _unseen_glyph(cell: Vector2i) -> String:
+	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var from := cell + direction
+		if not _sees(from) or not (World.is_walkable(from) or World.is_water(from)):
+			continue
+		if World.edge_kind(from, -direction) == Terrain.Edge.WALL \
+				or not (World.is_walkable(cell) or World.is_water(cell)):
+			return "#"
+	return "?"
+
+
+## [param words]' first letter, upper case; [param otherwise] when that
+## would read as something in the grid's key.
+static func _initial(words: String, otherwise: String) -> String:
+	var letter := words.left(1).to_upper()
+	return otherwise if letter.is_empty() or letter == "D" or not letter.is_valid_identifier() else letter
 
 
 ## Crate, boulder or cart.
@@ -843,43 +1048,6 @@ func _nearer(a: Vector2i, b: Vector2i) -> bool:
 	if da != db:
 		return da < db
 	return (a - tile).length_squared() < (b - tile).length_squared()
-
-
-## One thing noticed, as a sentence: "Fire is burning two paces to your left."
-func _noticed(kind: String, at: Vector2i, point: Vector2) -> String:
-	const PACES: Array[String] = ["", "one pace", "two paces", "three paces", "four paces", "five paces"]
-	const SAYING := {
-		"fire": "Fire is burning", "water": "There is water", "torch": "A torch is lit",
-		"drop": "The ground drops away", "rise": "The ground rises in a ledge",
-		"crate": "A crate stands", "boulder": "A boulder sits", "cart": "A cart stands",
-		"open door": "An open door is", "closed door": "A closed door is",
-	}
-	if at == tile and kind in ["fire", "water", "torch"]:
-		return str({"fire": "You are standing in fire.", "water": "You are standing in water.",
-			"torch": "You are standing by a torch."}[kind])
-	var where := _where(point)
-	if where.is_empty():
-		var paces := World.distance(tile, at)
-		where = "%s %s" % ["just" if paces <= 1 else PACES[mini(paces, PACES.size() - 1)], _direction(point)]
-	return "%s %s." % [SAYING[kind], where]
-
-
-## "behind Jeff" or "beside Jeff" when that says where [param point] is
-## better than her own bearing does, else "".
-func _where(point: Vector2) -> String:
-	if not _alive(keeper):
-		return ""
-	var her := Vector2(tile)
-	var them := Vector2(keeper.tile)
-	var to_them := them - her
-	var to_it := point - her
-	if to_them.length() < 0.5 or point.distance_to(them) > 2.0:
-		return ""
-	if to_it.length() > to_them.length() + 0.4 and to_it.normalized().dot(to_them.normalized()) > 0.85:
-		return "behind %s" % keeper_name()
-	if point.distance_to(them) <= 1.5 and point.distance_to(them) < to_it.length() - 0.4:
-		return "beside %s" % keeper_name()
-	return ""
 
 
 ## Which way [param point] is from her, as she faces: "ahead of you", "to

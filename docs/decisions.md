@@ -969,3 +969,44 @@ the overlapping windows gives the conversation back, Jeff's lines
 included, for the days before. Rebuilt lines are marked off in the file
 and replaced on a rebuild, so it can be run any time without doubling
 what was written live.
+
+## 115. What she sees is a switch: list, grid or both
+
+Whether a small model understands a scene better from a list of things
+with their relations already worked out, or from a map it has to read
+itself, is a question for the model, not for us. So the "around you"
+block has three forms behind one flag (`--perception`, and live on the
+console), the same in the voice's ask and the stance's, and an eval that
+asks the real model. The list is the default: it is what the voice had
+before, in a richer form, and the cheapest in tokens.
+
+## 116. The list says where things are, so the model need not work it out
+
+Supersedes 111's "a sentence or two". Up to five things within six paces,
+each with paces, her bearing, and its relation to her and Jeff ("between
+you and Jeff", "behind Jeff", "on the ledge above you") computed by the
+server. A small model cannot do geometry from coordinates, but it can
+repeat a relation it is given. Monsters are chosen before ground: a ledge
+and a stair at her feet must not push the sneak next to Jeff off the end.
+Torches are left out, as they are of the grid's key.
+
+## 117. The grid draws walls and doors on cells
+
+The sim's walls and doors are thin, on the edges between cells; a
+character map has only cells. Drawing at double resolution would be a
+25 x 25 map, twice the tokens. Instead an unseen cell whose face she can
+see across a wall is drawn "#", and a door on its doorway, the cell beyond
+it from her ("D" closed, "d" open). Behind a wall she cannot see anyway,
+so nothing she could see is hidden; and the characters are spaced so
+each is its own token, or "....." reads as one.
+
+## 118. The perception eval scores against the sim, by keyword
+
+The truth for each question (what is next to her, where the nearest
+fire is, whether the nearest door is open, what is near Jeff) is worked
+out from the scene with the prompt's own line of sight, not written by
+hand, so a scene can be moved without its answers going stale. Keyword
+scoring is crude, but it is cheap, repeatable and needs no second model;
+an answer that names a thing as next to her when it is not fails, so
+reciting the whole list does not pass. It runs on the dev machine against
+the box's Ollama through a tunnel, so testing never means deploying.

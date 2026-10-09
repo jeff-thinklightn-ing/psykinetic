@@ -509,8 +509,8 @@ func _test_stance_events() -> void:
 	_check(mind.triggers("stance") == ["%s came up next to you." % imp.name], "one next to her: asked, in a sentence (%s)" % [mind.triggers("stance")])
 	_check(mind.voice_asks.is_empty(), "and no line for it")
 	var ask: Dictionary = mind.stance_asks.back()
-	_check(str(ask["user"]) == "%s\n%s\nNo standing instruction." % [pet.identity(), pet.situation_text()],
-			"the ask is who she is, the situation, the instruction, nothing else: %s" % ask["user"])
+	_check(str(ask["user"]) == "%s\n%s\n%s\nNo standing instruction." % [pet.identity(), pet.situation_text(), pet.perception()],
+			"the ask is who she is, the situation, what she sees, the instruction, nothing else: %s" % ask["user"])
 	mind.clear()
 	owner.hp = 9
 	World.step()
@@ -948,60 +948,101 @@ func _test_voice_in_world() -> void:
 
 
 func _test_surroundings() -> void:
-	print("\n== the voice: what is around her, nearest first, as she faces ==")
+	print("\n== what she sees: a list, nearest first, or a map; in the voice and the stance ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
 	_settle(pet)
-	# The test room's fire is (7..9, 5); its west door is between (4, 12) and (4, 13).
+	# The test room's fire is (6..8, 5); its west door is between (4, 12) and (4, 13).
 	_put(owner, Vector2i(11, 1))
 	_put(pet, Vector2i(7, 7))
 	pet.facing = Vector2i(0, -1)
-	var around := pet.surroundings()
-	_check(around.begins_with("Fire is burning two paces ahead of you."), "facing it: %s" % around)
+	var around := pet.perception_list()
+	_check(around.begins_with("Around you, what you can see, nearest first:\n- fire, 2 paces ahead of you"), "facing it: %s" % around)
 	pet.facing = Vector2i(1, 0)
-	around = pet.surroundings()
-	_check(around.begins_with("Fire is burning two paces to your left."), "facing east, it is to her left: %s" % around)
-	_check(around.count("Fire") == 1, "the fire told once, though it is three cells")
-	pet.facing = Vector2i(0, 1)
-	_check(pet.surroundings().begins_with("Fire is burning two paces behind you."), "and behind her facing away")
+	around = pet.perception_list()
+	_check("- fire, 2 paces to your left" in around, "facing east, it is to her left: %s" % around)
+	_check(around.count("fire") == 1, "the fire told once, though it is three cells")
+	_check(around.split("\n").size() - 1 <= Companion.PERCEPTION_MAX, "five things at most")
+	var far_imp := _spawn_imp(Vector2i(7, 1))
+	around = pet.perception_list()
+	_check(around.ends_with("- an imp, 6 paces to your left") and around.split("\n").size() - 1 == Companion.PERCEPTION_MAX,
+		"a monster is never crowded out by nearer crates: %s" % around)
+	World.damage(far_imp, 999)
 	_put(pet, Vector2i(8, 5))
-	_check(pet.surroundings().begins_with("You are standing in fire."), "standing in it: %s" % pet.surroundings())
+	_check("- fire, where you stand" in pet.perception_list(), "standing in it: %s" % pet.perception_list())
 	_put(pet, Vector2i(4, 11))
 	_put(owner, Vector2i(4, 12))
 	pet.facing = Vector2i(0, 1)
 	var door := World.door_across(Vector2i(4, 12), Vector2i(0, 1))
-	var state := "open" if door != null and door.open else "closed"
-	around = pet.surroundings()
-	_check(("A %s door is behind Player." % state) in around, "a door past her player: behind them (%s)" % around)
-	_check(around.split(". ").size() <= Companion.SURROUNDINGS_MAX, "two sentences at most")
+	World._set_door(door, false, owner)
+	around = pet.perception_list()
+	_check("- a closed door, 2 paces ahead of you: behind Player
+" in around + "
+", "a door past her player: behind them (%s)" % around)
+	var grid := pet.perception_grid()
+	var rows := grid.split("\n")
+	_check(rows.size() == Companion.GRID_SIZE + 2, "the map: a heading, 13 rows, the key (%d lines)" % rows.size())
+	_check(rows[1].split(" ").size() == Companion.GRID_SIZE, "13 to a row: %s" % rows[1])
+	var centre := Companion.GRID_SIZE / 2
+	var at := func(dx: int, dy: int) -> String: return rows[1 + centre + dy].split(" ")[centre + dx]
+	# Pip and Player share a letter: he is "&".
+	_check(at.call(0, 0) == "P" and at.call(0, 1) == "&", "her at the centre, her player below: %s" % grid)
+	_check(at.call(0, 2) == "D" and at.call(0, 3) == "?", "the closed door in its doorway, nothing seen past it")
+	_check(at.call(0, -1) == "#", "the wall at her back")
+	_check(rows[-1].begins_with("Key: P you, & Player, i imp, b brute"), "and the key: %s" % rows[-1])
+	World._set_door(door, true, owner)
+	_check(pet.perception_grid().split("\n")[1 + centre + 2].split(" ")[centre] == "d", "an open door is d")
+	_check("- an open door" in pet.perception_list(), "and open in the list")
+	World._set_door(door, false, owner)
 	_put(pet, Vector2i(8, 7))
 	_put(owner, Vector2i(10, 7))
 	pet.facing = Vector2i(0, 1)
+	var imp := _spawn_imp(Vector2i(9, 7))
 	var crate: GridEntity = _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "TestCrate", "tile": Vector2i(6, 7)})
-	around = pet.surroundings()
-	_check("A crate stands two paces to your right." in around, "a crate, by her bearing: %s" % around)
+	around = pet.perception_list()
+	_check("- an imp, 1 pace to your left: adjacent to you, between you and Player" in around,
+		"an imp between them: %s" % around)
+	_check("- a crate, 2 paces to your right" in around, "a crate, by her bearing: %s" % around)
+	grid = pet.perception_grid()
+	_check(grid.split("\n")[1 + centre].split(" ").slice(centre - 2, centre + 3) == PackedStringArray(["c", ".", "P", "i", "&"]),
+		"on the map too: %s" % grid.split("\n")[1 + centre])
+	World.damage(imp, 999)
 	World.despawn(crate)
 	crate.queue_free()
 	_put(pet, Vector2i(16, 11))
 	_put(owner, Vector2i(17, 11))
-	_check(pet.surroundings() == "", "nothing worth telling in an empty corner")
+	_check(pet.perception_list() == "", "nothing worth telling in an empty corner")
 	var prompt := pet.voice_prompt("test")
 	_check("If you don't know what something is, say so." in prompt, "and she is told to say when she does not know a thing")
 	_put(pet, Vector2i(7, 7))
 	pet.facing = Vector2i(0, -1)
-	_check(pet.surroundings() in pet.voice_prompt("test"), "what is around her is in the voice's now")
+	_check(pet.perception_list() in pet.voice_prompt("test") and pet.perception_list() in pet.stance_prompt(),
+		"the list is in the voice's ask and the stance's (by default)")
+	Net.perception = "grid"
+	_check(pet.perception_grid() in pet.voice_prompt("test") and "Around you" not in pet.voice_prompt("test")
+		and pet.perception_grid() in pet.stance_prompt(), "--perception=grid: the map instead")
+	Net.perception = "both"
+	prompt = pet.voice_prompt("test")
+	_check(prompt.find("A map of what you can see") != -1 and prompt.find("A map of what you can see") < prompt.find("Around you"),
+		"--perception=both: the map, then the list")
+	Net.perception = "list"
 	# Heights and torches, on a level of their own.
 	World._set_terrain({"floor": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
 		"fire": [], "edges": {}, "heights": {Vector2i(2, 0): 1, Vector2i(2, 1): 1}, "torches": [Vector2i(0, 1)]})
 	var was := pet.tile
 	pet.tile = Vector2i(0, 0)
 	pet.facing = Vector2i(1, 0)
-	var ledge := pet.surroundings()
+	var ledge := pet.perception_list()
+	var above := pet.relations_of(Vector2i(2, 0), Vector2(2, 0))
+	pet.tile = Vector2i(2, 0)
+	var below := pet.perception_grid().split("\n")[1 + centre].split(" ")[centre - 1]
 	pet.tile = was
 	World._set_terrain(_main._terrain)
-	_check("The ground rises in a ledge" in ledge and "A torch is lit just to your right." in ledge,
-			"a ledge and a torch: %s" % ledge)
+	_check("- a ledge, the ground rising, 1 pace ahead of you: adjacent to you" in ledge and "torch" not in ledge,
+		"a ledge (and no torch: the map has none either): %s" % ledge)
+	_check("on the ledge above you" in above, "higher ground: on the ledge above her (%s)" % [above])
+	_check(below == "v", "and from up there, the drop on the map (%s)" % below)
 	_settle(pet)
 
 
