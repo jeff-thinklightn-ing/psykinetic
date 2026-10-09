@@ -3,6 +3,14 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.54
+
+Packaging. Client.
+
+- The client no longer carries development scratch files it never used.
+
+The server must be updated to v0.1.54 too, as it refuses any other version.
+
 ## v0.1.53
 
 Levels from pixel maps. Server and client.

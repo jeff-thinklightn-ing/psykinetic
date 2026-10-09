@@ -917,3 +917,9 @@ records the map, so a restart resumes there.
 Not walkable, but nothing is built along it and sight crosses it, so a
 lake reads as open country, not a room; a body pushed to its edge stops
 there, unhurt.
+
+## 109. The exports leave out build/
+
+build/ holds the release output and scratch scenes; "all resources" swept
+the scratch scripts into the client's pck. Both presets now exclude
+build/*.
