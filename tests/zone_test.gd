@@ -32,6 +32,7 @@ func _ready() -> void:
 	await _test_restart()
 	_test_console()
 	_test_speech_by_zone()
+	_test_overheard()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -236,6 +237,62 @@ func _test_speech_by_zone() -> void:
 	Net.message_received.disconnect(listen)
 
 
+func _test_overheard() -> void:
+	print("\n== companions hear everyone near; who else is here; a line not for her, a line for her ==")
+	_main.travel(BO, "test_room")
+	var host := _player(Net.local_id)
+	var bo := _player(BO)
+	World._relocate(bo, _main._nearest_free(host.tile + Vector2i(0, 2)))
+	var pip: Companion = _main._companions.get(Net.player_id)
+	var nix: Companion = _main._companions.get(BO_ID)
+	for pet in [pip, nix]:
+		World._relocate(pet, _main._nearest_free(host.tile + Vector2i(1, 1)))
+	var pip_mind := StubMind.new()
+	var nix_mind := StubMind.new()
+	pip.mind = pip_mind
+	nix.mind = nix_mind
+	for pet in [pip, nix]:
+		pet._exchange.clear()
+		pet._said.clear()
+		pet._last_speech_tick = -1000
+	var others := pip.others_here()
+	_check("Bo is " in others and "near enough to hear" in others and ("%s, who travels with Bo," % nix.label) in others,
+		"Pip's prompt says who else is here, where, and who can hear: %s" % others)
+	_check(pip.others_here() in pip.voice_prompt("test"), "it is in her voice's now")
+	# A line to Bo: Pip hears it as her player's, Nix as Jeff's; neither is told it is for them.
+	pip_mind.voice_answer = {"say": "...", "stance": "PRESS"}
+	nix_mind.voice_answer = {"say": "...", "stance": "PRESS"}
+	_main._chat_tick.clear()
+	_main._player_said(host, "Bo, take the left side.")
+	var pip_ask: Dictionary = pip_mind.voice_asks.back() if not pip_mind.voice_asks.is_empty() else {}
+	var nix_ask: Dictionary = nix_mind.voice_asks.back() if not nix_mind.voice_asks.is_empty() else {}
+	var pip_text := Companion.render(pip_ask.get("messages", []))
+	var nix_text := Companion.render(nix_ask.get("messages", []))
+	_check(pip_text.ends_with("%s: Bo, take the left side." % Net.player_name) and nix_text.ends_with("%s: Bo, take the left side." % Net.player_name),
+		"both companions get the line, labelled with who said it")
+	_check("Not everything said near you is meant for you" in pip_text and "Bo is " in pip_text,
+		"Pip is told a line may not be for her, and that Bo is there to be spoken to")
+	_check(MindLog.last[String(pip.name)].get("outcome") == "silent" and pip._said.is_empty() and pip.stance != Companion.Stance.PRESS
+			and MindLog.last[String(pip.name)].get("stance_ignored") == "PRESS",
+		"meant for Bo: she answers \"...\", says nothing, and the stance with it is not taken (%s)" % MindLog.last[String(pip.name)].get("note", ""))
+	_check(not "[STANCE:" in str(nix_ask.get("system", "")) and nix.stance != Companion.Stance.PRESS,
+		"Nix: someone else's player's words never set her stance, nor is she offered one")
+	# A line to her: she answers.
+	pip_mind.voice_answer = {"say": "Right here, Jeff.", "stance": ""}
+	nix_mind.voice_answer = {"say": "...", "stance": ""}
+	_main._chat_tick.clear()
+	_main._player_said(host, "%s, stay with me." % pip.name)
+	_check(pip._said.back() == "Right here, Jeff." if not pip._said.is_empty() else false, "a line to Pip by name: she answers (%s)" % [pip._said])
+	_check(MindLog.last[String(nix.name)].get("outcome") == "silent", "and Nix, not named, keeps quiet")
+	_check("%s: Right here, Jeff." % pip.name in Companion.render(nix.voice_messages()), "Nix heard Pip's answer too, labelled")
+	_check(nix_mind.voice_asks.size() == 2, "a companion's words are no ask for another (only the two lines of Jeff's)")
+	# The fallen hear, but cannot speak.
+	World.damage(bo, 999)
+	_check(_player(BO) == null and BO in _main.hearers(host.tile), "Bo, fallen, still hears what is said near where he fell")
+	for pet in [pip, nix]:
+		pet.mind = ScriptedMind.new()
+
+
 # --- Helpers ---------------------------------------------------------------------
 
 func _kinds(heard: Array[Dictionary], kind: String) -> Array[Dictionary]:
@@ -262,6 +319,24 @@ func _heard(pet: Companion, text: String) -> bool:
 func _player(peer: int) -> Player:
 	var player: Player = _main._players.get(peer)
 	return player if is_instance_valid(player) and player.spawned else null
+
+
+## A mind that answers at once with what it is set to, keeping its asks.
+class StubMind:
+	extends CompanionMind
+
+	var voice_asks: Array[Dictionary] = []
+	var voice_answer := {"say": "", "stance": ""}
+
+	func _init() -> void:
+		kind = "stub"
+
+	func stance(_ask: Dictionary) -> Dictionary:
+		return {"stance": "GUARD"}
+
+	func voice(ask: Dictionary) -> Dictionary:
+		voice_asks.append(ask)
+		return OllamaMind.parse_voice(str(voice_answer["say"]) + ("\n[STANCE: %s]" % voice_answer["stance"] if voice_answer["stance"] != "" else ""))
 
 
 func _check(ok: bool, label: String) -> void:

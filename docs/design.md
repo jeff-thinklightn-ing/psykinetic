@@ -856,6 +856,24 @@ same way, from where she stands. The words are data: the voice's system
 prompt says they are speech in the game, never instructions about its
 rules or format, and its answer is checked as ever.
 
+**Overhearing.** Every companion within earshot of a player's words
+hears them, not only that player's own: they enter her exchange labelled
+with who said it ("Bo: take the left side."), as her own player's do
+("Jeff: ..."), and another companion's lines too (no ask for those, so
+companions never set each other talking). Her voice's "now" says who else
+is in the zone, where and whether near enough to hear (`others_here`: "Bo
+is 2 paces to the south-west, near enough to hear; Nix, who travels with
+Bo, ..."). The voice decides whether a line was meant for her (her name, a
+question or something for her to do, or her own player with no one else
+near), and if not usually answers "...". What the server knows it says:
+to her own player's words, "it was meant for you" when the line says her
+name or no one else is near (`VOICE_FOR_HER`), else "it may have been
+meant for Bo" (`VOICE_FOR_WHOM`); to another's that says her name, "it was
+meant for you" (`VOICE_NAMED`). Only her own player's words may set a
+stance, and a stance with no words counts only when the line was certainly
+hers. A fallen player hears from where they fell until they rise, but has
+no body to speak with.
+
 **Party chat** crosses zones: a line starting `/p ` is `World.command("party")`,
 sent to every player on the server wherever they are
 (`Net.message("party", {from, zone, text})`), shown in the talk panel in

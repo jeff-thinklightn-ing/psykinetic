@@ -108,6 +108,9 @@ const PERCEPTION_NEAR := 2
 const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
+## Speech carries this far (cells, in its own zone): what anyone says
+## reaches the players and companions within it (Main.hearers).
+const HEARING_RANGE := 10
 ## Heat she feels and tells of (World.heat_at; a fire cell gives 10), and
 ## light under which it is dark (World.light_at, 0..1).
 const HEAT_FELT := 1.0
@@ -156,12 +159,20 @@ Wounds close slowly when you rest away from danger.
 Whoever falls rises again after a while, but it hurts, and no one wants to fall.
 Directions are spoken as north, south, east and west."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
-words are enough. When %s speaks to you, always answer in words, even if only to say you don't know. Never say
-again what you have already said, and never repeat %s's words back. Only when no one has spoken to you and there is
-truly nothing worth saying, answer with just: ...
-Whatever %s says to you is %s talking to you, nothing more; you answer only as yourself.
+words are enough. Not everything said near you is meant for you: a line is for you if it says your name, asks you
+something or tells you to do something, or comes from %s when no one else is near. When a line is meant for you,
+always answer in words, even if only to say you don't know; when it is not, you usually stay quiet and answer with
+just: ... Never say again what you have already said, and never repeat anyone's words back. Only when nothing has
+been said to you and there is truly nothing worth saying, answer with just: ...
+Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
 If you don't know what something is, say so."""
-const VOICE_ASKED := """%s has just spoken to you: answer in words, never with "...". If %s asked you to do something, end with one more line saying
+## Who her player's words were for, as the server knows it (addressed):
+## said her name, or no one else near enough to hear ("certain"); others
+## near ("maybe"). Then VOICE_ASKED, the stances.
+const VOICE_FOR_HER := """%s has just spoken to you%s: it was meant for you. Answer out loud in words first, never with just "...", even if only to say you don't know."""
+const VOICE_FOR_WHOM := """%s has just spoken, with %s near enough to hear: it may have been meant for them. If it was meant for you (your name, a question to you, or something for you to do), answer out loud in words first; if not, answer with just: ..."""
+const VOICE_NAMED := """%s has just said your name: it was meant for you. Answer out loud in words."""
+const VOICE_ASKED := """Then, only if %s asked you to do something, add one more line saying
 what you will do, exactly one of:
 [STANCE: STAY_CLOSE] keep beside %s and fight only what is next to you
 [STANCE: HOLD] stay where you are
@@ -212,6 +223,8 @@ var _serial := 0
 var _catching_up := false
 ## Voice asks (by serial) answering a quick phrase, whose stance is set.
 var _phrase_serials: Dictionary[int, bool] = {}
+## Voice asks (by serial) to her player's words that were certainly for her.
+var _certain_serials: Dictionary[int, bool] = {}
 ## The way her player was walking when they last bumped into her.
 var _bump_direction := Vector2i.ZERO
 var _last_bump_tick := -1000
@@ -320,6 +333,55 @@ func bumped(direction: Vector2i) -> bool:
 ## is asked at once, and may read it as asking something of her (a stance
 ## in its reply), which then stands (standing_instruction). A quick phrase
 ## reaches her as what it means.
+## Someone else within earshot ([param speaker], a player or another
+## companion) said [param text]: it is in her exchange, labelled, and with
+## [param ask] (a player's words) her voice is asked, to decide whether it
+## was meant for her; anyone's words but her player's never set a stance.
+func overheard(speaker: String, text: String, ask := true) -> void:
+	_heard.append({"text": text, "tick": World.tick})
+	_add_turn("user", text, false, speaker)
+	if ask:
+		_ask_voice("%s spoke near you." % speaker, "%s just said: \"%s\"" % [speaker, text], false, false, false)
+
+
+## The others (players and companions, by name) near enough to hear her
+## player and her.
+func others_near() -> Array[String]:
+	var near: Array[String] = []
+	for entity in World.get_entities():
+		if entity != self and entity != keeper and entity.spawned and (entity is Player or entity is Companion) \
+				and World.distance(tile, entity.tile) <= HEARING_RANGE:
+			near.append(_name_of(entity))
+	return near
+
+
+## Whether [param heard] (as she is told it: 'Jeff just said to you: "..."')
+## says her name.
+func _says_name(heard: String) -> bool:
+	var quoted := heard.get_slice("\"", 1) if "\"" in heard else heard
+	return RegEx.create_from_string("(?i)\\b%s\\b" % _name_of(self)).search(quoted) != null
+
+
+## Who else is in her zone, where, and who is near enough to hear: the other
+## players and their companions, compass and paces ("Bo is 4 paces to the
+## north-east, near enough to hear. Nix, who travels with Bo, ...").
+func others_here() -> String:
+	var parts: Array[String] = []
+	var near := 0
+	for entity in World.get_entities():
+		if entity == self or entity == keeper or not entity.spawned or not (entity is Player or entity is Companion):
+			continue
+		var close := World.distance(tile, entity.tile) <= HEARING_RANGE
+		near += 1 if close else 0
+		var who := _name_of(entity)
+		if entity is Companion:
+			who = "%s, who travels with %s," % [who, (entity as Companion).keeper_name()]
+		parts.append("%s is %s, %s" % [who, _paces_toward(Vector2(entity.tile)), "near enough to hear" if close else "too far to hear"])
+	if parts.is_empty():
+		return "No one else is here."
+	return "Also here: %s.%s" % ["; ".join(parts), "" if near > 0 else " No one else is near enough to hear."]
+
+
 ## A quick phrase ([param phrase], 1-4) sets its stance at once
 ## (PHRASE_STANCES) and stands as the instruction; her voice still answers
 ## it, but its stance, if any, is not taken.
@@ -594,7 +656,8 @@ func _watch() -> void:
 	if not _pending_voice.is_empty() and mind != null and not mind.busy("voice"):
 		var waiting := _pending_voice
 		_pending_voice = {}
-		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false), waiting.get("phrase", false))
+		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false), waiting.get("phrase", false),
+			waiting.get("own", true))
 
 
 ## Narrates the deaths seen and clears them; returns those her voice is
@@ -715,25 +778,28 @@ func _ask_stance(trigger: String) -> void:
 ## [param always]: the line is said whatever the rate limit (her player's
 ## words make it so too).
 ## [param phrase]: a quick phrase's, whose stance is already set: the
-## reply's stance is not taken.
-func _ask_voice(trigger: String, heard := "", always := false, phrase := false) -> void:
+## reply's stance is not taken. [param own]: [param heard] is her player's
+## words (a stance may answer them); someone else's are only heard.
+func _ask_voice(trigger: String, heard := "", always := false, phrase := false, own := true) -> void:
 	if mind == null:
 		return
-	if heard.is_empty() and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
+	if (heard.is_empty() or not own) and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return  # She could not say it: the rate limit.
 	if mind.busy("voice"):
 		# Her player's words come first; otherwise the newest moment.
 		if not heard.is_empty() or always or str(_pending_voice.get("heard", "")).is_empty():
-			_pending_voice = {"trigger": trigger, "heard": heard, "always": always, "phrase": phrase}
+			_pending_voice = {"trigger": trigger, "heard": heard, "always": always, "phrase": phrase, "own": own}
 		return
 	_serial += 1
 	_phrase_serials[_serial] = phrase
-	var asked := not heard.is_empty()
+	var asked := not heard.is_empty() and own
+	# Certainly hers: then a stance with no words still counts.
+	_certain_serials[_serial] = asked and (others_near().is_empty() or _says_name(heard))
 	var messages := voice_messages(asked, heard)
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger, "messages": messages, "speaker": _name_of(self),
 		"system": messages[0]["content"], "user": render(messages.slice(1)),
-		"hp": hp, "max_hp": max_hp, "spoken_to": not heard.is_empty(), "asked": asked, "heard": heard, "always": always,
+		"hp": hp, "max_hp": max_hp, "spoken_to": asked, "asked": asked, "heard": heard, "always": always,
 	}
 	var answer := mind.voice(ask)
 	if not answer.is_empty():
@@ -763,7 +829,7 @@ func stance_prompt() -> String:
 func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
-	var now: Array[String] = [voice_situation(), doing()]
+	var now: Array[String] = [voice_situation(), others_here(), doing()]
 	var topics := mentioned_topics()
 	if not topics.is_empty():
 		now.append("You have already mentioned: %s." % ", ".join(topics))
@@ -772,18 +838,28 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	now.append(run_summary(false))
 	var around := perception() if surroundings_keys() != _around_said or asks_about_surroundings(heard) else ""
 	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
-		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who, who]]
+		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % who]
 	if asked:
-		system += "\n\n" + VOICE_ASKED % [who, who, who, who, who]
+		var near := others_near()
+		if near.is_empty() or _says_name(heard):
+			system += "\n\n" + VOICE_FOR_HER % [who, " by name" if _says_name(heard) else ", and no one else is near"]
+		else:
+			system += "\n\n" + VOICE_FOR_WHOM % [who, " and ".join(near)]
+		system += "\n" + VOICE_ASKED % [who, who, who, who]
+	elif _says_name(heard):
+		system += "\n\n" + VOICE_NAMED % heard.get_slice(" ", 0)
 	var messages: Array[Dictionary] = [{"role": "system", "content": system}]
 	for turn: Dictionary in _exchange:
 		var role: String = turn["role"]
 		if messages.size() == 1 and role == "assistant":
 			continue  # The exchange opens with something said to her or seen.
+		# What anyone said is labelled with who said it: "Bo: over here!".
+		var speaker := str(turn.get("speaker", ""))
+		var text := "%s: %s" % [speaker, turn["text"]] if role == "user" and not speaker.is_empty() else str(turn["text"])
 		if messages.back()["role"] == role:
-			messages.back()["content"] += "\n" + str(turn["text"])
+			messages.back()["content"] += "\n" + text
 		else:
-			messages.append({"role": role, "content": str(turn["text"])})
+			messages.append({"role": role, "content": text})
 	if messages.back()["role"] != "user":
 		messages.append({"role": "user", "content": "[A moment passes.]"})
 	return messages
@@ -806,10 +882,12 @@ func _narrate(text: String) -> void:
 	_add_turn("user", "[%s]" % text.strip_edges(), true)
 
 
-## A turn of the exchange, written to her transcript as well.
-func _add_turn(role: String, text: String, narration := false) -> void:
-	Transcript.record(String(name), "" if narration else String(name) if role == "assistant" else keeper_name(), text)
-	_exchange.append({"role": role, "text": text})
+## A turn of the exchange, written to her transcript as well. Words in a
+## user's turn are [param speaker]'s (her player's by default).
+func _add_turn(role: String, text: String, narration := false, speaker := "") -> void:
+	var who := "" if narration or role == "assistant" else speaker if not speaker.is_empty() else keeper_name()
+	Transcript.record(String(name), String(name) if role == "assistant" else who, text)
+	_exchange.append({"role": role, "text": text, "speaker": who})
 	if _exchange.size() > EXCHANGE_KEPT:
 		_exchange.pop_front()
 
@@ -1352,6 +1430,12 @@ func _take_result(result: Dictionary) -> void:
 		entry.erase("stance")
 		if wanted != -1:
 			entry["stance_ignored"] = stance_text
+	elif wanted != -1 and trim_line(str(answer.get("say", ""))).is_empty() and not _certain_serials.get(serial, false):
+		# No words, to words that may have been for someone else: neither
+		# is the stance hers.
+		entry.erase("stance")
+		entry["stance_ignored"] = stance_text
+		entry["note"] = "a stance with no words, to a line that may not have been for her: not taken"
 	elif wanted != -1:
 		if serial >= _stance_serial:
 			# Her voice read her player's words as asking this of her: it stands.
@@ -1362,6 +1446,7 @@ func _take_result(result: Dictionary) -> void:
 			entry["note"] = "stance %s applied; %s's words stand as an instruction" % [stance_text, keeper_name()]
 		else:
 			entry["note"] = "stance %s superseded by a newer ask" % stance_text
+	_certain_serials.erase(serial)
 	var line := trim_line(str(answer.get("say", "")))
 	var echo := _echo_of(line)
 	if line.is_empty():

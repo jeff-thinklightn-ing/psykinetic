@@ -490,7 +490,7 @@ func _test_quick_phrases() -> void:
 	_check(_main.hint_panel.visible == shown, "and shows it again")
 	_check(is_equal_approx(HudCompass.RADIUS * 2.0, 220.0), "the compass is 220 HUD units across: about 110 px at 1080p")
 	var log_size: int = _main.party_log.size()
-	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
+	mind.voice_answer = {"say": "Right.", "stance": "PULL_BACK"}
 	var key := InputEventKey.new()
 	key.keycode = KEY_2
 	key.pressed = true
@@ -676,7 +676,7 @@ func _test_stance_events() -> void:
 	_check("[Sneak fell.]" in str(mind.voice_asks.back()["user"]), "the voice sees it as narration: [Sneak fell.]")
 	# Words ask the voice only; for 60 ticks after an instruction only an hp threshold asks the hands.
 	mind.clear()
-	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
+	mind.voice_answer = {"say": "Right.", "stance": "STAY_CLOSE"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
 	mind.voice_answer = {"say": "", "stance": ""}
 	_check(mind.stance_asks.is_empty() and mind.triggers("voice") == ["Player just spoke to you."],
@@ -787,7 +787,7 @@ func _test_owner_speaks() -> void:
 	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"%s\"" % [pet.name, said], "the party log: %s" % [lines])
 	var entry: Dictionary = MindLog.last[String(pet.name)]
 	_check(entry["kind"] == "voice" and entry["trigger"] == "Player just spoke to you."
-			and (str(entry["prompt"]).ends_with("\n" + said) or str(entry["prompt"]).ends_with("user: " + said)),
+			and (str(entry["prompt"]).ends_with("\nPlayer: " + said) or str(entry["prompt"]).ends_with("user: Player: " + said)),
 			"her voice is asked at once, the words as Player's turn (trigger: %s)" % entry["trigger"])
 	_check(pet.stance == Companion.Stance.GUARD, "the words set nothing by themselves (%s)" % pet.stance_name())
 	_check("%s said: \"Hm?\"" % pet.name in lines, "she answers, and that is logged: %s" % [lines])
@@ -887,7 +887,7 @@ func _test_lapse() -> void:
 	pet.mind = mind
 	var foe := _foe_nearby(pet)
 	World.step()
-	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
+	mind.voice_answer = {"say": "Right.", "stance": "STAY_CLOSE"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
 	_check(pet.stance == Companion.Stance.STAY_CLOSE and not pet.standing_instruction().is_empty(), "Stay back!: STAY_CLOSE, standing")
 	mind.clear()
@@ -909,7 +909,7 @@ func _test_lapse() -> void:
 	World.step()
 	for i in 21:
 		World.step()
-	mind.voice_answer = {"say": "", "stance": "STAY_CLOSE"}
+	mind.voice_answer = {"say": "Right.", "stance": "STAY_CLOSE"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
 	mind.clear()
 	mind.stance_answer = {"stance": "STAY_CLOSE"}
@@ -971,7 +971,7 @@ func _test_her_own_lapse() -> void:
 	for i in 21:
 		World.step()
 	var foe := _foe_nearby(pet)
-	mind.voice_answer = {"say": "", "stance": "HOLD"}
+	mind.voice_answer = {"say": "Right.", "stance": "HOLD"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
 	mind.voice_answer = {"say": "", "stance": ""}
 	mind.clear()
@@ -993,7 +993,7 @@ func _test_voice_stance_only_to_words() -> void:
 	_settle(pet)
 	var mind := CountingMind.new()
 	pet.mind = mind
-	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
+	mind.voice_answer = {"say": "Right.", "stance": "PULL_BACK"}
 	pet.note_death("Sneak")
 	World.step()
 	var entry: Dictionary = MindLog.last[String(pet.name)]
@@ -1186,8 +1186,9 @@ func _test_surroundings() -> void:
 	_check(pet.perception_list() == "", "nothing worth telling in an empty corner")
 	var prompt := pet.voice_prompt("test")
 	_check("If you don't know what something is, say so." in prompt, "and she is told to say when she does not know a thing")
-	_check("Only when no one has spoken to you" in prompt, "silence only when no one spoke to her")
-	_check("answer in words, never with \"...\"" in pet.voice_prompt("test", "Is the door open?"),
+	_check("Only when nothing has\nbeen said to you" in prompt and "Not everything said near you is meant for you" in prompt,
+			"silence only when nothing was said to her, or it was not meant for her")
+	_check("Answer out loud in words first, never with just \"...\"" in pet.voice_prompt("test", "Player just said to you: \"Is the door open?\""),
 		"and spoken to, she is told to answer in words")
 	_put(pet, Vector2i(7, 7))
 	pet.facing = Vector2i(0, -1)
@@ -1659,7 +1660,7 @@ func _test_standing_instruction() -> void:
 	_check("[STANCE: HOLD]" in str(mind.voice_asks.back()["system"]), "though her voice was asked whether it asks something of her")
 	for i in 21:
 		World.step()
-	mind.voice_answer = {"say": "", "stance": "PULL_BACK"}
+	mind.voice_answer = {"say": "Right.", "stance": "PULL_BACK"}
 	_main._on_command(owner, "say", {"text": "Stay back!"})
 	mind.voice_answer = {"say": "", "stance": ""}
 	_check(pet.standing_instruction() == "Player wants you to stay back.", "her voice answered with a stance: it stands (%s)" % pet.standing_instruction())

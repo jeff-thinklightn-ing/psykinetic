@@ -1138,3 +1138,15 @@ she hears her player only from as close; each zone keeps its own party
 log. What players need to say across zones is party chat, `/p`, marked and
 coloured apart, and kept from the companions: it is the players talking,
 not anything said in her world.
+
+## 134. Companions overhear; the server says what it knows of whom a line is for
+
+With two players together, every word was her own player's to her, so
+"Bo, take the left side" was an order to Pip. Now everyone's words within
+earshot reach every companion there, labelled by speaker, and her voice
+decides whether a line was for her. Left wholly to the model, she went
+quiet even when Jeff, alone with her, asked a question (5 of 5) and gave a
+bare stance with no words when named (5 of 5); so the facts the server has,
+her name in the line and who else is near enough to hear, go into the ask
+as facts. Run against qwen3:14b: a line to Bo, silent 5/5; "Pip, stay with
+me", answered 5/5; Jeff's question with no one near, answered 5/5.

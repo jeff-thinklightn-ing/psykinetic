@@ -197,6 +197,8 @@ static func exchange_in(prompt: String, companion: String, known_keeper := "") -
 				lines.append("%s: %s" % [companion, text])
 			elif text.begins_with("["):
 				lines.append(text)
+			elif RegEx.create_from_string("^[^\\[:][^:]{0,30}: ").search(text) != null:
+				lines.append(text)  # Labelled with its speaker already (from v0.1.66).
 			elif not keeper.is_empty():
 				lines.append("%s: %s" % [keeper, text])
 	return lines

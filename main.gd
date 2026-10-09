@@ -113,7 +113,7 @@ var party_log := PartyLog.new()
 ## Speech carries this far (cells, in its own zone): chat and a companion's
 ## lines reach the players within it, and a companion hears her player's
 ## words only from this close.
-const HEARING_RANGE := 10
+const HEARING_RANGE := Companion.HEARING_RANGE
 ## A chat line that starts with this is party chat: to every player on the
 ## server, whatever their zone; no companion hears it.
 const PARTY_PREFIX := "/p "
@@ -207,6 +207,9 @@ var spawner: MultiplayerSpawner
 ## (a despawn that is no death).
 var _view_zone := ""
 var _travelling := false
+## Where each fallen player fell (peer -> cell), till they rise: they hear
+## from there.
+var _fell_at: Dictionary[int, Vector2i] = {}
 @onready var cursor: Polygon2D = $Cursor
 @onready var ripple: ClickRipple = $Ripple
 @onready var camera: Camera2D = $Camera
@@ -1522,6 +1525,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		World.peer_zone[peer] = World.zone.name
 	_players[peer] = player
 	_peer_ids[peer] = id
+	_fell_at.erase(peer)
 	print("[net] %s (%s) joined as %s at %s%s" % [
 		player_name, id.left(8), player.name, tile, " (back)" if back else ""])
 	party_log.add("%s joined." % player_name)
@@ -1839,6 +1843,12 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var hears := is_instance_valid(pet) and pet.spawned and pet.zone == player.zone \
 			and World.distance(pet.tile, player.tile) <= HEARING_RANGE
 	var to := String(pet.name) if hears else ""
+	# Every other companion within earshot hears it too, labelled; her voice
+	# decides whether it was meant for her.
+	for entity in World.get_entities():
+		var other := entity as Companion
+		if other != null and other != pet and other.spawned and World.distance(other.tile, player.tile) <= HEARING_RANGE:
+			other.overheard(_display_name(player), line)
 	party_log.add("%s said%s: \"%s\"" % [_display_name(player), " to " + to if to != "" else "", line])
 	Net.broadcast_to(hearers(player.tile), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
@@ -1847,13 +1857,15 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 
 
 ## The peers whose players can hear something said at [param at] in the
-## zone World is in: there, alive, within HEARING_RANGE.
+## zone World is in: there, within HEARING_RANGE; a fallen player, waiting
+## to rise, hears from where they fell (but has no body to speak with).
 func hearers(at: Vector2i) -> Array[int]:
 	var peers: Array[int] = []
 	for peer in World.peers_in(World.zone.name):
 		var player: Player = _players.get(peer)
-		if is_instance_valid(player) and player.spawned and player.zone == World.zone.name \
-				and World.distance(player.tile, at) <= HEARING_RANGE:
+		var standing := is_instance_valid(player) and player.spawned and player.zone == World.zone.name
+		var from: Vector2i = player.tile if standing else _fell_at.get(peer, NONE)
+		if (standing or _fell_at.has(peer)) and World.distance(from, at) <= HEARING_RANGE:
 			peers.append(peer)
 	return peers
 
@@ -1884,6 +1896,11 @@ func say_phrase(slot: int) -> void:
 
 
 func _on_companion_said(text: String, pet: Companion) -> void:
+	# The other companions within earshot hear her, labelled; it is no ask.
+	for entity in World.get_entities():
+		var other := entity as Companion
+		if other != null and other != pet and other.spawned and World.distance(other.tile, pet.tile) <= HEARING_RANGE:
+			other.overheard(String(pet.name), text, false)
 	party_log.add("%s said: \"%s\"" % [pet.name, text])
 	var record: PlayerRecord = _records.get(pet.keeper_id)
 	if record != null:
@@ -2073,6 +2090,7 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 	var peer := entity.owner_peer
 	if entity is Player and _players.get(peer) == entity:
 		_players.erase(peer)
+		_fell_at[peer] = entity.tile
 		_respawn_at[peer] = World.tick + RESPAWN_TICKS
 		print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
 	if entity is Companion:

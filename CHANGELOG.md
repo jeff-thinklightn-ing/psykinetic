@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.66
+
+Companions. Server.
+
+- **Companions hear everyone nearby**: what any player (or companion) says
+  within earshot reaches every companion there, who knows who said it.
+- **She knows when it isn't for her**: talk to the other player and your
+  companion keeps quiet; say her name, or speak to her with no one else
+  around, and she answers.
+- She knows who else is around, and where.
+- A fallen player still hears what is said nearby.
+
+The server must be updated to v0.1.66 too, as it refuses any other version.
+
 ## v0.1.65
 
 Chat. Server and client.
