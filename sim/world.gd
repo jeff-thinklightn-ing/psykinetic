@@ -40,6 +40,8 @@ const DIRECTIONS: Array[Vector2i] = [
 	Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1),
 ]
 const FIRE_DAMAGE := 2
+## A body pushed off a ledge takes this much impact per level it falls.
+const FALL_IMPACT_PER_LEVEL := 3
 ## Clamp on mover_mass / target_mass when scaling push travel and impact.
 const MASS_RATIO_MIN := 0.5
 const MASS_RATIO_MAX := 1.5
@@ -100,6 +102,15 @@ var tick_alpha := 0.0
 
 var _floor: Dictionary[Vector2i, bool] = {}
 var _fire: Dictionary[Vector2i, bool] = {}
+## Heights (cell -> 1..6 levels; 0 is absent), stairs (cell -> the way it
+## climbs: to the orthogonal neighbour one level up) and water (not walkable,
+## not a wall). See Level.
+var _height: Dictionary[Vector2i, int] = {}
+var _stairs: Dictionary[Vector2i, Vector2i] = {}
+var _water: Dictionary[Vector2i, bool] = {}
+## The eye height of the line of sight being walked (has_line_of_sight), -1
+## when none: a wall lower than the eye does not stop it.
+var _eye := -1
 ## Walls and doors are edges between cells, keyed as Terrain.edge_key says;
 ## open edges are absent. Blocking is a property of the edge you cross.
 var _edges: Dictionary[Vector3i, int] = {}
@@ -184,6 +195,9 @@ func reset() -> void:
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
+	_height.clear()
+	_stairs.clear()
+	_water.clear()
 	_next_id = 1
 	tick = 0
 	tick_alpha = 0.0
@@ -201,6 +215,17 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
+	_height.clear()
+	_stairs.clear()
+	_water.clear()
+	var heights: Dictionary = terrain.get("heights", {})
+	for cell: Vector2i in heights:
+		_height[cell] = int(heights[cell])
+	var stairs: Dictionary = terrain.get("stairs", {})
+	for cell: Vector2i in stairs:
+		_stairs[cell] = stairs[cell]
+	for cell: Vector2i in terrain.get("water", []):
+		_water[cell] = true
 	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
 	for t: Vector2i in terrain["fire"]:
@@ -680,6 +705,9 @@ func mirror_reset() -> void:
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
+	_height.clear()
+	_stairs.clear()
+	_water.clear()
 	tick = 0
 	tick_alpha = 0.0
 	_accumulator = 0.0
@@ -841,13 +869,26 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 					stopped_by = "fire"
 					max_tiles = 0
 		var door_hit: Door = null
+		var fall := 0
 		while tiles < max_tiles:
 			var next: Vector2i = body.tile + direction
-			if _terrain_blocks_step(body.tile, direction):
+			if is_water(next) and not edge_blocks(body.tile, direction):
+				# The water's edge: it stops there, unhurt.
+				stopped = true
+				stopped_by = "water"
+				break
+			if _terrain_blocks_step(body.tile, direction, false, false):
 				stopped = true
 				collided = true
 				door_hit = _closed_door_across(body.tile, direction)
 				stopped_by = "wall" if door_hit == null else door_hit.name
+				break
+			var drop := height_step(body.tile, direction)
+			if drop < 0:
+				# Nothing is pushed up a step.
+				stopped = true
+				collided = true
+				stopped_by = "a ledge"
 				break
 			blocker = _occupancy.get(next)
 			if blocker != null:
@@ -857,6 +898,12 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 				break
 			_relocate(body, next)
 			tiles += 1
+			if drop > 0:
+				# Off a ledge: it falls, and the fall is what hurts.
+				fall = drop
+				stopped = true
+				stopped_by = "a fall of %d" % drop
+				break
 			if _fire.has(next) and body.is_creature():
 				stopped = true
 				stopped_by = "fire"
@@ -864,7 +911,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 
 		# Force spent on travel, rounded up; the rest is what hits.
 		var remaining := 0.0
-		if stopped:
+		if stopped and fall == 0:
 			remaining = maxf(f - ceili(tiles / ratio - 0.001), 0.0)
 		var impact := impact_damage(remaining, ratio)
 
@@ -885,6 +932,10 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 			_impact(body, impact, mover, against)
 			if door_hit != null:
 				_hit_door(door_hit, impact, mover)
+		if fall > 0 and _alive(body):
+			impact = FALL_IMPACT_PER_LEVEL * fall
+			_stun(body, 0.0)
+			_impact(body, impact, mover, &"stone")
 		# Running into something stuns, even with no force left to hurt.
 		if collided:
 			_stun(body, remaining)
@@ -990,6 +1041,43 @@ func is_walkable(at: Vector2i) -> bool:
 	return _floor.has(at)
 
 
+## A cell's height in levels (0..6).
+func height_at(at: Vector2i) -> int:
+	return _height.get(at, 0)
+
+
+## The way the stair on [param at] climbs, or ZERO for none.
+func stair_at(at: Vector2i) -> Vector2i:
+	return _stairs.get(at, Vector2i.ZERO)
+
+
+func is_water(at: Vector2i) -> bool:
+	return _water.has(at)
+
+
+## How a step from [param from] in [param direction] meets the ground: 0 on
+## the level or by a stair (the lower cell's stair climbing that way, one
+## level), n > 0 a drop of n levels off a ledge, n < 0 a ledge n levels up.
+## A diagonal across any change of height is a ledge (stairs are
+## orthogonal), up or down as the destination is.
+func height_step(from: Vector2i, direction: Vector2i) -> int:
+	var to := from + direction
+	var rise := height_at(to) - height_at(from)
+	if direction.x != 0 and direction.y != 0:
+		var flat := rise == 0 and height_at(from + Vector2i(direction.x, 0)) == height_at(from) \
+				and height_at(from + Vector2i(0, direction.y)) == height_at(from)
+		if flat:
+			return 0
+		return -rise if rise != 0 else -1
+	if rise == 0:
+		return 0
+	if rise == 1 and stair_at(from) == direction:
+		return 0
+	if rise == -1 and stair_at(to) == -direction:
+		return 0
+	return -rise
+
+
 ## What is on the edge leaving [param from] in orthogonal [param direction];
 ## OPEN for a diagonal, which crosses a corner, not an edge.
 func edge_kind(from: Vector2i, direction: Vector2i) -> int:
@@ -1026,8 +1114,12 @@ func edge_blocks(from: Vector2i, direction: Vector2i, opens_doors := false) -> b
 	return false
 
 
-## A closed door or a wall: what stops sight.
+## A closed door or a wall: what stops sight, unless the eye of the sight
+## being walked is above both cells it stands between (higher cells see
+## over lower walls).
 func edge_blocks_sight(from: Vector2i, direction: Vector2i) -> bool:
+	if _eye >= 0 and _eye > maxi(height_at(from), height_at(from + direction)):
+		return false
 	match edge_kind(from, direction):
 		Terrain.Edge.WALL:
 			return true
@@ -1140,6 +1232,15 @@ func blocks_sight(at: Vector2i) -> bool:
 ## tile between; the endpoints themselves never block. A diagonal step of
 ## the walk needs one of its two orthogonal routes open.
 func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
+	_eye = height_at(from)
+	var seen := _line_of_sight(from, to)
+	_eye = -1
+	return seen
+
+
+## The walk itself. Ground higher than both ends stops it too.
+func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
+	var top := maxi(height_at(from), height_at(to))
 	var d: Vector2i = (to - from).abs()
 	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
 	var err: int = d.x - d.y
@@ -1156,7 +1257,7 @@ func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 		if _sight_crosses_edge(at, step):
 			return false
 		at += step
-		if at != to and blocks_sight(at):
+		if at != to and (blocks_sight(at) or height_at(at) > top):
 			return false
 	return true
 
@@ -1250,11 +1351,14 @@ func _path_heuristic(a: Vector2i, b: Vector2i) -> int:
 ## the destination is not floor, the edge between is a wall (or a closed door
 ## and the stepper does not open doors), or, for a diagonal, either
 ## orthogonal neighbour is not floor or any of the four edges around that
-## corner is shut: no cutting a wall corner. Entities standing there do not
-## count.
-func _terrain_blocks_step(from: Vector2i, direction: Vector2i, opens_doors := false) -> bool:
+## corner is shut: no cutting a wall corner. With [param heights] (walking),
+## a ledge up or down too: only a stair joins two heights. Entities
+## standing there do not count.
+func _terrain_blocks_step(from: Vector2i, direction: Vector2i, opens_doors := false, heights := true) -> bool:
 	var to := from + direction
 	if not is_walkable(to):
+		return true
+	if heights and height_step(from, direction) != 0:
 		return true
 	if direction.x == 0 or direction.y == 0:
 		return edge_blocks(from, direction, opens_doors)

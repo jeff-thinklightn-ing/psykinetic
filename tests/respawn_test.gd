@@ -228,8 +228,7 @@ func _shove(attacker: GridEntity, target: GridEntity) -> void:
 
 
 func _test_click_snaps_to_floor() -> void:
-	print("
-== a move click off the floor goes to the nearest walkable cell ==")
+	print("\n== a move click off the floor goes to the nearest walkable cell ==")
 	_check(_main._snap_to_floor(Vector2(3.0, 2.0)) == Vector2i(3, 2), "a click on floor is that cell")
 	var across_the_wall := Vector2(0.3, 2.1)
 	_check(not World.is_walkable(Iso.local_to_tile(_grid_point(across_the_wall))), "the point past the west wall is void")
@@ -246,8 +245,7 @@ func _grid_point(grid: Vector2) -> Vector2:
 
 
 func _test_renderer_setting() -> void:
-	print("
-== renderer: 3D unless 2d is asked for; the command line wins over the file ==")
+	print("\n== renderer: 3D unless 2d is asked for; the command line wins over the file ==")
 	_check(Net.renderer_from("2d") == "2d" and Net.renderer_from(" 2D ") == "2d", "2d is the 2D view")
 	_check(Net.renderer_from("3d") == "3d" and Net.renderer_from("") == "3d" and Net.renderer_from("iso") == "3d",
 			"3d, nothing or anything else is the 3D view")

@@ -204,8 +204,9 @@ around next tick.
 mispredictions in the last minute, and snaps in the last minute, and the
 control scheme.
 
-**Respawn.** `LEVEL_ENTITIES` in `main.gd` is the spawn table: one slot
-per monster, crate and boulder, with its tile, scene and properties. Every
+**Respawn.** The level's entities (`Main.level_entities`, from its
+markers and `level.json`) are the spawn table: one slot per monster, crate,
+boulder and cart, with its tile, scene and properties. Every
 level entity carries its slot (`spawn` in its spec, saved in the snapshot).
 When a slot's entity is killed or broken the slot is dead from that tick,
 and comes back — a fresh entity on the slot's own tile, at full stats — once
@@ -235,9 +236,9 @@ to a host's own player.
 of every level entity (type, name, tile, hp, stamina, facing, spawn
 properties) and every player record every 30 ticks and on clean shutdown,
 and rebuilds the room's entities and its memory of players from it on start.
-Terrain always comes from the ASCII map, and so does what a level entity
-*is*: on load its script, shape, tint, scale and properties are taken from
-its `LEVEL_ENTITIES` slot as the map says now (found by saved slot, or by
+Terrain always comes from the level (docs/levels.md), and so does what a
+level entity *is*: on load its script, shape, tint, scale and properties
+are taken from its slot as the level says now (found by saved slot, or by
 name for snapshots older than slots), and only its tile, hp, stamina and
 facing from the file. A missing or unreadable snapshot is logged and the room is
 generated fresh. Restoring goes through the same path as spawning
@@ -270,12 +271,33 @@ flying. A player that dies is respawned at a start
 tile 20 ticks later with the same name and tint (a placeholder rule that
 keeps the test room usable). `R` on the host rebuilds the room for everyone.
 
+## Levels
+
+A level is a folder `levels/<name>/` of `layout.png` (the map in the same
+double resolution as the ASCII maps: cells at even pixels, edges at odd
+ones), an optional `height.png` and `level.json`, read by `sim/level.gd`
+into the terrain the World and both views take; the format, the legend
+and how to make one are in docs/levels.md. `--map=<name>` picks it (default
+`test_room`, the original room, unchanged); the server tells every client
+its map (`Net.message("map")`), and `map load <name>` on its console
+reloads live. The terrain now has ground kinds (stone, grass, dirt), water
+(not walkable, no wall), heights 0-6 with stairs between them, torches,
+and level links, which take the party to another map.
+
+**Heights** (World): a step between cells of different heights needs a
+stair on the lower cell climbing toward the other, one level; otherwise
+it is a ledge, which no walker crosses and no pathfinder plans across. A
+pushed body falls off a ledge (`FALL_IMPACT_PER_LEVEL` impact per level,
+stunned) and is stopped by one up. Sight: a wall stops it only if the eye
+stands no higher than both cells beside the wall; ground higher than both
+ends blocks it.
+
 ## Tick order
 
 The sim runs at a fixed **10 Hz** (`World.TICK_RATE`), driven by an accumulator
 in `World._process`. At most 5 ticks run per frame; past that the sim slows
 down rather than spiralling. Every entity gets an **id** at spawn, ascending
-in spawn order: `LEVEL_ENTITIES` in `main.gd` in order (or the snapshot's
+in spawn order: the level's entities in order (or the snapshot's
 entities), then the host's own player, then players as their peers join. Each tick (`World.step`), on the
 server only:
 
@@ -851,7 +873,7 @@ the tests use is where it was.
 Test rooms written as old cell maps go through `Terrain.expand`.
 
 **Camera.** The camera eases toward the local player
-(`CAMERA_FOLLOW_RATE`), starting on `CHAMBER_CENTRE`. In the click scheme
+(`CAMERA_FOLLOW_RATE`), starting on the level's `centre`. In the click scheme
 that is all it does. In the WASD scheme it also leans toward the cursor
 (`Main.camera_lean`), from the cursor's place on the screen alone: its
 offset from the middle, each axis over half the screen, counted from the

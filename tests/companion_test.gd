@@ -166,7 +166,7 @@ func _test_old_record_gets_a_companion() -> void:
 	var reply: String = _main.admin_command("reset")
 	_check("companions brought back: %s" % record.companion["name"] in reply, "'reset' says who it brought back (%s)" % reply)
 	pet = _companion()
-	_check(_player().tile in _main.PLAYER_STARTS and _player().tile != last_seen, "the owner is put on a start tile, away from the imps (at %s)" % _player().tile)
+	_check(_player().tile in _main.player_starts and _player().tile != last_seen, "the owner is put on a start tile, away from the imps (at %s)" % _player().tile)
 	_check(pet != null and World.distance(pet.tile, _player().tile) == 1, "and the companion is beside the owner, not left by the imps (at %s)" % [pet.tile if pet else Vector2i(-1, -1)])
 	reply = _main.admin_command("reset")
 	_check("no dead companions" in reply, "a reset with none dead says so (%s)" % reply)

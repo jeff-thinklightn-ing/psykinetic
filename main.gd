@@ -37,113 +37,22 @@ const BUMP_SEND_INTERVAL := 0.25
 ## second, as an exponential rate. Higher is tighter.
 const CAMERA_FOLLOW_RATE := 6.0
 ## Where the camera starts (and stays on a dedicated server): the chamber.
-const CHAMBER_CENTRE := Vector2i(6, 6)
 ## What is drawn where there is no map: near-black, so walls along the void
 ## stand apart from it.
 const VOID := Color(0.05, 0.05, 0.06)
-## Double resolution (see Terrain): '#' wall, '+' door, '.' floor, '~' fire.
-## The west corridor is rows 8-9, x 3..5, two wide, narrowing to the one
-## cell (1..2, 8) at its dead end: the one chokepoint. Rows 11-12 are a
-## two-wide passage; the corridors south and east of it are two wide too,
-## and the door above (4, 13) is the only way into the south one.
-const LEVEL: Array[String] = [
-	"",
-	" #########################",
-	" #. . . . .#. . . . . . .#",
-	" #                       #",
-	" #. . . . . . . . . . . .#",
-	" #                       #",
-	" #. . . . . . . . . . . .#",
-	" #                       #",
-	" #. . . . . . . . . . . .#",
-	" #                       #",
-	" #. . . . . . ~ ~ ~ . . .#",
-	" #                       #",
-	" #. . . . . . . . . . . .#",
-	" ###########             #",
-	"           #. . . . . . .#",
-	" ###########             #",
-	" #. . . . . . . . . . . .#",
-	" ##### # # #             #",
-	"      . . . . . . . . . .#",
-	" ########### # ####### # #",
-	" #          . .       . .#",
-	" #           # ####### # ###################",
-	" #. . . . . . . . . . . . . . . . . . . . .#",
-	" #                                         #",
-	" #. . . . . . . . . . . . . . . . . . . . .#",
-	" #######+###############################   #",
-	"      . .#                             #. .#",
-	"     # # #                             #   #",
-	"     #. .#                             #. .#",
-	"     #   #                             #   #",
-	"     #. .#                             #. .#",
-	"     #   #                             #   #",
-	"     #. .#                             #. .#",
-	"     #   #                             #   #",
-	"     #. .#                             #. .#",
-	"     #   ###############################   ###################",
-	"     #. . . . . . . . . . . . . . . . . . . . . . . . . . . .#",
-	"     #                                                       #",
-	"     #. . . . . . . . . . . . . . . . . . . . . . . . . . . .#",
-	"     ###################################   ###############   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #   #             #   #",
-	"                                       #. .#             #. .#",
-	"                                       #####             #   #",
-	"                                                         #. .#",
-	"                                                         #   #",
-	"                                                         #. .#",
-	"                                                         #   #",
-	"                                                         #. .#",
-	"                                                         #   #",
-	"                                                         #. .#",
-	"                                                         #####",
-]
 const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
 const PLAYER := "res://sim/player.gd"
 const COMPANION := "res://sim/companion.gd"
-## Spawned by the server in this order, which is also entity id order. Each
-## spec is built by EntityFactory on every peer: script, shape, tint, scale,
-## label, and "props" set on the instance before it enters the tree.
-const LEVEL_ENTITIES: Array[Dictionary] = [
-	# Imps come in different masses; Monster shades them darker as they get heavier.
-	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp1", "tile": Vector2i(1, 8), "props": {"mass": 25.0}},
-	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp2", "tile": Vector2i(2, 8), "props": {"mass": 40.0}},
-	{"script": MONSTER, "shape": "capsule", "name": "CorridorImp3", "tile": Vector2i(3, 8), "props": {"mass": 60.0}},
-	# These two doze in the open: they only notice what comes within 3 tiles.
-	{"script": MONSTER, "shape": "capsule", "name": "Imp1", "tile": Vector2i(1, 6), "props": {"mass": 30.0, "sight_range": 3}},
-	{"script": MONSTER, "shape": "capsule", "name": "Imp2", "tile": Vector2i(2, 6), "props": {"mass": 70.0, "sight_range": 3}},
-	{"script": PUSHABLE, "shape": "cube", "name": "Crate1", "tile": Vector2i(8, 2), "tint": Color(0.8, 0.6, 0.35)},
-	{"script": PUSHABLE, "shape": "cube", "name": "Crate2", "tile": Vector2i(8, 3), "tint": Color(0.8, 0.6, 0.35)},
-	{"script": PUSHABLE, "shape": "cube", "name": "Crate3", "tile": Vector2i(4, 2), "tint": Color(0.8, 0.6, 0.35)},
-	{"script": PUSHABLE, "shape": "sphere", "name": "Boulder", "tile": Vector2i(6, 3), "tint": Color(0.55, 0.55, 0.6),
-		"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}},
-]
-## A joining peer's player takes the first of these that is free.
-const PLAYER_STARTS: Array[Vector2i] = [
-	Vector2i(11, 2), Vector2i(12, 1), Vector2i(11, 1), Vector2i(12, 2),
-	Vector2i(10, 1), Vector2i(10, 2), Vector2i(12, 3), Vector2i(11, 3),
-]
+## The level in play (Level.load_level): its entities, spawned by the
+## server in this order, which is also entity id order (each spec built by
+## EntityFactory on every peer); the starts, a joining peer's player taking
+## the first free one; where the camera first looks.
+var level: Dictionary = {}
+var level_entities: Array[Dictionary] = []
+var player_starts: Array[Vector2i] = []
+var level_centre := Vector2i.ZERO
+var map_name := ""
 ## Indexed by join order.
 const PLAYER_TINTS: Array[Color] = [
 	Color(0.35, 0.65, 1.0), Color(0.4, 0.9, 0.45), Color(1.0, 0.85, 0.3), Color(0.95, 0.5, 0.9),
@@ -203,9 +112,9 @@ var _revived: Array[String] = []
 var party_log := PartyLog.new()
 ## Which mind new decisions use: "scripted" or "ollama" (console: mind ...).
 var mind_kind := "scripted"
-## Server only: LEVEL_ENTITIES index -> the entity holding that slot now.
+## Server only: level_entities index -> the entity holding that slot now.
 var _alive_slots: Dictionary[int, GridEntity] = {}
-## Server only: LEVEL_ENTITIES index -> tick its entity died or broke.
+## Server only: level_entities index -> tick its entity died or broke.
 var _dead_since: Dictionary[int, int] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
@@ -305,10 +214,11 @@ func _ready() -> void:
 
 	near_walls.self_modulate.a = NEAR_WALL_ALPHA
 	_build_talk()
+	_load_level(Net.map_name if not Net.map_name.is_empty() else Level.DEFAULT_MAP)
 	_paint_level()
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
-	camera.position = Iso.tile_to_local(CHAMBER_CENTRE)
+	camera.position = Iso.tile_to_local(level_centre)
 	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
 		_show_3d()
 	RenderingServer.set_default_clear_color(VOID)
@@ -358,6 +268,13 @@ func _go_online() -> void:
 			mind_kind = "ollama"
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
+		World.entity_moved.connect(_on_entity_moved)
+		# A server comes back on the map its snapshot was saved on, unless
+		# --map names one.
+		var saved_map := Snapshot.map_of(Net.state_path) if Net.state_path != "" else ""
+		if Net.map_name.is_empty() and saved_map != "" and saved_map != map_name and Level.exists(saved_map):
+			_load_level(saved_map)
+			_repaint()
 		_start_level(true)
 		_start_console()
 	else:
@@ -506,7 +423,7 @@ func _show_3d() -> void:
 		node.visible = false
 	_client3d = preload("res://client3d/client3d.tscn").instantiate()
 	add_child(_client3d)
-	_client3d.setup(_terrain)
+	_client3d.setup(_terrain, level_centre)
 	_client3d.bubbles = bubbles
 
 
@@ -1013,12 +930,24 @@ func _mouse_tile() -> Vector2i:
 ## WallEdge.is_near) in the translucent NearWalls group above it. Doors are
 ## spawned by the server with the level (see _spawn_doors): they have state.
 func _paint_level() -> void:
-	_terrain = Terrain.parse(LEVEL)
+	ground.clear()
+	for wall in _walls:
+		wall.queue_free()
+	_walls.clear()
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var fire: Array[Vector2i] = _terrain["fire"]
+	var kinds: Dictionary = _terrain.get("kinds", {})
+	var heights: Dictionary = _terrain.get("heights", {})
+	var stairs: Dictionary = _terrain.get("stairs", {})
 	for cell: Vector2i in _terrain["floor"]:
-		ground.set_cell(cell, FIRE_SOURCE if cell in fire else FLOOR_SOURCE, Vector2i.ZERO)
+		if cell in fire:
+			ground.set_cell(cell, FIRE_SOURCE, Vector2i.ZERO)
+		else:
+			var look := "stair" if stairs.has(cell) else str(kinds.get(cell, "stone"))
+			ground.set_cell(cell, FLOOR_SOURCE, Vector2i.ZERO, _ground_tile(look, int(heights.get(cell, 0))))
+	for cell: Vector2i in _terrain.get("water", []):
+		ground.set_cell(cell, FLOOR_SOURCE, Vector2i.ZERO, _ground_tile("water", int(heights.get(cell, 0))))
 	for key: Vector3i in edges:
 		if edges[key] != Terrain.Edge.WALL:
 			continue
@@ -1030,6 +959,87 @@ func _paint_level() -> void:
 			$YSort.add_child(wall)
 		wall.setup(key, kind_at, WALL_VALUE)
 		_walls.append(wall)
+
+
+## 2D: how each ground looks, as a tint of the floor tile, and lighter by
+## height (alternative tiles of the floor source, made once).
+const GROUND_TINTS := {
+	"stone": Color(1, 1, 1), "grass": Color(0.62, 0.95, 0.55), "dirt": Color(0.95, 0.75, 0.55),
+	"water": Color(0.45, 0.6, 1.0), "stair": Color(1.0, 0.95, 0.7),
+}
+var _ground_tiles: Dictionary[String, int] = {}
+
+
+func _ground_tile(look: String, height: int) -> int:
+	var key := "%s_%d" % [look, height]
+	if look == "stone" and height == 0:
+		return 0
+	if _ground_tiles.has(key):
+		return _ground_tiles[key]
+	if _ground_tiles.is_empty():
+		ground.tile_set = ground.tile_set.duplicate(true)  # This map's alternatives, not the shared resource's.
+	var source := ground.tile_set.get_source(FLOOR_SOURCE) as TileSetAtlasSource
+	var id := source.create_alternative_tile(Vector2i.ZERO)
+	var tint: Color = GROUND_TINTS.get(look, Color.WHITE)
+	source.get_tile_data(Vector2i.ZERO, id).modulate = tint.lightened(height * 0.06)
+	_ground_tiles[key] = id
+	return id
+
+
+## Reads level [param level_name] and makes it this peer's terrain and spawn
+## table; the default map if there is no such level. False if neither loads.
+func _load_level(level_name: String) -> bool:
+	var loaded := Level.load_level(level_name)
+	if loaded.is_empty() and level_name != Level.DEFAULT_MAP:
+		push_warning("[level] no map %s; loading %s" % [level_name, Level.DEFAULT_MAP])
+		loaded = Level.load_level(Level.DEFAULT_MAP)
+	if loaded.is_empty():
+		return false
+	level = loaded
+	map_name = str(loaded["name"])
+	_terrain = loaded["terrain"]
+	level_entities.assign(loaded["entities"])
+	player_starts.assign(loaded["starts"])
+	level_centre = loaded["centre"]
+	print("[level] %s: %d cells, %d entities, %d starts, %d links" % [map_name, _terrain["floor"].size(),
+		level_entities.size(), player_starts.size(), loaded["links"].size()])
+	return true
+
+
+## Draws the terrain afresh in both views (a map loaded live).
+func _repaint() -> void:
+	_paint_level()
+	if _client3d != null:
+		_client3d.rebuild(_terrain, level_centre)
+
+
+## Server: loads map [param level_name] and rebuilds the room on it; every
+## online player arrives at [param arrival] ("" for the map's first start;
+## a spawn point's name otherwise), and every client is told the map.
+## [param whole]: heal and revive as a reset does (not on travel).
+func load_map(level_name: String, arrival := "", whole := true) -> bool:
+	if not Net.is_authority() or not Level.exists(level_name):
+		return false
+	_load_level(level_name)
+	_repaint()
+	var spawns: Dictionary = level.get("spawn_points", {})
+	var tile: Vector2i = spawns.get(arrival, player_starts[0] if not player_starts.is_empty() else NONE)
+	_start_level(false, tile, whole)
+	Net.broadcast("map", {"name": map_name})
+	return true
+
+
+## Server: a player stepping onto a level link takes the whole party there.
+func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
+	if not entity is Player:
+		return
+	for link: Dictionary in level.get("links", []):
+		if link["tile"] == to:
+			print("[level] %s took the link at %s to %s (%s)" % [_display_name(entity), to, link["to_map"], link["to_spawn"]])
+			party_log.add("%s led the way to %s." % [_display_name(entity), link["to_map"]])
+			# After the tick: the room is rebuilt, not mid-step.
+			load_map.call_deferred(str(link["to_map"]), str(link["to_spawn"]), false)
+			return
 
 
 ## Server: one Door node per door edge, through the spawner so every client
@@ -1047,15 +1057,23 @@ func _spawn_doors() -> void:
 ## (Re)builds the room. Also the R restart: removing the old entities and
 ## spawning new ones replicates to every client through the spawner.
 ## With [param from_snapshot], entities come from the --state file when it
-## has one; the room itself is always the ASCII map.
-func _start_level(from_snapshot := false) -> void:
+## has one; the room itself is always the level. Coming into a new map
+## ([param arrival]), every online player is placed there; without
+## [param whole] (travel) nobody is healed or revived.
+func _start_level(from_snapshot := false, arrival := NONE, whole := true) -> void:
 	if not Net.is_authority():
 		return
-	# Whoever is online keeps their place through the rebuild.
+	# Whoever is online keeps their place through the rebuild, or, coming
+	# into a new map, arrives at [param arrival] with their companion.
 	for peer: int in _players:
 		var player: Player = _players[peer]
 		if is_instance_valid(player) and player.spawned and _records.has(_peer_ids.get(peer, "")):
-			_records[_peer_ids[peer]].remember(player)
+			var record: PlayerRecord = _records[_peer_ids[peer]]
+			record.remember(player)
+			if arrival != NONE:
+				record.tile = arrival
+				if not record.companion.is_empty():
+					record.companion["tile"] = null
 	World.reset()
 	for child in entities.get_children():
 		entities.remove_child(child)
@@ -1073,14 +1091,14 @@ func _start_level(from_snapshot := false) -> void:
 	# Player records survive a rebuild; a snapshot brings its own.
 	if from_snapshot:
 		_records.clear()
-	else:
+	elif whole:
 		_revived = _revive_companions()
 		# A rebuilt room starts whole: the living come back healed too.
 		for record: PlayerRecord in _records.values():
 			if not record.companion.is_empty():
 				record.companion["hp"] = 0  # 0: spawn at full stats.
 	if not (from_snapshot and _spawn_from_snapshot()):
-		for slot in LEVEL_ENTITIES.size():
+		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
 	if Net.mode != Net.Mode.SERVER:
 		_join_player(Net.local_id, Net.player_id, Net.player_name)
@@ -1088,7 +1106,7 @@ func _start_level(from_snapshot := false) -> void:
 		var id := Net.player_of(peer)
 		if id != "":
 			_join_player(peer, id, _records[id].name if _records.has(id) else Net.DEFAULT_NAME)
-	if not from_snapshot:
+	if not from_snapshot and whole:
 		# A rebuilt room starts whole: every player at full hp and stamina.
 		for player: Player in _players.values():
 			if is_instance_valid(player) and player.spawned:
@@ -1108,6 +1126,10 @@ func _spawn_from_snapshot() -> bool:
 		return false
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
+	if str(snapshot.get("map", Level.DEFAULT_MAP)) != map_name:
+		# Saved on another map: its people come, its things do not.
+		print("[state] %s was saved on %s, not %s: player records only" % [Net.state_path, snapshot["map"], map_name])
+		return false
 	var restored := 0
 	for entry: Dictionary in snapshot["entities"]:
 		var spec := _level_spec_for(entry["spec"])
@@ -1120,7 +1142,7 @@ func _spawn_from_snapshot() -> bool:
 	for respawn: Dictionary in snapshot["respawns"]:
 		if not _alive_slots.has(respawn["spawn"]):
 			_dead_since[respawn["spawn"]] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
-	for slot in LEVEL_ENTITIES.size():
+	for slot in level_entities.size():
 		if not _alive_slots.has(slot) and not _dead_since.has(slot):
 			_dead_since[slot] = World.tick
 	print("[state] loaded %d entities and %d player records from %s (saved at tick %d)" % [
@@ -1136,10 +1158,10 @@ func _spawn_from_snapshot() -> bool:
 ## same name. Anything that is not a level entity is returned as saved.
 func _level_spec_for(saved: Dictionary) -> Dictionary:
 	var slot := int(saved.get("spawn", -1))
-	if slot < 0 or slot >= LEVEL_ENTITIES.size():
+	if slot < 0 or slot >= level_entities.size():
 		slot = -1
-		for i in LEVEL_ENTITIES.size():
-			if LEVEL_ENTITIES[i]["name"] == saved.get("name") and not _alive_slots.has(i):
+		for i in level_entities.size():
+			if level_entities[i]["name"] == saved.get("name") and not _alive_slots.has(i):
 				slot = i
 				break
 	if slot == -1 or _alive_slots.has(slot):
@@ -1152,7 +1174,7 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 ## The spawn table entry for [param slot], tagged with its index so the
 ## entity can be tracked through death and respawn.
 func _slot_spec(slot: int) -> Dictionary:
-	var spec: Dictionary = LEVEL_ENTITIES[slot].duplicate(true)
+	var spec: Dictionary = level_entities[slot].duplicate(true)
 	spec["spawn"] = slot
 	return spec
 
@@ -1200,7 +1222,7 @@ func _save_state() -> void:
 	for slot: int in _dead_since:
 		respawns.append({"spawn": slot,
 			"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
-	Snapshot.save(Net.state_path, World.tick, World.get_entities(), records, respawns)
+	Snapshot.save(Net.state_path, World.tick, World.get_entities(), records, respawns, map_name)
 
 
 func _exit_tree() -> void:
@@ -1586,6 +1608,13 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
+	if kind == "map":
+		# The server's map: a client draws and predicts on the same one.
+		var wanted := str(data.get("name", ""))
+		if not Net.is_authority() and wanted != map_name and _load_level(wanted):
+			World.mirror_terrain(_terrain)
+			_repaint()
+		return
 	if kind == "death":
 		if _client3d != null:
 			_client3d.on_death(data)
@@ -1658,7 +1687,7 @@ func _nearest_hostile_distance(tile: Vector2i) -> int:
 func _safest_start_tile(fallback: Vector2i) -> Vector2i:
 	var best := fallback
 	var best_distance := -1
-	for start in PLAYER_STARTS:
+	for start in player_starts:
 		if not World.is_free(start):
 			continue
 		var distance := _nearest_hostile_distance(start)
@@ -1688,13 +1717,13 @@ func _nearest_free(wanted: Vector2i) -> Vector2i:
 
 
 func _free_start_tile() -> Vector2i:
-	for tile in PLAYER_STARTS:
+	for tile in player_starts:
 		if World.is_free(tile):
 			return tile
 	for cell: Vector2i in _terrain["floor"]:
 		if World.is_free(cell) and not World.is_fire(cell):
 			return cell
-	return PLAYER_STARTS[0]
+	return player_starts[0] if not player_starts.is_empty() else Vector2i.ZERO
 
 
 ## MultiplayerSpawner's spawn function: runs on the server and on every client
@@ -1706,6 +1735,7 @@ func _build_entity(spec: Dictionary) -> Node:
 
 
 func _on_peer_authenticated(peer: int, id: String, player_name: String) -> void:
+	Net.broadcast("map", {"name": map_name})
 	_join_player(peer, id, player_name)
 
 
@@ -1907,8 +1937,7 @@ func _read_stdin() -> void:
 			continue
 		empties = 0
 		_stdin_mutex.lock()
-		for line in chunk.split("
-", false):
+		for line in chunk.split("\n", false):
 			if not line.strip_edges().is_empty():
 				_stdin_lines.append(line.strip_edges())
 		_stdin_mutex.unlock()
@@ -1946,6 +1975,13 @@ func admin_command(line: String) -> String:
 	if words.is_empty():
 		return ""
 	match words[0].to_lower():
+		"map":
+			if words.size() >= 3 and words[1] == "load":
+				if not Level.exists(words[2]):
+					return "no map %s in %s" % [words[2], Level.DIR]
+				load_map(words[2])
+				return "map %s loaded: %d cells, %d entities" % [map_name, _terrain["floor"].size(), level_entities.size()]
+			return "map %s (map load <name> loads another)" % map_name
 		"reset":
 			_start_level()
 			return "room rebuilt from the map; %d player records kept; %s" % [_records.size(),

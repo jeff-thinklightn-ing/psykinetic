@@ -17,7 +17,7 @@ const VERSION := 1
 ## Writes [param entities] to [param path]. Returns false and logs on failure.
 ## [param respawns] lists dead level entities as {spawn, ticks_left}.
 static func save(path: String, tick: int, entities: Array[GridEntity],
-		players: Array[PlayerRecord] = [], respawns: Array[Dictionary] = []) -> bool:
+		players: Array[PlayerRecord] = [], respawns: Array[Dictionary] = [], map := "") -> bool:
 	var list: Array[Dictionary] = []
 	for entity in entities:
 		if not is_instance_valid(entity) or not entity.spawned or entity.owner_peer != 0:
@@ -43,7 +43,7 @@ static func save(path: String, tick: int, entities: Array[GridEntity],
 	for record in players:
 		records.append(record.to_dict())
 	var text := JSON.stringify(
-			{"version": VERSION, "tick": tick, "entities": list, "players": records,
+			{"version": VERSION, "tick": tick, "map": map, "entities": list, "players": records,
 				"respawns": respawns}, "\t")
 
 	var directory := path.get_base_dir()
@@ -109,7 +109,24 @@ static func load(path: String) -> Dictionary:
 			if entry is Dictionary and entry.get("spawn") is float:
 				respawns.append({"spawn": int(entry["spawn"]), "ticks_left": int(entry.get("ticks_left", 0))})
 	return {"ok": true, "tick": int(data.get("tick", 0)), "entities": entities,
-		"players": players, "respawns": respawns}
+		"players": players, "respawns": respawns, "map": _map_in(data)}
+
+
+## The map [param path]'s snapshot was saved on ("" for no snapshot; the
+## test room for one from before maps).
+static func map_of(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	# Quietly: a file that does not parse is load()'s to report.
+	var json := JSON.new()
+	if json.parse(FileAccess.get_file_as_string(path)) != OK:
+		return ""
+	return _map_in(json.data) if json.data is Dictionary else ""
+
+
+static func _map_in(data: Dictionary) -> String:
+	var map := str(data.get("map", ""))
+	return map if not map.is_empty() else "test_room"
 
 
 ## Snapshots from before the generic entity scene named a scene type instead

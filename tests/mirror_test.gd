@@ -76,8 +76,7 @@ func _test_a_step_starts_after_the_display_delay() -> void:
 
 
 func _test_prediction_does_not_walk_into_a_pinned_crate() -> void:
-	print("
-== the local player's prediction treats a crate against a wall as a wall ==")
+	print("\n== the local player's prediction treats a crate against a wall as a wall ==")
 	# A 10 x 3 strip of floor, y 19..21, x 0..9; everything else is off the map.
 	var floor_tiles: Array[Vector2i] = []
 	for x in 10:
@@ -105,8 +104,7 @@ func _test_prediction_does_not_walk_into_a_pinned_crate() -> void:
 
 
 func _test_prediction_gives_up_when_the_server_has() -> void:
-	print("
-== the prediction gives an order up when the server does ==")
+	print("\n== the prediction gives an order up when the server does ==")
 	var me := _me(Vector2i(6, 21))
 	me.predict_move(Vector2i(8, 21))
 	me._process(0.05)

@@ -329,8 +329,7 @@ func _test_diamonds() -> void:
 
 
 func _test_wheel_zoom() -> void:
-	print("
-== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.4x, saved; a middle click puts it to 1x ==")
+	print("\n== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.4x, saved; a middle click puts it to 1x ==")
 	var saved: String = Net.controls
 	var rig := _rig()
 	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "it starts at 1x")

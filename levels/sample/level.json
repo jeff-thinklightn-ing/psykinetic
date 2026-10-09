@@ -1,0 +1,11 @@
+{
+	"name": "Sample",
+	"centre": [6, 5],
+	"starts": [[1, 4], [2, 4], [1, 3], [2, 3]],
+	"entities": [
+		{"at": [8, 7], "name": "Sneak", "props": {"sight_range": 4}},
+		{"at": [13, 9], "name": "Brute"}
+	],
+	"spawn_points": {"path_end": [13, 5]},
+	"links": [{"at": [14, 5], "to_map": "test_room", "to_spawn": ""}]
+}

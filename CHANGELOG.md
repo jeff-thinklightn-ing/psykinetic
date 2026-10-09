@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.53
+
+Levels from pixel maps. Server and client.
+
+- **Maps are pictures now**: a level is a folder with a painted map, an
+  optional height map and a short settings file. The test room is the same
+  room as before, now drawn this way.
+- **New ground**: grass, dirt, water, stairs, torches, carts, and brutes and
+  sneaks besides imps.
+- **Heights**: raised ground with cliffs, climbed by stairs. Shove someone
+  off a ledge and they fall and get hurt; nobody can be pushed up a step.
+  From higher ground you see over lower walls.
+- **Level links**: step onto one and the whole party goes to the next map.
+- A sample level shows all of it.
+
+The server must be updated to v0.1.53 too, as it refuses any other version.
+
 ## v0.1.52
 
 Healing and instructions. Server.

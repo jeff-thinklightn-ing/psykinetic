@@ -882,3 +882,38 @@ you rest away from danger.").
 
 The next maps go above ground; the primer speaks of "the old stone places
 and the land around them" so it does not have to change with them.
+
+## 104. Levels are pixel maps, in double resolution
+
+A map is painted, not typed: layout.png in any paint program, a colour per
+meaning. It keeps the ASCII map's double resolution (cells at even pixels,
+edges at odd ones) rather than one pixel per cell, because walls are edges
+here: two rooms sharing a thin wall are adjacent cells, which a pixel per
+cell cannot say without moving them apart, and the test room converts
+exactly. The legend is overridable per level, and level.json carries what
+a picture cannot (names, props, order, links).
+
+## 105. Level images import as Image
+
+A dedicated server has no renderer, so a texture's pixels cannot be read
+there. The level PNGs use Godot's Image importer, which loads anywhere.
+
+## 106. Heights are levels, joined only by stairs
+
+0-6 levels per cell from a grey image. Walking between heights needs a
+stair, so a map's routes are what its author drew; a ledge is a place to
+push someone off (impact per level), never a way up. Seeing over lower
+walls from higher ground makes height worth taking.
+
+## 107. A level link moves the whole party
+
+The world is one room on one server: one player cannot be on another map.
+A link rebuilds the room on the new map with everyone in it, at the named
+spawn point, without the heal and revive a reset gives. The snapshot
+records the map, so a restart resumes there.
+
+## 108. Water is neither floor nor wall
+
+Not walkable, but nothing is built along it and sight crosses it, so a
+lake reads as open country, not a room; a body pushed to its edge stops
+there, unhurt.

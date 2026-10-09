@@ -1,0 +1,18 @@
+{
+	"name": "Test room",
+	"centre": [6, 6],
+	"starts": [[11, 2], [12, 1], [11, 1], [12, 2], [10, 1], [10, 2], [12, 3], [11, 3]],
+	"entities": [
+		{"at": [1, 8], "name": "CorridorImp1", "props": {"mass": 25.0}},
+		{"at": [2, 8], "name": "CorridorImp2", "props": {"mass": 40.0}},
+		{"at": [3, 8], "name": "CorridorImp3", "props": {"mass": 60.0}},
+		{"at": [1, 6], "name": "Imp1", "props": {"mass": 30.0, "sight_range": 3}},
+		{"at": [2, 6], "name": "Imp2", "props": {"mass": 70.0, "sight_range": 3}},
+		{"at": [8, 2], "name": "Crate1"},
+		{"at": [8, 3], "name": "Crate2"},
+		{"at": [4, 2], "name": "Crate3"},
+		{"at": [6, 3], "name": "Boulder"}
+	],
+	"spawn_points": {},
+	"links": []
+}

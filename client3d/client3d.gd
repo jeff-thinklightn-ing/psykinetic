@@ -83,6 +83,13 @@ extends Node3D
 
 const KIT := "res://art/kenney-castle/Models/GLB format/"
 const WALL_HEIGHT := 3.0
+## One height level (height.png) in units; a stair is drawn in STAIR_STEPS.
+const LEVEL_RISE := 0.5
+const STAIR_STEPS := 4
+## Ground kinds' tints on the kit's floor; water and torches.
+const GROUND_TINTS := {"grass": Color(0.55, 0.8, 0.45), "dirt": Color(0.85, 0.65, 0.45)}
+const WATER := Color(0.2, 0.42, 0.85, 0.75)
+const TORCH := Color(1.0, 0.72, 0.38)
 const KIT_WALL_HEIGHT := 1.31
 ## The kit's walls are this thick and occupy x in [-0.5, 0] of their
 ## module; they are shifted to straddle the edge.
@@ -279,6 +286,10 @@ var _peek_t := 1.0
 ## WASD: the camera's lean toward the cursor, in grid units (Main.camera_lean).
 var _lead := Vector2.ZERO
 var _room: Node3D
+## Where the camera first looks (the level's centre).
+var _centre := Vector2i.ZERO
+## Kit floor material per ground kind, made once.
+var _ground_materials: Dictionary[String, Material] = {}
 ## The kit's own material and a see-through copy of it; the flat stone
 ## pair likewise.
 var _kit_opaque: Material
@@ -326,8 +337,9 @@ var _terrain: Dictionary = {}
 
 ## Builds the room and the rig. [param terrain] is Terrain.parse's result,
 ## the same the 2D view paints from.
-func setup(terrain: Dictionary) -> void:
+func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_terrain = terrain
+	_centre = centre
 	_ring_mesh = _make_ring(0.42, 0.5)
 	_build_environment()
 	_build_camera()
@@ -403,7 +415,7 @@ func _build_camera() -> void:
 	_camera.near = 0.1
 	_camera.far = CAMERA_DISTANCE * 3.0
 	add_child(_camera)
-	_camera_target = _tile_position(Main.CHAMBER_CENTRE)
+	_camera_target = _tile_position(_centre)
 	_place_camera()
 	_camera.current = true
 
@@ -720,11 +732,30 @@ func mouse_grid() -> Vector2:
 	var ray := _mouse_ray()
 	if absf(ray[1].y) < 0.0001:
 		return Vector2(NAN, NAN)
+	# From the highest level down: the first ground the ray meets at its own
+	# height; the ground plane if none.
+	for level in range(Level.MAX_HEIGHT, 0, -1):
+		var t := (level * LEVEL_RISE - ray[0].y) / ray[1].y
+		if t < 0.0:
+			continue
+		var at := ray[0] + ray[1] * t
+		if _height(Vector2i(roundi(at.x), roundi(at.z))) == level:
+			return Vector2(at.x, at.z)
 	var t := -ray[0].y / ray[1].y
 	if t < 0.0:
 		return Vector2(NAN, NAN)
 	var hit := ray[0] + ray[1] * t
 	return Vector2(hit.x, hit.z)
+
+
+## How high the ground is under [param grid] (a puppet's place): its cell's
+## height, a stair's halfway up it.
+func _ground_height(grid: Vector2) -> float:
+	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
+	var height := float(_height(cell))
+	if _stair(cell) != Vector2i.ZERO:
+		height += 0.5
+	return height * LEVEL_RISE
 
 
 ## The first pick Area3D the cursor's ray hits, with its "entity" or
@@ -908,8 +939,33 @@ func ripple(tile: Vector2i) -> void:
 
 # --- Room ----------------------------------------------------------------------
 
-static func _tile_position(tile: Vector2i) -> Vector3:
-	return Vector3(tile.x, 0.0, tile.y)
+## A cell's centre on its ground, at its height.
+func _tile_position(tile: Vector2i) -> Vector3:
+	return Vector3(tile.x, _height(tile) * LEVEL_RISE, tile.y)
+
+
+## This view's terrain, not the World's: the room is built before the World
+## has its terrain, and a client's World mirrors the same map anyway.
+func _height(cell: Vector2i) -> int:
+	return int(_terrain.get("heights", {}).get(cell, 0))
+
+
+func _stair(cell: Vector2i) -> Vector2i:
+	return _terrain.get("stairs", {}).get(cell, Vector2i.ZERO)
+
+
+## The room drawn afresh for [param terrain] (a map loaded live).
+func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
+	_terrain = terrain
+	_centre = centre
+	if _room != null:
+		_room.free()
+	_walls.clear()
+	_posts.clear()
+	_doorways.clear()
+	_build_room()
+	_classify_walls()
+	_camera_target = _tile_position(_centre)
 
 
 func _kit(piece: String) -> Node3D:
@@ -956,13 +1012,23 @@ func _build_room() -> void:
 	_stone_opaque = _stone(1.0)
 	_stone_near = _stone(NEAR_ALPHA)
 	var fire: Array[Vector2i] = _terrain["fire"]
+	var kinds: Dictionary = _terrain.get("kinds", {})
 	for cell: Vector2i in _terrain["floor"]:
 		var ground := _kit("ground")
 		ground.name = "Floor_%d_%d" % [cell.x, cell.y]
 		ground.position = _tile_position(cell)
+		_tint_ground(ground, str(kinds.get(cell, "stone")))
 		_room.add_child(ground)
 		if cell in fire:
 			_add_fire(cell)
+	for cell: Vector2i in _terrain.get("water", []):
+		_add_water(cell)
+	_add_cliffs()
+	var stairs: Dictionary = _terrain.get("stairs", {})
+	for cell: Vector2i in stairs:
+		_add_stair(cell, stairs[cell])
+	for cell: Vector2i in _terrain.get("torches", []):
+		_add_torch(cell)
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
@@ -1018,6 +1084,107 @@ func _kit_wall(piece: String) -> Node3D:
 	return holder
 
 
+## Grass and dirt: the kit's floor in their colour.
+func _tint_ground(ground: Node3D, kind: String) -> void:
+	if not GROUND_TINTS.has(kind):
+		return
+	if not _ground_materials.has(kind):
+		var material := _kit_opaque.duplicate() as BaseMaterial3D
+		material.albedo_color = material.albedo_color * GROUND_TINTS[kind]
+		_ground_materials[kind] = material
+	for node in _descendants(ground):
+		if node is MeshInstance3D:
+			(node as MeshInstance3D).material_override = _ground_materials[kind]
+
+
+func _add_water(cell: Vector2i) -> void:
+	var quad := MeshInstance3D.new()
+	quad.name = "Water_%d_%d" % [cell.x, cell.y]
+	var mesh := PlaneMesh.new()
+	mesh.size = Vector2.ONE
+	var material := StandardMaterial3D.new()
+	material.albedo_color = WATER
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.roughness = 0.15
+	material.metallic = 0.3
+	mesh.material = material
+	quad.mesh = mesh
+	quad.position = _tile_position(cell) - Vector3(0.0, 0.08, 0.0)
+	_room.add_child(quad)
+
+
+## Cliff faces: where a cell stands above its neighbour (or above the void
+## or water at the map's edge), a face of stone down to it, unless a stair
+## joins them.
+func _add_cliffs() -> void:
+	var stairs: Dictionary = _terrain.get("stairs", {})
+	for cell: Vector2i in _terrain["floor"]:
+		var top := _height(cell)
+		if top == 0:
+			continue
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := cell + direction
+			var low := _height(next) if next in _terrain["floor"] or next in _terrain.get("water", []) else 0
+			if low >= top or stairs.get(next, Vector2i.ZERO) == -direction:
+				continue
+			var face := _box(Vector3(1.0, (top - low) * LEVEL_RISE, 0.06), _stone_opaque)
+			face.name = "Cliff_%d_%d_%d_%d" % [cell.x, cell.y, direction.x, direction.y]
+			face.position = Vector3(cell.x + direction.x * 0.5, low * LEVEL_RISE, cell.y + direction.y * 0.5)
+			face.rotation.y = PI * 0.5 if direction.x != 0 else 0.0
+			_room.add_child(face)
+
+
+## A stair: STAIR_STEPS stone steps on its cell, rising one level toward
+## [param up].
+func _add_stair(cell: Vector2i, up: Vector2i) -> void:
+	var base := _tile_position(cell)
+	var holder := Node3D.new()
+	holder.name = "Stair_%d_%d" % [cell.x, cell.y]
+	holder.position = base
+	holder.rotation.y = -Vector2(up).angle() + PI * 0.5
+	for i in STAIR_STEPS:
+		var rise := (i + 1) * LEVEL_RISE / STAIR_STEPS
+		var step := _box(Vector3(1.0, rise, 1.0 / STAIR_STEPS), _stone_opaque)
+		step.position.z = -0.5 + (i + 0.5) / STAIR_STEPS
+		holder.add_child(step)
+	_room.add_child(holder)
+
+
+## A torch on a post, and its warm light.
+func _add_torch(cell: Vector2i) -> void:
+	var at := _tile_position(cell)
+	var post := _box(Vector3(0.1, 1.1, 0.1), _stone_opaque)
+	post.name = "Torch_%d_%d" % [cell.x, cell.y]
+	post.position = at
+	_room.add_child(post)
+	var flame := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.09
+	mesh.height = 0.2
+	var material := StandardMaterial3D.new()
+	material.albedo_color = TORCH
+	material.emission_enabled = true
+	material.emission = TORCH
+	material.emission_energy_multiplier = 3.0
+	mesh.material = material
+	flame.mesh = mesh
+	flame.position = at + Vector3(0.0, 1.2, 0.0)
+	_room.add_child(flame)
+	var light := OmniLight3D.new()
+	light.light_color = TORCH
+	light.light_energy = 1.4
+	light.omni_range = 4.5
+	light.shadow_enabled = true
+	light.position = at + Vector3(0.0, 1.3, 0.0)
+	_room.add_child(light)
+
+
+## The base of an edge's wall: the higher of the cells it stands between.
+func _edge_base(key: Vector3i) -> float:
+	var cells := Terrain.edge_cells(key)
+	return maxi(_height(cells[0]), _height(cells[1])) * LEVEL_RISE
+
+
 func _add_wall(key: Vector3i) -> void:
 	var wall: Node3D
 	if BOX_WALLS:
@@ -1025,7 +1192,7 @@ func _add_wall(key: Vector3i) -> void:
 	else:
 		wall = _kit_wall("wall-narrow")
 	wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
-	wall.position = _edge_midpoint(key)
+	wall.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
 	wall.rotation.y = _edge_yaw(key)
 	_room.add_child(wall)
 	_walls[key] = wall
@@ -1037,7 +1204,7 @@ func _add_wall(key: Vector3i) -> void:
 func _add_doorway(key: Vector3i) -> void:
 	var doorway := Node3D.new()
 	doorway.name = "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
-	doorway.position = _edge_midpoint(key)
+	doorway.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
 	doorway.rotation.y = _edge_yaw(key)
 	var frame := _kit_wall("wall-doorway")
 	frame.name = "Frame"
@@ -1086,7 +1253,10 @@ func _add_post(vertex: Vector2i) -> void:
 		post = _kit("wall-narrow-corner")
 		post.scale = Vector3(1.0, WALL_HEIGHT / KIT_WALL_HEIGHT, 1.0)
 	post.name = "Post_%d_%d" % [vertex.x, vertex.y]
-	post.position = Vector3(vertex.x - 0.5, 0.0, vertex.y - 0.5)
+	var base := 0
+	for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:
+		base = maxi(base, _height(corner))
+	post.position = Vector3(vertex.x - 0.5, base * LEVEL_RISE, vertex.y - 0.5)
 	_room.add_child(post)
 	_posts[vertex] = post
 
@@ -1181,7 +1351,7 @@ func _sync_puppets() -> void:
 			_puppets[id] = _make_puppet(entity)
 		var puppet := _puppets[id]
 		var grid := Iso.local_to_grid(entity.position)
-		puppet.position = Vector3(grid.x, 0.0, grid.y)
+		puppet.position = Vector3(grid.x, _ground_height(grid), grid.y)
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		if facing != null:
 			facing.rotation.y = -entity.shown_facing().angle()

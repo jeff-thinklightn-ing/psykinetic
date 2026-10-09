@@ -190,8 +190,7 @@ func _test_door_breaks() -> void:
 
 
 func _test_projection() -> void:
-	print("
-== drawing: the projection turns with the azimuth; 0 is the 2:1 diamond, 45 the axis-aligned view ==")
+	print("\n== drawing: the projection turns with the azimuth; 0 is the 2:1 diamond, 45 the axis-aligned view ==")
 	Iso.set_azimuth(0.0)
 	var tile := Vector2i(3, 5)
 	_check(Iso.tile_to_local(tile).is_equal_approx(Vector2((3 - 5) * 16 + 16, (3 + 5) * 8 + 8)), "at 0 a tile centre is where the diamond TileSet puts it")

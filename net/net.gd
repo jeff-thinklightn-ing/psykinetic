@@ -14,6 +14,7 @@ extends Node
 ##   --console                    read console commands from stdin (--server does this anyway)
 ##   --no-companions              server/host: players get no companion
 ##   --no-player-reset            server/host: R from a client does not rebuild the room
+##   --map=<name>                 server/host: play levels/<name> (default test_room)
 ##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
 ##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
@@ -130,6 +131,9 @@ var llm_model := ""
 ## there. --mind-why asks the minds for their reason as well.
 const DEFAULT_MIND_LOG := "/var/lib/psykinetic/mind.log"
 var mind_log_path := ""
+## --map=<name>: the level to play ("" for the default, or the one the
+## snapshot was saved on).
+var map_name := ""
 var _mind_log_given := false
 var mind_why := false
 ## --no-companions: players get no companion (tests of other things, or ops).
@@ -877,7 +881,7 @@ func _parse_args() -> void:
 			"--mind-why":
 				mind_why = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--mind-log", \
+					"--llm-url", "--llm-model", "--mind-log", "--map", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
@@ -928,6 +932,8 @@ func _set_option(key: String, value: String) -> void:
 			llm_url = value
 		"--llm-model":
 			llm_model = value
+		"--map":
+			map_name = value
 		"--mind-log":
 			mind_log_path = value
 			_mind_log_given = true
