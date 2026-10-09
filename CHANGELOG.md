@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.78
+
+Companions. Server.
+
+- Fixed: after you left and came back, a right click on your companion
+  shoved her instead of opening her pack, because she no longer counted as
+  yours. She does now.
+
+The server must be updated to v0.1.78 too, as it refuses any other version.
+
 ## v0.1.77
 
 Packs. Server.

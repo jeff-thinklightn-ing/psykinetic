@@ -95,7 +95,8 @@ var id := 0
 ## Peer whose input may order this entity; 0 for none. Same on every peer.
 var owner_peer := 0
 ## A companion: the peer whose player it belongs to; 0 for anything else.
-## Set from the spawn spec on every peer, so a client knows its own.
+## Set from the spawn spec, and on a rejoin (a new peer) by Main; a
+## companion replicates it, so a client always knows its own.
 var keeper_peer := 0
 ## The MultiplayerSpawner spec this entity was built from, kept so a server
 ## snapshot can rebuild it. Set by Main on every peer.

@@ -287,6 +287,18 @@ func _test_companion_pack() -> void:
 	host = _player(Net.local_id)
 	World._relocate(pet, host.tile + Vector2i(-4, 0) if World.is_free(host.tile + Vector2i(-4, 0)) else host.tile + Vector2i(-5, 0))
 	_check(not World.reaches(host, pet), "4 cells off, out of reach")
+	# Bo leaves while their companion waits, and comes back on a new peer.
+	_main._admit(BO, BO_ID, "Bo")
+	var bo_pet: Companion = _main._companions.get(BO_ID)
+	_check(bo_pet != null and bo_pet.keeper_peer == BO, "Bo's companion is Bo's (peer %d)" % (bo_pet.keeper_peer if bo_pet else -1))
+	_main._leave(BO, _player(BO), BO_ID)
+	_main._admit(BO + 1, BO_ID, "Bo")
+	var bo_back := _player(BO + 1)
+	_check(_main._companions.get(BO_ID) == bo_pet and bo_pet.keeper_peer == BO + 1,
+			"back on a new peer, the companion who waited is theirs again (peer %d)" % bo_pet.keeper_peer)
+	World._relocate(bo_pet, bo_back.tile + Vector2i(0, 1) if World.is_free(bo_back.tile + Vector2i(0, 1)) else bo_back.tile + Vector2i(-1, 1))
+	_check(World.reaches(bo_back, bo_pet) and not World.reaches(host, bo_pet), "Bo reaches her pack again; the host does not")
+	_main._leave(BO + 1, bo_back, BO_ID)
 	Net.companions = false
 
 

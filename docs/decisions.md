@@ -1260,3 +1260,12 @@ clothBelt and clothBelt2 have a belt buckle in them: nearly all their
 loudness is above 5 kHz, as in handleCoins, and it was heard as a jingle
 when an item went into a pack. The pack sound is the two small leather
 handlings alone, 6 dB up (they average some 20 dB under the chest's thud).
+
+## 146. A companion's keeper_peer follows her player to a new peer
+
+keeper_peer was set once, from the spawn spec. A player who leaves and
+comes back while their companion waited joins on a new peer, and she kept
+the old one: their client no longer knew her for their own (a right click
+shoved her instead of opening her pack, a left click would attack her)
+and the server would not let them reach her pack. Main sets it on the
+rejoin, and a companion replicates it.

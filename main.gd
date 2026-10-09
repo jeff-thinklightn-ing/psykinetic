@@ -1573,6 +1573,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var existing: Companion = _companions.get(record.player_id)
 	if is_instance_valid(existing) and existing.spawned:
 		existing.keeper = player
+		# A rejoin is a new peer: she is theirs again (replicated, so their
+		# client knows her for their own: a right click opens her pack).
+		existing.keeper_peer = player.owner_peer
 		existing.current_intent = Companion.Intent.FOLLOW
 		print("[net] %s's companion %s was waiting at %s and follows again" % [
 			record.name, existing.name, existing.tile])
