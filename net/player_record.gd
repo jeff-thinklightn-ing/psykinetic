@@ -21,6 +21,9 @@ var last_seen := 0
 ## said: her last lines, newest last}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
+## What is in the player's slots (Items ids, "" empty), kept through
+## death, travel and leaving.
+var slots := Items.tidy([], Player.SLOTS)
 
 
 ## Copies the live state off the player's entity.
@@ -31,6 +34,7 @@ func remember(entity: GridEntity) -> void:
 	hp = entity.hp
 	stamina = entity.stamina
 	facing = entity.facing
+	slots = entity.slots.duplicate()
 	last_seen = int(Time.get_unix_time_from_system())
 
 
@@ -47,6 +51,7 @@ func to_dict() -> Dictionary:
 		"zone": zone,
 		"last_seen": last_seen,
 		"companion": companion.duplicate(true),
+		"slots": Array(slots),
 	}
 
 
@@ -70,6 +75,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.color = Color.html(html) if Color.html_is_valid(html) else Color.WHITE
 	record.last_seen = int(entry.get("last_seen", 0))
 	record.zone = str(entry.get("zone", ""))
+	record.slots = Items.tidy(entry.get("slots", []), Player.SLOTS)
 	var pet: Variant = entry.get("companion", {})
 	if pet is Dictionary and pet.get("name") is String:
 		record.companion = {

@@ -107,6 +107,19 @@ $phase5 = @($server5, $clientJ, $clientK)
 $phase5 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
 $phase5 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
+# Phase 6: the chest. Max joins first and does nothing; Lee joins second,
+# walks to the chest and drags the bandaging kit into their slots. Both
+# clients must show the chest empty and Lee holding the kit (Max leaves
+# first, so Lee's last view has only Lee in it).
+$server6 = Start-Instance 'server6' @('--server', '--no-companions', "--token=$token", '--test-exit-after=15')
+Start-Sleep -Seconds 2
+$clientM = Start-Instance 'clientM' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Max', '--test-exit-after=8')
+Start-Sleep -Seconds 1
+$clientL = Start-Instance 'clientL' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Lee', '--test-chest=take', '--test-exit-after=10')
+$phase6 = @($server6, $clientM, $clientL)
+$phase6 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+$phase6 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
 	if (Test-Path $path) { @(Get-Content $path) } else { @() }
@@ -131,6 +144,9 @@ $clientILog = Read-Log 'clientI'
 $server5Log = Read-Log 'server5'
 $clientJLog = Read-Log 'clientJ'
 $clientKLog = Read-Log 'clientK'
+$server6Log = Read-Log 'server6'
+$clientMLog = Read-Log 'clientM'
+$clientLLog = Read-Log 'clientL'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -178,7 +194,7 @@ Assert ($loser.Count -eq 1) 'the loser is not on (9, 1) and counted exactly one 
 Assert (@($clientLogs | Select-String 'mispredict: Player\d+ step into \(9, 1\) refused').Count -eq 1) 'the loser was told its step into (9, 1) was refused and re-planned'
 Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) joined as Player3 at ').Count -eq 1) 'phase 1: Casey joined as Player3'
 Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) left').Count -eq 1) 'phase 1: her leaving was logged with her name and id'
-Assert (@($server2Log | Select-String '\[state\] loaded 9 entities and 3 player records').Count -eq 1) 'phase 2: the restarted server loads three player records'
+Assert (@($server2Log | Select-String '\[state\] loaded 10 entities and 3 player records').Count -eq 1) 'phase 2: the restarted server loads three player records'
 $colorBefore = @($client4Log | Select-String 'display: Player3 .*color=([0-9a-f]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
 $colorAfter = @($clientCLog | Select-String 'display: Player3 server_tile=\(11, 3\).*color=([0-9a-f]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
 Assert ($colorBefore.Count -eq 1 -and $colorAfter.Count -eq 1 -and $colorAfter[0] -eq $colorBefore[0]) "phase 2: Casey is back on (11, 3) as Player3 in her colour (before $colorBefore, after $colorAfter)"
@@ -204,6 +220,10 @@ $kimTiles = @($clientKLog | Select-String '\[test\] tiles: ')
 Assert ($joTiles.Count -eq 1 -and $joTiles[0].Line -match 'Sneak=' -and $joTiles[0].Line -match 'Player1=' -and $joTiles[0].Line -match 'Pip=' -and $joTiles[0].Line -notmatch 'CorridorImp|Player2=|Nix=') "phase 5: Jo sees the sample, herself and her companion Pip, nothing of the test room ($($joTiles | ForEach-Object { $_.Line }))"
 Assert ($kimTiles.Count -eq 1 -and $kimTiles[0].Line -match 'CorridorImp1=' -and $kimTiles[0].Line -match 'Player2=' -and $kimTiles[0].Line -match 'Nix=' -and $kimTiles[0].Line -notmatch 'Sneak=|Player1=|Pip=') "phase 5: Kim, who stayed, sees the test room and not Jo or Pip ($($kimTiles | ForEach-Object { $_.Line }))"
 Assert (@($clientKLog | Select-String '\[zone\] now in').Count -eq 0) 'phase 5: and Kim never left it'
+Assert (@($clientLLog | Select-String '\[test\] Player2 drags bandaging_kit from Chest1 0 to Player2 0').Count -eq 1) 'phase 6: Lee walks to the chest and drags the kit to their slots'
+Assert (@($server6Log | Select-String 'slots: Player2 moved bandaging_kit from Chest1 0 to Player2 0').Count -eq 1) 'phase 6: the server moves it'
+Assert (@($clientLLog | Select-String '\[test\] slots: Chest1=\[\] Player2=\[bandaging_kit\]$').Count -eq 1) 'phase 6: Lee sees the chest empty and the kit in their slots (Max has gone by then)'
+Assert (@($clientMLog | Select-String '\[test\] slots: Chest1=\[\] Player1=\[\] Player2=\[bandaging_kit\]$').Count -eq 1) 'phase 6: Max, who did nothing, sees the same'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

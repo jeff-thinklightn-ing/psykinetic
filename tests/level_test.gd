@@ -95,7 +95,7 @@ func _register_maps() -> void:
 # --- Tests ----------------------------------------------------------------------
 
 func _test_test_room_unchanged() -> void:
-	print("\n== levels/test_room is the old test room, unchanged ==")
+	print("\n== levels/test_room is the old test room, unchanged (but for its chest) ==")
 	_check(load("res://levels/test_room/layout.png") is Image, "its layout.png is imported as an Image (readable on a headless server)")
 	var level := Level.load_level("test_room")
 	var old := Terrain.parse(LEGACY.LEVEL)
@@ -103,7 +103,11 @@ func _test_test_room_unchanged() -> void:
 	_check(_same_cells(terrain["floor"], old["floor"]) and _same_cells(terrain["fire"], old["fire"]),
 			"the same floor (%d) and fire (%d)" % [terrain["floor"].size(), terrain["fire"].size()])
 	_check(terrain["edges"] == old["edges"], "the same walls and doors (%d edges)" % terrain["edges"].size())
-	var entities: Array = level["entities"]
+	var entities: Array = level["entities"].filter(func(spec: Dictionary) -> bool: return spec["script"] != Level.CHEST)
+	var chests: Array = level["entities"].filter(func(spec: Dictionary) -> bool: return spec["script"] == Level.CHEST)
+	_check(chests.size() == 1 and chests[0]["tile"] == Vector2i(10, 3) and chests[0]["name"] == "Chest1"
+			and Array(chests[0]["props"]["slots"]) == ["bandaging_kit", "", "", ""],
+			"one thing new: Chest1 at (10, 3), a bandaging kit in it")
 	var same := entities.size() == LEGACY.LEVEL_ENTITIES.size()
 	for i in mini(entities.size(), LEGACY.LEVEL_ENTITIES.size()):
 		var a: Dictionary = entities[i]
@@ -116,7 +120,7 @@ func _test_test_room_unchanged() -> void:
 	_check(level["starts"] == LEGACY.PLAYER_STARTS and level["centre"] == LEGACY.CHAMBER_CENTRE, "the same starts, in order, and centre")
 	_check(level["warnings"].is_empty() and terrain["heights"].is_empty() and terrain["water"].is_empty(),
 			"no warnings, no heights, no water (%s)" % [level["warnings"]])
-	_check(_main.map_name == "test_room" and _main.level_entities.size() == 9, "and it is what the game plays by default")
+	_check(_main.map_name == "test_room" and _main.level_entities.size() == 10, "and it is what the game plays by default")
 
 
 func _test_every_level() -> void:

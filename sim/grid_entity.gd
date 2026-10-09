@@ -121,6 +121,10 @@ var protected := false
 var protected_until_tick := 0
 ## Direction of the last step or attack.
 var facing := Vector2i(0, 1)
+## What it holds, a slot each: Items ids, "" for empty. None for most
+## things; a player and a chest have theirs (Player.SLOTS, Chest.SLOTS),
+## replicated (replicate). Written only by World (try_transfer, set_slots).
+var slots := PackedStringArray()
 var spawned := false
 ## The tick (maybe fractional) the next step may start; see World.try_move.
 var next_move_tick := 0.0
@@ -197,6 +201,16 @@ func _init() -> void:
 	synchronizer.add_visibility_filter(_visible_to)
 	add_child(synchronizer)
 	sync = synchronizer
+
+
+## Adds [param property] to what this entity replicates, on change, from
+## its spawn on: for a subclass's own state (a chest's slots). Call it from
+## _init, after super(), on every peer alike.
+func replicate(property: String) -> void:
+	var path := NodePath(".:" + property)
+	sync.replication_config.add_property(path)
+	sync.replication_config.property_set_spawn(path, true)
+	sync.replication_config.property_set_replication_mode(path, SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
 
 
 ## Whether the client [param peer] is sent this entity (World.peer_sees).

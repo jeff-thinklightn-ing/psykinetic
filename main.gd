@@ -219,6 +219,12 @@ var _fell_at: Dictionary[int, Vector2i] = {}
 var compass: HudCompass
 ## The controls, down the left (H shows and hides them).
 var hint_panel: HintPanel
+## The player's slots and an open chest's (I; a click on a chest beside you).
+var slots_panel: SlotsPanel
+## A chest clicked from afar: opened once the player is beside it.
+var _chest_wanted: GridEntity
+var _test_chest_done := false
+var _test_chest_walking := false
 @onready var toss_aim: Line2D = $TossAim
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
 var _terrain: Dictionary = {}
@@ -284,6 +290,7 @@ func _go_online() -> void:
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.command_received.connect(_on_command)
+		World.slots_changed.connect(_on_slots_changed)
 		if Net.llm_url != "" and Net.llm_model != "":
 			mind_kind = "ollama"
 		if Net.mode == Net.Mode.SERVER:
@@ -330,6 +337,7 @@ func _process(delta: float) -> void:
 		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
+	_update_chest()
 	if compass != null:
 		compass.north_on_screen = screen_north()
 	if debug_overlay.visible:
@@ -356,6 +364,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_H:
 		toggle_hints()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_I:
+		toggle_slots()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
 		# A command like any other, so it works from a client too; the
@@ -408,6 +419,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
+	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
+		_click_chest(player, target)
+		return
 	if click.button_index == MOUSE_BUTTON_RIGHT:
 		var door := _door_under_mouse()
 		if door != null and player.tile in Terrain.edge_cells(door.key):
@@ -697,6 +711,7 @@ func _apply_azimuth() -> void:
 ## floor, ignored) and ripples there. Holding the button keeps retargeting
 ## from _process as the cursor moves to other cells.
 func _move_click(player: Player, tile: Vector2i) -> void:
+	_chest_wanted = null
 	_held_target = tile
 	if tile == NONE:
 		return
@@ -1359,6 +1374,8 @@ func _spawn_saved(section: Dictionary) -> bool:
 		if entity == null:
 			continue
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
+		if entry.get("slots") != null:
+			World.set_slots(entity, entry["slots"])
 	# Slots with no entity are dead: pick up their timers, or start one now.
 	for respawn: Dictionary in section.get("respawns", []):
 		if not _alive_slots.has(respawn["spawn"]):
@@ -1519,6 +1536,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	if known and not respawn:
 		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
 	World.protect(player, SPAWN_GRACE_TICKS)
+	World.set_slots(player, record.slots)
 	record.remember(player)
 	record.zone = World.zone.name
 	if not World.peer_zone.has(peer):
@@ -1669,6 +1687,11 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var facing := _direction_arg(args)
 		if facing != Vector2i.ZERO:
 			World.face(entity, facing)
+	elif command_name == "transfer":
+		var from := get_node_or_null(NodePath(str(args.get("from", "")))) as GridEntity
+		var to := get_node_or_null(NodePath(str(args.get("to", "")))) as GridEntity
+		if from != null and to != null:
+			World.try_transfer(entity, from, int(args.get("from_slot", -1)), to, int(args.get("to_slot", -1)))
 	elif command_name == "door":
 		var edge: Variant = args.get("edge")
 		if edge is Array and edge.size() == 3:
@@ -1707,6 +1730,10 @@ func _build_talk() -> void:
 	hint_panel.name = "Hints"
 	hint_panel.visible = Net.hints
 	$HUD.add_child(hint_panel)
+	slots_panel = SlotsPanel.new()
+	slots_panel.name = "Slots"
+	slots_panel.transfer = _transfer
+	$HUD.add_child(slots_panel)
 	talk = TalkPanel.new()
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
@@ -2159,6 +2186,7 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_contest(player, tick)
 	_run_test_reset(player, tick)
 	_run_test_door(player, tick)
+	_run_test_chest(player)
 
 
 ## The controls for the HUD's list, a line each, "key\twhat it does".
@@ -2174,9 +2202,93 @@ func hint_lines() -> Array[String]:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "Wheel\tzoom (MMB click: 1x)"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
-	lines.append_array(["Enter\ttalk", "Tab\ttalk log", "R\treset the room", "F3\tdebug", "F11\tfullscreen",
-		"H\thide these"])
+	lines.append_array(["LMB chest\topen it (drag items)", "I\tyour slots", "Enter\ttalk", "Tab\ttalk log",
+		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	return lines
+
+
+## I: the slots panel shown or hidden; with a chest open, the chest closed.
+func toggle_slots() -> void:
+	if slots_panel == null:
+		return
+	if slots_panel.chest != null:
+		close_chest()
+		return
+	slots_panel.shown = not slots_panel.shown
+
+
+## A left click on [param chest]: open beside it; from afar, walk to the
+## nearest free cell beside it, and open on arrival (_update_chest).
+func _click_chest(player: Player, chest: GridEntity) -> void:
+	if World.can_melee(player.tile, chest.tile):
+		open_chest(chest)
+		return
+	var beside := _beside(chest.tile, player.tile)
+	if beside == NONE:
+		return
+	_move_click(player, beside)
+	_chest_wanted = chest
+
+
+## The free floor cell next to [param at], reachable from it for a hand
+## (World.can_melee), nearest [param from]; NONE if there is none.
+func _beside(at: Vector2i, from: Vector2i) -> Vector2i:
+	var best := NONE
+	for direction in World.DIRECTIONS:
+		var cell := at + direction
+		var mine := cell == from
+		if (mine or World.is_free(cell)) and World.can_melee(cell, at) \
+				and (best == NONE or World.distance(from, cell) < World.distance(from, best)):
+			best = cell
+	return best
+
+
+func open_chest(chest: GridEntity) -> void:
+	_chest_wanted = null
+	if slots_panel != null:
+		slots_panel.open(chest)
+
+
+func close_chest() -> void:
+	_chest_wanted = null
+	if slots_panel != null:
+		slots_panel.open(null)
+
+
+## Each frame: the panel follows the local player; a chest walked to opens,
+## and an open one closes once the player is no longer beside it.
+func _update_chest() -> void:
+	if slots_panel == null:
+		return
+	var player := _local_player()
+	slots_panel.player = player
+	if player == null:
+		close_chest()
+		return
+	if is_instance_valid(_chest_wanted) and World.can_melee(player.tile, _chest_wanted.tile):
+		open_chest(_chest_wanted)
+	var chest := slots_panel.chest
+	if chest != null and (not is_instance_valid(chest) or not World.can_melee(player.tile, chest.tile)):
+		close_chest()
+
+
+## The slots panel's drop: a command, so the server decides (World.try_transfer).
+func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> void:
+	var player := _local_player()
+	if player == null:
+		return
+	World.command(player, "transfer", {"from": str(from.get_path()), "from_slot": from_slot,
+		"to": str(to.get_path()), "to_slot": to_slot})
+
+
+## Server: a player's slots changed: their record has it at once, so it
+## survives a death, a trip and a restart.
+func _on_slots_changed(entity: GridEntity) -> void:
+	if not entity is Player:
+		return
+	var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
+	if record != null and _players.get(entity.owner_peer) == entity:
+		record.slots = entity.slots.duplicate()
 
 
 ## H: the controls list shown or hidden, and remembered.
@@ -2489,6 +2601,39 @@ func _run_test_door(player: Player, tick: int) -> void:
 			return
 
 
+## --test-chest=take|put: walk to the chest nearest the local player, open
+## it, and drag its first item into the player's first empty slot (take),
+## or the player's first item into the chest's first empty slot (put),
+## through the slots panel as a drag would.
+func _run_test_chest(player: Player) -> void:
+	if Net.test_chest.is_empty() or _test_chest_done or player == null or slots_panel == null:
+		return
+	var chest: GridEntity = null
+	for entity in World.get_entities():
+		if entity is Chest and (chest == null or World.distance(player.tile, entity.tile) < World.distance(player.tile, chest.tile)):
+			chest = entity
+	if chest == null:
+		return
+	if not World.can_melee(player.tile, chest.tile):
+		if not _test_chest_walking:
+			_test_chest_walking = true
+			_click_chest(player, chest)
+			print("[test] %s walks to %s" % [player.name, chest.name])
+		return
+	open_chest(chest)
+	var take := Net.test_chest == "take"
+	var from: GridEntity = chest if take else player
+	var to: GridEntity = player if take else chest
+	var from_slot := Array(from.slots).find_custom(func(item: String) -> bool: return not item.is_empty())
+	var to_slot := Array(to.slots).find("")
+	_test_chest_done = true
+	if from_slot < 0 or to_slot < 0:
+		print("[test] %s: nothing to %s (%s, %s)" % [player.name, Net.test_chest, Array(from.slots), Array(to.slots)])
+		return
+	print("[test] %s drags %s from %s %d to %s %d" % [player.name, from.slots[from_slot], from.name, from_slot, to.name, to_slot])
+	slots_panel.drop(from, from_slot, to, to_slot)
+
+
 func _run_test_reset(player: Player, tick: int) -> void:
 	if Net.test_reset_tick <= 0 or _test_reset_sent or player == null or tick < Net.test_reset_tick:
 		return
@@ -2599,5 +2744,12 @@ func _on_test_exit() -> void:
 		tiles.append("%s=%s" % [entity.name, entity.tile])
 	tiles.sort()
 	print("[test] tiles: %s" % " ".join(tiles))
+	var held: Array[String] = []
+	for entity in World.get_entities():
+		if entity is Chest or entity is Player:
+			held.append("%s=[%s]" % [entity.name, ",".join(Array(entity.slots).filter(
+				func(item: String) -> bool: return not item.is_empty()))])
+	held.sort()
+	print("[test] slots: %s" % " ".join(held))
 	Net.shutdown()
 	get_tree().quit()

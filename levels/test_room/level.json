@@ -11,7 +11,8 @@
 		{"at": [8, 2], "name": "Crate1"},
 		{"at": [8, 3], "name": "Crate2"},
 		{"at": [4, 2], "name": "Crate3"},
-		{"at": [6, 3], "name": "Boulder"}
+		{"at": [6, 3], "name": "Boulder"},
+		{"at": [10, 3], "name": "Chest1", "props": {"slots": ["bandaging_kit", "", "", ""]}}
 	],
 	"spawn_points": {"from_sample": [2, 1]},
 	"links": [{"at": [1, 1], "to_map": "sample", "to_spawn": "path_end"}]

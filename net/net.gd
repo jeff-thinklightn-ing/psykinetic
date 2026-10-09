@@ -72,6 +72,8 @@ extends Node
 ##   --test-azimuth=<degrees>     start with the view turned by this (for screenshots)
 ##   --test-yaw=<degrees>         3D: start with the camera yawed by this (for screenshots)
 ##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
+##   --test-chest=take|put        walk to the nearest chest and drag its first item into the player's slots (take),
+##                                or the player's first item into it (put)
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##   --test-lag=<seconds>         client: hold every order this long before sending it
@@ -105,7 +107,7 @@ signal join_rejected(reason: String, server_version: String)
 
 ## Bump for a wire change that protocol() cannot see by itself (the
 ## meaning of an existing RPC argument, say).
-const PROTOCOL_REVISION := 3
+const PROTOCOL_REVISION := 4
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -248,6 +250,7 @@ var test_azimuth := 0.0
 var test_yaw := 0.0
 var _test_yaw_given := false
 var test_door_tick := 0
+var test_chest := ""
 var test_lag := 0.0
 var test_steer := 0.0
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
@@ -931,7 +934,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
+					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
 				if not has_value and i + 1 < args.size():
 					i += 1
@@ -1018,6 +1021,8 @@ func _set_option(key: String, value: String) -> void:
 			screenshot_path = value
 		"--test-door":
 			test_door_tick = value.to_int()
+		"--test-chest":
+			test_chest = value
 		"--test-click":
 			test_click_after = value.to_float()
 		"--test-fullscreen":

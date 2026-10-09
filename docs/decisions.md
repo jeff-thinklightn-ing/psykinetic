@@ -1190,3 +1190,19 @@ quick; the voice is words, where a bigger model is better. So the voice's
 channel takes its own endpoint and model (--voice-url, --voice-model), and
 a server can send it to a bigger card while the rest stays on the box.
 Unset, all three share --llm-url and --llm-model.
+
+## 139. Slots: item ids on the entity, moved only by World, replicated
+
+A thing in a slot is an id (Items), and slots are an array on the entity
+(GridEntity.slots), not separate nodes: a bandaging kit has no tile, no
+body and nothing to sync but its name. Player and chest add the array to
+what their synchronizer sends, so contents reach every peer in the zone
+the same way hp does, and a client never changes them: a drag is a
+transfer command, World.try_transfer checks the hand can reach both sides
+(the player's own slots, or a chest beside them, can_melee) and swaps the
+two slots. Swapping, not refusing an occupied slot, keeps a drop onto a
+full slot meaningful. A player's slots live in their record, updated on
+every change, so death, travel and a restart keep them; a chest's are in
+its snapshot entry. A room reset rebuilds a chest from the level while
+players keep what they hold, so a reset can make a second kit: the reset
+is a test-room tool, and that is accepted for now.

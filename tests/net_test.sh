@@ -137,7 +137,7 @@ predicted=$(cat $clients | grep -cE 'mispredict: Player[0-9]+ step into \(9, 1\)
 check "$predicted" 1 "the loser was told its step into (9, 1) was refused and re-planned"
 check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at ' "$LOGS/server.log")" 1 "phase 1: Casey joined as Player3"
 check "$(count '\[net\] Casey \(c0ffee00\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and id"
-check "$(count '\[state\] loaded 9 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"
+check "$(count '\[state\] loaded 10 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"
 color_before=$(grep -oE 'display: Player3 .*color=[0-9a-f]+' "$LOGS/client4.log" | grep -oE 'color=[0-9a-f]+' | head -1)
 color_after=$(grep -oE 'display: Player3 server_tile=\(11, 3\).*color=[0-9a-f]+' "$LOGS/clientC.log" | grep -oE 'color=[0-9a-f]+' | head -1)
 check "$([ -n "$color_before" ] && echo "$color_after")" "$color_before" "phase 2: Casey is back on (11, 3) as Player3 in her colour"

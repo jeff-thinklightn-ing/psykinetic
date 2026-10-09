@@ -1,5 +1,7 @@
 # Snapshot test: a host run pushes a crate and writes --state; a second run
-# must load the crate where it was left; a corrupt file must start fresh.
+# must load the crate where it was left; the bandaging kit taken from the
+# chest, and put back, must stay where it was left across restarts; a
+# corrupt file must start fresh.
 # Exit code 0 = all assertions passed, 1 = any failed.
 # Godot is taken from $env:GODOT_PATH, or `godot` on PATH.
 $godot = if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'godot' }
@@ -43,13 +45,32 @@ Assert ($crate.Count -eq 1 -and $crate[0].tile[0] -eq 7 -and $crate[0].tile[1] -
 Assert (@($room.entities | Where-Object { $_.script -eq 'res://sim/player.gd' }).Count -eq 0) 'players are not among the entities'
 $dev = @($json.players | Where-Object { $_.player_id -eq 'dev-host' })
 Assert ($json.players.Count -eq 1 -and $dev.Count -eq 1 -and $dev[0].tile[0] -eq 8 -and $dev[0].tile[1] -eq 2 -and $dev[0].zone -eq 'test_room') "snapshot holds the dev host's player record at [8, 2] in the test room"
-Assert ($room.entities.Count -eq 9) "snapshot holds the 9 level entities (saw $($room.entities.Count))"
+Assert ($room.entities.Count -eq 10) "snapshot holds the 10 level entities (saw $($room.entities.Count))"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 $second = Run-Host 'second' @('--test-exit-after=2')
-Assert (@($second | Select-String '\[state\] loaded 9 entities and 1 player records').Count -eq 1) 'second run loads 9 entities and 1 player record from the snapshot'
+Assert (@($second | Select-String '\[state\] loaded 10 entities and 1 player records').Count -eq 1) 'second run loads 10 entities and 1 player record from the snapshot'
 Assert (@($second | Select-String '\[net\] Player \(dev-host\) joined as Player1 at \(8, 2\) \(back\)').Count -eq 1) 'the host comes back where it left off, as Player1'
 Assert (@($second | Select-String 'tiles: .*Crate1=\(7, 2\)').Count -eq 1) 'second run has Crate1 where the first left it'
+Assert (@($second | Select-String 'slots: Chest1=\[bandaging_kit\] Player1=\[\]$').Count -eq 1) 'the chest holds the bandaging kit, the host nothing'
+
+# 2b. The host walks to the chest and drags the kit into their slots.
+$take = Run-Host 'take' @('--test-chest=take', '--test-exit-after=5')
+Assert (@($take | Select-String '\[test\] Player1 drags bandaging_kit from Chest1 0 to Player1 0').Count -eq 1) 'the host walks to the chest and drags the kit to their first slot'
+Assert (@($take | Select-String 'slots: Player1 moved bandaging_kit from Chest1 0 to Player1 0').Count -eq 1) 'the server moves it'
+Assert (@($take | Select-String 'slots: Chest1=\[\] Player1=\[bandaging_kit\]$').Count -eq 1) 'the chest is empty, the host holds the kit'
+try { $json = Get-Content $state -Raw | ConvertFrom-Json } catch { $json = $null }
+$chest = @($json.zones.test_room.entities | Where-Object { $_.name -eq 'Chest1' })
+$dev = @($json.players | Where-Object { $_.player_id -eq 'dev-host' })
+Assert ($chest.Count -eq 1 -and @($chest[0].slots | Where-Object { $_ -ne '' }).Count -eq 0 -and $dev.Count -eq 1 -and $dev[0].slots[0] -eq 'bandaging_kit') "the snapshot has the chest empty and the kit in the host's first slot"
+$after = Run-Host 'after-take' @('--test-exit-after=2')
+Assert (@($after | Select-String 'slots: Chest1=\[\] Player1=\[bandaging_kit\]$').Count -eq 1) 'after a restart the host still holds the kit and the chest is empty'
+
+# 2c. And puts it back.
+$put = Run-Host 'put' @('--test-chest=put', '--test-exit-after=4')
+Assert (@($put | Select-String '\[test\] Player1 drags bandaging_kit from Player1 0 to Chest1 0').Count -eq 1) 'the host drags the kit back into the chest'
+$after = Run-Host 'after-put' @('--test-exit-after=2')
+Assert (@($after | Select-String 'slots: Chest1=\[bandaging_kit\] Player1=\[\]$').Count -eq 1) 'after a restart it is in the chest, the host holds nothing'
 
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 Set-Content $state 'this is not json' -Encoding ascii

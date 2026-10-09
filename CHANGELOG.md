@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.71
+
+Slots and chests. Server.
+
+- **Slots**: you have 4, shown at the bottom right; I shows and hides them.
+- **Chests**: click a chest when you're beside it to open it (click one
+  from further off and you walk over first). Drag things between the
+  chest and your slots. Everyone sees the same chest.
+- The test room has a chest beside the start with a **bandaging kit** in
+  it. It does nothing yet.
+- What's in chests and in your slots is kept across restarts, deaths and
+  trips between maps.
+
+The server must be updated to v0.1.71 too, as it refuses any other version.
+
 ## v0.1.70
 
 Companions. Server.

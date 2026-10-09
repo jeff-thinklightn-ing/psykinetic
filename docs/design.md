@@ -337,6 +337,47 @@ stunned) and is stopped by one up. Sight: a wall stops it only if the eye
 stands no higher than both cells beside the wall; ground higher than both
 ends blocks it.
 
+## Chests and slots
+
+Things (`sim/items.gd`, `Items`: an id, a name, what a slot shows) live in
+**slots**: `GridEntity.slots`, a `PackedStringArray` of item ids, `""` for
+an empty slot. Most entities have none. Every player has `Player.SLOTS`
+(4), empty at first; a **chest** (`sim/chest.gd`, the `chest` marker) has
+`Chest.SLOTS` (4), filled from its `level.json` props (`"slots":
+["bandaging_kit"]`). A chest stands on its tile, is not pushed by walking
+into it, does not break and is no creature. The bandaging kit is the
+first item and does nothing yet: it exists to be moved.
+
+**Only World moves things** (`World.try_transfer(by, from, from_slot, to,
+to_slot)`): the item in one slot goes to another, swapping with what is
+there. Each side must be the player doing it or a chest in their zone
+next to them with no wall or closed door between (`World.reaches`, the
+reach of a hand, `can_melee`); the slot taken from must hold something.
+Anything else is refused and nothing moves. A client asks with the
+`transfer` command (entity paths and slot numbers); the server decides.
+Slots replicate like hp and tiles (`GridEntity.replicate("slots")`, on
+change, to the zone's clients), so the chest and both players show every
+peer the same contents.
+
+**The panel** (`render/slots_panel.gd`, bottom right): the player's four
+slots, shown and hidden with I; a left click on a chest beside you opens
+its row above them (from afar, you walk to the nearest free cell beside
+it and it opens on arrival); walking away closes it, as does I. Drag an
+item onto another slot to move it there (Godot's own drag and drop; the
+boxes show what the server says, not what was dropped).
+
+**Persistence**: a chest's slots are saved with its entry in the snapshot
+(`slots`) and put back on load (`World.set_slots`); an entry with none
+saved keeps the level's. A player's slots are kept in their record
+(`PlayerRecord.slots`), updated the moment they change
+(`World.slots_changed`), so they survive a death, a trip to another zone,
+leaving and a restart. A room reset (R) rebuilds its chests from the
+level, as it does the crates; players keep what they hold.
+
+Test hook: `--test-chest=take|put` walks the local player to the nearest
+chest and drags its first item into their first empty slot, or theirs
+into it, through the panel; at exit every peer prints `[test] slots:`.
+
 ## Tick order
 
 The sim runs at a fixed **10 Hz** (`World.TICK_RATE`), driven by an accumulator

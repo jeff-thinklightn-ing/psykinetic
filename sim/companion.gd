@@ -118,7 +118,7 @@ const HEARING_RANGE := 10
 const HEAT_FELT := 1.0
 const DARK := 0.35
 ## Words in her player's that ask about what is around them.
-const SURROUNDINGS_WORDS := "\\b(where|see|look|around|near|next|here|this|that|fire|flames?|burn\\w*|glow\\w*|warm|water|door|crates?|box\\w*|boulders?|rocks?|carts?|ledges?|edge|drop|stairs?|torch\\w*|light)\\b"
+const SURROUNDINGS_WORDS := "\\b(where|see|look|around|near|next|here|this|that|fire|flames?|burn\\w*|glow\\w*|warm|water|door|crates?|box\\w*|boulders?|rocks?|carts?|chests?|ledges?|edge|drop|stairs?|torch\\w*|light)\\b"
 ## "You have already mentioned: ...": the topics of her last so many lines,
 ## each found by the start of a word.
 const MENTIONED_LINES := 5
@@ -129,6 +129,7 @@ const MENTIONED_TOPICS := {
 	"the crates": "crate",
 	"the boulder": "boulder|rock",
 	"the cart": "cart",
+	"the chest": "chest",
 	"the ledge": "ledge|edge|drop",
 	"the torches": "torch",
 	"the imps": "imp",
@@ -441,6 +442,8 @@ func sightings() -> Dictionary[String, Dictionary]:
 		var entity := World.get_entity_at(cell)
 		if entity != null and entity.pushable and entity.spawned:
 			kinds.append(object_word(entity))
+		elif entity is Chest and entity.spawned:
+			kinds.append("chest")
 		for kind in kinds:
 			if not seen.has(kind):
 				seen[kind] = {"at": cell, "point": Vector2(cell)}
@@ -467,7 +470,7 @@ func _remember_sights() -> void:
 ## there is none.
 func knowledge_of(kinds: Array[String]) -> String:
 	const NAMES := {"fire": "fire", "water": "water", "stair": "a stair", "ledge": "a ledge", "torch": "a torch",
-		"crate": "a crate", "boulder": "a boulder", "cart": "a cart", "door": "a door"}
+		"crate": "a crate", "boulder": "a boulder", "cart": "a cart", "chest": "a chest", "door": "a door"}
 	var seen := sightings()
 	var sentences: Array[String] = []
 	var unseen := 0
@@ -1212,6 +1215,8 @@ func perceived() -> Array[Dictionary]:
 			found.append(monster)
 		elif entity.pushable:
 			found.append(_thing(object_word(entity), cell, Vector2(cell)))
+		elif entity is Chest:
+			found.append(_thing("chest", cell, Vector2(cell)))
 	for door: Door in World.get_doors():
 		var sides := Terrain.edge_cells(door.key)
 		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
@@ -1238,7 +1243,7 @@ func asked_about() -> Array[String]:
 	const WORDS := {
 		"fire": "fire|flame|burn", "water": "water|pool|lake|river", "stair": "stair|steps",
 		"ledge": "ledge|drop|edge|cliff", "door": "door", "crate": "crate|box", "boulder": "boulder|rock",
-		"cart": "cart", "torch": "torch",
+		"cart": "cart", "chest": "chest", "torch": "torch",
 	}
 	var said := ""
 	for turn in _exchange:
@@ -1371,6 +1376,8 @@ func perception_grid() -> String:
 				kinds.append(kind)
 		elif entity.pushable:
 			glyphs[cell] = "o" if object_word(entity) == "boulder" else "c"
+		elif entity is Chest:
+			glyphs[cell] = "="
 	# The level's north at the top, its east on the right.
 	var up := World.north
 	var east := Vector2i(-up.y, up.x)
@@ -1388,7 +1395,7 @@ func perception_grid() -> String:
 			kinds.append(kind)
 	for kind in kinds:
 		key.append("%s %s" % [kind[0], kind])
-	key.append_array(["f fire", "~ water", "# wall", "D closed door", "d open door", "c crate or cart", "o boulder",
+	key.append_array(["f fire", "~ water", "# wall", "D closed door", "d open door", "c crate or cart", "o boulder", "= chest",
 		"^ stair", "v drop to lower ground", ". floor", "? out of sight"])
 	return "A map of what you can see, you at the centre, north at the top, one character a pace:\n%s\nKey: %s." % [
 		"\n".join(rows), ", ".join(key)]

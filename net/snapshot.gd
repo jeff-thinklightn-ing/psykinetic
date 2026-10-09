@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ## Holds every loaded zone (World.zones): its tick, every entity the level
 ## owns (the spawn spec it was built from, its tile, hp, stamina and
-## facing) and its respawn timers; and a PlayerRecord per player who has
+## facing, and a chest's slots) and its respawn timers; and a PlayerRecord per player who has
 ## ever joined, with the zone they are in, so a player comes back where they
 ## left off. The rooms themselves always come from the levels. A version 1
 ## file (one map, before zones) loads as that one zone.
@@ -42,7 +42,7 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 		if entity is Companion:
 			continue  # Kept in its owner's player record instead.
 		var spec := entity.spawn_spec
-		list.append({
+		var entry := {
 			"script": str(spec.get("script", "")),
 			"shape": str(spec.get("shape", EntityFactory.DEFAULT_SHAPE)),
 			"tint": spec["tint"].to_html(true) if spec.get("tint") is Color else "",
@@ -55,7 +55,10 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			"facing": [entity.facing.x, entity.facing.y],
 			"props": JSON.from_native(entity.spawn_spec.get("props", {})),
 			"spawn": int(entity.spawn_spec.get("spawn", -1)),
-		})
+		}
+		if not entity.slots.is_empty():
+			entry["slots"] = Array(entity.slots)
+		list.append(entry)
 	return list
 
 
@@ -80,7 +83,8 @@ static func _write(path: String, text: String) -> bool:
 ## Reads [param path]. The result's "ok" is false if there was nothing usable
 ## (missing, unreadable, or malformed); otherwise "zones" holds each zone's
 ## {tick, entities, respawns}, "entities" one entry per restorable entity:
-## {spec, hp, stamina, facing}, and "players" the records. Entries that make
+## {spec, hp, stamina, facing, slots (null if none saved)}, and "players"
+## the records. Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": []}
@@ -198,6 +202,7 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		"hp": int(entry.get("hp", 0)),
 		"stamina": int(entry.get("stamina", 0)),
 		"facing": facing if facing != null else Vector2i(0, 1),
+		"slots": entry["slots"] if entry.get("slots") is Array else null,
 	}
 
 

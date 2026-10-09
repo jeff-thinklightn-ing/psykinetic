@@ -30,6 +30,9 @@ signal entity_despawned(entity: GridEntity)
 signal entity_died(entity: GridEntity, cause: StringName)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
+## Something went into or out of [param entity]'s slots (try_transfer,
+## set_slots). Server only.
+signal slots_changed(entity: GridEntity)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -521,6 +524,62 @@ func _hit_door(door: Door, amount: int, by: GridEntity) -> void:
 		_log("door: %s broke" % door.name)
 		door.open = true
 	door_changed.emit(door, by)
+
+
+## [param by] moves what is in [param from]'s slot [param from_slot] into
+## [param to]'s slot [param to_slot], swapping with whatever is there. Each
+## side is [param by] itself or a chest it can reach (reaches); the slot
+## taken from must hold something. False, and nothing moves, otherwise.
+func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> bool:
+	if not Net.is_authority():
+		return false
+	if not by is Player or not by.spawned or by.hp <= 0 or not reaches(by, from) or not reaches(by, to):
+		return false
+	if from_slot < 0 or from_slot >= from.slots.size() or to_slot < 0 or to_slot >= to.slots.size():
+		return false
+	if from == to and from_slot == to_slot:
+		return false
+	var item := from.slots[from_slot]
+	if item.is_empty():
+		return false
+	# New arrays, so each synchronizer sees a change.
+	var taken := from.slots.duplicate()
+	var other := to.slots[to_slot]
+	taken[from_slot] = other
+	if from == to:
+		taken[to_slot] = item
+		from.slots = taken
+	else:
+		var given := to.slots.duplicate()
+		given[to_slot] = item
+		from.slots = taken
+		to.slots = given
+	_log("slots: %s moved %s from %s %d to %s %d%s" % [by.name, item, from.name, from_slot, to.name, to_slot,
+		"" if other.is_empty() else " (swapping %s)" % other])
+	slots_changed.emit(from)
+	if to != from:
+		slots_changed.emit(to)
+	return true
+
+
+## Whether [param by] can get at [param entity]'s slots: its own, or a
+## chest in its zone next to it with no wall or closed door between.
+func reaches(by: GridEntity, entity: GridEntity) -> bool:
+	if entity == by:
+		return true
+	return entity is Chest and is_instance_valid(entity) and entity.spawned and entity.zone == by.zone \
+			and can_melee(by.tile, entity.tile)
+
+
+## Puts saved contents back into [param entity]'s slots (unknown items
+## dropped, cut or padded to its size). Server only.
+func set_slots(entity: GridEntity, contents: Variant) -> void:
+	if not Net.is_authority():
+		return
+	var tidy := Items.tidy(contents, entity.slots.size())
+	if tidy != entity.slots:
+		entity.slots = tidy
+		slots_changed.emit(entity)
 
 
 func spawn(entity: GridEntity, at: Vector2i) -> bool:

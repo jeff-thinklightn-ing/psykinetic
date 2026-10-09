@@ -10,6 +10,9 @@ extends GridEntity
 ## whatever is on it, if World allows. WASD steps (queued_steps) are taken
 ## one per free tick, in order, and win over everything else.
 
+## Slots a player has for things (Items), from the start, empty.
+const SLOTS := 4
+
 ## WASD steps waiting for the movement timer: {direction, predicted}.
 var queued_steps: Array[Dictionary] = []
 ## How many of this player's predicted WASD steps have been refused. A
@@ -30,6 +33,8 @@ func _init() -> void:
 	strength = 10
 	max_stamina = 100
 	attack_ticks = 5
+	slots = Items.tidy([], SLOTS)
+	replicate("slots")
 
 
 func _sim_tick() -> void:

@@ -57,11 +57,12 @@ In the order of the swatches above:
 | `#f0b070` | crate | cell | a wooden crate to push |
 | `#5a5a78` | boulder | cell | a stone boulder, mass 200 |
 | `#7a3cb4` | cart | cell | a low cart, mass 60 |
+| `#8c4a1c` | chest | cell | a chest of 4 slots; its props say what is in it |
 | `#ffe000` | torch | cell | a torch on a post: light, and a little heat |
 | `#fff0b0` | lantern | cell | a lantern on a short post: light only |
 | `#ff00ff` | level link | cell | stepping onto it takes that player (and companion) to another zone |
 
-A marker's cell (start, monster, crate, boulder, cart, torch, lantern, link) is
+A marker's cell (start, monster, crate, boulder, cart, chest, torch, lantern, link) is
 walkable, and its ground is the kind most of its four neighbours are
 (stone if none). A colour not in the legend is void, and the server says so
 when it loads the map.
@@ -132,7 +133,8 @@ All of it is optional.
   listed come after, in reading order (rows top to bottom, then left to
   right).
 - `entities`: names, props (`mass`, `sight_range`, `body_material` as
-  `"stone"` / `"wood"` / `"flesh"`) and tints for the markers at those
+  `"stone"` / `"wood"` / `"flesh"`, a chest's `slots` as item ids:
+  `["bandaging_kit", "", "", ""]`) and tints for the markers at those
   cells, which are spawned first, in this order (the order is the entity
   id order, and a server's snapshot finds its entities by their slots).
   Other markers follow in reading order, named by kind: `Crate1`, `Imp2`.

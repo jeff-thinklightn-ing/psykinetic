@@ -47,13 +47,22 @@ crate_tile=$(sed -n '/"name": "Crate1"/,/"type": "pushable"/p' "$STATE" | grep -
 check "$crate_tile" 1 "snapshot has Crate1 at [7, 2]"
 check "$(count '"script": "res://sim/player.gd"' "$STATE")" 0 "players are not among the entities"
 check "$(count '"player_id": "dev-host"' "$STATE")" 1 "snapshot holds the dev host's player record"
-check "$(count '"script": "res://sim/(monster|pushable).gd"' "$STATE")" 9 "snapshot holds the 9 level entities"
+check "$(count '"script": "res://sim/(monster|pushable|chest).gd"' "$STATE")" 10 "snapshot holds the 10 level entities"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 run_host second --test-exit-after=2
-check "$(count '\[state\] loaded 9 entities and 1 player records' "$DIR/second.log")" 1 "second run loads 9 entities and 1 player record from the snapshot"
+check "$(count '\[state\] loaded 10 entities and 1 player records' "$DIR/second.log")" 1 "second run loads 10 entities and 1 player record from the snapshot"
 check "$(count '\[net\] Player \(dev-host\) joined as Player1 at \(8, 2\) \(back\)' "$DIR/second.log")" 1 "the host comes back where it left off, as Player1"
 check "$(count 'tiles: .*Crate1=\(7, 2\)' "$DIR/second.log")" 1 "second run has Crate1 where the first left it"
+
+# 2b. The kit: chest -> the host's slots -> chest, each across a restart.
+run_host take --test-chest=take --test-exit-after=5
+check "$(count 'slots: Chest1=\[\] Player1=\[bandaging_kit\]$' "$DIR/take.log")" 1 "the host takes the kit from the chest"
+run_host after_take --test-exit-after=2
+check "$(count 'slots: Chest1=\[\] Player1=\[bandaging_kit\]$' "$DIR/after_take.log")" 1 "after a restart the host still holds it"
+run_host put --test-chest=put --test-exit-after=4
+run_host after_put --test-exit-after=2
+check "$(count 'slots: Chest1=\[bandaging_kit\] Player1=\[\]$' "$DIR/after_put.log")" 1 "put back, it is in the chest after a restart"
 
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 echo 'this is not json' >"$STATE"

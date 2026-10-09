@@ -14,8 +14,8 @@ extends RefCounted
 ##
 ## A cell pixel is ground (stone, grass, dirt), fire, water, a stair, void
 ## (also any pixel more than half transparent), or a marker: a player start,
-## a monster spawn by type, a crate, a boulder, a cart, a torch, a level
-## link; a marker's cell is ground of the kind most of its neighbours are.
+## a monster spawn by type, a crate, a boulder, a cart, a chest, a torch, a
+## level link; a marker's cell is ground of the kind most of its neighbours are.
 ## An edge pixel is a wall or a door, or open: a wall pixel between two
 ## walkable cells is a thin wall on that edge, and an edge between a
 ## walkable cell and void is a wall whatever its pixel says (the outer
@@ -38,6 +38,7 @@ const MAX_HEIGHT := 6
 
 const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
+const CHEST := "res://sim/chest.gd"
 
 ## The default legend: a meaning per colour (hex, RGB). level.json "legend"
 ## overrides or adds ({"wall": "#402a20", "monster_wraith": "#c0c0ff"}).
@@ -58,12 +59,13 @@ const LEGEND := {
 	"crate": "#f0b070",
 	"boulder": "#5a5a78",
 	"cart": "#7a3cb4",
+	"chest": "#8c4a1c",
 	"torch": "#ffe000",
 	"lantern": "#fff0b0",
 	"link": "#ff00ff",
 }
 const GROUNDS: Array[String] = ["stone", "grass", "dirt"]
-const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "torch", "lantern", "link"]
+const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "torch", "lantern", "link"]
 ## level.json "north": which way in layout.png is north.
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## What a marker spawns, before level.json's props for that tile.
@@ -76,6 +78,8 @@ const CRATE := {"script": PUSHABLE, "shape": "cube", "tint": Color(0.8, 0.6, 0.3
 const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.55, 0.6),
 	"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}}
 const CART := {"script": PUSHABLE, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "props": {"mass": 60.0}}
+## Empty; level.json's props say what is in it ({"slots": ["bandaging_kit"]}).
+const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12)}
 
 ## Levels made in code (tests): name -> {layout: Image, height: Image or
 ## null, config: Dictionary}; load() takes these before the folder.
@@ -323,7 +327,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				warnings.append("an entity in level.json has no \"at\": [x, y]")
 				continue
 			if not by_tile.has(at) or not _spawns(str(by_tile[at]["marker"])):
-				warnings.append("level.json names an entity at %s, where there is no crate, boulder, cart or monster" % at)
+				warnings.append("level.json names an entity at %s, where there is no crate, boulder, cart, chest or monster" % at)
 				continue
 			order.append(at)
 			overrides[at] = entry
@@ -407,7 +411,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 
 
 static func _spawns(marker: String) -> bool:
-	return marker in ["crate", "boulder", "cart"] or marker.begins_with("monster_")
+	return marker in ["crate", "boulder", "cart", "chest"] or marker.begins_with("monster_")
 
 
 static func _base_name(marker: String) -> String:
@@ -424,6 +428,8 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 			return BOULDER.duplicate(true)
 		"cart":
 			return CART.duplicate(true)
+		"chest":
+			return CHEST_SPEC.duplicate(true)
 	var type := marker.trim_prefix("monster_")
 	if not monster_types.has(type):
 		return {}
@@ -436,8 +442,10 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except
-## sight_range.
+## sight_range, slots as a chest's (Items.tidy).
 static func _prop(key: String, value: Variant) -> Variant:
+	if key == "slots":
+		return Items.tidy(value, Chest.SLOTS)
 	if key == "body_material" and value is String:
 		return GridEntity.BodyMaterial.get(str(value).to_upper(), GridEntity.BodyMaterial.FLESH)
 	if key == "sight_range":
