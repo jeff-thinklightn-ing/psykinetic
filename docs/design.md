@@ -607,7 +607,8 @@ from its name.
   have travelled together and who fell near her; then what she can see
   around her (`perception`, below); then how to answer
   (`VOICE_RULES`: out loud, a sentence or two, answer Jeff, never repeat
-  herself or Jeff, "..." only when there is truly nothing to say, and
+  herself or Jeff, always words when Jeff has spoken to her, "..." only
+  when no one has and there is truly nothing to say, and
   "If you don't know what something is, say so.").
 
 What she can see around her, the "around you" block, goes in the voice's
@@ -616,8 +617,10 @@ by `--perception=list|grid|both` (default list; `perception` on the
 console switches it live):
 
 - **list** (`perception_list`): up to 5 things she can see within 6
-  paces, nearest first, monsters chosen before ground so a ledge never
-  crowds out an imp; each with its paces, her bearing as she faces, and
+  paces, nearest first, but only the monsters, what Jeff's last words
+  named (`asked_about`: "Where's the fire?" brings in the fire four paces
+  off) and anything within 2 paces, chosen in that order; each with its
+  paces, her bearing as she faces, and
   its relations as the server works them out: "adjacent to you",
   "between you and Jeff", "behind Jeff", "next to Jeff", "where Jeff
   stands", "on the ledge above you", "below you, down off the ledge".

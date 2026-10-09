@@ -6,7 +6,7 @@ extends Node
 ##
 ##   godot --headless --path . --scene tests/perception_eval.tscn -- \
 ##       --llm-url=http://127.0.0.1:11434/api/chat --llm-model=qwen3:14b \
-##       [--eval-runs=3] [--eval-modes=list,grid,both] [--eval-scenes=a,b] \
+##       [--eval-runs=5] [--eval-modes=list,grid,both] [--eval-scenes=a,b] \
 ##       [--eval-out=build/perception_eval] [--eval-preview]
 ##
 ## Eight fixed scenes, on the test room and the sample level: Wren, Jeff,
@@ -74,7 +74,7 @@ const CLOSED := "\\b(closed|shut|not open|isn'?t open|locked|barred)\\b"
 var _main: Node
 var _mind: OllamaMind
 var _http: HTTPRequest
-var _runs := 3
+var _runs := 5
 var _modes: Array[String] = MODES.duplicate()
 var _only: Array[String] = []
 var _out := "build/perception_eval"
@@ -142,6 +142,9 @@ func _run() -> void:
 			continue
 		for mode in _modes:
 			Net.perception = mode
+			# Sized as asked: the list tells what Jeff asked about.
+			pet._exchange.clear()
+			pet._add_turn("user", QUESTIONS["next_to_you"])
 			tokens.append({"scene": scene["id"], "mode": mode,
 				"voice": await _count_tokens(pet.voice_messages(true)),
 				"stance": await _count_tokens([
@@ -384,9 +387,10 @@ static func score(question: String, say: String, truth: Dictionary) -> Dictionar
 		"door":
 			if not truth["seen"]:
 				return {"pass": _has(text, UNSEEN), "why": "wanted: none seen"}
-			var closed := _has(text, CLOSED)
+			# A bare "Yes." or "No." answers the question as asked.
+			var closed := _has(text, CLOSED) or _has(text, "^\\W*no\\b")
 			if truth["open"]:
-				return {"pass": _has(text, "\\bopen\\b") and not closed, "why": "wanted: open"}
+				return {"pass": (_has(text, "\\bopen\\b") or _has(text, "^\\W*yes\\b")) and not closed, "why": "wanted: open"}
 			return {"pass": closed, "why": "wanted: closed"}
 	return {"pass": false, "why": "unknown question"}
 

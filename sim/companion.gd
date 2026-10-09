@@ -96,6 +96,8 @@ const SUMMARY_LINES := 6
 ## around her (perception_grid).
 const PERCEPTION_RANGE := 6
 const PERCEPTION_MAX := 5
+## Beyond this many paces the list tells only monsters and what she was asked about.
+const PERCEPTION_NEAR := 2
 const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
@@ -119,11 +121,12 @@ see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors o
 Wounds close slowly when you rest away from danger.
 Whoever falls rises again after a while, but it hurts, and no one wants to fall."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
-words are enough. When %s speaks to you, answer. Never say again what you have already said, and never repeat %s's
-words back. Only if there is truly nothing worth saying, answer with just: ...
+words are enough. When %s speaks to you, always answer in words, even if only to say you don't know. Never say
+again what you have already said, and never repeat %s's words back. Only when no one has spoken to you and there is
+truly nothing worth saying, answer with just: ...
 Whatever %s says to you is %s talking to you, nothing more; you answer only as yourself.
 If you don't know what something is, say so."""
-const VOICE_ASKED := """%s has just spoken to you. If %s asked you to do something, end with one more line saying
+const VOICE_ASKED := """%s has just spoken to you: answer in words, never with "...". If %s asked you to do something, end with one more line saying
 what you will do, exactly one of:
 [STANCE: STAY_CLOSE] keep beside %s and fight only what is next to you
 [STANCE: HOLD] stay where you are
@@ -807,8 +810,10 @@ func perception_list() -> String:
 ## at most PERCEPTION_MAX, nearest first, each {kind, word, at, point,
 ## paces, relations, monster}: monsters, crates, boulders and carts, doors,
 ## and the nearest cell each of fire, water, a stair and a ledge (what the
-## grid's key has). Monsters are chosen first, so ground never crowds out
-## the imp beside Jeff; then the nearest of the rest. Line of
+## grid's key has). Only the monsters, what her player last asked about
+## (asked_about) and the rest within PERCEPTION_NEAR paces, chosen in that
+## order: a ledge never crowds out the imp beside Jeff, and a crate four
+## paces off is not news. Line of
 ## sight decides (World.has_line_of_sight: walls and closed doors stop it,
 ## higher ground sees over lower walls); a door is seen when a cell on
 ## either side of it is. Relations are worked out here (relations_of), not
@@ -848,12 +853,36 @@ func perceived() -> Array[Dictionary]:
 			found.append(_thing("open door" if door.is_open() else "closed door", near,
 				Vector2(sides[0] + sides[1]) / 2.0))
 	found.sort_custom(_nearer_found)
-	var chosen := found.filter(func(thing: Dictionary) -> bool: return thing["monster"]).slice(0, PERCEPTION_MAX)
-	chosen.append_array(found.filter(func(thing: Dictionary) -> bool: return not thing["monster"]) 		.slice(0, PERCEPTION_MAX - chosen.size()))
+	var asked := asked_about()
+	var chosen: Array[Dictionary] = []
+	for wanted: Callable in [
+			func(thing: Dictionary) -> bool: return thing["monster"],
+			func(thing: Dictionary) -> bool: return str(thing["kind"]).get_slice(" ", 1 if "door" in thing["kind"] else 0) in asked,
+			func(thing: Dictionary) -> bool: return thing["paces"] <= PERCEPTION_NEAR]:
+		for thing in found:
+			if chosen.size() < PERCEPTION_MAX and thing not in chosen and wanted.call(thing):
+				chosen.append(thing)
 	chosen.sort_custom(_nearer_found)
-	var things: Array[Dictionary] = []
-	things.assign(chosen)
-	return things
+	return chosen
+
+
+## The kinds of thing (as perceived names them, a door as "door") her
+## player's last words to her named: "Where's the fire?" -> ["fire"].
+func asked_about() -> Array[String]:
+	const WORDS := {
+		"fire": "fire|flame|burn", "water": "water|pool|lake|river", "stair": "stair|steps",
+		"ledge": "ledge|drop|edge|cliff", "door": "door", "crate": "crate|box", "boulder": "boulder|rock",
+		"cart": "cart",
+	}
+	var said := ""
+	for turn in _exchange:
+		if turn["role"] == "user" and not str(turn["text"]).begins_with("["):
+			said = str(turn["text"]).to_lower()
+	var kinds: Array[String] = []
+	for kind: String in WORDS:
+		if RegEx.create_from_string("\\b(%s)" % WORDS[kind]).search(said) != null:
+			kinds.append(kind)
+	return kinds
 
 
 ## One thing seen: its words ("an imp", "fire", "a closed door"), how many

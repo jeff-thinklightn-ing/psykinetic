@@ -1010,3 +1010,29 @@ scoring is crude, but it is cheap, repeatable and needs no second model;
 an answer that names a thing as next to her when it is not fails, so
 reciting the whole list does not pass. It runs on the dev machine against
 the box's Ollama through a tunnel, so testing never means deploying.
+
+## 119. Spoken to, she always answers in words
+
+"..." was her way to say nothing when nothing was worth saying, but the
+model took it as leave to ignore a plain question: asked "Is the door
+open?", it answered "..." 64 times in 72. Silence is now only for the
+moments no one spoke to her; when Jeff speaks she answers, if only to
+say she doesn't know.
+
+## 120. The list tells what is close, what is dangerous, and what was asked
+
+Five things nearest first still put a crate four paces off in front of
+the model, and asked "What's next to you?" it read the list out. Now the
+list holds only monsters (at any distance in sight), what Jeff's last
+words named, and the rest within two paces. Asking is how he points at
+something far, so the fire he asks about is told wherever it is in
+sight; the crate he does not mention is not news.
+
+## 121. The list stays the default; both is a setting
+
+Run two of the eval (5 runs a cell, after 119 and 120): both 80%, list
+79%, grid 55%. Within five points the cheaper prompt wins: the list is
+about 250 tokens shorter on every voice and stance ask, and its one clear
+loss to both is placing the fire (85% against 100%). Both stays behind
+--perception for when that is worth the tokens.
+

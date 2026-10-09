@@ -2,7 +2,7 @@
 # against the box's model: opens an ssh tunnel to the box's Ollama, runs
 # the eval headless through it, closes the tunnel. Deploys nothing.
 #
-#   tools\perception_eval.ps1                      # 3 runs, every mode and scene
+#   tools\perception_eval.ps1                      # 5 runs, every mode and scene
 #   tools\perception_eval.ps1 -Runs 1 -Modes grid  # a quick look
 #   tools\perception_eval.ps1 -Preview             # the scenes and their truth; no model
 #
@@ -10,7 +10,7 @@
 # build\perception_eval.jsonl. The live server shares the box's Ollama, so
 # latency is only clean while nobody is playing.
 param(
-	[int]$Runs = 3,
+	[int]$Runs = 5,
 	[string]$Modes = 'list,grid,both',
 	[string]$Scenes = '',
 	[string]$Model = 'qwen3:14b',
