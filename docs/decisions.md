@@ -1253,3 +1253,10 @@ sounds in 141 and 142.
 An item put in a chest makes the chest's thud; one put in a pack, the
 pack's leather. The separate item_place set is gone: each container has
 one sound, for opening it and for putting something in it.
+
+## 145. The pack's leather without the buckle
+
+clothBelt and clothBelt2 have a belt buckle in them: nearly all their
+loudness is above 5 kHz, as in handleCoins, and it was heard as a jingle
+when an item went into a pack. The pack sound is the two small leather
+handlings alone, 6 dB up (they average some 20 dB under the chest's thud).

@@ -1522,7 +1522,7 @@ ortho camera is 40 units off). What plays, on what:
 | A door opened / closed (its replicated state) | `door_open_1-2` / `door_close_1-4` | RPG `doorOpen_1-2` / `doorClose_1-4` |
 | A creature's replicated tile moves on by one | `footstep_1-5` (quiet) | `footstep_concrete_000-004` |
 | A chest opened (this player's panel), or an item put in it | `chest_open_1-3` | RPG `bookPlace1-3` |
-| A pack opened (your own on I, or your companion's), or an item put in it | `pack_open_1-4` | RPG `handleSmallLeather`, `handleSmallLeather2`, `clothBelt`, `clothBelt2` |
+| A pack opened (your own on I, or your companion's), or an item put in it | `pack_open_1-2` (+6 dB on the others: they are quiet) | RPG `handleSmallLeather`, `handleSmallLeather2` |
 
 Not yet: fire (a crackle loop on fire tiles, a hiss on a burn), grunts on
 a body hit, and death cries: neither pack has them. `master_volume=` and

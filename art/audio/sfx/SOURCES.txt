@@ -62,5 +62,3 @@ chest_open_2.ogg         Kenney RPG Audio, bookPlace2.ogg
 chest_open_3.ogg         Kenney RPG Audio, bookPlace3.ogg
 pack_open_1.ogg          Kenney RPG Audio, handleSmallLeather.ogg
 pack_open_2.ogg          Kenney RPG Audio, handleSmallLeather2.ogg
-pack_open_3.ogg          Kenney RPG Audio, clothBelt.ogg
-pack_open_4.ogg          Kenney RPG Audio, clothBelt2.ogg

@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.77
+
+Packs. Server.
+
+- No more jingle when you put something in a pack: it's just leather now,
+  and a little louder.
+
+The server must be updated to v0.1.77 too, as it refuses any other version.
+
 ## v0.1.76
 
 Packs and chests. Server.
