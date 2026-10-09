@@ -888,8 +888,9 @@ answer, what she knows of it: in sight, where ("A door is a few paces to
 the south, closed."); else remembered, where and how long ago, from her
 memory of the zone (`_remember_sights` every `MEMORY_EVERY` ticks: "You saw
 fire some way off to the north-east just now."); else sensed (heat from
-fire she cannot see); else that she has not seen one here, and cannot tell
-anything about it, never that there is none.
+fire she cannot see); else that she has not seen one here and knows of
+none, so she asks about it as she would ("What door?"), never saying there
+is none.
 
 **How she speaks** (`VOICE_RULES`): to her player as "you", the name only
 to call out; "I" and "me" in what anyone says are the one speaking; she

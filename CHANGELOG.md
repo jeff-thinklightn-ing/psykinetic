@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.68
+
+Companions. Server.
+
+- Ask about something she hasn't seen and she asks back ("What door?")
+  instead of telling you there isn't one.
+
+The server must be updated to v0.1.68 too, as it refuses any other version.
+
 ## v0.1.67
 
 Companions. Server and client.
