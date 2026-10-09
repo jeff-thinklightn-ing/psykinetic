@@ -98,6 +98,18 @@ the service's state directory, without any flag. At 5 MB it is moved to
 `mind.log.1` (replacing the one before) and a new one is started, so at
 most about 10 MB is ever on disk.
 
+Transcripts: beside it, `/var/lib/psykinetic/transcripts/` holds a
+plain-text file per companion per day, `<companion>-<YYYY-MM-DD>.txt`
+(server local time): a timestamped line for everything said to her and by
+her, with events as short bracketed notes between them, exactly as her
+voice sees the exchange. Files older than 30 days are deleted. On the
+console, `transcript pip` prints today's and `transcript pip 2026-10-01` an
+older one; or read the files directly:
+
+```sh
+sudo tail -f /var/lib/psykinetic/transcripts/Pip-$(date +%F).txt
+```
+
 The sudo commands `deploy.sh` runs: `install` (three times),
 `systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the
 ones `/etc/sudoers.d/psykinetic-deploy` allows without a password.
@@ -132,7 +144,10 @@ The server takes four commands: `reset` (rebuild the room from the map;
 player records are kept, anyone online keeps their place, and companions
 that died come back; the reply names them), `respawn`
 (bring every dead monster and crate back now), `players` (who is connected,
-where, with what hp), `save` (write the snapshot now).
+where, with what hp), `save` (write the snapshot now). Also `companions`,
+`mind ...` (see the mind log), `map` and `map load <name>`, and
+`transcript <name> [<YYYY-MM-DD>]` (a companion's transcript, today's by
+default); `help` lists them.
 
 Players can also rebuild the room themselves: `R` in the game does what
 `reset` does, for whoever presses it, and the server logs
@@ -150,6 +165,7 @@ bash's `/dev/tcp`, no netcat needed:
 ~/psykinetic/server/admin.sh respawn
 ~/psykinetic/server/admin.sh reset
 ~/psykinetic/server/admin.sh save
+~/psykinetic/server/admin.sh transcript pip
 ```
 
 It must run on the box; the port only listens on localhost. By hand:

@@ -923,3 +923,23 @@ there, unhurt.
 build/ holds the release output and scratch scenes; "all resources" swept
 the scratch scripts into the client's pck. Both presets now exclude
 build/*.
+
+## 110. Transcripts are the exchange, as plain text, a file a day
+
+The mind log answers "what was the model sent and what did it reply"; a
+transcript answers "what did she and Jeff say to each other". It is
+written from the one place the exchange grows (Companion._add_turn), so it
+is exactly what her voice sees, events in brackets included, and nothing
+the voice does not see. Plain text, one file per companion per day, kept
+30 days: readable with tail, grep or the console, and small enough never
+to need rotating. Server local time, as an operator reading it expects.
+
+## 111. Her surroundings are a sentence or two, by her own bearing
+
+The voice can only speak of what it is told. She is told the few things
+worth mentioning near her (fire, water, doors, things that can be shoved,
+ledges, torches), nearest first, at most two, within 4 paces and in her
+sight, in words she might use: paces, and left or right as she faces, or
+"behind Jeff" when that says it better. Grid positions and compass
+directions mean nothing to someone standing there. Each kind of ground is
+told once, so a pool of fire is one sentence, not nine.

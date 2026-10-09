@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.55
+
+Companions. Server.
+
+- **Transcripts**: the server keeps a day-by-day text record of everything
+  said to each companion and by her, with what happened in between, for
+  30 days.
+- **She sees what is around her**: fire, water, doors, crates, boulders,
+  carts, ledges and torches nearby, and she can say where they are ("Fire
+  is burning two paces to your left").
+- She says so when she doesn't know what something is.
+
+The server must be updated to v0.1.55 too, as it refuses any other version.
+
 ## v0.1.54
 
 Packaging. Client.

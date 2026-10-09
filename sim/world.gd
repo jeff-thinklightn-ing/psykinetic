@@ -108,6 +108,8 @@ var _fire: Dictionary[Vector2i, bool] = {}
 var _height: Dictionary[Vector2i, int] = {}
 var _stairs: Dictionary[Vector2i, Vector2i] = {}
 var _water: Dictionary[Vector2i, bool] = {}
+## Torches on their posts (cells), for what a companion sees around her.
+var _torches: Dictionary[Vector2i, bool] = {}
 ## The eye height of the line of sight being walked (has_line_of_sight), -1
 ## when none: a wall lower than the eye does not stop it.
 var _eye := -1
@@ -218,6 +220,9 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_height.clear()
 	_stairs.clear()
 	_water.clear()
+	_torches.clear()
+	for cell: Vector2i in terrain.get("torches", []):
+		_torches[cell] = true
 	var heights: Dictionary = terrain.get("heights", {})
 	for cell: Vector2i in heights:
 		_height[cell] = int(heights[cell])
@@ -1053,6 +1058,10 @@ func stair_at(at: Vector2i) -> Vector2i:
 
 func is_water(at: Vector2i) -> bool:
 	return _water.has(at)
+
+
+func is_torch(at: Vector2i) -> bool:
+	return _torches.has(at)
 
 
 ## How a step from [param from] in [param direction] meets the ground: 0 on

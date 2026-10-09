@@ -17,6 +17,9 @@ extends Node
 ##   --map=<name>                 server/host: play levels/<name> (default test_room)
 ##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
 ##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
+##   --transcripts=<dir>          server/host: keep what is said to and by each companion here, a
+##                                text file each a day (a dedicated server:
+##                                /var/lib/psykinetic/transcripts when it can); see Transcript
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
 ##                                (or PSYKINETIC_MIND_WHY=1)
 ##   --llm-model=<m>              companion minds ask this model...
@@ -135,6 +138,10 @@ var mind_log_path := ""
 ## snapshot was saved on).
 var map_name := ""
 var _mind_log_given := false
+## Where the companions' transcripts go ("" for none); see Transcript.
+const DEFAULT_TRANSCRIPTS := "/var/lib/psykinetic/transcripts"
+var transcripts_dir := ""
+var _transcripts_given := false
 var mind_why := false
 ## --no-companions: players get no companion (tests of other things, or ops).
 var companions := true
@@ -252,6 +259,8 @@ func _enter_tree() -> void:
 	_apply_window_settings()
 	if mode == Mode.SERVER and not _mind_log_given and DirAccess.dir_exists_absolute(DEFAULT_MIND_LOG.get_base_dir()):
 		mind_log_path = DEFAULT_MIND_LOG
+	if mode == Mode.SERVER and not _transcripts_given and DirAccess.dir_exists_absolute(DEFAULT_TRANSCRIPTS.get_base_dir()):
+		transcripts_dir = DEFAULT_TRANSCRIPTS
 	if player_id.is_empty():
 		# A client run from the command line gets a throwaway id; a host or
 		# server run from the project is always the same dev player.
@@ -881,7 +890,7 @@ func _parse_args() -> void:
 			"--mind-why":
 				mind_why = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--mind-log", "--map", \
+					"--llm-url", "--llm-model", "--mind-log", "--map", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
@@ -937,6 +946,9 @@ func _set_option(key: String, value: String) -> void:
 		"--mind-log":
 			mind_log_path = value
 			_mind_log_given = true
+		"--transcripts":
+			transcripts_dir = value
+			_transcripts_given = true
 		"--test-version":
 			_test_version = value
 		"--test-protocol":

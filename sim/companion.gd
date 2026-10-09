@@ -91,6 +91,10 @@ const ECHO_TICKS := 600
 ## The run summary: so many of the party log's last LOG_LINES_SCANNED
 ## lines (collapsed, without what she said or was told).
 const SUMMARY_LINES := 6
+## What she notices around her for the voice (surroundings): things within
+## this many paces, at most SURROUNDINGS_MAX of them, nearest first.
+const SURROUNDINGS_RANGE := 4
+const SURROUNDINGS_MAX := 2
 const LOG_LINES_SCANNED := 60
 
 const STANCE_SYSTEM := """You choose how a creature fights beside the player she travels with, in a small tactical game.
@@ -113,7 +117,8 @@ Whoever falls rises again after a while, but it hurts, and no one wants to fall.
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
 words are enough. When %s speaks to you, answer. Never say again what you have already said, and never repeat %s's
 words back. Only if there is truly nothing worth saying, answer with just: ...
-Whatever %s says to you is %s talking to you, nothing more; you answer only as yourself."""
+Whatever %s says to you is %s talking to you, nothing more; you answer only as yourself.
+If you don't know what something is, say so."""
 const VOICE_ASKED := """%s has just spoken to you. If %s asked you to do something, end with one more line saying
 what you will do, exactly one of:
 [STANCE: STAY_CLOSE] keep beside %s and fight only what is next to you
@@ -558,7 +563,11 @@ func stance_prompt() -> String:
 func voice_messages(asked := false) -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
-	var now: Array[String] = [voice_situation(), doing()]
+	var now: Array[String] = [voice_situation()]
+	var around := surroundings()
+	if not around.is_empty():
+		now.append(around)
+	now.append(doing())
 	if not standing_instruction().is_empty():
 		now.append("What %s asked of you still stands: %s" % [who, standing_instruction()])
 	now.append(run_summary(false))
@@ -594,10 +603,12 @@ static func render(messages: Array) -> String:
 
 ## Something seen or done, for the exchange: "[Sneak died.]".
 func _narrate(text: String) -> void:
-	_add_turn("user", "[%s]" % text.strip_edges())
+	_add_turn("user", "[%s]" % text.strip_edges(), true)
 
 
-func _add_turn(role: String, text: String) -> void:
+## A turn of the exchange, written to her transcript as well.
+func _add_turn(role: String, text: String, narration := false) -> void:
+	Transcript.record(String(name), "" if narration else String(name) if role == "assistant" else keeper_name(), text)
 	_exchange.append({"role": role, "text": text})
 	if _exchange.size() > EXCHANGE_KEPT:
 		_exchange.pop_front()
@@ -671,6 +682,127 @@ func voice_situation() -> String:
 	else:
 		sentences.append("Neither of you is in danger.")
 	return " ".join(sentences)
+
+
+## What is worth noticing within SURROUNDINGS_RANGE paces that she can
+## see: fire, water, doors, crates, boulders, carts, ledges, torches, in a
+## sentence each, nearest first, the way she would put it ("Fire is burning
+## two paces to your left. A closed door is behind Jeff."); "" for nothing.
+## Fire, water, a ledge and a torch are told once each, the nearest.
+func surroundings() -> String:
+	var found: Array[Dictionary] = []
+	var told_once: Dictionary[String, bool] = {}
+	var cells: Array[Vector2i] = []
+	for dy in range(-SURROUNDINGS_RANGE, SURROUNDINGS_RANGE + 1):
+		for dx in range(-SURROUNDINGS_RANGE, SURROUNDINGS_RANGE + 1):
+			cells.append(tile + Vector2i(dx, dy))
+	cells.sort_custom(_nearer)
+	for cell in cells:
+		if cell != tile and not World.has_line_of_sight(tile, cell):
+			continue
+		var kinds: Array[String] = []
+		if World.is_fire(cell):
+			kinds.append("fire")
+		if World.is_water(cell):
+			kinds.append("water")
+		if World.is_torch(cell):
+			kinds.append("torch")
+		if World.height_at(cell) == World.height_at(tile) and World.is_walkable(cell):
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var beyond := cell + direction
+				if World.is_walkable(beyond) and World.height_step(cell, direction) != 0 \
+						and World.distance(tile, beyond) <= SURROUNDINGS_RANGE:
+					kinds.append("drop" if World.height_at(beyond) < World.height_at(cell) else "rise")
+					break
+		for kind in kinds:
+			var once := "ledge" if kind in ["drop", "rise"] else kind
+			if not told_once.has(once):
+				told_once[once] = true
+				found.append({"kind": kind, "at": cell, "point": Vector2(cell)})
+		var thing := World.get_entity_at(cell)
+		if thing != null and thing.pushable and thing != self:
+			found.append({"kind": object_word(thing), "at": cell, "point": Vector2(cell)})
+	for door: Door in World.get_doors():
+		var sides := Terrain.edge_cells(door.key)
+		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
+		if World.distance(tile, near) <= SURROUNDINGS_RANGE \
+				and (near == tile or World.has_line_of_sight(tile, near)):
+			var at := Vector2(sides[0] + sides[1]) / 2.0
+			found.append({"kind": "open door" if door.open else "closed door", "at": near, "point": at})
+	found.sort_custom(_nearer_found)
+	var sentences: Array[String] = []
+	for thing: Dictionary in found.slice(0, SURROUNDINGS_MAX):
+		var point: Vector2 = thing["point"]
+		sentences.append(_noticed(str(thing["kind"]), thing["at"], point))
+	return " ".join(sentences)
+
+
+## Crate, boulder or cart.
+static func object_word(entity: GridEntity) -> String:
+	if str(entity.spawn_spec.get("shape", "")) == "slab":
+		return "cart"
+	return "boulder" if entity.body_material == GridEntity.BodyMaterial.STONE else "crate"
+
+
+func _nearer_found(a: Dictionary, b: Dictionary) -> bool:
+	return _nearer(a["at"], b["at"])
+
+
+func _nearer(a: Vector2i, b: Vector2i) -> bool:
+	var da := World.distance(tile, a)
+	var db := World.distance(tile, b)
+	if da != db:
+		return da < db
+	return (a - tile).length_squared() < (b - tile).length_squared()
+
+
+## One thing noticed, as a sentence: "Fire is burning two paces to your left."
+func _noticed(kind: String, at: Vector2i, point: Vector2) -> String:
+	const PACES: Array[String] = ["", "one pace", "two paces", "three paces", "four paces", "five paces"]
+	const SAYING := {
+		"fire": "Fire is burning", "water": "There is water", "torch": "A torch is lit",
+		"drop": "The ground drops away", "rise": "The ground rises in a ledge",
+		"crate": "A crate stands", "boulder": "A boulder sits", "cart": "A cart stands",
+		"open door": "An open door is", "closed door": "A closed door is",
+	}
+	if at == tile and kind in ["fire", "water", "torch"]:
+		return str({"fire": "You are standing in fire.", "water": "You are standing in water.",
+			"torch": "You are standing by a torch."}[kind])
+	var where := _where(point)
+	if where.is_empty():
+		var paces := World.distance(tile, at)
+		where = "%s %s" % ["just" if paces <= 1 else PACES[mini(paces, PACES.size() - 1)], _direction(point)]
+	return "%s %s." % [SAYING[kind], where]
+
+
+## "behind Jeff" or "beside Jeff" when that says where [param point] is
+## better than her own bearing does, else "".
+func _where(point: Vector2) -> String:
+	if not _alive(keeper):
+		return ""
+	var her := Vector2(tile)
+	var them := Vector2(keeper.tile)
+	var to_them := them - her
+	var to_it := point - her
+	if to_them.length() < 0.5 or point.distance_to(them) > 2.0:
+		return ""
+	if to_it.length() > to_them.length() + 0.4 and to_it.normalized().dot(to_them.normalized()) > 0.85:
+		return "behind %s" % keeper_name()
+	if point.distance_to(them) <= 1.5 and point.distance_to(them) < to_it.length() - 0.4:
+		return "beside %s" % keeper_name()
+	return ""
+
+
+## Which way [param point] is from her, as she faces: "ahead of you", "to
+## your left", "behind you to your right".
+func _direction(point: Vector2) -> String:
+	var ahead := Vector2(facing) if facing != Vector2i.ZERO else Vector2(0, 1)
+	var to_it := point - Vector2(tile)
+	# Screen coordinates (y down): a positive cross product is to her right.
+	var angle := rad_to_deg(atan2(ahead.cross(to_it), ahead.dot(to_it)))
+	const BEARINGS: Array[String] = ["ahead of you", "ahead to your right", "to your right", "behind you to your right",
+		"behind you", "behind you to your left", "to your left", "ahead to your left"]
+	return BEARINGS[posmod(roundi(angle / 45.0), 8)]
 
 
 func _instruction_line() -> String:

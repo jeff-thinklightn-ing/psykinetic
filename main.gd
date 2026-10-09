@@ -2038,8 +2038,17 @@ func admin_command(line: String) -> String:
 				if is_instance_valid(pet):
 					pet.mind = _make_mind()
 			return "companion minds: %s" % mind_kind
+		"transcript":
+			if words.size() < 2:
+				return "usage: transcript <name> [<YYYY-MM-DD>]"
+			var who := words[1]
+			for pet: Companion in _companions.values():
+				if is_instance_valid(pet) and String(pet.name).to_lower() == who.to_lower():
+					who = String(pet.name)
+			return Transcript.show(who, words[2] if words.size() >= 3 else "")
 		"help":
-			return "reset | respawn | players | companions | mind scripted|ollama | mind log on|off | mind last <name> | save"
+			return "reset | respawn | players | companions | mind scripted|ollama | mind log on|off | mind last <name> | " \
+				+ "transcript <name> [<date>] | map | map load <name> | save"
 	return "unknown command %s (try help)" % words[0]
 
 

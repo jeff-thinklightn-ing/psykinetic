@@ -592,12 +592,18 @@ no game, players, stances or JSON in it, and sent as a chat
   and **now**: the
   situation in her words (`voice_situation`: health as unhurt, a little
   hurt, badly hurt or close to falling; paces for cells; who is in
-  danger), what she is set on and doing ("You are keeping beside Jeff and
+  danger), what is worth noticing around her (`surroundings`: fire,
+  water, doors open or closed, crates, boulders, carts, ledges and
+  torches she can see within 4 paces, the nearest two, a sentence each,
+  by her bearing as she faces or as "behind Jeff" / "beside Jeff": "Fire
+  is burning two paces to your left. A closed door is behind Jeff."),
+  what she is set on and doing ("You are keeping beside Jeff and
   fighting whatever comes at either of you; right now you are attacking
   Brute."), what Jeff asked that still stands, how long they have
   travelled together and who fell near her; then how to answer
   (`VOICE_RULES`: out loud, a sentence or two, answer Jeff, never repeat
-  herself or Jeff, "..." only when there is truly nothing to say).
+  herself or Jeff, "..." only when there is truly nothing to say, and
+  "If you don't know what something is, say so.").
 - **the exchange** (`_exchange`, the last 16 entries of this session):
   Jeff's typed words as the user's turns, her lines as the assistant's,
   and what happens as brief bracketed narration in the user's turns
@@ -615,6 +621,14 @@ become the standing instruction. Any other
 reply's stance is logged as `stance_ignored`. Jeff's words never ask the
 hands. The echo filter is as before. Every line's latency is in the mind
 log, with the whole chat as its prompt.
+
+**Transcripts** (`Transcript`): every turn of the exchange, as it is added,
+is also a line in her transcript, a plain-text file per companion per day
+(`<companion>-<YYYY-MM-DD>.txt` in `Net.transcripts_dir`: `--transcripts=`,
+by default `/var/lib/psykinetic/transcripts` on a dedicated server):
+the time, then Jeff's words as `Jeff: ...`, hers as `Pip: ...`, events as
+the bracketed notes the voice sees. Files older than 30 days are deleted.
+The console's `transcript <name> [<date>]` prints one.
 
 **The newest stance wins**: each ask has a serial, and an answer to an
 older ask than the one whose stance stands is logged as superseded. The

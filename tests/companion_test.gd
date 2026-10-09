@@ -33,6 +33,8 @@ func _ready() -> void:
 	_test_voice()
 	_test_names()
 	_test_voice_in_world()
+	_test_surroundings()
+	_test_transcript()
 	_test_voice_knows()
 	_test_lapse()
 	_test_said_persists()
@@ -937,6 +939,119 @@ func _test_voice_in_world() -> void:
 	var body: Variant = JSON.parse_string(ollama.request_messages(messages, "voice"))
 	_check(body is Dictionary and not body.has("format") and body["messages"].size() == messages.size(),
 			"sent as those messages, not as JSON")
+	pet.mind = ScriptedMind.new()
+	for i in 21:
+		World.step()
+
+
+func _test_surroundings() -> void:
+	print("\n== the voice: what is around her, nearest first, as she faces ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	# The test room's fire is (7..9, 5); its west door is between (4, 12) and (4, 13).
+	_put(owner, Vector2i(11, 1))
+	_put(pet, Vector2i(7, 7))
+	pet.facing = Vector2i(0, -1)
+	var around := pet.surroundings()
+	_check(around.begins_with("Fire is burning two paces ahead of you."), "facing it: %s" % around)
+	pet.facing = Vector2i(1, 0)
+	around = pet.surroundings()
+	_check(around.begins_with("Fire is burning two paces to your left."), "facing east, it is to her left: %s" % around)
+	_check(around.count("Fire") == 1, "the fire told once, though it is three cells")
+	pet.facing = Vector2i(0, 1)
+	_check(pet.surroundings().begins_with("Fire is burning two paces behind you."), "and behind her facing away")
+	_put(pet, Vector2i(8, 5))
+	_check(pet.surroundings().begins_with("You are standing in fire."), "standing in it: %s" % pet.surroundings())
+	_put(pet, Vector2i(4, 11))
+	_put(owner, Vector2i(4, 12))
+	pet.facing = Vector2i(0, 1)
+	var door := World.door_across(Vector2i(4, 12), Vector2i(0, 1))
+	var state := "open" if door != null and door.open else "closed"
+	around = pet.surroundings()
+	_check(("A %s door is behind Player." % state) in around, "a door past her player: behind them (%s)" % around)
+	_check(around.split(". ").size() <= Companion.SURROUNDINGS_MAX, "two sentences at most")
+	_put(pet, Vector2i(8, 7))
+	_put(owner, Vector2i(10, 7))
+	pet.facing = Vector2i(0, 1)
+	var crate: GridEntity = _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "TestCrate", "tile": Vector2i(6, 7)})
+	around = pet.surroundings()
+	_check("A crate stands two paces to your right." in around, "a crate, by her bearing: %s" % around)
+	World.despawn(crate)
+	crate.queue_free()
+	_put(pet, Vector2i(16, 11))
+	_put(owner, Vector2i(17, 11))
+	_check(pet.surroundings() == "", "nothing worth telling in an empty corner")
+	var prompt := pet.voice_prompt("test")
+	_check("If you don't know what something is, say so." in prompt, "and she is told to say when she does not know a thing")
+	_put(pet, Vector2i(7, 7))
+	pet.facing = Vector2i(0, -1)
+	_check(pet.surroundings() in pet.voice_prompt("test"), "what is around her is in the voice's now")
+	# Heights and torches, on a level of their own.
+	World._set_terrain({"floor": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
+		"fire": [], "edges": {}, "heights": {Vector2i(2, 0): 1, Vector2i(2, 1): 1}, "torches": [Vector2i(0, 1)]})
+	var was := pet.tile
+	pet.tile = Vector2i(0, 0)
+	pet.facing = Vector2i(1, 0)
+	var ledge := pet.surroundings()
+	pet.tile = was
+	World._set_terrain(_main._terrain)
+	_check("The ground rises in a ledge" in ledge and "A torch is lit just to your right." in ledge,
+			"a ledge and a torch: %s" % ledge)
+	_settle(pet)
+
+
+func _test_transcript() -> void:
+	print("\n== transcripts: what is said to her and by her, a file a day ==")
+	var dir := OS.get_user_data_dir().path_join("transcripts_test")
+	if DirAccess.dir_exists_absolute(dir):
+		for file in DirAccess.get_files_at(dir):
+			DirAccess.remove_absolute(dir.path_join(file))
+	var saved := Net.transcripts_dir
+	Net.transcripts_dir = dir
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "I see it.", "stance": ""}
+	pet._last_speech_tick = -1000
+	_main._on_command(owner, "say", {"text": "Look at that door."})
+	pet.note_death("Sneak")
+	World.step()
+	var today := Time.get_date_string_from_system()
+	var path := Transcript.path_of(dir, String(pet.name), today)
+	var lines := FileAccess.get_file_as_string(path).strip_edges().split("\n")
+	var time := RegEx.create_from_string("^\\d\\d:\\d\\d:\\d\\d ")
+	_check(lines.size() >= 3 and Array(lines).all(func(l: String) -> bool: return time.search(l) != null),
+			"%s-%s.txt, a timestamped line each (%d)" % [pet.name, today, lines.size()])
+	var text := "\n".join(lines)
+	_check(" Player: Look at that door." in text and (" %s: I see it." % pet.name) in text and " [Sneak fell.]" in text,
+			"her player's words, hers, and the event in brackets:\n%s" % text)
+	_check(_main.admin_command("transcript %s" % String(pet.name).to_lower()) == FileAccess.get_file_as_string(path).strip_edges(false, true),
+			"console: transcript %s prints today's" % String(pet.name).to_lower())
+	var old_day := Time.get_date_string_from_unix_time(Time.get_unix_time_from_system() - 40 * 86400)
+	var kept_day := Time.get_date_string_from_unix_time(Time.get_unix_time_from_system() - 20 * 86400)
+	for day in [old_day, kept_day]:
+		var file := FileAccess.open(Transcript.path_of(dir, String(pet.name), day), FileAccess.WRITE)
+		file.store_line("12:00:00 [An old day.]")
+		file.close()
+	_check(_main.admin_command("transcript %s %s" % [pet.name, kept_day]) == "12:00:00 [An old day.]",
+			"transcript %s <date> prints that day's" % pet.name)
+	_check(_main.admin_command("transcript %s 2001-01-01" % pet.name).begins_with("no transcript of %s on 2001-01-01 (there are: " % pet.name),
+			"a day with none says which days there are")
+	_check(_main.admin_command("transcript %s ../x" % pet.name) == "a date is YYYY-MM-DD", "a date that is not one is refused")
+	var removed := Transcript.prune(dir, today)
+	_check(removed == 1 and not FileAccess.file_exists(Transcript.path_of(dir, String(pet.name), old_day))
+			and FileAccess.file_exists(Transcript.path_of(dir, String(pet.name), kept_day)) and FileAccess.file_exists(path),
+			"%d days are kept: the one 40 days old is deleted, 20 days old kept" % Transcript.KEEP_DAYS)
+	for file in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir.path_join(file))
+	DirAccess.remove_absolute(dir)
+	Net.transcripts_dir = saved
 	pet.mind = ScriptedMind.new()
 	for i in 21:
 		World.step()
