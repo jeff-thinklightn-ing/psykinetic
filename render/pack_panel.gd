@@ -7,7 +7,8 @@ extends PanelContainer
 ## goes to the server as a command (Main._transfer) and the boxes show what
 ## comes back, so every peer shows the same. I shows and hides it (Main);
 ## opening a chest or a companion's pack shows it with that row. When an
-## item lands in a row on show, sound plays "item_place" there, once a
+## item lands in a row on show, sound plays there what that container
+## sounds like opening ("chest_open", a thud; "pack_open", leather), once a
 ## frame. Sizes in the HUD's 3840 x 2160 units.
 
 const SLOT_SIZE := Vector2(132, 132)
@@ -19,7 +20,7 @@ const TEXT := Color(0.93, 0.92, 0.88, 0.95)
 
 ## Called with (from, from_slot, to, to_slot) when an item is dropped.
 var transfer: Callable
-## Called with (sound set name, entity) for the clunk of an item landing.
+## Called with (sound set name, entity) for an item landing.
 var sound: Callable
 ## Whose pack the bottom row shows; null for none (no player).
 var player: GridEntity:
@@ -201,4 +202,4 @@ func _refresh() -> void:
 			box.label.text = Items.short_of(item) if not item.is_empty() else ""
 			box.label.add_theme_color_override("font_color", Items.color_of(item))
 	if landed != null and sound.is_valid():
-		sound.call("item_place", landed)
+		sound.call("chest_open" if landed is Chest else "pack_open", landed)

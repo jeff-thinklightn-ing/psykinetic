@@ -1247,3 +1247,9 @@ The creak is gone. A chest opens with the thud (bookPlace), and an item
 landing keeps the chest's sound, so it is the thud too; a pack opens
 with the leather rustle (handleSmallLeather, clothBelt). Supersedes the
 sounds in 141 and 142.
+
+## 144. An item lands with its container's sound
+
+An item put in a chest makes the chest's thud; one put in a pack, the
+pack's leather. The separate item_place set is gone: each container has
+one sound, for opening it and for putting something in it.

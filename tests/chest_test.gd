@@ -90,12 +90,15 @@ func _test_there_and_back() -> void:
 			"dragged to the player's first slot: theirs now, the chest empty (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	await get_tree().process_frame
 	_check(panel.shown_in(true, 0) == "Bandages" and panel.shown_in(false, 0) == "", "the panel shows it moved")
-	_check(_main.sounds == ["item_place %s" % host.name], "and it clunks, once, in the pack it landed in (%s)" % [_main.sounds])
+	_check(_main.sounds == ["pack_open %s" % host.name], "and it lands with the pack's leather, once (%s)" % [_main.sounds])
 	await get_tree().process_frame
 	_check(_main.sounds.size() == 1, "once only (%s)" % [_main.sounds])
 	panel.drop(host, 0, host, 3)
 	_check(Array(host.slots) == ["", "", "", KIT], "moved along the player's own slots (%s)" % [Array(host.slots)])
+	_main.sounds.clear()
 	panel.drop(host, 3, chest, 2)
+	await get_tree().process_frame
+	_check(_main.sounds == ["chest_open Chest1"], "into the chest, with the chest's thud (%s)" % [_main.sounds])
 	_check(Array(host.slots) == ["", "", "", ""] and Array(chest.slots) == ["", "", KIT, ""],
 			"and back into the chest, its third slot (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	World.try_transfer(host, chest, 2, chest, 0)

@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.76
+
+Packs and chests. Server.
+
+- Moving an item sounds like where it goes: a thud into a chest, leather
+  into a pack.
+
+The server must be updated to v0.1.76 too, as it refuses any other version.
+
 ## v0.1.75
 
 Packs and chests. Server.

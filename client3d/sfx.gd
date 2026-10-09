@@ -20,7 +20,7 @@ const SET_SIZES := {
 	"impact_body": [-2.0, 5], "impact_body_soft": [-6.0, 5], "break": [0.0, 5],
 	"death_monster": [0.0, 5], "death_player": [0.0, 5], "death_companion": [-2.0, 1],
 	"door_open": [-4.0, 2], "door_close": [-4.0, 4], "footstep": [-16.0, 5],
-	"chest_open": [-4.0, 3], "pack_open": [-4.0, 4], "item_place": [-4.0, 3],
+	"chest_open": [-4.0, 3], "pack_open": [-4.0, 4],
 }
 ## Set name -> [volume in dB, its files under PACK].
 var sets := _sets()
