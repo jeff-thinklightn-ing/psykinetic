@@ -606,7 +606,12 @@ from its name.
   torches she can see within 4 paces, the nearest two, a sentence each,
   by her bearing as she faces or as "behind Jeff" / "beside Jeff": "Fire
   is burning two paces to your left. A closed door is behind Jeff."),
-  what she is set on and doing ("You are keeping beside Jeff and
+  only when it is new to her (what it tells, thing and cell, differs
+  from when she last spoke; turning does not count) or Jeff's words ask
+  about it (where, see, look, fire, door, ...: `SURROUNDINGS_WORDS`),
+  what she is set on and doing, what she has already mentioned in her
+  last 5 lines ("You have already mentioned: the fire, resting.", by
+  `MENTIONED_TOPICS`), ("You are keeping beside Jeff and
   fighting whatever comes at either of you; right now you are attacking
   Brute."), what Jeff asked that still stands, how long they have
   travelled together and who fell near her; then how to answer

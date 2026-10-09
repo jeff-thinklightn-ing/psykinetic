@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_names()
 	_test_voice_in_world()
 	_test_surroundings()
+	_test_surroundings_when_new()
 	_test_transcript()
 	_test_transcript_rebuild()
 	_test_monsters_by_kind()
@@ -1005,6 +1006,44 @@ func _test_surroundings() -> void:
 	_settle(pet)
 
 
+func _test_surroundings_when_new() -> void:
+	print("\n== surroundings only when they changed since her last line, or are asked about; what she has mentioned ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(11, 1))
+	_put(pet, Vector2i(7, 7))
+	pet.facing = Vector2i(0, -1)
+	var around := pet.surroundings()
+	_check(around in pet.voice_prompt("test"), "new to her: told (%s)" % around)
+	pet._last_speech_tick = -1000
+	pet._say("The fire is close. Rest while you can.", true)
+	_check(not (around in pet.voice_prompt("test")), "said a line since, nothing changed: not told again")
+	pet.facing = Vector2i(1, 0)
+	_check(not ("Fire is burning" in pet.voice_prompt("test")), "turning changes nothing around her")
+	_check("Fire is burning" in pet.voice_prompt("test", "Player just said to you: \"Where's the fire?\""),
+			"Player asks about it: told")
+	_check(not ("Fire is burning" in pet.voice_prompt("test", "Player just said to you: \"thanks\"")),
+			"Player says something else: not told")
+	var crate: GridEntity = _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "TestCrate2", "tile": Vector2i(8, 7)})
+	_check("A crate stands just" in pet.voice_prompt("test"), "something new beside her: told (%s)" % pet.surroundings())
+	World.despawn(crate)
+	crate.queue_free()
+	_check("You have already mentioned: the fire, resting." in pet.voice_prompt("test"),
+			"her last lines' topics: %s" % [pet.mentioned_topics()])
+	pet._said.clear()
+	for line in ["Your wound needs rest.", "a", "b", "c", "d", "e"]:
+		pet._said.append(line)
+	_check(pet.mentioned_topics().is_empty(), "only her last %d lines count" % Companion.MENTIONED_LINES)
+	pet._said.clear()
+	pet._said.append("Your wound needs rest.")
+	_check(str(pet.mentioned_topics()) == str(["Player's wounds", "resting"]), "%s" % [pet.mentioned_topics()])
+	_check(not ("You have already mentioned" in Companion.VOICE_RULES), "not a rule: part of now")
+	pet._said.clear()
+	_settle(pet)
+
+
 func _test_transcript() -> void:
 	print("\n== transcripts: what is said to her and by her, a file a day ==")
 	var dir := OS.get_user_data_dir().path_join("transcripts_test")
@@ -1183,6 +1222,18 @@ func _test_transcript_rebuild() -> void:
 	Transcript.rebuild(logs)
 	var again := FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n").size()
 	_check(again == expected.size(), "rebuilding again replaces what was rebuilt (%d lines)" % again)
+	# Asked while Jeff was down, an ask called him "the one you travel with".
+	var down := system.replace("Jeff", "the one you travel with")
+	file = FileAccess.open(log_path, FileAccess.WRITE)
+	for ask: Dictionary in asks:
+		file.store_line(JSON.stringify(ask))
+	file.store_line(JSON.stringify({"kind": "voice", "companion": "Pip", "time": stamp + "Z", "outcome": "silent", "say": "",
+		"prompt": down + "\n\nuser: Look there\n\nassistant: Hm.\n\nuser: Is it coming?\n[It came up next to you.]\n\nassistant: I see it.\n\nuser: [An imp fell.]\nGood\n[Jeff fell.]"}))
+	file.close()
+	Transcript.rebuild(logs)
+	var after := FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day))
+	_check(after.count("Jeff: Good") == 1 and not ("the one you travel with" in after) and "[Jeff fell.]" in after,
+			"an ask made while Jeff was down: his name as last known, nothing repeated")
 	for f in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir.path_join(f))
 	DirAccess.remove_absolute(dir)

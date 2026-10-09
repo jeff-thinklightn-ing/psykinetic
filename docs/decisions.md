@@ -969,3 +969,13 @@ the overlapping windows gives the conversation back, Jeff's lines
 included, for the days before. Rebuilt lines are marked off in the file
 and replaced on a rebuild, so it can be run any time without doubling
 what was written live.
+
+## 115. Surroundings are told when they are news
+
+Told every time, the same fire two paces off became the thing she talked
+about. Now the voice hears her surroundings only when they changed since
+her last line (by what is there and where, not by how she faces) or when
+Jeff's words ask about them. And she is told the topics of her own last
+five lines ("You have already mentioned: the fire, resting."), a cheaper
+and surer guard against harping than the echo filter, which only catches
+repeated words.
