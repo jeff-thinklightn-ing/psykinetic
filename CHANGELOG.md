@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.80
+
+Maps. Server.
+
+- **The Castle**, a new map. From the test room, walk to the far end of
+  the long corridor in the south-east corner and step onto the link there.
+  The castle's own link, beside where you arrive, brings you back.
+
+The server must be updated to v0.1.80 too, as it refuses any other version.
+
 ## v0.1.79
 
 Level editor. Server.

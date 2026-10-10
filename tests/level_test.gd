@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_sight_over_walls()
 	await _test_level_links()
 	_test_console()
+	await _test_castle()
 
 	_main.load_map(Level.DEFAULT_MAP)
 	print("")
@@ -258,6 +259,48 @@ func _test_level_links() -> void:
 	_check(arrived != null and arrived.tile == Vector2i(2, 2), "and Player arrives at its spawn point gate, (2, 2) (%s)" % [arrived.tile if arrived else "none"])
 	_check(World.zones.has("test_link_a") and arrived != null and arrived.zone == "test_link_b",
 		"in the zone test_link_b; test_link_a stays loaded")
+
+
+func _test_castle() -> void:
+	print("\n== the castle, and the way there from the test room ==")
+	var castle := Level.load_level("castle")
+	_check(not castle.is_empty() and castle["display_name"] == "The Castle" and castle["warnings"].is_empty(),
+			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
+	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
+	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle"}]),
+			"its link at (27, 12) goes to the test room (%s)" % [castle["links"]])
+	var room := Level.load_level("test_room")
+	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")
+	_check(back.size() == 1 and back[0]["tile"] == Vector2i(30, 34) and back[0]["to_spawn"] == "from_test_room",
+			"the test room's link at (30, 34) goes to the castle")
+	_main.load_map("test_room")
+	var player := _player()
+	var start := player.tile
+	var path: Array = World.find_path(start, Vector2i(30, 34))
+	_check(not path.is_empty(), "a path from the start, %s, to that link (%d steps)" % [start, path.size()])
+	var turns: Array[Vector2i] = []
+	for i in path.size():
+		var here: Vector2i = path[i]
+		var before: Vector2i = start if i == 0 else path[i - 1]
+		var after: Vector2i = path[i + 1] if i + 1 < path.size() else here
+		if i + 1 == path.size() or after - here != here - before:
+			turns.append(here)
+	print("    the way: %s -> %s" % [start, " -> ".join(turns.map(func(t: Vector2i) -> String: return str(t)))])
+	_put(player, Vector2i(30, 33))
+	_wait_for_step(player)
+	_check(World.try_move(player, Vector2i(0, 1)), "Player steps onto it")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var there := _player()
+	_check(_main.map_name == "castle" and there != null and there.tile == Vector2i(26, 13),
+			"and arrives in the castle beside its link, at (26, 13) (%s %s)" % [_main.map_name, there.tile if there else "none"])
+	_wait_for_step(there)
+	_check(World.try_move(there, Vector2i(1, -1)), "steps onto the castle's link")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var home := _player()
+	_check(_main.map_name == "test_room" and home != null and home.tile == Vector2i(30, 33),
+			"and is back in the test room beside its link, at (30, 33) (%s %s)" % [_main.map_name, home.tile if home else "none"])
 
 
 func _test_console() -> void:

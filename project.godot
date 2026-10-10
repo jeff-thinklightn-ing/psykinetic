@@ -25,12 +25,10 @@ World="*res://sim/world.gd"
 
 window/size/viewport_width=3840
 window/size/viewport_height=2160
-window/size/resizable=true
 window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/dpi/allow_hidpi=true
 
 [gui]
 
@@ -42,6 +40,5 @@ theme/default_theme_scale=3.0
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
 textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"

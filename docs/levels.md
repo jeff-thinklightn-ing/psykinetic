@@ -13,7 +13,8 @@ its first visit, kept loaded. `--map=<name>` is where new players start;
 everyone else is in the zone they were last in. On a server's console,
 `zones` lists them and `zone reset <name>` rebuilds one from its map.
 `levels/test_room` is the original room; `levels/sample` uses every entry in
-the legend, with heights, stairs and a link back to the test room.
+the legend, with heights, stairs and a link back to the test room;
+`levels/castle` is the first map made in the level editor.
 
 ## The grid: double resolution
 
@@ -150,6 +151,9 @@ a safe start if a monster is close), their companion beside them. Nobody
 else moves. Travel does not heal or revive, as a reset does. Their record
 keeps the zone, so a restart brings them back there. The test room's link
 is in its top-left corner, (1, 1), to the sample; the sample's leads back.
+Its second, at the dead end of the south-east corridor, (30, 34), goes to
+`levels/castle` ("The Castle"), arriving at (26, 13) beside the castle's
+own link at (27, 12), which comes back to (30, 33).
 
 ## The level editor
 

@@ -14,6 +14,9 @@
 		{"at": [6, 3], "name": "Boulder"},
 		{"at": [10, 3], "name": "Chest1", "props": {"slots": ["bandaging_kit", "", "", ""]}}
 	],
-	"spawn_points": {"from_sample": [2, 1]},
-	"links": [{"at": [1, 1], "to_map": "sample", "to_spawn": "path_end"}]
+	"spawn_points": {"from_sample": [2, 1], "from_castle": [30, 33]},
+	"links": [
+		{"at": [1, 1], "to_map": "sample", "to_spawn": "path_end"},
+		{"at": [30, 34], "to_map": "castle", "to_spawn": "from_test_room"}
+	]
 }

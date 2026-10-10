@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://darni3jpajf0d"
+path="res://.godot/imported/layout.png-0e1bb8d121fc18a53cecca385c044659.image"
+
+[deps]
+
+source_file="res://levels/castle/layout.png"
+dest_files=["res://.godot/imported/layout.png-0e1bb8d121fc18a53cecca385c044659.image"]
+
+[params]
+
