@@ -30,6 +30,8 @@ func _ready() -> void:
 	await _test_companion_death()
 	await _test_player_death()
 	_test_settings()
+	_test_ground_colours()
+	await _test_fade()
 	_test_outdoor()
 	await _test_goblin()
 
@@ -208,8 +210,19 @@ func _test_outdoor() -> void:
 	var terrain: Dictionary = castle["terrain"]
 	_rig.rebuild(terrain, castle["centre"])
 	_check(_rig._outdoor and _rig._environment.background_mode == Environment.BG_SKY
-			and _rig._environment.ambient_light_source == Environment.AMBIENT_SOURCE_SKY and _rig._sun.light_energy > 0.5,
-			"the castle is outdoors: lit by a sky and a day's sun")
+			and _rig._sun.light_energy > 0.5, "the castle is outdoors: under a sky, lit by a day's sun")
+	var ambient := _rig._environment.ambient_light_color
+	_check(_rig._environment.ambient_light_source == Environment.AMBIENT_SOURCE_COLOR
+			and is_equal_approx(ambient.r, ambient.g) and is_equal_approx(ambient.g, ambient.b),
+			"its ambient light is neutral, not the sky's green-bottomed colour (%s)" % ambient)
+	var water: Array = terrain.get("water", [])
+	if not water.is_empty():
+		var cell: Vector2i = water[0]
+		var surface := _rig._room.get_node("Water_%d_%d" % [cell.x, cell.y]) as Node3D
+		var bed := _rig._room.get_node_or_null("WaterBed_%d_%d" % [cell.x, cell.y]) as Node3D
+		var forest_floor := _rig._room.get_node("ForestFloor") as Node3D
+		_check(bed != null and forest_floor.position.y < bed.position.y and bed.position.y < surface.position.y,
+				"its water is drawn above its bed, and both above the forest floor, not hidden under it")
 	var land: Dictionary = _rig._land
 	var bare: Array[Vector2i] = []
 	for cell: Vector2i in land:
@@ -236,6 +249,74 @@ func _test_outdoor() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
 			"and back in the test room, it is under stone again")
+
+
+func _test_ground_colours() -> void:
+	print("\n== floors: stone is grey (the kit's floor piece is grass), grass and dirt are tinted ==")
+	var stone := _rig._ground_base("stone")
+	_check(stone.albedo_texture == null and is_equal_approx(stone.albedo_color.r, stone.albedo_color.g)
+			and absf(stone.albedo_color.g - stone.albedo_color.b) < 0.05, "stone: grey, untextured (%s)" % stone.albedo_color)
+	var grass := _rig._ground_base("grass")
+	_check(grass.albedo_texture != null and grass != stone, "grass: the kit's piece, tinted")
+	for cell: Vector2i in _rig._grounds:
+		if _rig._ground_kinds[cell] == "stone":
+			var mesh := _rig._grounds[cell].find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+			var drawn := mesh.material_override as BaseMaterial3D
+			_check(drawn != null and drawn.albedo_texture == null, "a stone floor cell in the room is drawn grey (%s)" % cell)
+			break
+
+
+func _test_fade() -> void:
+	print("\n== walls fade only between the camera and the player, worked out again as the camera moves ==")
+	var player := _player()
+	var start := player.tile
+	var floor_cells: Array = _main._terrain["floor"]
+	# A wall with floor on both sides: stand on its far side from the camera.
+	var toward := _rig._camera.global_transform.basis.z
+	var wall_key := Vector3i(-1, -1, -1)
+	var behind := Vector2i.ZERO
+	for key: Vector3i in _rig._walls:
+		var cell := Vector2i(key.x, key.y)
+		var normal := Vector2i(1, 0) if key.z == Terrain.EAST else Vector2i(0, 1)
+		var other := cell + normal
+		var far := cell if Vector2(normal).dot(Vector2(toward.x, toward.z)) > 0.0 else other
+		if cell in floor_cells and other in floor_cells and World.get_entity_at(far) == null and _rig._height(cell) == _rig._height(other):
+			wall_key = key
+			behind = far
+			break
+	_check(wall_key.z != -1, "the test room has a wall with floor on both sides (%s)" % wall_key)
+	if wall_key.z == -1:
+		return
+	_place(player, behind)
+	await get_tree().create_timer(1.5).timeout
+	var wall := _rig._walls[wall_key]
+	_check(_rig._faded.has(wall), "standing just behind a wall: it fades (%s, at %s)" % [wall_key, behind])
+	var far_faded := 0
+	var companion := _companion()
+	for piece: Node3D in _rig._faded:
+		var at := Vector2(piece.global_position.x, piece.global_position.z)
+		var near_player := at.distance_to(Vector2(player.tile)) < 5.0
+		var near_companion := companion != null and at.distance_to(Vector2(companion.tile)) < 5.0
+		if not near_player and not near_companion:
+			far_faded += 1
+	_check(far_faded == 0, "and nothing far from the player or the companion fades (%d of %d)" % [far_faded, _rig._faded.size()])
+	var away := behind
+	for cell: Vector2i in floor_cells:
+		if Vector2(cell - behind).length() >= 6.0 and World.get_entity_at(cell) == null and (companion == null or Vector2(cell - companion.tile).length() >= 6.0):
+			away = cell
+			break
+	_place(player, away)
+	await get_tree().create_timer(1.5).timeout
+	_check(not _rig._faded.has(wall), "walk away, the camera with them: that wall is solid again")
+	_place(player, start)
+	await get_tree().create_timer(1.0).timeout
+
+
+func _place(entity: GridEntity, tile: Vector2i) -> void:
+	World._relocate(entity, tile)
+	if entity is Player:
+		entity.queued_steps.clear()
+		entity.has_move_order = false
 
 
 func _test_goblin() -> void:

@@ -434,7 +434,8 @@ func _test_pitch_peek() -> void:
 	_ease(rig)
 	var yaw := rig.yaw
 	var saved := Net.camera_yaw
-	var near_before := _near_walls(rig)
+	rig._update_fade(true)
+	var fade_before := rig._fade_key
 	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE),
 			"at rest: pitch %s, size %s" % [rig.pitch, rig._camera.size])
 	rig.begin_pitch_peek()
@@ -450,7 +451,8 @@ func _test_pitch_peek() -> void:
 			and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE * Client3D.PEEK_PULL_BACK),
 			"past the full drag, either way: top-down at %s and pulled back to %s" % [rig.pitch, rig._camera.size])
 	_check(is_equal_approx(rig.yaw, yaw), "the yaw never moves (%s)" % rig.yaw)
-	_check(_near_walls(rig) == near_before, "the same walls are near, and see-through, at the full tilt")
+	rig._update_fade()
+	_check(rig._fade_key != fade_before, "at the full tilt, what fades is worked out again for that view")
 	rig.end_pitch_peek()
 	rig._ease_peek(Client3D.PEEK_RETURN_SECONDS * 0.5)
 	_check(rig.pitch > Client3D.CAMERA_PITCH and rig.pitch < Client3D.PEEK_PITCH, "let go: springing back (%s)" % rig.pitch)
@@ -503,15 +505,6 @@ func _test_middle_drag_axis() -> void:
 			"a middle click tilts nothing; it puts the zoom to 1x")
 	Net.controls = saved
 	_free_rig(rig)
-
-
-## Wall edge keys the 3D view has see-through now.
-func _near_walls(rig: Client3D) -> Array[Vector3i]:
-	var near: Array[Vector3i] = []
-	for key: Vector3i in rig._walls:
-		if rig._is_near(key):
-			near.append(key)
-	return near
 
 
 func _test_schemes_are_inert_outside() -> void:

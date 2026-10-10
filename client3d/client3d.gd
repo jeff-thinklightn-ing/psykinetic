@@ -18,10 +18,10 @@ extends Node3D
 ## quad with a small light. Flat-colour boxes in the kit's stone (_box,
 ## _stone) stay available for interior walls later (BOX_WALLS).
 ##
-## Near and far, as in 2D: a wall whose camera-facing side has walkable
-## floor behind it is near and drawn at NEAR_ALPHA, so what stands there
-## shows through; the rest are opaque. A post is near when all its walls
-## are. Recomputed whenever the camera yaw changes.
+## Near and far: a wall, doorway, post or tree that stands between the
+## camera and the local player or their companion is near and drawn at
+## NEAR_ALPHA, so they show through it; the rest are opaque. Recomputed
+## whenever the camera or they move (_update_fade).
 ##
 ## Entities get a puppet each: a primitive at the scale table's size,
 ## coloured as the 2D sprite is, with a Label3D name on creatures, a warm-white light on players and companions, and an Area3D
@@ -88,7 +88,13 @@ const LEVEL_RISE := 0.5
 const STAIR_STEPS := 4
 ## Ground kinds' tints on the kit's floor; water and torches.
 const GROUND_TINTS := {"grass": Color(0.55, 0.8, 0.45), "dirt": Color(0.85, 0.65, 0.45)}
+## The kit's floor piece is grass; stone (any kind without a tint) is this
+## grey instead, untextured.
+const STONE_FLOOR := Color(0.56, 0.56, 0.54)
 const WATER := Color(0.2, 0.42, 0.85, 0.75)
+## Under water, so it is never drawn over the void or the forest floor.
+const WATER_BED := Color(0.16, 0.24, 0.3)
+const WATER_DEPTH := 0.08
 const TORCH := Color(1.0, 0.72, 0.38)
 const KIT_WALL_HEIGHT := 1.31
 ## The kit's walls are this thick and occupy x in [-0.5, 0] of their
@@ -162,14 +168,24 @@ const SUN_ENERGY := 0.1
 ## past the forest), and the outline is a band of the kit's trees on the
 ## void beside the land instead of walls: one on every cell beside it,
 ## thinning out to FOREST_DEPTH, a scatter out to FOREST_REACH, over a
-## forest floor. Trees on the camera's side of the land are see-through,
-## as near walls are.
+## forest floor. A tree between the camera and the player is see-through,
+## as a near wall is. The ambient light is neutral (DAY_AMBIENT), not the
+## sky's, whose lower half is the forest's green: colour comes from the
+## lights.
 const SKY_TOP := Color("4f86c6")
 const SKY_HORIZON := Color("b8d0e6")
 const FOREST_FLOOR := Color("2c4224")
 const DAY_SUN := Color(1.0, 0.95, 0.86)
 const DAY_SUN_ENERGY := 1.1
+const DAY_AMBIENT := Color(1.0, 1.0, 1.0)
 const DAY_AMBIENT_ENERGY := 0.6
+## Below the water's bed.
+const FOREST_FLOOR_DEPTH := 0.2
+## A piece fades when a ray from the local player or their companion, at
+## each of these heights, toward the camera passes within FADE_MARGIN of
+## its bounds.
+const FADE_HEIGHTS: Array[float] = [0.3, 0.9, 1.5]
+const FADE_MARGIN := 0.3
 const FOREST_DEPTH := 3
 ## Monster kinds drawn as an animated model instead of a capsule: the scene
 ## (retargeted on import to SkeletonProfileHumanoid, its skeleton
@@ -388,6 +404,13 @@ var _outdoor := false
 var _land: Dictionary[Vector2i, bool] = {}
 var _trees: Dictionary[Vector2i, Node3D] = {}
 var _see_through: Dictionary[Material, Material] = {}
+## [piece, its bounds grown by FADE_MARGIN, is a tree], for every wall,
+## doorway frame, post and tree, made once per room; the pieces faded now,
+## and what they were worked out for.
+var _occluders: Array[Array] = []
+var _occluders_built := false
+var _faded: Dictionary[Node3D, bool] = {}
+var _fade_key := ""
 var _kit_heights: Dictionary[String, float] = {}
 
 
@@ -435,6 +458,7 @@ func _process(delta: float) -> void:
 	_ease_tilt(delta)
 	_ease_zoom(delta)
 	_follow(delta)
+	_update_fade()
 	_drop_departed()
 	_update_mourning(delta)
 
@@ -478,7 +502,8 @@ func _apply_sky() -> void:
 		sky.sky_material = sky_material
 		_environment.sky = sky
 		_environment.background_mode = Environment.BG_SKY
-		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		_environment.ambient_light_color = DAY_AMBIENT
 		_environment.ambient_light_energy = DAY_AMBIENT_ENERGY
 		_sun.light_color = DAY_SUN
 		_sun.light_energy = DAY_SUN_ENERGY
@@ -1067,6 +1092,10 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_grounds.clear()
 	_ground_kinds.clear()
 	_trees.clear()
+	_occluders.clear()
+	_occluders_built = false
+	_faded.clear()
+	_fade_key = ""
 	_apply_sky()
 	_build_room()
 	_classify_walls()
@@ -1220,7 +1249,7 @@ func _add_forest() -> void:
 	forest_floor.name = "ForestFloor"
 	forest_floor.mesh = floor_mesh
 	forest_floor.material_override = material
-	forest_floor.position = Vector3((low.x + high.x) * 0.5, -0.03, (low.y + high.y) * 0.5)
+	forest_floor.position = Vector3((low.x + high.x) * 0.5, -FOREST_FLOOR_DEPTH, (low.y + high.y) * 0.5)
 	_room.add_child(forest_floor)
 
 
@@ -1262,8 +1291,8 @@ func _kit_height(piece: String) -> float:
 	return _kit_heights[piece]
 
 
-## A tree see-through and shadowless on the camera's side of the land (as a
-## near wall is), or as modelled.
+## A tree see-through and shadowless between the camera and the player (as
+## a near wall is), or as modelled.
 func _set_tree(tree: Node3D, near: bool) -> void:
 	for node in _descendants(tree):
 		var mesh := node as MeshInstance3D
@@ -1324,17 +1353,26 @@ func _kit_wall(piece: String) -> Node3D:
 	return holder
 
 
-## Grass and dirt: the kit's floor in their colour.
+## The kit's floor in its kind's colour: grass and dirt tinted, stone grey.
 func _tint_ground(ground: Node3D, kind: String) -> void:
-	if not GROUND_TINTS.has(kind):
-		return
-	if not _ground_materials.has(kind):
-		var material := _kit_opaque.duplicate() as BaseMaterial3D
-		material.albedo_color = material.albedo_color * GROUND_TINTS[kind]
-		_ground_materials[kind] = material
+	var material := _ground_base(kind)
 	for node in _descendants(ground):
 		if node is MeshInstance3D:
-			(node as MeshInstance3D).material_override = _ground_materials[kind]
+			(node as MeshInstance3D).material_override = material
+
+
+## A floor kind's plain material: the kit's grass tinted (GROUND_TINTS), or
+## for stone, STONE_FLOOR without the kit's texture.
+func _ground_base(kind: String) -> BaseMaterial3D:
+	if not _ground_materials.has(kind):
+		var material := _kit_opaque.duplicate() as BaseMaterial3D
+		if GROUND_TINTS.has(kind):
+			material.albedo_color = material.albedo_color * GROUND_TINTS[kind]
+		else:
+			material.albedo_texture = null
+			material.albedo_color = STONE_FLOOR
+		_ground_materials[kind] = material
+	return _ground_materials[kind]
 
 
 func _add_water(cell: Vector2i) -> void:
@@ -1346,11 +1384,21 @@ func _add_water(cell: Vector2i) -> void:
 	material.albedo_color = WATER
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.roughness = 0.15
-	material.metallic = 0.3
 	mesh.material = material
 	quad.mesh = mesh
-	quad.position = _tile_position(cell) - Vector3(0.0, 0.08, 0.0)
+	quad.position = _tile_position(cell) - Vector3(0.0, WATER_DEPTH, 0.0)
 	_room.add_child(quad)
+	var bed := MeshInstance3D.new()
+	bed.name = "WaterBed_%d_%d" % [cell.x, cell.y]
+	var bed_mesh := PlaneMesh.new()
+	bed_mesh.size = Vector2.ONE
+	var bed_material := StandardMaterial3D.new()
+	bed_material.albedo_color = WATER_BED
+	bed_material.roughness = 1.0
+	bed_mesh.material = bed_material
+	bed.mesh = bed_mesh
+	bed.position = _tile_position(cell) - Vector3(0.0, (WATER_DEPTH + FOREST_FLOOR_DEPTH) * 0.5, 0.0)
+	_room.add_child(bed)
 
 
 ## Cliff faces: where a cell stands above its neighbour (or above the void
@@ -1417,8 +1465,8 @@ func _shade_floor() -> void:
 			continue
 		var key := "%s_%.1f_%.2f" % [kind, bright, warm]
 		if not _ground_materials.has(key):
-			var material := _kit_opaque.duplicate() as BaseMaterial3D
-			var colour: Color = material.albedo_color * GROUND_TINTS.get(kind, Color.WHITE) * bright
+			var material := _ground_base(kind).duplicate() as BaseMaterial3D
+			var colour: Color = material.albedo_color * bright
 			material.albedo_color = colour.lerp(WARM, warm)
 			if warm > 0.0:
 				material.emission_enabled = true
@@ -1429,14 +1477,9 @@ func _shade_floor() -> void:
 				(node as MeshInstance3D).material_override = _ground_materials[key]
 
 
-## A floor back to its plain colour: its kind's tint, or the kit's own.
+## A floor back to its kind's plain colour.
 func _restore_ground(ground: Node3D, kind: String) -> void:
-	if GROUND_TINTS.has(kind):
-		_tint_ground(ground, kind)
-		return
-	for node in _descendants(ground):
-		if node is MeshInstance3D:
-			(node as MeshInstance3D).material_override = null
+	_tint_ground(ground, kind)
 
 
 ## A lantern hung on a short post, and its pale light.
@@ -1588,47 +1631,83 @@ func _add_fire(cell: Vector2i) -> void:
 
 # --- Near and far ----------------------------------------------------------------
 
-## The 2D near rule for this camera: the cell behind an edge's
-## camera-facing side is its -x / -y cell when the +x / +y face points
-## toward the camera, else the other; the wall is near when that cell is
-## walkable.
-func _is_near(key: Vector3i) -> bool:
-	var toward := _camera_offset()
-	var toward_grid := Vector2(toward.x, toward.z)
-	var normal := Vector2(1, 0) if key.z == Terrain.EAST else Vector2(0, 1)
-	var behind := Vector2i(key.x, key.y)
-	if normal.dot(toward_grid) < -0.0001:
-		behind += Vector2i(normal)
-	return behind in _terrain["floor"]
-
-
 func _classify_walls() -> void:
-	var near_keys: Dictionary[Vector3i, bool] = {}
-	for key in _walls:
-		var near := _is_near(key)
-		near_keys[key] = near
-		_set_stone(_walls[key], near)
-	for key in _doorways:
-		var near := _is_near(key)
-		near_keys[key] = near
-		_set_stone(_doorways[key].get_node("Frame"), near)
-	var edges: Dictionary = _terrain["edges"]
-	for vertex in _posts:
-		var all_near := true
-		for entry: Array in WallEdge.edges_at_vertex(vertex):
-			if edges.get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and not near_keys.get(entry[0], false):
-				all_near = false
-		_set_stone(_posts[vertex], all_near)
-	var toward := _camera_offset()
-	var toward_grid := Vector2(toward.x, toward.z)
-	for cell: Vector2i in _trees:
-		var near := false
-		for dy in range(-2, 3):
-			for dx in range(-2, 3):
-				var other := cell + Vector2i(dx, dy)
-				if _land.has(other) and Vector2(cell - other).dot(toward_grid) > 0.0:
-					near = true
-		_set_tree(_trees[cell], near)
+	_update_fade(true)
+
+
+## Fades what stands between the camera and the local player or their
+## companion, and only that, whenever the camera or they have moved
+## ([param force]: every piece set again).
+func _update_fade(force := false) -> void:
+	if _camera == null or _room == null or not _camera.is_inside_tree():
+		return
+	if not _occluders_built:
+		_index_occluders()
+	var points := _focus_points()
+	var toward := _camera.global_transform.basis.z
+	var key := "%s %s" % [toward, points]
+	if key == _fade_key and not force:
+		return
+	_fade_key = key
+	var now: Dictionary[Node3D, bool] = {}
+	for entry in _occluders:
+		var bounds: AABB = entry[1]
+		for point in points:
+			if bounds.intersects_ray(point, toward) != null:
+				now[entry[0]] = true
+				break
+	for entry in _occluders:
+		var piece: Node3D = entry[0]
+		var fade := now.has(piece)
+		if fade == _faded.has(piece) and not force:
+			continue
+		if entry[2]:
+			_set_tree(piece, fade)
+		else:
+			_set_stone(piece, fade)
+	_faded = now
+
+
+## Where the local player and their companion are, at FADE_HEIGHTS: as
+## drawn, or at their tile before they have a puppet.
+func _focus_points() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for entity in World.get_entities():
+		if not entity.spawned:
+			continue
+		if not (entity is Player and entity.owner_peer == Net.local_id or entity is Companion and entity.keeper_peer == Net.local_id):
+			continue
+		var puppet: Node3D = _puppets.get(entity.get_instance_id())
+		var at := puppet.global_position if puppet != null else to_global(_tile_position(entity.tile))
+		for height in FADE_HEIGHTS:
+			out.append(at + Vector3(0.0, height, 0.0))
+	return out
+
+
+func _index_occluders() -> void:
+	_occluders.clear()
+	for piece: Node3D in _walls.values() + _posts.values():
+		_occluders.append([piece, _bounds(piece), false])
+	for doorway: Node3D in _doorways.values():
+		var frame := doorway.get_node("Frame") as Node3D
+		_occluders.append([frame, _bounds(frame), false])
+	for tree: Node3D in _trees.values():
+		_occluders.append([tree, _bounds(tree), true])
+	_occluders_built = true
+
+
+## [param piece]'s meshes' bounds, in the world, grown by FADE_MARGIN.
+func _bounds(piece: Node3D) -> AABB:
+	var out := AABB()
+	var first := true
+	for node in _descendants(piece):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		var box := mesh.global_transform * mesh.mesh.get_aabb()
+		out = box if first else out.merge(box)
+		first = false
+	return out.grow(FADE_MARGIN)
 
 
 ## A near piece is see-through and casts no shadow, so a lantern behind it

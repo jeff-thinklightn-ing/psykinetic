@@ -1070,15 +1070,18 @@ A level may be outdoors (level.json `"outdoor": true`, in the terrain as
 changes: its outline is still edge walls where the land meets the void,
 blocking walking and sight. What changes is how it looks and what a
 companion is told. The 3D view (`Client3D._apply_sky`, `_add_forest`)
-lights it with a procedural day sky (ambient from the sky, a warm sun);
+lights it with a procedural day sky and a warm sun; the ambient light is
+neutral (`DAY_AMBIENT`), not the sky's, whose lower half is the forest's
+green and tinted everything, so colour comes from the lights;
 the camera looks down, orthographic, so the sky shows as its light and as
 the ground colour past the forest, not as a horizon. It draws no wall on
 the outline: trees from the castle kit stand on the void instead, one on
 every cell beside the land (eight ways), thinning out to `FOREST_DEPTH`
 and scattered to `FOREST_REACH`, sized, turned and placed by a hash of the
-cell so every peer grows the same forest, over a forest floor. A tree on
-the camera's side of the land is see-through and casts no shadow, as a
-near wall is. The 2D view's void is the forest floor's colour. Her
+cell so every peer grows the same forest, over a forest floor
+(`FOREST_FLOOR_DEPTH` down, below water and its bed, which it hid when it
+lay higher). A tree between the camera and the player is see-through and
+casts no shadow, as a near wall is. The 2D view's void is the forest floor's colour. Her
 situation says "You are outdoors, under the sky, with forest all around
 the edge of this place."; her map's key reads `# wall or forest`.
 
@@ -1320,8 +1323,9 @@ physics; the only collision objects are `Area3D`s for picking.
 
 **Room**, built once from `Terrain.parse` out of the Kenney Castle Kit at
 its own proportions (1-unit modules, `KIT_WALL_HEIGHT` 1.31 tall), scaled
-in height only to `WALL_HEIGHT` (3): the `ground` piece per floor cell;
-`wall-narrow` per wall edge, shifted so its 0.5 thickness straddles the
+in height only to `WALL_HEIGHT` (3): the `ground` piece per floor cell
+(the kit's is grass: tinted for grass and dirt, and for stone replaced by
+untextured `STONE_FLOOR` grey); `wall-narrow` per wall edge, shifted so its 0.5 thickness straddles the
 boundary line; `wall-narrow-corner` at every vertex where walls meet at
 an angle or end (none along a straight run, the 2D corner rule);
 `wall-doorway` with the kit's `gate` leaf for a door, hinged at the edge's
@@ -1331,12 +1335,14 @@ reused as is, with a see-through copy for near pieces. Flat-colour boxes
 in the kit's stone (`_box`, `_stone`, `STONE`) stay available for interior
 walls later (`BOX_WALLS`).
 
-**Near and far**, the 2D rule for this camera (`_is_near`): the cell
-behind an edge's camera-facing side is its -x / -y cell when that face
-points toward the camera, else the other; the wall is near when that cell
-is walkable, and near walls, doorway pieces and posts (a post when all
-its walls are) take the `NEAR_ALPHA` (0.3) stone and cast no shadow.
-Recomputed whenever the yaw changes. Near pieces blend as ordinary
+**Near and far** (`_update_fade`): a wall, doorway frame, post or tree is
+near when it stands between the camera and the local player or their
+companion: a ray from each, at `FADE_HEIGHTS`, toward the camera passes
+through its bounds grown by `FADE_MARGIN`. Near pieces take the
+`NEAR_ALPHA` (0.3) material and cast no shadow; everything else is opaque,
+however much floor is behind it. Worked out again whenever the camera
+(yaw, tilt, zoom, following) or they move. The 2D view keeps its own rule
+(`WallEdge.is_near`). Near pieces blend as ordinary
 translucent meshes, so two overlapping ones do stack a little.
 
 **Entities** get a puppet each (`_make_puppet`): a primitive at the scale

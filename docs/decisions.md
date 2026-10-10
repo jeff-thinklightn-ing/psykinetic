@@ -1351,3 +1351,17 @@ when they named her, or once a minute for a warning; their words reach
 their own companion first, and anyone else's only by name. Nix's card says
 terse means short, whole sentences: told one "speaks little", the model
 answers in single words.
+
+## 152. In 3D, only what stands between the camera and the player fades
+
+The 3D view used the 2D near rule: a wall fades when walkable floor lies
+behind its camera-facing side. Indoors that is the room's front walls; in
+the castle, with floor on both sides of nearly every wall, it was almost
+every wall, and the place read as glass. Now a wall, doorway frame, post or
+tree fades only when a ray from the local player or their companion toward
+the camera passes through it (bounds grown a little, at feet, middle and
+head), worked out again whenever the camera or they move. It costs a ray
+test per piece per moving frame, cheap at these sizes, and walls elsewhere
+stay solid, so the shape of the place reads. The 2D view keeps its rule:
+its walls are flat faces drawn in a fixed order, not geometry a ray can
+meet.

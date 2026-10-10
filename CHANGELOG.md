@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.86
+
+3D view.
+
+- Stone floors are grey. They were drawn with the kit's grass tile, which
+  is why grey stone looked mint everywhere.
+- Outdoors, the ambient light is neutral; it came from the sky, whose lower
+  half is forest green, and tinted the whole castle green.
+- Water shows in the castle: the forest floor lay above it and hid it,
+  which is why it looked black. Water has a bed under it now.
+- Walls (and doorways, posts and trees) fade only when they stand between
+  the camera and you or your companion, and solid again once they don't,
+  as the camera turns, tilts or follows you. The rest stay solid.
+
 ## v0.1.85
 
 Companions. Server.
