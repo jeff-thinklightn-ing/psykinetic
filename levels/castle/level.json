@@ -1,5 +1,6 @@
 {
 	"name": "The Castle",
+	"outdoor": true,
 	"spawn_points": {"from_test_room": [26, 13]},
 	"links": [{"at": [27, 12], "to_map": "test_room", "to_spawn": "from_castle"}]
 }

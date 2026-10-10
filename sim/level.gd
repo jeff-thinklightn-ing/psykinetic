@@ -285,6 +285,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
 			"ambient": clampf(float(config.get("ambient", 1.0)), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
+			"outdoor": bool(config.get("outdoor", false)),
 		},
 		"warnings": warnings,
 	}

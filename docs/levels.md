@@ -107,6 +107,16 @@ No `height.png` means everything is at 0.
   with nothing near is dark: drawn darker in 3D, and a companion says so.
   Fire, torches, lanterns and the lantern every player and companion
   carries light it (docs/design.md, Heat and light).
+- `"outdoor"` (`true` or `false`, default `false`): under the sky. The 3D
+  view lights it with a day sky and sun instead of the dark under-stone
+  look, lays a forest floor under everything, and draws its outline (every
+  edge between the land and the void) as a band of trees on the void
+  instead of walls: a tree on every cell beside the land, thinning out over
+  three cells, scattered to eight. Walls painted inside the map stay
+  walls. The forest's edge blocks walking and sight exactly as the outer
+  wall does; a companion is told she is outdoors, and her map's `#` is
+  "wall or forest". `levels/castle` is outdoors. (Later the forest's edge
+  may be crossable, into a forest map.)
 - `"north"` (`"up"`, `"down"`, `"left"` or `"right"`, default `"up"`):
   which way in layout.png is north. Every direction a companion hears is a
   compass point from it, and the HUD compass shows it.

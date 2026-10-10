@@ -157,6 +157,22 @@ const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
 const SUN_ENERGY := 0.1
+## Outdoors (level.json "outdoor"): a day sky lights the place (the camera
+## looks down, so the sky is seen as its light and as the ground's colour
+## past the forest), and the outline is a band of the kit's trees on the
+## void beside the land instead of walls: one on every cell beside it,
+## thinning out to FOREST_DEPTH, a scatter out to FOREST_REACH, over a
+## forest floor. Trees on the camera's side of the land are see-through,
+## as near walls are.
+const SKY_TOP := Color("4f86c6")
+const SKY_HORIZON := Color("b8d0e6")
+const FOREST_FLOOR := Color("2c4224")
+const DAY_SUN := Color(1.0, 0.95, 0.86)
+const DAY_SUN_ENERGY := 1.1
+const DAY_AMBIENT_ENERGY := 0.6
+const FOREST_DEPTH := 3
+const FOREST_REACH := 8
+const TREE_HEIGHT := 3.6
 ## Label3D: units per font pixel, with the font size, for a name about a
 ## quarter unit tall.
 const LABEL_SIZE := 0.004
@@ -344,6 +360,13 @@ var _listener: AudioListener3D
 var sfx: Sfx
 var _hp_bar_shader: Shader
 var _terrain: Dictionary = {}
+var _sun: DirectionalLight3D
+var _outdoor := false
+## Floor and water cells: the land the forest stands around.
+var _land: Dictionary[Vector2i, bool] = {}
+var _trees: Dictionary[Vector2i, Node3D] = {}
+var _see_through: Dictionary[Material, Material] = {}
+var _kit_heights: Dictionary[String, float] = {}
 
 
 ## Builds the room and the rig. [param terrain] is Terrain.parse's result,
@@ -353,6 +376,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_centre = centre
 	_ring_mesh = _make_ring(0.42, 0.5)
 	_build_environment()
+	_apply_sky()
 	_build_camera()
 	_build_room()
 	_hover = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), HOVER)
@@ -416,6 +440,34 @@ func _build_environment() -> void:
 	sun.shadow_enabled = true
 	sun.rotation_degrees = Vector3(-55.0, 160.0, 0.0)
 	add_child(sun)
+	_sun = sun
+
+
+## The dark under-stone look, or outdoors a day sky: its light, a warm sun.
+func _apply_sky() -> void:
+	_outdoor = bool(_terrain.get("outdoor", false))
+	if _outdoor:
+		var sky_material := ProceduralSkyMaterial.new()
+		sky_material.sky_top_color = SKY_TOP
+		sky_material.sky_horizon_color = SKY_HORIZON
+		sky_material.ground_horizon_color = FOREST_FLOOR.lightened(0.2)
+		sky_material.ground_bottom_color = FOREST_FLOOR
+		var sky := Sky.new()
+		sky.sky_material = sky_material
+		_environment.sky = sky
+		_environment.background_mode = Environment.BG_SKY
+		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+		_environment.ambient_light_energy = DAY_AMBIENT_ENERGY
+		_sun.light_color = DAY_SUN
+		_sun.light_energy = DAY_SUN_ENERGY
+	else:
+		_environment.background_mode = Environment.BG_COLOR
+		_environment.background_color = BACKGROUND
+		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		_environment.ambient_light_color = AMBIENT
+		_environment.ambient_light_energy = 1.0
+		_sun.light_color = SUN
+		_sun.light_energy = SUN_ENERGY
 
 
 func _build_camera() -> void:
@@ -992,6 +1044,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_doorways.clear()
 	_grounds.clear()
 	_ground_kinds.clear()
+	_trees.clear()
+	_apply_sky()
 	_build_room()
 	_classify_walls()
 	_camera_target = _tile_position(_centre)
@@ -1042,6 +1096,9 @@ func _build_room() -> void:
 	_stone_near = _stone(NEAR_ALPHA)
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
+	_land.clear()
+	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
+		_land[cell] = true
 	for cell: Vector2i in _terrain["floor"]:
 		var ground := _kit("ground")
 		ground.name = "Floor_%d_%d" % [cell.x, cell.y]
@@ -1069,6 +1126,8 @@ func _build_room() -> void:
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
 	for key: Vector3i in edges:
+		if _outdoor and _is_outline(key):
+			continue  # The forest's edge, not a wall (_add_forest).
 		match edges[key]:
 			Terrain.Edge.WALL:
 				_add_wall(key)
@@ -1081,6 +1140,129 @@ func _build_room() -> void:
 	for vertex in vertices:
 		if _needs_post(vertex, kind_at):
 			_add_post(vertex)
+	if _outdoor:
+		_add_forest()
+
+
+## An edge between the land and the void: the map's outline.
+func _is_outline(key: Vector3i) -> bool:
+	var sides := Terrain.edge_cells(key)
+	return _land.has(sides[0]) != _land.has(sides[1])
+
+
+## Trees on the void around the land, and the forest floor under them.
+func _add_forest() -> void:
+	if _land.is_empty():
+		return
+	# How far each void cell is from the land (cells, eight ways), out to
+	# FOREST_REACH: a walk outward from every land cell at once.
+	var distance: Dictionary[Vector2i, int] = {}
+	var frontier: Array[Vector2i] = []
+	for cell: Vector2i in _land:
+		distance[cell] = 0
+		frontier.append(cell)
+	var head := 0
+	while head < frontier.size():
+		var cell := frontier[head]
+		head += 1
+		if distance[cell] >= FOREST_REACH:
+			continue
+		for direction: Vector2i in World.DIRECTIONS:
+			var next := cell + direction
+			if not distance.has(next):
+				distance[next] = distance[cell] + 1
+				frontier.append(next)
+	var low := Vector2i(1 << 20, 1 << 20)
+	var high := -low
+	for cell: Vector2i in distance:
+		low = low.min(cell)
+		high = high.max(cell)
+		var away := distance[cell]
+		if away == 0:
+			continue
+		var roll := _roll(cell, 0)
+		if away == 1 or away <= FOREST_DEPTH and roll < 0.7 or roll < 0.25:
+			_add_tree(cell)
+		elif roll < 0.33:
+			var rock := _kit("rocks-small")
+			rock.name = "Rock_%d_%d" % [cell.x, cell.y]
+			rock.position = _tile_position(cell)
+			rock.rotation.y = _roll(cell, 3) * TAU
+			_room.add_child(rock)
+	var floor_mesh := PlaneMesh.new()
+	floor_mesh.size = Vector2(high - low) + Vector2.ONE * 2.0
+	var material := StandardMaterial3D.new()
+	material.albedo_color = FOREST_FLOOR
+	material.roughness = 1.0
+	var forest_floor := MeshInstance3D.new()
+	forest_floor.name = "ForestFloor"
+	forest_floor.mesh = floor_mesh
+	forest_floor.material_override = material
+	forest_floor.position = Vector3((low.x + high.x) * 0.5, -0.03, (low.y + high.y) * 0.5)
+	_room.add_child(forest_floor)
+
+
+## One of the kit's trees on [param cell], sized, turned and nudged by the
+## cell, so every peer grows the same forest.
+func _add_tree(cell: Vector2i) -> void:
+	var piece := "tree-large" if _roll(cell, 1) < 0.6 else "tree-small"
+	var tree := _kit(piece)
+	tree.name = "Tree_%d_%d" % [cell.x, cell.y]
+	tree.scale = Vector3.ONE * TREE_HEIGHT * lerpf(0.85, 1.2, _roll(cell, 2)) / _kit_height(piece)
+	tree.rotation.y = _roll(cell, 3) * TAU
+	tree.position = _tile_position(cell) + Vector3(_roll(cell, 4) - 0.5, 0.0, _roll(cell, 5) - 0.5) * 0.3
+	_room.add_child(tree)
+	_trees[cell] = tree
+
+
+## 0..1, the same for [param cell] and [param salt] on every peer.
+static func _roll(cell: Vector2i, salt: int) -> float:
+	return float(absi(hash(Vector3i(cell.x, cell.y, salt))) % 10007) / 10007.0
+
+
+## How tall a kit piece stands, as modelled (its meshes' bounds).
+func _kit_height(piece: String) -> float:
+	if not _kit_heights.has(piece):
+		var sample := _kit(piece)
+		var top := 0.0
+		for node in _descendants(sample):
+			var mesh := node as MeshInstance3D
+			if mesh == null or mesh.mesh == null:
+				continue
+			var place := Transform3D.IDENTITY
+			var at: Node = mesh
+			while at != sample and at is Node3D:
+				place = (at as Node3D).transform * place
+				at = at.get_parent()
+			top = maxf(top, (place * mesh.mesh.get_aabb()).end.y)
+		sample.free()
+		_kit_heights[piece] = maxf(top, 0.01)
+	return _kit_heights[piece]
+
+
+## A tree see-through and shadowless on the camera's side of the land (as a
+## near wall is), or as modelled.
+func _set_tree(tree: Node3D, near: bool) -> void:
+	for node in _descendants(tree):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.mesh.surface_get_material(surface)
+			mesh.set_surface_override_material(surface, _see_through_of(own) if near and own != null else null)
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if near \
+				else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+
+func _see_through_of(material: Material) -> Material:
+	if not _see_through.has(material):
+		var copy := material.duplicate() as BaseMaterial3D
+		if copy == null:
+			return material
+		copy.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		copy.albedo_color = Color(copy.albedo_color, NEAR_ALPHA)
+		_see_through[material] = copy
+	return _see_through[material]
 
 
 ## An edge on the ground: its midpoint, and its yaw (a south edge runs
@@ -1415,6 +1597,16 @@ func _classify_walls() -> void:
 			if edges.get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and not near_keys.get(entry[0], false):
 				all_near = false
 		_set_stone(_posts[vertex], all_near)
+	var toward := _camera_offset()
+	var toward_grid := Vector2(toward.x, toward.z)
+	for cell: Vector2i in _trees:
+		var near := false
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				var other := cell + Vector2i(dx, dy)
+				if _land.has(other) and Vector2(cell - other).dot(toward_grid) > 0.0:
+					near = true
+		_set_tree(_trees[cell], near)
 
 
 ## A near piece is see-through and casts no shadow, so a lantern behind it

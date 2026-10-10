@@ -1287,3 +1287,28 @@ cannot read, so the editor writes its .import as Image (Godot fills in
 the rest on the next import). And run from the project, Level reads the
 PNG itself before its import, so a save plays at once without one; an
 exported build, which has only the import, is unchanged.
+
+## 148. Outdoor zones: the outline is a forest's edge, drawn, not simulated
+
+"outdoor" in level.json changes looks and words only. The sim keeps its
+edge walls along the outline, so walking, pathing, sight and pushes need
+no second rule, and an outdoor map plays like any other. The 3D view
+plants trees on the void beside the land in place of those walls, and
+lights the place with a day sky. Trees come from the castle kit the view
+already loads (tree-large, tree-small, rocks-small), until the separate
+asset work gives better ones. With an orthographic camera looking down
+there is no horizon to put a skybox in: the sky is its light, the
+background past the forest is its ground colour, and a forest floor plane
+fills the void so it is never black. The forest is placed by a hash of
+each cell, the same on every peer with nothing sent. Its edge is a wall
+for now; crossing into a forest biome later is a level link along it, or
+a forest map beyond it, not a change to this.
+
+## 149. Godot does not import .blend files
+
+Blender files are the asset work's sources, not the game's: Godot's .blend
+import needs Blender itself, which a headless import (the release, the
+server build) cannot run, so one in the project stopped every release.
+project.godot turns that importer off (filesystem/import/blender/enabled =
+false); models reach the game as exported .glb, as the kit's do, and a
+.blend can sit anywhere in the tree as a source.

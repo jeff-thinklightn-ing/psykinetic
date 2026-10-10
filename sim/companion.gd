@@ -1102,6 +1102,8 @@ func voice_situation() -> String:
 	sentences.append("%s monster%s next to you." % [NUMBERS[mini(next_to_her, NUMBERS.size() - 1)],
 		" is" if next_to_her == 1 else "s are"])
 	sentences.append("You are %s." % health_words(self))
+	if World.outdoor:
+		sentences.append("You are outdoors, under the sky, with forest all around the edge of this place.")
 	var who := keeper_name()
 	var her_danger := _in_danger(self)
 	var their_danger := false
@@ -1410,7 +1412,7 @@ func perception_grid() -> String:
 			kinds.append(kind)
 	for kind in kinds:
 		key.append("%s %s" % [kind[0], kind])
-	key.append_array(["f fire", "~ water", "# wall", "D closed door", "d open door", "c crate or cart", "o boulder", "= chest",
+	key.append_array(["f fire", "~ water", "# wall" if not World.outdoor else "# wall or forest", "D closed door", "d open door", "c crate or cart", "o boulder", "= chest",
 		"^ stair", "v drop to lower ground", ". floor", "? out of sight"])
 	return "A map of what you can see, you at the centre, north at the top, one character a pace:\n%s\nKey: %s." % [
 		"\n".join(rows), ", ".join(key)]

@@ -40,6 +40,8 @@ const CAMERA_FOLLOW_RATE := 6.0
 ## What is drawn where there is no map: near-black, so walls along the void
 ## stand apart from it.
 const VOID := Color(0.05, 0.05, 0.06)
+## The 2D view's void outdoors: the forest floor.
+const FOREST_VOID := Color(0.1, 0.17, 0.09)
 const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
 const PLAYER := "res://sim/player.gd"
@@ -255,7 +257,7 @@ func _ready() -> void:
 	camera.position = Iso.tile_to_local(level_centre)
 	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
 		_show_3d()
-	RenderingServer.set_default_clear_color(VOID)
+	RenderingServer.set_default_clear_color(FOREST_VOID if _terrain.get("outdoor", false) else VOID)
 
 	World.ticked.connect(_on_world_ticked)
 	World.stepped.connect(_on_world_stepped)
@@ -978,6 +980,7 @@ func _mouse_tile() -> Vector2i:
 ## WallEdge.is_near) in the translucent NearWalls group above it. Doors are
 ## spawned by the server with the level (see _spawn_doors): they have state.
 func _paint_level() -> void:
+	RenderingServer.set_default_clear_color(FOREST_VOID if _terrain.get("outdoor", false) else VOID)
 	ground.clear()
 	for wall in _walls:
 		wall.queue_free()

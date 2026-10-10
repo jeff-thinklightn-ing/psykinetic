@@ -20,6 +20,7 @@ var water: Dictionary[Vector2i, bool] = {}
 var torches: Dictionary[Vector2i, bool] = {}
 var fields := Fields.new()
 var north := Vector2i(0, -1)
+var outdoor := false
 var edges: Dictionary[Vector3i, int] = {}
 var doors: Dictionary[Vector3i, Door] = {}
 var occupancy: Dictionary[Vector2i, GridEntity] = {}

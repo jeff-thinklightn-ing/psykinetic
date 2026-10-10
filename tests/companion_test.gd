@@ -1432,6 +1432,11 @@ func _test_how_she_speaks() -> void:
 	var prompt := pet.voice_prompt("test")
 	_check(not RegEx.create_from_string("\\d+ paces?").search(prompt), "no number of paces anywhere in her voice's prompt")
 	_check("You carry a lantern, and in your pack nothing." in prompt, "what she carries: her lantern, and an empty pack")
+	_check("outdoors" not in pet.voice_situation() and "# wall," in pet.perception_grid(), "under stone she is told nothing of the sky")
+	World.outdoor = true
+	_check("You are outdoors, under the sky, with forest all around the edge of this place." in pet.voice_situation()
+			and "# wall or forest" in pet.perception_grid(), "outdoors she is told so, and her map's # is wall or forest")
+	World.outdoor = false
 	_check("Speak to Player as \"you\"" in prompt and "\"I\" and \"me\" are the one speaking" in prompt
 			and "never describe yourself or recite who you are" in prompt, "speak to her player as you; I and me are the speaker; no reciting")
 	pet.card = "She thinks before she moves and before she speaks. She is gentle."

@@ -137,6 +137,9 @@ var fields := Fields.new()
 ## layout by default). Every direction told to a companion is a compass
 ## point worked out from it (compass).
 var north := Vector2i(0, -1)
+## Under the sky (level.json "outdoor"): its outline is a forest's edge,
+## not a wall. Only words and looks change; the edge blocks as a wall does.
+var outdoor := false
 ## Light a body through on a line (has_clear_line): bodies do not stop it.
 var _through_bodies := false
 ## The eye height of the line of sight being walked (has_line_of_sight), -1
@@ -302,6 +305,7 @@ func enter(to: Zone) -> Zone:
 	from.torches = _torches
 	from.fields = fields
 	from.north = north
+	from.outdoor = outdoor
 	from.edges = _edges
 	from.doors = _doors
 	from.occupancy = _occupancy
@@ -317,6 +321,7 @@ func enter(to: Zone) -> Zone:
 	_torches = to.torches
 	fields = to.fields
 	north = to.north
+	outdoor = to.outdoor
 	_edges = to.edges
 	_doors = to.doors
 	_occupancy = to.occupancy
@@ -412,6 +417,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
 	north = terrain.get("north", Vector2i(0, -1))
+	outdoor = bool(terrain.get("outdoor", false))
 	fields.load(terrain)
 	fields_changed()
 	var heights: Dictionary = terrain.get("heights", {})

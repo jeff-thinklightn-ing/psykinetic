@@ -292,6 +292,8 @@ func _test_castle() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var there := _player()
+	_check(World.outdoor and castle["terrain"]["outdoor"] and not room["terrain"]["outdoor"],
+			"the castle is outdoors (level.json \"outdoor\"), the test room is not")
 	_check(_main.map_name == "castle" and there != null and there.tile == Vector2i(26, 13),
 			"and arrives in the castle beside its link, at (26, 13) (%s %s)" % [_main.map_name, there.tile if there else "none"])
 	_wait_for_step(there)
@@ -299,6 +301,7 @@ func _test_castle() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var home := _player()
+	_check(not World.outdoor, "and World is indoors again in the test room")
 	_check(_main.map_name == "test_room" and home != null and home.tile == Vector2i(30, 33),
 			"and is back in the test room beside its link, at (30, 33) (%s %s)" % [_main.map_name, home.tile if home else "none"])
 

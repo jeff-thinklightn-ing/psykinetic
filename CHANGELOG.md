@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.81
+
+Maps. Server.
+
+- **Outdoors**: the Castle is now outdoors, in daylight under a sky, with
+  a forest all around its edge instead of the black void and outer walls.
+  The forest edge blocks you the same way the walls did. The castle's own
+  walls are still walls.
+- Your companion knows when she's outdoors.
+
+The server must be updated to v0.1.81 too, as it refuses any other version.
+
 ## v0.1.80
 
 Maps. Server.

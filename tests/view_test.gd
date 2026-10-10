@@ -30,6 +30,7 @@ func _ready() -> void:
 	await _test_companion_death()
 	await _test_player_death()
 	_test_settings()
+	_test_outdoor()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -196,6 +197,44 @@ func _test_player_death() -> void:
 	await get_tree().create_timer(Client3D.MOURN_RETURN_SECONDS + 0.2).timeout
 	_check(is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_equal_approx(_rig._camera.size, size),
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
+
+
+func _test_outdoor() -> void:
+	print("\n== outdoors: a day sky, and a forest for the outline ==")
+	_check(not _rig._outdoor and _rig._environment.background_mode == Environment.BG_COLOR and _rig._trees.is_empty(),
+			"the test room is under stone: dark, no sky, no trees")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	_rig.rebuild(terrain, castle["centre"])
+	_check(_rig._outdoor and _rig._environment.background_mode == Environment.BG_SKY
+			and _rig._environment.ambient_light_source == Environment.AMBIENT_SOURCE_SKY and _rig._sun.light_energy > 0.5,
+			"the castle is outdoors: lit by a sky and a day's sun")
+	var land: Dictionary = _rig._land
+	var bare: Array[Vector2i] = []
+	for cell: Vector2i in land:
+		for direction: Vector2i in World.DIRECTIONS:
+			var next := cell + direction
+			if not land.has(next) and not _rig._trees.has(next) and next not in bare:
+				bare.append(next)
+	_check(not _rig._trees.is_empty() and bare.is_empty(), "a tree on every cell beside the land (%d trees; bare: %s)" % [_rig._trees.size(), bare.slice(0, 5)])
+	var outline_walls := 0
+	var inner_walls := 0
+	var edges: Dictionary = terrain["edges"]
+	for key: Vector3i in edges:
+		if edges[key] != Terrain.Edge.WALL:
+			continue
+		if _rig._is_outline(key):
+			outline_walls += 1 if _rig._walls.has(key) else 0
+		else:
+			inner_walls += 1 if _rig._walls.has(key) else 0
+	_check(outline_walls == 0 and inner_walls > 0, "no wall along the outline; the walls painted inside stand (%d)" % inner_walls)
+	_check(_rig._room.get_node_or_null("ForestFloor") != null, "over a forest floor")
+	var tree: Node3D = _rig._trees.values()[0]
+	_check(tree.scale.x * _rig._kit_height("tree-large" if "large" in str(tree.get_child(0).name) else "tree-small") > 2.5,
+			"trees stand taller than a player")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
+			"and back in the test room, it is under stone again")
 
 
 func _test_settings() -> void:

@@ -1022,6 +1022,25 @@ north-east."), the dark where she stands, and the dark past an open door
 ("It is dark past the door to the east."). Sight for monsters and nerve
 are not affected yet.
 
+## Outdoors
+
+A level may be outdoors (level.json `"outdoor": true`, in the terrain as
+`outdoor`, `World.outdoor` for the zone World is in). Nothing in the sim
+changes: its outline is still edge walls where the land meets the void,
+blocking walking and sight. What changes is how it looks and what a
+companion is told. The 3D view (`Client3D._apply_sky`, `_add_forest`)
+lights it with a procedural day sky (ambient from the sky, a warm sun);
+the camera looks down, orthographic, so the sky shows as its light and as
+the ground colour past the forest, not as a horizon. It draws no wall on
+the outline: trees from the castle kit stand on the void instead, one on
+every cell beside the land (eight ways), thinning out to `FOREST_DEPTH`
+and scattered to `FOREST_REACH`, sized, turned and placed by a hash of the
+cell so every peer grows the same forest, over a forest floor. A tree on
+the camera's side of the land is see-through and casts no shadow, as a
+near wall is. The 2D view's void is the forest floor's colour. Her
+situation says "You are outdoors, under the sky, with forest all around
+the edge of this place."; her map's key reads `# wall or forest`.
+
 ## Directions
 
 Every level has a fixed north (level.json `north`: up, down, left or
