@@ -396,6 +396,14 @@ func _test_goblin() -> void:
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(absf(angle_difference(yaw, was)) < 0.05, "and turned back to its own facing, yaw %.2f" % yaw)
 	imp.pushed.emit(1)
+	_slide(puppet, Vector3(0.5, 0.0, 0.0))
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed back again: it backpedals")
+	await get_tree().process_frame
+	_slide(puppet, Vector3(-0.3, 0.0, 0.0))
+	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_WALK,
+			"walking back the other way: the knock is over and it walks, not backpedals (%s)" % animator.current_animation)
+	await get_tree().create_timer(1.0).timeout
+	imp.pushed.emit(1)
 	_slide(puppet, Vector3(0.0, 0.0, 0.5))
 	imp.impacted.emit(2, &"stone")
 	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed into a wall: it backpedals there first")

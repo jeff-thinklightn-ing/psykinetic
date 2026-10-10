@@ -1410,3 +1410,15 @@ whole run with it: the straight line of walls and frames it is part of,
 with its posts, ending where the line turns, stops or meets another wall.
 Ending at a junction keeps it to a room's side rather than a castle's
 whole length. Posts and trees still fade alone.
+
+## 156. A knock ends when the body walks off
+
+The knock lasted while the puppet moved fast and took its facing from
+each frame's step, so a goblin that came straight back at you after a
+push kept backpedalling, now facing the way it walked: it flipped and
+walked backwards toward you. The knock now takes its direction once, from
+the first step of the slide, and counts any movement another way, or
+after a push could still be sliding (`KNOCK_SLIDE_SECONDS`, a little
+over `MAX_PUSH_SLIDE_TICKS`), as the body's own walk: the knock ends that
+frame, without its landing or doubling over, and the walk clip takes over
+from where the knock left the body facing.

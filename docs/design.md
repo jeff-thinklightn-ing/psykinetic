@@ -1072,7 +1072,13 @@ against another body is Hit_Chest. The clip waits for the slide to show,
 since others are drawn a little in the past. The knock turns the model
 to face whence it came at `TURN_RATE`, as the sim turns a body, and when
 it ends hands the sim that angle (`GridEntity.turn_shown_from`) to turn
-back to its facing from there, so neither way snaps. A dead model plays
+back to its facing from there, so neither way snaps. The slide is the
+push's only while it goes the way it first went (within
+`KNOCK_SAME_WAY`) and for no longer than a push slides
+(`KNOCK_SLIDE_SECONDS`): a body moving after that, or another way (a
+goblin coming straight back at you), is walking, and the knock ends there
+and then, with no landing or doubling over, for the walk to take over.
+A dead model plays
 its death where it stands instead of tipping over, lies, and sinks as any
 corpse does. The sim knows nothing of it: the imp is a capsule-shaped
 monster everywhere but in the 3D view.

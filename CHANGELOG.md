@@ -3,6 +3,13 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.90
+
+3D view.
+
+- A goblin that comes straight back at you after being pushed walks back
+  facing you, instead of turning round and backpedalling toward you.
+
 ## v0.1.89
 
 3D view.
