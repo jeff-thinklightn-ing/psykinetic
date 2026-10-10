@@ -208,7 +208,7 @@ const ITEM_WORDS := "\\b(carry\\w*|pack|bag|items?|lanterns?|bandag\\w*|kit|hold
 const OWN_ITEMS := "\\b(lanterns?|bandag\\w*|pack)\\b"
 ## Narration in a line, not speech: her own name and a verb, a gesture,
 ## or herself moving into place ("You move to stand between ...").
-const NARRATION := "(?i)^(%s) [a-z]+s\\b|^(you |)(nod|nods|smile|smiles|sigh|sighs|shrug|shrugs|grin|grins|frown|frowns)\\b|^you (move|step|walk|go|turn|shift|edge|plant|brace|position) .*\\b(stand|between|beside|in front of|yourself)\\b"
+const NARRATION := "(?i)^(%s) [a-z]+s\\b|^a moment passes\\b|^(you |)(nod|nods|smile|smiles|sigh|sighs|shrug|shrugs|grin|grins|frown|frowns)\\b|^you (move|step|walk|go|turn|shift|edge|plant|brace|position) .*\\b(stand|between|beside|in front of|yourself)\\b"
 ## The recent exchange the voice sees: so many turns and narrations.
 const EXCHANGE_KEPT := 16
 ## With --mind-why each reply gives its reason too, for the mind log.
@@ -1807,12 +1807,16 @@ func spoken(line: String, items_asked := false) -> String:
 		for who in [keeper_word] + others:
 			var front := RegEx.create_from_string("(?i)^%s\\s*[,:!]\\s*" % _escaped(who))
 			var back := RegEx.create_from_string("(?i),\\s*%s\\s*([.!?]*)$" % _escaped(who))
+			var middle := RegEx.create_from_string("(?i),\\s*%s\\s*,\\s*" % _escaped(who))
 			if front.search(sentence) != null:
 				called = who
 				sentence = front.sub(sentence, "")
 			elif back.search(sentence) != null:
 				called = who
 				sentence = back.sub(sentence, "$1")
+			elif middle.search(sentence) != null:
+				called = who
+				sentence = middle.sub(sentence, ", ")
 		sentence = sentence.strip_edges()
 		if sentence.is_empty() or narration.search(sentence) != null:
 			continue
@@ -1825,7 +1829,7 @@ func spoken(line: String, items_asked := false) -> String:
 			continue  # A one-word fragment; a one-word question is an answer.
 		repeated[plain] = true
 		if called == keeper_word and _alive(keeper) and World.distance(tile, keeper.tile) > CALL_OUT_PACES:
-			sentence = "%s, %s" % [keeper_word, sentence.left(1).to_lower() + sentence.substr(1)]
+			sentence = "%s, %s" % [keeper_word, _after_name(sentence, [keeper_word] + others)]
 		elif not called.is_empty() and called != keeper_word:
 			# An answer to someone who spoke to her is free; anything else to
 			# them is a warning, at most once in ADDRESS_OTHER_TICKS.
@@ -1833,7 +1837,7 @@ func spoken(line: String, items_asked := false) -> String:
 				if not _may_warn(called):
 					continue
 				_addressed[called] = World.tick
-			sentence = "%s, %s" % [called, sentence.left(1).to_lower() + sentence.substr(1)]
+			sentence = "%s, %s" % [called, _after_name(sentence, [keeper_word] + others)]
 		kept.append(sentence.left(1).to_upper() + sentence.substr(1))
 	return " ".join(kept)
 
@@ -1848,6 +1852,19 @@ func _may_warn(who: String) -> bool:
 		if entity.spawned and _name_of(entity) == who and (_in_danger(entity) or _badly_hurt(entity)):
 			return true
 	return false
+
+
+## [param sentence] put after a name and a comma: its first letter lower
+## case, unless its first word is "I" (I'm, I'll) or one of [param names].
+func _after_name(sentence: String, names: Array) -> String:
+	var found := RegEx.create_from_string("^[A-Za-z]+").search(sentence)
+	var first := found.get_string() if found != null else ""
+	if first == "I":
+		return sentence
+	for who: String in names + [_name_of(self)]:
+		if not first.is_empty() and first.to_lower() == _plain(who).get_slice(" ", 0):
+			return sentence
+	return sentence.left(1).to_lower() + sentence.substr(1)
 
 
 ## [param text]'s sentences, each with its stop.

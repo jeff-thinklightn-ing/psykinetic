@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.85
+
+Companions. Server.
+
+- A name in the middle of a line ("Hold, Cylinder, they're close.") now
+  counts as speaking to that person, so the once-a-minute rule for other
+  players holds there too; your own name in the middle comes off.
+- When she calls someone by name, "I" and names after it keep their
+  capitals ("Cylinder, I see it.", not "Cylinder, i see it.").
+- She never says "A moment passes." aloud.
+- Pip talks in short, whole sentences, not a few words.
+
+The server must be updated to v0.1.85 too, as it refuses any other version.
+
 ## v0.1.84
 
 Companions. Server.

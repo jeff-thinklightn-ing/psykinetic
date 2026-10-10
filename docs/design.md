@@ -986,7 +986,7 @@ the same one twice; no one-word fragment ("East.", "Hold."), but a one-word
 answer or question stays (`ONE_WORD_ANSWERS`, "Where?"); her own things
 (lantern, bandages, her pack) only when asked about. Her player is spoken
 to as "you": their name off the front ("Jeff, move west." -> "Move
-west.") or the end of a sentence, a bare name gone, unless they are
+west."), the middle or the end of a sentence, a bare name gone, unless they are
 further than `CALL_OUT_PACES` and she calls out. Anyone else is spoken to
 only when they named her within `SPOKE_TO_HER_TICKS` (30 s), or, unasked,
 when they are in danger or badly hurt, at most once in
