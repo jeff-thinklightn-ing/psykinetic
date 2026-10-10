@@ -437,8 +437,13 @@ func _test_toss() -> void:
 	player = e["P"][0]
 	imp = e["m"][0]
 	World.order_shove(player, imp)
+	var before := Vector2(imp.facing).normalized()
 	World.step()
 	_check(imp.tile.y < 2 and not imp.tossed, "a plain shove straight on is a push back, not a toss (at %s)" % imp.tile)
+	for i in 4:
+		imp._process(0.05)
+	_check(imp.shown_facing().dot(before) > 0.99,
+			"knocked along its slide, it does not turn to face it (shows %s, faced %s)" % [imp.shown_facing(), before])
 
 	e = _build(room)
 	player = e["P"][0]

@@ -1381,3 +1381,16 @@ cosmetic, like the hop it rides with, and the sim reads nothing of it. The
 the message comes, because other entities are drawn a couple of ticks in
 the past, and it ends it when the slide stops (the backpedal holds a
 moment, the roll plays out), so the timing follows what is on screen.
+
+## 154. A pushed body keeps its facing; knock turns ease
+
+The shown facing turned toward any slide, so a knocked-back body spun to
+face where it was flung, and the 3D backpedal then snapped it back to
+face whence it came. A slide that starts within `PUSH_SLIDE_TICKS` of a
+push (by this peer's clock, host or mirror: the slide and the push
+message come together) is now the push's own and does not turn the
+shown facing. The 3D knock's own turns, onto whence it came and back to
+the facing when it ends, ease at the sim's `TURN_RATE` rather than snap;
+the view hands its angle back to the sim's shown facing so the turn back
+is the sim's ordinary one. Display only; the sim's `facing` was never
+touched by a push.

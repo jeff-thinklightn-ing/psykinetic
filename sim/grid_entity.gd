@@ -53,6 +53,9 @@ const PIP_REACH := 4.0
 ## How fast the shown facing turns toward where it should point: about
 ## 100 ms to come round (an exponential ease at this rate per second).
 const TURN_RATE := 30.0
+## A slide starting within this many ticks of a push is the push's own: the
+## body is knocked along it, so its shown facing does not turn to it.
+const PUSH_SLIDE_TICKS := 2.5
 ## A refused or corrected step eases to a stop over this many ticks.
 const STOP_EASE_TICKS := 2.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)
@@ -175,6 +178,8 @@ var _lofted := false
 ## plain push back: the 3D view rolls it and lands it instead of
 ## backpedalling.
 var tossed := false
+## Tick (this peer's clock) of the last push, for telling its slide.
+var _pushed_tick := -INF
 ## Tick (this peer's clock) until which the sprite reels from a stun.
 var _reel_until := 0.0
 # Regen bookkeeping, written by World through the _world_note_* hooks.
@@ -314,7 +319,7 @@ func _process(delta: float) -> void:
 			if _move_duration > 0.0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
 			position = Iso.grid_to_local(Vector2(_from_tile).lerp(Vector2(to), t))
-			if t < 1.0 and to != _from_tile:
+			if t < 1.0 and to != _from_tile and absf(_move_tick - _pushed_tick) > PUSH_SLIDE_TICKS:
 				wanted = Vector2(to - _from_tile)
 			elif aim != Vector2.ZERO:
 				wanted = aim
@@ -337,6 +342,13 @@ func _turn_toward(wanted: Vector2, delta: float) -> void:
 		return
 	var step := angle_difference(_shown_angle, target) * (1.0 - exp(-TURN_RATE * delta))
 	_shown_angle = wrapf(_shown_angle + step, -PI, PI)
+
+
+## Puts the shown facing at [param angle] (grid space), to turn back from
+## there to the facing, smoothly: a view that turned the body its own way
+## hands it back so.
+func turn_shown_from(angle: float) -> void:
+	_shown_angle = wrapf(angle, -PI, PI)
 
 
 ## The facing as shown: a unit vector in grid units, turning smoothly.
@@ -422,6 +434,7 @@ func _world_note_moved(on_tick: int) -> void:
 func _world_pushed(tiles: int, lofted := false, toss := false) -> void:
 	_lofted = lofted
 	tossed = toss
+	_pushed_tick = float(World.tick)
 	pushed.emit(tiles)
 	for peer in Net.sendable_peers():
 		_net_pushed.rpc_id(peer, tiles, lofted, toss)
@@ -608,6 +621,7 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 func _net_pushed(tiles: int, lofted: bool, toss: bool) -> void:
 	_lofted = lofted
 	tossed = toss
+	_pushed_tick = float(World.tick)
 	pushed.emit(tiles)
 
 

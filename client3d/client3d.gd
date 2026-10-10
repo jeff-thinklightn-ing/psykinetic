@@ -2058,18 +2058,27 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, step: Vec
 		if step.length() > 0.001:
 			# Backpedalling or rolling over backwards: facing whence it came.
 			knock["yaw"] = -(-step).angle()
+			if not knock.has("shown"):
+				knock["shown"] = (puppet.get_node("Body") as Node3D).rotation.y
 		if not toss:
 			animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
 	if started < 0:
 		if now - int(knock["since"]) < int(KNOCK_WAIT_SECONDS * 1000.0):
 			return false
 	else:
-		(puppet.get_node("Body") as Node3D).rotation.y = knock["yaw"]
+		# Turned to it as the sim turns a body, not snapped round.
+		knock["shown"] = lerp_angle(knock.get("shown", knock["yaw"]), knock["yaw"],
+				1.0 - exp(-GridEntity.TURN_RATE * get_process_delta_time()))
+		(puppet.get_node("Body") as Node3D).rotation.y = knock["shown"]
 		var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
 		if speed > KNOCK_MOVING or held:
 			return true
 	puppet.remove_meta("knock")
 	puppet.set_meta("busy_until", 0)
+	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
+	if entity != null and knock.has("shown"):
+		# Back to its facing from where the knock left it, turning.
+		entity.turn_shown_from(-float(knock["shown"]))
 	if knock["impact"]:
 		_play_once(puppet, CLIP_IMPACT)
 	elif toss and started >= 0:
@@ -2096,6 +2105,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var puppet := Node3D.new()
 	puppet.name = entity.name
 	puppet.set_meta("entity_name", String(entity.name))
+	puppet.set_meta("entity_id", entity.get_instance_id())
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
 	var model := model_for(entity)
 	var height: float = float(model["height"]) if not model.is_empty() else Iso.HEIGHTS[shape]

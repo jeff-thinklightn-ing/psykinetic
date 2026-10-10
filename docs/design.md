@@ -1069,7 +1069,10 @@ whence it came (Roll played in reverse, `ROLL_SPEED` faster), then lands
 a door (an impact against stone or wood, a fall too), doubles over
 (Hit_Stomach) when its slide ends, or at once if it never moved. An impact
 against another body is Hit_Chest. The clip waits for the slide to show,
-since others are drawn a little in the past. A dead model plays
+since others are drawn a little in the past. The knock turns the model
+to face whence it came at `TURN_RATE`, as the sim turns a body, and when
+it ends hands the sim that angle (`GridEntity.turn_shown_from`) to turn
+back to its facing from there, so neither way snaps. A dead model plays
 its death where it stands instead of tipping over, lies, and sinks as any
 corpse does. The sim knows nothing of it: the imp is a capsule-shaped
 monster everywhere but in the 3D view.
@@ -1158,7 +1161,8 @@ stutter by the fraction. A refused or corrected predicted step eases out
 to its stop over `RECONCILE_BLEND_TICKS` instead of halting dead.
 
 **Facing as shown** turns toward where the body is going: along the step
-being drawn, else the replicated `facing`, else (the local player in WASD,
+being drawn (not a push's slide, starting within `PUSH_SLIDE_TICKS` of the
+push: a body knocked along keeps its facing), else the replicated `facing`, else (the local player in WASD,
 standing) the cursor (`GridEntity.aim`). It eases there at `TURN_RATE`
 (about 100 ms to come round, `GridEntity.shown_facing`), on the 2D pip and
 the 3D nose alike.

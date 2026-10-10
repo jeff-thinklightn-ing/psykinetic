@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.88
+
+2D and 3D views.
+
+- A knocked-back body no longer spins round to face where it is flung:
+  it keeps its facing.
+- A goblin knocked from behind or the side turns to face whence it came
+  and back again afterwards, instead of snapping round.
+
 ## v0.1.87
 
 3D view. Server.

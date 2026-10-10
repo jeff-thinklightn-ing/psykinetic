@@ -360,12 +360,21 @@ func _test_goblin() -> void:
 	imp.tossed = false
 	imp.pushed.emit(1)
 	_check(animator.current_animation == "Hit_Chest", "pushed: the blow plays on until the slide shows")
+	var was := (puppet.get_node("Body") as Node3D).rotation.y
 	_slide(puppet, Vector3(0.5, 0.0, 0.0))
 	var yaw := (puppet.get_node("Body") as Node3D).rotation.y
-	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL and absf(absf(yaw) - PI) < 0.01,
-			"pushed back (+x): it backpedals, facing whence it came (-x), yaw %.2f" % yaw)
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL and absf(angle_difference(yaw, PI)) > 0.05
+			and absf(angle_difference(yaw, PI)) < absf(angle_difference(was, PI)),
+			"pushed back (+x): it backpedals, turning (not snapping) toward whence it came (-x), yaw %.2f from %.2f" % [yaw, was])
+	for i in 20:
+		await get_tree().process_frame
+		_slide(puppet, Vector3(0.5, 0.0, 0.0))
+	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	_check(absf(angle_difference(yaw, PI)) < 0.05, "and comes round to face it, yaw %.2f" % yaw)
 	await get_tree().create_timer(Client3D.KNOCK_MIN_SECONDS + 0.4).timeout
 	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_IDLE, "come to rest: Idle again (%s)" % animator.current_animation)
+	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	_check(absf(angle_difference(yaw, was)) < 0.05, "and turned back to its own facing, yaw %.2f" % yaw)
 	imp.pushed.emit(1)
 	_slide(puppet, Vector3(0.0, 0.0, 0.5))
 	imp.impacted.emit(2, &"stone")
@@ -379,9 +388,12 @@ func _test_goblin() -> void:
 	imp.tossed = true
 	imp.pushed.emit(2)
 	_slide(puppet, Vector3(0.0, 0.0, -0.5))
+	for i in 20:
+		await get_tree().process_frame
+		_slide(puppet, Vector3(0.0, 0.0, -0.5))
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(animator.current_animation == Client3D.CLIP_ROLL and animator.get_playing_speed() < 0.0
-			and absf(yaw - (-Vector2(0, 1).angle())) < 0.01,
+			and absf(angle_difference(yaw, -Vector2(0, 1).angle())) < 0.05,
 			"tossed (-z): it rolls over backwards, facing whence it came (+z), yaw %.2f, speed %.2f" % [yaw, animator.get_playing_speed()])
 	var roll := animator.get_animation(Client3D.CLIP_ROLL).length / Client3D.ROLL_SPEED
 	await get_tree().create_timer(roll + 0.15).timeout
