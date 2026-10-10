@@ -183,7 +183,8 @@ const DAY_AMBIENT_ENERGY := 0.6
 const FOREST_FLOOR_DEPTH := 0.2
 ## A piece fades when a ray from the local player or their companion, at
 ## each of these heights, toward the camera passes within FADE_MARGIN of
-## its bounds.
+## its bounds, and the piece stands on the camera's side of them (not a
+## wall at their back in a corner); a wall fades with its whole run.
 const FADE_HEIGHTS: Array[float] = [0.3, 0.9, 1.5]
 const FADE_MARGIN := 0.3
 const FOREST_DEPTH := 3
@@ -423,9 +424,9 @@ var _outdoor := false
 var _land: Dictionary[Vector2i, bool] = {}
 var _trees: Dictionary[Vector2i, Node3D] = {}
 var _see_through: Dictionary[Material, Material] = {}
-## [piece, its bounds grown by FADE_MARGIN, is a tree], for every wall,
-## doorway frame, post and tree, made once per room; the pieces faded now,
-## and what they were worked out for.
+## [piece, its bounds grown by FADE_MARGIN, is a tree, the pieces that fade
+## with it], for every wall, doorway frame, post and tree, made once per
+## room; the pieces faded now, and what they were worked out for.
 var _occluders: Array[Array] = []
 var _occluders_built := false
 var _faded: Dictionary[Node3D, bool] = {}
@@ -1672,8 +1673,10 @@ func _update_fade(force := false) -> void:
 	for entry in _occluders:
 		var bounds: AABB = entry[1]
 		for point in points:
-			if bounds.intersects_ray(point, toward) != null:
-				now[entry[0]] = true
+			var ahead := bounds.get_center() - point
+			if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_ray(point, toward) != null:
+				for piece: Node3D in entry[3]:
+					now[piece] = true
 				break
 	for entry in _occluders:
 		var piece: Node3D = entry[0]
@@ -1705,14 +1708,56 @@ func _focus_points() -> Array[Vector3]:
 
 func _index_occluders() -> void:
 	_occluders.clear()
-	for piece: Node3D in _walls.values() + _posts.values():
-		_occluders.append([piece, _bounds(piece), false])
-	for doorway: Node3D in _doorways.values():
-		var frame := doorway.get_node("Frame") as Node3D
-		_occluders.append([frame, _bounds(frame), false])
+	var runs := _wall_runs()
+	for key: Vector3i in _walls:
+		_occluders.append([_walls[key], _bounds(_walls[key]), false, runs[key]])
+	for key: Vector3i in _doorways:
+		var frame := _doorways[key].get_node("Frame") as Node3D
+		_occluders.append([frame, _bounds(frame), false, runs[key]])
+	for post: Node3D in _posts.values():
+		_occluders.append([post, _bounds(post), false, [post]])
 	for tree: Node3D in _trees.values():
-		_occluders.append([tree, _bounds(tree), true])
+		_occluders.append([tree, _bounds(tree), true, [tree]])
 	_occluders_built = true
+
+
+## For each wall and doorway edge, the pieces of its run: the walls and
+## doorway frames in a straight line with it, and the posts along and at
+## the ends of that line, up to where it turns, ends or another wall meets
+## it (a room's side, not the whole castle's).
+func _wall_runs() -> Dictionary[Vector3i, Array]:
+	var out: Dictionary[Vector3i, Array] = {}
+	var standing := func(key: Vector3i) -> bool: return _walls.has(key) or _doorways.has(key)
+	for start: Vector3i in _walls.keys() + _doorways.keys():
+		if out.has(start):
+			continue
+		var edges: Array[Vector3i] = [start]
+		var vertices: Array[Vector2i] = []
+		for end in 2:
+			var key := start
+			var at := end
+			while true:
+				var vertex := WallEdge.vertex_at(key, at)
+				vertices.append(vertex)
+				var meeting := 0
+				for entry: Array in WallEdge.edges_at_vertex(vertex):
+					if standing.call(entry[0]):
+						meeting += 1
+				var along := Vector3i(0, 1 if at == 0 else -1, 0) if key.z == Terrain.EAST else Vector3i(-1 if at == 0 else 1, 0, 0)
+				var next := key + along
+				if meeting > 2 or not standing.call(next) or next in edges:
+					break
+				edges.append(next)
+				key = next
+		var pieces: Array = []
+		for key in edges:
+			pieces.append(_walls[key] if _walls.has(key) else _doorways[key].get_node("Frame"))
+		for vertex in vertices:
+			if _posts.has(vertex) and not pieces.has(_posts[vertex]):
+				pieces.append(_posts[vertex])
+		for key in edges:
+			out[key] = pieces
+	return out
 
 
 ## [param piece]'s meshes' bounds, in the world, grown by FADE_MARGIN.

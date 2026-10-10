@@ -3,6 +3,14 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.89
+
+3D view.
+
+- A wall in front of you fades along its whole length, up to where it
+  turns or another wall meets it, not just the piece by you.
+- In a corner, the walls at your back no longer fade.
+
 ## v0.1.88
 
 2D and 3D views.

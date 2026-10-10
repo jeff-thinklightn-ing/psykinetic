@@ -267,7 +267,7 @@ func _test_ground_colours() -> void:
 
 
 func _test_fade() -> void:
-	print("\n== walls fade only between the camera and the player, worked out again as the camera moves ==")
+	print("\n== walls fade only between the camera and the player, a whole run at once, worked out again as the camera moves ==")
 	var player := _player()
 	var start := player.tile
 	var floor_cells: Array = _main._terrain["floor"]
@@ -291,15 +291,35 @@ func _test_fade() -> void:
 	await get_tree().create_timer(1.5).timeout
 	var wall := _rig._walls[wall_key]
 	_check(_rig._faded.has(wall), "standing just behind a wall: it fades (%s, at %s)" % [wall_key, behind])
-	var far_faded := 0
+	var run: Array = _rig._wall_runs()[wall_key]
+	_check(run.size() > 1 and run.all(func(piece: Node3D) -> bool: return _rig._faded.has(piece)),
+			"and its whole run with it (%d pieces)" % run.size())
+	# Everything faded is in the run of a piece near the player or the
+	# companion, or is such a piece itself.
 	var companion := _companion()
-	for piece: Node3D in _rig._faded:
-		var at := Vector2(piece.global_position.x, piece.global_position.z)
-		var near_player := at.distance_to(Vector2(player.tile)) < 5.0
-		var near_companion := companion != null and at.distance_to(Vector2(companion.tile)) < 5.0
-		if not near_player and not near_companion:
-			far_faded += 1
-	_check(far_faded == 0, "and nothing far from the player or the companion fades (%d of %d)" % [far_faded, _rig._faded.size()])
+	var near_runs: Dictionary[Node3D, bool] = {}
+	for entry: Array in _rig._occluders:
+		var at := Vector2((entry[0] as Node3D).global_position.x, (entry[0] as Node3D).global_position.z)
+		if at.distance_to(Vector2(player.tile)) < 3.0 or companion != null and at.distance_to(Vector2(companion.tile)) < 3.0:
+			for piece: Node3D in entry[3]:
+				near_runs[piece] = true
+	var far_faded := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return not near_runs.has(piece)).size()
+	_check(far_faded == 0, "and nothing else far from the player or the companion fades (%d of %d)" % [far_faded, _rig._faded.size()])
+	# A corner whose two walls are at the player's back, away from the
+	# camera: neither fades.
+	var corner := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		var side_x := Vector3i(cell.x, cell.y, Terrain.EAST) if toward.x < 0.0 else Vector3i(cell.x - 1, cell.y, Terrain.EAST)
+		var side_z := Vector3i(cell.x, cell.y, Terrain.SOUTH) if toward.z < 0.0 else Vector3i(cell.x, cell.y - 1, Terrain.SOUTH)
+		var link := (_main.level.get("links", []) as Array).any(func(l: Dictionary) -> bool: return l["tile"] == cell)
+		if _rig._walls.has(side_x) and _rig._walls.has(side_z) and World.get_entity_at(cell) == null and not link:
+			corner = cell
+			_place(player, cell)
+			await get_tree().create_timer(1.5).timeout
+			_check(not _rig._faded.has(_rig._walls[side_x]) and not _rig._faded.has(_rig._walls[side_z]),
+					"in a corner, its walls at the player's back stay solid (at %s)" % cell)
+			break
+	_check(corner.x != -1, "the test room has a corner away from the camera")
 	var away := behind
 	for cell: Vector2i in floor_cells:
 		if Vector2(cell - behind).length() >= 6.0 and World.get_entity_at(cell) == null and (companion == null or Vector2(cell - companion.tile).length() >= 6.0):

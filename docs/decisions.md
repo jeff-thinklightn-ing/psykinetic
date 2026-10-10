@@ -1394,3 +1394,19 @@ the facing when it ends, ease at the sim's `TURN_RATE` rather than snap;
 the view hands its angle back to the sim's shown facing so the turn back
 is the sim's ordinary one. Display only; the sim's `facing` was never
 touched by a push.
+
+## 155. A wall fades with its run, and never from behind
+
+Fading only the pieces a ray from the player passed through left a hole
+the width of one wall piece in an otherwise solid wall, and the bounds
+were grown by `FADE_MARGIN` so that a ray grazing a piece counts. In a
+corner the player stands inside the grown bounds of the walls at their
+back, and a ray that starts inside a box hits it, so those walls faded,
+away from the camera. A piece now fades only when its centre is on the
+camera's side of the player across the ground (height is left out:
+a wall's centre is above the player's feet, and counting it let a wall
+just behind them through). A wall or doorway frame that fades takes its
+whole run with it: the straight line of walls and frames it is part of,
+with its posts, ending where the line turns, stops or meets another wall.
+Ending at a junction keeps it to a room's side rather than a castle's
+whole length. Posts and trees still fade alone.

@@ -1353,7 +1353,13 @@ walls later (`BOX_WALLS`).
 **Near and far** (`_update_fade`): a wall, doorway frame, post or tree is
 near when it stands between the camera and the local player or their
 companion: a ray from each, at `FADE_HEIGHTS`, toward the camera passes
-through its bounds grown by `FADE_MARGIN`. Near pieces take the
+through its bounds grown by `FADE_MARGIN`, and the piece's centre is on
+the camera's side of them across the ground (so in a corner the walls at
+their back, whose grown bounds they stand in, stay solid). A wall or
+doorway frame fades with its whole run (`_wall_runs`): the walls and
+frames in a straight line with it, and the posts along and at its ends,
+up to where it turns, ends or another wall meets it, so a room's side
+goes see-through together, not one piece of it. Near pieces take the
 `NEAR_ALPHA` (0.3) material and cast no shadow; everything else is opaque,
 however much floor is behind it. Worked out again whenever the camera
 (yaw, tilt, zoom, following) or they move. The 2D view keeps its own rule
