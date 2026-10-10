@@ -174,9 +174,12 @@ const FOREST_DEPTH := 3
 ## Monster kinds drawn as an animated model instead of a capsule: the scene
 ## (retargeted on import to SkeletonProfileHumanoid, its skeleton
 ## %GeneralSkeleton), its clips (an AnimationLibrary of retargeted clips,
-## art/models/animations), and how tall it stands. The model faces -Z.
+## art/models/animations), how tall it stands, and which way it faces as
+## modelled ("faces": the yaw that turns its front to +X; the goblin faces
+## +Z, its toes ahead of its feet, so a quarter turn).
 const MODELS := {
-	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2},
+	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
+		"faces": PI * 0.5},
 }
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
@@ -1865,14 +1868,14 @@ static func model_for(entity: GridEntity) -> Dictionary:
 
 
 ## The model as the puppet's Body: the scene turned to face +X (as the
-## nose does, so Body turns with the facing), with an AnimationPlayer on
+## nose does, so Body turns with the facing; MODELS' "faces"), with an AnimationPlayer on
 ## its root playing its clips, kept as the puppet's "animator".
 func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	var body := Node3D.new()
 	body.name = "Body"
 	var scene := (load(model["scene"]) as PackedScene).instantiate() as Node3D
 	scene.name = "Model"
-	scene.rotation.y = -PI * 0.5
+	scene.rotation.y = float(model.get("faces", 0.0))
 	body.add_child(scene)
 	var animator := AnimationPlayer.new()
 	animator.name = "Animator"

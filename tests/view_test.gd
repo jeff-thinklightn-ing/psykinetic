@@ -261,11 +261,10 @@ func _test_goblin() -> void:
 		for i in 30:
 			imp._process(0.05)
 		_rig._process(0.0)
-		var model := puppet.get_node("Body/Model") as Node3D
-		var forward := model.global_transform.basis * Vector3(0, 0, -1)
+		# Its front, from the rig: the toes are ahead of the feet.
+		var forward := _toes_ahead(puppet)
 		var wanted := Vector2(direction).normalized()
-		_check(Vector2(forward.x, forward.z).normalized().dot(wanted) > 0.98,
-				"it faces %s (%s)" % [direction, Vector2(forward.x, forward.z).normalized()])
+		_check(forward.dot(wanted) > 0.9, "it faces %s: its toes point %s" % [direction, forward])
 	puppet.set_meta("last_at", puppet.position - Vector3(0.3, 0.0, 0.0))
 	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
 	_rig._animate(puppet)
@@ -369,6 +368,18 @@ func _companion() -> Companion:
 		if entity is Companion and entity.spawned:
 			return entity
 	return null
+
+
+## Which way a model's toes point from its feet, on the ground, unit: its
+## front, whatever axis it was modelled facing.
+func _toes_ahead(puppet: Node3D) -> Vector2:
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var ahead := Vector3.ZERO
+	for side in ["Left", "Right"]:
+		var foot := skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(side + "Foot")).origin
+		var toes := skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(side + "Toes")).origin
+		ahead += toes - foot
+	return Vector2(ahead.x, ahead.z).normalized()
 
 
 func _spawn_imp(tile: Vector2i, kind := "") -> Monster:

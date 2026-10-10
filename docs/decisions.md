@@ -1326,3 +1326,8 @@ already sees: movement of the puppet picks Walk or Idle, the swung, struck
 and death events pick the rest, and a one-off plays out before movement
 takes over again. The death clip replaces the capsule's tip-over, because
 the model has a fall of its own.
+
+Which way a model faces is part of its MODELS entry, not assumed: the
+goblin faces +Z (it was first turned as if it faced -Z, and walked
+backwards). The view test finds a model's front from its rig, the toes
+ahead of the feet, so a wrong turn cannot pass it.

@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.83
+
+Monsters.
+
+- Fixed: goblins faced away from where they were going, so they walked
+  backwards and fought facing away. They face forward now.
+
+The server must be updated to v0.1.83 too, as it refuses any other version.
+
 ## v0.1.82
 
 Monsters.
