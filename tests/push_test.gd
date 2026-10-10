@@ -424,6 +424,7 @@ func _test_toss() -> void:
 	_check(imp.tile == Vector2i(5, 2), "imp north of the player is tossed east, not north (at %s)" % imp.tile)
 	_check(player.stamina == 83, "a toss costs what a shove costs (stamina %d)" % player.stamina)
 	_check(player.facing == Vector2i(0, -1), "the player still faces the imp it threw")
+	_check(imp.tossed, "and the views are told it was a toss")
 
 	e = _build(room)
 	player = e["P"][0]
@@ -431,6 +432,13 @@ func _test_toss() -> void:
 	World.order_shove(player, imp, Vector2i(-1, -1))
 	World.step()
 	_check(imp.tile == Vector2i(2, 1), "a diagonal toss works too (at %s)" % imp.tile)
+
+	e = _build(room)
+	player = e["P"][0]
+	imp = e["m"][0]
+	World.order_shove(player, imp)
+	World.step()
+	_check(imp.tile.y < 2 and not imp.tossed, "a plain shove straight on is a push back, not a toss (at %s)" % imp.tile)
 
 	e = _build(room)
 	player = e["P"][0]

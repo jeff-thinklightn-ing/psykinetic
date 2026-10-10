@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.87
+
+3D view. Server.
+
+- Goblins react to being knocked about:
+  - pushed back (hit or shoved), they backpedal, facing you;
+  - tossed, they roll over backwards and land;
+  - slammed into a wall or a door, they double over.
+
+The server must be updated to v0.1.87 too, as it refuses any other version.
+
 ## v0.1.86
 
 3D view.

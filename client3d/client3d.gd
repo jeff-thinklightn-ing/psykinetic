@@ -202,6 +202,25 @@ const CLIP_WALK := "Walk"
 const CLIP_ATTACK := "Punch_Jab"
 const CLIP_HIT := "Hit_Chest"
 const CLIP_DEATH := "Death01"
+## Knocked about: a plain push back backpedals for the slide (at least
+## KNOCK_MIN_SECONDS), facing whence it came; a toss rolls over backwards
+## (the forward roll played in reverse), facing whence it came too, then
+## lands; either, stopped by a wall or a door (or a fall), doubles
+## over when it gets there. A blow into another body is a hit as ever.
+const CLIP_BACKPEDAL := "Jog_Bwd"
+const CLIP_IMPACT := "Hit_Stomach"
+const CLIP_ROLL := "Roll"
+const CLIP_LAND := "Jump_Land"
+const KNOCK_MIN_SECONDS := 0.45
+## Faster than this (tiles a second, as _animate smooths it) is the slide.
+const KNOCK_MOVING := 1.5
+## The backpedal's pace at speed 1, as the walk's; the roll is played this
+## much faster, to fit a toss's short flight.
+const BACKPEDAL_CLIP_SPEED := 1.6
+const ROLL_SPEED := 1.6
+## A push that has not shown any slide by then (the view draws others a
+## little in the past) is over.
+const KNOCK_WAIT_SECONDS := 0.6
 ## The walk clip's pace at speed 1 (tiles a second): faster walkers play it
 ## faster, so the feet keep up.
 const WALK_CLIP_SPEED := 1.6
@@ -1827,18 +1846,38 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var puppet: Node3D = _puppets.get(id)
-	if puppet != null:
-		_play_once(puppet, CLIP_HIT)
+	if puppet != null and cause != &"impact":
+		_play_once(puppet, CLIP_HIT)  # An impact is shown by _on_impacted.
 	if puppet != null and cause == &"attack":
 		sfx.play("hit", puppet.position + Vector3.UP * 0.8)
 
 
-## An impact: the sound of what it hit.
+## Pushed [param tiles]: a model is knocked back (_animate), a backpedal or,
+## for a toss, a roll, once the slide shows.
+func _on_pushed(tiles: int, id: int) -> void:
+	_combat_at[id] = Time.get_ticks_msec()
+	var puppet: Node3D = _puppets.get(id)
+	var entity := instance_from_id(id) as GridEntity
+	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("animator"):
+		return
+	puppet.set_meta("knock", {"toss": entity.tossed, "impact": false, "since": Time.get_ticks_msec(), "moving_since": -1, "yaw": 0.0})
+
+
+## An impact: the sound of what it hit; into a wall or a door (or the
+## ground, falling), a model doubles over: at the end of its slide if it is
+## knocked back, else now.
 func _on_impacted(_amount: int, against: StringName, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null:
 		return
+	if against == &"stone" or against == &"wood":
+		if puppet.has_meta("knock"):
+			(puppet.get_meta("knock") as Dictionary)["impact"] = true
+		else:
+			_play_once(puppet, CLIP_IMPACT)
+	elif against == &"body":
+		_play_once(puppet, CLIP_HIT)
 	var at := puppet.position + Vector3.UP * 0.6
 	match against:
 		&"stone":
@@ -1901,6 +1940,8 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 		bubbles.show_line(puppet.get_instance_id(), line)
 	# A model plays its death and lies where it fell; the rest go over onto
 	# their side, a touch too far, back, and still.
+	if puppet.has_meta("knock"):
+		puppet.remove_meta("knock")
 	if _play_once(puppet, CLIP_DEATH):
 		puppet.set_meta("busy_until", 1 << 62)
 		var lie := create_tween()
@@ -1977,10 +2018,12 @@ func _animate(puppet: Node3D) -> void:
 	puppet.set_meta("last_at", puppet.position)
 	puppet.set_meta("last_ms", now)
 	var speed: float = puppet.get_meta("speed", 0.0)
+	var step := Vector2(puppet.position.x - last.x, puppet.position.z - last.z)
 	if seconds > 0.0:
-		var moved := Vector2(puppet.position.x - last.x, puppet.position.z - last.z).length() / seconds
-		speed = lerpf(speed, moved, clampf(seconds * 12.0, 0.0, 1.0))
+		speed = lerpf(speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
 	puppet.set_meta("speed", speed)
+	if puppet.has_meta("knock") and _knocked(puppet, animator, speed, step, now):
+		return
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
 	if speed > WALKING:
@@ -1991,6 +2034,47 @@ func _animate(puppet: Node3D) -> void:
 		if animator.current_animation != CLIP_IDLE:
 			animator.play(CLIP_IDLE, CLIP_BLEND)
 		animator.speed_scale = 1.0
+
+
+## A knocked-back model's frame (see CLIP_BACKPEDAL): true while the knock
+## has the model, false once it is over (or before its slide shows, so the
+## blow's own clip plays on).
+func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, step: Vector2, now: int) -> bool:
+	var knock: Dictionary = puppet.get_meta("knock")
+	var toss: bool = knock["toss"]
+	var started: int = knock["moving_since"]
+	if speed > KNOCK_MOVING:
+		if started < 0:
+			started = now
+			knock["moving_since"] = now
+			if toss:
+				animator.play_backwards(CLIP_ROLL, CLIP_BLEND)
+				animator.speed_scale = ROLL_SPEED
+			else:
+				animator.play(CLIP_BACKPEDAL, CLIP_BLEND)
+				animator.seek(0.0, true)
+			if toss:
+				puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_ROLL).length / ROLL_SPEED * 1000.0))
+		if step.length() > 0.001:
+			# Backpedalling or rolling over backwards: facing whence it came.
+			knock["yaw"] = -(-step).angle()
+		if not toss:
+			animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
+	if started < 0:
+		if now - int(knock["since"]) < int(KNOCK_WAIT_SECONDS * 1000.0):
+			return false
+	else:
+		(puppet.get_node("Body") as Node3D).rotation.y = knock["yaw"]
+		var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
+		if speed > KNOCK_MOVING or held:
+			return true
+	puppet.remove_meta("knock")
+	puppet.set_meta("busy_until", 0)
+	if knock["impact"]:
+		_play_once(puppet, CLIP_IMPACT)
+	elif toss and started >= 0:
+		_play_once(puppet, CLIP_LAND)
+	return true
 
 
 ## Plays [param clip] once on [param puppet]'s model, if it has one, and
@@ -2065,7 +2149,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		entity.swung.connect(_on_swung.bind(id))
 		entity.struck.connect(_on_struck.bind(id))
 		entity.impacted.connect(_on_impacted.bind(id))
-		entity.pushed.connect(func(_tiles: int) -> void: _combat_at[id] = Time.get_ticks_msec())
+		entity.pushed.connect(_on_pushed.bind(id))
 		if entity.max_hp > 0:
 			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
 	elif entity.is_breakable():

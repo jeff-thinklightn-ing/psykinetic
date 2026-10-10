@@ -320,7 +320,7 @@ func _place(entity: GridEntity, tile: Vector2i) -> void:
 
 
 func _test_goblin() -> void:
-	print("\n== an imp is the goblin: a model that faces, walks, punches, flinches and dies ==")
+	print("\n== an imp is the goblin: a model that faces, walks, punches, flinches, is knocked about and dies ==")
 	var player := _player()
 	var imp := _spawn_imp(Vector2i(9, 4), "imp")
 	_rig._process(0.0)
@@ -330,8 +330,9 @@ func _test_goblin() -> void:
 		return
 	var animator := puppet.get_meta("animator") as AnimationPlayer
 	var clips := Array(animator.get_animation_list())
-	_check(["Idle", "Walk", "Punch_Jab", "Hit_Chest", "Death01"].all(func(clip: String) -> bool: return clip in clips),
-			"with its five clips (%s)" % [clips])
+	_check([Client3D.CLIP_IDLE, Client3D.CLIP_WALK, Client3D.CLIP_ATTACK, Client3D.CLIP_HIT, Client3D.CLIP_DEATH,
+			Client3D.CLIP_BACKPEDAL, Client3D.CLIP_IMPACT, Client3D.CLIP_ROLL, Client3D.CLIP_LAND].all(
+			func(clip: String) -> bool: return clip in clips), "with its nine clips (%s)" % [clips])
 	_check(animator.current_animation == "Idle", "standing: Idle")
 	var bone_count := 0
 	for skeleton in puppet.find_children("*", "Skeleton3D", true, false):
@@ -356,6 +357,37 @@ func _test_goblin() -> void:
 	_check(animator.current_animation == "Punch_Jab", "played out, not cut off by walking")
 	imp.struck.emit(1, &"attack")
 	_check(animator.current_animation == "Hit_Chest", "struck: Hit_Chest")
+	imp.tossed = false
+	imp.pushed.emit(1)
+	_check(animator.current_animation == "Hit_Chest", "pushed: the blow plays on until the slide shows")
+	_slide(puppet, Vector3(0.5, 0.0, 0.0))
+	var yaw := (puppet.get_node("Body") as Node3D).rotation.y
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL and absf(absf(yaw) - PI) < 0.01,
+			"pushed back (+x): it backpedals, facing whence it came (-x), yaw %.2f" % yaw)
+	await get_tree().create_timer(Client3D.KNOCK_MIN_SECONDS + 0.4).timeout
+	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_IDLE, "come to rest: Idle again (%s)" % animator.current_animation)
+	imp.pushed.emit(1)
+	_slide(puppet, Vector3(0.0, 0.0, 0.5))
+	imp.impacted.emit(2, &"stone")
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed into a wall: it backpedals there first")
+	await get_tree().create_timer(Client3D.KNOCK_MIN_SECONDS + 0.15).timeout
+	_check(animator.current_animation == Client3D.CLIP_IMPACT, "and doubles over when it hits (%s)" % animator.current_animation)
+	await get_tree().create_timer(1.0).timeout
+	imp.impacted.emit(1, &"wood")
+	_check(animator.current_animation == Client3D.CLIP_IMPACT, "shoved against a door where it stands: doubles over at once")
+	await get_tree().create_timer(1.0).timeout
+	imp.tossed = true
+	imp.pushed.emit(2)
+	_slide(puppet, Vector3(0.0, 0.0, -0.5))
+	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	_check(animator.current_animation == Client3D.CLIP_ROLL and animator.get_playing_speed() < 0.0
+			and absf(yaw - (-Vector2(0, 1).angle())) < 0.01,
+			"tossed (-z): it rolls over backwards, facing whence it came (+z), yaw %.2f, speed %.2f" % [yaw, animator.get_playing_speed()])
+	var roll := animator.get_animation(Client3D.CLIP_ROLL).length / Client3D.ROLL_SPEED
+	await get_tree().create_timer(roll + 0.15).timeout
+	_check(animator.current_animation == Client3D.CLIP_LAND, "then lands (%s)" % animator.current_animation)
+	imp.tossed = false
+	await get_tree().create_timer(1.4).timeout
 	World.damage(imp, 999, player, &"attack")
 	_rig._process(0.0)
 	_check(puppet.has_meta("corpse") and animator.current_animation == "Death01", "killed: Death01")
@@ -364,6 +396,13 @@ func _test_goblin() -> void:
 	_check(Client3D.model_for(_spawn_imp(Vector2i(10, 4))).is_empty(), "a monster of no kind with a model is still a capsule")
 	# The hit and death sounds finish before the test does.
 	await get_tree().create_timer(1.5).timeout
+
+
+## One frame of [param puppet] having moved [param by] in 0.1 s: a slide.
+func _slide(puppet: Node3D, by: Vector3) -> void:
+	puppet.set_meta("last_at", puppet.position - by)
+	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
+	_rig._animate(puppet)
 
 
 func _test_settings() -> void:

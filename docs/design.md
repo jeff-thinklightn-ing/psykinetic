@@ -1052,13 +1052,24 @@ Models are imported with a SkeletonProfileHumanoid bone map
 (`art/models/bonemaps/`), so their skeleton is `%GeneralSkeleton` with the
 profile's bone names, and their clips are an AnimationLibrary of
 retargeted clips (`art/models/animations/goblin.res`: Idle, Walk,
-Punch_Jab, Hit_Chest and Death01 from the Quaternius Universal Animation
-Library, CC0, saved by `tools/extract_clips.gd` so the 20 MB pack is never
+Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll and Jump_Land
+from the Quaternius Universal Animation Library (Pro), CC0, saved by `tools/extract_clips.gd` so the 20 MB pack is never
 shipped). The model is the puppet's Body, turned to the shown facing (it
 has no nose); an AnimationPlayer on it walks while the puppet moves (the
 clip sped up to its pace), stands Idle when it does not, and plays
 Punch_Jab on a swing, Hit_Chest when struck and Death01 when it dies, each
-played out before walking or idling take over again. A dead model plays
+played out before walking or idling take over again. Knocked about
+(`_on_pushed`, `_knocked`), by how it was pushed: pushed back (an attack's
+knockback, a shove straight on) it backpedals (Jog_Bwd, paced by the
+slide) facing whence it came, for the slide and at least
+`KNOCK_MIN_SECONDS`; tossed (aimed another way, or overhead: the sim's
+`GridEntity.tossed`, sent with the push) it rolls over backwards, facing
+whence it came (Roll played in reverse, `ROLL_SPEED` faster), then lands
+(Jump_Land); either, stopped by a wall or
+a door (an impact against stone or wood, a fall too), doubles over
+(Hit_Stomach) when its slide ends, or at once if it never moved. An impact
+against another body is Hit_Chest. The clip waits for the slide to show,
+since others are drawn a little in the past. A dead model plays
 its death where it stands instead of tipping over, lies, and sinks as any
 corpse does. The sim knows nothing of it: the imp is a capsule-shaped
 monster everywhere but in the 3D view.

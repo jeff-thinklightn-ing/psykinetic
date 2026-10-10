@@ -1138,7 +1138,7 @@ func _resolve_hits() -> void:
 		if hit.damage > 0:
 			damage(hit.target, hit.damage, hit.source, &"attack")
 		if hit.force > 0.0 and _alive(hit.target):
-			_push(hit.source, hit.target, hit.push_direction, hit.force)
+			_push(hit.source, hit.target, hit.push_direction, hit.force, hit.push_direction != hit.direction)
 
 
 ## Force push. The mover's mass is a budget: each body set in motion spends its
@@ -1146,7 +1146,9 @@ func _resolve_hits() -> void:
 ## travels up to floor(force * ratio) tiles; whatever force is left when
 ## something stops it becomes impact. Nothing here knows what kind of entity
 ## it is pushing.
-func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: float) -> void:
+## [param toss]: the first body was tossed (aimed another way than straight
+## on), for the views; what it knocks on is pushed.
+func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: float, toss := false) -> void:
 	var mover_mass: float = mover.mass
 	var budget: float = mover_mass
 	var body: GridEntity = first
@@ -1237,7 +1239,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS))
-		body._world_pushed(tiles, lofted and tiles > 0)
+		body._world_pushed(tiles, lofted and tiles > 0, toss and body == first)
 		var note := ""
 		var next_body: GridEntity = null
 		if impact > 0:

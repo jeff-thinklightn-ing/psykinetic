@@ -13,7 +13,8 @@ characters/goblin.glb.import  imported with retarget/bone_map = bonemaps/goblin.
 bonemaps/goblin.tres, bonemaps/ual.tres
                          bone maps from the retarget test: the goblin (identity) and the Quaternius
                          Universal Animation Library (Unreal mannequin names) onto SkeletonProfileHumanoid
-animations/goblin.res    Idle, Walk, Punch_Jab, Hit_Chest, Death01 from the Quaternius Universal
-                         Animation Library (UAL1.glb, in place), retargeted through bonemaps/ual.tres,
+animations/goblin.res    Idle, Walk, Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll,
+                         Jump_Land from the Quaternius Universal Animation Library (Pro, UAL1.glb,
+                         in place), retargeted through bonemaps/ual.tres,
                          saved by tools/extract_clips.gd. Animations by Quaternius, CC0 1.0
                          (animations/LICENSE-quaternius-ual.txt), https://quaternius.com

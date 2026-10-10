@@ -1365,3 +1365,19 @@ test per piece per moving frame, cheap at these sizes, and walls elsewhere
 stay solid, so the shape of the place reads. The 2D view keeps its rule:
 its walls are flat faces drawn in a fixed order, not geometry a ray can
 meet.
+
+## 153. Knockback is shown by how the body was pushed
+
+A pushed goblin slid with its walk clip, so a knockback looked like a
+quick walk backwards. Three kinds of push now have their own clips, from
+the same animation pack: a push back backpedals, a toss rolls over
+backwards (the pack's forward roll played in reverse) and lands,
+and a stop against a wall or door doubles over. The views could already
+tell an overhead toss (lofted) but not an aimed one, so the sim sends a
+`tossed` flag with every push (the first body of a shove aimed another way
+than straight on); what it knocks on is pushed, not tossed. It is
+cosmetic, like the hop it rides with, and the sim reads nothing of it. The
+3D view starts the clip when the puppet's slide shows rather than when
+the message comes, because other entities are drawn a couple of ticks in
+the past, and it ends it when the slide stops (the backpedal holds a
+moment, the roll plays out), so the timing follows what is on screen.

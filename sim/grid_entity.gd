@@ -171,6 +171,10 @@ var _sprite_rest_scale := Vector2.ONE
 var _hop_offset := 0.0
 ## Whether the push being shown is an overhead toss (a higher, longer arc).
 var _lofted := false
+## Whether the push being shown is a toss (aimed, or overhead), not a
+## plain push back: the 3D view rolls it and lands it instead of
+## backpedalling.
+var tossed := false
 ## Tick (this peer's clock) until which the sprite reels from a stun.
 var _reel_until := 0.0
 # Regen bookkeeping, written by World through the _world_note_* hooks.
@@ -415,11 +419,12 @@ func _world_note_moved(on_tick: int) -> void:
 		_exerted_tick = on_tick
 
 
-func _world_pushed(tiles: int, lofted := false) -> void:
+func _world_pushed(tiles: int, lofted := false, toss := false) -> void:
 	_lofted = lofted
+	tossed = toss
 	pushed.emit(tiles)
 	for peer in Net.sendable_peers():
-		_net_pushed.rpc_id(peer, tiles, lofted)
+		_net_pushed.rpc_id(peer, tiles, lofted, toss)
 
 
 func _world_impacted(amount: int, against: StringName) -> void:
@@ -600,8 +605,9 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 
 # Cosmetic only: they replay feedback, they carry no sim state.
 @rpc("authority", "call_remote", "reliable")
-func _net_pushed(tiles: int, lofted: bool) -> void:
+func _net_pushed(tiles: int, lofted: bool, toss: bool) -> void:
 	_lofted = lofted
+	tossed = toss
 	pushed.emit(tiles)
 
 

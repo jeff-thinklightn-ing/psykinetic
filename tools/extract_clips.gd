@@ -12,7 +12,7 @@ extends SceneTree
 ##    UAL), and import: godot --headless --path . --import
 ## 3. godot --headless --path . -s res://tools/extract_clips.gd -- \
 ##        res://build/ual_extract/UAL1.glb res://art/models/animations/goblin.res \
-##        Idle Walk Punch_Jab Hit_Chest Death01
+##        Idle Walk Punch_Jab Hit_Chest Death01 Jog_Bwd Hit_Stomach Roll Jump_Land
 ## 4. Delete build/ual_extract.
 ##
 ## Track paths stay as retargeted (%GeneralSkeleton:<Bone>), so the library
