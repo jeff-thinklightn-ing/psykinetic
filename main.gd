@@ -234,6 +234,10 @@ var _terrain: Dictionary = {}
 
 
 func _ready() -> void:
+	if not Net.edit_map.is_empty():
+		# --edit: the level editor instead of the game; nothing goes online.
+		get_tree().change_scene_to_file.call_deferred("res://editor/level_editor.tscn")
+		return
 	# After every other node: see _process.
 	process_priority = 10
 	var probe := Vector2i(3, 5)

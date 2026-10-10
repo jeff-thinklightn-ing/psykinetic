@@ -132,8 +132,14 @@ static func load_level(level_name: String) -> Dictionary:
 
 
 ## An image as imported (the "image" importer, so it loads on a headless
-## server too), or, in the project, the file itself; null if neither.
+## server too), or, in the project, the file itself; null if neither. Run
+## from the project (the editor's build) the file itself wins, so a map
+## the level editor has just saved plays without a reimport.
 static func _image(path: String) -> Image:
+	if OS.has_feature("editor") and FileAccess.file_exists(path):
+		var fresh := Image.load_from_file(ProjectSettings.globalize_path(path))
+		if fresh != null:
+			return fresh
 	if ResourceLoader.exists(path):
 		var resource: Resource = load(path)
 		if resource is Image:

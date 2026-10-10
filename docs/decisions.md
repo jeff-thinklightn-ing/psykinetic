@@ -1269,3 +1269,21 @@ the old one: their client no longer knew her for their own (a right click
 shoved her instead of opening her pack, a left click would attack her)
 and the server would not let them reach her pack. Main sets it on the
 rejoin, and a companion replicates it.
+
+## 147. The level editor edits layout.png itself
+
+The editor (--edit=<map>, editor/) reads layout.png into cells and edges
+(LevelMap) and writes the same double-resolution picture back, so there is
+still one map format, readable by any paint program and by Level.parse,
+and a map round-trips unchanged (tests/editor_test.gd checks every level
+in levels/). It paints edges as well as cells, because walls and doors
+live on edges; the nearest edge to the cursor is the target with an edge
+brush, and a drag along edges is held to the first edge's line so a run of
+wall comes out straight. Painted between cells: the cells' ground where
+both sides share it, so the picture reads as the map; void otherwise.
+
+A new picture would be imported as a texture, which the dedicated server
+cannot read, so the editor writes its .import as Image (Godot fills in
+the rest on the next import). And run from the project, Level reads the
+PNG itself before its import, so a save plays at once without one; an
+exported build, which has only the import, is unchanged.

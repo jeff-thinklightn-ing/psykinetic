@@ -151,14 +151,51 @@ else moves. Travel does not heal or revive, as a reset does. Their record
 keeps the zone, so a restart brings them back there. The test room's link
 is in its top-left corner, (1, 1), to the sample; the sample's leads back.
 
+## The level editor
+
+```
+Godot_v4.7.2-stable_win64.exe --path <project> --edit=<name> [--edit-size=32x24]
+```
+
+opens `levels/<name>/layout.png` as a top-down grid (`editor/`), or a blank
+map of that many cells (default 32 x 24) if there is none yet; nothing is
+written until you save. Run it from the project: an exported game cannot
+write its levels.
+
+- **The palette** (left) has every cell type and thing in the legend,
+  the three edge types (wall, door, clear), and any colour `level.json`
+  adds. Click one, or press its key: `1`-`0` for the first ten (stone,
+  grass, dirt, water, fire, stair, wall, door, clear, void), `Shift+1`-`0`
+  for the next (start, imp, brute, sneak, crate, boulder, cart, chest,
+  torch, lantern), `Alt+1` for link and `Alt+` the rest.
+- **Cells**: left click paints the cell under the cursor; a drag paints
+  the line of cells it passes over.
+- **Edges**: with wall, door or clear picked, the edge nearest the cursor
+  lights up and a click sets it; a drag sets a straight run along that
+  line, however the cursor wanders off it.
+- **Right click** (and drag) erases: cells to void, edges to clear.
+- `Ctrl+S` saves, `Ctrl+Z` undoes a stroke, `Ctrl+Y` (or `Ctrl+Shift+Z`)
+  redoes it. Middle drag or the arrow keys pan, the wheel zooms.
+- The faint lines along the floor's outline are the outer walls the game
+  builds by itself; you never need to draw them.
+
+Saving writes the same double-resolution `layout.png` (the file's own size
+kept), its `.import` set to Image, and reports what the server would warn
+about. `height.png` and `level.json` are left as they are. Run from the
+project, the game reads `layout.png` itself rather than its import, so a
+saved map plays at once with `--map=<name>`.
+
+Not yet: painting heights, and a 3D preview.
+
 ## Making a level
 
-1. Draw `layout.png` in any paint program (at 1 pixel per cell or edge, no
+1. Draw `layout.png` in the level editor (above) or in any paint program (at 1 pixel per cell or edge, no
    smoothing), and `height.png` if it has heights.
-2. In Godot's Import dock, import both as **Image** ("Import As: Image"),
-   not as a texture: the dedicated server has no renderer to read a
-   texture's pixels from. `tests/level_test.tscn` checks this for the test
-   room.
+2. Import both as **Image**, not as a texture: the dedicated server has
+   no renderer to read a texture's pixels from. The editor sets this for
+   `layout.png`; for a picture painted elsewhere, and for `height.png`, it is
+   "Import As: Image" in Godot's Import dock. `tests/level_test.tscn` checks
+   this for the test room.
 3. Write `level.json` if anything needs naming, ordering or linking.
 4. `--map=<name>` to play it; the server prints any warning about the map
    (unknown colours, a stair with nothing above it, a link with no entry).

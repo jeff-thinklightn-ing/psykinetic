@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.79
+
+Level editor. Server.
+
+- **A level editor**: run the project with `--edit=<map>` to paint
+  `levels/<map>/layout.png` on a grid, or start a new map. Pick ground,
+  water, fire, stairs, monsters, crates, chests, torches, starts and links
+  from the palette (or number keys) and paint them; with wall, door or
+  clear picked, click or drag along the lines between cells. Right click
+  erases, Ctrl+S saves, Ctrl+Z undoes. See docs/levels.md.
+- A map saved in the editor plays straight away when you run the project
+  with `--map=<map>`.
+
+The server must be updated to v0.1.79 too, as it refuses any other version.
+
 ## v0.1.78
 
 Companions. Server.

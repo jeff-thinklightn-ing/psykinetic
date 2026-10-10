@@ -15,6 +15,8 @@ extends Node
 ##   --no-companions              server/host: players get no companion
 ##   --no-player-reset            server/host: R from a client does not rebuild the room
 ##   --map=<name>                 server/host: new players start in zone levels/<name> (default test_room)
+##   --edit=<name>                the level editor on levels/<name>/layout.png (made if there is none;
+##   --edit-size=<w>x<h>          a new one this many cells, default 32x24); no game, no network
 ##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
 ##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
 ##   --transcripts=<dir>          server/host: keep what is said to and by each companion here, a
@@ -150,6 +152,10 @@ const DEFAULT_MIND_LOG := "/var/lib/psykinetic/mind.log"
 var mind_log_path := ""
 ## --map=<name>: the zone new players start in ("" for the default map).
 var map_name := ""
+## --edit=<name>: run the level editor on that map instead of the game.
+var edit_map := ""
+## --edit-size=<w>x<h>: a new map's size in cells.
+var edit_size := LevelMap.NEW_SIZE
 var _mind_log_given := false
 ## Where the companions' transcripts go ("" for none); see Transcript.
 const DEFAULT_TRANSCRIPTS := "/var/lib/psykinetic/transcripts"
@@ -932,7 +938,7 @@ func _parse_args() -> void:
 			"--mind-why":
 				mind_why = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--transcripts", \
+					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-walk":
@@ -994,6 +1000,12 @@ func _set_option(key: String, value: String) -> void:
 				print("[net] --perception=%s: not one of %s; keeping %s" % [value, "|".join(PERCEPTIONS), perception])
 		"--map":
 			map_name = value
+		"--edit":
+			edit_map = value.strip_edges()
+		"--edit-size":
+			var parts := value.to_lower().split("x")
+			if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+				edit_size = Vector2i(clampi(parts[0].to_int(), 2, 256), clampi(parts[1].to_int(), 2, 256))
 		"--mind-log":
 			mind_log_path = value
 			_mind_log_given = true
