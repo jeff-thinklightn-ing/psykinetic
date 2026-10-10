@@ -69,14 +69,15 @@ const TOSS_AIM_LENGTH := 26.0
 ## many tiles of the click point (Euclidean on the ground plane), or nowhere.
 const SNAP_RANGE := 3.0
 const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
-const COMPANION_CARD := "Loyal and cautious. Guards the one she travels with, and speaks little."
+const COMPANION_CARD := "Loyal and cautious. Guards the one she travels with, and says little, in short, plain sentences."
 ## Companions' cards, a paragraph each, by name; any companion not in it
 ## keeps the card in its record (COMPANION_CARD for a new one).
 const COMPANION_CARDS := "res://levels/companions.json"
 static var _cards: Dictionary[String, String] = {}
 ## Cards earlier builds gave every companion, which spoke of "its friend":
 ## a record that still has one gets COMPANION_CARD.
-const OLD_COMPANION_CARDS: Array[String] = ["A loyal, cautious companion who guards its friend and speaks little.",
+const OLD_COMPANION_CARDS: Array[String] = ["Loyal and cautious. Guards the one she travels with, and speaks little.",
+	"A loyal, cautious companion who guards its friend and speaks little.",
 	"A loyal, cautious companion who guards its friend."]
 const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 ## What a companion says as she falls.
@@ -1862,6 +1863,8 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 		# Always said: last words never wait on the speech rate limit.
 		line = COMPANION_DEATH_LINES[randi() % COMPANION_DEATH_LINES.size()]
 		party_log.add("%s said: \"%s\"" % [entity.name, line])
+		# Her last words are hers: in her transcript like any line.
+		Transcript.record(String(entity.name), String(entity.name), line)
 	Net.broadcast_to(World.peers_in(World.zone.name), "death", {"entity": String(entity.name),
 		"tile": [entity.tile.x, entity.tile.y], "kind": kind, "cause": String(cause), "say": line})
 

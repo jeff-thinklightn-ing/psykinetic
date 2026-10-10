@@ -1331,3 +1331,23 @@ Which way a model faces is part of its MODELS entry, not assumed: the
 goblin faces +Z (it was first turned as if it faced -Z, and walked
 backwards). The view test finds a model's front from its rig, the toes
 ahead of the feet, so a wrong turn cannot pass it.
+
+## 151. Her words are cleaned in code, because the rules alone do not hold
+
+The castle playtest had Wren give Cylinder (another player) an order in
+most fights, both companions open every line with their player's name, a
+bare "Jeff." tacked on, "Bandages. Now." and her lantern unasked, and Nix
+down to "Cylinder. West." Replaying his logged prompts on the box: a new
+card and rules changed nothing while his own fragments were in his
+exchange (he copies them); with them gone he spoke in whole sentences.
+Wren's fight prompts, with the new rules, still called Jeff by name in 7
+of 12 replies. So the prompt says what to do (whole sentences, speak to
+your player, never narrate), and Companion.spoken makes it so: it strips
+the name, the fragments, the repeats, the narration, the unasked items
+and the words to others, sentence by sentence, before anything is said,
+so what she has said (and so what the voice sees of her) is clean, and
+the pattern does not feed itself. Talking to another player is allowed
+when they named her, or once a minute for a warning; their words reach
+their own companion first, and anyone else's only by name. Nix's card says
+terse means short, whole sentences: told one "speaks little", the model
+answers in single words.

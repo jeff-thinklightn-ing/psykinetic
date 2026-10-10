@@ -288,13 +288,19 @@ func _test_overheard() -> void:
 	_check(nix_mind.voice_asks.is_empty(), "and Nix, the line naming Pip, is not asked")
 	_check("%s: Right here, Jeff." % pip.name in Companion.render(nix.voice_messages()), "Nix heard Pip's answer too, labelled")
 	_check(nix_mind.voice_asks.is_empty(), "nor is a companion's line an ask for another")
-	# A line naming no one, with others near: open to anyone; both are asked.
+	# A line naming no one: a player's words are their own companion's first;
+	# another companion answers only if named.
 	pip_mind.voice_asks.clear()
 	_main._chat_tick.clear()
 	_main._player_said(host, "Anyone see a way out?")
-	var open_text := Companion.render(nix_mind.voice_asks.back()["messages"]) if not nix_mind.voice_asks.is_empty() else ""
-	_check(not pip_mind.voice_asks.is_empty() and "naming no one" in open_text and "it is open to anyone" in open_text,
-		"a line naming no one: both are asked, told it is open to anyone")
+	var open_text := Companion.render(pip_mind.voice_asks.back()["messages"]) if not pip_mind.voice_asks.is_empty() else ""
+	_check("naming no one" in open_text and "it is open to anyone" in open_text,
+		"a line naming no one: Pip, whose player said it, is asked, told it is open to anyone")
+	_check(nix_mind.voice_asks.is_empty() and "%s: Anyone see a way out?" % Net.player_name in Companion.render(nix.voice_messages()),
+		"Nix hears it, but is not asked: it was not his player's, and did not name him")
+	_main._chat_tick.clear()
+	_main._player_said(host, "Nix, can you see a way out?")
+	_check(not nix_mind.voice_asks.is_empty(), "named, Nix is asked")
 	# The fallen hear, but cannot speak.
 	World.damage(bo, 999)
 	_check(_player(BO) == null and BO in _main.hearers(host.tile), "Bo, fallen, still hears what is said near where he fell")

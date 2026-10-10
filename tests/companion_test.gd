@@ -64,6 +64,7 @@ func _ready() -> void:
 	_test_mind_log_rotates()
 	_test_situation()
 	_test_bubbles()
+	_test_spoken()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -348,6 +349,11 @@ func _test_last_words() -> void:
 	print("\n== last words: always said, in the server log, the party log and the panel ==")
 	var pet := _companion()
 	pet._last_speech_tick = World.tick  # The rate limit would drop anything now.
+	var saved_dir := Net.transcripts_dir
+	Net.transcripts_dir = OS.get_user_data_dir().path_join("last_words_test")
+	var transcript := Transcript.path_of(Net.transcripts_dir, String(pet.name), Time.get_date_string_from_system())
+	if FileAccess.file_exists(transcript):
+		DirAccess.remove_absolute(transcript)
 	var before: int = _main.party_log.size()
 	var talk_lines: int = _main.talk.lines.size()
 	World.damage(pet, 999, null, &"attack")
@@ -356,6 +362,65 @@ func _test_last_words() -> void:
 	_check(words.size() == 1, "the party log has her last words (%s)" % [lines])
 	_check(_main.talk.lines.size() >= mini(talk_lines + 1, TalkPanel.MAX_LINES) and _main.talk.lines.back()[1] == String(pet.name)
 			and not words.is_empty() and str(_main.talk.lines.back()[2]) in str(words[0]), "and so does the Tab panel")
+	var written := FileAccess.get_file_as_string(transcript)
+	var last: String = _main.talk.lines.back()[2]
+	_check(("%s: %s" % [pet.name, last]) in written, "and her transcript, as her own line (%s)" % written.strip_edges())
+	DirAccess.remove_absolute(transcript)
+	Net.transcripts_dir = saved_dir
+
+
+func _test_spoken() -> void:
+	print("\n== what she says is cleaned: one reply, you not the name, no repeats, no narration, her things only when asked ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	pet._said.clear()
+	var who := pet.keeper_name()
+	_check(pet.spoken("%s, move west." % who) == "Move west.", "her player is spoken to as you: \"%s, move west.\" -> %s" % [who, pet.spoken("%s, move west." % who)])
+	_check(pet.spoken("Imps falling. %s." % who) == "Imps falling.", "a bare name goes: %s" % pet.spoken("Imps falling. %s." % who))
+	_check(pet.spoken("%s: hold here." % who) == "Hold here." and pet.spoken("Stay behind me, %s." % who) == "Stay behind me.",
+			"so does a name before a colon, or at the end")
+	_put(owner, Vector2i(2, 6))
+	_check(pet.spoken("%s, come back." % who) == "%s, come back." % who, "from far off she calls out by name: %s" % pet.spoken("%s, come back." % who))
+	_put(owner, Vector2i(9, 6))
+	_check(pet.spoken("Stay close.\n\nRest now.") == "Stay close.", "one reply only, never two glued together")
+	_check(pet.spoken("Stay close.\nThe imps are gone.") == "Stay close. The imps are gone.", "a reply broken over lines is one line")
+	_check(pet.spoken("You move to stand between %s and the imps." % who).is_empty() and pet.spoken("*nods* Ready.") == "Ready."
+			and pet.spoken("%s draws her blade. I'm here." % pet.name) == "I'm here.",
+			"narration of what she does is not said")
+	_check(pet.spoken("Keep your lantern lit.").is_empty() and pet.spoken("Bandages. Get back.") == "Get back.", "her things only when asked about")
+	_check(pet.spoken("West.").is_empty() and pet.spoken("Bandages. Now.").is_empty() and pet.spoken("No.") == "No.",
+			"a one-word fragment is not said; a one-word answer is")
+	_check(pet.spoken("I have a bandaging kit.", true) == "I have a bandaging kit.", "and said when asked")
+	pet.remember_said("Bandages. Now.")
+	pet.remember_said("Stay close.")
+	_check(pet.spoken("Stay close. The east is clear.") == "The east is clear.", "a sentence she said lately is not said again")
+	_check(pet.spoken("Now. Hold here.") == "Hold here.", "nor a one-word fragment of one")
+	_check(pet.spoken("Hold here. Hold here.") == "Hold here.", "nor twice in one reply")
+	for i in Companion.REPEAT_LINES:
+		pet.remember_said("Line %d is said." % i)
+	_check(pet.spoken("Stay close.") == "Stay close.", "after %d other lines it may be said again" % Companion.REPEAT_LINES)
+	pet._said.clear()
+	_check(not Companion.asks_about_items("") and Companion.asks_about_items("%s just said to you: \"What are you carrying?\"" % who)
+			and Companion.asks_about_items("%s just said to you: \"Got any bandages?\"" % who), "asked about her things: carrying, bandages")
+	print("\n== someone other than her player: only when they spoke to her, or once a minute when it is urgent ==")
+	var other := _main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "Cyl", "tile": Vector2i(10, 8),
+		"peer": 77, "label": "Cylinder"}) as Player
+	_check(pet.spoken("Cylinder, light them.").is_empty(), "an order to another player, unasked, not urgent: not said")
+	_check(pet.spoken("%s, rest here. Cylinder, stay near." % who) == "Rest here.", "only the part for her own player is said: %s" % pet.spoken("%s, rest here. Cylinder, stay near." % who))
+	_check(pet.spoken("Cylinder. West.").is_empty(), "a bare name and an order after it: neither")
+	pet.overheard("Cylinder", "%s, where is the door?" % pet.name, false)
+	_check(pet.spoken("Cylinder, it is to the north.") == "Cylinder, it is to the north.", "they named her: she may answer them")
+	pet._spoke_to_her.clear()
+	World.damage(other, other.max_hp - 3)
+	_check(pet.spoken("Cylinder, fall back.") == "Cylinder, fall back.", "they are badly hurt: she may warn them, once")
+	_check(pet.spoken("Cylinder, fall back now.").is_empty(), "not again within the minute")
+	pet._addressed["Cylinder"] = World.tick - Companion.ADDRESS_OTHER_TICKS
+	_check(pet.spoken("Cylinder, get away.") == "Cylinder, get away.", "a minute on, again")
+	pet._addressed.clear()
+	World.despawn(other)
 
 
 func _test_log_collapsed() -> void:
@@ -1431,7 +1496,8 @@ func _test_how_she_speaks() -> void:
 	var pet := _companion()
 	var prompt := pet.voice_prompt("test")
 	_check(not RegEx.create_from_string("\\d+ paces?").search(prompt), "no number of paces anywhere in her voice's prompt")
-	_check("You carry a lantern, and in your pack nothing." in prompt, "what she carries: her lantern, and an empty pack")
+	_check("You carry a lantern" not in prompt and "You carry a lantern, and in your pack nothing." in pet.voice_prompt("", "Player just said to you: \"What are you carrying?\""),
+			"what she carries is in her prompt only when asked about it")
 	_check("outdoors" not in pet.voice_situation() and "# wall," in pet.perception_grid(), "under stone she is told nothing of the sky")
 	World.outdoor = true
 	_check("You are outdoors, under the sky, with forest all around the edge of this place." in pet.voice_situation()
@@ -1473,6 +1539,7 @@ func _test_surroundings_when_new() -> void:
 	_check("- a crate, close by" in pet.voice_prompt("test"), "something new beside her: told (%s)" % pet.perception())
 	World.despawn(crate)
 	crate.queue_free()
+	pet._said.assign(pet._said.slice(-2))  # Her last two lines: a reply to Player, then the fire.
 	_check("You have already mentioned: the fire, resting." in pet.voice_prompt("test"),
 			"her last lines' topics: %s" % [pet.mentioned_topics()])
 	pet._said.clear()

@@ -3,6 +3,28 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.84
+
+Companions. Server.
+
+- Your companion talks to **you**: no more "Jeff, ..." at the start of
+  every line, or a bare name tacked on the end (she still calls your name
+  from across the room).
+- She leaves other players alone: she answers them when they speak to her
+  by name, and otherwise only warns them once a minute when they're in
+  danger.
+- Your words go to your own companion; someone else's answers only if you
+  say her name.
+- She doesn't repeat herself: nothing she said in her last few lines, not
+  even a one-word fragment. And always one reply at a time.
+- She mentions her lantern and bandages only when you ask what she's
+  carrying.
+- Nix talks in short, whole sentences now, not single words, and never
+  narrates what he's doing.
+- A companion's last words are in her transcript.
+
+The server must be updated to v0.1.84 too, as it refuses any other version.
+
 ## v0.1.83
 
 Monsters.

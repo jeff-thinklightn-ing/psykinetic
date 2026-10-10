@@ -939,10 +939,12 @@ no body to speak with.
 
 **Whom a line is for** (`addressed_to`): a line that says her name is
 hers; one that names someone else (another player or companion there) is
-not, and she is told so ("spoken to Bo, not to you"; another's line
-naming someone else is not even an ask); one that names no one is open to
-anyone near (`VOICE_OPEN`), answered if she has something useful; her own
-player's, with no one else near, is hers.
+not, and she is told so ("spoken to Bo, not to you"); one of her own
+player's that names no one is open to anyone near (`VOICE_OPEN`), answered
+if she has something useful; her own player's, with no one else near, is
+hers. A player's words are first their own companion's: another player's
+companion hears them (they are in her exchange, labelled) but is asked
+only when they say her name.
 
 **What she knows of what is mentioned** (`knowledge_of`): when her
 player's words name a kind of thing (door, fire, water, crate, boulder,
@@ -971,7 +973,26 @@ never repeats back what she was asked or recites who she is (the echo
 filter also drops a line that is her card's or her instruction's words).
 Distances in the voice's ask are words, never numbers (`distance_words`:
 close by, a few paces, some way off, at the edge of sight). She is told
-what she carries (her lantern, nothing else yet). The dead are no threat:
+what she carries (her lantern, her pack) only when her player's words ask
+about it (`ITEM_WORDS`: carrying, pack, lantern, bandages, kit...).
+
+**What she says is cleaned** (`Companion.spoken`), after the echo check
+and before it is said, whatever the model wrote: one reply only (its first
+paragraph, on one line; her lines are never merged into one turn of the
+exchange either, so she is never shown two replies as one); no narration
+(her own name and a verb, a gesture, "You move to stand between..."); no
+sentence she said in her last `REPEAT_LINES` (5) lines, however short, nor
+the same one twice; no one-word fragment ("East.", "Hold."), but a one-word
+answer or question stays (`ONE_WORD_ANSWERS`, "Where?"); her own things
+(lantern, bandages, her pack) only when asked about. Her player is spoken
+to as "you": their name off the front ("Jeff, move west." -> "Move
+west.") or the end of a sentence, a bare name gone, unless they are
+further than `CALL_OUT_PACES` and she calls out. Anyone else is spoken to
+only when they named her within `SPOKE_TO_HER_TICKS` (30 s), or, unasked,
+when they are in danger or badly hurt, at most once in
+`ADDRESS_OTHER_TICKS` (a minute); otherwise the sentences for them go. A
+reply with nothing left is logged as dropped, with what it was. Her last
+words, at her death, are in her transcript. The dead are no threat:
 monsters leave the world as they die, and those she saw fall are "lying
 dead near you, no threat now". A stance line is read with or without its
 brackets, and never spoken.

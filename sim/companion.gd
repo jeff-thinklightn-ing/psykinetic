@@ -161,14 +161,16 @@ see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors o
 Wounds close slowly when you rest away from danger.
 Whoever falls rises again after a while, but it hurts, and no one wants to fall.
 Directions are spoken as north, south, east and west."""
-const VOICE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
-words are enough. Not everything said near you is meant for you: a line that says your name is for you; a line that
+const VOICE_RULES := """Say what you would say out loud right now, as yourself, in one or two short sentences. However few
+your words, say them as whole sentences, never a single word or a bare name. Your words are only what you say aloud:
+never describe what you do or where you go. Not everything said near you is meant for you: a line that says your name is for you; a line that
 names someone else is not; a line that names no one is open to anyone near, and you answer it if you have something
 useful to say; from %s with no one else near, it is for you. When a line is meant for you, always answer in words,
 even if only to say you don't know; when it is not, you usually stay quiet and answer with just: ... Never say again
 what you have already said, and never repeat anyone's words back. Only when nothing has been said to you and there is
 truly nothing worth saying, answer with just: ...
-Speak to %s as "you"; say the name only to call out. In what anyone says, "I" and "me" are the one speaking.
+Speak to %s as "you", and to no one else unless they have just spoken to you or are in danger you must warn them
+of; say a name only to call out. In what anyone says, "I" and "me" are the one speaking.
 Never repeat back what you were asked to do, and never describe yourself or recite who you are.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
 If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there, and a plain no would claim you do."""
@@ -187,6 +189,26 @@ what you will do, exactly one of:
 [STANCE: GUARD] keep beside %s and fight whatever comes at either of you
 [STANCE: PULL_BACK] get away to safety
 If %s asked nothing of you, leave that line out."""
+## What she says is cleaned before it is said (spoken): a sentence in her
+## last REPEAT_LINES lines is not said again; someone other than her player
+## is spoken to only when they spoke to her (named her) within
+## SPOKE_TO_HER_TICKS, or, unasked, at most once every ADDRESS_OTHER_TICKS
+## when they are in danger or badly hurt; her player is "you", called by
+## name only from further than CALL_OUT_PACES.
+const REPEAT_LINES := 5
+const SPOKE_TO_HER_TICKS := 300
+const ADDRESS_OTHER_TICKS := 600
+const CALL_OUT_PACES := 6
+## A sentence of one word is a fragment, not said, unless it is one of
+## these answers. Fragments said teach the voice more fragments.
+const ONE_WORD_ANSWERS: Array[String] = ["yes", "no", "ready", "here", "coming", "sorry", "thanks", "okay", "ok", "aye"]
+## Words that ask about what she carries: only then is her pack in her
+## prompt, and only then may she speak of her lantern or bandages.
+const ITEM_WORDS := "\\b(carry\\w*|pack|bag|items?|lanterns?|bandag\\w*|kit|holding|what (do|have) you (got|have))\\b"
+const OWN_ITEMS := "\\b(lanterns?|bandag\\w*|pack)\\b"
+## Narration in a line, not speech: her own name and a verb, a gesture,
+## or herself moving into place ("You move to stand between ...").
+const NARRATION := "(?i)^(%s) [a-z]+s\\b|^(you |)(nod|nods|smile|smiles|sigh|sighs|shrug|shrugs|grin|grins|frown|frowns)\\b|^you (move|step|walk|go|turn|shift|edge|plant|brace|position) .*\\b(stand|between|beside|in front of|yourself)\\b"
 ## The recent exchange the voice sees: so many turns and narrations.
 const EXCHANGE_KEPT := 16
 ## With --mind-why each reply gives its reason too, for the mind log.
@@ -215,7 +237,7 @@ var keeper_id := ""
 var keeper: GridEntity
 ## Her player's name as last known (keeper_name).
 var keeper_label := ""
-var card := "Loyal and cautious. Guards the one she travels with, and speaks little."
+var card := "Loyal and cautious. Guards the one she travels with, and says little, in short, plain sentences."
 var mind: CompanionMind
 var party_log: PartyLog
 
@@ -282,6 +304,10 @@ var _said: Array[String] = []
 ## is told her surroundings again only once they change, or when asked.
 var _around_said: Array[String] = []
 var _heard: Array[Dictionary] = []
+## Who (by name) last named her when they spoke, and when; whom she last
+## spoke to unasked, and when (spoken).
+var _spoke_to_her: Dictionary[String, int] = {}
+var _addressed: Dictionary[String, int] = {}
 ## What the voice sees of the recent exchange: {role: "user" | "assistant",
 ## text}; her player's words and narration as the user's, her lines as hers.
 var _exchange: Array[Dictionary] = []
@@ -368,8 +394,12 @@ func overheard(speaker: String, text: String, ask := true) -> void:
 	_heard.append({"text": text, "tick": World.tick})
 	_add_turn("user", text, false, speaker)
 	var heard := "%s just said: \"%s\"" % [speaker, text]
-	# A line naming someone else is theirs: in her exchange, no ask.
-	if ask and addressed_to(heard) != "other":
+	if _says_name(heard):
+		_spoke_to_her[speaker] = World.tick
+	# Someone else's player's words are first for their own companion: she
+	# is asked only when they say her name. Otherwise they are in her
+	# exchange, and that is all.
+	if ask and _says_name(heard):
 		_ask_voice("%s spoke near you." % speaker, heard, false, false, false)
 
 
@@ -985,7 +1015,10 @@ func stance_prompt() -> String:
 func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
-	var now: Array[String] = [voice_situation(), others_here(), carried(), doing()]
+	var now: Array[String] = [voice_situation(), others_here()]
+	if asks_about_items(heard):
+		now.append(carried())
+	now.append(doing())
 	var topics := mentioned_topics()
 	if not topics.is_empty():
 		now.append("You have already mentioned: %s." % ", ".join(topics))
@@ -1023,7 +1056,11 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 		# What anyone said is labelled with who said it: "Bo: over here!".
 		var who_said := str(turn.get("speaker", ""))
 		var text := "%s: %s" % [who_said, turn["text"]] if role == "user" and not who_said.is_empty() else str(turn["text"])
-		if messages.back()["role"] == role:
+		if messages.back()["role"] == role and role == "assistant":
+			# Two of her lines are two replies, never one: a moment between.
+			messages.append({"role": "user", "content": "[A moment passes.]"})
+			messages.append({"role": role, "content": text})
+		elif messages.back()["role"] == role:
 			messages.back()["content"] += "\n" + text
 		else:
 			messages.append({"role": role, "content": text})
@@ -1672,15 +1709,23 @@ func _take_result(result: Dictionary) -> void:
 		entry["note"] = "stance %s waits on the instruction check" % stance_text
 		_check_instruction(wanted, serial, str(result.get("heard", "")))
 	_certain_serials.erase(serial)
-	var line := trim_line(str(answer.get("say", "")))
-	var echo := _echo_of(line)
-	if line.is_empty():
+	var raw_line := trim_line(str(answer.get("say", "")))
+	# A whole line said back is dropped as such; then what is left of it
+	# once cleaned (spoken) is what she says.
+	var echo := _echo_of(raw_line)
+	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, asks_about_items(str(result.get("heard", "")))))
+	if echo.is_empty() and line != raw_line:
+		entry["say_raw"] = raw_line
+	if raw_line.is_empty():
 		entry["outcome"] = "silent"
 	elif not echo.is_empty():
 		entry["outcome"] = "dropped"
-		entry["say_dropped"] = line
+		entry["say_dropped"] = raw_line
 		entry["note"] = "echoes %s" % echo
-		line = ""
+	elif line.is_empty():
+		entry["outcome"] = "dropped"
+		entry["say_dropped"] = raw_line
+		entry["note"] = "nothing left once cleaned: said lately, narration, her own things, or not hers to say"
 	elif not _say(line, always):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
@@ -1712,6 +1757,111 @@ func _say(line: String, always: bool) -> bool:
 	_add_turn("assistant", line)
 	said.emit(line)
 	return true
+
+
+## Whether [param heard] (her player's words to her) asks about what she
+## carries.
+static func asks_about_items(heard: String) -> bool:
+	return not heard.is_empty() and RegEx.create_from_string("(?i)" + ITEM_WORDS).search(_quoted(heard)) != null
+
+
+## [param line] as she will say it: one reply (its first paragraph, on one
+## line); no narration of what she does; no sentence she said in her last
+## REPEAT_LINES lines, nor twice in this one; her own things (lantern,
+## bandages, her pack) only when [param items_asked]; her player spoken to
+## as "you" (their name off the front or the end of a sentence, and a bare
+## name gone), unless they are further than CALL_OUT_PACES; anyone else
+## spoken to only when they named her lately or, once in
+## ADDRESS_OTHER_TICKS, when they are in danger: otherwise those sentences
+## go; and no one-word fragment (ONE_WORD_ANSWERS aside). "" if nothing is
+## left.
+func spoken(line: String, items_asked := false) -> String:
+	var text := line.strip_edges().get_slice("\n\n", 0).replace("\n", " ")
+	text = RegEx.create_from_string("\\*[^*]*\\*|\\([^)]*\\)").sub(text, " ", true)
+	var keeper_word := keeper_name()
+	var others: Array[String] = []
+	for entity in World.get_entities():
+		if entity != self and entity != keeper and entity.spawned and (entity is Player or entity is Companion):
+			others.append(_name_of(entity))
+	var repeated: Dictionary[String, bool] = {}
+	for said_line in _said.slice(-REPEAT_LINES):
+		for sentence in _sentences(said_line):
+			repeated[_plain(sentence)] = true
+	var narration := RegEx.create_from_string(NARRATION % RegEx.create_from_string("\\W").sub(_name_of(self), "", true))
+	var items := RegEx.create_from_string("(?i)" + OWN_ITEMS)
+	var kept: Array[String] = []
+	var to := ""
+	for raw in _sentences(text):
+		var sentence := raw.strip_edges()
+		var plain := _plain(sentence)
+		# A bare name calls whoever is named for what follows.
+		var bare := ""
+		for who in [keeper_word] + others:
+			if plain == _plain(who):
+				bare = who
+		if not bare.is_empty():
+			to = bare
+			continue
+		var called := to
+		to = ""
+		for who in [keeper_word] + others:
+			var front := RegEx.create_from_string("(?i)^%s\\s*[,:!]\\s*" % _escaped(who))
+			var back := RegEx.create_from_string("(?i),\\s*%s\\s*([.!?]*)$" % _escaped(who))
+			if front.search(sentence) != null:
+				called = who
+				sentence = front.sub(sentence, "")
+			elif back.search(sentence) != null:
+				called = who
+				sentence = back.sub(sentence, "$1")
+		sentence = sentence.strip_edges()
+		if sentence.is_empty() or narration.search(sentence) != null:
+			continue
+		if not items_asked and items.search(sentence) != null:
+			continue
+		plain = _plain(sentence)
+		if plain.is_empty() or repeated.has(plain):
+			continue
+		if not " " in plain and plain not in ONE_WORD_ANSWERS and not sentence.ends_with("?"):
+			continue  # A one-word fragment; a one-word question is an answer.
+		repeated[plain] = true
+		if called == keeper_word and _alive(keeper) and World.distance(tile, keeper.tile) > CALL_OUT_PACES:
+			sentence = "%s, %s" % [keeper_word, sentence.left(1).to_lower() + sentence.substr(1)]
+		elif not called.is_empty() and called != keeper_word:
+			# An answer to someone who spoke to her is free; anything else to
+			# them is a warning, at most once in ADDRESS_OTHER_TICKS.
+			if World.tick - int(_spoke_to_her.get(called, -100000)) > SPOKE_TO_HER_TICKS:
+				if not _may_warn(called):
+					continue
+				_addressed[called] = World.tick
+			sentence = "%s, %s" % [called, sentence.left(1).to_lower() + sentence.substr(1)]
+		kept.append(sentence.left(1).to_upper() + sentence.substr(1))
+	return " ".join(kept)
+
+
+## Whether she may speak to [param who] (not her player) unasked: they
+## are in danger or badly hurt, and she has not done so within
+## ADDRESS_OTHER_TICKS.
+func _may_warn(who: String) -> bool:
+	if World.tick - int(_addressed.get(who, -100000)) < ADDRESS_OTHER_TICKS:
+		return false
+	for entity in World.get_entities():
+		if entity.spawned and _name_of(entity) == who and (_in_danger(entity) or _badly_hurt(entity)):
+			return true
+	return false
+
+
+## [param text]'s sentences, each with its stop.
+static func _sentences(text: String) -> Array[String]:
+	var out: Array[String] = []
+	for found in RegEx.create_from_string("[^.!?…]+[.!?…]*").search_all(text):
+		var sentence := found.get_string().strip_edges()
+		if not sentence.is_empty():
+			out.append(sentence)
+	return out
+
+
+static func _escaped(words: String) -> String:
+	return RegEx.create_from_string("([\\\\.^$|?*+()\\[\\]{}])").sub(words, "\\$1", true)
 
 
 ## What [param line] echoes ("her player's words" or "her own line"), or "".
