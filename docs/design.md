@@ -1022,6 +1022,26 @@ north-east."), the dark where she stands, and the dark past an open door
 ("It is dark past the door to the east."). Sight for monsters and nerve
 are not affected yet.
 
+## Models
+
+A monster kind can be drawn as an animated model instead of a capsule
+(`Client3D.MODELS`, by the spawn spec's `kind`): the imp is the goblin
+(`art/models/characters/goblin.glb`, 1.2 tall, a 22-bone humanoid rig).
+Models are imported with a SkeletonProfileHumanoid bone map
+(`art/models/bonemaps/`), so their skeleton is `%GeneralSkeleton` with the
+profile's bone names, and their clips are an AnimationLibrary of
+retargeted clips (`art/models/animations/goblin.res`: Idle, Walk,
+Punch_Jab, Hit_Chest and Death01 from the Quaternius Universal Animation
+Library, CC0, saved by `tools/extract_clips.gd` so the 20 MB pack is never
+shipped). The model is the puppet's Body, turned to the shown facing (it
+has no nose); an AnimationPlayer on it walks while the puppet moves (the
+clip sped up to its pace), stands Idle when it does not, and plays
+Punch_Jab on a swing, Hit_Chest when struck and Death01 when it dies, each
+played out before walking or idling take over again. A dead model plays
+its death where it stands instead of tipping over, lies, and sinks as any
+corpse does. The sim knows nothing of it: the imp is a capsule-shaped
+monster everywhere but in the 3D view.
+
 ## Outdoors
 
 A level may be outdoors (level.json `"outdoor": true`, in the terrain as

@@ -1,0 +1,19 @@
+The game's 3D models, named by what they are. Meshes generated from a concept image with
+TRELLIS.2 (Microsoft, MIT License), using the DINOv3 image encoder (Meta, DINOv3 License) and
+BiRefNet background removal (ZhengPeng7, MIT License), then cleaned up, painted and rigged in Blender.
+Each .blend records this as the scene custom property `source`.
+
+characters/goblin.blend  generated:trellis2, blender (goblin-4000f.glb: loose parts removed, holes
+                         closed, watertight, 1.2 m tall, flat colours; 22-bone humanoid rig with
+                         Godot SkeletonProfileHumanoid bone names, T-pose rest, no animations)
+characters/goblin.glb    export of goblin.blend: mesh + skin + armature, +Y up
+
+characters/goblin.glb.import  imported with retarget/bone_map = bonemaps/goblin.tres (identity onto
+                         SkeletonProfileHumanoid); the skeleton becomes %GeneralSkeleton
+bonemaps/goblin.tres, bonemaps/ual.tres
+                         bone maps from the retarget test: the goblin (identity) and the Quaternius
+                         Universal Animation Library (Unreal mannequin names) onto SkeletonProfileHumanoid
+animations/goblin.res    Idle, Walk, Punch_Jab, Hit_Chest, Death01 from the Quaternius Universal
+                         Animation Library (UAL1.glb, in place), retargeted through bonemaps/ual.tres,
+                         saved by tools/extract_clips.gd. Animations by Quaternius, CC0 1.0
+                         (animations/LICENSE-quaternius-ual.txt), https://quaternius.com

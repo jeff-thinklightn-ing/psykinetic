@@ -31,6 +31,7 @@ func _ready() -> void:
 	await _test_player_death()
 	_test_settings()
 	_test_outdoor()
+	await _test_goblin()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -237,6 +238,54 @@ func _test_outdoor() -> void:
 			"and back in the test room, it is under stone again")
 
 
+func _test_goblin() -> void:
+	print("\n== an imp is the goblin: a model that faces, walks, punches, flinches and dies ==")
+	var player := _player()
+	var imp := _spawn_imp(Vector2i(9, 4), "imp")
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
+	_check(puppet.get_node_or_null("Body/Model") != null and puppet.has_meta("animator"), "its puppet is the goblin model, animated")
+	if not puppet.has_meta("animator"):
+		return
+	var animator := puppet.get_meta("animator") as AnimationPlayer
+	var clips := Array(animator.get_animation_list())
+	_check(["Idle", "Walk", "Punch_Jab", "Hit_Chest", "Death01"].all(func(clip: String) -> bool: return clip in clips),
+			"with its five clips (%s)" % [clips])
+	_check(animator.current_animation == "Idle", "standing: Idle")
+	var bone_count := 0
+	for skeleton in puppet.find_children("*", "Skeleton3D", true, false):
+		bone_count = (skeleton as Skeleton3D).get_bone_count()
+	_check(bone_count == 22, "on its 22-bone rig")
+	for direction: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, -1)]:
+		World.face(imp, direction)
+		for i in 30:
+			imp._process(0.05)
+		_rig._process(0.0)
+		var model := puppet.get_node("Body/Model") as Node3D
+		var forward := model.global_transform.basis * Vector3(0, 0, -1)
+		var wanted := Vector2(direction).normalized()
+		_check(Vector2(forward.x, forward.z).normalized().dot(wanted) > 0.98,
+				"it faces %s (%s)" % [direction, Vector2(forward.x, forward.z).normalized()])
+	puppet.set_meta("last_at", puppet.position - Vector3(0.3, 0.0, 0.0))
+	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
+	_rig._animate(puppet)
+	_check(animator.current_animation == "Walk" and animator.speed_scale > 1.0, "moving 3 tiles a second: Walk, played faster (%.2f)" % animator.speed_scale)
+	imp.swung.emit(Vector2i(1, 0))
+	_check(animator.current_animation == "Punch_Jab", "an attack: Punch_Jab")
+	_rig._animate(puppet)
+	_check(animator.current_animation == "Punch_Jab", "played out, not cut off by walking")
+	imp.struck.emit(1, &"attack")
+	_check(animator.current_animation == "Hit_Chest", "struck: Hit_Chest")
+	World.damage(imp, 999, player, &"attack")
+	_rig._process(0.0)
+	_check(puppet.has_meta("corpse") and animator.current_animation == "Death01", "killed: Death01")
+	await get_tree().create_timer(Client3D.FALL_SECONDS + 0.15).timeout
+	_check(is_instance_valid(puppet) and is_zero_approx(puppet.rotation.z), "it plays its death rather than tipping over")
+	_check(Client3D.model_for(_spawn_imp(Vector2i(10, 4))).is_empty(), "a monster of no kind with a model is still a capsule")
+	# The hit and death sounds finish before the test does.
+	await get_tree().create_timer(1.5).timeout
+
+
 func _test_settings() -> void:
 	print("\n== hp_bars, master_volume and sfx_volume in settings.cfg, other lines kept ==")
 	Net.apply_view_options({"hp_bars": "0", "master_volume": "0.5", "sfx_volume": "3", "colour_blind": "yes"})
@@ -322,12 +371,15 @@ func _companion() -> Companion:
 	return null
 
 
-func _spawn_imp(tile: Vector2i) -> Monster:
+func _spawn_imp(tile: Vector2i, kind := "") -> Monster:
 	var occupant := World.get_entity_at(tile)
 	if occupant != null:
 		World.despawn(occupant)
-	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
-		"name": "ViewImp%d_%d" % [tile.x, tile.y], "tile": tile}) as Monster
+	var spec := {"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "ViewImp%d_%d" % [tile.x, tile.y], "tile": tile}
+	if not kind.is_empty():
+		spec["kind"] = kind
+	var imp := _main._spawn(spec) as Monster
 	imp.sight_range = 0
 	return imp
 

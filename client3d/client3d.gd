@@ -171,6 +171,25 @@ const DAY_SUN := Color(1.0, 0.95, 0.86)
 const DAY_SUN_ENERGY := 1.1
 const DAY_AMBIENT_ENERGY := 0.6
 const FOREST_DEPTH := 3
+## Monster kinds drawn as an animated model instead of a capsule: the scene
+## (retargeted on import to SkeletonProfileHumanoid, its skeleton
+## %GeneralSkeleton), its clips (an AnimationLibrary of retargeted clips,
+## art/models/animations), and how tall it stands. The model faces -Z.
+const MODELS := {
+	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2},
+}
+const CLIP_IDLE := "Idle"
+const CLIP_WALK := "Walk"
+const CLIP_ATTACK := "Punch_Jab"
+const CLIP_HIT := "Hit_Chest"
+const CLIP_DEATH := "Death01"
+## The walk clip's pace at speed 1 (tiles a second): faster walkers play it
+## faster, so the feet keep up.
+const WALK_CLIP_SPEED := 1.6
+## Moving faster than this (tiles a second) walks.
+const WALKING := 0.4
+const CLIP_BLEND := 0.15
+const MODEL_RADIUS := 0.3
 const FOREST_REACH := 8
 const TREE_HEIGHT := 3.6
 ## Label3D: units per font pixel, with the font size, for a name about a
@@ -1647,6 +1666,9 @@ func _sync_puppets() -> void:
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		if facing != null:
 			facing.rotation.y = -entity.shown_facing().angle()
+		if puppet.has_meta("animator"):
+			(puppet.get_node("Body") as Node3D).rotation.y = -entity.shown_facing().angle()
+			_animate(puppet)
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
 	for id in _puppets.keys():
@@ -1723,6 +1745,8 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var puppet: Node3D = _puppets.get(id)
+	if puppet != null:
+		_play_once(puppet, CLIP_HIT)
 	if puppet != null and cause == &"attack":
 		sfx.play("hit", puppet.position + Vector3.UP * 0.8)
 
@@ -1793,7 +1817,17 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	if not line.is_empty() and bubbles != null:
 		puppet.set_meta("bubble_height", 1.0)
 		bubbles.show_line(puppet.get_instance_id(), line)
-	# Over onto its side, a touch too far, back, and still.
+	# A model plays its death and lies where it fell; the rest go over onto
+	# their side, a touch too far, back, and still.
+	if _play_once(puppet, CLIP_DEATH):
+		puppet.set_meta("busy_until", 1 << 62)
+		var lie := create_tween()
+		lie.tween_interval(CORPSE_SECONDS + (puppet.get_meta("animator") as AnimationPlayer).get_animation(CLIP_DEATH).length)
+		lie.tween_property(puppet, "position:y", -SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
+		lie.tween_callback(puppet.queue_free)
+		if kind == "player" and str(data.get("entity", "")) == _local_name:
+			_mourning = true
+		return
 	var side := PI * 0.5
 	var fall := create_tween()
 	fall.set_parallel(true)
@@ -1823,16 +1857,82 @@ func _update_mourning(delta: float) -> void:
 	_apply_size()
 
 
+## MODELS' entry for [param entity] (a monster of a kind that has one), or {}.
+static func model_for(entity: GridEntity) -> Dictionary:
+	if not entity is Monster:
+		return {}
+	return MODELS.get(str(entity.spawn_spec.get("kind", "")), {})
+
+
+## The model as the puppet's Body: the scene turned to face +X (as the
+## nose does, so Body turns with the facing), with an AnimationPlayer on
+## its root playing its clips, kept as the puppet's "animator".
+func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
+	var body := Node3D.new()
+	body.name = "Body"
+	var scene := (load(model["scene"]) as PackedScene).instantiate() as Node3D
+	scene.name = "Model"
+	scene.rotation.y = -PI * 0.5
+	body.add_child(scene)
+	var animator := AnimationPlayer.new()
+	animator.name = "Animator"
+	scene.add_child(animator)
+	animator.root_node = NodePath("..")
+	animator.add_animation_library("", load(model["clips"]) as AnimationLibrary)
+	animator.play(CLIP_IDLE)
+	puppet.set_meta("animator", animator)
+	return body
+
+
+## A model's clip for what it is doing: a one-off (an attack, a flinch, a
+## death) plays out; otherwise it walks while it moves, at its pace, and
+## stands idle when it does not.
+func _animate(puppet: Node3D) -> void:
+	var animator := puppet.get_meta("animator") as AnimationPlayer
+	var now := Time.get_ticks_msec()
+	var last: Vector3 = puppet.get_meta("last_at", puppet.position)
+	var seconds := (now - int(puppet.get_meta("last_ms", now))) / 1000.0
+	puppet.set_meta("last_at", puppet.position)
+	puppet.set_meta("last_ms", now)
+	var speed: float = puppet.get_meta("speed", 0.0)
+	if seconds > 0.0:
+		var moved := Vector2(puppet.position.x - last.x, puppet.position.z - last.z).length() / seconds
+		speed = lerpf(speed, moved, clampf(seconds * 12.0, 0.0, 1.0))
+	puppet.set_meta("speed", speed)
+	if now < int(puppet.get_meta("busy_until", 0)):
+		return
+	if speed > WALKING:
+		if animator.current_animation != CLIP_WALK:
+			animator.play(CLIP_WALK, CLIP_BLEND)
+		animator.speed_scale = clampf(speed / WALK_CLIP_SPEED, 0.6, 2.5)
+	else:
+		if animator.current_animation != CLIP_IDLE:
+			animator.play(CLIP_IDLE, CLIP_BLEND)
+		animator.speed_scale = 1.0
+
+
+## Plays [param clip] once on [param puppet]'s model, if it has one, and
+## holds it till done. False if there is no model.
+func _play_once(puppet: Node3D, clip: String) -> bool:
+	if not puppet.has_meta("animator"):
+		return false
+	var animator := puppet.get_meta("animator") as AnimationPlayer
+	if not animator.has_animation(clip):
+		return false
+	animator.speed_scale = 1.0
+	animator.play(clip, CLIP_BLEND)
+	animator.seek(0.0, true)
+	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(animator.get_animation(clip).length * 1000.0))
+	return true
+
+
 func _make_puppet(entity: GridEntity) -> Node3D:
 	var puppet := Node3D.new()
 	puppet.name = entity.name
 	puppet.set_meta("entity_name", String(entity.name))
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
-	var height: float = Iso.HEIGHTS[shape]
-	var body := MeshInstance3D.new()
-	body.name = "Body"
-	body.mesh = (_shapes[shape] as Callable).call()
-	body.position.y = height * 0.5
+	var model := model_for(entity)
+	var height: float = float(model["height"]) if not model.is_empty() else Iso.HEIGHTS[shape]
 	var material := StandardMaterial3D.new()
 	var sprite := entity.get_node_or_null("Sprite") as Sprite2D
 	material.albedo_color = sprite.modulate if sprite != null else Color.WHITE
@@ -1840,31 +1940,44 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	# A touch of glow so a body reads in the dark away from any light.
 	material.emission_enabled = true
 	material.emission = material.albedo_color * 0.12
-	body.material_override = material
-	puppet.add_child(body)
-	# The pick shape: the body's own.
 	var area := Area3D.new()
 	area.name = "Pick"
 	area.set_meta("entity", entity.get_instance_id())
 	var collision := CollisionShape3D.new()
-	collision.shape = _pick_shape(shape, body.mesh)
 	collision.position.y = height * 0.5
 	area.add_child(collision)
+	if model.is_empty():
+		var body := MeshInstance3D.new()
+		body.name = "Body"
+		body.mesh = (_shapes[shape] as Callable).call()
+		body.position.y = height * 0.5
+		body.material_override = material
+		puppet.add_child(body)
+		# The pick shape: the body's own.
+		collision.shape = _pick_shape(shape, body.mesh)
+	else:
+		puppet.add_child(_make_model(model, puppet))
+		var capsule := CapsuleShape3D.new()
+		capsule.radius = MODEL_RADIUS
+		capsule.height = height
+		collision.shape = capsule
 	puppet.add_child(area)
 	if entity.is_creature():
 		var caption: String = entity.label if not entity.label.is_empty() else entity.name
 		puppet.add_child(_label("Name", caption, Color.WHITE, height + 0.35))
 		puppet.set_meta("bubble_height", height + BUBBLE_OVER_HEAD)
 		# The nose: which way it faces, turned each frame (see _sync_puppets).
+		# A model turns itself instead.
 		var pivot := Node3D.new()
 		pivot.name = "Facing"
-		var nose := MeshInstance3D.new()
-		var nose_mesh := BoxMesh.new()
-		nose_mesh.size = Vector3(0.18, 0.1, 0.14)
-		nose.mesh = nose_mesh
-		nose.material_override = material
-		nose.position = Vector3(0.3, height * 0.72, 0.0)
-		pivot.add_child(nose)
+		if model.is_empty():
+			var nose := MeshInstance3D.new()
+			var nose_mesh := BoxMesh.new()
+			nose_mesh.size = Vector3(0.18, 0.1, 0.14)
+			nose.mesh = nose_mesh
+			nose.material_override = material
+			nose.position = Vector3(0.3, height * 0.72, 0.0)
+			pivot.add_child(nose)
 		puppet.add_child(pivot)
 		var id := entity.get_instance_id()
 		entity.swung.connect(_on_swung.bind(id))
@@ -1918,6 +2031,7 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var swinger := instance_from_id(id) as GridEntity
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
 	sfx.play("swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
+	_play_once(puppet, CLIP_ATTACK)
 	var body := puppet.get_node("Body") as Node3D
 	var rest := Vector3(0.0, body.position.y, 0.0)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE

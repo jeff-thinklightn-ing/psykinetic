@@ -1312,3 +1312,17 @@ server build) cannot run, so one in the project stopped every release.
 project.godot turns that importer off (filesystem/import/blender/enabled =
 false); models reach the game as exported .glb, as the kit's do, and a
 .blend can sit anywhere in the tree as a source.
+
+## 150. Models by monster kind, animated from retargeted clips
+
+The imp is the first model (the goblin), chosen by the spawn spec's kind
+in the 3D view alone, so the sim, the 2D view and the server are untouched
+and a monster with no model is the capsule it was. The goblin and the
+animations are imported through SkeletonProfileHumanoid bone maps, which
+is what lets the Quaternius Universal Animation Library (CC0) drive a rig
+it was not made for; only the five clips used are kept, as a saved
+AnimationLibrary, rather than the 20 MB pack. Clips follow what the view
+already sees: movement of the puppet picks Walk or Idle, the swung, struck
+and death events pick the rest, and a one-off plays out before movement
+takes over again. The death clip replaces the capsule's tip-over, because
+the model has a fall of its own.

@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.82
+
+Monsters.
+
+- **Imps are goblins** now, in place of red capsules: they stand idle,
+  walk, punch when they attack, flinch when they're hit, and fall when
+  they die. Brutes and sneaks are still capsules for now.
+
+The server must be updated to v0.1.82 too, as it refuses any other version.
+
 ## v0.1.81
 
 Maps. Server.
