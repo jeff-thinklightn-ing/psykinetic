@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.91
+
+3D and 2D views. Server.
+
+- Knockback now works properly when you play on a server, not only when
+  hosting: goblins backpedal facing you for the whole push, double over
+  when they hit a wall or door, roll when tossed, and walk back facing you.
+  Before, on a client, they could flip round, slide backwards without the
+  backpedal, or never double over.
+
+The server must be updated to v0.1.91 too, as it refuses any other version.
+
 ## v0.1.90
 
 3D view.

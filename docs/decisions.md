@@ -1422,3 +1422,20 @@ after a push could still be sliding (`KNOCK_SLIDE_SECONDS`, a little
 over `MAX_PUSH_SLIDE_TICKS`), as the body's own walk: the knock ends that
 frame, without its landing or doubling over, and the walk clip takes over
 from where the knock left the body facing.
+
+## 157. The sim says which slide is the push's
+
+Decisions 154 and 156 told a push's slide by timing (a slide starting
+near the push's tick) and by the motion on screen (the puppet's speed and
+direction). Both held on the host and failed on a client: a client's
+clock follows the server's ticks as they arrive, so when its frames run
+long a slide can start late, show in pieces, be cut short by the next, or
+not show at all, and the knock then backpedalled the wrong way, flipped,
+or never doubled over. The push message now carries where the body was
+pushed from and to, and the entity marks any slide along that line, its
+way, as the push's own (`GridEntity.push_shown`: waiting, sliding, over;
+over too once the body is drawn at the end without a slide, or a step of
+its own is drawn). The shown facing ignores those slides, and the 3D knock
+takes its facing from the push's direction and its timing from
+`push_shown`, never from the puppet's motion. The push message's
+signature changed, so the server must match.

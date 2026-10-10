@@ -1067,17 +1067,19 @@ slide) facing whence it came, for the slide and at least
 whence it came (Roll played in reverse, `ROLL_SPEED` faster), then lands
 (Jump_Land); either, stopped by a wall or
 a door (an impact against stone or wood, a fall too), doubles over
-(Hit_Stomach) when its slide ends, or at once if it never moved. An impact
-against another body is Hit_Chest. The clip waits for the slide to show,
-since others are drawn a little in the past. The knock turns the model
+(Hit_Stomach) when its slide gets there, or at once if it never moved. An
+impact against another body is Hit_Chest. The sim tells the view what of
+the push is on screen (`GridEntity.push_shown`, from the push's line,
+sent with it): the clip waits for the slide to show, since others are
+drawn a little in the past, lasts while it shows, and is played where the
+body stands if a client never drew it. Its facing is the push's
+direction, never the slide's on screen. The knock turns the model
 to face whence it came at `TURN_RATE`, as the sim turns a body, and when
 it ends hands the sim that angle (`GridEntity.turn_shown_from`) to turn
-back to its facing from there, so neither way snaps. The slide is the
-push's only while it goes the way it first went (within
-`KNOCK_SAME_WAY`) and for no longer than a push slides
-(`KNOCK_SLIDE_SECONDS`): a body moving after that, or another way (a
-goblin coming straight back at you), is walking, and the knock ends there
-and then, with no landing or doubling over, for the walk to take over.
+back to its facing from there, so neither way snaps. A body drawn taking
+a step of its own (`GridEntity.stepping`: a goblin coming straight back
+at you) is walking, and the knock ends there and then, with no landing,
+for the walk to take over.
 A dead model plays
 its death where it stands instead of tipping over, lies, and sinks as any
 corpse does. The sim knows nothing of it: the imp is a capsule-shaped
@@ -1167,8 +1169,9 @@ stutter by the fraction. A refused or corrected predicted step eases out
 to its stop over `RECONCILE_BLEND_TICKS` instead of halting dead.
 
 **Facing as shown** turns toward where the body is going: along the step
-being drawn (not a push's slide, starting within `PUSH_SLIDE_TICKS` of the
-push: a body knocked along keeps its facing), else the replicated `facing`, else (the local player in WASD,
+being drawn (not a push's: any slide along the last push's line, its
+way, as the push message gives it, so a client that draws it in pieces
+or late still knows it; a body knocked along keeps its facing), else the replicated `facing`, else (the local player in WASD,
 standing) the cursor (`GridEntity.aim`). It eases there at `TURN_RATE`
 (about 100 ms to come round, `GridEntity.shown_facing`), on the 2D pip and
 the 3D nose alike.

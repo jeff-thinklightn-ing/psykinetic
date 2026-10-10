@@ -1239,7 +1239,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS))
-		body._world_pushed(tiles, lofted and tiles > 0, toss and body == first)
+		body._world_pushed(tiles, lofted and tiles > 0, toss and body == first, start)
 		var note := ""
 		var next_body: GridEntity = null
 		if impact > 0:
@@ -1341,7 +1341,7 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	_relocate(entity, to)
 	entity._world_slide_from(from, start, duration)
 	if entity != mover:
-		entity._world_pushed(1)
+		entity._world_pushed(1, false, false, from)
 		_log("push: %s -> %s dir=%s tiles=1 impact=0 stopped_by=nothing (walked into)" % [
 			mover.name, entity.name, direction])
 		entity_pushed.emit(entity, mover, direction, 1, 0, "nothing (walked into)")

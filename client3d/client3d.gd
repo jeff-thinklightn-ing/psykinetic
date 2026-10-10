@@ -213,21 +213,13 @@ const CLIP_IMPACT := "Hit_Stomach"
 const CLIP_ROLL := "Roll"
 const CLIP_LAND := "Jump_Land"
 const KNOCK_MIN_SECONDS := 0.45
-## Faster than this (tiles a second, as _animate smooths it) is the slide.
-const KNOCK_MOVING := 1.5
 ## The backpedal's pace at speed 1, as the walk's; the roll is played this
 ## much faster, to fit a toss's short flight.
 const BACKPEDAL_CLIP_SPEED := 1.6
 const ROLL_SPEED := 1.6
-## A push that has not shown any slide by then (the view draws others a
-## little in the past) is over.
+## A push whose slide has not shown by then (the view draws others a
+## little in the past) is knocked about where it stands.
 const KNOCK_WAIT_SECONDS := 0.6
-## The slide is the push's while it goes the way the push sent it (the
-## step's direction within this cosine of the first) and for no longer than
-## a push slides (MAX_PUSH_SLIDE_TICKS, and a little): moving after that,
-## or another way, the body is walking on its own and the knock is over.
-const KNOCK_SAME_WAY := 0.7
-const KNOCK_SLIDE_SECONDS := 0.4
 ## The walk clip's pace at speed 1 (tiles a second): faster walkers play it
 ## faster, so the feet keep up.
 const WALK_CLIP_SPEED := 1.6
@@ -1911,7 +1903,10 @@ func _on_pushed(tiles: int, id: int) -> void:
 	var entity := instance_from_id(id) as GridEntity
 	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("animator"):
 		return
-	puppet.set_meta("knock", {"toss": entity.tossed, "impact": false, "since": Time.get_ticks_msec(), "moving_since": -1, "yaw": 0.0})
+	# Facing whence it came, the way the sim says it was pushed, whatever the
+	# slide on screen does.
+	puppet.set_meta("knock", {"toss": entity.tossed, "impact": false, "since": Time.get_ticks_msec(), "started": -1,
+			"yaw": -(-Vector2(entity.push_direction)).angle(), "shown": (puppet.get_node("Body") as Node3D).rotation.y})
 
 
 ## An impact: the sound of what it hit; into a wall or a door (or the
@@ -2073,7 +2068,7 @@ func _animate(puppet: Node3D) -> void:
 	if seconds > 0.0:
 		speed = lerpf(speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
 	puppet.set_meta("speed", speed)
-	if puppet.has_meta("knock") and _knocked(puppet, animator, speed, step, now):
+	if puppet.has_meta("knock") and _knocked(puppet, animator, speed, now):
 		return
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
@@ -2089,49 +2084,49 @@ func _animate(puppet: Node3D) -> void:
 
 ## A knocked-back model's frame (see CLIP_BACKPEDAL): true while the knock
 ## has the model, false once it is over (or before its slide shows, so the
-## blow's own clip plays on).
-func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, step: Vector2, now: int) -> bool:
+## blow's own clip plays on). The sim says which slide is the push's
+## (GridEntity.push_shown), so a slide cut short or drawn in pieces on a
+## client, or one never drawn, is still known for what it is.
+func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int) -> bool:
 	var knock: Dictionary = puppet.get_meta("knock")
 	var toss: bool = knock["toss"]
-	var started: int = knock["moving_since"]
-	var walking := false
-	var way := step.normalized()
-	if started >= 0 and step.length() > 0.001 \
-			and (way.dot(knock["way"]) < KNOCK_SAME_WAY or now - started > int(KNOCK_SLIDE_SECONDS * 1000.0)):
-		walking = true
-	elif speed > KNOCK_MOVING and step.length() > 0.001:
-		if started < 0:
-			started = now
-			knock["moving_since"] = now
-			# Backpedalling or rolling over backwards: facing whence it came,
-			# turned to from where it faced.
-			knock["way"] = way
-			knock["yaw"] = -(-way).angle()
-			knock["shown"] = (puppet.get_node("Body") as Node3D).rotation.y
-			if toss:
-				animator.play_backwards(CLIP_ROLL, CLIP_BLEND)
-				animator.speed_scale = ROLL_SPEED
-				puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_ROLL).length / ROLL_SPEED * 1000.0))
-			else:
-				animator.play(CLIP_BACKPEDAL, CLIP_BLEND)
-				animator.seek(0.0, true)
-		if not toss:
-			animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
+	var started: int = knock["started"]
+	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
+	var shown := entity.push_shown if entity != null else GridEntity.PushShown.OVER
+	var walking := entity != null and entity.stepping
 	if started < 0:
-		if now - int(knock["since"]) < int(KNOCK_WAIT_SECONDS * 1000.0):
+		var waited := now - int(knock["since"]) >= int(KNOCK_WAIT_SECONDS * 1000.0)
+		if walking and waited:
+			# It walked off before its slide ever showed: no knock to show.
+			puppet.remove_meta("knock")
 			return false
-	elif not walking:
+		if (walking or shown == GridEntity.PushShown.WAITING) and not waited:
+			# Not on screen yet (or the step before it still is).
+			return false
+		started = now
+		knock["started"] = now
+		if toss:
+			animator.play_backwards(CLIP_ROLL, CLIP_BLEND)
+			animator.speed_scale = ROLL_SPEED
+			puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_ROLL).length / ROLL_SPEED * 1000.0))
+		else:
+			animator.play(CLIP_BACKPEDAL, CLIP_BLEND)
+			animator.seek(0.0, true)
+	if not walking:
 		# Turned to it as the sim turns a body, not snapped round.
 		knock["shown"] = lerp_angle(knock["shown"], knock["yaw"],
 				1.0 - exp(-GridEntity.TURN_RATE * get_process_delta_time()))
 		(puppet.get_node("Body") as Node3D).rotation.y = knock["shown"]
+		if not toss:
+			animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
 		var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
-		if speed > KNOCK_MOVING or held:
+		# Stopped by a wall or a door: it doubles over when it gets there.
+		var arrived := shown != GridEntity.PushShown.SLIDING and shown != GridEntity.PushShown.WAITING
+		if shown == GridEntity.PushShown.SLIDING or held and not (knock["impact"] and arrived):
 			return true
 	puppet.remove_meta("knock")
 	puppet.set_meta("busy_until", 0)
-	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
-	if entity != null and knock.has("shown"):
+	if entity != null:
 		# Back to its facing from where the knock left it, turning.
 		entity.turn_shown_from(-float(knock["shown"]))
 	if walking:
@@ -2140,7 +2135,7 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, step: Vec
 		return false
 	if knock["impact"]:
 		_play_once(puppet, CLIP_IMPACT)
-	elif toss and started >= 0:
+	elif toss:
 		_play_once(puppet, CLIP_LAND)
 	return true
 

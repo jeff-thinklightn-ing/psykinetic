@@ -377,57 +377,61 @@ func _test_goblin() -> void:
 	_check(animator.current_animation == "Punch_Jab", "played out, not cut off by walking")
 	imp.struck.emit(1, &"attack")
 	_check(animator.current_animation == "Hit_Chest", "struck: Hit_Chest")
-	imp.tossed = false
-	imp.pushed.emit(1)
-	_check(animator.current_animation == "Hit_Chest", "pushed: the blow plays on until the slide shows")
+	await get_tree().create_timer(0.6).timeout
 	var was := (puppet.get_node("Body") as Node3D).rotation.y
-	_slide(puppet, Vector3(0.5, 0.0, 0.0))
+	_push_imp(imp, Vector2i(1, 0))
+	await _run_clock(0.05)
 	var yaw := (puppet.get_node("Body") as Node3D).rotation.y
 	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL and absf(angle_difference(yaw, PI)) > 0.05
 			and absf(angle_difference(yaw, PI)) < absf(angle_difference(was, PI)),
 			"pushed back (+x): it backpedals, turning (not snapping) toward whence it came (-x), yaw %.2f from %.2f" % [yaw, was])
-	for i in 20:
-		await get_tree().process_frame
-		_slide(puppet, Vector3(0.5, 0.0, 0.0))
+	await _run_clock(0.3)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(absf(angle_difference(yaw, PI)) < 0.05, "and comes round to face it, yaw %.2f" % yaw)
-	await get_tree().create_timer(Client3D.KNOCK_MIN_SECONDS + 0.4).timeout
+	await _run_clock(Client3D.KNOCK_MIN_SECONDS + 0.4)
 	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_IDLE, "come to rest: Idle again (%s)" % animator.current_animation)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(absf(angle_difference(yaw, was)) < 0.05, "and turned back to its own facing, yaw %.2f" % yaw)
-	imp.pushed.emit(1)
-	_slide(puppet, Vector3(0.5, 0.0, 0.0))
+	_push_imp(imp, Vector2i(1, 0))
+	await _run_clock(0.15)
 	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed back again: it backpedals")
-	await get_tree().process_frame
-	_slide(puppet, Vector3(-0.3, 0.0, 0.0))
-	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_WALK,
-			"walking back the other way: the knock is over and it walks, not backpedals (%s)" % animator.current_animation)
-	await get_tree().create_timer(1.0).timeout
-	imp.pushed.emit(1)
-	_slide(puppet, Vector3(0.0, 0.0, 0.5))
+	_step_imp(imp, Vector2i(-1, 0))
+	await _run_clock(0.1)
+	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_WALK and absf(angle_difference(yaw, PI)) < 0.3,
+			"walking straight back: the knock is over and it walks back facing the way it goes, not backpedals (%s, yaw %.2f)" % [animator.current_animation, yaw])
+	await _run_clock(1.0)
+	# As a client that never drew the slide: the body is just there.
+	var from := imp.tile
+	World._relocate(imp, from + Vector2i(1, 0))
+	imp._world_slide_from(from, World.tick - 5, 1)
+	imp._world_pushed(1, false, false, from)
+	await _run_clock(0.1)
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "a push whose slide never showed: it still backpedals where it stands (%s)" % animator.current_animation)
+	await _run_clock(0.3)
+	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	_check(absf(angle_difference(yaw, PI)) < 0.05, "facing whence it came, from what the sim says, yaw %.2f" % yaw)
+	await _run_clock(1.0)
+	_push_imp(imp, Vector2i(0, 1))
 	imp.impacted.emit(2, &"stone")
-	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed into a wall: it backpedals there first")
-	await get_tree().create_timer(Client3D.KNOCK_MIN_SECONDS + 0.15).timeout
-	_check(animator.current_animation == Client3D.CLIP_IMPACT, "and doubles over when it hits (%s)" % animator.current_animation)
-	await get_tree().create_timer(1.0).timeout
+	await _run_clock(0.05)
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed into a wall: it backpedals there first (%s)" % animator.current_animation)
+	await _run_clock(0.25)
+	_check(animator.current_animation == Client3D.CLIP_IMPACT, "and doubles over when it gets there (%s)" % animator.current_animation)
+	await _run_clock(1.0)
 	imp.impacted.emit(1, &"wood")
 	_check(animator.current_animation == Client3D.CLIP_IMPACT, "shoved against a door where it stands: doubles over at once")
-	await get_tree().create_timer(1.0).timeout
-	imp.tossed = true
-	imp.pushed.emit(2)
-	_slide(puppet, Vector3(0.0, 0.0, -0.5))
-	for i in 20:
-		await get_tree().process_frame
-		_slide(puppet, Vector3(0.0, 0.0, -0.5))
+	await _run_clock(1.0)
+	_push_imp(imp, Vector2i(0, -2), true)
+	await _run_clock(0.3)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(animator.current_animation == Client3D.CLIP_ROLL and animator.get_playing_speed() < 0.0
 			and absf(angle_difference(yaw, -Vector2(0, 1).angle())) < 0.05,
 			"tossed (-z): it rolls over backwards, facing whence it came (+z), yaw %.2f, speed %.2f" % [yaw, animator.get_playing_speed()])
 	var roll := animator.get_animation(Client3D.CLIP_ROLL).length / Client3D.ROLL_SPEED
-	await get_tree().create_timer(roll + 0.15).timeout
+	await _run_clock(roll)
 	_check(animator.current_animation == Client3D.CLIP_LAND, "then lands (%s)" % animator.current_animation)
-	imp.tossed = false
-	await get_tree().create_timer(1.4).timeout
+	await _run_clock(1.4)
 	World.damage(imp, 999, player, &"attack")
 	_rig._process(0.0)
 	_check(puppet.has_meta("corpse") and animator.current_animation == "Death01", "killed: Death01")
@@ -438,11 +442,33 @@ func _test_goblin() -> void:
 	await get_tree().create_timer(1.5).timeout
 
 
-## One frame of [param puppet] having moved [param by] in 0.1 s: a slide.
-func _slide(puppet: Node3D, by: Vector3) -> void:
-	puppet.set_meta("last_at", puppet.position - by)
-	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
-	_rig._animate(puppet)
+## Pushes [param imp] [param by] tiles as the sim does: there at once, its
+## slide from where it was, and the push's message.
+func _push_imp(imp: GridEntity, by: Vector2i, toss := false) -> void:
+	var from := imp.tile
+	World._relocate(imp, from + by)
+	var tiles := maxi(absi(by.x), absi(by.y))
+	imp._world_slide_from(from, World.tick + World.tick_alpha, tiles)
+	imp._world_pushed(tiles, false, toss, from)
+
+
+## [param imp] takes a step of its own, [param by].
+func _step_imp(imp: GridEntity, by: Vector2i) -> void:
+	var from := imp.tile
+	World._relocate(imp, from + by)
+	imp._world_slide_from(from, World.tick + World.tick_alpha, 3.0)
+
+
+## Runs the drawing clock (the sim is stopped in this test) for
+## [param seconds] of real frames.
+func _run_clock(seconds: float) -> void:
+	var until := Time.get_ticks_msec() + int(seconds * 1000.0)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		World.tick_alpha += get_process_delta_time() * World.TICK_RATE
+		while World.tick_alpha >= 1.0:
+			World.tick += 1
+			World.tick_alpha -= 1.0
 
 
 func _test_settings() -> void:

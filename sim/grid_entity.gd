@@ -53,9 +53,8 @@ const PIP_REACH := 4.0
 ## How fast the shown facing turns toward where it should point: about
 ## 100 ms to come round (an exponential ease at this rate per second).
 const TURN_RATE := 30.0
-## A slide starting within this many ticks of a push is the push's own: the
-## body is knocked along it, so its shown facing does not turn to it.
-const PUSH_SLIDE_TICKS := 2.5
+## A push not yet drawn this many ticks after it came is taken as over.
+const PUSH_SHOWN_TICKS := 10.0
 ## A refused or corrected step eases to a stop over this many ticks.
 const STOP_EASE_TICKS := 2.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)
@@ -178,7 +177,22 @@ var _lofted := false
 ## plain push back: the 3D view rolls it and lands it instead of
 ## backpedalling.
 var tossed := false
-## Tick (this peer's clock) of the last push, for telling its slide.
+## The last push, as drawn: WAITING until its slide shows, SLIDING while
+## it does (a mirror may draw it as several shorter slides, and pause
+## between them), OVER once it has reached where it was pushed to, or the
+## body steps off on its own. Any slide from a tile to another along the
+## push's line, its way, is the push's own: the body is knocked along it,
+## not walking, so its shown facing does not turn to it. For the views.
+enum PushShown { NONE, WAITING, SLIDING, OVER }
+var push_shown := PushShown.NONE
+## The way the last push sent the body, a grid step; ZERO for none.
+var push_direction := Vector2i.ZERO
+## True while the body is drawn taking a step of its own (any slide that is
+## not its push's).
+var stepping := false
+var _push_from := Vector2i.ZERO
+var _push_to := Vector2i.ZERO
+## Tick (this peer's clock) of the last push.
 var _pushed_tick := -INF
 ## Tick (this peer's clock) until which the sprite reels from a stun.
 var _reel_until := 0.0
@@ -319,7 +333,11 @@ func _process(delta: float) -> void:
 			if _move_duration > 0.0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
 			position = Iso.grid_to_local(Vector2(_from_tile).lerp(Vector2(to), t))
-			if t < 1.0 and to != _from_tile and absf(_move_tick - _pushed_tick) > PUSH_SLIDE_TICKS:
+			var sliding := t < 1.0 and to != _from_tile
+			var knocked := sliding and _on_push_line(_from_tile, to)
+			stepping = sliding and not knocked
+			_note_push_shown(knocked, to, t)
+			if stepping:
 				wanted = Vector2(to - _from_tile)
 			elif aim != Vector2.ZERO:
 				wanted = aim
@@ -329,6 +347,51 @@ func _process(delta: float) -> void:
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH
 	_update_body()
 	_update_flash()
+
+
+## Whether a slide from [param from] to [param to] goes along the last
+## push's line, its way: the push's own.
+func _on_push_line(from: Vector2i, to: Vector2i) -> bool:
+	if push_shown != PushShown.WAITING and push_shown != PushShown.SLIDING:
+		return false
+	var a := _push_index(from)
+	var b := _push_index(to)
+	return a >= 0 and b > a
+
+
+## How many of the push's steps [param cell] is from where it started, or
+## -1 if it is not on the push's line.
+func _push_index(cell: Vector2i) -> int:
+	var steps := maxi(absi(_push_to.x - _push_from.x), absi(_push_to.y - _push_from.y))
+	for k in steps + 1:
+		if _push_from + push_direction * k == cell:
+			return k
+	return -1
+
+
+## Moves push_shown along from what is drawn this frame: [param knocked],
+## a slide of the push's on screen, [param to] where the slide drawn ends,
+## [param t] how far along it.
+func _note_push_shown(knocked: bool, to: Vector2i, t: float) -> void:
+	match push_shown:
+		PushShown.WAITING:
+			if knocked:
+				push_shown = PushShown.SLIDING
+			elif (to == _push_to and t >= 1.0) or World.tick - _pushed_tick > PUSH_SHOWN_TICKS:
+				# Drawn there already without a slide (a client that skipped it).
+				push_shown = PushShown.OVER
+		PushShown.SLIDING:
+			if stepping or (to == _push_to and t >= 1.0) or World.tick - _pushed_tick > PUSH_SHOWN_TICKS:
+				push_shown = PushShown.OVER
+
+
+## A push to show: from [param from] to [param to].
+func _note_pushed(from: Vector2i, to: Vector2i) -> void:
+	_pushed_tick = float(World.tick)
+	_push_from = from
+	_push_to = to
+	push_direction = Vector2i(signi(to.x - from.x), signi(to.y - from.y))
+	push_shown = PushShown.WAITING if to != from else PushShown.OVER
 
 
 ## Eases the shown facing toward [param wanted] (grid units), the short
@@ -431,13 +494,13 @@ func _world_note_moved(on_tick: int) -> void:
 		_exerted_tick = on_tick
 
 
-func _world_pushed(tiles: int, lofted := false, toss := false) -> void:
+func _world_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i) -> void:
 	_lofted = lofted
 	tossed = toss
-	_pushed_tick = float(World.tick)
+	_note_pushed(from, tile)
 	pushed.emit(tiles)
 	for peer in Net.sendable_peers():
-		_net_pushed.rpc_id(peer, tiles, lofted, toss)
+		_net_pushed.rpc_id(peer, tiles, lofted, toss, from, tile)
 
 
 func _world_impacted(amount: int, against: StringName) -> void:
@@ -618,10 +681,10 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 
 # Cosmetic only: they replay feedback, they carry no sim state.
 @rpc("authority", "call_remote", "reliable")
-func _net_pushed(tiles: int, lofted: bool, toss: bool) -> void:
+func _net_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, to: Vector2i) -> void:
 	_lofted = lofted
 	tossed = toss
-	_pushed_tick = float(World.tick)
+	_note_pushed(from, to)
 	pushed.emit(tiles)
 
 
