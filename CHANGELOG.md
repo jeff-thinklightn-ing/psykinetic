@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.98
+
+Server.
+
+- Wren, badly hurt and retreating, no longer sprints back and forth between
+  two spots: she picks a place well away from the monsters and keeps going
+  there unless it stops being safe.
+
+The server must be updated to v0.1.98 too, as it refuses any other version.
+
 ## v0.1.97
 
 Server.

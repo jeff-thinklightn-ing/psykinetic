@@ -1550,3 +1550,20 @@ castle fight, the monsters' share of a tick stayed near 0.1 ms. The brute's
 wind-up is told to the views at once, so the swing on screen lands as the
 blow does. A snapshot keeps a monster's kind now too, for one that is no
 level entity (a level's own takes everything it is from the level).
+
+## 164. Wren keeps to the way she is retreating
+
+Hurt in a fight on the box, Wren was seen to rubber-band: sprinting back
+and forth. A local fight through the lag relay, her kept hurt, showed the
+client drawing her faithfully (no jumps, no slides piling up) and the
+server stepping her straight back where she had been on a quarter of her
+steps. RETREAT chose its cell afresh each tick: the nearest with no hostile
+next to it, near her player. With monsters closing round her and her player
+(more so now they surround, decision 163) such a cell, two from a monster,
+is safe this tick and not the next, and the best flips from one side of her
+player to the other. Now a cell clear of hostiles counts for more (2 a tile
+of clearance, up to 3); she keeps the cell she chose while it is safe and
+no other beats it by more than 1 (with no hostile about, she takes the best,
+so she still keeps by her player as they move); and a way that starts back
+the way she last stepped costs 1.5 more. In the same fight: 11% of her steps
+straight back, from 25 to 34%, and a quarter as many steps.

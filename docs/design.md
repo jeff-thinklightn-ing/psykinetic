@@ -691,8 +691,14 @@ Below 30% of her hp she retreats whatever her stance; with a hostile next
 to her that is the **reflex**, which no mind can change. **RETREAT** moves
 away from danger: to the nearest free, fire-free cell within 6 steps that
 no hostile is next to (her own cell, if it is one), preferring those near
-Jeff (the least of steps / 2 plus the distance to Jeff); if there is none
-she attacks the hostile next to her rather than stand still. A bump
+Jeff and clear of hostiles (the least of steps / 2 plus the distance to
+Jeff, less 2 for each tile, up to 3, to the nearest hostile:
+`RETREAT_CLEAR`, `RETREAT_CLEAR_WEIGHT`); if there is none she attacks the
+hostile next to her rather than stand still. She keeps to the cell she
+chose while it is safe and, with a hostile about, no other is better by
+more than `RETREAT_KEEP_MARGIN`; a way that starts back the way she last
+stepped costs `RETREAT_TURN_BACK` more. Choosing afresh each tick, with
+monsters closing round her and Jeff, she ran from side to side of him. A bump
 (below) is the hands' too. An ATTACK whose target is gone becomes FOLLOW
 until the next tick picks again.
 

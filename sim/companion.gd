@@ -60,8 +60,20 @@ const DANGER_RANGE := 2
 ## Crossing one of these fractions of her or her player's hp, either way,
 ## is an event.
 const HP_THRESHOLDS: Array[float] = [0.5, 0.3]
-## RETREAT looks this many steps around her for a safe cell.
+## RETREAT looks this many steps around her for a safe cell, and takes one
+## clear of hostiles sooner, by this much a tile up to RETREAT_CLEAR tiles
+## from the nearest. She keeps to the one she chose while it stays safe and
+## no other beats it by more than RETREAT_KEEP_MARGIN (with no hostile
+## about, she takes the best: there is nothing to dither over); and a way
+## that starts back the way she came costs RETREAT_TURN_BACK more. A cell
+## two from a hostile is safe this tick and seldom the next, which is why
+## clear counts for so much: else she runs from side to side of her player
+## as the hostiles round them close in.
 const RETREAT_REACH := 6
+const RETREAT_CLEAR := 3
+const RETREAT_CLEAR_WEIGHT := 2.0
+const RETREAT_KEEP_MARGIN := 1.0
+const RETREAT_TURN_BACK := 1.5
 ## Out of combat (no hostile within CALM_RANGE for CALM_TICKS) she heals
 ## 1 hp every HEAL_EVERY ticks.
 const CALM_RANGE := 6
@@ -272,6 +284,11 @@ var _last_bump_tick := -1000
 ## Where YIELD goes (her own tile when there was nowhere) and until when.
 var _yield_tile := NONE
 var _yield_until := -1
+## RETREAT: the safe cell she is making for (NONE: none chosen); where she
+## was last, and the way she last stepped.
+var _retreat_goal := NONE
+var _retreat_at := NONE
+var _retreat_heading := Vector2i.ZERO
 var _known_hostiles: Dictionary[int, bool] = {}
 ## Hostiles that have been next to her or her player this fight: one that
 ## steps away and back is not new.
@@ -2011,6 +2028,9 @@ func _heal() -> void:
 # --- Acting -------------------------------------------------------------------
 
 func _execute() -> void:
+	if current_intent != Intent.RETREAT:
+		_retreat_goal = NONE
+		_retreat_at = NONE
 	match current_intent:
 		Intent.FOLLOW:
 			_follow()
@@ -2036,43 +2056,67 @@ func _execute() -> void:
 
 ## RETREAT: to the nearest cell with no hostile next to it, near her player
 ## when such a cell is (safe_cell); with none, she fights the hostile next
-## to her rather than stand still.
+## to her rather than stand still. She keeps to the cell she chose while it
+## is still safe and no other is better by more than RETREAT_KEEP_MARGIN:
+## with the hostiles closing in the best cell changes tick to tick, and,
+## taking each, she would run back and forth between two.
 func _retreat() -> void:
-	var cell := safe_cell()
+	if tile != _retreat_at:
+		_retreat_heading = tile - _retreat_at if _retreat_at != NONE and World.are_adjacent(tile, _retreat_at) else Vector2i.ZERO
+		_retreat_at = tile
+	var scores := _safe_cells(_retreat_heading)
+	var best := NONE
+	for cell: Vector2i in scores:
+		if best == NONE or scores[cell] < scores[best]:
+			best = cell
+	var margin := RETREAT_KEEP_MARGIN if _hostile_within(RETREAT_REACH + 1) else 0.0
+	if not scores.has(_retreat_goal) or best != NONE and scores[_retreat_goal] > scores[best] + margin:
+		_retreat_goal = best
+	var cell := _retreat_goal
 	if cell == NONE:
 		var foe := _adjacent_hostile()
 		if foe != null and World.can_melee(tile, foe.tile):
 			World.try_attack(self, foe)
 		return
-	if cell != tile:
-		_step_toward(cell, false)
+	if cell != tile and not _step_toward(cell, false):
+		_retreat_goal = NONE
 
 
 ## The cell RETREAT makes for: of the free, fire-free cells within
 ## RETREAT_REACH steps that no hostile is next to (her own among them), the
-## one with the least of steps / 2 plus the distance to her player. NONE
-## if there is none.
+## one with the least of steps / 2 plus the distance to her player, less
+## RETREAT_CLEAR_WEIGHT for each tile (up to RETREAT_CLEAR) to the nearest
+## hostile. NONE if there is none.
 func safe_cell() -> Vector2i:
+	var scores := _safe_cells()
+	var best := NONE
+	for cell: Vector2i in scores:
+		if best == NONE or scores[cell] < scores[best]:
+			best = cell
+	return best
+
+
+## Each cell safe_cell might take, with its score (lower is better); with
+## [param heading], the way she last stepped, a way back costs more.
+func _safe_cells(heading := Vector2i.ZERO) -> Dictionary[Vector2i, float]:
+	var scores: Dictionary[Vector2i, float] = {}
 	var hostiles: Array[Vector2i] = []
 	for entity in World.get_entities():
 		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) <= RETREAT_REACH + 1:
 			hostiles.append(entity.tile)
 	var steps: Dictionary[Vector2i, int] = {tile: 0}
+	var first: Dictionary[Vector2i, Vector2i] = {tile: Vector2i.ZERO}
 	var frontier: Array[Vector2i] = [tile]
-	var best := NONE
-	var best_score := INF
 	while not frontier.is_empty():
 		var cell: Vector2i = frontier.pop_front()
-		var safe := true
+		var clear := RETREAT_CLEAR
 		for at in hostiles:
-			if World.distance(cell, at) <= 1:
-				safe = false
-				break
-		if safe:
-			var score := steps[cell] * 0.5 + (World.distance(cell, keeper.tile) if _alive(keeper) else 0)
-			if score < best_score:
-				best = cell
-				best_score = score
+			clear = mini(clear, World.distance(cell, at))
+		if clear > 1:
+			scores[cell] = steps[cell] * 0.5 + (World.distance(cell, keeper.tile) if _alive(keeper) else 0) \
+					- clear * RETREAT_CLEAR_WEIGHT
+			if Vector2(first[cell]).dot(Vector2(heading)) < 0.0:
+				scores[cell] += RETREAT_TURN_BACK
 		if steps[cell] >= RETREAT_REACH:
 			continue
 		for direction in World.DIRECTIONS:
@@ -2081,8 +2125,9 @@ func safe_cell() -> Vector2i:
 					or World._terrain_blocks_step(cell, direction, true):
 				continue
 			steps[next] = steps[cell] + 1
+			first[next] = direction if cell == tile else first[cell]
 			frontier.append(next)
-	return best
+	return scores
 
 
 ## The nearest free cell that is not fire, at most YIELD_REACH steps away,
