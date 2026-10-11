@@ -1157,7 +1157,8 @@ hides it, remembered in settings.cfg (`hints=on|off`).
 `World.tick_alpha` is the fraction of the current tick that has elapsed
 (0 ≤ α < 1). When `World` moves an entity it records the tile it came from,
 the tick, and a slide duration in ticks (the walker's `move_ticks`; for a
-force push, the tiles travelled, capped at 3). Each frame:
+force push, `World.push_slide_ticks`: 2 a tile travelled, capped at 6).
+Each frame:
 
 ```
 t        = clamp((World.tick + World.tick_alpha - move_tick) / move_duration, 0, 1)

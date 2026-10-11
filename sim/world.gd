@@ -64,7 +64,11 @@ const FALL_IMPACT_PER_LEVEL := 3
 ## Clamp on mover_mass / target_mass when scaling push travel and impact.
 const MASS_RATIO_MIN := 0.5
 const MASS_RATIO_MAX := 1.5
-const MAX_PUSH_SLIDE_TICKS := 3
+## A pushed body is drawn sliding this many ticks a tile, at most
+## MAX_PUSH_SLIDE_TICKS: slow enough to read as being thrown. The sim moves
+## it at once; only the drawing and the stun after it wait.
+const PUSH_SLIDE_TICKS_PER_TILE := 2
+const MAX_PUSH_SLIDE_TICKS := 6
 ## net_display_delay_ticks: how far in the past a client draws everything it
 ## does not predict. One tick means a replicated tile change is always in hand
 ## before its slide has to begin.
@@ -1242,7 +1246,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		var impact := impact_damage(remaining, ratio)
 
 		if tiles > 0:
-			body._world_slide_from(start, tick, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS))
+			body._world_slide_from(start, tick, push_slide_ticks(tiles))
 		body._world_pushed(tiles, lofted and tiles > 0, toss and body == first, start)
 		var note := ""
 		var next_body: GridEntity = null
@@ -1266,7 +1270,7 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		if collided:
 			_stun(body, remaining)
 		if tiles > 0 and fall == 0:
-			_stun_for(body, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS) + knockback_stun_ticks)
+			_stun_for(body, push_slide_ticks(tiles) + knockback_stun_ticks)
 		if blocker != null:
 			_stun(blocker, remaining)
 			var blocker_impact := impact_damage(
@@ -1291,6 +1295,11 @@ func _can_land_behind(mover: GridEntity, direction: Vector2i) -> bool:
 	return not _terrain_blocks_step(from, direction) \
 			and not _terrain_blocks_step(mover.tile, direction) \
 			and not _occupancy.has(mover.tile + direction)
+
+
+## Ticks a push of [param tiles] is drawn sliding.
+static func push_slide_ticks(tiles: int) -> int:
+	return clampi(tiles * PUSH_SLIDE_TICKS_PER_TILE, 1, MAX_PUSH_SLIDE_TICKS)
 
 
 ## Creatures only. A longer stun replaces a shorter one; they do not add up.

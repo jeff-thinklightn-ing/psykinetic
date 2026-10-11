@@ -343,8 +343,8 @@ func _test_stun() -> void:
 	imp.sight_range = 7  # It wants to walk straight back to the player.
 	_shove(player, imp)
 	_check(imp.tile == Vector2i(3, 1) and World.is_stunned(imp), "imp thrown into a wall is stunned")
-	_check(imp.stunned_until_tick == World.tick + 8, "for its 1-tick slide + 7, longer than 4 + 1 * 3 (until %d, now %d)" % [imp.stunned_until_tick, World.tick])
-	for i in 7:
+	_check(imp.stunned_until_tick == World.tick + 9, "for its 2-tick slide + 7, longer than 4 + 1 * 3 (until %d, now %d)" % [imp.stunned_until_tick, World.tick])
+	for i in 8:
 		World.step()
 	_check(imp.tile == Vector2i(3, 1), "it does not move while stunned (tick %d, at %s)" % [World.tick, imp.tile])
 	World.step()
@@ -361,7 +361,7 @@ func _test_stun() -> void:
 	_check(first.tile == Vector2i(4, 1) and second.tile == Vector2i(5, 1), "first imp flies two tiles and stops against the second")
 	_check(_damage(first, &"impact") == 0 and _damage(second, &"impact") == 0, "with no force left, the collision does no damage")
 	_check(World.is_stunned(first) and World.is_stunned(second), "but both imps are stunned")
-	_check(first.stunned_until_tick == World.tick + 9, "the thrown one for its 2-tick slide + 7 (until %d, now %d)" % [first.stunned_until_tick, World.tick])
+	_check(first.stunned_until_tick == World.tick + 11, "the thrown one for its 4-tick slide + 7 (until %d, now %d)" % [first.stunned_until_tick, World.tick])
 	_check(second.stunned_until_tick == World.tick + 4, "the one run into for the base 4 ticks (until %d, now %d)" % [second.stunned_until_tick, World.tick])
 	_check(not World.is_stunned(e["P"][0]), "the shover is not")
 
@@ -376,10 +376,11 @@ func _test_stun() -> void:
 	_shove(e["P"][0], imp)
 	var slid := imp.tile.x - 2
 	_check(slid > 0 and _damage(imp, &"impact") == 0, "an imp shoved across open ground slides %d, unhurt" % slid)
-	_check(imp.stunned_until_tick == World.tick + slid + World.knockback_stun_ticks,
+	var ticks := World.push_slide_ticks(slid) + World.knockback_stun_ticks
+	_check(imp.stunned_until_tick == World.tick + ticks,
 			"and is stunned for its slide + %d (until %d, now %d)" % [World.knockback_stun_ticks, imp.stunned_until_tick, World.tick])
 	var at := imp.tile
-	for i in slid + World.knockback_stun_ticks - 1:
+	for i in ticks - 1:
 		World.step()
 	_check(imp.tile == at, "it stays put while stunned (at %s)" % imp.tile)
 	World.step()

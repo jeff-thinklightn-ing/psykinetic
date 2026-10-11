@@ -54,7 +54,7 @@ const PIP_REACH := 4.0
 ## 100 ms to come round (an exponential ease at this rate per second).
 const TURN_RATE := 30.0
 ## A push not yet drawn this many ticks after it came is taken as over.
-const PUSH_SHOWN_TICKS := 10.0
+const PUSH_SHOWN_TICKS := 14.0
 ## A refused or corrected step eases to a stop over this many ticks.
 const STOP_EASE_TICKS := 2.0
 const IMPACT_FLASH := Color(4.0, 4.0, 4.0)

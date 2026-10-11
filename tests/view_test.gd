@@ -451,7 +451,7 @@ func _push_imp(imp: GridEntity, by: Vector2i, toss := false) -> void:
 	var from := imp.tile
 	World._relocate(imp, from + by)
 	var tiles := maxi(absi(by.x), absi(by.y))
-	imp._world_slide_from(from, World.tick + World.tick_alpha, tiles)
+	imp._world_slide_from(from, World.tick + World.tick_alpha, World.push_slide_ticks(tiles))
 	imp._world_pushed(tiles, false, toss, from)
 
 

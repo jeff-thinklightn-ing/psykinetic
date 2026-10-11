@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.93
+
+3D and 2D views. Server.
+
+- A push throws its target at half the speed it did, so you can see it
+  fly back.
+
+The server must be updated to v0.1.93 too, as it refuses any other version.
+
 ## v0.1.92
 
 3D view. Server.

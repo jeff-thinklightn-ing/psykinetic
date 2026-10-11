@@ -1452,3 +1452,14 @@ a push back doubled over, holding the push's facing until the clip is
 done. This is gameplay, not only a look: a pushed creature cannot act for
 that beat. Tosses still land (Jump_Land) unless something stops them; the
 roll outlasts the stun, so the landing can still be cut by the walk.
+
+## 159. A push slides 2 ticks a tile
+
+A push was drawn at a tick a tile (10 tiles a second, capped at 3
+ticks), three times a walk's pace or more, and read as a jump rather
+than a throw. It is now drawn at `World.PUSH_SLIDE_TICKS_PER_TILE` (2) a
+tile, capped at `MAX_PUSH_SLIDE_TICKS` (6): 0.2 s a tile, 0.6 s at most.
+The sim still moves the body at once; the knockback stun (decision 158)
+counts from the end of the slower slide, so the doubling over still gets
+its beat, and `GridEntity.PUSH_SHOWN_TICKS` rose to 14 to outlast the
+longest slide drawn a little in the past.
