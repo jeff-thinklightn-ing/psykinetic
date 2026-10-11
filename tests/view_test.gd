@@ -351,8 +351,9 @@ func _test_goblin() -> void:
 	var animator := puppet.get_meta("animator") as AnimationPlayer
 	var clips := Array(animator.get_animation_list())
 	_check([Client3D.CLIP_IDLE, Client3D.CLIP_WALK, Client3D.CLIP_ATTACK, Client3D.CLIP_HIT, Client3D.CLIP_DEATH,
-			Client3D.CLIP_BACKPEDAL, Client3D.CLIP_IMPACT, Client3D.CLIP_ROLL, Client3D.CLIP_LAND].all(
-			func(clip: String) -> bool: return clip in clips), "with its nine clips (%s)" % [clips])
+			Client3D.CLIP_BACKPEDAL, Client3D.CLIP_IMPACT, Client3D.CLIP_ROLL, Client3D.CLIP_LAND,
+			Client3D.CLIP_JOG, Client3D.CLIP_SPRINT].all(
+			func(clip: String) -> bool: return clip in clips), "with its eleven clips (%s)" % [clips])
 	_check(animator.current_animation == "Idle", "standing: Idle")
 	var bone_count := 0
 	for skeleton in puppet.find_children("*", "Skeleton3D", true, false):
@@ -367,10 +368,18 @@ func _test_goblin() -> void:
 		var forward := _toes_ahead(puppet)
 		var wanted := Vector2(direction).normalized()
 		_check(forward.dot(wanted) > 0.9, "it faces %s: its toes point %s" % [direction, forward])
-	puppet.set_meta("last_at", puppet.position - Vector3(0.3, 0.0, 0.0))
-	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
-	_rig._animate(puppet)
-	_check(animator.current_animation == "Walk" and animator.speed_scale > 1.0, "moving 3 tiles a second: Walk, played faster (%.2f)" % animator.speed_scale)
+	for pace: Array in [[0.7, Client3D.CLIP_WALK], [1.4, Client3D.CLIP_WALK], [2.5, Client3D.CLIP_JOG], [1.2, Client3D.CLIP_JOG],
+			[0.9, Client3D.CLIP_WALK], [5.5, Client3D.CLIP_SPRINT], [4.0, Client3D.CLIP_SPRINT], [3.5, Client3D.CLIP_JOG]]:
+		puppet.set_meta("speed", float(pace[0]))
+		puppet.set_meta("last_at", puppet.position - Vector3(float(pace[0]) * 0.1, 0.0, 0.0))
+		puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
+		_rig._animate(puppet)
+		var own := 0.0
+		for gait: Array in Client3D.GAITS:
+			if gait[0] == animator.current_animation:
+				own = gait[1]
+		_check(animator.current_animation == pace[1] and absf(animator.speed_scale * own - float(pace[0])) < 0.05,
+				"moving %.1f tiles a second: %s, its feet at that pace (x%.2f)" % [pace[0], animator.current_animation, animator.speed_scale])
 	imp.swung.emit(Vector2i(1, 0))
 	_check(animator.current_animation == "Punch_Jab", "an attack: Punch_Jab")
 	_rig._animate(puppet)
@@ -401,7 +410,7 @@ func _test_goblin() -> void:
 	_step_imp(imp, Vector2i(-1, 0))
 	await _run_clock(0.1)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
-	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_WALK and absf(angle_difference(yaw, PI)) < 0.3,
+	_check(not puppet.has_meta("knock") and Client3D.is_gait(animator.current_animation) and absf(angle_difference(yaw, PI)) < 0.3,
 			"walking straight back: the knock is over and it walks back facing the way it goes, not backpedals (%s, yaw %.2f)" % [animator.current_animation, yaw])
 	await _run_clock(1.0)
 	# As a client that never drew the slide: the body is just there.

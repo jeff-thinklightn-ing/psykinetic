@@ -1463,3 +1463,19 @@ The sim still moves the body at once; the knockback stun (decision 158)
 counts from the end of the slower slide, so the doubling over still gets
 its beat, and `GridEntity.PUSH_SHOWN_TICKS` rose to 14 to outlast the
 longest slide drawn a little in the past.
+
+## 160. A goblin runs at a run's pace, its clips paced by its own feet
+
+The goblin moves 2.5 tiles a second, but only had a walk, whose planted
+foot moves about 0.5 tiles a second at speed 1 (the code assumed 1.6), so
+its feet skated under it at most of its speed. Jog_Fwd and Sprint are added
+to goblin.res from the same library (goblin.glb untouched), and the view
+picks walk, jog or sprint by the puppet's pace, changing at the geometric
+mean of two paces, 15% past it either way so a pace near the change does
+not flicker. Each clip's pace (`Client3D.GAITS`: walk 0.5, jog 3.5, sprint
+5.4; the backpedal 2.6) was measured, not guessed: the goblin model moved
+at a set speed under the clip, the pace swept, and the one kept at which
+its planted toes drift least (jog 5%, sprint 8%; the walk and the backpedal
+drift 26% and 42% at best, the retargeted clips' own). The mannequin's root
+motion did not carry over: retargeting to shorter legs changes each clip's
+stride differently.

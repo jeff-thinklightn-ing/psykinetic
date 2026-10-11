@@ -200,6 +200,8 @@ const MODELS := {
 }
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
+const CLIP_JOG := "Jog_Fwd"
+const CLIP_SPRINT := "Sprint"
 const CLIP_ATTACK := "Punch_Jab"
 const CLIP_HIT := "Hit_Chest"
 const CLIP_DEATH := "Death01"
@@ -215,16 +217,22 @@ const CLIP_IMPACT := "Hit_Stomach"
 const CLIP_ROLL := "Roll"
 const CLIP_LAND := "Jump_Land"
 const KNOCK_MIN_SECONDS := 0.45
-## The backpedal's pace at speed 1, as the walk's; the roll is played this
+## The backpedal's pace at speed 1, as GAITS'; the roll is played this
 ## much faster, to fit a toss's short flight.
-const BACKPEDAL_CLIP_SPEED := 1.6
+const BACKPEDAL_CLIP_SPEED := 2.6
 const ROLL_SPEED := 1.6
 ## A push whose slide has not shown by then (the view draws others a
 ## little in the past) is knocked about where it stands.
 const KNOCK_WAIT_SECONDS := 0.6
-## The walk clip's pace at speed 1 (tiles a second): faster walkers play it
-## faster, so the feet keep up.
-const WALK_CLIP_SPEED := 1.6
+## Moving, a model walks, jogs or sprints by its pace, each clip played at
+## the pace over its own (tiles a second at speed 1), so a planted foot stays
+## put instead of skating. A clip's pace is the one at which the goblin's
+## planted feet drift least, measured by moving the model under the clip
+## (decision 160).
+const GAITS: Array[Array] = [[CLIP_WALK, 0.5], [CLIP_JOG, 3.5], [CLIP_SPRINT, 5.4]]
+## Gaits change past the geometric mean of their paces, this much beyond it
+## either way, so a pace near a change does not flicker between them.
+const GAIT_HYSTERESIS := 1.15
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
@@ -2075,9 +2083,10 @@ func _animate(puppet: Node3D) -> void:
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
 	if speed > WALKING:
-		if animator.current_animation != CLIP_WALK:
-			animator.play(CLIP_WALK, CLIP_BLEND)
-		animator.speed_scale = clampf(speed / WALK_CLIP_SPEED, 0.6, 2.5)
+		var gait: Array = GAITS[gait_for(animator.current_animation, speed)]
+		if animator.current_animation != gait[0]:
+			animator.play(gait[0], CLIP_BLEND)
+		animator.speed_scale = clampf(speed / float(gait[1]), 0.3, 3.0)
 	else:
 		if animator.current_animation != CLIP_IDLE:
 			animator.play(CLIP_IDLE, CLIP_BLEND)
@@ -2125,7 +2134,7 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 				return true
 		else:
 			if not toss:
-				animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
+				animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 4.0)
 			var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
 			# It doubles over when it gets there: a push back always, a toss
 			# if a wall or a door stopped it. One knocked where it stands holds.
@@ -2146,6 +2155,27 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 		# Off on its own: the walk takes over now, from where it faces.
 		(puppet.get_node("Body") as Node3D).rotation.y = knock["shown"]
 	return false
+
+
+## The GAITS index for moving at [param speed] (tiles a second) from the
+## clip playing, [param current]: a gait already reached holds till a little
+## below its change.
+static func gait_for(current: String, speed: float) -> int:
+	var at := 0
+	for i in GAITS.size():
+		if GAITS[i][0] == current:
+			at = i
+	var index := 0
+	for i in range(1, GAITS.size()):
+		var change := sqrt(float(GAITS[i - 1][1]) * float(GAITS[i][1]))
+		if speed > change * (1.0 / GAIT_HYSTERESIS if at >= i else GAIT_HYSTERESIS):
+			index = i
+	return index
+
+
+## True if [param clip] is one of GAITS'.
+static func is_gait(clip: String) -> bool:
+	return GAITS.any(func(gait: Array) -> bool: return gait[0] == clip)
 
 
 ## Plays [param clip] once on [param puppet]'s model, if it has one, and

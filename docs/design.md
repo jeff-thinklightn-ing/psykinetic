@@ -1054,11 +1054,14 @@ Models are imported with a SkeletonProfileHumanoid bone map
 (`art/models/bonemaps/`), so their skeleton is `%GeneralSkeleton` with the
 profile's bone names, and their clips are an AnimationLibrary of
 retargeted clips (`art/models/animations/goblin.res`: Idle, Walk,
-Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll and Jump_Land
-from the Quaternius Universal Animation Library (Pro), CC0, saved by `tools/extract_clips.gd` so the 20 MB pack is never
+Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll, Jump_Land,
+Jog_Fwd and Sprint from the Quaternius Universal Animation Library (Pro), CC0, saved by `tools/extract_clips.gd` so the 20 MB pack is never
 shipped). The model is the puppet's Body, turned to the shown facing (it
-has no nose); an AnimationPlayer on it walks while the puppet moves (the
-clip sped up to its pace), stands Idle when it does not, and plays
+has no nose); an AnimationPlayer on it walks, jogs or sprints while the
+puppet moves, by its pace (`Client3D.GAITS`: each clip's own pace, the one
+its planted feet drift least at, measured on the goblin; the clip played at
+the puppet's pace over it, a change of gait held a little past the change,
+`GAIT_HYSTERESIS`), stands Idle when it does not, and plays
 Punch_Jab on a swing, Hit_Chest when struck and Death01 when it dies, each
 played out before walking or idling take over again. Knocked about
 (`_on_pushed`, `_knocked`), by how it was pushed: pushed back (an attack's

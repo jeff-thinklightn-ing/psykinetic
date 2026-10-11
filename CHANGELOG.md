@@ -3,6 +3,14 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.94
+
+3D view.
+
+- Goblins run (jog, or sprint if they are fast enough) instead of walking
+  at a run's speed, so their feet keep up with them instead of sliding
+  along the ground.
+
 ## v0.1.93
 
 3D and 2D views. Server.
