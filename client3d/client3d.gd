@@ -206,8 +206,10 @@ const CLIP_DEATH := "Death01"
 ## Knocked about: a plain push back backpedals for the slide (at least
 ## KNOCK_MIN_SECONDS), facing whence it came; a toss rolls over backwards
 ## (the forward roll played in reverse), facing whence it came too, then
-## lands; either, stopped by a wall or a door (or a fall), doubles
-## over when it gets there. A blow into another body is a hit as ever.
+## lands; a push back doubles over when it gets there, hit or not (the sim
+## stuns it for that beat, World.knockback_stun_ticks), and a toss does too
+## if a wall or a door (or a fall) stops it. A blow into another body is a
+## hit as ever.
 const CLIP_BACKPEDAL := "Jog_Bwd"
 const CLIP_IMPACT := "Hit_Stomach"
 const CLIP_ROLL := "Roll"
@@ -2117,12 +2119,23 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 		knock["shown"] = lerp_angle(knock["shown"], knock["yaw"],
 				1.0 - exp(-GridEntity.TURN_RATE * get_process_delta_time()))
 		(puppet.get_node("Body") as Node3D).rotation.y = knock["shown"]
-		if not toss:
-			animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
-		var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
-		# Stopped by a wall or a door: it doubles over when it gets there.
-		var arrived := shown != GridEntity.PushShown.SLIDING and shown != GridEntity.PushShown.WAITING
-		if shown == GridEntity.PushShown.SLIDING or held and not (knock["impact"] and arrived):
+		if knock.get("ending", false):
+			# Doubling over (or landing), still facing whence it came.
+			if now < int(puppet.get_meta("busy_until", 0)):
+				return true
+		else:
+			if not toss:
+				animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 3.0)
+			var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
+			# It doubles over when it gets there: a push back always, a toss
+			# if a wall or a door stopped it. One knocked where it stands holds.
+			var slid: bool = knock.get("slid", false) or shown == GridEntity.PushShown.SLIDING
+			knock["slid"] = slid
+			var arrived := shown != GridEntity.PushShown.SLIDING and shown != GridEntity.PushShown.WAITING
+			if shown == GridEntity.PushShown.SLIDING or held and not (arrived and (knock["impact"] or slid and not toss)):
+				return true
+			_play_once(puppet, CLIP_IMPACT if knock["impact"] or not toss else CLIP_LAND)
+			knock["ending"] = true
 			return true
 	puppet.remove_meta("knock")
 	puppet.set_meta("busy_until", 0)
@@ -2132,12 +2145,7 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 	if walking:
 		# Off on its own: the walk takes over now, from where it faces.
 		(puppet.get_node("Body") as Node3D).rotation.y = knock["shown"]
-		return false
-	if knock["impact"]:
-		_play_once(puppet, CLIP_IMPACT)
-	elif toss:
-		_play_once(puppet, CLIP_LAND)
-	return true
+	return false
 
 
 ## Plays [param clip] once on [param puppet]'s model, if it has one, and

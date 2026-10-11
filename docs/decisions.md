@@ -1439,3 +1439,16 @@ its own is drawn). The shown facing ignores those slides, and the 3D knock
 takes its facing from the push's direction and its timing from
 `push_shown`, never from the puppet's motion. The push message's
 signature changed, so the server must match.
+
+## 158. Every knockback ends doubled over, stunned a beat
+
+A push that hit nothing, or used up its force exactly at a wall
+(impact 0), ended the backpedal with no reaction and the goblin walked
+straight back, so a knockback read as being slid about. Now any creature
+knocked back is stunned until `World.knockback_stun_ticks` (7, a little
+over the 0.67 s Hit_Stomach clip) past the end of its slide, on top of
+and never shorter than the collision stun, and the 3D knock always ends
+a push back doubled over, holding the push's facing until the clip is
+done. This is gameplay, not only a look: a pushed creature cannot act for
+that beat. Tosses still land (Jump_Land) unless something stops them; the
+roll outlasts the stun, so the landing can still be cut by the walk.

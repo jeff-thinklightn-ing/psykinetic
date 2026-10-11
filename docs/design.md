@@ -534,7 +534,9 @@ grid direction nearest the drag on screen, and release tosses that way.
 stunned, and so is a creature that something is thrown into — even when no
 force is left to do damage. A stun lasts
 `stun_ticks_base + round(remaining × stun_ticks_per_force)` ticks (4 and 3,
-exported on `World`); a longer stun replaces a shorter one. A stunned entity
+exported on `World`). Any creature knocked back, wall or no wall, is also
+stunned until `knockback_stun_ticks` (7) past the end of its slide, a beat
+to double over in; a longer stun replaces a shorter one. A stunned entity
 skips its turn and cannot move, attack or shove; its orders wait. Landing on
 fire is not a collision and does not stun. On screen the sprite reels from
 side to side until it wears off.
@@ -1065,9 +1067,11 @@ slide) facing whence it came, for the slide and at least
 `KNOCK_MIN_SECONDS`; tossed (aimed another way, or overhead: the sim's
 `GridEntity.tossed`, sent with the push) it rolls over backwards, facing
 whence it came (Roll played in reverse, `ROLL_SPEED` faster), then lands
-(Jump_Land); either, stopped by a wall or
-a door (an impact against stone or wood, a fall too), doubles over
-(Hit_Stomach) when its slide gets there, or at once if it never moved. An
+(Jump_Land). A push back doubles over (Hit_Stomach) when its slide gets
+there, hit or not (the sim's knockback stun holds it for that); a toss
+does instead of landing if a wall or a door (an impact against stone or
+wood, a fall too) stops it; either, hit where it stands, doubles over at
+once. The knock keeps its facing through the doubling over or the landing. An
 impact against another body is Hit_Chest. The sim tells the view what of
 the push is on screen (`GridEntity.push_shown`, from the push's line,
 sent with it): the clip waits for the slide to show, since others are

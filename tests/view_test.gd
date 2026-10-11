@@ -388,13 +388,16 @@ func _test_goblin() -> void:
 	await _run_clock(0.3)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(absf(angle_difference(yaw, PI)) < 0.05, "and comes round to face it, yaw %.2f" % yaw)
-	await _run_clock(Client3D.KNOCK_MIN_SECONDS + 0.4)
+	_check(animator.current_animation == Client3D.CLIP_IMPACT,
+			"there, hit nothing, it doubles over all the same, still facing it (%s)" % animator.current_animation)
+	await _run_clock(Client3D.KNOCK_MIN_SECONDS + 0.8)
 	_check(not puppet.has_meta("knock") and animator.current_animation == Client3D.CLIP_IDLE, "come to rest: Idle again (%s)" % animator.current_animation)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(absf(angle_difference(yaw, was)) < 0.05, "and turned back to its own facing, yaw %.2f" % yaw)
 	_push_imp(imp, Vector2i(1, 0))
-	await _run_clock(0.15)
+	await _run_clock(0.05)
 	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "pushed back again: it backpedals")
+	await _run_clock(0.15)
 	_step_imp(imp, Vector2i(-1, 0))
 	await _run_clock(0.1)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y

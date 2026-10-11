@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.92
+
+3D view. Server.
+
+- Pushed goblins (and anything else knocked back) now always double over
+  at the end of the push, even if they hit nothing, and are stunned for a
+  moment before they can act or walk back.
+
+The server must be updated to v0.1.92 too, as it refuses any other version.
+
 ## v0.1.91
 
 3D and 2D views. Server.

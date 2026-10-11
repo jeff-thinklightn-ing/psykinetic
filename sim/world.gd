@@ -113,6 +113,10 @@ const EXHAUSTED_MASS_FACTOR := 0.5
 ## into, is stunned for base + round(remaining force x per_force) ticks.
 @export var stun_ticks_base := 4
 @export var stun_ticks_per_force := 3.0
+## A creature knocked back (it moved) is stunned at least this many ticks
+## past the end of its slide, wall or no wall: a beat to double over before
+## it can act again.
+@export var knockback_stun_ticks := 7
 ## Ticks after attacking, shoving or being thrown before regen resumes.
 ## 0 means only the tick of the exertion itself is lost.
 @export var stamina_regen_delay := 10
@@ -1261,6 +1265,8 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		# Running into something stuns, even with no force left to hurt.
 		if collided:
 			_stun(body, remaining)
+		if tiles > 0 and fall == 0:
+			_stun_for(body, clampi(tiles, 1, MAX_PUSH_SLIDE_TICKS) + knockback_stun_ticks)
 		if blocker != null:
 			_stun(blocker, remaining)
 			var blocker_impact := impact_damage(
@@ -1289,9 +1295,13 @@ func _can_land_behind(mover: GridEntity, direction: Vector2i) -> bool:
 
 ## Creatures only. A longer stun replaces a shorter one; they do not add up.
 func _stun(entity: GridEntity, remaining_force: float) -> void:
+	_stun_for(entity, stun_ticks_base + roundi(remaining_force * stun_ticks_per_force))
+
+
+## Stuns [param entity] for [param ticks] from now, if that is longer.
+func _stun_for(entity: GridEntity, ticks: int) -> void:
 	if not _alive(entity) or not entity.is_creature():
 		return
-	var ticks := stun_ticks_base + roundi(remaining_force * stun_ticks_per_force)
 	if tick + ticks > entity.stunned_until_tick:
 		entity._world_stunned(tick + ticks, ticks)
 
