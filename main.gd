@@ -2383,7 +2383,9 @@ func _debug_text() -> String:
 		lines.append("mispredicts: %d / min (%d total)" % [
 			Net.mispredicts_per_minute(), Net.mispredicts_total])
 		lines.append("snaps: %d / min (%d total)" % [Net.snaps_per_minute(), Net.snaps_total])
-		lines.append("display delay: %d ticks" % World.display_delay_ticks)
+		lines.append("worst correction: %.2f tiles this minute (%.2f ever)" % [
+			Net.stats.worst_correction(), Net.stats.worst_correction_ever])
+		lines.append("display delay: %d ms" % roundi(World.display_delay_ticks * 1000.0 / World.TICK_RATE))
 		lines.append("build: v%s %s" % [Net.version, Net.protocol()])
 	else:
 		lines.append("rtt: n/a (this peer is the authority)")
@@ -2575,8 +2577,17 @@ func admin_command(line: String) -> String:
 				if is_instance_valid(pet) and String(pet.name).to_lower() == who.to_lower():
 					who = String(pet.name)
 			return Transcript.show(who, words[2] if words.size() >= 3 else "")
+		"net":
+			var peers: Array[String] = []
+			var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+			for peer: int in _players:
+				var link := enet.get_peer(peer) if enet != null else null
+				if link != null:
+					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
+			return "%s
+%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+			return "reset | respawn | players | net | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | save"
 	return "unknown command %s (try help)" % words[0]

@@ -3,6 +3,24 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.95
+
+Network. Server.
+
+- Others (Wren, goblins, other players) move smoothly on a client: no more
+  stalls and little jumps when packets arrive late or bunched. They are
+  drawn 150 ms in the past instead of 200 ms.
+- Knockback looks the same on every client as on the host, at its proper
+  (slower) speed.
+- When you shove something while standing still, it flies back the moment
+  you click, instead of a third of a second later.
+- F3 shows your worst position correction; the server's admin console has a
+  new `net` command (tick time, bandwidth, everyone's ping).
+- An old display_delay line in settings.cfg is dropped; display_delay_ms
+  can be set by hand.
+
+The server must be updated to v0.1.95 too, as it refuses any other version.
+
 ## v0.1.94
 
 3D view.

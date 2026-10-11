@@ -417,7 +417,7 @@ func _test_goblin() -> void:
 	var from := imp.tile
 	World._relocate(imp, from + Vector2i(1, 0))
 	imp._world_slide_from(from, World.tick - 5, 1)
-	imp._world_pushed(1, false, false, from)
+	imp._world_pushed(1, false, false, from, World.tick - 5, 1, 0)
 	await _run_clock(0.1)
 	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL, "a push whose slide never showed: it still backpedals where it stands (%s)" % animator.current_animation)
 	await _run_clock(0.3)
@@ -461,7 +461,7 @@ func _push_imp(imp: GridEntity, by: Vector2i, toss := false) -> void:
 	World._relocate(imp, from + by)
 	var tiles := maxi(absi(by.x), absi(by.y))
 	imp._world_slide_from(from, World.tick + World.tick_alpha, World.push_slide_ticks(tiles))
-	imp._world_pushed(tiles, false, toss, from)
+	imp._world_pushed(tiles, false, toss, from, World.tick + World.tick_alpha, World.push_slide_ticks(tiles), 0)
 
 
 ## [param imp] takes a step of its own, [param by].

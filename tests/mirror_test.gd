@@ -4,7 +4,7 @@ extends Node
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
-const SAMPLES_PER_TICK := 5
+const SAMPLES_PER_TICK := 10
 
 var _failures := 0
 var _tick := 100
@@ -19,6 +19,10 @@ func _ready() -> void:
 	_test_a_fast_walker_slides_too()
 	_test_turning_a_corner()
 	_test_a_step_starts_after_the_display_delay()
+	_test_the_display_clock_rides_out_late_ticks()
+	_test_a_push_is_drawn_as_the_server_timed_it()
+	_test_a_push_you_made_is_drawn_at_once()
+	_test_a_guessed_shove()
 	_test_prediction_does_not_walk_into_a_pinned_crate()
 	_test_prediction_gives_up_when_the_server_has()
 
@@ -40,12 +44,12 @@ func _test_a_walk_is_drawn_without_jumps_or_pauses() -> void:
 
 
 func _test_a_fast_walker_slides_too() -> void:
-	print("\n== so is one whose step is as short as the display delay ==")
-	# Two ticks a step, drawn two ticks behind: the next step arrives just as
-	# this one's slide is due to begin.
-	var runner := _mirror("Runner", Vector2i(2, 7), World.display_delay_ticks)
+	print("\n== so is a fast one, two ticks a step ==")
+	# Two ticks a step, drawn 1.5 ticks behind: the next step arrives just
+	# before this one's slide ends.
+	var runner := _mirror("Runner", Vector2i(2, 7), 2)
 	var moves := _walk(runner, [Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0)])
-	var per_sample := _tile_pixels(Vector2i(1, 0)) / float(World.display_delay_ticks * SAMPLES_PER_TICK)
+	var per_sample := _tile_pixels(Vector2i(1, 0)) / (2.0 * SAMPLES_PER_TICK)
 	var walking := _trim(moves)
 	_check(walking.max() <= per_sample * 1.05 and walking.min() >= per_sample * 0.95,
 			"an even slide, not tile-to-tile hops (%.2f to %.2f px a sample, want %.2f)" % [walking.min(), walking.max(), per_sample])
@@ -72,7 +76,130 @@ func _test_a_step_starts_after_the_display_delay() -> void:
 		still += 1
 	# The slide begins on the first sample of the tick it is due in, so the
 	# first movement shows on the sample after that.
-	_check(still == World.display_delay_ticks * SAMPLES_PER_TICK + 1, "still for %d ticks first (%d samples)" % [World.display_delay_ticks, still])
+	_check(still == floori(World.display_delay_ticks * SAMPLES_PER_TICK) + 1, "still for %.1f ticks first (%d samples)" % [World.display_delay_ticks, still])
+
+
+func _test_the_display_clock_rides_out_late_ticks() -> void:
+	print("\n== the display clock runs on smoothly through late and bunched ticks ==")
+	World.set_process(true)
+	var frame := 1.0 / 60.0
+	var server := float(_tick)
+	World._net_tick(_tick)
+	World._clock = _tick
+	var shown: Array[float] = []
+	var arrivals := 0
+	# Six seconds of 60 fps; the ticks come every 100 ms, but every fifth is
+	# 80 ms late and arrives with the next.
+	var late := -1
+	for f in 360:
+		server += frame * World.TICK_RATE
+		World._process(frame)
+		while floori(server) > _tick:
+			_tick += 1
+			if _tick % 5 == 0:
+				late = _tick
+				continue
+			if late != -1:
+				World._net_tick(late)
+				arrivals += 1
+				late = -1
+			World._net_tick(_tick)
+			arrivals += 1
+		shown.append(World.tick + World.tick_alpha)
+	World.set_process(false)
+	var steps: Array[float] = []
+	for i in range(1, shown.size()):
+		steps.append(shown[i] - shown[i - 1])
+	var even := frame * World.TICK_RATE
+	_check(steps.min() > even * 0.7 and steps.max() < even * 1.3,
+			"each frame moves it %.3f to %.3f ticks, never stopping or jumping (even: %.3f)" % [steps.min(), steps.max(), even])
+	_check(absf(shown.back() - server) < 1.0, "and it keeps up with the server (%.2f behind)" % (server - shown.back()))
+
+
+func _test_a_push_is_drawn_as_the_server_timed_it() -> void:
+	print("\n== a push is drawn as the server timed it, whichever comes first ==")
+	for order in ["the push's word first", "the tile first"]:
+		var imp := _mirror("Pushed", Vector2i(2, 13) if order == "the tile first" else Vector2i(2, 15), 4)
+		var from := imp.tile
+		var to := from + Vector2i(2, 0)
+		_run_tick(imp, [])
+		if order == "the tile first":
+			imp.tile = to
+			imp._net_pushed(2, false, false, from, to, float(_tick), 4.0, 0)
+		else:
+			imp._net_pushed(2, false, false, from, to, float(_tick), 4.0, 0)
+			imp.tile = to
+		var moves: Array[float] = []
+		for i in 10:
+			_run_tick(imp, moves)
+		var sliding := _trim(moves)
+		_check(sliding.size() == 4 * SAMPLES_PER_TICK,
+				"%s: it slides the two tiles in the server's 4 ticks, not the jump's guess (%d samples)" % [order, sliding.size()])
+		_check(imp.position.is_equal_approx(Iso.tile_to_local(to)), "%s: and ends there" % order)
+
+
+func _test_a_push_you_made_is_drawn_at_once() -> void:
+	print("\n== a push the local player made is drawn at once, not 1.5 ticks later ==")
+	var imp := _mirror("Shoved", Vector2i(2, 17), 4)
+	var from := imp.tile
+	var to := from + Vector2i(2, 0)
+	_run_tick(imp, [])
+	imp._net_pushed(2, false, false, from, to, float(_tick), 4.0, multiplayer.get_unique_id())
+	imp.tile = to
+	var moves: Array[float] = []
+	_tick += 1
+	World._net_tick(_tick)
+	World.tick_alpha = 0.1
+	imp._process(0.0)
+	_check(imp.position != Iso.tile_to_local(from), "moving on the very next frame (at %s)" % Iso.local_to_grid(imp.position))
+	for i in 6:
+		_run_tick(imp, moves)
+	_check(imp.position.is_equal_approx(Iso.tile_to_local(to)), "and there after the server's 4 ticks")
+	# Shoved again, and walking back two steps before the slide is over: the
+	# steps come due on the display clock while the push still shows.
+	imp._net_pushed(2, false, false, to, to + Vector2i(2, 0), float(_tick), 6.0, multiplayer.get_unique_id())
+	imp.tile = to + Vector2i(2, 0)
+	moves.clear()
+	_run_tick(imp, moves)
+	for back in 2:
+		_run_tick(imp, moves, Vector2i(-1, 0))
+		for i in 3:
+			_run_tick(imp, moves)
+	for i in 10:
+		_run_tick(imp, moves)
+	var push_sample := _tile_pixels(Vector2i(2, 0)) / (6.0 * SAMPLES_PER_TICK)
+	var step_sample := _tile_pixels(Vector2i(1, 0)) / (4.0 * SAMPLES_PER_TICK)
+	_check(moves.max() <= maxf(push_sample, step_sample) * 1.05,
+			"the walk that came due meanwhile follows on, no jump to its end (largest %.2f px a sample)" % moves.max())
+	_check(imp.position.is_equal_approx(Iso.tile_to_local(to)), "and it ends back where it walked to (%s)" % Iso.local_to_grid(imp.position))
+
+
+func _test_a_guessed_shove() -> void:
+	print("\n== your shove, guessed: shown at once, kept, corrected or taken back ==")
+	for case in ["right", "wrong", "unanswered"]:
+		var imp := _mirror("Guessed_" + case, Vector2i(2, 23 + ["right", "wrong", "unanswered"].find(case) * 2), 4)
+		var from := imp.tile
+		var guess := from + Vector2i(2, 0)
+		_run_tick(imp, [])
+		imp.guess_knock(guess, 4.0)
+		var moves: Array[float] = []
+		_run_tick(imp, moves)
+		_check(moves.max() > 0.0, "%s: it starts sliding at once" % case)
+		if case != "unanswered":
+			var to := guess if case == "right" else from + Vector2i(1, 0)
+			imp._net_pushed(2, false, false, from, to, float(_tick), 4.0, multiplayer.get_unique_id())
+			imp.tile = to
+			for i in 8:
+				_run_tick(imp, moves)
+			var steady := _trim(moves)
+			if case == "right":
+				_check(steady.size() == 4 * SAMPLES_PER_TICK and steady.max() - steady.min() < 0.01,
+						"right: the server's word changes nothing, one even slide (%d samples, %.2f to %.2f px)" % [steady.size(), steady.min(), steady.max()])
+			_check(imp.position.is_equal_approx(Iso.tile_to_local(to)), "%s: it ends where the server put it (%s)" % [case, Iso.local_to_grid(imp.position)])
+		else:
+			for i in 12:
+				_run_tick(imp, moves)
+			_check(imp.position.is_equal_approx(Iso.tile_to_local(from)), "unanswered: it slides back to its tile (%s)" % Iso.local_to_grid(imp.position))
 
 
 func _test_prediction_does_not_walk_into_a_pinned_crate() -> void:
@@ -165,7 +292,7 @@ func _walk(entity: GridEntity, steps: Array[Vector2i]) -> Array[float]:
 		_run_tick(entity, moves, step)
 		for i in int(World.step_ticks(entity, step)) - 1:
 			_run_tick(entity, moves)
-	for i in World.display_delay_ticks + 2:
+	for i in ceili(World.display_delay_ticks) + 2:
 		_run_tick(entity, moves)
 	return moves
 

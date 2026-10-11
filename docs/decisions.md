@@ -1479,3 +1479,33 @@ its planted toes drift least (jog 5%, sprint 8%; the walk and the backpedal
 drift 26% and 42% at best, the retargeted clips' own). The mannequin's root
 motion did not carry over: retargeting to shorter legs changes each clip's
 stride differently.
+
+## 161. A smooth client clock, pushes as events, your shoves shown at once
+
+Measured first, in a scripted castle fight (a headless host shoving and
+swinging at imps, a client walking about it through a relay adding the
+laptop's 28 ms and jitter): the server's ticks took 0.4 to 1.7 ms, worst
+under 20 ms (nothing blocks a tick: the companions' model calls are
+asynchronous); the local player was corrected about 5 times a minute, all
+blended, none snapped. What showed was the others: the client's clock was
+set to each server tick as it arrived and stood still past it, so late or
+bunched ticks stalled and jumped every slide (speed changing 0.9 tiles a
+second frame to frame, 3 to 5 hitches a minute); a push's slide was
+guessed from the tile jump (1 to 3 ticks, where the server draws 2 a tile,
+so v0.1.93's slower push never reached a client); and a shove showed 250 ms
+after the server's word of it, on the display delay.
+
+So: the client's display clock runs on its own and is slewed (at most 10%)
+toward the server's ticks; the display delay is 150 ms, not 200; a push
+carries its start tick, duration and shover, and every client draws the
+server's slide; a push the local player makes or takes is drawn on the
+present clock as soon as the word comes; and a plain shove the server will
+take at once is guessed from the same push reckoning, run on the mirrored
+world, and confirmed, corrected or taken back. The old display_delay
+setting was written into every settings.cfg, so a new default could never
+reach anyone: it is dropped, and display_delay_ms is read only when written
+by hand. Sending the clock at 20 Hz was tried and made no difference (the
+sim and so positions stay at 10 Hz) for a few bytes more: it stays an
+option, off. After: speed changing 0.3 tiles a second frame to frame, no
+hitches, a shove standing still shown in one frame (32 ms) rather than
+344 ms (median), bandwidth unchanged at under 1 KB/s a client.

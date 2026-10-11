@@ -149,6 +149,9 @@ var action_direction := Vector2i.ZERO
 
 # Render interpolation: slide from _from_tile to tile over _move_duration ticks.
 var _from_tile := Vector2i.ZERO
+## Where the slide being shown starts, in grid space: _from_tile's cell, or
+## wherever the body was drawn when a present push took it (see _present).
+var _from_pos := Vector2.ZERO
 var _move_tick := 0.0
 var _move_duration := 0.0
 ## The facing as shown, an angle in grid space, turning toward the wanted
@@ -160,6 +163,27 @@ var _shown_angle := NAN
 # clock reaches them; _to_tile is where the slide being shown ends.
 var _slides: Array[Dictionary] = []
 var _to_tile := Vector2i.ZERO
+## Mirrors only: the slide being shown is timed by the present clock, not
+## the display clock: a push the local player made, or took, is drawn as
+## soon as the server's word of it comes, from wherever the body is drawn,
+## instead of display_delay_ticks later (decision 161).
+var _present := false
+## Mirrors only: a push the server has told of whose tile has not arrived
+## yet: {from, to, tick, duration, present}.
+var _pending_push := {}
+## Mirrors only: a shove by the local player, guessed and shown before the
+## server's word ({to, until}); and, once one of the server's two words
+## (the push, the tile) has confirmed it, where, so the other changes
+## nothing (see guess_knock).
+var _guess := {}
+var _guess_confirmed := Vector2i(-9999, -9999)
+## The local player, on a client: the tick before which it is taken to be
+## still cooling down from its last shove, for guessing (World._predict_shove).
+var _guessed_ready_tick := 0
+## The local player, on a client: when (display clock) a walk of its own was
+## last shown. The server is a step behind the screen, so a shove soon after
+## waits there for that step to end (see World._predict_shove).
+var _walk_shown_at := -INF
 ## True on a client once this mirror is registered with World.
 var _mirroring := false
 ## Set only on the client that controls this entity. See MovePrediction.
@@ -311,6 +335,7 @@ func _process(delta: float) -> void:
 		if _prediction != null and _prediction.is_active():
 			# The local player's own walking: shown ahead of the server.
 			position = _prediction.position()
+			_walk_shown_at = World.tick + World.tick_alpha
 			if _prediction.facing() != Vector2i.ZERO:
 				wanted = Vector2(_prediction.facing())
 		else:
@@ -319,20 +344,39 @@ func _process(delta: float) -> void:
 			var now := World.tick + World.tick_alpha
 			var to := tile
 			if _mirroring:
-				now -= World.display_delay_ticks
-				while not _slides.is_empty() and now >= _slides[0]["tick"]:
+				var shown := now - World.display_delay_ticks
+				# A present push plays out before anything after it.
+				var held := _present and now < _move_tick + _move_duration
+				while not held and not _slides.is_empty() \
+						and (_slides[0].get("present", false) or shown >= _slides[0]["tick"]):
 					var slide: Dictionary = _slides.pop_front()
+					if _present and not slide.get("present", false) and shown > slide["tick"]:
+						# Back to the display clock after a present push: what
+						# came due meanwhile goes on from here, one after
+						# another, not all at once (a jump to the last).
+						var late: float = shown - slide["tick"]
+						slide["tick"] = shown
+						slide["from_pos"] = Iso.local_to_grid(position)
+						for later: Dictionary in _slides:
+							later["tick"] = later["tick"] + late
 					_from_tile = slide["from"]
 					_to_tile = slide["to"]
 					_move_tick = slide["tick"]
 					_move_duration = slide["duration"]
+					_present = slide.get("present", false)
+					_from_pos = slide.get("from_pos", Vector2(_from_tile))
+					held = _present
+				if not _present:
+					now = shown
+				if not _guess.is_empty() and World.tick + World.tick_alpha > float(_guess["until"]):
+					_take_back_guess()
 				to = _to_tile
 			# Constant speed along the step, no easing at its ends: steps
 			# that follow one another join up into one steady walk.
 			var t := 1.0
 			if _move_duration > 0.0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
-			position = Iso.grid_to_local(Vector2(_from_tile).lerp(Vector2(to), t))
+			position = Iso.grid_to_local(_from_pos.lerp(Vector2(to), t))
 			var sliding := t < 1.0 and to != _from_tile
 			var knocked := sliding and _on_push_line(_from_tile, to)
 			stepping = sliding and not knocked
@@ -476,6 +520,7 @@ func _world_set_facing(direction: Vector2i) -> void:
 ## Render hint: the entity just went from [param from] to its current tile.
 func _world_slide_from(from: Vector2i, at_tick: float, duration: float) -> void:
 	_from_tile = from
+	_from_pos = Vector2(from)
 	_move_tick = at_tick
 	_move_duration = duration
 
@@ -494,13 +539,18 @@ func _world_note_moved(on_tick: int) -> void:
 		_exerted_tick = on_tick
 
 
-func _world_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i) -> void:
+## Pushed from [param from] to here, drawn sliding from [param at_tick] for
+## [param duration] ticks; [param by_peer] is the shover's player's peer
+## (0 for anything else). The clients get all of it, so each draws the same
+## slide, and the shover's draws it at once.
+func _world_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, at_tick: float,
+		duration: float, by_peer: int) -> void:
 	_lofted = lofted
 	tossed = toss
 	_note_pushed(from, tile)
 	pushed.emit(tiles)
 	for peer in Net.sendable_peers():
-		_net_pushed.rpc_id(peer, tiles, lofted, toss, from, tile)
+		_net_pushed.rpc_id(peer, tiles, lofted, toss, from, tile, at_tick, duration, by_peer)
 
 
 func _world_impacted(amount: int, against: StringName) -> void:
@@ -544,14 +594,34 @@ func _mirror_attach() -> void:
 ## Draw the mirror standing on its tile, with no slide shown or waiting.
 func _mirror_rest() -> void:
 	_from_tile = tile
+	_from_pos = Vector2(tile)
 	_to_tile = tile
 	_move_duration = 0.0
+	_present = false
 	_slides.clear()
 
 
 ## A replicated tile arrived.
 func _mirror_tile_changed(old: Vector2i) -> void:
 	World.mirror_changed()
+	if tile == _guess_confirmed:
+		# The push's word came first and confirmed the guess being shown.
+		_guess_confirmed = Vector2i(-9999, -9999)
+		return
+	if not _guess.is_empty():
+		var guessed: Vector2i = _guess["to"]
+		_guess = {}
+		if tile == guessed:
+			# Right: the guess being shown is the push; its word changes nothing.
+			_guess_confirmed = tile
+			return
+	if not _pending_push.is_empty() and _pending_push["to"] == tile:
+		# Thrown: the server said so before the tile came, with its timing.
+		var push := _pending_push
+		_pending_push = {}
+		push["from"] = old
+		_show_push(push)
+		return
 	if _prediction != null and _prediction.is_active():
 		if _prediction.reconcile(tile):
 			# Already on screen: the prediction showed this step.
@@ -578,6 +648,11 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 		start = previous_end
 	_slides.append({"from": old, "to": tile, "tick": start,
 		"duration": World.step_ticks(self, delta) if steps == 1 else float(clampi(steps, 1, 3))})
+
+
+## True while this client is showing its own walk ahead of the server.
+func predicting() -> bool:
+	return _prediction != null and _prediction.is_active()
 
 
 ## Turns on prediction of this entity's own walking. Only meaningful on the
@@ -646,7 +721,9 @@ func shown_tile() -> Vector2i:
 func _mispredicted(reason: String) -> void:
 	var predicted := _prediction.predicted_tile()
 	var error := World.distance(predicted, tile)
+	var off := (Iso.local_to_grid(position) - Vector2(tile)).length()
 	Net.record_mispredict()
+	Net.stats.record_correction(off, error > SNAP_TILES)
 	_mirror_rest()
 	if error > SNAP_TILES:
 		_prediction.clear()
@@ -669,6 +746,7 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 	if not _prediction.is_active():
 		return
 	Net.record_mispredict()
+	Net.stats.record_correction((Iso.local_to_grid(position) - Vector2(tile)).length(), false)
 	_mirror_rest()
 	# A refused step into the destination itself: the server has dropped the
 	# order (see Player._sim_tick), so there is nothing left to predict.
@@ -681,11 +759,97 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 
 # Cosmetic only: they replay feedback, they carry no sim state.
 @rpc("authority", "call_remote", "reliable")
-func _net_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, to: Vector2i) -> void:
+func _net_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, to: Vector2i, at_tick: float,
+		duration: float, by_peer: int) -> void:
 	_lofted = lofted
 	tossed = toss
+	var guessed: Vector2i = Vector2i(-9999, -9999) if _guess.is_empty() else _guess["to"]
+	_guess = {}
+	if to == _guess_confirmed or to == guessed:
+		# The guess being shown was right: on with it, the knock already
+		# under way. Its tile, if still to come, changes nothing either.
+		_note_pushed(from, to)
+		_guess_confirmed = to if tile != to else Vector2i(-9999, -9999)
+		return
+	if guessed != Vector2i(-9999, -9999):
+		print("[net] shove guess: %s guessed %s, server has %s" % [name, guessed, to])
 	_note_pushed(from, to)
 	pushed.emit(tiles)
+	if not _mirroring or tiles <= 0:
+		if guessed != Vector2i(-9999, -9999):
+			_take_back_guess()
+		return
+	var push := {"from": from, "to": to, "tick": at_tick, "duration": duration,
+		"present": by_peer == multiplayer.get_unique_id() or _prediction != null}
+	if tile != to:
+		# The tile comes after: the slide waits for it (_mirror_tile_changed).
+		_pending_push = push
+		return
+	# The tile came first and its slide was guessed from the jump: the
+	# server's timing goes on it.
+	if not push["present"]:
+		for slide: Dictionary in _slides:
+			if slide["to"] == to:
+				slide["tick"] = at_tick
+				slide["duration"] = duration
+				return
+	if push["present"] or (_to_tile == to and _from_tile == from):
+		push["from"] = _from_tile if _to_tile == to else from
+		_show_push(push)
+
+
+## Client: the local player's shove will throw this body to [param to]:
+## shown now, over [param duration] ticks, as if the server had said so.
+## Its word (the push, the tile) confirms it, or puts it where the server
+## did; none by Net.rtt_ticks() and two ticks more, and it slides back.
+func guess_knock(to: Vector2i, duration: float) -> void:
+	if not _mirroring or _prediction != null or to == tile:
+		return
+	tossed = false
+	_lofted = false
+	_note_pushed(tile, to)
+	pushed.emit(World.distance(tile, to))
+	var now := World.tick + World.tick_alpha
+	_guess = {"to": to, "until": now + Net.rtt_ticks() + 2.0}
+	_slides.clear()
+	_slides.append({"from": tile, "to": to, "tick": now, "duration": duration, "present": true,
+		"from_pos": Iso.local_to_grid(position)})
+	_present = false
+
+
+## A guessed knock nobody confirmed: back to the tile, from wherever it is.
+func _take_back_guess() -> void:
+	if not _guess.is_empty():
+		print("[net] shove guess: %s guessed %s, no push came: taken back" % [name, _guess["to"]])
+	_guess = {}
+	push_shown = PushShown.OVER
+	_slides.clear()
+	_slides.append({"from": _to_tile, "to": tile, "tick": World.tick + World.tick_alpha, "duration": 2.0,
+		"present": true, "from_pos": Iso.local_to_grid(position)})
+	_present = false
+
+
+## Shows [param push] ({from, to, tick, duration, present}): a present one
+## at once, from wherever the body is drawn, dropping what was waiting (the
+## steps before it, already past for the server); any other in its turn on
+## the display clock, as the server timed it.
+func _show_push(push: Dictionary) -> void:
+	if _prediction != null and _prediction.is_active():
+		# The local player, thrown: no misprediction, just the server's slide.
+		_prediction.clear()
+	var slide := {"from": push["from"], "to": push["to"], "tick": push["tick"], "duration": push["duration"]}
+	if push["present"]:
+		slide["present"] = true
+		slide["tick"] = World.tick + World.tick_alpha
+		slide["from_pos"] = Iso.local_to_grid(position)
+		_slides.clear()
+		_present = false
+	elif _to_tile == push["to"] and _from_tile == push["from"]:
+		# Already being shown, guessed: retimed in place.
+		_move_tick = push["tick"]
+		_move_duration = push["duration"]
+		return
+	_slides.append(slide)
 
 
 @rpc("authority", "call_remote", "reliable")

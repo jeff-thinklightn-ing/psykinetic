@@ -81,7 +81,9 @@ opened it runs offline instead.
 - *Per-entity state*: a `MultiplayerSynchronizer` on every `GridEntity`
   (built in `GridEntity._init`) sends `tile`, `hp`, `facing` and `stamina`,
   on change. Nothing else.
-- *The tick counter*: `World._net_tick`, one RPC per tick.
+- *The tick counter*: `World._net_tick`, one RPC per tick (with
+  `--tick-send-hz=20`, `_net_half_tick` each half tick too: tried, and no
+  smoother, as positions only change on ticks; off by default).
 - *Input*: `World.request_move`, `request_attack`, `request_shove` —
   `@rpc("any_peer", "call_remote", "reliable")`. Each checks that the calling
   peer owns the entity it is ordering (`GridEntity.owner_peer`) and then calls
@@ -90,7 +92,10 @@ opened it runs offline instead.
   client. Clients never call `try_move`, `try_attack` or `try_shove`.
 - *Feedback*: `GridEntity._net_pushed` / `_net_impacted` / `_net_stunned`
   replay the hop, the flash and the stun reel on clients. They carry no sim
-  state.
+  state. A push is an event: it carries where from and to, the tick its
+  slide starts and how long it takes, and whose player shoved, so every
+  client draws the same slide, the server's, not one guessed from the tile
+  jump (decision 161).
 
 **Joining.** A peer is admitted only once it has sent its version, its
 build fingerprint and, if the server has one, the token (`Net.authenticate`, an `any_peer` RPC the
@@ -136,16 +141,31 @@ no push resolution.
 **What a client draws.** Two cases, both presentation only — neither writes
 sim state.
 
-- *Everything except the local player's own walking* is interpolated two
-  ticks in the past (`World.display_delay_ticks`, default
-  `NET_DISPLAY_DELAY_TICKS` = 2, overridable as `display_delay=` in
-  `settings.cfg`). A replicated tile change is stamped with the tick it
-  arrived in, and its slide starts when the display clock, running that far
-  behind, reaches that tick. The change is therefore in hand before its slide
-  has to begin, with a tick to spare for jitter: 100 ms of latency for no
-  visible stutter. Changes wait in a queue until their turn: the next step
-  of a walk arrives while the slide for the one before is still on screen,
-  and must not replace it early.
+- *Everything except the local player's own walking* is interpolated 150 ms
+  in the past (`World.display_delay_ticks`, default
+  `NET_DISPLAY_DELAY_TICKS` = 1.5, overridable as `display_delay_ms=` in
+  `settings.cfg`, only by hand). A replicated tile change is stamped with
+  the tick it arrived in, and its slide starts when the display clock,
+  running that far behind, reaches that tick. The change is therefore in
+  hand before its slide has to begin, with room for latency and jitter.
+  Changes wait in a queue until their turn: the next step of a walk arrives
+  while the slide for the one before is still on screen, and must not
+  replace it early. The display clock (`World._clock`) runs on its own at
+  the tick rate; each server tick as it arrives says how far off it is, and
+  half of that is made up by running at most `CLOCK_SLEW` (10%) fast or
+  slow, so a late or bunched packet neither freezes nor jumps what is drawn
+  (more than `CLOCK_SNAP_TICKS`, 3, off, it is set outright).
+- *Pushes the local player makes or takes* are drawn on the present clock,
+  not the display clock (`GridEntity._present`): as soon as the server's
+  word comes, from wherever the body is drawn, for the server's duration;
+  what came due on the display clock meanwhile follows on from there. A
+  plain shove the server will take at once (the shover standing for longer
+  than a round trip and a tick, next to the target, off cooldown as far as
+  the client knows) is guessed before that (`World._predict_shove`,
+  `predict_push_end`, the same reckoning as `_push` for the first body,
+  changing nothing): the target is slid at once to where the push should
+  leave it; the server's word confirms it (nothing changes), moves it where
+  the server put it, or, none by a round trip and two ticks, it slides back.
 - *The local player's own walking* is predicted (`net/prediction.gd`). On a
   move order the client computes the path against the replicated world —
   every other entity's current tile, which is where it is or is heading,
@@ -201,8 +221,12 @@ dropped; if it was a tile on the way, the order stays and is re-pathed
 around next tick.
 
 `F3` toggles a debug overlay: peer id, round trip time (from ENet),
-mispredictions in the last minute, and snaps in the last minute, and the
-control scheme.
+mispredictions in the last minute, snaps in the last minute, the worst
+correction (how far the sprite was from the server's tile) this minute and
+ever, and the control scheme. `NetStats` (`Net.stats`) measures: on the
+server each tick's time, the longest frame and bytes a second, for the
+admin's `net` command and a log line a minute while anyone is connected;
+on a client each correction, for F3 and a log line a minute.
 
 **Respawn.** The level's entities (`Main.level_entities`, from its
 markers and `level.json`) are the spawn table: one slot per monster, crate,
@@ -1184,11 +1208,12 @@ standing) the cursor (`GridEntity.aim`). It eases there at `TURN_RATE`
 (about 100 ms to come round, `GridEntity.shown_facing`), on the 2D pip and
 the 3D nose alike.
 
-On a client the same code runs from mirrored values, two ticks in the past:
-`World.tick` is the last replicated tick and `tick_alpha` counts up locally
-since it arrived. A client is not told why a tile changed, so it picks the
-slide length from the size of the jump (one step: the entity's step time;
-more: a push). Each change is queued with the tick it arrived in and becomes
+On a client the same code runs from mirrored values, 1.5 ticks in the
+past: `World.tick` is the last replicated tick and `tick_alpha` is the
+display clock's lead on it (see Networking). A client is not told why a
+tile changed, so it picks the slide length from the size of the jump (one
+step: the entity's step time; more: a push), unless the push's own message
+says, which puts the server's timing on it. Each change is queued with the tick it arrived in and becomes
 the slide on screen when the delayed clock reaches that tick, so a walk is
 one even slide: every step's slide ends exactly as the next begins
 (`tests/mirror_test.gd` samples this). The local player's own walking is

@@ -43,8 +43,8 @@ extends Node
 ## With no mode argument: an exported build reads settings.cfg (address=,
 ## port=, token=, player_id=, name=) next to the exe and joins as a client,
 ## or asks for those once if the file is missing; a run from the project is
-## a host. display_delay= (ticks, default 2) sets how far in the past other
-## entities are drawn. player_id is a UUID made on first run; the server remembers each
+## a host. display_delay_ms= (default 150) sets how far in the past other
+## entities are drawn; it is only ever written by hand. player_id is a UUID made on first run; the server remembers each
 ## player by it. A host run from the project uses a fixed dev id.
 ## window_width=, window_height= and window_mode= (windowed, fullscreen)
 ## are the window as it was last left; F11 toggles fullscreen. camera_yaw=
@@ -258,11 +258,17 @@ var _test_yaw_given := false
 var test_door_tick := 0
 var test_chest := ""
 var test_lag := 0.0
+## Server: how often the tick clock goes to clients, 10 (each tick) or 20
+## (each half tick too); --tick-send-hz. The sim stays at 10 Hz.
+var tick_send_hz := 10
 var test_steer := 0.0
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
 var test_walk: Array[Dictionary] = []
 
 var mispredicts_total := 0
+## Tick times, bandwidth, corrections: see NetStats.
+var stats := NetStats.new()
+var _traffic_at_msec := 0
 var snaps_total := 0
 ## Times (msec) of snaps in the last minute.
 var _snap_times: Array[int] = []
@@ -352,9 +358,12 @@ func _apply_settings() -> void:
 	configure_client(settings.get("address", address), int(settings.get("port", str(port))),
 			settings.get("token", ""))
 	player_name = tidy_name(settings.get("name", DEFAULT_NAME))
-	var delay := str(settings.get("display_delay", ""))
-	if delay.is_valid_int():
-		World.display_delay_ticks = clampi(delay.to_int(), 0, 10)
+	# display_delay (ticks) was written by older builds, always, so a new
+	# default could never reach anyone: it is dropped, and only a hand-written
+	# display_delay_ms (kept as it is, never written) counts.
+	var delay := str(settings.get("display_delay_ms", ""))
+	if delay.is_valid_float():
+		World.display_delay_ticks = clampf(delay.to_float() / 1000.0 * World.TICK_RATE, 0.0, 10.0)
 	player_id = str(settings.get("player_id", "")).strip_edges()
 	if player_id.is_empty():
 		# First run with a hand-written file: give it an identity and keep it.
@@ -531,9 +540,9 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 	if file == null:
 		push_warning("[net] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
-	file.store_string(("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\ndisplay_delay=%d\n"
+	file.store_string(("address=%s\nport=%d\ntoken=%s\nplayer_id=%s\nname=%s\n"
 			+ "window_width=%d\nwindow_height=%d\nwindow_mode=%s\ncamera_yaw=%d\ncamera_zoom=%.3f\n") % [
-		new_address, new_port, new_token, player_id, player_name, World.display_delay_ticks,
+		new_address, new_port, new_token, player_id, player_name,
 		window_size.x, window_size.y, "fullscreen" if fullscreen else "windowed", roundi(camera_yaw), camera_zoom])
 	if _settings_renderer != "":
 		file.store_string("renderer=%s\n" % _settings_renderer)
@@ -614,11 +623,21 @@ func mispredicts_per_minute() -> int:
 ## Net's _process runs before every other node's, so the RPCs sent this
 ## frame never see the peer either.
 func _process(_delta: float) -> void:
+	if online and mode == Mode.CLIENT and stats.log_due():
+		print("[net] client: rtt %d ms, %s" % [roundi(rtt_ms()), stats.client_text()])
 	if not online or not is_authority():
 		return
 	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
 	if enet == null:
 		return
+	stats.record_frame(roundi(Performance.get_monitor(Performance.TIME_PROCESS) * 1000000.0))
+	var now := Time.get_ticks_msec()
+	if now - _traffic_at_msec >= 1000 and enet.host != null:
+		_traffic_at_msec = now
+		stats.record_traffic(roundi(enet.host.pop_statistic(ENetConnection.HOST_TOTAL_SENT_DATA)),
+				roundi(enet.host.pop_statistic(ENetConnection.HOST_TOTAL_RECEIVED_DATA)))
+	if not multiplayer.get_peers().is_empty() and stats.log_due():
+		print("[net] server: %d peers; %s" % [multiplayer.get_peers().size(), stats.server_text()])
 	enet.poll()
 	for peer in multiplayer.get_peers():
 		var link := enet.get_peer(peer)
@@ -941,7 +960,7 @@ func _parse_args() -> void:
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-walk":
+					"--test-lag", "--test-steer", "--test-walk", "--tick-send-hz":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -968,6 +987,8 @@ func _set_option(key: String, value: String) -> void:
 		"--controls":
 			controls = controls_from(value)
 			_controls_given = true
+		"--tick-send-hz":
+			tick_send_hz = clampi(value.to_int(), 10, 20)
 		"--test-lag":
 			test_lag = maxf(value.to_float(), 0.0)
 		"--test-steer":

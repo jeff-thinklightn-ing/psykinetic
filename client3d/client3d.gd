@@ -1913,6 +1913,13 @@ func _on_pushed(tiles: int, id: int) -> void:
 	var entity := instance_from_id(id) as GridEntity
 	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("animator"):
 		return
+	if puppet.has_meta("knock"):
+		var knock: Dictionary = puppet.get_meta("knock")
+		if not knock.get("ending", false) and absf(angle_difference(float(knock["yaw"]),
+				-(-Vector2(entity.push_direction)).angle())) < 0.01 and Time.get_ticks_msec() - int(knock["since"]) < 500:
+			# The same knock, already under way (a guessed shove the server
+			# then did otherwise, the same way): it goes on.
+			return
 	# Facing whence it came, the way the sim says it was pushed, whatever the
 	# slide on screen does.
 	puppet.set_meta("knock", {"toss": entity.tossed, "impact": false, "since": Time.get_ticks_msec(), "started": -1,

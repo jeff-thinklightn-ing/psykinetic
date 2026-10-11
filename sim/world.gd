@@ -69,12 +69,20 @@ const MASS_RATIO_MAX := 1.5
 ## it at once; only the drawing and the stun after it wait.
 const PUSH_SLIDE_TICKS_PER_TILE := 2
 const MAX_PUSH_SLIDE_TICKS := 6
-## net_display_delay_ticks: how far in the past a client draws everything it
-## does not predict. One tick means a replicated tile change is always in hand
-## before its slide has to begin.
-const NET_DISPLAY_DELAY_TICKS := 2
-## The live value: settings.cfg's display_delay overrides the default.
+## NET_DISPLAY_DELAY_TICKS: how far in the past a client draws everything it
+## does not predict, so a replicated tile change is in hand before its slide
+## has to begin: 150 ms, room for a link's latency and jitter (decision 161).
+const NET_DISPLAY_DELAY_TICKS := 1.5
+## The live value: settings.cfg's display_delay_ms overrides the default.
 var display_delay_ticks := NET_DISPLAY_DELAY_TICKS
+## A client's display clock (ticks) runs at the tick rate on its own, and
+## each server tick as it arrives says how far off it is: half of that is
+## made up by running up to CLOCK_SLEW faster or slower, so a late or
+## bunched packet neither freezes nor jumps what is drawn. More than
+## CLOCK_SNAP_TICKS off (a stall, a reconnect), it is set outright.
+const CLOCK_PULL := 0.5
+const CLOCK_SLEW := 0.1
+const CLOCK_SNAP_TICKS := 3.0
 ## A diagonal step takes this many times the ticks of an orthogonal one, so
 ## world speed is roughly constant in every direction (a diagonal cell is
 ## sqrt(2) as long). Steps may take a fraction of a tick: the movement
@@ -126,8 +134,16 @@ const EXHAUSTED_MASS_FACTOR := 0.5
 @export var stamina_regen_delay := 10
 
 var tick := 0
-## Fraction of the way from the last tick to the next one, in [0, 1). Read by rendering.
+## Fraction of the way from the last tick to the next one, in [0, 1). Read by
+## rendering, as tick + tick_alpha. On a client it is the display clock's
+## lead on the last tick received, which may run a little past 1 or below 0.
 var tick_alpha := 0.0
+## A client's display clock, in ticks, and what it has yet to make up: see
+## CLOCK_PULL.
+var _clock := 0.0
+var _clock_drift := 0.0
+## Server: the tick whose half was last sent (Net.tick_send_hz 20).
+var _half_sent := -1
 
 var _floor: Dictionary[Vector2i, bool] = {}
 var _fire: Dictionary[Vector2i, bool] = {}
@@ -197,18 +213,28 @@ class Hit:
 
 func _process(delta: float) -> void:
 	if not Net.is_authority():
-		# Mirror: no sim, only render time since the last replicated tick.
-		_accumulator += delta
-		tick_alpha = minf(_accumulator / TICK_DT, 1.0)
+		# Mirror: no sim, only the display clock, running on smoothly.
+		var advance := delta * TICK_RATE
+		var slew := clampf(_clock_drift, -advance * CLOCK_SLEW, advance * CLOCK_SLEW)
+		_clock += advance + slew
+		_clock_drift -= slew
+		tick_alpha = _clock - tick
 		return
 	_accumulator += delta
 	var steps := 0
 	while _accumulator >= TICK_DT:
 		_accumulator -= TICK_DT
 		if steps < MAX_CATCHUP_TICKS:
+			var started := Time.get_ticks_usec()
 			step()
+			Net.stats.record_tick(Time.get_ticks_usec() - started, tick)
 			steps += 1
 	tick_alpha = _accumulator / TICK_DT
+	if Net.tick_send_hz >= 20 and steps == 0 and tick_alpha >= 0.5 and _half_sent != tick:
+		# Net.tick_send_hz 20: the clock's half ticks go out too.
+		_half_sent = tick
+		for peer in Net.sendable_peers():
+			_net_half_tick.rpc_id(peer, tick)
 
 
 ## Advances the sim one tick: every awake zone (one with a player in it)
@@ -869,6 +895,7 @@ func command_attack(entity: GridEntity, target: GridEntity) -> void:
 		order_attack(entity, target)
 	else:
 		entity.predict_approach(target.tile)
+		_note_strike_sent(entity)
 		_to_server(&"request_attack", [entity.get_path(), target.get_path()])
 
 
@@ -877,7 +904,67 @@ func command_shove(entity: GridEntity, target: GridEntity, direction := Vector2i
 		order_shove(entity, target, direction)
 	else:
 		entity.predict_approach(target.tile)
+		_predict_shove(entity, target, direction)
+		_note_strike_sent(entity)
 		_to_server(&"request_shove", [entity.get_path(), target.get_path(), direction])
+
+
+## Client: a plain shove the server will take at once (the shover standing,
+## for longer than the server is behind the screen, next to the target, off
+## cooldown as far as this client knows) is shown
+## now: the target is slid to where predict_push_end says the push leaves
+## it, and the server's word confirms or corrects it (GridEntity.guess_knock).
+func _predict_shove(entity: GridEntity, target: GridEntity, direction: Vector2i) -> void:
+	var aim := target.tile - entity.tile
+	if direction != Vector2i.ZERO and direction != aim:
+		return  # A toss: not guessed.
+	var now := tick + tick_alpha
+	if not can_melee(entity.tile, target.tile) or entity.predicting() \
+			or now - entity._walk_shown_at < Net.rtt_ticks() + 1.0 \
+			or now < entity._reel_until or tick < entity._guessed_ready_tick:
+		return
+	entity._guessed_ready_tick = tick + entity.attack_ticks
+	var end := predict_push_end(entity, target, aim)
+	if end != target.tile:
+		target.guess_knock(end, push_slide_ticks(distance(target.tile, end)))
+
+
+## Client: a blow was sent, which the server may only take once a step is
+## over and a round trip has passed; until it has cooled down from that, no
+## shove is guessed (it would wait on the server, and the guess be taken back).
+func _note_strike_sent(entity: GridEntity) -> void:
+	var later := float(entity.attack_ticks) + Net.rtt_ticks() + (entity.move_ticks if entity.predicting() else 0.0)
+	entity._guessed_ready_tick = maxi(entity._guessed_ready_tick, tick + ceili(later))
+
+
+## Where a plain shove by [param mover] leaves [param body], pushed
+## [param direction], by the same reckoning as _push for the first body
+## (force, stamina, mass, terrain, whoever is in the way), changing
+## nothing. A client's guess: the server's _push is what happens.
+func predict_push_end(mover: GridEntity, body: GridEntity, direction: Vector2i) -> Vector2i:
+	var body_mass := pushed_mass(body)
+	if body_mass > mover.mass:
+		return body.tile
+	var force := push_force(mover, body)
+	var cost := shove_cost(force, body)
+	if mover.max_stamina > 0 and cost > 0 and mover.stamina < cost:
+		force *= float(mover.stamina) / cost
+	var max_tiles: int = floori(force * mass_ratio(mover.mass, body_mass) + 0.001)
+	var at := body.tile
+	var tiles := 0
+	while tiles < max_tiles:
+		var next := at + direction
+		if is_water(next) and not edge_blocks(at, direction):
+			break
+		if _terrain_blocks_step(at, direction, false, false) or height_step(at, direction) < 0 \
+				or _occupancy.has(next):
+			break
+		var drop := height_step(at, direction)
+		at = next
+		tiles += 1
+		if drop > 0 or (is_burning(next) and body.is_creature()):
+			break
+	return at
 
 
 ## WASD: one step in [param direction]. On a client it is predicted when
@@ -1020,9 +1107,24 @@ func _net_tick(server_tick: int) -> void:
 	if Net.is_authority():
 		return
 	tick = server_tick
-	_accumulator = 0.0
-	tick_alpha = 0.0
+	var error := server_tick - _clock
+	if absf(error) > CLOCK_SNAP_TICKS:
+		_clock = server_tick
+		_clock_drift = 0.0
+	else:
+		_clock_drift = error * CLOCK_PULL
+	tick_alpha = _clock - tick
 	ticked.emit(tick)
+
+
+## The server is half way through [param server_tick] (Net.tick_send_hz 20).
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _net_half_tick(server_tick: int) -> void:
+	if Net.is_authority() or server_tick < tick:
+		return
+	var error := server_tick + 0.5 - _clock
+	if absf(error) <= CLOCK_SNAP_TICKS:
+		_clock_drift = error * CLOCK_PULL
 
 
 func mirror_reset() -> void:
@@ -1038,6 +1140,8 @@ func mirror_reset() -> void:
 	_water.clear()
 	tick = 0
 	tick_alpha = 0.0
+	_clock = 0.0
+	_clock_drift = 0.0
 	_accumulator = 0.0
 
 
@@ -1247,7 +1351,8 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, push_slide_ticks(tiles))
-		body._world_pushed(tiles, lofted and tiles > 0, toss and body == first, start)
+		body._world_pushed(tiles, lofted and tiles > 0, toss and body == first, start, tick,
+				push_slide_ticks(tiles), mover.owner_peer)
 		var note := ""
 		var next_body: GridEntity = null
 		if impact > 0:
@@ -1360,7 +1465,7 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	_relocate(entity, to)
 	entity._world_slide_from(from, start, duration)
 	if entity != mover:
-		entity._world_pushed(1, false, false, from)
+		entity._world_pushed(1, false, false, from, start, duration, mover.owner_peer)
 		_log("push: %s -> %s dir=%s tiles=1 impact=0 stopped_by=nothing (walked into)" % [
 			mover.name, entity.name, direction])
 		entity_pushed.emit(entity, mover, direction, 1, 0, "nothing (walked into)")
