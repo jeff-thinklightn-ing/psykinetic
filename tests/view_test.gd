@@ -369,6 +369,13 @@ func _test_goblins_differ() -> void:
 	imps[1].hp = 2
 	_rig._animate(b)
 	_check(animators[1].current_animation == Client3D.CLIP_TIRED, "hurt, it stands tired (%s)" % animators[1].current_animation)
+	var heavy := big.get_meta("animator") as AnimationPlayer
+	brute.winding.emit(Vector2i(-1, 0), Monster.WINDUP_TICKS)
+	_check(heavy.current_animation == Client3D.CLIP_HEAVY
+			and is_equal_approx(heavy.speed_scale, Client3D.CLIP_HEAVY_CONTACT / (Monster.WINDUP_TICKS * World.TICK_DT)),
+			"a brute winding up swings, timed to connect as its blow lands (%s x%.2f)" % [heavy.current_animation, heavy.speed_scale])
+	brute.swung.emit(Vector2i(-1, 0))
+	_check(heavy.current_animation == Client3D.CLIP_HEAVY, "and the blow itself plays no other clip over it (%s)" % heavy.current_animation)
 	for each: GridEntity in [imps[0], imps[1], brute]:
 		World.despawn(each)
 	_rig._process(0.0)

@@ -3,6 +3,22 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.97
+
+Server.
+
+- Monsters spread out around you instead of lining up behind each other.
+- Each fights its own way: some are quicker or slower, some hesitate, some
+  hang back until others have joined in, and they no longer move in step.
+- Imps dart in, hit, and back off while they recover.
+- Brutes are slower but charge the last few tiles, and wind up a heavy
+  two-damage swing: step away in time and it misses; shove them and it
+  never lands.
+- Sneaks are quick and fragile, and circle to your side or back; a hit
+  from behind does extra damage.
+
+The server must be updated to v0.1.97 too, as it refuses any other version.
+
 ## v0.1.96
 
 - No two goblins alike: each is its own size (heavier ones are bigger),

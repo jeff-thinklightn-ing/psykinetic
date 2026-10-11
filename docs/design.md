@@ -1195,6 +1195,38 @@ hides it, remembered in settings.cfg (`hints=on|off`).
   takes the first step of an A* path toward them. Sees nobody: stands still.
   Its sprite is shaded by mass, pale at 20 through dark at 80, so heavier
   monsters look darker. The test room's imps are 25, 30, 40, 60 and 70.
+  That is a monster of no kind (`Monster.Tactic.PLAIN`). One of a kind (its
+  level marker's, `spawn_spec["kind"]`) fights as its kind does
+  (`Monster.TACTICS`), in a manner of its own, and with its pack:
+  - *Kinds.* The imp darts (`DART`): in, a blow, and, `DART_AFTER_TICKS`
+    on (its blow played out), a step out of reach for the rest of its
+    cooldown, back in as it ends. The brute (`HEAVY`; `Level.MONSTER_TYPES`:
+    mass 70, a step of 5 ticks, a cooldown of 14, blows of 2) plods, charges
+    the last `CHARGE_RANGE` tiles at `CHARGE_PACE` of its step time when it
+    has a clear line, and winds its blow up for `WINDUP_TICKS`: the views are
+    told at once (`Monster.winding`, the 3D view swings Sword_Attack to
+    connect then), and the blow lands on its target only if it is still in
+    reach then, a whiff (`try_swing`) if not; knocked off its tile or
+    stunned meanwhile, it comes to nothing. The sneak (`FLANK`; mass 25, a
+    step of 3, 8 hp) works round to its target's back or side before it
+    strikes (`FLANK_PATIENCE_TICKS` beside its front at most), and from
+    behind its blow does `BACKSTAB_DAMAGE` more (`World.try_attack`'s
+    `hit_damage`).
+  - *Manner* (`_temper`, seeded by its name on the server, so the same
+    monster is the same after a respawn or a restart): its step time give or
+    take `PACE_SPREAD` (`move_ticks` is replicated, as a charge changes it
+    and a client slides each step by it), its cooldown `COOLDOWN_SPREAD`
+    ticks either way, up to `REACTION_TICKS_MAX` ticks to act on a new
+    target, a small chance a tick (`PAUSE_CHANCE_MAX` at most) to stop a
+    moment on its way in, and a boldness: under `HOLD_BACK_BELOW` it waits
+    `HOLD_BACK_RANGE` off until another monster is at its target or its
+    target is under half its hp. It keeps its target unless another is
+    `RETARGET_TILES` nearer.
+  - *The pack.* Each makes for a free tile beside its target that no other
+    monster with that target is making for (`Monster.slot`, `_pick_slot`),
+    nearest first, so a pack surrounds rather than queues; its way there is
+    searched only so far (`find_path`'s `max_tiles`, `SLOT_SEARCH_TILES`),
+    and with nowhere free beside its target it goes as near as it can.
 - **Pushable** — never acts.
 
 ## Rendering between ticks

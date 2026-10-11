@@ -56,6 +56,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			"props": JSON.from_native(entity.spawn_spec.get("props", {})),
 			"spawn": int(entity.spawn_spec.get("spawn", -1)),
 		}
+		if spec.has("kind"):
+			entry["kind"] = str(spec["kind"])
 		if not entity.slots.is_empty():
 			entry["slots"] = Array(entity.slots)
 		list.append(entry)
@@ -197,6 +199,10 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		spec["label"] = entry["label"]
 	if entry.get("spawn") is float and int(entry["spawn"]) >= 0:
 		spec["spawn"] = int(entry["spawn"])
+	if entry.get("kind") is String and not entry["kind"].is_empty():
+		# A monster that is no level entity (a level's own takes its kind,
+		# as all it is, from the level).
+		spec["kind"] = entry["kind"]
 	return {
 		"spec": spec,
 		"hp": int(entry.get("hp", 0)),

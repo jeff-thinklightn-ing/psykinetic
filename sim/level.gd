@@ -69,10 +69,12 @@ const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "t
 ## level.json "north": which way in layout.png is north.
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## What a marker spawns, before level.json's props for that tile.
+## Each kind fights its own way too (Monster.TACTICS): the brute plods and
+## hits hard and seldom, the sneak is quick and frail.
 const MONSTER_TYPES := {
 	"imp": {"mass": 40.0},
-	"brute": {"mass": 70.0},
-	"sneak": {"mass": 25.0},
+	"brute": {"mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
+	"sneak": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 8},
 }
 const CRATE := {"script": PUSHABLE, "shape": "cube", "tint": Color(0.8, 0.6, 0.35)}
 const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.55, 0.6),

@@ -1525,3 +1525,28 @@ looks about; a hurt or winded one stands tired. The brute and the sneak,
 capsules till now, are the goblin too, the brute a fifth taller. It is all
 view: the sim, and what a blow does, are as they were. How they fight, as
 kinds and as individuals, is decision 163.
+
+## 163. Monsters fight as kinds, as individuals, and as a pack
+
+Every monster ran the same few lines: the nearest player, straight at it,
+hit it. Imps and brutes differed only in mass, all stepped every 4 ticks and
+struck every 10, so they moved in step and queued behind each other. Now a
+monster of a kind fights as its kind does: imps dart in and out (the blow
+played out first, so the punch is not dragged backwards), brutes plod,
+charge the last few tiles and wind up a heavy blow that can be stepped out
+of or knocked out of, sneaks circle to a back or a side and stab harder
+there. Each has a manner of its own drawn from its name (pace, cooldown,
+reaction, pauses, boldness), so the same monster is the same one after a
+respawn or a restart, and every peer agrees. A pack spreads round its
+target: each claims a free tile beside it that no other is making for.
+
+The kinds' bodies are level data (Level.MONSTER_TYPES), as mass already
+was; their ways are code (Monster.TACTICS). A monster of no kind is as
+monsters were, so the tests built on that behaviour still hold. The step
+time is replicated now, since a charge changes it and a client slides each
+step by it. A slot search is capped (find_path's max_tiles), as a tile
+beside a target is near or not worth reaching; measured in a scripted
+castle fight, the monsters' share of a tick stayed near 0.1 ms. The brute's
+wind-up is told to the views at once, so the swing on screen lands as the
+blow does. A snapshot keeps a monster's kind now too, for one that is no
+level entity (a level's own takes everything it is from the level).

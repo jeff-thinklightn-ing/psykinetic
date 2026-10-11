@@ -749,12 +749,13 @@ func face(entity: GridEntity, direction: Vector2i) -> void:
 	entity._world_set_facing(direction)
 
 
-## Melee: attack_damage plus a push of half the shove force, at no stamina
-## cost. Queued; resolved after every entity has acted this tick.
-func try_attack(attacker: GridEntity, target: GridEntity) -> bool:
+## Melee: attack_damage (or [param hit_damage], when given) plus a push of
+## half the shove force, at no stamina cost. Queued; resolved after every
+## entity has acted this tick.
+func try_attack(attacker: GridEntity, target: GridEntity, hit_damage := -1) -> bool:
 	if not Net.is_authority():
 		return false
-	return _try_hit(attacker, target, attacker.attack_damage, false)
+	return _try_hit(attacker, target, attacker.attack_damage if hit_damage < 0 else hit_damage, false)
 
 
 ## Shove: no direct damage, only a push at full force, paid for in stamina
@@ -1743,8 +1744,10 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## monster, push a crate), but occupied tiles along the way still block.
 ## [param ignore] is an entity whose own tile does not count as occupied
 ## (a client predicting for itself, whose replicated tile lags behind).
+## [param max_tiles] > 0 gives up (empty) after looking at that many tiles:
+## a monster's way to a tile beside its target is short or not worth it.
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
-		ignore: GridEntity = null) -> Array[Vector2i]:
+		ignore: GridEntity = null, max_tiles := 0) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
@@ -1767,6 +1770,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 				best_f = f
 		var current: Vector2i = open[best]
 		open.remove_at(best)
+		if max_tiles > 0 and closed.size() >= max_tiles:
+			return path
 
 		if current == to:
 			while current != from:

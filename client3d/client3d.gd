@@ -228,6 +228,12 @@ const FIDGET_SECONDS_MIN := 7.0
 const FIDGET_SECONDS_MAX := 20.0
 const FIDGET_CALM_SECONDS := 4.0
 const TIRED_BELOW := 0.34
+## A wound-up blow (Monster's HEAVY): this clip, played so that its swing
+## connects (CLIP_HEAVY_CONTACT seconds in, at speed 1: measured on the
+## goblin, just past the hand's fastest) as the sim's blow lands; that
+## blow's own swing then plays no other clip.
+const CLIP_HEAVY := "Sword_Attack"
+const CLIP_HEAVY_CONTACT := 0.45
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
 const CLIP_JOG := "Jog_Fwd"
@@ -2361,6 +2367,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		entity.struck.connect(_on_struck.bind(id))
 		entity.impacted.connect(_on_impacted.bind(id))
 		entity.pushed.connect(_on_pushed.bind(id))
+		if entity is Monster:
+			(entity as Monster).winding.connect(_on_winding.bind(id))
 		if entity.max_hp > 0:
 			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
 	elif entity.is_breakable():
@@ -2408,13 +2416,31 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var swinger := instance_from_id(id) as GridEntity
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
 	sfx.play("swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
-	_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
+	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
+		_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
 	var body := puppet.get_node("Body") as Node3D
 	var rest := Vector3(0.0, body.position.y, 0.0)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE
 	var tween := create_tween()
 	tween.tween_property(body, "position", out, LUNGE_SECONDS * 0.4).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "position", rest, LUNGE_SECONDS * 0.6).set_ease(Tween.EASE_IN)
+
+
+## A blow wound up over [param ticks]: the heavy swing, timed to connect
+## as it lands.
+func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null:
+		return
+	_combat_at[id] = Time.get_ticks_msec()
+	if not _play_once(puppet, CLIP_HEAVY):
+		return
+	var animator := puppet.get_meta("animator") as AnimationPlayer
+	var seconds := ticks * World.TICK_DT
+	animator.speed_scale = CLIP_HEAVY_CONTACT / seconds
+	var now := Time.get_ticks_msec()
+	puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_HEAVY).length / animator.speed_scale * 1000.0))
+	puppet.set_meta("wound_until", now + int(seconds * 1000.0) + 400)
 
 
 func _pick_shape(shape_name: String, mesh: Mesh) -> Shape3D:
