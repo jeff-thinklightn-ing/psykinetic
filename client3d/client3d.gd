@@ -197,7 +197,37 @@ const FOREST_DEPTH := 3
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
 		"faces": PI * 0.5},
+	"brute": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
+		"faces": PI * 0.5},
+	"sneak": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
+		"faces": PI * 0.5},
 }
+## Each modelled monster is its own (_vary, seeded by its name, so every
+## view sees the same one): its size goes with its mass, as the cube root of
+## its mass over MODEL_MASS, within MODEL_SCALE_MIN/MAX, give or take
+## MODEL_SCALE_SPREAD; its pace (GAITS', as its legs are longer or shorter,
+## give or take PACE_SPREAD) and its idle tempo (TEMPO_SPREAD) its own; and
+## loops start where they will, so a crowd does not move as one.
+const MODEL_MASS := 40.0
+const MODEL_SCALE_MIN := 0.8
+const MODEL_SCALE_MAX := 1.4
+const MODEL_SCALE_SPREAD := 0.05
+const PACE_SPREAD := 0.08
+const TEMPO_SPREAD := 0.12
+## A blow, a flinch, a death: one of these, never the same blow or flinch
+## twice running.
+const ATTACK_CLIPS: Array[String] = ["Punch_Jab", "Punch_Cross", "Kick"]
+const HIT_CLIPS: Array[String] = ["Hit_Chest", "Hit_Head", "Hit_Shoulder_L", "Hit_Shoulder_R"]
+const DEATH_CLIPS: Array[String] = ["Death01", "Death02"]
+## Standing, a model now and then looks about (once FIDGET_CALM_SECONDS
+## from the last blow near it, every FIDGET_SECONDS_MIN to MAX); hurt or
+## winded it stands tired.
+const CLIP_LOOK_ABOUT := "Idle_LookAround"
+const CLIP_TIRED := "Idle_Tired"
+const FIDGET_SECONDS_MIN := 7.0
+const FIDGET_SECONDS_MAX := 20.0
+const FIDGET_CALM_SECONDS := 4.0
+const TIRED_BELOW := 0.34
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
 const CLIP_JOG := "Jog_Fwd"
@@ -1900,7 +1930,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var puppet: Node3D = _puppets.get(id)
 	if puppet != null and cause != &"impact":
-		_play_once(puppet, CLIP_HIT)  # An impact is shown by _on_impacted.
+		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))  # An impact is shown by _on_impacted.
 	if puppet != null and cause == &"attack":
 		sfx.play("hit", puppet.position + Vector3.UP * 0.8)
 
@@ -1940,7 +1970,7 @@ func _on_impacted(_amount: int, against: StringName, id: int) -> void:
 		else:
 			_play_once(puppet, CLIP_IMPACT)
 	elif against == &"body":
-		_play_once(puppet, CLIP_HIT)
+		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	var at := puppet.position + Vector3.UP * 0.6
 	match against:
 		&"stone":
@@ -2005,10 +2035,11 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	# their side, a touch too far, back, and still.
 	if puppet.has_meta("knock"):
 		puppet.remove_meta("knock")
-	if _play_once(puppet, CLIP_DEATH):
+	var death := _pick_clip(puppet, DEATH_CLIPS)
+	if _play_once(puppet, death):
 		puppet.set_meta("busy_until", 1 << 62)
 		var lie := create_tween()
-		lie.tween_interval(CORPSE_SECONDS + (puppet.get_meta("animator") as AnimationPlayer).get_animation(CLIP_DEATH).length)
+		lie.tween_interval(CORPSE_SECONDS + (puppet.get_meta("animator") as AnimationPlayer).get_animation(death).length)
 		lie.tween_property(puppet, "position:y", -SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
 		lie.tween_callback(puppet.queue_free)
 		if kind == "player" and str(data.get("entity", "")) == _local_name:
@@ -2060,6 +2091,7 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	scene.name = "Model"
 	scene.rotation.y = float(model.get("faces", 0.0))
 	body.add_child(scene)
+	scene.scale = Vector3.ONE * float(puppet.get_meta("model_scale", 1.0))
 	var animator := AnimationPlayer.new()
 	animator.name = "Animator"
 	scene.add_child(animator)
@@ -2067,7 +2099,53 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	animator.add_animation_library("", load(model["clips"]) as AnimationLibrary)
 	animator.play(CLIP_IDLE)
 	puppet.set_meta("animator", animator)
+	_start_anywhere(puppet, animator)
 	return body
+
+
+## [param entity]'s own look and manner (see MODEL_MASS), on its puppet:
+## "model_scale", "pace" (its gaits' paces over GAITS'), "tempo" and "rng",
+## which picks its blows and flinches.
+static func _vary(entity: GridEntity, puppet: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(String(entity.name))
+	var size := clampf(pow(entity.mass / MODEL_MASS, 1.0 / 3.0), MODEL_SCALE_MIN, MODEL_SCALE_MAX)
+	size *= 1.0 + rng.randf_range(-MODEL_SCALE_SPREAD, MODEL_SCALE_SPREAD)
+	puppet.set_meta("model_scale", size)
+	puppet.set_meta("pace", size * (1.0 + rng.randf_range(-PACE_SPREAD, PACE_SPREAD)))
+	puppet.set_meta("tempo", 1.0 + rng.randf_range(-TEMPO_SPREAD, TEMPO_SPREAD))
+	puppet.set_meta("rng", rng)
+	puppet.set_meta("fidget_at", Time.get_ticks_msec() + int(rng.randf_range(2.0, FIDGET_SECONDS_MAX) * 1000.0))
+
+
+## A loop just started somewhere along it, not at its start.
+static func _start_anywhere(puppet: Node3D, animator: AnimationPlayer) -> void:
+	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
+	var clip := animator.get_animation(animator.current_animation)
+	if rng != null and clip != null:
+		animator.seek(rng.randf() * clip.length, true)
+
+
+## One of [param clips], at random, not [param puppet]'s last of them.
+static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
+	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
+	if rng == null:
+		return clips[0]
+	var key := "last_" + clips[0]
+	var last := str(puppet.get_meta(key, ""))
+	var choices := clips.filter(func(clip: String) -> bool: return clip != last)
+	var clip: String = choices[rng.randi() % choices.size()]
+	puppet.set_meta(key, clip)
+	return clip
+
+
+## Standing: tired when hurt or winded, else idle.
+static func _idle_clip(puppet: Node3D) -> String:
+	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
+	if entity != null and entity.max_hp > 0 and (float(entity.hp) / entity.max_hp < TIRED_BELOW
+			or entity.max_stamina > 0 and entity.stamina_fraction() < GridEntity.WINDED_BELOW):
+		return CLIP_TIRED
+	return CLIP_IDLE
 
 
 ## A model's clip for what it is doing: a one-off (an attack, a flinch, a
@@ -2087,17 +2165,38 @@ func _animate(puppet: Node3D) -> void:
 	puppet.set_meta("speed", speed)
 	if puppet.has_meta("knock") and _knocked(puppet, animator, speed, now):
 		return
+	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)
+	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm):
+		# Looking about is no reason to stand still: it goes.
+		puppet.set_meta("fidgeting", false)
+		puppet.set_meta("busy_until", 0)
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
+	puppet.set_meta("fidgeting", false)
+	var pace: float = puppet.get_meta("pace", 1.0)
+	var tempo: float = puppet.get_meta("tempo", 1.0)
 	if speed > WALKING:
-		var gait: Array = GAITS[gait_for(animator.current_animation, speed)]
+		var gait: Array = GAITS[gait_for(animator.current_animation, speed / pace)]
 		if animator.current_animation != gait[0]:
 			animator.play(gait[0], CLIP_BLEND)
-		animator.speed_scale = clampf(speed / float(gait[1]), 0.3, 3.0)
-	else:
-		if animator.current_animation != CLIP_IDLE:
-			animator.play(CLIP_IDLE, CLIP_BLEND)
-		animator.speed_scale = 1.0
+			_start_anywhere(puppet, animator)
+		animator.speed_scale = clampf(speed / (float(gait[1]) * pace), 0.3, 3.0)
+		return
+	var idle := _idle_clip(puppet)
+	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)) \
+			and animator.has_animation(CLIP_LOOK_ABOUT):
+		var rng: RandomNumberGenerator = puppet.get_meta("rng")
+		puppet.set_meta("fidget_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
+		animator.play(CLIP_LOOK_ABOUT, CLIP_BLEND * 2.0)
+		animator.seek(0.0, true)
+		animator.speed_scale = tempo
+		puppet.set_meta("fidgeting", true)
+		puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_LOOK_ABOUT).length / tempo * 1000.0))
+		return
+	if animator.current_animation != idle:
+		animator.play(idle, CLIP_BLEND)
+		_start_anywhere(puppet, animator)
+	animator.speed_scale = tempo
 
 
 ## A knocked-back model's frame (see CLIP_BACKPEDAL): true while the knock
@@ -2141,7 +2240,7 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 				return true
 		else:
 			if not toss:
-				animator.speed_scale = clampf(speed / BACKPEDAL_CLIP_SPEED, 1.0, 4.0)
+				animator.speed_scale = clampf(speed / (BACKPEDAL_CLIP_SPEED * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0)
 			var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
 			# It doubles over when it gets there: a push back always, a toss
 			# if a wall or a door stopped it. One knocked where it stands holds.
@@ -2194,6 +2293,7 @@ func _play_once(puppet: Node3D, clip: String) -> bool:
 	if not animator.has_animation(clip):
 		return false
 	animator.speed_scale = 1.0
+	puppet.set_meta("fidgeting", false)
 	animator.play(clip, CLIP_BLEND)
 	animator.seek(0.0, true)
 	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(animator.get_animation(clip).length * 1000.0))
@@ -2207,7 +2307,9 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	puppet.set_meta("entity_id", entity.get_instance_id())
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
 	var model := model_for(entity)
-	var height: float = float(model["height"]) if not model.is_empty() else Iso.HEIGHTS[shape]
+	if not model.is_empty():
+		_vary(entity, puppet)
+	var height: float = float(model["height"]) * float(puppet.get_meta("model_scale", 1.0)) if not model.is_empty() else Iso.HEIGHTS[shape]
 	var material := StandardMaterial3D.new()
 	var sprite := entity.get_node_or_null("Sprite") as Sprite2D
 	material.albedo_color = sprite.modulate if sprite != null else Color.WHITE
@@ -2306,7 +2408,7 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var swinger := instance_from_id(id) as GridEntity
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
 	sfx.play("swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
-	_play_once(puppet, CLIP_ATTACK)
+	_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
 	var body := puppet.get_node("Body") as Node3D
 	var rest := Vector3(0.0, body.position.y, 0.0)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE

@@ -34,6 +34,7 @@ func _ready() -> void:
 	await _test_fade()
 	_test_outdoor()
 	await _test_goblin()
+	_test_goblins_differ()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -332,6 +333,47 @@ func _test_fade() -> void:
 	await get_tree().create_timer(1.0).timeout
 
 
+func _test_goblins_differ() -> void:
+	print("\n== no two goblins alike: size by mass, their own pace and tempo, out of step; they look about, and stand tired ==")
+	var imps: Array[Monster] = [_spawn_imp(Vector2i(9, 2), "imp"), _spawn_imp(Vector2i(10, 2), "imp")]
+	var brute := _spawn_imp(Vector2i(11, 2), "brute")
+	brute.mass = 70.0  # Before its puppet is made.
+	_rig._process(0.0)
+	var a: Node3D = _rig._puppets[imps[0].get_instance_id()]
+	var b: Node3D = _rig._puppets[imps[1].get_instance_id()]
+	var big: Node3D = _rig._puppets[brute.get_instance_id()]
+	_check(big.has_meta("animator"), "a brute is the goblin too")
+	var looks := func(puppet: Node3D) -> Array:
+		return [snappedf(puppet.get_meta("model_scale"), 0.001), snappedf(puppet.get_meta("pace"), 0.001), snappedf(puppet.get_meta("tempo"), 0.001)]
+	_check(looks.call(a) != looks.call(b), "two imps differ in size, pace or tempo (%s, %s)" % [looks.call(a), looks.call(b)])
+	_check(absf(float(a.get_meta("model_scale")) - 1.0) <= Client3D.MODEL_SCALE_SPREAD + 0.001,
+			"an imp is about the goblin's size (x%.2f)" % a.get_meta("model_scale"))
+	_check(float(big.get_meta("model_scale")) > 1.12, "and the brute, heavier, bigger (x%.2f)" % big.get_meta("model_scale"))
+	var animators: Array[AnimationPlayer] = [a.get_meta("animator"), b.get_meta("animator")]
+	_check(absf(animators[0].current_animation_position - animators[1].current_animation_position) > 0.01,
+			"standing side by side, out of step (%.2f s, %.2f s into Idle)" % [animators[0].current_animation_position, animators[1].current_animation_position])
+	var again := RandomNumberGenerator.new()
+	again.seed = hash(String(imps[0].name))
+	_check(is_equal_approx(float(a.get_meta("model_scale")), clampf(1.0, Client3D.MODEL_SCALE_MIN, Client3D.MODEL_SCALE_MAX)
+			* (1.0 + again.randf_range(-Client3D.MODEL_SCALE_SPREAD, Client3D.MODEL_SCALE_SPREAD))),
+			"each the same on every view: seeded by its name")
+	a.set_meta("fidget_at", 0)
+	_rig._combat_at.erase(imps[0].get_instance_id())
+	_rig._animate(a)
+	_check(animators[0].current_animation == Client3D.CLIP_LOOK_ABOUT, "calm a while, it looks about (%s)" % animators[0].current_animation)
+	a.set_meta("speed", 2.0)
+	a.set_meta("last_at", a.position - Vector3(0.2, 0.0, 0.0))
+	a.set_meta("last_ms", Time.get_ticks_msec() - 100)
+	_rig._animate(a)
+	_check(Client3D.is_gait(animators[0].current_animation), "and goes when it moves, not looking about as it slides (%s)" % animators[0].current_animation)
+	imps[1].hp = 2
+	_rig._animate(b)
+	_check(animators[1].current_animation == Client3D.CLIP_TIRED, "hurt, it stands tired (%s)" % animators[1].current_animation)
+	for each: GridEntity in [imps[0], imps[1], brute]:
+		World.despawn(each)
+	_rig._process(0.0)
+
+
 func _place(entity: GridEntity, tile: Vector2i) -> void:
 	World._relocate(entity, tile)
 	if entity is Player:
@@ -352,8 +394,10 @@ func _test_goblin() -> void:
 	var clips := Array(animator.get_animation_list())
 	_check([Client3D.CLIP_IDLE, Client3D.CLIP_WALK, Client3D.CLIP_ATTACK, Client3D.CLIP_HIT, Client3D.CLIP_DEATH,
 			Client3D.CLIP_BACKPEDAL, Client3D.CLIP_IMPACT, Client3D.CLIP_ROLL, Client3D.CLIP_LAND,
-			Client3D.CLIP_JOG, Client3D.CLIP_SPRINT].all(
-			func(clip: String) -> bool: return clip in clips), "with its eleven clips (%s)" % [clips])
+			Client3D.CLIP_JOG, Client3D.CLIP_SPRINT, Client3D.CLIP_LOOK_ABOUT, Client3D.CLIP_TIRED].all(
+			func(clip: String) -> bool: return clip in clips)
+			and (Client3D.ATTACK_CLIPS + Client3D.HIT_CLIPS + Client3D.DEATH_CLIPS).all(
+			func(clip: String) -> bool: return clip in clips), "with all its clips (%s)" % [clips])
 	_check(animator.current_animation == "Idle", "standing: Idle")
 	var bone_count := 0
 	for skeleton in puppet.find_children("*", "Skeleton3D", true, false):
@@ -368,6 +412,8 @@ func _test_goblin() -> void:
 		var forward := _toes_ahead(puppet)
 		var wanted := Vector2(direction).normalized()
 		_check(forward.dot(wanted) > 0.9, "it faces %s: its toes point %s" % [direction, forward])
+	var own_pace: float = puppet.get_meta("pace")
+	puppet.set_meta("pace", 1.0)  # The gaits at GAITS' own paces; its own pace below.
 	for pace: Array in [[0.7, Client3D.CLIP_WALK], [1.4, Client3D.CLIP_WALK], [2.5, Client3D.CLIP_JOG], [1.2, Client3D.CLIP_JOG],
 			[0.9, Client3D.CLIP_WALK], [5.5, Client3D.CLIP_SPRINT], [4.0, Client3D.CLIP_SPRINT], [3.5, Client3D.CLIP_JOG]]:
 		puppet.set_meta("speed", float(pace[0]))
@@ -380,12 +426,24 @@ func _test_goblin() -> void:
 				own = gait[1]
 		_check(animator.current_animation == pace[1] and absf(animator.speed_scale * own - float(pace[0])) < 0.05,
 				"moving %.1f tiles a second: %s, its feet at that pace (x%.2f)" % [pace[0], animator.current_animation, animator.speed_scale])
-	imp.swung.emit(Vector2i(1, 0))
-	_check(animator.current_animation == "Punch_Jab", "an attack: Punch_Jab")
+	puppet.set_meta("pace", own_pace)
+	puppet.set_meta("speed", 0.7)
+	puppet.set_meta("last_at", puppet.position - Vector3(0.07, 0.0, 0.0))
+	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
 	_rig._animate(puppet)
-	_check(animator.current_animation == "Punch_Jab", "played out, not cut off by walking")
+	_check(animator.current_animation == Client3D.CLIP_WALK and absf(animator.speed_scale * Client3D.GAITS[0][1] * own_pace - 0.7) < 0.05,
+			"at its own pace (x%.2f of the clip's, its legs longer or shorter): x%.2f" % [own_pace, animator.speed_scale])
+	var blows := {}
+	for i in 4:
+		imp.swung.emit(Vector2i(1, 0))
+		blows[animator.current_animation] = true
+		_check(animator.current_animation in Client3D.ATTACK_CLIPS, "an attack: %s" % animator.current_animation)
+	_check(blows.size() >= 2, "and not the same blow every time (%s)" % [blows.keys()])
+	var blow := animator.current_animation
+	_rig._animate(puppet)
+	_check(animator.current_animation == blow, "played out, not cut off by walking")
 	imp.struck.emit(1, &"attack")
-	_check(animator.current_animation == "Hit_Chest", "struck: Hit_Chest")
+	_check(animator.current_animation in Client3D.HIT_CLIPS, "struck: %s" % animator.current_animation)
 	await get_tree().create_timer(0.6).timeout
 	var was := (puppet.get_node("Body") as Node3D).rotation.y
 	_push_imp(imp, Vector2i(1, 0))
@@ -446,7 +504,7 @@ func _test_goblin() -> void:
 	await _run_clock(1.4)
 	World.damage(imp, 999, player, &"attack")
 	_rig._process(0.0)
-	_check(puppet.has_meta("corpse") and animator.current_animation == "Death01", "killed: Death01")
+	_check(puppet.has_meta("corpse") and animator.current_animation in Client3D.DEATH_CLIPS, "killed: %s" % animator.current_animation)
 	await get_tree().create_timer(Client3D.FALL_SECONDS + 0.15).timeout
 	_check(is_instance_valid(puppet) and is_zero_approx(puppet.rotation.z), "it plays its death rather than tipping over")
 	_check(Client3D.model_for(_spawn_imp(Vector2i(10, 4))).is_empty(), "a monster of no kind with a model is still a capsule")

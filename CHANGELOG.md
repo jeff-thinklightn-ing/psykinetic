@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.96
+
+- No two goblins alike: each is its own size (heavier ones are bigger),
+  walks at its own stride, and they no longer breathe and step in time.
+- They throw jabs, crosses and kicks, flinch in different ways, and die in
+  one of two ways.
+- A goblin left alone looks around now and then; a badly hurt or winded one
+  stands tired.
+- Brutes and sneaks are goblins too now, instead of capsules.
+
 ## v0.1.95
 
 Network. Server.

@@ -1072,21 +1072,39 @@ are not affected yet.
 ## Models
 
 A monster kind can be drawn as an animated model instead of a capsule
-(`Client3D.MODELS`, by the spawn spec's `kind`): the imp is the goblin
-(`art/models/characters/goblin.glb`, 1.2 tall, a 22-bone humanoid rig).
+(`Client3D.MODELS`, by the spawn spec's `kind`): the imp, the brute and
+the sneak are the goblin (`art/models/characters/goblin.glb`, 1.2 tall, a
+22-bone humanoid rig).
 Models are imported with a SkeletonProfileHumanoid bone map
 (`art/models/bonemaps/`), so their skeleton is `%GeneralSkeleton` with the
 profile's bone names, and their clips are an AnimationLibrary of
 retargeted clips (`art/models/animations/goblin.res`: Idle, Walk,
 Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll, Jump_Land,
-Jog_Fwd and Sprint from the Quaternius Universal Animation Library (Pro), CC0, saved by `tools/extract_clips.gd` so the 20 MB pack is never
-shipped). The model is the puppet's Body, turned to the shown facing (it
+Jog_Fwd, Sprint, Punch_Cross, Kick, Sword_Attack, Death02, Hit_Head,
+Hit_Shoulder_L, Hit_Shoulder_R, Idle_LookAround and Idle_Tired from the
+Quaternius Universal Animation Library (Pro), CC0, saved by
+`tools/extract_clips.gd`, which adds to a library already there, so the
+20 MB pack is never shipped).
+
+No two are alike (`Client3D._vary`, seeded by the entity's name, so every
+view draws the same one): the model's size goes with its mass (the cube
+root of mass over `MODEL_MASS`, 40, so a brute of 70 stands a fifth taller
+and a sneak of 25 a seventh shorter), give or take 5%; its paces (GAITS')
+go with its size, as its legs do, give or take 8%; its idle tempo is its
+own, give or take 12%; and a loop starts anywhere along it, so a crowd that
+stops together does not breathe together. A blow is Punch_Jab, Punch_Cross
+or Kick, a flinch Hit_Chest, Hit_Head or either shoulder, never the same one
+twice running (`_pick_clip`); a death Death01 or Death02. Standing calm (no
+blow near it for `FIDGET_CALM_SECONDS`), it looks about now and then
+(Idle_LookAround, every `FIDGET_SECONDS_MIN` to `MAX`), dropped the moment
+it moves or a fight comes to it; under a third of its hp, or winded, it
+stands tired (Idle_Tired). The model is the puppet's Body, turned to the shown facing (it
 has no nose); an AnimationPlayer on it walks, jogs or sprints while the
 puppet moves, by its pace (`Client3D.GAITS`: each clip's own pace, the one
 its planted feet drift least at, measured on the goblin; the clip played at
 the puppet's pace over it, a change of gait held a little past the change,
-`GAIT_HYSTERESIS`), stands Idle when it does not, and plays
-Punch_Jab on a swing, Hit_Chest when struck and Death01 when it dies, each
+`GAIT_HYSTERESIS`), stands idle when it does not, and plays
+a blow on a swing, a flinch when struck and a death when it dies, each
 played out before walking or idling take over again. Knocked about
 (`_on_pushed`, `_knocked`), by how it was pushed: pushed back (an attack's
 knockback, a shove straight on) it backpedals (Jog_Bwd, paced by the

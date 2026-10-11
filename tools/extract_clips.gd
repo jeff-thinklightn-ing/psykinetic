@@ -15,6 +15,9 @@ extends SceneTree
 ##        Idle Walk Punch_Jab Hit_Chest Death01 Jog_Bwd Hit_Stomach Roll Jump_Land
 ## 4. Delete build/ual_extract.
 ##
+## A library already at <out.res> keeps its clips; those named are added
+## (or replaced), so more can be taken later without the first ones.
+##
 ## Track paths stay as retargeted (%GeneralSkeleton:<Bone>), so the library
 ## plays on any model imported with a SkeletonProfileHumanoid bone map.
 
@@ -33,6 +36,9 @@ func _init() -> void:
 		return
 	var source := (players[0] as AnimationPlayer).get_animation_library("")
 	var library := AnimationLibrary.new()
+	if ResourceLoader.exists(args[1]):
+		library = (load(args[1]) as AnimationLibrary).duplicate(true)
+		print("adding to %s's %d clips" % [args[1], library.get_animation_list().size()])
 	var missing := 0
 	for clip in args.slice(2):
 		if not source.has_animation(clip):
@@ -40,6 +46,8 @@ func _init() -> void:
 			missing += 1
 			continue
 		var animation := source.get_animation(clip).duplicate(true) as Animation
+		if library.has_animation(clip):
+			library.remove_animation(clip)
 		library.add_animation(clip, animation)
 		print("%s: %.2f s, %s, %d tracks" % [clip, animation.length, "loops" if animation.loop_mode != Animation.LOOP_NONE else "once",
 			animation.get_track_count()])

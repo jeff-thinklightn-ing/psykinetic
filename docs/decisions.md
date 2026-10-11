@@ -1509,3 +1509,19 @@ sim and so positions stay at 10 Hz) for a few bytes more: it stays an
 option, off. After: speed changing 0.3 tiles a second frame to frame, no
 hitches, a shove standing still shown in one frame (32 ms) rather than
 344 ms (median), bandwidth unchanged at under 1 KB/s a client.
+
+## 162. No two goblins alike
+
+Every goblin played the same clip at the same moment: one blow, one flinch,
+one death, one idle begun together, at one size and one pace, so a pack
+read as clones. Now each is varied in the view, from a generator seeded by
+its name (every client sees the same goblin, and it is the same after a
+respawn): its size by its mass, so weight shows on a model as it did on a
+capsule's shade, and with it its paces, as longer legs take longer strides;
+a little of its own on size, pace and idle tempo; loops started anywhere
+along them. Blows, flinches and deaths are picked from several UAL clips,
+never the same blow or flinch twice running. A calm goblin now and then
+looks about; a hurt or winded one stands tired. The brute and the sneak,
+capsules till now, are the goblin too, the brute a fifth taller. It is all
+view: the sim, and what a blow does, are as they were. How they fight, as
+kinds and as individuals, is decision 163.
