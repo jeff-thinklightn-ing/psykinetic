@@ -37,7 +37,11 @@ bonemaps/goblin.tres, bonemaps/ual.tres
                          bone maps from the retarget test: the goblin (identity) and the Quaternius
                          Universal Animation Library (Unreal mannequin names) onto SkeletonProfileHumanoid
 animations/goblin.res    Idle, Walk, Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll,
-                         Jump_Land from the Quaternius Universal Animation Library (Pro, UAL1.glb,
+                         Jump_Land, Jog_Fwd, Sprint, Punch_Cross, Kick, Sword_Attack, Death02,
+                         Hit_Head, Hit_Shoulder_L, Hit_Shoulder_R, Idle_LookAround, Idle_Tired,
+                         Idle_Talking, Drink, Fixing_Kneeling, PickUp_Kneeling, Crouch_Idle,
+                         GroundSit_Enter, GroundSit_Idle, GroundSit_Exit
+                         from the Quaternius Universal Animation Library (Pro, UAL1.glb,
                          in place), retargeted through bonemaps/ual.tres,
                          saved by tools/extract_clips.gd. Animations by Quaternius, CC0 1.0
                          (animations/LICENSE-quaternius-ual.txt), https://quaternius.com

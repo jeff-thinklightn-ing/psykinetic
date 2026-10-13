@@ -357,10 +357,37 @@ func _test_goblins_differ() -> void:
 	_check(is_equal_approx(float(a.get_meta("model_scale")), clampf(1.0, Client3D.MODEL_SCALE_MIN, Client3D.MODEL_SCALE_MAX)
 			* (1.0 + again.randf_range(-Client3D.MODEL_SCALE_SPREAD, Client3D.MODEL_SCALE_SPREAD))),
 			"each the same on every view: seeded by its name")
-	a.set_meta("fidget_at", 0)
+	_check([a, b, big].all(func(p: Node3D) -> bool: return absf(float(p.get_meta("tempo")) - 1.0) <= Client3D.TEMPO_SPREAD + 0.001),
+			"each its own tempo, within %d%%" % roundi(Client3D.TEMPO_SPREAD * 100.0))
 	_rig._combat_at.erase(imps[0].get_instance_id())
+	var fidgets: Array[String] = []
+	for i in 40:
+		a.set_meta("fidget_at", 0)
+		a.set_meta("busy_until", 0)
+		a.set_meta("fidgeting", false)
+		_rig._animate(a)
+		fidgets.append(animators[0].current_animation)
+	var kinds := {}
+	for clip in fidgets:
+		kinds[clip] = int(kinds.get(clip, 0)) + 1
+	_check(fidgets.all(func(clip: String) -> bool: return Client3D.FIDGETS.has(clip)), "calm a while, it fidgets (%s)" % fidgets[0])
+	_check(kinds.size() >= 4, "now one way, now another (%s)" % [kinds])
+	_check(range(1, fidgets.size()).all(func(i: int) -> bool: return fidgets[i] != fidgets[i - 1]), "never the same twice running")
+	_check(int(kinds.get(Client3D.CLIP_LOOK_ABOUT, 0)) >= kinds.values().max() - 2, "looking about the most of them, by weight (%d)" % kinds.get(Client3D.CLIP_LOOK_ABOUT, 0))
+	a.set_meta("busy_until", 0)
+	a.set_meta("fidgeting", false)
+	a.set_meta("fidget_at", Time.get_ticks_msec() + 100000)
+	imps[0].pose = Monster.Pose.SIT
 	_rig._animate(a)
-	_check(animators[0].current_animation == Client3D.CLIP_LOOK_ABOUT, "calm a while, it looks about (%s)" % animators[0].current_animation)
+	_check(animators[0].current_animation == Client3D.CLIP_SIT_DOWN, "set to sit, it sits down (%s)" % animators[0].current_animation)
+	a.set_meta("busy_until", 0)
+	_rig._animate(a)
+	_check(animators[0].current_animation == Client3D.CLIP_SITTING, "and stays sat (%s)" % animators[0].current_animation)
+	imps[0].pose = Monster.Pose.STAND
+	_rig._animate(a)
+	_check(animators[0].current_animation == Client3D.CLIP_SIT_UP, "and gets up when it stands (%s)" % animators[0].current_animation)
+	a.set_meta("busy_until", 0)
+	a.set_meta("fidgeting", false)
 	a.set_meta("speed", 2.0)
 	a.set_meta("last_at", a.position - Vector3(0.2, 0.0, 0.0))
 	a.set_meta("last_ms", Time.get_ticks_msec() - 100)
@@ -403,7 +430,8 @@ func _test_goblin() -> void:
 			Client3D.CLIP_BACKPEDAL, Client3D.CLIP_IMPACT, Client3D.CLIP_ROLL, Client3D.CLIP_LAND,
 			Client3D.CLIP_JOG, Client3D.CLIP_SPRINT, Client3D.CLIP_LOOK_ABOUT, Client3D.CLIP_TIRED].all(
 			func(clip: String) -> bool: return clip in clips)
-			and (Client3D.ATTACK_CLIPS + Client3D.HIT_CLIPS + Client3D.DEATH_CLIPS).all(
+			and (Client3D.ATTACK_CLIPS + Client3D.HIT_CLIPS + Client3D.DEATH_CLIPS + Client3D.FIDGETS.keys()
+				+ [Client3D.CLIP_SIT_DOWN, Client3D.CLIP_SITTING, Client3D.CLIP_SIT_UP]).all(
 			func(clip: String) -> bool: return clip in clips), "with all its clips (%s)" % [clips])
 	_check(animator.current_animation == "Idle", "standing: Idle")
 	var bone_count := 0

@@ -1660,3 +1660,17 @@ An entry in level.json also set the spawn order (listed first), and with
 it names and the slots a snapshot finds entities by: giving one monster a
 facing would have renamed others and moved them on the box. So an entry of
 only at, facing and idle leaves the order as it was.
+
+## 171. Idling looks like idling: fidgets by weight, and sitting
+
+With monsters idling (decision 168) the view had one fidget, looking about,
+so a calm courtyard was a crowd doing the same thing. Now a calm goblin's
+fidget is one of six clips from the same library (looking about most;
+muttering, a swig, kneeling at the ground, stooping, crouching), picked by
+weight from its own random stream, never the one it did last. The pack has
+no scratch or stretch, so these are what it has. A monster sitting at a
+gathering is told to the views by the replicated pose, not a new message,
+and the view sits it down, keeps it sat and gets it up. The idle tempo
+spread is 10% either way, as asked; loops already start anywhere along
+them. All of it is the view's: every peer draws the same monster the same,
+each from its name.

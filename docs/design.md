@@ -1089,7 +1089,9 @@ profile's bone names, and their clips are an AnimationLibrary of
 retargeted clips (`art/models/animations/goblin.res`: Idle, Walk,
 Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit_Stomach, Roll, Jump_Land,
 Jog_Fwd, Sprint, Punch_Cross, Kick, Sword_Attack, Death02, Hit_Head,
-Hit_Shoulder_L, Hit_Shoulder_R, Idle_LookAround and Idle_Tired from the
+Hit_Shoulder_L, Hit_Shoulder_R, Idle_LookAround, Idle_Tired, Idle_Talking,
+Drink, Fixing_Kneeling, PickUp_Kneeling, Crouch_Idle and GroundSit_Enter,
+_Idle and _Exit from the
 Quaternius Universal Animation Library (Pro), CC0, saved by
 `tools/extract_clips.gd`, which adds to a library already there, so the
 20 MB pack is never shipped).
@@ -1103,9 +1105,13 @@ own, give or take 12%; and a loop starts anywhere along it, so a crowd that
 stops together does not breathe together. A blow is Punch_Jab, Punch_Cross
 or Kick, a flinch Hit_Chest, Hit_Head or either shoulder, never the same one
 twice running (`_pick_clip`); a death Death01 or Death02. Standing calm (no
-blow near it for `FIDGET_CALM_SECONDS`), it looks about now and then
-(Idle_LookAround, every `FIDGET_SECONDS_MIN` to `MAX`), dropped the moment
-it moves or a fight comes to it; under a third of its hp, or winded, it
+blow near it for `FIDGET_CALM_SECONDS`), it fidgets now and then (every
+`FIDGET_SECONDS_MIN` to `MAX`): one of `FIDGETS` by weight, never the one
+before (looking about most, muttering, a swig, kneeling at the ground,
+stooping, crouching), dropped the moment it moves or a fight comes to it;
+a monster sitting at a gathering (`Monster.pose`) sits down
+(GroundSit_Enter), stays sat (GroundSit_Idle) and gets up (GroundSit_Exit)
+when it stands, cut short if it has to move; under a third of its hp, or winded, it
 stands tired (Idle_Tired). The model is the puppet's Body, turned to the shown facing (it
 has no nose); an AnimationPlayer on it walks, jogs or sprints while the
 puppet moves, by its pace (`Client3D.GAITS`: each clip's own pace, the one

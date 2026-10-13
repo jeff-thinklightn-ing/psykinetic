@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.104
+
+Client.
+
+- Idle goblins do more than look about: they mutter, take a swig, kneel and
+  fiddle at the ground, stoop and crouch, each in its own time, so a group
+  never moves in step.
+- A goblin set to gather round a point can sit down on the ground there,
+  and gets up when it has to move.
+
+The server must be updated to v0.1.104 too, as it refuses any other version.
+
 ## v0.1.103
 
 Level editor.

@@ -220,17 +220,24 @@ const MODEL_SCALE_MIN := 0.8
 const MODEL_SCALE_MAX := 1.4
 const MODEL_SCALE_SPREAD := 0.05
 const PACE_SPREAD := 0.08
-const TEMPO_SPREAD := 0.12
+const TEMPO_SPREAD := 0.10
 ## A blow, a flinch, a death: one of these, never the same blow or flinch
 ## twice running.
 const ATTACK_CLIPS: Array[String] = ["Punch_Jab", "Punch_Cross", "Kick"]
 const HIT_CLIPS: Array[String] = ["Hit_Chest", "Hit_Head", "Hit_Shoulder_L", "Hit_Shoulder_R"]
 const DEATH_CLIPS: Array[String] = ["Death01", "Death02"]
-## Standing, a model now and then looks about (once FIDGET_CALM_SECONDS
-## from the last blow near it, every FIDGET_SECONDS_MIN to MAX); hurt or
-## winded it stands tired.
+## Standing, a model now and then fidgets (once FIDGET_CALM_SECONDS from the
+## last blow near it, every FIDGET_SECONDS_MIN to MAX): one of FIDGETS, by
+## weight, not the one before; a loop among them is played for one round
+## of it. Hurt or winded it stands tired.
 const CLIP_LOOK_ABOUT := "Idle_LookAround"
+const FIDGETS := {"Idle_LookAround": 4, "Idle_Talking": 2, "Drink": 1, "Fixing_Kneeling": 1,
+	"PickUp_Kneeling": 1, "Crouch_Idle": 1}
 const CLIP_TIRED := "Idle_Tired"
+## Sitting (Monster.Pose.SIT, at a gathering): down, sat, and up again.
+const CLIP_SIT_DOWN := "GroundSit_Enter"
+const CLIP_SITTING := "GroundSit_Idle"
+const CLIP_SIT_UP := "GroundSit_Exit"
 const FIDGET_SECONDS_MIN := 7.0
 const FIDGET_SECONDS_MAX := 20.0
 const FIDGET_CALM_SECONDS := 4.0
@@ -2195,6 +2202,34 @@ static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 	return clip
 
 
+## One of FIDGETS for [param puppet], by weight, not its last (any with no
+## clip in [param animator] left out); "" for none.
+static func _pick_fidget(puppet: Node3D, animator: AnimationPlayer) -> String:
+	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
+	var last := str(puppet.get_meta("last_fidget", ""))
+	var total := 0
+	for clip: String in FIDGETS:
+		if clip != last and animator.has_animation(clip):
+			total += int(FIDGETS[clip])
+	if total == 0:
+		return ""
+	var roll := rng.randi_range(1, total) if rng != null else 1
+	for clip: String in FIDGETS:
+		if clip == last or not animator.has_animation(clip):
+			continue
+		roll -= int(FIDGETS[clip])
+		if roll <= 0:
+			puppet.set_meta("last_fidget", clip)
+			return clip
+	return ""
+
+
+## Whether [param puppet]'s monster is sitting (Monster.Pose.SIT).
+static func _sitting(puppet: Node3D) -> bool:
+	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as Monster
+	return entity != null and entity.pose == Monster.Pose.SIT
+
+
 ## Standing: tired when hurt or winded, else idle.
 static func _idle_clip(puppet: Node3D) -> String:
 	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
@@ -2223,14 +2258,35 @@ func _animate(puppet: Node3D) -> void:
 		return
 	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)
 	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm):
-		# Looking about is no reason to stand still: it goes.
+		# A fidget (or sitting down, or getting up) is no reason to stand
+		# still: it goes.
 		puppet.set_meta("fidgeting", false)
+		puppet.set_meta("busy_until", 0)
+	if speed > WALKING and puppet.get_meta("seated", false):
+		puppet.set_meta("seated", false)
 		puppet.set_meta("busy_until", 0)
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
 	puppet.set_meta("fidgeting", false)
 	var pace: float = puppet.get_meta("pace", 1.0)
 	var tempo: float = puppet.get_meta("tempo", 1.0)
+	if speed <= WALKING and animator.has_animation(CLIP_SITTING):
+		var sitting := _sitting(puppet)
+		var seated: bool = puppet.get_meta("seated", false)
+		if sitting and not seated:
+			_play_fidget(puppet, animator, CLIP_SIT_DOWN, now, tempo)
+			puppet.set_meta("seated", true)
+			return
+		if sitting:
+			if animator.current_animation != CLIP_SITTING:
+				animator.play(CLIP_SITTING, CLIP_BLEND)
+				_start_anywhere(puppet, animator)
+			animator.speed_scale = tempo
+			return
+		if seated:
+			_play_fidget(puppet, animator, CLIP_SIT_UP, now, tempo)
+			puppet.set_meta("seated", false)
+			return
 	if speed > WALKING:
 		var gait: Array = GAITS[gait_for(animator.current_animation, speed / pace)]
 		if animator.current_animation != gait[0]:
@@ -2239,20 +2295,28 @@ func _animate(puppet: Node3D) -> void:
 		animator.speed_scale = clampf(speed / (float(gait[1]) * pace), 0.3, 3.0)
 		return
 	var idle := _idle_clip(puppet)
-	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)) \
-			and animator.has_animation(CLIP_LOOK_ABOUT):
+	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
 		var rng: RandomNumberGenerator = puppet.get_meta("rng")
 		puppet.set_meta("fidget_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
-		animator.play(CLIP_LOOK_ABOUT, CLIP_BLEND * 2.0)
-		animator.seek(0.0, true)
-		animator.speed_scale = tempo
-		puppet.set_meta("fidgeting", true)
-		puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_LOOK_ABOUT).length / tempo * 1000.0))
-		return
+		var fidget := _pick_fidget(puppet, animator)
+		if not fidget.is_empty():
+			_play_fidget(puppet, animator, fidget, now, tempo)
+			return
 	if animator.current_animation != idle:
 		animator.play(idle, CLIP_BLEND)
 		_start_anywhere(puppet, animator)
 	animator.speed_scale = tempo
+
+
+## [param clip] once through from its start, at [param tempo], blended in,
+## the model busy with it till it ends (a fidget: dropped if it moves or a
+## fight comes to it).
+static func _play_fidget(puppet: Node3D, animator: AnimationPlayer, clip: String, now: int, tempo: float) -> void:
+	animator.play(clip, CLIP_BLEND * 2.0)
+	animator.seek(0.0, true)
+	animator.speed_scale = tempo
+	puppet.set_meta("fidgeting", true)
+	puppet.set_meta("busy_until", now + int(animator.get_animation(clip).length / tempo * 1000.0))
 
 
 ## A knocked-back model's frame (see CLIP_BACKPEDAL): true while the knock
