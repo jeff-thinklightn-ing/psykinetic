@@ -1698,3 +1698,14 @@ pixels, a step that turns sharply left out, since a corner is a change of
 mind, not a swirl. Once a drag is a swirl its pan is undone and the turn
 starts from nothing, so there is no jump, and letting go settles on a
 diamond as A/D do. A middle click still recentres and resets the zoom.
+
+## 174. The middle-drag pan springs back; no swirl, no middle click
+
+Decision 173's swirl-to-turn felt clunky in play and is gone: turning is
+A/D's again, and every click-scheme middle drag pans. The pan is now a peek
+rather than a place to leave the view: let go, it eases back onto the
+player, as the W/S tilt springs back to 50°. With nothing left to undo, the
+middle click (which put back the zoom and the pan) is gone too, in both
+schemes: let go without a drag, the button does nothing, and the zoom
+stays where the wheel put it. This replaces 166's lasting pan and the
+middle-click reset of 67 and 68.

@@ -329,7 +329,7 @@ func _test_diamonds() -> void:
 
 
 func _test_wheel_zoom() -> void:
-	print("\n== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.4x, saved; a middle click puts it to 1x ==")
+	print("\n== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.4x, saved; a middle click does nothing ==")
 	var saved: String = Net.controls
 	var rig := _rig()
 	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "it starts at 1x")
@@ -363,8 +363,8 @@ func _test_wheel_zoom() -> void:
 	_main._end_middle_drag()
 	for i in 60:
 		rig._ease_zoom(1.0 / 60.0)
-	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(Net.camera_zoom, 1.0) and is_equal_approx(rig.yaw, yaw)
-			and is_equal_approx(rig.pitch, pitch), "%s: a middle click, back to 1x, nothing else moved" % Net.controls)
+	_check(is_equal_approx(rig.zoom, Client3D.ZOOM_MAX) and is_equal_approx(Net.camera_zoom, Client3D.ZOOM_MAX) and is_equal_approx(rig.yaw, yaw)
+			and is_equal_approx(rig.pitch, pitch), "%s: a middle click leaves the zoom (and all else) as it was" % Net.controls)
 	_check(is_equal_approx(Net.saved_zoom("1.2", -1.0), 1.2) and is_equal_approx(Net.saved_zoom("2", -1.0), Client3D.ZOOM_MAX)
 			and is_equal_approx(Net.saved_zoom("0.6", -1.0), Client3D.ZOOM_MIN) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
 			"a saved zoom loads held to 0.8..1.4; none keeps 1x")
@@ -489,7 +489,7 @@ func _test_middle_drag_axis() -> void:
 	for i in 10:
 		rig._ease_peek(0.05)
 	Net.controls = "click"
-	print("\n== click: a middle drag pans, the ground under the cursor kept under it; a middle click brings it back ==")
+	print("\n== click: a middle drag pans, the ground under the cursor kept under it, and springs back when let go ==")
 	rig._sync_puppets()
 	rig._follow(0.0)
 	var ground := rig._camera_target
@@ -507,80 +507,36 @@ func _test_middle_drag_axis() -> void:
 	moved = rig._camera.unproject_position(rig.to_global(ground)) - at
 	_check(moved.distance_to(Vector2(120, -90)) < 1.0, "up and down too, through the tilt (%s)" % moved)
 	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig._peeking, "and it does not tilt (%s)" % rig.pitch)
-	_main._end_middle_drag()
 	var panned := rig.pan
-	_check(panned != Vector3.ZERO and rig._camera_target.is_equal_approx(_player_puppet(rig) + panned),
-			"let go, it stays panned (%s), following the player that far off" % panned)
-	_main._begin_middle_drag(Vector2(500, 500))
-	_main._middle_drag(Vector2(0, 30))
-	_check(rig.pan.distance_to(panned) > 0.1, "a second drag goes on from there")
-	_main._middle_drag(Vector2(100000, 0))
-	_check(rig.pan.length() <= Client3D.PAN_MAX + 0.001, "never more than %d tiles off (%.2f)" % [Client3D.PAN_MAX, rig.pan.length()])
-	_main._end_middle_drag()
-	_main._begin_middle_drag(Vector2(500, 500))
 	_main._end_middle_drag()
 	rig._ease_pan(1.0 / 60.0)
-	_check(rig.pan != Vector3.ZERO and rig.pan.length() < Client3D.PAN_MAX, "a middle click: back, eased, not at once")
+	_check(rig.pan != Vector3.ZERO and rig.pan.length() < panned.length(), "let go, it springs back, eased, not at once (%s)" % rig.pan)
 	for i in 60:
 		rig._ease_pan(1.0 / 60.0)
 	rig._follow(0.0)
 	_check(rig.pan == Vector3.ZERO and rig._camera_target.is_equal_approx(_player_puppet(rig)), "on the player again within a second")
-
-	print("\n== click: a middle drag swirled round turns the view with it, and settles on a diamond ==")
-	for way: float in [1.0, -1.0]:
-		_ease(rig)
-		rig._follow(0.0)
-		var start_yaw := rig.yaw
-		var east := rig._camera.unproject_position(rig.to_global(_player_puppet(rig) + Vector3(3, 0, 0)))
-		var middle := rig._camera.unproject_position(rig.to_global(_player_puppet(rig)))
-		var before := (east - middle).angle()
-		_main._begin_middle_drag(Vector2(500, 500))
-		var radius := 90.0
-		var turned_at := -1
-		for i in range(1, 73):
-			var t := deg_to_rad(i * 5.0) * way
-			_main._middle_drag(Vector2(radius * sin(t), radius - radius * cos(t)))
-			if turned_at < 0 and rig._dragging:
-				turned_at = i * 5
-		_check(turned_at > 0 and turned_at <= int(Main.SWIRL_DEGREES) + 20 and rig.pan == Vector3.ZERO,
-				"%s: once it has curved a little (%d degrees of circle) it turns, and pans no more"
-				% ["clockwise" if way > 0.0 else "anticlockwise", turned_at])
-		rig._follow(0.0)
-		var now_east := rig._camera.unproject_position(rig.to_global(_player_puppet(rig) + Vector3(3, 0, 0)))
-		var now_middle := rig._camera.unproject_position(rig.to_global(_player_puppet(rig)))
-		var swung := rad_to_deg(wrapf((now_east - now_middle).angle() - before, -PI, PI))
-		_check(signf(swung) == way and not is_equal_approx(rig.yaw, start_yaw),
-				"the ground turns the way the swirl went (%.0f degrees on the screen)" % swung)
-		_main._end_middle_drag()
-		_ease(rig)
-		_check(not rig._dragging and is_equal_approx(fposmod(rig.yaw, Client3D.ORBIT_STEP), 0.0)
-				and not is_equal_approx(rig.yaw, start_yaw), "let go, it settles on another diamond (%.0f)" % rig.yaw)
-	_ease(rig)
-	var straight_yaw := rig.yaw
 	_main._begin_middle_drag(Vector2(500, 500))
-	for i in range(1, 30):
-		_main._middle_drag(Vector2(i * 8.0, i * 1.5 + sin(i * 0.7) * 3.0))
-	_check(not rig._dragging and rig.pan != Vector3.ZERO and is_equal_approx(rig.yaw, straight_yaw),
-			"a straight drag, a little wobbly, still pans")
+	_main._middle_drag(Vector2(100000, 0))
+	_check(rig.pan.length() <= Client3D.PAN_MAX + 0.001, "never more than %d tiles off (%.2f)" % [Client3D.PAN_MAX, rig.pan.length()])
 	_main._end_middle_drag()
-	_main._begin_middle_drag(Vector2(500, 500))
-	for i in range(1, 20):
-		_main._middle_drag(Vector2(i * 10.0, 0.0))
-	for i in range(1, 20):
-		_main._middle_drag(Vector2(190.0, i * 10.0))
-	_check(not rig._dragging and is_equal_approx(rig.yaw, straight_yaw), "and so does one that turns a corner")
-	_main._end_middle_drag()
-	_main._begin_middle_drag(Vector2(500, 500))
-	_main._end_middle_drag()
-	for i in 60:
+	for i in 3:
 		rig._ease_pan(1.0 / 60.0)
-	_check(rig.pan == Vector3.ZERO, "a middle click recentres")
+	var easing := rig.pan
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(0, 30))
+	rig._ease_pan(1.0 / 60.0)
+	_check(easing != Vector3.ZERO and rig.pan.distance_to(easing) < 2.0 and not rig._pan_home,
+			"caught on its way back, a new drag holds it from there")
+	_main._end_middle_drag()
+	for i in 90:
+		rig._ease_pan(1.0 / 60.0)
 	var before := rig.pitch
+	var zoom_to := rig._zoom_to
 	_main._begin_middle_drag(Vector2(500, 500))
 	_main._middle_drag(Vector2(2, 1))
 	_main._end_middle_drag()
-	_check(is_equal_approx(rig.pitch, before) and rig._tilt_t >= 1.0 and is_equal_approx(rig._zoom_to, 1.0),
-			"a middle click tilts nothing; it puts the zoom to 1x")
+	_check(is_equal_approx(rig.pitch, before) and rig._tilt_t >= 1.0 and is_equal_approx(rig._zoom_to, zoom_to) and rig.pan == Vector3.ZERO,
+			"a middle click does nothing: no tilt, no zoom, no pan")
 	Net.controls = saved
 	_free_rig(rig)
 

@@ -37,11 +37,10 @@ extends Node3D
 ## The ortho size is CAMERA_SIZE times `zoom`, and times up to
 ## PEEK_PULL_BACK during a WASD pitch peek. The mouse wheel zooms in either
 ## scheme, a ZOOM_STEP a notch between ZOOM_MIN and ZOOM_MAX, eased
-## (ZOOM_RATE), on the player; a middle click puts it back to 1. The zoom
-## is saved (Net.camera_zoom). Click scheme: a middle drag pans, sliding
-## the view off the player (`pan`, PAN_MAX at most) so the ground under the
-## cursor stays under it; the view then follows the player still, that far
-## off, until a middle click brings it back (or a new map does).
+## (ZOOM_RATE), on the player. The zoom is saved (Net.camera_zoom). Click
+## scheme: a middle drag pans, sliding the view off the player (`pan`,
+## PAN_MAX at most) so the ground under the cursor stays under it; let go,
+## it eases back onto the player.
 ##
 ## Turning, in both schemes: the yaw turns freely, all the way round, and
 ## rests only on the diamond views (multiples of ORBIT_STEP from 0). Let
@@ -132,9 +131,6 @@ const ZOOM_RATE := 14.0
 ## under the cursor kept under it, no further than PAN_MAX tiles; a middle
 ## click brings it back, eased at ZOOM_RATE.
 const PAN_MAX := 10.0
-## A middle-drag swirl's degrees of curve to the yaw's: +1 or -1, so that a
-## swirl clockwise on the screen turns the view clockwise with it.
-const SWIRL_YAW := -1.0
 ## A WASD middle drag let go: on to its diamond, eased out.
 const SETTLE_SECONDS := 0.25
 ## A turn of less than this, let go, goes back to the diamond it set off
@@ -687,14 +683,6 @@ func zoom_by(notches: int) -> void:
 	_save_zoom()
 
 
-## A middle click: the zoom back to 1 and the view back on the player,
-## eased; the zoom saved.
-func reset_zoom() -> void:
-	_zoom_to = 1.0
-	_save_zoom()
-	_pan_home = true
-
-
 ## Click scheme: a middle drag begins; pan_by moves from where it is now.
 func begin_pan() -> void:
 	_pan_base = pan
@@ -717,9 +705,9 @@ func pan_by(offset: Vector2) -> void:
 	pan = (_pan_base + moved).limit_length(PAN_MAX)
 
 
-## The drag's pan undone (it became a swirl): back where it began.
-func cancel_pan() -> void:
-	pan = _pan_base
+## The middle drag let go: the view eases back onto the player.
+func end_pan() -> void:
+	_pan_home = true
 
 
 func _ease_pan(delta: float) -> void:

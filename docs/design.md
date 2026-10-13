@@ -1524,20 +1524,14 @@ times the **zoom**: the mouse wheel, in either scheme, zooms by
 `ZOOM_STEP` (1.1×) a notch, up nearer, between `ZOOM_MIN` (0.8) and
 `ZOOM_MAX` (1.4), each step eased (`ZOOM_RATE`, all but done in a quarter
 second), on the player (the camera is locked on them, less any pan); a
-middle click (the button let go without a drag, in either scheme) puts it
-back to 1×. In the click scheme a middle drag **pans**: the view slides
+middle click (the button let go without a drag) does nothing, in either
+scheme. In the click scheme a middle drag **pans**: the view slides
 off the player so the ground under the cursor stays under it (an ortho
 view: a pixel across is `size / height` of ground, one up or down that
 over the sine of the tilt), no further than `PAN_MAX` (10 tiles); let go,
-the view follows the player still at that offset, and a middle click
-eases it back onto them with the zoom (`ZOOM_RATE`), as does a new map.
-The ears stay with the player (the listener is not panned). A middle drag
-that curves (its heading turning `Main.SWIRL_DEGREES`, summed over
-`SWIRL_STEP_PX` steps, a step turning more than `SWIRL_CORNER_DEGREES` left
-out so a corner is no curve) is a **swirl**: the pan it made is undone, and
-from there the camera turns as the drag curves on, clockwise on the screen
-for a clockwise swirl (`Client3D.SWIRL_YAW`), settling on a diamond when
-let go as an A/D turn does. The
+it springs back, easing onto the player (`ZOOM_RATE`), and a new map puts
+it back at once. A drag begun while it eases holds it where it is.
+The ears stay with the player (the listener is not panned). The
 zoom is saved as `camera_zoom` (`Net.camera_zoom`, held to that range on
 load, `Net.saved_zoom`). The WASD pitch peek pulls the size back a moment
 more (`Client3D._apply_size`), and so does the local player's death. The near/far
@@ -1649,8 +1643,7 @@ hold-to-move retargets, right click (and drag) shoves and tosses, the
 verbs land on the clicked target. In 3D, A/D turn the camera freely and
 lock it on the next diamond when let go (saved); W/S tilt it while held,
 springing back to 50° when let go; the wheel zooms, a middle drag pans
-the view (swirled round, it turns it) and a middle click puts the zoom
-and the pan back; Q/E do
+the view, springing back onto the player when let go; Q/E do
 nothing (see the 3D view). The camera follows the player alone (at any
 pan's offset).
 

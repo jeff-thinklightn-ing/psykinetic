@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.107
+
+Client.
+
+- The middle-drag swirl that turned the camera is gone; A/D turn it, as
+  before.
+- A middle drag still pans the view, and now springs back onto you when you
+  let go.
+- A middle click no longer does anything (it used to recentre and reset the
+  zoom).
+
+The server must be updated to v0.1.107 too, as it refuses any other version.
+
 ## v0.1.106
 
 Client.
