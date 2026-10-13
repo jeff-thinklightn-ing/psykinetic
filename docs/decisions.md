@@ -1686,3 +1686,15 @@ millions behind it: the server froze in it, the player was dropped, and
 nobody could join until it was restarted. Now every sample coming in trims
 the window, at most once a second, and a trim cuts the stale run off in one
 slice (samples are in time order, so a binary search finds where).
+
+## 173. A middle drag swirled round turns the view
+
+The click scheme's middle drag pans (decision 166), and turning took A/D.
+Turning the view with the mouse too, without giving up the pan, goes by
+the drag's shape: straight (a little wobble, or a corner, included) pans;
+curved, round a quarter-ish, turns, the way it curves, like turning a map
+on the table. Curve is the heading's turning summed over steps of a dozen
+pixels, a step that turns sharply left out, since a corner is a change of
+mind, not a swirl. Once a drag is a swirl its pan is undone and the turn
+starts from nothing, so there is no jump, and letting go settles on a
+diamond as A/D do. A middle click still recentres and resets the zoom.

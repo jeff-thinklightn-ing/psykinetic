@@ -27,6 +27,13 @@ const DRAG_DEGREES_PER_PX := 0.25
 ## 3D, WASD: a middle drag is a turn or a pitch peek by whichever axis it
 ## first moves this far on, and stays that for the rest of the drag.
 const DRAG_AXIS_PX := 6.0
+## Click scheme: a middle drag that curves this far (degrees of its heading,
+## summed over SWIRL_STEP_PX steps, a step turning more than
+## SWIRL_CORNER_DEGREES left out: a corner is no curve) is a swirl, which
+## turns the camera with it, clockwise for clockwise; a straighter one pans.
+const SWIRL_DEGREES := 60.0
+const SWIRL_STEP_PX := 12.0
+const SWIRL_CORNER_DEGREES := 35.0
 ## WASD: the facing sent for a player standing still changes at most this
 ## often (seconds).
 const FACE_SEND_INTERVAL := 0.15
@@ -178,6 +185,11 @@ var _pick_grid := Vector2(NAN, NAN)
 enum Drag { UNDECIDED, TURN, PITCH, PAN }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
+## The swirl so far: where its last step began, that step's heading (NAN:
+## none yet) and how far it has curved, degrees, clockwise positive.
+var _swirl_from := Vector2.ZERO
+var _swirl_heading := NAN
+var _swirled := 0.0
 ## Click scheme, 3D: W/S or A/D were held last frame (their release
 ## springs the tilt back and settles the turn).
 var _tilting := false
@@ -543,14 +555,28 @@ func _drag_yaw() -> void:
 func _begin_middle_drag(at: Vector2) -> void:
 	_drag_from = at
 	_drag = Drag.UNDECIDED
+	_swirl_from = Vector2.ZERO
+	_swirl_heading = NAN
+	_swirled = 0.0
 
 
 ## The drag is [param offset] (screen px) from where it went down. In the
-## click scheme it pans the view (then it is no middle click); in WASD it
-## is a turn or a pitch peek by the axis it first moves on.
+## click scheme it pans the view, until it has curved SWIRL_DEGREES: then
+## it is a swirl, the pan it made is undone and the camera turns as it
+## curves on, settling as A/D do when let go (either way it is no middle
+## click). In WASD it is a turn or a pitch peek by the axis it first moves on.
 func _middle_drag(offset: Vector2) -> void:
-	if _drag == Drag.PAN:
-		_client3d.pan_by(offset)
+	if Net.controls == "click" and _drag in [Drag.PAN, Drag.TURN]:
+		var swirled := _swirl(offset)
+		if _drag == Drag.PAN and absf(swirled) >= SWIRL_DEGREES:
+			_client3d.cancel_pan()
+			_client3d.begin_drag()
+			_drag = Drag.TURN
+		if _drag == Drag.TURN:
+			# From the curve that made it a swirl on, so the turn starts at nothing.
+			_client3d.drag((swirled - signf(swirled) * SWIRL_DEGREES) * Client3D.SWIRL_YAW)
+		else:
+			_client3d.pan_by(offset)
 		return
 	if _drag == Drag.UNDECIDED:
 		if absf(offset.x) < DRAG_AXIS_PX and absf(offset.y) < DRAG_AXIS_PX:
@@ -558,6 +584,7 @@ func _middle_drag(offset: Vector2) -> void:
 		if Net.controls == "click":
 			_drag = Drag.PAN
 			_client3d.begin_pan()
+			_swirl(offset)
 			_client3d.pan_by(offset)
 			return
 		if absf(offset.x) >= absf(offset.y):
@@ -570,6 +597,22 @@ func _middle_drag(offset: Vector2) -> void:
 		_client3d.drag(offset.x * DRAG_DEGREES_PER_PX)
 	else:
 		_client3d.pitch_peek(offset.y)
+
+
+## How far the drag at [param offset] has curved, so far (degrees,
+## clockwise on the screen positive).
+func _swirl(offset: Vector2) -> float:
+	var step := offset - _swirl_from
+	if step.length() < SWIRL_STEP_PX:
+		return _swirled
+	var heading := step.angle()
+	if not is_nan(_swirl_heading):
+		var turn := rad_to_deg(wrapf(heading - _swirl_heading, -PI, PI))
+		if absf(turn) <= SWIRL_CORNER_DEGREES:
+			_swirled += turn
+	_swirl_heading = heading
+	_swirl_from = offset
+	return _swirled
 
 
 func _end_middle_drag() -> void:
@@ -2229,7 +2272,7 @@ func hint_lines() -> Array[String]:
 	else:
 		lines.append_array(["LMB\tmove / attack (hold to steer)", "RMB\tshove (drag to toss)"])
 		if _client3d != null:
-			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan", "Wheel\tzoom (MMB click: back)"])
+			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan (swirl: turn)", "Wheel\tzoom (MMB click: recentre)"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",

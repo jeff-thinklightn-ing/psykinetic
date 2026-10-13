@@ -525,6 +525,56 @@ func _test_middle_drag_axis() -> void:
 		rig._ease_pan(1.0 / 60.0)
 	rig._follow(0.0)
 	_check(rig.pan == Vector3.ZERO and rig._camera_target.is_equal_approx(_player_puppet(rig)), "on the player again within a second")
+
+	print("\n== click: a middle drag swirled round turns the view with it, and settles on a diamond ==")
+	for way: float in [1.0, -1.0]:
+		_ease(rig)
+		rig._follow(0.0)
+		var start_yaw := rig.yaw
+		var east := rig._camera.unproject_position(rig.to_global(_player_puppet(rig) + Vector3(3, 0, 0)))
+		var middle := rig._camera.unproject_position(rig.to_global(_player_puppet(rig)))
+		var before := (east - middle).angle()
+		_main._begin_middle_drag(Vector2(500, 500))
+		var radius := 90.0
+		var turned_at := -1
+		for i in range(1, 73):
+			var t := deg_to_rad(i * 5.0) * way
+			_main._middle_drag(Vector2(radius * sin(t), radius - radius * cos(t)))
+			if turned_at < 0 and rig._dragging:
+				turned_at = i * 5
+		_check(turned_at > 0 and turned_at <= int(Main.SWIRL_DEGREES) + 20 and rig.pan == Vector3.ZERO,
+				"%s: once it has curved a little (%d degrees of circle) it turns, and pans no more"
+				% ["clockwise" if way > 0.0 else "anticlockwise", turned_at])
+		rig._follow(0.0)
+		var now_east := rig._camera.unproject_position(rig.to_global(_player_puppet(rig) + Vector3(3, 0, 0)))
+		var now_middle := rig._camera.unproject_position(rig.to_global(_player_puppet(rig)))
+		var swung := rad_to_deg(wrapf((now_east - now_middle).angle() - before, -PI, PI))
+		_check(signf(swung) == way and not is_equal_approx(rig.yaw, start_yaw),
+				"the ground turns the way the swirl went (%.0f degrees on the screen)" % swung)
+		_main._end_middle_drag()
+		_ease(rig)
+		_check(not rig._dragging and is_equal_approx(fposmod(rig.yaw, Client3D.ORBIT_STEP), 0.0)
+				and not is_equal_approx(rig.yaw, start_yaw), "let go, it settles on another diamond (%.0f)" % rig.yaw)
+	_ease(rig)
+	var straight_yaw := rig.yaw
+	_main._begin_middle_drag(Vector2(500, 500))
+	for i in range(1, 30):
+		_main._middle_drag(Vector2(i * 8.0, i * 1.5 + sin(i * 0.7) * 3.0))
+	_check(not rig._dragging and rig.pan != Vector3.ZERO and is_equal_approx(rig.yaw, straight_yaw),
+			"a straight drag, a little wobbly, still pans")
+	_main._end_middle_drag()
+	_main._begin_middle_drag(Vector2(500, 500))
+	for i in range(1, 20):
+		_main._middle_drag(Vector2(i * 10.0, 0.0))
+	for i in range(1, 20):
+		_main._middle_drag(Vector2(190.0, i * 10.0))
+	_check(not rig._dragging and is_equal_approx(rig.yaw, straight_yaw), "and so does one that turns a corner")
+	_main._end_middle_drag()
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._end_middle_drag()
+	for i in 60:
+		rig._ease_pan(1.0 / 60.0)
+	_check(rig.pan == Vector3.ZERO, "a middle click recentres")
 	var before := rig.pitch
 	_main._begin_middle_drag(Vector2(500, 500))
 	_main._middle_drag(Vector2(2, 1))

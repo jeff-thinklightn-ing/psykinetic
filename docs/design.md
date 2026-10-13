@@ -1531,7 +1531,13 @@ view: a pixel across is `size / height` of ground, one up or down that
 over the sine of the tilt), no further than `PAN_MAX` (10 tiles); let go,
 the view follows the player still at that offset, and a middle click
 eases it back onto them with the zoom (`ZOOM_RATE`), as does a new map.
-The ears stay with the player (the listener is not panned). The
+The ears stay with the player (the listener is not panned). A middle drag
+that curves (its heading turning `Main.SWIRL_DEGREES`, summed over
+`SWIRL_STEP_PX` steps, a step turning more than `SWIRL_CORNER_DEGREES` left
+out so a corner is no curve) is a **swirl**: the pan it made is undone, and
+from there the camera turns as the drag curves on, clockwise on the screen
+for a clockwise swirl (`Client3D.SWIRL_YAW`), settling on a diamond when
+let go as an A/D turn does. The
 zoom is saved as `camera_zoom` (`Net.camera_zoom`, held to that range on
 load, `Net.saved_zoom`). The WASD pitch peek pulls the size back a moment
 more (`Client3D._apply_size`), and so does the local player's death. The near/far
@@ -1643,7 +1649,8 @@ hold-to-move retargets, right click (and drag) shoves and tosses, the
 verbs land on the clicked target. In 3D, A/D turn the camera freely and
 lock it on the next diamond when let go (saved); W/S tilt it while held,
 springing back to 50° when let go; the wheel zooms, a middle drag pans
-the view and a middle click puts the zoom and the pan back; Q/E do
+the view (swirled round, it turns it) and a middle click puts the zoom
+and the pan back; Q/E do
 nothing (see the 3D view). The camera follows the player alone (at any
 pan's offset).
 

@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.106
+
+Client.
+
+- Swirl the middle mouse button round to turn the camera: clockwise turns it
+  clockwise, anticlockwise the other way, settling on the nearest view when
+  you let go, as A/D do. A straight middle drag still pans, and a middle
+  click recentres the view on you.
+
+The server must be updated to v0.1.106 too, as it refuses any other version.
+
 ## v0.1.105
 
 Server.

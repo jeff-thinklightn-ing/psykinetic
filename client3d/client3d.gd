@@ -132,6 +132,9 @@ const ZOOM_RATE := 14.0
 ## under the cursor kept under it, no further than PAN_MAX tiles; a middle
 ## click brings it back, eased at ZOOM_RATE.
 const PAN_MAX := 10.0
+## A middle-drag swirl's degrees of curve to the yaw's: +1 or -1, so that a
+## swirl clockwise on the screen turns the view clockwise with it.
+const SWIRL_YAW := -1.0
 ## A WASD middle drag let go: on to its diamond, eased out.
 const SETTLE_SECONDS := 0.25
 ## A turn of less than this, let go, goes back to the diamond it set off
@@ -712,6 +715,11 @@ func pan_by(offset: Vector2) -> void:
 	var ahead := Vector3(-basis.z.x, 0.0, -basis.z.z).normalized()
 	var moved := -right * offset.x * per_px + ahead * offset.y * per_px / sin(deg_to_rad(pitch))
 	pan = (_pan_base + moved).limit_length(PAN_MAX)
+
+
+## The drag's pan undone (it became a swirl): back where it began.
+func cancel_pan() -> void:
+	pan = _pan_base
 
 
 func _ease_pan(delta: float) -> void:
