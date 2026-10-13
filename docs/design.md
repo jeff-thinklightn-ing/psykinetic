@@ -887,6 +887,11 @@ block stripped first in case a model reasons anyway. A URL ending in
 `/chat/completions` is spoken to OpenAI-style instead (no `format` or
 `keep_alive`; `max_tokens`; the answer read from
 `choices[0].message.content`). Timeouts: 2 s for a stance, 5 s for a line.
+When she comes into the world (her player joins, comes back or respawns,
+or the console switches her mind), `warm()` asks each native endpoint and
+model to load (a chat with no messages, `"keep_alive": -1`), on its own
+request with a 120 s timeout and its reply unused, so her first ask does
+not time out while a cold model loads (half a minute on the box).
 An ask made while its channel is busy waits, the newest of its kind, and
 goes when the channel is free. The tick never waits.
 

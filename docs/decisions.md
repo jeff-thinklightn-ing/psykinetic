@@ -1784,3 +1784,24 @@ same; heat and light over 20 door flips, the same to the bit).
 
 The castle tick, profiled: 2.3 ms on average with several over 15, worst
 19, to 1.2, worst 8.
+
+## 179. A companion warms her model when she comes into the world
+
+Her asks time out quickly (2 s for a stance, 5 s for a line), and a cold
+model takes the box about 30 s to load, so after Ollama restarted every ask
+timed out until one happened to load it, and she fell back on her scripted
+answers. When she comes into the world (her player joins, comes back or
+respawns, or the console switches her mind), the mind now asks each
+endpoint and model she uses to load, with a chat of no messages (Ollama's
+load-only ask) and keep_alive -1. It goes on its own request with a 120 s
+timeout, apart from her channels, so it holds up no stance or line, and
+only one to each endpoint and model is out at a time; the reply is logged
+("loaded in N ms") and not used. An OpenAI-shaped endpoint has no such ask
+and is not warmed. Rejected: making the first ask itself wait longer, as
+her answers are meant to come quickly, and one stuck ask would hold up
+that channel for the whole load.
+
+(Found while fixing her timeouts on the box: its Ollama had been kept off
+port 11434 since Oct 6 by a reverse tunnel from the desktop, so her asks
+went to the desktop's Ollama. The box's Ollama now listens on 11600, set
+in /etc/psykinetic/env; box config, not the repo's.)

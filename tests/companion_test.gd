@@ -685,6 +685,22 @@ func _test_native_ollama_endpoint() -> void:
 	var openai_body: Variant = JSON.parse_string(openai.request_body("system", "user"))
 	_check(openai_body is Dictionary and not openai_body.has("format") and not openai_body.has("keep_alive")
 			and openai_body.get("think") == false, "its body has no format or keep_alive, and still think false")
+	# Warming up: each endpoint and model asked once to load and keep its model.
+	split.stub_warm = true
+	split.warm()
+	split.warm()
+	var loads := split.warm_sent.map(func(sent: Dictionary) -> String: return "%s %s" % [sent["url"], sent["body"]["model"]])
+	_check(loads == [Net.DEFAULT_LLM_URL + " small", "http://10.0.0.9:11434/api/chat big"]
+			and split.warm_sent.all(func(sent: Dictionary) -> bool:
+				return sent["body"]["messages"].is_empty() and int(sent["body"]["keep_alive"]) == -1),
+			"warm() asks each endpoint to load its model and keep it, once while out (%s)" % [loads])
+	same.stub_warm = true
+	same.warm()
+	_check(same.warm_sent.size() == 1, "one endpoint and model: one warm-up")
+	openai.stub_warm = true
+	openai.warm()
+	_check(openai.warm_sent.is_empty(), "an OpenAI-shaped endpoint is not warmed")
+	_check(not split.busy("stance") and not split.busy("voice"), "a warm-up holds up neither channel")
 	# A stance and a line in flight at once, on their own channels.
 	var slow := OllamaMind.new("http://10.255.255.1:9/api/chat", "stub", _main)
 	slow.stance({"system": "s", "user": "u"})

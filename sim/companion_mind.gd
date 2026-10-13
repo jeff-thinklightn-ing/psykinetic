@@ -42,6 +42,12 @@ func busy(_what: String) -> bool:
 	return false
 
 
+## She has come into the world: a mind that needs time to be ready (a
+## model to load) starts on it now, so her first ask is answered in time.
+func warm() -> void:
+	pass
+
+
 ## Called every tick: the asks that came back since, answered or not
 ## ({kind, serial, prompt, trigger, raw, answer, error, latency_ms,
 ## spoken_to}); [] for a mind that answers at once.

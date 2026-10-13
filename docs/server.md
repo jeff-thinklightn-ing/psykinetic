@@ -213,7 +213,9 @@ PSYKINETIC_MIND_WHY=1
 qwen3:14b, with each answer's reason in the mind log. The default URL is Ollama's native
 chat endpoint. The server asks it for JSON output with reasoning off and the
 model kept loaded (`"format": "json"`, `"think": false`, `"keep_alive": -1`),
-so the first decision does not pay a model load. A URL ending in
+so the first decision does not pay a model load; and each time a companion
+comes into the world it asks the model to load (a chat with no messages),
+so a restarted Ollama is ready before her first ask. A URL ending in
 `/chat/completions` is treated as an OpenAI-compatible endpoint instead.
 
 Her voice can run on its own endpoint and model, a bigger model on a bigger

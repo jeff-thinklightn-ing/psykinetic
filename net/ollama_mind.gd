@@ -22,6 +22,8 @@ const MAX_TOKENS := {"stance": 24, "voice": 90, "check": 12}
 const TEMPERATURE := {"stance": 0.2, "voice": 0.8, "check": 0.0}
 ## More with --mind-why, for the reason after the answer.
 const WHY_TOKENS := 40
+## Loading a model cold takes the box half a minute; a warm-up may.
+const WARM_TIMEOUT := 120.0
 
 var url := ""
 var model := ""
@@ -42,6 +44,14 @@ var _sent: Dictionary[String, Dictionary] = {}
 var _stubbed_body := ""
 ## Requests come back, answered or not, not yet taken.
 var _results: Array[Dictionary] = []
+## The node the HTTPRequests hang under.
+var _host: Node
+## The warm-up asked of each endpoint and model, "url model" -> its
+## HTTPRequest, while it is out.
+var _warming: Dictionary[String, HTTPRequest] = {}
+## Test hook: warm() only notes the bodies it would send.
+var warm_sent: Array[Dictionary] = []
+var stub_warm := false
 
 
 ## [param host] is a node to hang the HTTPRequests under.
@@ -52,6 +62,7 @@ func _init(endpoint: String, model_name: String, host: Node, voice_endpoint := "
 	url = endpoint
 	model = model_name
 	openai_shaped = endpoint.trim_suffix("/").ends_with("/chat/completions")
+	_host = host
 	for what: String in ["stance", "voice", "check"]:
 		var own := what == "voice"
 		_urls[what] = voice_endpoint if own and not voice_endpoint.is_empty() else endpoint
@@ -79,6 +90,40 @@ func voice(ask: Dictionary) -> Dictionary:
 func check(ask: Dictionary) -> Dictionary:
 	_send("check", ask)
 	return {}
+
+
+## Asks each native endpoint to load its model and keep it (a chat with no
+## messages, which Ollama answers once the model is in memory), on its own
+## request with a long timeout, its reply unused: her first stance or line
+## then finds the model loaded instead of timing out while it loads. An
+## OpenAI-shaped endpoint has no such ask; nor is one sent while one to the
+## same endpoint and model is still out.
+func warm() -> void:
+	for what: String in ["stance", "voice"]:
+		if _openai[what]:
+			continue
+		var key := "%s %s" % [_urls[what], _models[what]]
+		if _warming.has(key):
+			continue
+		var body := JSON.stringify({"model": _models[what], "messages": [], "keep_alive": -1})
+		if stub_warm:
+			warm_sent.append({"url": _urls[what], "body": JSON.parse_string(body)})
+			_warming[key] = null
+			continue
+		var http := HTTPRequest.new()
+		http.timeout = WARM_TIMEOUT
+		_host.add_child(http)
+		_warming[key] = http
+		var at := Time.get_ticks_msec()
+		http.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+			print("[mind] ollama: %s %s in %d ms" % [_models[what],
+					"loaded" if result == HTTPRequest.RESULT_SUCCESS and code == 200 else "did not load (%d, HTTP %d)" % [result, code],
+					Time.get_ticks_msec() - at])
+			_warming.erase(key)
+			http.queue_free())
+		if http.request(_urls[what], PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST, body) != OK:
+			_warming.erase(key)
+			http.queue_free()
 
 
 func busy(what: String) -> bool:

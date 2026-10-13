@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.112
+
+Server.
+
+- Your companion's AI was timing out (she fell back on her stock lines):
+  the server's AI was set up on the wrong port. It now runs on the
+  server's own graphics card.
+- When she joins you, she asks the AI model to load straight away, so her
+  first answer after a server restart no longer times out while it loads.
+
+The server must be updated to v0.1.112 too, as it refuses any other version.
+
 ## v0.1.111
 
 Server and client.

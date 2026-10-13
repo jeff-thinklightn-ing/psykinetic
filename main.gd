@@ -1606,6 +1606,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		# client knows her for their own: a right click opens her pack).
 		existing.keeper_peer = player.owner_peer
 		existing.current_intent = Companion.Intent.FOLLOW
+		if existing.mind != null:
+			existing.mind.warm()
 		print("[net] %s's companion %s was waiting at %s and follows again" % [
 			record.name, existing.name, existing.tile])
 		return
@@ -1657,6 +1659,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	World.set_slots(pet, record.companion.get("slots", []))
 	pet.party_log = party_log
 	pet.mind = _make_mind()
+	pet.mind.warm()  # The model loads now, not on her first ask.
 	pet.said.connect(_on_companion_said.bind(pet))
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
@@ -2578,6 +2581,7 @@ func admin_command(line: String) -> String:
 			for pet: Companion in _companions.values():
 				if is_instance_valid(pet):
 					pet.mind = _make_mind()
+					pet.mind.warm()
 			return "companion minds: %s" % mind_kind
 		"perception":
 			if words.size() >= 2:
