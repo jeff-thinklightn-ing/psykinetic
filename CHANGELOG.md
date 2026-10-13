@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.109
+
+Client.
+
+- The monster your next click would attack is marked with a red ring at its
+  feet and a red glow, and the floor square hides, so you can see whether a
+  click will hit or walk.
+
+The server must be updated to v0.1.109 too, as it refuses any other version.
+
 ## v0.1.108
 
 Client.

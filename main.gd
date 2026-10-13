@@ -336,10 +336,13 @@ func _process(delta: float) -> void:
 	_drive_wasd()
 	_run_test_steer()
 	# Hover is the floor cell under the cursor, on the ground plane alone:
-	# nothing standing on the map intercepts it.
+	# nothing standing on the map intercepts it. In 3D a monster a click
+	# would attack is outlined instead, and the cell is not shown.
 	var tile := _mouse_tile()
 	if _client3d != null:
-		_client3d.hover(tile, World.is_walkable(tile))
+		var foe := _foe_under_mouse()
+		_client3d.target(foe)
+		_client3d.hover(tile, foe == null and World.is_walkable(tile))
 	else:
 		cursor.visible = World.is_walkable(tile)
 		cursor.position = Iso.tile_to_local(tile)
@@ -698,6 +701,16 @@ func _wasd_click(player: Player, button: MouseButton) -> void:
 	elif button == MOUSE_BUTTON_RIGHT and reachable:
 		_toss_target = next
 		_toss_from = get_global_mouse_position()
+
+
+## The monster a left click now would attack (the one under the cursor,
+## see _entity_under_mouse), or null.
+func _foe_under_mouse() -> GridEntity:
+	var player := _local_player()
+	if player == null:
+		return null
+	var entity := _entity_under_mouse()
+	return entity if entity is Monster and World.can_target(player, entity) else null
 
 
 ## A companion that belongs to this peer's player.

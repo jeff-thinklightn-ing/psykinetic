@@ -302,6 +302,12 @@ const LABEL_SIZE := 0.004
 const LABEL_FONT_SIZE := 64
 const SPEECH := Color(1, 0.95, 0.6)
 const HOVER := Color(1, 1, 1, 0.35)
+## The monster a click would attack (the one under the cursor) is marked:
+## a ring of this colour on the floor round its feet, and its body lit with
+## a glow of it (added over its own colours, this strong). An outline shell
+## was tried: the goblin's faceted mesh tears it into specks.
+const TARGET := Color(1.0, 0.3, 0.2, 0.9)
+const TARGET_GLOW := 0.2
 const RIPPLE := Color(0.58, 0.76, 0.69)
 const RIPPLE_SECONDS := 0.25
 const RING_SEGMENTS := 40
@@ -459,6 +465,10 @@ var _doorways: Dictionary[Vector3i, Node3D] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
+## The target's ring and glow, and the marked entity's instance id (0: none).
+var _target_ring: MeshInstance3D
+var _target_glow: StandardMaterial3D
+var _targeted := 0
 var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
 ## Main's speech bubbles, for last words.
@@ -517,6 +527,15 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_hover = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), HOVER)
 	_hover.visible = false
 	add_child(_hover)
+	_target_ring = _make_ring_instance(TARGET)
+	_target_ring.name = "TargetRing"
+	_target_ring.visible = false
+	add_child(_target_ring)
+	_target_glow = StandardMaterial3D.new()
+	_target_glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_target_glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_target_glow.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_target_glow.albedo_color = Color(TARGET, TARGET_GLOW)
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
@@ -549,6 +568,7 @@ func _process(delta: float) -> void:
 	_ease_zoom(delta)
 	_ease_pan(delta)
 	_follow(delta)
+	_place_target_ring()
 	_update_fade()
 	_drop_departed()
 	_update_mourning(delta)
@@ -1162,6 +1182,42 @@ func hover(tile: Vector2i, show: bool) -> void:
 	_hover.visible = show
 	if show:
 		_hover.position = _tile_position(tile) + Vector3(0.0, ON_FLOOR, 0.0)
+
+
+## Marks [param entity] as the one the next click attacks, and nothing
+## else (null: none).
+func target(entity: GridEntity) -> void:
+	var id := entity.get_instance_id() if entity != null else 0
+	if id != _targeted:
+		_glow_puppet(_targeted, null)
+		_targeted = id
+		_glow_puppet(id, _target_glow)
+	_place_target_ring()
+
+
+## The ring under the marked puppet, where it is drawn now; hidden when
+## none (or it is gone).
+func _place_target_ring() -> void:
+	var puppet: Node3D = _puppets.get(_targeted)
+	_target_ring.visible = puppet != null and is_instance_valid(puppet)
+	if _target_ring.visible:
+		_target_ring.position = puppet.position + Vector3(0.0, ON_FLOOR, 0.0)
+
+
+## The meshes of entity [param id]'s body (not its bar or label) drawn
+## with [param overlay] over them, or with none.
+func _glow_puppet(id: int, overlay: Material) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null or not is_instance_valid(puppet):
+		return
+	var body := puppet.get_node_or_null("Body")
+	if body == null:
+		return
+	var meshes := body.find_children("*", "MeshInstance3D", true, false)
+	if body is MeshInstance3D:
+		meshes.append(body)
+	for mesh: MeshInstance3D in meshes:
+		mesh.material_overlay = overlay
 
 
 ## The toss aim during a right drag: an arrow on the floor from

@@ -34,6 +34,7 @@ func _ready() -> void:
 	await _test_fade()
 	_test_outdoor()
 	await _test_near_miss_picks()
+	await _test_target_marked()
 	await _test_goblin()
 	_test_goblins_differ()
 
@@ -439,6 +440,48 @@ func _test_near_miss_picks() -> void:
 	var by_other := other.global_position + Vector3.UP * 0.6 + basis.x * 0.1
 	var picked: GridEntity = _rig.monster_near_ray(by_other - ahead * 30.0, ahead)
 	_check(picked == near, "two near: the nearer to the ray wins (%s)" % picked)
+	World.despawn(imp)
+	World.despawn(near)
+	await _frames(2)
+
+
+func _test_target_marked() -> void:
+	print("
+== the monster a click would attack is marked: a ring at its feet, its body aglow ==")
+	var imp := _spawn_imp(Vector2i(9, 4), "imp")
+	var other := _spawn_imp(Vector2i(10, 3), "imp")
+	await _frames(2)
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
+	var ring := _rig.get_node("TargetRing") as MeshInstance3D
+	_check(not ring.visible and _glowing(puppet) == 0, "none marked at first")
+	_rig.target(imp)
+	var meshes := puppet.get_node("Body").find_children("*", "MeshInstance3D", true, false).size()
+	_check(ring.visible and Vector2(ring.position.x, ring.position.z).is_equal_approx(Vector2(puppet.position.x, puppet.position.z)),
+			"the ring is at its feet (%s)" % ring.position)
+	_check(meshes > 0 and _glowing(puppet) == meshes, "every mesh of its body glows (%d of %d)" % [_glowing(puppet), meshes])
+	_check(_glowing(_rig._puppets[other.get_instance_id()]) == 0, "the one beside it does not")
+	_place(imp, Vector2i(9, 5))
+	await _frames(30)
+	_rig._process(0.0)
+	_check(Vector2(ring.position.x, ring.position.z).distance_to(Vector2(puppet.position.x, puppet.position.z)) < 0.01,
+			"the ring goes where it goes (%s)" % ring.position)
+	_rig.target(other)
+	_check(_glowing(puppet) == 0 and _glowing(_rig._puppets[other.get_instance_id()]) > 0, "another marked: the first no longer is")
+	_rig.target(null)
+	_check(not ring.visible and _glowing(_rig._puppets[other.get_instance_id()]) == 0, "none: nothing marked")
+	World.despawn(imp)
+	World.despawn(other)
+	await _frames(2)
+
+
+## How many of [param puppet]'s meshes have an overlay (the target's glow).
+func _glowing(puppet: Node3D) -> int:
+	var count := 0
+	for mesh: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
+		if mesh.material_overlay != null:
+			count += 1
+	return count
 
 
 func _place(entity: GridEntity, tile: Vector2i) -> void:

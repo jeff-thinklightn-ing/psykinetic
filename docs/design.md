@@ -1595,7 +1595,11 @@ passes within `PICK_SLACK` of, past its own shape: `monster_near_ray`), so
 a click just off a slim goblin hits it rather than ordering a walk to the
 ground behind it, round it; `mouse_grid` meets the floor plane and Main snaps it
 to the nearest walkable cell within three tiles as in 2D. The hover is a
-square outline of the cell (`hover`), the click ripple a ring (`ripple`)
+square outline of the cell (`hover`), unless a click there would attack:
+then the monster it would hit (`Main._foe_under_mouse`, the same pick a
+click makes) is marked instead (`target`), a red ring at its feet
+(`TARGET`) and its body's meshes overlaid with an added red glow
+(`TARGET_GLOW`), the click ripple a ring (`ripple`)
 and the toss aim during a right drag an arrow (`toss_aim`), all flat on
 the floor; the toss drag reads its screen directions from the camera
 (`screen_vector`). `--test-yaw=<deg>` starts with the camera yawed, for

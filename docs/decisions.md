@@ -1723,3 +1723,15 @@ capsule is the target (the nearest, if more). Only monsters get the slack:
 a crate or a companion beside the cursor is not worth a wrong order, and a
 walk was never the wrong thing near them. A held move click brought onto a
 monster becomes an attack on it and ends, for the same reason.
+
+## 176. The monster under the cursor is marked
+
+With picking more forgiving (175), what a click will do should show before
+it is made. Each frame the 3D view marks the monster a left click would
+attack, found by the very pick a click uses, so the mark never promises
+what the click won't do: a red ring on the floor round its feet and a faint
+red glow added over its body. The floor's hover square hides meanwhile, as
+the click is no walk. An inverted-hull outline was tried first and dropped:
+the goblin's faceted mesh has split normals, and the grown shell tore into
+specks. Only monsters are marked, as only they get the pick's slack; the
+2D view is left as it was.
