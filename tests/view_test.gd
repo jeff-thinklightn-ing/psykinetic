@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_ground_colours()
 	await _test_fade()
 	_test_outdoor()
+	await _test_near_miss_picks()
 	await _test_goblin()
 	_test_goblins_differ()
 
@@ -406,6 +407,38 @@ func _test_goblins_differ() -> void:
 	for each: GridEntity in [imps[0], imps[1], brute]:
 		World.despawn(each)
 	_rig._process(0.0)
+
+
+func _test_near_miss_picks() -> void:
+	print("\n== a click just off a goblin is a click on it, not on the ground behind it ==")
+	var imp := _spawn_imp(Vector2i(9, 4), "imp")
+	await _frames(2)
+	_rig._process(0.0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
+	var basis := _rig._camera.global_transform.basis
+	var ahead := -basis.z
+	var chest := puppet.global_position + Vector3.UP * 0.6
+	var off := chest - basis.x * 0.6
+	var query := PhysicsRayQueryParameters3D.create(off - ahead * 30.0, off + ahead * 30.0)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var hit := _rig.get_world_3d().direct_space_state.intersect_ray(query)
+	_check(hit.is_empty() or hit["collider"].get_meta("entity", 0) != imp.get_instance_id(),
+			"its own pick shape misses a ray 0.6 off its chest (it is slim)")
+	_check(_rig.monster_near_ray(off - ahead * 30.0, ahead) == imp, "but that ray picks it")
+	var above := puppet.global_position + Vector3.UP * (float(puppet.get_meta("pick_height")) + 0.4)
+	_check(_rig.monster_near_ray(above - ahead * 30.0, ahead) == imp, "and one just over its head")
+	var wide := chest - basis.x * 1.2
+	_check(_rig.monster_near_ray(wide - ahead * 30.0, ahead) == null, "a ray 1.2 off it picks nothing")
+	var near := _spawn_imp(Vector2i(10, 3), "imp")
+	await _frames(2)
+	_rig._process(0.0)
+	var other: Node3D = _rig._puppets[near.get_instance_id()]
+	var by_other := other.global_position + Vector3.UP * 0.6 + basis.x * 0.1
+	var picked: GridEntity = _rig.monster_near_ray(by_other - ahead * 30.0, ahead)
+	_check(picked == near, "two near: the nearer to the ray wins (%s)" % picked)
 
 
 func _place(entity: GridEntity, tile: Vector2i) -> void:

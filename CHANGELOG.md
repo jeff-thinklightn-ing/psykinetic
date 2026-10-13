@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.108
+
+Client.
+
+- Clicking a monster is easier: a click just off its body, or behind your
+  own character, now attacks it instead of walking you round it to the
+  ground behind.
+- Holding the left button to walk and bringing the cursor onto a monster
+  attacks it.
+
+The server must be updated to v0.1.108 too, as it refuses any other version.
+
 ## v0.1.107
 
 Client.

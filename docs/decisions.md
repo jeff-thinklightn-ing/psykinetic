@@ -1709,3 +1709,17 @@ middle click (which put back the zoom and the pan) is gone too, in both
 schemes: let go without a drag, the button does nothing, and the zoom
 stays where the wheel put it. This replaces 166's lasting pan and the
 middle-click reset of 67 and 68.
+
+## 175. A click near a monster is a click on it
+
+Clicking a goblin often walked the player round it while it hit them. The
+goblin's pick capsule is 0.3 in radius, and a click that missed it fell
+through to the ground under the cursor, which for a point on its body is
+the tile behind it: a move order there, re-pathed round the goblin every
+step. The local player's own capsule in front also stopped the ray dead.
+Now the pick looks through the local player, and when the ray hits no
+body, the monster whose feet-to-head line it passes within 0.45 of its
+capsule is the target (the nearest, if more). Only monsters get the slack:
+a crate or a companion beside the cursor is not worth a wrong order, and a
+walk was never the wrong thing near them. A held move click brought onto a
+monster becomes an attack on it and ends, for the same reason.

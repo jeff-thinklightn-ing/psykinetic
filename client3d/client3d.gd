@@ -286,6 +286,14 @@ const GAIT_HYSTERESIS := 1.15
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
 const MODEL_RADIUS := 0.3
+## A click this near a monster's body (ground units, past its own pick
+## shape, from the cursor's ray to the line from its feet to its head) is a
+## click on it: a model is slim, and a click just off one would land on the
+## ground behind it, a walk round it instead of a hit.
+const PICK_SLACK := 0.45
+## At most this many pick shapes are looked through (the local player, a
+## door) for the entity under the cursor.
+const PICK_DEPTH := 8
 const FOREST_REACH := 8
 const TREE_HEIGHT := 3.6
 ## Label3D: units per font pixel, with the font size, for a name about a
@@ -1003,18 +1011,51 @@ func _pick() -> Dictionary:
 
 
 ## The entity whose puppet is under the cursor, or null. The local player
-## is skipped so clicks pass through to what is behind it.
+## is looked through, so clicks pass on to what is behind it; a door in
+## front stops the ray. Where no puppet is hit, a monster within PICK_SLACK
+## of the cursor's ray is the one (the nearest, if more).
 func entity_under_mouse() -> GridEntity:
-	var hit := _pick()
-	if hit.is_empty():
-		return null
-	var area: Area3D = hit["collider"]
-	if not area.has_meta("entity"):
-		return null
-	var entity := instance_from_id(area.get_meta("entity")) as GridEntity
-	if entity == null or not entity.spawned or entity == _local_player():
-		return null
-	return entity
+	var own := _local_player()
+	var ray := _mouse_ray()
+	var query := PhysicsRayQueryParameters3D.create(ray[0], ray[0] + ray[1] * CAMERA_DISTANCE * 3.0)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = []
+	for i in PICK_DEPTH:
+		query.exclude = exclude
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			break
+		var area: Area3D = hit["collider"]
+		if not area.has_meta("entity"):
+			return null
+		var entity := instance_from_id(area.get_meta("entity")) as GridEntity
+		if entity != null and entity.spawned and entity != own:
+			return entity
+		exclude.append(hit["rid"])
+	return monster_near_ray(ray[0], ray[1])
+
+
+## The monster whose body passes within MODEL_RADIUS + PICK_SLACK of the
+## ray from [param origin] along [param direction] (the nearest), or null.
+func monster_near_ray(origin: Vector3, direction: Vector3) -> GridEntity:
+	var far := origin + direction * CAMERA_DISTANCE * 3.0
+	var best: GridEntity = null
+	var best_off := MODEL_RADIUS + PICK_SLACK
+	for id: int in _puppets:
+		var entity := instance_from_id(id) as GridEntity
+		var puppet := _puppets[id]
+		if not entity is Monster or not entity.spawned or not is_instance_valid(puppet) or not puppet.is_visible_in_tree():
+			continue
+		var feet := puppet.global_position
+		var head := feet + Vector3.UP * float(puppet.get_meta("pick_height", 1.0))
+		var closest := Geometry3D.get_closest_points_between_segments(origin, far, feet, head)
+		var off := closest[0].distance_to(closest[1])
+		if off < best_off:
+			best = entity
+			best_off = off
+	return best
 
 
 ## The door whose leaf or frame is under the cursor, or null.
@@ -2436,6 +2477,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var area := Area3D.new()
 	area.name = "Pick"
 	area.set_meta("entity", entity.get_instance_id())
+	puppet.set_meta("pick_height", height)
 	var collision := CollisionShape3D.new()
 	collision.position.y = height * 0.5
 	area.add_child(collision)

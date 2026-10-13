@@ -738,7 +738,9 @@ func _move_click(player: Player, tile: Vector2i) -> void:
 
 
 ## Left button held after a move click: when the cursor reaches another
-## cell, that is the new target, with its own ripple.
+## cell, that is the new target, with its own ripple. Brought onto a
+## monster, the hold is an attack on it instead (and ends): walking for the
+## ground under it would go round it.
 func _retarget_held() -> void:
 	if _held_target == NONE or not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_held_target = NONE
@@ -746,6 +748,11 @@ func _retarget_held() -> void:
 	var player := _local_player()
 	if player == null:
 		_held_target = NONE
+		return
+	var foe := _entity_under_mouse()
+	if foe is Monster and World.can_target(player, foe):
+		_held_target = NONE
+		World.command_attack(player, foe)
 		return
 	var tile := _snap_to_floor(_mouse_grid())
 	if tile != NONE and tile != _held_target:

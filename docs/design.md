@@ -1589,7 +1589,11 @@ client sends exactly the commands the 2D one does (move, attack, shove
 with a drag to toss, door, quick phrases 1–4, R, F3, F11, hold-to-move with
 retargeting). Main asks the view for its picks: `entity_under_mouse` and
 `door_under_mouse` cast a ray from the camera through the cursor against
-the pick `Area3D`s; `mouse_grid` meets the floor plane and Main snaps it
+the pick `Area3D`s (`entity_under_mouse` looks through the local player's
+own, and failing a hit takes the monster whose body, feet to head, the ray
+passes within `PICK_SLACK` of, past its own shape: `monster_near_ray`), so
+a click just off a slim goblin hits it rather than ordering a walk to the
+ground behind it, round it; `mouse_grid` meets the floor plane and Main snaps it
 to the nearest walkable cell within three tiles as in 2D. The hover is a
 square outline of the cell (`hover`), the click ripple a ring (`ripple`)
 and the toss aim during a right drag an arrow (`toss_aim`), all flat on
@@ -1639,7 +1643,8 @@ the HUD's controls list shows only the active scheme's. In both, 1–4 are
 the quick phrases, R, F3, F11 and H as ever.
 
 **Click** is the input described above: left click moves or attacks,
-hold-to-move retargets, right click (and drag) shoves and tosses, the
+hold-to-move retargets (brought onto a monster, the hold attacks it and
+ends), right click (and drag) shoves and tosses, the
 verbs land on the clicked target. In 3D, A/D turn the camera freely and
 lock it on the next diamond when let go (saved); W/S tilt it while held,
 springing back to 50° when let go; the wheel zooms, a middle drag pans
