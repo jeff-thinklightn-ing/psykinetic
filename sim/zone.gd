@@ -26,6 +26,8 @@ var doors: Dictionary[Vector3i, Door] = {}
 var occupancy: Dictionary[Vector2i, GridEntity] = {}
 var entities: Array[GridEntity] = []
 var hits: Array = []
+## World.find_path's memo of what the terrain allows: see World._path_step.
+var path_steps: Dictionary[Vector3i, int] = {}
 ## Main's state for this zone (its level, spawn table, respawn timers, the
 ## node its entities are under and their spawner).
 var main := {}

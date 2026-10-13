@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.111
+
+Server and client.
+
+- Less lag with monsters about: the server's tick spiked whenever a monster
+  went through a door or searched far for a way to you, and when your
+  companion described what she sees; those are now several times cheaper
+  (the castle's tick, worst case 19 ms to 8 locally).
+- The outline on the monster your next click would attack is a little
+  thicker, and off-white.
+
+The server must be updated to v0.1.111 too, as it refuses any other version.
+
 ## v0.1.110
 
 Client.

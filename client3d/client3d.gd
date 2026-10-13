@@ -303,7 +303,7 @@ const LABEL_FONT_SIZE := 64
 const SPEECH := Color(1, 0.95, 0.6)
 const HOVER := Color(1, 1, 1, 0.35)
 ## The monster a click would attack (the one under the cursor) is
-## outlined, its own look untouched. Its body draws as ever but marks its
+## outlined (off-white), its own look untouched. Its body draws as ever but marks its
 ## pixels in the stencil buffer (its materials' copies, OUTLINE_STENCIL);
 ## over it, its meshes draw again in this colour, nudged this many screen
 ## pixels each of the eight ways (one pass a way, OUTLINE_SHADER), only
@@ -312,8 +312,8 @@ const HOVER := Color(1, 1, 1, 0.35)
 ## (ground units) nearer the camera than the body, so the floor just in
 ## front of its feet does not hide the rim there; anything further in
 ## front still does.
-const TARGET_OUTLINE := Color(1.0, 1.0, 1.0)
-const TARGET_PIXELS := 2.0
+const TARGET_OUTLINE := Color(0.93, 0.9, 0.82)
+const TARGET_PIXELS := 3.0
 const OUTLINE_NEARER := 0.4
 const OUTLINE_STENCIL := 1
 const OUTLINE_SHADER := """shader_type spatial;

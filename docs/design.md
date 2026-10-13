@@ -494,6 +494,13 @@ sight is a Bresenham walk blocked by a wall edge or closed door crossed on
 the way (a diagonal step of the walk needs one of its two orthogonal routes
 open) and by entities with `blocks_sight`. A creature's path may go through
 a closed door at the cost of one extra step; it opens it by walking into it.
+The open tiles are a binary heap keyed by (f, the order each was first
+opened), which picks exactly what a scan in that order would; what the
+terrain allows across each step is worked out once a zone
+(`World._path_step`, kept on the Zone, emptied when its terrain is set),
+but for a diagonal past a door edge, asked each time, since the door's
+state decides it; and whether a tile burns is the map's heat alone while
+nobody carries heat (`World.is_burning`, `_carried_heat`, once a tick).
 
 **Doors** (`sim/door.gd`) are nodes on door edges, spawned by the server
 with the level through the spawner, so every client has them; `open` and
@@ -1063,8 +1070,11 @@ adds up, light falls off linearly and adds to the level's ambient light
 (level.json `ambient`, default 1: fully lit), capped at 1. The fixed
 sources are worked out again when the map or a door changes
 (`World.fields_changed`, which a Door's `open` calls on every peer, so a
-client's view follows the replicated door); carried ones are added at each
-look, so they move with their bearer. `World.heat_at`, `light_at`,
+client's view follows the replicated door): each source's share is kept,
+a door works out again only the sources within reach of it, and the totals
+are summed from the shares in the fixed order, the same to the bit as a
+whole recompute. Carried ones are added at each look, so they move with
+their bearer. `World.heat_at`, `light_at`,
 `is_burning`, `heat_from` (the compass point the heat comes from).
 
 The 3D view shades each floor cell by its fixed light (darker toward
@@ -1597,7 +1607,7 @@ ground behind it, round it; `mouse_grid` meets the floor plane and Main snaps it
 to the nearest walkable cell within three tiles as in 2D. The hover is a
 square outline of the cell (`hover`), unless a click there would attack:
 then the monster it would hit (`Main._foe_under_mouse`, the same pick a
-click makes) is outlined instead (`target`): a white rim
+click makes) is outlined instead (`target`): an off-white rim
 (`TARGET_OUTLINE`, `TARGET_PIXELS` wide) round its silhouette, its own
 look untouched. Its body draws with copies of its materials that mark the
 stencil buffer, and over it `OUTLINE_SHADER` draws its meshes again,

@@ -16,7 +16,11 @@ extends RefCounted
 ##
 ## Fixed sources (fire, torches) are worked out once and again only when
 ## the map or a door changes (World.fields_changed); carried ones are added
-## at each look, so they are always where their bearer is.
+## at each look, so they are always where their bearer is. Each fixed
+## source's share is kept (_parts): a door that opens or shuts works out
+## again only the sources that reach it (mark_dirty_near), and the totals
+## are added up from the shares in the same order as ever, so they come out
+## the same to the last bit (the whole castle took 16 ms a door).
 
 ## What each fixed source gives at its own cell, and how far it reaches.
 const FIRE := {"heat": 10.0, "light": 0.8, "reach": 4}
@@ -34,6 +38,10 @@ var _lanterns: Array[Vector2i] = []
 var _heat: Dictionary[Vector2i, float] = {}
 var _light: Dictionary[Vector2i, float] = {}
 var _dirty := true
+## Each fixed source's share, fire then torches then lanterns, each in
+## order: {"heat": {cell: amount}, "light": {cell: amount}}, or null to be
+## worked out again. Empty: all of them.
+var _parts: Array = []
 
 
 func load(terrain: Dictionary) -> void:
@@ -41,11 +49,41 @@ func load(terrain: Dictionary) -> void:
 	_torches.assign(terrain.get("torches", []))
 	_lanterns.assign(terrain.get("lanterns", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
-	_dirty = true
+	mark_dirty()
 
 
 func mark_dirty() -> void:
+	_parts.clear()
 	_dirty = true
+
+
+## Something changed at [param cells] (a door between two): only the
+## sources that reach that far (their reach, and a pace) are worked out
+## again; any line of theirs that crosses it stays within that.
+func mark_dirty_near(cells: Array[Vector2i]) -> void:
+	_dirty = true
+	if _parts.is_empty():
+		return
+	var sources := _sources()
+	for i in sources.size():
+		var source: Vector2i = sources[i][0]
+		var reach: int = sources[i][1]["reach"]
+		for cell in cells:
+			if maxi(absi(cell.x - source.x), absi(cell.y - source.y)) <= reach + 1:
+				_parts[i] = null
+				break
+
+
+## Every fixed source in the order its share is added: [cell, spec].
+func _sources() -> Array:
+	var sources := []
+	for cell in _fire:
+		sources.append([cell, FIRE])
+	for cell in _torches:
+		sources.append([cell, TORCH])
+	for cell in _lanterns:
+		sources.append([cell, LANTERN])
+	return sources
 
 
 ## Heat at [param cell]: fixed sources and carried ones.
@@ -56,6 +94,22 @@ func heat_at(world: Node, cell: Vector2i) -> float:
 		if entity.emit_heat > 0.0 and entity.spawned:
 			heat += _reaching(world, entity.tile, cell, CARRIED_REACH, entity.emit_heat, true)
 	return heat
+
+
+## The heat at [param cell] from the map's own sources alone (fire,
+## torches, lanterns set in it), without what creatures carry: heat_at when
+## nobody carries any.
+func map_heat_at(world: Node, cell: Vector2i) -> float:
+	_refresh(world)
+	return _heat.get(cell, 0.0)
+
+
+## Whether anything in [param world] carries heat now (see heat_at).
+func any_carried_heat(world: Node) -> bool:
+	for entity: GridEntity in world.get_entities():
+		if entity.emit_heat > 0.0 and entity.spawned:
+			return true
+	return false
 
 
 ## Light at [param cell], 0 (dark) to 1; [param carried]: with the lights
@@ -91,27 +145,43 @@ func _refresh(world: Node) -> void:
 	if not _dirty:
 		return
 	_dirty = false
+	var sources := _sources()
+	_parts.resize(sources.size())
+	for i in sources.size():
+		if _parts[i] == null:
+			_parts[i] = _spread(world, sources[i][0], sources[i][1])
 	_heat.clear()
 	_light.clear()
-	for cell in _fire:
-		_spread(world, cell, FIRE)
-	for cell in _torches:
-		_spread(world, cell, TORCH)
-	for cell in _lanterns:
-		_spread(world, cell, LANTERN)
+	for part: Dictionary in _parts:
+		var heat: Dictionary = part["heat"]
+		for cell: Vector2i in heat:
+			_heat[cell] = _heat.get(cell, 0.0) + heat[cell]
+		var light: Dictionary = part["light"]
+		for cell: Vector2i in light:
+			_light[cell] = _light.get(cell, 0.0) + light[cell]
 
 
-func _spread(world: Node, source: Vector2i, spec: Dictionary) -> void:
+## One source's share: {"heat": {cell: amount}, "light": {cell: amount}},
+## each cell's line from it traced once for both.
+func _spread(world: Node, source: Vector2i, spec: Dictionary) -> Dictionary:
 	var reach: int = spec["reach"]
+	var heat_share: Dictionary[Vector2i, float] = {}
+	var light_share: Dictionary[Vector2i, float] = {}
 	for dy in range(-reach, reach + 1):
 		for dx in range(-reach, reach + 1):
 			var cell := source + Vector2i(dx, dy)
-			var heat := _reaching(world, source, cell, reach, spec["heat"], true)
+			var distance := Vector2(cell - source).length()
+			if distance > reach + 0.5:
+				continue
+			if cell != source and not world.has_clear_line(source, cell):
+				continue
+			var heat := _given(distance, reach, spec["heat"], true)
 			if heat > 0.0:
-				_heat[cell] = _heat.get(cell, 0.0) + heat
-			var light := _reaching(world, source, cell, reach, spec["light"], false)
+				heat_share[cell] = heat
+			var light := _given(distance, reach, spec["light"], false)
 			if light > 0.0:
-				_light[cell] = _light.get(cell, 0.0) + light
+				light_share[cell] = light
+	return {"heat": heat_share, "light": light_share}
 
 
 ## What a source at [param source] giving [param amount] gives at
@@ -122,6 +192,14 @@ func _reaching(world: Node, source: Vector2i, cell: Vector2i, reach: int, amount
 	if distance > reach + 0.5 or amount <= 0.0:
 		return 0.0
 	if cell != source and not world.has_clear_line(source, cell):
+		return 0.0
+	return _given(distance, reach, amount, heat)
+
+
+## What a source giving [param amount] gives [param distance] paces off,
+## in its sight (see _reaching).
+static func _given(distance: float, reach: int, amount: float, heat: bool) -> float:
+	if amount <= 0.0:
 		return 0.0
 	if heat:
 		return amount * pow(HEAT_FALLOFF, distance)

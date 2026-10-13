@@ -1752,3 +1752,35 @@ even all round whatever the mesh, costs eight extra draws of one goblin,
 and needs no mesh copies. The outline is now kept on the puppet itself,
 not looked up by the entity, so a monster that dies outlined loses it: its
 puppet had left the lookup, and the glow stayed on the corpse.
+
+## 178. The server's tick, made cheap where it spiked
+
+With monsters about, the box's tick had gone from 0.07 ms idle to 2 ms on
+average, with spikes of 20-100 ms (a tick is 100 ms), felt as lag; the
+network was fine (21 ms round trip, few corrections). A local profile of
+the castle tick found the spikes, not in the monsters' thinking, but in
+three things they and Pip ask of the world. Every fix gives exactly what
+it replaces (checked: 3000 random castle paths with doors flipping, the
+same; heat and light over 20 door flips, the same to the bit).
+
+- **Paths.** `find_path` asked "does this tile burn?" of every neighbour,
+  and heat_at went through every entity (39 in the castle) for heat that
+  only a creature might carry, which none does. `is_burning` now asks once
+  a tick whether anything carries heat, and reads the map's heat alone if
+  not. What the terrain allows across a step is remembered per zone (walls,
+  heights and stairs do not move; a diagonal past a door edge is still
+  asked each time, as the door decides it), and the open list is a heap.
+  A search: 2.9 ms on average, worst 30, to 0.5, worst 7.
+- **Doors.** A door opening or shutting made every torch, fire and lantern
+  in the zone work out its reach again, line of sight to each cell twice
+  (for heat, then light): 16 ms, every time a goblin went through a door.
+  Each source's share is kept, a door redoes only the sources that reach
+  it, the line is traced once for both, and the totals are summed from the
+  shares in the old order: 0.7 ms.
+- **Pip's asks.** Her description of what she sees (a line of sight to
+  each cell within six) was worked out two or three times an ask; it is
+  worked out once and handed on, and asked_about's patterns are compiled
+  once: a voice ask, 10 ms to 3.3.
+
+The castle tick, profiled: 2.3 ms on average with several over 15, worst
+19, to 1.2, worst 8.

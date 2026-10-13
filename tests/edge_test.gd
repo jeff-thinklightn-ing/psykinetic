@@ -38,6 +38,8 @@ func _ready() -> void:
 	_test_door_breaks()
 	_test_projection()
 	_test_near_walls()
+	_test_paths_remember_the_terrain()
+	_test_fields_by_door()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -227,6 +229,58 @@ func _test_near_walls() -> void:
 	_check(WallEdge.is_near(Vector3i(1, 1, Terrain.EAST), floor_at), "a partition between two walkable cells: near, by the cell it is the east edge of")
 	_check(WallEdge.full_height() == Iso.height_px("wall"), "every wall is the scale table's full height")
 	_check(Main.NEAR_WALL_ALPHA > 0.0 and Main.NEAR_WALL_ALPHA < 1.0, "near walls are translucent (%.2f)" % Main.NEAR_WALL_ALPHA)
+
+
+func _test_paths_remember_the_terrain() -> void:
+	print("
+== find_path remembers what the terrain allows, but not a door's state, nor an old map ==")
+	_build()
+	var door := _door(DOOR_KEY, 20)
+	door.open = false
+	# (1, 3) to (2, 2) is a diagonal past the door's edge (east of (1, 2)).
+	var closed := World.find_path(Vector2i(1, 3), Vector2i(2, 2))
+	door.open = true
+	var opened := World.find_path(Vector2i(1, 3), Vector2i(2, 2))
+	door.open = false
+	var shut_again := World.find_path(Vector2i(1, 3), Vector2i(2, 2))
+	_check(closed.size() == 2 and opened == [Vector2i(2, 2)] and shut_again == closed,
+			"a diagonal past a door: round while it is shut %s, straight across once open %s, round again shut %s" % [closed, opened, shut_again])
+	var across := World.find_path(Vector2i(0, 0), Vector2i(2, 0))
+	World.load_terrain(Terrain.parse([
+		". .#.",
+		"  #  ",
+		". .#.",
+	]))
+	var walled := World.find_path(Vector2i(0, 0), Vector2i(2, 0))
+	_check(across.size() == 2 and walled.is_empty(), "a new map: its own walls, not the old map's open floor (%s, then %s)" % [across, walled])
+
+
+func _test_fields_by_door() -> void:
+	print("
+== a door opening or shutting works out again only the light and heat that reach it, the same as all of it ==")
+	_build()
+	var terrain := Terrain.parse(ROOM)
+	terrain["torches"] = [Vector2i(0, 2), Vector2i(4, 3)]
+	terrain["fire"] = [Vector2i(3, 0)]
+	terrain["lanterns"] = [Vector2i(0, 0)]
+	World.load_terrain(terrain)
+	var door := _door(DOOR_KEY, 20)
+	var same := true
+	var changed := false
+	var before: Dictionary = {}
+	for i in 6:
+		door.open = i % 2 == 0
+		World.heat_at(Vector2i(2, 2))
+		var whole := Fields.new()
+		whole.load(terrain)
+		whole._refresh(World)
+		same = same and World.fields._heat == whole._heat and World.fields._light == whole._light
+		if i == 1:
+			before = World.fields._light.duplicate()
+		if i == 2:
+			changed = World.fields._light != before
+	_check(same, "after each of six, every cell's heat and light are exactly as worked out afresh")
+	_check(changed, "and the door does change them")
 
 
 # --- helpers ------------------------------------------------------------------

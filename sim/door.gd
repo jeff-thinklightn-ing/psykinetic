@@ -30,7 +30,8 @@ var open := false:
 	set(value):
 		if open != value:
 			open = value
-			World.fields_changed()  # Light and heat pass an open door.
+			# Light and heat pass an open door: what reaches it is worked out again.
+			World.fields_changed(Terrain.edge_cells(key))
 var hp := 20
 var max_hp := 20
 var body_material := GridEntity.BodyMaterial.WOOD

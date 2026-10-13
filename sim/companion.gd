@@ -1042,7 +1042,8 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	if not standing_instruction().is_empty():
 		now.append("What %s asked of you still stands: %s" % [who, standing_instruction()])
 	now.append(run_summary(false))
-	var around := perception() if surroundings_keys() != _around_said or asks_about_surroundings(heard) else ""
+	var things := perceived()
+	var around := perception(things) if surroundings_keys(things) != _around_said or asks_about_surroundings(heard) else ""
 	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
 	var addressed := addressed_to(heard)
@@ -1189,17 +1190,20 @@ func voice_situation() -> String:
 ## you" block), as Net.perception has it: "list" (perception_list), "grid"
 ## (perception_grid) or "both", the grid first; then what the heat and the
 ## light tell her (field_sentences). "" when there is nothing to tell.
-func perception() -> String:
+## [param things]: perceived's result, when the caller has it already (it
+## looks at every cell in range: worked out once an ask, not once a use).
+func perception(things: Variant = null) -> String:
+	var seen: Array[Dictionary] = perceived() if things == null else things
 	var told := ""
 	match Net.perception:
 		"grid":
 			told = perception_grid()
 		"both":
-			var listed := perception_list()
+			var listed := perception_list(seen)
 			told = perception_grid() + ("\n" + listed if not listed.is_empty() else "")
 		_:
-			told = perception_list()
-	var felt := " ".join(field_sentences(perceived()))
+			told = perception_list(seen)
+	var felt := " ".join(field_sentences(seen))
 	if felt.is_empty():
 		return told
 	return felt if told.is_empty() else told + "\n" + felt
@@ -1207,9 +1211,9 @@ func perception() -> String:
 
 ## What she can see (perceived), a line each, nearest first: "- an imp, 2
 ## paces ahead to your left: between you and Jeff". "" for nothing.
-func perception_list() -> String:
+func perception_list(things: Variant = null) -> String:
 	var lines: Array[String] = []
-	for thing in perceived():
+	for thing: Dictionary in (perceived() if things == null else things):
 		var paces: int = thing["paces"]
 		var where := "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]
 		var relations: Array[String] = thing["relations"]
@@ -1222,9 +1226,9 @@ func perception_list() -> String:
 ## What the list tells (perceived), as "kind@cell" keys: the same while
 ## nothing around her changes, however she turns. The voice is told what
 ## she sees only when these changed since her last line, or when asked.
-func surroundings_keys() -> Array[String]:
+func surroundings_keys(seen: Variant = null) -> Array[String]:
 	var keys: Array[String] = []
-	var things := perceived()
+	var things: Array[Dictionary] = perceived() if seen == null else seen
 	for thing: Dictionary in things:
 		keys.append("%s@%s" % [thing["kind"], thing["at"]])
 	keys.append_array(field_sentences(things))
@@ -1308,6 +1312,10 @@ func perceived() -> Array[Dictionary]:
 	return chosen
 
 
+## asked_about's patterns, by kind, compiled once.
+static var _asked_words: Dictionary[String, RegEx] = {}
+
+
 ## The kinds of thing (as perceived names them, a door as "door") her
 ## player's last words to her named: "Where's the fire?" -> ["fire"].
 func asked_about() -> Array[String]:
@@ -1321,9 +1329,12 @@ func asked_about() -> Array[String]:
 		if turn["role"] == "user" and not str(turn["text"]).begins_with("[") \
 				and str(turn.get("speaker", keeper_name())) == keeper_name():
 			said = str(turn["text"]).to_lower()
+	if _asked_words.is_empty():
+		for kind: String in WORDS:
+			_asked_words[kind] = RegEx.create_from_string("\\b(%s)" % WORDS[kind])
 	var kinds: Array[String] = []
 	for kind: String in WORDS:
-		if RegEx.create_from_string("\\b(%s)" % WORDS[kind]).search(said) != null:
+		if _asked_words[kind].search(said) != null:
 			kinds.append(kind)
 	return kinds
 

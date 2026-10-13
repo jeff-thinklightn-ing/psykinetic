@@ -94,6 +94,15 @@ const DIAGONAL_TICK_SCALE := 1.5
 const MAX_QUEUED_STEPS := 3
 # Path costs are integers proportional to ticks. The +1 only breaks ties in
 # favour of straight lines; fire is a detour worth five steps.
+## What the terrain lets a walker who opens doors do across one step (see
+## _path_step): not go, go, go through a door edge (open or not: its state
+## is asked each time, a closed one costing PATH_DOOR_EXTRA), or, a
+## diagonal past a door edge, whatever that door's state allows now (a
+## closed one stops it), asked of the terrain each time.
+enum { PATH_STEP_BLOCKED, PATH_STEP_OPEN, PATH_STEP_DOOR, PATH_STEP_ASK }
+## find_path's heap keys: the order a tile was first opened in, in the low
+## bits, under its f.
+const PATH_ORDER_BITS := 24
 const PATH_STEP_COST := 1000
 const PATH_DIAGONAL_COST := int(PATH_STEP_COST * DIAGONAL_TICK_SCALE)
 const PATH_DIAGONAL_EXTRA := 1
@@ -146,6 +155,13 @@ var _clock_drift := 0.0
 var _half_sent := -1
 
 var _floor: Dictionary[Vector2i, bool] = {}
+## find_path's memo, this zone's (Zone.path_steps): for a cell and one of
+## DIRECTIONS (x, y, its index), PATH_STEP_* by the terrain alone. Emptied
+## whenever the terrain is set or cleared.
+var _path_steps: Dictionary[Vector3i, int] = {}
+## _carried_heat's memo: for which (tick, entity count), and its answer.
+var _carried_heat_key := Vector2i(-1, -1)
+var _carried_heat_now := false
 var _fire: Dictionary[Vector2i, bool] = {}
 ## Heights (cell -> 1..6 levels; 0 is absent), stairs (cell -> the way it
 ## climbs: to the orthogonal neighbour one level up) and water (not walkable,
@@ -345,6 +361,7 @@ func enter(to: Zone) -> Zone:
 	from.occupancy = _occupancy
 	from.entities = _entities
 	from.hits = _hits.duplicate()
+	from.path_steps = _path_steps
 	zone = to
 	tick = to.tick
 	_floor = to.floor
@@ -361,6 +378,8 @@ func enter(to: Zone) -> Zone:
 	_occupancy = to.occupancy
 	_entities = to.entities
 	_hits.assign(to.hits)
+	_path_steps = to.path_steps
+	_carried_heat_key = Vector2i(-1, -1)
 	zone_switched.emit(from, to)
 	return from
 
@@ -421,6 +440,7 @@ func reset() -> void:
 	_entities.clear()
 	_occupancy.clear()
 	_hits.clear()
+	_path_steps.clear()
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
@@ -441,6 +461,7 @@ func load_terrain(terrain: Dictionary) -> void:
 
 
 func _set_terrain(terrain: Dictionary) -> void:
+	_path_steps.clear()
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
@@ -484,9 +505,13 @@ func unregister_door(door: Door) -> void:
 		fields_changed()
 
 
-## The fixed heat and light must be worked out again (a door, the map).
-func fields_changed() -> void:
-	fields.mark_dirty()
+## The fixed heat and light must be worked out again (a door, the map):
+## all of it, or ([param near]) only what reaches those cells.
+func fields_changed(near: Array[Vector2i] = []) -> void:
+	if near.is_empty():
+		fields.mark_dirty()
+	else:
+		fields.mark_dirty_near(near)
 	fields_changed_signal.emit()
 
 
@@ -500,9 +525,24 @@ func light_at(at: Vector2i, carried := true) -> float:
 	return fields.light_at(self, at, carried)
 
 
-## Whether a creature standing at [param at] burns.
+## Whether a creature standing at [param at] burns. Asked of every cell a
+## path or a flood looks at: with nobody carrying heat (as now, always) it
+## is the map's heat alone, a lookup, where heat_at goes through every
+## entity each time.
 func is_burning(at: Vector2i) -> bool:
+	if not _carried_heat():
+		return fields.map_heat_at(self, at) >= HEAT_BURN
 	return heat_at(at) >= HEAT_BURN
+
+
+## Whether anything carries heat (Fields.any_carried_heat), worked out once
+## a tick (and again if the entities change in number).
+func _carried_heat() -> bool:
+	var key := Vector2i(tick, _entities.size())
+	if key != _carried_heat_key:
+		_carried_heat_key = key
+		_carried_heat_now = fields.any_carried_heat(self)
+	return _carried_heat_now
 
 
 ## Which way the heat at [param at] comes from, as a compass point ("" for none).
@@ -1133,6 +1173,7 @@ func mirror_reset() -> void:
 		return
 	_entities.clear()
 	_occupancy.clear()
+	_path_steps.clear()
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
@@ -1754,22 +1795,25 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	if _occupancy.has(to) and not ignore_goal_occupant and _occupancy[to] != ignore:
 		return path
 
-	var open: Array[Vector2i] = [from]
+	# The open tiles in a binary heap keyed by (f, the order each was first
+	# opened in): the cheapest, the earliest of equals, comes out first, as a
+	# scan of a list in that order would pick it, without the scan (a search
+	# of the whole castle took 10-20 ms that way). A tile made cheaper is
+	# pushed again; its older entry is stale and skipped when it comes up.
+	var heap_keys := PackedInt64Array()
+	var heap_cells: Array[Vector2i] = []
+	var opened: Dictionary[Vector2i, int] = {from: 0}
 	var closed: Dictionary[Vector2i, bool] = {}
 	var came_from: Dictionary[Vector2i, Vector2i] = {}
 	var cost: Dictionary[Vector2i, int] = {}
 	cost[from] = 0
+	_heap_push(heap_keys, heap_cells, _path_heuristic(from, to) << PATH_ORDER_BITS, from)
 
-	while not open.is_empty():
-		var best := 0
-		var best_f: int = cost[open[0]] + _path_heuristic(open[0], to)
-		for i in range(1, open.size()):
-			var f: int = cost[open[i]] + _path_heuristic(open[i], to)
-			if f < best_f:
-				best = i
-				best_f = f
-		var current: Vector2i = open[best]
-		open.remove_at(best)
+	while not heap_keys.is_empty():
+		var key := heap_keys[0]
+		var current: Vector2i = _heap_pop(heap_keys, heap_cells)
+		if closed.has(current) or key >> PATH_ORDER_BITS != cost[current] + _path_heuristic(current, to):
+			continue  # Stale: closed already, or pushed again since, cheaper.
 		if max_tiles > 0 and closed.size() >= max_tiles:
 			return path
 
@@ -1781,9 +1825,13 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			return path
 
 		closed[current] = true
-		for direction in DIRECTIONS:
+		for way in DIRECTIONS.size():
+			var direction: Vector2i = DIRECTIONS[way]
 			var next: Vector2i = current + direction
-			if closed.has(next) or _terrain_blocks_step(current, direction, true):
+			if closed.has(next):
+				continue
+			var step := _path_step(current, way)
+			if step == PATH_STEP_BLOCKED or step == PATH_STEP_ASK and _terrain_blocks_step(current, direction, true):
 				continue
 			if _occupancy.has(next) and next != to and _occupancy[next] != ignore:
 				continue
@@ -1792,16 +1840,87 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 				next_cost += PATH_DIAGONAL_COST + PATH_DIAGONAL_EXTRA
 			else:
 				next_cost += PATH_STEP_COST
-				if _closed_door_across(current, direction) != null:
+				if step == PATH_STEP_DOOR and _closed_door_across(current, direction) != null:
 					next_cost += PATH_DOOR_EXTRA
 			if is_burning(next):
 				next_cost += PATH_FIRE_EXTRA
 			if not cost.has(next) or next_cost < cost[next]:
 				cost[next] = next_cost
 				came_from[next] = current
-				if next not in open:
-					open.append(next)
+				if not opened.has(next):
+					opened[next] = opened.size()
+				_heap_push(heap_keys, heap_cells,
+						((next_cost + _path_heuristic(next, to)) << PATH_ORDER_BITS) | opened[next], next)
 	return path
+
+
+## What the terrain lets a walker who opens doors do stepping from
+## [param from] the way DIRECTIONS[[param way]] points (PATH_STEP_*),
+## worked out once a zone's terrain (_terrain_blocks_step, which asks a
+## dozen things of it) and remembered: walls, heights and stairs stay put,
+## and a door edge never blocks one who opens doors going straight through;
+## only a diagonal past one depends on the door (PATH_STEP_ASK).
+func _path_step(from: Vector2i, way: int) -> int:
+	var key := Vector3i(from.x, from.y, way)
+	var step: int = _path_steps.get(key, -1)
+	if step == -1:
+		var direction: Vector2i = DIRECTIONS[way]
+		var via_x := Vector2i(direction.x, 0)
+		var via_y := Vector2i(0, direction.y)
+		if direction.x != 0 and direction.y != 0 and Terrain.Edge.DOOR in [edge_kind(from, via_x),
+				edge_kind(from + via_x, via_y), edge_kind(from, via_y), edge_kind(from + via_y, via_x)]:
+			step = PATH_STEP_ASK
+		elif _terrain_blocks_step(from, direction, true):
+			step = PATH_STEP_BLOCKED
+		elif edge_kind(from, direction) == Terrain.Edge.DOOR:
+			step = PATH_STEP_DOOR
+		else:
+			step = PATH_STEP_OPEN
+		_path_steps[key] = step
+	return step
+
+
+## find_path's heap: [param cell] in under [param key], sifted up.
+static func _heap_push(keys: PackedInt64Array, cells: Array[Vector2i], key: int, cell: Vector2i) -> void:
+	keys.append(key)
+	cells.append(cell)
+	var at := keys.size() - 1
+	while at > 0:
+		var parent := (at - 1) >> 1
+		if keys[parent] <= key:
+			break
+		keys[at] = keys[parent]
+		cells[at] = cells[parent]
+		at = parent
+	keys[at] = key
+	cells[at] = cell
+
+
+## find_path's heap: the cell under the least key, taken out.
+static func _heap_pop(keys: PackedInt64Array, cells: Array[Vector2i]) -> Vector2i:
+	var top: Vector2i = cells[0]
+	var last := keys.size() - 1
+	var key := keys[last]
+	var cell: Vector2i = cells[last]
+	keys.resize(last)
+	cells.resize(last)
+	if last == 0:
+		return top
+	var at := 0
+	while true:
+		var child := at * 2 + 1
+		if child >= last:
+			break
+		if child + 1 < last and keys[child + 1] < keys[child]:
+			child += 1
+		if keys[child] >= key:
+			break
+		keys[at] = keys[child]
+		cells[at] = cells[child]
+		at = child
+	keys[at] = key
+	cells[at] = cell
+	return top
 
 
 ## Cheapest possible cost between two tiles on an empty grid.
