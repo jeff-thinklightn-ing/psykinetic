@@ -8,6 +8,25 @@ characters/goblin.blend  generated:trellis2, blender (goblin-4000f.glb: loose pa
                          Godot SkeletonProfileHumanoid bone names, T-pose rest, no animations)
                          Repainted by hand: white eye sockets (goblin_eyes), a dark brow under
                          the hood and the mouth (goblin_hair), more of the face and neck skin.
+                         Since textured: one material, goblin, showing paint/goblin_paint.png
+                         (colour) and paint/goblin_shine.png (roughness, its green) through the
+                         UV map "paint"; the seven part materials are kept unused (fake user)
+                         to bake from again.
+paint/goblin_paint.png   the goblin's colour, 2048 x 2048, painted by hand: a sheet of views
+                         (front, back, both sides, from above and below, the face close up from a
+                         little below) with the faces no side shows packed in a strip at the foot;
+                         each face is in the view it faces and can be seen from, and where two
+                         overlap there the nearer keeps it. Started as a bake of the seven parts'
+                         colours.
+paint/goblin_shine.png   the goblin's roughness on the same sheet (white rough, black shiny):
+                         skin 0.55, eyes 0.2, leather 0.5, boots 0.65, cloth 0.9, hood and cape
+                         0.95, brow and mouth 0.8; painted by hand from there.
+paint/goblin_paint_guide.png
+                         an overlay for painting: every face outlined in its part's colour, the
+                         views labelled, the eye sockets ringed. paint/ has a .gdignore: the
+                         game reads the images through goblin.glb, never these.
+characters/goblin_goblin_paint.png, characters/goblin_goblin_shine.png
+                         the two images as Godot extracts them from goblin.glb on import
 characters/goblin.glb    export of goblin.blend: mesh + skin + armature, +Y up (glTF 2.0 binary,
                          selected goblin + goblin_rig, custom properties, skinning, no shape
                          keys, no animations)

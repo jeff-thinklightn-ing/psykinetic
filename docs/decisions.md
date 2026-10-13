@@ -1596,3 +1596,22 @@ the player, since what is heard is where they are. The WASD scheme keeps
 its middle drag for turning and the pitch peek: the two schemes were
 already split on the button, and the click scheme turns and tilts with
 A/D and W/S instead.
+
+## 167. The goblin is textured: one sheet to paint, colour and shine
+
+Seven flat materials let the goblin be only seven colours and one dullness,
+and every part read as the same matte rubber. It has one material now,
+with two images on one UV sheet: its colour and its roughness. The sheet
+is laid out to be painted as a picture, not by Blender's packing (Smart UV
+Project cut it into hundreds of islands no one could find a face in): each
+face goes in the view it faces and can be seen from (front, back, both
+sides, above, below, and the face close up from a little below), the
+nearer of two faces that overlap there keeps its place, and what no side
+shows (the eye sockets, the mouth, the inside of the hood) is packed in a
+strip. The colours were baked from the seven materials, so the goblin
+looked the same the day it was textured; the shine was each part's own
+(skin and leather with a sheen, the hood and cloth dull, the eyes glossy).
+The images live in art/models/paint/, which Godot ignores: the game reads
+them only as goblin.glb carries them, so the 2048 sheets are packed once.
+The seven materials stay in the .blend, unused, to bake from again; the
+.blend is still the source and goblin.glb its export.

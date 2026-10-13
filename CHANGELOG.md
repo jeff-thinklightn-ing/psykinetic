@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.101
+
+Client.
+
+- Goblins are no longer one dull matte: their skin and leather have a sheen,
+  their eyes are glossy, and their hood and cloth stay rough.
+- Their eyes are yellow.
+
+The server must be updated to v0.1.101 too, as it refuses any other version.
+
 ## v0.1.100
 
 Client.
