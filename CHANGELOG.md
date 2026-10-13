@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.99
+
+Client.
+
+- Goblins have white eyes, a dark brow and mouth under the hood, and more of
+  their face showing.
+
+The server must be updated to v0.1.99 too, as it refuses any other version.
+
 ## v0.1.98
 
 Server.

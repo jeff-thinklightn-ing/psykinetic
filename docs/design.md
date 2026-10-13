@@ -1080,7 +1080,8 @@ are not affected yet.
 A monster kind can be drawn as an animated model instead of a capsule
 (`Client3D.MODELS`, by the spawn spec's `kind`): the imp, the brute and
 the sneak are the goblin (`art/models/characters/goblin.glb`, 1.2 tall, a
-22-bone humanoid rig).
+22-bone humanoid rig, seven flat colours: hood and cape, skin, cloth,
+leather, boots, white eye sockets, and a near-black brow and mouth).
 Models are imported with a SkeletonProfileHumanoid bone map
 (`art/models/bonemaps/`), so their skeleton is `%GeneralSkeleton` with the
 profile's bone names, and their clips are an AnimationLibrary of

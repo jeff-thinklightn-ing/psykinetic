@@ -6,7 +6,11 @@ Each .blend records this as the scene custom property `source`.
 characters/goblin.blend  generated:trellis2, blender (goblin-4000f.glb: loose parts removed, holes
                          closed, watertight, 1.2 m tall, flat colours; 22-bone humanoid rig with
                          Godot SkeletonProfileHumanoid bone names, T-pose rest, no animations)
-characters/goblin.glb    export of goblin.blend: mesh + skin + armature, +Y up
+                         Repainted by hand: white eye sockets (goblin_eyes), a dark brow under
+                         the hood and the mouth (goblin_hair), more of the face and neck skin.
+characters/goblin.glb    export of goblin.blend: mesh + skin + armature, +Y up (glTF 2.0 binary,
+                         selected goblin + goblin_rig, custom properties, skinning, no shape
+                         keys, no animations)
 
 characters/goblin.glb.import  imported with retarget/bone_map = bonemaps/goblin.tres (identity onto
                          SkeletonProfileHumanoid); the skeleton becomes %GeneralSkeleton

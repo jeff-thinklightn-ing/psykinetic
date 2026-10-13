@@ -1567,3 +1567,18 @@ no other beats it by more than 1 (with no hostile about, she takes the best,
 so she still keeps by her player as they move); and a way that starts back
 the way she last stepped costs 1.5 more. In the same fight: 11% of her steps
 straight back, from 25 to 34%, and a quarter as many steps.
+
+## 165. The goblin repainted in its source, exported as before
+
+The goblin's face read as a blank under its hood: its eye sockets and mouth
+were the hood's colour. It was repainted by hand in goblin.blend: the eye
+sockets white, the brow under the hood and the mouth near black, more of
+the face and neck skin, a little of the back cloth; three vertices of the
+mouth moved to open it. The rig, the skin weights and the vertex count are
+as they were, so the clips need nothing. The .blend stays the source, and
+goblin.glb is exported from it with the settings it was first exported
+with (checked against it: the same nodes, skin and five old materials, the
+scene's source property kept), so the next export cannot undo a change
+made only in the .glb. Colour lives in the model, not in Client3D, as one
+look for every goblin; a kind's own colours, were they wanted, would be an
+override in MODELS.
