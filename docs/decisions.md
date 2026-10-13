@@ -1582,3 +1582,17 @@ scene's source property kept), so the next export cannot undo a change
 made only in the .glb. Colour lives in the model, not in Client3D, as one
 look for every goblin; a kind's own colours, were they wanted, would be an
 override in MODELS.
+
+## 166. A middle drag pans the view, in the click scheme
+
+The click scheme's middle drag did nothing, and the camera was locked on
+the player, so there was no looking further off than the screen. Now it
+pans: the ground under the cursor stays under it, as a map is dragged. The
+pan is an offset from the player, not a place, so the view goes on
+following them while panned, and is held to 10 tiles so they cannot be
+lost off screen. A middle click, already "back to normal" for the zoom,
+brings the pan back too; a new map starts unpanned. The listener stays on
+the player, since what is heard is where they are. The WASD scheme keeps
+its middle drag for turning and the pitch peek: the two schemes were
+already split on the button, and the click scheme turns and tilts with
+A/D and W/S instead.

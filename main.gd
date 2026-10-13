@@ -174,9 +174,8 @@ var _lead := Vector2.ZERO
 var _pick_grid := Vector2(NAN, NAN)
 ## 3D: the screen point a middle drag went down at (x NAN when none), and
 ## what it is: UNDECIDED until it has moved (let go so, in the click
-## scheme, a middle click), then TURN or PITCH (WASD) or MOVED (click: a
-## drag, which does nothing).
-enum Drag { UNDECIDED, TURN, PITCH, MOVED }
+## scheme, a middle click), then TURN or PITCH (WASD) or PAN (click).
+enum Drag { UNDECIDED, TURN, PITCH, PAN }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
 ## Click scheme, 3D: W/S or A/D were held last frame (their release
@@ -547,16 +546,19 @@ func _begin_middle_drag(at: Vector2) -> void:
 
 
 ## The drag is [param offset] (screen px) from where it went down. In the
-## click scheme a drag does nothing (it is then no middle click); in WASD
-## it is a turn or a pitch peek by the axis it first moves on.
+## click scheme it pans the view (then it is no middle click); in WASD it
+## is a turn or a pitch peek by the axis it first moves on.
 func _middle_drag(offset: Vector2) -> void:
-	if _drag == Drag.MOVED:
+	if _drag == Drag.PAN:
+		_client3d.pan_by(offset)
 		return
 	if _drag == Drag.UNDECIDED:
 		if absf(offset.x) < DRAG_AXIS_PX and absf(offset.y) < DRAG_AXIS_PX:
 			return
 		if Net.controls == "click":
-			_drag = Drag.MOVED
+			_drag = Drag.PAN
+			_client3d.begin_pan()
+			_client3d.pan_by(offset)
 			return
 		if absf(offset.x) >= absf(offset.y):
 			_drag = Drag.TURN
@@ -578,7 +580,8 @@ func _end_middle_drag() -> void:
 		Drag.PITCH:
 			_client3d.end_pitch_peek()
 		Drag.UNDECIDED:
-			# Let go without moving: a middle click, which resets the zoom.
+			# Let go without moving: a middle click, which resets the zoom
+			# (and, in the click scheme, any pan).
 			_client3d.reset_zoom()
 	_drag = Drag.UNDECIDED
 
@@ -2226,7 +2229,7 @@ func hint_lines() -> Array[String]:
 	else:
 		lines.append_array(["LMB\tmove / attack (hold to steer)", "RMB\tshove (drag to toss)"])
 		if _client3d != null:
-			lines.append_array(["W / S\ttilt", "A / D\tturn", "Wheel\tzoom (MMB click: 1x)"])
+			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan", "Wheel\tzoom (MMB click: back)"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",

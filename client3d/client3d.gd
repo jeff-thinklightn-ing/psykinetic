@@ -38,7 +38,10 @@ extends Node3D
 ## PEEK_PULL_BACK during a WASD pitch peek. The mouse wheel zooms in either
 ## scheme, a ZOOM_STEP a notch between ZOOM_MIN and ZOOM_MAX, eased
 ## (ZOOM_RATE), on the player; a middle click puts it back to 1. The zoom
-## is saved (Net.camera_zoom).
+## is saved (Net.camera_zoom). Click scheme: a middle drag pans, sliding
+## the view off the player (`pan`, PAN_MAX at most) so the ground under the
+## cursor stays under it; the view then follows the player still, that far
+## off, until a middle click brings it back (or a new map does).
 ##
 ## Turning, in both schemes: the yaw turns freely, all the way round, and
 ## rests only on the diamond views (multiples of ORBIT_STEP from 0). Let
@@ -125,6 +128,10 @@ const ZOOM_STEP := 1.1
 const ZOOM_MIN := 0.8
 const ZOOM_MAX := 1.4
 const ZOOM_RATE := 14.0
+## Click scheme, a middle drag: the view slides off the player, the ground
+## under the cursor kept under it, no further than PAN_MAX tiles; a middle
+## click brings it back, eased at ZOOM_RATE.
+const PAN_MAX := 10.0
 ## A WASD middle drag let go: on to its diamond, eased out.
 const SETTLE_SECONDS := 0.25
 ## A turn of less than this, let go, goes back to the diamond it set off
@@ -398,6 +405,11 @@ var pitch := CAMERA_PITCH
 ## The wheel's zoom now and where it is easing to.
 var zoom := 1.0
 var _zoom_to := 1.0
+## The click scheme's pan: how far the view is off the player (ground
+## units), what it was when this drag began, and whether it is easing home.
+var pan := Vector3.ZERO
+var _pan_base := Vector3.ZERO
+var _pan_home := false
 ## A W/S tilt springing back: from, and how far along (1: not springing).
 var _tilt_from := CAMERA_PITCH
 var _tilt_t := 1.0
@@ -521,6 +533,7 @@ func _process(delta: float) -> void:
 	_ease_peek(delta)
 	_ease_tilt(delta)
 	_ease_zoom(delta)
+	_ease_pan(delta)
 	_follow(delta)
 	_update_fade()
 	_drop_departed()
@@ -618,9 +631,10 @@ func _place_camera() -> void:
 	_camera.position = _camera_target + _camera_offset()
 	_camera.look_at(_camera_target, Vector3.UP)
 	if _listener != null:
-		# On the ground under the camera's aim, turned as the camera is, so
-		# left and right in the ears are left and right on the screen.
-		_listener.global_transform = Transform3D(_camera.global_transform.basis, _camera_target + Vector3.UP)
+		# On the ground under the camera's aim (less any pan: the ears stay
+		# with the player), turned as the camera is, so left and right in
+		# the ears are left and right on the screen.
+		_listener.global_transform = Transform3D(_camera.global_transform.basis, _camera_target - pan + Vector3.UP)
 
 
 ## The camera stays on the player (plus the WASD lean, which eases by
@@ -635,7 +649,7 @@ func _follow(delta: float) -> void:
 		return
 	_local_name = String(player.name)
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
-	_camera_target = puppet.position + Vector3(_lead.x, 0.0, _lead.y)
+	_camera_target = puppet.position + Vector3(_lead.x, 0.0, _lead.y) + pan
 	_place_camera()
 
 
@@ -663,10 +677,43 @@ func zoom_by(notches: int) -> void:
 	_save_zoom()
 
 
-## A middle click: the zoom back to 1, eased; saved.
+## A middle click: the zoom back to 1 and the view back on the player,
+## eased; the zoom saved.
 func reset_zoom() -> void:
 	_zoom_to = 1.0
 	_save_zoom()
+	_pan_home = true
+
+
+## Click scheme: a middle drag begins; pan_by moves from where it is now.
+func begin_pan() -> void:
+	_pan_base = pan
+	_pan_home = false
+
+
+## The drag is [param offset] (screen px) from where it went down: the view
+## slides so the ground under the cursor stays under it (an ortho view, so
+## a pixel across is size / height of ground, and one up and down that over
+## the sine of the tilt), held to PAN_MAX.
+func pan_by(offset: Vector2) -> void:
+	var height := get_viewport().get_visible_rect().size.y
+	if _camera == null or height <= 0.0:
+		return
+	var per_px := _camera.size / height
+	var basis := _camera.global_transform.basis
+	var right := Vector3(basis.x.x, 0.0, basis.x.z).normalized()
+	var ahead := Vector3(-basis.z.x, 0.0, -basis.z.z).normalized()
+	var moved := -right * offset.x * per_px + ahead * offset.y * per_px / sin(deg_to_rad(pitch))
+	pan = (_pan_base + moved).limit_length(PAN_MAX)
+
+
+func _ease_pan(delta: float) -> void:
+	if not _pan_home:
+		return
+	pan = pan.lerp(Vector3.ZERO, 1.0 - exp(-ZOOM_RATE * delta))
+	if pan.length() < 0.001:
+		pan = Vector3.ZERO
+		_pan_home = false
 
 
 func _save_zoom() -> void:
@@ -1164,6 +1211,9 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_build_room()
 	_classify_walls()
 	_camera_target = _tile_position(_centre)
+	# A new map: the view starts on the player.
+	pan = Vector3.ZERO
+	_pan_home = false
 
 
 func _kit(piece: String) -> Node3D:

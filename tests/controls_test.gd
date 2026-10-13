@@ -489,14 +489,42 @@ func _test_middle_drag_axis() -> void:
 	for i in 10:
 		rig._ease_peek(0.05)
 	Net.controls = "click"
+	print("\n== click: a middle drag pans, the ground under the cursor kept under it; a middle click brings it back ==")
+	rig._sync_puppets()
+	rig._follow(0.0)
+	var ground := rig._camera_target
+	var at := rig._camera.unproject_position(rig.to_global(ground))
 	_main._begin_middle_drag(Vector2(500, 500))
-	_main._middle_drag(Vector2(300, 0))
-	_check(is_equal_approx(rig.yaw, yaw) and not rig._dragging, "click: a sideways middle drag does nothing (%s)" % rig.yaw)
+	_main._middle_drag(Vector2(3, 2))
+	_check(rig.pan == Vector3.ZERO, "under %d px it is not yet a pan" % Main.DRAG_AXIS_PX)
+	_main._middle_drag(Vector2(120, 0))
+	rig._follow(0.0)
+	var moved := rig._camera.unproject_position(rig.to_global(ground)) - at
+	_check(moved.distance_to(Vector2(120, 0)) < 1.0, "sideways: the ground goes with the cursor (%s)" % moved)
+	_check(is_equal_approx(rig.yaw, yaw) and not rig._dragging, "and it does not turn (%s)" % rig.yaw)
+	_main._middle_drag(Vector2(120, -90))
+	rig._follow(0.0)
+	moved = rig._camera.unproject_position(rig.to_global(ground)) - at
+	_check(moved.distance_to(Vector2(120, -90)) < 1.0, "up and down too, through the tilt (%s)" % moved)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig._peeking, "and it does not tilt (%s)" % rig.pitch)
+	_main._end_middle_drag()
+	var panned := rig.pan
+	_check(panned != Vector3.ZERO and rig._camera_target.is_equal_approx(_player_puppet(rig) + panned),
+			"let go, it stays panned (%s), following the player that far off" % panned)
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(0, 30))
+	_check(rig.pan.distance_to(panned) > 0.1, "a second drag goes on from there")
+	_main._middle_drag(Vector2(100000, 0))
+	_check(rig.pan.length() <= Client3D.PAN_MAX + 0.001, "never more than %d tiles off (%.2f)" % [Client3D.PAN_MAX, rig.pan.length()])
 	_main._end_middle_drag()
 	_main._begin_middle_drag(Vector2(500, 500))
-	_main._middle_drag(Vector2(0, -150))
-	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig._peeking, "nor does an up and down one (%s)" % rig.pitch)
 	_main._end_middle_drag()
+	rig._ease_pan(1.0 / 60.0)
+	_check(rig.pan != Vector3.ZERO and rig.pan.length() < Client3D.PAN_MAX, "a middle click: back, eased, not at once")
+	for i in 60:
+		rig._ease_pan(1.0 / 60.0)
+	rig._follow(0.0)
+	_check(rig.pan == Vector3.ZERO and rig._camera_target.is_equal_approx(_player_puppet(rig)), "on the player again within a second")
 	var before := rig.pitch
 	_main._begin_middle_drag(Vector2(500, 500))
 	_main._middle_drag(Vector2(2, 1))
@@ -598,6 +626,13 @@ func _free_rig(rig: Client3D) -> void:
 
 
 ## Long enough for any ease to finish.
+## Where the local player's puppet is in [param rig] (its WASD lean aside:
+## the click scheme has none).
+func _player_puppet(rig: Client3D) -> Vector3:
+	var player := rig._local_player()
+	return (rig._puppets[player.get_instance_id()] as Node3D).position
+
+
 func _ease(rig: Client3D) -> void:
 	for i in 20:
 		rig._ease_yaw(0.05)

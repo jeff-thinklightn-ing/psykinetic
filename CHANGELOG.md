@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.100
+
+Client.
+
+- Drag with the middle mouse button to pan the camera (click controls);
+  a middle click brings it back to you, along with the zoom.
+
+The server must be updated to v0.1.100 too, as it refuses any other version.
+
 ## v0.1.99
 
 Client.
