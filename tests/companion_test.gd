@@ -11,6 +11,9 @@ var _imps := 0
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = 17786  # Not 7777: the editor may be hosting there.
+	# The test room's monsters stay where they stand: these tests stage what
+	# they need beside them, and a wandering imp would join in.
+	Monster.idling = false
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 

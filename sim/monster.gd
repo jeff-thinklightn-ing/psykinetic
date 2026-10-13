@@ -7,6 +7,14 @@ extends GridEntity
 ## that kind does (TACTICS), in a manner of its own (_temper, from its name):
 ## it makes for a tile beside its target that no other monster is making
 ## for, so a pack surrounds rather than queues (_pick_slot).
+##
+## With nobody in sight it idles (Idle, level.json "idle", else by kind,
+## IDLE_BY_KIND), at IDLE_PACE of its step time: GUARD stands at its home
+## facing its set way and now and then glances aside; WANDER strolls about
+## its home; PATROL walks a route of waypoints; GATHER stands or sits round
+## a point, facing it. After a fight it walks back (home, its route, its
+## place at the point) and goes on. Its facing is its level entry's, or one
+## of its own from its name.
 
 ## Mass reads off the body: the sprite runs from SHADE_LIGHT at
 ## SHADE_LIGHT_MASS to SHADE_DARK at SHADE_DARK_MASS. Darker is heavier.
@@ -52,8 +60,45 @@ const NO_TILE := Vector2i(-9999, -9999)
 ## target before going straight at it instead.
 const SLOT_SEARCH_TILES := 120
 
+## What it does with nobody in sight. NONE: stands where it is (a monster of
+## no kind, as monsters were).
+enum Idle { NONE, GUARD, WANDER, PATROL, GATHER }
+const IDLE_MODES := {"none": Idle.NONE, "guard": Idle.GUARD, "wander": Idle.WANDER, "patrol": Idle.PATROL,
+	"gather": Idle.GATHER}
+const IDLE_BY_KIND := {"imp": Idle.WANDER, "brute": Idle.GUARD, "sneak": Idle.PATROL}
+## Idling it walks this much slower than it chases (its step time times this).
+const IDLE_PACE := 1.6
+## GUARD: a glance aside every so often (ticks), up to GLANCE_STEPS_MAX
+## eighths of a turn (2: 90 degrees) either way, held a moment.
+const GLANCE_EVERY_TICKS := Vector2i(30, 70)
+const GLANCE_HOLD_TICKS := Vector2i(8, 20)
+const GLANCE_STEPS_MAX := 2
+## WANDER: to a free tile at most this far from home, then a pause.
+const WANDER_RADIUS := 3
+const WANDER_PAUSE_TICKS := Vector2i(15, 60)
+## PATROL: a pause at each waypoint. With no route set, a loop of its own of
+## PATROL_LOOP_POINTS about its home, PATROL_LOOP_RADIUS out.
+const PATROL_PAUSE_TICKS := Vector2i(8, 25)
+const PATROL_LOOP_POINTS := 4
+const PATROL_LOOP_RADIUS := 3
+## GATHER: its place is a free tile this near the point (not in fire); some
+## sit there, by name, the rest stand.
+const GATHER_RADIUS := 2
+const SIT_CHANCE := 0.5
+## How far (tiles looked at) it searches for its way home or about.
+const IDLE_SEARCH_TILES := 400
+## How it is standing, for the views: SIT at a gathering.
+enum Pose { STAND, SIT }
+## The eight ways round, clockwise from north (for glances).
+const AROUND: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1),
+	Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)]
+
 ## A blow is coming (HEAVY): which way, over how many ticks. Views wind up.
 signal winding(direction: Vector2i, ticks: int)
+
+## Off: no monster idles (they stand where they are, as before idling). For
+## tests staged in a real level whose monsters must stay put.
+static var idling := true
 
 @export var sight_range := 7
 ## Who it went for this tick (null for nobody), for the companions' minds.
@@ -74,6 +119,27 @@ var _dart_from := -1
 var _dart_until := -1
 ## FLANK: ticks spent beside its target's front, ready to strike.
 var _front_ticks := 0
+## Idling: how, where home is (its level tile) and which way it faces there,
+## its route (PATROL; loop, or back and forth), the point it gathers at.
+var idle := Idle.NONE
+var home := NO_TILE
+var home_facing := Vector2i(0, 1)
+var route: Array[Vector2i] = []
+var route_loop := true
+var gather_point := NO_TILE
+var wander_radius := WANDER_RADIUS
+var pose := Pose.STAND
+var _idle_rng := RandomNumberGenerator.new()
+## Going back after a fight.
+var _returning := false
+## WANDER's tile, GATHER's place.
+var _idle_goal := NO_TILE
+## Pausing, or holding a glance, till then.
+var _idle_until := 0
+var _glancing := false
+var _route_index := 0
+var _route_step := 1
+var _sits := false
 
 
 func _init() -> void:
@@ -85,8 +151,10 @@ func _init() -> void:
 	strength = 6
 	max_stamina = 60
 	attack_ticks = 10
-	# Its pace changes as it charges; a client slides its steps by it.
+	# Its pace changes as it charges and as it idles; a client slides its
+	# steps by it.
 	replicate("move_ticks")
+	replicate("pose")
 
 
 func _ready() -> void:
@@ -97,6 +165,30 @@ func _ready() -> void:
 		_sprite.modulate = SHADE_LIGHT.lerp(SHADE_DARK, heaviness)
 	if Net.is_authority():
 		_temper()
+		_settle_idle()
+
+
+## How it idles, where its home is and which way it faces, from its spawn
+## spec ("home", "facing", "idle": as Level gives them), else by its kind and
+## its name.
+func _settle_idle() -> void:
+	_idle_rng.seed = hash(String(name) + "/idle")
+	var tile_given: Variant = spawn_spec.get("tile")
+	home = spawn_spec.get("home", tile_given if tile_given is Vector2i else NO_TILE)
+	var set_facing: Variant = spawn_spec.get("facing")
+	home_facing = set_facing if set_facing is Vector2i and set_facing in AROUND \
+			else AROUND[_idle_rng.randi_range(0, AROUND.size() - 1)]
+	facing = home_facing
+	var given: Dictionary = spawn_spec.get("idle", {})
+	var mode := str(given.get("mode", ""))
+	idle = IDLE_MODES[mode] if IDLE_MODES.has(mode) else IDLE_BY_KIND.get(str(spawn_spec.get("kind", "")), Idle.NONE)
+	route.assign(given.get("route", []))
+	route_loop = bool(given.get("loop", true))
+	var point: Variant = given.get("point")
+	gather_point = point if point is Vector2i else home
+	wander_radius = int(given.get("radius", WANDER_RADIUS))
+	_sits = _idle_rng.randf() < SIT_CHANCE
+	_idle_until = World.tick + _idle_rng.randi_range(0, GLANCE_EVERY_TICKS.y)
 
 
 ## Its kind's tactic and its own manner, the same every time for the same
@@ -122,9 +214,18 @@ func _sim_tick() -> void:
 		_noticed_tick = World.tick
 		slot = NO_TILE
 		_front_ticks = 0
+		if seen == null:
+			# The fight is over: back to where it idles, then on as before.
+			_returning = idle != Idle.NONE
+			_idle_goal = NO_TILE
+			_glancing = false
+		elif target == null:
+			move_ticks = _pace
+			pose = Pose.STAND
 	target = seen
 	if target == null:
 		_windup = {}
+		_idle_tick()
 		return
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
@@ -309,9 +410,202 @@ func _nearest_visible_target() -> GridEntity:
 	return nearest
 
 
+# --- Idling ---------------------------------------------------------------------
+
+## Nobody in sight: back from a fight first, then as it idles; slower than
+## it chases.
+func _idle_tick() -> void:
+	if not idling or idle == Idle.NONE or World.is_stunned(self) or World.tick < next_move_tick:
+		return
+	move_ticks = _pace * IDLE_PACE
+	if _returning:
+		var back := _back_to()
+		if back == NO_TILE or tile == back or not _idle_step(back):
+			_returning = false
+			_idle_until = World.tick + _idle_rng.randi_range(PATROL_PAUSE_TICKS.x, PATROL_PAUSE_TICKS.y)
+		return
+	match idle:
+		Idle.GUARD:
+			_guard()
+		Idle.WANDER:
+			_wander()
+		Idle.PATROL:
+			_patrol()
+		Idle.GATHER:
+			_gather()
+
+
+## Where it goes back to after a fight: home, or (PATROL) the nearest
+## waypoint of its route, or (GATHER) its place at the point.
+func _back_to() -> Vector2i:
+	match idle:
+		Idle.PATROL:
+			_ensure_route()
+			if route.is_empty():
+				return home
+			var nearest := 0
+			for i in route.size():
+				if World.distance(tile, route[i]) < World.distance(tile, route[nearest]):
+					nearest = i
+			_route_index = nearest
+			return route[nearest]
+		Idle.GATHER:
+			return _gather_place()
+	return home
+
+
+## GUARD: at home, facing its way, and every so often a glance aside, held
+## a moment, then back.
+func _guard() -> void:
+	if tile != home:
+		if not _idle_step(home):
+			_idle_until = World.tick + PATROL_PAUSE_TICKS.y  # Someone is on it: wait.
+		return
+	if World.tick < _idle_until:
+		return
+	if _glancing or facing != home_facing:
+		World.face(self, home_facing)
+		_glancing = false
+		_idle_until = World.tick + _idle_rng.randi_range(GLANCE_EVERY_TICKS.x, GLANCE_EVERY_TICKS.y)
+		return
+	var steps := _idle_rng.randi_range(1, GLANCE_STEPS_MAX) * (1 if _idle_rng.randf() < 0.5 else -1)
+	World.face(self, turned(home_facing, steps))
+	_glancing = true
+	_idle_until = World.tick + _idle_rng.randi_range(GLANCE_HOLD_TICKS.x, GLANCE_HOLD_TICKS.y)
+
+
+## WANDER: to a free tile near home, a pause, another.
+func _wander() -> void:
+	if World.tick < _idle_until:
+		return
+	if _idle_goal == tile:
+		_idle_goal = NO_TILE
+		_idle_until = World.tick + _idle_rng.randi_range(WANDER_PAUSE_TICKS.x, WANDER_PAUSE_TICKS.y)
+		return
+	if _idle_goal == NO_TILE:
+		_idle_goal = _wander_goal()
+		if _idle_goal == NO_TILE:
+			_idle_until = World.tick + WANDER_PAUSE_TICKS.x
+			return
+	if not _idle_step(_idle_goal):
+		_idle_goal = NO_TILE
+		_idle_until = World.tick + WANDER_PAUSE_TICKS.x
+
+
+## A free tile it can walk to, at most wander_radius from home, not where it
+## stands; NO_TILE if a few tries find none.
+func _wander_goal() -> Vector2i:
+	for i in 12:
+		var at := home + Vector2i(_idle_rng.randi_range(-wander_radius, wander_radius),
+				_idle_rng.randi_range(-wander_radius, wander_radius))
+		if at == tile or not World.is_walkable(at) or not World.is_free(at) or World.is_fire(at):
+			continue
+		if not World.find_path(tile, at, false, null, IDLE_SEARCH_TILES).is_empty():
+			return at
+	return NO_TILE
+
+
+## PATROL: waypoint to waypoint, a pause at each; round again (a loop) or
+## back the way it came.
+func _patrol() -> void:
+	_ensure_route()
+	if route.size() < 2 or World.tick < _idle_until:
+		return
+	var to := route[_route_index]
+	if tile == to or not _idle_step(to):
+		# There (or no way there now: on to the next).
+		if route_loop:
+			_route_index = (_route_index + 1) % route.size()
+		else:
+			if _route_index + _route_step < 0 or _route_index + _route_step >= route.size():
+				_route_step = -_route_step
+			_route_index += _route_step
+		_idle_until = World.tick + _idle_rng.randi_range(PATROL_PAUSE_TICKS.x, PATROL_PAUSE_TICKS.y)
+
+
+## A route of its own when none is set: home, then PATROL_LOOP_POINTS - 1
+## tiles round it it can walk to, in turn round the compass from a way of
+## its own, as a loop.
+func _ensure_route() -> void:
+	if not route.is_empty() or home == NO_TILE:
+		return
+	route.append(home)
+	var start := _idle_rng.randi_range(0, AROUND.size() - 1)
+	var per := AROUND.size() / (PATROL_LOOP_POINTS - 1)
+	for i in PATROL_LOOP_POINTS - 1:
+		var way := AROUND[(start + i * per) % AROUND.size()]
+		for reach in range(PATROL_LOOP_RADIUS, 0, -1):
+			var at := home + way * reach
+			if World.is_walkable(at) and not World.is_fire(at) and at not in route \
+					and not World.find_path(home, at, true, null, IDLE_SEARCH_TILES).is_empty():
+				route.append(at)
+				break
+	route_loop = true
+
+
+## GATHER: to its place by the point, then facing the point, sitting or
+## standing.
+func _gather() -> void:
+	var place := _gather_place()
+	if place == NO_TILE:
+		return
+	if tile != place:
+		pose = Pose.STAND
+		if not _idle_step(place):
+			_idle_goal = NO_TILE  # Taken or cut off: another place.
+			_idle_until = World.tick + PATROL_PAUSE_TICKS.y
+		return
+	var toward := gather_point - tile
+	toward = Vector2i(signi(toward.x), signi(toward.y))
+	if toward != Vector2i.ZERO and facing != toward:
+		World.face(self, toward)
+	pose = Pose.SIT if _sits else Pose.STAND
+
+
+## Its place round the gather point: a free tile within GATHER_RADIUS (not
+## the point, not fire, nearest the point first), one of its own by name
+## among those; kept while it is free.
+func _gather_place() -> Vector2i:
+	if _idle_goal != NO_TILE and (_idle_goal == tile or World.is_free(_idle_goal)):
+		return _idle_goal
+	var places: Array[Vector2i] = []
+	for reach in range(1, GATHER_RADIUS + 1):
+		for dx in range(-reach, reach + 1):
+			for dy in range(-reach, reach + 1):
+				var at := gather_point + Vector2i(dx, dy)
+				if World.distance(at, gather_point) != reach or not World.is_walkable(at) or World.is_fire(at):
+					continue
+				if at != tile and not World.is_free(at):
+					continue
+				places.append(at)
+		if not places.is_empty():
+			break
+	if places.is_empty():
+		return NO_TILE
+	_idle_goal = places[absi(hash(String(name))) % places.size()]
+	return _idle_goal
+
+
+## A step toward [param to] as it idles; false if there is no way.
+func _idle_step(to: Vector2i) -> bool:
+	var path := World.find_path(tile, to, false, null, IDLE_SEARCH_TILES)
+	if path.is_empty():
+		return false
+	return World.try_move(self, path[0] - tile)
+
+
+## [param direction] turned [param steps] eighths of a turn (clockwise for
+## positive), one of AROUND.
+static func turned(direction: Vector2i, steps: int) -> Vector2i:
+	var at := AROUND.find(direction)
+	if at < 0:
+		return direction
+	return AROUND[posmod(at + steps, AROUND.size())]
+
+
 func _world_winding(direction: Vector2i, ticks: int) -> void:
 	winding.emit(direction, ticks)
-	for peer in Net.sendable_peers():
+	for peer in viewers():
 		_net_winding.rpc_id(peer, direction, ticks)
 
 

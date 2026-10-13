@@ -10,7 +10,8 @@ extends RefCounted
 ##   height.png   optional, the same size: a cell pixel's grey is its height,
 ##                level n = grey n * 40 (0..240), 0..6 levels.
 ##   level.json   name; legend overrides; the entities' names and props by
-##                tile; the start order; named spawn points; level links.
+##                tile (a monster's facing and idling too); the start order;
+##                named spawn points; level links.
 ##
 ## A cell pixel is ground (stone, grass, dirt), fire, water, a stair, void
 ## (also any pixel more than half transparent), or a marker: a player start,
@@ -82,6 +83,8 @@ const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.5
 const CART := {"script": PUSHABLE, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "props": {"mass": 60.0}}
 ## Empty; level.json's props say what is in it ({"slots": ["bandaging_kit"]}).
 const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12)}
+## The idle modes level.json may give a monster (Monster.IDLE_MODES).
+const IDLE_MODES: Array[String] = ["guard", "wander", "patrol", "gather", "none"]
 
 ## Levels made in code (tests): name -> {layout: Image, height: Image or
 ## null, config: Dictionary}; load() takes these before the folder.
@@ -368,6 +371,16 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				props[key] = _prop(key, more[key])
 		if not props.is_empty():
 			spec["props"] = props
+		if spec.get("script") == MONSTER:
+			# Where it lives, whatever tile a snapshot later puts it on.
+			spec["home"] = at
+			var facing: Variant = facing_from(entry.get("facing"))
+			if facing != null:
+				spec["facing"] = facing
+			if entry.has("idle"):
+				var idle := idle_from(entry["idle"], warnings, at)
+				if not idle.is_empty():
+					spec["idle"] = idle
 		entities.append(spec)
 	# Starts: level.json's order, then any other start marker by scan.
 	var starts: Array[Vector2i] = []
@@ -460,6 +473,45 @@ static func _prop(key: String, value: Variant) -> Variant:
 	if key == "sight_range":
 		return int(value)
 	return value
+
+
+## A facing from level.json, [dx, dy] each -1, 0 or 1 (not both 0); null
+## for anything else.
+static func facing_from(value: Variant) -> Variant:
+	var at: Variant = _tile(value)
+	if at == null:
+		return null
+	var direction := Vector2i(clampi(at.x, -1, 1), clampi(at.y, -1, 1))
+	return direction if direction != Vector2i.ZERO else null
+
+
+## A monster's idling from level.json: a mode name ("guard", "wander",
+## "patrol", "gather", "none") or {"mode", "route": [[x, y], ...], "loop",
+## "point": [x, y], "radius"}, as {mode, route (Array of Vector2i), loop,
+## point (Vector2i), radius}; {} with a warning for an unknown mode.
+static func idle_from(value: Variant, warnings: Array[String], at: Vector2i) -> Dictionary:
+	var given: Dictionary = value if value is Dictionary else {"mode": value}
+	var mode := str(given.get("mode", ""))
+	if mode not in IDLE_MODES:
+		warnings.append("the monster at %s has an unknown idle mode \"%s\" (%s)" % [at, mode, ", ".join(IDLE_MODES)])
+		return {}
+	var idle := {"mode": mode}
+	var route: Array[Vector2i] = []
+	var listed: Variant = given.get("route", [])
+	if listed is Array:
+		for point: Variant in listed:
+			var tile: Variant = _tile(point)
+			if tile != null:
+				route.append(tile)
+	if not route.is_empty():
+		idle["route"] = route
+		idle["loop"] = bool(given.get("loop", true))
+	var point: Variant = _tile(given.get("point"))
+	if point != null:
+		idle["point"] = point
+	if given.has("radius"):
+		idle["radius"] = int(given["radius"])
+	return idle
 
 
 static func _tile(value: Variant) -> Variant:

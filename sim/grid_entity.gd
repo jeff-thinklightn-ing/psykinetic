@@ -266,6 +266,17 @@ func _visible_to(peer: int) -> bool:
 	return World.peer_sees(peer, zone)
 
 
+## The peers its events go to: those it can be sent to whose players are in
+## its zone (a peer elsewhere has no such node, and would be sent nothing it
+## could take).
+func viewers() -> Array[int]:
+	var peers: Array[int] = []
+	for peer in Net.sendable_peers():
+		if _visible_to(peer):
+			peers.append(peer)
+	return peers
+
+
 func _ready() -> void:
 	_sprite = get_node_or_null("Sprite")
 	if _sprite != null:
@@ -549,33 +560,33 @@ func _world_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, at_tick
 	tossed = toss
 	_note_pushed(from, tile)
 	pushed.emit(tiles)
-	for peer in Net.sendable_peers():
+	for peer in viewers():
 		_net_pushed.rpc_id(peer, tiles, lofted, toss, from, tile, at_tick, duration, by_peer)
 
 
 func _world_impacted(amount: int, against: StringName) -> void:
 	impacted.emit(amount, against)
-	for peer in Net.sendable_peers():
+	for peer in viewers():
 		_net_impacted.rpc_id(peer, amount, against)
 
 
 func _world_damaged(amount: int, cause: StringName) -> void:
 	damaged.emit(amount)
 	struck.emit(amount, cause)
-	for peer in Net.sendable_peers():
+	for peer in viewers():
 		_net_struck.rpc_id(peer, amount, cause)
 
 
 func _world_swung(direction: Vector2i) -> void:
 	swung.emit(direction)
-	for peer in Net.sendable_peers():
+	for peer in viewers():
 		_net_swung.rpc_id(peer, direction)
 
 
 func _world_stunned(until_tick: int, ticks: int) -> void:
 	stunned_until_tick = until_tick
 	_reel_until = until_tick
-	for peer in Net.sendable_peers():
+	for peer in viewers():
 		_net_stunned.rpc_id(peer, ticks)
 
 

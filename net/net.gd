@@ -167,6 +167,9 @@ const PERCEPTIONS: Array[String] = ["list", "grid", "both"]
 var perception := "list"
 ## --no-companions: players get no companion (tests of other things, or ops).
 var companions := true
+## --still-monsters: no monster idles (they stand where they are), for tests
+## that stage what they need in a real level (Monster.idling).
+var still_monsters := false
 ## --no-player-reset turns this off: any player may rebuild the room with R.
 ## On while the game is only being tested; the console's reset always works.
 var player_reset := true
@@ -952,6 +955,9 @@ func _parse_args() -> void:
 				console = true
 			"--no-companions":
 				companions = false
+			"--still-monsters":
+				still_monsters = true
+				Monster.idling = false
 			"--no-player-reset":
 				player_reset = false
 			"--mind-why":

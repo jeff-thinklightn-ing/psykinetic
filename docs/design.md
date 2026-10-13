@@ -1235,6 +1235,23 @@ hides it, remembered in settings.cfg (`hints=on|off`).
     nearest first, so a pack surrounds rather than queues; its way there is
     searched only so far (`find_path`'s `max_tiles`, `SLOT_SEARCH_TILES`),
     and with nowhere free beside its target it goes as near as it can.
+  - *Idling* (`Monster.Idle`), with nobody in sight: as its level entry
+    says (`"idle"`, docs/levels.md), else by kind (`IDLE_BY_KIND`: imps
+    `WANDER`, brutes `GUARD`, sneaks `PATROL`; no kind `NONE`), at
+    `IDLE_PACE` of its step time. `GUARD` holds its home cell facing its
+    way (`home_facing`), glancing aside up to `GLANCE_STEPS_MAX` eighths of
+    a turn every `GLANCE_EVERY_TICKS`, for `GLANCE_HOLD_TICKS`; `WANDER`
+    walks to free cells within `wander_radius` of home, pausing
+    `WANDER_PAUSE_TICKS`; `PATROL` walks its route, pausing
+    `PATROL_PAUSE_TICKS` at each waypoint, round or back and forth (with no
+    route, `PATROL_LOOP_POINTS` of its own about home); `GATHER` takes a
+    free cell within `GATHER_RADIUS` of its point (one of its own, by
+    name), faces it, and sits there (`pose`, replicated) or stands. When a
+    fight ends it walks back (home, the nearest waypoint, its place) and
+    goes on. Home is its level cell (`spawn_spec["home"]`, so a snapshot
+    putting it elsewhere does not move its home), its facing its entry's or
+    one of its own from its name; facing is replicated (`GridEntity.REPLICATED`)
+    for the sight cones to come.
 - **Pushable** — never acts.
 
 ## Rendering between ticks

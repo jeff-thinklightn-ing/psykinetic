@@ -130,7 +130,9 @@ No `height.png` means everything is at 0.
 	"starts": [[1, 4], [2, 4], [1, 3], [2, 3]],
 	"entities": [
 		{"at": [8, 7], "name": "Sneak", "props": {"sight_range": 4}},
-		{"at": [13, 9], "name": "Brute", "tint": "#802020"}
+		{"at": [13, 9], "name": "Brute", "tint": "#802020", "facing": [-1, 0], "idle": "guard"},
+		{"at": [3, 2], "idle": {"mode": "patrol", "route": [[3, 2], [9, 2], [9, 6]], "loop": false}},
+		{"at": [5, 8], "idle": {"mode": "gather", "point": [6, 9]}}
 	],
 	"spawn_points": {"path_end": [13, 5]},
 	"links": [{"at": [14, 5], "to_map": "test_room", "to_spawn": ""}]
@@ -149,6 +151,25 @@ All of it is optional.
   cells, which are spawned first, in this order (the order is the entity
   id order, and a server's snapshot finds its entities by their slots).
   Other markers follow in reading order, named by kind: `Crate1`, `Imp2`.
+  A monster's entry may also say which way it faces, `"facing": [dx, dy]`
+  (each -1, 0 or 1; without one it faces a way of its own, from its name),
+  and how it idles with nobody in sight, `"idle"`: a mode, or the mode
+  with what it needs:
+  - `"guard"`: stays on its cell facing its way, and now and then glances
+    aside (up to 90 degrees) and back.
+  - `"wander"` (`"radius"`, default 3): strolls to cells near its own,
+    pausing between.
+  - `"patrol"` (`"route"`: cells, `"loop"`: true to go round, false to go
+    back and forth): walks the route, pausing at each cell of it. Without a
+    route, a short loop of its own about its cell.
+  - `"gather"` (`"point"`: a cell, like a fire): stands or sits round it,
+    facing it, each in a place of its own.
+  - `"none"`: stands where it is.
+
+  Without one, imps wander, brutes guard and sneaks patrol (a monster of no
+  kind stands). It idles at a slower step than it chases; a fight
+  interrupts it, and after the fight it walks back (its cell, its route,
+  its place at the point) and goes on.
 - `spawn_points`: named cells where a link into this map can arrive.
 - `links`: one per link marker, `to_map` the level to load and
   `to_spawn` the spawn point there ("" for its first start).

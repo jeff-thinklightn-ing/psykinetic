@@ -3,6 +3,22 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.102
+
+Server.
+
+- Monsters no longer stand still waiting for you: imps wander about, brutes
+  stand guard and glance around, sneaks patrol a short loop. They walk
+  slower than when they chase.
+- After a fight, a monster walks back to where it was and carries on.
+- Levels can set each monster's facing and how it idles (guard, wander,
+  patrol a route, gather round a point) in level.json; the level editor
+  will set these next.
+- The server no longer logs errors when a fight happens in one zone while
+  a player is in another.
+
+The server must be updated to v0.1.102 too, as it refuses any other version.
+
 ## v0.1.101
 
 Client.

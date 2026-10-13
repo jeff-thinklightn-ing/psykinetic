@@ -1615,3 +1615,32 @@ The images live in art/models/paint/, which Godot ignores: the game reads
 them only as goblin.glb carries them, so the 2048 sheets are packed once.
 The seven materials stay in the .blend, unused, to bake from again; the
 .blend is still the source and goblin.glb its export.
+
+## 168. Monsters idle: guard, wander, patrol, gather
+
+With nobody in sight a monster stood where it was, so a level was a set of
+statues until someone came near. Now each idles as its level entry says,
+or as its kind does by default (imps wander, brutes guard, sneaks patrol a
+loop of their own), at a slower step than it chases. Idling is sim, on the
+server: where a monster stands and which way it faces matter (facing was
+already sim and replicated, and sight cones will read it), so the views
+are told nothing new but a pose (sitting, at a gathering). A fight
+interrupts idling as before; afterwards it walks back and goes on, so the
+level is put back as it was made rather than left wherever the fight
+ended. Home is the level cell, carried in the spawn spec, since a snapshot
+spawns a monster where it stood. The settings live in level.json beside
+names and props, as the editor will write them. Defaults by kind keep every
+existing level lively with no data; a monster of no kind stays still, as
+do the test room's monsters for tests that stage fights beside them
+(Monster.idling).
+
+## 169. An entity's events go to the peers in its zone
+
+A swing, a blow, a push, a stun or a brute's wind-up went out by RPC to
+every connected peer, while the entity itself is spawned only on the
+clients in its zone (its synchronizer's visibility). A fight in one zone
+with a player in another sent that player calls for a node it does not
+have; Godot refused each with an error (85 in a week on the box), and the
+network test's fights, once its imps idled into them, failed on them. Now
+GridEntity.viewers() is the peers its events go to: the sendable peers that
+can see it, by the same rule as its synchronizer.
