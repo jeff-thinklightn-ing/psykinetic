@@ -1735,3 +1735,20 @@ the click is no walk. An inverted-hull outline was tried first and dropped:
 the goblin's faceted mesh has split normals, and the grown shell tore into
 specks. Only monsters are marked, as only they get the pick's slack; the
 2D view is left as it was.
+
+## 177. The target is outlined, by the stencil
+
+176's ring and red glow were too much, and the glow changed the model. The
+mark is now a thin white rim round the monster's silhouette, the model
+drawn as it is. Two ways of growing a shell along the normals were tried
+on the way and failed on the goblin: its split normals tore the shell into
+specks; smoothed, the shell still showed in the body's hollows, or, pushed
+back from the camera to hide that, lost the rim at the feet, and flat parts
+facing the camera (ears, hands) never got one. What works is the stencil
+buffer (Godot 4.5+): the outlined body marks its pixels (its materials'
+copies, otherwise the same), and its meshes draw again in white, shifted a
+couple of pixels each of the eight ways, only where it did not. The rim is
+even all round whatever the mesh, costs eight extra draws of one goblin,
+and needs no mesh copies. The outline is now kept on the puppet itself,
+not looked up by the entity, so a monster that dies outlined loses it: its
+puppet had left the lookup, and the glow stayed on the corpse.

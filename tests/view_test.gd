@@ -446,42 +446,61 @@ func _test_near_miss_picks() -> void:
 
 
 func _test_target_marked() -> void:
-	print("
-== the monster a click would attack is marked: a ring at its feet, its body aglow ==")
+	print("\n== the monster a click would attack is outlined, its own look untouched; not after it dies ==")
+	var player := _player()
 	var imp := _spawn_imp(Vector2i(9, 4), "imp")
 	var other := _spawn_imp(Vector2i(10, 3), "imp")
 	await _frames(2)
 	_rig._process(0.0)
 	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
-	var ring := _rig.get_node("TargetRing") as MeshInstance3D
-	_check(not ring.visible and _glowing(puppet) == 0, "none marked at first")
+	var beside: Node3D = _rig._puppets[other.get_instance_id()]
+	var meshes := _body_meshes(puppet)
+	var own: Array[Material] = []
+	for mesh in meshes:
+		own.append(mesh.get_active_material(0))
+	_check(not meshes.is_empty() and _outlined(puppet) == 0, "none outlined at first")
 	_rig.target(imp)
-	var meshes := puppet.get_node("Body").find_children("*", "MeshInstance3D", true, false).size()
-	_check(ring.visible and Vector2(ring.position.x, ring.position.z).is_equal_approx(Vector2(puppet.position.x, puppet.position.z)),
-			"the ring is at its feet (%s)" % ring.position)
-	_check(meshes > 0 and _glowing(puppet) == meshes, "every mesh of its body glows (%d of %d)" % [_glowing(puppet), meshes])
-	_check(_glowing(_rig._puppets[other.get_instance_id()]) == 0, "the one beside it does not")
-	_place(imp, Vector2i(9, 5))
-	await _frames(30)
-	_rig._process(0.0)
-	_check(Vector2(ring.position.x, ring.position.z).distance_to(Vector2(puppet.position.x, puppet.position.z)) < 0.01,
-			"the ring goes where it goes (%s)" % ring.position)
+	_check(_outlined(puppet) == meshes.size(), "every mesh of its body is outlined (%d of %d)" % [_outlined(puppet), meshes.size()])
+	var passes := 0
+	var pass_: Material = meshes[0].material_overlay
+	while pass_ != null:
+		passes += 1
+		pass_ = pass_.next_pass
+	_check(passes == 8, "by its silhouette nudged each of the eight ways (%d passes)" % passes)
+	var same := true
+	for n in meshes.size():
+		var drawn := meshes[n].get_active_material(0) as BaseMaterial3D
+		var was := own[n] as BaseMaterial3D
+		same = same and drawn != null and was != null and drawn.stencil_mode == BaseMaterial3D.STENCIL_MODE_CUSTOM \
+				and drawn.stencil_reference == Client3D.OUTLINE_STENCIL and drawn.albedo_texture == was.albedo_texture \
+				and drawn.albedo_color == was.albedo_color and drawn.roughness_texture == was.roughness_texture
+	_check(same, "its body marks the stencil, with its own colours and textures")
+	_check(_outlined(beside) == 0, "the one beside it is not outlined")
 	_rig.target(other)
-	_check(_glowing(puppet) == 0 and _glowing(_rig._puppets[other.get_instance_id()]) > 0, "another marked: the first no longer is")
+	_check(_outlined(puppet) == 0 and meshes[0].get_active_material(0) == own[0] and _outlined(beside) > 0,
+			"another outlined: the first is as it was")
 	_rig.target(null)
-	_check(not ring.visible and _glowing(_rig._puppets[other.get_instance_id()]) == 0, "none: nothing marked")
-	World.despawn(imp)
+	_check(_outlined(beside) == 0, "none: nothing outlined")
+	_rig.target(imp)
+	World.damage(imp, 999, player, &"attack")
+	_rig._process(0.0)
+	_check(_outlined(puppet) == 0 and meshes[0].get_active_material(0) == own[0], "killed while outlined: gone at once")
+	_rig.target(null)
 	World.despawn(other)
 	await _frames(2)
 
 
-## How many of [param puppet]'s meshes have an overlay (the target's glow).
-func _glowing(puppet: Node3D) -> int:
-	var count := 0
-	for mesh: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
-		if mesh.material_overlay != null:
-			count += 1
-	return count
+## The meshes of [param puppet]'s body.
+func _body_meshes(puppet: Node3D) -> Array[MeshInstance3D]:
+	var meshes: Array[MeshInstance3D] = []
+	for mesh in puppet.get_node("Body").find_children("*", "MeshInstance3D", true, false):
+		meshes.append(mesh)
+	return meshes
+
+
+## How many of [param puppet]'s body meshes have the outline over them.
+func _outlined(puppet: Node3D) -> int:
+	return _body_meshes(puppet).filter(func(mesh: MeshInstance3D) -> bool: return mesh.material_overlay != null).size()
 
 
 func _place(entity: GridEntity, tile: Vector2i) -> void:

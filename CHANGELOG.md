@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.110
+
+Client.
+
+- The monster your next click would attack now gets a thin white outline,
+  instead of the red ring and glow; the model itself looks as it always
+  does.
+- A monster that died while marked no longer keeps its tint.
+
+The server must be updated to v0.1.110 too, as it refuses any other version.
+
 ## v0.1.109
 
 Client.
