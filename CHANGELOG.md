@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.103
+
+Level editor.
+
+- A select tool (V): click a monster, turn its facing with Q / E or the
+  wheel over it, and set how it idles in the panel on the right: guard,
+  wander (and how far), patrol (click waypoints; loop or back and forth),
+  gather (click the point), none, or its kind's own.
+- Every monster shows its facing as an arrow; patrol routes and gather
+  points are drawn on the grid.
+- Ctrl+S writes these into level.json; monsters keep their names.
+
+The server must be updated to v0.1.103 too, as it refuses any other version.
+
 ## v0.1.102
 
 Server.

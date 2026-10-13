@@ -13,9 +13,20 @@ extends Node2D
 ## Ctrl+Z undoes a stroke, Ctrl+Y (or Ctrl+Shift+Z) redoes it. Middle drag
 ## or the arrow keys pan, the wheel zooms.
 ##
+## The select tool (V) picks a placed monster: Q / E (or the wheel over
+## it) turn its facing an eighth at a time, and the panel on the right sets
+## how it idles (guard, wander and its radius, patrol and its route, gather
+## and its point, none, or its kind's default). Editing a route, a click adds
+## a waypoint and a right click takes the last back; setting a point, a
+## click sets it. Every monster shows its facing as an arrow (faint: the
+## way it faces of its own, none set), a patrol its route, a gatherer its
+## point. Esc stops a route or point, then lets go of the monster.
+##
 ## Saving writes the same double-resolution layout.png (LevelMap.to_image)
 ## and its .import as Image, and says what the game will warn about
-## (Level.parse). height.png and level.json are left as they are.
+## (Level.parse); level.json too, when a monster's facing or idling was
+## set, with only those in its entry (the rest of the file as it was).
+## height.png is left as it is.
 
 const CELL := 48.0
 const GRID := Color(1, 1, 1, 0.07)
@@ -28,12 +39,21 @@ const HOVER := Color(1.0, 0.9, 0.3, 0.9)
 const FONT_SIZE := 30
 const PAN_SPEED := 1400.0
 const UNDO_LIMIT := 200
+const ARROW := Color(1, 1, 1, 0.95)
+const ARROW_OWN := Color(1, 1, 1, 0.35)
+const ROUTE := Color(0.35, 0.85, 1.0, 0.85)
+const ROUTE_FAINT := Color(0.35, 0.85, 1.0, 0.3)
+const POINT := Color(1.0, 0.55, 0.15, 0.9)
+const SELECTED := Color(0.3, 1.0, 0.5, 0.95)
+const NOWHERE := Vector2i(-1, -1)
+## The idle modes the panel offers; "" is the kind's own (Monster.IDLE_BY_KIND).
+const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", "none"]
 
 ## Palette order: what the number keys pick, ten to a row.
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link",
+	"link", "select",
 ]
 const EDGE_BRUSHES: Array[String] = ["wall", "door", "clear"]
 ## A thing's letter on its cell.
@@ -63,6 +83,16 @@ var _panning := false
 var _camera: Camera2D
 var _status: Label
 var _buttons: Dictionary[String, Button] = {}
+## The select tool's monster (NOWHERE: none), and whether clicks now edit its
+## route or set its gather point.
+var selected := NOWHERE
+var editing_route := false
+var setting_point := false
+## level.json has changes to write.
+var config_dirty := false
+## Each monster cell's name as the game will give it (for its own facing).
+var _names: Dictionary[Vector2i, String] = {}
+var _panel: VBoxContainer
 
 
 func _ready() -> void:
@@ -111,6 +141,9 @@ func load_map() -> void:
 		map = LevelMap.new(Net.edit_size, config)
 		report = "new map %s: %d x %d cells (not saved yet)" % [map_name, map.size.x, map.size.y]
 	palette = PALETTE.duplicate()
+	selected = NOWHERE
+	config_dirty = false
+	_name_cells()
 	for meaning: String in map.colours:
 		if meaning not in palette and meaning != "door" and meaning != "wall":
 			palette.append(meaning)
@@ -129,6 +162,16 @@ func save() -> bool:
 		print("[editor] " + report)
 		return false
 	var imported := LevelMap.ensure_image_import(ProjectSettings.globalize_path(png), png)
+	if config_dirty:
+		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
+		if json == null:
+			report = "could not save %slevel.json" % folder
+			print("[editor] " + report)
+			return false
+		json.store_string(JSON.stringify(config, "	", false) + "
+")
+		json.close()
+		config_dirty = false
 	dirty = false
 	var level := Level.parse(image, null, config)
 	var warnings: Array = level["warnings"]
@@ -146,6 +189,8 @@ func pick(meaning: String) -> void:
 	if meaning not in palette:
 		return
 	brush = meaning
+	if meaning != "select":
+		select(NOWHERE)
 	for each: String in _buttons:
 		_buttons[each].button_pressed = each == meaning
 	hover = {}
@@ -179,6 +224,9 @@ func target_at(grid: Vector2) -> Dictionary:
 ## Starts a stroke with [param button] (left paints, right erases) at grid
 ## point [param grid].
 func begin_stroke(button: MouseButton, grid: Vector2) -> void:
+	if brush == "select":
+		_select_click(button, Vector2i(floori(grid.x), floori(grid.y)))
+		return
 	_stroke = {}
 	_stroke_button = button
 	var target := target_at(grid)
@@ -215,6 +263,7 @@ func end_stroke() -> void:
 	_stroke_from = null
 	if _stroke.is_empty():
 		return
+	_name_cells()
 	_undo.append(_stroke)
 	if _undo.size() > UNDO_LIMIT:
 		_undo.pop_front()
@@ -264,8 +313,16 @@ func _swap(stroke: Dictionary) -> Dictionary:
 	for key: Variant in stroke:
 		if key is Vector2i:
 			back[key] = map.set_cell(key, stroke[key])
-		else:
+		elif key is Vector3i:
 			back[key] = map.set_edge(key, stroke[key])
+		else:
+			# A monster's entry: "entry x y" -> the entry as it was ({}: none).
+			var parts := str(key).split(" ")
+			var at := Vector2i(int(parts[1]), int(parts[2]))
+			back[key] = entry_of(at).duplicate(true)
+			_put_entry(at, stroke[key])
+	_name_cells()
+	_refresh_panel()
 	dirty = true
 	queue_redraw()
 	return back
@@ -292,6 +349,385 @@ static func _line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	return out
 
 
+# --- Monsters: facing and idling ----------------------------------------------------
+
+## Whether cell [param at] holds a monster.
+func is_monster(at: Vector2i) -> bool:
+	return map.cell(at).begins_with("monster_")
+
+
+## Selects the monster at [param at] (NOWHERE, or a cell with none: lets go).
+func select(at: Vector2i) -> void:
+	selected = at if at != NOWHERE and is_monster(at) else NOWHERE
+	editing_route = false
+	setting_point = false
+	_refresh_panel()
+	queue_redraw()
+
+
+func _select_click(button: MouseButton, at: Vector2i) -> void:
+	if not map.in_bounds(at):
+		return
+	if editing_route and selected != NOWHERE:
+		if button == MOUSE_BUTTON_LEFT:
+			add_waypoint(at)
+		else:
+			remove_waypoint()
+		return
+	if setting_point and selected != NOWHERE and button == MOUSE_BUTTON_LEFT:
+		set_gather_point(at)
+		setting_point = false
+		_refresh_panel()
+		return
+	if button == MOUSE_BUTTON_LEFT:
+		select(at)
+
+
+## level.json's entry for the entity at [param at] ({} for none).
+func entry_of(at: Vector2i) -> Dictionary:
+	var listed: Variant = config.get("entities", [])
+	if listed is Array:
+		for entry: Variant in listed:
+			if entry is Dictionary and Level._tile(entry.get("at")) == at:
+				return entry
+	return {}
+
+
+## Puts [param entry] as the entry for [param at]: replaced where it is in
+## the list, added at the end, or ({} or only "at") taken out.
+func _put_entry(at: Vector2i, entry: Dictionary) -> void:
+	if not config.get("entities") is Array:
+		config["entities"] = []
+	var listed: Array = config["entities"]
+	var index := -1
+	for i in listed.size():
+		if listed[i] is Dictionary and Level._tile(listed[i].get("at")) == at:
+			index = i
+			break
+	var empty := entry.keys().all(func(key: Variant) -> bool: return str(key) == "at")
+	if empty:
+		if index >= 0:
+			listed.remove_at(index)
+	elif index >= 0:
+		listed[index] = entry
+	else:
+		listed.append(entry)
+	if listed.is_empty():
+		config.erase("entities")
+	config_dirty = true
+	dirty = true
+
+
+## Changes the selected monster's entry with [param change] (given the
+## entry to edit), as one undo step.
+func _edit_selected(change: Callable) -> void:
+	if selected == NOWHERE:
+		return
+	var before := entry_of(selected).duplicate(true)
+	var entry := before.duplicate(true)
+	entry["at"] = [selected.x, selected.y]
+	change.call(entry)
+	if entry == before:
+		return
+	_put_entry(selected, entry)
+	_undo.append({"entry %d %d" % [selected.x, selected.y]: before})
+	if _undo.size() > UNDO_LIMIT:
+		_undo.pop_front()
+	_redo.clear()
+	_refresh_panel()
+	queue_redraw()
+
+
+## The monster at [param at]'s facing: its entry's, or the one it takes of
+## its own (Monster.own_facing); and whether it is set.
+func facing_of(at: Vector2i) -> Array:
+	var set_one: Variant = Level.facing_from(entry_of(at).get("facing"))
+	if set_one != null:
+		return [set_one, true]
+	return [Monster.own_facing(_names.get(at, "")), false]
+
+
+## Turns the selected monster [param steps] eighths of a turn (clockwise
+## for positive), from the way it faces now.
+func turn_selected(steps: int) -> void:
+	if selected == NOWHERE:
+		return
+	var now: Vector2i = facing_of(selected)[0]
+	var to := Monster.turned(now, steps)
+	_edit_selected(func(entry: Dictionary) -> void: entry["facing"] = [to.x, to.y])
+
+
+## Back to the way it faces of its own: no facing in its entry.
+func clear_facing() -> void:
+	_edit_selected(func(entry: Dictionary) -> void: entry.erase("facing"))
+
+
+## The monster at [param at]'s idling as its entry gives it, as a
+## Dictionary ({"mode": ""} for its kind's own).
+func idle_of(at: Vector2i) -> Dictionary:
+	var given: Variant = entry_of(at).get("idle")
+	if given is Dictionary:
+		return given
+	if given is String:
+		return {"mode": given}
+	return {"mode": ""}
+
+
+## Sets the selected monster's idle mode ("" for its kind's own), keeping
+## what a mode needs that it already has (a route, a point).
+func set_idle_mode(mode: String) -> void:
+	var at := selected
+	_edit_selected(func(entry: Dictionary) -> void:
+		if mode.is_empty():
+			entry.erase("idle")
+			return
+		var idle := idle_of(at).duplicate(true)
+		idle["mode"] = mode
+		if mode == "gather" and not idle.has("point"):
+			idle["point"] = [at.x + 1, at.y]
+		entry["idle"] = _tidy_idle(idle))
+
+
+## An idle setting with only what its mode uses: a plain name for one that
+## needs nothing else.
+static func _tidy_idle(idle: Dictionary) -> Variant:
+	var mode := str(idle.get("mode", ""))
+	var keep := {"mode": mode}
+	match mode:
+		"wander":
+			if idle.has("radius"):
+				keep["radius"] = int(idle["radius"])
+		"patrol":
+			if idle.has("route"):
+				keep["route"] = idle["route"]
+				keep["loop"] = bool(idle.get("loop", true))
+		"gather":
+			if idle.has("point"):
+				keep["point"] = idle["point"]
+	return keep if keep.size() > 1 else mode
+
+
+## Changes the selected monster's idling with [param change] (given it as a
+## Dictionary), as one undo step.
+func _edit_idle(change: Callable) -> void:
+	var at := selected
+	_edit_selected(func(entry: Dictionary) -> void:
+		var idle := idle_of(at).duplicate(true)
+		change.call(idle)
+		entry["idle"] = _tidy_idle(idle))
+
+
+## A waypoint at [param at] on the end of the selected monster's route.
+func add_waypoint(at: Vector2i) -> void:
+	if not map.walkable(at):
+		return
+	_edit_idle(func(idle: Dictionary) -> void:
+		idle["mode"] = "patrol"
+		var route: Array = idle.get("route", [])
+		if route.is_empty() or Level._tile(route.back()) != at:
+			route.append([at.x, at.y])
+		idle["route"] = route
+		if not idle.has("loop"):
+			idle["loop"] = true)
+
+
+## Takes the last waypoint off its route.
+func remove_waypoint() -> void:
+	_edit_idle(func(idle: Dictionary) -> void:
+		var route: Array = idle.get("route", [])
+		if not route.is_empty():
+			route.pop_back()
+		if route.is_empty():
+			idle.erase("route")
+		else:
+			idle["route"] = route)
+
+
+func clear_route() -> void:
+	_edit_idle(func(idle: Dictionary) -> void: idle.erase("route"))
+
+
+## Round and round ([param loop] true) or back and forth.
+func set_route_loop(loop: bool) -> void:
+	_edit_idle(func(idle: Dictionary) -> void: idle["loop"] = loop)
+
+
+func set_gather_point(at: Vector2i) -> void:
+	_edit_idle(func(idle: Dictionary) -> void:
+		idle["mode"] = "gather"
+		idle["point"] = [at.x, at.y])
+
+
+## WANDER's radius, at least 1.
+func set_wander_radius(radius: int) -> void:
+	_edit_idle(func(idle: Dictionary) -> void:
+		idle["mode"] = "wander"
+		idle["radius"] = maxi(1, radius))
+
+
+## The idle mode the selected monster's kind has of its own, by name.
+func kind_mode(at: Vector2i) -> String:
+	var kind := map.cell(at).trim_prefix("monster_")
+	var mode: int = Monster.IDLE_BY_KIND.get(kind, Monster.Idle.NONE)
+	return str(Monster.IDLE_MODES.find_key(mode))
+
+
+## Every monster cell's name, as the game will name it (Level.parse).
+func _name_cells() -> void:
+	_names.clear()
+	var level := Level.parse(map.to_image(), null, config)
+	for spec: Dictionary in level["entities"]:
+		if spec.get("script") == Level.MONSTER:
+			_names[spec["tile"]] = str(spec["name"])
+	if selected != NOWHERE and not is_monster(selected):
+		selected = NOWHERE
+
+
+## The panel for the selected monster, made again from what it is now.
+func _refresh_panel() -> void:
+	if _panel == null:
+		return
+	for child in _panel.get_children():
+		_panel.remove_child(child)
+		child.queue_free()
+	_panel.get_parent().visible = selected != NOWHERE
+	if selected == NOWHERE:
+		return
+	var facing: Array = facing_of(selected)
+	var idle := idle_of(selected)
+	var mode := str(idle.get("mode", ""))
+	_panel_label("%s  (%s)" % [_names.get(selected, "?"), map.cell(selected).trim_prefix("monster_")], 30)
+	_panel_label("at %d, %d" % [selected.x, selected.y], 22)
+	_panel_label("Facing %s%s   Q / E or wheel" % [World.COMPASS[Monster.AROUND.find(facing[0])],
+		"" if facing[1] else " (its own)"], 24)
+	var facing_row := HBoxContainer.new()
+	_panel.add_child(facing_row)
+	_panel_button(facing_row, "Q  turn left", turn_selected.bind(-1))
+	_panel_button(facing_row, "E  turn right", turn_selected.bind(1))
+	if facing[1]:
+		_panel_button(facing_row, "its own", clear_facing)
+	_panel_label("Idle", 26)
+	var modes := HBoxContainer.new()
+	_panel.add_child(modes)
+	for choice in IDLE_CHOICES:
+		var text := choice if not choice.is_empty() else "kind's (%s)" % kind_mode(selected)
+		var button := _panel_button(modes, text, set_idle_mode.bind(choice))
+		button.toggle_mode = true
+		button.button_pressed = choice == mode
+	match mode:
+		"wander":
+			var radius := int(idle.get("radius", Monster.WANDER_RADIUS))
+			var row := HBoxContainer.new()
+			_panel.add_child(row)
+			_panel_label_in(row, "radius %d" % radius)
+			_panel_button(row, "-", set_wander_radius.bind(radius - 1))
+			_panel_button(row, "+", set_wander_radius.bind(radius + 1))
+		"patrol":
+			var route: Array = idle.get("route", [])
+			var loop := bool(idle.get("loop", true))
+			_panel_label("Route: %d waypoints%s" % [route.size(), "" if not route.is_empty() else " (a loop of its own)"], 22)
+			var row := HBoxContainer.new()
+			_panel.add_child(row)
+			var edit := _panel_button(row, "editing: click adds, right click takes back" if editing_route else "edit route",
+					func() -> void:
+						editing_route = not editing_route
+						setting_point = false
+						_refresh_panel())
+			edit.toggle_mode = true
+			edit.button_pressed = editing_route
+			var row2 := HBoxContainer.new()
+			_panel.add_child(row2)
+			var round_button := _panel_button(row2, "loop", set_route_loop.bind(true))
+			round_button.toggle_mode = true
+			round_button.button_pressed = loop
+			var back_button := _panel_button(row2, "back and forth", set_route_loop.bind(false))
+			back_button.toggle_mode = true
+			back_button.button_pressed = not loop
+			_panel_button(row2, "clear", clear_route)
+		"gather":
+			var point: Variant = Level._tile(idle.get("point"))
+			_panel_label("Point: %s" % (str(point) if point != null else "none"), 22)
+			var set_button := _panel_button(_panel, "click a cell..." if setting_point else "set point", func() -> void:
+				setting_point = not setting_point
+				editing_route = false
+				_refresh_panel())
+			set_button.toggle_mode = true
+			set_button.button_pressed = setting_point
+	_panel_label("Esc lets go", 20)
+
+
+func _panel_label(text: String, size: int) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", size)
+	_panel.add_child(label)
+	return label
+
+
+func _panel_label_in(row: Container, text: String) -> void:
+	var label := Label.new()
+	label.text = text + "  "
+	label.add_theme_font_size_override("font_size", 22)
+	row.add_child(label)
+
+
+func _panel_button(row: Container, text: String, on_press: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 22)
+	button.pressed.connect(on_press)
+	row.add_child(button)
+	return button
+
+
+## Facing arrows on every monster, routes and gather points; the selected
+## monster's brighter.
+func _draw_monsters() -> void:
+	for at: Vector2i in map.cells:
+		if not is_monster(at):
+			continue
+		var mine := at == selected
+		var centre := (Vector2(at) + Vector2(0.5, 0.5)) * CELL
+		var facing: Array = facing_of(at)
+		var way := Vector2(facing[0]).normalized()
+		var colour: Color = SELECTED if mine else (ARROW if facing[1] else ARROW_OWN)
+		var tip := centre + way * CELL * 0.48
+		draw_line(centre, tip, colour, 4.0)
+		var side := way.orthogonal() * CELL * 0.13
+		draw_colored_polygon(PackedVector2Array([tip + way * CELL * 0.08, tip - way * CELL * 0.12 + side,
+			tip - way * CELL * 0.12 - side]), colour)
+		var idle := idle_of(at)
+		match str(idle.get("mode", "")):
+			"patrol":
+				var points: Array[Vector2] = []
+				for point: Variant in idle.get("route", []):
+					var tile: Variant = Level._tile(point)
+					if tile != null:
+						points.append((Vector2(tile) + Vector2(0.5, 0.5)) * CELL)
+				if points.is_empty():
+					continue
+				var line_colour := ROUTE if mine else ROUTE_FAINT
+				draw_line(centre, points[0], line_colour, 2.0)
+				for i in points.size() - 1:
+					draw_line(points[i], points[i + 1], line_colour, 4.0 if mine else 2.0)
+				if bool(idle.get("loop", true)) and points.size() > 2:
+					draw_line(points.back(), points[0], line_colour, 4.0 if mine else 2.0)
+				for i in points.size():
+					draw_circle(points[i], CELL * 0.16, line_colour)
+					if mine:
+						draw_string(ThemeDB.fallback_font, points[i] + Vector2(-CELL * 0.5, CELL * 0.1), str(i + 1),
+								HORIZONTAL_ALIGNMENT_CENTER, CELL, 20, Color.BLACK)
+			"gather":
+				var point: Variant = Level._tile(idle.get("point"))
+				if point != null:
+					var spot: Vector2 = (Vector2(point) + Vector2(0.5, 0.5)) * CELL
+					draw_line(centre, spot, POINT if mine else Color(POINT, 0.35), 2.0)
+					draw_arc(spot, CELL * 0.32, 0.0, TAU, 24, POINT if mine else Color(POINT, 0.5), 4.0)
+	if selected != NOWHERE:
+		draw_rect(Rect2(Vector2(selected) * CELL, Vector2.ONE * CELL).grow(2.0), SELECTED, false, 5.0)
+
+
 # --- Input -------------------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -303,6 +739,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			redo()
 		elif key.ctrl_pressed and key.keycode == KEY_Z:
 			undo()
+		elif key.keycode == KEY_V and not key.ctrl_pressed:
+			pick("select")
+		elif key.keycode in [KEY_Q, KEY_E] and selected != NOWHERE:
+			turn_selected(-1 if key.keycode == KEY_Q else 1)
+		elif key.keycode == KEY_ESCAPE and brush == "select":
+			if editing_route or setting_point:
+				editing_route = false
+				setting_point = false
+				_refresh_panel()
+			else:
+				select(NOWHERE)
 		elif key.keycode >= KEY_0 and key.keycode <= KEY_9 and not key.ctrl_pressed:
 			var digit := (key.keycode - KEY_0 + 9) % 10  # 1 -> 0, ..., 0 -> 9
 			var index := digit + (10 if key.shift_pressed else 20 if key.alt_pressed else 0)
@@ -317,7 +764,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if button.button_index == MOUSE_BUTTON_MIDDLE:
 			_panning = button.pressed
 		elif button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and button.pressed:
-			_zoom(1.15 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15)
+			var grid := _mouse_grid()
+			if selected != NOWHERE and Vector2i(floori(grid.x), floori(grid.y)) == selected:
+				# The wheel over the chosen monster turns it.
+				turn_selected(1 if button.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
+			else:
+				_zoom(1.15 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15)
 		elif button.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 			if button.pressed and _stroke_button == MOUSE_BUTTON_NONE:
 				begin_stroke(button.button_index, _mouse_grid())
@@ -364,8 +816,14 @@ func _status_text() -> String:
 	elif hover.has("edge"):
 		var key: Vector3i = hover["edge"]
 		over = "edge %s of %d, %d: %s" % ["east" if key.z == Terrain.EAST else "south", key.x, key.y, map.edge(key)]
-	return "%s%s   %s   brush: %s   |   LMB paint  RMB erase  1-0 / Shift / Alt pick  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
-		map_name, " (unsaved)" if dirty else "", over, brush, report]
+	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select"
+	if brush == "select":
+		tools = "LMB pick a monster  Q / E turn it  Esc let go" if not editing_route \
+				else "LMB add a waypoint  RMB take the last back  Esc done"
+		if setting_point:
+			tools = "LMB the gather point  Esc never mind"
+	return "%s%s   %s   brush: %s   |   %s  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
+		map_name, " (unsaved)" if dirty else "", over, brush, tools, report]
 
 
 # --- Drawing -----------------------------------------------------------------------
@@ -400,6 +858,7 @@ func _draw() -> void:
 					_draw_edge(key, AUTO_WALL, 4.0)
 	for key: Vector3i in map.edges:
 		_draw_edge(key, WALL if map.edges[key] == "wall" else DOOR, 8.0, map.edges[key] == "door")
+	_draw_monsters()
 	if hover.has("cell"):
 		draw_rect(Rect2(Vector2(hover["cell"]) * CELL, Vector2.ONE * CELL), HOVER, false, 4.0)
 	elif hover.has("edge"):
@@ -443,12 +902,25 @@ func _build_ui() -> void:
 		button.button_group = group
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.add_theme_font_size_override("font_size", 26)
-		button.text = "%s  %s" % [key_name(i), meaning.trim_prefix("monster_") + (" (edge)" if meaning in EDGE_BRUSHES else "")]
+		button.text = "%s  %s" % ["V   " if meaning == "select" else key_name(i),
+			meaning.trim_prefix("monster_") + (" (edge)" if meaning in EDGE_BRUSHES else " (a monster)" if meaning == "select" else "")]
 		button.icon = _swatch(meaning)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(pick.bind(meaning))
 		list.add_child(button)
 		_buttons[meaning] = button
+	var side := PanelContainer.new()
+	side.add_theme_stylebox_override("panel", style)
+	side.anchor_left = 1.0
+	side.anchor_right = 1.0
+	side.offset_left = -760.0
+	side.offset_right = -30.0
+	side.offset_top = 140.0
+	side.visible = false
+	layer.add_child(side)
+	_panel = VBoxContainer.new()
+	_panel.add_theme_constant_override("separation", 8)
+	side.add_child(_panel)
 	_status = Label.new()
 	_status.position = Vector2(30, 20)
 	_status.add_theme_font_size_override("font_size", FONT_SIZE)
@@ -467,7 +939,7 @@ static func key_name(index: int) -> String:
 
 func _swatch(meaning: String) -> Texture2D:
 	var image := Image.create(36, 36, false, Image.FORMAT_RGBA8)
-	var colour: Color = map.colours.get(meaning, Color.WHITE) if meaning != "clear" else Color(0, 0, 0, 0)
+	var colour: Color = map.colours.get(meaning, Color.WHITE) if meaning not in ["clear", "select"] else Color(0, 0, 0, 0)
 	if meaning == "wall":
 		colour = WALL
 	image.fill(colour)

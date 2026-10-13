@@ -16,6 +16,8 @@ func _ready() -> void:
 	_clear()
 	_test_round_trip()
 	await _test_painting()
+	_clear()
+	await _test_monsters()
 	_test_import_file()
 	_clear()
 	print("")
@@ -148,6 +150,104 @@ func _test_painting() -> void:
 	again.queue_free()
 	await get_tree().process_frame
 	Net.edit_size = LevelMap.NEW_SIZE
+
+
+func _test_monsters() -> void:
+	print("\n== monsters: select, turn, how they idle, saved in level.json ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var markers := {Vector2i(2, 2): "monster_brute", Vector2i(5, 2): "monster_sneak", Vector2i(3, 4): "monster_imp"}
+	# Double resolution: 27 x 23 pixels are 14 x 12 cells.
+	var rows: Array[String] = []
+	for y in 23:
+		rows.append(".".repeat(27))
+	Level.image_from_rows(rows, markers).save_png(dir.path_join("layout.png"))
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"name": "Monsters", "entities": [{"at": [3, 4], "name": "Grub"}]}, "\t"))
+	json.close()
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	var order_before: Array = Level.parse(editor.map.to_image(), null, editor.config)["entities"].map(
+			func(spec: Dictionary) -> String: return "%s@%s" % [spec["name"], spec["tile"]])
+
+	_key(editor, KEY_V)
+	_check(editor.brush == "select", "V picks the select tool")
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(2.5, 2.5))
+	editor.end_stroke()
+	_check(editor.selected == Vector2i(2, 2) and editor._panel.get_parent().visible, "a click picks the brute, and its panel shows")
+	_check(editor.map.cell(Vector2i(2, 2)) == "monster_brute", "and paints nothing")
+	var own := Monster.own_facing("Brute1")
+	_check(editor.facing_of(Vector2i(2, 2)) == [own, false], "it faces its own way to start (%s)" % own)
+	_key(editor, KEY_E)
+	_check(editor.facing_of(Vector2i(2, 2)) == [Monster.turned(own, 1), true], "E turns it an eighth clockwise")
+	_key(editor, KEY_Q)
+	_key(editor, KEY_Q)
+	var facing: Vector2i = Monster.turned(own, -1)
+	_check(editor.entry_of(Vector2i(2, 2)).get("facing") == [facing.x, facing.y], "Q back the other way, set in its entry")
+	editor.set_idle_mode("guard")
+	_check(editor.entry_of(Vector2i(2, 2)).get("idle") == "guard", "and it guards")
+
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(5.5, 2.5))
+	editor.end_stroke()
+	editor.set_idle_mode("patrol")
+	editor.editing_route = true
+	for at: Vector2 in [Vector2(5.5, 2.5), Vector2(9.5, 2.5), Vector2(9.5, 6.5), Vector2(12.5, 9.5)]:
+		editor.begin_stroke(MOUSE_BUTTON_LEFT, at)
+		editor.end_stroke()
+	editor.begin_stroke(MOUSE_BUTTON_RIGHT, Vector2(1.5, 1.5))
+	editor.end_stroke()
+	editor.set_route_loop(false)
+	var idle: Dictionary = editor.entry_of(Vector2i(5, 2)).get("idle", {})
+	_check(idle.get("mode") == "patrol" and idle.get("route") == [[5, 2], [9, 2], [9, 6]] and idle.get("loop") == false,
+			"the sneak patrols a route of clicks, the last taken back, back and forth (%s)" % [idle])
+	_check(editor.selected == Vector2i(5, 2), "clicks on the route did not pick anything else")
+	_key(editor, KEY_ESCAPE)
+	_check(not editor.editing_route and editor.selected == Vector2i(5, 2), "Esc ends the route")
+
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(3.5, 4.5))
+	editor.end_stroke()
+	editor.set_idle_mode("gather")
+	editor.setting_point = true
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(6.5, 6.5))
+	editor.end_stroke()
+	var grub := editor.entry_of(Vector2i(3, 4))
+	_check(grub.get("idle") == {"mode": "gather", "point": [6, 6]} and grub.get("name") == "Grub",
+			"Grub gathers at the point clicked, its name kept (%s)" % [grub])
+	_key(editor, KEY_Z, true)
+	_check(editor.entry_of(Vector2i(3, 4)).get("idle", {}).get("point") == [4, 4], "Ctrl+Z puts the point back as it was")
+	_key(editor, KEY_Y, true)
+	_check(editor.entry_of(Vector2i(3, 4)).get("idle", {}).get("point") == [6, 6], "and Ctrl+Y again")
+	_key(editor, KEY_ESCAPE)
+	_check(editor.selected == Vector2i(-1, -1) and not editor._panel.get_parent().visible, "Esc lets go of it")
+
+	_key(editor, KEY_S, true)
+	var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json"))
+	_check(saved is Dictionary and saved.get("name") == "Monsters", "Ctrl+S writes level.json, the rest of it kept")
+	var level := Level.parse(Image.load_from_file(dir.path_join("layout.png")), null, saved)
+	var by_name := {}
+	for spec: Dictionary in level["entities"]:
+		by_name[spec["name"]] = spec
+	_check(by_name.has("Brute1") and by_name["Brute1"].get("facing") == facing and by_name["Brute1"].get("idle", {}).get("mode") == "guard",
+			"the game reads the brute's facing and guard")
+	_check(by_name.has("Sneak1") and by_name["Sneak1"]["idle"].get("route") == [Vector2i(5, 2), Vector2i(9, 2), Vector2i(9, 6)],
+			"the sneak's route")
+	_check(by_name.has("Grub") and by_name["Grub"]["idle"].get("point") == Vector2i(6, 6), "and Grub's point")
+	var order_after: Array = level["entities"].map(func(spec: Dictionary) -> String: return "%s@%s" % [spec["name"], spec["tile"]])
+	_check(order_after == order_before, "every monster keeps its name and place in the order (%s)" % [order_after])
+	editor.queue_free()
+	await get_tree().process_frame
+	var again: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	again.map_name = "editor_test"
+	again.folder = FOLDER
+	add_child(again)
+	await get_tree().process_frame
+	_check(again.facing_of(Vector2i(2, 2)) == [facing, true] and again.idle_of(Vector2i(5, 2)).get("loop") == false,
+			"opened again, it is as saved")
+	again.queue_free()
+	await get_tree().process_frame
 
 
 func _test_import_file() -> void:

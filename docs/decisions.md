@@ -1644,3 +1644,19 @@ have; Godot refused each with an error (85 in a week on the box), and the
 network test's fights, once its imps idled into them, failed on them. Now
 GridEntity.viewers() is the peers its events go to: the sendable peers that
 can see it, by the same rule as its synchronizer.
+
+## 170. The editor sets a monster's facing and idling, in its level.json entry
+
+The level editor painted cells and left level.json alone; facing and idling
+(decision 168) needed hand-written JSON. Now its select tool picks a placed
+monster: Q / E or the wheel over it turn it, a panel sets its idle mode and
+what the mode needs (a route of clicked waypoints, loop or back and forth;
+a gather point; a wander radius), each change one undo step, and the grid
+shows every monster's facing (faint when it is its own, Monster.own_facing,
+the same the game will take), routes and points. Saving writes only those
+settings into the monster's entry, keeping the rest of the file.
+
+An entry in level.json also set the spawn order (listed first), and with
+it names and the slots a snapshot finds entities by: giving one monster a
+facing would have renamed others and moved them on the box. So an entry of
+only at, facing and idle leaves the order as it was.

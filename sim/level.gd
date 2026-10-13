@@ -85,6 +85,8 @@ const CART := {"script": PUSHABLE, "shape": "slab", "tint": Color(0.55, 0.4, 0.2
 const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12)}
 ## The idle modes level.json may give a monster (Monster.IDLE_MODES).
 const IDLE_MODES: Array[String] = ["guard", "wander", "patrol", "gather", "none"]
+## An entity entry of only these keys leaves the spawn order as it was.
+const ORDERLESS_KEYS: Array[String] = ["at", "facing", "idle"]
 
 ## Levels made in code (tests): name -> {layout: Image, height: Image or
 ## null, config: Dictionary}; load() takes these before the folder.
@@ -341,10 +343,14 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 			if not by_tile.has(at) or not _spawns(str(by_tile[at]["marker"])):
 				warnings.append("level.json names an entity at %s, where there is no crate, boulder, cart, chest or monster" % at)
 				continue
-			order.append(at)
+			# An entry that only says how a monster faces and idles (as the
+			# editor writes them) does not move it up the order: its name and
+			# slot stay what they were.
+			if entry.keys().any(func(key: Variant) -> bool: return str(key) not in ORDERLESS_KEYS):
+				order.append(at)
 			overrides[at] = entry
 	for marker in markers:
-		if _spawns(str(marker["marker"])) and not overrides.has(marker["tile"]):
+		if _spawns(str(marker["marker"])) and marker["tile"] not in order:
 			order.append(marker["tile"])
 	for at in order:
 		if taken.has(at):

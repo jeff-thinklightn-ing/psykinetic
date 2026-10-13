@@ -176,8 +176,7 @@ func _settle_idle() -> void:
 	var tile_given: Variant = spawn_spec.get("tile")
 	home = spawn_spec.get("home", tile_given if tile_given is Vector2i else NO_TILE)
 	var set_facing: Variant = spawn_spec.get("facing")
-	home_facing = set_facing if set_facing is Vector2i and set_facing in AROUND \
-			else AROUND[_idle_rng.randi_range(0, AROUND.size() - 1)]
+	home_facing = set_facing if set_facing is Vector2i and set_facing in AROUND else own_facing(String(name))
 	facing = home_facing
 	var given: Dictionary = spawn_spec.get("idle", {})
 	var mode := str(given.get("mode", ""))
@@ -592,6 +591,12 @@ func _idle_step(to: Vector2i) -> bool:
 	if path.is_empty():
 		return false
 	return World.try_move(self, path[0] - tile)
+
+
+## The way a monster called [param monster_name] faces when its level entry
+## sets none: one of AROUND, the same every time (the editor draws it).
+static func own_facing(monster_name: String) -> Vector2i:
+	return AROUND[absi(hash(monster_name + "/facing")) % AROUND.size()]
 
 
 ## [param direction] turned [param steps] eighths of a turn (clockwise for

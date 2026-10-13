@@ -167,7 +167,9 @@ All of it is optional.
   - `"none"`: stands where it is.
 
   Without one, imps wander, brutes guard and sneaks patrol (a monster of no
-  kind stands). It idles at a slower step than it chases; a fight
+  kind stands). An entry with nothing but `at`, `facing` and `idle` (as the
+  level editor writes them) leaves the spawn order as it is, so setting a
+  monster's facing does not rename it or move its slot. It idles at a slower step than it chases; a fight
   interrupts it, and after the fight it walks back (its cell, its route,
   its place at the point) and goes on.
 - `spawn_points`: named cells where a link into this map can arrive.
