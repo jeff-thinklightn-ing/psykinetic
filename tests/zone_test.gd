@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_console()
 	_test_speech_by_zone()
 	_test_overheard()
+	_test_stats_with_nobody_on()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -107,6 +108,26 @@ func _test_companion_follows() -> void:
 	_check(left_behind == 0, "and not in the test room any more")
 	var host_pet: Companion = _main._companions.get(Net.player_id)
 	_check(host_pet != null and host_pet.zone == "test_room", "the host's companion stayed with the host")
+
+
+func _test_stats_with_nobody_on() -> void:
+	print("
+== hours with nobody on: the tick stats keep a minute, and read back at once ==")
+	var stats := NetStats.new()
+	var stale := Time.get_ticks_msec() - NetStats.WINDOW_MSEC - 5000
+	# Two million samples gone stale, as hours of frames with nobody on made.
+	for i in 2000000:
+		stats._frames.append([stale, 100])
+	stats._ticks.append([stale, 100, 1])
+	var started := Time.get_ticks_msec()
+	stats.record_frame(200)
+	var trimmed := Time.get_ticks_msec() - started
+	_check(stats._frames.size() == 1 and stats._ticks.is_empty(), "a sample coming in trims the stale ones (%d left)" % stats._frames.size())
+	_check(trimmed < 1000, "all at once, not one by one (%d ms for two million)" % trimmed)
+	for i in 1000:
+		stats.record_frame(100)
+	_check(stats._frames.size() == 1001, "and keeps what is in the window (%d)" % stats._frames.size())
+	_check(stats.server_text().begins_with("no ticks"), "nothing to say of ticks it has not seen: %s" % stats.server_text())
 
 
 func _test_empty_zone_sleeps() -> void:

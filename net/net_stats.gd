@@ -10,6 +10,10 @@ extends RefCounted
 ##   minute.
 
 const WINDOW_MSEC := 60000
+## The window is trimmed this often as samples come in, whether or not
+## anything reads it: a server nobody is on for hours keeps a minute of
+## samples, not hours of them.
+const TRIM_EVERY_MSEC := 1000
 
 ## [msec, usec, tick] for each sim tick in the window.
 var _ticks: Array[Array] = []
@@ -22,18 +26,22 @@ var _corrections: Array[Array] = []
 var corrections_total := 0
 var worst_correction_ever := 0.0
 var _next_log_msec := WINDOW_MSEC
+var _next_trim_msec := 0
 
 
 func record_tick(usec: int, tick: int) -> void:
 	_ticks.append([Time.get_ticks_msec(), usec, tick])
+	_trim_due()
 
 
 func record_frame(usec: int) -> void:
 	_frames.append([Time.get_ticks_msec(), usec])
+	_trim_due()
 
 
 func record_traffic(sent: int, received: int) -> void:
 	_traffic.append([Time.get_ticks_msec(), sent, received])
+	_trim_due()
 
 
 ## The local player was corrected: its sprite was [param tiles] from the
@@ -44,11 +52,29 @@ func record_correction(tiles: float, snapped: bool) -> void:
 	worst_correction_ever = maxf(worst_correction_ever, tiles)
 
 
+func _trim_due() -> void:
+	var now := Time.get_ticks_msec()
+	if now >= _next_trim_msec:
+		_next_trim_msec = now + TRIM_EVERY_MSEC
+		_trim()
+
+
+## Drops the samples older than the window: all of them at once (they are
+## in time order), not one at a time from the front, which moves the rest
+## each time.
 func _trim() -> void:
 	var cutoff := Time.get_ticks_msec() - WINDOW_MSEC
-	for list: Array[Array] in [_ticks, _frames, _traffic, _corrections]:
-		while not list.is_empty() and int(list[0][0]) < cutoff:
-			list.pop_front()
+	_ticks = _within(_ticks, cutoff)
+	_frames = _within(_frames, cutoff)
+	_traffic = _within(_traffic, cutoff)
+	_corrections = _within(_corrections, cutoff)
+
+
+static func _within(list: Array[Array], cutoff: int) -> Array[Array]:
+	var old := list.bsearch_custom([cutoff], func(a: Array, b: Array) -> bool: return int(a[0]) < int(b[0]))
+	if old == 0:
+		return list
+	return list.slice(old)
 
 
 ## Server: "tick avg 0.42 ms, worst 3.10 ms (tick 812) over 600; frame

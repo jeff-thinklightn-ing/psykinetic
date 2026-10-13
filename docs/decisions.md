@@ -1674,3 +1674,15 @@ and the view sits it down, keeps it sat and gets it up. The idle tempo
 spread is 10% either way, as asked; loops already start anywhere along
 them. All of it is the view's: every peer draws the same monster the same,
 each from its name.
+
+## 172. The network stats trim themselves, whether or not anyone reads them
+
+NetStats kept a sample per tick and per frame and dropped those older than
+its minute only when its line was written, once a minute while someone was
+connected. A server nobody was on for nine and a half hours kept every
+frame of them (1.1 GB), and the first player to join set off the first
+trim, which took them off the front one at a time, each move shifting the
+millions behind it: the server froze in it, the player was dropped, and
+nobody could join until it was restarted. Now every sample coming in trims
+the window, at most once a second, and a trim cuts the stale run off in one
+slice (samples are in time order, so a binary search finds where).

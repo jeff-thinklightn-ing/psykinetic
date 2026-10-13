@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.105
+
+Server.
+
+- Fixed the server freezing when the first player logged in after it had
+  run for hours with nobody on, which dropped them and kept everyone out
+  until it was restarted.
+
+The server must be updated to v0.1.105 too, as it refuses any other version.
+
 ## v0.1.104
 
 Client.
