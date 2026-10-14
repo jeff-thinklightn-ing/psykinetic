@@ -11,3 +11,4 @@ pc-character 800
 terrain 1000
 art-kit 1200
 enemy-ai 1400
+companions 1600
