@@ -21,7 +21,9 @@ which worktree owns each step, and the design rules not to break without asking 
   `GODOT_PATH`, a clean tree, the Windows export template and `gh`). Docs and tools-only
   changes land on `main` without a release.
 - Every architectural choice gets its own numbered entry at the bottom of
-  `docs/decisions.md`, in the same commit as the code.
+  `docs/decisions.md`, in the same commit as the code. With several worktree sessions
+  running, ask the coordinator (the session in the main folder) for the number before
+  committing, so two trees don't take the same one.
 - Server and client must be built from the same commit; a release that changes the wire
   format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
 - Never commit a real token: check the diff of `project.godot`.
