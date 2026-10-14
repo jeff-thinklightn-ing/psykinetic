@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_tiers()
 	_test_world_tick()
 	_test_plans_per_step()
+	_test_walk_round_held_ground()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -569,6 +570,42 @@ func _test_plans_per_step() -> void:
 		planned.append(sneaks.filter(func(m: Monster) -> bool: return not m.route.is_empty()).size())
 	_check(sneaks.size() == 10 and planned[0] <= World.PLANS_PER_STEP and planned[-1] == sneaks.size(),
 			"%d patrols, routes worked out by step: %s (%d a step at most)" % [sneaks.size(), planned, World.PLANS_PER_STEP])
+
+
+func _test_walk_round_held_ground() -> void:
+	print("
+== a far monster walking back does not walk over ground another faction holds ==")
+	# A hall with the town's farm across it at x 15 (radius 1: the whole
+	# column, and the cells beside its middle), an imp (the goblins') home at x 5, sent back from x 25.
+	var floor := "#" + ".".repeat(30) + "#"
+	var e := _build(["#".repeat(32), floor, "#" + ".".repeat(24) + "i" + ".".repeat(5) + "#", floor, "#".repeat(32)])
+	var imp: Monster = e["i"][0]
+	var block_rows: Array[String] = []
+	for y in 9:
+		block_rows.append(".".repeat(63))
+	Level.register("held_hall", Level.image_from_rows(block_rows), null, {"places": {
+		"farm": {"at": [15, 2], "kind": "farm", "radius": 1, "holder": "town"}}})
+	var names: Array[String] = ["held_hall"]
+	var was_holdings := World.holdings
+	var was_name := World.zone.name
+	World.holdings = Holdings.new(WorldMap.build(names), Factions.read())
+	World.zone.name = "held_hall"
+	var home := Vector2i(5, 2)
+	imp.home = home
+	imp._returning = true
+	imp._world_tick(60.0)
+	_check(imp.tile.x == 16 and not World.held_against(imp).has(imp.tile) and imp._returning,
+			"it walks to the edge of the town's farm and stops there (%s)" % [imp.tile])
+	World.holdings.take("held_hall/farm", "goblins")
+	imp._world_tick(60.0)
+	_check(imp.tile == home and not imp._returning, "the goblins take the farm: it is theirs to cross, and it is home (%s)" % [imp.tile])
+	World.holdings.take("held_hall/farm", "town")
+	World._relocate(imp, Vector2i(15, 2))
+	imp._returning = true
+	imp._world_tick(60.0)
+	_check(imp.tile == Vector2i(15, 2), "standing in the town's ground, it has met them there and does not walk (%s)" % [imp.tile])
+	World.holdings = was_holdings
+	World.zone.name = was_name
 
 
 func _build(rows: Array[String], extra := {}) -> Dictionary:

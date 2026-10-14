@@ -2576,3 +2576,21 @@ dictionaries were the cost), and clearing the arrays for each search
 The 256x256 tick: 4 players 31 ms to 26 on average, 9 players 46 to 38,
 1 player 6.1; corner to corner about 190 ms to 90 to 150 (noisy, with
 other work on the machine).
+
+## 214. A world tick's walk keeps off ground another faction holds
+
+Jeff's rule: nobody walks over ground another faction holds (206). The
+world tick's walk (207) went by find_path within its zone, through
+anyone's ground. find_path takes walls now (cells it never steps into,
+the goal among them), and World.walk gives it the cells the walker's
+faction may not walk: World.held_against, Holdings.blocked_cells for the
+zone and the faction of the monster's kind (Factions.of_kind; a kind of no
+faction may walk only nobody's ground). It goes round them, or, with no
+way round, as near as it can get (find_path's nearest): the edge of the
+ground in its way. One already standing in such ground has met its
+holders and does not walk. What comes of a meeting (a fight, a taking) is
+the world tick's, with groups, later; for now a monster stopped at the
+edge tries again at its next world tick, so it goes on once the ground
+changes hands. Rejected: maps' routes (WorldRoutes.route) for this walk
+(they are between areas; this walk stays in its zone, and the same walls
+give the same answer without a second graph).

@@ -507,6 +507,16 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	return monster.tier as Tier
 
 
+## The cells of this zone [param entity] may not walk: held by a faction
+## not its own (Holdings.blocked_cells; a monster's faction is its kind's,
+## Factions.of_kind), each with the place holding it. None with no holdings.
+func held_against(entity: GridEntity) -> Dictionary:
+	if holdings == null:
+		return {}
+	var kind := str(entity.spawn_spec.get("kind", ""))
+	return holdings.blocked_cells(zone.name, holdings.factions.of_kind(kind) if holdings.factions != null else Factions.NOBODY)
+
+
 var _plans_step := -1
 var _plans_left := 0
 
@@ -532,7 +542,10 @@ func take_plan() -> bool:
 ## out; with no way there (the tile taken, or
 ## farther than it could look in that time) it gets as near as it can. The
 ## search looks at WALK_SEARCH_PER_STEP tiles for each step it could take.
-## True if it got there.
+## Nobody walks over ground another faction holds (held_against): it goes
+## round, or as near as it can get, the edge; one standing in such ground
+## already has met its holders there and does not walk (what comes of
+## meeting them is the world tick's, later). True if it got there.
 func walk(entity: GridEntity, to: Vector2i, ticks: float) -> bool:
 	if not entity.spawned:
 		return false
@@ -541,7 +554,10 @@ func walk(entity: GridEntity, to: Vector2i, ticks: float) -> bool:
 	var reach := floori(ticks / step_ticks(entity, Vector2i(1, 0)))
 	if reach <= 0:
 		return false
-	var path := find_path(entity.tile, to, false, entity, reach * WALK_SEARCH_PER_STEP, true)
+	var walls := held_against(entity)
+	if walls.has(entity.tile):
+		return false
+	var path := find_path(entity.tile, to, false, entity, reach * WALK_SEARCH_PER_STEP, true, walls)
 	var at := entity.tile
 	var spent := 0.0
 	for next in path:
@@ -2182,8 +2198,10 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## With [param nearest], giving up (or no way there) gives the way to the
 ## tile it looked at that is nearest [param to] instead (the earliest of
 ## equals; empty if that is [param from]): as far as a walk can get.
+## [param walls]: cells it never steps into ({cell: anything}; another
+## faction's held ground), the goal among them.
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
-		ignore: GridEntity = null, max_tiles := 0, nearest := false) -> Array[Vector2i]:
+		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
@@ -2219,6 +2237,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	# for each search: a third of the time.
 	var heap_keys := PackedInt64Array()
 	var heap_cells := PackedInt32Array()
+	var walled := not walls.is_empty()
 	_heap_push_at(heap_keys, heap_cells, best_left << PATH_ORDER_BITS, from_at)
 	var offsets := PackedInt32Array()
 	for direction in DIRECTIONS:
@@ -2259,6 +2278,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			if step == PATH_STEP_BLOCKED or step == PATH_STEP_ASK and _terrain_blocks_step(current, direction, true):
 				continue
 			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore:
+				continue
+			if walled and walls.has(next):
 				continue
 			var next_cost: int = _search_cost[at]
 			if way >= 4:

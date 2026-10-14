@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.130
+
+Client and server.
+
+- Monsters walking back to their posts while nobody is near no longer
+  cross ground another faction holds: they go round it, or wait at its
+  edge.
+
+The server must be updated to v0.1.130 too, as it refuses any other version.
+
 ## v0.1.129
 
 Client and server.
