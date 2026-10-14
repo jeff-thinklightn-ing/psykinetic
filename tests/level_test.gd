@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_falls()
 	_test_sight_over_walls()
 	await _test_level_links()
+	await _test_edge_links()
 	_test_console()
 	await _test_castle()
 
@@ -91,6 +92,16 @@ func _register_maps() -> void:
 		{"links": [{"at": [4, 1], "to_map": "test_link_b", "to_spawn": "gate"}]})
 	Level.register("test_link_b", Level.image_from_rows(_rows(1, 3, 1, 2), {Vector2i(1, 1): "start"}), null,
 		{"spawn_points": {"gate": [2, 2]}})
+	# Edge links: test_edge_w (4 x 3 cells, all floor) has test_edge_e
+	# (3 x 5) east of it, and the other way round.
+	var w_rows: Array[String] = []
+	for y in 5:
+		w_rows.append(".".repeat(7))
+	Level.register("test_edge_w", Level.image_from_rows(w_rows, {Vector2i(0, 1): "start"}), null, {"neighbours": {"east": "test_edge_e"}})
+	var e_rows: Array[String] = []
+	for y in 9:
+		e_rows.append(".".repeat(5))
+	Level.register("test_edge_e", Level.image_from_rows(e_rows, {Vector2i(2, 0): "start"}), null, {"neighbours": {"west": "test_edge_w"}})
 
 
 # --- Tests ----------------------------------------------------------------------
@@ -279,6 +290,38 @@ func _test_level_links() -> void:
 		"in the zone test_link_b; test_link_a stays loaded")
 
 
+func _test_edge_links() -> void:
+	print("
+== edge links: walk off one map's edge, arrive at the next one's ==")
+	_main.load_map("test_edge_w")
+	_check(_main.level["size"] == Vector2i(4, 3) and _main.level["neighbours"] == {"east": "test_edge_e"},
+		"test_edge_w is 4 x 3 cells with test_edge_e east (%s, %s)" % [_main.level["size"], _main.level["neighbours"]])
+	var player := _player()
+	_put(player, Vector2i(3, 0))
+	_wait_for_step(player)
+	_check(not World.try_move(player, Vector2i(0, -1)), "walking into the north edge, which has no neighbour, is a wall")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "test_edge_w", "and Player stays (%s)" % _main.map_name)
+	player = _player()
+	_put(player, Vector2i(3, 2))
+	_wait_for_step(player)
+	_check(not World.try_move(player, Vector2i(1, 0)), "walking into the east edge is not a step on the map")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var arrived := _player()
+	_check(_main.map_name == "test_edge_e" and arrived != null and arrived.zone == "test_edge_e", "it takes Player to test_edge_e (%s)" % _main.map_name)
+	_check(arrived != null and arrived.tile == Vector2i(0, 2), "arriving on its west edge at the same row, (0, 2) (%s)" % [arrived.tile if arrived else "none"])
+	_put(arrived, Vector2i(0, 4))
+	_wait_for_step(arrived)
+	World.try_move(arrived, Vector2i(-1, 0))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var back := _player()
+	_check(_main.map_name == "test_edge_w" and back != null and back.tile == Vector2i(3, 2),
+		"back west from row 4, past test_edge_w's last row: its east edge's last cell, (3, 2) (%s)" % [back.tile if back else "none"])
+
+
 func _test_castle() -> void:
 	print("\n== the castle, and the way there from the test room ==")
 	var castle := Level.load_level("castle")
@@ -330,7 +373,7 @@ func _test_console() -> void:
 	_check(_main.admin_command("map").begins_with("map load is now zone reset"), _main.admin_command("map"))
 	_check(_main.admin_command("zone reset nowhere").begins_with("no map nowhere"), "an unknown map is refused")
 	var reply: String = _main.admin_command("zone reset test_room")
-	_check(reply.begins_with("zone test_room rebuilt: 275 cells") and World.zone.name == "test_link_b",
+	_check(reply.begins_with("zone test_room rebuilt: 275 cells") and World.zone.name == "test_edge_w",
 			"zone reset test_room rebuilds it, the host's zone untouched: %s" % reply)
 
 

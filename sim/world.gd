@@ -44,6 +44,9 @@ signal fields_changed_signal
 signal command_received(entity: GridEntity, command: String, args: Dictionary)
 ## A walking step into [param occupant] was refused: it would not be pushed.
 signal entity_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i)
+## Server: a move by [param entity] that failed because the cell ahead is
+## no floor (a wall's far side, void, off the map): an edge link's trigger.
+signal walked_off(entity: GridEntity, direction: Vector2i)
 ## An attack or a swing at air: [param direction] is where it went.
 signal entity_swung(entity: GridEntity, direction: Vector2i)
 
@@ -784,6 +787,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		if ahead != null and ahead.is_creature() \
 				and not _terrain_blocks_step(entity.tile, direction, true):
 			entity_bumped.emit(entity, ahead, direction)
+		elif not is_walkable(entity.tile + direction):
+			walked_off.emit(entity, direction)
 		return false
 	entity.next_move_tick = start + duration
 	entity._world_set_facing(direction)

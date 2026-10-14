@@ -27,7 +27,7 @@ extends RefCounted
 ## no wall: nothing is built along it, and sight passes over it.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
-## links, neighbours, centre, warnings}; terrain is what World.load_terrain and the
+## links, neighbours, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
 ## views take: floor, fire, edges (as Terrain.parse), and kinds (cell ->
 ## "stone" | "grass" | "dirt"), water, heights (cell -> 1..6; 0 is left
 ## out), stairs (cell -> the direction it climbs), torches.
@@ -312,6 +312,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
 			"outdoor": bool(config.get("outdoor", false)),
 		},
+		"size": cells,
 		"warnings": warnings,
 	}
 	_place(level, markers, config, warnings)

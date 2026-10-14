@@ -2119,6 +2119,26 @@ way back on purpose says `"one_way": true`. Rejected: a separate
 level.json already holds; and checking only that a link's target exists,
 which misses dead ends a player can walk into and not out of.
 
+## 195. An edge link is a bump against the map's edge
+
+Walking off a map onto its neighbour (level.json `"neighbours"`) happens
+when a player's move fails against the map's outline where that side has
+a neighbour: World emits `walked_off` for any move refused because the cell
+ahead is no floor, and main checks that the cell is past the map's edge
+(`WorldMap.side_off`) and that the side has a neighbour, then travels as a
+link does (decision 128: the player and their companion, nobody else),
+arriving at the matching cell of the opposite edge (`WorldMap.arrival`:
+same row or column, clamped to the neighbour's size, nearest free cell).
+The outline keeps its wall, so walking, pathing, sight and pushes need no
+second rule at the edge (as decision 148 wanted for forest edges), and a
+monster pushed or chasing to the edge just stops. The maths is static and
+needs no player, peer or zone, so the world tick can move a group across
+with `WorldMap.crossing`. Rejected: opening the outer wall on a neighbour's
+side and travelling on stepping out of bounds, which would let pushes,
+paths and sight leave the map and need guarding everywhere; and treating
+the border cells as link markers, which would throw a player walking along
+the edge into the next map and give up a row or column of every map.
+
 ## 196. The editor's level is a MapDoc, with no screen
 
 The level editor kept the map, level.json, the undo stack and saving in its

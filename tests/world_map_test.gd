@@ -15,6 +15,7 @@ func _ready() -> void:
 
 	_test_graph()
 	_test_problems()
+	_test_crossing()
 	_test_levels()
 
 	print("")
@@ -101,6 +102,27 @@ func _test_problems() -> void:
 	names = ["wm_ghost_link"]
 	more = WorldMap.build(names).problems("wm_ghost_link")
 	_check(more.any(func(problem: String) -> bool: return "goes to wm_ghost, which is no level" in problem), "a link to no level is flagged")
+
+
+func _test_crossing() -> void:
+	print("crossing")
+	var world_map := _world()
+	var east := world_map.crossing("wm_hub", Vector2i(5, 0), Vector2i(1, 0))
+	_check(east == {"to": "wm_east", "side": "east", "at": Vector2i(0, 0)}, "off the hub's east edge to wm_east's west edge, same row (%s)" % [east])
+	var back := world_map.crossing("wm_east", Vector2i(0, 0), Vector2i(-1, 0))
+	_check(back == {"to": "wm_hub", "side": "west", "at": Vector2i(5, 0)}, "and back to the hub's east edge (%s)" % [back])
+	_check(world_map.crossing("wm_hub", Vector2i(4, 0), Vector2i(1, 0)).is_empty(), "a step that stays on the map crosses nothing")
+	_check(world_map.crossing("wm_hub", Vector2i(0, 0), Vector2i(-1, 0)).is_empty(), "an edge with no neighbour crosses nothing")
+	var up := world_map.crossing("wm_east", Vector2i(1, 0), Vector2i(0, -1))
+	_check(up == {"to": "wm_up", "side": "north", "at": Vector2i(1, 0)}, "north lands on the neighbour's last row, even one not named back (%s)" % [up])
+	Level.register("wm_nowhere", _strip(2), null, {"neighbours": {"east": "wm_ghost"}})
+	var names: Array[String] = ["wm_nowhere"]
+	_check(WorldMap.build(names).crossing("wm_nowhere", Vector2i(1, 0), Vector2i(1, 0)).is_empty(), "a neighbour that is no level here crosses nothing")
+	_check(WorldMap.side_off(Vector2i(4, 3), Vector2i(4, 3)) == "east" and WorldMap.side_off(Vector2i(4, 3), Vector2i(1, -1)) == "north"
+		and WorldMap.side_off(Vector2i(4, 3), Vector2i(3, 2)) == "", "side_off: past a corner is east or west; on the map is none")
+	_check(WorldMap.arrival("south", Vector2i(9, 3), Vector2i(5, 5)) == Vector2i(4, 0)
+		and WorldMap.arrival("north", Vector2i(2, -1), Vector2i(5, 5)) == Vector2i(2, 4),
+		"arrival: south lands on row 0, north on the last row, kept on a narrower map")
 
 
 func _test_levels() -> void:

@@ -182,8 +182,7 @@ All of it is optional.
 - `neighbours`: the level across each map edge, `{"east": "wilds"}`: walk
   off the east edge and arrive at the west edge of wilds at the same row
   (north and south keep the column). The neighbour names this level on its
-  opposite side. (For now only the world map reads it; walking across is
-  not built yet.)
+  opposite side (see Edge links).
 
 ## Level links
 
@@ -196,6 +195,18 @@ is in its top-left corner, (1, 1), to the sample; the sample's leads back.
 Its second, at the dead end of the south-east corridor, (30, 34), goes to
 `levels/castle` ("The Castle"), arriving at (26, 13) beside the castle's
 own link at (27, 12), which comes back to (30, 33).
+
+## Edge links
+
+A player who walks into the edge of a map where level.json names a
+neighbour on that side goes there, with their companion, as a link takes
+them: they arrive on the neighbour's opposite edge at the same row (east,
+west) or column (north, south), kept on the map if the neighbour is
+shorter, at the nearest free cell to it. The outline stays a wall (an
+outdoor map's forest edge); the bump against it is the crossing. Only
+players cross for now; `WorldMap.crossing(area, cell, direction)` gives
+the same answer without a player or a zone, for the world tick to move
+groups across.
 
 ## The world map
 

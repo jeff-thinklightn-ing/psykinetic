@@ -55,6 +55,57 @@ func _read(area_name: String) -> void:
 			"to_spawn": "", "one_way": false})
 
 
+## Where a step from [param cell] by [param direction] in
+## [param area_name] goes when it leaves the map across an edge that has a
+## neighbour: {to (the area), side, at (the matching cell on the
+## neighbour's opposite edge: WorldMap.arrival)}; {} when the step stays on
+## the map, or that edge has no neighbour (or one that is no level here).
+## Needs no player and no zone: the world tick moves groups with it too.
+func crossing(area_name: String, cell: Vector2i, direction: Vector2i) -> Dictionary:
+	var area: Dictionary = areas.get(area_name, {})
+	if area.is_empty():
+		return {}
+	var to_cell := cell + direction
+	var side := side_off(area["size"], to_cell)
+	var to: String = area["neighbours"].get(side, "")
+	if side.is_empty() or not areas.has(to):
+		return {}
+	return {"to": to, "side": side, "at": arrival(side, to_cell, areas[to]["size"])}
+
+
+## The edge of a map [param size] cells across that [param cell] is beyond
+## ("north", "east", "south", "west"), or "" for a cell on the map. A cell
+## past a corner is east or west of it.
+static func side_off(size: Vector2i, cell: Vector2i) -> String:
+	if cell.x < 0:
+		return "west"
+	if cell.x >= size.x:
+		return "east"
+	if cell.y < 0:
+		return "north"
+	if cell.y >= size.y:
+		return "south"
+	return ""
+
+
+## Where a step off the [param side] edge into [param cell] (a cell just
+## beyond it) arrives on a neighbour [param to_size] cells across: on its
+## opposite edge, at the same row (east, west) or column (north, south),
+## kept on the map when the neighbour is shorter.
+static func arrival(side: String, cell: Vector2i, to_size: Vector2i) -> Vector2i:
+	var last := to_size - Vector2i.ONE
+	match side:
+		"east":
+			return Vector2i(0, clampi(cell.y, 0, last.y))
+		"west":
+			return Vector2i(last.x, clampi(cell.y, 0, last.y))
+		"south":
+			return Vector2i(clampi(cell.x, 0, last.x), 0)
+		"north":
+			return Vector2i(clampi(cell.x, 0, last.x), last.y)
+	return cell
+
+
 ## The ways out of [param area_name].
 func ways_from(area_name: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

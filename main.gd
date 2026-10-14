@@ -308,6 +308,7 @@ func _go_online() -> void:
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		World.entity_moved.connect(_on_entity_moved)
+		World.walked_off.connect(_on_walked_off)
 		var drawn := map_name
 		_boot()
 		if World.home().name == drawn:
@@ -1289,9 +1290,11 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 
 ## Server: [param peer]'s player (and their companion) go to zone
 ## [param to_map], at its spawn point [param to_spawn] ("" for its first
-## start); nobody else moves. The zone is opened if need be. False if there
-## is no such map or no such player.
-func travel(peer: int, to_map: String, to_spawn := "") -> bool:
+## start), or, across an edge, at the cell matching [param edge] ({side,
+## cell}: the edge crossed and the cell just beyond it; WorldMap.arrival);
+## nobody else moves. The zone is opened if need be. False if there is no
+## such map or no such player.
+func travel(peer: int, to_map: String, to_spawn := "", edge := {}) -> bool:
 	var id: String = _peer_ids.get(peer, "")
 	var record: PlayerRecord = _records.get(id)
 	if record == null or not Level.exists(to_map):
@@ -1316,6 +1319,8 @@ func travel(peer: int, to_map: String, to_spawn := "") -> bool:
 	World.enter(target)
 	var spawns: Dictionary = level.get("spawn_points", {})
 	record.tile = spawns.get(to_spawn, player_starts[0] if not player_starts.is_empty() else Vector2i.ZERO)
+	if not edge.is_empty():
+		record.tile = WorldMap.arrival(edge["side"], edge["cell"], level["size"])
 	record.zone = to_map
 	if not record.companion.is_empty():
 		record.companion["tile"] = null  # Beside their player.
@@ -1347,6 +1352,22 @@ func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void
 			# After the tick: not mid-step.
 			travel.call_deferred(entity.owner_peer, str(link["to_map"]), str(link["to_spawn"]))
 			return
+
+
+## Server: a player walking into the map's edge where the level has a
+## neighbour goes there, arriving at the matching cell of its opposite edge
+## (level.json "neighbours"), with their companion, as a link takes them.
+func _on_walked_off(entity: GridEntity, direction: Vector2i) -> void:
+	if not entity is Player:
+		return
+	var beyond := entity.tile + direction
+	var side := WorldMap.side_off(level.get("size", Vector2i.ZERO), beyond)
+	var neighbours: Dictionary = level.get("neighbours", {})
+	if side.is_empty() or not neighbours.has(side) or not Level.exists(neighbours[side]):
+		return
+	print("[level] %s walked off the %s edge at %s to %s" % [_display_name(entity), side, entity.tile, neighbours[side]])
+	# After the tick: not mid-step.
+	travel.call_deferred(entity.owner_peer, str(neighbours[side]), "", {"side": side, "cell": beyond})
 
 
 ## Server: one Door node per door edge, through the spawner so every client

@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.122
+
+Client and server.
+
+- Maps can now join edge to edge: walk into the side of one map where it
+  meets the next and you step straight onto that map's matching edge, at
+  the same place along it, your companion with you. No map uses it yet;
+  new areas built off the wilds will.
+
+The server must be updated to v0.1.122 too, as it refuses any other version.
+
 ## v0.1.121
 
 Client and server.
