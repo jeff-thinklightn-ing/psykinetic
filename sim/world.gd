@@ -1193,27 +1193,34 @@ func reaches(by: GridEntity, entity: GridEntity) -> bool:
 
 ## [param by] puts [param from]'s [param from_slot] into [param depot]: banked
 ## in the stockpile its tile is in, the slot emptied, if the town holds that
-## stockpile; refused (false, nothing moves) if not.
+## stockpile; refused (false, nothing moves) if not. A resource item
+## (Items.yield_of) is banked as its yield and its instance ended; gear is
+## banked as itself, its instance kept at the store.
 func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) -> bool:
 	if from == depot:
 		return false
 	var area := depot.zone if not depot.zone.is_empty() else zone.name
 	var place := Stockpile.place_at(holdings, area, depot.tile)
 	var item := from.slots[from_slot]
-	if stockpile == null or place.is_empty() or not stockpile.deposit(place, item, 1, String(by.name), String(from.name)):
+	var yields := Items.yield_of(item)
+	if stockpile == null or place.is_empty() \
+			or yields.keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
 		_log("slots: %s refused %s: no stockpile the town holds there" % [depot.name, item])
 		return false
-	# The instance: gear is never ended, so it waits in the book, at the
-	# store (the stockpile keeps ids for now; its uids next).
 	var uid := slot_uid(from, from_slot)
-	items.place(uid, "stockpile:" + place)
-	items.note(uid, "banked", "%s by %s" % [place, _label_of(by)], depot.zone, depot.tile)
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
 	taken[from_slot] = ""
 	taken_uids[from_slot] = 0
 	from.slots = taken
 	from.slot_items = taken_uids
+	var who := _label_of(by)
+	if yields.is_empty():
+		stockpile.bank(place, uid, who, _label_of(from), depot.zone, depot.tile)
+	else:
+		for what: String in yields:
+			stockpile.deposit(place, what, int(yields[what]), who, _label_of(from))
+		items.end(uid, "banked", "%s by %s" % [place, who], depot.zone, depot.tile)
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
 	slots_changed.emit(from)
 	return true

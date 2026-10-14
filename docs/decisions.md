@@ -2975,11 +2975,14 @@ second town is only another key. A store holds:
   defines, tagged "resource" with a yield ({ore: 5} for a sack of ore);
   banking one will add its yield and end that instance ("banked"). The
   line agreed with items: resources are counts, not instances;
-- gear item by item. For now that is the item id (Items.ALL); when items'
-  ItemBook lands it becomes the item's uid, its history kept in the book
-  and never copied here. The stockpile is a place, not a carrier: no
-  carrier time runs while gear sits in it;
-- a ledger of the last 200 changes (step, what, count, by, from),
+- gear item by item, by its uid in the item book (ItemBook, decision
+  231), its history kept in the book and never copied here: the book has
+  it at "stockpile:<place>", carried by nobody, with a "banked" event. The
+  stockpile is a place, not a carrier: no carrier time runs while gear
+  sits in it. A resource item put in a depot is banked as its yield
+  (Items.yield_of) and its instance ended ("banked"). Gear saved by id in
+  a snapshot from before uids comes back as a new, "migrated" instance;
+- a ledger of the last 200 changes (step, what, count, by, from, uid),
   stamped with World.steps, for the reports and to check that nothing
   banked goes missing.
 
@@ -2994,7 +2997,8 @@ dragged or carted into the place's ground; carts on tracks will hand
 their load to the same Stockpile.deposit.
 
 Players never withdraw: the economy builds the town, not one player's
-wealth. Only the town's own work takes (Stockpile.take with a reason):
+wealth. Only the town's own work takes (Stockpile.take for resources,
+Stockpile.take_item for gear, then World.put_item, each with a reason):
 production jobs use resources, and banked gear goes back into use through
 the town, sold or lent in the shop (step 5) or reworked by the smith
 (step 3), so the store is not a sink. A store whose place is gone from

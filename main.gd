@@ -1218,10 +1218,10 @@ func _boot() -> void:
 	# Who holds which place: as the levels start them, then as the snapshot
 	# left them, on the world's clock.
 	World.holdings = Holdings.new(WorldMap.build(), Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
-	# The town's stores, as the snapshot left them.
-	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), func() -> int: return World.steps)
 	# Every thing in the world and its history, as the snapshot left them.
 	World.items = ItemBook.from_dict(snapshot.get("items", {}), World.steps_now)
+	# The town's stores, as the snapshot left them, their gear in the book.
+	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), World.steps_now, World.items)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record

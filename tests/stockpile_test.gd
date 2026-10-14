@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_banking()
 	_test_refused()
 	_test_resources()
+	_test_resource_items()
 	await _test_restart()
 	_test_old_and_odd_snapshots()
 
@@ -112,14 +113,21 @@ func _test_banking() -> void:
 	var depot := _entity("Depot1")
 	World._relocate(host, Vector2i(5, 3))
 	World.steps = 1234
+	var uid := World.slot_uid(host, 0)
+	var who := World._label_of(host)
 	_check(World.try_transfer(host, host, 0, depot, 2), "the host puts the kit in the depot")
 	_check(Array(host.slots) == ["", "", "", ""] and Array(depot.slots) == ["", "", "", ""],
 		"the pack's slot is empty, and so is the depot (%s, %s)" % [Array(host.slots), Array(depot.slots)])
-	_check(World.stockpile.count(STORE, KIT) == 1 and World.stockpile.items(STORE) == _strings([KIT]),
-		"the store holds one kit (%s)" % [World.stockpile.items(STORE)])
+	_check(World.stockpile.count(STORE, KIT) == 1 and World.stockpile.items(STORE) == _ints([uid])
+		and World.stockpile.item_ids(STORE) == _strings([KIT]), "the store holds the kit, by its uid #%d (%s)" % [uid, World.stockpile.items(STORE)])
+	var history := World.items.history(uid)
+	_check(World.items.at_of(uid) == Stockpile.holder(STORE) and history.get("holder") == ""
+		and history["events"].back()["kind"] == "banked", "in the book it is at the store, carried by nobody, its last event banked (%s)" % [history])
+	_check(history["carriers"].any(func(row: Dictionary) -> bool: return int(row["since"]) < 0),
+		"and the host's time carrying it is counted (%s)" % [history["carriers"]])
 	var ledger := World.stockpile.ledger(STORE)
-	_check(ledger.size() == 1 and ledger[0] == {"step": 1234, "what": KIT, "count": 1, "by": String(host.name), "from": String(host.name)},
-		"its ledger: who and at which world step (%s)" % [ledger])
+	_check(ledger.size() == 1 and ledger[0] == {"step": 1234, "what": KIT, "count": 1, "by": who, "from": who, "uid": uid},
+		"its ledger: who, which thing and at which world step (%s)" % [ledger])
 	_check(not World.try_transfer(host, depot, 0, host, 0), "nothing to take back out of the depot")
 
 
@@ -144,18 +152,41 @@ func _test_resources() -> void:
 	var stock := World.stockpile
 	_check(stock.deposit(STORE, "gold", 10, "Bo", "castle") and stock.deposit(STORE, "ore", 5, "Bo", "mine"), "10 gold and 5 ore banked")
 	_check(stock.resources(STORE) == {"gold": 10, "ore": 5, "wood": 0, "cloth": 0, "food": 0}, "counted (%s)" % [stock.resources(STORE)])
-	_check(not stock.deposit(STORE, "dragon", 1) and not stock.deposit(STORE, "ore", 0) and not stock.deposit("", "ore", 1),
-		"no banking of what is not a resource or item, of nothing, or nowhere")
+	_check(not stock.deposit(STORE, "dragon", 1) and not stock.deposit(STORE, KIT, 1) and not stock.deposit(STORE, "ore", 0)
+		and not stock.deposit("", "ore", 1), "no depositing of what is not a resource (gear is banked by uid), of nothing, or nowhere")
 	_check(stock.take(STORE, "ore", 3, "smith: a blade") and stock.count(STORE, "ore") == 2, "the smith takes 3 ore: 2 left")
 	_check(not stock.take(STORE, "ore", 3) and stock.count(STORE, "ore") == 2, "3 more is more than there is: nothing taken")
-	_check(stock.take(STORE, KIT, 1, "shop") and stock.count(STORE, KIT) == 1, "the shop takes a kit: 1 left")
-	_check(stock.ledger(STORE).back() == {"step": World.steps, "what": KIT, "count": -1, "by": "shop", "from": ""},
+	var kit := stock.items(STORE)[0]
+	_check(not stock.bank(STORE, kit) and not stock.bank(STORE, 99999), "a uid already here, or not in the book, is not banked")
+	_check(stock.take_item(STORE, kit, "shop") and stock.count(STORE, KIT) == 1 and World.items.at_of(kit) == "",
+		"the shop takes a kit: 1 left, the taken one nowhere in the book until it is put somewhere")
+	_check(stock.ledger(STORE).back() == {"step": World.steps, "what": KIT, "count": -1, "by": "shop", "from": "", "uid": kit},
 		"the ledger says why (%s)" % [stock.ledger(STORE).back()])
+	_check(not stock.take_item(STORE, kit), "it can't be taken twice")
+	var host := _player(Net.local_id)
+	_check(World.put_item(host, host, 1, kit) and host.slots[1] == KIT and World.items.has(kit),
+		"the town hands it to a player (World.put_item): the same thing, history and all")
+	var depot := _entity("Depot1")
+	_check(World.try_transfer(host, host, 1, depot, 0) and stock.items(STORE).has(kit), "and it can be banked again")
 	var other := Stockpile.new()
 	for i in Stockpile.LEDGER_SIZE + 5:
 		other.deposit("x/y", "wood", 1)
 	_check(other.ledger("x/y").size() == Stockpile.LEDGER_SIZE and other.count("x/y", "wood") == Stockpile.LEDGER_SIZE + 5,
 		"the ledger keeps the last %d lines; the count keeps everything" % Stockpile.LEDGER_SIZE)
+
+
+func _test_resource_items() -> void:
+	print("\n== a sack of ore is banked as its ore ==")
+	var host := _player(Net.local_id)
+	World.set_slots(host, ["ore_sack", "", "", ""])
+	var sack := World.slot_uid(host, 0)
+	_check(Items.yield_of("ore_sack") == {"ore": 5} and World.items.has(sack), "a sack of ore yields 5 ore, and is a thing in the book (#%d)" % sack)
+	_check(World.try_transfer(host, host, 0, _entity("Depot1"), 0), "the host puts it in the depot")
+	_check(World.stockpile.count(STORE, "ore") == 7 and World.stockpile.count(STORE, "ore_sack") == 0 and host.slots[0] == "",
+		"the store has 5 more ore (%d), no sack, and the pack's slot is empty" % World.stockpile.count(STORE, "ore"))
+	_check(not World.items.has(sack), "the sack's instance has ended (banked)")
+	var line: Dictionary = World.stockpile.ledger(STORE).back()
+	_check(line["what"] == "ore" and line["count"] == 5 and line["uid"] == 0, "the ledger counts the ore (%s)" % [line])
 
 
 func _test_restart() -> void:
@@ -169,9 +200,16 @@ func _test_restart() -> void:
 	World.clear_zones()
 	World.stockpile = null
 	await _boot()
-	_check(World.stockpile.resources(STORE) == {"gold": 10, "ore": 2, "wood": 0, "cloth": 0, "food": 0}
-		and World.stockpile.items(STORE) == _strings([KIT]), "after the restart: the same resources and the kit (%s)" % [World.stockpile.to_dict()])
+	var kits: Array[int] = []
+	kits.assign(before[STORE]["items"])
+	_check(World.stockpile.resources(STORE) == {"gold": 10, "ore": 7, "wood": 0, "cloth": 0, "food": 0}
+		and World.stockpile.items(STORE) == kits and World.stockpile.item_ids(STORE) == _strings([KIT, KIT]),
+		"after the restart: the same resources and the same two kits (%s)" % [World.stockpile.to_dict()])
+	_check(kits.all(func(uid: int) -> bool: return World.items.at_of(uid) == Stockpile.holder(STORE)),
+		"the book still has them at the store")
 	_check(World.stockpile.ledger(STORE) == before[STORE]["ledger"], "and the same ledger")
+	_check(World.items.orphans(World.stockpile.all_items()).all(func(uid: int) -> bool: return World.items.at_of(uid) != Stockpile.holder(STORE)),
+		"every thing the book has at the store, the store holds")
 
 
 func _test_old_and_odd_snapshots() -> void:
@@ -183,11 +221,16 @@ func _test_old_and_odd_snapshots() -> void:
 	var old := Snapshot.load(path)
 	DirAccess.remove_absolute(path)
 	_check(old["ok"] and old["stockpile"] == {}, "a snapshot from before the stockpile loads with none (%s)" % [old.get("stockpile")])
-	var odd := Stockpile.new({"gone/place": {"resources": {"gold": 3, "ore": -4, "wood": "lots"}, "items": [KIT, "dragon"]},
-		"junk": 5})
+	var book := ItemBook.new()
+	var odd := Stockpile.new({"gone/place": {"resources": {"gold": 3, "ore": -4, "wood": "lots"}, "items": [KIT, "dragon", 4242]},
+		"junk": 5}, Callable(), book)
 	_check(odd.places() == _strings(["gone/place"]), "a store whose place is gone is kept; junk is left out (%s)" % [odd.places()])
 	_check(odd.resources("gone/place") == {"gold": 3, "ore": 0, "wood": 0, "cloth": 0, "food": 0}
-		and odd.items("gone/place") == _strings([KIT]), "counts under 0, counts that aren't numbers and unknown items are left out (%s)" % [odd.to_dict()])
+		and odd.item_ids("gone/place") == _strings([KIT]),
+		"counts under 0, counts that aren't numbers, unknown items and uids the book hasn't are left out (%s)" % [odd.to_dict()])
+	var migrated := odd.items("gone/place")[0]
+	_check(book.history(migrated)["events"][0]["kind"] == "migrated" and book.at_of(migrated) == Stockpile.holder("gone/place"),
+		"a kit saved by its id (before uids) is a new thing, migrated, at the store (%s)" % [book.history(migrated)])
 
 
 func _entity(entity_name: String) -> GridEntity:
@@ -204,6 +247,12 @@ func _player(peer: int) -> Player:
 
 func _strings(values: Array) -> Array[String]:
 	var out: Array[String] = []
+	out.assign(values)
+	return out
+
+
+func _ints(values: Array) -> Array[int]:
+	var out: Array[int] = []
 	out.assign(values)
 	return out
 

@@ -3,13 +3,15 @@ extends RefCounted
 ## The town's store: what players have brought home. Each store belongs to a
 ## place of kind "stockpile" (Holdings, by place id "<area>/<key>"), and
 ## holds counts of the raw resources (RESOURCES: gold, ore, wood, cloth,
-## food) and the gear banked there, one entry per item (its id for now;
-## the item book's uid once items are instances). A ledger keeps the last
-## LEDGER_SIZE changes, stamped with the World's steps.
+## food) and the gear banked there, by its uid in the item book (book,
+## World.items), its history kept there and never copied here: in the
+## book it is at "stockpile:<place>", carried by nobody. A ledger keeps
+## the last LEDGER_SIZE changes, stamped with the World's steps.
 ##
 ## Things reach it through a depot (a Chest with depot set) inside a
 ## stockpile place the town holds: World.try_transfer banks what is put in
-## at once. Picking loot up counts for nothing. Players never take from it:
+## at once, a resource item (Items.yield_of) as its yield, its instance
+## ended, gear as itself. Picking loot up counts for nothing. Players never take from it:
 ## take is for the town's own use (production, the shop, raids), and a
 ## store whose place is gone from the levels is kept, never dropped.
 ## World keeps one (World.stockpile), made by Main at boot from the
@@ -23,15 +25,25 @@ const LEDGER_SIZE := 200
 
 ## () -> int: the World's steps, the ledger's clock (0 if unset).
 var clock := Callable()
+## The item book the banked gear's uids are in.
+var book: ItemBook
 
-## Place id -> {resources: {name: count}, items: Array[String],
-## ledger: Array[{step, what, count, by, from}]}.
+## Place id -> {resources: {name: count}, items: Array[int] (uids),
+## ledger: Array[{step, what, count, by, from, uid}]}.
 var _stores: Dictionary[String, Dictionary] = {}
 
 
-func _init(saved := {}, with_clock := Callable()) -> void:
+## The stores [param saved] (to_dict's) holds, their gear in [param with_book]
+## (a new one if none), on [param with_clock].
+func _init(saved := {}, with_clock := Callable(), with_book: ItemBook = null) -> void:
 	clock = with_clock
+	book = with_book if with_book != null else ItemBook.new(with_clock)
 	from_dict(saved)
+
+
+## The book's holder key for [param place]'s store.
+static func holder(place: String) -> String:
+	return "stockpile:" + place
 
 
 func now() -> int:
@@ -67,7 +79,7 @@ func count(place: String, what: String) -> int:
 		return 0
 	if what in RESOURCES:
 		return int(_stores[place]["resources"].get(what, 0))
-	return _stores[place]["items"].count(what)
+	return _stores[place]["items"].filter(func(uid: int) -> bool: return book.id_of(uid) == what).size()
 
 
 func has(place: String, what: String, amount := 1) -> bool:
@@ -82,11 +94,27 @@ func resources(place: String) -> Dictionary:
 	return out
 
 
-## [param place]'s banked items, in the order they came.
-func items(place: String) -> Array[String]:
-	var out: Array[String] = []
+## [param place]'s banked gear, uids in the order they came.
+func items(place: String) -> Array[int]:
+	var out: Array[int] = []
 	if _stores.has(place):
 		out.assign(_stores[place]["items"])
+	return out
+
+
+## [param place]'s banked gear by id (ItemBook.id_of), in the order it came.
+func item_ids(place: String) -> Array[String]:
+	var out: Array[String] = []
+	for uid in items(place):
+		out.append(book.id_of(uid))
+	return out
+
+
+## Every uid every store holds (ItemBook.orphans' known).
+func all_items() -> Array[int]:
+	var out: Array[int] = []
+	for place: String in _stores:
+		out.append_array(_stores[place]["items"])
 	return out
 
 
@@ -100,38 +128,59 @@ func ledger(place: String) -> Array[Dictionary]:
 
 # --- Changing ------------------------------------------------------------------------
 
-## Banks [param amount] of [param what] (a resource, or an item id: one item
-## each) at [param place], brought [param by] someone [param from]
-## somewhere. False (nothing banked) for no place, an amount under 1, or
-## something that is neither a resource nor an item.
+## Banks [param amount] of resource [param what] at [param place], brought
+## [param by] someone [param from] somewhere. False (nothing banked) for no
+## place, an amount under 1, or no such resource.
 func deposit(place: String, what: String, amount := 1, by := "", from := "") -> bool:
-	if place.is_empty() or amount < 1 or not (what in RESOURCES or Items.exists(what)):
+	if place.is_empty() or amount < 1 or what not in RESOURCES:
 		return false
 	var store := _store(place)
-	if what in RESOURCES:
-		store["resources"][what] = int(store["resources"].get(what, 0)) + amount
-	else:
-		for i in amount:
-			store["items"].append(what)
+	store["resources"][what] = int(store["resources"].get(what, 0)) + amount
 	_record(store, what, amount, by, from)
 	print("[stockpile] %s banked %d %s at %s (from %s), step %d" % [by if by != "" else "someone", amount,
-		Items.name_of(what) if what not in RESOURCES else what, place, from if from != "" else "nowhere said", now()])
+		what, place, from if from != "" else "nowhere said", now()])
 	return true
 
 
-## Takes [param amount] of [param what] from [param place] for the town's
-## own use ([param reason]: a production job, the shop, a raid). False
-## (nothing taken) if it hasn't that many.
+## Banks the gear [param uid] (in the book, not already here) at
+## [param place], brought [param by] someone [param from] somewhere, at
+## [param zone] [param tile]: the book has it at the store, carried by
+## nobody, with a "banked" event. False (nothing banked) if not.
+func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vector2i(-1, -1)) -> bool:
+	if place.is_empty() or not book.has(uid) or uid in all_items():
+		return false
+	var store := _store(place)
+	store["items"].append(uid)
+	book.place(uid, holder(place))
+	book.note(uid, "banked", "%s by %s" % [place, by if by != "" else "someone"], zone, tile)
+	_record(store, book.id_of(uid), 1, by, from, uid)
+	print("[stockpile] %s banked %s (#%d) at %s (from %s), step %d" % [by if by != "" else "someone",
+		Items.name_of(book.id_of(uid)), uid, place, from if from != "" else "nowhere said", now()])
+	return true
+
+
+## Takes [param amount] of resource [param what] from [param place] for the
+## town's own use ([param reason]: a production job, the shop, a raid).
+## False (nothing taken) if it hasn't that many.
 func take(place: String, what: String, amount := 1, reason := "") -> bool:
-	if amount < 1 or not has(place, what, amount):
+	if amount < 1 or what not in RESOURCES or not has(place, what, amount):
 		return false
 	var store: Dictionary = _stores[place]
-	if what in RESOURCES:
-		store["resources"][what] = int(store["resources"][what]) - amount
-	else:
-		for i in amount:
-			store["items"].erase(what)
+	store["resources"][what] = int(store["resources"][what]) - amount
 	_record(store, what, -amount, reason, "")
+	return true
+
+
+## Takes the gear [param uid] out of [param place] for the town's use
+## ([param reason]: the shop, the smith): in the book it is nowhere until
+## World.put_item puts it somewhere. False (nothing taken) if it isn't here.
+func take_item(place: String, uid: int, reason := "") -> bool:
+	if not _stores.has(place) or uid not in _stores[place]["items"]:
+		return false
+	var store: Dictionary = _stores[place]
+	store["items"].erase(uid)
+	book.place(uid, "")
+	_record(store, book.id_of(uid), -1, reason, "", uid)
 	return true
 
 
@@ -144,9 +193,9 @@ func _store(place: String) -> Dictionary:
 	return _stores[place]
 
 
-func _record(store: Dictionary, what: String, amount: int, by: String, from: String) -> void:
+func _record(store: Dictionary, what: String, amount: int, by: String, from: String, uid := 0) -> void:
 	var ledger: Array = store["ledger"]
-	ledger.append({"step": now(), "what": what, "count": amount, "by": by, "from": from})
+	ledger.append({"step": now(), "what": what, "count": amount, "by": by, "from": from, "uid": uid})
 	if ledger.size() > LEDGER_SIZE:
 		ledger.pop_front()
 
@@ -158,9 +207,11 @@ func to_dict() -> Dictionary:
 	return _stores.duplicate(true)
 
 
-## to_dict's [param saved] over what is here. A store whose place is no
-## longer in the levels is kept (nothing banked is lost); counts under 0
-## and items there are not are left out with a word.
+## to_dict's [param saved] over what is here, the book already loaded. A
+## store whose place is no longer in the levels is kept (nothing banked is
+## lost). Gear saved as an id (from before uids) gets an instance
+## ("migrated"); a uid the book no longer has, counts under 0 and items
+## there are not are left out with a word.
 func from_dict(saved: Dictionary) -> void:
 	for place: Variant in saved:
 		var entry: Variant = saved[place]
@@ -176,13 +227,20 @@ func from_dict(saved: Dictionary) -> void:
 		var banked: Variant = entry.get("items", [])
 		if banked is Array:
 			for item: Variant in banked:
-				if Items.exists(str(item)):
-					store["items"].append(str(item))
-				else:
-					print("[stockpile] the snapshot's %s holds %s, which is no item; left out" % [place, item])
+				var uid := 0
+				if item is String and Items.exists(item):
+					uid = book.mint(item, "migrated", str(place))
+					book.place(uid, holder(str(place)))
+				elif (item is float or item is int) and book.has(int(item)) and int(item) not in all_items():
+					uid = int(item)
+				if uid == 0:
+					print("[stockpile] the snapshot's %s holds %s, which is no item in the book; left out" % [place, item])
+					continue
+				store["items"].append(uid)
 		var lines: Variant = entry.get("ledger", [])
 		if lines is Array:
 			for line: Variant in lines.slice(-LEDGER_SIZE):
 				if line is Dictionary:
 					store["ledger"].append({"step": int(line.get("step", 0)), "what": str(line.get("what", "")),
-						"count": int(line.get("count", 0)), "by": str(line.get("by", "")), "from": str(line.get("from", ""))})
+						"count": int(line.get("count", 0)), "by": str(line.get("by", "")), "from": str(line.get("from", "")),
+						"uid": int(line.get("uid", 0))})
