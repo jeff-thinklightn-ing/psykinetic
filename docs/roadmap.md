@@ -16,7 +16,7 @@ can be made quickly. This is the most important track right now.
 
 | Pass | Job | Done when |
 |------|-----|-----------|
-| 1 | **Canvas and stamps** | Editor resize (grow/shrink from any side; entities and level.json shift to match). A 128 × 128 outdoor map `levels/wilds` with forest edges. Prefabs: select an area in the editor, save as a named prefab (terrain, edges, entities, idle behaviours) under `levels/prefabs/`, stamp anywhere with rotation. Seed a few by hand: small house, campfire camp (gather points), fenced field, well. |
+| 1 | **Canvas and stamps** | Editor resize (grow/shrink from any side; entities and level.json shift to match). A 256 × 256 outdoor map `levels/wilds` with forest edges. Prefabs: select an area in the editor, save as a named prefab (terrain, edges, entities, idle behaviours) under `levels/prefabs/`, stamp anywhere with rotation. Seed a few by hand: small house, campfire camp (gather points), fenced field, well. |
 | 2 | **Area tools** | Usable by hand in the editor: pond (water blob with shore), grove (scattered trees, optional clearing), path between clicked points (winding, with width), fence/wall line, scatter (rocks, crates, bushes). Each with size and seed, and undo. |
 | 3 | **Builder mode** | In-game dev toggle (B): drag to select an area, type a request ("a pond here", "a goblin camp guarding a chest"). The server sends the area, its contents, the legend and the prefab list to Claude (key in `/etc/psykinetic/env`, never in the client or repo) with tools for paint terrain, path, place entity (monsters with idle behaviour, chests with contents), stamp prefab, and the area tools. Edits show as a ghost preview; Enter accepts, Esc discards, follow-ups refine ("bigger", "move it north"). Accepted edits go through the editor's undo and save to the map files. Log cost per request; spend limit set in the Console. |
 | 4 | **New area at an edge** | Builder tool `new_area(side, size, description)`: when the selection touches a map edge, create a new level with forest edges, link both ways through `neighbours` (walk off one edge, arrive at the matching edge at the same position), optionally draft it from the description, load it live. Undo removes area and link. |
@@ -31,7 +31,7 @@ a story only matters if there's something to fight with.
 
 | # | Step | Done when | Worktree |
 |---|------|-----------|----------|
-| 1 | **Performance** | 128² map: load < 2 s, server tick < 20 ms at castle density, 60 fps on the laptop; per-frame scripts < 4 ms at 128², < 8 ms at 256². Far-away monsters think less often (full rate within ~30 cells of a player/companion, reduced at 30–60; fights always full rate). Beyond that, and in zones nobody is in, the world is not paused: it moves on at a slow world tick (see "The world moves on" below). | `perf` |
+| 1 | **Performance** | 256² map: load < 2 s (3D build included), server tick < 20 ms at castle density, 60 fps on the laptop; per-frame scripts < 4 ms at 128², < 8 ms at 256². Far-away monsters think less often (full rate within ~30 cells of a player/companion, reduced at 30–60; fights always full rate). Beyond that, and in zones nobody is in, the world is not paused: it moves on at a slow world tick (see "The world moves on" below). | `perf` |
 | 2 | **Network smoothness** | No rubber-banding in a castle fight. Knockback sent as one event (direction, distance, start tick) every client plays identically; others drawn ~100–150 ms in the past and interpolated; corrections blended, not snapped; camera follows a smoothed position. Report corrections/min and worst snap before/after. | after `perf` (same client code) |
 | 3 | **Combat animation states** | Synced from sim state: wind-up (longer for heavy attacks), strike, recover, hit (direction-aware), pushed (matches knockback event), knocked down (fall/lie/get up, timed to sim), block, guard break, death. Clean blends, no popping. | after `pc-character` |
 | 4 | **Player character** | One shared humanoid body for players and companions, human proportions so the animation library fits, hand attach points for weapons. Replaces the capsule. | `pc-character` |
@@ -147,7 +147,7 @@ but hasn't committed to; confirm before building them.
 
 ### Engine, network and tooling
 - **Send each player only nearby entities** (~30–40 cells) instead of the whole zone.
-- **Keep the map bench** as a release check at 64² and 128², with budgets for tick time, load time and frame rate.
+- **Keep the map bench** as a release check at 128² and 256², with budgets for tick time, load time and frame rate.
 - **Configurable test ports per worktree** so parallel sessions don't collide.
 - **Staging server:** run a new build on a second port and check it before swapping it in.
 - **Licensing records:** `THIRD_PARTY.md`, a `source` per asset with a test that fails without one, and dated license copies (e.g. DINOv3, 2025-08-19).
