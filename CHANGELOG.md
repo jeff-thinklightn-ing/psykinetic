@@ -34,6 +34,10 @@ top section as the release notes.
 - Companions can hand things over and take them back, as players do.
 - Behind the scenes: a door or other piece with its own moving part, made
   for the game, no longer logs a warning as it is drawn.
+- Walls are continuous stonework instead of rows of identical blocks:
+  their height rises and falls along a wall, tops are broken off here and
+  there, and long walls sometimes have a collapsed stretch, a bank of
+  rubble you still can't get through.
 
 ## v0.1.139
 

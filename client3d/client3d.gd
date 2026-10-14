@@ -85,6 +85,27 @@ extends Node3D
 ## is Main's; this view only answers its picks and draws what it is told.
 
 const WALL_HEIGHT := 3.0
+## Wall runs (_add_wall_runs): at most this many edges a mesh; a height
+## every WALL_SWAY edges, the body up to WALL_HEIGHT_SWAY of cap_y either
+## way; an edge's top broken off this often (WALL_BROKEN_LOW to _HIGH of
+## cap_y, over WALL_BROKEN_STEPS steps); a breach of rubble this often in a
+## run of WALL_GAP_RUN edges or more (WALL_RUBBLE_LOW to _HIGH tall, a half
+## width of WALL_RUBBLE_HALF); its stone's texture this many metres a tile.
+const WALL_RUN_MOST := 16
+const WALL_SWAY := 3
+const WALL_HEIGHT_SWAY := 0.1
+const WALL_BROKEN := 0.1
+const WALL_BROKEN_LOW := 0.45
+const WALL_BROKEN_HIGH := 0.8
+const WALL_BROKEN_STEPS := 4
+const WALL_GAP := 0.05
+const WALL_GAP_RUN := 6
+const WALL_RUBBLE_LOW := 0.9
+const WALL_RUBBLE_HIGH := 1.15
+const WALL_RUBBLE_HALF := 0.35
+const WALL_TILE := 2.0
+## What an edge of a run is drawn as.
+enum { WALL_WHOLE, WALL_TOPLESS, WALL_RUBBLE }
 ## One height level (height.png) in units; a stair is a ramp up one.
 const LEVEL_RISE := 0.5
 ## Cliffs: rock's colour (sRGB), a row of facets this tall at most, this
@@ -575,6 +596,8 @@ var _shade_all := true
 var _stone_opaque: StandardMaterial3D
 ## Wall edge key -> its piece; vertex -> its post.
 var _walls: Dictionary[Vector3i, Node3D] = {}
+## The wall edges drawn as a breach of rubble (_add_wall_run).
+var _wall_breaches: Array[Vector3i] = []
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge).
 var _doorways: Dictionary[Vector3i, Node3D] = {}
@@ -1625,6 +1648,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	if _room != null:
 		_room.free()
 	_walls.clear()
+	_wall_breaches.clear()
 	_posts.clear()
 	_doorways.clear()
 	_doors_due.clear()
@@ -1710,18 +1734,23 @@ func _build_room() -> void:
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
+	var wall_keys: Array[Vector3i] = []
 	for key: Vector3i in edges:
 		if _outdoor and _is_outline(key):
 			continue  # The forest's edge, not a wall (_add_forest).
 		match edges[key]:
 			Terrain.Edge.WALL:
-				_add_wall(key)
+				if BOX_WALLS:
+					_add_wall(key)
+				else:
+					wall_keys.append(key)
 			Terrain.Edge.DOOR:
 				_add_doorway(key)
 			_:
 				continue
 		for end in 2:
 			vertices[WallEdge.vertex_at(key, end)] = true
+	_add_wall_runs(wall_keys)
 	for vertex in vertices:
 		if _needs_post(vertex, kind_at):
 			_add_post(vertex)
@@ -2446,6 +2475,341 @@ func _add_wall(key: Vector3i) -> void:
 	_walls[key] = wall
 
 
+## The walls: each straight run of wall edges (to where it turns, meets
+## another wall, a door, a change of height, or WALL_RUN_MOST edges) is one
+## mesh, wall.profile swept along it: the body under the profile's cap_y
+## rises and falls along the run (a height every WALL_SWAY edges, straight
+## between), the cap band on top kept whole; now and then an edge's top is
+## broken off (WALL_BROKEN), and in a long run, rarely, an edge is a breach
+## filled with rubble (WALL_GAP), low but never a way through (the sim
+## keeps the wall). Every edge of a run is in _walls as the run's node, so
+## the run fades as one (_wall_runs, 188).
+func _add_wall_runs(keys: Array[Vector3i]) -> void:
+	var lines: Dictionary[Vector2i, Array] = {}
+	for key in keys:
+		# East edges run along z at x + 0.5, south edges along x at y + 0.5.
+		var line := Vector2i(key.z, key.x if key.z == Terrain.EAST else key.y)
+		if not lines.has(line):
+			lines[line] = []
+		lines[line].append(key)
+	var standing := func(key: Vector3i) -> int:
+		return _terrain["edges"].get(key, Terrain.Edge.OPEN) if not (_outdoor and _is_outline(key)) else Terrain.Edge.OPEN
+	var material := _wall_material()
+	for line: Vector2i in lines:
+		var along: Array = lines[line]
+		along.sort_custom(func(a: Vector3i, b: Vector3i) -> bool: return _along(a) < _along(b))
+		var run: Array[Vector3i] = []
+		for key: Vector3i in along:
+			if not run.is_empty():
+				var last := run[-1]
+				var joined := _along(key) == _along(last) + 1 and _edge_base(key) == _edge_base(last) \
+						and run.size() < WALL_RUN_MOST and not _needs_post(WallEdge.vertex_at(key, 1 if key.z == Terrain.EAST else 0), standing)
+				if not joined:
+					_add_wall_run(run, material)
+					run = []
+			run.append(key)
+		if not run.is_empty():
+			_add_wall_run(run, material)
+
+
+## Where an edge is along its line: its z for an east edge, its x for a
+## south one.
+static func _along(key: Vector3i) -> int:
+	return key.y if key.z == Terrain.EAST else key.x
+
+
+## One run of wall edges, in order along its line, as one mesh.
+func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
+	var first := run[0]
+	var east := first.z == Terrain.EAST
+	# Built in the run's own frame (x across, y up from its base, z along
+	# from its first vertex) and placed by its node: an east run as it is,
+	# a south one turned a quarter (the profile is the same either side).
+	var line := first.x + 0.5 if east else first.y + 0.5
+	var start := _along(first) - 0.5
+	var base := _edge_base(first)
+	var count := run.size()
+	# What each edge is: whole, broken off, or a breach of rubble.
+	var states := PackedInt32Array()
+	states.resize(count)
+	for i in count:
+		var cell := Vector2i(run[i].x, run[i].y)
+		if count >= WALL_GAP_RUN and i >= 2 and i <= count - 3 and _roll(cell, 20 + run[i].z) < WALL_GAP \
+				and (i < 3 or states[i - 1] != WALL_RUBBLE and states[i - 2] != WALL_RUBBLE):
+			states[i] = WALL_RUBBLE
+	for i in count:
+		if states[i] == WALL_WHOLE and (_roll(Vector2i(run[i].x, run[i].y), 22 + run[i].z) < WALL_BROKEN
+				or i > 0 and states[i - 1] == WALL_RUBBLE or i < count - 1 and states[i + 1] == WALL_RUBBLE):
+			states[i] = WALL_TOPLESS
+	for k in count:
+		if states[k] == WALL_RUBBLE:
+			_wall_breaches.append(run[k])
+	var profile := _wall_profile()
+	var points: PackedVector2Array = profile[0]
+	var cap: float = profile[1]
+	var faces: PackedInt32Array = profile[2]
+	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
+	var i := 0
+	while i < count:
+		if states[i] != WALL_WHOLE:
+			_wall_broken(mesh, i, run, states, cap)
+			i += 1
+			continue
+		# A span of whole edges, to the next sway point or broken edge.
+		var j := i + 1
+		while j < count and states[j] == WALL_WHOLE and (_along(run[j]) % WALL_SWAY) != 0:
+			j += 1
+		var low := _wall_height(run[i], 0, cap)
+		var high := _wall_height(run[j - 1], 1, cap)
+		for k in points.size():
+			var p := points[k]
+			var q := points[(k + 1) % points.size()]
+			if p.y <= 0.0 and q.y <= 0.0:
+				continue  # The bottom, on the ground.
+			_wall_quad(mesh, Vector3(p.x, _profile_y(p.y, cap, low), i), Vector3(q.x, _profile_y(q.y, cap, low), i),
+					Vector3(q.x, _profile_y(q.y, cap, high), j), Vector3(p.x, _profile_y(p.y, cap, high), j),
+					Vector3(q.y - p.y, -(q.x - p.x), 0.0), absf(q.y - p.y) < absf(q.x - p.x))
+		# An end that nothing hides: the run's own, or against a broken edge.
+		if i == 0 or states[i - 1] != WALL_WHOLE:
+			_wall_cap(mesh, i, points, faces, cap, low, -1.0)
+		if j == count or states[j] != WALL_WHOLE:
+			_wall_cap(mesh, j, points, faces, cap, high, 1.0)
+		i = j
+	if mesh[0].is_empty():
+		return
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = mesh[0]
+	arrays[Mesh.ARRAY_NORMAL] = mesh[1]
+	arrays[Mesh.ARRAY_TEX_UV] = mesh[2]
+	arrays[Mesh.ARRAY_INDEX] = mesh[3]
+	var array_mesh := ArrayMesh.new()
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var drawn := MeshInstance3D.new()
+	drawn.name = "Wall_%d_%d_%s" % [first.x, first.y, "e" if east else "s"]
+	drawn.mesh = array_mesh
+	drawn.material_override = material
+	var holder := Node3D.new()
+	holder.position = Vector3(line, base, start) if east else Vector3(start, base, line)
+	holder.rotation.y = 0.0 if east else PI * 0.5
+	holder.name = drawn.name
+	drawn.name = "Body"
+	holder.add_child(drawn)
+	_room.add_child(holder)
+	for key in run:
+		_walls[key] = holder
+
+
+## How tall the body under the cap stands at [param key]'s end [param end]
+## (0 its start, 1 its end): a height at every WALL_SWAY-th vertex along
+## the line, straight between, so neighbouring runs on one line agree.
+func _wall_height(key: Vector3i, end: int, cap: float) -> float:
+	var at := _along(key) + end
+	var before := at - posmod(at, WALL_SWAY)
+	var after := before + WALL_SWAY
+	var line := Vector2i(key.x if key.z == Terrain.EAST else key.y, key.z)
+	var sway := func(along: int) -> float: return (_roll(Vector2i(line.x * 7 + line.y, along), 24) - 0.5) * 2.0 * WALL_HEIGHT_SWAY
+	return cap * (1.0 + lerpf(sway.call(before), sway.call(after), float(at - before) / WALL_SWAY))
+
+
+## A profile height as drawn: the body (under [param cap]) stretched to
+## [param body], the band above it as it is.
+static func _profile_y(y: float, cap: float, body: float) -> float:
+	return y * body / cap if y <= cap else body + (y - cap)
+
+
+## A broken or rubble edge [param i] of [param run]: a slab with a ragged
+## top (lower, wider and lumpier for rubble), over WALL_BROKEN_STEPS steps.
+func _wall_broken(mesh: Array, i: int, run: Array[Vector3i], states: PackedInt32Array, cap: float) -> void:
+	var key := run[i]
+	var rubble := states[i] == WALL_RUBBLE
+	var half := WALL_RUBBLE_HALF if rubble else WALL_THICKNESS * 0.5
+	var heights := PackedFloat32Array()
+	var lean := PackedFloat32Array()
+	for step in WALL_BROKEN_STEPS + 1:
+		var cell := Vector2i(_along(key) * WALL_BROKEN_STEPS + step, key.x + key.y * 7 + key.z * 13)
+		var roll := _roll(cell, 26)
+		if rubble:
+			heights.append(lerpf(WALL_RUBBLE_LOW, WALL_RUBBLE_HIGH, roll))
+		elif step == 0 and i > 0 and states[i - 1] == WALL_WHOLE:
+			heights.append(_wall_height(key, 0, cap) * 0.85)
+		elif step == WALL_BROKEN_STEPS and i < run.size() - 1 and states[i + 1] == WALL_WHOLE:
+			heights.append(_wall_height(key, 1, cap) * 0.85)
+		else:
+			heights.append(cap * lerpf(WALL_BROKEN_LOW, WALL_BROKEN_HIGH, roll))
+		lean.append((_roll(cell, 28) - 0.5) * (0.24 if rubble else 0.0))
+	for step in WALL_BROKEN_STEPS:
+		var s0 := i + step / float(WALL_BROKEN_STEPS)
+		var s1 := i + (step + 1) / float(WALL_BROKEN_STEPS)
+		var h0 := heights[step]
+		var h1 := heights[step + 1]
+		var l0 := lean[step]
+		var l1 := lean[step + 1]
+		for side: float in [-1.0, 1.0]:
+			_wall_quad(mesh, Vector3(side * half, 0.0, s0), Vector3(side * half, 0.0, s1),
+					Vector3(side * half * 0.8 + l1, h1, s1), Vector3(side * half * 0.8 + l0, h0, s0), Vector3(side, 0.0, 0.0), false)
+		_wall_quad(mesh, Vector3(-half * 0.8 + l0, h0, s0), Vector3(half * 0.8 + l0, h0, s0),
+				Vector3(half * 0.8 + l1, h1, s1), Vector3(-half * 0.8 + l1, h1, s1), Vector3(0.0, 1.0, 0.0), true)
+	# Its ends, where what is beside it is not the same slab.
+	for end in 2:
+		var other := i - 1 if end == 0 else i + 1
+		if other >= 0 and other < run.size() and states[other] == states[i]:
+			continue
+		var s := float(i + end)
+		var h := heights[0 if end == 0 else WALL_BROKEN_STEPS]
+		var l := lean[0 if end == 0 else WALL_BROKEN_STEPS]
+		_wall_quad(mesh, Vector3(-half, 0.0, s), Vector3(half, 0.0, s), Vector3(half * 0.8 + l, h, s),
+				Vector3(-half * 0.8 + l, h, s), Vector3(0.0, 0.0, -1.0 if end == 0 else 1.0), false)
+
+
+## A whole run's end at [param s]: the profile as a face, [param body] tall,
+## facing [param facing] along the run (in the run's frame).
+func _wall_cap(mesh: Array, s: float, points: PackedVector2Array, faces: PackedInt32Array, cap: float, body: float, facing: float) -> void:
+	var positions: PackedVector3Array = mesh[0]
+	var normal := Vector3(0.0, 0.0, facing)
+	for t in range(0, faces.size(), 3):
+		var a := points[faces[t]]
+		var b := points[faces[t + 1]]
+		var c := points[faces[t + 2]]
+		var first := positions.size()
+		var pa := Vector3(a.x, _profile_y(a.y, cap, body), s)
+		var pb := Vector3(b.x, _profile_y(b.y, cap, body), s)
+		var pc := Vector3(c.x, _profile_y(c.y, cap, body), s)
+		if (pc - pa).cross(pb - pa).dot(normal) < 0.0:
+			var swap := pb
+			pb = pc
+			pc = swap
+		positions.append(pa)
+		positions.append(pb)
+		positions.append(pc)
+		for k in 3:
+			mesh[1].append(normal)
+		mesh[2].append(Vector2(pa.x, pa.y) / WALL_TILE)
+		mesh[2].append(Vector2(pb.x, pb.y) / WALL_TILE)
+		mesh[2].append(Vector2(pc.x, pc.y) / WALL_TILE)
+		mesh[3].append(first)
+		mesh[3].append(first + 1)
+		mesh[3].append(first + 2)
+	mesh[0] = positions
+
+
+## A quad a b c d into [param mesh], in a run's frame (x across, y up, z
+## along), facing [param out]; its texture by metres: along and up on a
+## side, along and across on a top ([param flat]).
+func _wall_quad(mesh: Array, a: Vector3, b: Vector3, c: Vector3, d: Vector3, out: Vector3, flat: bool) -> void:
+	if (c - a).cross(b - a).dot(out) < 0.0:
+		var swap := b
+		b = d
+		d = swap
+	var face := (c - a).cross(b - a)
+	var normal := face.normalized() if face.length_squared() > 0.0000001 else out.normalized()
+	var positions: PackedVector3Array = mesh[0]
+	var normals: PackedVector3Array = mesh[1]
+	var uvs: PackedVector2Array = mesh[2]
+	var indices: PackedInt32Array = mesh[3]
+	var first := positions.size()
+	positions.append(a)
+	positions.append(b)
+	positions.append(c)
+	positions.append(d)
+	normals.append(normal)
+	normals.append(normal)
+	normals.append(normal)
+	normals.append(normal)
+	if flat:
+		uvs.append(Vector2(a.z, a.x) / WALL_TILE)
+		uvs.append(Vector2(b.z, b.x) / WALL_TILE)
+		uvs.append(Vector2(c.z, c.x) / WALL_TILE)
+		uvs.append(Vector2(d.z, d.x) / WALL_TILE)
+	else:
+		uvs.append(Vector2(a.z, a.y) / WALL_TILE)
+		uvs.append(Vector2(b.z, b.y) / WALL_TILE)
+		uvs.append(Vector2(c.z, c.y) / WALL_TILE)
+		uvs.append(Vector2(d.z, d.y) / WALL_TILE)
+	indices.append(first)
+	indices.append(first + 1)
+	indices.append(first + 2)
+	indices.append(first)
+	indices.append(first + 2)
+	indices.append(first + 3)
+	mesh[0] = positions
+	mesh[1] = normals
+	mesh[2] = uvs
+	mesh[3] = indices
+
+
+## wall.profile from the art slots: its points (x across, y up), its cap_y,
+## and its face as triangles (indices into the points), made once.
+static var _profile: Array = []
+
+
+static func _wall_profile() -> Array:
+	if _profile.is_empty():
+		var spec := ArtKit.spec("wall.profile")
+		var points := PackedVector2Array()
+		for each: Array in spec.get("points", [[-0.25, 0.0], [0.25, 0.0], [0.25, 3.0], [-0.25, 3.0]]):
+			points.append(Vector2(each[0], each[1]))
+		_profile = [points, float(spec.get("cap_y", 2.7)), Geometry2D.triangulate_polygon(points)]
+	return _profile
+
+
+## The walls' material: material.wall's texture if it has one, else a
+## stone-course texture made here, in the castle's stone; a plain
+## StandardMaterial3D, so a near run's see-through copy is made as any
+## other's (_see_through_of).
+static var _wall_stone: StandardMaterial3D
+
+
+static func _wall_material() -> StandardMaterial3D:
+	if _wall_stone == null:
+		_wall_stone = StandardMaterial3D.new()
+		var own := ArtKit.texture("material.wall")
+		_wall_stone.albedo_texture = own if own != null else _stone_courses()
+		_wall_stone.albedo_color = Color.WHITE if own != null else STONE
+		_wall_stone.roughness = 0.9
+		_wall_stone.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	return _wall_stone
+
+
+## Courses of stone blocks, WALL_TILE metres square, tiling: rows of
+## blocks of random length, each its own shade, mortar between.
+static func _stone_courses() -> ImageTexture:
+	var size := 128
+	var rows := 5
+	var bytes := PackedByteArray()
+	bytes.resize(size * size * 3)
+	for row in rows:
+		var top := row * size / rows
+		var bottom := (row + 1) * size / rows
+		# The row's joints across, from a shift so rows do not line up.
+		var joints: Array[int] = []
+		var x := int(_roll(Vector2i(row, 1), 30) * size * 0.5)
+		var end := x + size
+		while x < end - size * 0.15:
+			joints.append(x % size)
+			x += int(lerpf(0.3, 0.55, _roll(Vector2i(row, x), 31)) * size)
+		for y in range(top, bottom):
+			for px in size:
+				# The block: the last joint at or before px, round the tile.
+				var block := joints.size() - 1
+				var gap := size
+				for k in joints.size():
+					var behind := posmod(px - joints[k], size)
+					if behind < gap:
+						gap = behind
+						block = k
+				var mortar := y - top < 2 or gap < 2
+				var shade := 0.78 if mortar else lerpf(0.9, 1.0, _roll(Vector2i(row, block), 32)) * lerpf(0.97, 1.0, _roll(Vector2i(px, y), 33))
+				var value := int(shade * 255.0)
+				var at := (y * size + px) * 3
+				bytes[at] = value
+				bytes[at + 1] = value
+				bytes[at + 2] = value
+	var image := Image.create_from_data(size, size, false, Image.FORMAT_RGB8, bytes)
+	image.generate_mipmaps()
+	return ImageTexture.create_from_image(image)
+
+
 ## A door.single on the edge, its leaf (DOOR_LEAF) hinged at the edge's
 ## start end and swinging with the Door node, and an Area3D over the module
 ## for picking. Its frame (DOOR_FRAME) fades with its wall's run.
@@ -2656,8 +3020,12 @@ func _focus_points() -> Array[Vector3]:
 func _index_occluders() -> void:
 	_occluders.clear()
 	var runs := _wall_runs()
+	# A run of wall is one node for all its edges (_add_wall_runs), but
+	# what hides the player is still asked edge by edge, by the edge's own
+	# bounds: a run's would reach far past the player either way.
 	for key: Vector3i in _walls:
-		_occluders.append([_walls[key], _bounds(_walls[key]), false, runs[key]])
+		var bounds := _bounds(_walls[key]) if BOX_WALLS else _edge_bounds(key)
+		_occluders.append([_walls[key], bounds, false, runs[key]])
 	for key: Vector3i in _doorways:
 		var frame := _doorways[key].get_node(DOOR_FRAME) as Node3D
 		_occluders.append([frame, _bounds(frame), false, runs[key]])
@@ -2698,13 +3066,23 @@ func _wall_runs() -> Dictionary[Vector3i, Array]:
 				key = next
 		var pieces: Array = []
 		for key in edges:
-			pieces.append(_walls[key] if _walls.has(key) else _doorways[key].get_node(DOOR_FRAME))
+			var piece: Node3D = _walls[key] if _walls.has(key) else _doorways[key].get_node(DOOR_FRAME)
+			if not pieces.has(piece):
+				pieces.append(piece)
 		for vertex in vertices:
 			if _posts.has(vertex) and not pieces.has(_posts[vertex]):
 				pieces.append(_posts[vertex])
 		for key in edges:
 			out[key] = pieces
 	return out
+
+
+## A wall edge's own share of its run: the wall's thickness across, the
+## edge along, WALL_HEIGHT up from its base.
+func _edge_bounds(key: Vector3i) -> AABB:
+	var middle := _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
+	var half := Vector3(WALL_THICKNESS * 0.5, 0.0, 0.5) if key.z == Terrain.EAST else Vector3(0.5, 0.0, WALL_THICKNESS * 0.5)
+	return AABB(middle - half, half * 2.0 + Vector3(0.0, WALL_HEIGHT, 0.0))
 
 
 ## [param piece]'s meshes' bounds, in the world.

@@ -3210,3 +3210,45 @@ once (monster_test). Hearing is as before.
 
 tools/map_bench, 256x256 at castle density over 600 ticks, 16 players:
 26.6 ms on average to 24.1.
+
+## 245. A run of wall is one swept mesh, varied, broken in places, never open
+
+Walls were the kit's wall module on every wall edge: a row of cell-sized
+blocks, each with its own inset panel, every top the same. Each straight
+run of wall edges (to where it turns or meets another wall, a door, a
+change of height, or WALL_RUN_MOST edges) is now one mesh
+(Client3D._add_wall_runs): art-kit's wall.profile (ArtKit.spec: its points
+and cap_y) swept along it. The body under cap_y rises and falls along the
+run (a height every WALL_SWAY edges along the line, straight between, so
+two runs on one line agree; up to WALL_HEIGHT_SWAY of cap_y either way),
+the cap band kept whole on top. An edge's top is broken off now and then
+(WALL_BROKEN: a slab of ragged height, WALL_BROKEN_LOW to _HIGH of cap_y),
+and in a run of WALL_GAP_RUN edges or more an edge is, rarely, a breach
+(WALL_GAP), its neighbours broken too. The sim keeps every wall, so a
+breach must never read as a way through (the coordinator's rule until Jeff
+says otherwise): it is a bank of rubble, wider than the wall and lumpy,
+WALL_RUBBLE_LOW to _HIGH tall (at least art-kit's 0.6 m for wall.rubble;
+taller, as a low bank between high walls read as a dip from above), under
+broken stone either side. All of it is by a hash of where the edge is,
+the same on every peer. Doors and posts are art-kit's pieces as before.
+
+The stone is a StandardMaterial3D: material.wall's texture when Jeff gives
+it one, until then courses of stone blocks made at run time (no asset),
+UVs in metres along and up. A plain BaseMaterial3D, so a near run's
+see-through copy is made as any other's (_see_through_of; a ShaderMaterial
+would not fade) and the fade (188) is unchanged: every edge of a run is in
+_walls as the run's node, so the run fades as one, as runs already did.
+What hides the player is still asked edge by edge, each edge an occluder
+with its own bounds (_edge_bounds): a whole run's bounds reach far past
+the player, and its middle can be ahead of them when the wall is behind
+(view_test's walls at the player's back faded until this).
+
+Each run is built in its own frame (x across, y up from its base, z
+along) and placed by its node, a south run turned a quarter (the profile
+is the same either side); mapping every point into the world as it was
+made cost the 256x256 build 460 ms. tools/map_bench, windowed, under the
+bench lock, alternately with main, three runs each: 256x256 3D rebuild
+1.56 / 1.56 / 1.49 s (main 1.47 / 1.36 / 1.31), frames 68.8 / 78.7 / 73.2
+fps (main 68.7 / 77.9 / 98.0), nodes 85,575 to 49,031, static memory 445
+to 394 MB; 128x128 rebuild 0.39 / 0.37 / 0.36 s (main 0.41 / 0.35 /
+0.32), frames 189 / 200 / 244 (main 166 / 217 / 202).

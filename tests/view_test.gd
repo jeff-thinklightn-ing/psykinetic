@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_outdoor()
 	_test_heights()
 	_test_water()
+	_test_wall_runs()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -208,6 +209,51 @@ func _test_player_death() -> void:
 	await get_tree().create_timer(Client3D.MOURN_RETURN_SECONDS + 0.2).timeout
 	_check(is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_equal_approx(_rig._camera.size, size),
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
+
+
+func _test_wall_runs() -> void:
+	print("\n== walls: a run of wall is one mesh, swept, varied; a breach is rubble, never a way through ==")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	_rig.rebuild(terrain, castle["centre"])
+	var runs: Dictionary[Node3D, int] = {}
+	for key: Vector3i in _rig._walls:
+		runs[_rig._walls[key]] = runs.get(_rig._walls[key], 0) + 1
+	var stood := 0
+	for key: Vector3i in terrain["edges"]:
+		if terrain["edges"][key] == Terrain.Edge.WALL and not _rig._is_outline(key):
+			stood += 1 if _rig._walls.has(key) else 0
+	_check(stood > 0 and stood == _rig._walls.size() and runs.size() < stood / 2,
+			"every wall edge stands, in runs: %d edges, %d meshes" % [stood, runs.size()])
+	var heights: Dictionary[float, bool] = {}
+	for run: Node3D in runs:
+		var top := -INF
+		var body := run.get_node("Body") as MeshInstance3D
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			top = maxf(top, (body.global_transform * point).y)
+		heights[snappedf(top, 0.05)] = true
+	_check(heights.size() > 3, "the runs' tops are not all one height (%d heights)" % heights.size())
+	# A breach: the sim's wall stays, and its rubble stands at least waist high.
+	print("  (breaches: %s)" % [_rig._wall_breaches])
+	for key: Vector3i in _rig._wall_breaches:
+		var middle := Client3D._edge_midpoint(key)
+		var top := 0.0
+		var body := _rig._walls[key].get_node("Body") as MeshInstance3D
+		for local: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			var point := body.global_transform * local
+			if Vector2(point.x - middle.x, point.z - middle.z).length() < 0.5:
+				top = maxf(top, point.y - _rig._edge_base(key))
+		_check(terrain["edges"].get(key) == Terrain.Edge.WALL and top >= Client3D.WALL_RUBBLE_LOW,
+				"the breach at %s is rubble %.2f m high where the sim keeps its wall" % [key, top])
+	# A run fades as one, by its see-through copy (188).
+	var run: Node3D = runs.keys()[0]
+	var body := run.get_node("Body") as MeshInstance3D
+	_rig._set_near(run, true)
+	var faded := body.material_override as BaseMaterial3D
+	_check(faded != null and faded.albedo_color.a < 1.0 and faded.next_pass != null, "a near run is see-through, its depth drawn first")
+	_rig._set_near(run, false)
+	_check((body.material_override as BaseMaterial3D).albedo_color.a == 1.0, "and solid again after")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_water() -> void:
@@ -459,7 +505,9 @@ func _test_fade() -> void:
 	var companion := _companion()
 	var near_runs: Dictionary[Node3D, bool] = {}
 	for entry: Array in _rig._occluders:
-		var at := Vector2((entry[0] as Node3D).global_position.x, (entry[0] as Node3D).global_position.z)
+		# Where the occluder is: its bounds (a run of wall is one node).
+		var centre := (entry[1] as AABB).get_center()
+		var at := Vector2(centre.x, centre.z)
 		if at.distance_to(Vector2(player.tile)) < 3.0 or companion != null and at.distance_to(Vector2(companion.tile)) < 3.0:
 			for piece: Node3D in entry[3]:
 				near_runs[piece] = true
