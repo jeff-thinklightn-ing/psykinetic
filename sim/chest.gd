@@ -4,9 +4,13 @@ extends GridEntity
 ## does not break. A player beside it opens it with a click (Main) and drags
 ## things between it and their own slots; World.try_transfer moves them.
 ## Its slots are replicated to the clients in its zone and saved in the
-## snapshot.
+## snapshot. A depot (level.json props {"depot": true}) keeps nothing: what
+## is put in is banked in the town's stockpile at once (Stockpile).
 
 const SLOTS := 4
+
+## Whether this is a stockpile's depot.
+var depot := false
 
 
 func _init() -> void:

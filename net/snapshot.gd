@@ -7,7 +7,8 @@ extends RefCounted
 ## facing, and a chest's slots) and its respawn timers; and a PlayerRecord per player who has
 ## ever joined, with the zone they are in, so a player comes back where they
 ## left off; and the world's clock (World.steps), so the world tick goes on
-## from where it stopped (the world waits while the server is down). The
+## from where it stopped (the world waits while the server is down); who
+## holds which place (Holdings) and the town's stores (Stockpile). The
 ## rooms themselves always come from the levels. A version 1
 ## file (one map, before zones) loads as that one zone.
 ##
@@ -94,7 +95,8 @@ static func _write(path: String, text: String) -> bool:
 ## {spec, hp, stamina, facing, slots (null if none saved)}, "players"
 ## the records, "steps" the world's clock (0 in a file from before it
 ## was kept), and "holdings" who holds which place (Holdings.to_dict; {} in
-## a file from before them: the levels' own holders). Entries that make
+## a file from before them: the levels' own holders), and "stockpile" the
+## town's stores (Stockpile.to_dict; {} in a file from before it). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
@@ -141,9 +143,11 @@ static func load(path: String) -> Dictionary:
 				record.zone = _map_in(data)
 	var steps: Variant = data.get("steps", 0)
 	var holdings: Variant = data.get("holdings", {})
+	var stockpile: Variant = data.get("stockpile", {})
 	return {"ok": true, "zones": zones, "players": players,
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
-		"holdings": holdings if holdings is Dictionary else {}}
+		"holdings": holdings if holdings is Dictionary else {},
+		"stockpile": stockpile if stockpile is Dictionary else {}}
 
 
 ## One zone's {tick, entities, respawns} as read.

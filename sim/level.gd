@@ -79,7 +79,7 @@ const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "t
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
-const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "other"]
+const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "other"]
 ## A place's radius when level.json gives none, in cells.
 const PLACE_RADIUS := 8
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}

@@ -11,6 +11,11 @@ top section as the release notes.
   boxes, and the foot of each drop is shaded, so raised ground stands out.
 - Characters, the cursor outline, the click ripple and builder previews
   follow the slope of a ramp.
+- The town has a stockpile: a shared store of gold, ore, wood, cloth, food
+  and gear. Whatever a player puts into a stockpile's depot chest is banked
+  for the town at once, as long as the town holds that ground; picking
+  loot up out in the world doesn't count until it's brought home. There is
+  no town map yet, so no depot appears in the game's levels so far.
 
 ## v0.1.139
 

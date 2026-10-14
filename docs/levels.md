@@ -186,8 +186,9 @@ All of it is optional.
 - `places`: what factions hold here (see Places and who holds them), by
   key: `{"goblin_camp": {"at": [200, 40], "kind": "camp", "radius": 12,
   "worth": 2, "holder": "goblins", "name": "the goblin camp"}}`. `kind` is
-  camp, keep, farm, gate, mine or other; `radius` defaults to 8 cells,
-  `worth` to 1, `holder` (who holds it at the start) to nobody.
+  camp, keep, farm, gate, mine, stockpile (where the town banks what is
+  brought home: see The stockpile) or other; `radius` defaults to 8
+  cells, `worth` to 1, `holder` (who holds it at the start) to nobody.
 
 ## Level links
 
@@ -258,6 +259,19 @@ accepted takes up places added, moved or gone (`rebind`). A camp's place
 belongs on its gather point, where its group gathers. Prefabs keep their
 places, and stamping one gives a key the map already has a `_2`; builder
 mode's `mark_place` marks one. Nothing in play shows them yet.
+
+### The stockpile
+
+A place of kind `stockpile` is where the town keeps what players bring
+home: gold, ore, wood, cloth and food as counts, and gear item by item
+(`Stockpile`, `sim/stockpile.gd`, kept as `World.stockpile` and saved in
+the snapshot). Things reach it through a depot: a chest with
+`"props": {"depot": true}` inside the place's radius. Whatever a player
+puts into the depot is banked at once (the slot empties, the store counts
+it, its ledger says who and when); picking loot up counts for nothing.
+A depot only banks while the town holds its place: if another faction
+takes it, the depot refuses. Players never take from the stockpile; the
+town's own work (production, the shop, raids) does.
 
 ### Routes between areas
 

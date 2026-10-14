@@ -350,7 +350,7 @@ const TOOLS := [
 	{"name": "mark_place", "description": "Marks a place factions hold: a cell in the area and a radius of ground round it, held at the start by the goblins, the town or nobody. A key already used is moved or changed.",
 		"input_schema": {"type": "object", "properties": {
 			"key": {"type": "string", "description": "lower case letters, digits and _, e.g. \"goblin_camp\""},
-			"kind": {"type": "string", "enum": ["camp", "keep", "farm", "gate", "mine", "other"]},
+			"kind": {"type": "string", "enum": ["camp", "keep", "farm", "gate", "mine", "stockpile", "other"]},
 			"at": _CELL,
 			"radius": {"type": "integer", "minimum": 1, "maximum": 32},
 			"holder": {"type": "string", "enum": ["goblins", "town", "nobody"]},

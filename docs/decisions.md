@@ -2958,3 +2958,46 @@ there are none), windowed, under the bench lock, alternately with main
 Rejected: smoothing every rise into a slope (it would show walkable
 ground where the sim has a ledge), and jittering the ground's corners on
 a ledge to wobble its line (a corner a cell is a zigzag, not a wobble).
+
+## 230. The stockpile: counts and gear, banked at a depot in a town-held stockpile place
+
+The town's store (economy, step 1). `Stockpile` (`sim/stockpile.gd`),
+kept as `World.stockpile` beside `World.holdings`: server only, made by
+Main at boot from the snapshot, saved in it as a top-level "stockpile"
+key through Snapshot.save's world argument (no version bump; an older
+file loads with none).
+
+One store per place of the new kind "stockpile" (Level.PLACE_KINDS, the
+builder's mark_place and docs/levels.md list it), by place id, so a
+second town is only another key. A store holds:
+- the raw resources (RESOURCES: gold, ore, wood, cloth, food) as plain
+  counts. Out in the world they travel as catalog items the `items` tree
+  defines, tagged "resource" with a yield ({ore: 5} for a sack of ore);
+  banking one will add its yield and end that instance ("banked"). The
+  line agreed with items: resources are counts, not instances;
+- gear item by item. For now that is the item id (Items.ALL); when items'
+  ItemBook lands it becomes the item's uid, its history kept in the book
+  and never copied here. The stockpile is a place, not a carrier: no
+  carrier time runs while gear sits in it;
+- a ledger of the last 200 changes (step, what, count, by, from),
+  stamped with World.steps, for the reports and to check that nothing
+  banked goes missing.
+
+What "reaches the stockpile" means, with no town map yet: a depot (a
+Chest with props {"depot": true}) inside a stockpile place's radius.
+World.try_transfer into a depot banks the item at once (the slot
+empties; the depot never keeps anything) if the town holds that place,
+and refuses (nothing moves) if not: held ground is physical, and a raid
+that takes the place shuts its depot. Picking loot up counts for
+nothing. Hauling (step 2) widens "reaches" to whatever is carried,
+dragged or carted into the place's ground; carts on tracks will hand
+their load to the same Stockpile.deposit.
+
+Players never withdraw: the economy builds the town, not one player's
+wealth. Only the town's own work takes (Stockpile.take with a reason):
+production jobs use resources, and banked gear goes back into use through
+the town, sold or lent in the shop (step 5) or reworked by the smith
+(step 3), so the store is not a sink. A store whose place is gone from
+the levels is kept, never dropped, and losing a run never touches it;
+raids (step 6) will take with a reason in the ledger, and what they take
+can be rebuilt.

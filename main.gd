@@ -1217,6 +1217,8 @@ func _boot() -> void:
 	# Who holds which place: as the levels start them, then as the snapshot
 	# left them, on the world's clock.
 	World.holdings = Holdings.new(WorldMap.build(), Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
+	# The town's stores, as the snapshot left them.
+	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), func() -> int: return World.steps)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1651,7 +1653,8 @@ func _save_state() -> void:
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns}
 	World.enter(was)
 	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
-		"holdings": World.holdings.to_dict() if World.holdings != null else {}})
+		"holdings": World.holdings.to_dict() if World.holdings != null else {},
+		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {}})
 
 
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.

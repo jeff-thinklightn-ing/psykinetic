@@ -288,6 +288,9 @@ var steps := 0
 ## Server: who holds which place (Holdings), the world tick's to change;
 ## made by Main at boot, from the levels and the snapshot. Null on a client.
 var holdings: Holdings = null
+## Server: the town's stores (Stockpile), which depots bank into; made by
+## Main at boot, from the snapshot. Null on a client.
+var stockpile: Stockpile = null
 
 
 ## An attack or shove accepted this tick, waiting for the resolve phase.
@@ -965,6 +968,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	var item := from.slots[from_slot]
 	if item.is_empty():
 		return false
+	if to is Chest and (to as Chest).depot:
+		return _bank(by, from, from_slot, to)
 	# New arrays, so each synchronizer sees a change.
 	var taken := from.slots.duplicate()
 	var other := to.slots[to_slot]
@@ -1000,6 +1005,26 @@ func reaches(by: GridEntity, entity: GridEntity) -> bool:
 		return by.owner_peer != 0 and entity.keeper_peer == by.owner_peer and entity.hp > 0 \
 				and distance(by.tile, entity.tile) <= COMPANION_REACH and has_line_of_sight(by.tile, entity.tile)
 	return false
+
+
+## [param by] puts [param from]'s [param from_slot] into [param depot]: banked
+## in the stockpile its tile is in, the slot emptied, if the town holds that
+## stockpile; refused (false, nothing moves) if not.
+func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) -> bool:
+	if from == depot:
+		return false
+	var area := depot.zone if not depot.zone.is_empty() else zone.name
+	var place := Stockpile.place_at(holdings, area, depot.tile)
+	var item := from.slots[from_slot]
+	if stockpile == null or place.is_empty() or not stockpile.deposit(place, item, 1, String(by.name), String(from.name)):
+		_log("slots: %s refused %s: no stockpile the town holds there" % [depot.name, item])
+		return false
+	var taken := from.slots.duplicate()
+	taken[from_slot] = ""
+	from.slots = taken
+	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
+	slots_changed.emit(from)
+	return true
 
 
 ## Puts saved contents back into [param entity]'s slots (unknown items
