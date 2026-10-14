@@ -90,21 +90,26 @@ const WALL_HEIGHT := 3.0
 ## One height level (height.png) in units; a stair is drawn in STAIR_STEPS.
 const LEVEL_RISE := 0.5
 const STAIR_STEPS := 4
-## Ground kinds' tints on the kit's floor; water and torches.
-const GROUND_TINTS := {"grass": Color(0.55, 0.8, 0.45), "dirt": Color(0.85, 0.65, 0.45)}
-## The kit's floor piece is grass; stone (any kind without a tint) is this
-## grey instead, untextured.
-const STONE_FLOOR := Color(0.56, 0.56, 0.54)
+## Each ground kind's colour (sRGB), and its channel in the ground's kinds
+## texture (ground.gdshader); a kind not here is stone. Grass is the kit's
+## floor piece as it was tinted; sand is ready for a map that paints it.
+const GROUND_COLOURS := {"grass": Color(0.21, 0.64, 0.25), "dirt": Color(0.46, 0.36, 0.22),
+		"stone": Color(0.56, 0.56, 0.54), "sand": Color(0.78, 0.7, 0.5)}
+const GROUND_CHANNELS := {"grass": 0, "dirt": 1, "stone": 2, "sand": 3}
 const WATER := Color(0.2, 0.42, 0.85, 0.75)
 ## Under water, so it is never drawn over the void or the forest floor.
 const WATER_BED := Color(0.16, 0.24, 0.3)
 const WATER_DEPTH := 0.08
 const TORCH := Color(1.0, 0.72, 0.38)
 const KIT_WALL_HEIGHT := 1.31
-## The floor is drawn in squares this many cells across, one MultiMesh per
-## square and ground kind: few draws, and squares off screen are culled.
+## The ground is drawn in squares this many cells across, a mesh each: few
+## draws, and squares off screen are culled.
 const FLOOR_CHUNK := 16
-const FLOOR_SHADER := preload("res://client3d/floor.gdshader")
+const GROUND_SHADER := preload("res://client3d/ground.gdshader")
+## The highest a cell stands (Level.MAX_HEIGHT), for the ground's corners.
+const MAX_GROUND_HEIGHT := Level.MAX_HEIGHT
+## The ground's noise texture, texels across (64 features across it).
+const GROUND_NOISE_SIZE := 512
 ## The kit's walls are this thick and occupy x in [-0.5, 0] of their
 ## module; they are shifted to straddle the edge.
 const WALL_THICKNESS := 0.5
@@ -191,6 +196,9 @@ const SHADOW_RECHECK := 0.5
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
 const FIRE := Color(1.0, 0.45, 0.1)
+const FIRE_SHADER := preload("res://client3d/fire.gdshader")
+## How wide a cell's fire patch is drawn, in cells.
+const FIRE_SPREAD := 1.5
 ## The floor where there is no light at all (Fields), as a share of its
 ## colour; the glow it takes on near heat, at most WARM_MOST of the way.
 const FLOOR_DARKEST := 0.3
@@ -507,15 +515,33 @@ var _lead := Vector2.ZERO
 var _room: Node3D
 ## Where the camera first looks (the level's centre).
 var _centre := Vector2i.ZERO
-## Kit floor material per ground kind, made once.
-var _ground_materials: Dictionary[String, Material] = {}
-## Each floor cell's place in the floor's MultiMeshes [multimesh, index],
-## its kind, and the shade last drawn on it [bright, warm]: shaded by the
-## light and heat fields (_shade_floor) whenever World says they changed,
-## only the cells that changed.
-var _grounds: Dictionary[Vector2i, Array] = {}
+## The ground (_build_ground). Each floor cell's index, its kind, and the
+## shade last drawn on it [bright, warm]: shaded by the light and heat
+## fields (_shade_floor) whenever World says they changed, only the cells
+## that changed.
+var _grounds: Dictionary[Vector2i, int] = {}
 var _ground_kinds: Dictionary[Vector2i, String] = {}
 var _ground_shades: Dictionary[Vector2i, Vector2] = {}
+## A cell's shade by index, as drawn: bright, warm, a byte each.
+var _cell_shades := PackedByteArray()
+## The corners: a vertex in the ground's meshes is a corner of one chunk at
+## one height. For each, its chunk, its shade's byte in _ground_bytes, and
+## the (up to 4, else -1) cells around it at its height, whose shades it
+## averages. A cell's vertices (its corners in every chunk that has them)
+## are _cell_vertices[_cell_vertex_start[i] .. _cell_vertex_start[i + 1]].
+var _vertex_chunk := PackedInt32Array()
+var _vertex_byte := PackedInt32Array()
+var _vertex_cells := PackedInt32Array()
+var _cell_vertex_start := PackedInt32Array()
+var _cell_vertices := PackedInt32Array()
+## Every chunk's attribute stream (CUSTOM0, the shade) one after another;
+## a chunk's mesh, its first byte here and its length.
+var _ground_bytes := PackedByteArray()
+var _ground_meshes: Array[ArrayMesh] = []
+var _chunk_byte_start := PackedInt32Array()
+## The vertex attribute stream's stride and CUSTOM0's place in it.
+var _ground_stride := 4
+var _ground_custom := 0
 var _shade_due := false
 ## The lights that may cast shadows (torches, carried lanterns), and the
 ## view they were last sorted for (_update_shadows).
@@ -1595,7 +1621,7 @@ func _build_room() -> void:
 	_land.clear()
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
-	_build_floor(kinds)
+	_build_ground(kinds)
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
 			_add_fire(cell)
@@ -1797,84 +1823,191 @@ func _kit_wall(piece: String) -> Node3D:
 	return holder
 
 
-## The floor: the kit's floor piece on every floor cell, in its kind's
-## colour, by MultiMesh, one per FLOOR_CHUNK square and kind (a node a cell
-## took half a millisecond each to make).
-func _build_floor(kinds: Dictionary) -> void:
-	var piece := _kit("ground")
-	var mesh: Mesh = null
-	for node in _descendants(piece):
-		if node is MeshInstance3D:
-			mesh = (node as MeshInstance3D).mesh
-			break
-	piece.free()
-	var groups: Dictionary[String, Array] = {}
-	for cell: Vector2i in _terrain["floor"]:
+## The ground: one mesh per FLOOR_CHUNK square, a vertex at each corner of
+## its cells (one per height where cells of different heights meet), so no
+## cell is a tile of its own. The kinds go in a texture, a texel a cell,
+## that ground.gdshader reads with noise (ragged borders, not cell edges);
+## the light and heat on each corner go in its CUSTOM0 bytes, updated where
+## they change (_shade_floor).
+func _build_ground(kinds: Dictionary) -> void:
+	var cells: Array = _terrain["floor"]
+	_cell_shades = PackedByteArray()
+	_vertex_chunk = PackedInt32Array()
+	_vertex_byte = PackedInt32Array()
+	_vertex_cells = PackedInt32Array()
+	_cell_vertex_start = PackedInt32Array()
+	_cell_vertices = PackedInt32Array()
+	_ground_bytes = PackedByteArray()
+	_ground_meshes.clear()
+	_chunk_byte_start = PackedInt32Array()
+	if cells.is_empty():
+		return
+	var low := Vector2i(1 << 30, 1 << 30)
+	var high := -low
+	for cell: Vector2i in cells:
+		low = low.min(cell)
+		high = high.max(cell)
+	# The cells by place (index or -1) and their heights, the kinds texture
+	# a texel a cell with a border of one, and the cells by chunk.
+	var across := high.x - low.x + 3
+	var down := high.y - low.y + 3
+	var origin := low - Vector2i.ONE
+	var at := PackedInt32Array()
+	at.resize(across * down)
+	at.fill(-1)
+	var heights := PackedInt32Array()
+	heights.resize(cells.size())
+	var kind_bytes := PackedByteArray()
+	kind_bytes.resize(across * down * 4)
+	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
+	for i in cells.size():
+		var cell: Vector2i = cells[i]
 		var kind := str(kinds.get(cell, "stone"))
+		if not GROUND_CHANNELS.has(kind):
+			kind = "stone"
+		_grounds[cell] = i
 		_ground_kinds[cell] = kind
-		var key := "%d_%d_%s" % [floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)), kind]
-		if not groups.has(key):
-			groups[key] = []
-		groups[key].append(cell)
-	for key: String in groups:
-		var cells: Array = groups[key]
-		var kind := _ground_kinds[cells[0]]
-		var multimesh := MultiMesh.new()
-		multimesh.transform_format = MultiMesh.TRANSFORM_3D
-		multimesh.use_colors = true
-		multimesh.use_custom_data = true
-		multimesh.mesh = mesh
-		multimesh.instance_count = cells.size()
-		var plain := _ground_base(kind).albedo_color.srgb_to_linear()
-		for i in cells.size():
+		heights[i] = clampi(_height(cell), 0, MAX_GROUND_HEIGHT)
+		var place := (cell.y - origin.y) * across + cell.x - origin.x
+		at[place] = i
+		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
+		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
+		if not chunks.has(chunk):
+			chunks[chunk] = PackedInt32Array()
+		chunks[chunk].append(i)
+	_cell_shades.resize(cells.size() * 2)
+	for i in cells.size():
+		_cell_shades[i * 2] = 255
+	var format := Mesh.ARRAY_FORMAT_VERTEX | Mesh.ARRAY_FORMAT_NORMAL | Mesh.ARRAY_FORMAT_INDEX \
+			| Mesh.ARRAY_FORMAT_CUSTOM0 | (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+	_ground_stride = RenderingServer.mesh_surface_get_format_attribute_stride(format, 1)
+	_ground_custom = RenderingServer.mesh_surface_get_format_offset(format, 1, Mesh.ARRAY_CUSTOM0)
+	var material := _ground_material(kind_bytes, across, down, origin)
+	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
+	var pair_cell := PackedInt32Array()
+	var pair_vertex := PackedInt32Array()
+	var corners: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
+	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
+	var ends := PackedInt32Array([0, 0, 0, 0])
+	# A chunk's vertex for each corner and height, or -1.
+	var local := PackedInt32Array()
+	local.resize((FLOOR_CHUNK + 1) * (FLOOR_CHUNK + 1) * (MAX_GROUND_HEIGHT + 1))
+	for chunk: Vector2i in chunks:
+		var chunk_index := _ground_meshes.size()
+		var base := chunk * FLOOR_CHUNK
+		var byte_start := _ground_bytes.size()
+		_chunk_byte_start.append(byte_start)
+		local.fill(-1)
+		var positions := PackedVector3Array()
+		var indices := PackedInt32Array()
+		for i in chunks[chunk]:
 			var cell: Vector2i = cells[i]
-			multimesh.set_instance_transform(i, Transform3D(Basis(), _tile_position(cell)))
-			multimesh.set_instance_color(i, plain)
-			multimesh.set_instance_custom_data(i, Color(0.0, 0.0, 0.0, 0.0))
-			_grounds[cell] = [multimesh, i]
-		var drawn := MultiMeshInstance3D.new()
-		drawn.name = "Floor_" + key
-		drawn.multimesh = multimesh
-		drawn.material_override = _floor_material(kind)
+			var height := heights[i]
+			for c in 4:
+				var corner := cell + corners[c]
+				var key := ((corner.x - base.x) * (FLOOR_CHUNK + 1) + corner.y - base.y) * (MAX_GROUND_HEIGHT + 1) + height
+				var vertex := local[key]
+				if vertex < 0:
+					vertex = positions.size()
+					local[key] = vertex
+					positions.append(Vector3(corner.x - 0.5, height * LEVEL_RISE, corner.y - 0.5))
+					var global := _vertex_chunk.size()
+					_vertex_chunk.append(chunk_index)
+					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
+					for step in around:
+						var next := corner + step
+						var other := at[(next.y - origin.y) * across + next.x - origin.x]
+						if other >= 0 and heights[other] != height:
+							other = -1
+						_vertex_cells.append(other)
+						if other >= 0:
+							pair_cell.append(other)
+							pair_vertex.append(global)
+				ends[c] = vertex
+			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
+		var custom := PackedByteArray()
+		custom.resize(positions.size() * 4)
+		_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
+		for v in positions.size():
+			custom[v * 4] = 255
+			_ground_bytes[byte_start + v * _ground_stride + _ground_custom] = 255
+		var normals := PackedVector3Array()
+		normals.resize(positions.size())
+		normals.fill(Vector3.UP)
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = positions
+		arrays[Mesh.ARRAY_NORMAL] = normals
+		arrays[Mesh.ARRAY_CUSTOM0] = custom
+		arrays[Mesh.ARRAY_INDEX] = indices
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {},
+				Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+		_ground_meshes.append(mesh)
+		var drawn := MeshInstance3D.new()
+		drawn.name = "Ground_%d_%d" % [chunk.x, chunk.y]
+		drawn.mesh = mesh
+		drawn.material_override = material
+		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_room.add_child(drawn)
+	_chunk_byte_start.append(_ground_bytes.size())
+	# The pairs gathered by cell.
+	_cell_vertex_start.resize(cells.size() + 1)
+	_cell_vertex_start.fill(0)
+	for cell in pair_cell:
+		_cell_vertex_start[cell + 1] += 1
+	for i in cells.size():
+		_cell_vertex_start[i + 1] += _cell_vertex_start[i]
+	_cell_vertices.resize(pair_cell.size())
+	var filled := _cell_vertex_start.duplicate()
+	for p in pair_cell.size():
+		var cell := pair_cell[p]
+		_cell_vertices[filled[cell]] = pair_vertex[p]
+		filled[cell] += 1
 
 
-## The floor's material for a kind: floor.gdshader with the kind's texture
-## (none for stone); the colour is each cell's own.
-func _floor_material(kind: String) -> ShaderMaterial:
-	var key := "floor/" + kind
-	if not _ground_materials.has(key):
-		var base := _ground_base(kind)
-		var material := ShaderMaterial.new()
-		material.shader = FLOOR_SHADER
-		material.set_shader_parameter("texture_albedo", base.albedo_texture)
-		material.set_shader_parameter("roughness", base.roughness)
-		material.set_shader_parameter("metallic", base.metallic)
-		material.set_shader_parameter("specular", base.metallic_specular)
-		_ground_materials[key] = material
-	return _ground_materials[key]
+## The ground's material: ground.gdshader with the kinds texture
+## [param bytes] ([param across] by [param down] texels, the first at
+## [param origin]) and the kinds' colours.
+func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Vector2i) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = GROUND_SHADER
+	var image := Image.create_from_data(across, down, false, Image.FORMAT_RGBA8, bytes)
+	material.set_shader_parameter("kinds", ImageTexture.create_from_image(image))
+	material.set_shader_parameter("kinds_origin", Vector2(origin))
+	material.set_shader_parameter("kinds_size", Vector2(across, down))
+	for kind: String in GROUND_COLOURS:
+		material.set_shader_parameter(kind, GROUND_COLOURS[kind])
+	material.set_shader_parameter("warm", WARM)
+	material.set_shader_parameter("noise_tex", _ground_noise())
+	return material
 
 
-## What a floor cell of [param kind] is drawn as, shaded [param bright]
-## (1: fully lit) and warmed [param warm]: [colour, glow], as the kit's
-## material would have them (sRGB).
-func _ground_shade(kind: String, bright: float, warm: float) -> Array[Color]:
-	var colour: Color = _ground_base(kind).albedo_color * bright
-	return [colour.lerp(WARM, warm), WARM * warm if warm > 0.0 else Color.BLACK]
+## The noise the ground's shader reads (a texture lookup is far cheaper than
+## noise worked out per pixel): made once, on a thread, the same everywhere.
+static var _noise_texture: NoiseTexture2D
 
 
-## A floor kind's plain material: the kit's grass tinted (GROUND_TINTS), or
-## for stone, STONE_FLOOR without the kit's texture.
-func _ground_base(kind: String) -> BaseMaterial3D:
-	if not _ground_materials.has(kind):
-		var material := _kit_opaque.duplicate() as BaseMaterial3D
-		if GROUND_TINTS.has(kind):
-			material.albedo_color = material.albedo_color * GROUND_TINTS[kind]
-		else:
-			material.albedo_texture = null
-			material.albedo_color = STONE_FLOOR
-		_ground_materials[kind] = material
-	return _ground_materials[kind]
+static func _ground_noise() -> NoiseTexture2D:
+	if _noise_texture == null:
+		var noise := FastNoiseLite.new()
+		noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		noise.seed = 1
+		noise.frequency = 64.0 / GROUND_NOISE_SIZE
+		noise.fractal_type = FastNoiseLite.FRACTAL_NONE
+		_noise_texture = NoiseTexture2D.new()
+		_noise_texture.width = GROUND_NOISE_SIZE
+		_noise_texture.height = GROUND_NOISE_SIZE
+		_noise_texture.seamless = true
+		_noise_texture.generate_mipmaps = true
+		_noise_texture.noise = noise
+	return _noise_texture
+
+
+## What a ground cell of [param kind] is drawn as, shaded [param bright]
+## (1: fully lit) and warmed [param warm], before the shader's noise (sRGB).
+func _ground_colour(kind: String, bright: float, warm: float) -> Color:
+	return (GROUND_COLOURS[kind] * bright).lerp(WARM, warm)
 
 
 func _add_water(cell: Vector2i) -> void:
@@ -1950,7 +2083,10 @@ func _on_fields_changed() -> void:
 
 ## Each floor cell darkened by the light it lacks (fixed sources and the
 ## level's ambient light; the carried lanterns are real lights here) and
-## warmed by the heat on it: the glow around a fire.
+## warmed by the heat on it: the glow around a fire. A changed cell's
+## corners take the average of the cells around them, in every chunk that
+## has them, and each chunk with a changed corner is sent once, the span
+## that changed.
 func _shade_floor() -> void:
 	_shade_due = false
 	if _grounds.is_empty():
@@ -1961,8 +2097,11 @@ func _shade_floor() -> void:
 	# Heat as World.is_burning reads it: the map's alone while nobody
 	# carries any (heat_at goes through every entity, for every cell).
 	var carried := World.fields.any_carried_heat(World)
+	var dirty := PackedInt32Array()
+	var marked: Dictionary[int, bool] = {}
 	for cell: Vector2i in cells:
-		if not _grounds.has(cell):
+		var index: int = _grounds.get(cell, -1)
+		if index < 0:
 			continue
 		var light := World.light_at(cell, false)
 		var heat := World.heat_at(cell) if carried else World.fields.map_heat_at(World, cell)
@@ -1971,11 +2110,38 @@ func _shade_floor() -> void:
 		if _ground_shades.get(cell) == shade:
 			continue
 		_ground_shades[cell] = shade
-		var drawn := _ground_shade(_ground_kinds[cell], minf(shade.x, 1.0), shade.y)
-		var multimesh: MultiMesh = _grounds[cell][0]
-		var index: int = _grounds[cell][1]
-		multimesh.set_instance_color(index, drawn[0].srgb_to_linear())
-		multimesh.set_instance_custom_data(index, drawn[1].srgb_to_linear())
+		_cell_shades[index * 2] = roundi(minf(shade.x, 1.0) * 255.0)
+		_cell_shades[index * 2 + 1] = roundi(shade.y * 255.0)
+		for k in range(_cell_vertex_start[index], _cell_vertex_start[index + 1]):
+			var vertex := _cell_vertices[k]
+			if not marked.has(vertex):
+				marked[vertex] = true
+				dirty.append(vertex)
+	if dirty.is_empty():
+		return
+	# Each chunk's changed span of shade bytes [first, last].
+	var spans: Dictionary[int, Vector2i] = {}
+	for vertex in dirty:
+		var bright := 0
+		var warm := 0
+		var count := 0
+		for k in range(vertex * 4, vertex * 4 + 4):
+			var cell := _vertex_cells[k]
+			if cell >= 0:
+				bright += _cell_shades[cell * 2]
+				warm += _cell_shades[cell * 2 + 1]
+				count += 1
+		var byte := _vertex_byte[vertex]
+		_ground_bytes[byte] = roundi(bright / float(count))
+		_ground_bytes[byte + 1] = roundi(warm / float(count))
+		var chunk := _vertex_chunk[vertex]
+		var span: Vector2i = spans.get(chunk, Vector2i(byte, byte))
+		spans[chunk] = Vector2i(mini(span.x, byte), maxi(span.y, byte))
+	for chunk: int in spans:
+		var first := spans[chunk].x - _ground_custom
+		var last := spans[chunk].y - _ground_custom + _ground_stride
+		_ground_meshes[chunk].surface_update_attribute_region(0, first - _chunk_byte_start[chunk],
+				_ground_bytes.slice(first, last))
 
 
 ## A lantern hung on a short post, and its pale light.
@@ -2104,18 +2270,25 @@ func _add_post(vertex: Vector2i) -> void:
 	_posts[vertex] = post
 
 
+## Fire on the ground: a ragged glowing patch (fire.gdshader) wider than
+## its cell, so cells of fire side by side run together; one mesh for all.
+static var _fire_mesh: PlaneMesh
+
+
 func _add_fire(cell: Vector2i) -> void:
+	if _fire_mesh == null:
+		_fire_mesh = PlaneMesh.new()
+		_fire_mesh.size = Vector2(FIRE_SPREAD, FIRE_SPREAD)
+		var material := ShaderMaterial.new()
+		material.shader = FIRE_SHADER
+		material.set_shader_parameter("fire", FIRE)
+		_fire_mesh.material = material
 	var quad := MeshInstance3D.new()
-	var mesh := PlaneMesh.new()
-	mesh.size = Vector2(0.9, 0.9)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = FIRE
-	material.emission_enabled = true
-	material.emission = FIRE
-	material.emission_energy_multiplier = 2.0
-	mesh.material = material
-	quad.mesh = mesh
+	quad.name = "Fire_%d_%d" % [cell.x, cell.y]
+	quad.mesh = _fire_mesh
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	quad.position = _tile_position(cell) + Vector3(0.0, ON_FLOOR, 0.0)
+	quad.rotation.y = _roll(cell, 6) * TAU
 	_room.add_child(quad)
 	var light := OmniLight3D.new()
 	light.light_color = FIRE

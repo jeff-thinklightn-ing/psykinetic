@@ -258,27 +258,40 @@ func _test_outdoor() -> void:
 
 
 func _test_ground_colours() -> void:
-	print("\n== floors: stone is grey (the kit's floor piece is grass), grass and dirt are tinted ==")
-	var stone := _rig._ground_base("stone")
-	_check(stone.albedo_texture == null and is_equal_approx(stone.albedo_color.r, stone.albedo_color.g)
-			and absf(stone.albedo_color.g - stone.albedo_color.b) < 0.05, "stone: grey, untextured (%s)" % stone.albedo_color)
-	var grass := _rig._ground_base("grass")
-	_check(grass.albedo_texture != null and grass != stone, "grass: the kit's piece, tinted")
+	print("\n== the ground: a mesh a chunk, stone grey, grass green, dirt brown, light and heat on each corner ==")
+	var stone: Color = Client3D.GROUND_COLOURS["stone"]
+	var grass: Color = Client3D.GROUND_COLOURS["grass"]
+	var dirt: Color = Client3D.GROUND_COLOURS["dirt"]
+	_check(is_equal_approx(stone.r, stone.g) and absf(stone.g - stone.b) < 0.05, "stone: grey (%s)" % stone)
+	_check(grass.g > grass.r and grass.g > grass.b and dirt.r > dirt.g and dirt.g > dirt.b, "grass green, dirt brown")
+	var chunks := _rig._room.find_children("Ground_*", "MeshInstance3D", false, false)
+	_check(chunks.size() == _rig._ground_meshes.size() and chunks.size() > 0
+			and _rig._room.find_children("Floor_*", "", false, false).is_empty(),
+			"the ground is a mesh a chunk (%d), no tile of its own a cell" % chunks.size())
+	var material := (chunks[0] as MeshInstance3D).material_override as ShaderMaterial
+	_check(material != null and material.shader == Client3D.GROUND_SHADER and material.get_shader_parameter("kinds") is Texture2D,
+			"drawn by the ground shader with the kinds texture")
 	for cell: Vector2i in _rig._grounds:
 		if _rig._ground_kinds[cell] == "stone":
-			var multimesh: MultiMesh = _rig._grounds[cell][0]
-			var holder: MultiMeshInstance3D = null
-			for node in _rig._room.find_children("Floor_*", "MultiMeshInstance3D", false, false):
-				if (node as MultiMeshInstance3D).multimesh == multimesh:
-					holder = node
-			var drawn := holder.material_override as ShaderMaterial if holder != null else null
-			# (A headless MultiMesh keeps no colours: what is set on it, from its shade.)
 			var shade: Vector2 = _rig._ground_shades[cell]
-			var colour: Color = _rig._ground_shade("stone", shade.x, shade.y)[0]
-			_check(drawn != null and drawn.get_shader_parameter("texture_albedo") == null
-					and colour.r > 0.1 and is_equal_approx(colour.r, colour.g) and absf(colour.g - colour.b) < 0.05,
-					"a stone floor cell in the room is drawn grey, untextured (%s: %s)" % [cell, colour])
+			var colour: Color = _rig._ground_colour("stone", shade.x, shade.y)
+			_check(colour.r > 0.1 and is_equal_approx(colour.r, colour.g) and absf(colour.g - colour.b) < 0.05,
+					"a stone floor cell in the room is drawn grey (%s: %s)" % [cell, colour])
 			break
+	# (Headless, a mesh keeps no attributes: the bytes sent, kept by the view.)
+	var averaged := 0
+	for vertex in _rig._vertex_chunk.size():
+		var bright := 0
+		var count := 0
+		for k in range(vertex * 4, vertex * 4 + 4):
+			var cell := _rig._vertex_cells[k]
+			if cell >= 0:
+				bright += _rig._cell_shades[cell * 2]
+				count += 1
+		if count > 0 and _rig._ground_bytes[_rig._vertex_byte[vertex]] == roundi(bright / float(count)):
+			averaged += 1
+	_check(averaged == _rig._vertex_chunk.size(),
+			"every corner is lit as the cells around it, averaged (%d of %d)" % [averaged, _rig._vertex_chunk.size()])
 	var lit := 0
 	for cell: Vector2i in _rig._grounds:
 		var shade: Vector2 = _rig._ground_shades.get(cell, Vector2(-1.0, -1.0))

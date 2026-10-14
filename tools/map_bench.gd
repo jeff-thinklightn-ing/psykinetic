@@ -121,6 +121,24 @@ func _ready() -> void:
 	if flips > 0:
 		print("BENCH door flip (light and heat again): avg %.2f ms, worst %.2f ms (%d doors)" % [
 			door_total / 1000.0 / (flips * 2), door_worst / 1000.0, doors.size()])
+	# And the 3D view's ground shaded again for it: the cells it changed,
+	# their corners rewritten and each chunk touched sent once.
+	if flips > 0 and _main._client3d != null:
+		_main._client3d._shade_floor()
+		var shade_total := 0
+		var shade_worst := 0
+		for i in flips:
+			var door: Door = doors[rng.randi_range(0, doors.size() - 1)]
+			for open: bool in [not door.open, door.open]:
+				door.open = open
+				World.light_at(Terrain.edge_cells(door.key)[0], false)
+				started = Time.get_ticks_usec()
+				_main._client3d._shade_floor()
+				var took := Time.get_ticks_usec() - started
+				shade_total += took
+				shade_worst = maxi(shade_worst, took)
+		print("BENCH door flip, the 3D ground shaded again: avg %.2f ms, worst %.2f ms" % [
+			shade_total / 1000.0 / (flips * 2), shade_worst / 1000.0])
 
 	# The world tick at its worst: every monster on its way back after a
 	# fight at once, each first put up to 8 tiles from its post (into the

@@ -2657,3 +2657,51 @@ opened the first time and loops worked out): 16 players about 30 ms on
 average to 24, 9 players 15 to 18, 4 players 13, 1 player 3.9. Worst ticks
 are still the start, when players arrive and hundreds of monsters wake at
 once; next.
+
+## 216. The ground is one mesh a chunk, its kinds blended by noise
+
+Jeff: the world looks far too blocky; the grid stays the rules and the
+visuals stop showing it. The floor was the kit's floor tile on every cell
+(182's MultiMesh a chunk and kind), each cell one flat colour: every cell
+edge and every change of kind a straight line. This replaces 182's floor
+(its touched-only shading stays). Each FLOOR_CHUNK square is now one
+ArrayMesh with a vertex at each cell corner (one per height where cells of
+different heights meet), drawn by client3d/ground.gdshader. Which ground is
+where is a texture of a texel a cell (grass, dirt, stone, sand by channel;
+sand ready for a map that paints it, no kind added), read linearly at a
+point pushed about by noise, each kind given a ragged edge of its own and
+the strongest kept with a short soft band: kinds meet along wandering
+borders, not cell edges. Each kind's look is noise too (grass patches,
+dirt grain, irregular cobbles for stone), worked out only where that kind
+shows, from one noise texture made at run time (FastNoiseLite, seamless,
+read turned at an odd angle so its repeats never line up with the cells):
+no texture assets, so nothing for THIRD_PARTY.md. Gradient noise and an
+integer hash, not value noise: value noise showed its lattice as squares.
+
+Light and heat stay a cell's (same snapping, same sRGB sums), but are
+drawn on the corners: a corner is the average of the cells around it at
+its height, so they fade from cell to cell. Perf's rules for it: the mesh
+is never rebuilt to change colour; each chunk's attribute stream (CUSTOM0,
+RGBA8, stride and offset from RenderingServer's format functions) is kept
+in one byte array, only the touched corners are written, and each chunk
+with a change is sent once a frame, the span that changed, by
+surface_update_attribute_region; corners on a chunk's border are in every
+chunk that has them, so a cell there dirties its neighbours' chunks too;
+each cell's corners (in every chunk) are worked out once at build, so a
+changed cell costs array reads, no lookups per corner; the shading is
+still once a frame, after however many changes. A headless mesh keeps no
+attributes, so the view keeps what it sent and view_test checks that.
+
+Fire cells were yellow squares: a fire is now a ragged flickering patch
+1.5 cells wide (client3d/fire.gdshader), so fire side by side runs
+together.
+
+tools/map_bench, windowed, run alternately with the commit before: 128x128
+frames 45.4 to 45.7 fps (before 44.5 to 45.1), draw calls 381 to 337;
+256x256 11.9 fps (before 11.2), draw calls 391 to 352; the 3D client
+rebuild 1.23 s to 1.30 to 1.35 (_build_ground 210 ms); a door flip's ground
+shaded again avg 1.0 to 1.3 ms, worst under 3. Rejected: kind weights on
+the corners (a path one cell wide came out half dirt), a vertex at each
+cell centre too (more corners to write on each change; the kinds texture
+gives the same for nothing), and noise worked out per pixel (it cost
+frames; a lookup is cheap).
