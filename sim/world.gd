@@ -30,6 +30,9 @@ signal entity_despawned(entity: GridEntity)
 signal entity_died(entity: GridEntity, cause: StringName)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
+## A door came, or its open or hp changed, on this peer (the server's
+## change or a replicated one): views redraw that door.
+signal door_shown(door: Door)
 ## Something went into or out of [param entity]'s slots (try_transfer,
 ## set_slots). Server only.
 signal slots_changed(entity: GridEntity)
@@ -504,6 +507,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 func register_door(door: Door) -> void:
 	_doors[door.key] = door
 	fields_changed()
+	door_shown.emit(door)
 
 
 func unregister_door(door: Door) -> void:
@@ -570,6 +574,11 @@ func bearing_index(offset: Vector2) -> int:
 	var east := Vector2(-up.y, up.x)  # A quarter turn clockwise on the map.
 	var degrees := rad_to_deg(atan2(offset.dot(east), offset.dot(up)))
 	return posmod(roundi(degrees / 45.0), 8)
+
+
+## The door on edge [param key], or null.
+func door_on(key: Vector3i) -> Door:
+	return _doors.get(key)
 
 
 func get_doors() -> Array[Door]:

@@ -32,7 +32,12 @@ var open := false:
 			open = value
 			# Light and heat pass an open door: what reaches it is worked out again.
 			World.fields_changed(Terrain.edge_cells(key))
-var hp := 20
+			_shown_changed()
+var hp := 20:
+	set(value):
+		if hp != value:
+			hp = value
+			_shown_changed()
 var max_hp := 20
 var body_material := GridEntity.BodyMaterial.WOOD
 ## 0 closed .. 1 fully open, eased toward the state each frame.
@@ -50,6 +55,8 @@ func _init() -> void:
 	synchronizer.name = "Sync"
 	synchronizer.replication_config = config
 	synchronizer.add_visibility_filter(func(peer: int) -> bool: return World.peer_sees(peer, zone))
+	# As an entity's: asked on spawn and zone changes, not every frame.
+	synchronizer.visibility_update_mode = MultiplayerSynchronizer.VISIBILITY_PROCESS_NONE
 	add_child(synchronizer)
 	sync = synchronizer
 
@@ -95,11 +102,21 @@ func is_open() -> bool:
 	return open or is_broken()
 
 
+## Open or hp changed: it swings again (it sleeps once it is still) and
+## the views are told.
+func _shown_changed() -> void:
+	set_process(true)
+	if is_inside_tree() and World.door_on(key) == self:
+		World.door_shown.emit(self)
+
+
 func _process(delta: float) -> void:
 	var target := 1.0 if is_open() else 0.0
 	if not is_equal_approx(_swing, target):
 		_swing = move_toward(_swing, target, delta / SWING_SECONDS)
 		queue_redraw()
+	else:
+		set_process(false)  # Still: nothing to do till it changes.
 
 
 ## The panel as drawn now, in local space: hinge end, free end, and the two

@@ -245,8 +245,12 @@ func _init() -> void:
 	var synchronizer := MultiplayerSynchronizer.new()
 	synchronizer.name = "Sync"
 	synchronizer.replication_config = config
-	# Spawned on, and synchronized to, only the clients in its zone.
+	# Spawned on, and synchronized to, only the clients in its zone. Asked
+	# when it spawns and when a player changes zone (World.update_visibility),
+	# not every frame: thousands of them asking each frame took a third of
+	# a big map's frame.
 	synchronizer.add_visibility_filter(_visible_to)
+	synchronizer.visibility_update_mode = MultiplayerSynchronizer.VISIBILITY_PROCESS_NONE
 	add_child(synchronizer)
 	sync = synchronizer
 
@@ -336,6 +340,11 @@ func is_breakable() -> bool:
 			and (body_material == BodyMaterial.FLESH or body_material == BodyMaterial.WOOD)
 
 
+## Whether the 2D view is drawn on this peer (Main._draws_2d): its sprites'
+## frame-by-frame touches are skipped where it is not.
+static var draws_2d := true
+
+
 func _process(delta: float) -> void:
 	var wanted := Vector2(facing)
 	if _prediction != null and _prediction.advance(delta):
@@ -397,6 +406,8 @@ func _process(delta: float) -> void:
 			elif aim != Vector2.ZERO:
 				wanted = aim
 	_turn_toward(wanted, delta)
+	if not draws_2d:
+		return  # Its sprite is not seen: no bob, reel or flash to draw.
 	if _pip != null:
 		var screen_facing := Iso.project(shown_facing())
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH

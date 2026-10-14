@@ -253,6 +253,7 @@ func _ready() -> void:
 	_load_level(Net.map_name if not Net.map_name.is_empty() else Level.DEFAULT_MAP)
 	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
 		_show_3d()
+	GridEntity.draws_2d = _draws_2d()
 	_paint_level()
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()

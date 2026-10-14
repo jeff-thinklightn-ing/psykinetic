@@ -1916,3 +1916,35 @@ would still take in. Rejected: a fixed range in cells round the player
 
 What holds a big map's frame rate down is the scripts each frame (35 ms
 at 256x256, 3D view hidden or not), next.
+
+## 185. A frame does work for what changed and what is near
+
+A 256x256 map (tools/map_bench: 1025 entities, 1984 doors) took 25 ms a
+frame, the view hidden or not; measured by turning each part off:
+
+- **Synchronizers' visibility, 9 ms.** Each entity's and door's
+  MultiplayerSynchronizer asked its visibility filter every frame (the
+  default, VISIBILITY_PROCESS_IDLE), three thousand GDScript calls a frame,
+  on the server too. They are set to VISIBILITY_PROCESS_NONE: a new one is
+  asked when it spawns, and every change of who sees what already calls
+  World.update_visibility (a player's zone set in _show_zone_to, on
+  joining, travelling and leaving). net_test (a real server and clients:
+  joins, returns, reset) passes.
+- **Doors, 5 ms.** The 3D view looked at every door every frame, and each
+  Door ran _process. A door now says when it comes or its open or hp
+  changes (World.door_shown, on every peer, from the setters, so a
+  replicated change counts); the view moves only those doors' leaves, till
+  each is still (a float32 angle, compared near enough), and a Door's
+  _process stops once its swing is still and starts again on a change.
+- **Puppets, 4 ms.** Every entity's puppet was placed, turned, animated
+  and its bar and footsteps kept up each frame. Only the puppets within the
+  view's reach and PUPPET_MARGIN, or within earshot (Sfx.MAX_DISTANCE), are
+  now; a far one keeps only its tile and hp (no footstep for the way it
+  came, its bar showing a fight it had) and is placed when it is made.
+  Position and turn are set only when they change.
+- **Sprites, 2 ms.** An entity's 2D sprite bob, reel and flash are skipped
+  where the 2D view is not drawn (GridEntity.draws_2d, from Main).
+
+256x256: 25 ms a frame to 4.3. Rejected: MultiplayerSynchronizer
+delta_interval (it slowed the frame), and updating far puppets in turn
+(their state would go stale out of order; a far one is not seen or heard).

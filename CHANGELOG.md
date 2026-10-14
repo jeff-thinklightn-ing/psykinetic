@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.117
+
+Client and server.
+
+- Big maps run smoothly: a frame on a 256x256 map takes about a sixth of
+  what it did. Doors, creatures and crates off screen cost next to nothing,
+  and the server no longer checks every creature's visibility each frame.
+
+The server must be updated to v0.1.117 too, as it refuses any other version.
+
 ## v0.1.116
 
 Client and server.

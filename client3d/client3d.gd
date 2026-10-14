@@ -166,6 +166,10 @@ const PLAYER_LIGHT_RANGE := 6.0
 ## shows, give or take this (cells); checked when the view moves a cell or
 ## changes size, and every SHADOW_RECHECK seconds for lights that move.
 const SHADOW_MARGIN := 2.0
+## A puppet is kept up each frame only while its entity is within the view's
+## reach and this (cells), or within earshot (Sfx.MAX_DISTANCE); further
+## off, only what it will need on coming back (its tile, its hp).
+const PUPPET_MARGIN := 4.0
 const SHADOW_RECHECK := 0.5
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
@@ -542,6 +546,11 @@ var _pending_deaths: Dictionary[String, Dictionary] = {}
 var _departed: Dictionary[String, Dictionary] = {}
 ## Door edge key -> open, as last seen, for their sounds.
 var _door_open: Dictionary[Vector3i, bool] = {}
+## The doors whose leaf may have to move or show (World.door_shown, or a new
+## room): _sync_doors looks at these alone, till each is still.
+var _doors_due: Dictionary[Vector3i, bool] = {}
+## The puppets of entities too far off to keep up (_sync_puppets).
+var _far: Dictionary[int, bool] = {}
 ## The local player's entity name while there is one.
 var _local_name := ""
 ## The local player's death: 0 alive .. 1 fully mourned.
@@ -1390,6 +1399,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_walls.clear()
 	_posts.clear()
 	_doorways.clear()
+	_doors_due.clear()
 	_grounds.clear()
 	_ground_kinds.clear()
 	_ground_shades.clear()
@@ -1502,6 +1512,11 @@ func _build_room() -> void:
 			_add_post(vertex)
 	if _outdoor:
 		_add_forest()
+	# Every door's leaf set once; from then on those that change.
+	if not World.door_shown.is_connected(_on_door_shown):
+		World.door_shown.connect(_on_door_shown)
+	for door in World.get_doors():
+		_doors_due[door.key] = true
 
 
 ## An edge between the land and the void: the map's outline.
@@ -2211,21 +2226,43 @@ func _set_stone(piece: Node3D, near: bool) -> void:
 func _sync_puppets() -> void:
 	var seen: Dictionary[int, bool] = {}
 	var now := Time.get_ticks_msec()
+	var reach := maxf(_view_reach() + PUPPET_MARGIN, Sfx.MAX_DISTANCE) if _camera != null else INF
+	var aim := Vector2(_camera_target.x, _camera_target.z)
 	for entity in World.get_entities():
 		if not entity.spawned:
 			continue
 		var id := entity.get_instance_id()
 		seen[id] = true
-		if not _puppets.has(id):
+		var made := not _puppets.has(id)
+		if made:
 			_puppets[id] = _make_puppet(entity)
 		var puppet := _puppets[id]
+		if not made and Vector2(entity.tile).distance_to(aim) > reach:
+			# Far off: unseen and unheard. Its tile and hp are kept, so it
+			# makes no footstep for the way it came and its bar shows a
+			# fight it had, when it comes near.
+			_far[id] = true
+			_last_tile[id] = entity.tile
+			if _last_hp.get(id, entity.hp) != entity.hp:
+				_combat_at[id] = now
+			_last_hp[id] = entity.hp
+			continue
+		if _far.has(id):
+			_far.erase(id)
+			puppet.remove_meta("last_at")  # Not a run from where it was last drawn.
 		var grid := Iso.local_to_grid(entity.position)
-		puppet.position = Vector3(grid.x, _ground_height(grid), grid.y)
+		var at := Vector3(grid.x, _ground_height(grid), grid.y)
+		if puppet.position != at:
+			puppet.position = at
+		var yaw := -entity.shown_facing().angle()
 		var facing := puppet.get_node_or_null("Facing") as Node3D
-		if facing != null:
-			facing.rotation.y = -entity.shown_facing().angle()
+		# (Angles kept as float32: compared near enough, not ==.)
+		if facing != null and not is_equal_approx(facing.rotation.y, yaw):
+			facing.rotation.y = yaw
 		if puppet.has_meta("animator"):
-			(puppet.get_node("Body") as Node3D).rotation.y = -entity.shown_facing().angle()
+			var body := puppet.get_node("Body") as Node3D
+			if not is_equal_approx(body.rotation.y, yaw):
+				body.rotation.y = yaw
 			_animate(puppet)
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
@@ -2244,6 +2281,7 @@ func _entity_went(id: int) -> void:
 	_combat_at.erase(id)
 	_last_hp.erase(id)
 	_last_tile.erase(id)
+	_far.erase(id)
 	var entity_name: String = puppet.get_meta("entity_name", "")
 	if _pending_deaths.has(entity_name):
 		_fall(puppet, _pending_deaths[entity_name])
@@ -2908,11 +2946,19 @@ func _label(name_: String, text: String, color: Color, height: float) -> Label3D
 	return label
 
 
-## The leaf of each door follows its Door node's open state.
+func _on_door_shown(door: Door) -> void:
+	_doors_due[door.key] = true
+
+
+## The leaf of each door follows its Door node's open state: the doors
+## that changed, till their leaves are still (a big map's two thousand
+## doors, each looked at every frame, took 5 ms of it).
 func _sync_doors() -> void:
-	for door in World.get_doors():
-		var doorway: Node3D = _doorways.get(door.key)
-		if doorway == null:
+	for key: Vector3i in _doors_due.keys():
+		var door := World.door_on(key)
+		var doorway: Node3D = _doorways.get(key)
+		if door == null or doorway == null:
+			_doors_due.erase(key)
 			continue
 		var hinge := doorway.get_node("Hinge") as Node3D
 		if _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
@@ -2921,3 +2967,5 @@ func _sync_doors() -> void:
 		hinge.visible = not door.is_broken()
 		var target: float = PI * 0.5 if door.is_open() else 0.0
 		hinge.rotation.y = move_toward(hinge.rotation.y, target, get_process_delta_time() / Door.SWING_SECONDS * PI * 0.5)
+		if is_equal_approx(hinge.rotation.y, target):  # (A float32 angle: never == PI / 2.)
+			_doors_due.erase(key)

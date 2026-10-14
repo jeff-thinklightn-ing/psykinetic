@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_goblins_differ()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
+	await _test_doors_swing()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -789,6 +790,38 @@ func _test_no_2d_under_3d() -> void:
 	_main._paint_level()
 	_check(_main._walls.is_empty() and _main.ground.get_used_cells().is_empty(),
 			"no 2D walls or floor tiles (%d, %d)" % [_main._walls.size(), _main.ground.get_used_cells().size()])
+
+
+func _test_doors_swing() -> void:
+	print("
+== a door's leaf swings when it opens or shuts, and then nothing is done for it ==")
+	var doors := World.get_doors()
+	_check(not doors.is_empty(), "the test room has a door")
+	if doors.is_empty():
+		return
+	var door: Door = doors[0]
+	var hinge := _rig._doorways[door.key].get_node("Hinge") as Node3D
+	for i in 30:
+		_rig._process(0.05)
+		await get_tree().process_frame
+	_check(_rig._doors_due.is_empty() and not door.is_processing(), "at rest, no door is looked at, and the door sleeps (due %s, processing %s, doorways %s, doors %s)" % [_rig._doors_due.keys(), door.is_processing(), _rig._doorways.keys(), doors.map(func(d: Door) -> Vector3i: return d.key)])
+	var was := door.open
+	# No door sound (one plays only when its last state is known): quitting
+	# while a sound plays holds its stream at exit.
+	_rig._door_open.erase(door.key)
+	door.open = not was
+	_check(_rig._doors_due.has(door.key) and door.is_processing(), "it changes: it is looked at again, and swings")
+	for i in 40:
+		await get_tree().process_frame
+		_rig._process(0.05)
+	var target := PI * 0.5 if door.is_open() else 0.0
+	_check(is_equal_approx(hinge.rotation.y, target), "its leaf has swung %s (%.2f)" % ["open" if door.is_open() else "shut", hinge.rotation.y])
+	_check(_rig._doors_due.is_empty() and not door.is_processing(), "and once still, both rest again")
+	_rig._door_open.erase(door.key)
+	door.open = was
+	for i in 40:
+		await get_tree().process_frame
+		_rig._process(0.05)
 
 
 # --- helpers ------------------------------------------------------------------
