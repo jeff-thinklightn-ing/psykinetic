@@ -151,6 +151,14 @@ func map_heat_at(world: Node, cell: Vector2i) -> float:
 ## [param threshold]: where a creature burns with nobody carrying heat.
 ## Looked for in the whole map once, then kept up as doors change it.
 func hot_cells(world: Node, threshold: float) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	cells.assign(hot_set(world, threshold).keys())
+	return cells
+
+
+## hot_cells as a set, {cell: true}, for looking cells up in. Not a copy:
+## read it, do not change it.
+func hot_set(world: Node, threshold: float) -> Dictionary:
 	_refresh(world)
 	if not _hot.has(threshold):
 		var found: Dictionary[Vector2i, bool] = {}
@@ -158,9 +166,7 @@ func hot_cells(world: Node, threshold: float) -> Array[Vector2i]:
 			if _heat[cell] >= threshold:
 				found[cell] = true
 		_hot[threshold] = found
-	var cells: Array[Vector2i] = []
-	cells.assign(_hot[threshold].keys())
-	return cells
+	return _hot[threshold]
 
 
 ## Whether anything in [param world] carries heat now (see heat_at).

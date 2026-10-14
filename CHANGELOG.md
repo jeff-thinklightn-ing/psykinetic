@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.129
+
+Client and server.
+
+- Monsters find their way about two to three times faster on the server:
+  smoother with several players on a big map. They walk the same ways as
+  before.
+
+The server must be updated to v0.1.129 too, as it refuses any other version.
+
 ## v0.1.128
 
 Client and server.

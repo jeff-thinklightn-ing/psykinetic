@@ -206,10 +206,23 @@ var _clock_drift := 0.0
 var _half_sent := -1
 
 var _floor: Dictionary[Vector2i, bool] = {}
-## find_path's memo, this zone's (Zone.path_steps): for a cell and one of
-## DIRECTIONS (x, y, its index), PATH_STEP_* by the terrain alone. Emptied
-## whenever the terrain is set or cleared.
-var _path_steps: Dictionary[Vector3i, int] = {}
+## find_path's grid, this zone's (Zone.grid_rect, grid_steps): the floor's
+## bounds and a pace beyond (Rect2i(): not worked out yet), each cell in it
+## an index; and its memo, for a cell's index * 8 + one of DIRECTIONS,
+## PATH_STEP_* + 1 by the terrain alone (0: not yet). Let go whenever the
+## terrain is set or cleared.
+var _grid_rect := Rect2i()
+var _grid_steps := PackedByteArray()
+## find_path's own, by cell index, for any zone: whether a cell was opened
+## or closed in search number _search (the search it holds the number of),
+## and its cost, the cell it came from and the order it was opened in, so
+## nothing is emptied between searches.
+var _search := 0
+var _search_opened := PackedInt32Array()
+var _search_closed := PackedInt32Array()
+var _search_cost := PackedInt32Array()
+var _search_from := PackedInt32Array()
+var _search_order := PackedInt32Array()
 ## _carried_heat's memo: for which (tick, entity count), and its answer.
 var _carried_heat_key := Vector2i(-1, -1)
 var _carried_heat_now := false
@@ -584,7 +597,8 @@ func enter(to: Zone) -> Zone:
 	from.occupancy = _occupancy
 	from.entities = _entities
 	from.hits = _hits.duplicate()
-	from.path_steps = _path_steps
+	from.grid_rect = _grid_rect
+	from.grid_steps = _grid_steps
 	zone = to
 	tick = to.tick
 	_floor = to.floor
@@ -602,7 +616,8 @@ func enter(to: Zone) -> Zone:
 	_entities = to.entities
 	_roster_changed()
 	_hits.assign(to.hits)
-	_path_steps = to.path_steps
+	_grid_rect = to.grid_rect
+	_grid_steps = to.grid_steps
 	_carried_heat_key = Vector2i(-1, -1)
 	zone_switched.emit(from, to)
 	return from
@@ -665,7 +680,8 @@ func reset() -> void:
 	_roster_changed()
 	_occupancy.clear()
 	_hits.clear()
-	_path_steps.clear()
+	_grid_rect = Rect2i()
+	_grid_steps = PackedByteArray()
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
@@ -687,7 +703,8 @@ func load_terrain(terrain: Dictionary) -> void:
 
 
 func _set_terrain(terrain: Dictionary) -> void:
-	_path_steps.clear()
+	_grid_rect = Rect2i()
+	_grid_steps = PackedByteArray()
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
@@ -1433,7 +1450,8 @@ func mirror_reset() -> void:
 	_entities.clear()
 	_roster_changed()
 	_occupancy.clear()
-	_path_steps.clear()
+	_grid_rect = Rect2i()
+	_grid_steps = PackedByteArray()
 	_floor.clear()
 	_fire.clear()
 	_edges.clear()
@@ -2171,74 +2189,101 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 		return path
 	if _occupancy.has(to) and not ignore_goal_occupant and _occupancy[to] != ignore:
 		return path
-
-	# The open tiles in a binary heap keyed by (f, the order each was first
-	# opened in): the cheapest, the earliest of equals, comes out first, as a
-	# scan of a list in that order would pick it, without the scan (a search
-	# of the whole castle took 10-20 ms that way). A tile made cheaper is
-	# pushed again; its older entry is stale and skipped when it comes up.
-	var heap_keys := PackedInt64Array()
-	var heap_cells: Array[Vector2i] = []
-	var opened: Dictionary[Vector2i, int] = {from: 0}
-	var closed: Dictionary[Vector2i, bool] = {}
-	var came_from: Dictionary[Vector2i, Vector2i] = {}
-	var cost: Dictionary[Vector2i, int] = {}
-	cost[from] = 0
-	var best := from
+	_ensure_grid()
+	var origin := _grid_rect.position
+	var width := _grid_rect.size.x
+	if not _grid_rect.has_point(from):
+		return path  # Off the map and its edge: nothing walkable beside it.
+	# Search number _search: a cell's entries count only if stamped with it.
+	_search += 1
+	var stamp := _search
+	# Packed arrays are copied when written through a second name: the
+	# members are written directly.
+	var from_at := (from.y - origin.y) * width + from.x - origin.x
+	var to_at := (to.y - origin.y) * width + to.x - origin.x
+	_search_opened[from_at] = stamp
+	_search_order[from_at] = 0
+	_search_cost[from_at] = 0
+	var opened_count := 1
+	var closed_count := 0
+	var best := from_at
 	var best_left := _path_heuristic(from, to)
-	_heap_push(heap_keys, heap_cells, best_left << PATH_ORDER_BITS, from)
+	var heat_carried := _carried_heat()
+	var hot: Dictionary = {} if heat_carried else fields.hot_set(self, HEAT_BURN)
+	# The open cells (indices) in a binary heap keyed by (f, the order each
+	# was first opened in): the cheapest, the earliest of equals, comes out
+	# first, as a scan of a list in that order would pick it, without the
+	# scan. A cell made cheaper is pushed again; its older entry is stale and
+	# skipped when it comes up. The cells' state is in flat arrays by index
+	# (_search_*), stamped with the search's number, not dictionaries made
+	# for each search: a third of the time.
+	var heap_keys := PackedInt64Array()
+	var heap_cells := PackedInt32Array()
+	_heap_push_at(heap_keys, heap_cells, best_left << PATH_ORDER_BITS, from_at)
+	var offsets := PackedInt32Array()
+	for direction in DIRECTIONS:
+		offsets.append(direction.y * width + direction.x)
 
 	while not heap_keys.is_empty():
 		var key := heap_keys[0]
-		var current: Vector2i = _heap_pop(heap_keys, heap_cells)
-		if closed.has(current) or key >> PATH_ORDER_BITS != cost[current] + _path_heuristic(current, to):
+		var at := _heap_pop_at(heap_keys, heap_cells)
+		var current := Vector2i(origin.x + at % width, origin.y + at / width)
+		if _search_closed[at] == stamp or key >> PATH_ORDER_BITS != _search_cost[at] + _path_heuristic(current, to):
 			continue  # Stale: closed already, or pushed again since, cheaper.
-		if max_tiles > 0 and closed.size() >= max_tiles:
+		if max_tiles > 0 and closed_count >= max_tiles:
 			break
-
-		if current == to:
-			while current != from:
-				path.append(current)
-				current = came_from[current]
+		if at == to_at:
+			while at != from_at:
+				path.append(Vector2i(origin.x + at % width, origin.y + at / width))
+				at = _search_from[at]
 			path.reverse()
 			return path
-
-		closed[current] = true
+		_search_closed[at] = stamp
+		closed_count += 1
 		if nearest:
 			var left := _path_heuristic(current, to)
 			if left < best_left:
-				best = current
+				best = at
 				best_left = left
-		for way in DIRECTIONS.size():
+		for way in 8:
 			var direction: Vector2i = DIRECTIONS[way]
 			var next: Vector2i = current + direction
-			if closed.has(next):
+			if not _grid_rect.has_point(next):
+				continue  # Off the grid: not floor, so blocked.
+			var next_at := at + offsets[way]
+			if _search_closed[next_at] == stamp:
 				continue
-			var step := _path_step(current, way)
+			var step: int = _grid_steps[at * 8 + way] - 1
+			if step == -1:
+				step = _path_step(current, way)
 			if step == PATH_STEP_BLOCKED or step == PATH_STEP_ASK and _terrain_blocks_step(current, direction, true):
 				continue
-			if _occupancy.has(next) and next != to and _occupancy[next] != ignore:
+			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore:
 				continue
-			var next_cost: int = cost[current]
-			if direction.x != 0 and direction.y != 0:
+			var next_cost: int = _search_cost[at]
+			if way >= 4:
 				next_cost += PATH_DIAGONAL_COST + PATH_DIAGONAL_EXTRA
 			else:
 				next_cost += PATH_STEP_COST
 				if step == PATH_STEP_DOOR and _closed_door_across(current, direction) != null:
 					next_cost += PATH_DOOR_EXTRA
-			if is_burning(next):
+			if hot.has(next) if not heat_carried else is_burning(next):
 				next_cost += PATH_FIRE_EXTRA
-			if not cost.has(next) or next_cost < cost[next]:
-				cost[next] = next_cost
-				came_from[next] = current
-				if not opened.has(next):
-					opened[next] = opened.size()
-				_heap_push(heap_keys, heap_cells,
-						((next_cost + _path_heuristic(next, to)) << PATH_ORDER_BITS) | opened[next], next)
+			var seen := _search_opened[next_at] == stamp
+			if not seen or next_cost < _search_cost[next_at]:
+				_search_cost[next_at] = next_cost
+				_search_from[next_at] = at
+				if not seen:
+					_search_opened[next_at] = stamp
+					_search_order[next_at] = opened_count
+					opened_count += 1
+				_heap_push_at(heap_keys, heap_cells,
+						((next_cost + _path_heuristic(next, to)) << PATH_ORDER_BITS) | _search_order[next_at], next_at)
 	if nearest:
-		while best != from:
-			path.append(best)
-			best = came_from[best]
+		var at := best
+		while at != from_at:
+			path.append(Vector2i(origin.x + at % width, origin.y + at / width))
+			at = _search_from[at]
 		path.reverse()
 	return path
 
@@ -2250,8 +2295,9 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 ## and a door edge never blocks one who opens doors going straight through;
 ## only a diagonal past one depends on the door (PATH_STEP_ASK).
 func _path_step(from: Vector2i, way: int) -> int:
-	var key := Vector3i(from.x, from.y, way)
-	var step: int = _path_steps.get(key, -1)
+	_ensure_grid()
+	var key := ((from.y - _grid_rect.position.y) * _grid_rect.size.x + from.x - _grid_rect.position.x) * 8 + way
+	var step: int = _grid_steps[key] - 1
 	if step == -1:
 		var direction: Vector2i = DIRECTIONS[way]
 		var via_x := Vector2i(direction.x, 0)
@@ -2265,12 +2311,37 @@ func _path_step(from: Vector2i, way: int) -> int:
 			step = PATH_STEP_DOOR
 		else:
 			step = PATH_STEP_OPEN
-		_path_steps[key] = step
+		_grid_steps[key] = step + 1
 	return step
 
 
-## find_path's heap: [param cell] in under [param key], sifted up.
-static func _heap_push(keys: PackedInt64Array, cells: Array[Vector2i], key: int, cell: Vector2i) -> void:
+## _grid_rect and _grid_steps worked out, if not yet, and find_path's own
+## arrays as big as this zone's grid.
+func _ensure_grid() -> void:
+	if _grid_rect.size != Vector2i.ZERO:
+		return
+	var low := Vector2i.ZERO
+	var high := Vector2i.ZERO
+	var first := true
+	for cell: Vector2i in _floor:
+		low = cell if first else low.min(cell)
+		high = cell if first else high.max(cell)
+		first = false
+	_grid_rect = Rect2i(low - Vector2i.ONE, high - low + Vector2i(3, 3))
+	var cells := _grid_rect.size.x * _grid_rect.size.y
+	_grid_steps = PackedByteArray()
+	_grid_steps.resize(cells * 8)
+	if _search_opened.size() < cells:
+		_search_opened.resize(cells)
+		_search_closed.resize(cells)
+		_search_cost.resize(cells)
+		_search_from.resize(cells)
+		_search_order.resize(cells)
+
+
+## find_path's heap of cell indices: [param cell] in under [param key],
+## sifted up.
+static func _heap_push_at(keys: PackedInt64Array, cells: PackedInt32Array, key: int, cell: int) -> void:
 	keys.append(key)
 	cells.append(cell)
 	var at := keys.size() - 1
@@ -2285,12 +2356,12 @@ static func _heap_push(keys: PackedInt64Array, cells: Array[Vector2i], key: int,
 	cells[at] = cell
 
 
-## find_path's heap: the cell under the least key, taken out.
-static func _heap_pop(keys: PackedInt64Array, cells: Array[Vector2i]) -> Vector2i:
-	var top: Vector2i = cells[0]
+## find_path's heap of cell indices: the cell under the least key, taken out.
+static func _heap_pop_at(keys: PackedInt64Array, cells: PackedInt32Array) -> int:
+	var top: int = cells[0]
 	var last := keys.size() - 1
 	var key := keys[last]
-	var cell: Vector2i = cells[last]
+	var cell: int = cells[last]
 	keys.resize(last)
 	cells.resize(last)
 	if last == 0:

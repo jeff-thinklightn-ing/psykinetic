@@ -2548,3 +2548,31 @@ crossed. Rejected: costs instead of walls (against the rule); obstacles
 applied per query on the open fields (a flood of the area every route);
 cutting the open route at its first held cell (a town group would stop at
 a camp it could walk round).
+
+## 213. find_path keeps its search in flat arrays over the zone's grid
+
+With players spread over a 256x256 map, find_path was most of what idle
+monsters near them cost, at about 5 us a cell looked at: each neighbour a
+handful of dictionary lookups keyed by Vector2i (opened, closed, cost,
+came from) and a Vector3i one for the terrain memo, and is_burning, three
+calls deep, for every one.
+
+The search now works over the zone's grid: the floor's bounds and a pace
+beyond (World._grid_rect, worked out once a terrain, kept in the Zone
+with the rest), each cell an index. Its state is in flat packed arrays by
+index (_search_opened, _closed, _cost, _from, _order), each entry stamped
+with the number of the search that wrote it, so nothing is made or
+emptied for a search; the heap holds indices. The terrain memo is a
+PackedByteArray by index and direction (Zone.grid_steps, was path_steps).
+Burning is asked once a search: with nobody carrying heat it is a lookup
+in the fields' hot cells (212). Cells beyond the grid are not floor, so
+blocked, as before. The same cells come out in the same order, ties and
+all: checked against the old search on 600 searches in tools/map_bench
+(goals taken or not, every cap, nearest), none different, about 2.8
+times as fast. Rejected: one dictionary of records per search (the
+dictionaries were the cost), and clearing the arrays for each search
+(65536 cells at 256x256, for searches that look at a hundred).
+
+The 256x256 tick: 4 players 31 ms to 26 on average, 9 players 46 to 38,
+1 player 6.1; corner to corner about 190 ms to 90 to 150 (noisy, with
+other work on the machine).
