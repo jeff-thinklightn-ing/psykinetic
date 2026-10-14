@@ -242,6 +242,10 @@ func _ready() -> void:
 		# --edit: the level editor instead of the game; nothing goes online.
 		get_tree().change_scene_to_file.call_deferred("res://editor/level_editor.tscn")
 		return
+	if Net.world_map:
+		# --world-map: the world map editor instead of the game.
+		get_tree().change_scene_to_file.call_deferred("res://editor/world_map_view.tscn")
+		return
 	# After every other node: see _process.
 	process_priority = 10
 	var probe := Vector2i(3, 5)

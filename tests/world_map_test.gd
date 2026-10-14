@@ -17,6 +17,8 @@ func _ready() -> void:
 	_test_problems()
 	_test_crossing()
 	_test_levels()
+	_test_join()
+	await _test_view()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -136,6 +138,52 @@ func _test_levels() -> void:
 		print("    " + problem)
 	_check(problems.is_empty(), "the levels connect with no problems")
 	_check(world_map.reachable(Level.DEFAULT_MAP).size() == names.size(), "every level is reachable from %s" % Level.DEFAULT_MAP)
+
+
+func _test_join() -> void:
+	print("join and unjoin (MapDocs, no screen)")
+	var a := MapDoc.open("user://wm_join_a/", Vector2i(4, 4))
+	var b := MapDoc.open("user://wm_join_b/", Vector2i(4, 4))
+	b.config["neighbours"] = {"south": "elsewhere"}
+	var before := WorldMap.join(a, "east", b)
+	_check(a.config["neighbours"] == {"east": "wm_join_b"} and b.config["neighbours"] == {"south": "elsewhere", "west": "wm_join_a"},
+		"join sets both sides (%s, %s)" % [a.config.get("neighbours"), b.config.get("neighbours")])
+	_check(a.config_dirty and b.config_dirty, "and marks both level.json as changed")
+	_check(before == {"a": {}, "b": {"south": "elsewhere"}}, "and returns what was there (%s)" % [before])
+	WorldMap.unjoin(a, "east", b)
+	_check(not a.config.has("neighbours") and b.config["neighbours"] == {"south": "elsewhere"}, "unjoin takes both away, the rest kept")
+	WorldMap.put_neighbours(b, before["b"])
+	_check(b.config["neighbours"] == {"south": "elsewhere"}, "put_neighbours puts back what join returned")
+
+
+## The node map on the real levels, edited in memory and never saved.
+func _test_view() -> void:
+	print("the world map view (not saved)")
+	var view: WorldMapView = preload("res://editor/world_map_view.tscn").instantiate()
+	add_child(view)
+	await get_tree().process_frame
+	var boxes := view.graph.get_children().filter(func(child: Node) -> bool: return child is GraphNode)
+	_check(boxes.size() == Level.names().size(), "a box per level (%d)" % boxes.size())
+	_check(view.graph.get_connection_list().size() == view.world_map.ways.size(), "a wire per way (%d)" % view.graph.get_connection_list().size())
+	var to_room := view.graph.get_connection_list().filter(func(wire: Dictionary) -> bool:
+		return wire["from_node"] == &"castle" and wire["to_node"] == &"test_room")
+	_check(to_room.size() == 1 and view._ports["castle"]["right"][to_room[0]["from_port"]] == Vector2i(27, 12)
+		and view._ports["test_room"]["left"][to_room[0]["to_port"]] == "in", "the castle's link at (27, 12) is wired to the test room's in")
+	view.join("castle", "west", "sample")
+	_check(view.world_map.areas["castle"]["neighbours"] == {"west": "sample"} and view.world_map.areas["sample"]["neighbours"] == {"east": "castle"},
+		"joining the castle's west to the sample makes them neighbours both ways, in the graph at once")
+	_check(view.unsaved() and view.world_map.ways.size() == view.graph.get_connection_list().size(), "unsaved, and the wires follow")
+	view.unjoin("castle", "west", "sample")
+	_check(view.world_map.areas["sample"]["neighbours"].is_empty(), "unjoining takes it away again")
+	view.set_link("castle", Vector2i(27, 12), "sample", view.default_spawn("castle", "sample"))
+	var problems := view.world_map.problems()
+	_check(problems.any(func(problem: String) -> bool: return problem.begins_with("castle:") and "sample" in problem and "no way back" in problem),
+		"retargeting the castle's link to the sample shows its problems at once (%s)" % [problems])
+	view.remove_link("castle", Vector2i(27, 12))
+	_check(view.world_map.problems().any(func(problem: String) -> bool: return "(27, 12) goes nowhere" in problem),
+		"taking the link out leaves its marker going nowhere, and says so")
+	_check(FileAccess.get_file_as_string("res://levels/castle/level.json").contains("\"to_map\": \"test_room\""), "nothing was saved")
+	view.queue_free()
 
 
 func _check(ok: bool, label: String) -> void:

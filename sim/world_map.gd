@@ -19,16 +19,18 @@ var ways: Array[Dictionary] = []
 var _configs: Dictionary[String, Dictionary] = {}
 
 
-## The world map of the levels [param names] (every level by default).
-static func build(names: Array[String] = Level.names()) -> WorldMap:
+## The world map of the levels [param names] (every level by default),
+## with [param sources] (area name -> {layout, height, config}, as
+## Level.source gives them) read in place of the files: levels being
+## edited and not saved yet.
+static func build(names: Array[String] = Level.names(), sources: Dictionary = {}) -> WorldMap:
 	var out := WorldMap.new()
 	for area_name in names:
-		out._read(area_name)
+		out._read(area_name, sources[area_name] if sources.has(area_name) else Level.source(area_name))
 	return out
 
 
-func _read(area_name: String) -> void:
-	var made := Level.source(area_name)
+func _read(area_name: String, made: Dictionary) -> void:
 	var layout: Image = made["layout"]
 	if layout == null:
 		return
@@ -104,6 +106,57 @@ static func arrival(side: String, cell: Vector2i, to_size: Vector2i) -> Vector2i
 		"north":
 			return Vector2i(clampi(cell.x, 0, last.x), last.y)
 	return cell
+
+
+## Makes [param a] and [param b] (levels being edited) neighbours across
+## [param a]'s [param side]: b on a's side, a on b's opposite side, each
+## replacing what was there. Returns what to give unjoin's opposite,
+## put_neighbours, to undo it: {a: a's neighbours before, b: b's}. Marks
+## both level.json as changed; saving is the caller's.
+static func join(a: MapDoc, side: String, b: MapDoc) -> Dictionary:
+	var before := {"a": neighbours_of(a).duplicate(), "b": neighbours_of(b).duplicate()}
+	var a_side := neighbours_of(a)
+	a_side[side] = doc_name(b)
+	put_neighbours(a, a_side)
+	var b_side := neighbours_of(b)
+	b_side[Level.OPPOSITE[side]] = doc_name(a)
+	put_neighbours(b, b_side)
+	return before
+
+
+## Takes [param a]'s [param side] neighbour away, and [param b]'s opposite
+## one where it is [param a]. Returns what was there, as join does.
+static func unjoin(a: MapDoc, side: String, b: MapDoc) -> Dictionary:
+	var before := {"a": neighbours_of(a).duplicate(), "b": neighbours_of(b).duplicate()}
+	var a_side := neighbours_of(a)
+	a_side.erase(side)
+	put_neighbours(a, a_side)
+	var b_side := neighbours_of(b)
+	if b_side.get(Level.OPPOSITE[side], "") == doc_name(a):
+		b_side.erase(Level.OPPOSITE[side])
+	put_neighbours(b, b_side)
+	return before
+
+
+## [param doc]'s level.json "neighbours" ({} for none), a copy.
+static func neighbours_of(doc: MapDoc) -> Dictionary:
+	var listed: Variant = doc.config.get("neighbours", {})
+	return (listed as Dictionary).duplicate() if listed is Dictionary else {}
+
+
+## Sets [param doc]'s level.json "neighbours" ({} takes the key out).
+static func put_neighbours(doc: MapDoc, neighbours: Dictionary) -> void:
+	if neighbours.is_empty():
+		doc.config.erase("neighbours")
+	else:
+		doc.config["neighbours"] = neighbours.duplicate()
+	doc.config_dirty = true
+	doc.dirty = true
+
+
+## The level name a MapDoc is for: its folder's name.
+static func doc_name(doc: MapDoc) -> String:
+	return doc.folder.trim_suffix("/").get_file()
 
 
 ## The ways out of [param area_name].

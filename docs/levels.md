@@ -230,6 +230,27 @@ and the ways between them, point links and neighbours alike. Its
 `godot --headless --path . --scene res://tools/check_world.tscn` prints the
 list (exit code 1 if there is anything on it).
 
+### The world map editor
+
+```
+Godot_v4.7.2-stable_win64.exe --path <project> -- --world-map
+```
+
+shows every level as a box and every way as a wire (`editor/world_map_view`,
+a GraphEdit). A box has an "in" row (where links arrive), its four sides
+(its neighbours) and a row per link (its cell, where it goes, a list of the
+target's spawn points to arrive at, and x to take it out of level.json).
+Drag a side to a side of another box to make the two neighbours both ways;
+drag a link to a box's "in" to send it there (arriving at `from_<this
+level>` if the target has that spawn point, else its first); drag a wire's
+end away to undo either. A new point link needs its marker, so it starts
+in the level editor; double-click a box to open its level there. The panel
+on the right lists the problems as they stand. Ctrl+S writes the changed
+level.json files and where the boxes are (`levels/world_map.json`, read by
+nothing else). For code (builder mode's new area at an edge),
+`WorldMap.join(doc_a, side, doc_b)` and `unjoin` do the same to two MapDocs
+and return what they replaced, for undo.
+
 ## The level editor
 
 ```

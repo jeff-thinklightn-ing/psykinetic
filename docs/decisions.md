@@ -2181,3 +2181,20 @@ account's). `ClaudeClient` asks the Messages API with raw HTTP (no SDK in
 GDScript) on Claude Opus 5.5 at medium effort, with server-side refusal
 fallback, the key read from the server's environment only; `StubClaude`
 answers from a script, so the whole flow is tested without a key.
+
+## 198. The world map editor edits level.json, through MapDocs
+
+The node map (`--world-map`, `editor/world_map_view`, Godot's GraphEdit)
+draws WorldMap's graph and edits only what the levels already hold: a
+neighbour (both sides at once, `WorldMap.join`/`unjoin`), a link's target
+and spawn point, or a link taken out. Each level it touches is opened as a
+MapDoc (decision 196), so it saves the way the level editor does and
+builder mode can make the same edits with no screen; the graph is rebuilt
+from those MapDocs after every edit, so the wires and the problems panel
+always show what Ctrl+S would write. Where the boxes sit is the only thing
+it keeps of its own, in `levels/world_map.json`, which nothing else reads.
+It does not make point links: a link needs its marker on the map, which is
+the level editor's to place, and a double-click opens it there. Rejected:
+a world file the node map owns (it would repeat level.json, decision 194),
+and laying the boxes out by the maps' places in the world (there are none
+yet: the edges a neighbour joins are its only geometry).

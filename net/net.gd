@@ -17,6 +17,7 @@ extends Node
 ##   --map=<name>                 server/host: new players start in zone levels/<name> (default test_room)
 ##   --edit=<name>                the level editor on levels/<name>/layout.png (made if there is none;
 ##   --edit-size=<w>x<h>          a new one this many cells, default 32x24); no game, no network
+##   --world-map                  the world map editor: every level and its links as a node map
 ##   --mind-log=<path>            server/host: write the companion minds' decisions here, a JSON line
 ##                                each (a dedicated server: /var/lib/psykinetic/mind.log when it can)
 ##   --transcripts=<dir>          server/host: keep what is said to and by each companion here, a
@@ -155,6 +156,8 @@ var mind_log_path := ""
 var map_name := ""
 ## --edit=<name>: run the level editor on that map instead of the game.
 var edit_map := ""
+## --world-map: the world map editor (editor/world_map_view) instead of the game.
+var world_map := false
 ## --edit-size=<w>x<h>: a new map's size in cells.
 var edit_size := LevelMap.NEW_SIZE
 var _mind_log_given := false
@@ -965,6 +968,8 @@ func _parse_args() -> void:
 				player_reset = false
 			"--mind-why":
 				mind_why = true
+			"--world-map":
+				world_map = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
