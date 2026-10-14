@@ -46,8 +46,8 @@ func _ready() -> void:
 	_box.anchor_right = 0.5
 	_box.offset_left = -800
 	_box.offset_right = 800
-	_box.offset_top = 200
-	_box.offset_bottom = 280
+	_box.offset_top = 270
+	_box.offset_bottom = 350
 	_box.add_theme_font_size_override("font_size", 28)
 	_box.text_submitted.connect(_submitted)
 	_box.gui_input.connect(func(event: InputEvent) -> void:
@@ -151,8 +151,13 @@ func _set_area(rect: Rect2i) -> void:
 
 
 func _show_area() -> void:
-	if main._client3d != null:
-		main._client3d.show_builder(area, _proposal.get("cells", []), _proposal.get("edges", []))
+	if main._client3d == null:
+		return
+	var beyond := Rect2i()
+	var footprint: Array = _proposal.get("new_area", {}).get("footprint", [])
+	if footprint.size() == 4:
+		beyond = Rect2i(int(footprint[0]), int(footprint[1]), int(footprint[2]), int(footprint[3]))
+	main._client3d.show_builder(area, _proposal.get("cells", []), _proposal.get("edges", []), beyond)
 
 
 func _open_box() -> void:
@@ -196,8 +201,11 @@ func on_message(data: Dictionary) -> void:
 			if given.size() == 4:
 				area = Rect2i(int(given[0]), int(given[1]), int(given[2]), int(given[3]))
 			_show_area()
-			_say("%s\n($%.3f; this area $%.3f)   Enter accepts, a request in the box changes it, Esc discards." % [
-				data.get("summary", ""), float(data.get("cost", 0.0)), float(data.get("total", 0.0))])
+			var made: Dictionary = data.get("new_area", {})
+			var beyond := "" if made.is_empty() else "\nA new level, %s (%d x %d), beyond the %s edge (outlined in orange)." % [
+				made.get("name", ""), int(made.get("size", [0, 0])[0]), int(made.get("size", [0, 0])[1]), made.get("side", "")]
+			_say("%s%s\n($%.3f; this area $%.3f)   Enter accepts, a request in the box changes it, Esc discards." % [
+				data.get("summary", ""), beyond, float(data.get("cost", 0.0)), float(data.get("total", 0.0))])
 			_box.placeholder_text = "Enter accepts; or say what to change (\"bigger\", \"move it north\")"
 			_box.visible = true
 			_box.grab_focus()

@@ -15,6 +15,7 @@ func _ready() -> void:
 	await _test_session()
 	await _test_follow_up_and_errors()
 	await _test_spending_limit()
+	await _test_new_area()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -49,7 +50,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "look"], "and the tools")
+			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
@@ -135,6 +136,47 @@ func _test_spending_limit() -> void:
 	var result: Dictionary = await session.ask("look forever")
 	_check(not result["ok"] and "spending limit" in str(result["error"]) and session.usage["requests"] == 3,
 			"a request stops when it passes its limit: %s after %d requests" % [result["error"], session.usage["requests"]])
+
+
+func _test_new_area() -> void:
+	print("
+== a new area beyond the edge ==")
+	var doc := _doc()
+	var area := Rect2i(30, 10, 10, 8)
+	var stub := StubClaude.new([
+		[{"name": "new_area", "input": {"side": "west", "width": 32, "height": 24, "name": "Nope"}},
+			{"name": "new_area", "input": {"side": "east", "width": 32, "height": 24, "name": "Ashen Wood", "description": "a burnt wood", "seed": 4}}],
+		"A way east, into the Ashen Wood.",
+	])
+	var session := BuilderSession.new(doc, area, "test_field", stub)
+	_check("touches the map's edge on the east (nothing beyond it yet" in session._situation(), "Claude is told the area touches the east edge, with nothing beyond")
+	var result: Dictionary = await session.ask("a new area to the east")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(results[0]["is_error"] and "does not touch the west edge" in str(results[0]["content"]), "a side the area does not touch: an error (%s)" % results[0]["content"])
+	_check(result["ok"] and not results[1]["is_error"], "the east edge: done (%s)" % results[1]["content"])
+	var proposal := session.proposal()
+	var exit := Vector2i(39, 14)
+	_check(proposal["cells"].get(exit) == "dirt" and proposal["cells"].get(Vector2i(35, 14)) == "dirt", "a way of dirt out to the edge at %s" % exit)
+	_check(proposal.get("config", {}).get("neighbours") == {"east": "ashen_wood"}, "the level names its new neighbour (%s)" % [proposal.get("config")])
+	_check(proposal.get("new_area", {}).get("footprint") == Rect2i(40, 0, 32, 24), "and where it lies, past the edge, for the ghost")
+
+	_check(session.accept() and session.created == "ashen_wood" and doc.undo_steps.size() == 1, "accepted: one undo step, the new level made")
+	var made := session.created_doc
+	_check(made.map.size == Vector2i(32, 24) and made.config.get("neighbours") == {"west": "test_field"}
+			and made.config.get("name") == "Ashen Wood" and made.config.get("about") == "a burnt wood", "the new level: 32 x 24, joined back on its west, named")
+	var arrive := WorldMap.arrival("east", exit + Vector2i(1, 0), made.map.size)
+	_check(made.map.walkable(arrive) and made.map.walkable(arrive + Vector2i(3, 0)), "walking off the edge at %s arrives on open ground at %s" % [exit, arrive])
+	_check(made.map.cell(Vector2i(31, 0)) == "void" and made.map.cell(Vector2i(16, 23)) == "void", "with forest round its other sides")
+	var level := Level.parse(made.map.to_image(), null, made.config)
+	_check(level["warnings"].is_empty() and level["starts"].size() == 1, "the game reads it cleanly, a start by the way in (%s)" % [level["warnings"]])
+	doc.undo()
+	_check(not doc.config.has("neighbours") and doc.map.cell(exit) == "grass", "undo takes the way and the neighbour back")
+	session.discard()
+	stub.turns = [[{"name": "new_area", "input": {"side": "east", "width": 20, "height": 20, "name": "Again"}}], "x"]
+	doc.config["neighbours"] = {"east": "somewhere"}
+	await session.ask("another")
+	var again: Array = stub.sent.back()["messages"][-1]["content"]
+	_check(again[0]["is_error"] and "somewhere already" in str(again[0]["content"]), "an edge with a neighbour already: an error")
 
 
 func _check(ok: bool, label: String) -> void:

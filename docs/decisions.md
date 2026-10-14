@@ -2366,3 +2366,25 @@ Door flip 3.6 ms to 0.85 at 128x128, 4.5 to 1.04 at 256x256; the
 256x256 tick 11 ms to 8.4 on average, 27 to 20 at worst. Rejected: a
 light spread by flood or shadowcasting (it would not light the same
 cells as the line its creature's sight and heat use).
+
+## 205. A new area beyond the edge is a drafted level, joined in one step
+
+Builder mode's `new_area` makes a level past an edge of the one picked,
+when the area picked touches that edge and nothing is beyond it yet. Three
+things have to happen together or not at all: a way out (the outdoor edge
+is a band of forest, so the way across must be carved to the map's last
+row or column, where the bump that crosses is made), the two levels named
+as neighbours both ways, and a new level that opens where the way arrives
+(the same row or column, `WorldMap.arrival`). The way and this level's
+neighbour are one `MapDoc.apply_changes` (its "config" changes are undone
+like cells), so one undo takes both back; the new level is a fresh MapDoc
+(`AreaDraft`: grass, dirt, groves, maybe a pond, forest round it, a gap in
+the forest where the way arrives, a start just inside), joined back with
+`WorldMap.put_neighbours`, and saved to the overlay before the level picked,
+so a way never leads to a level not yet there. Undo removes the new level
+when nothing names it any more, and is refused while anyone is in it. The
+new level is a draft, not a design: Claude makes it in one call, and a
+follow-up in it (the area there) builds what was asked for. The ghost
+outlines it past the edge. Rejected: having Claude draw the new level cell
+by cell in the same request (a 64 x 64 level is 4096 cells of tool calls);
+and opening the new zone at once (it opens on the first visit, as any zone).

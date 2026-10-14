@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_terrain_message()
 	await _test_refused()
 	await _test_undo()
+	await _test_new_area()
 	_test_console()
 
 	_remove_tree(ProjectSettings.globalize_path(OVERLAY))
@@ -123,6 +124,49 @@ func _test_undo() -> void:
 	var live := World.get_entities().filter(func(entity: GridEntity) -> bool: return entity is Chest and entity.tile == _chest_cell())
 	World.enter(was)
 	_check(live.is_empty(), "and from the zone")
+
+
+func _test_new_area() -> void:
+	print("
+== a new area beyond the east edge, walked into, taken back ==")
+	_main._builder.test_turns = [[{"name": "new_area", "input": {"side": "east", "width": 24, "height": 24, "name": "Cellar Fields", "seed": 2}}],
+		"A way east to the Cellar Fields."]
+	var host := _player(Net.local_id)
+	var area := [25, 10, 6, 6]
+	_main._on_command(host, "builder", {"op": "ask", "area": area, "text": "somewhere new to the east"})
+	var proposal := await _wait_for("proposal")
+	_check(proposal.get("new_area", {}).get("name") == "cellar_fields" and proposal["new_area"]["footprint"] == [31, 0, 24, 24],
+			"the proposal: a new level, cellar_fields, past the east edge (%s)" % [proposal.get("new_area")])
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	await _wait_for("accepted")
+	_check(Level.overlaid("cellar_fields") and "cellar_fields" in Level.names(), "accepted: the new level is in the overlay, and among the levels")
+	var world := WorldMap.build()
+	var exit := Vector2i(30, 13)
+	var way := world.crossing("test_room", exit, Vector2i(1, 0))
+	_check(way.get("to") == "cellar_fields", "walking east off %s leads there (%s)" % [exit, way])
+	var problems := world.problems().filter(func(problem: String) -> bool: return "cellar_fields" in problem)
+	_check(problems.is_empty(), "and the world map finds nothing wrong with it (%s)" % [problems])
+	var zone_level := Level.load_level("test_room")
+	_check(Vector2i(30, 13) in (zone_level["terrain"]["floor"] as Array), "the way out reaches the edge")
+
+	_check(_main.travel(Net.local_id, "cellar_fields", "", {"side": "east", "cell": exit + Vector2i(1, 0)}), "the host walks across")
+	for i in 4:
+		await get_tree().process_frame
+	var there := _player(Net.local_id)
+	_check(there != null and there.zone == "cellar_fields", "and is in the new level (%s at %s)" % [there.zone if there else "-", there.tile if there else "-"])
+	_main._on_command(there, "builder", {"op": "undo"})
+	await get_tree().process_frame
+	var refused: int = _main._builder.docs["test_room"].undo_steps.size()
+	_check(Level.overlaid("cellar_fields") and refused > 0, "undo from inside it is refused: someone is there")
+	_main.travel(Net.local_id, "test_room", "")
+	for i in 4:
+		await get_tree().process_frame
+	_heard.clear()
+	_main._on_command(_player(Net.local_id), "builder", {"op": "undo"})
+	await _wait_for("undone")
+	_check(not Level.overlaid("cellar_fields") and not Level.load_level("test_room").get("neighbours", {}).has("east"),
+			"back home, undo takes the way, the neighbour and the level away")
+	_main._builder.test_turns = []
 
 
 func _test_console() -> void:

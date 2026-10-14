@@ -33,6 +33,8 @@ const GROUNDS: Array[String] = ["stone", "grass", "dirt", "water", "fire", "void
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Context shown round the area, in cells.
 const MARGIN := 3
+## level.json keys a proposal may change as a whole (beyond entries and links).
+const CONFIG_KEYS: Array[String] = ["neighbours"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -54,6 +56,12 @@ var usage := {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "cost"
 ## Claude's last words to the player.
 var summary := ""
 var busy := false
+## A new level beyond the map's edge, proposed by new_area ({} for none):
+## {name, side (of this level), size, seed, description, gate, footprint}.
+var new_area := {}
+## Accepted: the new level made (its MapDoc, saved by the caller), and its name.
+var created_doc: MapDoc
+var created := ""
 
 
 func _init(level_doc: MapDoc, selected: Rect2i, level_name: String, claude: Object) -> void:
@@ -65,6 +73,7 @@ func _init(level_doc: MapDoc, selected: Rect2i, level_name: String, claude: Obje
 
 
 func _fresh_working() -> void:
+	new_area = {}
 	working = MapDoc.new()
 	working.folder = doc.folder
 	working.map = doc.map.copy()
@@ -191,6 +200,8 @@ Each row starts with its y; the first line says the x of the first column. Walls
 
 Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, imps wander, brutes guard and sneaks patrol. Chests hold item ids; the items there are: %s.
 
+Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
+
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
 %s""" % [", ".join(legend), ", ".join(Items.ALL.keys()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
@@ -204,7 +215,28 @@ func _situation() -> String:
 		"outdoors (void is forest)" if outdoor else "indoors (void is nothing, walled off)",
 		area.position.x, area.end.x - 1, area.position.y, area.end.y - 1, area.size.x, area.size.y,
 		grid(doc.map, doc.config, shown, area)]
+	var edges := edges_touched()
+	if not edges.is_empty():
+		var beyond := PackedStringArray()
+		for side in edges:
+			var neighbour := str(doc.config.get("neighbours", {}).get(side, ""))
+			beyond.append("%s (%s)" % [side, "beyond it: %s" % neighbour if not neighbour.is_empty() else "nothing beyond it yet: new_area can make a level there"])
+		text += "\n\nThe area touches the map's edge on the " + ", ".join(beyond) + "."
 	return text
+
+
+## The map edges [param area] touches: "north", "east", "south", "west".
+func edges_touched() -> Array[String]:
+	var out: Array[String] = []
+	if area.position.y == 0:
+		out.append("north")
+	if area.end.x == doc.map.size.x:
+		out.append("east")
+	if area.end.y == doc.map.size.y:
+		out.append("south")
+	if area.position.x == 0:
+		out.append("west")
+	return out
 
 
 ## [param shown] of [param map] as a grid of CHARS, a row a line labelled
@@ -307,6 +339,15 @@ const TOOLS := [
 			"required": ["prefab", "at"]}},
 	{"name": "look", "description": "The area as it is now, with your changes so far, as a grid.",
 		"input_schema": {"type": "object", "properties": {}}},
+	{"name": "new_area", "description": "Makes a new level beyond the map's edge on a side the area touches (one with nothing beyond it yet), joined both ways, and carves a way from the middle of the area out to that edge. The new level is a first draft, its size given in cells (16 to 256).",
+		"input_schema": {"type": "object", "properties": {
+			"side": {"type": "string", "enum": ["north", "east", "south", "west"]},
+			"width": {"type": "integer", "minimum": 16, "maximum": 256},
+			"height": {"type": "integer", "minimum": 16, "maximum": 256},
+			"name": {"type": "string", "description": "a short name for it, e.g. \"Ashen Wood\""},
+			"description": {"type": "string", "description": "what it is, a sentence"},
+			"seed": _SEED},
+			"required": ["side", "width", "height", "name"]}},
 ]
 
 const FACINGS := {"north": Vector2i(0, -1), "north-east": Vector2i(1, -1), "east": Vector2i(1, 0), "south-east": Vector2i(1, 1),
@@ -398,7 +439,54 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			return _lay(Prefab.stamp_changes(prefab, working.map, at), "stamped %s" % prefab_name)
 		"look":
 			return {"ok": true, "text": grid(working.map, working.config, area, area)}
+		"new_area":
+			return _new_area(given)
 	return _no("no tool \"%s\"" % tool)
+
+
+func _new_area(given: Dictionary) -> Dictionary:
+	var side := str(given.get("side", ""))
+	if side not in edges_touched():
+		return _no("the area does not touch the %s edge (it touches: %s)" % [side, ", ".join(edges_touched()) if not edges_touched().is_empty() else "none"])
+	var neighbour := str(doc.config.get("neighbours", {}).get(side, ""))
+	if not neighbour.is_empty():
+		return _no("beyond the %s edge is %s already" % [side, neighbour])
+	var title := str(given.get("name", "")).strip_edges()
+	var level_name := Prefab.tidy_name(title)
+	if level_name.is_empty():
+		level_name = "%s_%s" % [map_name, side]
+	if Level.exists(level_name):
+		level_name = "%s_%s" % [map_name, level_name]
+	if Level.exists(level_name):
+		return _no("there is a level %s already: another name" % level_name)
+	var size := Vector2i(clampi(int(given.get("width", 64)), 16, 256), clampi(int(given.get("height", 64)), 16, 256))
+	# The way out: from the middle of the area to the middle of its edge.
+	var middle := area.position + area.size / 2
+	var exit := middle
+	match side:
+		"east":
+			exit.x = doc.map.size.x - 1
+		"west":
+			exit.x = 0
+		"north":
+			exit.y = 0
+		"south":
+			exit.y = doc.map.size.y - 1
+	var points: Array[Vector2i] = [middle, exit]
+	var draft_seed := int(given.get("seed", 1))
+	_lay(AreaTools.path(working.map, points, draft_seed, 3, "dirt"), "")
+	var neighbours: Dictionary = (working.config.get("neighbours", {}) as Dictionary).duplicate()
+	neighbours[side] = level_name
+	working.apply_changes({"config": {"neighbours": neighbours}})
+	var along := exit.y if side in ["east", "west"] else exit.x
+	var gate := clampi(along, 0, (size.y if side in ["east", "west"] else size.x) - 1)
+	var footprint := {"east": Rect2i(doc.map.size.x, 0, size.x, size.y), "west": Rect2i(-size.x, 0, size.x, size.y),
+		"south": Rect2i(0, doc.map.size.y, size.x, size.y), "north": Rect2i(0, -size.y, size.x, size.y)}[side] as Rect2i
+	new_area = {"name": level_name, "title": title if not title.is_empty() else level_name.capitalize(), "side": side,
+		"size": size, "seed": draft_seed, "description": str(given.get("description", "")).strip_edges(),
+		"gate": gate, "footprint": footprint}
+	return {"ok": true, "text": "a new level %s (%d x %d) beyond the %s edge, a way out to it from the middle of the area" % [
+		level_name, size.x, size.y, side]}
 
 
 func _place(given: Dictionary) -> Dictionary:
@@ -520,14 +608,46 @@ func proposal() -> Dictionary:
 				var key := Vector3i(x, y, side)
 				if working.map.edge(key) != doc.map.edge(key):
 					edges[key] = working.map.edge(key)
-	return {"cells": cells, "edges": edges, "heights": heights, "covers": covers, "entries": entries, "links": links}
+	var out := {"cells": cells, "edges": edges, "heights": heights, "covers": covers, "entries": entries, "links": links}
+	var config := {}
+	for key in CONFIG_KEYS:
+		if str(working.config.get(key)) != str(doc.config.get(key)):
+			config[key] = working.config.get(key)
+	if not config.is_empty():
+		out["config"] = config
+	if not new_area.is_empty():
+		out["new_area"] = new_area.duplicate()
+	return out
 
 
-## Lays the proposal on the doc as one undo step. Whether it changed anything.
+## Lays the proposal on the doc as one undo step. Whether it changed
+## anything. With a new area, [member created_doc] is the new level (not
+## saved: the caller saves it, first) and [member created] its name.
 func accept() -> bool:
-	var changed := doc.apply_changes(proposal())
+	var changes := proposal()
+	created_doc = null
+	created = ""
+	if not new_area.is_empty():
+		created_doc = draft_level(new_area, map_name, bool(doc.config.get("outdoor", true)))
+		created = str(new_area["name"])
+	var changed := doc.apply_changes(changes)
 	_fresh_working()
 	return changed
+
+
+## The new level [param plan] (new_area's) as a MapDoc to save in the
+## overlay, joined back to [param beside] on its opposite side.
+static func draft_level(plan: Dictionary, beside: String, outdoor: bool) -> MapDoc:
+	var joined: String = Level.OPPOSITE[plan["side"]]
+	var made := MapDoc.new()
+	made.folder = Level.overlay_dir + str(plan["name"]) + "/"
+	made.map = AreaDraft.draft(plan["size"], int(plan["seed"]), joined, int(plan["gate"]))
+	made.config = {"name": plan["title"], "outdoor": outdoor}
+	if not str(plan.get("description", "")).is_empty():
+		made.config["about"] = plan["description"]
+	WorldMap.put_neighbours(made, {joined: beside})
+	made.dirty = true
+	return made
 
 
 ## Forgets the proposal (the conversation stays, for a new follow-up).

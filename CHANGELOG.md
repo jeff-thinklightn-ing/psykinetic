@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.126
+
+Client and server.
+
+- Builder mode can make somewhere new: pick an area on the edge of the
+  map and ask for a new area beyond it ("somewhere new to the east", "the
+  woods past here"). The new level is outlined in orange past the edge;
+  kept, a path leads out to the edge, and walking off it takes you into the
+  new level, a first draft of fields and groves ringed by forest, ready to
+  build in. Ctrl+Z takes it all back (not while anyone is in it).
+
+The server must be updated to v0.1.126 too, as it refuses any other version.
+
 ## v0.1.125
 
 Client and server.

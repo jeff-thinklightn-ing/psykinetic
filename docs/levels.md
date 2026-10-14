@@ -422,6 +422,19 @@ client), or runs with `--builder-stub`, which answers from a script.
   twice; a known gap of a dev tool). Everyone in the zone, and everyone who
   comes in later, is sent the edited level (the "terrain" message, decision
   200), since a client's own copy is its pck's.
+- **A new area beyond the edge**: when the area picked touches the map's
+  edge with no neighbour beyond it, Claude can make a new level there
+  (`new_area`, asked for as "somewhere new to the east", "the woods past
+  here"): a first draft (`builder/area_draft.gd`) of grass and dirt, groves
+  and maybe a pond, forest round it 3 to 11 cells deep and open where the
+  way arrives, with a start just inside. The level picked gets a way of dirt
+  from the middle of the area out to its edge, and the two become
+  neighbours both ways (walk off the edge, arrive on the new level's
+  opposite edge at the same row or column; see Edge links). The ghost
+  outlines the new level past the edge in orange. Accepted, the new level is
+  saved to the overlay first, then the level picked; it opens when someone
+  first walks in. `Ctrl+Z` takes back the way, the neighbour and the new
+  level together; not while anyone is in it.
 - The server logs every request: what was asked, its tokens in and out,
   what it cost, the request id. A request stops at `--builder-max-cost`
   dollars (default 1); the account's limit is set in the Claude Console.

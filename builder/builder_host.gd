@@ -17,7 +17,8 @@ extends Node
 ## [x, y, w, h], text}, {op: "accept"}, {op: "discard"}, {op: "undo"}.
 ## Answers to that client (message "builder"): {state: "working" |
 ## "proposal" (summary, cost, total, area, cells: [[x, y, meaning]...],
-## edges: [[x, y, side, kind]...]) | "error" (error) | "accepted" |
+## edges: [[x, y, side, kind]...], new_area: {name, side, size, footprint:
+## [x, y, w, h] beyond the edge} when one is proposed) | "error" (error) | "accepted" |
 ## "discarded" | "undone" | "nothing"}.
 
 ## The biggest area one request may cover.
@@ -32,6 +33,11 @@ var sessions: Dictionary[int, BuilderSession] = {}
 var _session_zone: Dictionary[int, String] = {}
 var docs: Dictionary[String, MapDoc] = {}
 var spent := 0.0
+## Levels made with new_area since the server started: name -> {parent,
+## side}. Undone (its neighbour gone from the parent), the level is removed.
+var created: Dictionary[String, Dictionary] = {}
+## Tests: what the stub does instead of its own script ([] for its own).
+var test_turns: Array = []
 
 
 ## Whether builder mode can run here: a key, or the stub.
@@ -109,7 +115,7 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 		_reply(peer, {"state": "error", "error": "still working on the last request"})
 		return
 	if session == null or session.area != area or _session_zone.get(peer, "") != zone_name or session.doc != doc:
-		session = BuilderSession.new(doc, area, zone_name, _stub_for(area) if Net.builder_stub else claude)
+		session = BuilderSession.new(doc, area, zone_name, (StubClaude.new(test_turns) if not test_turns.is_empty() else _stub_for(area, text, doc.map.size)) if Net.builder_stub else claude)
 		session.model = Net.builder_model
 		session.effort = Net.builder_effort
 		session.max_cost = Net.builder_max_cost
@@ -145,8 +151,14 @@ static func proposal_message(session: BuilderSession) -> Dictionary:
 	var edges: Array = []
 	for key: Vector3i in proposal["edges"]:
 		edges.append([key.x, key.y, key.z, proposal["edges"][key]])
-	return {"state": "proposal", "area": [session.area.position.x, session.area.position.y, session.area.size.x, session.area.size.y],
+	var message := {"state": "proposal", "area": [session.area.position.x, session.area.position.y, session.area.size.x, session.area.size.y],
 		"cells": cells, "edges": edges}
+	if proposal.has("new_area"):
+		var plan: Dictionary = proposal["new_area"]
+		var footprint: Rect2i = plan["footprint"]
+		message["new_area"] = {"name": plan["name"], "side": plan["side"], "size": [plan["size"].x, plan["size"].y],
+			"footprint": [footprint.position.x, footprint.position.y, footprint.size.x, footprint.size.y]}
+	return message
 
 
 func _accept(peer: int, player_id: String) -> void:
@@ -155,9 +167,17 @@ func _accept(peer: int, player_id: String) -> void:
 		_reply(peer, {"state": "nothing"})
 		return
 	var zone_name: String = _session_zone[peer]
+	var plan := session.new_area.duplicate()
 	if not session.accept():
 		_reply(peer, {"state": "nothing"})
 		return
+	if session.created_doc != null:
+		# The new level first, so the way to it never leads nowhere.
+		if not session.created_doc.save():
+			push_warning("[builder] " + session.created_doc.report)
+		created[session.created] = {"parent": zone_name, "side": plan["side"]}
+		print("[builder] %s made a new level, %s (%d x %d), beyond the %s edge of %s" % [player_id, session.created,
+			plan["size"].x, plan["size"].y, plan["side"], zone_name])
 	if not _save_and_reload(zone_name):
 		_reply(peer, {"state": "error", "error": "could not save: %s" % session.doc.report})
 		return
@@ -167,15 +187,29 @@ func _accept(peer: int, player_id: String) -> void:
 
 func _undo(peer: int, player_id: String, zone_name: String) -> void:
 	var doc: MapDoc = docs.get(zone_name)
-	if doc == null or not doc.undo():
+	if doc == null or doc.undo_steps.is_empty():
 		_reply(peer, {"state": "nothing"})
 		return
+	# A new level the step made goes with it: not while anyone is in it.
+	for level_name: String in created:
+		if created[level_name]["parent"] == zone_name and doc.undo_steps.back().has("config neighbours") \
+				and not World.peers_in(level_name).is_empty():
+			_reply(peer, {"state": "error", "error": "someone is in %s: it cannot be taken back now" % level_name})
+			return
+	doc.undo()
 	for each: int in sessions:
 		if _session_zone.get(each, "") == zone_name:
 			sessions[each].discard()
 	if not _save_and_reload(zone_name):
 		_reply(peer, {"state": "error", "error": "could not save: %s" % doc.report})
 		return
+	for level_name: String in created.keys():
+		var made: Dictionary = created[level_name]
+		if made["parent"] == zone_name and str(doc.config.get("neighbours", {}).get(made["side"], "")) != level_name:
+			created.erase(level_name)
+			docs.erase(level_name)
+			remove_overlay(level_name)
+			print("[builder] %s is gone with it" % level_name)
 	print("[builder] %s took back the last change to %s" % [player_id, zone_name])
 	_reply(peer, {"state": "undone"})
 
@@ -222,8 +256,15 @@ static func register_terrain(data: Dictionary) -> bool:
 
 
 ## The stub's script for an area: a patch of dirt in its middle third, a
-## chest and a torch on it.
-static func _stub_for(area: Rect2i) -> StubClaude:
+## chest and a torch on it; or, asked for a "new area" with the area on the
+## edge of a map [param size] across, a new level beyond that edge.
+static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO) -> StubClaude:
+	if text.to_lower().begins_with("new area"):
+		var sides := {"north": area.position.y == 0, "east": area.end.x == size.x, "south": area.end.y == size.y, "west": area.position.x == 0}
+		for side: String in sides:
+			if sides[side]:
+				return StubClaude.new([[{"name": "new_area", "input": {"side": side, "width": 48, "height": 48, "name": "Stub Fields"}}],
+					"(Stub) A new level beyond the %s edge." % side])
 	var middle := Rect2i(area.position + area.size / 3, (area.size / 3).max(Vector2i.ONE))
 	var centre := middle.position + middle.size / 2
 	return StubClaude.new([
@@ -232,6 +273,16 @@ static func _stub_for(area: Rect2i) -> StubClaude:
 			{"name": "place", "input": {"at": [middle.position.x, middle.position.y], "thing": "torch"}}],
 		"(Stub) A patch of dirt with a chest and a torch.",
 	])
+
+
+## Removes level [param level_name]'s files from the overlay.
+static func remove_overlay(level_name: String) -> void:
+	var folder := ProjectSettings.globalize_path(Level.overlay_dir + level_name)
+	if not DirAccess.dir_exists_absolute(folder):
+		return
+	for file in DirAccess.get_files_at(folder):
+		DirAccess.remove_absolute(folder.path_join(file))
+	DirAccess.remove_absolute(folder)
 
 
 func _reply(peer: int, data: Dictionary) -> void:
@@ -266,10 +317,7 @@ static func overlay_command(words: PackedStringArray, reloader: Node) -> String:
 		"drop":
 			if words.size() < 3 or not Level.overlaid(words[2]):
 				return "usage: builder drop <name> (an edited level: %s)" % ", ".join(Level.overlay_names())
-			var folder := ProjectSettings.globalize_path(Level.overlay_dir + words[2])
-			for file in DirAccess.get_files_at(folder):
-				DirAccess.remove_absolute(folder.path_join(file))
-			DirAccess.remove_absolute(folder)
+			remove_overlay(words[2])
 			if reloader != null and reloader.has_method("forget_level_edits"):
 				reloader.forget_level_edits(words[2])
 			return "dropped the edits to %s: it is the repo's again" % words[2]

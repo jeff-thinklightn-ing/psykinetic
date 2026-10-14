@@ -10,7 +10,8 @@ extends RefCounted
 ## An undo step is a Dictionary of what to put back: a cell (Vector2i ->
 ## meaning), an edge (Vector3i -> kind), "height x y" -> level,
 ## "entry x y" / "link x y" -> level.json's entry or link there ({} for
-## none), or "canvas" -> {map, config} as they were before a resize.
+## none), "config <key>" -> a level.json key's value (null: not there), or
+## "canvas" -> {map, config} as they were before a resize.
 
 ## After any change made through it (apply, undo, redo, resize).
 signal changed
@@ -167,6 +168,10 @@ func _swap(step: Dictionary) -> Dictionary:
 		elif key == "canvas":
 			back[key] = _canvas_state()
 			_set_canvas_state(step[key])
+		elif str(key).begins_with("config "):
+			var config_key := str(key).trim_prefix("config ")
+			back[key] = config.get(config_key)
+			set_config(config_key, step[key])
 		else:
 			var parts := str(key).split(" ")
 			var at := Vector2i(int(parts[1]), int(parts[2]))
@@ -189,9 +194,16 @@ func _swap(step: Dictionary) -> Dictionary:
 ## key -> kind, and optionally heights: cell -> level, entries and links
 ## (level.json's, at their cells), covers: the cells whose entries and links
 ## go first (default: every cell in cells)}, as Prefab.stamp_changes and
-## AreaTools give them. Returns whether anything changed.
+## AreaTools give them; config: level.json key -> value (null takes it
+## out), such as "neighbours"). Returns whether anything changed.
 func apply_changes(changes: Dictionary) -> bool:
 	var step := {}
+	var keys: Dictionary = changes.get("config", {})
+	for config_key: String in keys:
+		var old: Variant = config.get(config_key)
+		if str(old) != str(keys[config_key]):
+			step["config " + config_key] = old.duplicate(true) if old is Dictionary or old is Array else old
+			set_config(config_key, keys[config_key])
 	var cells: Dictionary = changes.get("cells", {})
 	var covers: Array = changes.get("covers", cells.keys())
 	for cell: Vector2i in covers:
@@ -234,6 +246,16 @@ func apply_changes(changes: Dictionary) -> bool:
 	push(step)
 	changed.emit()
 	return true
+
+
+## Sets level.json's [param key] to [param value] (null takes it out).
+func set_config(key: String, value: Variant) -> void:
+	if value == null:
+		config.erase(key)
+	else:
+		config[key] = value.duplicate(true) if value is Dictionary or value is Array else value
+	config_dirty = true
+	dirty = true
 
 
 ## Sets cell [param at]'s height (0 for none); returns what it was. A

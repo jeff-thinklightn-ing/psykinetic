@@ -1269,6 +1269,8 @@ func _make_flat(mesh: Mesh, color: Color) -> MeshInstance3D:
 # --- Builder mode: the area picked, the proposal as a ghost ------------------------------
 
 const BUILDER_AREA := Color(0.45, 0.8, 1.0, 0.9)
+## A new level's outline, beyond the map's edge.
+const BUILDER_BEYOND := Color(1.0, 0.7, 0.3, 0.9)
 const BUILDER_GHOST_ALPHA := 0.6
 ## A ghost's void cell: forest outdoors, nothing indoors.
 const BUILDER_VOID := Color(0.08, 0.3, 0.12)
@@ -1277,25 +1279,21 @@ var _builder_marks: Node3D
 
 ## Builder mode's marks: [param area]'s outline (size zero: none) and, over
 ## it, the cells and edges a proposal would change ([[x, y, meaning]...],
-## [[x, y, side, kind]...]), see-through, coloured as the legend.
-func show_builder(area: Rect2i, cells: Array = [], edges: Array = []) -> void:
+## [[x, y, side, kind]...]), see-through, coloured as the legend; and
+## [param beyond] (a new level's place past the map's edge) outlined.
+func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i()) -> void:
 	clear_builder()
 	if area.size == Vector2i.ZERO:
 		return
 	_builder_marks = Node3D.new()
 	add_child(_builder_marks)
-	var a := Vector2(area.position) - Vector2(0.5, 0.5)
-	var b := Vector2(area.end) - Vector2(0.5, 0.5)
-	var line := 0.08
-	var outline: Array[PackedVector2Array] = [
-		PackedVector2Array([a, Vector2(b.x, a.y), Vector2(b.x, a.y + line), Vector2(a.x, a.y + line)]),
-		PackedVector2Array([Vector2(a.x, b.y - line), Vector2(b.x, b.y - line), b, Vector2(a.x, b.y)]),
-		PackedVector2Array([a, Vector2(a.x + line, a.y), Vector2(a.x + line, b.y), Vector2(a.x, b.y)]),
-		PackedVector2Array([Vector2(b.x - line, a.y), Vector2(b.x, a.y), b, Vector2(b.x - line, b.y)]),
-	]
-	var frame := _make_flat(_flat_mesh(outline), BUILDER_AREA)
+	var frame := _make_flat(_frame_mesh(area, 0.08), BUILDER_AREA)
 	frame.position.y = ON_FLOOR * 3.0 + _height(area.position) * LEVEL_RISE
 	_builder_marks.add_child(frame)
+	if beyond.size != Vector2i.ZERO:
+		var far := _make_flat(_frame_mesh(beyond, 0.25), BUILDER_BEYOND)
+		far.position.y = ON_FLOOR * 3.0
+		_builder_marks.add_child(far)
 	# Cells, one mesh a colour; a thing as a smaller square on its cell.
 	var by_colour := {}
 	for each: Variant in cells:
@@ -1334,6 +1332,19 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = []) -> void:
 		box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		box.position = _tile_position(cell) + (Vector3(0.5, 0.35, 0.0) if key.z == Terrain.EAST else Vector3(0.0, 0.35, 0.5))
 		_builder_marks.add_child(box)
+
+
+## A flat frame round the cells of [param rect], [param line] wide.
+static func _frame_mesh(rect: Rect2i, line: float) -> ArrayMesh:
+	var a := Vector2(rect.position) - Vector2(0.5, 0.5)
+	var b := Vector2(rect.end) - Vector2(0.5, 0.5)
+	var quads: Array[PackedVector2Array] = [
+		PackedVector2Array([a, Vector2(b.x, a.y), Vector2(b.x, a.y + line), Vector2(a.x, a.y + line)]),
+		PackedVector2Array([Vector2(a.x, b.y - line), Vector2(b.x, b.y - line), b, Vector2(a.x, b.y)]),
+		PackedVector2Array([a, Vector2(a.x + line, a.y), Vector2(a.x + line, b.y), Vector2(a.x, b.y)]),
+		PackedVector2Array([Vector2(b.x - line, a.y), Vector2(b.x, a.y), b, Vector2(b.x - line, b.y)]),
+	]
+	return _flat_mesh(quads)
 
 
 func clear_builder() -> void:
