@@ -7,6 +7,8 @@
 # minute after the clients join (the join's spawns), and the minute after
 # that (steady). Per client is that over N.
 #   tools/net_bench.sh [clients=1] [size=256] [monsters=2]
+# NET_BENCH_SERVER_ARGS adds to the server's arguments (--no-interest: every
+# client sent everything, as before decision 217).
 set -u
 GODOT="${GODOT_PATH:-godot}"
 case "$GODOT" in
@@ -32,7 +34,7 @@ if [ -e "$SHARED" ]; then
 	rm -rf "$SHARED" "$LOGS"
 	exit 1
 fi
-"$GODOT" --headless --path . --server --map=netbench --no-companions --token=bench "--port=$PORT" "--admin-port=$ADMIN" \
+"$GODOT" --headless --path . --server --map=netbench --no-companions --token=bench "--port=$PORT" "--admin-port=$ADMIN" "--max-players=$CLIENTS" ${NET_BENCH_SERVER_ARGS:-} \
 	--test-exit-after=200 </dev/null >"$LOGS/server.log" 2>&1 &
 sleep 8
 ask() {
@@ -53,10 +55,11 @@ echo "the minute of the join, $CLIENTS clients: $(ask)"
 sleep 60
 echo "the minute after, steady: $(ask)"
 echo "joins: $(grep -c ') joined as Player' "$LOGS/server.log")"
+echo "slow interest recomputes: $(grep -c '^.interest.' "$LOGS/server.log"); slowest: $(grep '^.interest.' "$LOGS/server.log" | awk '{ print $(NF-1), $0 }' | sort -n | tail -1)"
 if [ -n "${NET_BENCH_VERBOSE:-}" ]; then
 	grep -h "joined\|left\|timed\|refus\|kick" "$LOGS/server.log" | head -12
 	grep -h "connect\|lost\|refus\|version\|ERROR" "$LOGS/client1.log" | head -12
 fi
 kill %1 2>/dev/null
 wait 2>/dev/null
-rm -rf "$LOGS"
+if [ -n "${NET_BENCH_KEEP:-}" ]; then echo "logs kept: $LOGS"; else rm -rf "$LOGS"; fi

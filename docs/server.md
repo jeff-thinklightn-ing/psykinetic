@@ -303,8 +303,9 @@ The server only accepts a peer that sends the token and its version
 then the peer has no player and every gameplay RPC from it is ignored. A
 version mismatch, or a wrong or empty token, is rejected at once; a peer
 that sends nothing is dropped after 5 seconds. The log line is
-`[net] rejected peer N from <address> (<why>)`. At most 4 peers can be
-authenticated at once; the rest are refused as `server full`.
+`[net] rejected peer N from <address> (<why>)`. At most 16 peers can be
+authenticated at once (`--max-players=<n>` for fewer, or more); the rest
+are refused as `server full`.
 
 A rejected client is told why before it is cut off and shows it:
 `authentication failed`, `client out of date` (with both versions),

@@ -585,6 +585,10 @@ var _pending_deaths: Dictionary[String, Dictionary] = {}
 var _departed: Dictionary[String, Dictionary] = {}
 ## Door edge key -> open, as last seen, for their sounds.
 var _door_open: Dictionary[Vector3i, bool] = {}
+## Door edge -> the instance id of the Door node last shown there: a door
+## that comes back into a player's interest (decision 217) is a new node,
+## and its state is not a change to sound.
+var _door_node: Dictionary[Vector3i, int] = {}
 ## The doors whose leaf may have to move or show (World.door_shown, or a new
 ## room): _sync_doors looks at these alone, till each is still.
 var _doors_due: Dictionary[Vector3i, bool] = {}
@@ -3184,9 +3188,11 @@ func _sync_doors() -> void:
 			_doors_due.erase(key)
 			continue
 		var hinge := doorway.get_node(DOOR_LEAF) as Node3D
-		if _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
+		var same_door: bool = _door_node.get(door.key, 0) == door.get_instance_id()
+		if same_door and _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
 			sfx.play("door_open" if door.is_open() else "door_close", doorway.position + Vector3.UP)
 		_door_open[door.key] = door.is_open()
+		_door_node[door.key] = door.get_instance_id()
 		hinge.visible = not door.is_broken()
 		var target: float = PI * 0.5 if door.is_open() else 0.0
 		hinge.rotation.y = move_toward(hinge.rotation.y, target, get_process_delta_time() / Door.SWING_SECONDS * PI * 0.5)

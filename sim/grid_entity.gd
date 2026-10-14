@@ -267,7 +267,7 @@ func replicate(property: String) -> void:
 
 ## Whether the client [param peer] is sent this entity (World.peer_sees).
 func _visible_to(peer: int) -> bool:
-	return World.peer_sees(peer, zone)
+	return World.peer_sees(peer, zone) and Net.interest.sees(peer, self)
 
 
 ## The peers its events go to: those it can be sent to whose players are in

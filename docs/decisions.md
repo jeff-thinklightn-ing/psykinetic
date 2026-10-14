@@ -2619,6 +2619,35 @@ left is idle walking within 60 cells and going over every entity each
 tick. Rejected for now: the monsters' thinking in C# or a GDExtension
 (Jeff: not now).
 
+## 217. A client is sent what is near its player, by chunks
+
+Every client in a zone was sent every entity and door in it (decision
+126): on a 256x256 map, 3072 entities and 1984 doors spawned to each client
+as it joined, about 2.5 MB, and the server froze 1.1 to 1.5 s doing it
+(tools/net_bench.sh). Now `Interest` (net/interest.gd, `Net.interest`)
+narrows the synchronizers' visibility filters further: a peer is sent what
+stands in the 8x8-cell chunks within 4 chunks of its player's (about 36
+cells), and a chunk it sees leaves only beyond 5 (about 44). The view's
+widest reach is 24 to 28 cells and sounds carry 30, so nothing pops in or
+goes quiet in sight or hearing; the hysteresis keeps a thing at the edge
+from flickering. A peer always sees its own player and companion. Doors
+are things like the rest (at their edge's cell); lights are terrain, every
+client has them all. Entities and doors are kept in an index by chunk,
+from Main's spawns and World's entity_moved and entity_despawned, so a
+player crossing into another chunk asks again only the synchronizers in the
+chunks that came or went, and a thing crossing a chunk border is checked
+against each peer once. Events go to GridEntity.viewers(), which asks the
+same filter, and the death message now goes to those that see the dead (the
+host's own client always), so a fight out of sight sends nothing. Leaving
+interest is a despawn on that client: its puppet goes quietly (deaths are
+their own message, the party log is the server's), and a door coming back
+does not sound its swing. A zone rebuilt (a builder change accepted) keeps
+each peer's chunks, so only what is near is spawned again. `--no-interest`
+turns it off. With it, a server takes 16 players by default (Jeff's
+number, up from 4); `--max-players` sets another. Rejected: per cell instead of per chunk (a check for every
+thing on every step), recomputing every frame (decision 185 took the
+filters off the frame for a reason), and a ring per thing kind.
+
 ## 218. An idle monster walks straight when it can
 
 With many players spread out, most of the tick was idle monsters walking

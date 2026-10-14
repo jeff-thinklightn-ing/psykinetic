@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.139
+
+Client and server.
+
+- Up to 16 players on a server (it was 4).
+- Each player is now sent only what is near them (about 36 to 44 cells
+  round them, further than you can see or hear), not everything on the
+  map. On a big map with 9 players the server sends about a fifteenth as
+  much while people join and a little over half as much after, and its
+  tick is faster.
+- Joining a big map no longer freezes the server for a second or drops
+  players mid-join.
+- A door you come back to no longer plays its swing sound if someone
+  opened or shut it while you were away.
+
+The server must be updated to v0.1.139 too, as it refuses any other version.
+
 ## v0.1.138
 
 Client only.

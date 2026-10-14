@@ -11,6 +11,9 @@ extends Node
 ##   --state=<path>               server/host: JSON snapshot of entity state, written every
 ##                                30 ticks and on clean shutdown, loaded on start if present
 ##   --admin-port=<n>             server/host: accept console commands on 127.0.0.1:<n> (TCP)
+##   --max-players=<n>            server/host: players at once (default 16)
+##   --no-interest                server/host: send every client everything in its zone, not only
+##                                what is near its player (decision 217)
 ##   --console                    read console commands from stdin (--server does this anyway)
 ##   --no-companions              server/host: players get no companion
 ##   --no-player-reset            server/host: R from a client does not rebuild the room
@@ -98,8 +101,8 @@ enum Mode { HOST, SERVER, CLIENT }
 const DEFAULT_PORT := 7777
 ## ENet connections, including ones still waiting to authenticate.
 const MAX_CLIENTS := 8
-## Authenticated peers at once; later ones are refused.
-const MAX_PLAYERS := 4
+## Authenticated peers at once by default; later ones are refused.
+const MAX_PLAYERS := 16
 ## Seconds a connected peer has to send the token.
 const AUTH_TIMEOUT := 5.0
 ## Seconds between telling a peer why it is rejected and disconnecting it.
@@ -295,6 +298,11 @@ var test_walk: Array[Dictionary] = []
 var mispredicts_total := 0
 ## Tick times, bandwidth, corrections: see NetStats.
 var stats := NetStats.new()
+## --max-players=<n>: authenticated peers at once (MAX_PLAYERS unless said);
+## twice as many connections may wait to authenticate.
+var max_players := MAX_PLAYERS
+## Server: what each client is sent, by nearness to its player (Interest).
+var interest := Interest.new()
 var _traffic_at_msec := 0
 var snaps_total := 0
 ## Times (msec) of snaps in the last minute.
@@ -747,14 +755,14 @@ func authenticate(hello: Dictionary) -> void:
 		_reject(peer, "authentication failed", "bad player id")
 	elif id in _authenticated.values():
 		_reject(peer, "already connected", "already connected as %s" % id.left(8))
-	elif _authenticated.size() >= MAX_PLAYERS:
+	elif _authenticated.size() >= max_players:
 		_reject(peer, "server full")
 	else:
 		_admit(peer, id, player_name_given)
 
 
 func _on_peer_connected(peer: int) -> void:
-	if _authenticated.size() >= MAX_PLAYERS:
+	if _authenticated.size() >= max_players:
 		_reject(peer, "server full")
 	else:
 		# Even without a token the peer must say hello, so its version is checked.
@@ -779,7 +787,7 @@ func _on_peer_disconnected(peer: int) -> void:
 func _admit(peer: int, id: String, player_name_given: String) -> void:
 	_authenticated[peer] = id
 	print("[net] peer %d authenticated as %s (%s) (%d of %d)" % [
-		peer, player_name_given, id.left(8), _authenticated.size(), MAX_PLAYERS])
+		peer, player_name_given, id.left(8), _authenticated.size(), max_players])
 	peer_authenticated.emit(peer, id, player_name_given)
 
 
@@ -929,7 +937,7 @@ func start() -> void:
 		# link (two clients leaving in one poll: the second, already without
 		# channels, was told about the first).
 		(multiplayer as SceneMultiplayer).server_relay = false
-		var error := peer.create_server(port, MAX_CLIENTS)
+		var error := peer.create_server(port, maxi(MAX_CLIENTS, max_players * 2))
 		if error != OK:
 			if mode == Mode.SERVER:
 				push_error("[net] cannot listen on port %d (%s)" % [port, error_string(error)])
@@ -995,11 +1003,13 @@ func _parse_args() -> void:
 				player_reset = false
 			"--mind-why":
 				mind_why = true
+			"--no-interest":
+				interest.enabled = false
 			"--world-map":
 				world_map = true
 			"--builder-stub":
 				builder_stub = true
-			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
+			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-version", "--test-protocol", \
@@ -1052,6 +1062,9 @@ func _set_option(key: String, value: String) -> void:
 		"--admin-port":
 			if value.is_valid_int():
 				admin_port = value.to_int()
+		"--max-players":
+			if value.is_valid_int():
+				max_players = clampi(value.to_int(), 1, 64)
 		"--llm-url":
 			llm_url = value
 		"--llm-model":

@@ -313,6 +313,10 @@ func _go_online() -> void:
 		Net.peer_authenticated.connect(_on_peer_authenticated)
 		Net.peer_left.connect(_on_peer_disconnected)
 		World.entity_despawned.connect(_on_entity_despawned)
+		# What each client is sent follows its player (decision 217).
+		if not World.entity_moved.is_connected(Net.interest.moved):
+			World.entity_moved.connect(Net.interest.moved)
+			World.entity_despawned.connect(Net.interest.remove)
 		World.entity_pushed.connect(_narrate_push)
 		World.entity_damaged.connect(_narrate_damage)
 		World.entity_bumped.connect(_on_bumped)
@@ -1205,6 +1209,7 @@ func default_zone() -> String:
 ## Server start: every zone the snapshot holds, back as it was saved, and
 ## the default zone; the player records; and a host's own player.
 func _boot() -> void:
+	Net.interest.reset()
 	var snapshot := Snapshot.load(Net.state_path) if Net.state_path != "" else {"ok": false, "zones": {}, "players": [], "steps": 0}
 	# The world's clock goes on from where it stopped: the world waits while
 	# the server is down.
@@ -1356,6 +1361,8 @@ func _admit(peer: int, id: String, player_name: String) -> void:
 func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []) -> void:
 	var old: String = World.peer_zone.get(peer, "")
 	World.peer_zone[peer] = zone_name
+	# It sees nothing of the new zone until its player is there (centre).
+	Net.interest.forget(peer)
 	if peer == Net.local_id:
 		return
 	if peer in multiplayer.get_peers():
@@ -1459,9 +1466,9 @@ func _spawn_doors() -> void:
 	var edges: Dictionary = _terrain["edges"]
 	for key: Vector3i in edges:
 		if edges[key] == Terrain.Edge.DOOR:
-			spawner.spawn({"script": DOOR, "name": "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"],
+			Net.interest.add(spawner.spawn({"script": DOOR, "name": "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"],
 				"edge": [key.x, key.y, key.z], "zone": World.zone.name,
-				"props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}})
+				"props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}}))
 
 
 # --- Server: level and players ------------------------------------------------
@@ -1495,6 +1502,7 @@ func _start_level(from_snapshot := false, whole := true) -> void:
 	for child in entities.get_children():
 		entities.remove_child(child)
 		child.queue_free()
+	Net.interest.clear_zone(here)
 	World.load_terrain(_terrain)
 	_spawn_doors()
 	for peer in peers:
@@ -1668,6 +1676,7 @@ func _spawn(spec: Dictionary) -> GridEntity:
 		entities.remove_child(entity)
 		entity.queue_free()
 		return null
+	Net.interest.add(entity)
 	if spec.has("spawn"):
 		_alive_slots[spec["spawn"]] = entity
 		_dead_since.erase(spec["spawn"])
@@ -1719,6 +1728,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	record.zone = World.zone.name
 	if not World.peer_zone.has(peer):
 		World.peer_zone[peer] = World.zone.name
+	# What this peer is sent is what is round its player now.
+	Net.interest.centre(peer, World.zone.name, player.tile)
 	_players[peer] = player
 	_peer_ids[peer] = id
 	_fell_at.erase(peer)
@@ -2035,7 +2046,12 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 		party_log.add("%s said: \"%s\"" % [entity.name, line])
 		# Her last words are hers: in her transcript like any line.
 		Transcript.record(String(entity.name), String(entity.name), line)
-	Net.broadcast_to(World.peers_in(World.zone.name), "death", {"entity": String(entity.name),
+	# To those it is sent to (decision 217): a death far off is nobody's to
+	# see. The host's own client has every entity.
+	var told: Array[int] = []
+	told.assign(World.peers_in(World.zone.name).filter(func(peer: int) -> bool:
+		return peer == Net.local_id or entity._visible_to(peer)))
+	Net.broadcast_to(told, "death", {"entity": String(entity.name),
 		"tile": [entity.tile.x, entity.tile.y], "kind": kind, "cause": String(cause), "say": line})
 
 
@@ -2288,6 +2304,7 @@ func _on_peer_disconnected(peer: int) -> void:
 	var was := World.enter_named(World.peer_zone.get(peer, World.zone.name))
 	_leave(peer, player, id)
 	World.peer_zone.erase(peer)
+	Net.interest.forget(peer)
 	World.enter(was)
 
 

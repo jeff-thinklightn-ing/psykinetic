@@ -54,7 +54,7 @@ func _init() -> void:
 	var synchronizer := MultiplayerSynchronizer.new()
 	synchronizer.name = "Sync"
 	synchronizer.replication_config = config
-	synchronizer.add_visibility_filter(func(peer: int) -> bool: return World.peer_sees(peer, zone))
+	synchronizer.add_visibility_filter(func(peer: int) -> bool: return World.peer_sees(peer, zone) and Net.interest.sees(peer, self))
 	# As an entity's: asked on spawn and zone changes, not every frame.
 	synchronizer.visibility_update_mode = MultiplayerSynchronizer.VISIBILITY_PROCESS_NONE
 	add_child(synchronizer)

@@ -82,6 +82,8 @@ func _test_ask_and_accept() -> void:
 	var live := World.get_entities().filter(func(entity: GridEntity) -> bool: return entity is Chest and entity.tile == chest)
 	World.enter(was)
 	_check(live.size() == 1, "the zone was rebuilt: the chest is there")
+	_check(live.size() == 1 and Net.interest._where.has(live[0].get_instance_id()),
+		"and the rebuilt chest is in the interest index, so it is sent to those near it (decision 217)")
 	var after := _player(Net.local_id)
 	_check(after != null and after.tile == host_tile, "and the host is where they were (%s)" % [after.tile if after else "-"])
 

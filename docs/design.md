@@ -342,6 +342,20 @@ client is told the new zone's name (`map`; it frees the old node and
 spawner and loads the map), then the new zone's entities are spawned on it.
 A host draws only its own zone's node.
 
+**And only what is near them** (`net/interest.gd`, `Net.interest`): within
+a zone, a client is sent the entities and doors in the 8x8-cell chunks
+round its player's, a chunk coming in within 4 chunks (about 36 cells) and
+going only beyond 5 (about 44), so nothing flickers at the edge; its own
+player and companion always. The view reaches 24 to 28 cells at its widest
+and sounds carry 30, so nothing comes or goes where it could be seen or
+heard. The same filters ask it, so events (`GridEntity.viewers`) and the
+death message follow it. Things are kept in an index by chunk, kept up from
+World's `entity_moved`; a player crossing into another chunk asks again only
+the synchronizers in the chunks that came or went. Leaving a client's
+interest is a despawn there, which shows nothing (deaths are their own
+message); coming back is a fresh spawn as it is now. `--no-interest` sends
+everything in the zone, as before.
+
 **Empty zones sleep**: a zone with no player in it (none standing there,
 no connected peer belonging there) does not step: monsters freeze, fire
 holds, respawn timers wait. It wakes when someone arrives
