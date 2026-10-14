@@ -1146,7 +1146,9 @@ func _ground_height(grid: Vector2) -> float:
 ## How high [param cell]'s ground is at [param point] (on it or its edge):
 ## flat at its height, or a stair's ramp, a level up across the cell.
 func _height_in(cell: Vector2i, point: Vector2) -> float:
-	var levels := _corner_levels(cell)
+	if not _ramp_levels.has(cell):
+		return _height(cell) * LEVEL_RISE  # Flat: nearly every cell, every puppet every frame.
+	var levels: PackedInt32Array = _ramp_levels[cell]
 	var at := (point - Vector2(cell) + Vector2(0.5, 0.5)).clamp(Vector2.ZERO, Vector2.ONE)
 	var top := lerpf(levels[0], levels[1], at.x)
 	var bottom := lerpf(levels[2], levels[3], at.x)

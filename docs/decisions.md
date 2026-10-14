@@ -2944,6 +2944,17 @@ only): at the foot of a drop (a cell round it higher), shaded to half; at
 its top (one lower, or the void), lit a little. Both fade over the cell,
 so a raised floor stands out from the one below.
 
+A puppet's height is asked every frame: a cell with no raised corner (all
+but a few) answers from its height alone, with nothing made; without that,
+256x256 lost about a tenth of its frames.
+
+tools/map_bench (no heights in its dungeon, so this is the cost where
+there are none), windowed, under the bench lock, alternately with main
+(v0.1.135), three runs each: 256x256 72.2 / 77.7 / 76.9 fps (main 77.5 /
+69.7 / 77.2), rendering 1.0 ms CPU and 0.5 GPU a frame both; 128x128 210 /
+222 / 216 (main 199 / 181 / 212); 3D rebuild at 256x256 1.19 to 1.26 s
+(main 1.14 to 1.22).
+
 Rejected: smoothing every rise into a slope (it would show walkable
 ground where the sim has a ledge), and jittering the ground's corners on
 a ledge to wobble its line (a corner a cell is a zigzag, not a wobble).
