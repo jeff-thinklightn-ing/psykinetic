@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.131
+
+Client and server.
+
+- Smoother server with many players spread over a big map: monsters off
+  everyone's screen, with nobody to fight, think less often. Monsters in a
+  fight still act every moment, wherever they are.
+
+The server must be updated to v0.1.131 too, as it refuses any other version.
+
 ## v0.1.130
 
 Client and server.

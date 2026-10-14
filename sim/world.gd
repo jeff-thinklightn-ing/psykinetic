@@ -55,15 +55,15 @@ const TICK_DT := 1.0 / TICK_RATE
 ## Ticks run per frame at most; beyond this the sim slows down instead of spiralling.
 const MAX_CATCHUP_TICKS := 5
 ## How often a monster thinks, by how far it is from the nearest player or
-## companion in its zone (Chebyshev tiles): NEAR every tick, MID every
-## MID_EVERY_TICKS (staggered by id), FAR not at all: the world tick moves
-## it on instead (_world_tick). A monster with a target (a fight) is always
-## NEAR. Each monster's tier is looked at again every TIER_EVERY_TICKS.
+## companion in its zone (Chebyshev tiles): NEAR (within about a screen of
+## them) every tick, MID every MID_EVERY_TICKS (staggered by id), FAR not
+## at all: the world tick moves it on instead (_world_tick). A monster with
+## a target (a fight) is always NEAR, wherever it is. Each monster's tier is looked at again every TIER_EVERY_TICKS.
 ## With nobody standing in the zone (a player dead, waiting to respawn) it
 ## is measured from where they last stood; a zone that has never had anyone
 ## (a test room) thinks at the full rate everywhere.
 enum Tier { NEAR, MID, FAR }
-const NEAR_TILES := 30
+const NEAR_TILES := 16
 const MID_TILES := 60
 const MID_EVERY_TICKS := 4
 const TIER_EVERY_TICKS := 5

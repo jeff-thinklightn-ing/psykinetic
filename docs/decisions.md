@@ -2594,3 +2594,27 @@ edge tries again at its next world tick, so it goes on once the ground
 changes hands. Rejected: maps' routes (WorldRoutes.route) for this walk
 (they are between areas; this walk stays in its zone, and the same walls
 give the same answer without a second graph).
+
+## 215. Full rate within a screen of someone; a fight anywhere
+
+Replaces the "full rate within 30" of 193 (Jeff's call). With 16 players
+spread over a 256x256 map nearly every monster was within 30 cells of
+someone, so 193's tiers saved nothing: some 1400 monsters thought every
+tick, most of them idle and on nobody's screen. NEAR_TILES is 16 now
+(about a screen); from there out to MID_TILES (60) a monster thinks one
+tick in MID_EVERY_TICKS (4), and beyond, the world tick, as before. A
+monster in a fight thinks every tick wherever it is, as before; one idle
+at 16 or more cannot see anyone (sight 7), so it notices nobody later
+for it.
+
+And looking for a target measures the distance first, before asking what
+each player or companion is: most looks end there, the same answer for
+half the cost (7.4 ms a tick to 4.2 with 16 players).
+
+tools/map_bench, 256x256 at castle density (--cells-per-monster=42),
+average and worst tick: 4 players 26 / 46 ms to 22 / 43, 9 players 31 / 47
+to 28 / 50, 16 players 41 / 61 to 35 / 59 (another bench running on the
+machine for part of it). Still over 20 ms with players spread out; what is
+left is idle walking within 60 cells and going over every entity each
+tick. Rejected for now: the monsters' thinking in C# or a GDExtension
+(Jeff: not now).

@@ -419,11 +419,13 @@ func _nearest_visible_target() -> GridEntity:
 	var nearest_distance := sight_range + 1
 	var kept := -1
 	for entity in World.sought():
-		if entity.protected:
-			continue  # Spawn grace.
+		# Out of sight range first: a few sums, where most looks end.
+		var at := entity.tile
+		var d := maxi(absi(at.x - tile.x), absi(at.y - tile.y))
+		if d > sight_range or entity.protected:
+			continue  # Too far, or in its spawn grace.
 		if entity is Player or (entity is Companion and entity.keeper != null):
-			var d := World.distance(tile, entity.tile)
-			if d <= sight_range and World.has_line_of_sight(tile, entity.tile):
+			if World.has_line_of_sight(tile, at):
 				if entity == target:
 					kept = d
 				if d < nearest_distance:
