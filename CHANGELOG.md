@@ -6,6 +6,12 @@ top section as the release notes.
 
 ## Unreleased
 
+- Companions can do what you ask, and now say they will only when they
+  can: open or shut a door they can see, look in a chest and tell you
+  what is in it, or go and look at a dark or hidden spot nearby and come
+  back to tell you what they saw. "I'll check the chest" with no chest
+  in sight is no longer said. A monster coming near, a new order from
+  you or taking too long calls them back.
 - A client and the server no longer need to be the very same build to
   play together: only what they send each other has to match. A release
   that changes only how the game looks no longer needs the server updated,

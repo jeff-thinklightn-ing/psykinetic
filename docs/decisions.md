@@ -3628,3 +3628,49 @@ the stockpile's ground banks nothing; only what is let go of there is.
 
 Hauling is physical and near players, so it runs on the full tick and
 only on those events: a cached lookup per landing, no scan.
+
+## 260. Errands: her voice chooses from what she can do, and promises only that
+
+Jeff: "The voice may only promise actions it can do." A companion now
+has real verbs, chosen by her voice and done by her hands; the mind
+still never acts (the hands carry it out through World, as a player's
+would).
+
+When her player has just asked something of her, the voice's prompt
+lists what she can do here and now (Companion.can_do), numbered: open
+or close a door she sees (not broken), open a chest she sees and tell
+what is in it, or go and look at a walkable cell she cannot see (dark
+or out of line of sight, within her sight's range, the nearest one a
+compass point, two of them), and come back. At most six, nearest
+first. The prompt says only what is true and what she may do ("Only if
+Jeff asked you to do one of these, add one more line: [DO: its number].
+Of these things, you can only promise what is on this list."), never a
+line to say. OllamaMind.parse_voice takes [DO: n] out as "do".
+
+A promise is held to the list (_promises). A sentence that promises
+(I'll, I will, let me, I'm going to, I can, on it) one of these verbs
+(_errand_verbs: a chest opened, checked or looked in; a door opened,
+closed or shut; a look with a compass point, dark, there, ahead or
+around) is said only when it names exactly one listed thing (its
+compass point, if it says one, must match), or the one [DO: n] chose;
+then she does it. Otherwise it is not said: "I'll check the chest" with
+no chest in sight, or a look that could be either of two. Unasked
+nothing is offered, so such a promise is never said. A promise of
+anything else ("I'll keep watch") is roleplay and stays.
+
+The errand (Companion.errand) is one at a time, a new intent ERRAND
+over her stance: going (her own A* steps), doing, and for a look
+returning to within 2 of her player. A door is opened from a cell on
+either side with World.try_toggle_door; once enemy-ai's World.can_open
+is on main a locked door is "the door is locked" (looked up by
+has_method until then). A chest is read, never emptied: taking and
+handing over are step 4, through World.try_transfer. A look ends when
+she sees the cell, telling what she sees within 2 of it. Done, the
+outcome is narrated and her voice asked to tell it; that ask is cleaned
+as an answer, since what she tells is new though the narration has it.
+It ends undone when she falls below 30% hp, a monster she sees comes
+within 4, after 20 s, or when her player asks something else (a quick
+phrase, or an instruction the check confirms); undone because it could
+not be done (no way there, broken, locked) her voice says so. Every
+step is in the mind log as kind "errand". LOCK, UNLOCK and BAR follow
+the door step and items' keys.

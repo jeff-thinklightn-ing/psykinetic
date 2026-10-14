@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_spoken_polish()
 	_test_quiet_after_minor()
 	_test_senses()
+	_test_errands()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -360,11 +361,12 @@ func _test_last_words() -> void:
 	var transcript := Transcript.path_of(Net.transcripts_dir, String(pet.name), Time.get_date_string_from_system())
 	if FileAccess.file_exists(transcript):
 		DirAccess.remove_absolute(transcript)
-	var before: int = _main.party_log.size()
 	var talk_lines: int = _main.talk.lines.size()
 	World.damage(pet, 999, null, &"attack")
-	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - before)
-	var words := lines.filter(func(line: String) -> bool: return line.begins_with("%s said:" % pet.name))
+	# The log's tail: it keeps PartyLog.MAX_LINES, so it may not grow.
+	var lines: Array[String] = _main.party_log.last(mini(5, _main.party_log.size()))
+	var words := lines.filter(func(line: String) -> bool:
+		return line.begins_with("%s said:" % pet.name) and str(_main.talk.lines.back()[2]) in line)
 	_check(words.size() == 1, "the party log has her last words (%s)" % [lines])
 	_check(_main.talk.lines.size() >= mini(talk_lines + 1, TalkPanel.MAX_LINES) and _main.talk.lines.back()[1] == String(pet.name)
 			and not words.is_empty() and str(_main.talk.lines.back()[2]) in str(words[0]), "and so does the Tab panel")
@@ -524,8 +526,7 @@ func _test_quiet_after_minor() -> void:
 
 
 func _test_senses() -> void:
-	print("
-== she sees by light, knows a death only if she saw it, and hears what she cannot see ==")
+	print("\n== she sees by light, knows a death only if she saw it, and hears what she cannot see ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
@@ -590,6 +591,155 @@ func _test_senses() -> void:
 	pet._noises.clear()
 	pet.mind = ScriptedMind.new()
 	_settle(pet)
+
+
+func _test_errands() -> void:
+	print("\n== errands: what she can do, offered by number; [DO: n] and a promise she can keep are done, and told; one she cannot keep is not said ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	# The test room's west door is between (4, 12) and (4, 13); its chest is at (10, 3).
+	var door := World.door_across(Vector2i(4, 12), Vector2i(0, 1))
+	World._set_door(door, false, owner)
+	_put(owner, Vector2i(5, 11))
+	_put(pet, Vector2i(4, 11))
+	World.step()
+	var offered := pet.can_do()
+	var open_at := _offer(offered, "open")
+	_check(open_at >= 0 and str(offered[open_at]["words"]).begins_with("open the closed door, a few paces to the south"),
+		"the closed door is hers to open: %s" % [_words(offered)])
+	_check(_offer(offered, "look") >= 0, "and what she cannot see, to go and look at")
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "On my way.", "stance": "", "do": str(open_at + 1)}
+	_main._on_command(owner, "say", {"text": "%s, open the door." % pet.name})
+	var system := str(mind.voice_asks.back()["system"])
+	_check("These you can do here and now:\n1: " in system and "[DO: its number]" in system, "her voice is told what she can do, by number")
+	_check(pet.errand.get("verb", "") == "open", "[DO: %d] sets her off (%s)" % [open_at + 1, pet.errand.get("words", "")])
+	mind.clear()
+	mind.voice_answer = {"say": "It's open.", "stance": ""}
+	_step_until(func() -> bool: return door.is_open(), 40)
+	_check(door.is_open() and pet.tile in Terrain.edge_cells(door.key), "she walks to it and opens it (at %s)" % pet.tile)
+	_check(pet.errand.is_empty() and mind.triggers("voice").size() == 1 and "You opened the door" in mind.triggers("voice")[0],
+		"and her voice is asked to tell it: %s" % [mind.triggers("voice")])
+	_check(MindLog.last[String(pet.name)].get("say", "") == "It's open.", "what she tells is said, though the narration has it")
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "I'll shut the door.", "stance": ""}
+	_main._on_command(owner, "say", {"text": "%s, shut it again." % pet.name})
+	_check(pet.errand.get("verb", "") == "close", "a promise that names one thing she can do is done (%s)" % pet.errand.get("words", ""))
+	_step_until(func() -> bool: return not door.is_open(), 40)
+	_check(not door.is_open(), "the door is shut")
+
+	_put(owner, Vector2i(11, 6))
+	_put(pet, Vector2i(10, 6))
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "I’ll check the chest.", "stance": ""}
+	_main._on_command(owner, "say", {"text": "%s, what's in that chest?" % pet.name})
+	_check(pet.errand.get("verb", "") == "open_chest", "\"I’ll check the chest.\", with the chest in sight: she does (%s)" % pet.errand.get("words", ""))
+	var chest: Chest = pet.errand.get("chest")
+	mind.clear()
+	mind.voice_answer = {"say": "Bandages, in there.", "stance": ""}
+	_step_until(func() -> bool: return pet.errand.is_empty(), 40)
+	var told := mind.triggers("voice")
+	var held := Items.name_of(chest.slots[0]) if chest != null and not chest.slots[0].is_empty() else "nothing"
+	_check(told.size() == 1 and "You looked in the chest" in told[0] and held in told[0], "she looks in and tells what it holds: %s" % [told])
+	_check(World.distance(pet.tile, chest.tile) == 1 and chest.slots[0] == ("" if held == "nothing" else chest.slots[0]),
+		"from beside it, taking nothing")
+
+	var none := pet._promises("I'll open the door. I'll keep watch.", [], -1)
+	_check(none["line"] == "I'll keep watch." and none["dropped"] == "I'll open the door.",
+		"with nothing to open, \"I'll open the door.\" is not said; \"I'll keep watch.\" is no errand, and stays (%s)" % [none])
+	var two := [{"verb": "look", "words": "go and look a few paces to the north, where it is too dark to see, and come back"},
+		{"verb": "look", "words": "go and look some way off to the west, where it is out of your sight, and come back"}]
+	_check(pet._promises("Let me look to the west.", two, -1)["chosen"] == 1, "a promise names the one by its compass point")
+	_check(pet._promises("Let me look around.", two, -1)["line"] == "", "one that could be either is not said")
+	_check(pet._promises("I'll look to the west.", two, 0)["line"] == "", "nor one that is not what [DO: n] chose")
+	_check(OllamaMind.parse_voice("I'll get it.\n[DO: 2]") == {"say": "I'll get it.", "stance": "", "do": "2"},
+		"[DO: n] taken out of her reply")
+	pet._exchange.clear()
+	_put(pet, Vector2i(10, 6))
+	mind.voice_answer = {"say": "I'll open the door.", "stance": ""}
+	mind.clear()
+	pet._last_speech_tick = -1000
+	pet._ask_voice("nothing asked", "", true)
+	_check(pet.errand.is_empty() and MindLog.last[String(pet.name)].get("promise_dropped", "") == "I'll open the door.",
+		"unasked, nothing is offered and the promise is not said")
+
+	# Looking: in the dark but for her lantern, at a place she cannot see.
+	_put(owner, Vector2i(7, 6))
+	_put(pet, Vector2i(6, 6))
+	var light := owner.emit_light
+	var ambient: float = World.fields.ambient
+	owner.emit_light = 0.0
+	World.fields.ambient = 0.0
+	World.fields_changed()
+	World.step()
+	offered = pet.can_do()
+	var look_at := _offer(offered, "look")
+	_check(look_at >= 0, "a place she cannot see is hers to look at: %s" % [_words(offered)])
+	for i in 21:
+		World.step()
+	mind.voice_answer = {"say": "I'll go and see.", "stance": "", "do": str(look_at + 1)}
+	_main._on_command(owner, "say", {"text": "%s, have a look about." % pet.name})
+	_check(pet.errand.get("verb", "") == "look", "[DO: n] sends her to look (%s)" % pet.errand.get("words", ""))
+	var cell: Vector2i = pet.errand.get("cell", Vector2i(-1, -1))
+	var went := false
+	mind.clear()
+	mind.voice_answer = {"say": "Nothing out there.", "stance": ""}
+	for i in Companion.ERRAND_TICKS:
+		if pet.errand.is_empty():
+			break
+		went = went or pet._sees(cell)
+		World.step()
+	told = mind.triggers("voice")
+	_check(went and told.size() == 1 and "You went and looked" in told[0], "she goes until she sees it, and tells what is there: %s" % [told])
+	_check(World.distance(pet.tile, owner.tile) <= Companion.ERRAND_BACK, "back beside her player (%s, %s)" % [pet.tile, owner.tile])
+	owner.emit_light = light
+	World.fields.ambient = ambient
+	World.fields_changed()
+
+	pet._start_errand(offered[look_at], pet._serial)
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 3))
+	World.step()
+	_check(pet.errand.is_empty() and _narrated(pet, "a monster came near"), "a monster she sees coming near ends it")
+	World.damage(imp, 999)
+	pet._start_errand(offered[look_at], pet._serial)
+	pet.errand["until"] = World.tick - 1
+	World.step()
+	_check(pet.errand.is_empty() and _narrated(pet, "it was taking too long"), "and so does taking too long")
+	for i in 21:
+		World.step()
+	pet._start_errand(offered[look_at], pet._serial)
+	_main._on_command(owner, "say", {"text": Net.DEFAULT_PHRASES[0], "phrase": 1})
+	_check(pet.errand.is_empty() and _narrated(pet, "asked something else of you"), "and her player asking something else")
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _offer(offered: Array[Dictionary], verb: String) -> int:
+	for i in offered.size():
+		if offered[i]["verb"] == verb:
+			return i
+	return -1
+
+
+func _words(offered: Array[Dictionary]) -> Array[String]:
+	var out: Array[String] = []
+	for action in offered:
+		out.append(str(action["words"]))
+	return out
+
+
+func _narrated(pet: Companion, words: String) -> bool:
+	for turn: Dictionary in pet._exchange:
+		if words in str(turn["text"]):
+			return true
+	return false
 
 
 func _test_log_collapsed() -> void:

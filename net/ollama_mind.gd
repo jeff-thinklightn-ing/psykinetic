@@ -182,7 +182,8 @@ static func max_tokens(what: String) -> int:
 	return int(MAX_TOKENS.get(what, 64)) + (WHY_TOKENS if Net.mind_why and what == "stance" else 0)
 
 
-## Her plain-words reply as {say, stance}: an optional [STANCE: X] line
+## Her plain-words reply as {say, stance}, and do when it has one: an
+## optional [STANCE: X] line and [DO: n] line (what she was offered to do)
 ## taken out, quotes and her own name off the front, "..." as silence.
 static func parse_voice(content: String, speaker := "") -> Dictionary:
 	var text := content
@@ -193,6 +194,12 @@ static func parse_voice(content: String, speaker := "") -> Dictionary:
 	if found != null:
 		stance = found.get_string(1).to_upper()
 		text = tag.sub(text, "", true)
+	var do_tag := RegEx.create_from_string("(?i)\\[?\\s*\\bDO\\s*:\\s*(\\d+)\\s*\\]?")
+	var act := ""
+	found = do_tag.search(text)
+	if found != null:
+		act = found.get_string(1)
+		text = do_tag.sub(text, "", true)
 	text = text.strip_edges()
 	if not speaker.is_empty() and text.begins_with(speaker + ":"):
 		text = text.substr(speaker.length() + 1).strip_edges()
@@ -200,7 +207,7 @@ static func parse_voice(content: String, speaker := "") -> Dictionary:
 		text = text.substr(1, text.length() - 2).strip_edges()
 	if text.replace(".", "").replace("…", "").strip_edges().is_empty():
 		text = ""
-	return {"say": text, "stance": stance}
+	return {"say": text, "stance": stance, "do": act} if not act.is_empty() else {"say": text, "stance": stance}
 
 
 ## Requests that came back since last asked (see CompanionMind).

@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## A bump this soon after the last one is the same bump (a held key).
@@ -145,6 +145,25 @@ const NOISE_WORDS := {
 	&"fight": ["fighting", true], &"door": ["a door opening or shutting", false],
 	&"door_struck": ["something striking a door", true], &"door_broken": ["a door breaking", true],
 }
+## What she can do when her player asks (can_do), offered to her voice by
+## number ([DO: n]): open or close a door she sees, open a chest she sees
+## and tell what is in it, or go and look where she cannot see (within her
+## sight's range, at most LOOKS_OFFERED ways) and come back; at most
+## ACTIONS_MAX in all. An errand ends after ERRAND_TICKS, when she is low,
+## or when a monster she sees comes within ERRAND_BREAK; a look ends back
+## within ERRAND_BACK of her player, telling what she saw within LOOK_AROUND
+## of where she looked.
+const LOOKS_OFFERED := 2
+const ACTIONS_MAX := 6
+const ERRAND_TICKS := 200
+const ERRAND_BREAK := 4
+const ERRAND_BACK := 2
+const LOOK_AROUND := 2
+## A sentence promising something (PROMISE) that is one of her errands
+## (_errand_verbs) is said only when it names exactly one thing she could
+## do now, which she then does; any other promise is roleplay and stays.
+const PROMISE := "(?i)\\b(i'?ll|i will|let me|i'?m going to|i can|on it)\\b"
+const COMPASS_WORD := "\\b(north-east|north-west|south-east|south-west|north|south|east|west)\\b"
 ## She notes where she has seen things every so many ticks (_remember_sights).
 const MEMORY_EVERY := 10
 ## Speech carries this far (cells, in its own zone): what anyone says
@@ -226,6 +245,10 @@ what you will do, exactly one of:
 [STANCE: GUARD] keep beside %s and fight whatever comes at either of you
 [STANCE: PULL_BACK] get away to safety
 If %s asked nothing of you, leave that line out."""
+## What she can do now, by number, after VOICE_ASKED.
+const VOICE_CAN_DO := """These you can do here and now:
+%s
+Only if %s asked you to do one of these, add one more line: [DO: its number]. Of these things, you can only promise what is on this list."""
 ## What she says is cleaned before it is said (spoken): a sentence in her
 ## last REPEAT_LINES lines is not said again; someone other than her player
 ## is spoken to only when they spoke to her (named her) within
@@ -378,6 +401,15 @@ var senses: Senses
 var _noises: Array[Dictionary] = []
 var _heard_upto := -1
 var _noise_asked_tick := -100000
+## Her errand, or empty: what can_do offered ({verb, words, at, and its
+## door, chest or cell}) with phase ("going", "doing", "returning"), the
+## serial of the ask it answered, and when it gives up. What she was
+## offered for each voice ask out, by serial; the asks that are her report
+## of an errand (cleaned as an answer: what she tells is new).
+var errand := {}
+var _offering: Array[Dictionary] = []
+var _offered: Dictionary[int, Array] = {}
+var _report_serials: Dictionary[int, bool] = {}
 
 
 ## Her slots (Items): a pack and two hands, as a player's, empty at first;
@@ -644,6 +676,7 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_serial += 1
 		var wanted: int = PHRASE_STANCES[phrase]
 		_set_stance(wanted, _serial, "phrase")
+		_called_off(_serial)
 		_instruction = heard
 		_instruction_tick = World.tick
 		_instruction_stance = STANCE_NAMES[wanted]
@@ -924,7 +957,7 @@ func _watch() -> void:
 		var waiting := _pending_voice
 		_pending_voice = {}
 		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false), waiting.get("phrase", false),
-			waiting.get("own", true))
+			waiting.get("own", true), waiting.get("report", false))
 
 
 ## Narrates the deaths seen and clears them; returns those her voice is
@@ -1085,7 +1118,8 @@ func _ask_stance(trigger: String) -> void:
 ## [param phrase]: a quick phrase's, whose stance is already set: the
 ## reply's stance is not taken. [param own]: [param heard] is her player's
 ## words (a stance may answer them); someone else's are only heard.
-func _ask_voice(trigger: String, heard := "", always := false, phrase := false, own := true) -> void:
+## [param report]: she tells how an errand went (what she tells is new).
+func _ask_voice(trigger: String, heard := "", always := false, phrase := false, own := true, report := false) -> void:
 	if mind == null:
 		return
 	if (heard.is_empty() or not own) and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
@@ -1093,14 +1127,18 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 	if mind.busy("voice"):
 		# Her player's words come first; otherwise the newest moment.
 		if not heard.is_empty() or always or str(_pending_voice.get("heard", "")).is_empty():
-			_pending_voice = {"trigger": trigger, "heard": heard, "always": always, "phrase": phrase, "own": own}
+			_pending_voice = {"trigger": trigger, "heard": heard, "always": always, "phrase": phrase, "own": own, "report": report}
 		return
 	_serial += 1
 	_phrase_serials[_serial] = phrase
+	if report:
+		_report_serials[_serial] = true
 	var asked := not heard.is_empty() and own
 	# Certainly hers: then a stance with no words still counts.
 	_certain_serials[_serial] = asked and addressed_to(heard) == "her"
 	var messages := voice_messages(asked, heard)
+	if not _offering.is_empty():
+		_offered[_serial] = _offering
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger, "messages": messages, "speaker": _name_of(self),
 		"system": messages[0]["content"], "user": render(messages.slice(1)),
@@ -1132,6 +1170,7 @@ func stance_prompt() -> String:
 ## world, now), then the exchange, a user's turn last. [param asked]: her
 ## player has just spoken to her, so she may answer with a stance.
 func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
+	_offering = []
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
 	var now: Array[String] = [voice_situation(), others_here()]
@@ -1167,6 +1206,12 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 			system += "\nWhat you know of what %s mentioned: %s" % [who, knowledge_of(kinds)]
 		if addressed != "other":
 			system += "\n" + VOICE_ASKED % [who, who, who, who]
+			_offering = can_do()
+			if not _offering.is_empty():
+				var listed: Array[String] = []
+				for i in _offering.size():
+					listed.append("%d: %s" % [i + 1, _offering[i]["words"]])
+				system += "\n" + VOICE_CAN_DO % ["\n".join(listed), who]
 	elif addressed == "her":
 		system += "\n\n" + VOICE_NAMED % speaker
 	elif addressed == "open":
@@ -1236,6 +1281,8 @@ func doing() -> String:
 			action = "stepping out of %s's way" % keeper_name()
 		Intent.IDLE:
 			action = "waiting"
+		Intent.ERRAND:
+			action = "on your way to %s" % errand.get("words", "do what you were asked")
 		_:
 			action = "keeping by %s" % keeper_name()
 	return "You are %s; right now you are %s." % [words, action]
@@ -1774,6 +1821,7 @@ func _take_check(result: Dictionary, answer: Dictionary, entry: Dictionary) -> v
 		entry["note"] = "a newer ask's %s stands" % stance_name()
 	else:
 		_set_stance(wanted, serial, entry["mind"])
+		_called_off(serial)
 		_instruction = str(waiting["heard"])
 		_instruction_tick = World.tick
 		_instruction_stance = STANCE_NAMES[wanted]
@@ -1847,7 +1895,26 @@ func _take_result(result: Dictionary) -> void:
 		entry["note"] = "stance %s waits on the instruction check" % stance_text
 		_check_instruction(wanted, serial, str(result.get("heard", "")))
 	_certain_serials.erase(serial)
-	var raw_line := trim_line(str(answer.get("say", "")))
+	var report: bool = _report_serials.get(serial, false)
+	_report_serials.erase(serial)
+	spoken_to = spoken_to or report
+	# What she was offered to do: [DO: n] to her player's words picks one,
+	# and a promise picks the one it names; a promise of what she cannot do
+	# now is not said.
+	var offered: Array = _offered.get(serial, []) if asked else []
+	_offered.erase(serial)
+	var chosen := -1
+	var do_text := str(answer.get("do", "")).strip_edges()
+	if not offered.is_empty() and do_text.is_valid_int() and int(do_text) >= 1 and int(do_text) <= offered.size():
+		chosen = int(do_text) - 1
+	elif not do_text.is_empty():
+		entry["do_ignored"] = do_text
+	var promised := _promises(trim_line(str(answer.get("say", ""))), offered, chosen)
+	if chosen == -1:
+		chosen = promised["chosen"]
+	if not str(promised["dropped"]).is_empty():
+		entry["promise_dropped"] = promised["dropped"]
+	var raw_line := trim_line(str(promised["line"]))
 	# A whole line said back is dropped as such; then what is left of it
 	# once cleaned (spoken) is what she says.
 	var echo := _echo_of(raw_line)
@@ -1875,7 +1942,11 @@ func _take_result(result: Dictionary) -> void:
 		entry["note"] = "within %d ticks of her last line" % SPEECH_INTERVAL_TICKS
 		line = ""
 	entry["say"] = line
+	if chosen >= 0:
+		entry["do"] = offered[chosen]["words"]
 	_log(entry)
+	if chosen >= 0:
+		_start_errand(offered[chosen], serial)
 
 
 func _set_stance(wanted: int, serial: int, source: String) -> void:
@@ -2151,7 +2222,11 @@ func _act() -> void:
 		return
 	intent_target = null
 	if low:
+		if not errand.is_empty():
+			_end_errand("you are badly hurt", false)
 		current_intent = Intent.RETREAT
+	elif _on_errand():
+		current_intent = Intent.ERRAND
 	else:
 		match stance:
 			Stance.PULL_BACK:
@@ -2252,6 +2327,8 @@ func _execute() -> void:
 		Intent.YIELD:
 			if _yield_tile != NONE and tile != _yield_tile and World.is_free(_yield_tile):
 				_step_toward(_yield_tile, false)
+		Intent.ERRAND:
+			_errand_step()
 		Intent.IDLE, Intent.SHOVE:
 			pass
 
@@ -2410,6 +2487,235 @@ func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
 		return false
 	World.try_move(self, path[0] - tile)
 	return true
+
+
+# --- Errands: what she does when asked ------------------------------------------
+
+## What she can do here and now, nearest first, at most ACTIONS_MAX: each
+## {verb ("open", "close", "open_chest", "look"), words (for her voice:
+## "open the closed door, a few paces to the south"), at, and its door,
+## chest or cell}. Only what she sees: a door not broken, a chest; and the
+## nearest walkable cells she cannot see within her sight's range, one a
+## compass point, LOOKS_OFFERED of them.
+func can_do() -> Array[Dictionary]:
+	var actions: Array[Dictionary] = []
+	for door: Door in World.get_doors():
+		if door.is_broken():
+			continue
+		var sides := Terrain.edge_cells(door.key)
+		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
+		if World.distance(tile, near) <= PERCEPTION_RANGE and (_sees(sides[0]) or _sees(sides[1])):
+			var verb := "close" if door.is_open() else "open"
+			actions.append({"verb": verb, "door": door, "at": near, "words": "%s the %s door, %s" % [
+				verb, "open" if door.is_open() else "closed", _paces_toward(Vector2(sides[0] + sides[1]) / 2.0)]})
+	for entity in World.get_entities():
+		if entity is Chest and entity.spawned and World.distance(tile, entity.tile) <= PERCEPTION_RANGE and _sees(entity.tile):
+			actions.append({"verb": "open_chest", "chest": entity, "at": entity.tile,
+				"words": "open the chest %s and see what is in it" % _paces_toward(Vector2(entity.tile))})
+	actions.sort_custom(_nearer_found)
+	actions.resize(mini(actions.size(), ACTIONS_MAX - LOOKS_OFFERED))
+	var ways: Dictionary[int, bool] = {}
+	for cell in _cells_within(SIGHT_RANGE):
+		if ways.size() >= LOOKS_OFFERED:
+			break
+		if cell == tile or not World.is_walkable(cell) or _sees(cell):
+			continue
+		var way := World.bearing_index(Vector2(cell - tile))
+		if ways.has(way):
+			continue
+		ways[way] = true
+		var why := "too dark to see" if World.has_line_of_sight(tile, cell) else "out of your sight"
+		actions.append({"verb": "look", "cell": cell, "at": cell,
+			"words": "go and look %s, where it is %s, and come back" % [_paces_toward(Vector2(cell)), why]})
+	return actions
+
+
+## The errands (can_do's verbs) a sentence, lower case, speaks of doing.
+static func _errand_verbs(text: String) -> Array[String]:
+	var has := func(pattern: String) -> bool: return RegEx.create_from_string(pattern).search(text) != null
+	var chest: bool = has.call("\\b(chests?|trunk)\\b")
+	var door: bool = has.call("\\bdoors?\\b")
+	var verbs: Array[String] = []
+	if chest and has.call("\\b(open|check|search|look|see|peek)"):
+		verbs.append("open_chest")
+	if door and has.call("\\bopen"):
+		verbs.append("open")
+	if door and has.call("\\b(close|shut)"):
+		verbs.append("close")
+	if not chest and not door and has.call("\\b(look|check|scout|see|peek)") \
+			and has.call(COMPASS_WORD + "|\\b(dark|there|ahead|around|corner)\\b"):
+		verbs.append("look")
+	return verbs
+
+
+## [param line] without the sentences that promise one of her errands but
+## do not name exactly one thing of [param offered] (or, with [param chosen]
+## from [DO: n], that one); {line, chosen: what a promise named, or -1,
+## dropped: the sentences left out}.
+func _promises(line: String, offered: Array, chosen: int) -> Dictionary:
+	var promise := RegEx.create_from_string(PROMISE)
+	var compass := RegEx.create_from_string(COMPASS_WORD)
+	var kept: Array[String] = []
+	var dropped: Array[String] = []
+	var named := -1
+	for sentence in _sentences(line):
+		var text := sentence.to_lower().replace("’", "'")
+		var verbs := _errand_verbs(text) if promise.search(text) != null else ([] as Array[String])
+		if verbs.is_empty():
+			kept.append(sentence)  # No promise, or roleplay: nothing she could do.
+			continue
+		var way := compass.search(text)
+		var matching: Array[int] = []
+		for i in offered.size():
+			var said_way := compass.search(str(offered[i]["words"]))
+			if offered[i]["verb"] in verbs and (way == null or said_way != null and said_way.get_string() == way.get_string()):
+				matching.append(i)
+		if chosen >= 0 and chosen in matching or chosen == -1 and matching.size() == 1:
+			kept.append(sentence)
+			if chosen == -1 and named == -1:
+				named = matching[0]
+		else:
+			dropped.append(sentence)
+	return {"line": " ".join(kept), "chosen": named, "dropped": " ".join(dropped)}
+
+
+func _start_errand(action: Dictionary, serial: int) -> void:
+	errand = action.duplicate()
+	errand["phase"] = "going"
+	errand["serial"] = serial
+	errand["until"] = World.tick + ERRAND_TICKS
+	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand["words"], "outcome": "set off"})
+
+
+## Her player asked something else of her (ask [param serial]): an errand
+## from an older ask is called off.
+func _called_off(serial: int) -> void:
+	if not errand.is_empty() and serial > int(errand["serial"]):
+		_end_errand("%s asked something else of you" % keeper_name(), false)
+
+
+## Whether she goes on with her errand: none, a monster she sees within
+## ERRAND_BREAK, or out of time, and it ends.
+func _on_errand() -> bool:
+	if errand.is_empty():
+		return false
+	if World.tick > int(errand["until"]):
+		_end_errand("it was taking too long", false)
+		return false
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) <= ERRAND_BREAK and senses.sees(entity):
+			_end_errand("a monster came near", false)
+			return false
+	return true
+
+
+## A step of her errand: going there, doing it, and from a look coming back.
+func _errand_step() -> void:
+	match str(errand["phase"]):
+		"going":
+			if _errand_there():
+				errand["phase"] = "doing"
+				_errand_do()
+			elif not _errand_walk():
+				_end_errand("there was no way there", true)
+		"doing":
+			_errand_do()
+		"returning":
+			if not _alive(keeper) or World.distance(tile, keeper.tile) <= ERRAND_BACK or not _step_toward(keeper.tile, true):
+				_report_errand(str(errand["told"]))
+
+
+func _errand_there() -> bool:
+	match str(errand["verb"]):
+		"open", "close":
+			return tile in Terrain.edge_cells(errand["door"].key)
+		"open_chest":
+			return World.distance(tile, errand["chest"].tile) == 1
+		_:
+			return _sees(errand["cell"])
+
+
+## A step toward where her errand is done; false if there is no way.
+func _errand_walk() -> bool:
+	match str(errand["verb"]):
+		"open", "close":
+			# The door's near side, or its far one if that is taken.
+			for side: Vector2i in [errand["at"]] + Terrain.edge_cells(errand["door"].key):
+				if not World.find_path(tile, side).is_empty():
+					return _step_toward(side, false)
+			return false
+		"open_chest":
+			return _alive(errand["chest"]) and _step_toward(errand["chest"].tile, true)
+		_:
+			return _step_toward(errand["cell"], true)
+
+
+## There: the door opened or closed, the chest looked in, or the place looked at.
+func _errand_do() -> void:
+	match str(errand["verb"]):
+		"open", "close":
+			var door: Door = errand["door"]
+			var opening: bool = errand["verb"] == "open"
+			var sides := Terrain.edge_cells(door.key)
+			var where := _paces_toward(Vector2(sides[0] + sides[1]) / 2.0)
+			if door.is_broken():
+				_end_errand("the door is broken", true)
+			elif door.is_open() == opening:
+				_report_errand("The door %s is %s already." % [where, "open" if opening else "shut"])
+			elif opening and World.has_method(&"can_open") and not World.call(&"can_open", self, door):
+				_end_errand("the door is locked", true)
+			elif World.tick >= next_move_tick:
+				if World.try_toggle_door(self, door.key):
+					_report_errand("You %s the door %s." % ["opened" if opening else "shut", where])
+				else:
+					_end_errand("the door would not move", true)
+		"open_chest":
+			var chest: Chest = errand["chest"]
+			var things: Array[String] = []
+			for id: String in chest.slots:
+				if not id.is_empty():
+					var word := Items.name_of(id)
+					things.append(("an " if word[0] in "aeiou" else "a ") + word)
+			var held := "nothing" if things.is_empty() else things[0] if things.size() == 1 \
+					else "%s and %s" % [", ".join(things.slice(0, -1)), things.back()]
+			_report_errand("You looked in the chest %s: it holds %s." % [_paces_toward(Vector2(chest.tile)), held])
+		_:
+			var cell: Vector2i = errand["cell"]
+			var seen: Array[String] = []
+			for entity in World.get_entities():
+				if entity == self or entity == keeper or not entity.spawned or World.distance(entity.tile, cell) > LOOK_AROUND \
+						or not senses.sees(entity):
+					continue
+				if entity is Monster or entity is Player or entity is Companion:
+					seen.append(refer(entity))
+				elif entity is Chest:
+					seen.append("a chest")
+				elif entity.pushable:
+					seen.append("a " + object_word(entity))
+			errand["told"] = "You went and looked %s, and came back: %s." % [str(errand["words"]).get_slice(", ", 0).trim_prefix("go and look "),
+				"nothing there" if seen.is_empty() else "you saw " + ", ".join(seen) + " there"]
+			errand["phase"] = "returning"
+
+
+## Her errand is done: [param told] narrated, and her voice asked to tell it.
+func _report_errand(told: String) -> void:
+	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand.get("words", ""), "outcome": "done",
+		"note": told})
+	errand = {}
+	_narrate(told)
+	_ask_voice(told, "", true, false, true, true)
+
+
+## Her errand ends undone, because of [param why]; with [param tell] her
+## voice is asked to say so (it could not be done), else it is narrated.
+func _end_errand(why: String, tell: bool) -> void:
+	var told := "You did not %s: %s." % [str(errand.get("words", "do it")).get_slice(", ", 0), why]
+	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand.get("words", ""),
+		"outcome": "undone", "note": why})
+	errand = {}
+	_narrate(told)
+	if tell:
+		_ask_voice(told, "", true, false, true, true)
 
 
 # --- Words --------------------------------------------------------------------

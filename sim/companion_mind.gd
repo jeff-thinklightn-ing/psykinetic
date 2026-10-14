@@ -12,7 +12,8 @@ extends RefCounted
 ##   stance(ask)  on an event that matters: answers {"stance": name} (one
 ##                of Companion.STANCE_NAMES), optionally "why".
 ##   voice(ask)   at a speaking moment: answers {"say": line or "",
-##                "stance": name or ""}, optionally "why".
+##                "stance": name or ""}, optionally "why", and "do": the
+##                number of what she was offered to do (Companion.can_do).
 ##   check(ask)   the instruction check, on her player's words alone (user):
 ##                answers {"asked": true} if they ask her to change how she
 ##                fights or moves with them, {"asked": false} otherwise.
