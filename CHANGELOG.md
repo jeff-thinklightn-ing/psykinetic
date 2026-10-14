@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.115
+
+Client.
+
+- Maps load much faster: the 3D view of a big map builds about forty
+  times faster (a 256x256 map in about a second, from 49 s), and a game
+  you host builds its map once instead of twice.
+- Opening a door no longer stalls a big map for a moment while the floor
+  is shaded again: only the floor whose light changed is redrawn.
+
+The server must be updated to v0.1.115 too, as it refuses any other version.
+
 ## v0.1.114
 
 Server.

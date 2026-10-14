@@ -305,7 +305,12 @@ func _go_online() -> void:
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		World.entity_moved.connect(_on_entity_moved)
+		var drawn := map_name
 		_boot()
+		if World.home().name == drawn:
+			# The views drew this map above: not again (a big map's 3D view
+			# takes seconds to build).
+			_view_zone = drawn
 		_start_console()
 	else:
 		# Terrain is static level data, not replicated state. The zone's

@@ -1880,3 +1880,17 @@ any, as World.is_burning does. Rejected: one MultiMesh for the whole map
 of them (the nodes were the cost, not the materials).
 
 128x128: 12.0 s to 3.0; 256x256: 49 s to 12, the rest mostly walls.
+
+## 183. The kit's pieces are loaded once; a host builds its map once
+
+After the floor (182), a 128x128 map still took 3 s to build, nearly all
+of it in load(): the kit's scenes were loaded for each wall, door and post
+and held by nothing once instanced, so each was let go and the next load
+read the .glb from disk again, half a millisecond a piece (an instance is
+6 us). Client3D keeps each piece's scene once loaded (_kit_scenes, for
+the run). And a host drew its map twice on starting: the views in _ready,
+and again when it first showed its home zone, which was that map; the view
+is now marked as showing it.
+
+tools/map_bench, 3D build: 128x128 3.0 s to 0.28, 256x256 12 s to 1.15
+(49 s before 182).

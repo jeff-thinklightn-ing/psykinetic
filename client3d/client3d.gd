@@ -1399,9 +1399,16 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_pan_home = false
 
 
+## The kit's pieces as loaded, kept: a scene nothing holds is let go once
+## its instance is made, and loaded from disk again for the next (half a
+## millisecond a wall).
+static var _kit_scenes: Dictionary[String, PackedScene] = {}
+
+
 func _kit(piece: String) -> Node3D:
-	var scene: PackedScene = load(KIT + piece + ".glb")
-	return scene.instantiate() as Node3D
+	if not _kit_scenes.has(piece):
+		_kit_scenes[piece] = load(KIT + piece + ".glb")
+	return _kit_scenes[piece].instantiate() as Node3D
 
 
 func _stone(alpha: float) -> StandardMaterial3D:
