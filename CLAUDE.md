@@ -43,8 +43,14 @@ which worktree owns each step, and the design rules not to break without asking 
   held, wait. Keep many-process runs short.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
-- Server and client must be built from the same commit; a release that changes the wire
-  format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
+- Joining depends on `Net.protocol()`, not the build (decision 239). A new message kind,
+  RPC script, or property you `replicate()` must be listed in `net/net.gd`
+  (`MESSAGE_KINDS`, `RPC_SCRIPTS`, `SUBCLASS_REPLICATED`); `tests/protocol_test` names
+  what's missing. A change to what an existing message or RPC carries, or to what a
+  replicated value means, needs `PROTOCOL_REVISION` bumped: see the comment above it in
+  `net/net.gd`. Say in your landing message if the protocol changed
+  (`godot --headless --path . -- --print-protocol` before and after); a protocol change
+  needs the server redeployed with the next release, a client-only change doesn't.
 - Edit files with the editor tool, not shell heredocs or `sed`, when the text has
   backslashes: heredocs here have eaten `\` line continuations and turned `\a` or `\t` in
   Windows paths into control characters. From python, write a backslash as `chr(92)`.
