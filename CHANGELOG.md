@@ -6,6 +6,12 @@ top section as the release notes.
 
 ## Unreleased
 
+- Stairs are smooth ramps instead of steps, and the ground beside them
+  slopes up with them. Ledges are rocky cliff faces instead of flat
+  boxes, and the foot of each drop is shaded, so raised ground stands out.
+- Characters, the cursor outline, the click ripple and builder previews
+  follow the slope of a ramp.
+
 ## v0.1.139
 
 Client and server.
