@@ -13,6 +13,13 @@ top section as the release notes.
   match, you're told which side is behind: "client out of date" (update
   through launch.bat) or "server out of date" (the server is due an
   update). This release itself still needs the server updated.
+- Two hands: your pack has two hand slots (R and L) beside its four. Some
+  things take both hands; what you carry adds to your weight, so a loaded
+  player is harder to shove.
+- Put things down (G), pick them up (F) and throw them at the cursor (T).
+  Light things fly across a room; a heavy sack goes a cell or two and
+  staggers whoever it hits. Things on the ground stay there, saved with
+  the world.
 
 ## v0.1.140
 

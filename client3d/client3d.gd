@@ -381,6 +381,11 @@ const PICK_SLACK := 0.45
 const PICK_DEPTH := 8
 const FOREST_REACH := 8
 const TREE_HEIGHT := 3.6
+## A thing thrown onto a pile is drawn flying there if the pile shows it
+## within this many ticks of the throw, for THROW_FLIGHT_SECONDS.
+const THROWN_SHOWN_TICKS := 10
+const THROW_FLIGHT_SECONDS := 0.4
+const PILE_RING := Color(0.95, 0.85, 0.55, 0.55)
 ## Label3D: units per font pixel, with the font size, for a name about a
 ## quarter unit tall.
 const LABEL_SIZE := 0.004
@@ -664,6 +669,9 @@ var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
+## Each GroundPile's heap of things (_show_piles), under the room.
+var _pile_nodes: Dictionary[GroundPile, Node3D] = {}
+var _pile_ring_mesh: Mesh
 var _see_through: Dictionary[Material, Material] = {}
 ## [piece, its bounds, is a tree, the pieces that fade with it], for every
 ## wall, doorway frame, post and tree, made once per room; the pieces
@@ -1647,6 +1655,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_centre = centre
 	if _room != null:
 		_room.free()
+	_pile_nodes.clear()
 	_walls.clear()
 	_wall_breaches.clear()
 	_posts.clear()
@@ -1761,6 +1770,7 @@ func _build_room() -> void:
 		World.door_shown.connect(_on_door_shown)
 	for door in World.get_doors():
 		_doors_due[door.key] = true
+	_show_piles()
 
 
 ## An edge between the land and the void: the map's outline.
@@ -1832,6 +1842,83 @@ func _add_tree(cell: Vector2i) -> void:
 	tree.position = _tile_position(cell) + Vector3(_roll(cell, 4) - 0.5, 0.0, _roll(cell, 5) - 0.5) * 0.3
 	_room.add_child(tree)
 	_trees[cell] = tree
+
+
+## What lies on the ground: each GroundPile drawn as its things' art slots
+## (ArtKit, item.<id>: a grey box till art comes), lying on their side,
+## the top one last; one just thrown flies there from where it was thrown.
+func _show_piles() -> void:
+	if not World.pile_shown.is_connected(_on_pile_shown):
+		World.pile_shown.connect(_on_pile_shown)
+		World.pile_gone.connect(_on_pile_gone)
+	for pile: GroundPile in World.zone.piles.values():
+		_on_pile_shown(pile)
+
+
+func _on_pile_shown(pile: GroundPile) -> void:
+	# Only the zone shown (a host's other zones' nodes sit under hidden holders).
+	if _room == null or not is_instance_valid(pile) or not pile.is_inside_tree() or not (pile.get_parent() as Node2D).visible:
+		return
+	_on_pile_gone(pile)
+	var heap := Node3D.new()
+	heap.name = GroundPile.name_for(pile.tile)
+	heap.position = _tile_position(pile.tile)
+	# A pale ring on the ground under it, so a small thing reads from afar.
+	var ring := MeshInstance3D.new()
+	ring.mesh = _pile_ring()
+	ring.position.y = 0.01
+	heap.add_child(ring)
+	for i in pile.ids.size():
+		var slot := str(Items.def(pile.ids[i]).get("art", ""))
+		if not ArtKit.has(slot):
+			continue
+		var thing := ArtKit.instance(slot)
+		# On its side, its length along the ground, turned by the cell and
+		# its place in the heap, a little apart from the others.
+		thing.rotation = Vector3(0.0, _roll(pile.tile, 10 + i) * TAU, PI * 0.5)
+		thing.position = Vector3(cos(i * 2.4) * 0.18 * mini(i, 1), ArtKit.size(slot).z * 0.5,
+				sin(i * 2.4) * 0.18 * mini(i, 1))
+		heap.add_child(thing)
+		if i == pile.ids.size() - 1 and pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
+			_fly(thing, _tile_position(pile.thrown_from) - heap.position + Vector3.UP * 1.2, thing.position)
+	_room.add_child(heap)
+	_pile_nodes[pile] = heap
+
+
+func _on_pile_gone(pile: GroundPile) -> void:
+	var heap: Node3D = _pile_nodes.get(pile)
+	if heap != null:
+		_pile_nodes.erase(pile)
+		if is_instance_valid(heap):
+			heap.queue_free()
+
+
+## The ring under a pile: one mesh and material for all of them.
+func _pile_ring() -> Mesh:
+	if _pile_ring_mesh == null:
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.26
+		torus.outer_radius = 0.32
+		torus.rings = 24
+		torus.ring_segments = 4
+		var material := StandardMaterial3D.new()
+		material.albedo_color = PILE_RING
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		torus.material = material
+		_pile_ring_mesh = torus
+	return _pile_ring_mesh
+
+
+## [param thing] flies from [param from] to [param to] (its heap's space) in
+## an arc, over THROW_FLIGHT_SECONDS.
+func _fly(thing: Node3D, from: Vector3, to: Vector3) -> void:
+	thing.position = from
+	var tween := thing.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		if is_instance_valid(thing):
+			thing.position = from.lerp(to, t) + Vector3.UP * sin(t * PI) * (0.6 + from.distance_to(to) * 0.15),
+		0.0, 1.0, THROW_FLIGHT_SECONDS)
 
 
 ## 0..1, the same for [param cell] and [param salt] on every peer.

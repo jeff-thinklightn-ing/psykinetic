@@ -7,6 +7,11 @@ extends Node2D
 const FLOOR_SOURCE := 0
 const FIRE_SOURCE := 2
 const DOOR := "res://sim/door.gd"
+const PILE := "res://sim/ground_pile.gd"
+## Keys for things, in both schemes: F picks up (your cell, the one under the
+## cursor, or one beside), G puts down what is in your hand, T throws it at
+## the cursor.
+const ITEM_KEYS := {KEY_F: "pick_up", KEY_G: "drop", KEY_T: "throw"}
 ## The one grey every wall face is drawn in, 0..1: darker than the floor,
 ## a few steps above the void, the same whichever way the face points.
 const WALL_VALUE := 0.18
@@ -323,6 +328,7 @@ func _go_online() -> void:
 		World.entity_died.connect(_on_entity_died)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
+		World.ground_changed.connect(_on_ground_changed)
 		BuilderHost.warn_overlays()
 		if BuilderHost.available():
 			_builder = BuilderHost.new()
@@ -431,6 +437,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var holder := _local_player()
 		if holder != null:
 			World.command(holder, "lantern", {})
+		return
+	if key != null and key.pressed and not key.echo and ITEM_KEYS.has(key.keycode):
+		item_key(ITEM_KEYS[key.keycode])
 		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_4:
 		say_phrase(key.keycode - KEY_0)
@@ -1261,6 +1270,7 @@ func _open_zone(zone_name: String, saved := {}) -> Zone:
 	if saved.is_empty() or not _spawn_saved(saved):
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
+	_restore_ground(saved.get("ground", []))
 	print("[zone] %s loaded%s" % [zone_name, " from the snapshot" if not saved.is_empty() else ""])
 	World.enter(was)
 	return opened
@@ -1535,6 +1545,7 @@ func _start_level(from_snapshot := false, whole := true) -> void:
 	if saved.is_empty() or not _spawn_saved(saved):
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
+	_restore_ground(saved.get("ground", []))
 	for peer in peers:
 		var id: String = ids[peer]
 		if id != "":
@@ -1658,7 +1669,10 @@ func _save_state() -> void:
 				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
 		for entity in World.get_entities():
 			World.slot_uids(entity)  # A chest's things get their instances before the book is saved.
-		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns}
+		var ground: Array[Dictionary] = []
+		for cell: Vector2i in each.ground:
+			ground.append({"cell": [cell.x, cell.y], "items": Array(each.ground[cell]), "ids": Array(World.ground_at(cell))})
+		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns, "ground": ground}
 	World.enter(was)
 	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
@@ -1891,6 +1905,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "party" and entity is Player:
 		_party_said(entity, str(args.get("text", "")))
+	elif command_name in ["pick_up", "drop", "throw"] and entity is Player:
+		_item_command(entity, command_name, args)
 	elif command_name == "lantern" and entity is Player:
 		(entity as Player).toggle_lantern()
 	elif command_name == "swing" and entity is Player:
@@ -2307,6 +2323,8 @@ func _free_start_tile() -> Vector2i:
 func _build_entity(spec: Dictionary) -> Node:
 	if spec.get("script") == DOOR:
 		return Door.build(spec)
+	if spec.get("script") == PILE:
+		return GroundPile.build(spec)
 	return EntityFactory.build(spec)
 
 
@@ -2451,6 +2469,7 @@ func hint_lines() -> Array[String]:
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",
+		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:
@@ -2548,6 +2567,97 @@ func _sound(set_name: String, entity: GridEntity) -> void:
 	sounds.append("%s %s" % [set_name, entity.name])
 	if _client3d != null and is_instance_valid(entity) and DisplayServer.get_name() != "headless":
 		_client3d.play_at(set_name, entity)
+
+
+## F, G or T ([param what]: pick_up, drop, throw): a command for the local
+## player, with the cell under the cursor; the server decides (_item_command).
+func item_key(what: String) -> void:
+	var me := _local_player()
+	if me == null:
+		return
+	var args := {}
+	if what != "drop":
+		var cell := _mouse_tile()
+		if cell != NONE:
+			args["cell"] = [cell.x, cell.y]
+	World.command(me, what, args)
+
+
+## Server: [param player]'s F, G or T. Picking up takes from the cell asked
+## for if it is in reach, else their own, else one beside with something on
+## it; putting down and throwing use the right hand, else the left (putting
+## down: else the last thing in the pack).
+func _item_command(player: Player, what: String, args: Dictionary) -> void:
+	var cell: Variant = Snapshot.vector(args.get("cell"))
+	var held := Player.RIGHT_HAND if not player.slots[Player.RIGHT_HAND].is_empty() else Player.LEFT_HAND
+	match what:
+		"pick_up":
+			var cells: Array[Vector2i] = []
+			if cell != null:
+				cells.append(cell)
+			cells.append(player.tile)
+			for direction: Vector2i in World.DIRECTIONS:
+				cells.append(player.tile + direction)
+			for each in cells:
+				if not World.ground_uids(each).is_empty() and World.try_pick_up(player, each):
+					return
+		"drop":
+			var slot := held
+			if player.slots[slot].is_empty():
+				slot = -1
+				for i in Items.PACK:
+					if not player.slots[i].is_empty():
+						slot = i
+			if slot >= 0:
+				World.try_drop(player, slot)
+		"throw":
+			if cell != null:
+				World.try_throw(player, held, cell)
+
+
+## Server: what lay on the ground in a snapshot's zone section, back where
+## it was, each thing its saved instance where the book still has it.
+func _restore_ground(ground: Array) -> void:
+	for pile: Dictionary in ground:
+		var ids: Array = pile["ids"]
+		var uids: Array = pile.get("items", [])
+		for i in ids.size():
+			var id := str(ids[i])
+			if not Items.exists(id):
+				continue
+			var uid := int(uids[i]) if i < uids.size() and (uids[i] is float or uids[i] is int) else 0
+			var at := World.items.at_of(uid)
+			if World.items.id_of(uid) != id or not at in ["", "%s@%d,%d" % [World.zone.name, pile["cell"].x, pile["cell"].y]]:
+				uid = World.items.mint(id, "migrated", "the ground", World.zone.name, pile["cell"])
+			World.put_on_ground(uid, pile["cell"])
+
+
+## Server: World's ground changed on [param cell] (of the zone World is
+## in): its GroundPile spawned,
+## changed or freed (the spawner does the same on the clients that see it).
+func _on_ground_changed(_zone_name: String, cell: Vector2i, thrown_from: Vector2i) -> void:
+	var ids := World.ground_at(cell)
+	var pile: GroundPile = World.zone.piles.get(cell)
+	if ids.is_empty():
+		if is_instance_valid(pile):
+			World.zone.piles.erase(cell)
+			Net.interest.remove(pile)
+			# Out of the tree now, so a new pile on the cell can take its name.
+			pile.get_parent().remove_child(pile)
+			pile.queue_free()
+		return
+	if is_instance_valid(pile):
+		if thrown_from != World.NO_CELL:
+			pile.thrown_from = thrown_from
+			pile.thrown_tick = World.tick
+		pile.ids = ids
+		return
+	var spec := {"script": PILE, "name": GroundPile.name_for(cell), "tile": [cell.x, cell.y], "zone": World.zone.name,
+		"ids": Array(ids)}
+	if thrown_from != World.NO_CELL:
+		spec["thrown_from"] = [thrown_from.x, thrown_from.y]
+		spec["thrown_tick"] = World.tick
+	Net.interest.add(spawner.spawn(spec))
 
 
 ## The pack panel's drop: a command, so the server decides (World.try_transfer).

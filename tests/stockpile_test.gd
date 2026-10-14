@@ -103,7 +103,7 @@ func _test_pickup_banks_nothing() -> void:
 	var host := _player(Net.local_id)
 	World._relocate(host, Vector2i(9, 4))
 	_check(World.try_transfer(host, _entity("Chest1"), 0, host, 0), "the host takes the kit from Chest1")
-	_check(Array(host.slots) == [KIT, "", "", ""], "it's in the host's pack (%s)" % [Array(host.slots)])
+	_check(Array(host.slots) == [KIT, "", "", "", "", ""], "it's in the host's pack (%s)" % [Array(host.slots)])
 	_check(World.stockpile.count(STORE, KIT) == 0 and World.stockpile.places().is_empty(), "and the stockpile has nothing")
 
 
@@ -116,7 +116,7 @@ func _test_banking() -> void:
 	var uid := World.slot_uid(host, 0)
 	var who := World._label_of(host)
 	_check(World.try_transfer(host, host, 0, depot, 2), "the host puts the kit in the depot")
-	_check(Array(host.slots) == ["", "", "", ""] and Array(depot.slots) == ["", "", "", ""],
+	_check(Array(host.slots) == ["", "", "", "", "", ""] and Array(depot.slots) == ["", "", "", ""],
 		"the pack's slot is empty, and so is the depot (%s, %s)" % [Array(host.slots), Array(depot.slots)])
 	_check(World.stockpile.count(STORE, KIT) == 1 and World.stockpile.items(STORE) == _ints([uid])
 		and World.stockpile.item_ids(STORE) == _strings([KIT]), "the store holds the kit, by its uid #%d (%s)" % [uid, World.stockpile.items(STORE)])
@@ -137,11 +137,11 @@ func _test_refused() -> void:
 	World.set_slots(host, [KIT, "", "", ""])
 	World._relocate(host, Vector2i(9, 3))
 	_check(not World.try_transfer(host, host, 0, _entity("StrayDepot"), 0), "the stray depot refuses the kit")
-	_check(Array(host.slots) == [KIT, "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "it stays in the pack (%s)" % [Array(host.slots)])
+	_check(Array(host.slots) == [KIT, "", "", "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "it stays in the pack (%s)" % [Array(host.slots)])
 	World._relocate(host, Vector2i(5, 3))
 	World.holdings.take(STORE, "goblins")
 	_check(not World.try_transfer(host, host, 0, _entity("Depot1"), 0), "with the goblins holding the store, its depot refuses")
-	_check(Array(host.slots) == [KIT, "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "the kit stays, the store keeps its one")
+	_check(Array(host.slots) == [KIT, "", "", "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "the kit stays, the store keeps its one")
 	World.holdings.take(STORE, "town")
 	_check(World.try_transfer(host, host, 0, _entity("Depot1"), 0), "the town takes it back: the depot banks again")
 	_check(World.stockpile.count(STORE, KIT) == 2, "two kits now (%d)" % World.stockpile.count(STORE, KIT))

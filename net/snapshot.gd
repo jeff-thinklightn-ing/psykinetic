@@ -31,7 +31,7 @@ static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] =
 		var entities: Array[GridEntity] = []
 		entities.assign(section.get("entities", []))
 		saved[zone_name] = {"tick": int(section.get("tick", 0)), "entities": _entries(entities),
-			"respawns": section.get("respawns", [])}
+			"respawns": section.get("respawns", []), "ground": section.get("ground", [])}
 	var records: Array[Dictionary] = []
 	for record in players:
 		records.append(record.to_dict())
@@ -175,7 +175,12 @@ static func _parse_zone(raw: Dictionary) -> Dictionary:
 		for entry in respawn_entries:
 			if entry is Dictionary and entry.get("spawn") is float:
 				respawns.append({"spawn": int(entry["spawn"]), "ticks_left": int(entry.get("ticks_left", 0))})
-	return {"tick": int(raw.get("tick", 0)), "entities": entities, "respawns": respawns}
+	var ground: Array = []
+	for pile: Variant in raw.get("ground", []) if raw.get("ground") is Array else []:
+		var cell: Variant = vector(pile.get("cell")) if pile is Dictionary else null
+		if cell != null and pile.get("ids") is Array:
+			ground.append({"cell": cell, "ids": pile["ids"], "items": pile["items"] if pile.get("items") is Array else []})
+	return {"tick": int(raw.get("tick", 0)), "entities": entities, "respawns": respawns, "ground": ground}
 
 
 ## A version 1 snapshot's map (the test room for one from before maps).

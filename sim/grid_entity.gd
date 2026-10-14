@@ -62,6 +62,9 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 
 @export var start_tile := Vector2i.ZERO
 @export var mass := 10.0
+## Server: its mass with nothing carried; mass is this plus what its slots
+## weigh (World._carried_changed). -1 until it first carries anything.
+var base_mass := -1.0
 @export var body_material := BodyMaterial.FLESH
 ## Can be shoved along by something walking into it. Force pushes ignore this.
 @export var pushable := false

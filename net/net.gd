@@ -122,14 +122,15 @@ signal join_rejected(reason: String, server_version: String)
 ## (decision 239): a client and a server of different builds play together
 ## as long as what goes over the wire is the same. protocol() sees by itself:
 ## the RPC methods of RPC_SCRIPTS and their arguments' names; the properties
-## entities and doors replicate (GridEntity.REPLICATED, Door.REPLICATED,
-## SUBCLASS_REPLICATED); the message kinds (MESSAGE_KINDS); the spawn spec
-## format (EntityFactory.SPEC_VERSION). Bump PROTOCOL_REVISION for a wire
-## change it cannot see: a message's or an RPC's fields or their meaning, a
-## replicated value's meaning or units, a spawn spec key, the order of
-## anything sent. tests/protocol_test checks that every message kind,
-## RPC script and replicated property is listed here.
-const PROTOCOL_REVISION := 6
+## entities, doors and ground piles replicate (GridEntity.REPLICATED,
+## Door.REPLICATED, GroundPile.REPLICATED, SUBCLASS_REPLICATED); the message
+## kinds (MESSAGE_KINDS); the spawn spec format (EntityFactory.SPEC_VERSION).
+## Bump PROTOCOL_REVISION for a wire change it cannot see: a message's or an
+## RPC's fields or their meaning, a replicated value's meaning or units, a
+## spawn spec key, the order of anything sent. tests/protocol_test checks
+## that every message kind, RPC script and replicated property is listed
+## here. 7: a carrier's slots are 6, the pack and two hands (decision 247).
+const PROTOCOL_REVISION := 7
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
@@ -882,6 +883,7 @@ func protocol() -> String:
 			"rev%d" % PROTOCOL_REVISION, "spec%d" % EntityFactory.SPEC_VERSION]
 		parts.append_array(GridEntity.REPLICATED)
 		parts.append_array(Door.REPLICATED)
+		parts.append_array(GroundPile.REPLICATED)
 		parts.append_array(SUBCLASS_REPLICATED)
 		parts.append_array(MESSAGE_KINDS)
 		for path in RPC_SCRIPTS:

@@ -25,6 +25,11 @@ var edges: Dictionary[Vector3i, int] = {}
 var doors: Dictionary[Vector3i, Door] = {}
 var occupancy: Dictionary[Vector2i, GridEntity] = {}
 var entities: Array[GridEntity] = []
+## Server: what lies on the ground, cell -> ItemBook uids (the top last)
+## (World.put_on_ground); saved with the zone.
+var ground: Dictionary[Vector2i, PackedInt32Array] = {}
+## Each cell's GroundPile node (server and client): what is drawn.
+var piles: Dictionary[Vector2i, GroundPile] = {}
 var hits: Array = []
 ## World.find_path's grid and its memo of what the terrain allows: see
 ## World._grid_rect.

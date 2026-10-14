@@ -3445,3 +3445,77 @@ town as a whole."
 
 Built now, with step 3: wages (taxed, down to the floor) and rent. The
 player's gold and coin purses wait for items' use and the shop.
+
+## 247. Hands are the last two slots of one slots array; ground items are per-cell piles under Interest
+
+Items step 2 (carrying). A player's and a companion's slots grow from 4 to
+6: the pack (0-3) and then two hands, Items.RIGHT_HAND (4) and LEFT_HAND
+(5), also Player.RIGHT_HAND and LEFT_HAND. One array keeps one writer
+(World), one replicated property, one save and one history path, and
+try_transfer, take_item and put_item work on hands as they did on the
+pack. Hands last, not first: a save from before them is the pack exactly,
+padded by Items.tidy, so nothing migrates and no index anyone used moves.
+Chests keep 4. World.hands_allow keeps the rule: a hand holds only what
+can be held (hands 1 or 2), a two-handed thing only in the right hand with
+the left empty; a move that breaks it is refused. Rejected: a separate
+replicated hands array (a second writer, a second save and history path,
+and every move between pack and hand a special case).
+
+What a carrier holds weighs: World sets mass to base_mass (the mass it
+had before it first carried anything) plus Items.weight_of over its slots,
+whenever its slots change (_slots_changed), never per tick. Pushes,
+shoves and tosses already read mass.
+
+The ground is Zone.ground: cell -> ItemBook uids, four a cell at most
+(more spill to the nearest dry floor within 3, World.put_on_ground). Each
+cell with something on it has one GroundPile node (its cell and ids),
+spawned and freed by Main through the zone's spawner on
+World.ground_changed(zone, cell, thrown_from), and registered with
+Interest like a door, so a client gets the piles in the chunks it sees
+and nothing beyond them. A pile occupies, blocks and ticks nothing.
+try_drop and try_pick_up reach the carrier's own cell and those beside it
+with no wall between; a pick-up goes to a free hand that can hold it,
+else the pack. Piles save with their zone ("ground": cell, uids, ids) and
+a rebuilt room ends them as lost as it does its chests' things. Rejected:
+an entity a thing (thousands of nodes on a big map, each in the occupancy
+and the tick) and one replicated dictionary per zone (sent whole on
+every change, to everyone in the zone, past Interest). The wire changes:
+GroundPile.REPLICATED joins Net.protocol(), and PROTOCOL_REVISION goes to 7
+(a carrier's slots mean six now), so an older client is told it is out
+of date.
+
+Keys, in both schemes: F picks up (the cell under the cursor in reach,
+else one's own, else one beside), G puts down what is in the right hand,
+else the left, else the last thing in the pack, and T throws the right
+hand's thing (else the left's) at the cursor; the pack panel edges the
+hands in brass, marked R and L. The 3D view draws a pile as each thing's
+art slot lying on its side in a pale ring, and a thing just thrown flies
+there.
+
+The catalog also takes economy's "made" (how the town makes a thing:
+{by: a trade in Items.TRADES, from: {resource or item id: count}, steps}
+or {by, rework: an id, steps}), validated at load and left out with a
+warning when it names no trade, no resource or item, or no steps; and
+Items.add_for_test / Items.reset, so tests can use things the catalog
+does not carry.
+
+## 249. A thrown thing flies by strength over weight, and stuns what it hits
+
+Items step 2. T throws what is in a hand at the cursor (World.try_throw).
+Its reach is THROW_PER_STRENGTH (0.5) x strength / the square root of its
+weight, 1 to THROW_MAX (6) cells: a player (strength 10) throws a 0.5 kg
+kit 6 cells, a 10 kg sack of ore 1. The square root, not the plain ratio:
+with it a few kilos still go a few cells, and the heaviest things a cell.
+It flies a cell at a time, each a step toward the target (diagonals
+first), over water and ledges; a wall or a closed door stops it, and so
+does a body, which takes impact_damage(weight x THROW_FORCE_PER_KG (0.3),
+mass_ratio(weight, its mass)) through _impact, as a push's collision does,
+and is stunned by that force (_stun). It is not pushed: _push spends the
+mover's mass as a budget and refuses any body heavier than it, so a thrown
+thing would move nothing; the weapons step can add a push for heavy
+things. It lands on the last dry cell it reached, its pile's thrown_from
+and thrown_tick set so the views draw the flight; a hit is noted in its
+history ("thrown", at whom). Rejected: reach from mass_ratio (clamped 0.5
+to 1.5, so a kit and a sack went nearly as far), and a projectile entity
+(a node, the occupancy and the tick for a flight a client can draw from
+two cells).

@@ -9,13 +9,17 @@ extends PanelContainer
 ## opening a chest or a companion's pack shows it with that row. When an
 ## item lands in a row on show, sound plays there what that container
 ## sounds like opening ("chest_open", a thud; "pack_open", leather), once a
-## frame. Sizes in the HUD's 3840 x 2160 units.
+## frame. A player's or a companion's last two boxes are their hands
+## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L.
+## Sizes in the HUD's 3840 x 2160 units.
 
 const SLOT_SIZE := Vector2(132, 132)
 const FONT_SIZE := 26
 const BACKING := Color(0.04, 0.04, 0.06, 0.82)
 const SLOT := Color(0.16, 0.15, 0.14, 0.95)
 const SLOT_EDGE := Color(0.55, 0.5, 0.42, 0.9)
+const HAND_EDGE := Color(0.85, 0.68, 0.3, 0.95)
+const HAND_MARK := Color(0.85, 0.68, 0.3, 0.8)
 const TEXT := Color(0.93, 0.92, 0.88, 0.95)
 
 ## Called with (from, from_slot, to, to_slot) when an item is dropped.
@@ -127,12 +131,21 @@ func _row(mine: bool) -> HBoxContainer:
 		box.mine = mine
 		box.index = i
 		box.custom_minimum_size = SLOT_SIZE
+		var hand := i >= Items.PACK
 		var style := StyleBoxFlat.new()
 		style.bg_color = SLOT
-		style.border_color = SLOT_EDGE
-		style.set_border_width_all(2)
+		style.border_color = HAND_EDGE if hand else SLOT_EDGE
+		style.set_border_width_all(3 if hand else 2)
 		style.set_corner_radius_all(8)
 		box.add_theme_stylebox_override("panel", style)
+		if hand:
+			var mark := Label.new()
+			mark.text = "R" if i == Items.RIGHT_HAND else "L"
+			mark.position = Vector2(10, 4)
+			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			mark.add_theme_font_size_override("font_size", FONT_SIZE - 6)
+			mark.add_theme_color_override("font_color", HAND_MARK)
+			box.add_child(mark)
 		var label := Label.new()
 		label.set_anchors_preset(Control.PRESET_FULL_RECT)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

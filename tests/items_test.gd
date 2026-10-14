@@ -38,6 +38,9 @@ func _ready() -> void:
 	_test_found_and_held()
 	_test_given()
 	_test_take_and_put()
+	_test_hands()
+	_test_ground()
+	_test_throw()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -70,6 +73,18 @@ func _test_catalog() -> void:
 			"%s is current with the catalog (else: tools/items_art_slots.gd)" % Items.ART_SLOTS)
 	_check(Items.art_slots()["slots"]["item.wood_bundle"]["sockets"].has("grip_2") \
 			and not Items.art_slots()["slots"]["item.bandaging_kit"]["sockets"].has("grip_2"), "two hands, two grips")
+	var made := Items.read(JSON.stringify({"items": [
+		{"id": "sword", "name": "sword", "made": {"by": "smith", "from": {"ore": 3, "wood": 1}, "steps": 3000}},
+		{"id": "fine_sword", "name": "fine sword", "made": {"by": "smith", "rework": "sword", "steps": 1500}},
+		{"id": "odd", "name": "odd", "made": {"by": "baker", "from": {"ore": 1}, "steps": 10}},
+		{"id": "odder", "name": "odder", "made": {"by": "smith", "from": {"moonbeams": 1}, "steps": 10}}]}))
+	_check(made["sword"]["made"] == {"by": "smith", "from": {"ore": 3, "wood": 1}, "steps": 3000}
+			and made["fine_sword"]["made"]["rework"] == "sword", "made: a sword from ore and wood by a smith; a fine one reworked from it")
+	_check(made["odd"]["made"].is_empty() and made["odder"]["made"].is_empty(), "made by no trade, or from nothing known: left out")
+	Items.add_for_test({"id": "test_sword", "name": "test sword", "hands": 1})
+	_check(Items.exists("test_sword"), "a test can add a thing")
+	Items.reset()
+	_check(not Items.exists("test_sword") and Items.exists(KIT), "and reset brings back the catalog alone")
 	var read := Items.read('{"items": [{"id": "a", "name": "A", "weight": 2}, {"name": "no id"}, {"id": "a", "name": "again"}]}')
 	_check(read.keys() == ["a"] and read["a"]["name"] == "A" and read["a"]["hands"] == 1,
 			"a catalog with an entry with no id and an id twice: the first a, filled in (%s)" % [read.keys()])
@@ -147,7 +162,7 @@ func _test_given() -> void:
 	_check(World.try_transfer(host, host, 0, pet, 1), "the host gives the kit to %s" % pet.name)
 	var events: Array = World.items.history(uid)["events"]
 	_check(events[-1]["kind"] == "given" and pet.name in str(events[-1]["what"]), "given, to her (%s)" % [events[-1]])
-	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0], "her player's record has its instance")
+	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0], "her player's record has its instance")
 	World.steps += 20
 	_check(World.try_transfer(pet, pet, 1, host, 3), "she hands it back herself")
 	_check(World.items.held_by(uid, World.holder_key(pet)) == 20 and host.slot_items[3] == uid, "she held it 20 steps; the host has it")
@@ -169,6 +184,105 @@ func _test_take_and_put() -> void:
 	_check(World.take_item(host, host, 0) == 0, "nothing to take from an empty slot")
 
 
+func _test_hands() -> void:
+	print("\n== two hands: what can be held, and how; what is carried weighs ==")
+	var host := _player(Net.local_id)
+	var base := host.mass if host.base_mass < 0.0 else host.base_mass
+	_check(host.slots[1] == KIT and host.slots.size() == 6, "a pack of 4 and two hands; the kit in the pack")
+	_check(World.try_transfer(host, host, 1, host, Player.RIGHT_HAND), "the kit goes into the right hand")
+	_check(World.try_transfer(host, host, Player.RIGHT_HAND, host, Player.LEFT_HAND) and host.slots[Player.LEFT_HAND] == KIT,
+			"and from one hand to the other")
+	var wood := _give(host, "wood_bundle", 0)
+	_check(host.slots[0] == "wood_bundle", "a bundle of wood (two-handed) in the pack")
+	_check(not World.try_transfer(host, host, 0, host, Player.RIGHT_HAND), "it cannot go in the right hand while the left holds the kit")
+	World.try_transfer(host, host, Player.LEFT_HAND, host, 1)
+	_check(not World.try_transfer(host, host, 0, host, Player.LEFT_HAND), "nor ever in the left")
+	_check(World.try_transfer(host, host, 0, host, Player.RIGHT_HAND), "the hands empty, it goes in the right")
+	_check(not World.try_transfer(host, host, 1, host, Player.LEFT_HAND), "and the left takes nothing while it is held")
+	Items.add_for_test({"id": "test_boulder", "name": "boulder", "weight": 50, "hands": 0})
+	_give(host, "test_boulder", 2)
+	_check(not World.try_transfer(host, host, 2, host, Player.LEFT_HAND) and World.free_slot_for(host, "test_boulder") == 0,
+			"a thing for the pack alone goes in no hand")
+	_check(is_equal_approx(host.mass, base + 8.0 + 0.5 + 50.0), "carried, they weigh: %.1f = %.1f + 8 + 0.5 + 50" % [host.mass, base])
+	World.items.end(World.take_item(host, host, 2), "gone")
+	Items.reset()
+	_check(is_equal_approx(host.mass, base + 8.5), "set down, the weight goes (%.1f)" % host.mass)
+	_check(host.slot_items[Player.RIGHT_HAND] == wood, "the wood in the right hand is the same thing")
+
+
+func _test_ground() -> void:
+	print("\n== put down and picked up; the ground keeps four a cell ==")
+	var host := _player(Net.local_id)
+	var cell := host.tile
+	var wood := host.slot_items[Player.RIGHT_HAND]
+	_check(World.try_drop(host, Player.RIGHT_HAND), "the host puts the wood down")
+	_check(World.ground_at(cell) == PackedStringArray(["wood_bundle"]) and host.slots[Player.RIGHT_HAND] == "",
+			"it lies at their feet (%s)" % [World.ground_at(cell)])
+	var pile: GroundPile = World.zone.piles.get(cell)
+	_check(is_instance_valid(pile) and pile.ids == PackedStringArray(["wood_bundle"]) and pile.zone == World.zone.name,
+			"a pile is there to be seen")
+	_check(World.items.at_of(wood) == "%s@%d,%d" % [World.zone.name, cell.x, cell.y] and World.items.history(wood)["holder"] == "",
+			"the wood knows where it lies, carried by nobody")
+	var host_mass := host.mass
+	_check(World.try_pick_up(host, cell) and host.slot_items[Player.RIGHT_HAND] == wood, "picked up again: into the right hand")
+	_check(not World.zone.piles.has(cell) and World.ground_at(cell).is_empty(), "and the ground is bare")
+	_check(host.mass > host_mass, "it weighs again")
+	World.try_drop(host, Player.RIGHT_HAND)
+	var kits: Array[int] = []
+	for i in 4:
+		var uid := World.items.mint(KIT, "built")
+		kits.append(uid)
+		World.put_on_ground(uid, cell)
+	_check(World.ground_at(cell).size() == World.GROUND_PER_CELL, "four things on one cell (%s)" % [World.ground_at(cell)])
+	var spilt := World.items.at_of(kits[-1])
+	_check(spilt != "%s@%d,%d" % [World.zone.name, cell.x, cell.y] and spilt.begins_with(World.zone.name + "@"),
+			"the fifth spills to a cell beside (%s)" % spilt)
+	var far := cell + Vector2i(3, 0)
+	_check(not World.try_pick_up(host, far) and not World.try_drop(host, 1, far), "nothing picked up or put down three cells off")
+	for i in 3:
+		World.items.end(World.take_from_ground(cell, World.ground_uids(cell).size() - 1), "gone")
+	var left := World.ground_uids(cell)
+	_check(left.size() == 1 and left[0] == wood, "the wood is left there (%s)" % [World.ground_at(cell)])
+	for each: Vector2i in World.zone.ground.keys():
+		if each != cell:
+			while not World.ground_uids(each).is_empty():
+				World.items.end(World.take_from_ground(each, 0), "gone")
+
+
+func _test_throw() -> void:
+	print("\n== thrown: as far as strength and weight allow, and a body hit feels it ==")
+	var host := _player(Net.local_id)
+	World._relocate(host, _open_line(host, 1))
+	World.try_transfer(host, host, 1, host, Player.RIGHT_HAND)
+	var kit := host.slot_items[Player.RIGHT_HAND]
+	var reach := World.throw_reach(host, KIT)
+	_check(reach >= 4 and World.throw_reach(host, "ore_sack") <= 2, "a kit goes %d cells, a sack of ore %d" % [reach, World.throw_reach(host, "ore_sack")])
+	var target := _open_line(host, 3)
+	_check(target != World.NO_CELL, "three free cells in a line from the host (to %s)" % target)
+	var from := host.tile
+	_check(World.try_throw(host, Player.RIGHT_HAND, target) and World.items.at_of(kit) == "%s@%d,%d" % [World.zone.name, target.x, target.y],
+			"the kit lands on the cell aimed at (%s)" % World.items.at_of(kit))
+	var pile: GroundPile = World.zone.piles.get(target)
+	_check(is_instance_valid(pile) and pile.thrown_from == from, "its pile says where it was thrown from")
+	_check(not World.try_throw(host, 1, target), "nothing is thrown from the pack")
+	World._relocate(host, target)
+	World.try_pick_up(host, target)
+	World.try_transfer(host, host, Player.RIGHT_HAND, host, 1)
+	_main._admit(BO, BO_ID, "Bo")
+	var bo := _player(BO)
+	var beside := _open_line(host, 1)
+	World._relocate(bo, beside)
+	var ore := _give(host, "ore_sack", 0)
+	World.try_transfer(host, host, 0, host, Player.RIGHT_HAND)
+	var hp := bo.hp
+	_check(World.try_throw(host, Player.RIGHT_HAND, beside + (beside - host.tile) * 3), "the host throws a sack of ore at Bo, beside them")
+	_check(bo.hp < hp and World.is_stunned(bo), "Bo is hurt (%d to %d) and staggered" % [hp, bo.hp])
+	_check(World.items.history(ore)["events"][-1]["kind"] == "thrown" and World.ground_uids(host.tile).has(ore),
+			"the sack fell at the host's feet, its history says thrown at Bo")
+	World.items.end(World.take_from_ground(host.tile, World.ground_uids(host.tile).find(ore)), "gone")
+	_main._leave(BO, bo, BO_ID)
+
+
 func _test_restart() -> void:
 	print("\n== a restart keeps every instance and its history ==")
 	var host := _player(Net.local_id)
@@ -183,6 +297,11 @@ func _test_restart() -> void:
 	_check(after["events"] == history["events"] and after["carriers"].size() == history["carriers"].size(),
 			"with its history (%s)" % [after["events"]])
 	_check(World.items.size() == count, "the book as big as it was (%d)" % World.items.size())
+	var lying: Array = []
+	for cell: Vector2i in World.zone.ground:
+		lying.append_array(Array(World.ground_uids(cell)))
+	_check(lying.size() == 1 and World.items.id_of(lying[0]) == "wood_bundle" and World.zone.piles.size() == 1,
+			"the wood still lies where it was, the same thing, its pile there (%s)" % [lying])
 	_check(World.items.orphans(_all_uids()).is_empty(), "and nothing in it that nobody holds (%s)" % [World.items.orphans(_all_uids())])
 
 
@@ -214,6 +333,7 @@ func _test_rebuild() -> void:
 	_main._start_level(false, true)
 	chest = _chest()
 	_check(not World.items.has(uid), "the kit left in the chest is gone from the book")
+	_check(World.zone.ground.is_empty() and World.zone.piles.is_empty(), "and what lay on the ground with it")
 	_check(chest.slots[0] == KIT and World.slot_uid(chest, 0) != uid, "the rebuilt chest has a new one from the level")
 	_check(World.items.orphans(_all_uids()).is_empty(), "nothing leaked (%s)" % [World.items.orphans(_all_uids())])
 
@@ -251,10 +371,37 @@ func _all_uids() -> Array:
 	var uids := []
 	for entity in World.get_entities():
 		uids.append_array(Array(World.slot_uids(entity)))
+	for cell: Vector2i in World.zone.ground:
+		uids.append_array(Array(World.ground_uids(cell)))
+	if World.stockpile != null:
+		uids.append_array(Array(World.stockpile.all_items()))
 	for record: PlayerRecord in _main._records.values():
 		uids.append_array(Array(record.slot_items))
 		uids.append_array(record.companion.get("items", []))
 	return uids.filter(func(uid: Variant) -> bool: return int(uid) != 0)
+
+
+func _give(entity: GridEntity, id: String, slot: int) -> int:
+	var uid := World.items.mint(id, "built")
+	World.put_item(entity, entity, slot, uid)
+	return uid
+
+
+## A cell [param cells] away from [param entity] in a straight line with
+## every cell on the way free and open; World.NO_CELL if none.
+func _open_line(entity: GridEntity, cells: int) -> Vector2i:
+	for direction: Vector2i in World.DIRECTIONS:
+		var at := entity.tile
+		var open := true
+		for i in cells:
+			if World._terrain_blocks_step(at, direction, false, false) or not World.is_free(at + direction) \
+					or World.zone.ground.has(at + direction):
+				open = false
+				break
+			at += direction
+		if open:
+			return at
+	return World.NO_CELL
 
 
 func _beside(entity: GridEntity, chest: Chest) -> void:

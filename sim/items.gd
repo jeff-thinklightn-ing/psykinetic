@@ -10,14 +10,27 @@ extends RefCounted
 ## color (the slot text and grey box), art (its ArtKit slot, item.<id>),
 ## kind (held or cell), size (metres), weight (kg), hands (0 pack only, 1
 ## or 2), tags, effects ([{kind, amount, ticks}]: buffs, used up), use
-## (the verb it is used with), yield (a resource's counts when banked).
+## (the verb it is used with), yield (a resource's counts when banked),
+## made (how the town makes it, read by economy's production: {by: a trade
+## (TRADES), from: {resource or item id: count}, steps} to make it, or
+## {by, rework: the id it is reworked from, steps}; {} for none).
 ## Levels, prefabs and the builder name ids; an unknown id is dropped.
 
 const CATALOG := "res://levels/items.json"
 ## The ArtKit manifest of items' slots, generated from the catalog.
 const ART_SLOTS := "res://art/kit/slots_items.json"
 const ART_BUDGET := 500
-const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb"]
+## A carrier's slots (a player's, a companion's): the pack first, then two
+## hands, right and left. A thing in a hand is held (hands 1 or 2; a
+## two-handed one in the right hand with the left empty); World keeps to it.
+## A save from before hands had the pack alone: tidy pads the hands.
+const PACK := 4
+const RIGHT_HAND := 4
+const LEFT_HAND := 5
+const CARRIED := 6
+const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made"]
+## Who makes things (made's "by"), as economy's production has them.
+const TRADES: Array[String] = ["smith", "cook", "carpenter"]
 
 static var _catalog: Dictionary = {}
 
@@ -50,7 +63,37 @@ static func read(text: String) -> Dictionary:
 			if key not in FIELDS:
 				push_warning("Items: %s has an unknown field %s" % [id, key])
 		definitions[id] = _definition(id, entry)
+	for id: String in definitions:
+		var made: Dictionary = definitions[id]["made"]
+		var problem := made_problem(made, definitions)
+		if not problem.is_empty():
+			push_warning("Items: %s's made %s; left out" % [id, problem])
+			definitions[id]["made"] = {}
 	return definitions
+
+
+## What is wrong with a definition's [param made] given [param definitions]
+## (every id), or "" if nothing: "by" a trade (TRADES), "steps" over 0, and
+## either "from" (stockpile resources or item ids, each a count over 0) or
+## "rework" (an item id).
+static func made_problem(made: Dictionary, definitions: Dictionary) -> String:
+	if made.is_empty():
+		return ""
+	if str(made.get("by", "")) not in TRADES:
+		return "is by %s, no trade (%s)" % [made.get("by"), ", ".join(TRADES)]
+	if int(made.get("steps", 0)) <= 0:
+		return "takes no steps"
+	if made.has("rework"):
+		return "" if definitions.has(str(made["rework"])) else "reworks %s, no item" % made["rework"]
+	var from: Variant = made.get("from")
+	if from is not Dictionary or from.is_empty():
+		return "is from nothing"
+	for what: Variant in from:
+		if str(what) not in Stockpile.RESOURCES and not definitions.has(str(what)):
+			return "is from %s, no resource or item" % what
+		if int(from[what]) <= 0:
+			return "takes %s of %s" % [from[what], what]
+	return ""
 
 
 static func _definition(id: String, entry: Dictionary) -> Dictionary:
@@ -79,7 +122,37 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"use": str(entry.get("use", "")),
 		"verb": entry.get("verb", {}) if entry.get("verb") is Dictionary else {},
 		"yield": yields,
+		"made": _made(entry.get("made")),
 	}
+
+
+## A made field as read: counts as ints, steps an int; {} for none.
+static func _made(value: Variant) -> Dictionary:
+	if value is not Dictionary:
+		return {}
+	var made := {"by": str(value.get("by", "")), "steps": int(value.get("steps", 0))}
+	if value.has("rework"):
+		made["rework"] = str(value["rework"])
+	elif value.get("from") is Dictionary:
+		var from := {}
+		for what: Variant in value["from"]:
+			from[str(what)] = int(value["from"][what])
+		made["from"] = from
+	return made
+
+
+## For tests: [param entry] (as a catalog entry, with an id) added to the
+## catalog as if it were in the file, until reset. Its definition.
+static func add_for_test(entry: Dictionary) -> Dictionary:
+	var id := str(entry.get("id", ""))
+	all()[id] = _definition(id, entry)
+	return _catalog[id]
+
+
+## For tests: the catalog read again from the file on next use, anything
+## added_for_test gone.
+static func reset() -> void:
+	_catalog = {}
 
 
 static func exists(id: String) -> bool:

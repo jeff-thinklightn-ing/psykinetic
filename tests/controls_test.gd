@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
+	_test_item_keys()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -657,6 +658,40 @@ func _middle(pressed: bool) -> InputEventMouseButton:
 	button.pressed = pressed
 	return button
 
+
+
+func _test_item_keys() -> void:
+	print("\n== F picks up, G puts down, T throws, in both schemes, and the list says so ==")
+	var was: String = Net.controls
+	var player := _player()
+	for scheme in ["click", "wasd"]:
+		Net.controls = scheme
+		var lines := "\n".join(_main.hint_lines())
+		_check("F\tpick up" in lines and "G\tput down" in lines and "T\tthrow" in lines, "%s: F, G and T in the controls list" % scheme)
+		var uid := World.items.mint("bandaging_kit", "built")
+		World.put_item(player, player, Player.RIGHT_HAND, uid)
+		_press(KEY_G)
+		_check(player.slots[Player.RIGHT_HAND] == "" and World.ground_uids(player.tile).has(uid), "%s: G puts the kit down at the feet" % scheme)
+		_press(KEY_F)
+		_check(player.slot_items[Player.RIGHT_HAND] == uid and World.ground_uids(player.tile).is_empty(), "%s: F picks it up again" % scheme)
+		var free := Vector2i(-1, -1)
+		for direction: Vector2i in World.DIRECTIONS:
+			var cell := player.tile + direction * 2
+			if World.is_free(player.tile + direction) and World.is_free(cell) and not World._terrain_blocks_step(player.tile, direction, false, false) \
+					and not World._terrain_blocks_step(player.tile + direction, direction, false, false):
+				free = cell
+				break
+		World.command(player, "throw", {"cell": [free.x, free.y]})
+		_check(World.ground_uids(free).has(uid), "%s: T's command throws it two cells, to %s" % [scheme, free])
+		World.items.end(World.take_from_ground(free, World.ground_uids(free).find(uid)), "gone")
+	Net.controls = was
+
+
+func _press(keycode: Key) -> void:
+	var key := InputEventKey.new()
+	key.keycode = keycode
+	key.pressed = true
+	_main._unhandled_input(key)
 
 
 func _player() -> Player:

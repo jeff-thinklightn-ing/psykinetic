@@ -43,10 +43,32 @@ func _ready() -> void:
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
 	await _test_doors_swing()
+	_test_piles()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
+
+
+func _test_piles() -> void:
+	print("\n== what lies on the ground is drawn: each thing's art slot in a ring; gone when taken ==")
+	var cell := Vector2i(-1, -1)
+	for each: Vector2i in _main._terrain["floor"]:
+		if World.is_walkable(each) and not World.is_water(each):
+			cell = each
+			break
+	var kit := World.items.mint("bandaging_kit", "built")
+	var ore := World.items.mint("ore_sack", "built")
+	World.put_on_ground(kit, cell)
+	World.put_on_ground(ore, cell)
+	var pile: GroundPile = World.zone.piles.get(cell)
+	var heap: Node3D = _rig._pile_nodes.get(pile)
+	_check(heap != null and heap.get_child_count() == 3, "a heap at %s: a ring and two things (%d)" % [cell, heap.get_child_count() if heap else -1])
+	_check(heap != null and heap.position.is_equal_approx(_rig._tile_position(cell)), "standing on its cell")
+	World.items.end(World.take_from_ground(cell, 1), "gone")
+	_check(_rig._pile_nodes.has(pile) and _rig._pile_nodes[pile].get_child_count() == 2, "one taken: the heap has the other")
+	World.items.end(World.take_from_ground(cell, 0), "gone")
+	_check(not _rig._pile_nodes.has(pile) and World.ground_at(cell).is_empty(), "both taken: the heap is gone")
 
 
 func _test_every_sound_has_its_files() -> void:

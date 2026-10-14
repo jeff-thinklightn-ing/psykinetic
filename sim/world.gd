@@ -36,6 +36,14 @@ signal door_shown(door: Door)
 ## Something went into or out of [param entity]'s slots (try_transfer,
 ## set_slots). Server only.
 signal slots_changed(entity: GridEntity)
+## The things on [param cell] of zone [param zone_name] (the one World is
+## in) changed: something put down, spilt or thrown there (from
+## [param thrown_from], else NO_CELL), or taken away. Main keeps its
+## GroundPile; economy banks what lands on stockpile ground. Server only.
+signal ground_changed(zone_name: String, cell: Vector2i, thrown_from: Vector2i)
+## A GroundPile came, changed or went, for the views (any peer).
+signal pile_shown(pile: GroundPile)
+signal pile_gone(pile: GroundPile)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -170,6 +178,18 @@ const PATH_DOOR_EXTRA := PATH_STEP_COST
 const ATTACK_FORCE_FACTOR := 0.5
 ## How far off a player can still get at their companion's pack (cells).
 const COMPANION_REACH := 2
+## Things on one cell of ground at most; more spill to the nearest cell with
+## room, at most GROUND_SPILL away (put_on_ground).
+const GROUND_PER_CELL := 4
+const GROUND_SPILL := 3
+## No cell: what put_on_ground gives when there is nowhere to put a thing.
+const NO_CELL := Vector2i(-99999, -99999)
+## Throwing (try_throw): reach is THROW_PER_STRENGTH x strength / the square
+## root of the weight, 1 to THROW_MAX cells; a body hit takes force weight x
+## THROW_FORCE_PER_KG (impact_damage at the thing's mass over its).
+const THROW_MAX := 6
+const THROW_PER_STRENGTH := 0.5
+const THROW_FORCE_PER_KG := 0.3
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
@@ -739,6 +759,9 @@ func update_visibility(peer: int, zone_name: String) -> void:
 	for door: Door in doors.values():
 		if is_instance_valid(door) and door.sync != null:
 			door.sync.update_visibility(peer)
+	for pile: GroundPile in each.piles.values():
+		if is_instance_valid(pile) and pile.sync != null:
+			pile.sync.update_visibility(peer)
 
 
 # --- Mutations (server only) --------------------------------------------------
@@ -753,6 +776,12 @@ func reset() -> void:
 				if uid != 0:
 					items.place(uid, "")
 					_unclaimed.append(uid)
+	for cell: Vector2i in zone.ground:
+		for uid in zone.ground[cell]:
+			items.place(uid, "")
+			_unclaimed.append(uid)
+	zone.ground.clear()
+	zone.piles.clear()
 	for entity in _entities:
 		if is_instance_valid(entity):
 			entity._world_remove()
@@ -818,6 +847,21 @@ func _set_terrain(terrain: Dictionary) -> void:
 
 ## Doors register on every peer: the server reads and changes them, a client
 ## reads them for prediction and drawing.
+## A GroundPile entered the tree (server and client): the zone it is in
+## knows it by cell, and the views are told.
+func register_pile(pile: GroundPile) -> void:
+	var each: Zone = zones.get(pile.zone, zone) if Net.is_authority() else zone
+	each.piles[pile.tile] = pile
+	pile_shown.emit(pile)
+
+
+func unregister_pile(pile: GroundPile) -> void:
+	for each: Zone in ([zone] if not Net.is_authority() else zones.values()):
+		if each.piles.get(pile.tile) == pile:
+			each.piles.erase(pile.tile)
+	pile_gone.emit(pile)
+
+
 func register_door(door: Door) -> void:
 	_doors[door.key] = door
 	fields_changed()
@@ -1021,6 +1065,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	if from == to:
 		taken[to_slot] = item
 		taken_uids[to_slot] = uid
+		if not hands_allow(from, taken):
+			return false
 		from.slots = taken
 		from.slot_items = taken_uids
 	else:
@@ -1028,6 +1074,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		var given_uids := to.slot_items.duplicate()
 		given[to_slot] = item
 		given_uids[to_slot] = uid
+		if not hands_allow(from, taken) or not hands_allow(to, given):
+			return false
 		from.slots = taken
 		from.slot_items = taken_uids
 		to.slots = given
@@ -1037,9 +1085,9 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 			_moved_item(other_uid, to, from)
 	_log("slots: %s moved %s from %s %d to %s %d%s" % [by.name, item, from.name, from_slot, to.name, to_slot,
 		"" if other.is_empty() else " (swapping %s)" % other])
-	slots_changed.emit(from)
+	_slots_changed(from)
 	if to != from:
-		slots_changed.emit(to)
+		_slots_changed(to)
 	return true
 
 
@@ -1061,7 +1109,7 @@ func take_item(by: GridEntity, from: GridEntity, slot: int) -> int:
 	from.slots = taken
 	from.slot_items = taken_uids
 	items.place(uid, "")
-	slots_changed.emit(from)
+	_slots_changed(from)
 	return uid
 
 
@@ -1079,13 +1127,51 @@ func put_item(by: GridEntity, to: GridEntity, slot: int, uid: int) -> bool:
 	var given_uids := to.slot_items.duplicate()
 	given[slot] = id
 	given_uids[slot] = uid
+	if not hands_allow(to, given):
+		return false
 	to.slots = given
 	to.slot_items = given_uids
 	var carrier := _carrier_of(to)
 	items.place(uid, holder_key(to), carrier[0], carrier[1])
 	_log("slots: %s put %s into %s %d" % [by.name, id, to.name, slot])
-	slots_changed.emit(to)
+	_slots_changed(to)
 	return true
+
+
+## Whether [param slots] (what [param entity]'s would be) keep to the
+## hands: in a carrier's hands (Items.RIGHT_HAND, LEFT_HAND) only things
+## that can be held; a two-handed one only in the right hand, the left
+## then empty. Anything else (a chest) has no hands.
+func hands_allow(entity: GridEntity, slots: PackedStringArray) -> bool:
+	if not has_hands(entity) or slots.size() < Items.CARRIED:
+		return true
+	var right := slots[Items.RIGHT_HAND]
+	var left := slots[Items.LEFT_HAND]
+	for held in [right, left]:
+		if not held.is_empty() and int(Items.def(held).get("hands", 0)) == 0:
+			return false
+	if not left.is_empty() and int(Items.def(left)["hands"]) == 2:
+		return false
+	return right.is_empty() or int(Items.def(right)["hands"]) < 2 or left.is_empty()
+
+
+## A player or a companion: something with hands (Items.CARRIED slots).
+func has_hands(entity: GridEntity) -> bool:
+	return (entity is Player or entity.keeper_peer != 0) and entity.slots.size() == Items.CARRIED
+
+
+## [param entity]'s slots changed: its mass follows what it carries (its
+## base_mass and the things' weights), and slots_changed is emitted.
+func _slots_changed(entity: GridEntity) -> void:
+	if entity.base_mass < 0.0:
+		entity.base_mass = entity.mass
+	var carried := 0.0
+	if not entity is Chest:
+		for id in entity.slots:
+			if not id.is_empty():
+				carried += Items.weight_of(id)
+	entity.mass = entity.base_mass + carried
+	slots_changed.emit(entity)
 
 
 ## The instance in [param entity]'s slot [param slot]: 0 for an empty slot;
@@ -1229,8 +1315,192 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 			stockpile.deposit(place, what, int(yields[what]), who, _label_of(from))
 		items.end(uid, "banked", "%s by %s" % [place, who], depot.zone, depot.tile)
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
-	slots_changed.emit(from)
+	_slots_changed(from)
 	return true
+
+
+## The things lying on [param cell] of the zone World is in: their ids,
+## the top (the last put down) last.
+func ground_at(cell: Vector2i) -> PackedStringArray:
+	var ids := PackedStringArray()
+	for uid in zone.ground.get(cell, PackedInt32Array()):
+		ids.append(items.id_of(uid))
+	return ids
+
+
+## Their instances (ItemBook uids), as ground_at.
+func ground_uids(cell: Vector2i) -> PackedInt32Array:
+	return zone.ground.get(cell, PackedInt32Array()).duplicate()
+
+
+## Whether [param by] can reach [param cell] to pick up or put down: its own
+## cell, or one beside it with no wall or closed door between.
+func reaches_cell(by: GridEntity, cell: Vector2i) -> bool:
+	return cell == by.tile or can_melee(by.tile, cell)
+
+
+## [param by] puts what is in its slot [param slot] down on [param at] (its
+## own cell if null; one it reaches). A full cell (GROUND_PER_CELL) spills
+## to the nearest with room. False, and nothing moves, if it cannot.
+func try_drop(by: GridEntity, slot: int, at: Variant = null) -> bool:
+	if not Net.is_authority() or not _can_handle(by):
+		return false
+	var cell: Vector2i = by.tile if at == null else at
+	if not reaches_cell(by, cell) or slot < 0 or slot >= by.slots.size() or by.slots[slot].is_empty():
+		return false
+	if _ground_room(cell) == NO_CELL:
+		return false
+	var id := by.slots[slot]
+	var uid := take_item(by, by, slot)
+	if uid == 0:
+		return false
+	var landed := put_on_ground(uid, cell)
+	_log("ground: %s put %s down at %s" % [by.name, id, landed])
+	return true
+
+
+## [param by] picks up the thing at [param index] (-1: the top one) on
+## [param cell], one it reaches, into a free hand that can hold it, else
+## its pack. False, and nothing moves, if it cannot (nothing there, no room).
+func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
+	if not Net.is_authority() or not _can_handle(by) or not reaches_cell(by, cell):
+		return false
+	var there: PackedInt32Array = zone.ground.get(cell, PackedInt32Array())
+	if there.is_empty():
+		return false
+	if index < 0:
+		index = there.size() - 1
+	if index >= there.size():
+		return false
+	var uid := there[index]
+	var slot := free_slot_for(by, items.id_of(uid))
+	if slot < 0:
+		return false
+	take_from_ground(cell, index)
+	var carried_before: bool = not items.history(uid).get("carriers", []).is_empty()
+	put_item(by, by, slot, uid)
+	if not carried_before:
+		items.note(uid, "found", "on the ground by %s" % _label_of(by), zone.name, cell)
+	_log("ground: %s picked up %s at %s" % [by.name, items.id_of(uid), cell])
+	return true
+
+
+## The slot [param entity] would take [param id] into: a free hand that
+## can hold it (the right first; a two-handed thing both hands free), else
+## the first free pack slot; -1 for none.
+func free_slot_for(entity: GridEntity, id: String) -> int:
+	if has_hands(entity):
+		for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+			if entity.slots[hand].is_empty():
+				var trial := entity.slots.duplicate()
+				trial[hand] = id
+				if hands_allow(entity, trial):
+					return hand
+	for slot in mini(entity.slots.size(), Items.PACK if has_hands(entity) else entity.slots.size()):
+		if entity.slots[slot].is_empty():
+			return slot
+	return -1
+
+
+## Puts the instance [param uid] on [param cell], or the nearest cell with
+## room (on the floor, dry, fewer than GROUND_PER_CELL there) within
+## GROUND_SPILL: where it went, NO_CELL if nowhere (it stays where it was).
+## For whatever lays things down: a drop, a throw, later loot.
+func put_on_ground(uid: int, cell: Vector2i, thrown_from := NO_CELL) -> Vector2i:
+	var landed := _ground_room(cell)
+	if landed == NO_CELL or not items.has(uid):
+		return NO_CELL
+	var there: PackedInt32Array = zone.ground.get(landed, PackedInt32Array()).duplicate()
+	there.append(uid)
+	zone.ground[landed] = there
+	items.place(uid, "%s@%d,%d" % [zone.name, landed.x, landed.y])
+	ground_changed.emit(zone.name, landed, thrown_from)
+	return landed
+
+
+## Takes the thing at [param index] off [param cell]: its uid (0 if none).
+## Whoever has it now says where it is.
+func take_from_ground(cell: Vector2i, index: int) -> int:
+	var there: PackedInt32Array = zone.ground.get(cell, PackedInt32Array()).duplicate()
+	if index < 0 or index >= there.size():
+		return 0
+	var uid := there[index]
+	there.remove_at(index)
+	if there.is_empty():
+		zone.ground.erase(cell)
+	else:
+		zone.ground[cell] = there
+	items.place(uid, "")
+	ground_changed.emit(zone.name, cell, NO_CELL)
+	return uid
+
+
+## [param by] throws what is in one of its hands ([param slot]) toward
+## [param target]: it flies a cell at a time (a step toward the target
+## each, so diagonals first) as far as throw_reach, over water and
+## ledges, until a wall or a closed door stops it or it hits a body; the
+## body takes an impact from its weight (impact_damage, through _impact,
+## as a push's collision does) and is stunned. It lands on the last cell
+## it reached (off water). False, and nothing moves, if it cannot.
+func try_throw(by: GridEntity, slot: int, target: Vector2i) -> bool:
+	if not Net.is_authority() or not _can_handle(by) or is_stunned(by):
+		return false
+	if not has_hands(by) or slot not in [Items.RIGHT_HAND, Items.LEFT_HAND] or by.slots[slot].is_empty() or target == by.tile:
+		return false
+	var id := by.slots[slot]
+	var reach := throw_reach(by, id)
+	var cell := by.tile
+	var dry := by.tile
+	var hit: GridEntity = null
+	for i in reach:
+		if cell == target:
+			break
+		var step := Vector2i(signi(target.x - cell.x), signi(target.y - cell.y))
+		if _terrain_blocks_step(cell, step, false, false) and not is_water(cell + step):
+			break
+		if edge_blocks(cell, step):
+			break
+		var body: GridEntity = _occupancy.get(cell + step)
+		if body != null and body != by:
+			hit = body
+			break
+		cell += step
+		if not is_water(cell):
+			dry = cell
+	var uid := take_item(by, by, slot)
+	if uid == 0:
+		return false
+	var landed := put_on_ground(uid, dry, by.tile)
+	_log("throw: %s threw %s from %s to %s%s" % [by.name, id, by.tile, landed, "" if hit == null else ", hitting %s" % hit.name])
+	if hit != null:
+		var force := Items.weight_of(id) * THROW_FORCE_PER_KG
+		var impact := impact_damage(force, mass_ratio(Items.weight_of(id), pushed_mass(hit)))
+		items.note(uid, "thrown", "at %s by %s" % [_label_of(hit), _label_of(by)], zone.name, hit.tile)
+		_stun(hit, force)
+		if impact > 0:
+			_impact(hit, impact, by, &"body")
+	return true
+
+
+## How many cells [param by] can throw [param id]: its strength over the
+## thing's weight (square root: a sack goes a cell or two, a kit across a
+## room), 1 to THROW_MAX.
+func throw_reach(by: GridEntity, id: String) -> int:
+	return clampi(floori(THROW_PER_STRENGTH * by.strength / sqrt(maxf(Items.weight_of(id), 0.5))), 1, THROW_MAX)
+
+
+## [param cell] if it has room for one more thing, else the nearest that
+## does, within GROUND_SPILL (dry floor); NO_CELL if none.
+func _ground_room(cell: Vector2i) -> Vector2i:
+	for radius in GROUND_SPILL + 1:
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if maxi(absi(dx), absi(dy)) != radius:
+					continue
+				var each := cell + Vector2i(dx, dy)
+				if is_walkable(each) and not is_water(each) and zone.ground.get(each, PackedInt32Array()).size() < GROUND_PER_CELL:
+					return each
+	return NO_CELL
 
 
 ## Puts saved contents back into [param entity]'s slots (unknown items
@@ -1257,7 +1527,7 @@ func set_slots(entity: GridEntity, contents: Variant, uids: Variant = []) -> voi
 	if tidy != entity.slots or kept != entity.slot_items:
 		entity.slots = tidy
 		entity.slot_items = kept
-		slots_changed.emit(entity)
+		_slots_changed(entity)
 
 
 func spawn(entity: GridEntity, at: Vector2i) -> bool:

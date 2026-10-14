@@ -63,8 +63,19 @@ func _crate(cell: Vector2i) -> GridEntity:
 	return null
 
 
+## A free floor cell at or near [param cell].
+func _floor_near(cell: Vector2i) -> Vector2i:
+	for radius in 6:
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var each := cell + Vector2i(dx, dy)
+				if World.is_walkable(each) and not World.is_water(each) and World.is_free(each):
+					return each
+	return cell
+
+
 func _sees(node: Object) -> bool:
-	if node is Door:
+	if node is Door or node is GroundPile:
 		return World.peer_sees(FAR_PEER, node.zone) and Net.interest.sees(FAR_PEER, node)
 	return node._visible_to(FAR_PEER)
 
@@ -78,8 +89,14 @@ func _test_near_and_far() -> void:
 	_check(not _sees(_crate(Vector2i(50, 50))) and not _sees(_crate(Vector2i(110, 110))), "not those beyond: (50, 50), (110, 110)")
 	_check(_sees(World.door_on(Vector3i(20, 5, Terrain.EAST))) and not _sees(World.door_on(Vector3i(100, 100, Terrain.EAST))),
 		"a door near is sent, a door far is not")
+	var near_cell := _floor_near(Vector2i(12, 12))
+	var far_cell := _floor_near(Vector2i(100, 100))
+	World.put_on_ground(World.items.mint("bandaging_kit", "built"), near_cell)
+	World.put_on_ground(World.items.mint("bandaging_kit", "built"), far_cell)
+	_check(_sees(World.zone.piles.get(near_cell)) and not _sees(World.zone.piles.get(far_cell)),
+		"a thing on the ground near is sent (%s), one far is not (%s)" % [near_cell, far_cell])
 	var count := Net.interest.count_seen(FAR_PEER, MAP)
-	_check(count > 0 and count < 40, "%d of the map's %d things are sent to it" % [count, World.get_entities().size() + 2])
+	_check(count > 0 and count < 42, "%d of the map's %d things are sent to it" % [count, World.get_entities().size() + 2])
 	var host_player: Player = _main._players.get(Net.local_id)
 	_check(host_player != null and not _sees(host_player) == false, "the host's player beside it is sent too")
 

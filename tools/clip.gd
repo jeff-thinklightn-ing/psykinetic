@@ -19,6 +19,10 @@ extends Node
 ##   leash: in a long hall the player keeps just ahead of an imp; LEASH
 ##     tiles from where it took up the chase it gives up and walks home,
 ##     the player in plain sight.
+##   items: a lit room, a chest with a bandaging kit and a sack of ore, an
+##     imp on guard. The player takes the kit into a hand, puts it down (G),
+##     picks it up (F), throws it across the room (T), then throws the sack
+##     at the imp, who staggers; the pack (I) is open throughout.
 
 const NAME := "clip"
 
@@ -51,6 +55,8 @@ func _ready() -> void:
 			_escape()
 		"leash":
 			_leash()
+		"items":
+			_items()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -64,13 +70,16 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	_player.max_hp = 1000000
-	_player.hp = _player.max_hp
+	if scenario == "sneak":
+		_player.max_hp = 1000000
+		_player.hp = _player.max_hp
 	var layer := CanvasLayer.new()
 	layer.layer = 100
 	add_child(layer)
 	if _main.hint_panel != null:
 		_main.hint_panel.visible = false  # The controls list would cover the caption.
+	if scenario == "items":
+		_main.pack_panel.shown = true
 	_caption = Label.new()
 	_caption.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -175,6 +184,39 @@ func _leash() -> void:
 		["say", 15, "An imp sees you."],
 		["lure", [Vector2i(30, 2), 3], "You keep just ahead of it..."],
 		["say", 80, "...too far from its post: it gives up, you in plain sight."],
+func _items() -> void:
+	var rows: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var markers := {Vector2i(2, 3): "start", Vector2i(3, 1): "chest", Vector2i(10, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["bandaging_kit", "ore_sack", "", ""]}},
+			{"at": [10, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["say", 30, "A chest: a bandaging kit and a sack of ore."],
+		["walk", Vector2i(3, 2), "To the chest."],
+		["open", true, "Opened: the chest above, the pack and two hands (R, L) below."],
+		["wait", 25, ""],
+		["take", [0, Player.RIGHT_HAND], "The kit into the right hand (drag, in the pack below)."],
+		["wait", 25, ""],
+		["key", ["drop", null], "G: put it down."],
+		["wait", 30, ""],
+		["key", ["pick_up", null], "F: picked up again."],
+		["wait", 30, ""],
+		["key", ["throw", Vector2i(8, 2)], "T: thrown at the cursor (a kit flies far)."],
+		["wait", 40, ""],
+		["take", [1, Player.RIGHT_HAND], "The sack of ore: 10 kg. Carried, it weighs on you."],
+		["open", false, ""],
+		["walk", "beside the monster", "Up to the imp."],
+		["key", ["throw", "the monster"], "T: thrown at the imp: it staggers."],
+		["wait", 60, ""],
 	]
 
 
@@ -200,8 +242,21 @@ func _on_tick(tick: int) -> void:
 		"lantern":
 			if (_player.emit_light > 0.0) != bool(step[1]):
 				_player.toggle_lantern()
+		"take":
+			World.try_transfer(_player, _chest(), int(step[1][0]), _player, int(step[1][1]))
+		"open":
+			if bool(step[1]):
+				_main._open_pack(_player, _chest())
+			else:
+				_main.close_other()
+		"key":
+			var args := {}
+			var cell: Variant = _monster.tile if step[1][1] is String else step[1][1]
+			if cell != null:
+				args["cell"] = [cell.x, cell.y]
+			World.command(_player, str(step[1][0]), args)
 		"walk":
-			if not _walk(step[1]):
+			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
 		"lure":
 			var after := _monster.alert == Monster.Alert.FIGHTING or _monster.alert == Monster.Alert.HUNTING
@@ -225,7 +280,31 @@ func _walk(to: Vector2i) -> bool:
 	return false
 
 
+## A free cell beside the monster, on the player's side.
+func _beside_monster() -> Vector2i:
+	var best := _monster.tile
+	for direction: Vector2i in World.DIRECTIONS:
+		var cell := _monster.tile + direction
+		if (World.is_free(cell) or cell == _player.tile) and World.can_melee(cell, _monster.tile) \
+				and (best == _monster.tile or World.distance(cell, _player.tile) < World.distance(best, _player.tile)):
+			best = cell
+	return best
+
+
+func _chest() -> Chest:
+	for entity in World.get_entities():
+		if entity is Chest:
+			return entity
+	return null
+
+
 func _log(tick: int) -> void:
+	if scenario == "items":
+		print("[clip] tick %d: player %s mass %.1f hands %s; ground %s (%d piles, %d drawn); %s hp %d%s" % [tick, _player.tile, _player.mass,
+			[_player.slots[Player.RIGHT_HAND], _player.slots[Player.LEFT_HAND]], World.zone.ground.keys(), World.zone.piles.size(),
+			_main._client3d._pile_nodes.size() if _main._client3d != null else -1, _monster.name + " at %s" % _monster.tile,
+			_monster.hp, " stunned" if World.is_stunned(_monster) else ""])
+		return
 	var heard := "" if _monster.senses.heard.is_empty() else "%s at %s (tick %d)" % [
 		_monster.senses.heard.back()["kind"], _monster.senses.heard.back()["at"], _monster.senses.heard.back()["tick"]]
 	print("[clip] tick %d: player %s lantern %s; %s at %s facing %s, %s, target %s, heard %s" % [tick, _player.tile,

@@ -10,8 +10,11 @@ extends GridEntity
 ## whatever is on it, if World allows. WASD steps (queued_steps) are taken
 ## one per free tick, in order, and win over everything else.
 
-## Slots a player has for things (Items), from the start, empty.
-const SLOTS := 4
+## Slots a player has for things (Items): the pack and two hands
+## (Items.RIGHT_HAND, LEFT_HAND), from the start, empty.
+const SLOTS := Items.CARRIED
+const RIGHT_HAND := Items.RIGHT_HAND
+const LEFT_HAND := Items.LEFT_HAND
 ## Its lantern's light (GridEntity.emit_light) while lit.
 const LANTERN := 0.9
 

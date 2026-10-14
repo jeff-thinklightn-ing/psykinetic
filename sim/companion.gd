@@ -339,8 +339,9 @@ var _joined_tick := -1
 var _fallen: Array[Dictionary] = []
 
 
-## Slots in her pack (Items), empty at first; her player can get at them.
-const SLOTS := 4
+## Her slots (Items): a pack and two hands, as a player's, empty at first;
+## her player can get at them.
+const SLOTS := Items.CARRIED
 
 
 func _init() -> void:
@@ -551,16 +552,19 @@ func knowledge_of(kinds: Array[String]) -> String:
 	return " ".join(sentences)
 
 
-## What she carries, in a sentence: her lantern, and what is in her pack.
+## What she carries, in a sentence: her lantern, what is in her hands and
+## what is in her pack.
 func carried() -> String:
 	var items: Array[String] = []
-	for item in slots:
-		if not item.is_empty():
-			items.append("a " + Items.name_of(item))
+	var held: Array[String] = []
+	for i in slots.size():
+		if not slots[i].is_empty():
+			(held if i >= Items.PACK else items).append("a " + Items.name_of(slots[i]))
 	var pack := "nothing" if items.is_empty() else ", ".join(items)
+	var hands := "" if held.is_empty() else " In your hands: %s." % " and ".join(held)
 	if emit_light > 0.0:
-		return "You carry a lantern, and in your pack %s." % pack
-	return "In your pack you carry %s." % pack
+		return "You carry a lantern, and in your pack %s.%s" % [pack, hands]
+	return "In your pack you carry %s.%s" % [pack, hands]
 
 
 ## Who else is in her zone, where, and who is near enough to hear: the other
