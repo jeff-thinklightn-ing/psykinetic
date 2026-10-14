@@ -5,14 +5,18 @@ extends Node
 ## costs: reading it, opening its zone, painting it, the client's 3D build,
 ## the server's tick, long paths, nodes and memory, and, with a window,
 ## frames. One size per run, so each starts clean (tools/map_bench.ps1
-## runs a series).
-##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--ticks=200] [--seconds=8]
+## runs a series). With --players=N, N - 1 more players join (as peers of
+## their own) and stand spread over the map on a grid, so more monsters are
+## near someone and fighting; every player is then too tough to die, so
+## nobody is away respawning for part of the run.
+##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--players=1] [--ticks=200] [--seconds=8]
 
 const NAME := "bench"
 const ROOM := 8
 
 var size := 64
 var monsters := 2
+var players := 1
 var ticks := 200
 var seconds := 8.0
 var _main: Node
@@ -26,11 +30,12 @@ func _ready() -> void:
 		match pair[0]:
 			"size": size = pair[1].to_int()
 			"monsters": monsters = pair[1].to_int()
+			"players": players = maxi(1, pair[1].to_int())
 			"ticks": ticks = pair[1].to_int()
 			"seconds": seconds = pair[1].to_float()
 	var windowed := DisplayServer.get_name() != "headless"
-	print("BENCH size=%d cells (%d floor), monsters/room=%d, %s" % [size, size * size,
-		monsters, "windowed" if windowed else "headless"])
+	print("BENCH size=%d cells (%d floor), monsters/room=%d, players=%d, %s" % [size, size * size,
+		monsters, players, "windowed" if windowed else "headless"])
 	var memory_before := OS.get_static_memory_usage()
 
 	var started := Time.get_ticks_usec()
@@ -59,6 +64,8 @@ func _ready() -> void:
 		_main._client3d.rebuild(_main._terrain, _main.level_centre)
 		_report("  3D client rebuild again", started)
 
+	if players > 1:
+		_spread_players()
 	World.step()
 	var worst := 0
 	var total := 0
@@ -171,6 +178,41 @@ func _frames() -> void:
 		frames / elapsed, worst, draws,
 		Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
+
+
+## players - 1 more players, each at the free tile nearest a point of a grid
+## over the map (the host keeps its corner), and every player too tough to
+## die.
+func _spread_players() -> void:
+	var across := ceili(sqrt(players))
+	var joined := 0
+	for i in across * across:
+		if joined >= players - 1:
+			break
+		var point := Vector2i((i % across * 2 + 1) * size / (across * 2), (i / across * 2 + 1) * size / (across * 2))
+		if point.x < size / (across * 2) + 1 and point.y < size / (across * 2) + 1 and i == 0 and across > 1:
+			continue  # The host's corner.
+		var peer := 1000 + joined
+		_main._admit(peer, "be0c0000-0000-4000-8000-%012d" % peer, "Bench%d" % joined)
+		var player: Player = _main._players.get(peer)
+		var spot := _free_near(point)
+		if player != null and spot != Vector2i(-1, -1):
+			World._relocate(player, spot)
+		joined += 1
+	for entity in World.sought():
+		entity.max_hp = 1000000
+		entity.hp = entity.max_hp
+	print("BENCH players: %d, spread over a %dx%d grid" % [World.sought().size(), across, across])
+
+
+## The free tile nearest [param point], looking out ring by ring.
+func _free_near(point: Vector2i) -> Vector2i:
+	for reach in 12:
+		for dy in range(-reach, reach + 1):
+			for dx in range(-reach, reach + 1):
+				if maxi(absi(dx), absi(dy)) == reach and World.is_free(point + Vector2i(dx, dy)):
+					return point + Vector2i(dx, dy)
+	return Vector2i(-1, -1)
 
 
 func _report(what: String, started: int) -> void:

@@ -63,6 +63,9 @@ var _source_list: Array = []
 ## stop, in the order _spread looks at them, "doors": for each, what its
 ## line owes to doors (World.line_doors)}.
 var _lines: Array = []
+## hot_cells' answers, kept up as cells are added up again:
+## {threshold: {cell: true}}.
+var _hot := {}
 
 
 func load(terrain: Dictionary) -> void:
@@ -144,6 +147,22 @@ func map_heat_at(world: Node, cell: Vector2i) -> float:
 	return _heat.get(cell, 0.0)
 
 
+## The cells whose own fixed heat (map_heat_at) is at least
+## [param threshold]: where a creature burns with nobody carrying heat.
+## Looked for in the whole map once, then kept up as doors change it.
+func hot_cells(world: Node, threshold: float) -> Array[Vector2i]:
+	_refresh(world)
+	if not _hot.has(threshold):
+		var found: Dictionary[Vector2i, bool] = {}
+		for cell: Vector2i in _heat:
+			if _heat[cell] >= threshold:
+				found[cell] = true
+		_hot[threshold] = found
+	var cells: Array[Vector2i] = []
+	cells.assign(_hot[threshold].keys())
+	return cells
+
+
 ## Whether anything in [param world] carries heat now (see heat_at).
 func any_carried_heat(world: Node) -> bool:
 	for entity: GridEntity in world.get_entities():
@@ -189,6 +208,7 @@ func _refresh(world: Node) -> void:
 	if not _parts.is_empty():
 		_refresh_redone(world, sources)
 		return
+	_hot.clear()
 	_parts.resize(sources.size())
 	for i in sources.size():
 		_parts[i] = _spread(world, i, sources[i][0], sources[i][1])
@@ -242,6 +262,11 @@ func _refresh_redone(world: Node, sources: Array) -> void:
 			_heat[cell] = heat
 		else:
 			_heat.erase(cell)
+		for threshold: float in _hot:
+			if heated and heat >= threshold:
+				_hot[threshold][cell] = true
+			else:
+				_hot[threshold].erase(cell)
 		if lit:
 			_light[cell] = light
 		else:

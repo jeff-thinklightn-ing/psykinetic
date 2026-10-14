@@ -2465,3 +2465,55 @@ world map view colours areas and places by holder. Rejected: holding whole
 areas (one camp would close a 256-cell map), and a world file of places
 apart from the levels (it would fall out of step with them, as decision
 194 says of links).
+
+## 209. A monster's search for its target has an end
+
+tools/map_bench took one player, in a corner: the kindest case for 193's
+tiers. With --players=N (N - 1 more, spread over the map on a grid, too
+tough to die so none is away respawning) a 256x256 tick was 213 ms on
+average and 1428 at worst with 4 players, 65 and 163 with 9. Timed part by
+part, four causes (209 to 212).
+
+A monster with nowhere free beside its target (or one of no kind) looked
+for a way to the target itself with no end. Round a surrounded player
+there is none, so each such monster searched the whole map, every tick:
+173 ms a tick of the 213. It looks at CHASE_SEARCH_TILES (400) at most now:
+its target is in sight, so a way longer than that goes round a crowd it
+cannot get through, and it waits where it is, as when there is no way.
+
+## 210. Plans that take many searches are worked out a few a step
+
+Players arriving bring hundreds of monsters near at once, and every
+patroller worked its own loop out on its first turn (up to nine searches
+each): 112 ms in one tick. World.take_plan lets PLANS_PER_STEP (8) be
+worked out a step, all zones together, in id order; the rest wait a step
+or two (a patroller with no loop yet stands, or after a fight goes home).
+And a stroll's spot and a loop's waypoints, all within a few tiles of
+home, are looked for in twice the square round home at most
+(ABOUT_SEARCH_PER_TILE), not 400 tiles: a spot that needs a long way round
+is not about home. Rejected: a budget for every plan a monster makes (the
+same monsters, first in id order, would always go first, the last never).
+
+## 211. An idling monster keeps its way
+
+A monster idling planned its whole way again at every step, most of what
+idling cost near players. It keeps the way (Monster._idle_path) and plans
+again only when its next step is taken, it is somewhere else (pushed,
+moved on by the world tick) or the goal changes; a stroll walks the way
+its spot was found by, with the same small search. A way that a monster
+has since stepped into is seen at the next step and planned round then.
+
+## 212. Fire burns who stands where it burns, not everyone asked
+
+The hazard phase asked every entity in the zone whether it burns: 3000 a
+tick on the bench's map. With nobody carrying heat (as now) it takes the
+creatures standing on the cells whose map heat burns (Fields.hot_cells),
+in id order as before. Those cells are found once, then kept up as each
+door's heat is added up again (a list made again after every door was 9
+ms a tick, worse than before). Anyone carrying heat: every entity is asked,
+as before.
+
+The four together, the same bench: 4 players 31 ms on average and 54 at
+worst; 9 players 46 and 80; 1 player 7.4 and 14. Still over the 20 ms
+target with players spread out; what is left is idle monsters within
+NEAR_TILES of someone (about 20 ms at 4 players).

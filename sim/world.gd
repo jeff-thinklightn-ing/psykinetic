@@ -80,6 +80,11 @@ const TIER_EVERY_TICKS := 5
 const WORLD_TICK_STEPS := 300
 const WORLD_TICK_SLICES := 10
 const WORLD_TICK_BUDGET_USEC := 2000
+## How many plans that take several searches (a patrol's own loop) are
+## worked out in one step, all zones together (take_plan): a crowd that
+## comes near at once (players arriving) plans over a few steps, not in
+## one.
+const PLANS_PER_STEP := 8
 ## A world tick's walk looks at most this many tiles for each tile it
 ## could walk in its time (World.walk).
 const WALK_SEARCH_PER_STEP := 8
@@ -487,6 +492,22 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
 	monster.tier_tick = tick
 	return monster.tier as Tier
+
+
+var _plans_step := -1
+var _plans_left := 0
+
+
+## Whether one more plan of PLANS_PER_STEP may be worked out this step;
+## counts it if so.
+func take_plan() -> bool:
+	if _plans_step != steps:
+		_plans_step = steps
+		_plans_left = PLANS_PER_STEP
+	if _plans_left <= 0:
+		return false
+	_plans_left -= 1
+	return true
 
 
 ## A walk for the world tick: [param entity] along a real way toward
@@ -1722,9 +1743,21 @@ func _regen_stamina() -> void:
 func _apply_hazards() -> void:
 	if not fields.has_heat():
 		return
-	for entity in _entities.duplicate():
-		if _alive(entity) and entity.is_creature() and is_burning(entity.tile):
-			damage(entity, FIRE_DAMAGE, null, &"fire")
+	if _carried_heat():
+		for entity in _entities.duplicate():
+			if _alive(entity) and entity.is_creature() and is_burning(entity.tile):
+				damage(entity, FIRE_DAMAGE, null, &"fire")
+		return
+	# Nobody carries heat (as now, always): only who stands where the map's
+	# own heat burns, in id order as above, not every entity.
+	var burning: Array[GridEntity] = []
+	for cell in fields.hot_cells(self, HEAT_BURN):
+		var entity: GridEntity = _occupancy.get(cell)
+		if entity != null and _alive(entity) and entity.is_creature():
+			burning.append(entity)
+	burning.sort_custom(func(a: GridEntity, b: GridEntity) -> bool: return a.id < b.id)
+	for entity in burning:
+		damage(entity, FIRE_DAMAGE, null, &"fire")
 
 
 ## One walking step for [param entity], shoving the pushable chain ahead of

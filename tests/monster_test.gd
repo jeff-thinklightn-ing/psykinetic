@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_roster()
 	_test_tiers()
 	_test_world_tick()
+	_test_plans_per_step()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -550,6 +551,24 @@ func _test_world_tick() -> void:
 			"a short time, a short way: %d steps toward home, to %s" % [steps, far.tile])
 	far._world_tick(30.0)
 	_check(far.tile == far_home and not far._returning, "and the rest of the way the next time (%s)" % [far.tile])
+
+
+func _test_plans_per_step() -> void:
+	print("
+== a crowd that comes near at once works its patrols out over a few steps ==")
+	var rows: Array[String] = ["#".repeat(42)]
+	for y in 4:
+		rows.append("#" + ("s......." if y % 2 == 0 else "........").repeat(5) + "#")
+	rows.append("#" + ".".repeat(40) + "#")
+	rows.append("#".repeat(42))
+	var e := _build(rows)
+	var sneaks: Array = e["s"]
+	var planned: Array[int] = []
+	for i in 4:
+		World.step()
+		planned.append(sneaks.filter(func(m: Monster) -> bool: return not m.route.is_empty()).size())
+	_check(sneaks.size() == 10 and planned[0] <= World.PLANS_PER_STEP and planned[-1] == sneaks.size(),
+			"%d patrols, routes worked out by step: %s (%d a step at most)" % [sneaks.size(), planned, World.PLANS_PER_STEP])
 
 
 func _build(rows: Array[String], extra := {}) -> Dictionary:

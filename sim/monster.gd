@@ -62,6 +62,11 @@ const NO_TILE := Vector2i(-9999, -9999)
 ## How far (tiles looked at) it searches for a way to a tile beside its
 ## target before going straight at it instead.
 const SLOT_SEARCH_TILES := 120
+## How far (tiles looked at) it searches for a way to its target itself
+## (nowhere free beside it, or a monster of no kind): its target is in
+## sight, so a way that needs more is round a crowd it cannot get through,
+## not worth a search of the whole map every tick.
+const CHASE_SEARCH_TILES := 400
 
 ## What it does with nobody in sight. NONE: stands where it is (a monster of
 ## no kind, as monsters were).
@@ -90,6 +95,12 @@ const GATHER_RADIUS := 2
 const SIT_CHANCE := 0.5
 ## How far (tiles looked at) it searches for its way home or about.
 const IDLE_SEARCH_TILES := 400
+## Choosing a tile to stroll to or a patrol waypoint within so many tiles of
+## home, it looks at no more than this many tiles for each tile of the
+## square round home that reaches: a spot only a long way round from home
+## is not about home (and looking for it was most of a monster's first
+## turn near a player).
+const ABOUT_SEARCH_PER_TILE := 2
 ## How it is standing, for the views: SIT at a gathering.
 enum Pose { STAND, SIT }
 ## The eight ways round, clockwise from north (for glances).
@@ -143,6 +154,9 @@ var _glancing := false
 var _route_index := 0
 var _route_step := 1
 var _sits := false
+## The way it is walking as it idles, and where to (_idle_step).
+var _idle_path: Array[Vector2i] = []
+var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
 ## not yet). World's.
 var tier := 0
@@ -241,7 +255,7 @@ func _sim_tick() -> void:
 		if World.can_melee(tile, target.tile):
 			World.try_attack(self, target)
 		elif World.tick >= next_move_tick:
-			var path := World.find_path(tile, target.tile, true)
+			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES)
 			if not path.is_empty():
 				World.try_move(self, path[0] - tile)
 		return
@@ -283,7 +297,7 @@ func _sim_tick() -> void:
 	slot = _pick_slot()
 	if slot == NO_TILE or not _go_to(slot):
 		# Nowhere free beside it: as near as it can get.
-		var path := World.find_path(tile, target.tile, true)
+		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES)
 		if not path.is_empty():
 			World.try_move(self, path[0] - tile)
 
@@ -497,7 +511,7 @@ func _wander() -> void:
 		if _idle_goal == NO_TILE:
 			_idle_until = World.tick + WANDER_PAUSE_TICKS.x
 			return
-	if not _idle_step(_idle_goal):
+	if not _idle_step(_idle_goal, _about_search(wander_radius)):
 		_idle_goal = NO_TILE
 		_idle_until = World.tick + WANDER_PAUSE_TICKS.x
 
@@ -510,9 +524,19 @@ func _wander_goal() -> Vector2i:
 				_idle_rng.randi_range(-wander_radius, wander_radius))
 		if at == tile or not World.is_walkable(at) or not World.is_free(at) or World.is_fire(at):
 			continue
-		if not World.find_path(tile, at, false, null, IDLE_SEARCH_TILES).is_empty():
+		var path := World.find_path(tile, at, false, null, _about_search(wander_radius))
+		if not path.is_empty():
+			# The way there is the walk's first plan (_idle_step).
+			_idle_path = path
+			_idle_path_to = at
 			return at
 	return NO_TILE
+
+
+## How many tiles a search for a spot within [param radius] of home looks
+## at (ABOUT_SEARCH_PER_TILE).
+static func _about_search(radius: int) -> int:
+	return (radius * 2 + 1) * (radius * 2 + 1) * ABOUT_SEARCH_PER_TILE
 
 
 ## PATROL: waypoint to waypoint, a pause at each; round again (a loop) or
@@ -533,12 +557,15 @@ func _patrol() -> void:
 		_idle_until = World.tick + _idle_rng.randi_range(PATROL_PAUSE_TICKS.x, PATROL_PAUSE_TICKS.y)
 
 
-## A route of its own when none is set: home, then PATROL_LOOP_POINTS - 1
+## A route of its own when none is set (if World.take_plan allows it this
+## step; till then it has none): home, then PATROL_LOOP_POINTS - 1
 ## tiles round it it can walk to, in turn round the compass from a way of
 ## its own, as a loop.
 func _ensure_route() -> void:
 	if not route.is_empty() or home == NO_TILE:
 		return
+	if not World.take_plan():
+		return  # Enough worked out this step: it waits a step or two.
 	route.append(home)
 	var start := _idle_rng.randi_range(0, AROUND.size() - 1)
 	var per := AROUND.size() / (PATROL_LOOP_POINTS - 1)
@@ -547,7 +574,7 @@ func _ensure_route() -> void:
 		for reach in range(PATROL_LOOP_RADIUS, 0, -1):
 			var at := home + way * reach
 			if World.is_walkable(at) and not World.is_fire(at) and at not in route \
-					and not World.find_path(home, at, true, null, IDLE_SEARCH_TILES).is_empty():
+					and not World.find_path(home, at, true, null, _about_search(PATROL_LOOP_RADIUS)).is_empty():
 				route.append(at)
 				break
 	route_loop = true
@@ -596,12 +623,23 @@ func _gather_place() -> Vector2i:
 	return _idle_goal
 
 
-## A step toward [param to] as it idles; false if there is no way.
-func _idle_step(to: Vector2i) -> bool:
-	var path := World.find_path(tile, to, false, null, IDLE_SEARCH_TILES)
-	if path.is_empty():
-		return false
-	return World.try_move(self, path[0] - tile)
+## A step toward [param to] as it idles, looking at [param max_tiles] at
+## most for the way (a stroll's spot, near, less); false if there is no way. The
+## way is kept from step to step (_idle_path) and planned again only when
+## the next step on it is taken, it is somewhere else (pushed, moved on by
+## the world tick) or the goal has changed: planning it at every step was
+## most of what idling cost.
+func _idle_step(to: Vector2i, max_tiles := IDLE_SEARCH_TILES) -> bool:
+	if _idle_path.is_empty() or _idle_path_to != to or World.distance(tile, _idle_path[0]) != 1 			or not World.is_free(_idle_path[0]):
+		_idle_path = World.find_path(tile, to, false, null, max_tiles)
+		_idle_path_to = to
+		if _idle_path.is_empty():
+			return false
+	if World.try_move(self, _idle_path[0] - tile):
+		_idle_path.pop_front()
+		return true
+	_idle_path.clear()
+	return false
 
 
 ## The world tick (far from everyone, or its zone asleep): [param seconds]

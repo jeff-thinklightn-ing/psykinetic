@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.128
+
+Client and server.
+
+- Much smoother server with several players on a big map, apart from each
+  other: monsters crowding round someone, or a crowd of them noticing
+  players arriving, no longer stall the server for a moment.
+
+The server must be updated to v0.1.128 too, as it refuses any other version.
+
 ## v0.1.127
 
 Client and server.
