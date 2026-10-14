@@ -50,3 +50,23 @@ License, allows research and evaluation only, with no commercial use.
 Slot candidates from the art-gen session (`C:\dev\art-gen`) land in
 `D:\assets\candidates\<slot>\` with a `notes.md` naming the model files, LoRA, prompts, seeds and
 licences. A candidate picked for a slot cites that note in the slot's `source` (its `notes`).
+
+## Models (vetting)
+
+Every model used to make assets is vetted before use (Jeff): what it is exactly, where it came
+from, what its licence says on the day it was read, and whether it may be used. Approved means
+nothing it makes is held back by its licence (no non-commercial, research-only or regional
+limit). The licence text as read is kept in `docs/licenses/<model>_<YYYY-MM-DD>.txt`. The art-gen
+session sends rows and licence texts through the coordinator, and art-kit commits them. A dash
+marks something still to fill in, and a model with a dash in its verdict may not be used yet.
+
+| Model | Version or file SHA-256 | Source | Licence | Read | Verdict | Why |
+|-------|-------------------------|--------|---------|------|---------|-----|
+| Qwen-Image-2512 | — | — | Apache-2.0 | — | approved | Apache-2.0 allows commercial use; concept images for slot candidates |
+| Qwen2.5-VL-7B (text encoder) | — | — | Apache-2.0 | — | approved | Apache-2.0; part of Qwen-Image-2512 |
+| Qwen-Image ComfyUI repacks (Comfy-Org) | — | — | Apache-2.0 | — | approved | repackaged weights of the above, same licence |
+| Qwen-Image-2512-Lightning LoRA (lightx2v) | — | — | Apache-2.0 | — | approved | Apache-2.0; faster sampling only |
+| Qwen-Image-2.1 | — | — | Qwen Research License | — | **banned** | research and evaluation only, no commercial use |
+| TRELLIS.2 (Microsoft) | — | — | MIT | — | approved | MIT; meshes from concept images (the goblin, slot candidates) |
+| DINOv3 image encoder (Meta) | — | — | DINOv3 License | 2025-08-19 (the roadmap's dated copy; not yet in `docs/licenses/`) | — | its own licence, to be read against the rule and its text kept here before it is used again |
+| BiRefNet (ZhengPeng7) | — | — | MIT | — | approved | MIT; background removal for concept images |
