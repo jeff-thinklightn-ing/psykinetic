@@ -217,7 +217,13 @@ func _test_routes() -> void:
 	_register_route_maps()
 	var names: Array[String] = ["r_room", "r_field", "r_east"]
 	var world_map := WorldMap.build(names)
+	# Walking each time (no fields), then with the fields made on the pool.
+	var walking := WorldRoutes.new(world_map, false, false)
+	_check(not walking.is_ready() and walking.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).map(
+		func(leg: Dictionary) -> float: return leg["steps"]) == [10.5, 3.0, 1.0], "with no distance fields, a route walks the areas and finds the same legs")
 	var routes := world_map.routes()
+	routes.wait()
+	_check(routes.is_ready() and routes.build_ms.size() == 3, "the distance fields are made on a pool task, every area's (%s)" % [routes.build_ms])
 	_check(routes.gaps.is_empty(), "every way has its portals (%s)" % [routes.gaps])
 	var around := routes.steps_from("r_room", Vector2i(0, 0), [Vector2i(4, 0)] as Array[Vector2i])
 	_check(around.get(Vector2i(4, 0), -1.0) == 10.5, "the walk round the wall is 10.5 steps, not the 4 of a straight line (%s)" % [around])
@@ -240,6 +246,23 @@ func _test_routes() -> void:
 	routes.extra_cost = func(_way: Dictionary) -> float: return 5.0
 	_check(routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).size() == 3, "an extra cost slows a way without closing it")
 	_check(routes.route("r_room", Vector2i(0, 0), "nowhere", Vector2i.ZERO).is_empty(), "no route to an area that is not there")
+	routes.extra_cost = Callable()
+	_test_along(routes)
+
+
+func _test_along(routes: WorldRoutes) -> void:
+	print("along")
+	var legs := routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1))
+	var at := func(cells: float) -> Dictionary: return routes.along(legs, cells)
+	_check(at.call(0.0) == {"area": "r_room", "cell": Vector2i(0, 0), "leg": 0, "done": false}, "after no steps: where it set out")
+	var halfway: Dictionary = at.call(5.5)
+	var left := routes.steps_from("r_room", halfway["cell"], [Vector2i(4, 0)] as Array[Vector2i])
+	_check(halfway["area"] == "r_room" and left.get(Vector2i(4, 0), -1.0) == 5.0,
+		"5.5 steps on: on the walk round the wall, 5 steps from the link (%s)" % [halfway])
+	_check(at.call(10.5) == {"area": "r_field", "cell": Vector2i(0, 1), "leg": 1, "done": false}, "crossing the link: where it arrives")
+	_check(at.call(13.0)["cell"] == Vector2i(2, 1), "1.5 steps into r_field: down the east edge's field, at (2, 1) (%s)" % [at.call(13.0)])
+	_check(at.call(16.5) == {"area": "r_east", "cell": Vector2i(1, 1), "leg": 2, "done": true}, "after every step and crossing (16.5): there, done")
+	_check(at.call(99.0)["done"] and routes.along([] as Array[Dictionary], 3.0).is_empty(), "further is still there; no route is nowhere")
 
 
 func _test_level_routes() -> void:
@@ -249,8 +272,11 @@ func _test_level_routes() -> void:
 	var built := Time.get_ticks_usec()
 	var routes := world_map.routes()
 	var routed := Time.get_ticks_usec()
-	print("    WorldMap.build %.0f ms; routes %.0f ms (in-area lengths: %s)" % [(built - started) / 1000.0, (routed - built) / 1000.0,
+	routes.wait()
+	print("    WorldMap.build %.0f ms; routes %.0f ms on this thread, then distance fields on the pool in %.0f ms (%s)" % [
+		(built - started) / 1000.0, (routed - built) / 1000.0, (Time.get_ticks_usec() - routed) / 1000.0,
 		", ".join(routes.build_ms.keys().map(func(area: String) -> String: return "%s %.0f ms" % [area, routes.build_ms[area]]))])
+	_check((routed - built) / 1000.0 < 50.0, "making the routes leaves the distance fields to the pool: under 50 ms here")
 	_check(routes.gaps.is_empty(), "every way on the levels has its portals (%s)" % [routes.gaps])
 	# The worst a pair of portals can cost: a walk that floods the whole area.
 	for area_name: String in world_map.areas:
@@ -266,6 +292,16 @@ func _test_level_routes() -> void:
 		" / ".join(legs.map(func(leg: Dictionary) -> String: return "%s %s->%s %.1f" % [leg["area"], leg["from"], leg["to"], leg["steps"]]))])
 	_check(legs.map(func(leg: Dictionary) -> String: return leg["area"]) == ["test_room", "castle", "wilds"],
 		"the test room's start to the wilds goes through the castle")
+	# Deep into the wilds: its last leg comes from the fields, not a walk.
+	var far := Vector2i.ZERO
+	for cell: Vector2i in wilds["floor"]:
+		if cell.y > far.y:
+			far = cell
+	query = Time.get_ticks_usec()
+	legs = routes.route("test_room", room["starts"][0], "wilds", far)
+	var ms := (Time.get_ticks_usec() - query) / 1000.0
+	print("    test_room to the wilds' far side %s: %.0f ms, %s steps" % [far, ms, legs.map(func(leg: Dictionary) -> float: return leg["steps"])])
+	_check(legs.size() == 3 and ms < 50.0, "to the wilds' far side, with the fields: %.0f ms" % ms)
 
 
 func _check(ok: bool, label: String) -> void:

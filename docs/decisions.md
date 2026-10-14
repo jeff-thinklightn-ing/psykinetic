@@ -2310,3 +2310,32 @@ after an edit, and to a player entering an edited zone just before its
 level rather than the changed cells: it is small (a 256 x 256 level's PNG
 is tens of kilobytes), it cannot fall out of step, and it is the same
 format the files and `Level.parse` already use. PROTOCOL_REVISION is 5.
+
+## 202. Routes' distance fields are made on the pool; a group's place along a route comes from them
+
+Each way end (portal) gets a distance field: the steps from it to every
+cell of its area, a PackedFloat32Array indexed by cell (-1 where it cannot
+walk). They are made on a WorkerThreadPool task started when the routes
+are made (WorldMap.routes()), because one field over the wilds takes a
+quarter of a second and the server's tick cannot wait for several. The
+task reads only copies of the areas' floor, edges, heights and stairs
+taken when it starts, never a MapDoc, the World or the WorldMap, and hands
+each area's fields back under a mutex as it finishes it; the A* graph is
+only ever touched on the caller's thread, which joins an area's portals
+from its fields the first time a route needs that area. Until an area's
+fields are in, a route through it walks the area there and then (correct,
+slow on a big map), and `is_ready()` lets the world tick wait a world tick
+instead, which perf prefers: routes are asked only when a group picks a new
+goal. With the fields, a route's first and last legs are lookups, so a
+route between areas costs no walk at all; one inside a single area still
+walks from start to end (its length is not in any portal's field).
+`along(legs, cells)` gives a group's area and cell after that many steps
+(perf: the world tick advances speed x seconds in cells and keeps an area,
+a cell and the route), stepping down the field of the portal a leg leads
+to, so the cell is on a real shortest walk; a leg no field covers falls back
+to the floor cell nearest the straight line. Fields are rebuilt with the
+WorldMap (a level edit, a builder accept), never patched. Freeing the
+routes stops the task at its next portal and waits for it. Rejected: making
+the fields on the server's thread at load (seconds once the wilds has a
+few more ways), and fields per area pair instead of per portal (no cheaper
+to make, and along() needs the per-portal ones).

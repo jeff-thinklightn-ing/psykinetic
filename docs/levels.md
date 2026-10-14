@@ -240,11 +240,20 @@ area passed through ({area, from, to, steps, way}), or [] if there is none.
 Its graph's points are the ways' ends (a link's marker and its spawn point;
 an edge's middle floor cell and the matching cell across), joined inside
 each area at the real length of the walk (walls, doors, corners, ledges
-and stairs as World walks; a diagonal is 1.5 steps), worked out once when
-the routes are made. `blocked` and `extra_cost` (Callables taking a way)
-can close or slow a way for every route found after. Making them costs a
-walk over the area per way end; the longest, a flood of the whole wilds,
-is about a quarter of a second.
+and stairs as World walks; a diagonal is 1.5 steps). Those lengths come
+from a distance field per way end (the steps from it to every cell of its
+area), made on a WorkerThreadPool task when the routes are made, from
+copies of the areas, so making routes costs the caller a few milliseconds;
+the fields follow in about half a second (the wilds' are most of it).
+`is_ready()` says when they are all in; until then a route walks the areas
+it needs there and then (about a quarter of a second for the wilds), so the
+world tick can wait a tick instead. With them, a route's first and last
+legs are lookups; a route inside one area still walks from start to end.
+`along(legs, cells)` says where a group is after that many steps of a
+route ({area, cell, leg, done}), the cell on a shortest walk where the
+fields have it. `blocked` and `extra_cost` (Callables taking a way) can
+close or slow a way for every route found after. A WorldMap built again (a
+level edited, a builder change accepted) makes new routes and new fields.
 
 ### The world map editor
 
