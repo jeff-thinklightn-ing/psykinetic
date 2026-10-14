@@ -50,6 +50,9 @@ func _ready() -> void:
 	_test_sight_by_light()
 	_test_hearing()
 	_test_noise_reach()
+	_test_hunt()
+	_test_leash()
+	_test_roused()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -823,6 +826,135 @@ func _test_noise_reach() -> void:
 			and Senses.speech_radius("OK") == Senses.NOISE_SPEECH and Senses.speech_radius("WHO? 123!") == Senses.NOISE_SHOUT,
 			"capitals are a shout, a short word is not")
 
+
+func _test_hunt() -> void:
+	print("\n== out of sight, it hunts: to where it last saw them and on, looks round, gives up, goes back ==")
+	Monster.idling = true
+	var e := _build(["################", "#.........#....#", "#.i.......#....#", "#.........#....#", "#....P....#....#",
+		"################"], {"i": {"facing": Vector2i(1, 1)}})
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	imp.sight_range = 7
+	imp.reaction_ticks = 0
+	World.step()
+	_check(imp.target == player and imp.alert == Monster.Alert.FIGHTING, "it sees them: fighting")
+	var home := imp.home
+	# They step east twice, then are gone (out of its sight, far off).
+	for x in [6, 7]:
+		_move_to(player, Vector2i(x, 4))
+		World.step()
+	_move_to(player, Vector2i(13, 2))  # Into a room it cannot see into.
+	World.step()
+	_check(imp.alert == Monster.Alert.HUNTING and imp.target == null, "lost from sight: hunting (%s)" % Monster.Alert.keys()[imp.alert])
+	_check(imp._lead == Vector2i(9, 4), "making for where it last saw them, and on the way they went (%s)" % imp._lead)
+	var lead := imp._lead
+	var reached := false
+	var faced := {}
+	for i in 80:
+		World.step()
+		reached = reached or imp.tile == lead
+		if reached and imp.tile == lead:
+			faced[imp.facing] = true
+	_check(reached and imp.alert == Monster.Alert.HUNTING, "it gets there, still hunting (at %s)" % imp.tile)
+	_check(faced.size() >= 3, "and looks round (%d ways)" % faced.size())
+	for i in Monster.HUNT_TICKS + Monster.SUSPICIOUS_TICKS:
+		World.step()
+	_check(imp.alert == Monster.Alert.IDLE, "in time it gives up (%s)" % Monster.Alert.keys()[imp.alert])
+	for i in 80:
+		World.step()
+	_check(World.distance(imp.tile, home) <= imp.wander_radius, "and goes back home (%s, home %s)" % [imp.tile, home])
+
+
+func _test_leash() -> void:
+	print("\n== too far from where it took up the chase, it gives up, and lets them be a while ==")
+	Monster.idling = false
+	var e := _build(["##################################", "#i...............................#",
+		"#................................#", "#...............................P#", "##################################"],
+			{"i": {"facing": Vector2i(1, 0)}})
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	imp.sight_range = 40
+	imp.reaction_ticks = 0
+	imp.senses.cone_cos = -1.0  # All round: this tests the leash.
+	for i in World.MID_EVERY_TICKS:
+		World.step()  # Far from the player, it thinks one tick in so many.
+	_check(imp.alert == Monster.Alert.FIGHTING and imp._post == Vector2i(1, 1), "fighting, from (1, 1)")
+	World._relocate(imp, Vector2i(1 + Monster.LEASH + 1, 1))
+	World.step()
+	_check(imp.alert == Monster.Alert.IDLE and imp.target == null, "past its leash: it gives up (%s)" % Monster.Alert.keys()[imp.alert])
+	World.step()
+	_check(imp.target == null, "and does not take them up again, in sight as they are")
+	World._relocate(imp, Vector2i(15, 1))  # Walked back (idling is off here).
+	for i in World.MID_EVERY_TICKS:
+		World.step()
+	_check(imp.target == null, "walking back, still not")
+	_move_to(player, Vector2i(5, 3))
+	for i in World.MID_EVERY_TICKS:
+		World.step()
+	_check(imp.target == player, "until they come near where it took up the chase")
+	e = _build(["##################################", "#i...............................#",
+		"#................................#", "#...............................P#", "##################################"],
+			{"i": {"facing": Vector2i(1, 0)}})
+	imp = e["i"][0]
+	imp.sight_range = 40
+	imp.reaction_ticks = 0
+	imp.senses.cone_cos = -1.0
+	for i in World.MID_EVERY_TICKS:
+		World.step()
+	World._relocate(imp, Vector2i(1 + Monster.LEASH + 1, 1))
+	World.step()
+	World._relocate(imp, Vector2i(5, 1))
+	for i in Monster.GIVE_UP_TICKS + World.MID_EVERY_TICKS:
+		World.step()
+	_check(imp.target == e["P"][0], "or the while is over")
+	Monster.idling = true
+
+
+func _test_roused() -> void:
+	print("\n== a noise sends it to look; a fight, or a blow from one unseen, to hunt; a glimpse to look ==")
+	Monster.idling = false
+	var e := _build(["##########", "#........#", "#...b....#", "#........#", "#........#", "#.......P#", "##########"],
+			{"b": {"facing": Vector2i(0, -1)}})
+	var brute: Monster = e["b"][0]
+	var player: GridEntity = e["P"][0]
+	brute.sight_range = 3
+	World.noise(Vector2i(6, 2), Senses.NOISE_DOOR, &"door", null)
+	World.step()
+	_check(brute.alert == Monster.Alert.SUSPICIOUS and brute._lead == Vector2i(6, 2), "a door: it goes to look (%s, %s)" % [
+		Monster.Alert.keys()[brute.alert], brute._lead])
+	World.noise(Vector2i(1, 4), Senses.NOISE_FIGHT, &"fight", null)
+	World.step()
+	_check(brute.alert == Monster.Alert.HUNTING and brute._lead == Vector2i(1, 4), "a fight: it hunts (%s)" % Monster.Alert.keys()[brute.alert])
+	e = _build(["#######", "#.b#..#", "#######"], {"b": {"facing": Vector2i(-1, 0)}})
+	brute = e["b"][0]
+	World.noise(Vector2i(4, 1), Senses.NOISE_FIGHT, &"fight", null)
+	World.step()
+	_check(brute.senses.heard.back()["muffled"] and brute.alert == Monster.Alert.SUSPICIOUS,
+			"a fight heard through a wall: it goes to look, no more (%s)" % Monster.Alert.keys()[brute.alert])
+	e = _build(["##########", "#........#", "#...b....#", "#........#", "#........#", "#.......P#", "##########"],
+			{"b": {"facing": Vector2i(0, -1)}})
+	brute = e["b"][0]
+	player = e["P"][0]
+	World.noise(brute.tile, Senses.NOISE_FIGHT, &"fight", player)
+	World.step()
+	_check(brute.alert == Monster.Alert.HUNTING and brute._lead == player.tile and brute._quarry == player,
+			"struck by one it does not see: after them (%s)" % brute._lead)
+	e = _build(["##########", "#........#", "#...b....#", "#........#", "#........#", "#...P....#", "##########"],
+			{"b": {"facing": Vector2i(0, 1)}})
+	brute = e["b"][0]
+	player = e["P"][0]
+	brute.sight_range = 7
+	(player as Player).toggle_lantern()
+	World.fields.ambient = 0.2
+	World.fields_changed()
+	World.step()
+	_check(brute.target == null and brute.alert == Monster.Alert.SUSPICIOUS and brute._lead == Vector2i(4, 5),
+			"dimly lit before it: a glimpse, it goes to look (%s, %s)" % [Monster.Alert.keys()[brute.alert], brute._lead])
+	World.fields.ambient = 1.0
+	World.fields_changed()
+	brute._world_tick(1.0)
+	_check(brute.alert == Monster.Alert.IDLE, "the world tick (far off) calms it")
+	Monster.idling = true
 
 ## Moves [param entity] to [param to] at once (a test's hand).
 func _move_to(entity: GridEntity, to: Vector2i) -> void:

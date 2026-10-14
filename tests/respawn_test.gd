@@ -175,7 +175,9 @@ func _test_old_snapshot_gets_current_looks() -> void:
 	for entity in World.get_entities():
 		if entity is Pushable and entity.spawn_spec.get("spawn") == 5:
 			crates += 1
-	_check(crates == 1 and World.get_entity_at(Vector2i(8, 2)) == null, "the crate holds its slot, so no second one respawns at its spawn tile")
+	# Something else may stand there (Pip, in a fight that drew the imps).
+	_check(crates == 1 and not World.get_entity_at(Vector2i(8, 2)) is Pushable,
+			"the crate holds its slot, so no second one respawns at its spawn tile")
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
 

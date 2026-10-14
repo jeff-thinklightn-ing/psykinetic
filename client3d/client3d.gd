@@ -3177,6 +3177,8 @@ func _sync_puppets() -> void:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
 			if lantern != null and lantern.visible != (entity.emit_light > 0.0):
 				lantern.visible = entity.emit_light > 0.0  # Covered (L).
+		elif entity is Monster:
+			_sync_alert(entity as Monster, puppet)
 		if puppet.has_meta("animator"):
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
@@ -3331,6 +3333,19 @@ func on_death(data: Dictionary) -> void:
 		if _puppets[id].get_meta("entity_name", "") == entity_name:
 			_pending_deaths[entity_name] = data
 			return
+
+
+## A monster's name with how alert it is (Monster.Alert): "?" looking into
+## something, "!" after someone.
+func _sync_alert(monster: Monster, puppet: Node3D) -> void:
+	if int(puppet.get_meta("alert", Monster.Alert.IDLE)) == monster.alert:
+		return
+	puppet.set_meta("alert", monster.alert)
+	var label := puppet.get_node_or_null("Name") as Label3D
+	if label == null:
+		return
+	var marks := {Monster.Alert.SUSPICIOUS: " ?", Monster.Alert.HUNTING: " !", Monster.Alert.FIGHTING: " !"}
+	label.text = str(puppet.get_meta("caption", label.text)) + str(marks.get(monster.alert, ""))
 
 
 ## A corpse: it tips onto its side with a bounce, flashes, drops its
@@ -3732,6 +3747,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	if entity.is_creature():
 		var caption: String = entity.label if not entity.label.is_empty() else entity.name
 		puppet.add_child(_label("Name", caption, Color.WHITE, height + 0.35))
+		puppet.set_meta("caption", caption)
 		puppet.set_meta("bubble_height", height + BUBBLE_OVER_HEAD)
 		# The nose: which way it faces, turned each frame (see _sync_puppets).
 		# A model turns itself instead.

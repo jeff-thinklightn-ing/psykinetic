@@ -15,8 +15,10 @@ extends RefCounted
 ## (last_seen), dropped after MEMORY_TICKS. Every time is a World.tick, so
 ## an agent that thinks one tick in four reads the same.
 
-## Light under which it is too dark to see (World.light_at, 0..1).
+## Light under which it is too dark to see (World.light_at, 0..1), and
+## under which it is too dark even for a glimpse (glimpses).
 const DARK := 0.35
+const GLIMPSE := 0.15
 ## So near (cells) it is noticed whatever the light or the way it faces.
 const NOTICE_ALWAYS := 1
 ## A cone of 120 degrees: the cosine of half of it.
@@ -29,7 +31,7 @@ const NOISE_STEP := 3
 const NOISE_SPEECH := 10
 const NOISE_SHOUT := 20
 const NOISE_WHISPER := 2
-const NOISE_FIGHT := 8
+const NOISE_FIGHT := 5
 const NOISE_DOOR := 6
 const NOISE_DOOR_STRUCK := 10
 const NOISE_DOOR_BROKEN := 14
@@ -69,6 +71,19 @@ func sees(entity: GridEntity, d := -1, in_cone := true) -> bool:
 		return false
 	_seen[entity.get_instance_id()] = {"at": at, "tick": World.tick}
 	return true
+
+
+## Whether it glimpses [param entity], not seeing it (sees false): in
+## range, in its cone and in line of sight, but lit only dimly (GLIMPSE or
+## more, under DARK) and carrying no light. [param d] as sees.
+func glimpses(entity: GridEntity, d := -1) -> bool:
+	var at := entity.tile
+	if d < 0:
+		d = maxi(absi(at.x - agent.tile.x), absi(at.y - agent.tile.y))
+	if d <= NOTICE_ALWAYS or d > sight_range or entity.emit_light > 0.0 or not _in_cone(at):
+		return false
+	var light := _light(at, DARK)
+	return light >= GLIMPSE and light < DARK and World.has_line_of_sight(agent.tile, at)
 
 
 ## Whether it can see [param cell] (a spot, not someone): in range, in its
@@ -122,14 +137,15 @@ static func _light(cell: Vector2i, enough: float) -> float:
 
 
 ## World.noise: it heard [param kind] at [param at].
-func hear(at: Vector2i, radius: int, kind: StringName, source: GridEntity) -> void:
+## [param muffled]: through a wall or a closed door.
+func hear(at: Vector2i, radius: int, kind: StringName, source: GridEntity, muffled := false) -> void:
 	if heard.size() >= HEARD_MAX:
 		heard.pop_front()
-	heard.append({"at": at, "radius": radius, "kind": kind, "source": source, "tick": World.tick})
+	heard.append({"at": at, "radius": radius, "kind": kind, "source": source, "tick": World.tick, "muffled": muffled})
 
 
 ## The noises heard after [param tick], oldest first: {at, radius, kind,
-## tick, source}, source who made it only if it sees them now (asked now,
+## tick, muffled, source}, source who made it only if it sees them now (asked now,
 ## not when the noise came), else null.
 func heard_since(tick: int) -> Array[Dictionary]:
 	var since: Array[Dictionary] = []
@@ -137,7 +153,8 @@ func heard_since(tick: int) -> Array[Dictionary]:
 		if int(noise["tick"]) > tick:
 			var told := noise.duplicate()
 			var source: Variant = noise["source"]
-			told["source"] = source if is_instance_valid(source) and (source as GridEntity).spawned 					and sees(source) else null
+			told["source"] = source if is_instance_valid(source) and (source as GridEntity).spawned \
+					and sees(source) else null
 			since.append(told)
 	return since
 

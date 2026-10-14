@@ -3252,3 +3252,58 @@ bench lock, alternately with main, three runs each: 256x256 3D rebuild
 fps (main 68.7 / 77.9 / 98.0), nodes 85,575 to 49,031, static memory 445
 to 394 MB; 128x128 rebuild 0.39 / 0.37 / 0.36 s (main 0.41 / 0.35 /
 0.32), frames 189 / 200 / 244 (main 166 / 217 / 202).
+
+## 232. Alertness: a monster looks into what it hears, hunts what it lost, and gives up
+
+A monster of a kind is IDLE, SUSPICIOUS, HUNTING or FIGHTING (Monster.Alert);
+one of no kind only idles and fights, as monsters did. A target in sight
+is a fight, as before. Out of sight, it hunts: to where it last saw them
+and on HUNT_ON_TILES (2) the way they were going (round the corner they
+went round), at its chase pace. A noise or a glimpse (lit too dimly to
+see, Senses.glimpses: between GLIMPSE 0.15 and DARK) sends it to look, at
+its idle pace; a fight, a door struck or broken, a shout, to hunt (a
+fight heard only through a wall or a closed door, to look); a blow from
+one it does not see, after the striker. A fight now carries 5 tiles, not
+223's 8: with 16 players fighting without end on map_bench, 8 kept some
+170 monsters roused and on the move each tick, 10 ms a tick more under
+load; World.noise now walks each listener's clear line to tell a muffled
+noise (Senses: "muffled").
+
+What it costs: map_bench at 256x256, 16 players, 1000 ticks, under load
+(everything about 3 times its unloaded time): 69.5 ms a tick to 82.5. Not
+the thinking: the senses add 1.3 ms, searching 2 to 3. It is the
+fighting: a monster that lost sight of its target for a tick used to drop
+the fight and walk home, and now hunts back and fights on, so with the
+bench's players who never die some 35% more monsters are fighting (33 to
+45 fighting thinks a tick) and resolving their hits (_resolve_hits 34 ms
+to 43) is the cost. Kept as Jeff's design (pursuit), the bench being the
+worst case; held in reserve, a monster whose target is already beset
+by several going back instead of hunting. At its lead it looks round
+(LOOK_ROUND, a turn each LOOK_TICKS). With nothing new for HUNT_TICKS (15
+s) a hunt becomes a last look about (SUSPICIOUS, half SUSPICIOUS_TICKS),
+and that, run out, sends it back to where it idles.
+
+The leash: more than LEASH (20) tiles from where it took up the chase, it
+gives up at once, fight or hunt, and lets that one be for GIVE_UP_TICKS
+(10 s) unless they come within LEASH / 2 of there or strike it: it would
+otherwise turn round at the first glance over its shoulder on the way
+back. So you get away by outrunning its leash, or by breaking its line of
+sight and not being where it looks. The anchor is where it took up the
+chase, not its home: a patrol's route can run far from home.
+
+Every timer is a World.tick, so a monster thinking one tick in four (a
+hunt has no target, so perf's tiers treat it as idle) reads the same. Its
+walk to a lead is _idle_step with the full search (IDLE_SEARCH_TILES); no
+way there drops the lead, and it looks from where it is after
+CHASE_RETRY_TICKS. The world tick (far, or the zone asleep) calms it: one
+line in _world_tick, and it walks back by the world tick's own walk. The
+senses cost only the glimpse's line of sight, for a candidate in its cone
+and dimly lit.
+
+## 233. How alert a monster is shows over its head
+
+Monster.alert is replicated (on change; a wire change). The 3D view adds
+" ?" to its name while it is looking into something and " !" while it is
+after someone (hunting or fighting), on the name's own Label3D. It is
+there for players to read a monster's mind (back off, hide, or run), and
+for clips.

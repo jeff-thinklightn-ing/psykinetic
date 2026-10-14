@@ -38,6 +38,16 @@ top section as the release notes.
   their height rises and falls along a wall, tops are broken off here and
   there, and long walls sometimes have a collapsed stretch, a bank of
   rubble you still can't get through.
+- Monsters are more or less alert, and show it: "?" over a monster's name
+  means it heard or glimpsed something and is going to look; "!" means it
+  is after you. Lose one and it searches where it last saw you and the
+  way you were going, looks round, then gives up and goes back to its
+  post. Run far enough from where it took up the chase and it gives up
+  even with you in sight.
+- Fighting draws nearby monsters (five steps away; through a wall they
+  only come to look). A blow from one it can't see sends it after them.
+- Changes what the server sends (how alert a monster is): the server must
+  be updated with this release.
 
 ## v0.1.139
 

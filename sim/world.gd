@@ -904,9 +904,10 @@ func _hear(listener: Monster, at: Vector2i, radius: int, kind: StringName, sourc
 	if listener == source or listener.senses == null or not listener.spawned:
 		return
 	var d := maxi(absi(listener.tile.x - at.x), absi(listener.tile.y - at.y))
-	if d * 2 > radius and not has_clear_line(at, listener.tile):
-		return  # Muffled: through a wall or a closed door, only half as far.
-	listener.senses.hear(at, radius, kind, source)
+	var muffled := d > 0 and not has_clear_line(at, listener.tile)
+	if muffled and d * 2 > radius:
+		return  # Through a wall or a closed door: only half as far.
+	listener.senses.hear(at, radius, kind, source, muffled)
 
 
 ## Which way the heat at [param at] comes from, as a compass point ("" for none).

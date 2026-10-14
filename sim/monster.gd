@@ -21,6 +21,13 @@ extends GridEntity
 ## round, as monsters did. Hearing something with nobody in sight it turns
 ## that way (LISTEN_TICKS) and may see who made it.
 ##
+## A monster of a kind is more or less alert (Alert): a noise or a glimpse
+## sends it to look (SUSPICIOUS), a target lost from sight or a fight heard
+## after it (HUNTING), to where it last saw it and on the way it was going;
+## there it looks round, and in time it gives up and goes back. Too far
+## from where it took up the chase (LEASH) it gives up at once, and lets
+## that one be a while (GIVE_UP_TICKS): escape is possible.
+##
 ## Far from every player and companion it thinks less often, or not at all
 ## (World.Tier); the world tick moves it on then (_world_tick).
 
@@ -81,6 +88,26 @@ const CHASE_SEARCH_TILES := 400
 ## (it was not thinking then) is let go.
 const LISTEN_TICKS := 20
 const LISTEN_STALE_TICKS := 20
+## How alert it is (shown over its head): IDLE, as it idles; SUSPICIOUS, a
+## noise or a glimpse to look into, at its idle pace; HUNTING, a target
+## lost from sight or a fight heard, at its chase pace; FIGHTING, a target
+## in sight. A monster of no kind only idles and fights.
+enum Alert { IDLE, SUSPICIOUS, HUNTING, FIGHTING }
+## So long (ticks) since the last thing that roused it before it gives up.
+const SUSPICIOUS_TICKS := 100
+const HUNT_TICKS := 150
+## At its lead it looks round: these turns (eighths of a turn from the way
+## it faces), LOOK_TICKS each.
+const LOOK_ROUND: Array[int] = [2, -4, 2]
+const LOOK_TICKS := 10
+## Hunting, it goes on past where it last saw its quarry so far (tiles) the
+## way it was going: round the corner it went round.
+const HUNT_ON_TILES := 2
+## Fighting or hunting more than LEASH tiles from where it took up the
+## chase, it gives up, and lets that one be for GIVE_UP_TICKS unless it
+## comes within LEASH / 2 of there or strikes it.
+const LEASH := 20
+const GIVE_UP_TICKS := 100
 ## With no way to its target at all (a crowd round it), it looks for one
 ## again only after this many ticks: a crowd does not open in a tick.
 const CHASE_RETRY_TICKS := 5
@@ -138,6 +165,8 @@ static var idling := true
 			senses.sight_range = value
 ## What it sees, hears and remembers (the server's; null on a client).
 var senses: Senses
+## How alert it is (Alert); the views show it.
+var alert := Alert.IDLE
 ## Who it went for this tick (null for nobody), for the companions' minds.
 var target: GridEntity
 var tactic := Tactic.PLAIN
@@ -176,6 +205,23 @@ var _idle_until := 0
 ## The tick of the last noise it turned to, and till when it listens.
 var _listened_tick := -1
 var _listening_until := -1
+## Alertness (a monster of a kind: _wary): SUSPICIOUS or HUNTING till
+## _alert_until; where it is making for (_lead), the turns it has looked
+## there and till when it holds the last; whom it hunts, where it last saw
+## them and where before that; where it took up the chase (_post, for the
+## leash); whom it has given up on, till when (instance id -> tick); a
+## glimpse this tick.
+var _wary := false
+var _alert_until := 0
+var _lead := NO_TILE
+var _looks := 0
+var _look_until := -1
+var _quarry: GridEntity
+var _quarry_at := NO_TILE
+var _quarry_from := NO_TILE
+var _post := NO_TILE
+var _given_up: Dictionary[int, int] = {}
+var _glimpsed := NO_TILE
 var _glancing := false
 var _route_index := 0
 var _route_step := 1
@@ -216,6 +262,7 @@ func _init() -> void:
 	# steps by it.
 	replicate("move_ticks")
 	replicate("pose")
+	replicate("alert")
 
 
 func _ready() -> void:
@@ -228,7 +275,8 @@ func _ready() -> void:
 		_temper()
 		_settle_idle()
 		var kind := str(spawn_spec.get("kind", ""))
-		senses = Senses.new(self, sight_range, Senses.CONE_COS if TACTICS.has(kind) else -1.0)
+		_wary = TACTICS.has(kind)
+		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 
 
 ## How it idles, where its home is and which way it faces, from its spawn
@@ -272,24 +320,39 @@ func _temper() -> void:
 
 func _sim_tick() -> void:
 	var seen := _nearest_visible_target()
+	if seen != null and _wary and _beyond_leash():
+		_give_up(seen)
+		seen = null
 	if seen != target:
 		_noticed_tick = World.tick
 		slot = NO_TILE
 		_front_ticks = 0
 		if seen == null:
-			# The fight is over: back to where it idles, then on as before.
-			_returning = idle != Idle.NONE
+			if not _hunt(target):
+				# The fight is over: back to where it idles, then on as before.
+				_returning = idle != Idle.NONE
+				if alert == Alert.FIGHTING:
+					alert = Alert.IDLE
 			_idle_goal = NO_TILE
 			_glancing = false
-		elif target == null:
-			move_ticks = _pace
-			pose = Pose.STAND
+		else:
+			_quarry_at = seen.tile
+			_quarry_from = NO_TILE
+			if target == null:
+				move_ticks = _pace
+				pose = Pose.STAND
 	target = seen
 	if target == null:
 		_windup = {}
-		_listen()
-		_idle_tick()
+		_alert_tick()
 		return
+	if alert == Alert.IDLE:
+		_post = tile
+	alert = Alert.FIGHTING
+	_quarry = target
+	if target.tile != _quarry_at:
+		_quarry_from = _quarry_at
+		_quarry_at = target.tile
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
 			World.try_attack(self, target)
@@ -470,6 +533,7 @@ func _nearest_visible_target() -> GridEntity:
 	var nearest: GridEntity = null
 	var nearest_distance := sight_range + 1
 	var kept := -1
+	_glimpsed = NO_TILE
 	for entity in World.sought():
 		# Out of sight range first: a few sums, where most looks end.
 		var at := entity.tile
@@ -477,6 +541,8 @@ func _nearest_visible_target() -> GridEntity:
 		if d > sight_range or entity.protected:
 			continue  # Too far, or in its spawn grace.
 		if entity is Player or (entity is Companion and entity.keeper != null):
+			if not _given_up.is_empty() and _letting_be(entity):
+				continue
 			# Its target it follows, cone or not (it turns as it goes).
 			if senses.sees(entity, d, entity != target):
 				if entity == target:
@@ -484,6 +550,8 @@ func _nearest_visible_target() -> GridEntity:
 				if d < nearest_distance:
 					nearest = entity
 					nearest_distance = d
+			elif _wary and alert == Alert.IDLE and _glimpsed == NO_TILE and senses.glimpses(entity, d):
+				_glimpsed = at
 	if tactic != Tactic.PLAIN and kept >= 0 and kept - nearest_distance < RETARGET_TILES:
 		return target
 	return nearest
@@ -491,23 +559,164 @@ func _nearest_visible_target() -> GridEntity:
 
 ## Nobody in sight: the newest noise it has not turned to yet, if fresh,
 ## turns it that way, and it holds still a moment (LISTEN_TICKS) to look.
-func _listen() -> void:
+## That noise ({} for none).
+func _listen() -> Dictionary:
 	if senses.heard.is_empty() or World.tick < next_move_tick or World.is_stunned(self):
-		return
+		return {}
 	var noise: Dictionary = senses.heard.back()
 	var heard_at := int(noise["tick"])
 	if heard_at <= _listened_tick:
-		return
+		return {}
 	_listened_tick = heard_at
 	if World.tick - heard_at > LISTEN_STALE_TICKS:
-		return
+		return {}
 	var way := Senses.way_toward(tile, noise["at"])
-	if way == Vector2i.ZERO:
-		return
-	World.face(self, way)
+	if way != Vector2i.ZERO:
+		World.face(self, way)
 	pose = Pose.STAND
 	_glancing = true  # A guard turns back to its way after (_guard).
 	_listening_until = World.tick + LISTEN_TICKS
+	return noise
+
+
+# --- Alertness ------------------------------------------------------------------
+
+## Nobody in sight: a monster of no kind listens and idles; one of a kind is
+## roused by what it hears or glimpses, and goes to look (_search) till it
+## gives up.
+func _alert_tick() -> void:
+	var noise := _listen()
+	if not _wary:
+		_idle_tick()
+		return
+	if not noise.is_empty():
+		_heard(noise)
+	elif _glimpsed != NO_TILE and alert == Alert.IDLE:
+		_follow(_glimpsed, Alert.SUSPICIOUS, SUSPICIOUS_TICKS)
+	if alert == Alert.IDLE:
+		_idle_tick()
+		return
+	if _beyond_leash():
+		_give_up(_quarry)
+		return
+	if World.tick >= _alert_until:
+		if alert == Alert.HUNTING:
+			alert = Alert.SUSPICIOUS  # A last look about, then back.
+			_follow(tile, Alert.SUSPICIOUS, SUSPICIOUS_TICKS / 2)
+		else:
+			_give_up(null)
+			return
+	_search()
+
+
+## What a noise rouses it to: a fight (not through a wall), a door struck,
+## a shout, to hunt; the rest to look. A blow on itself from someone it
+## does not see, to hunt the one who struck it.
+func _heard(noise: Dictionary) -> void:
+	var at: Vector2i = noise["at"]
+	var kind: StringName = noise["kind"]
+	var urgent: bool = (kind == &"fight" and not noise.get("muffled", false)) or kind in [&"door_struck", &"door_broken"] \
+			or int(noise["radius"]) >= Senses.NOISE_SHOUT
+	var source: Variant = noise["source"]
+	if at == tile and kind == &"fight" and is_instance_valid(source) and source != self:
+		var striker := source as GridEntity
+		_given_up.erase(striker.get_instance_id())
+		_quarry = striker
+		at = striker.tile
+	if urgent:
+		_listening_until = -1
+	_follow(at, Alert.HUNTING if urgent else Alert.SUSPICIOUS, HUNT_TICKS if urgent else SUSPICIOUS_TICKS)
+
+
+## [param lost] went out of its sight: after it, to where it last saw it and
+## on HUNT_ON_TILES the way it was going. False (no hunt) for a monster of
+## no kind, one gone, or one it has given up on.
+func _hunt(lost: GridEntity) -> bool:
+	if not _wary or lost == null or not is_instance_valid(lost) or not lost.spawned \
+			or _given_up.has(lost.get_instance_id()):
+		return false
+	_quarry = lost
+	var lead := _quarry_at if _quarry_at != NO_TILE else tile
+	if _quarry_from != NO_TILE and _quarry_at != NO_TILE:
+		var way := Vector2i(signi(_quarry_at.x - _quarry_from.x), signi(_quarry_at.y - _quarry_from.y))
+		for n in range(HUNT_ON_TILES, 0, -1):
+			var on := _quarry_at + way * n
+			if World.is_walkable(on) and World.has_clear_line(_quarry_at, on):
+				lead = on
+				break
+	_follow(lead, Alert.HUNTING, HUNT_TICKS)
+	return true
+
+
+## Off to [param lead] at [param level] (a hunt stays a hunt for a lesser
+## lead), for [param ticks] from now; it looks round when there.
+func _follow(lead: Vector2i, level: Alert, ticks: int) -> void:
+	if alert == Alert.IDLE:
+		_post = tile
+	if not (alert == Alert.HUNTING and level == Alert.SUSPICIOUS):
+		alert = level
+	_alert_until = World.tick + ticks
+	_lead = lead
+	_looks = 0
+	_look_until = -1
+	_returning = false
+	pose = Pose.STAND
+
+
+## SUSPICIOUS or HUNTING: a step toward its lead (at its idle pace or its
+## chase pace), else, there or with no way there, a look round.
+func _search() -> void:
+	if World.is_stunned(self) or World.tick < next_move_tick or World.tick < _listening_until \
+			or World.tick < _look_until:
+		return
+	move_ticks = _pace if alert == Alert.HUNTING else _pace * IDLE_PACE
+	if _lead != NO_TILE and tile != _lead:
+		if _idle_step(_lead):
+			return
+		# No way there (a closed door, a crowd): it looks from here.
+		_lead = NO_TILE
+		next_move_tick = World.tick + CHASE_RETRY_TICKS
+		return
+	if _looks < LOOK_ROUND.size():
+		World.face(self, turned(facing, LOOK_ROUND[_looks]))
+		_looks += 1
+		_look_until = World.tick + LOOK_TICKS
+
+
+## More than LEASH from where it took up the chase.
+func _beyond_leash() -> bool:
+	return _post != NO_TILE and World.distance(tile, _post) > LEASH
+
+
+## Lets [param who] be for GIVE_UP_TICKS (null: nobody in particular), and
+## goes back to where it idles.
+func _give_up(who: GridEntity) -> void:
+	if who != null and is_instance_valid(who):
+		_given_up[who.get_instance_id()] = World.tick + GIVE_UP_TICKS
+	_calm()
+	_returning = idle != Idle.NONE
+
+
+## Whether it lets [param entity] be (given up on it, a while yet, and it is
+## not back near where it took up the chase).
+func _letting_be(entity: GridEntity) -> bool:
+	var id := entity.get_instance_id()
+	var until: int = _given_up.get(id, -1)
+	if until < World.tick:
+		_given_up.erase(id)
+		return false
+	return _post == NO_TILE or World.distance(entity.tile, _post) > LEASH / 2
+
+
+## Back to IDLE: a monster that was looking or hunting goes back to where it
+## idles (the world tick's walk, when far).
+func _calm() -> void:
+	if alert == Alert.SUSPICIOUS or alert == Alert.HUNTING:
+		_returning = idle != Idle.NONE
+		_idle_goal = NO_TILE
+	alert = Alert.IDLE
+	_lead = NO_TILE
+	_quarry = null
 
 
 # --- Idling ---------------------------------------------------------------------
@@ -787,6 +996,7 @@ func _world_tick(seconds: float) -> void:
 	slot = NO_TILE
 	_windup = {}
 	_glancing = false
+	_calm()
 	if not _returning:
 		return
 	move_ticks = _pace * IDLE_PACE
