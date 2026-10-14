@@ -926,7 +926,8 @@ func _test_hover() -> void:
 	if Net.test_hover_tile == Vector2i(-1, -1) or DisplayServer.get_name() == "headless":
 		return
 	# Cell -> viewport (camera) -> window (stretch).
-	var in_viewport: Vector2 = _client3d.screen_of_tile(Net.test_hover_tile) if _client3d != null 			else get_global_transform_with_canvas() * Iso.tile_to_local(Net.test_hover_tile)
+	var in_viewport: Vector2 = _client3d.screen_of_tile(Net.test_hover_tile) if _client3d != null \
+			else get_global_transform_with_canvas() * Iso.tile_to_local(Net.test_hover_tile)
 	Input.warp_mouse(get_viewport().get_screen_transform() * in_viewport)
 
 

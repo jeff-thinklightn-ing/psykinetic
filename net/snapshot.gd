@@ -193,7 +193,8 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 	var facing: Variant = vector(entry.get("facing"))
 	# Props were written with JSON.from_native; a bare {} (no props) is not.
 	var raw_props: Variant = entry.get("props", {})
-	var props: Variant = JSON.to_native(raw_props) 			if raw_props is Dictionary and raw_props.has("type") else {}
+	var props: Variant = JSON.to_native(raw_props) \
+			if raw_props is Dictionary and raw_props.has("type") else {}
 	var spec := {
 		"name": entry["name"],
 		"tile": tile,

@@ -501,7 +501,8 @@ func _listen() -> void:
 ## Nobody in sight: back from a fight first, then as it idles; slower than
 ## it chases.
 func _idle_tick() -> void:
-	if not idling or idle == Idle.NONE or World.is_stunned(self) or World.tick < next_move_tick 			or World.tick < _listening_until:
+	if not idling or idle == Idle.NONE or World.is_stunned(self) or World.tick < next_move_tick \
+			or World.tick < _listening_until:
 		return
 	if World.tick < _idle_from and not _returning:
 		return  # Just woken: in a moment of its own.
