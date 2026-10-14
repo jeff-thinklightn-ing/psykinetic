@@ -85,9 +85,14 @@ extends Node3D
 ## is Main's; this view only answers its picks and draws what it is told.
 
 const WALL_HEIGHT := 3.0
-## One height level (height.png) in units; a stair is drawn in STAIR_STEPS.
+## One height level (height.png) in units; a stair is a ramp up one.
 const LEVEL_RISE := 0.5
-const STAIR_STEPS := 4
+## Cliffs: rock's colour (sRGB), a row of facets this tall at most, this
+## many facets along a cell's edge, points pushed about this far.
+const CLIFF_ROCK := Color(0.5, 0.47, 0.43)
+const CLIFF_ROW := 0.2
+const CLIFF_ACROSS := 4
+const CLIFF_JITTER := 0.07
 ## Each ground kind's colour (sRGB), and its channel in the ground's kinds
 ## texture (ground.gdshader); a kind not here is stone. Grass is the kit's
 ## floor piece as it was tinted; sand is ready for a map that paints it.
@@ -103,6 +108,9 @@ const TORCH := Color(1.0, 0.72, 0.38)
 ## draws, and squares off screen are culled.
 const FLOOR_CHUNK := 16
 const GROUND_SHADER := preload("res://client3d/ground.gdshader")
+## A cell's corners, from its top left, in the order the ground's arrays
+## keep them.
+const GROUND_CORNERS: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
 ## The highest a cell stands (Level.MAX_HEIGHT), for the ground's corners.
 const MAX_GROUND_HEIGHT := Level.MAX_HEIGHT
 ## The ground's noise texture, texels across (64 features across it).
@@ -1125,13 +1133,44 @@ func mouse_grid() -> Vector2:
 
 
 ## How high the ground is under [param grid] (a puppet's place): its cell's
-## height, a stair's halfway up it.
+## height, or on a stair, the ramp's.
 func _ground_height(grid: Vector2) -> float:
-	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
+	return _height_in(Vector2i(roundi(grid.x), roundi(grid.y)), grid)
+
+
+## How high [param cell]'s ground is at [param point] (on it or its edge):
+## flat at its height, or a stair's ramp, a level up across the cell.
+func _height_in(cell: Vector2i, point: Vector2) -> float:
 	var height := float(_height(cell))
-	if _stair(cell) != Vector2i.ZERO:
-		height += 0.5
+	var up := _stair(cell)
+	if up != Vector2i.ZERO:
+		height += clampf((point - Vector2(cell)).dot(Vector2(up)) + 0.5, 0.0, 1.0)
 	return height * LEVEL_RISE
+
+
+## The levels of [param cell]'s corners (GROUND_CORNERS): its height, and on
+## a stair, the two on its high side a level up.
+func _corner_levels(cell: Vector2i) -> PackedInt32Array:
+	var height := _height(cell)
+	var levels := PackedInt32Array([height, height, height, height])
+	var up := _stair(cell)
+	if up != Vector2i.ZERO:
+		for c in 4:
+			if (Vector2(GROUND_CORNERS[c]) - Vector2(0.5, 0.5)).dot(Vector2(up)) > 0.0:
+				levels[c] += 1
+	return levels
+
+
+## Lies a flat mark (hover, ripple) on [param cell]'s ground, [param lift]
+## above it: at the ramp's middle on a stair, tilted with it.
+func _lay_on_ground(mark: Node3D, cell: Vector2i, lift: float) -> void:
+	var up := _stair(cell)
+	var tilt := Quaternion.IDENTITY
+	if up != Vector2i.ZERO:
+		var normal := Vector3(-up.x * LEVEL_RISE, 1.0, -up.y * LEVEL_RISE).normalized()
+		tilt = Quaternion(Vector3.UP, normal)
+	mark.quaternion = tilt
+	mark.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y) + tilt * Vector3(0.0, lift, 0.0)
 
 
 ## The first pick Area3D the cursor's ray hits, with its "entity" or
@@ -1248,6 +1287,17 @@ static func _flat_mesh(quads: Array[PackedVector2Array]) -> ArrayMesh:
 	return surface.commit()
 
 
+## Quads as given, each [a, b, c, d] corner order, facing up.
+static func _quads_mesh(quads: Array[PackedVector3Array]) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for quad in quads:
+		for i: int in [0, 1, 2, 0, 2, 3]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(quad[i])
+	return surface.commit()
+
+
 ## A square outline round the cell's centre: the inner edge [param half]
 ## minus [param line] out, the outer [param half].
 static func _make_square_outline(half: float, line: float) -> ArrayMesh:
@@ -1326,17 +1376,18 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 		var meaning := str(each[2])
 		var colour := BUILDER_VOID if meaning == "void" else Color(str(Level.LEGEND.get(meaning, "#ff00ff")))
 		var half := 0.5 if meaning in Level.GROUNDS or meaning in ["void", "water", "fire", "stair"] else 0.3
-		var centre := Vector2(at)
-		var quad := PackedVector2Array([centre + Vector2(-half, -half), centre + Vector2(half, -half),
-			centre + Vector2(half, half), centre + Vector2(-half, half)])
+		# On the cell's ground, corner by corner (a ramp's slope too).
+		var lift := ON_FLOOR * 4.0 if half < 0.5 else ON_FLOOR * 2.0
+		var quad := PackedVector3Array()
+		for offset: Vector2 in [Vector2(-half, -half), Vector2(half, -half), Vector2(half, half), Vector2(-half, half)]:
+			var point := Vector2(at) + offset
+			quad.append(Vector3(point.x, _height_in(at, point) + lift, point.y))
 		var key := colour.to_html()
 		if not by_colour.has(key):
-			by_colour[key] = {"colour": colour, "quads": [] as Array[PackedVector2Array], "rise": 0.0}
+			by_colour[key] = {"colour": colour, "quads": [] as Array[PackedVector3Array]}
 		by_colour[key]["quads"].append(quad)
-		by_colour[key]["rise"] = maxf(by_colour[key]["rise"], _height(at) * LEVEL_RISE + (ON_FLOOR * 4.0 if half < 0.5 else ON_FLOOR * 2.0))
 	for key: String in by_colour:
-		var ghost := _make_flat(_flat_mesh(by_colour[key]["quads"]), Color(by_colour[key]["colour"], BUILDER_GHOST_ALPHA))
-		ghost.position.y = by_colour[key]["rise"]
+		var ghost := _make_flat(_quads_mesh(by_colour[key]["quads"]), Color(by_colour[key]["colour"], BUILDER_GHOST_ALPHA))
 		_builder_marks.add_child(ghost)
 	# Edges: a see-through wall or door standing on each, nothing for clear.
 	for each: Variant in edges:
@@ -1382,7 +1433,7 @@ func clear_builder() -> void:
 func hover(tile: Vector2i, show: bool) -> void:
 	_hover.visible = show
 	if show:
-		_hover.position = _tile_position(tile) + Vector3(0.0, ON_FLOOR, 0.0)
+		_lay_on_ground(_hover, tile, ON_FLOOR)
 
 
 ## Outlines [param entity] as the one the next click attacks, and nothing
@@ -1462,7 +1513,7 @@ func toss_aim(target: GridEntity, direction: Vector2i) -> void:
 		return
 	var puppet: Node3D = _puppets.get(target.get_instance_id())
 	var at := puppet.position if puppet != null else _tile_position(target.tile)
-	_toss.position = Vector3(at.x, ON_FLOOR * 3.0, at.z)
+	_toss.position = Vector3(at.x, _ground_height(Vector2(at.x, at.z)) + ON_FLOOR * 3.0, at.z)
 	_toss.rotation.y = -Vector2(direction).angle()
 
 
@@ -1492,7 +1543,7 @@ func tile_px() -> float:
 ## over RIPPLE_SECONDS, then is gone.
 func ripple(tile: Vector2i) -> void:
 	var ring := _make_ring_instance(RIPPLE)
-	ring.position = _tile_position(tile) + Vector3(0.0, ON_FLOOR * 2.0, 0.0)
+	_lay_on_ground(ring, tile, ON_FLOOR * 2.0)
 	add_child(ring)
 	var material := ring.material_override as StandardMaterial3D
 	ring.scale = Vector3(0.2, 1.0, 0.2)
@@ -1600,9 +1651,6 @@ func _build_room() -> void:
 	for cell: Vector2i in _terrain.get("water", []):
 		_add_water(cell)
 	_add_cliffs()
-	var stairs: Dictionary = _terrain.get("stairs", {})
-	for cell: Vector2i in stairs:
-		_add_stair(cell, stairs[cell])
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
 	for cell: Vector2i in _terrain.get("lanterns", []):
@@ -1773,16 +1821,17 @@ func _build_ground(kinds: Dictionary) -> void:
 	for cell: Vector2i in cells:
 		low = low.min(cell)
 		high = high.max(cell)
-	# The cells by place (index or -1) and their heights, the kinds texture
-	# a texel a cell with a border of one, and the cells by chunk.
+	# The cells by place (index or -1) and the levels of their corners (a
+	# stair's two on its high side a level up: a ramp), the kinds texture a
+	# texel a cell with a border of one, and the cells by chunk.
 	var across := high.x - low.x + 3
 	var down := high.y - low.y + 3
 	var origin := low - Vector2i.ONE
 	var at := PackedInt32Array()
 	at.resize(across * down)
 	at.fill(-1)
-	var heights := PackedInt32Array()
-	heights.resize(cells.size())
+	var levels := PackedInt32Array()
+	levels.resize(cells.size() * 4)
 	var kind_bytes := PackedByteArray()
 	kind_bytes.resize(across * down * 4)
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
@@ -1793,7 +1842,9 @@ func _build_ground(kinds: Dictionary) -> void:
 			kind = "stone"
 		_grounds[cell] = i
 		_ground_kinds[cell] = kind
-		heights[i] = clampi(_height(cell), 0, MAX_GROUND_HEIGHT)
+		var corner_levels := _corner_levels(cell)
+		for c in 4:
+			levels[i * 4 + c] = clampi(corner_levels[c], 0, MAX_GROUND_HEIGHT + 1)
 		var place := (cell.y - origin.y) * across + cell.x - origin.x
 		at[place] = i
 		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
@@ -1812,12 +1863,13 @@ func _build_ground(kinds: Dictionary) -> void:
 	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
 	var pair_cell := PackedInt32Array()
 	var pair_vertex := PackedInt32Array()
-	var corners: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
+	# The cells round a corner, and which of their corners it is.
 	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
 	var ends := PackedInt32Array([0, 0, 0, 0])
-	# A chunk's vertex for each corner and height, or -1.
+	# A chunk's vertex for each corner and level, or -1.
+	var level_count := MAX_GROUND_HEIGHT + 2
 	var local := PackedInt32Array()
-	local.resize((FLOOR_CHUNK + 1) * (FLOOR_CHUNK + 1) * (MAX_GROUND_HEIGHT + 1))
+	local.resize((FLOOR_CHUNK + 1) * (FLOOR_CHUNK + 1) * level_count)
 	for chunk: Vector2i in chunks:
 		var chunk_index := _ground_meshes.size()
 		var base := chunk * FLOOR_CHUNK
@@ -1826,40 +1878,65 @@ func _build_ground(kinds: Dictionary) -> void:
 		local.fill(-1)
 		var positions := PackedVector3Array()
 		var indices := PackedInt32Array()
+		# Each corner's relief, a byte each: at the foot of a drop (shaded),
+		# at its top (lit a little).
+		var feet := PackedByteArray()
+		var tops := PackedByteArray()
 		for i in chunks[chunk]:
 			var cell: Vector2i = cells[i]
-			var height := heights[i]
 			for c in 4:
-				var corner := cell + corners[c]
-				var key := ((corner.x - base.x) * (FLOOR_CHUNK + 1) + corner.y - base.y) * (MAX_GROUND_HEIGHT + 1) + height
+				var corner := cell + GROUND_CORNERS[c]
+				var level := levels[i * 4 + c]
+				var key := ((corner.x - base.x) * (FLOOR_CHUNK + 1) + corner.y - base.y) * level_count + level
 				var vertex := local[key]
 				if vertex < 0:
 					vertex = positions.size()
 					local[key] = vertex
-					positions.append(Vector3(corner.x - 0.5, height * LEVEL_RISE, corner.y - 0.5))
+					positions.append(Vector3(corner.x - 0.5, level * LEVEL_RISE, corner.y - 0.5))
 					var global := _vertex_chunk.size()
 					_vertex_chunk.append(chunk_index)
 					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
-					for step in around:
-						var next := corner + step
+					var foot := false
+					var top := false
+					for a in 4:
+						var next := corner + around[a]
 						var other := at[(next.y - origin.y) * across + next.x - origin.x]
-						if other >= 0 and heights[other] != height:
+						# This corner is the other cell's corner 3 - a.
+						var theirs := levels[other * 4 + 3 - a] if other >= 0 else 0
+						foot = foot or theirs > level
+						top = top or theirs < level
+						if other >= 0 and theirs != level:
 							other = -1
 						_vertex_cells.append(other)
 						if other >= 0:
 							pair_cell.append(other)
 							pair_vertex.append(global)
+					feet.append(255 if foot else 0)
+					tops.append(255 if top else 0)
 				ends[c] = vertex
 			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
 		var custom := PackedByteArray()
 		custom.resize(positions.size() * 4)
 		_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
 		for v in positions.size():
+			var byte := byte_start + v * _ground_stride + _ground_custom
 			custom[v * 4] = 255
-			_ground_bytes[byte_start + v * _ground_stride + _ground_custom] = 255
+			custom[v * 4 + 2] = feet[v]
+			custom[v * 4 + 3] = tops[v]
+			_ground_bytes[byte] = 255
+			_ground_bytes[byte + 2] = feet[v]
+			_ground_bytes[byte + 3] = tops[v]
+		# Up, but tilted on and beside a ramp: each corner the sum of the
+		# faces round it.
 		var normals := PackedVector3Array()
 		normals.resize(positions.size())
-		normals.fill(Vector3.UP)
+		normals.fill(Vector3.ZERO)
+		for t in range(0, indices.size(), 3):
+			var face := (positions[indices[t + 2]] - positions[indices[t]]).cross(positions[indices[t + 1]] - positions[indices[t]])
+			for k in 3:
+				normals[indices[t + k]] += face
+		for v in normals.size():
+			normals[v] = normals[v].normalized()
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = positions
@@ -1962,41 +2039,128 @@ func _add_water(cell: Vector2i) -> void:
 	_room.add_child(bed)
 
 
-## Cliff faces: where a cell stands above its neighbour (or above the void
-## or water at the map's edge), a face of stone down to it, unless a stair
-## joins them.
+## Cliff faces: wherever a cell's edge stands above its neighbour's (or
+## above the void or water past it), rock from the one down to the other,
+## and nothing where a ramp joins them. A face is a strip of small facets
+## jittered by where each point is, the same for every strip that shares
+## it (so faces meet without gaps) and still at the top and bottom (so they
+## meet the ground), one mesh a chunk.
 func _add_cliffs() -> void:
-	var stairs: Dictionary = _terrain.get("stairs", {})
+	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain["floor"]:
-		var top := _height(cell)
-		if top == 0:
+		floor_cells[cell] = true
+	var water: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain.get("water", []):
+		water[cell] = true
+	# Each side: the corners on it (GROUND_CORNERS indices), as the cell
+	# and as its neighbour has them.
+	var sides := {
+		Vector2i(1, 0): [[1, 3], [0, 2]], Vector2i(-1, 0): [[2, 0], [3, 1]],
+		Vector2i(0, 1): [[3, 2], [1, 0]], Vector2i(0, -1): [[0, 1], [2, 3]],
+	}
+	var faces: Dictionary[Vector2i, Array] = {}
+	for cell: Vector2i in floor_cells:
+		var own := _corner_levels(cell)
+		if own[0] == 0 and own[1] == 0 and own[2] == 0 and own[3] == 0:
 			continue
-		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		for direction: Vector2i in sides:
 			var next := cell + direction
-			var low := _height(next) if next in _terrain["floor"] or next in _terrain.get("water", []) else 0
-			if low >= top or stairs.get(next, Vector2i.ZERO) == -direction:
+			var theirs := PackedInt32Array([0, 0, 0, 0])
+			if floor_cells.has(next):
+				theirs = _corner_levels(next)
+			elif water.has(next):
+				var level := _height(next)
+				theirs = PackedInt32Array([level, level, level, level])
+			var mine: Array = sides[direction][0]
+			var their: Array = sides[direction][1]
+			var top := Vector2(own[mine[0]], own[mine[1]])
+			var bottom := Vector2(mini(own[mine[0]], theirs[their[0]]), mini(own[mine[1]], theirs[their[1]]))
+			if top == bottom:
 				continue
-			var face := _box(Vector3(1.0, (top - low) * LEVEL_RISE, 0.06), _stone_opaque)
-			face.name = "Cliff_%d_%d_%d_%d" % [cell.x, cell.y, direction.x, direction.y]
-			face.position = Vector3(cell.x + direction.x * 0.5, low * LEVEL_RISE, cell.y + direction.y * 0.5)
-			face.rotation.y = PI * 0.5 if direction.x != 0 else 0.0
-			_room.add_child(face)
+			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
+			if not faces.has(chunk):
+				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
+			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
+			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
+			_cliff_strip(faces[chunk], from, to, top * LEVEL_RISE, bottom * LEVEL_RISE, Vector3(direction.x, 0.0, direction.y))
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.roughness = 1.0
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for chunk: Vector2i in faces:
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = faces[chunk][0]
+		arrays[Mesh.ARRAY_NORMAL] = faces[chunk][1]
+		arrays[Mesh.ARRAY_COLOR] = faces[chunk][2]
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var drawn := MeshInstance3D.new()
+		drawn.name = "Cliffs_%d_%d" % [chunk.x, chunk.y]
+		drawn.mesh = mesh
+		drawn.material_override = material
+		_room.add_child(drawn)
 
 
-## A stair: STAIR_STEPS stone steps on its cell, rising one level toward
-## [param up].
-func _add_stair(cell: Vector2i, up: Vector2i) -> void:
-	var base := _tile_position(cell)
-	var holder := Node3D.new()
-	holder.name = "Stair_%d_%d" % [cell.x, cell.y]
-	holder.position = base
-	holder.rotation.y = -Vector2(up).angle() + PI * 0.5
-	for i in STAIR_STEPS:
-		var rise := (i + 1) * LEVEL_RISE / STAIR_STEPS
-		var step := _box(Vector3(1.0, rise, 1.0 / STAIR_STEPS), _stone_opaque)
-		step.position.z = -0.5 + (i + 0.5) / STAIR_STEPS
-		holder.add_child(step)
-	_room.add_child(holder)
+## One cliff face into [param into] ([positions, normals, colours]): along
+## the edge [param from] to [param to], from [param top] (heights at each
+## end) down to [param bottom], facing [param out].
+func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom: Vector2, out: Vector3) -> void:
+	var drop := maxf(top.x - bottom.x, top.y - bottom.y)
+	var rows := maxi(1, ceili(drop / CLIFF_ROW))
+	var points: Array[PackedVector3Array] = []
+	for j in rows + 1:
+		var row := PackedVector3Array()
+		var v := j / float(rows)
+		for i in CLIFF_ACROSS + 1:
+			var u := i / float(CLIFF_ACROSS)
+			var at := from.lerp(to, u)
+			var low := lerpf(bottom.x, bottom.y, u)
+			var high := lerpf(top.x, top.y, u)
+			var point := Vector3(at.x, lerpf(low, high, v), at.y)
+			# Pushed less where the face is low (a wedge's thin end: none).
+			if j > 0 and j < rows:
+				point += _cliff_jitter(point) * minf((high - low) / LEVEL_RISE, 1.0)
+			row.append(point)
+		points.append(row)
+	var positions: PackedVector3Array = into[0]
+	var normals: PackedVector3Array = into[1]
+	var colours: PackedColorArray = into[2]
+	for j in rows:
+		for i in CLIFF_ACROSS:
+			var a := points[j][i]
+			var b := points[j][i + 1]
+			var c := points[j + 1][i]
+			var d := points[j + 1][i + 1]
+			for triangle: Array in [[a, b, c], [b, d, c]]:
+				var p0: Vector3 = triangle[0]
+				var p1: Vector3 = triangle[1]
+				var p2: Vector3 = triangle[2]
+				var normal := (p1 - p0).cross(p2 - p0)
+				if normal.length_squared() < 0.000001:
+					continue  # A wedge's point.
+				normal = normal.normalized()
+				if normal.dot(out) < 0.0:
+					normal = -normal
+				var middle := (p0 + p1 + p2) / 3.0
+				var shade := lerpf(0.8, 1.15, _roll(Vector2i(roundi(middle.x * 16.0), roundi(middle.z * 16.0)), roundi(middle.y * 16.0)))
+				# Darker toward the foot.
+				shade *= lerpf(0.72, 1.0, clampf(inverse_lerp(minf(bottom.x, bottom.y), maxf(top.x, top.y), middle.y), 0.0, 1.0))
+				var colour := Color(CLIFF_ROCK * shade, 1.0)
+				positions.append_array([p0, p1, p2])
+				normals.append_array([normal, normal, normal])
+				colours.append_array([colour, colour, colour])
+	into[0] = positions
+	into[1] = normals
+	into[2] = colours
+
+
+## How far a cliff's point is pushed: by where it is alone, so every face
+## that has the point pushes it alike.
+static func _cliff_jitter(point: Vector3) -> Vector3:
+	var key := Vector2i(roundi(point.x * 64.0), roundi(point.z * 64.0))
+	var level := roundi(point.y * 64.0)
+	return Vector3(_roll(key, level) - 0.5, (_roll(key, level + 7) - 0.5) * 0.4, _roll(key, level + 13) - 0.5) * CLIFF_JITTER * 2.0
 
 
 ## The heat and light changed (the map, a door): the floor is shaded

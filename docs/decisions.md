@@ -2906,3 +2906,39 @@ tools/map_bench 256x256, windowed, alternately with main (v0.1.135): the
 and 2.09 s (main 2.12 and 2.08), 1089 more nodes (a post's wrapper), the
 same draw calls, frames and memory. The castle, screenshotted on each:
 the same but for the goblins' animation phase and the fire's flicker.
+
+## 226. A stair is a ramp, a ledge a rock face, and the ground shows its drops
+
+The sim walks between heights only by stairs (World.height_step): every
+other rise is a ledge. So the smooth slopes Jeff asked for are the stairs,
+and every other rise is a cliff. The ground (216) now gives each cell's
+corners a level (Client3D._corner_levels): its height, and on a stair the
+two corners on its high side a level up, so a stair is a ramp sharing its
+top corners with the cell above and its bottom ones with the cell below,
+and side by side stairs make one wide ramp. The stone steps are gone. The
+ground's normals follow it (each corner the sum of its faces). A puppet's
+height (_ground_height) follows the ramp across the cell, and the flat
+marks lie on it: the hover outline and click ripple at the ramp's middle,
+tilted with it (_lay_on_ground), the toss arrow at the height under it,
+and a builder ghost's quads corner by corner (_height_in), so on a ramp
+none is half under the ground.
+
+Where an edge's corners stand above the neighbour's (or above the void or
+water past it), a rock face runs down to them: one mesh a chunk, rows of
+small facets (CLIFF_ROW high, CLIFF_ACROSS along a cell), each point
+pushed by a hash of where it is alone, so two faces that share a point
+push it alike and meet without a gap, and pushed less where the face is
+low (none at a wedge's thin end, beside a ramp) and not at all on its top
+and bottom rows, which meet the ground. Faceted, a colour a facet, darker
+toward the foot. The old faces were a thin stone box a cell edge.
+
+With every level the same green, a ledge read only by its face, flatter
+than the boxes it replaced. So each corner also carries its relief in the
+ground's CUSTOM0 b and a (set once at build; the shading writes r and g
+only): at the foot of a drop (a cell round it higher), shaded to half; at
+its top (one lower, or the void), lit a little. Both fade over the cell,
+so a raised floor stands out from the one below.
+
+Rejected: smoothing every rise into a slope (it would show walkable
+ground where the sim has a ledge), and jittering the ground's corners on
+a ledge to wobble its line (a corner a cell is a zigzag, not a wobble).

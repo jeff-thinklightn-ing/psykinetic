@@ -1,7 +1,9 @@
 shader_type spatial;
 // The ground, one mesh per chunk (Client3D._build_ground): a vertex at every
 // cell corner, its light and heat in CUSTOM0 (r: brightness, g: warmth, the
-// cells around the corner averaged), so both fade smoothly from cell to cell.
+// cells around the corner averaged), so both fade smoothly from cell to cell;
+// b: at the foot of a drop, a: at its top, so a ledge's foot is shaded and
+// its edge caught by the light.
 // Which ground is where comes from kinds, a texel a cell (r grass, g dirt,
 // b stone, a sand), read where the noise pushes it, so kinds meet along
 // ragged borders, not cell edges. Everything else is noise (noise_tex, made
@@ -21,6 +23,7 @@ uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 
 varying vec3 world;
 varying vec2 shade;
+varying vec2 relief;
 
 // Smooth noise 0..1 with about one feature per unit of p, read from
 // noise_tex (FastNoiseLite, made at run time, 64 features across before it
@@ -83,6 +86,7 @@ vec2 cobbles(vec2 p) {
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	shade = CUSTOM0.rg;
+	relief = CUSTOM0.ba;
 }
 
 void fragment() {
@@ -119,6 +123,8 @@ void fragment() {
 		colour += sand * (0.92 + 0.12 * noise(at * 0.5 + 21.0))
 				* (0.96 + 0.08 * noise(vec2(at.x * 1.5 + at.y * 0.4, at.y * 6.0))) * weights.a;
 	}
+
+	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);
 
 	// Light and heat as the old floor had them, worked out in sRGB.
 	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * shade.r;

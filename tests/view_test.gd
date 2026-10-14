@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_ground_colours()
 	await _test_fade()
 	_test_outdoor()
+	_test_heights()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -206,6 +207,55 @@ func _test_player_death() -> void:
 	await get_tree().create_timer(Client3D.MOURN_RETURN_SECONDS + 0.2).timeout
 	_check(is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_equal_approx(_rig._camera.size, size),
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
+
+
+func _test_heights() -> void:
+	print("\n== heights: a stair is a ramp the ground runs up, a ledge a rock face, marks lie on the slope ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"]
+	var stairs: Dictionary = terrain["stairs"]
+	_check(not stairs.is_empty(), "the sample has stairs (%d)" % stairs.size())
+	if stairs.is_empty():
+		return
+	_rig.rebuild(terrain, sample["centre"])
+	var stair: Vector2i = stairs.keys()[0]
+	var up: Vector2i = stairs[stair]
+	var low: int = terrain["heights"].get(stair, 0)
+	var rise := Client3D.LEVEL_RISE
+	_check(is_equal_approx(_rig._ground_height(Vector2(stair)), (low + 0.5) * rise)
+			and is_equal_approx(_rig._ground_height(Vector2(stair) - Vector2(up) * 0.49), (low + 0.01) * rise)
+			and is_equal_approx(_rig._ground_height(Vector2(stair) + Vector2(up) * 0.49), (low + 0.99) * rise),
+			"a puppet on a stair stands on its ramp: half up at its middle, nearly a level up at its top edge")
+	# The ramp's high corners are the upper cell's: one vertex shared.
+	var shared := false
+	var stair_index: int = _rig._grounds[stair]
+	var upper_index: int = _rig._grounds.get(stair + up, -1)
+	for vertex in _rig._vertex_chunk.size():
+		var around := Array(_rig._vertex_cells.slice(vertex * 4, vertex * 4 + 4))
+		if around.has(stair_index) and around.has(upper_index):
+			shared = true
+	_check(upper_index >= 0 and shared, "the ramp's top meets the cell above it, no step between")
+	_check(not _rig._room.find_children("Cliffs_*", "MeshInstance3D", false, false).is_empty()
+			and _rig._room.find_children("Stair_*", "", false, false).is_empty()
+			and _rig._room.find_children("Cliff_*", "", false, false).is_empty(),
+			"ledges are rock faces, a mesh a chunk; no stone boxes, no steps")
+	_rig.hover(stair, true)
+	var slope := Vector3(-up.x * rise, 1.0, -up.y * rise).normalized()
+	_check(absf(_rig._hover.position.y - (low + 0.5) * rise) < 0.05 and _rig._hover.basis.y.dot(slope) > 0.999,
+			"the hover outline lies on the ramp, tilted with it")
+	_rig.hover(stair, false)
+	_rig.show_builder(Rect2i(stair - Vector2i.ONE, Vector2i(3, 3)), [[stair.x, stair.y, "grass"]])
+	var lowest := INF
+	var highest := -INF
+	for node in _rig._builder_marks.get_children():
+		var mesh := (node as MeshInstance3D).mesh
+		if mesh is ArrayMesh and node.position == Vector3.ZERO:
+			for point: Vector3 in (mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+				lowest = minf(lowest, point.y)
+				highest = maxf(highest, point.y)
+	_check(highest - lowest > rise * 0.9, "a builder ghost on the stair runs up its ramp (%.2f to %.2f)" % [lowest, highest])
+	_rig.clear_builder()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_outdoor() -> void:
