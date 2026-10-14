@@ -1,7 +1,10 @@
 # Changelog
 
-Newest first. `tools/release_client.ps1` uses the top section as the release
-notes.
+Newest first. Worktrees add their bullets under `## Unreleased`; the coordinator
+renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
+top section as the release notes.
+
+## Unreleased
 
 ## v0.1.139
 

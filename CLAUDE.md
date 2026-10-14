@@ -13,20 +13,20 @@ which worktree owns each step, and the design rules not to break without asking 
 ## Landing work
 
 - Only `main` is released. In a worktree, rebase onto `origin/main` before each change,
-  test, commit, and land it per change (`git push origin HEAD:main`, or release with
-  `tools/release_client.ps1`, which pushes `HEAD:main` itself). If the push is refused,
-  `main` moved: rebase, retest, push again. A branch never collects unreleased work.
-- A tested change to the game is released straight away: `## vX.Y.Z` section at the top of
-  `CHANGELOG.md`, then `tools/release_client.ps1` with the next version (needs
-  `GODOT_PATH`, a clean tree, the Windows export template and `gh`). Docs and tools-only
-  changes land on `main` without a release.
+  run the full suite (plus net_test and state_test for anything the server runs), commit,
+  and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
+  moved: rebase, retest, push again. A branch never collects unlanded work.
+- Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
+  A tested change lands on `main` straight away, with its bullets added under
+  `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
+  coordinator cuts releases: it freezes `main` briefly, runs the suite on `main`, renames
+  `## Unreleased` to the next `## vX.Y.Z`, runs the release script, deploys the server,
+  and unfreezes. Between releases `main` runs ahead of the box; that's expected. Say in
+  your landing message if your change alters the wire format, so it isn't left unreleased.
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
   running, ask the coordinator (the session in the main folder) for the number before
   committing, so two trees don't take the same one.
-- Releases take turns the same way: ask the coordinator for the version before running
-  `tools/release_client.ps1`, so a release being retested doesn't lose its number to
-  another tree's.
 - After a pull or rebase that brings in a new `class_name`, run
   `godot --headless --path . --import` before testing: each worktree has its own `.godot`
   class cache, and without it scripts naming the new class fail to compile. Name any new
