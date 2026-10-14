@@ -42,6 +42,9 @@ func _sim_tick() -> void:
 		_take_queued_step()
 		return
 	if action_order != Order.NONE:
+		# The steps the client was showing when it sent the strike first.
+		if not move_via.is_empty() and World.tick >= next_move_tick and _walk_via():
+			return
 		_pursue_action()
 		return
 
@@ -82,7 +85,12 @@ func _take_queued_step() -> void:
 
 ## One step through the order's via tiles, if any are left. Tiles already
 ## behind the player are dropped; a via tile that is no longer one step
-## away (the player was pushed) drops them all. True if a step was tried.
+## away (the player was pushed) drops them all, and so does a way of the
+## server's own to the destination World.DETOUR_STEPS shorter than the rest
+## of them (a passage that was taken when the client planned round it has
+## cleared):
+## the server's own way is walked then, as before there were via tiles.
+## True if a step was tried.
 func _walk_via() -> bool:
 	var reached := move_via.find(tile)
 	if reached != -1:
@@ -93,9 +101,18 @@ func _walk_via() -> bool:
 	if World.distance(tile, next) != 1:
 		move_via.clear()
 		return false
+	if has_move_order and move_via.back() == move_order:
+		var own := World.find_path(tile, move_order, true)
+		if not own.is_empty() and own.size() + World.DETOUR_STEPS <= move_via.size():
+			move_via.clear()
+			return false
 	move_via.pop_front()
 	if not World.try_move(self, next - tile):
 		move_via.clear()
+		# Into the destination itself: decided, as in _sim_tick (refused once,
+		# not again next tick by the path round it).
+		if has_move_order and next == move_order:
+			has_move_order = false
 		World.report_move_refused(self, next)
 	return true
 
@@ -125,10 +142,17 @@ func _pursue_action() -> void:
 			World.try_shove(self, target, direction)
 		return
 	# Out of reach: close in, re-pathing each step in case the target moves.
+	# No way, or the step taken first: the order is dropped, and the client
+	# told at once, or it walks on showing the approach till it gives up
+	# waiting and is pulled back.
 	if World.tick < next_move_tick:
 		return
 	var path := World.find_path(tile, action_target.tile, true)
-	if path.is_empty() or not World.try_move(self, path[0] - tile):
+	if path.is_empty():
+		World.report_move_refused(self, action_target.tile, World.ORDER_DROPPED)
+		_clear_action()
+	elif not World.try_move(self, path[0] - tile):
+		World.report_move_refused(self, path[0], World.ORDER_DROPPED)
 		_clear_action()
 
 

@@ -133,6 +133,8 @@ var _stdin_lines: Array[String] = []
 var _admin: TCPServer
 var _admin_clients: Array[StreamPeerTCP] = []
 var _test_target := Vector2i.ZERO
+## --test-fight: when the last strike was ordered (msec).
+var _test_fight_at := -100000
 var _test_ordered := false
 var _test_arrived := false
 var _test_contested := false
@@ -2784,12 +2786,37 @@ func _run_test_steer() -> void:
 	var player := _local_player()
 	if Net.test_steer <= 0.0 or player == null:
 		return
+	if _run_test_fight(player):
+		return
 	var turns: Array[Vector2i] = [Vector2i(3, 0), Vector2i(0, 3), Vector2i(-3, 0), Vector2i(0, -3)]
 	var turn := int(Time.get_ticks_msec() / (Net.test_steer * 1000.0)) % turns.size()
 	var want := player.shown_tile() + turns[turn]
 	if World.is_walkable(want) and want != _test_target:
 		_test_target = want
 		World.command_move(player, want)
+
+
+## --test-fight (with --test-steer): every that many seconds, a strike at
+## the nearest monster within eight tiles, as a click on it does; it is
+## closed in on, and the steering waits a second for it. True while it does.
+func _run_test_fight(player: Player) -> bool:
+	if Net.test_fight <= 0.0:
+		return false
+	var now := Time.get_ticks_msec()
+	if now - _test_fight_at < 1000:
+		return true
+	if now - _test_fight_at < Net.test_fight * 1000.0:
+		return false
+	var nearest: GridEntity = null
+	for entity in World.monsters():
+		if entity.spawned and World.distance(entity.tile, player.tile) <= 8 \
+				and (nearest == null or World.distance(entity.tile, player.tile) < World.distance(nearest.tile, player.tile)):
+			nearest = entity
+	if nearest == null:
+		return false
+	_test_fight_at = now
+	World.command_attack(player, nearest)
+	return true
 
 
 ## --test-walk: the keys of the entry being held, or "" once all are done.

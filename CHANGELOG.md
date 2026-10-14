@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.118
+
+Client and server.
+
+- Less rubber-banding when you walk or fight among monsters: the server now
+  follows the way your client shows, and your character is pulled back far
+  less often, and not as far, when monsters get in the way. Clicking a
+  monster no longer sometimes walks you a step and pulls you back.
+
+The server must be updated to v0.1.118 too, as it refuses any other version.
+
 ## v0.1.117
 
 Client and server.

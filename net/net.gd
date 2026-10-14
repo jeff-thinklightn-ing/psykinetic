@@ -80,6 +80,7 @@ extends Node
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##   --test-lag=<seconds>         client: hold every order this long before sending it
 ##   --test-steer=<seconds>       hold-to-move with a cursor that swings a quarter turn this often
+##   --test-fight=<seconds>       strike at the nearest monster this often (closing in on it), between steering
 ##   --test-walk=<keys:secs,...>  WASD: hold these keys (e.g. w:1.5,wd:1) in turn, then let go
 ##
 ## Options are read from both the engine argument list and the user arguments
@@ -265,6 +266,8 @@ var test_lag := 0.0
 ## (each half tick too); --tick-send-hz. The sim stays at 10 Hz.
 var tick_send_hz := 10
 var test_steer := 0.0
+## --test-fight: seconds between strikes at the nearest monster.
+var test_fight := 0.0
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
 var test_walk: Array[Dictionary] = []
 
@@ -966,7 +969,7 @@ func _parse_args() -> void:
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
 					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-walk", "--tick-send-hz":
+					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -999,6 +1002,8 @@ func _set_option(key: String, value: String) -> void:
 			test_lag = maxf(value.to_float(), 0.0)
 		"--test-steer":
 			test_steer = maxf(value.to_float(), 0.0)
+		"--test-fight":
+			test_fight = maxf(value.to_float(), 0.0)
 		"--test-walk":
 			test_walk.clear()
 			for part in value.split(","):

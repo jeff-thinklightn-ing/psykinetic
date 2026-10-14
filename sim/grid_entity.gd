@@ -351,6 +351,8 @@ func _process(delta: float) -> void:
 		# Not a correction but silence: the server is not doing this walk.
 		_prediction.give_up()
 		_mispredicted("no confirmation from the server")
+	elif _prediction != null and _prediction.take_route_changed():
+		_resend_walk()  # Planned again on the way: the server walks the new plan.
 	if spawned:
 		if _prediction != null and _prediction.is_active():
 			# The local player's own walking: shown ahead of the server.
@@ -725,9 +727,16 @@ func step_epoch() -> int:
 
 ## The local player just ordered an attack or shove on something standing on
 ## [param target_tile]: show the walk up to it. The hit itself is not predicted.
-func predict_approach(target_tile: Vector2i) -> void:
-	if _prediction != null:
-		_prediction.order(target_tile, false)
+## Closing in on [param target] to strike: shown at once. Returns the steps
+## already under way on screen that the server has not confirmed: it walks
+## them before closing in (World._order_action).
+func predict_approach(target_tile: Vector2i, target: GridEntity = null) -> Array[Vector2i]:
+	var none: Array[Vector2i] = []
+	if _prediction == null:
+		return none
+	_prediction.order(target_tile, false)
+	_prediction.follow(target)
+	return _prediction.in_flight()
 
 
 ## Tile the sprite is drawn on, which on the predicting client may be ahead
@@ -754,8 +763,16 @@ func _mispredicted(reason: String) -> void:
 			name, predicted, tile, error, reason])
 	else:
 		_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
+		_resend_walk()
 		print("[net] mispredict: %s predicted %s, server has %s: blending (%s)" % [
 			name, predicted, tile, reason])
+
+
+## After a correction: the walk re-planned from the server's tile goes to
+## the server as the order, so it walks it rather than a way of its own.
+func _resend_walk() -> void:
+	if _prediction.is_walking_to_target():
+		World.resend_move(self, _prediction.target(), _prediction.unconfirmed())
 
 
 ## The server refused a step into [param refused] this tick. Re-plan from
@@ -770,11 +787,14 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 	Net.record_mispredict()
 	Net.stats.record_correction((Iso.local_to_grid(position) - Vector2(tile)).length(), false)
 	_mirror_rest()
-	# A refused step into the destination itself: the server has dropped the
-	# order (see Player._sim_tick), so there is nothing left to predict.
-	if refused == _prediction.target():
+	# A refused step into the destination itself, or a strike's closing in
+	# that the server gave up (World.ORDER_DROPPED): the server has dropped
+	# the order (Player._sim_tick, _pursue_action), so there is nothing left
+	# to predict.
+	if refused == _prediction.target() or epoch == World.ORDER_DROPPED:
 		_prediction.give_up()
 	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
+	_resend_walk()
 	print("[net] mispredict: %s step into %s refused, server has %s: %s" % [
 		name, refused, tile, "re-planned" if _prediction.has_target() else "order given up"])
 

@@ -95,6 +95,17 @@ const DIAGONAL_TICK_SCALE := 1.5
 ## WASD steps queued on the server for one player at most; more are
 ## dropped (the client never sends more than one ahead).
 const MAX_QUEUED_STEPS := 3
+## A move order's via tiles (the walk the client shows) kept at most; the
+## rest of the way the server plans itself.
+const MAX_VIA_STEPS := 64
+## How many steps shorter a way found now must be than the rest of a walk
+## being shown (or walked from the client's via tiles) to replace it: a
+## detour round a passage that has since cleared, not the step or two that
+## monsters moving about gain or lose every tick.
+const DETOUR_STEPS := 3
+## report_move_refused's epoch for a refusal that dropped the order (a
+## strike closing in that cannot): the client stops predicting it.
+const ORDER_DROPPED := -1
 # Path costs are integers proportional to ticks. The +1 only breaks ties in
 # favour of straight lines; fire is a detour worth five steps.
 ## What the terrain lets a walker who opens doors do across one step (see
@@ -858,7 +869,7 @@ func order_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i] = [])
 		return
 	entity.move_order = target
 	entity.has_move_order = true
-	entity.move_via = via.slice(0, MAX_QUEUED_STEPS)
+	entity.move_via = via.slice(0, MAX_VIA_STEPS)
 	if entity is Player:
 		(entity as Player).queued_steps.clear()
 	entity.action_order = GridEntity.Order.NONE
@@ -900,25 +911,30 @@ func order_swing(entity: GridEntity, direction: Vector2i) -> void:
 
 
 ## Player intent: attack [param target] on the entity's next free tick.
-func order_attack(entity: GridEntity, target: GridEntity) -> void:
+func order_attack(entity: GridEntity, target: GridEntity, via: Array[Vector2i] = []) -> void:
 	if not Net.is_authority():
 		return
-	_order_action(entity, GridEntity.Order.ATTACK, target, Vector2i.ZERO)
+	_order_action(entity, GridEntity.Order.ATTACK, target, Vector2i.ZERO, via)
 
 
 ## Player intent: shove [param target] on the entity's next free tick.
 ## With a [param direction] it is a toss: the target goes that way instead of
 ## straight away from the entity.
-func order_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
+func order_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO,
+		via: Array[Vector2i] = []) -> void:
 	if not Net.is_authority():
 		return
 	if direction != Vector2i.ZERO and direction not in DIRECTIONS:
 		return
-	_order_action(entity, GridEntity.Order.SHOVE, target, direction)
+	_order_action(entity, GridEntity.Order.SHOVE, target, direction, via)
 
 
+## [param via]: the steps the client was already showing when it sent the
+## order (a walk under way); they are walked first, as for a move order
+## (Player._sim_tick), or the client would be pulled back off a step it
+## showed while the server struck from where it stood.
 func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity,
-		direction: Vector2i) -> void:
+		direction: Vector2i, via: Array[Vector2i] = []) -> void:
 	if not Net.is_authority():
 		return
 	if not entity.spawned or not target.spawned or entity == target:
@@ -929,6 +945,7 @@ func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEnti
 	entity.action_target = target
 	entity.action_direction = direction
 	entity.has_move_order = false
+	entity.move_via = via.slice(0, MAX_QUEUED_STEPS)
 
 
 # --- Input from any peer ------------------------------------------------------
@@ -949,23 +966,31 @@ func command_move(entity: GridEntity, target: Vector2i) -> void:
 		_to_server(&"request_move", [entity.get_path(), target, via])
 
 
+## Client: the walk its prediction re-planned after a correction, sent
+## again as the order, so the server goes that way too and not round the
+## monsters a way of its own (see MovePrediction.order).
+func resend_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i]) -> void:
+	if not Net.is_authority():
+		_to_server(&"request_move", [entity.get_path(), target, via])
+
+
 func command_attack(entity: GridEntity, target: GridEntity) -> void:
 	if Net.is_authority():
 		order_attack(entity, target)
 	else:
-		entity.predict_approach(target.tile)
+		var via := entity.predict_approach(target.tile, target)
 		_note_strike_sent(entity)
-		_to_server(&"request_attack", [entity.get_path(), target.get_path()])
+		_to_server(&"request_attack", [entity.get_path(), target.get_path(), via])
 
 
 func command_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
 	if Net.is_authority():
 		order_shove(entity, target, direction)
 	else:
-		entity.predict_approach(target.tile)
+		var via := entity.predict_approach(target.tile, target)
 		_predict_shove(entity, target, direction)
 		_note_strike_sent(entity)
-		_to_server(&"request_shove", [entity.get_path(), target.get_path(), direction])
+		_to_server(&"request_shove", [entity.get_path(), target.get_path(), direction, via])
 
 
 ## Client: a plain shove the server will take at once (the shover standing,
@@ -1073,27 +1098,36 @@ func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predic
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_attack(entity_path: NodePath, target_path: NodePath) -> void:
+func request_attack(entity_path: NodePath, target_path: NodePath, via: Array) -> void:
 	if not Net.is_authority():
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
 	if entity != null and target != null and target.zone == entity.zone:
 		var was := enter_named(entity.zone)
-		order_attack(entity, target)
+		order_attack(entity, target, _tiles(via))
 		enter(was)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vector2i) -> void:
+func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vector2i, via: Array) -> void:
 	if not Net.is_authority():
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
 	if entity != null and target != null and target.zone == entity.zone:
 		var was := enter_named(entity.zone)
-		order_shove(entity, target, direction)
+		order_shove(entity, target, direction, _tiles(via))
 		enter(was)
+
+
+## The tiles of an order's via list as sent (anything else in it dropped).
+static func _tiles(via: Array) -> Array[Vector2i]:
+	var tiles: Array[Vector2i] = []
+	for at: Variant in via:
+		if at is Vector2i:
+			tiles.append(at)
+	return tiles
 
 
 ## Server: a player's step into [param tile] was refused this tick (someone

@@ -20,11 +20,14 @@ extends RefCounted
 ## Only walking is predicted. Being pushed is never predicted.
 ##
 ## A new move order keeps the steps already showing, and the order sent
-## to the server lists the ones it has not confirmed (order's result), so
-## the server walks them before re-pathing: otherwise an order that
-## arrives before the server has taken a shown step sets off from the tile
-## before it, often another way (hold-to-move steering, worst in 3D where
-## the camera moves the ground under a still cursor).
+## to the server lists every step shown or planned that it has not
+## confirmed (order's result), so the server walks the way shown, re-pathing
+## only when a step is refused: otherwise an order that arrives before the
+## server has taken a shown step sets off from the tile before it, and a
+## server re-pathing round monsters it sees a moment later goes another
+## way than the client planned (hold-to-move steering, worst in 3D where
+## the camera moves the ground under a still cursor). After a correction
+## the owner sends the re-planned walk again (GridEntity._resend_walk).
 ##
 ## WASD walks are predicted step by step (step()): each one starts where
 ## the last ends, so the walk is one steady motion, and is sent to the
@@ -39,6 +42,8 @@ extends RefCounted
 ## How long past its expected confirmation (start + round trip) a shown step
 ## may stay unconfirmed before it counts as a misprediction.
 const RECONCILE_GRACE_TICKS := 4.0
+## Ticks a step toward a target that came within reach is eased back over.
+const REACH_SETTLE_TICKS := 1.5
 
 
 class Step:
@@ -73,6 +78,12 @@ var epoch := 0
 ## When the last shown walk ended, on the clock, kept after its steps are
 ## dropped: a WASD step held on from it starts there, not a frame late.
 var _ended_at := -INF
+## Closing in to strike: the one struck at, whose replicated tile the walk
+## is planned to again as it moves, as the server re-paths each step.
+var _following: WeakRef = null
+## The walk was planned again (a step taken, a shorter way open) and is to
+## be sent to the server (take_route_changed).
+var _route_changed := false
 
 
 func _init(entity: GridEntity) -> void:
@@ -87,17 +98,17 @@ func is_active() -> bool:
 ## Steps already being shown stay; steps not yet started are replaced.
 ## With [param into_goal] false the walk stops next to the target tile, which
 ## is what the server does when closing in to attack or shove.
-## Returns the tiles of the shown steps the server has not confirmed, in
-## order: the server must walk those first.
+## Returns the tiles of every step it shows that the server has not
+## confirmed, in order, those under way and those planned: the server walks
+## them while it can (Player._walk_via), so it goes the way shown rather
+## than a way of its own round the same monsters, which it sees a moment
+## later and elsewhere (most of the corrections on the castle were that).
 func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
+	_following = null
 	_has_target = true
 	_target = target
 	_into_goal = into_goal
 	cancel_unstarted()
-	var via: Array[Vector2i] = []
-	for step in _steps:
-		if step.started and not step.confirmed:
-			via.append(step.to)
 	var at: Vector2i = _entity.tile
 	var start := _clock
 	if is_active():
@@ -105,7 +116,40 @@ func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 		at = last.to
 		start = maxf(_clock, last.start + last.duration)
 	_append_path(at, start)
+	return unconfirmed()
+
+
+## The tiles of the steps shown or planned that the server has not
+## confirmed, in order.
+func unconfirmed() -> Array[Vector2i]:
+	var via: Array[Vector2i] = []
+	for step in _steps:
+		if not step.confirmed:
+			via.append(step.to)
 	return via
+
+
+## The tiles of the steps under way on screen that the server has not
+## confirmed, in order (sent with a strike order, which the server plans
+## itself from where they end).
+func in_flight() -> Array[Vector2i]:
+	var via: Array[Vector2i] = []
+	for step in _steps:
+		if step.started and not step.confirmed:
+			via.append(step.to)
+	return via
+
+
+## Closing in on [param target] (after order(its tile, false)): as it moves
+## the approach is planned again to where it is (advance).
+func follow(target: GridEntity) -> void:
+	_following = weakref(target) if target != null else null
+
+
+## A walk to a tile (not a closing in to strike, which the server plans
+## itself), with a target still to reach.
+func is_walking_to_target() -> bool:
+	return _has_target and _into_goal
 
 
 ## WASD: one step in [param direction] from where the shown walk ends,
@@ -150,9 +194,13 @@ func ready_for_step() -> bool:
 	return _clock >= last.start + last.duration
 
 
-## Drops predicted steps that have not started showing (the order changed).
+## Drops predicted steps that have not started showing (the order changed),
+## but not one the server has already taken (confirmed while the server was
+## ahead): dropped and planned again, it would wait for a confirmation that
+## had come and gone, and be pulled back at its deadline onto the very tile
+## the server has ("predicted X, server has X: no confirmation").
 func cancel_unstarted() -> void:
-	while is_active() and not _steps.back().started:
+	while is_active() and not _steps.back().started and not _steps.back().confirmed:
 		_steps.pop_back()
 
 
@@ -201,6 +249,21 @@ func advance(delta: float) -> bool:
 	_clock += delta / World.TICK_DT
 	if not is_active():
 		return false
+	if _following != null and _has_target and not _into_goal:
+		var followed := _following.get_ref() as GridEntity
+		if followed == null or not followed.spawned:
+			_following = null
+		elif followed.tile != _target:
+			if World.can_melee(_entity.tile, followed.tile) and not in_flight().is_empty():
+				# It came within reach of where the server has the striker: the
+				# server strikes from there and takes no step, so neither is a
+				# step shown toward it.
+				_target = followed.tile
+				rebase(_entity.tile, REACH_SETTLE_TICKS)
+			else:
+				# It moved: the way to it again, as the server re-paths each step.
+				order(followed.tile, false)
+				_following = weakref(followed)
 	# Start steps whose time has come, re-planning if the world moved into one.
 	for i in _steps.size():
 		var step := _steps[i]
@@ -208,8 +271,14 @@ func advance(delta: float) -> bool:
 			continue
 		if step.start > _clock:
 			break
-		if _blocked(step.from, step.to - step.from):
+		# (Not one the server has taken already: its world is the one that counts.)
+		if not step.confirmed and (_blocked(step.from, step.to - step.from) or _shorter_way_from(i)):
+			# Taken, or a shorter way opened (one who stood in a passage moved
+			# on): planned again from here, as the server once did each step;
+			# the server walks the plan, so it is sent again (take_route_changed).
 			_replan_from(i)
+			if is_walking_to_target():
+				_route_changed = true
 			break
 		step.started = true
 	var all_confirmed := true
@@ -292,6 +361,23 @@ func _append_path(at: Vector2i, start: float) -> void:
 		_steps.append(step)
 		start += step.duration
 		at = next
+
+
+## A walk to a tile whose planned steps from index [param i] on are at
+## least World.DETOUR_STEPS more than a way found now from the same tile.
+func _shorter_way_from(i: int) -> bool:
+	if not is_walking_to_target() or _steps[_steps.size() - 1].to != _target:
+		return false
+	var way := World.find_path(_steps[i].from, _target, true, _entity)
+	return not way.is_empty() and way.size() + World.DETOUR_STEPS <= _steps.size() - i
+
+
+## Whether the walk was planned again since the last take: the owner sends
+## it to the server then (GridEntity._resend_walk). Clears it.
+func take_route_changed() -> bool:
+	var changed := _route_changed
+	_route_changed = false
+	return changed
 
 
 ## Drops steps from index [param i] on and plans again from the tile before.

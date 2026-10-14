@@ -1962,3 +1962,45 @@ release another session pushed meanwhile makes it fail, not overwrite;
 rebase and release again. Rejected: a perf branch merged now and then
 (server and client must be on one version, so unreleased work waits, and
 the sessions edit the same files, client3d.gd among them).
+
+## 187. The server walks the way the client shows
+
+Walking among monsters on the box rubber-banded, 1 to 5 corrections a
+minute of up to 1.8 tiles, with the server's tick under 5 ms and a 20 ms
+round trip: the prediction and the server disagreed. Reproduced locally
+(a server on the castle, a client steering with --test-steer and striking
+the nearest monster with the new --test-fight, 20 ms of --test-lag), and
+traced step by step, the corrections had these causes, each fixed:
+
+- **Two ways round the same monsters.** The client planned its walk once,
+  from monsters' positions a moment old, and sent only the steps under
+  way; the server re-planned every step from where they were then, and
+  often went another way ("the server moved it elsewhere"). A move order
+  now carries every step shown or planned (MAX_VIA_STEPS), and the server
+  walks them while it can; a re-plan after a correction, or on the way (a
+  step taken, a shorter way open), is sent again. The server still checks
+  every step, and drops the client's way for its own only when its own is
+  DETOUR_STEPS shorter (a passage taken when the client planned round it
+  has cleared: net_test's two players crossing).
+- **A strike's approach.** A strike order made the server drop the step the
+  client was showing and strike from where it stood, or close in by a way
+  of its own toward a target that had moved, while the client showed the
+  step and its old way; when the server could not close in it dropped the
+  order without a word, and the client walked on till its deadline and was
+  pulled back ("no confirmation"). A strike now carries the steps under way
+  (walked first), the client plans the approach again as the target moves,
+  and stops when the target comes within reach of where the server has the
+  striker; a dropped approach is reported (World.ORDER_DROPPED).
+- **A step confirmed early, then planned again.** With the server ahead, a
+  step not yet shown was confirmed; a new order dropped it with the
+  unstarted ones and planned it again, unconfirmable ("predicted X, server
+  has X"). Confirmed steps are kept.
+- A refused step into the destination itself is refused once, not again
+  the next tick.
+
+Three runs each of the fight test: 15 corrections a minute to 9.3, the
+worst 1.7-2.8 tiles to 1.5-1.7, "no confirmation" 6.3 to 1, the rest
+mostly refusals (a monster took the tile first), which no prediction
+foresees. Rejected: planning round a refused tile for a while (in a
+passage it is the only way, freed a tick later; it sent a player on a long
+detour), and the server keeping to its own way each step (the cause).
