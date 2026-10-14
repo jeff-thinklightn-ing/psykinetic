@@ -105,6 +105,46 @@
 			"scatter": {"scale": [0.8, 1.2], "yaw": "free", "tilt_max": 10, "sink": 0.05, "footprint_r": 0.55, "blocks": false},
 			"fill": {"from": "kenney-castle", "piece": "rocks-small"}
 		},
+		"scatter.tuft": {
+			"category": "plants",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.3, 0.25, 0.3],
+			"budget": 100,
+			"materials": 1,
+			"uses": "grass tufts terrain scatters over grass and dirt (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
+			"scatter": {"scale": [0.7, 1.3], "yaw": "free", "tilt_max": 8, "sink": 0.02, "footprint_r": 0.15, "blocks": false}
+		},
+		"scatter.flower": {
+			"category": "plants",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.2, 0.3, 0.2],
+			"budget": 150,
+			"materials": 1,
+			"uses": "small flowers terrain scatters over grass (terrain part 5), drawn by MultiMesh; its colours are terrain's to tint; terrain's procedural stand-in while empty",
+			"scatter": {"scale": [0.8, 1.2], "yaw": "free", "tilt_max": 10, "sink": 0.02, "footprint_r": 0.1, "blocks": false}
+		},
+		"scatter.stone": {
+			"category": "rocks",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.3, 0.15, 0.3],
+			"budget": 80,
+			"materials": 1,
+			"uses": "pebbles and small stones terrain scatters over dirt, sand and stone (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
+			"scatter": {"scale": [0.6, 1.4], "yaw": "free", "tilt_max": 20, "sink": 0.04, "footprint_r": 0.15, "blocks": false}
+		},
+		"scatter.root": {
+			"category": "plants",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.6, 0.15, 0.2],
+			"budget": 120,
+			"materials": 1,
+			"uses": "roots breaking the ground near trees (terrain part 5), drawn by MultiMesh, laid lengthwise along x; terrain's procedural stand-in while empty",
+			"scatter": {"scale": [0.8, 1.3], "yaw": "free", "tilt_max": 5, "sink": 0.05, "footprint_r": 0.3, "blocks": false}
+		},
 		"ground.grass": {
 			"category": "ground",
 			"type": "texture",

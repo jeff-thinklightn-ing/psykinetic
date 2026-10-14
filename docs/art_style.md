@@ -66,7 +66,8 @@ drawn a thousand times (a wall, a tuft) should be well under.
 | Post | 200 | |
 | Door, frame and leaf | 700 | the leaf about a third |
 | Tree | 800 | |
-| Rock (small), plant, tuft | 200 | scatter: one mesh, one material, no hierarchy |
+| Rock (small), plant | 200 | |
+| Scatter (tuft, flower, stone, root) | 50 to 150 | one mesh, one material, no hierarchy: drawn by MultiMesh |
 | Prop (crate, barrel, chest) | 500 | |
 | Building | 3000 | |
 | Character (reference) | the goblin is 3,780 | pc-character owns characters |
