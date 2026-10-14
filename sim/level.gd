@@ -151,7 +151,8 @@ static func names() -> Array[String]:
 	var out: Array[String] = overlay_names()
 	for folder in ResourceLoader.list_directory(DIR):
 		var level_name := folder.trim_suffix("/")
-		if folder.ends_with("/") and level_name != "prefabs" and level_name not in out 				and ResourceLoader.exists(DIR + level_name + "/layout.png"):
+		if folder.ends_with("/") and level_name != "prefabs" and level_name not in out \
+				and ResourceLoader.exists(DIR + level_name + "/layout.png"):
 			out.append(level_name)
 	out.sort()
 	return out
