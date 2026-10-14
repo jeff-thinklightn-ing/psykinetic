@@ -295,6 +295,9 @@ var holdings: Holdings = null
 ## Server: the town's stores (Stockpile), which depots bank into; made by
 ## Main at boot, from the snapshot. Null on a client.
 var stockpile: Stockpile = null
+## Server: the town's work (Production), moved on by the world tick's first
+## slice; made by Main at boot, from the snapshot. Null on a client.
+var production: Production = null
 ## Server: every thing in the world, with its history (ItemBook). Main
 ## replaces it at boot with the snapshot's.
 var items := ItemBook.new(steps_now)
@@ -380,6 +383,8 @@ func step() -> void:
 ## WORLD_TICK_SLICES), queued for _world_tick_due, or all of them at once
 ## for -1. Called by step, a slice at a time; tests call it directly.
 func world_tick(slice := -1) -> void:
+	if production != null and slice <= 0:
+		production.tick()
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())

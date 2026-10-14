@@ -1,0 +1,22 @@
+{
+	"window": 6000,
+	"tier_hold": 2,
+	"starve_after": 3,
+	"comfort": {"gold": 50, "ore": 20, "wood": 20, "cloth": 10, "food": 20},
+	"wants": {"weapon": 3, "shield": 2, "bandage": 4, "food": 4},
+	"uneasy_extra": {"weapon": 2, "shield": 1},
+	"shop_cap": 6,
+	"tiers": {
+		"defend": ["repair", "weapon", "shield", "bandage", "food"],
+		"stock": ["bandage", "food", "weapon", "shield"],
+		"surplus": ["goods", "rework"]
+	},
+	"work_up": {"ore": ["weapon", "shield"], "wood": ["shield", "weapon"], "cloth": ["bandage"], "food": ["food"]},
+	"defend_trades": ["smith", "carpenter", "cook"],
+	"busy": {"quiet_below": 4, "busy_from": 20},
+	"wage": 10,
+	"tax": {"sale": 0.2, "buy": 0.1, "trade": 0.1, "wage": 0.1},
+	"rent": 3,
+	"rent_every": 6000,
+	"gold_floor": 20
+}

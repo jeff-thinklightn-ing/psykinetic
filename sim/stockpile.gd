@@ -110,11 +110,21 @@ func item_ids(place: String) -> Array[String]:
 	return out
 
 
-## Every uid every store holds (ItemBook.orphans' known).
+## [param place]'s shop: the things the town has made for sale, uids in the
+## order they came (still the town's; prices come with the shop itself).
+func shop(place: String) -> Array[int]:
+	var out: Array[int] = []
+	if _stores.has(place):
+		out.assign(_stores[place]["shop"])
+	return out
+
+
+## Every uid every store and its shop holds (ItemBook.orphans' known).
 func all_items() -> Array[int]:
 	var out: Array[int] = []
 	for place: String in _stores:
 		out.append_array(_stores[place]["items"])
+		out.append_array(_stores[place]["shop"])
 	return out
 
 
@@ -145,14 +155,16 @@ func deposit(place: String, what: String, amount := 1, by := "", from := "") -> 
 ## Banks the gear [param uid] (in the book, not already here) at
 ## [param place], brought [param by] someone [param from] somewhere, at
 ## [param zone] [param tile]: the book has it at the store, carried by
-## nobody, with a "banked" event. False (nothing banked) if not.
-func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vector2i(-1, -1)) -> bool:
+## nobody, with an [param event] ("banked"; none for "", as for a thing a
+## cancelled job gives back). False (nothing banked) if not.
+func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vector2i(-1, -1), event := "banked") -> bool:
 	if place.is_empty() or not book.has(uid) or uid in all_items():
 		return false
 	var store := _store(place)
 	store["items"].append(uid)
 	book.place(uid, holder(place))
-	book.note(uid, "banked", "%s by %s" % [place, by if by != "" else "someone"], zone, tile)
+	if not event.is_empty():
+		book.note(uid, event, "%s by %s" % [place, by if by != "" else "someone"], zone, tile)
 	_record(store, book.id_of(uid), 1, by, from, uid)
 	print("[stockpile] %s banked %s (#%d) at %s (from %s), step %d" % [by if by != "" else "someone",
 		Items.name_of(book.id_of(uid)), uid, place, from if from != "" else "nowhere said", now()])
@@ -184,12 +196,29 @@ func take_item(place: String, uid: int, reason := "") -> bool:
 	return true
 
 
+## Puts [param uid] (in the book, held by no store) in [param place]'s
+## shop, made or reworked [param by] someone. False if it can't.
+func stock_shop(place: String, uid: int, by := "") -> bool:
+	if place.is_empty() or not book.has(uid) or uid in all_items():
+		return false
+	var store := _store(place)
+	store["shop"].append(uid)
+	book.place(uid, shop_holder(place))
+	_record(store, book.id_of(uid), 1, by, "to the shop", uid)
+	return true
+
+
+## The book's holder key for [param place]'s shop.
+static func shop_holder(place: String) -> String:
+	return "shop:" + place
+
+
 func _store(place: String) -> Dictionary:
 	if not _stores.has(place):
 		var counts := {}
 		for name in RESOURCES:
 			counts[name] = 0
-		_stores[place] = {"resources": counts, "items": [], "ledger": []}
+		_stores[place] = {"resources": counts, "items": [], "shop": [], "ledger": []}
 	return _stores[place]
 
 
@@ -237,6 +266,13 @@ func from_dict(saved: Dictionary) -> void:
 					print("[stockpile] the snapshot's %s holds %s, which is no item in the book; left out" % [place, item])
 					continue
 				store["items"].append(uid)
+		var for_sale: Variant = entry.get("shop", [])
+		if for_sale is Array:
+			for item: Variant in for_sale:
+				if (item is float or item is int) and book.has(int(item)) and int(item) not in all_items():
+					store["shop"].append(int(item))
+				else:
+					print("[stockpile] the snapshot's %s shop holds %s, which is no item in the book; left out" % [place, item])
 		var lines: Variant = entry.get("ledger", [])
 		if lines is Array:
 			for line: Variant in lines.slice(-LEDGER_SIZE):

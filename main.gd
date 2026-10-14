@@ -1222,6 +1222,8 @@ func _boot() -> void:
 	World.items = ItemBook.from_dict(snapshot.get("items", {}), World.steps_now)
 	# The town's stores, as the snapshot left them, their gear in the book.
 	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), World.steps_now, World.items)
+	# The town's workers, workshops and jobs, as the snapshot left them.
+	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1661,6 +1663,7 @@ func _save_state() -> void:
 	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
+		"production": World.production.to_dict() if World.production != null else {},
 		"items": World.items.to_dict()})
 
 

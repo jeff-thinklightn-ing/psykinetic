@@ -3354,3 +3354,94 @@ when it differs. The first release with this still needs a deploy, since
 older servers compare versions. Rejected: semver ranges (a version number
 says nothing about the wire), and a separate hand-kept protocol number with
 no fingerprint (it would be forgotten).
+
+## 251. Production: workshops choose their work from the town's tier and compete for its raws
+
+The town's work (economy, step 3). `Production` (`sim/production.gd`),
+kept as `World.production`: server only, made by Main at boot after the
+item book and the stockpile, saved in the snapshot as "production" (no
+version bump). Its rules are data, `levels/economy.json`.
+
+Records, all plain data:
+- a worker: name, trades, town (a stockpile place id), origin, purse. A
+  placeholder until rescued people (step 4) and town NPCs fill them; an
+  NPC entity will point at its record;
+- a workshop: trade, town, the worker in it. A building will point at it;
+- a job: make (materials in, a new instance "made" out) or rework (a
+  banked thing in, the same instance out with a "reworked" event: any
+  gear whose recipe is the worker's trade, half its steps and one of its
+  first resource). Repairs come with damage (step 6).
+
+Recipes are the item catalog's "made" ({by: trade, from: {resource or
+item id: count}, steps}); Production reads them through a catalog
+callable (Items.def by default; tests pass their own).
+
+Time is World.steps. A job takes its materials from the stockpile when
+it starts (two jobs can't count on the same ore), and is worked while its
+worker is at its workshop and not away (going away settles the work done
+up to then). World.world_tick's first slice calls Production.tick, every
+WORLD_TICK_STEPS: jobs advance by the steps since their last, in id
+order; done ones go into the town's shop ("shop:<place>" in the book, a
+list beside the store); then each town chooses new work. It depends on
+the clock alone, so a server's downtime pauses it and nothing is caught
+up; players being offline pauses nothing. The cost is a pass over the
+jobs and workshops, a few dozen.
+
+Nobody orders the work (Jeff): each town's workshops choose it from the
+town's state. Signals, from data already kept:
+- safety: threatened if the store's place isn't the town's, is at
+  strength 0 or contested, or a "raid:" ledger line falls in the window
+  (step 6); uneasy if a faction hostile to the town holds a place in the
+  area; else safe;
+- stock: gear in store and shop by tag against "wants" (raised by
+  "uneasy_extra" unless safe), and whether every resource is at comfort;
+- busyness: ledger lines in the window plus the town's jobs: quiet,
+  steady or busy;
+- raws players sold in the window (Production.note_sale; the shop calls
+  it from step 5).
+The tier is the first that applies: DEFEND (threatened: repairs, arms,
+bandages, food), WORK UP (raws sold: work them up, then as STOCK), STOCK
+(something short: the scarcest first), SURPLUS (all full: goods for the
+shop, reworks), IDLE. It changes only when the new one has held
+tier_hold ticks, so a town doesn't flap. Busy favours short recipes;
+quiet adds reworks to any tier.
+
+Workshops compete for raws (Jeff): every free workshop bids for its
+tier's first want it could make from the store as it is; bids are granted
+in order (a starved workshop, one that has lost starve_after times; then
+orders; then the tier's key: DEFEND by trade, smith, carpenter, cook;
+WORK UP using a sold raw; STOCK by shortfall; then the longest waiting,
+then the workshop's id), each taking its materials; those that find them
+gone wait and say so. SURPLUS lets every trade draw raws down to comfort
+and the shop holds at most shop_cap of each thing, so neither raws nor
+goods pile up. Production.order (tests, the console) goes ahead of the
+tier's choice; Production.cancel gives a job's materials back.
+
+## 254. Personal gold, taxes, the treasury and the sinks
+
+Jeff: "player should be able to keep gold for personal use, but town
+sinks gold, and everything is taxed and the tax goes to advancing the
+town as a whole."
+
+- A player's own gold (PlayerRecord.gold, coming with the shop, step 5)
+  is theirs: it survives death and a lost run, and only their own
+  spending, and the tax on it, takes from it.
+- A coin purse stays an item until its holder opens it (items' use,
+  their step 4): its yield goes to the holder's gold. Put in a depot or
+  dropped on stockpile ground it is a gift to the town, untaxed.
+- The treasury is the stockpile's gold. It pays for advancing the town:
+  wages, upgrades (step 4), repairs (step 6), buying from players
+  (step 5); never below gold_floor.
+- Every transaction is taxed (levels/economy.json "tax", starting values
+  for Jeff to tune): shop sales 20% to the treasury and the rest to the
+  resident selling; the town buying from players keeps 10%; trades
+  between players 10%; wages 10% (the town pays out the net).
+  Production.taxed(amount, kind) splits any of them, the tax rounded
+  down. Gifts and banking are not transactions.
+- Sinks: residents pay rent from their purse every rent_every steps,
+  destroyed as the town's upkeep (Production.upkeep counts it); no debt
+  and no eviction when they can't. Buildings' upkeep from the treasury
+  joins it with step 4.
+
+Built now, with step 3: wages (taxed, down to the floor) and rent. The
+player's gold and coin purses wait for items' use and the shop.
