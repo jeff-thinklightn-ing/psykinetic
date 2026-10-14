@@ -32,6 +32,11 @@ which worktree owns each step, and the design rules not to break without asking 
   class cache, and without it scripts naming the new class fail to compile. Name any new
   `class_name` when you report a landing.
 - The coordinator deploys the server to the box after releases; worktree sessions don't.
+- Worktrees share one Godot `user://` folder (`%APPDATA%/Godot/app_userdata/Psykinetic`),
+  which holds the edited-level overlay every test reads. Tests, benches and tools never
+  write levels there: register them in memory (`Level.register`), point `Level.overlay_dir`
+  at a private folder, or run with `APPDATA` set to a temp folder. Ports come from
+  `tests/port_offsets.txt` (`tests/test_ports.gd`); temp folders are named per checkout.
 - Server and client must be built from the same commit; a release that changes the wire
   format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
 - Never commit a real token: check the diff of `project.godot`.

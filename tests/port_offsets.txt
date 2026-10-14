@@ -8,3 +8,4 @@ perf 200
 builder 400
 maps 600
 pc-character 800
+terrain 1000
