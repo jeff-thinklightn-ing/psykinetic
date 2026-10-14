@@ -20,7 +20,7 @@ var _heard: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17798
+	Net.port = preload("res://tests/test_ports.gd").of(17798)
 	Net.companions = false
 	Net.state_path = ""
 	Net.builder_stub = true

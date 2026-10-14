@@ -12,7 +12,7 @@ var _main: Node
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17782  # Not 7777: the editor may be hosting there.
+	Net.port = preload("res://tests/test_ports.gd").of(17782)  # Not 7777: the editor may be hosting there.
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 

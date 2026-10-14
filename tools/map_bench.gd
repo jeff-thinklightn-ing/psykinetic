@@ -43,7 +43,7 @@ func _ready() -> void:
 	print("BENCH entities in level: %d" % level["entities"].size())
 
 	World.set_process(false)
-	Net.port = 17890
+	Net.port = preload("res://tests/test_ports.gd").of(17890)
 	Net.companions = false
 	Net.state_path = ""
 	Net.map_name = NAME

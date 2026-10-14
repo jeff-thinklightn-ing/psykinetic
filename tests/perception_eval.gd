@@ -84,7 +84,7 @@ var _nonce := 0
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17789
+	Net.port = preload("res://tests/test_ports.gd").of(17789)
 	Net.player_name = "Jeff"
 	Net.transcripts_dir = ""
 	Net.mind_log_path = ""

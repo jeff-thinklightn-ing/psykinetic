@@ -14,7 +14,7 @@ var _pushes: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17790
+	Net.port = preload("res://tests/test_ports.gd").of(17790)
 	Net.companions = false
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)

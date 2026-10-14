@@ -17,11 +17,13 @@ esac
 cd "$(dirname "$0")/.."
 DIR="$(mktemp -d)"
 STATE="$DIR/world.json"
+. tests/test_ports.sh
+PORT=$((17781 + PORT_OFFSET))
 
 run_host() {
 	name="$1"
 	shift
-	"$GODOT" --headless --path . --host --still-monsters --no-companions --port=17781 "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
+	"$GODOT" --headless --path . --host --still-monsters --no-companions "--port=$PORT" "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
 }
 
 failures=0

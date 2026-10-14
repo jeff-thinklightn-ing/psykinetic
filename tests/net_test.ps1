@@ -10,10 +10,12 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 }
 
 $root = Split-Path $PSScriptRoot -Parent
-$logs = Join-Path ([IO.Path]::GetTempPath()) 'psykinetic-net-test'
+# A folder per checkout, so worktrees can run this at the same time.
+$logs = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-net-test-' + (Split-Path $root -Leaf))
+. (Join-Path $PSScriptRoot 'test_ports.ps1')
 New-Item -ItemType Directory -Force $logs | Out-Null
 Remove-Item (Join-Path $logs '*') -Force -ErrorAction SilentlyContinue
-$port = 17777
+$port = 17777 + $portOffset
 $token = 'test-secret'
 $state = Join-Path $logs 'world.json'
 # Fixed identities for the players whose return we check.

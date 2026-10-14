@@ -17,7 +17,8 @@ esac
 
 cd "$(dirname "$0")/.."
 LOGS="$(mktemp -d)"
-PORT=17777
+. tests/test_ports.sh
+PORT=$((17777 + PORT_OFFSET))
 TOKEN=test-secret
 STATE="$LOGS/world.json"
 # Fixed identities for the players whose return we check.

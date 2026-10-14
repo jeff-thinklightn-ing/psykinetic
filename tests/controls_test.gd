@@ -18,7 +18,7 @@ var _swings: Array[Vector2i] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17788  # Not 7777: the editor may be hosting there.
+	Net.port = preload("res://tests/test_ports.gd").of(17788)  # Not 7777: the editor may be hosting there.
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	World.entity_swung.connect(func(_entity: GridEntity, direction: Vector2i) -> void: _swings.append(direction))

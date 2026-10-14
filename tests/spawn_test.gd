@@ -10,7 +10,7 @@ var _main: Node
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = 17787  # Not 7777: the editor may be hosting there.
+	Net.port = preload("res://tests/test_ports.gd").of(17787)  # Not 7777: the editor may be hosting there.
 	Net.companions = false  # A companion would pick fights with the test's imps.
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
