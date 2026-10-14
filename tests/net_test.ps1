@@ -26,105 +26,178 @@ $idD = 'd0d0d0d0-0000-4000-8000-00000000000d'
 $noStdin = Join-Path $logs 'stdin.empty'
 Set-Content $noStdin '' -NoNewline
 
-function Start-Instance($name, $modeArgs) {
-	$arguments = @('--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$port")
-	Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru `
+# Every instance quits when the script makes its file ($logs\<name>.done),
+# once what the phase waits for is in the logs; nothing waits a fixed time,
+# so a loaded machine only makes it slower. A client in the game sees 20 more
+# ticks, reports, and stays until <name>.done.quit, so the others' reports
+# still have it. --test-exit-after is only a backstop for a run that hangs.
+$script:instances = @{}
+$script:clients = @()
+$script:server = ''
+function Start-Instance($name, $modeArgs, $backstop) {
+	$done = Join-Path $logs "$name.done"
+	$arguments = @('--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$port", "--test-exit-on=`"$done`"", "--test-exit-after=$backstop")
+	$script:instances[$name] = Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru `
 		-RedirectStandardInput $noStdin `
 		-RedirectStandardOutput (Join-Path $logs "$name.log") `
 		-RedirectStandardError (Join-Path $logs "$name.err")
+	$null = $script:instances[$name].Handle  # Without it Windows PowerShell may lose the exit code.
 }
+# The phase's server, which quits last.
+function Start-Server($name, $modeArgs) {
+	$script:server = $name
+	Start-Instance $name $modeArgs 300
+}
+# A client of this phase.
+function Start-Client($name, $modeArgs) {
+	$script:clients += $name
+	Start-Instance $name $modeArgs 240
+}
+$waitLimit = if ($env:NET_TEST_WAIT) { [int]$env:NET_TEST_WAIT } else { 120 }
+function Get-Matches($name, $pattern) {
+	$path = Join-Path $logs "$name.log"
+	if (-not (Test-Path $path)) { return 0 }
+	@(Get-Content $path -ErrorAction SilentlyContinue | Select-String $pattern).Count
+}
+# Waits until <name>.log has $count lines matching $pattern, for $waitLimit
+# seconds at most; giving up only shows in the checks.
+function Wait-Log($name, $pattern, $count = 1) {
+	$deadline = (Get-Date).AddSeconds($waitLimit)
+	while ((Get-Matches $name $pattern) -lt $count) {
+		if ((Get-Date) -gt $deadline) { Write-Output "  (gave up waiting for /$pattern/ in $name.log)"; return }
+		Start-Sleep -Milliseconds 250
+	}
+}
+# The same, in any one of several logs.
+function Wait-Any($pattern, $names) {
+	$deadline = (Get-Date).AddSeconds($waitLimit)
+	while (-not ($names | Where-Object { (Get-Matches $_ $pattern) -gt 0 })) {
+		if ((Get-Date) -gt $deadline) { Write-Output "  (gave up waiting for /$pattern/ in $($names -join ', '))"; return }
+		Start-Sleep -Milliseconds 250
+	}
+}
+# Tells one instance to report and quit, and waits until it has.
+function Stop-Instance($name) {
+	foreach ($file in @("$name.done", "$name.done.quit")) {
+		New-Item -ItemType File -Force (Join-Path $logs $file) | Out-Null
+	}
+	$process = $script:instances[$name]
+	if (-not $process.WaitForExit(60000)) {
+		Write-Output "  ($name did not quit: stopped)"
+		$process | Stop-Process -Force
+	}
+	$script:clients = @($script:clients | Where-Object { $_ -ne $name })
+}
+# The end of a phase: the clients report, and once all have (each one's last
+# view still has the others) they quit; then the server.
+function Complete-Phase {
+	foreach ($name in $script:clients) { New-Item -ItemType File -Force (Join-Path $logs "$name.done") | Out-Null }
+	foreach ($name in $script:clients) { Wait-Log $name '\[test\] slots: ' }
+	foreach ($name in @($script:clients)) { Stop-Instance $name }
+	Stop-Instance $script:server
+}
+$good = @('--client', '--address=127.0.0.1', "--token=$token")
 
-$server = Start-Instance 'server' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--state=`"$state`"", '--test-exit-after=16')
-Start-Sleep -Seconds 2
-$client1 = Start-Instance 'client1' @('--client', '--address=127.0.0.1', "--token=$token", '--test-move=-3,0', '--test-contest=9,1,70', '--test-exit-after=9')
-# Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
-# so its move ends by pushing the crate to (7, 2). Client 2 joins after that
-# to the start tile client 1 left and walks to (9, 2). Both are then one step
-# from (9, 1), and at server tick
-# 70 both order a move into it. Each client predicts the step; the server lets
-# only one of them have the tile.
-Start-Sleep -Seconds 1
-$client2 = Start-Instance 'client2' @('--client', '--address=127.0.0.1', "--token=$token", '--test-move=-2,0', '--test-contest=9,1,70', '--test-exit-after=9')
+# Phase 1. The server's sim waits until both players are in, so its ticks
+# count from the same start whenever each process got going. Client 1 joins
+# first, as Player1 at (11, 2); three tiles west is Crate1, so its move ends
+# by pushing the crate to (7, 2). Client 2 joins as Player2 on the next start
+# tile, (12, 1), and walks to (10, 1). Both are then one step from (9, 1), and
+# at server tick 70 both order a move into it; the server holds tick 70 until
+# both orders are in, so they land on one tick. Each client predicts the
+# step; the server lets only one of them have the tile.
+Start-Server 'server' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--state=`"$state`"", '--test-wait-players=2', '--test-hold=70,2')
+Wait-Log 'server' 'listening on port'
+Start-Client 'client1' ($good + @('--test-move=-3,0', '--test-contest=9,1,70'))
+Wait-Log 'server' 'joined as Player1 '
+Start-Client 'client2' ($good + @('--test-move=-2,0', '--test-contest=9,1,70'))
+Wait-Any 'reached the contested tile \(9, 1\)' @('client1', 'client2')
+Wait-Any 'mispredict: Player\d+ step into \(9, 1\) refused' @('client1', 'client2')
 # A third client with the wrong token must be rejected and never get a player.
-Start-Sleep -Seconds 1
-$client3 = Start-Instance 'client3' @('--client', '--address=127.0.0.1', '--token=wrong-secret', '--test-move=0,1', '--test-exit-after=4')
-# A fourth joins with no mode argument, from a settings file like an exported client.
+Start-Client 'client3' @('--client', '--address=127.0.0.1', '--token=wrong-secret', '--test-move=0,1')
+# A fourth joins with no mode argument, from a settings file like an exported
+# client: once the contest is over, so it is Player3 on (11, 2), which client 1
+# left, and walks to (11, 3).
 $settings = Join-Path $logs 'settings.cfg'
 Set-Content $settings "address=127.0.0.1`nport=$port`ntoken=$token`nplayer_id=$idC`nname=Casey`n" -Encoding ascii
-Start-Sleep -Seconds 1
-$client4 = Start-Instance 'client4' @("--settings=`"$settings`"", '--test-move=0,1', '--test-exit-after=4')
+Start-Client 'client4' @("--settings=`"$settings`"", '--test-move=0,1')
 # A fifth has the right token but is an older build with another protocol:
 # turned away as out of date (decision 239: only the protocol decides).
-$client5 = Start-Instance 'client5' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=0.0.1', '--test-protocol=old-build', '--test-exit-after=4')
-# A seventh is a newer build with another protocol: the server is the one out of date.
-$client7 = Start-Instance 'client7' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=99.0.0', '--test-protocol=new-build', '--test-exit-after=4')
-
+Start-Client 'client5' ($good + @('--test-version=0.0.1', '--test-protocol=old-build'))
 # A sixth has the right token and version number but is a different build.
-$client6 = Start-Instance 'client6' @('--client', '--address=127.0.0.1', "--token=$token", '--test-protocol=stale-build', '--test-exit-after=4')
-
-$all = @($server, $client1, $client2, $client3, $client4, $client5, $client6, $client7)
-$all | Wait-Process -Timeout 40 -ErrorAction SilentlyContinue
-$all | Where-Object { -not $_.HasExited } | Stop-Process -Force
+Start-Client 'client6' ($good + @('--test-protocol=stale-build'))
+# A seventh is a newer build with another protocol: the server is the one out of date.
+Start-Client 'client7' ($good + @('--test-version=99.0.0', '--test-protocol=new-build'))
+Wait-Log 'client4' '\[test\] Player\d+ arrived'
+Wait-Log 'client3' 'authentication failed'
+Wait-Log 'client5' 'client out of date'
+Wait-Log 'client6' 'build mismatch'
+Wait-Log 'client7' 'server out of date'
+Complete-Phase
 
 # Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
-# come back where she left, Dana is new, and a second Casey is turned away.
-$server2 = Start-Instance 'server2' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--state=`"$state`"", '--test-exit-after=10')
-Start-Sleep -Seconds 2
-$clientC = Start-Instance 'clientC' @("--settings=`"$settings`"", '--test-exit-after=6')
-Start-Sleep -Seconds 1
-$clientD = Start-Instance 'clientD' @('--client', '--address=127.0.0.1', "--token=$token", "--player-id=$idD", '--name=Dana', '--test-exit-after=4')
-$clientE = Start-Instance 'clientE' @('--client', '--address=127.0.0.1', "--token=$token", "--player-id=$idC", '--name=Impostor', '--test-exit-after=3')
-$phase2 = @($server2, $clientC, $clientD, $clientE)
-$phase2 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-$phase2 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+# come back where she left, a second Casey is turned away while she is on,
+# and Dana is new.
+Start-Server 'server2' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--state=`"$state`"")
+Wait-Log 'server2' 'listening on port'
+Start-Client 'clientC' @("--settings=`"$settings`"")
+Wait-Log 'server2' 'Casey \(c0ffee00\) joined'
+Start-Client 'clientE' ($good + @("--player-id=$idC", '--name=Impostor'))
+Wait-Log 'clientE' 'already connected'
+Start-Client 'clientD' ($good + @("--player-id=$idD", '--name=Dana'))
+Wait-Log 'server2' 'Dana \(d0d0d0d0\) joined'
+Complete-Phase
 
 # Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
-# the bottom of the room, then at tick 70 cross it toward each other.
-$server3 = Start-Instance 'server3' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-exit-after=15')
-Start-Sleep -Seconds 2
+# the bottom of the room, then at tick 70 cross it toward each other. Fay is
+# Player1 from (11, 2), Gus Player2 from (12, 1), the sim waiting for both.
+Start-Server 'server3' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-wait-players=2', '--test-hold=70,2')
+Wait-Log 'server3' 'listening on port'
 # Fay is another build with the same protocol: she plays (decision 239).
-$clientF = Start-Instance 'clientF' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Fay', '--test-version=0.0.2', '--test-move=-6,9', '--test-contest=12,12,70', '--test-exit-after=12')
-Start-Sleep -Seconds 1
-$clientG = Start-Instance 'clientG' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Gus', '--test-move=1,9', '--test-contest=5,12,70', '--test-exit-after=11')
-$phase3 = @($server3, $clientF, $clientG)
-$phase3 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-$phase3 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+Start-Client 'clientF' ($good + @('--name=Fay', '--test-version=0.0.2', '--test-move=-6,9', '--test-contest=12,12,70'))
+Wait-Log 'server3' 'Fay \([a-z0-9-]+\) joined as Player1 '
+Start-Client 'clientG' ($good + @('--name=Gus', '--test-move=0,10', '--test-contest=5,12,70'))
+Wait-Log 'clientF' 'reached the contested tile'
+Wait-Log 'clientG' 'reached the contested tile'
+Complete-Phase
 
 # Phase 4: any player may reset the room. Hal pushes Crate1 west as client 1
 # did; at tick 70 Ivy asks for a reset, as her R key would.
-$server4 = Start-Instance 'server4' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-exit-after=13')
-Start-Sleep -Seconds 2
-$clientH = Start-Instance 'clientH' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Hal', '--test-move=-3,0', '--test-exit-after=10')
-Start-Sleep -Seconds 1
-$clientI = Start-Instance 'clientI' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Ivy', '--test-reset=70', '--test-exit-after=8')
-$phase4 = @($server4, $clientH, $clientI)
-$phase4 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-$phase4 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+Start-Server 'server4' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-wait-players=2')
+Wait-Log 'server4' 'listening on port'
+Start-Client 'clientH' ($good + @('--name=Hal', '--test-move=-3,0'))
+Wait-Log 'server4' 'Hal \([a-z0-9-]+\) joined as Player1 '
+Start-Client 'clientI' ($good + @('--name=Ivy', '--test-reset=70'))
+Wait-Log 'server4' '\[world\] Ivy reset the room'
+Wait-Log 'server4' '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' 4
+Complete-Phase
 
 # Phase 5: zones. Jo walks onto the test room's link at (1, 1) and goes to
 # the sample with her companion; Kim stays. Each client must be sent only
 # its own zone's entities.
-$server5 = Start-Instance 'server5' @('--server', '--still-monsters', "--token=$token", '--test-exit-after=16')
-Start-Sleep -Seconds 2
-$clientJ = Start-Instance 'clientJ' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Jo', '--test-move=-10,-1', '--test-exit-after=12')
-Start-Sleep -Seconds 1
-$clientK = Start-Instance 'clientK' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Kim', '--test-exit-after=11')
-$phase5 = @($server5, $clientJ, $clientK)
-$phase5 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-$phase5 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+Start-Server 'server5' @('--server', '--still-monsters', "--token=$token")
+Wait-Log 'server5' 'listening on port'
+Start-Client 'clientJ' ($good + @('--name=Jo', '--test-move=-10,-1'))
+Wait-Log 'server5' 'Jo \([a-z0-9-]+\) joined as Player1 '
+Start-Client 'clientK' ($good + @('--name=Kim'))
+Wait-Log 'server5' 'Kim \([a-z0-9-]+\) joined as Player2 '
+Wait-Log 'server5' '\[zone\] Jo went from test_room to sample'
+Wait-Log 'clientJ' '\[zone\] now in sample'
+Complete-Phase
 
 # Phase 6: the chest. Max joins first and does nothing; Lee joins second,
 # walks to the chest and drags the bandaging kit into their slots. Both
-# clients must show the chest empty and Lee holding the kit (Max leaves
-# first, so Lee's last view has only Lee in it).
-$server6 = Start-Instance 'server6' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-exit-after=15')
-Start-Sleep -Seconds 2
-$clientM = Start-Instance 'clientM' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Max', '--test-exit-after=8')
-Start-Sleep -Seconds 1
-$clientL = Start-Instance 'clientL' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Lee', '--test-chest=take', '--test-exit-after=10')
-$phase6 = @($server6, $clientM, $clientL)
-$phase6 | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-$phase6 | Where-Object { -not $_.HasExited } | Stop-Process -Force
+# clients must show the chest empty and Lee holding the kit; Max reports and
+# leaves first, so Lee's last view has only Lee in it.
+Start-Server 'server6' @('--server', '--still-monsters', '--no-companions', "--token=$token")
+Wait-Log 'server6' 'listening on port'
+Start-Client 'clientM' ($good + @('--name=Max'))
+Wait-Log 'server6' 'Max \([a-z0-9-]+\) joined as Player1 '
+Start-Client 'clientL' ($good + @('--name=Lee', '--test-chest=take'))
+Wait-Log 'server6' 'slots: Player2 moved bandaging_kit'
+Stop-Instance 'clientM'
+Wait-Log 'server6' 'Max \([a-z0-9-]+\) left'
+Complete-Phase
 
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
@@ -186,7 +259,7 @@ Assert (@($client1Log | Select-String '\[test\] Player\d+ arrived').Count -eq 1)
 Assert (@($client2Log | Select-String '\[test\] Player\d+ arrived').Count -eq 1) 'client 2 saw its own move replicated'
 $pushed = @($serverLog | Select-String 'push: Player1 -> Crate1').Count
 Assert ($pushed -eq 1) 'server log shows Player1 pushing Crate1'
-foreach ($entry in @(@('server', $serverLog), @('client 1', $client1Log), @('client 2 (joined after the push)', $client2Log))) {
+foreach ($entry in @(@('server', $serverLog), @('client 1', $client1Log), @('client 2', $client2Log))) {
 	Assert (@($entry[1] | Select-String '\[test\] tiles: .*Crate1=\(7, 2\)').Count -eq 1) "$($entry[0]) has the pushed crate at (7, 2)"
 }
 $clientLogs = @($client1Log) + @($client2Log)

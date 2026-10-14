@@ -69,13 +69,17 @@ extends Node
 ## kept as written when it rewrites the file.
 ##
 ## The game version comes from version.txt at the project root. A client
-## sends it with its token and a server rejects any other version.
+## sends it with its token and protocol; a server rejects another protocol
+## (decision 239).
 ##
 ## Test hooks (used by tests/net_test):
 ##   --test-move=<dx>,<dy>        once the local player exists, order it to move by this offset
 ##   --test-contest=<x>,<y>,<tick> at that server tick, order the local player to tile (x, y)
 ##   --test-reset=<tick>          at that server tick, ask for a room reset as the R key does
 ##   --test-exit-after=<seconds>  quit after this long
+##   --test-exit-on=<path>        quit once that file exists (a client in the game sees 20 more ticks first)
+##   --test-wait-players=<n>      server: the sim waits until n players are in (60 s at most)
+##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
@@ -299,6 +303,16 @@ var test_reset_tick := 0
 ## builder mode asks that for that area (for screenshots of the ghost).
 var test_builder := ""
 var test_exit_after := 0.0
+var test_exit_on := ""
+var test_wait_players := 0
+var test_hold_tick := 0
+var test_hold_orders := 0
+## Players admitted since start, for --test-wait-players.
+var _admitted_ever := 0
+## The peers that ordered on --test-hold's tick.
+var _hold_senders := {}
+## When the sim began to wait for a test hold (msec), -1 when it is not.
+var _hold_since := -1
 var screenshot_path := ""
 var test_hover_tile := Vector2i(-1, -1)
 var test_click_after := 0.0
@@ -822,9 +836,48 @@ func _on_peer_disconnected(peer: int) -> void:
 
 func _admit(peer: int, id: String, player_name_given: String) -> void:
 	_authenticated[peer] = id
+	_admitted_ever += 1
 	print("[net] peer %d authenticated as %s (%s) (%d of %d)" % [
 		peer, player_name_given, id.left(8), _authenticated.size(), max_players])
 	peer_authenticated.emit(peer, id, player_name_given)
+
+
+## Server, tests only: whether the sim waits this frame. --test-wait-players
+## starts the clock when the test's players are all in, and --test-hold keeps
+## [param tick] until every contestant's order is in, so a test counts in
+## ticks from the same start and a contest's orders land on one tick, however
+## slowly each process starts on a loaded machine. Each gives up after a while.
+func test_holds(tick: int) -> bool:
+	if test_wait_players > 0 and _admitted_ever < test_wait_players:
+		if _held("for %d players" % test_wait_players, 60000):
+			return true
+		test_wait_players = 0
+	elif test_hold_tick > 0 and tick == test_hold_tick and _hold_senders.size() < test_hold_orders:
+		if _held("at tick %d for %d orders" % [test_hold_tick, test_hold_orders], 20000):
+			return true
+		test_hold_tick = 0
+	elif _hold_since >= 0:
+		print("[test] the sim goes on at tick %d" % tick)
+		_hold_since = -1
+	return false
+
+
+## Whether a test hold waits on: false once it has waited [param max_msec].
+func _held(what: String, max_msec: int) -> bool:
+	if _hold_since < 0:
+		_hold_since = Time.get_ticks_msec()
+		print("[test] the sim waits %s" % what)
+	if Time.get_ticks_msec() - _hold_since < max_msec:
+		return true
+	print("[test] gave up waiting %s" % what)
+	_hold_since = -1
+	return false
+
+
+## Server: [param peer] ordered its player on [param tick] (for --test-hold).
+func test_note_order(peer: int, tick: int) -> void:
+	if test_hold_tick > 0 and tick == test_hold_tick:
+		_hold_senders[peer] = true
 
 
 ## [param reason] is what the player sees; [param detail] is for the log.
@@ -1084,7 +1137,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
-					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-version", "--test-protocol", \
+					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
 				if not has_value and i + 1 < args.size():
@@ -1193,6 +1246,15 @@ func _set_option(key: String, value: String) -> void:
 			test_builder = value
 		"--test-exit-after":
 			test_exit_after = value.to_float()
+		"--test-exit-on":
+			test_exit_on = value
+		"--test-wait-players":
+			test_wait_players = value.to_int()
+		"--test-hold":
+			var hold := value.split(",")
+			if hold.size() == 2:
+				test_hold_tick = hold[0].to_int()
+				test_hold_orders = hold[1].to_int()
 		"--screenshot":
 			screenshot_path = value
 		"--test-door":

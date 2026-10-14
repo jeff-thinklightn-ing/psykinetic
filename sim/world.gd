@@ -352,6 +352,9 @@ func _process(delta: float) -> void:
 		_clock_drift -= slew
 		tick_alpha = _clock - tick
 		return
+	if Net.test_holds(tick):
+		_accumulator = 0.0
+		return
 	_accumulator += delta
 	var steps := 0
 	while _accumulator >= TICK_DT:
@@ -1922,6 +1925,7 @@ func _to_server(method: StringName, args: Array) -> void:
 func request_move(entity_path: NodePath, target: Vector2i, via: Array) -> void:
 	if not Net.is_authority():
 		return
+	Net.test_note_order(multiplayer.get_remote_sender_id(), tick)
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity == null:
 		return
@@ -1938,6 +1942,7 @@ func request_move(entity_path: NodePath, target: Vector2i, via: Array) -> void:
 func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predicted: bool) -> void:
 	if not Net.is_authority():
 		return
+	Net.test_note_order(multiplayer.get_remote_sender_id(), tick)
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity != null:
 		var was := enter_named(entity.zone)

@@ -95,6 +95,8 @@ const SPAWN_SAFE_DISTANCE := 5
 ## Ticks a newly spawned player is ignored by monsters, unless it moves or
 ## attacks first.
 const SPAWN_GRACE_TICKS := 30
+## --test-exit-on: the ticks a client in the game sees after the file appears.
+const TEST_EXIT_SETTLE_TICKS := 20
 ## With --state, the server writes its snapshot this often.
 const SNAPSHOT_EVERY_TICKS := 30
 ## A dead level entity (monster killed, crate broken) comes back at its spawn
@@ -150,6 +152,8 @@ var _test_fight_at := -100000
 var _test_ordered := false
 var _test_arrived := false
 var _test_contested := false
+var _test_contest_reached := false
+var _test_exiting := false
 var _test_reset_sent := false
 var _test_door_sent := false
 ## Everything said this session (speech, last words, chat), shown with Tab.
@@ -287,6 +291,8 @@ func _ready() -> void:
 	World.stepped.connect(_on_world_stepped)
 	if Net.test_exit_after > 0.0:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
+	if Net.test_exit_on != "":
+		_exit_on_file()
 	if Net.test_click_after > 0.0:
 		get_tree().create_timer(Net.test_click_after).timeout.connect(_test_click)
 	if Net.test_fullscreen_after > 0.0:
@@ -3060,6 +3066,10 @@ func _run_test_reset(player: Player, tick: int) -> void:
 
 
 func _run_test_contest(player: Player, tick: int) -> void:
+	if _test_contested and not _test_contest_reached and player != null \
+			and player.tile == Net.test_contest_tile and player.shown_tile() == Net.test_contest_tile:
+		_test_contest_reached = true
+		print("[test] %s reached the contested tile %s at tick %d" % [player.name, player.tile, tick])
 	if Net.test_contest_tick <= 0 or _test_contested or player == null \
 			or tick < Net.test_contest_tick:
 		return
@@ -3167,7 +3177,44 @@ func _report_walk() -> void:
 		speeds.size(), speeds.min(), speeds.max(), total / speeds.size(), stops, slow_at, _walk_samples.back()[1]])
 
 
+## --test-exit-on: reports once that file exists (the test script makes it
+## when what it waits for is in the logs) and quits. A client in the game
+## first sees TEST_EXIT_SETTLE_TICKS more ticks (10 s at most), so what was
+## just decided reaches it, and after reporting stays until the file
+## "<path>.quit" exists (30 s at most), so the other clients' reports are
+## made before anyone leaves their view.
+func _exit_on_file() -> void:
+	while not FileAccess.file_exists(Net.test_exit_on):
+		await get_tree().create_timer(0.25).timeout
+	var in_game := not Net.is_authority() and Net.online and _local_player() != null
+	if in_game:
+		var until := World.tick + TEST_EXIT_SETTLE_TICKS
+		var deadline := Time.get_ticks_msec() + 10000
+		while World.tick < until and Time.get_ticks_msec() < deadline:
+			await get_tree().create_timer(0.1).timeout
+	if _test_exiting:
+		return
+	_test_exiting = true
+	_report_test()
+	if in_game:
+		var deadline := Time.get_ticks_msec() + 30000
+		while not FileAccess.file_exists(Net.test_exit_on + ".quit") and Time.get_ticks_msec() < deadline:
+			await get_tree().create_timer(0.25).timeout
+	Net.shutdown()
+	get_tree().quit()
+
+
 func _on_test_exit() -> void:
+	if _test_exiting:
+		return
+	_test_exiting = true
+	_report_test()
+	Net.shutdown()
+	get_tree().quit()
+
+
+## What a test reads at the end: the walk, where everything is, who holds what.
+func _report_test() -> void:
 	_report_walk()
 	if Net.screenshot_path != "":
 		var image := get_viewport().get_texture().get_image()
@@ -3193,5 +3240,3 @@ func _on_test_exit() -> void:
 				func(item: String) -> bool: return not item.is_empty()))])
 	held.sort()
 	print("[test] slots: %s" % " ".join(held))
-	Net.shutdown()
-	get_tree().quit()

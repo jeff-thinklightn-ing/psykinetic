@@ -1828,8 +1828,16 @@ replace the file on exit.
 
 `tests/net_test.ps1` / `tests/net_test.sh` start one headless `--server` and
 two headless `--client` instances on localhost (port 17777). Each client
-orders its player to move (`--test-move`), everything exits on a timer
-(`--test-exit-after`), and the script checks the logs: the server spawned two
+orders its player to move (`--test-move`), and the script checks the logs
+once everything has quit. Nothing waits a fixed time, so a loaded machine
+only makes it slower: the script waits for lines in the logs, then makes
+each instance's file, which `--test-exit-on` quits on (a client in the game
+sees 20 more ticks, reports, and stays until every client has reported);
+the server's sim waits until the test's players are in
+(`--test-wait-players`) and holds a contest's tick until each contestant has
+ordered (`--test-hold`), so ticks count from one start and the contest's
+orders land on one tick; `--test-exit-after` is only a backstop. It checks
+that the server spawned two
 players, both moved, occupancy was consistent at every move and at exit, each
 client saw its own move arrive, and nothing printed an error. Client 1's move
 pushes a crate, which must show at its new tile on both clients. Then both

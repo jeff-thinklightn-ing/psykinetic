@@ -25,67 +25,150 @@ STATE="$LOGS/world.json"
 ID_C=c0ffee00-0000-4000-8000-00000000000c
 ID_D=d0d0d0d0-0000-4000-8000-00000000000d
 
+# Every instance quits when the script makes its file ($LOGS/<name>.done),
+# once what the phase waits for is in the logs; nothing waits a fixed time,
+# so a loaded machine only makes it slower.
+# A client in the game sees 20 more ticks before it reports. --test-exit-after
+# is only a backstop for a run that hangs.
 start() {
 	name="$1"
 	shift
-	"$GODOT" --headless --path . "$@" "--port=$PORT" </dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
+	"$GODOT" --headless --path . "$@" "--port=$PORT" "--test-exit-on=$LOGS/$name.done" \
+		</dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
+	eval "pid_$name=$!"
 }
+# The phase's server, which quits last.
+server() {
+	SERVER="$1"
+	start "$@" --test-exit-after=300
+}
+# A client of this phase.
+client() {
+	CLIENTS="$CLIENTS $1"
+	start "$@" --test-exit-after=240
+}
+# Tells one instance to report and quit, and waits until it has.
+quit() {
+	touch "$LOGS/$1.done" "$LOGS/$1.done.quit"
+	eval "wait \$pid_$1"
+}
+# The end of a phase: the clients report, and once all have (each one's last
+# view still has the others) they quit; then the server.
+finish() {
+	for name in $CLIENTS; do touch "$LOGS/$name.done"; done
+	for name in $CLIENTS; do wait_for "$name" '\[test\] slots: '; done
+	for name in $CLIENTS; do quit "$name"; done
+	quit "$SERVER"
+	CLIENTS=""
+}
+# Waits until <name>.log has <count> (default 1) lines matching <regex>,
+# for WAIT_LIMIT seconds at most; giving up only shows in the checks.
+WAIT_LIMIT="${NET_TEST_WAIT:-120}"
+wait_for() {
+	waited=0
+	until [ "$(grep -cE "$2" "$LOGS/$1.log" 2>/dev/null || true)" -ge "${3:-1}" ]; do
+		waited=$((waited + 1))
+		if [ "$waited" -gt $((WAIT_LIMIT * 4)) ]; then
+			echo "  (gave up waiting for /$2/ in $1.log)"
+			return 1
+		fi
+		sleep 0.25
+	done
+}
+# The same, in any one of several logs: wait_any <regex> <name>...
+wait_any() {
+	regex="$1"
+	shift
+	waited=0
+	while :; do
+		for name in "$@"; do
+			grep -qE "$regex" "$LOGS/$name.log" 2>/dev/null && return 0
+		done
+		waited=$((waited + 1))
+		if [ "$waited" -gt $((WAIT_LIMIT * 4)) ]; then
+			echo "  (gave up waiting for /$regex/ in $*)"
+			return 1
+		fi
+		sleep 0.25
+	done
+}
+CLIENTS=""
+GOOD="--client --address=127.0.0.1 --token=$TOKEN"
 
-start server --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE" --test-exit-after=16
-sleep 2
-start client1 --client --address=127.0.0.1 "--token=$TOKEN" --test-move=-3,0 --test-contest=9,1,70 --test-exit-after=9
-# Client 1 joins first so it is Player1 at (11, 2); three tiles west is Crate1,
-# so its move ends by pushing the crate to (7, 2). Client 2 joins after that
-# to the start tile client 1 left and walks to (9, 2). Both are then one step
-# from (9, 1), and at server tick
-# 70 both order a move into it. Each client predicts the step; the server lets
-# only one of them have the tile.
-sleep 1
-start client2 --client --address=127.0.0.1 "--token=$TOKEN" --test-move=-2,0 --test-contest=9,1,70 --test-exit-after=9
+# Phase 1. The server's sim waits until both players are in, so its ticks
+# count from the same start whenever each process got going. Client 1 joins
+# first, as Player1 at (11, 2); three tiles west is Crate1, so its move ends
+# by pushing the crate to (7, 2). Client 2 joins as Player2 on the next start
+# tile, (12, 1), and walks to (10, 1). Both are then one step from (9, 1), and
+# at server tick 70 both order a move into it; the server holds tick 70 until
+# both orders are in, so they land on one tick. Each client predicts the
+# step; the server lets only one of them have the tile.
+server server --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE" \
+	--test-wait-players=2 --test-hold=70,2
+wait_for server 'listening on port'
+client client1 $GOOD --test-move=-3,0 --test-contest=9,1,70
+wait_for server 'joined as Player1 '
+client client2 $GOOD --test-move=-2,0 --test-contest=9,1,70
+wait_any 'reached the contested tile \(9, 1\)' client1 client2
+wait_any 'mispredict: Player[0-9]+ step into \(9, 1\) refused' client1 client2
 # A third client with the wrong token must be rejected and never get a player.
-sleep 1
-start client3 --client --address=127.0.0.1 --token=wrong-secret --test-move=0,1 --test-exit-after=4
-# A fourth joins with no mode argument, from a settings file like an exported client.
+client client3 --client --address=127.0.0.1 --token=wrong-secret --test-move=0,1
+# A fourth joins with no mode argument, from a settings file like an exported
+# client: once the contest is over, so it is Player3 on (11, 2), which client 1
+# left, and walks to (11, 3).
 printf 'address=127.0.0.1\nport=%s\ntoken=%s\nplayer_id=%s\nname=Casey\n' "$PORT" "$TOKEN" "$ID_C" >"$LOGS/settings.cfg"
-sleep 1
-start client4 "--settings=$LOGS/settings.cfg" --test-move=0,1 --test-exit-after=4
+client client4 "--settings=$LOGS/settings.cfg" --test-move=0,1
 # A fifth has the right token but is an older build with another protocol:
 # turned away as out of date (decision 239: only the protocol decides).
-start client5 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=0.0.1 --test-protocol=old-build --test-exit-after=4
+client client5 $GOOD --test-version=0.0.1 --test-protocol=old-build
 # A sixth has the right token and version number but is a different build.
-start client6 --client --address=127.0.0.1 "--token=$TOKEN" --test-protocol=stale-build --test-exit-after=4
+client client6 $GOOD --test-protocol=stale-build
 # A seventh is a newer build with another protocol: the server is the one out of date.
-start client7 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=99.0.0 --test-protocol=new-build --test-exit-after=4
-wait
+client client7 $GOOD --test-version=99.0.0 --test-protocol=new-build
+wait_for client4 '\[test\] Player[0-9]+ arrived'
+wait_for client3 'authentication failed'
+wait_for client5 'client out of date'
+wait_for client6 'build mismatch'
+wait_for client7 'server out of date'
+finish
 
 # Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
-# come back where she left, Dana is new, and a second Casey is turned away.
-start server2 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE" --test-exit-after=10
-sleep 2
-start clientC "--settings=$LOGS/settings.cfg" --test-exit-after=6
-sleep 1
-start clientD --client --address=127.0.0.1 "--token=$TOKEN" "--player-id=$ID_D" --name=Dana --test-exit-after=4
-start clientE --client --address=127.0.0.1 "--token=$TOKEN" "--player-id=$ID_C" --name=Impostor --test-exit-after=3
-wait
+# come back where she left, a second Casey is turned away while she is on,
+# and Dana is new.
+server server2 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE"
+wait_for server2 'listening on port'
+client clientC "--settings=$LOGS/settings.cfg"
+wait_for server2 'Casey \(c0ffee00\) joined'
+client clientE $GOOD "--player-id=$ID_C" --name=Impostor
+wait_for clientE 'already connected'
+client clientD $GOOD "--player-id=$ID_D" --name=Dana
+wait_for server2 'Dana \(d0d0d0d0\) joined'
+finish
 
 # Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
-# the bottom of the room, then at tick 70 cross it toward each other.
-start server3 --server --still-monsters --no-companions "--token=$TOKEN" --test-exit-after=15
-sleep 2
+# the bottom of the room, then at tick 70 cross it toward each other. Fay is
+# Player1 from (11, 2), Gus Player2 from (12, 1), the sim waiting for both.
+server server3 --server --still-monsters --no-companions "--token=$TOKEN" \
+	--test-wait-players=2 --test-hold=70,2
+wait_for server3 'listening on port'
 # Fay is another build with the same protocol: she plays (decision 239).
-start clientF --client --address=127.0.0.1 "--token=$TOKEN" --name=Fay --test-version=0.0.2 --test-move=-6,9 --test-contest=12,12,70 --test-exit-after=12
-sleep 1
-start clientG --client --address=127.0.0.1 "--token=$TOKEN" --name=Gus --test-move=1,9 --test-contest=5,12,70 --test-exit-after=11
-wait
+client clientF $GOOD --name=Fay --test-version=0.0.2 --test-move=-6,9 --test-contest=12,12,70
+wait_for server3 'Fay \([a-z0-9-]+\) joined as Player1 '
+client clientG $GOOD --name=Gus --test-move=0,10 --test-contest=5,12,70
+wait_for clientF 'reached the contested tile'
+wait_for clientG 'reached the contested tile'
+finish
 
 # Phase 4: any player may reset the room. Hal pushes Crate1 west as client 1
 # did; at tick 70 Ivy asks for a reset, as her R key would.
-start server4 --server --still-monsters --no-companions "--token=$TOKEN" --test-exit-after=13
-sleep 2
-start clientH --client --address=127.0.0.1 "--token=$TOKEN" --name=Hal --test-move=-3,0 --test-exit-after=10
-sleep 1
-start clientI --client --address=127.0.0.1 "--token=$TOKEN" --name=Ivy --test-reset=70 --test-exit-after=8
-wait
+server server4 --server --still-monsters --no-companions "--token=$TOKEN" --test-wait-players=2
+wait_for server4 'listening on port'
+client clientH $GOOD --name=Hal --test-move=-3,0
+wait_for server4 'Hal \([a-z0-9-]+\) joined as Player1 '
+client clientI $GOOD --name=Ivy --test-reset=70
+wait_for server4 '\[world\] Ivy reset the room'
+wait_for server4 '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' 4
+finish
 
 failures=0
 check() {
