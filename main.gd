@@ -1197,7 +1197,10 @@ func default_zone() -> String:
 ## Server start: every zone the snapshot holds, back as it was saved, and
 ## the default zone; the player records; and a host's own player.
 func _boot() -> void:
-	var snapshot := Snapshot.load(Net.state_path) if Net.state_path != "" else {"ok": false, "zones": {}, "players": []}
+	var snapshot := Snapshot.load(Net.state_path) if Net.state_path != "" else {"ok": false, "zones": {}, "players": [], "steps": 0}
+	# The world's clock goes on from where it stopped: the world waits while
+	# the server is down.
+	World.steps = snapshot.get("steps", 0)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1628,7 +1631,7 @@ func _save_state() -> void:
 				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns}
 	World.enter(was)
-	Snapshot.save(Net.state_path, zones, records)
+	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps})
 
 
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.

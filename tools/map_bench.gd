@@ -109,6 +109,34 @@ func _ready() -> void:
 		print("BENCH door flip (light and heat again): avg %.2f ms, worst %.2f ms (%d doors)" % [
 			door_total / 1000.0 / (flips * 2), door_worst / 1000.0, doors.size()])
 
+	# The world tick at its worst: every monster on its way back after a
+	# fight at once, each first put up to 8 tiles from its post (into the
+	# next room, often), those far from the player walking back; the slice a
+	# step does, and all of it in one go (which no step does).
+	var away := func() -> void:
+		for monster: Monster in World.monsters():
+			for attempt in 8:
+				var to := monster.tile + Vector2i(rng.randi_range(-8, 8), rng.randi_range(-8, 8))
+				if World.is_free(to):
+					World._relocate(monster, to)
+					break
+			monster._returning = true
+	away.call()
+	World.world_tick(0)
+	var queued := World._world_due.size()
+	var drains := 0
+	var drain_worst := 0
+	while not World._world_due.is_empty():
+		started = Time.get_ticks_usec()
+		World._world_tick_due(World.WORLD_TICK_BUDGET_USEC)
+		drain_worst = maxi(drain_worst, Time.get_ticks_usec() - started)
+		drains += 1
+	away.call()
+	started = Time.get_ticks_usec()
+	World.world_tick()
+	print("BENCH world tick, every monster walking back: a slice of %d queued, gone through in %d steps of %.2f ms at most; all at once (no step does it) %.2f ms" % [
+		queued, drains, drain_worst / 1000.0, (Time.get_ticks_usec() - started) / 1000.0])
+
 	print("BENCH nodes: %d, objects: %d, static memory: +%.1f MB" % [
 		Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 		Performance.get_monitor(Performance.OBJECT_COUNT),

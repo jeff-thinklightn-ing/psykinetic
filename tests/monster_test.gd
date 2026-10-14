@@ -522,16 +522,16 @@ func _test_world_tick() -> void:
 	var near_home := near.home
 	World.step()
 	for m: Monster in [far, near]:
-		World.place(m, m.home + Vector2i(-2, 1))
+		World._relocate(m, m.home + Vector2i(-2, 1))
 		m._returning = true
 	World.world_tick()
 	_check(far.tile == far_home and not far._returning,
-			"the far one is home in one step (%s, home %s)" % [far.tile, far_home])
+			"the far one has walked home in the time (%s, home %s)" % [far.tile, far_home])
 	_check(near.tile == near_home + Vector2i(-2, 1) and near._returning,
 			"a near one is left to walk back (%s)" % [near.tile])
 	var blocker := EntityFactory.build({"script": "res://sim/pushable.gd", "shape": "cube", "name": "Blocker", "tile": far_home})
 	_room.add_child(blocker)
-	World.place(far, far_home + Vector2i(-2, 1))
+	World._relocate(far, far_home + Vector2i(-2, 1))
 	far._returning = true
 	World.spawn(blocker, far_home)
 	World.world_tick()
@@ -541,6 +541,15 @@ func _test_world_tick() -> void:
 		World.step()
 	_check(far.tile == far_home and not far._returning,
 			"the step's own world tick, every %d steps, takes it home once it is free" % World.WORLD_TICK_STEPS)
+	# Ten tiles off, and two seconds: only as far as it walks in that time.
+	World._relocate(far, far_home + Vector2i(-10, 0))
+	far._returning = true
+	far._world_tick(2.0)
+	var steps := floori(2.0 * World.TICK_RATE / World.step_ticks(far, Vector2i(1, 0)))
+	_check(far.tile == far_home + Vector2i(-10 + steps, 0) and far._returning,
+			"a short time, a short way: %d steps toward home, to %s" % [steps, far.tile])
+	far._world_tick(30.0)
+	_check(far.tile == far_home and not far._returning, "and the rest of the way the next time (%s)" % [far.tile])
 
 
 func _build(rows: Array[String], extra := {}) -> Dictionary:

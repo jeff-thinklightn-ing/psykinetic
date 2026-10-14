@@ -2388,3 +2388,55 @@ follow-up in it (the area there) builds what was asked for. The ghost
 outlines it past the edge. Rejected: having Claude draw the new level cell
 by cell in the same request (a 64 x 64 level is 4096 cells of tool calls);
 and opening the new zone at once (it opens on the first visit, as any zone).
+
+## 207. The world tick walks real ways, a little each step
+
+Jeff's rule: movement is real, and nobody walks over ground. The world
+tick (193) put a monster that was away after a fight straight back where
+it idles (World.place), a jump. It now walks there (World.walk): along
+find_path, step by step at its own step times (diagonals 1.5), for the
+time gone by since its last world tick, and stops where that time runs
+out; a monster too far to arrive gets as near as the walk can (find_path's
+new nearest: the way to the tile it looked at nearest the goal) and goes
+on next time. Nobody is near to see it, so it lands at the end at once.
+Held ground does not stop it yet; that comes with faction-aware routes
+(206).
+
+- **Cost.** The search looks at WALK_SEARCH_PER_STEP (8) tiles for each
+  step the time allows, not the whole map (190 ms corner to corner at
+  256x256). The walker shuts the doors behind it: doors are left as they
+  were, so a walk nobody sees works out no light again (that was 70% of a
+  walk). A patroller with no route yet walks home, its first waypoint, and
+  works its route out when it is near and thinking (three searches; it was
+  all of a 32 ms first slice).
+- **Spread.** Each monster still gets a world tick every WORLD_TICK_STEPS
+  (300), but in WORLD_TICK_SLICES (10), a slice every 30 steps, by id; a
+  slice queues its monsters, and each step goes through the queue for
+  WORLD_TICK_BUDGET_USEC (2 ms) at most. Each moves by the time since its
+  own last world tick (Monster.world_step), twice WORLD_TICK_STEPS at
+  most, so waiting its turn costs it nothing. A queued monster that has
+  come near someone, or whose zone is gone, is passed over.
+
+tools/map_bench now times the worst of it: every monster put up to 8
+tiles from its post (into the next room, often) and walking back. At
+256x256 a slice queues 193 walks, gone through in 44 steps of 5.7 ms at
+most (the budget, and the one walk that runs over it); all of them at
+once would be 1.16 s, which no step does. The 256x256 tick: 7.5 ms on
+average, 12.5 at worst. Rejected: the slices alone (a slice of 193 walks
+was 32 to 385 ms in one step), and opening the doors on the way (each a
+light worked out again, for a walk nobody sees).
+
+## 208. The world's clock is kept; the world waits while the server is down
+
+World.steps (the world tick's clock, and each monster's world_step) began
+at 0 on every start. It is saved in the snapshot now, as a top-level
+"steps" beside zones and players, and Main takes it back at boot: the
+world tick goes on from where it stopped. Jeff's call: while the server is
+down the world waits; there is no catching up on the downtime (a deploy
+would otherwise move the world on by however long it took). Players being
+away pauses nothing: the server runs the world tick with nobody on.
+
+The key is optional, with no new snapshot version: a file without it
+starts the clock at 0, as before. Snapshot.save takes a fourth argument,
+the world's own keys for the top level ({"steps": ...}), where the
+holdings (204) go too.

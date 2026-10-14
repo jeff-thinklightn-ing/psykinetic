@@ -68,10 +68,21 @@ const MID_TILES := 60
 const MID_EVERY_TICKS := 4
 const TIER_EVERY_TICKS := 5
 ## The world tick: every so many steps, every zone, awake or asleep, moves
-## its far monsters (all of them, asleep) on in one coarse step
-## (Monster._world_tick: no paths cell by cell, no hits). It runs with
-## nobody connected too.
+## its far monsters (all of them, asleep) on by that much time in one go
+## (Monster._world_tick: real walks at their pace, no hits). It runs with
+## nobody connected too. Its work is cut in WORLD_TICK_SLICES, a monster
+## in each by id, one slice every WORLD_TICK_STEPS / WORLD_TICK_SLICES
+## steps; a slice's monsters are queued, and each step goes through the
+## queue for WORLD_TICK_BUDGET_USEC at most, each monster moved on by the
+## time since its own last world tick: many walks owed at once (a fight's
+## worth of monsters walking back) wait their turn rather than hold up a
+## step.
 const WORLD_TICK_STEPS := 300
+const WORLD_TICK_SLICES := 10
+const WORLD_TICK_BUDGET_USEC := 2000
+## A world tick's walk looks at most this many tiles for each tile it
+## could walk in its time (World.walk).
+const WALK_SEARCH_PER_STEP := 8
 ## Orthogonals first so ties in pathfinding prefer straight steps.
 const DIRECTIONS: Array[Vector2i] = [
 	Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1),
@@ -315,17 +326,20 @@ func step() -> void:
 			enter(each)
 			_step_zone()
 	steps += 1
-	if steps % WORLD_TICK_STEPS == 0:
-		world_tick()
+	var every := WORLD_TICK_STEPS / WORLD_TICK_SLICES
+	if steps % every == 0:
+		world_tick(steps / every % WORLD_TICK_SLICES)
+	_world_tick_due(WORLD_TICK_BUDGET_USEC)
 	enter(was)
 	stepped.emit()
 
 
 ## The world tick, every zone in turn (the one World is in if there are no
 ## zones): its far monsters, or all of them in a zone asleep, moved on by
-## WORLD_TICK_STEPS of time. Called by step; tests call it directly.
-func world_tick() -> void:
-	var seconds := WORLD_TICK_STEPS * TICK_DT
+## the time since each one's last; only those of [param slice] (id modulo
+## WORLD_TICK_SLICES), queued for _world_tick_due, or all of them at once
+## for -1. Called by step, a slice at a time; tests call it directly.
+func world_tick(slice := -1) -> void:
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())
@@ -335,9 +349,51 @@ func world_tick() -> void:
 		enter(each)
 		var near := _tier_origins()
 		for entity in monsters().duplicate():
+			if slice >= 0 and entity.id % WORLD_TICK_SLICES != slice:
+				continue
 			if _alive(entity) and (not each.awake or _tier(entity, near) == Tier.FAR):
-				entity._world_tick(seconds)
+				if slice < 0:
+					_world_tick_one(entity)
+				elif not entity.world_queued:
+					entity.world_queued = true
+					_world_due.append([each, entity])
 	enter(was)
+
+
+## The monsters a world tick slice queued, [zone, monster], in order, and
+## how far through them it is.
+var _world_due: Array = []
+var _world_due_at := 0
+
+
+## Goes through the queued world tick for [param budget_usec] at most.
+func _world_tick_due(budget_usec: int) -> void:
+	var started := Time.get_ticks_usec()
+	while _world_due_at < _world_due.size() and Time.get_ticks_usec() - started < budget_usec:
+		var due: Array = _world_due[_world_due_at]
+		_world_due_at += 1
+		var monster: GridEntity = due[1]
+		if not is_instance_valid(monster):
+			continue
+		monster.world_queued = false
+		var each: Zone = due[0]
+		if zones.get(each.name) != each and not (zones.is_empty() and each == zone):
+			continue  # Its zone is gone.
+		enter(each)
+		# Near someone since it was queued: the full tick has it.
+		if _alive(monster) and (not each.awake or _tier(monster, _tier_origins()) == Tier.FAR):
+			_world_tick_one(monster)
+	if _world_due_at >= _world_due.size():
+		_world_due.clear()
+		_world_due_at = 0
+
+
+## [param monster]'s world tick: the time since its last (WORLD_TICK_STEPS
+## for its first), WORLD_TICK_STEPS twice at most.
+func _world_tick_one(monster: GridEntity) -> void:
+	var since: int = WORLD_TICK_STEPS if monster.world_step < 0 else steps - monster.world_step
+	monster.world_step = steps
+	monster._world_tick(mini(since, WORLD_TICK_STEPS * 2) * TICK_DT)
 
 
 ## Whether [param each] has a player in it: one standing there, or a
@@ -430,15 +486,38 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	return monster.tier as Tier
 
 
-## A coarse move, for the world tick: [param entity] straight to
-## [param to], with no walk between; false if [param to] is not walkable or
-## is taken. Nobody is near to see it go.
-func place(entity: GridEntity, to: Vector2i) -> bool:
-	if not entity.spawned or not is_walkable(to) or _occupancy.has(to) or is_burning(to):
+## A walk for the world tick: [param entity] along a real way toward
+## [param to], as far as [param ticks] of its own steps take it (diagonals
+## as World.step_ticks costs them), done at once:
+## nobody is near to see it go. It goes through doors as a creature does,
+## and shuts them behind it: they are left as they were (no light and heat
+## to work out again for a walk nobody sees). It stops where its time runs
+## out; with no way there (the tile taken, or
+## farther than it could look in that time) it gets as near as it can. The
+## search looks at WALK_SEARCH_PER_STEP tiles for each step it could take.
+## True if it got there.
+func walk(entity: GridEntity, to: Vector2i, ticks: float) -> bool:
+	if not entity.spawned:
 		return false
-	_relocate(entity, to)
-	entity._world_slide_from(to, tick, 0.0)
-	return true
+	if entity.tile == to:
+		return true
+	var reach := floori(ticks / step_ticks(entity, Vector2i(1, 0)))
+	if reach <= 0:
+		return false
+	var path := find_path(entity.tile, to, false, entity, reach * WALK_SEARCH_PER_STEP, true)
+	var at := entity.tile
+	var spent := 0.0
+	for next in path:
+		var direction := next - at
+		var cost := step_ticks(entity, direction)
+		if spent + cost > ticks:
+			break
+		spent += cost
+		at = next
+	if at != entity.tile:
+		_relocate(entity, at)
+		entity._world_slide_from(at, tick, 0.0)
+	return at == to
 
 
 # --- Zones (server) -----------------------------------------------------------
@@ -2046,8 +2125,11 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## (a client predicting for itself, whose replicated tile lags behind).
 ## [param max_tiles] > 0 gives up (empty) after looking at that many tiles:
 ## a monster's way to a tile beside its target is short or not worth it.
+## With [param nearest], giving up (or no way there) gives the way to the
+## tile it looked at that is nearest [param to] instead (the earliest of
+## equals; empty if that is [param from]): as far as a walk can get.
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
-		ignore: GridEntity = null, max_tiles := 0) -> Array[Vector2i]:
+		ignore: GridEntity = null, max_tiles := 0, nearest := false) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
@@ -2066,7 +2148,9 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	var came_from: Dictionary[Vector2i, Vector2i] = {}
 	var cost: Dictionary[Vector2i, int] = {}
 	cost[from] = 0
-	_heap_push(heap_keys, heap_cells, _path_heuristic(from, to) << PATH_ORDER_BITS, from)
+	var best := from
+	var best_left := _path_heuristic(from, to)
+	_heap_push(heap_keys, heap_cells, best_left << PATH_ORDER_BITS, from)
 
 	while not heap_keys.is_empty():
 		var key := heap_keys[0]
@@ -2074,7 +2158,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 		if closed.has(current) or key >> PATH_ORDER_BITS != cost[current] + _path_heuristic(current, to):
 			continue  # Stale: closed already, or pushed again since, cheaper.
 		if max_tiles > 0 and closed.size() >= max_tiles:
-			return path
+			break
 
 		if current == to:
 			while current != from:
@@ -2084,6 +2168,11 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			return path
 
 		closed[current] = true
+		if nearest:
+			var left := _path_heuristic(current, to)
+			if left < best_left:
+				best = current
+				best_left = left
 		for way in DIRECTIONS.size():
 			var direction: Vector2i = DIRECTIONS[way]
 			var next: Vector2i = current + direction
@@ -2110,6 +2199,11 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 					opened[next] = opened.size()
 				_heap_push(heap_keys, heap_cells,
 						((next_cost + _path_heuristic(next, to)) << PATH_ORDER_BITS) | opened[next], next)
+	if nearest:
+		while best != from:
+			path.append(best)
+			best = came_from[best]
+		path.reverse()
 	return path
 
 

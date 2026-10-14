@@ -147,6 +147,10 @@ var _sits := false
 ## not yet). World's.
 var tier := 0
 var tier_tick := -1
+## The World.steps of its last world tick (-1: none yet), and whether one
+## is queued for it. World's.
+var world_step := -1
+var world_queued := false
 
 
 func _init() -> void:
@@ -601,21 +605,24 @@ func _idle_step(to: Vector2i) -> bool:
 
 
 ## The world tick (far from everyone, or its zone asleep): [param seconds]
-## gone by in one coarse step. A fight is over; one on its way back after a
-## fight is back (home, its route, its place at the point), if that is
-## free. No walk, no hits.
-func _world_tick(_seconds: float) -> void:
+## gone by at once. A fight is over; one on its way back after a fight
+## walks back (home, its route, its place at the point) as far as it would
+## have in that time at its idle pace, by a real way (World.walk), and is
+## back if it gets there. No hits.
+func _world_tick(seconds: float) -> void:
 	target = null
 	slot = NO_TILE
 	_windup = {}
 	_glancing = false
 	if not _returning:
 		return
-	var back := _back_to()
-	if back != NO_TILE and (tile == back or World.place(self, back)):
+	move_ticks = _pace * IDLE_PACE
+	# A patrol with no route yet goes home, its first waypoint, rather than
+	# work its route out now: it does that when it is near and thinking.
+	var back := home if idle == Idle.PATROL and route.is_empty() else _back_to()
+	if back != NO_TILE and World.walk(self, back, seconds * World.TICK_RATE):
 		_returning = false
 		_idle_goal = NO_TILE
-		move_ticks = _pace * IDLE_PACE
 
 
 ## The way a monster called [param monster_name] faces when its level entry

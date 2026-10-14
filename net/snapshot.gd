@@ -6,7 +6,9 @@ extends RefCounted
 ## owns (the spawn spec it was built from, its tile, hp, stamina and
 ## facing, and a chest's slots) and its respawn timers; and a PlayerRecord per player who has
 ## ever joined, with the zone they are in, so a player comes back where they
-## left off. The rooms themselves always come from the levels. A version 1
+## left off; and the world's clock (World.steps), so the world tick goes on
+## from where it stopped (the world waits while the server is down). The
+## rooms themselves always come from the levels. A version 1
 ## file (one map, before zones) loads as that one zone.
 ##
 ## Written to <path>.tmp then renamed, so a crash mid-write cannot leave a
@@ -18,8 +20,10 @@ const VERSION := 2
 
 ## Writes [param zones] (name -> {tick, entities: Array[GridEntity],
 ## respawns: dead level entities as {spawn, ticks_left}}) and
-## [param players] to [param path]. Returns false and logs on failure.
-static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] = []) -> bool:
+## [param players] to [param path], with [param world]'s keys at the top
+## level beside them ("steps": World.steps). Returns false and logs on
+## failure.
+static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] = [], world := {}) -> bool:
 	var saved := {}
 	for zone_name: String in zones:
 		var section: Dictionary = zones[zone_name]
@@ -30,7 +34,9 @@ static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] =
 	var records: Array[Dictionary] = []
 	for record in players:
 		records.append(record.to_dict())
-	var text := JSON.stringify({"version": VERSION, "zones": saved, "players": records}, "\t")
+	var data := {"version": VERSION, "zones": saved, "players": records}
+	data.merge(world)
+	var text := JSON.stringify(data, "\t")
 	return _write(path, text)
 
 
@@ -85,11 +91,12 @@ static func _write(path: String, text: String) -> bool:
 ## Reads [param path]. The result's "ok" is false if there was nothing usable
 ## (missing, unreadable, or malformed); otherwise "zones" holds each zone's
 ## {tick, entities, respawns}, "entities" one entry per restorable entity:
-## {spec, hp, stamina, facing, slots (null if none saved)}, and "players"
-## the records. Entries that make
+## {spec, hp, stamina, facing, slots (null if none saved)}, "players"
+## the records, and "steps" the world's clock (0 in a file from before it
+## was kept). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
-	var nothing := {"ok": false, "zones": {}, "players": []}
+	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
 	if not FileAccess.file_exists(path):
 		print("[state] no snapshot at %s; starting fresh" % path)
 		return nothing
@@ -131,7 +138,9 @@ static func load(path: String) -> Dictionary:
 		for record in players:
 			if record.zone.is_empty():
 				record.zone = _map_in(data)
-	return {"ok": true, "zones": zones, "players": players}
+	var steps: Variant = data.get("steps", 0)
+	return {"ok": true, "zones": zones, "players": players,
+		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0}
 
 
 ## One zone's {tick, entities, respawns} as read.

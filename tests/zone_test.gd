@@ -153,14 +153,15 @@ func _test_empty_zone_sleeps() -> void:
 		var was := World.enter(sample)
 		var off := Vector2i.ZERO
 		for direction in World.DIRECTIONS:
-			if World.place(monster, monster.home + direction):
+			if World.is_free(monster.home + direction):
+				World._relocate(monster, monster.home + direction)
 				off = direction
 				break
 		World.enter(was)
 		monster._returning = true
 		World.world_tick()
 		_check(off != Vector2i.ZERO and monster.tile == monster.home and not monster._returning and sample.tick == asleep_at,
-				"the world tick moves it on while it sleeps: back home (%s), its tick still %d" % [monster.tile, sample.tick])
+				"the world tick moves it on while it sleeps: walked home (%s), its tick still %d" % [monster.tile, sample.tick])
 	_check(_main.travel(BO, "sample"), "Bo goes to the sample again")
 	World.step()
 	World.step()
@@ -168,7 +169,8 @@ func _test_empty_zone_sleeps() -> void:
 
 
 func _test_restart() -> void:
-	print("\n== a restart puts both players back in their own zones ==")
+	print("\n== a restart puts both players back in their own zones, the world's clock where it stopped ==")
+	var clock := World.steps
 	_main._save_state()
 	var snapshot := Snapshot.load(Net.state_path)
 	var zones: Dictionary = snapshot["zones"]
@@ -178,14 +180,17 @@ func _test_restart() -> void:
 		where[record.name] = record.zone
 	_check(where.get("Bo") == "sample" and where.get(Net.player_name) == "test_room", "and each player's zone (%s)" % [where])
 	var sample_entities := (zones["sample"]["entities"] as Array).size()
+	_check(snapshot["steps"] == clock and clock > 0, "and the world's clock (%d)" % snapshot["steps"])
 	# The server stops and starts again.
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
+	World.steps = 0
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	await get_tree().process_frame
 	_check(World.zones.has("test_room") and World.zones.has("sample"), "both zones come back (%s)" % [World.zones.keys()])
+	_check(World.steps >= clock, "the clock goes on from %d, not from 0 (%d)" % [clock, World.steps])
 	_check(World.zones["sample"].entities.size() >= sample_entities, "the sample as it was saved (%d entities)" % World.zones["sample"].entities.size())
 	var host := _player(Net.local_id)
 	_check(host != null and host.zone == "test_room", "the host is back in the test room")

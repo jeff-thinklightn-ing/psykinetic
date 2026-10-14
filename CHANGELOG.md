@@ -3,6 +3,20 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.127
+
+Client and server.
+
+- Monsters far from everyone, or in places nobody is, now really walk
+  back to their posts after a fight, at their own pace, instead of
+  appearing there.
+- The world keeps its own clock across server restarts: it picks up where
+  it stopped, and waits while the server is down.
+- Steadier server on big maps: the world's slow background work is spread
+  over many ticks so no single tick takes long.
+
+The server must be updated to v0.1.127 too, as it refuses any other version.
+
 ## v0.1.126
 
 Client and server.
