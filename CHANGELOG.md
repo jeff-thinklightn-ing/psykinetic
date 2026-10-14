@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.138
+
+Client only.
+
+- Behind the scenes: everything the 3D view draws is now a named art slot,
+  so the game's own models can replace the borrowed ones one at a time.
+  Nothing looks different yet.
+- For checking sizes: `art_placeholders=1` in settings.cfg draws every slot
+  as a plain grey box, and `art_labels=1` puts its name over it.
+
 ## v0.1.137
 
 Client and server.
