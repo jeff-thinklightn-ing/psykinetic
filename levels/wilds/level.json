@@ -1,0 +1,125 @@
+{
+	"name": "The Wilds",
+	"outdoor": true,
+	"centre": [
+		128,
+		22
+	],
+	"starts": [
+		[
+			127,
+			22
+		],
+		[
+			129,
+			22
+		],
+		[
+			126,
+			22
+		],
+		[
+			130,
+			22
+		]
+	],
+	"spawn_points": {
+		"from_castle": [
+			128,
+			22
+		]
+	},
+	"links": [
+		{
+			"at": [
+				128,
+				20
+			],
+			"to_map": "castle",
+			"to_spawn": "from_wilds"
+		}
+	],
+	"entities": [
+		{
+			"at": [
+				122,
+				138
+			],
+			"props": {
+				"slots": [
+					"bandaging_kit",
+					"",
+					"",
+					""
+				]
+			}
+		},
+		{
+			"at": [
+				120,
+				152
+			],
+			"props": {
+				"slots": [
+					"bandaging_kit",
+					"",
+					"",
+					""
+				]
+			}
+		},
+		{
+			"at": [
+				199,
+				79
+			],
+			"idle": {
+				"mode": "gather",
+				"point": [
+					199,
+					81
+				]
+			}
+		},
+		{
+			"at": [
+				197,
+				81
+			],
+			"idle": {
+				"mode": "gather",
+				"point": [
+					199,
+					81
+				]
+			}
+		},
+		{
+			"at": [
+				201,
+				81
+			],
+			"idle": {
+				"mode": "gather",
+				"point": [
+					199,
+					81
+				]
+			}
+		},
+		{
+			"at": [
+				201,
+				83
+			],
+			"props": {
+				"slots": [
+					"bandaging_kit",
+					"",
+					"",
+					""
+				]
+			}
+		}
+	]
+}

@@ -137,6 +137,16 @@ func _test_every_level() -> void:
 				"%s: %d cells, %d entities (%s)" % [folder, level["terrain"]["floor"].size() if not level.is_empty() else 0,
 					level["entities"].size() if not level.is_empty() else 0, level.get("warnings", "no level")])
 	print("
+== every link leads to a level, and to a spawn point it has ==")
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR:
+			continue
+		for link: Dictionary in Level.load_level(folder).get("links", []):
+			var target := Level.load_level(str(link["to_map"])) if Level.exists(str(link["to_map"])) else {}
+			var spawn := str(link["to_spawn"])
+			_check(not target.is_empty() and (spawn.is_empty() or (target["spawn_points"] as Dictionary).has(spawn)),
+					"%s %s -> %s, %s" % [folder, link["tile"], link["to_map"], spawn if not spawn.is_empty() else "its first start"])
+	print("
 == every prefab in levels/prefabs/ imports as Images and reads cleanly ==")
 	var prefabs := Prefab.names()
 	_check(prefabs.size() >= 4, "the prefabs seeded by hand are there (%s)" % [prefabs])
@@ -281,8 +291,9 @@ func _test_castle() -> void:
 	_check(not castle.is_empty() and castle["display_name"] == "The Castle" and castle["warnings"].is_empty(),
 			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
 	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
-	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle"}]),
-			"its link at (27, 12) goes to the test room (%s)" % [castle["links"]])
+	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle"},
+			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle"}]),
+			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds (%s)" % [castle["links"]])
 	var room := Level.load_level("test_room")
 	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")
 	_check(back.size() == 1 and back[0]["tile"] == Vector2i(30, 34) and back[0]["to_spawn"] == "from_test_room",

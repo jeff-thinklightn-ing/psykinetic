@@ -14,7 +14,9 @@ everyone else is in the zone they were last in. On a server's console,
 `zones` lists them and `zone reset <name>` rebuilds one from its map.
 `levels/test_room` is the original room; `levels/sample` uses every entry in
 the legend, with heights, stairs and a link back to the test room;
-`levels/castle` is the first map made in the level editor.
+`levels/castle` is the first map made in the level editor. `levels/wilds`
+is the land south of it, 256 x 256 cells under the sky, made by
+`tools/make_wilds.gd` (below).
 
 ## The grid: double resolution
 
@@ -235,6 +237,20 @@ project, the game reads `layout.png` itself rather than its import, so a
 saved map plays at once with `--map=<name>`.
 
 Not yet: painting heights, and a 3D preview.
+
+## The wilds
+
+`levels/wilds` (256 x 256, outdoor) is written by `tools/make_wilds.gd`
+from a fixed seed: grass with patches of dirt, an uneven band of forest
+round it (4 to 24 cells deep), groves inside (void, drawn as trees; none
+under 16 cells) and a few ponds, a winding dirt path from its link at the
+top to a farmstead in the middle (two houses, two fenced fields and a well,
+stamped from the prefabs) and on to a goblin camp in the north-east, its
+three imps the only monsters for now. The castle's road leads to it: the
+link at the foot of the road, (16, 23), arrives at the top of the wilds'
+path, and the link there goes back to (16, 22). Run the tool again to
+remake it, then touch it up in the editor (running it again undoes the
+touching up).
 
 ## Prefabs
 

@@ -2066,3 +2066,19 @@ moves on"): the camp's imps are a group because they gather at one cell,
 which a coarse world tick can move or hand over without running their AI.
 No separate group record yet; one can be added when the world tick needs a
 name or an owner for it.
+
+## 191. Big maps start from a seeded tool, then the editor
+
+`levels/wilds` (256 x 256) is written by `tools/make_wilds.gd` from a fixed
+seed, not painted by hand: noise for the forest's edge, the groves, the
+dirt and the ponds (groves and ponds under a size dropped, so they read as
+shapes, not speckle), paths that walk toward a goal swung aside by noise,
+and the hand-made prefabs stamped on with the editor's own
+`Prefab.stamp_changes`. Painting 65k cells by hand is not the way to a
+first draft; the tool is, and the editor is for the touching up after.
+Rerunning the tool rewrites the map, so once it has been touched up by hand
+the tool is a record of how it began, not a way to remake it. The castle's
+side of the link was a hand edit (a link marker and two level.json
+entries), so the tool never rewrites a map it did not make. Builder pass 2's
+area tools (pond, grove, path, scatter) will do the same jobs one area at
+a time, and the tool can then call them.

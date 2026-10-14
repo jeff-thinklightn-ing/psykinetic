@@ -3,6 +3,18 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.120
+
+Client and server.
+
+- The Wilds: walk south from the castle, past the foot of its road, into
+  open country, a big map of fields, groves and ponds ringed by forest. A
+  path leads to a farmstead (two houses, fenced fields, a well, a chest in
+  each house), and on to a goblin camp in the north-east, three imps round
+  their fire.
+
+The server must be updated to v0.1.120 too, as it refuses any other version.
+
 ## v0.1.119
 
 Client and server.
