@@ -107,7 +107,7 @@ func _register_maps() -> void:
 # --- Tests ----------------------------------------------------------------------
 
 func _test_test_room_unchanged() -> void:
-	print("\n== levels/test_room is the old test room, unchanged (but for its chest) ==")
+	print("\n== levels/test_room is the old test room, unchanged (but for its chest, and crates that carry) ==")
 	_check(load("res://levels/test_room/layout.png") is Image, "its layout.png is imported as an Image (readable on a headless server)")
 	var level := Level.load_level("test_room")
 	var old := Terrain.parse(LEGACY.LEVEL)
@@ -123,7 +123,11 @@ func _test_test_room_unchanged() -> void:
 	var same := entities.size() == LEGACY.LEVEL_ENTITIES.size()
 	for i in mini(entities.size(), LEGACY.LEVEL_ENTITIES.size()):
 		var a: Dictionary = entities[i]
-		var b: Dictionary = LEGACY.LEVEL_ENTITIES[i]
+		var b: Dictionary = LEGACY.LEVEL_ENTITIES[i].duplicate(true)
+		if b["name"].begins_with("Crate"):
+			# Crates carry things now (decision 259): a Cargo of 4, nothing else changed.
+			b["script"] = Level.CARGO
+			b["props"] = {"capacity": 4}
 		for key in ["script", "shape", "name", "tile", "tint", "props"]:
 			if a.get(key) != b.get(key):
 				same = false

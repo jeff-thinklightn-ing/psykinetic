@@ -1067,6 +1067,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		return _bank(by, from, from_slot, to)
 	var uid := slot_uid(from, from_slot)
 	var other_uid := slot_uid(to, to_slot)
+	_fit_uids(from)
+	_fit_uids(to)
 	# New arrays, so each synchronizer sees a change.
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
@@ -1174,6 +1176,13 @@ func has_hands(entity: GridEntity) -> bool:
 ## [param entity]'s slots changed: its mass follows what it carries (its
 ## base_mass and the things' weights), and slots_changed is emitted.
 func _slots_changed(entity: GridEntity) -> void:
+	_weigh(entity)
+	slots_changed.emit(entity)
+
+
+## [param entity]'s mass: its base_mass (taken the first time) and what its
+## slots hold (a chest, fixed in place, stays as it is).
+func _weigh(entity: GridEntity) -> void:
 	if entity.base_mass < 0.0:
 		entity.base_mass = entity.mass
 	var carried := 0.0
@@ -1182,7 +1191,31 @@ func _slots_changed(entity: GridEntity) -> void:
 			if not id.is_empty():
 				carried += Items.weight_of(id)
 	entity.mass = entity.base_mass + carried
-	slots_changed.emit(entity)
+
+
+## Takes everything out of [param container] at once (economy banking a
+## cart that reached the stockpile; a crate breaking): their uids, the
+## slots empty. Whoever has them now says where they are (or ends them).
+func empty_container(container: GridEntity) -> Array[int]:
+	var uids: Array[int] = []
+	if not Net.is_authority() or not is_instance_valid(container):
+		return uids
+	for slot in container.slots.size():
+		var uid := slot_uid(container, slot)
+		if uid != 0:
+			items.place(uid, "")
+			uids.append(uid)
+	if uids.is_empty():
+		return uids
+	var empty := PackedStringArray()
+	empty.resize(container.slots.size())
+	var none := PackedInt32Array()
+	none.resize(container.slots.size())
+	container.slots = empty
+	container.slot_items = none
+	_log("slots: %s emptied of %d things" % [container.name, uids.size()])
+	_slots_changed(container)
+	return uids
 
 
 ## The instance in [param entity]'s slot [param slot]: 0 for an empty slot;
@@ -1244,7 +1277,7 @@ func _can_handle(by: GridEntity) -> bool:
 ## [carrier key, name] for an item's history: "" for a chest (a place, not
 ## a carrier).
 func _carrier_of(entity: GridEntity) -> Array[String]:
-	if entity is Chest:
+	if entity is Chest or entity is Cargo:
 		return ["", ""]
 	return [holder_key(entity), _label_of(entity)]
 
@@ -1285,7 +1318,7 @@ func reaches(by: GridEntity, entity: GridEntity) -> bool:
 		return true
 	if not is_instance_valid(entity) or not entity.spawned or entity.zone != by.zone:
 		return false
-	if entity is Chest:
+	if entity is Chest or entity is Cargo:
 		return can_melee(by.tile, entity.tile)
 	var near := entity.hp > 0 and distance(by.tile, entity.tile) <= COMPANION_REACH and has_line_of_sight(by.tile, entity.tile)
 	if entity.keeper_peer != 0:  # A companion (not named: companion.gd uses World).
@@ -1603,6 +1636,8 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	_occupancy[at] = entity
 	_entities.append(entity)
 	_roster_changed()
+	if entity is Cargo:
+		_weigh(entity)  # What its spawn spec put in it weighs from the start.
 	zone.comings += 1
 	entity.zone = zone.name
 	entity._world_place(_next_id, at)
@@ -1760,7 +1795,13 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	entity_damaged.emit(target, amount, source, cause)
 	if target.hp == 0:
 		entity_died.emit(target, cause)
+		var spilt: Array[int] = []
+		if target is Cargo:
+			spilt = empty_container(target)
+		var at := target.tile
 		despawn(target)
+		for uid in spilt:
+			put_on_ground(uid, at)
 
 
 ## Player intent: walk to [param target], by way of [param via] first

@@ -46,6 +46,7 @@ const MAX_HEIGHT := 6
 const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
 const CHEST := "res://sim/chest.gd"
+const CARGO := "res://sim/cargo.gd"
 
 ## The default legend: a meaning per colour (hex, RGB). level.json "legend"
 ## overrides or adds ({"wall": "#402a20", "monster_wraith": "#c0c0ff"}).
@@ -91,10 +92,12 @@ const MONSTER_TYPES := {
 	"brute": {"mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
 	"sneak": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 8},
 }
-const CRATE := {"script": PUSHABLE, "shape": "cube", "tint": Color(0.8, 0.6, 0.35)}
+## A crate and a cart carry things (Cargo: 4 and 8); props {"slots": [...]}
+## say what is in them, as a chest's.
+const CRATE := {"script": CARGO, "shape": "cube", "tint": Color(0.8, 0.6, 0.35), "props": {"capacity": 4}}
 const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.55, 0.6),
 	"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}}
-const CART := {"script": PUSHABLE, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "props": {"mass": 60.0}}
+const CART := {"script": CARGO, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "props": {"mass": 60.0, "capacity": 8}}
 ## Empty; level.json's props say what is in it ({"slots": ["bandaging_kit"]}).
 const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12)}
 ## The idle modes level.json may give a monster (Monster.IDLE_MODES).
@@ -573,10 +576,11 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except
-## sight_range, slots as a chest's (Items.tidy).
+## sight_range, slots as known item ids, at most a cart's (Items.tidy; the
+## chest or container fits them to its size).
 static func _prop(key: String, value: Variant) -> Variant:
 	if key == "slots":
-		return Items.tidy(value, Chest.SLOTS)
+		return Items.tidy(value, mini(value.size(), Cargo.MAX) if value is Array else 0)
 	if key == "body_material" and value is String:
 		return GridEntity.BodyMaterial.get(str(value).to_upper(), GridEntity.BodyMaterial.FLESH)
 	if key == "sight_range":

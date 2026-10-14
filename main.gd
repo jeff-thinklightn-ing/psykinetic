@@ -490,6 +490,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = World.get_entity_at(tile)
 	# Right: a chest, or your own companion, opens. Left: a chest is walked to.
 	if click.button_index == MOUSE_BUTTON_RIGHT and (target is Chest or _is_own_companion(target)):
+		# (A crate or a cart opens on release, a plain click within reach:
+		# _release_toss. Dragged, or from afar, it is shoved as before.)
 		_open_pack(player, target)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
@@ -881,6 +883,9 @@ func _release_toss(player: Player) -> void:
 	var direction := _toss_direction()
 	_toss_target = null
 	if is_instance_valid(target) and target.spawned:
+		if target is Cargo and direction == Vector2i.ZERO and World.reaches(player, target):
+			_open_pack(player, target)  # A plain right click on a crate or cart beside you opens it.
+			return
 		World.command_shove(player, target, direction)
 
 
@@ -2474,7 +2479,7 @@ func hint_lines() -> Array[String]:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
-	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",
+	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB crate, cart\topen it, beside you", "RMB companion\ther pack", "I\tyour pack",
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])

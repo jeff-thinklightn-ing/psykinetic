@@ -43,6 +43,9 @@ top section as the release notes.
   a death only if they saw it (no more news of a fight behind a wall).
 - Companions hear fighting and doors they cannot see, and may tell you
   ("I hear fighting to the west").
+- Crates and carts carry things: a crate holds 4, a cart 8. Right-click
+  one beside you to open it; drag to toss it as before. A loaded cart is
+  heavier to push, and a broken crate spills what it held.
 
 ## v0.1.140
 

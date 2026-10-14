@@ -21,3 +21,9 @@ func _init() -> void:
 	max_hp = 0
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
+
+
+## Its slots cut or padded to SLOTS, after a spawn spec's props set them
+## (EntityFactory.build).
+func fit_slots() -> void:
+	slots = Items.tidy(slots, SLOTS)

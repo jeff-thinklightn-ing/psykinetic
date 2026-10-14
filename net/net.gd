@@ -134,7 +134,8 @@ signal join_rejected(reason: String, server_version: String)
 ## spawn spec key, the order of anything sent. tests/protocol_test checks
 ## that every message kind, RPC script and replicated property is listed
 ## here. 7: a carrier's slots are 6, the pack and two hands (decision 247).
-const PROTOCOL_REVISION := 7
+## 8: crates and carts are Cargo, their slots replicated (decision 259).
+const PROTOCOL_REVISION := 8
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

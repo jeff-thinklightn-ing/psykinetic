@@ -3725,3 +3725,31 @@ is unfinished work, which art_kit_test refuses. Rejected: building the
 boxes again in Blender's Python from the manifest (a second copy of the
 grey box rules to keep in step), and committing templates for every slot
 (eighty .blend files nobody asked for).
+
+## 259. Crates and carts carry things: Cargo, a Pushable with slots
+
+Items step 2b, for economy's hauling. Level.CRATE and Level.CART spawn a
+Cargo (sim/cargo.gd, a Pushable): a crate of 4 slots, a cart of 8
+(capacity; Cargo.MAX 8), filled by a level's props {"slots": [...]} as a
+chest is (Level._prop keeps up to 8, the entity fits them to its size,
+EntityFactory calling fit_slots). It pushes, tosses and breaks as before;
+what it holds adds to its mass (World._weigh, from its spawn on), so a
+loaded cart is harder to push and hits harder. World treats it as a chest
+in every other way: reached from beside with no wall between, a place and
+not a carrier in an item's history, its slots replicated and saved, what it
+held ended as lost when its room is rebuilt. Broken (a crate has 12 hp), it
+spills what it held onto the ground where it stood (put_on_ground). For
+economy, World.empty_container takes everything out at once and gives the
+uids; a cargo arriving on stockpile ground is economy's to see, from
+World.entity_moved, which fires for every cell a push moves it. Boulders
+stay plain Pushables.
+
+A plain right click on a crate or cart within reach opens it (Main's
+_release_toss: no drag, World.reaches); dragged, or from afar, it is shoved
+or tossed as before, and walking into it still pushes it. Open question for
+the weapons step (Jeff's call): the backlog's fighter controls (right click
+grapple, right drag toss) will need to share or move this.
+
+Not "Container": Godot has a Control of that name. The wire changes
+(crates and carts spawn from a new script and replicate slots):
+PROTOCOL_REVISION 8.

@@ -83,6 +83,8 @@ class SlotBox:
 static func title_of(entity: GridEntity) -> String:
 	if entity is Chest:
 		return "Chest"
+	if entity is Cargo:
+		return "Cart" if entity.capacity > Chest.SLOTS else "Crate"
 	var who := entity.label if not entity.label.is_empty() else String(entity.name)
 	return "%s's Pack" % who
 
@@ -125,7 +127,7 @@ func _title() -> Label:
 func _row(mine: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
-	for i in maxi(Player.SLOTS, Chest.SLOTS):
+	for i in maxi(Player.SLOTS, Cargo.MAX):
 		var box := SlotBox.new()
 		box.panel = self
 		box.mine = mine

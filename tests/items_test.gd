@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_hands()
 	_test_ground()
 	_test_throw()
+	_test_containers()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -281,6 +282,61 @@ func _test_throw() -> void:
 			"the sack fell at the host's feet, its history says thrown at Bo")
 	World.items.end(World.take_from_ground(host.tile, World.ground_uids(host.tile).find(ore)), "gone")
 	_main._leave(BO, bo, BO_ID)
+
+
+func _test_containers() -> void:
+	print("\n== crates and carts carry things: opened from beside, heavier full, spilling when broken ==")
+	var host := _player(Net.local_id)
+	var crate: GridEntity = null
+	for entity in World.get_entities():
+		if entity.name == "Crate1":
+			crate = entity
+	_check(crate is Cargo and crate.slots == PackedStringArray(["", "", "", ""]) and crate.pushable,
+			"the test room's crate is a container of 4, empty, and still pushable")
+	var spot := _open_line(host, 1)
+	var cart := _main._spawn({"script": Level.CARGO, "shape": "slab", "name": "TestCart", "tile": spot,
+		"props": {"capacity": 8, "mass": 60.0, "slots": [KIT, "ore_sack"]}}) as Cargo
+	_check(cart != null and cart.slots.size() == 8 and cart.slots[0] == KIT and cart.slots[1] == "ore_sack",
+			"a cart of 8, with a kit and a sack of ore in it from its props")
+	_check(World.reaches(host, cart), "the host, beside it, reaches into it")
+	var mass := cart.mass
+	var kit := _give(host, KIT, 0)
+	_check(World.try_transfer(host, host, 0, cart, 2) and cart.slot_items[2] == kit, "the host puts a kit in")
+	_check(is_equal_approx(cart.mass, mass + 0.5) and World.items.history(kit)["holder"] == "",
+			"the cart is heavier by it (%.1f), and carries it as a place, not a carrier" % cart.mass)
+	var away := cart.tile + (cart.tile - host.tile) * 2
+	if World.is_free(away):
+		World._relocate(cart, away)
+		_check(not World.reaches(host, cart) and cart.slot_items[2] == kit, "pushed off two cells, it is out of reach, the kit still in it")
+		World._relocate(cart, spot)
+	_main.pack_panel.player = host
+	_main._toss_target = cart
+	_main._toss_from = _main.get_global_mouse_position()
+	_main._release_toss(host)
+	_check(_main.pack_panel.other == cart and _main.pack_panel.title_shown(false) == "Cart",
+			"a plain right click on it beside you opens it: \"%s\"" % _main.pack_panel.title_shown(false))
+	_main.close_other()
+	var held := cart.contents_uids()
+	var at := cart.tile
+	World.damage(cart, 1000, host, &"impact")
+	var lying: Array = []
+	for cell: Vector2i in World.zone.ground:
+		lying.append_array(Array(World.ground_uids(cell)))
+	_check(not is_instance_valid(cart) or not cart.spawned, "broken, the cart is gone")
+	_check(held.size() == 3 and held.all(func(uid: int) -> bool: return uid in lying),
+			"and what it held lies on the ground at %s, the same things (%s)" % [at, held])
+	for uid: int in held:
+		for cell: Vector2i in World.zone.ground.keys():
+			var index := Array(World.ground_uids(cell)).find(uid)
+			if index >= 0:
+				World.items.end(World.take_from_ground(cell, index), "gone")
+	var box := _main._spawn({"script": Level.CARGO, "shape": "cube", "name": "TestCrate", "tile": spot,
+		"props": {"capacity": 4, "slots": [KIT]}}) as Cargo
+	var emptied := World.empty_container(box)
+	_check(emptied.size() == 1 and World.items.id_of(emptied[0]) == KIT and box.slots[0] == "" and World.items.at_of(emptied[0]) == "",
+			"emptied at once (the stockpile's way): its kit's uid, the crate empty")
+	World.items.end(emptied[0], "gone")
+	World.despawn(box)
 
 
 func _test_restart() -> void:

@@ -73,6 +73,8 @@ static func build(spec: Dictionary) -> GridEntity:
 	var props: Dictionary = spec.get("props", {})
 	for property: String in props:
 		entity.set(property, props[property])
+	if entity.has_method("fit_slots"):
+		entity.fit_slots()  # A chest's or a container's contents, to its size.
 
 	entity.owner_peer = int(spec.get("peer", 0))
 	entity.zone = str(spec.get("zone", ""))
