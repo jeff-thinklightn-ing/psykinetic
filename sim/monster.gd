@@ -176,6 +176,8 @@ var _glancing := false
 var _route_index := 0
 var _route_step := 1
 var _sits := false
+## Woken, it idles from this tick on (_woke_up).
+var _idle_from := 0
 ## The way it is walking as it idles, and where to (_idle_step).
 var _idle_path: Array[Vector2i] = []
 var _idle_path_to := NO_TILE
@@ -497,6 +499,8 @@ func _listen() -> void:
 func _idle_tick() -> void:
 	if not idling or idle == Idle.NONE or World.is_stunned(self) or World.tick < next_move_tick 			or World.tick < _listening_until:
 		return
+	if World.tick < _idle_from and not _returning:
+		return  # Just woken: in a moment of its own.
 	move_ticks = _pace * IDLE_PACE
 	if _returning:
 		var back := _back_to()
@@ -734,6 +738,15 @@ func _idle_step(to: Vector2i, max_tiles := IDLE_SEARCH_TILES) -> bool:
 		return true
 	_idle_path.clear()
 	return false
+
+
+## It thinks again after not thinking at all (World._tier: out of FAR, or
+## its zone woken): its idling (a stroll, a glance, its loop) starts after
+## a moment of its own, up to World.WAKE_SPREAD_TICKS, so a crowd woken
+## together does not all choose and plan on one tick. Its looking out and
+## fighting start at once.
+func _woke_up() -> void:
+	_idle_from = World.tick + id % World.WAKE_SPREAD_TICKS
 
 
 ## The world tick (far from everyone, or its zone asleep): [param seconds]

@@ -67,6 +67,7 @@ const NEAR_TILES := 16
 const MID_TILES := 60
 const MID_EVERY_TICKS := 4
 const TIER_EVERY_TICKS := 5
+const WAKE_SPREAD_TICKS := 20
 ## The world tick: every so many steps, every zone, awake or asleep, moves
 ## its far monsters (all of them, asleep) on by that much time in one go
 ## (Monster._world_tick: real walks at their pace, no hits). It runs with
@@ -439,6 +440,11 @@ func _is_awake(each: Zone) -> bool:
 ## each monster as near as it is to whoever came.
 func _woke(each: Zone, seconds: float) -> void:
 	print("[zone] %s wakes after %.0f s asleep" % [each.name, seconds])
+	# Every monster's tier looked at afresh, so those near whoever came wake
+	# in turn (_tier).
+	for entity in each.entities if each != zone else _entities:
+		if entity is Monster:
+			entity.tier_tick = -1
 
 
 ## One tick of the zone World is in.
@@ -497,7 +503,9 @@ func _thinks(entity: GridEntity, near: Array[Vector2i]) -> bool:
 
 ## [param entity]'s tier (a monster's), looked at again every
 ## TIER_EVERY_TICKS, staggered by id; NEAR in a fight or with nobody to
-## measure from.
+## measure from. One that comes out of FAR (or is looked at the first time)
+## is woken (Monster._woke_up), so a crowd that someone's arrival brings
+## near starts idling over WAKE_SPREAD_TICKS, not all on one tick.
 func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	var monster := entity as Monster
 	if near.is_empty() or monster.target != null:
@@ -510,8 +518,11 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	var nearest := MID_TILES + 1
 	for at in near:
 		nearest = mini(nearest, distance(entity.tile, at))
+	var was: int = monster.tier if monster.tier_tick >= 0 else Tier.FAR
 	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
 	monster.tier_tick = tick
+	if was == Tier.FAR and monster.tier != Tier.FAR:
+		monster._woke_up()  # Thinking again: its idling starts in turn.
 	return monster.tier as Tier
 
 

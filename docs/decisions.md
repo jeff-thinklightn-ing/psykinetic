@@ -2806,3 +2806,22 @@ is parsed on the server, so a client needs nothing new. Shouting is not a
 command: a line in capitals carries farther to monsters (223), not to
 people.
 
+## 229. A crowd woken together starts idling in turn
+
+Players arriving bring hundreds of monsters out of FAR at once (193,
+215), and every one, its idle timers long run out, chose a spot, worked
+out a loop or planned a way on the same tick. One whose tier comes out of
+FAR, or is worked out the first time, or whose zone wakes (World._woke
+has every tier looked at afresh), is woken (Monster._woke_up): its idling
+starts WAKE_SPREAD_TICKS (20) at most later, a moment of its own by id.
+Looking out and fighting start at once: nothing reacts later for it, and
+one on its way back from a fight goes on.
+
+tools/map_bench, 256x256 at castle density, 200 ticks from the start:
+16 players 27.7 ms on average to 25.4, the worst 48 to 44; 4 players 16 to
+19 to 14 to 18, the worst 30 to 37 to 29 (one run had a lone 72). What is
+left of the start is work done once a run: patrollers working out their
+loops (210, eight a step) and doors opened the first time (their light);
+loops are kept and doors stay open, so a server that has run a while
+sees little of it. Rejected for now: working loops out at zone load on
+the pool (worth it if fresh areas still spike in play).

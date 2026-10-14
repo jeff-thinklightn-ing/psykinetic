@@ -506,6 +506,12 @@ func _test_tiers() -> void:
 	var mid: Monster = imps[1]
 	var far: Monster = imps[2]
 	var homes: Array = imps.map(func(m: Monster) -> Vector2i: return m.tile)
+	World.step()
+	var woke_at := World.tick
+	_check(near._idle_from == woke_at + near.id % World.WAKE_SPREAD_TICKS and mid._idle_from >= woke_at
+			and mid._idle_from < woke_at + World.WAKE_SPREAD_TICKS + World.TIER_EVERY_TICKS and far._idle_from == 0,
+			"woken by someone near, each idles from a moment of its own (%d, %d after %d); the far one is not woken" % [
+			near._idle_from, mid._idle_from, woke_at])
 	var moved := [0, 0, 0]
 	var thought := [0, 0, 0]
 	var origins := World._tier_origins()

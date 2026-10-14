@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.137
+
+Client and server.
+
+- Fewer stalls when players arrive somewhere busy: monsters that notice
+  someone nearby start strolling about a moment apart, not all at once.
+
+The server must be updated to v0.1.137 too, as it refuses any other version.
+
 ## v0.1.136
 
 Client and server.
