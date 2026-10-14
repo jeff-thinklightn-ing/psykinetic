@@ -1948,3 +1948,17 @@ frame, the view hidden or not; measured by turning each part off:
 256x256: 25 ms a frame to 4.3. Rejected: MultiplayerSynchronizer
 delta_interval (it slowed the frame), and updating far puppets in turn
 (their state would go stale out of order; a far one is not seen or heard).
+
+## 186. Releases land on main from any worktree
+
+Performance work moved to a worktree of its own (branch perf) while other
+sessions work in the main checkout, which often holds their edits in
+progress. Only main is released, one tested change at a time, as before:
+a worktree's change is rebased onto origin/main, tested, committed, and
+released from the worktree. tools/release_client.ps1 checks first that
+the commit has origin/main in it and that the tag is free on origin, and
+pushes the release to origin's main (HEAD:main): a fast-forward, so a
+release another session pushed meanwhile makes it fail, not overwrite;
+rebase and release again. Rejected: a perf branch merged now and then
+(server and client must be on one version, so unreleased work waits, and
+the sessions edit the same files, client3d.gd among them).

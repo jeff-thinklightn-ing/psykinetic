@@ -4,14 +4,20 @@
 #
 # Order of work, so a missing tool never leaves a half-done release:
 #   1. checks: Godot runs, the Windows export templates are installed, the
-#      tree is clean, the tag is free            (nothing touched yet)
+#      tree is clean, this commit has origin's main in it, the tag is free
+#      on origin too                              (nothing touched yet)
 #   2. write version.txt, export the "Windows Client" preset to build\client\,
 #      bundle launch.bat, update.ps1, settings.example.cfg, README.txt and
 #      version.txt, zip to build\psykinetic-client-v<version>.zip
 #      (a failure here puts version.txt back)
 #   3. commit "Release v<version>" and tag it
-#   4. with gh: push the commit and tag, create the GitHub release with the
-#      top CHANGELOG.md section as notes; without gh: print the manual steps
+#   4. with gh: push the commit to main and the tag, create the GitHub
+#      release with the top CHANGELOG.md section as notes; without gh: print
+#      the manual steps
+# A release always lands on main, from main or from any branch or worktree
+# (the perf worktree's branch, say): its commit goes to origin's main as a
+# fast-forward, so rebase onto origin/main first; a release another session
+# pushed meanwhile makes the push fail, not overwrite.
 # Nothing in the zip carries a token or address.
 param(
 	[string]$Version = ''
@@ -48,6 +54,15 @@ if (-not (Test-Path $template)) {
 if (git status --porcelain) {
 	Fail 'the working tree is not clean; commit or stash first'
 }
+# Releases land on origin's main (step 4): this commit must have it in it,
+# and the tag must be free there too. (git reports on stderr; under 'Stop'
+# that would abort, as at the push.)
+$ErrorActionPreference = 'Continue'
+git fetch -q origin main --tags
+if ($LASTEXITCODE -ne 0) { Fail 'git fetch origin failed' }
+git merge-base --is-ancestor origin/main HEAD
+if ($LASTEXITCODE -ne 0) { Fail 'this commit does not have origin/main in it: rebase onto origin/main first' }
+$ErrorActionPreference = 'Stop'
 $current = (Get-Content version.txt -Raw).Trim()
 if ($Version -eq '') {
 	$parts = $current.Split('.')
@@ -119,8 +134,8 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 	# git and gh report progress on stderr; under 'Stop' that would abort a
 	# push that succeeded. Only the exit codes matter here.
 	$ErrorActionPreference = 'Continue'
-	git push
-	if ($LASTEXITCODE -ne 0) { Fail 'git push failed' }
+	git push origin HEAD:main
+	if ($LASTEXITCODE -ne 0) { Fail 'git push origin HEAD:main failed (main moved on? rebase onto origin/main and release again)' }
 	git push origin $tag
 	if ($LASTEXITCODE -ne 0) { Fail "git push origin $tag failed" }
 	gh release create $tag $zip --title $tag --notes-file $notes
@@ -130,7 +145,7 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 } else {
 	Write-Output ''
 	Write-Output 'gh is not installed. To publish by hand:'
-	Write-Output "  git push && git push origin $tag"
+	Write-Output "  git push origin HEAD:main && git push origin $tag"
 	Write-Output "  then on GitHub: Releases > Draft a new release > tag $tag, title $tag,"
 	Write-Output "  attach $zip, and paste the notes from $notes"
 }
