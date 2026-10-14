@@ -34,13 +34,15 @@ check() {
 	fi
 }
 count() { grep -cE "$1" "$2" 2>/dev/null || true; }
+# The snapshot format's version, as net/snapshot.gd writes it.
+VERSION=$(sed -n 's/^const VERSION := \([0-9]*\).*$/\1/p' net/snapshot.gd)
 
 # 1. Fresh start: the host walks three tiles west, pushing Crate1 to (7, 2).
 run_host first --test-move=-3,0 --test-exit-after=5
 check "$(count 'no snapshot at' "$DIR/first.log")" 1 "first run finds no snapshot and starts fresh"
 check "$(count 'tiles: .*Crate1=\(7, 2\)' "$DIR/first.log")" 1 "first run ends with Crate1 pushed to (7, 2)"
 check "$([ -s "$STATE" ] && echo yes || echo no)" yes "snapshot file was written"
-check "$(count '"version": 1' "$STATE")" 1 "snapshot carries version 1"
+check "$(count "\"version\": $VERSION" "$STATE")" 1 "snapshot carries version $VERSION"
 # Keys are sorted, so an entry runs from its "name" to its "type"; the tile
 # is pretty-printed as "tile": [ then 7, then 2 on their own lines.
 crate_tile=$(sed -n '/"name": "Crate1"/,/"type": "pushable"/p' "$STATE" | grep -A2 '"tile"' | grep -cE '^[[:space:]]*7,$' || true)
@@ -70,7 +72,7 @@ run_host third --test-exit-after=2
 check "$(count 'does not parse.*starting fresh' "$DIR/third.log")" 1 "a corrupt snapshot is logged and ignored"
 check "$(count 'tiles: .*Crate1=\(8, 2\)' "$DIR/third.log")" 1 "and the room is generated fresh (Crate1 back at (8, 2))"
 check "$(count 'tiles: .*Player1=\(11, 2\)' "$DIR/third.log")" 1 "with the host at a start tile"
-check "$(count '"version": 1' "$STATE")" 1 "the corrupt file was replaced by a good snapshot on exit"
+check "$(count "\"version\": $VERSION" "$STATE")" 1 "the corrupt file was replaced by a good snapshot on exit"
 check "$(cat "$DIR"/*.err 2>/dev/null | wc -l | tr -d ' ')" 0 "no run printed errors"
 
 echo
