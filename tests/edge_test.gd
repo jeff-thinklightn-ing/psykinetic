@@ -344,7 +344,8 @@ func _compare_lines(terrain: Dictionary) -> Dictionary:
 					out["ask"] += 1
 				elif round == 0 and not owed.is_empty():
 					out["through"] += 1
-				if owed is int and World.has_clear_line(source, lines["cells"][k]) 						or owed is Array and Fields._all_open(World, owed):
+				if owed is int and World.has_clear_line(source, lines["cells"][k]) \
+						or owed is Array and Fields._all_open(World, owed):
 					cached[lines["cells"][k]] = true
 			for cell in Fields._reachable(source, reach):
 				var walked := cell == source or World.has_clear_line(source, cell)

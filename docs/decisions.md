@@ -3034,3 +3034,32 @@ only that a .blend has its .glb beside it. Rejected: the drop tool writing
 the slot's source into slots.json (rewriting the hand-kept JSON would lose
 its layout; the check says the exact line to add), and Blender's own
 validation add-on (it knows nothing of slots).
+
+## 234. The act phase passes over a monster that is not on its turn
+
+With many players a tick went through some 1600 monsters, and asked each
+three things (is it alive, is it stunned, is it its turn) by call before
+finding most were not on their turn: one in four ticks for MID (215), none
+for FAR. The act loop now reads the tier a monster has (World._tier's,
+kept TIER_EVERY_TICKS) and passes over one that is not on its turn,
+without a call, when that tier is not due to be looked at again this tick
+and it has no target: the same answer _thinks would give. Monsters say
+they are tiered (GridEntity.tiered).
+
+## 235. On nobody's screen an idler walks only straight
+
+Beyond World.VIEW_TILES (30) of every player and companion a monster is on
+nobody's screen: the view reaches 24 to 28 at its widest (maps measured it).
+Idling there (a stroll, a patrol leg, back to its post or its place at a
+gathering) it walks only by straight steps (218's _direct_step) and never
+plans a way: blocked, it waits or goes elsewhere, as idling does when there
+is no way, and a stroll takes only a spot it can walk to straight. Still
+real steps at its pace, no jumps. Walking back after a fight keeps its
+searches, and so does anything that is not idling (a monster hunting).
+
+The two, tools/map_bench at 256x256 and castle density over 600 ticks:
+16 players 25.4 to 28.3 ms on average (v0.1.137) to 20.4 to 20.9, the
+worst 47 to 88 to 36 to 39; 4 players 12.6 to 14.4 to 8.9 to 9.7. Full rate
+out to 28 cells (Jeff's ask, so that what is on a screen walks at its
+pace) costs about 7 ms with 16 players (26.6 to 29.7); his choice between
+that, a closer zoom, or 16 is open, NEAR_TILES stays 16 till then.

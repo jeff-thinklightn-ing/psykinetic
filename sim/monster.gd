@@ -185,6 +185,9 @@ var _idle_path_to := NO_TILE
 ## not yet). World's.
 var tier := 0
 var tier_tick := -1
+## Beyond World.VIEW_TILES of everyone when its tier was worked out: on
+## nobody's screen. World's.
+var beyond_view := false
 ## The World.steps of its last world tick (-1: none yet), and whether one
 ## is queued for it. World's.
 var world_step := -1
@@ -200,6 +203,7 @@ func _init() -> void:
 	strength = 6
 	max_stamina = 60
 	attack_ticks = 10
+	tiered = true
 	# Its pace changes as it charges and as it idles; a client slides its
 	# steps by it.
 	replicate("move_ticks")
@@ -542,7 +546,7 @@ func _back_to() -> Vector2i:
 ## a moment, then back.
 func _guard() -> void:
 	if tile != home:
-		if not _idle_step(home):
+		if not _idle_step(home, IDLE_SEARCH_TILES, beyond_view):
 			_idle_until = World.tick + PATROL_PAUSE_TICKS.y  # Someone is on it: wait.
 		return
 	if World.tick < _idle_until:
@@ -571,7 +575,7 @@ func _wander() -> void:
 		if _idle_goal == NO_TILE:
 			_idle_until = World.tick + WANDER_PAUSE_TICKS.x
 			return
-	if not _idle_step(_idle_goal, _about_search(wander_radius)):
+	if not _idle_step(_idle_goal, _about_search(wander_radius), beyond_view):
 		_idle_goal = NO_TILE
 		_idle_until = World.tick + WANDER_PAUSE_TICKS.x
 
@@ -587,6 +591,8 @@ func _wander_goal() -> Vector2i:
 		if _straight(tile, at, wander_radius * 2 + 2):
 			_idle_path.clear()  # It walks there straight (_idle_step).
 			return at
+		if beyond_view:
+			continue  # On nobody's screen: a spot it can walk to straight, or none.
 		var path := World.find_path(tile, at, false, null, _about_search(wander_radius))
 		if not path.is_empty():
 			# The way there is the walk's first plan (_idle_step).
@@ -603,7 +609,8 @@ func _wander_goal() -> Vector2i:
 static func _direct_step(from: Vector2i, to: Vector2i, now: bool) -> Vector2i:
 	var toward := Vector2i(signi(to.x - from.x), signi(to.y - from.y))
 	for direction: Vector2i in [toward, Vector2i(toward.x, 0), Vector2i(0, toward.y)]:
-		if direction != Vector2i.ZERO and World.terrain_step_open(from, direction) 				and (not now or World.is_free(from + direction)):
+		if direction != Vector2i.ZERO and World.terrain_step_open(from, direction) \
+				and (not now or World.is_free(from + direction)):
 			return direction
 	return Vector2i.ZERO
 
@@ -635,7 +642,7 @@ func _patrol() -> void:
 	if route.size() < 2 or World.tick < _idle_until:
 		return
 	var to := route[_route_index]
-	if tile == to or not _idle_step(to):
+	if tile == to or not _idle_step(to, IDLE_SEARCH_TILES, beyond_view):
 		# There (or no way there now: on to the next).
 		if route_loop:
 			_route_index = (_route_index + 1) % route.size()
@@ -679,7 +686,7 @@ func _gather() -> void:
 		return
 	if tile != place:
 		pose = Pose.STAND
-		if not _idle_step(place):
+		if not _idle_step(place, IDLE_SEARCH_TILES, beyond_view):
 			_idle_goal = NO_TILE  # Taken or cut off: another place.
 			_idle_until = World.tick + PATROL_PAUSE_TICKS.y
 		return
@@ -716,19 +723,25 @@ func _gather_place() -> Vector2i:
 
 ## A step toward [param to] as it idles, looking at [param max_tiles] at
 ## most for the way (a stroll's spot, near, less); false if there is no way.
+## With [param straight_only] (idling on nobody's screen) only a straight
+## step, never a search: false if that is shut, and it waits or goes
+## elsewhere, as idling does when there is no way.
 ## Straight toward it when it can (_direct_step); else by a planned way,
 ## kept from step to step (_idle_path) and planned again only when the next
 ## step on it is taken, it is somewhere else (pushed, moved on by the world
 ## tick) or the goal has changed: planning at every step was most of what
 ## idling cost.
-func _idle_step(to: Vector2i, max_tiles := IDLE_SEARCH_TILES) -> bool:
-	if _idle_path.is_empty() or _idle_path_to != to or World.distance(tile, _idle_path[0]) != 1 			or not World.is_free(_idle_path[0]):
+func _idle_step(to: Vector2i, max_tiles := IDLE_SEARCH_TILES, straight_only := false) -> bool:
+	if _idle_path.is_empty() or _idle_path_to != to or World.distance(tile, _idle_path[0]) != 1 \
+			or not World.is_free(_idle_path[0]):
 		# Straight there if it can (most idle walks are a few tiles over open
 		# floor): a few looks, where planning the way is a search.
 		var direct := _direct_step(tile, to, true)
 		if direct != Vector2i.ZERO:
 			_idle_path.clear()
 			return World.try_move(self, direct)
+		if straight_only:
+			return false  # Out of everyone's view: it waits, or goes elsewhere.
 		_idle_path = World.find_path(tile, to, false, null, max_tiles)
 		_idle_path_to = to
 		if _idle_path.is_empty():

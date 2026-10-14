@@ -311,6 +311,8 @@ func _exit_tree() -> void:
 ## ever move when moved (a crate, a chest), which World's act phase then
 ## passes over without asking.
 var acts := true
+## Whether World thinks for it by tier (World.Tier): a monster.
+var tiered := false
 
 
 ## One sim step. Called by World on the server, in ascending id order. Decide

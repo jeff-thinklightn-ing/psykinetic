@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_roster()
 	_test_tiers()
 	_test_world_tick()
+	_test_straight_beyond_view()
 	_test_plans_per_step()
 	_test_walk_round_held_ground()
 	_test_sight_cone()
@@ -523,6 +524,8 @@ func _test_tiers() -> void:
 		origins = World._tier_origins()
 		for j in 3:
 			moved[j] = maxi(moved[j], World.distance(homes[j], imps[j].tile))
+	_check(not near.beyond_view and mid.beyond_view, "beyond %d tiles of everyone (the mid one at %d), on nobody's screen" % [
+			World.VIEW_TILES, World.distance(mid.tile, player.tile)])
 	_check([near.tier, mid.tier, far.tier] == [World.Tier.NEAR, World.Tier.MID, World.Tier.FAR],
 			"near, mid and far by distance (%s)" % [[near.tier, mid.tier, far.tier]])
 	_check(thought[0] == 400 and absi(thought[1] * World.MID_EVERY_TICKS - 400) <= World.MID_EVERY_TICKS and thought[2] == 0,
@@ -538,6 +541,20 @@ func _test_tiers() -> void:
 	_build(["#####", "#.i.#", "#####"])
 	_check(World._tier_origins().is_empty() and World._thinks(World.monsters()[0], []),
 			"a room nobody has stood in thinks at the full rate")
+
+
+func _test_straight_beyond_view() -> void:
+	print("
+== on nobody's screen an idler walks only straight; on someone's it finds a way round ==")
+	var e := _build(["#######", "#..#..#", "#.i#..#", "#.....#", "#######"])
+	var imp: Monster = e["i"][0]
+	var goal := Vector2i(4, 2)
+	var from := imp.tile
+	_check(not imp._idle_step(goal, Monster.IDLE_SEARCH_TILES, true) and imp.tile == from,
+			"straight at a wall, out of view: it does not search, it waits (%s)" % [imp.tile])
+	imp.next_move_tick = 0
+	_check(imp._idle_step(goal, Monster.IDLE_SEARCH_TILES, false) and imp.tile != from,
+			"in someone's view: a way round the wall (%s)" % [imp.tile])
 
 
 func _test_world_tick() -> void:

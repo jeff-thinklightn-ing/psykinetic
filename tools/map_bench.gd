@@ -206,7 +206,8 @@ func _frames() -> void:
 		last = now
 		frames += 1
 		draws = maxf(draws, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
-		render_cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport) 				+ RenderingServer.get_frame_setup_time_cpu()
+		render_cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport) \
+				+ RenderingServer.get_frame_setup_time_cpu()
 		render_gpu += RenderingServer.viewport_get_measured_render_time_gpu(viewport)
 	var elapsed := (Time.get_ticks_usec() - started) / 1000000.0
 	print("BENCH frames: %.1f fps avg, worst frame %.1f ms, draw calls up to %d, objects in frame %d, video memory %.0f MB" % [
@@ -281,7 +282,8 @@ func _layout() -> Image:
 				# The share of spots kept for cells_per_monster (all of them by default).
 				var keep := 1.0 if cells_per_monster <= 0.0 else ROOM * ROOM / cells_per_monster / monsters
 				for m in monsters:
-					if at == Vector2i(1 + (m * 3) % 6, 5 + m / 2 % 2) 							and absi(hash(Vector3i(x, y, m + 100))) % 1000 < keep * 1000.0:
+					if at == Vector2i(1 + (m * 3) % 6, 5 + m / 2 % 2) \
+							and absi(hash(Vector3i(x, y, m + 100))) % 1000 < keep * 1000.0:
 						meaning = kinds[absi(hash(Vector3i(x, y, m))) % kinds.size()]
 			image.set_pixel(x * 2, y * 2, colour.call(meaning))
 			# Ground-coloured filler east and south, so the picture reads.

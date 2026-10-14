@@ -68,6 +68,10 @@ const MID_TILES := 60
 const MID_EVERY_TICKS := 4
 const TIER_EVERY_TICKS := 5
 const WAKE_SPREAD_TICKS := 20
+## Beyond this many tiles of every player and companion a monster is on
+## nobody's screen (the view's widest reach is 24 to 28): idling there it
+## walks only straight (Monster._idle_step), with no search for a way.
+const VIEW_TILES := 30
 ## The world tick: every so many steps, every zone, awake or asleep, moves
 ## its far monsters (all of them, asleep) on by that much time in one go
 ## (Monster._world_tick: real walks at their pace, no hits). It runs with
@@ -462,6 +466,13 @@ func _step_zone() -> void:
 	var near := _tier_origins()
 	_take_roster()
 	for entity in _actors:
+		# Not its turn by the tier it has, and that tier not due to be
+		# looked at again: passed over here, without a call (most of a
+		# crowded map's monsters, most ticks). The same answer as _thinks.
+		if entity.tiered and entity.tier_tick >= 0 and tick - entity.tier_tick < TIER_EVERY_TICKS \
+				and (tick + entity.id) % TIER_EVERY_TICKS != 0 and entity.target == null \
+				and (entity.tier == Tier.FAR or entity.tier == Tier.MID and (tick + entity.id) % MID_EVERY_TICKS != 0):
+			continue
 		# A stunned entity skips its turn; its orders wait for it.
 		if _alive(entity) and not is_stunned(entity) and _thinks(entity, near):
 			entity._sim_tick()
@@ -514,6 +525,7 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	if near.is_empty() or monster.target != null:
 		monster.tier = Tier.NEAR
 		monster.tier_tick = tick
+		monster.beyond_view = false
 		return Tier.NEAR
 	if monster.tier_tick >= 0 and tick - monster.tier_tick < TIER_EVERY_TICKS \
 			and (tick + entity.id) % TIER_EVERY_TICKS != 0:
@@ -524,6 +536,7 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	var was: int = monster.tier if monster.tier_tick >= 0 else Tier.FAR
 	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
 	monster.tier_tick = tick
+	monster.beyond_view = nearest > VIEW_TILES
 	if was == Tier.FAR and monster.tier != Tier.FAR:
 		monster._woke_up()  # Thinking again: its idling starts in turn.
 	return monster.tier as Tier
