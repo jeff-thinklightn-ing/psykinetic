@@ -176,7 +176,14 @@ All of it is optional.
   its place at the point) and goes on.
 - `spawn_points`: named cells where a link into this map can arrive.
 - `links`: one per link marker, `to_map` the level to load and
-  `to_spawn` the spawn point there ("" for its first start).
+  `to_spawn` the spawn point there ("" for its first start); `"one_way":
+  true` for a link with no way back on purpose (a drop, a trapdoor), so the
+  world map's check does not flag it.
+- `neighbours`: the level across each map edge, `{"east": "wilds"}`: walk
+  off the east edge and arrive at the west edge of wilds at the same row
+  (north and south keep the column). The neighbour names this level on its
+  opposite side. (For now only the world map reads it; walking across is
+  not built yet.)
 
 ## Level links
 
@@ -189,6 +196,28 @@ is in its top-left corner, (1, 1), to the sample; the sample's leads back.
 Its second, at the dead end of the south-east corridor, (30, 34), goes to
 `levels/castle` ("The Castle"), arriving at (26, 13) beside the castle's
 own link at (27, 12), which comes back to (30, 33).
+
+## The world map
+
+`WorldMap.build()` (`sim/world_map.gd`) reads every level (`Level.names()`:
+the folders under `levels/`, prefabs left out) into one graph: the areas,
+and the ways between them, point links and neighbours alike. Its
+`problems()` lists what is wrong with how they connect:
+
+- a link or neighbour to a level that does not exist, or to a spawn point
+  the level does not have;
+- a way with no way back (unless the link says `"one_way": true`), and a
+  neighbour the other level does not name back on its opposite side;
+- a cell level.json holds that is off the map (the cells are the ones a
+  resize moves, `LevelMap.moved_config`), and a spawn point or start on no
+  floor;
+- an area that cannot be reached from the default map, or has no way back
+  to it;
+- the level's own load warnings (a link off its marker, a marker with no
+  link).
+
+`godot --headless --path . --scene res://tools/check_world.tscn` prints the
+list (exit code 1 if there is anything on it).
 
 ## The level editor
 

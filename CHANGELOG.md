@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.121
+
+Client and server.
+
+- No change in play. Under the hood, one map of every area and the ways
+  between them, checked as the game is built: a link with no way back, a
+  missing arrival point or an area nobody can reach is caught before it
+  ships. The groundwork for walking straight off one map onto the next.
+
+The server must be updated to v0.1.121 too, as it refuses any other version.
+
 ## v0.1.120
 
 Client and server.

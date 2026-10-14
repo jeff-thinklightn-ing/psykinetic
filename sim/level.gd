@@ -11,7 +11,8 @@ extends RefCounted
 ##                level n = grey n * 40 (0..240), 0..6 levels.
 ##   level.json   name; legend overrides; the entities' names and props by
 ##                tile (a monster's facing and idling too); the start order;
-##                named spawn points; level links.
+##                named spawn points; level links; neighbours (the level
+##                across each map edge).
 ##
 ## A cell pixel is ground (stone, grass, dirt), fire, water, a stair, void
 ## (also any pixel more than half transparent), or a marker: a player start,
@@ -26,7 +27,7 @@ extends RefCounted
 ## no wall: nothing is built along it, and sight passes over it.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
-## links, centre, warnings}; terrain is what World.load_terrain and the
+## links, neighbours, centre, warnings}; terrain is what World.load_terrain and the
 ## views take: floor, fire, edges (as Terrain.parse), and kinds (cell ->
 ## "stone" | "grass" | "dirt"), water, heights (cell -> 1..6; 0 is left
 ## out), stairs (cell -> the direction it climbs), torches.
@@ -68,6 +69,10 @@ const LEGEND := {
 const GROUNDS: Array[String] = ["stone", "grass", "dirt"]
 const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "torch", "lantern", "link"]
 ## level.json "north": which way in layout.png is north.
+## Map edges a level can have a neighbour across (level.json "neighbours"),
+## each the way off the map it is.
+const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
+const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## What a marker spawns, before level.json's props for that tile.
 ## Each kind fights its own way too (Monster.TACTICS): the brute plods and
@@ -107,31 +112,44 @@ static func exists(level_name: String) -> bool:
 	return _registered.has(level_name) or ResourceLoader.exists(DIR + level_name + "/layout.png")
 
 
+## Every level in the game: the folders under levels/ with a layout.png
+## (prefabs left out; not the levels made in code), sorted.
+static func names() -> Array[String]:
+	var out: Array[String] = []
+	for folder in ResourceLoader.list_directory(DIR):
+		var level_name := folder.trim_suffix("/")
+		if folder.ends_with("/") and level_name != "prefabs" and ResourceLoader.exists(DIR + level_name + "/layout.png"):
+			out.append(level_name)
+	out.sort()
+	return out
+
+
+## What level [param level_name] is made of: {layout: Image or null,
+## height: Image or null, config: Dictionary}, from the levels made in code
+## or the folder. Warns when level.json is not a JSON object.
+static func source(level_name: String) -> Dictionary:
+	if _registered.has(level_name):
+		return _registered[level_name]
+	var folder := DIR + level_name + "/"
+	var config := {}
+	if FileAccess.file_exists(folder + "level.json"):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json"))
+		if parsed is Dictionary:
+			config = parsed
+		else:
+			push_warning("[level] %slevel.json is not a JSON object" % folder)
+	return {"layout": _image(folder + "layout.png"), "height": _image(folder + "height.png"), "config": config}
+
+
 ## Reads level [param level_name] (see the class doc). {} with a warning
 ## printed when there is none.
 static func load_level(level_name: String) -> Dictionary:
-	var layout: Image = null
-	var height: Image = null
-	var config := {}
-	if _registered.has(level_name):
-		var made: Dictionary = _registered[level_name]
-		layout = made["layout"]
-		height = made["height"]
-		config = made["config"]
-	else:
-		var folder := DIR + level_name + "/"
-		layout = _image(folder + "layout.png")
-		height = _image(folder + "height.png")
-		if FileAccess.file_exists(folder + "level.json"):
-			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json"))
-			if parsed is Dictionary:
-				config = parsed
-			else:
-				push_warning("[level] %slevel.json is not a JSON object" % folder)
+	var made := source(level_name)
+	var layout: Image = made["layout"]
 	if layout == null:
 		push_warning("[level] no level %s (%slayout.png)" % [level_name, DIR + level_name + "/"])
 		return {}
-	var level := parse(layout, height, config)
+	var level := parse(layout, made["height"], made["config"])
 	level["name"] = level_name
 	for warning: String in level["warnings"]:
 		push_warning("[level] %s: %s" % [level_name, warning])
@@ -425,17 +443,38 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 			if at == null or at not in link_tiles:
 				warnings.append("a level link in level.json is not on a link marker (%s)" % [entry])
 				continue
-			links.append({"tile": at, "to_map": str(entry.get("to_map", "")), "to_spawn": str(entry.get("to_spawn", ""))})
+			links.append({"tile": at, "to_map": str(entry.get("to_map", "")), "to_spawn": str(entry.get("to_spawn", "")),
+					"one_way": bool(entry.get("one_way", false))})
 	for at in link_tiles:
 		if links.all(func(link: Dictionary) -> bool: return link["tile"] != at):
 			warnings.append("the link marker at %s goes nowhere (no entry in level.json \"links\")" % at)
 	var centre: Variant = _tile(config.get("centre"))
+	level["neighbours"] = neighbours_from(config, warnings)
 	level["entities"] = entities
 	level["starts"] = starts
 	level["spawn_points"] = spawn_points
 	level["links"] = links
 	level["centre"] = centre if centre != null else starts[0] if not starts.is_empty() else Vector2i.ZERO
 	level["display_name"] = str(config.get("name", ""))
+
+
+## level.json's "neighbours", {side: map name} ("east": "wilds": walk off
+## the east edge, arrive at the west edge of wilds at the same row), with
+## sides that are not north, east, south or west said in [param warnings].
+static func neighbours_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, String]:
+	var out: Dictionary[String, String] = {}
+	var listed: Variant = config.get("neighbours", {})
+	if not listed is Dictionary:
+		warnings.append("\"neighbours\" in level.json is not an object")
+		return out
+	for side: Variant in listed:
+		if not SIDES.has(str(side)):
+			warnings.append("\"neighbours\" has a side %s: north, east, south or west" % [side])
+			continue
+		var to := str(listed[side])
+		if not to.is_empty():
+			out[str(side)] = to
+	return out
 
 
 static func _spawns(marker: String) -> bool:

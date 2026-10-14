@@ -2098,3 +2098,23 @@ cell (outdoors one is drawn as a tree), so a grove and a scattered tree
 need no new cell type; a fence is a wall, drawn as a castle wall until
 there is a fence edge kind, which needs the sim and the 3D view and is left
 for later.
+
+## 194. The world map is read from the levels, not kept beside them
+
+`WorldMap.build()` (`sim/world_map.gd`) makes the graph of areas and ways
+from every level's own files each time it is asked: a level is a node, a
+point link (`links`) or an edge link (`neighbours`, a side and a level) is
+an edge. There is no world file to fall out of step with level.json, and
+renaming or adding a level needs nothing else edited. It needs no scene or
+GUI, so the editor's node map, the builder's new area at an edge and the
+world tick's routing all take the same graph. Its `problems()` is the one
+connectivity check (the level test's own link check now calls it): a way
+to no level or to a missing spawn point, a way with no way back, a
+neighbour not named back on the opposite side, cells in level.json off the
+map (the cells `LevelMap.moved_config` moves, so a new kind of cell there
+is checked too), spawn points and starts on no floor, and areas that cannot
+be reached from the default map or have no way back to it. A link with no
+way back on purpose says `"one_way": true`. Rejected: a separate
+`levels/world.json` listing areas and links, which would repeat what each
+level.json already holds; and checking only that a link's target exists,
+which misses dead ends a player can walk into and not out of.
