@@ -1825,3 +1825,32 @@ hiding them stays faded for 0.4 s (FADE_HOLD), so walking along a wall,
 its pieces handing over one to the next, does not flicker. What hides
 them is worked out when the camera or they move (the camera's position is
 in the key now, so a pan counts); the hold is checked every frame.
+
+## 181. Monsters cost the tick in proportion to their number
+
+Bigger maps are next, and tools/map_bench (a square dungeon of 8x8 rooms,
+each with a door in each wall, a torch, a crate and two monsters) showed
+the tick growing faster than the monsters: 193 entities 9.7 ms, 769
+88 ms, 3073 1285 ms (a tick is 100 ms). Two things made it so; without
+monsters even a 512x512 map ticked in 4 ms.
+
+- **Looking for a target.** Every monster went through every entity, and
+  a copy of the list, every tick, for the players and companions; two
+  of its tactics went through them all again for the other monsters.
+  World now keeps the zone's players and companions (sought()) and its
+  monsters (monsters()), in id order, made again only when the entities
+  change (a spawn, a despawn, a zone entered, a reset), so a look goes
+  through the same candidates in the same order as before.
+- **A door's light.** A door a monster walks through redid only the
+  sources that reach it (178), but the totals were then added up again
+  from every source's share: the whole map, every door. Now only the
+  cells the redone sources can reach are added up again, from every share
+  that reaches each, in the same order as the whole sum adds them, so the
+  totals are the same to the bit (edge_test's six door flips against a
+  whole recompute still pass). Which sources can reach a cell is worked
+  out once a map.
+
+The same bench: 769 entities 28 ms, 3073 110 ms, now four times the time
+for four times the monsters (about 36 us a monster). What is left grows
+with how many monsters think at once; a monster far from every player
+could think less often, a choice for later.

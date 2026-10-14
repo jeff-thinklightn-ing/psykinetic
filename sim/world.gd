@@ -194,6 +194,11 @@ var _doors: Dictionary[Vector3i, Door] = {}
 var _occupancy: Dictionary[Vector2i, GridEntity] = {}
 ## Always in ascending id order: ids are handed out in spawn order.
 var _entities: Array[GridEntity] = []
+## _entities' players and companions, and its monsters, in its order;
+## made again when _entities changes (_roster_changed).
+var _sought: Array[GridEntity] = []
+var _monsters: Array[GridEntity] = []
+var _roster_current := false
 var _hits: Array[Hit] = []
 var _next_id := 1
 var _accumulator := 0.0
@@ -377,6 +382,7 @@ func enter(to: Zone) -> Zone:
 	_doors = to.doors
 	_occupancy = to.occupancy
 	_entities = to.entities
+	_roster_changed()
 	_hits.assign(to.hits)
 	_path_steps = to.path_steps
 	_carried_heat_key = Vector2i(-1, -1)
@@ -438,6 +444,7 @@ func reset() -> void:
 		if is_instance_valid(entity):
 			entity._world_remove()
 	_entities.clear()
+	_roster_changed()
 	_occupancy.clear()
 	_hits.clear()
 	_path_steps.clear()
@@ -680,6 +687,7 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 		return false
 	_occupancy[at] = entity
 	_entities.append(entity)
+	_roster_changed()
 	entity.zone = zone.name
 	entity._world_place(_next_id, at)
 	_next_id += 1
@@ -693,6 +701,7 @@ func despawn(entity: GridEntity) -> void:
 		return
 	_occupancy.erase(entity.tile)
 	_entities.erase(entity)
+	_roster_changed()
 	entity._world_remove()
 	entity_despawned.emit(entity)
 	entity.queue_free()
@@ -1172,6 +1181,7 @@ func mirror_reset() -> void:
 	if Net.is_authority():
 		return
 	_entities.clear()
+	_roster_changed()
 	_occupancy.clear()
 	_path_steps.clear()
 	_floor.clear()
@@ -1200,6 +1210,7 @@ func mirror_add(entity: GridEntity) -> void:
 		return
 	if entity not in _entities:
 		_entities.append(entity)
+		_roster_changed()
 	entity._mirror_attach()
 	mirror_changed()
 
@@ -1208,6 +1219,7 @@ func mirror_remove(entity: GridEntity) -> void:
 	if Net.is_authority():
 		return
 	_entities.erase(entity)
+	_roster_changed()
 	mirror_changed()
 
 
@@ -1635,6 +1647,38 @@ func get_entity_at(at: Vector2i) -> GridEntity:
 
 func get_entities() -> Array[GridEntity]:
 	return _entities.duplicate()
+
+
+## The players and companions in the zone, in id order: what a monster
+## looks for, without going through every crate and monster. Not a copy:
+## read it, do not change it.
+func sought() -> Array[GridEntity]:
+	_take_roster()
+	return _sought
+
+
+## The monsters in the zone, in id order. Not a copy, as sought().
+func monsters() -> Array[GridEntity]:
+	_take_roster()
+	return _monsters
+
+
+func _roster_changed() -> void:
+	_roster_current = false
+
+
+func _take_roster() -> void:
+	if _roster_current:
+		return
+	# New arrays, not cleared ones: one handed out before stays as it was.
+	_sought = []
+	_monsters = []
+	for entity in _entities:
+		if entity is Player or entity is Companion:
+			_sought.append(entity)
+		elif entity is Monster:
+			_monsters.append(entity)
+	_roster_current = true
 
 
 ## True if occupancy and the entity list describe the same thing: every entity

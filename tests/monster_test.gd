@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_gather()
 	_test_idle_pace()
 	_test_home_after_a_fight()
+	_test_roster()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -440,6 +441,29 @@ func _bold(monster: Monster) -> void:
 
 
 ## [param extra]: per symbol, more for its spawn spec ({"b": {"facing": ...}}).
+func _test_roster() -> void:
+	print("
+== what a monster looks for: the zone's players and companions, its monsters, kept up ==")
+	var e := _build(["#######", "#PicmP#", "#.....#", "#######"])
+	var players: Array = e["P"]
+	var imp: Monster = e["i"][0]
+	var other: Monster = e["m"][0]
+	_check(World.sought() == players, "the players, in id order (%s)" % [World.sought()])
+	_check(World.monsters() == [other, imp], "the monsters, in id order (spawned m then i), not the crate (%s)" % [World.monsters()])
+	World.despawn(imp)
+	_check(World.monsters() == [other], "a monster gone is gone from them (%s)" % [World.monsters()])
+	var late := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Late", "tile": Vector2i(1, 2)})
+	_room.add_child(late)
+	World.spawn(late, Vector2i(1, 2))
+	_check(World.monsters() == [other, late], "a monster come is in them (%s)" % [World.monsters()])
+	var elsewhere := World.add_zone("roster_elsewhere")
+	var was := World.enter(elsewhere)
+	_check(World.sought().is_empty() and World.monsters().is_empty(), "another zone has its own: none here")
+	World.enter(was)
+	_check(World.sought() == players and World.monsters() == [other, late], "and back, this zone's again")
+	World.zones.erase("roster_elsewhere")
+
+
 func _build(rows: Array[String], extra := {}) -> Dictionary:
 	World.reset()
 	if _room != null:

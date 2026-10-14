@@ -18,9 +18,11 @@ extends RefCounted
 ## the map or a door changes (World.fields_changed); carried ones are added
 ## at each look, so they are always where their bearer is. Each fixed
 ## source's share is kept (_parts): a door that opens or shuts works out
-## again only the sources that reach it (mark_dirty_near), and the totals
-## are added up from the shares in the same order as ever, so they come out
-## the same to the last bit (the whole castle took 16 ms a door).
+## again only the sources that reach it (mark_dirty_near), and only the
+## cells those reach are added up again, from the shares in the same order
+## as ever, so they come out the same to the last bit (the whole castle
+## took 16 ms a door, and adding up the whole map again made a door's cost
+## grow with the map).
 
 ## What each fixed source gives at its own cell, and how far it reaches.
 const FIRE := {"heat": 10.0, "light": 0.8, "reach": 4}
@@ -42,6 +44,12 @@ var _dirty := true
 ## order: {"heat": {cell: amount}, "light": {cell: amount}}, or null to be
 ## worked out again. Empty: all of them.
 var _parts: Array = []
+## The sources whose shares were let go since the last refresh (indices
+## into _parts).
+var _redo: Dictionary[int, bool] = {}
+## For each cell a source can reach, the sources that can, in order
+## (indices into _parts): who to add up again when one changes.
+var _covering: Dictionary[Vector2i, PackedInt32Array] = {}
 
 
 func load(terrain: Dictionary) -> void:
@@ -54,6 +62,7 @@ func load(terrain: Dictionary) -> void:
 
 func mark_dirty() -> void:
 	_parts.clear()
+	_redo.clear()
 	_dirty = true
 
 
@@ -71,6 +80,7 @@ func mark_dirty_near(cells: Array[Vector2i]) -> void:
 		for cell in cells:
 			if maxi(absi(cell.x - source.x), absi(cell.y - source.y)) <= reach + 1:
 				_parts[i] = null
+				_redo[i] = true
 				break
 
 
@@ -146,10 +156,18 @@ func _refresh(world: Node) -> void:
 		return
 	_dirty = false
 	var sources := _sources()
+	if not _parts.is_empty():
+		_refresh_redone(world, sources)
+		return
 	_parts.resize(sources.size())
 	for i in sources.size():
-		if _parts[i] == null:
-			_parts[i] = _spread(world, sources[i][0], sources[i][1])
+		_parts[i] = _spread(world, sources[i][0], sources[i][1])
+	_covering.clear()
+	for i in sources.size():
+		for cell in _reachable(sources[i][0], sources[i][1]["reach"]):
+			if not _covering.has(cell):
+				_covering[cell] = PackedInt32Array()
+			_covering[cell].append(i)
 	_heat.clear()
 	_light.clear()
 	for part: Dictionary in _parts:
@@ -159,6 +177,53 @@ func _refresh(world: Node) -> void:
 		var light: Dictionary = part["light"]
 		for cell: Vector2i in light:
 			_light[cell] = _light.get(cell, 0.0) + light[cell]
+
+
+## The sources let go since the last refresh worked out again, and the
+## cells they can reach added up again from every share that reaches them,
+## in order, as the whole sum adds them.
+func _refresh_redone(world: Node, sources: Array) -> void:
+	var cells: Dictionary[Vector2i, bool] = {}
+	for i: int in _redo:
+		_parts[i] = _spread(world, sources[i][0], sources[i][1])
+		for cell in _reachable(sources[i][0], sources[i][1]["reach"]):
+			cells[cell] = true
+	_redo.clear()
+	for cell: Vector2i in cells:
+		var heat := 0.0
+		var light := 0.0
+		var heated := false
+		var lit := false
+		for i in _covering[cell]:
+			var part: Dictionary = _parts[i]
+			var heat_share: Dictionary = part["heat"]
+			if heat_share.has(cell):
+				heat += heat_share[cell]
+				heated = true
+			var light_share: Dictionary = part["light"]
+			if light_share.has(cell):
+				light += light_share[cell]
+				lit = true
+		if heated:
+			_heat[cell] = heat
+		else:
+			_heat.erase(cell)
+		if lit:
+			_light[cell] = light
+		else:
+			_light.erase(cell)
+
+
+## The cells within [param reach] of [param source], as _spread looks at
+## them (whether it sees them or not).
+static func _reachable(source: Vector2i, reach: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var offset := Vector2i(dx, dy)
+			if Vector2(offset).length() <= reach + 0.5:
+				cells.append(source + offset)
+	return cells
 
 
 ## One source's share: {"heat": {cell: amount}, "light": {cell: amount}},

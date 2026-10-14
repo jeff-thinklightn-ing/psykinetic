@@ -347,7 +347,7 @@ func _go_to(to: Vector2i) -> bool:
 ## little sooner, so it does not dither. NO_TILE when there is none.
 func _pick_slot() -> Vector2i:
 	var claimed := {}
-	for entity in World.get_entities():
+	for entity in World.monsters():
 		if entity != self and entity is Monster and (entity as Monster).target == target:
 			claimed[(entity as Monster).slot] = true
 	var best := NO_TILE
@@ -380,7 +380,7 @@ func _in_front() -> bool:
 func _target_beset() -> bool:
 	if target.max_hp > 0 and target.hp * 2 < target.max_hp:
 		return true
-	for entity in World.get_entities():
+	for entity in World.monsters():
 		if entity != self and entity is Monster and World.are_adjacent(entity.tile, target.tile):
 			return true
 	return false
@@ -393,7 +393,7 @@ func _nearest_visible_target() -> GridEntity:
 	var nearest: GridEntity = null
 	var nearest_distance := sight_range + 1
 	var kept := -1
-	for entity in World.get_entities():
+	for entity in World.sought():
 		if entity.protected:
 			continue  # Spawn grace.
 		if entity is Player or (entity is Companion and entity.keeper != null):

@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.114
+
+Server.
+
+- The server copes with far more monsters on a map: what they cost it now
+  grows with their number, not faster. A map with 3000 creatures ticks
+  over ten times faster than before (the first step towards bigger maps).
+
+The server must be updated to v0.1.114 too, as it refuses any other version.
+
 ## v0.1.113
 
 Client and server.
