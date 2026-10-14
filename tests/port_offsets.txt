@@ -14,3 +14,4 @@ enemy-ai 1400
 companions 1600
 items 1800
 economy 2000
+lore 2200
