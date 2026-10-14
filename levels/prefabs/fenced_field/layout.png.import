@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bwetwxypvroea"
+path="res://.godot/imported/layout.png-f6382e9e4566a22cc2abe1ac12408b03.image"
+
+[deps]
+
+source_file="res://levels/prefabs/fenced_field/layout.png"
+dest_files=["res://.godot/imported/layout.png-f6382e9e4566a22cc2abe1ac12408b03.image"]
+
+[params]
+

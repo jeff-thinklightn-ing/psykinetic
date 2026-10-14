@@ -20,6 +20,8 @@ func _ready() -> void:
 	await _test_monsters()
 	_clear()
 	await _test_resize()
+	_clear()
+	await _test_prefabs()
 	_test_import_file()
 	_clear()
 	print("")
@@ -30,6 +32,8 @@ func _ready() -> void:
 func _test_round_trip() -> void:
 	print("\n== every level read into the editor and written back plays the same ==")
 	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR:
+			continue
 		var config := {}
 		var json := Level.DIR + folder + "/level.json"
 		if FileAccess.file_exists(json):
@@ -321,6 +325,102 @@ func _test_resize() -> void:
 			and level["links"][0]["tile"] == Vector2i(12, 9), "the height, the start and the link too")
 	editor.queue_free()
 	await get_tree().process_frame
+
+
+func _test_prefabs() -> void:
+	print("
+== prefabs: save an area, stamp it turned, undo ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var prefabs := FOLDER + "prefabs/"
+	_remove_tree(ProjectSettings.globalize_path(prefabs))
+	# 12 x 10 cells of grass: a brute at (2, 2) gathering at (3, 2), a wall
+	# south of (2, 3), cell (4, 3) one level up.
+	var map := LevelMap.new(Vector2i(12, 10))
+	for y in 10:
+		for x in 12:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(2, 2), "monster_brute")
+	map.set_edge(Vector3i(2, 3, Terrain.SOUTH), "wall")
+	map.heights[Vector2i(4, 3)] = 1
+	map.to_image().save_png(dir.path_join("layout.png"))
+	map.to_height_image().save_png(dir.path_join("height.png"))
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"entities": [{"at": [2, 2], "facing": [1, 0], "idle": {"mode": "gather", "point": [3, 2]}}]}))
+	json.close()
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	editor.prefab_dir = prefabs
+	add_child(editor)
+	await get_tree().process_frame
+
+	_key(editor, KEY_A)
+	_check(editor.brush == "area" and editor._panel.get_parent().visible, "A picks the area tool, and its panel shows")
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(4.5, 3.5))
+	editor.continue_stroke(Vector2(2.5, 2.5))
+	editor.end_stroke()
+	_check(editor.area == Rect2i(2, 2, 3, 2), "a drag from (4, 3) back to (2, 2) is a 3 x 2 area (%s)" % editor.area)
+	_check(editor.map.cell(Vector2i(2, 2)) == "monster_brute" and not editor.dirty, "and paints nothing")
+	editor.save_prefab("Little Camp")
+	var saved := Prefab.load_prefab("little_camp", prefabs)
+	_check(not saved.is_empty() and saved["map"].size == Vector2i(3, 2), "saved as prefab little_camp, 3 x 2: %s" % editor.report)
+	var entry: Dictionary = saved["config"]["entities"][0]
+	_check(Level._tile(entry["at"]) == Vector2i(0, 0) and Level._tile(entry["idle"]["point"]) == Vector2i(1, 0),
+			"its brute at its corner, the gather point beside it (%s)" % [entry])
+	_check(saved["map"].edge(Vector3i(0, 1, Terrain.SOUTH)) == "clear" and saved["map"].heights == {Vector2i(2, 1): 1},
+			"the wall below the area is not in it; the height is")
+
+	_key(editor, KEY_P)
+	_check(editor.brush == "stamp" and editor.area.size == Vector2i.ZERO, "P picks the stamp tool")
+	editor.pick_stamp("little_camp")
+	_key(editor, KEY_R)
+	_check(editor.stamp_turns == 1 and editor._stamp["map"].size == Vector2i(2, 3), "R turns it a quarter: 2 x 3")
+	_check(editor.stamp_corner(Vector2(7.2, 6.4)) == Vector2i(6, 5), "the cursor at its middle")
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(7.2, 6.4))
+	editor.end_stroke()
+	var brute := editor.entry_of(Vector2i(7, 5))
+	_check(editor.map.cell(Vector2i(7, 5)) == "monster_brute", "a click lays it: the brute at (7, 5)")
+	_check(Level._tile(brute.get("idle", {}).get("point")) == Vector2i(7, 6) and Level.facing_from(brute.get("facing")) == Vector2i(0, 1),
+			"its gather point and facing turned with it (%s)" % [brute])
+	_check(editor.map.heights.get(Vector2i(6, 7)) == 1, "and the height")
+	_check(editor.map.cell(Vector2i(2, 2)) == "monster_brute" and editor.entry_of(Vector2i(2, 2)).has("idle"), "the first brute is where it was")
+	_key(editor, KEY_Z, true)
+	_check(editor.map.cell(Vector2i(7, 5)) == "grass" and editor.entry_of(Vector2i(7, 5)).is_empty()
+			and not editor.map.heights.has(Vector2i(6, 7)), "Ctrl+Z takes the whole stamp back")
+	_key(editor, KEY_Y, true)
+	_check(editor.map.cell(Vector2i(7, 5)) == "monster_brute", "Ctrl+Y lays it again")
+
+	print("
+== the seeded camp: void stays as it was ==")
+	editor.prefab_dir = Prefab.DIR
+	editor.stamp_turns = 0
+	editor.pick_stamp("campfire_camp")
+	editor.map.set_cell(Vector2i(0, 0), "stone")
+	editor.stamp_at(Vector2i(0, 0))
+	_check(editor.map.cell(Vector2i(0, 0)) == "stone", "the camp's void corner leaves the stone there")
+	_check(editor.map.cell(Vector2i(3, 3)) == "fire" and editor.map.cell(Vector2i(3, 1)) == "monster_imp", "its fire and imps are laid")
+	_check(Level._tile(editor.entry_of(Vector2i(1, 3)).get("idle", {}).get("point")) == Vector2i(3, 3), "the imps gather at the fire")
+
+	_key(editor, KEY_S, true)
+	var image := Image.load_from_file(dir.path_join("layout.png"))
+	var level := Level.parse(image, Image.load_from_file(dir.path_join("height.png")), JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json")))
+	var gathering := (level["entities"] as Array).filter(func(spec: Dictionary) -> bool:
+		return spec.get("idle", {}).get("point") == Vector2i(3, 3))
+	_check(gathering.size() == 3 and level["terrain"]["heights"].get(Vector2i(6, 7)) == 1, "saved, the game reads three imps round the fire and the height")
+	editor.queue_free()
+	await get_tree().process_frame
+	_remove_tree(ProjectSettings.globalize_path(prefabs))
+
+
+func _remove_tree(path: String) -> void:
+	if not DirAccess.dir_exists_absolute(path):
+		return
+	for sub in DirAccess.get_directories_at(path):
+		_remove_tree(path.path_join(sub))
+	for file in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path.path_join(file))
+	DirAccess.remove_absolute(path)
 
 
 func _test_import_file() -> void:

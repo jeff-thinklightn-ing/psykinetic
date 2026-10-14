@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cwdk42u87fma2"
+path="res://.godot/imported/layout.png-6739431c3dd4ba622e4203671cf26506.image"
+
+[deps]
+
+source_file="res://levels/prefabs/small_house/layout.png"
+dest_files=["res://.godot/imported/layout.png-6739431c3dd4ba622e4203671cf26506.image"]
+
+[params]
+

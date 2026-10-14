@@ -221,6 +221,11 @@ write its levels.
   starts, spawn points, links, the centre), as does `height.png`. What falls
   off a shrunk side is dropped, and the status line names it. Each change is
   one undo step.
+- **Prefabs**: the area tool (`A`) drags out a rectangle (right click lets
+  go); its panel saves what is in it under a name as a prefab. The stamp
+  tool (`P`) lists the prefabs: pick one and it follows the cursor as a
+  see-through ghost, `R` (or a right click) turns it a quarter clockwise
+  (`Shift+R` back), and a click lays it down, one undo step. See Prefabs below.
 
 Saving writes the same double-resolution `layout.png` (the file's own size
 kept), its `.import` set to Image, and reports what the server would warn
@@ -230,6 +235,43 @@ project, the game reads `layout.png` itself rather than its import, so a
 saved map plays at once with `--map=<name>`.
 
 Not yet: painting heights, and a 3D preview.
+
+## Prefabs
+
+A prefab is a piece of map to stamp elsewhere, kept in
+`levels/prefabs/<name>/` in a level's own format: `layout.png`,
+`level.json`, and `height.png` if it has heights, its top-left cell at
+(0, 0) (`editor/prefab.gd`). Its `level.json` holds only what goes with the
+piece: the entities' entries (names, props such as a chest's `slots`,
+facing, idling with its route or gather point), links, and any `legend` or
+`monsters` it uses; no starts, spawn points or centre. A prefab is not a
+level: the server never loads one, and the level tests skip the folder.
+
+Stamping one with its top-left at a cell, turned 0-3 quarter turns:
+
+- each of its cells that is not **void** replaces the map's, with its
+  height; its void cells leave the map as it was, so a round camp lays round;
+- each edge between two of its cells, one of them not void, becomes the
+  prefab's (clear where it has none). Walls round a house are part of the
+  prefab only if the ring of cells outside them is too, which is why the
+  house and the field carry a ring of dirt or grass;
+- the map's entries and links on the cells it covers go, and the prefab's
+  are put where their cells land, with facings, routes and gather points
+  turned with it.
+
+Seeded by hand (`tools/seed_prefabs.gd` draws them; run it again after
+changing a drawing):
+
+| Prefab | Cells | |
+|---|---|---|
+| `small_house` | 6 x 6 | a stone room with a door south, a chest (a bandaging kit) and a lantern, a ring of dirt |
+| `campfire_camp` | 7 x 7 | a round dirt clearing, three imps gathered at the fire, a chest and crates |
+| `fenced_field` | 10 x 6 | dirt behind a fence with a gate south, a ring of grass |
+| `well` | 5 x 5 | water ringed with stone |
+
+A camp's group is its gather point: every monster gathering at one cell is
+that camp, so a coarse world tick can move the group (or hand the place
+over) by that cell, without the per-tick AI.
 
 ## Making a level
 

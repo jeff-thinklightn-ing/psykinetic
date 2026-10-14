@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cgb4826l0rh7h"
+path="res://.godot/imported/layout.png-89705e719330740b51f19310a05cb9a2.image"
+
+[deps]
+
+source_file="res://levels/prefabs/well/layout.png"
+dest_files=["res://.godot/imported/layout.png-89705e719330740b51f19310a05cb9a2.image"]
+
+[params]
+

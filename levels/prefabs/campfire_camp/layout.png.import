@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://biodatvo764gh"
+path="res://.godot/imported/layout.png-17dcbef876e1082ccc08bc43b805f1e3.image"
+
+[deps]
+
+source_file="res://levels/prefabs/campfire_camp/layout.png"
+dest_files=["res://.godot/imported/layout.png-17dcbef876e1082ccc08bc43b805f1e3.image"]
+
+[params]
+

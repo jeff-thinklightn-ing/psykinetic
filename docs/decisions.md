@@ -2041,3 +2041,28 @@ reads height.png and writes it back after a resize, so the two images stay
 the same size; it still does not paint heights. A resize is one undo step
 holding the whole map and level.json before it, not a diff: maps are small
 enough (256 x 256 is 65k cells) that a copy per step is cheap.
+
+## 190. Prefabs are small levels, stamped by their non-void cells
+
+A prefab (`levels/prefabs/<name>/`) is stored in a level's own format,
+layout.png, level.json and an optional height.png, so the editor opens one
+with `--edit=prefabs/<name>` to touch it up, the same code reads and writes
+it, and Claude (builder pass 3) can be given one as it is given a level.
+Its level.json keeps only what goes with the piece (entities, links, legend,
+monster types). Stamping is a union, not a paste: void cells in a prefab
+leave the map as it was, so shapes that are not rectangles (a round camp)
+lay cleanly onto grass; an edge is the prefab's only between two of its own
+cells with one not void, which means walls on a prefab's outline need the
+ring of ground outside them to be part of it (the house and the field carry
+one). Rotation is the same `LevelMap.transformed` and `moved_config` a
+resize uses (decision 189), with facings turned as well; a stamp is one undo
+step holding each cell, edge, height, entry and link it changed. Rejected:
+a separate prefab format (JSON of cells), which would need its own reader,
+writer and editor; and stamping void as void, which made every prefab a
+rectangle that erased what was round it.
+
+A group's anchor is its gather point (the roadmap's "The world
+moves on"): the camp's imps are a group because they gather at one cell,
+which a coarse world tick can move or hand over without running their AI.
+No separate group record yet; one can be added when the world tick needs a
+name or an owner for it.

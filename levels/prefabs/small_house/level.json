@@ -1,0 +1,18 @@
+{
+	"entities": [
+		{
+			"at": [
+				4,
+				1
+			],
+			"props": {
+				"slots": [
+					"bandaging_kit",
+					"",
+					"",
+					""
+				]
+			}
+		}
+	]
+}

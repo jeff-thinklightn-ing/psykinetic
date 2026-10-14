@@ -33,6 +33,11 @@ extends Node2D
 ## (entities, routes, gather points, starts, spawn points, links, the
 ## centre) and height.png move with it; what falls off a shrunk side is
 ## dropped, and the status line says what. One undo step per change.
+##
+## Prefabs (Prefab, levels/prefabs/): the area tool (A) drags out a
+## rectangle, and its panel saves what is in it as a named prefab. The stamp
+## tool (P) lists the prefabs; the picked one follows the cursor as a ghost,
+## R turns it a quarter, and a click lays it down as one undo step.
 
 const CELL := 48.0
 const GRID := Color(1, 1, 1, 0.07)
@@ -51,6 +56,7 @@ const ROUTE := Color(0.35, 0.85, 1.0, 0.85)
 const ROUTE_FAINT := Color(0.35, 0.85, 1.0, 0.3)
 const POINT := Color(1.0, 0.55, 0.15, 0.9)
 const SELECTED := Color(0.3, 1.0, 0.5, 0.95)
+const AREA := Color(0.45, 0.8, 1.0, 0.9)
 const NOWHERE := Vector2i(-1, -1)
 ## The idle modes the panel offers; "" is the kind's own (Monster.IDLE_BY_KIND).
 const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", "none"]
@@ -59,8 +65,10 @@ const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", 
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link", "select",
+	"link", "select", "area", "stamp",
 ]
+## Tools, not things to paint, and the key that picks each.
+const TOOLS := {"select": "V", "area": "A", "stamp": "P"}
 const EDGE_BRUSHES: Array[String] = ["wall", "door", "clear"]
 ## A thing's letter on its cell.
 const LETTERS := {"start": "S", "crate": "C", "boulder": "O", "cart": "K", "chest": "H", "torch": "T",
@@ -103,6 +111,16 @@ var heights_dirty := false
 var _names: Dictionary[Vector2i, String] = {}
 var _panel: VBoxContainer
 var _canvas: PanelContainer
+## The area tool's rectangle (size zero: none) and the cell a drag began on.
+var area := Rect2i()
+var _area_from := NOWHERE
+## Where prefabs are read from and saved to (tests use user://).
+var prefab_dir := Prefab.DIR
+## The stamp tool's prefab ("" none), its turn, and it turned ({} none).
+var stamp_name := ""
+var stamp_turns := 0
+var _stamp: Dictionary = {}
+var _prefab_name: LineEdit
 var _canvas_size: Label
 
 
@@ -218,6 +236,9 @@ func pick(meaning: String) -> void:
 	brush = meaning
 	if meaning != "select":
 		select(NOWHERE)
+	if meaning != "area":
+		area = Rect2i()
+	_refresh_panel()
 	for each: String in _buttons:
 		_buttons[each].button_pressed = each == meaning
 	hover = {}
@@ -251,8 +272,25 @@ func target_at(grid: Vector2) -> Dictionary:
 ## Starts a stroke with [param button] (left paints, right erases) at grid
 ## point [param grid].
 func begin_stroke(button: MouseButton, grid: Vector2) -> void:
+	var cell := Vector2i(floori(grid.x), floori(grid.y))
 	if brush == "select":
-		_select_click(button, Vector2i(floori(grid.x), floori(grid.y)))
+		_select_click(button, cell)
+		return
+	if brush == "area":
+		if button == MOUSE_BUTTON_RIGHT or not map.in_bounds(cell):
+			area = Rect2i()
+		else:
+			_area_from = cell
+			_stroke_button = button
+			area = Rect2i(cell, Vector2i.ONE)
+		_refresh_panel()
+		queue_redraw()
+		return
+	if brush == "stamp":
+		if button == MOUSE_BUTTON_LEFT:
+			stamp_at(stamp_corner(grid))
+		else:
+			rotate_stamp(1)
 		return
 	_stroke = {}
 	_stroke_button = button
@@ -264,6 +302,13 @@ func begin_stroke(button: MouseButton, grid: Vector2) -> void:
 ## The stroke goes on to [param grid]: every cell on the line from the last
 ## one, or every edge along the first edge's line.
 func continue_stroke(grid: Vector2) -> void:
+	if _area_from != NOWHERE:
+		var to := Vector2i(clampi(floori(grid.x), 0, map.size.x - 1), clampi(floori(grid.y), 0, map.size.y - 1))
+		var corner := Vector2i(mini(to.x, _area_from.x), mini(to.y, _area_from.y))
+		area = Rect2i(corner, (to - _area_from).abs() + Vector2i.ONE)
+		_refresh_panel()
+		queue_redraw()
+		return
 	if _stroke_button == MOUSE_BUTTON_NONE or _stroke_from == null:
 		return
 	if _stroke_from is Vector2i:
@@ -286,6 +331,7 @@ func continue_stroke(grid: Vector2) -> void:
 
 ## Ends the stroke: one undo step, if it changed anything.
 func end_stroke() -> void:
+	_area_from = NOWHERE
 	_stroke_button = MOUSE_BUTTON_NONE
 	_stroke_from = null
 	if _stroke.is_empty():
@@ -345,6 +391,15 @@ func _swap(stroke: Dictionary) -> Dictionary:
 		elif key == "canvas":
 			back[key] = _canvas_state()
 			_set_canvas_state(stroke[key])
+		elif str(key).begins_with("height "):
+			var parts := str(key).split(" ")
+			var at := Vector2i(int(parts[1]), int(parts[2]))
+			back[key] = _set_height(at, int(stroke[key]))
+		elif str(key).begins_with("link "):
+			var parts := str(key).split(" ")
+			var at := Vector2i(int(parts[1]), int(parts[2]))
+			back[key] = link_of(at).duplicate(true)
+			_put_link(at, stroke[key])
 		else:
 			# A monster's entry: "entry x y" -> the entry as it was ({}: none).
 			var parts := str(key).split(" ")
@@ -433,6 +488,159 @@ func _set_canvas_state(state: Dictionary) -> void:
 func toggle_canvas() -> void:
 	if _canvas != null:
 		_canvas.visible = not _canvas.visible
+
+
+# --- Prefabs: save an area, stamp it ------------------------------------------------
+
+## Saves the area as prefab [param text] (made a folder name). Returns the
+## status it reports.
+func save_prefab(text: String) -> String:
+	var prefab_name := Prefab.tidy_name(text)
+	if area.size == Vector2i.ZERO:
+		report = "no area: drag one out with the area tool (A)"
+	elif prefab_name.is_empty():
+		report = "a prefab needs a name"
+	else:
+		var prefab := Prefab.extract(map, config, area)
+		var error := Prefab.save(prefab_name, prefab, prefab_dir)
+		if error == OK:
+			report = "saved prefab %s (%d x %d cells, %d things)" % [prefab_name, area.size.x, area.size.y,
+				(prefab["config"].get("entities", []) as Array).size()]
+		else:
+			report = "could not save prefab %s (%s)" % [prefab_name, error_string(error)]
+	print("[editor] " + report)
+	_refresh_panel()
+	return report
+
+
+## Picks prefab [param prefab_name] to stamp ("" none).
+func pick_stamp(prefab_name: String) -> void:
+	stamp_name = prefab_name
+	_stamp = {}
+	if not prefab_name.is_empty():
+		var prefab := Prefab.load_prefab(prefab_name, prefab_dir)
+		if prefab.is_empty():
+			report = "no prefab %s" % prefab_name
+			stamp_name = ""
+		else:
+			_stamp = Prefab.rotated(prefab, stamp_turns)
+	_refresh_panel()
+	queue_redraw()
+
+
+## Turns the stamp [param steps] quarter turns clockwise.
+func rotate_stamp(steps: int) -> void:
+	stamp_turns = posmod(stamp_turns + steps, 4)
+	pick_stamp(stamp_name)
+
+
+## Where the stamp's top-left goes with the cursor at [param grid]: the
+## cursor at its middle.
+func stamp_corner(grid: Vector2) -> Vector2i:
+	if _stamp.is_empty():
+		return Vector2i(floori(grid.x), floori(grid.y))
+	var size: Vector2i = (_stamp["map"] as LevelMap).size
+	return Vector2i(floori(grid.x - size.x / 2.0 + 0.5), floori(grid.y - size.y / 2.0 + 0.5))
+
+
+## Lays the picked prefab with its top-left at [param at], as one undo step.
+func stamp_at(at: Vector2i) -> void:
+	if _stamp.is_empty():
+		return
+	var changes := Prefab.stamp_changes(_stamp, map, at)
+	var stroke := {}
+	for cell: Vector2i in changes["covers"]:
+		# What the map held there goes: its entry and link with its cell.
+		if not entry_of(cell).is_empty():
+			stroke["entry %d %d" % [cell.x, cell.y]] = entry_of(cell).duplicate(true)
+			_put_entry(cell, {})
+		if not link_of(cell).is_empty():
+			stroke["link %d %d" % [cell.x, cell.y]] = link_of(cell).duplicate(true)
+			_put_link(cell, {})
+	var cells: Dictionary = changes["cells"]
+	for cell: Vector2i in cells:
+		var old := map.set_cell(cell, cells[cell])
+		if old != cells[cell]:
+			stroke[cell] = old
+	var edges: Dictionary = changes["edges"]
+	for key: Vector3i in edges:
+		var old := map.set_edge(key, edges[key])
+		if old != edges[key]:
+			stroke[key] = old
+	var heights: Dictionary = changes["heights"]
+	for cell: Vector2i in heights:
+		var old := _set_height(cell, heights[cell])
+		if old != heights[cell]:
+			stroke["height %d %d" % [cell.x, cell.y]] = old
+	for entry: Dictionary in changes["entries"]:
+		var cell: Vector2i = Level._tile(entry.get("at"))
+		var key := "entry %d %d" % [cell.x, cell.y]
+		if not stroke.has(key):
+			stroke[key] = entry_of(cell).duplicate(true)
+		_put_entry(cell, entry)
+	for link: Dictionary in changes["links"]:
+		var cell: Vector2i = Level._tile(link.get("at"))
+		var key := "link %d %d" % [cell.x, cell.y]
+		if not stroke.has(key):
+			stroke[key] = link_of(cell).duplicate(true)
+		_put_link(cell, link)
+	if stroke.is_empty():
+		return
+	dirty = true
+	_undo.append(stroke)
+	if _undo.size() > UNDO_LIMIT:
+		_undo.pop_front()
+	_redo.clear()
+	_name_cells()
+	report = "stamped %s at %d, %d" % [stamp_name, at.x, at.y]
+	queue_redraw()
+
+
+## Sets cell [param at]'s height (0 for none); returns what it was. A
+## change means height.png is written on save.
+func _set_height(at: Vector2i, level: int) -> int:
+	var old: int = map.heights.get(at, 0)
+	if level <= 0:
+		map.heights.erase(at)
+	else:
+		map.heights[at] = level
+	if old != level:
+		heights_dirty = true
+		dirty = true
+	return old
+
+
+## level.json's link on [param at] ({} for none).
+func link_of(at: Vector2i) -> Dictionary:
+	var listed: Variant = config.get("links", [])
+	if listed is Array:
+		for link: Variant in listed:
+			if link is Dictionary and Level._tile(link.get("at")) == at:
+				return link
+	return {}
+
+
+## Puts [param link] as the link on [param at] ({} takes it out).
+func _put_link(at: Vector2i, link: Dictionary) -> void:
+	if not config.get("links") is Array:
+		config["links"] = []
+	var listed: Array = config["links"]
+	var index := -1
+	for i in listed.size():
+		if listed[i] is Dictionary and Level._tile(listed[i].get("at")) == at:
+			index = i
+			break
+	if link.is_empty():
+		if index >= 0:
+			listed.remove_at(index)
+	elif index >= 0:
+		listed[index] = link
+	else:
+		listed.append(link)
+	if listed.is_empty():
+		config.erase("links")
+	config_dirty = true
+	dirty = true
 
 
 # --- Monsters: facing and idling ----------------------------------------------------
@@ -676,7 +884,13 @@ func _refresh_panel() -> void:
 	for child in _panel.get_children():
 		_panel.remove_child(child)
 		child.queue_free()
-	_panel.get_parent().visible = selected != NOWHERE
+	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp"]
+	if brush == "area":
+		_area_panel()
+		return
+	if brush == "stamp":
+		_stamp_panel()
+		return
 	if selected == NOWHERE:
 		return
 	var facing: Array = facing_of(selected)
@@ -740,6 +954,39 @@ func _refresh_panel() -> void:
 			set_button.toggle_mode = true
 			set_button.button_pressed = setting_point
 	_panel_label("Esc lets go", 20)
+
+
+## The area tool's panel: the area, and a name to save it under as a prefab.
+func _area_panel() -> void:
+	_panel_label("Area", 30)
+	if area.size == Vector2i.ZERO:
+		_panel_label("drag out a rectangle; right click lets go", 22)
+		return
+	_panel_label("%d x %d cells at %d, %d" % [area.size.x, area.size.y, area.position.x, area.position.y], 22)
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	var typed := _prefab_name.text if _prefab_name != null and is_instance_valid(_prefab_name) else ""
+	_prefab_name = LineEdit.new()
+	_prefab_name.placeholder_text = "prefab name"
+	_prefab_name.text = typed
+	_prefab_name.custom_minimum_size = Vector2(360, 0)
+	_prefab_name.add_theme_font_size_override("font_size", 22)
+	_prefab_name.text_submitted.connect(func(text: String) -> void: save_prefab(text))
+	row.add_child(_prefab_name)
+	_panel_button(row, "save as prefab", func() -> void: save_prefab(_prefab_name.text))
+
+
+## The stamp tool's panel: every prefab, the one picked lit, and its turn.
+func _stamp_panel() -> void:
+	_panel_label("Stamp a prefab", 30)
+	var names := Prefab.names(prefab_dir)
+	if names.is_empty():
+		_panel_label("none yet: save one with the area tool (A)", 22)
+	for each in names:
+		var button := _panel_button(_panel, each, pick_stamp.bind(each))
+		button.toggle_mode = true
+		button.button_pressed = each == stamp_name
+	_panel_label("R / right click turns it (%d degrees), click lays it" % (stamp_turns * 90), 22)
 
 
 func _panel_label(text: String, size: int) -> Label:
@@ -829,6 +1076,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			toggle_canvas()
 		elif key.keycode == KEY_V and not key.ctrl_pressed:
 			pick("select")
+		elif key.keycode == KEY_A and not key.ctrl_pressed:
+			pick("area")
+		elif key.keycode == KEY_P and not key.ctrl_pressed:
+			pick("stamp")
+		elif key.keycode == KEY_R and not key.ctrl_pressed and brush == "stamp":
+			rotate_stamp(-1 if key.shift_pressed else 1)
 		elif key.keycode in [KEY_Q, KEY_E] and selected != NOWHERE:
 			turn_selected(-1 if key.keycode == KEY_Q else 1)
 		elif key.keycode == KEY_ESCAPE and brush == "select":
@@ -904,12 +1157,16 @@ func _status_text() -> String:
 	elif hover.has("edge"):
 		var key: Vector3i = hover["edge"]
 		over = "edge %s of %d, %d: %s" % ["east" if key.z == Terrain.EAST else "south", key.x, key.y, map.edge(key)]
-	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select"
+	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select  A area  P stamp"
 	if brush == "select":
 		tools = "LMB pick a monster  Q / E turn it  Esc let go" if not editing_route \
 				else "LMB add a waypoint  RMB take the last back  Esc done"
 		if setting_point:
 			tools = "LMB the gather point  Esc never mind"
+	elif brush == "area":
+		tools = "LMB drag an area  RMB let go  (save it as a prefab in the panel)"
+	elif brush == "stamp":
+		tools = "LMB lay %s  R / RMB turn it" % (stamp_name if not stamp_name.is_empty() else "(pick a prefab)")
 	return "%s%s   %s   brush: %s   |   %s  Ctrl+R resize  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
 		map_name, " (unsaved)" if dirty else "", over, brush, tools, report]
 
@@ -947,11 +1204,32 @@ func _draw() -> void:
 	for key: Vector3i in map.edges:
 		_draw_edge(key, WALL if map.edges[key] == "wall" else DOOR, 8.0, map.edges[key] == "door")
 	_draw_monsters()
+	if area.size != Vector2i.ZERO:
+		var rect := Rect2(Vector2(area.position) * CELL, Vector2(area.size) * CELL)
+		draw_rect(rect, Color(AREA, 0.12))
+		draw_rect(rect, AREA, false, 4.0)
+	if brush == "stamp" and not _stamp.is_empty():
+		_draw_ghost(stamp_corner(_mouse_grid()))
 	if hover.has("cell"):
 		draw_rect(Rect2(Vector2(hover["cell"]) * CELL, Vector2.ONE * CELL), HOVER, false, 4.0)
 	elif hover.has("edge"):
 		_draw_edge(hover["edge"], HOVER, 10.0)
 	draw_rect(Rect2(Vector2.ZERO, Vector2(map.size) * CELL), Color(1, 1, 1, 0.3), false, 2.0)
+
+
+## The picked prefab, see-through, with its top-left at [param at].
+func _draw_ghost(at: Vector2i) -> void:
+	var piece: LevelMap = _stamp["map"]
+	for cell: Vector2i in piece.cells:
+		var meaning: String = piece.cells[cell]
+		var rect := Rect2(Vector2(cell + at) * CELL, Vector2.ONE * CELL)
+		draw_rect(rect, Color(map.colours.get(meaning, Color.MAGENTA), 0.55))
+		if meaning not in Level.GROUNDS and meaning not in ["water", "fire"]:
+			var letter: String = LETTERS.get(meaning, meaning.trim_prefix("monster_").left(1).to_upper())
+			draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, CELL * 0.68), letter, HORIZONTAL_ALIGNMENT_CENTER, CELL, 26, Color(0, 0, 0, 0.7))
+	for key: Vector3i in piece.edges:
+		_draw_edge(key + Vector3i(at.x, at.y, 0), Color(WALL if piece.edges[key] == "wall" else DOOR, 0.7), 8.0, piece.edges[key] == "door")
+	draw_rect(Rect2(Vector2(at) * CELL, Vector2(piece.size) * CELL), AREA, false, 3.0)
 
 
 func _draw_edge(key: Vector3i, colour: Color, width: float, door := false) -> void:
@@ -990,8 +1268,9 @@ func _build_ui() -> void:
 		button.button_group = group
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.add_theme_font_size_override("font_size", 26)
-		button.text = "%s  %s" % ["V   " if meaning == "select" else key_name(i),
-			meaning.trim_prefix("monster_") + (" (edge)" if meaning in EDGE_BRUSHES else " (a monster)" if meaning == "select" else "")]
+		button.text = "%s  %s" % [TOOLS[meaning] + "   " if TOOLS.has(meaning) else key_name(i),
+			meaning.trim_prefix("monster_") + (" (edge)" if meaning in EDGE_BRUSHES else " (a monster)" if meaning == "select"
+				else " (save a prefab)" if meaning == "area" else " (a prefab)" if meaning == "stamp" else "")]
 		button.icon = _swatch(meaning)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(pick.bind(meaning))

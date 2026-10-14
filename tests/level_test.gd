@@ -127,6 +127,8 @@ func _test_test_room_unchanged() -> void:
 func _test_every_level() -> void:
 	print("\n== every level in levels/ imports as Images and loads cleanly ==")
 	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR:
+			continue
 		var images_ok := load(Level.DIR + folder + "/layout.png") is Image
 		if ResourceLoader.exists(Level.DIR + folder + "/height.png"):
 			images_ok = images_ok and load(Level.DIR + folder + "/height.png") is Image
@@ -134,6 +136,18 @@ func _test_every_level() -> void:
 		_check(images_ok and not level.is_empty() and level["warnings"].is_empty(),
 				"%s: %d cells, %d entities (%s)" % [folder, level["terrain"]["floor"].size() if not level.is_empty() else 0,
 					level["entities"].size() if not level.is_empty() else 0, level.get("warnings", "no level")])
+	print("
+== every prefab in levels/prefabs/ imports as Images and reads cleanly ==")
+	var prefabs := Prefab.names()
+	_check(prefabs.size() >= 4, "the prefabs seeded by hand are there (%s)" % [prefabs])
+	for prefab_name in prefabs:
+		var folder := Prefab.DIR + prefab_name + "/"
+		var image_ok := load(folder + "layout.png") is Image
+		var prefab := Prefab.load_prefab(prefab_name)
+		# A piece of map has no start of its own: that warning is expected.
+		var warnings: Array = Level.parse(prefab["map"].to_image(), null, prefab["config"])["warnings"].filter(
+				func(warning: String) -> bool: return not warning.begins_with("no player start"))
+		_check(image_ok and warnings.is_empty(), "%s: %s cells (%s)" % [prefab_name, prefab["map"].size, warnings])
 
 
 func _test_round_trip() -> void:
