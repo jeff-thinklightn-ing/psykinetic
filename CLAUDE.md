@@ -45,4 +45,7 @@ which worktree owns each step, and the design rules not to break without asking 
   name: that kills every tree's Godot, including other sessions' tests and benches.
 - Server and client must be built from the same commit; a release that changes the wire
   format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
+- Edit files with the editor tool, not shell heredocs or `sed`, when the text has
+  backslashes: heredocs here have eaten `\` line continuations and turned `` or `	` in
+  Windows paths into control characters. From python, write a backslash as `chr(92)`.
 - Never commit a real token: check the diff of `project.godot`.
