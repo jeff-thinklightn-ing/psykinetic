@@ -465,6 +465,12 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 	return _no("no tool \"%s\"" % tool)
 
 
+## A level by that name, or a folder under levels/ that is not one
+## (levels/lore, levels/prefabs: data), whose files an export would mix with.
+static func _name_taken(level_name: String) -> bool:
+	return Level.exists(level_name) or DirAccess.dir_exists_absolute(Level.DIR + level_name)
+
+
 func _new_area(given: Dictionary) -> Dictionary:
 	var side := str(given.get("side", ""))
 	if side not in edges_touched():
@@ -476,9 +482,9 @@ func _new_area(given: Dictionary) -> Dictionary:
 	var level_name := Prefab.tidy_name(title)
 	if level_name.is_empty():
 		level_name = "%s_%s" % [map_name, side]
-	if Level.exists(level_name):
+	if _name_taken(level_name):
 		level_name = "%s_%s" % [map_name, level_name]
-	if Level.exists(level_name):
+	if _name_taken(level_name):
 		return _no("there is a level %s already: another name" % level_name)
 	var size := Vector2i(clampi(int(given.get("width", 64)), 16, 256), clampi(int(given.get("height", 64)), 16, 256))
 	# The way out: from the middle of the area to the middle of its edge.

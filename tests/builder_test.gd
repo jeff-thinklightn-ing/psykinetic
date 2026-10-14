@@ -200,6 +200,12 @@ func _test_new_area() -> void:
 	await session.ask("another")
 	var again: Array = stub.sent.back()["messages"][-1]["content"]
 	_check(again[0]["is_error"] and "somewhere already" in str(again[0]["content"]), "an edge with a neighbour already: an error")
+	session.discard()
+	doc.config.erase("neighbours")
+	stub.turns = [[{"name": "new_area", "input": {"side": "east", "width": 20, "height": 20, "name": "Prefabs"}}], "x"]
+	await session.ask("one more")
+	_check(session.proposal().get("new_area", {}).get("name") == "test_field_prefabs",
+			"a name of a folder under levels/ that is not a level (prefabs, lore) is not used: %s" % [session.proposal().get("new_area", {}).get("name")])
 
 
 func _check(ok: bool, label: String) -> void:
