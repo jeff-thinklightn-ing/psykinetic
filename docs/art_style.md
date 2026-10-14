@@ -52,8 +52,10 @@ Starting points, not a cage. The goblin's paint and the game's ground colours se
   empty named `grip_2`) for the other hand, so it fits the character's hand attach points.
 - A **moving part** is its own object, named as the manifest names it (`leaf` for a door),
   with its origin at the pivot: a hinge's on the hinge line, a slide's at its closed position.
-- **States** (locked, barred, broken) are optional objects named `state_<name>`, shown only in
-  that state.
+- **States** are optional objects named `state_<name>`, shown only in that state, as the slot's
+  `states` lists them. A door's are `state_locked` (a lock plate), `state_barred` (a bar across)
+  and `state_broken` (splintered boards on the leaf: a broken door stays open). Open and closed
+  are the leaf's swing, not states.
 
 ## Budgets
 
