@@ -25,7 +25,9 @@ cd "$(dirname "$0")/.."
 LOG="$(mktemp -t psykinetic-run.XXXXXX)"
 trap 'rm -f "$LOG"' EXIT
 code=0
-for scene in tests/push_test.tscn tests/respawn_test.tscn tests/companion_test.tscn tests/spawn_test.tscn tests/mirror_test.tscn tests/edge_test.tscn tests/controls_test.tscn tests/view_test.tscn tests/level_test.tscn tests/world_map_test.tscn tests/interest_test.tscn tests/zone_test.tscn tests/chest_test.tscn tests/items_test.tscn tests/stockpile_test.tscn tests/editor_test.tscn tests/builder_test.tscn tests/builder_zone_test.tscn tests/monster_test.tscn tests/art_kit_test.tscn; do
+# Every tests/*_test.tscn, found by name, so a new test scene needs no edit here (a
+# shared list made every tree adding a test conflict with the others).
+for scene in tests/*_test.tscn; do
 	echo "### $scene"
 	# A script error aborts a test function without failing an assertion, so
 	# treat any engine error as a failure too.
