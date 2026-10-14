@@ -3674,3 +3674,28 @@ phrase, or an instruction the check confirms); undone because it could
 not be done (no way there, broken, locked) her voice says so. Every
 step is in the mind log as kind "errand". LOCK, UNLOCK and BAR follow
 the door step and items' keys.
+
+## 261. One palette, one material, for every slot's art
+
+Jeff's look (docs/art_slots_review.md): flat-shaded, faceted low-poly like
+the goblin, muted and earthy with a few saturated accents, flat colours from
+one shared palette, no painted textures for now, and one shared material for
+everything, a second only for a glowing or glass part. So
+art/kit/palette.png is the atlas, 8 rows of 8 swatches 16 px across (stone
+warm and grey, wood, earth, foliage, cloth and leather, metal, accents),
+and art/kit/palette.tres the one material that shows it (sampled nearest,
+so a face is exactly its swatch, roughness 0.9). A face is coloured by its
+UVs lying in one swatch.
+
+A .glb carries its own copy of every material, so ArtKit, loading a slot's
+own art, sets each surface whose material is named "palette" to the shared
+one on the mesh itself (every instance shares the mesh): all own art draws
+with one material, whatever file it came from. ArtCheck allows one material
+unless a slot says "materials": 2, and names any material that isn't the
+palette ("colour it from the palette"); grey boxes are one grey a box, their
+parts no longer a darker one. Budgets follow Jeff's answers: a door 600
+triangles, a prop 300 to 800, a tree 1500. Rejected: a material per colour
+(Blender's habit; dozens of draws a piece), vertex colours (no atlas for
+Jeff to repaint, and Godot's importer keeps them only on request), and
+replacing every material whatever its name (a slot's second, glowing
+material must survive).

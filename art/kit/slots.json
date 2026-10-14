@@ -54,7 +54,7 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.5, 3.0, 1.0],
-			"budget": 700,
+			"budget": 600,
 			"uses": "a door on a cell edge: the frame in the wall, its leaf swinging with the Door (Client3D._add_doorway, _sync_doors); open and closed are the leaf's swing, the other states (decision 256) are state_<name> nodes, a broken door's on its open leaf",
 			"states": ["locked", "barred", "broken"],
 			"parts": [
@@ -75,7 +75,7 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [1.75, 3.6, 1.75],
-			"budget": 800,
+			"budget": 1500,
 			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 6 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 0.7, 0], "size": [0.3, 1.4, 0.3]},
@@ -88,7 +88,7 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [2.0, 3.6, 2.0],
-			"budget": 600,
+			"budget": 1500,
 			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 4 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.25, 1.2, 0.25]},

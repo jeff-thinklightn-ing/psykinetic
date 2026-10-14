@@ -38,6 +38,11 @@ extends RefCounted
 const MANIFEST := "res://art/kit/slots.json"
 const MORE := "slots_*.json"
 const ROOT := "res://art/kit/"
+## The one material every slot's art shares (decision 261): flat colours
+## from PALETTE's swatches, sampled nearest. A .glb whose material is
+## named PALETTE_NAME draws with this one instead of its own copy.
+const PALETTE := "res://art/kit/palette.tres"
+const PALETTE_NAME := "palette"
 ## The greys a placeholder is drawn in, by category: told apart, all plainly
 ## not art.
 const GREYS := {
@@ -349,7 +354,7 @@ static func _grey_recipe(slot: String) -> Array:
 			var extent := _vec(part["size"])
 			own = [{"at": [0, extent.y * 0.5, extent.z * 0.5], "size": part["size"]}]
 		for i in own.size():
-			_grey_step(steps, node, "Box%d" % i, own[i], _grey((material.albedo_color as Color).darkened(0.15)))
+			_grey_step(steps, node, "Box%d" % i, own[i], material)
 	# A held piece's sockets (grip_2: the other hand) as empties, as its art has them.
 	var sockets: Variant = entry.get("sockets", {})
 	if str(entry.get("kind", "")) == "held" and sockets is Dictionary:
@@ -382,8 +387,27 @@ static func _grey(colour: Color) -> StandardMaterial3D:
 ## The scene at [param path], loaded once and kept.
 static func _scene(path: String) -> PackedScene:
 	if not _scenes.has(path):
-		_scenes[path] = _read_glb(path) if live and path.begins_with(ROOT) else load(path) as PackedScene
+		var own := path.begins_with(ROOT)
+		_scenes[path] = _read_glb(path) if live and own else load(path) as PackedScene
+		if own:
+			_share_palette(_scenes[path])
 	return _scenes[path]
+
+
+## [param scene]'s surfaces drawn in a material named PALETTE_NAME take the
+## shared PALETTE instead (set on the meshes, which every instance shares).
+static func _share_palette(scene: PackedScene) -> void:
+	var shared := load(PALETTE) as Material
+	var sample := scene.instantiate()
+	for node in _descendants(sample):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.mesh.surface_get_material(surface)
+			if own != null and own != shared and own.resource_name == PALETTE_NAME:
+				mesh.mesh.surface_set_material(surface, shared)
+	sample.free()
 
 
 ## A slot's file there to read: imported, or (live) on disk.

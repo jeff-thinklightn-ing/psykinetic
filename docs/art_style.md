@@ -3,39 +3,51 @@
 How the game's own art is made, so pieces made months apart sit together. Every model the game
 draws is a **slot** in `art/kit/slots.json`; this page is the rules a slot's art follows, and
 the manifest says each slot's size, origin, parts and budget. The goblin
-(`art/models/characters/goblin.blend`) is the reference for the look.
+(`art/models/characters/goblin.blend`) is the reference for the look. Jeff's answers that set
+these rules are in `docs/art_slots_review.md`.
 
 ## The look
 
-- **Low-poly and faceted.** Shapes read from the game camera (orthographic, looking down at
-  about 50°, a room on screen), not up close. Big planes, chamfers where light should catch,
-  no detail smaller than about 5 cm. Silhouette first.
-- **Flat or hand-painted colour, no photo textures.** Either flat colour per face (a
-  material per colour, baked to one later), or one hand-painted image over a UV map as the
-  goblin has (`art/models/paint/goblin_paint.png`, 2048²). No normal maps, no photo scans.
-- **Rough, not shiny.** Roughness 0.8 to 0.95 for stone, wood, cloth and earth; 0.5 to 0.65
-  for leather and skin; under 0.3 only for eyes, wet things and polished metal. Metallic 0
-  except bare metal (gate bars, nails, blades) at 1.
+- **Flat-shaded, faceted low-poly**, like the goblin. Shapes read from the game camera
+  (orthographic, looking down at about 50°, a room on screen), not up close. Big planes,
+  chamfers where light should catch, no detail smaller than about 5 cm. Silhouette first.
+  Flat shading: faces stay faceted, no smoothing across them.
+- **Flat colours from one shared palette, no painted textures** (for now). Every face takes
+  one swatch of the palette atlas (below). No gradients, normal maps or photo textures.
+- **Muted and earthy**: stone, wood, moss, leather. **A few saturated accents** for
+  torchlight, banners and magic, and nothing else.
 - **Light does the drama.** Interiors are dark and lit by torches and lanterns; outdoors a
-  day sun. Don't paint light or shadow into colours beyond a little darkening in crevices
-  (ambient occlusion, subtle). Keep albedo mid-valued (nothing near pure black or white), so
-  a torch and the sun both read.
-- **Muted and earthy, with a few saturated accents** (fire, magic, a banner). Grime and wear
-  at edges and bases, not all over.
+  day sun. Don't paint light or shadow into colours: pick a darker swatch for crevices and
+  undersides instead. Nothing near pure black or white, so a torch and the sun both read.
+- **Rough, not shiny.** The palette material's roughness is 0.9 for everything. Wear shows
+  as a darker swatch at edges and bases, not all over.
 
 ## Palette
 
-Starting points, not a cage. The goblin's paint and the game's ground colours set them.
+`art/kit/palette.png` is the atlas: 8 rows of 8 swatches, 16 px each (128 × 128), lighter to
+the left. Every piece uses the one material `palette` (`art/kit/palette.tres`), which shows
+it sampled nearest, so a face keeps exactly its swatch's colour. Colour a face by putting its
+UVs inside one swatch (the template does this for the grey box). Jeff may repaint swatches;
+keep the rows.
 
-| Use | Colours |
-|-----|---------|
-| Stone (walls, posts, cliffs) | `#ebb48e` warm sandstone (today's walls), `#8f8f8a` grey stone, `#6b6660` dark stone |
-| Wood | `#796145` light, `#5e4c41` mid, `#3b2e24` dark (beams, old planks) |
-| Earth and ground | grass `#36a340`, dirt `#755c38`, sand `#c7b380`, forest floor `#2c4224` |
-| Foliage | `#5d7742` (the goblin's green), `#4f6a35`, `#7a8f4a` lit tips |
-| Cloth | `#4c4a3b` olive, `#29231b` near-black, plus one accent per faction |
-| Metal | `#55575c` iron, `#8a6a3a` bronze |
-| Light | torch `#ffb861`, water `#336bd9` |
+| Row | Use | Swatches, light to dark |
+|-----|-----|-------------------------|
+| 0 | stone, warm (today's walls) | `#f2c9a6` `#ebb48e` `#d49c78` `#b8845f` `#9a6c4c` `#7c573d` `#5f4330` `#433024` |
+| 1 | stone, grey | `#c9c7c0` `#b0aea6` `#97958d` `#8f8f8a` `#77766f` `#6b6660` `#545049` `#3b3834` |
+| 2 | wood | `#b8946a` `#9e7c55` `#8a6a48` `#796145` `#6a523a` `#5e4c41` `#4a3a2c` `#3b2e24` |
+| 3 | earth (sand to dark soil) | `#d8c89a` `#c7b380` `#a88e5e` `#8c7148` `#755c38` `#5f4a2e` `#4a3a25` `#2c2418` |
+| 4 | foliage, moss | `#a8bf6a` `#8fa857` `#7a8f4a` `#5d7742` `#4f6a35` `#36a340` `#2f5a2a` `#2c4224` |
+| 5 | cloth, leather | `#c2b8a0` `#9c8f74` `#7a6e58` `#4c4a3b` `#6b4a35` `#55392a` `#3d2a1f` `#29231b` |
+| 6 | metal (iron, then bronze) | `#c7c9cc` `#a3a6ab` `#7d8086` `#55575c` `#3e4044` `#c79a55` `#a37d40` `#8a6a3a` |
+| 7 | accents | flame `#ffd27a`, torchlight `#ffb861`, ember `#e8792e`, banner red `#b8322a`, banner blue `#2f5aa8`, magic violet `#7a4fb0`, magic teal `#3fb8a8`, bone `#f4efe6` |
+
+## Materials
+
+**One material for everything: `palette`** (decision 261). The game swaps any material named
+`palette` in a `.glb` for the shared one, so every piece draws with the same material. A
+slot may allow a second (`"materials": 2` in the manifest) only for a special part: something
+that glows (a flame, a forge's mouth, magic) or glass. Ground, rock and wall-stone textures
+are texture slots, not materials on a model (see Budgets).
 
 ## Scale and axes
 
@@ -66,17 +78,16 @@ drawn a thousand times (a wall, a tuft) should be well under.
 |------|-----------|-------|
 | Wall module (1 m) | 300 | tiles along z; ends match wall.profile |
 | Post | 200 | |
-| Door, frame and leaf | 700 | the leaf about a third |
-| Tree | 800 | |
+| Door, frame and leaf | 600 | the leaf about a third |
+| Tree | 1500 | |
 | Rock (small), plant | 200 | |
 | Scatter (tuft, flower, stone, root) | 50 to 150 | one mesh, one material, no hierarchy: drawn by MultiMesh |
-| Prop (crate, barrel, chest) | 500 | |
+| Prop (crate, barrel, chest ...) | 300 to 800 | by size: a sack 300, a cart 800 |
 | Building | 3000 | |
 | Character (reference) | the goblin is 3,780 | pc-character owns characters |
 
-Materials: one per piece wherever possible (scatter must have one); at most three. Textures:
-512² for a prop, 1024² for a building, 2048² only for characters. Tileable textures (ground,
-rock, wall stone) say their world size in the manifest's `tile_m`.
+Materials: the one `palette` (above). Tileable textures (ground, rock, wall stone) are texture
+slots: 512 px square, tiling every 4 m (the manifest's `tile_m` gives the world size).
 
 ## Making a slot's art
 

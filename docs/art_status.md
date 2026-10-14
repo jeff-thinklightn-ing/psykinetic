@@ -33,10 +33,10 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 
 | Slot | Kind | Size (m) | Budget | Drawn from | Licence |
 |------|------|----------|--------|------------|---------|
-| `door.single` | edge | 0.5 x 3.0 x 1.0 | 700 | Castle Kit 2.0, Kenney: wall-doorway | CC0 1.0 |
+| `door.single` | edge | 0.5 x 3.0 x 1.0 | 600 | Castle Kit 2.0, Kenney: wall-doorway | CC0 1.0 |
 | `rock.small` | cell | 1.03 x 0.5 x 1.1 | 200 | Castle Kit 2.0, Kenney: rocks-small | CC0 1.0 |
-| `tree.broadleaf` | cell | 1.75 x 3.6 x 1.75 | 800 | Castle Kit 2.0, Kenney: tree-large | CC0 1.0 |
-| `tree.small` | cell | 2.0 x 3.6 x 2.0 | 600 | Castle Kit 2.0, Kenney: tree-small | CC0 1.0 |
+| `tree.broadleaf` | cell | 1.75 x 3.6 x 1.75 | 1500 | Castle Kit 2.0, Kenney: tree-large | CC0 1.0 |
+| `tree.small` | cell | 2.0 x 3.6 x 2.0 | 1500 | Castle Kit 2.0, Kenney: tree-small | CC0 1.0 |
 | `wall.post` | vertex | 0.5 x 3.0 x 0.5 | 200 | Castle Kit 2.0, Kenney: wall-narrow-corner | CC0 1.0 |
 | `wall.straight` | edge | 0.5 x 3.0 x 1.0 | 300 | Castle Kit 2.0, Kenney: wall-narrow | CC0 1.0 |
 

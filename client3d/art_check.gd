@@ -15,8 +15,9 @@ extends RefCounted
 const TOLERANCE := 0.05
 ## Metres any measure may be off by, for rounding in the export.
 const SLACK := 0.02
-## Materials a piece may have unless its slot says ("materials").
-const MATERIALS := 3
+## Materials a piece may have unless its slot says ("materials"): the
+## shared palette (decision 261); a slot with a glowing or glass part says 2.
+const MATERIALS := 1
 
 
 ## Every problem with [param slot]'s own art (none when it has none yet).
@@ -101,7 +102,12 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 		out.append("error: %d triangles, the slot's budget is %d: simplify it (Decimate, or fewer bevel segments)" % [counts.triangles, budget])
 	var allowed := int(entry.get("materials", MATERIALS))
 	if counts.materials > allowed:
-		out.append("error: %d materials, at most %d: join them into one (one image over a UV map)" % [counts.materials, allowed])
+		out.append("error: %d materials, at most %d: use the shared \"palette\" material (the template has it)%s" % [
+			counts.materials, allowed, ", and one more for the glowing or glass part" if allowed > 1 else ""])
+	var foreign: Array = counts.names.filter(func(name: String) -> bool: return name != "" and name != ArtKit.PALETTE_NAME)
+	if foreign.size() > allowed - 1 and not foreign.is_empty():
+		out.append("warning: material%s %s, not the shared \"palette\": colour it from the palette (the template's material), so it draws with every other piece" % [
+			"s" if foreign.size() > 1 else "", ", ".join(foreign.map(func(name: String) -> String: return "\"%s\"" % name))])
 	if entry.has("scatter") and (counts.meshes != 1 or counts.surfaces != 1 or counts.others > 0):
 		out.append("error: a scattered piece is one mesh with one material and nothing else (it has %d meshes, %d surfaces, %d other objects): join it into one object" % [
 			counts.meshes, counts.surfaces, counts.others])
@@ -119,7 +125,7 @@ static func _times(ratio: float) -> String:
 ## Triangles, distinct materials, meshes, their surfaces, and nodes that are
 ## neither a mesh nor the root nor a mesh's holder, under [param node].
 static func _count(node: Node3D) -> Dictionary:
-	var out := {"triangles": 0, "materials": 0, "meshes": 0, "surfaces": 0, "others": 0}
+	var out := {"triangles": 0, "materials": 0, "meshes": 0, "surfaces": 0, "others": 0, "names": []}
 	var materials := {}
 	for child in ArtKit._descendants(node):
 		var mesh := child as MeshInstance3D
@@ -139,6 +145,8 @@ static func _count(node: Node3D) -> Dictionary:
 			if material != null:
 				materials[material] = true
 	out.materials = materials.size()
+	for material: Material in materials:
+		(out.names as Array).append(material.resource_name)
 	return out
 
 

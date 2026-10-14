@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_status_current()
 	_test_live_read()
 	_test_live_is_preview_only()
+	_test_palette_shared()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -294,10 +295,46 @@ func _test_live_read() -> void:
 	door.free()
 	_check(error == OK, "a grey door written as a .glb (%s)" % error_string(error))
 	var read := ArtKit._read_glb(path).instantiate() as Node3D
-	var problems := ArtCheck.check_node("door.single", read)
+	var problems := ArtCheck.check_node("door.single", read).filter(func(line: String) -> bool: return line.begins_with("error"))
 	_check(read.find_child("leaf", true, false) != null and problems.is_empty(), "read back from disk, its leaf is there and it fits its slot %s" % [problems])
 	read.free()
 	DirAccess.remove_absolute(path)
+
+
+func _test_palette_shared() -> void:
+	print("
+== one material: art coloured from the palette draws with the shared one; another is named ==")
+	var shared := load(ArtKit.PALETTE) as StandardMaterial3D
+	_check(shared != null and shared.albedo_texture != null and shared.texture_filter == BaseMaterial3D.TEXTURE_FILTER_NEAREST,
+			"%s: the atlas, sampled nearest" % ArtKit.PALETTE)
+	var own := StandardMaterial3D.new()
+	own.resource_name = ArtKit.PALETTE_NAME
+	var root := Node3D.new()
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = BoxMesh.new()
+	mesh.mesh.surface_set_material(0, own)
+	root.add_child(mesh)
+	mesh.owner = root
+	var scene := PackedScene.new()
+	scene.pack(root)
+	root.free()
+	ArtKit._share_palette(scene)
+	var drawn := scene.instantiate()
+	_check((drawn.get_child(0) as MeshInstance3D).mesh.surface_get_material(0) == shared, "a .glb's own \"palette\" material is swapped for the shared one")
+	drawn.free()
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	var door := ArtKit.instance("door.single")
+	var other := StandardMaterial3D.new()
+	other.resource_name = "Material.001"
+	for box in door.find_children("*", "MeshInstance3D", true, false):
+		(box as MeshInstance3D).material_override = other
+	var problems := ArtCheck.check_node("door.single", door)
+	_check(problems.any(func(line: String) -> bool: return line.begins_with("warning") and "Material.001" in line and "palette" in line),
+			"a material of its own is named, with what to use instead: %s" % [problems])
+	door.free()
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
 
 
 ## Only the preview reads art live: the game, its tools and the export
