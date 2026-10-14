@@ -95,6 +95,15 @@ const SPAWN_SAFE_DISTANCE := 5
 ## Ticks a newly spawned player is ignored by monsters, unless it moves or
 ## attacks first.
 const SPAWN_GRACE_TICKS := 30
+## A client that loses the server it played on tries again this often, for
+## this long (decision 240).
+const RECONNECT_EVERY := 2.0
+const RECONNECT_FOR := 180.0
+## The console's restart: what a dedicated server exits with, which the
+## systemd unit (Restart=on-failure) starts again; and the seconds left at
+## which players are told again, after the first word.
+const RESTART_EXIT_CODE := 75
+const RESTART_WARNINGS: Array[int] = [10, 3]
 ## --test-exit-on: the ticks a client in the game sees after the file appears.
 const TEST_EXIT_SETTLE_TICKS := 20
 ## With --state, the server writes its snapshot this often.
@@ -179,6 +188,15 @@ const CHAT_INTERVAL := 2.0
 var _had_player := false
 ## Client: the server said why it turned us away; keep that message up.
 var _rejected := false
+## Client: trying to get back to the server (decision 240).
+var _reconnecting := false
+## Server: when the console's restart is due (msec), -1 when none is, and
+## what the server exits with then (RESTART_EXIT_CODE, or 0 for stop).
+var _restart_at := -1
+var _restart_exit := RESTART_EXIT_CODE
+var _restart_why := ""
+## RESTART_WARNINGS already given (or longer than the countdown).
+var _restart_told: Array[int] = []
 ## Right button held on this entity: released without a drag it is a shove,
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
@@ -402,6 +420,7 @@ func _process(delta: float) -> void:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
 	_poll_console()
+	_count_down_restart()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -2762,10 +2781,129 @@ func _on_server_disconnected() -> void:
 	if _rejected:
 		return  # The reason is already on screen.
 	if _had_player:
-		hud.text = "disconnected from server"
+		_reconnect()
 	else:
 		hud.text = "authentication failed"
 		print("[net] authentication failed: disconnected before a player was spawned")
+
+
+## Client: the server it played on went away (a restart, a crash): its
+## zone's entities go, and it connects again every RECONNECT_EVERY seconds
+## for RECONNECT_FOR; once it is back in, the server sends the zone as on a
+## first join (decision 240).
+func _reconnect() -> void:
+	if _reconnecting:
+		return
+	_reconnecting = true
+	print("[net] lost the server; reconnecting every %d s for %d s" % [RECONNECT_EVERY, RECONNECT_FOR])
+	_drop_zone_entities()
+	var started := Time.get_ticks_msec()
+	var tries := 0
+	hud.text = "server restarting, reconnecting…"
+	while Time.get_ticks_msec() - started < RECONNECT_FOR * 1000.0:
+		await get_tree().create_timer(RECONNECT_EVERY).timeout
+		tries += 1
+		hud.text = "server restarting, reconnecting… (%d)" % tries
+		if Net.reconnect() and await _connection_settled():
+			print("[net] reconnected (try %d)" % tries)
+			_reconnecting = false
+			return
+	print("[net] gave up reconnecting after %d tries" % tries)
+	hud.text = "the server is gone: start the game again to rejoin"
+	_reconnecting = false
+
+
+## Whether the connection Net.reconnect began got through (false when it
+## failed or is still trying after 10 s).
+func _connection_settled() -> bool:
+	var deadline := Time.get_ticks_msec() + 10000
+	var link := multiplayer.multiplayer_peer
+	while link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTING \
+			and Time.get_ticks_msec() < deadline:
+		await get_tree().create_timer(0.1).timeout
+	return link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+
+
+## Client: the zone's entities go, as on a change of zone, with the map left
+## as it is; the server sends them again when the player is back.
+func _drop_zone_entities() -> void:
+	if entities != null:
+		entities.free()
+	if spawner != null:
+		spawner.free()
+	World.mirror_reset()
+	_zone_nodes(map_name)
+	World.mirror_terrain(_terrain)
+	_repaint()
+
+
+# --- Restart (decision 240) ------------------------------------------------------
+
+## Server: the console's restart and stop. In [param seconds] the world is
+## saved, the players let go and the server exits: restart with
+## RESTART_EXIT_CODE, for systemd to start it again; stop with 0, which
+## systemd leaves down, for deploy.sh to install the new build and start it
+## (the running server reads its .pck as it goes, so it must not be replaced
+## under it). Clients reconnect by themselves either way. Players hear it from
+## "Server" in the party chat now and at RESTART_WARNINGS seconds left: three
+## lines at most.
+func _restart_command(words: PackedStringArray) -> String:
+	if words.size() >= 2 and words[1] == "cancel":
+		if _restart_at < 0:
+			return "no restart is due"
+		_restart_at = -1
+		_server_says("The restart is off.")
+		return "restart cancelled"
+	var seconds := 60
+	var why_from := 1
+	if words.size() >= 2 and words[1].is_valid_int():
+		seconds = maxi(0, words[1].to_int())
+		why_from = 2
+	_restart_why = " ".join(words.slice(why_from))
+	_restart_at = Time.get_ticks_msec() + seconds * 1000
+	_restart_exit = RESTART_EXIT_CODE if words[0].to_lower() == "restart" else 0
+	_restart_told.clear()
+	for left in RESTART_WARNINGS:
+		if left >= seconds:
+			_restart_told.append(left)
+	var because := " (%s)" % _restart_why if not _restart_why.is_empty() else ""
+	if seconds > 0:
+		_server_says("Restarting in %d s%s; you'll be reconnected." % [seconds, because])
+	return "restarting in %d s%s, %d connected, then exiting %d%s (restart cancel to call it off)" % [
+		seconds, because, _players.size(), _restart_exit,
+		"" if _restart_exit != 0 else ": down until started"]
+
+
+## Server: tells the players what is left of a restart, and restarts when
+## it is time. Every frame.
+func _count_down_restart() -> void:
+	if _restart_at < 0:
+		return
+	var left := (_restart_at - Time.get_ticks_msec()) / 1000.0
+	for warning in RESTART_WARNINGS:
+		if left <= warning and warning not in _restart_told:
+			_restart_told.append(warning)
+			_server_says("Restarting in %d s." % warning)
+	if left > 0.0:
+		return
+	_restart_at = -1
+	print("[admin] restarting%s: saving, letting %d players go, exiting %d" % [
+		" (%s)" % _restart_why if not _restart_why.is_empty() else "", _players.size(), _restart_exit])
+	_save_state()
+	# Each client is let go, so it hears at once rather than when it times
+	# out, and reconnects; the disconnects go out before the server quits,
+	# and nobody new comes in meanwhile (a reconnect would find it going).
+	multiplayer.multiplayer_peer.refuse_new_connections = true
+	for peer in multiplayer.get_peers():
+		multiplayer.multiplayer_peer.disconnect_peer(peer)
+	await get_tree().create_timer(0.5).timeout
+	get_tree().quit(_restart_exit)
+
+
+## Server: a line to every player, from "Server", in the party chat.
+func _server_says(text: String) -> void:
+	print("[admin] told everyone: %s" % text)
+	Net.broadcast("party", {"from": "Server", "text": text})
 
 
 # --- Server console -----------------------------------------------------------
@@ -2936,6 +3074,8 @@ func admin_command(line: String) -> String:
 			return Transcript.show(who, words[2] if words.size() >= 3 else "")
 		"version":
 			return "v%s protocol %s" % [Net.version, Net.protocol()]
+		"restart", "stop":
+			return _restart_command(words)
 		"net":
 			var peers: Array[String] = []
 			var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
@@ -2943,10 +3083,9 @@ func admin_command(line: String) -> String:
 				var link := enet.get_peer(peer) if enet != null else null
 				if link != null:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
-			return "%s
-%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
+			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name>"
 	return "unknown command %s (try help)" % words[0]

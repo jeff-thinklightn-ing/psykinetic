@@ -24,6 +24,7 @@ STATE="$LOGS/world.json"
 # Fixed identities for the players whose return we check.
 ID_C=c0ffee00-0000-4000-8000-00000000000c
 ID_D=d0d0d0d0-0000-4000-8000-00000000000d
+ID_R=5e5e5e5e-0000-4000-8000-00000000000e
 
 # Every instance quits when the script makes its file ($LOGS/<name>.done),
 # once what the phase waits for is in the logs; nothing waits a fixed time,
@@ -170,6 +171,30 @@ wait_for server4 '\[world\] Ivy reset the room'
 wait_for server4 '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' 4
 finish
 
+# Phase 5: the console's restart (decision 240). Rex walks two tiles west;
+# the server is told to restart in 3 s: it tells him, saves, and exits 75,
+# which systemd would start again: here the script starts it again from the
+# same snapshot. Rex's client reconnects by itself and is put back where he
+# stood.
+ADMIN=$((PORT + 11))
+admin() {
+	exec 3<>"/dev/tcp/127.0.0.1/$ADMIN"
+	printf '%s\n' "$*" >&3
+	cat <&3
+	exec 3<&-
+}
+server server5 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$LOGS/restart.json" "--admin-port=$ADMIN"
+wait_for server5 'console on'
+client clientR $GOOD --name=Rex "--player-id=$ID_R" --test-move=-2,0
+wait_for clientR '\[test\] Player[0-9]+ arrived'
+admin restart 3 a test >"$LOGS/admin.txt" 2>&1
+restart_code=0
+eval "wait \$pid_server5" || restart_code=$?
+server server6 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$LOGS/restart.json" "--admin-port=$ADMIN"
+wait_for server6 'Rex \(5e5e5e5e\) joined'
+wait_for clientR '\[net\] reconnected'
+finish
+
 failures=0
 check() {
 	if [ "$1" = "$2" ]; then
@@ -244,6 +269,14 @@ check "$(count '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' "$LOGS/server
 # Hal stood on the crate's spawn tile, so he is put on the nearest free one.
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=' "$LOGS/clientI.log")" 1 "phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself"
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)' "$LOGS/clientH.log")" 1 "phase 4: Hal, who did not ask, sees the same room"
+check "$(count 'restarting in 3 s \(a test\), 1 connected' "$LOGS/admin.txt")" 1 "phase 5: the console says the restart is due"
+check "$(count "\\[party\\] Server: Restarting in 3 s \\(a test\\); you'll be reconnected\\." "$LOGS/clientR.log")$(count '\[party\] Server:' "$LOGS/clientR.log")" 11 "phase 5: Rex is told once (a countdown of 3 s has no later warnings)"
+check "$(count '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75' "$LOGS/server5.log")" 1 "phase 5: the server saves and lets him go"
+check "$restart_code" 75 "phase 5: and exits 75, for systemd to start it again"
+check "$(count '\[net\] lost the server; reconnecting' "$LOGS/clientR.log")$(count '\[net\] reconnected \(try [0-9]+\)' "$LOGS/clientR.log")" 11 "phase 5: Rex's client reconnects by itself"
+check "$(count '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)' "$LOGS/server6.log")" 1 "phase 5: the restarted server puts him back on (9, 2)"
+check "$(count '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)' "$LOGS/clientR.log")" 1 "phase 5: and his client shows him there"
+check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)$' "$LOGS/clientR.log")" 1 "phase 5: and the room as it was, its entities sent again"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

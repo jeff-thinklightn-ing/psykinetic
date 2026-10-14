@@ -3829,3 +3829,34 @@ How they are named and shaped:
 
 The buildings land first, as the buildings tree waits on them; the rest
 follows in its own landing under this decision.
+
+## 240. A server restarts with a countdown, and clients reconnect by themselves
+
+Every deploy used to be `systemctl restart`: everyone was cut off without a
+word, and a client that lost the server stayed on "disconnected from
+server" until it was started again. Now the console has `restart
+[<seconds>] [<why>]` (60 by default): the players are told in the party
+chat, from "Server", at once and at 10 and 3 seconds left (three lines at
+most, fewer for a short countdown); at 0 the server saves the snapshot,
+disconnects each client (so it hears at once, not on a timeout), refuses
+new connections for the half second the disconnects take to go out, and
+exits with code 75, which the unit's Restart=on-failure starts again after
+RestartSec=5. `stop` is the same countdown exiting 0, which systemd leaves
+down: deploy.sh uses it, because a running server reads its .pck as it
+goes, so the new build may only be installed once it has exited. deploy.sh
+then installs and starts it, restarting it anyway if it is still up a
+minute after the countdown or anything fails once it has stopped; a server
+too old for `stop`, none running, or `--now` gets the old install and
+restart. `restart cancel` calls either off.
+
+A client that loses the server it played on (a restart, a crash) drops the
+zone's entities, as on a change of zone, and connects again every 2
+seconds for 3 minutes ("server restarting, reconnecting… (n)"), with the
+same player id, so the server puts it back where it was saved; the map
+message and the zone's entities come as on a first join. One that never
+had a player (a wrong token, a rejection) does not retry. Nothing new goes
+over the wire: the countdown is party chat and the reconnect a new
+connection, so the protocol is unchanged. net_test's restart phase has a
+client play, the console restart the server in 3 s, the script start it
+again from the snapshot as systemd would, and the client come back on its
+tile by itself.

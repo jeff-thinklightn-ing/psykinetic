@@ -15,6 +15,9 @@ top section as the release notes.
   back to tell you what they saw. "I'll check the chest" with no chest
   in sight is no longer said. A monster coming near, a new order from
   you or taking too long calls them back.
+- When the server is updated, everyone is told a minute ahead in the party
+  chat, and the game reconnects by itself once the server is back,
+  putting you where you stood (it keeps trying for 3 minutes).
 - A client and the server no longer need to be the very same build to
   play together: only what they send each other has to match. A release
   that changes only how the game looks no longer needs the server updated,

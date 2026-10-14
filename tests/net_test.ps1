@@ -21,6 +21,7 @@ $state = Join-Path $logs 'world.json'
 # Fixed identities for the players whose return we check.
 $idC = 'c0ffee00-0000-4000-8000-00000000000c'
 $idD = 'd0d0d0d0-0000-4000-8000-00000000000d'
+$idR = '5e5e5e5e-0000-4000-8000-00000000000e'
 
 # Servers read console commands from stdin; give them a closed one.
 $noStdin = Join-Path $logs 'stdin.empty'
@@ -199,6 +200,36 @@ Stop-Instance 'clientM'
 Wait-Log 'server6' 'Max \([a-z0-9-]+\) left'
 Complete-Phase
 
+# Phase 7: the console's restart (decision 240). Rex walks two tiles west;
+# the server is told to restart in 3 s: it tells him, saves, and exits 75,
+# which systemd would start again: here the script starts it again from the
+# same snapshot. Rex's client reconnects by itself and is put back where he
+# stood.
+$adminPort = $port + 11
+$restartState = Join-Path $logs 'restart.json'
+function Send-Admin($line) {
+	$tcp = New-Object Net.Sockets.TcpClient('127.0.0.1', $adminPort)
+	$stream = $tcp.GetStream()
+	$writer = New-Object IO.StreamWriter($stream)
+	$writer.WriteLine($line)
+	$writer.Flush()
+	$reply = (New-Object IO.StreamReader($stream)).ReadToEnd()
+	$tcp.Close()
+	$reply
+}
+Start-Server 'server7' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--state=`"$restartState`"", "--admin-port=$adminPort")
+Wait-Log 'server7' 'console on'
+Start-Client 'clientR' ($good + @('--name=Rex', "--player-id=$idR", '--test-move=-2,0'))
+Wait-Log 'clientR' '\[test\] Player\d+ arrived'
+$adminReply = Send-Admin 'restart 3 a test'
+$restarting = $script:instances['server7']
+if (-not $restarting.WaitForExit(60000)) { $restarting | Stop-Process -Force }
+$restartCode = $restarting.ExitCode
+Start-Server 'server8' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--state=`"$restartState`"", "--admin-port=$adminPort")
+Wait-Log 'server8' 'Rex \(5e5e5e5e\) joined'
+Wait-Log 'clientR' '\[net\] reconnected'
+Complete-Phase
+
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
 	if (Test-Path $path) { @(Get-Content $path) } else { @() }
@@ -227,6 +258,9 @@ $clientKLog = Read-Log 'clientK'
 $server6Log = Read-Log 'server6'
 $clientMLog = Read-Log 'clientM'
 $clientLLog = Read-Log 'clientL'
+$server7Log = Read-Log 'server7'
+$server8Log = Read-Log 'server8'
+$clientRLog = Read-Log 'clientR'
 
 $script:failures = 0
 function Assert($ok, $label) {
@@ -306,6 +340,14 @@ Assert (@($clientLLog | Select-String '\[test\] Player2 drags bandaging_kit from
 Assert (@($server6Log | Select-String 'slots: Player2 moved bandaging_kit from Chest1 0 to Player2 0').Count -eq 1) 'phase 6: the server moves it'
 Assert (@($clientLLog | Select-String '\[test\] slots: Chest1=\[\] Player2=\[bandaging_kit\]$').Count -eq 1) 'phase 6: Lee sees the chest empty and the kit in their slots (Max has gone by then)'
 Assert (@($clientMLog | Select-String '\[test\] slots: Chest1=\[\] Player1=\[\] Player2=\[bandaging_kit\]$').Count -eq 1) 'phase 6: Max, who did nothing, sees the same'
+Assert ($adminReply -match 'restarting in 3 s \(a test\), 1 connected') "phase 7: the console says the restart is due ($adminReply)"
+Assert (@($clientRLog | Select-String "\[party\] Server: Restarting in 3 s \(a test\); you'll be reconnected\.").Count -eq 1 -and @($clientRLog | Select-String '\[party\] Server:').Count -eq 1) 'phase 7: Rex is told once (a countdown of 3 s has no later warnings)'
+Assert (@($server7Log | Select-String '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75').Count -eq 1) 'phase 7: the server saves and lets him go'
+Assert ($restartCode -eq 75) "phase 7: and exits 75, for systemd to start it again (exit $restartCode)"
+Assert (@($clientRLog | Select-String '\[net\] lost the server; reconnecting').Count -eq 1 -and @($clientRLog | Select-String '\[net\] reconnected \(try \d+\)').Count -eq 1) "phase 7: Rex's client reconnects by itself"
+Assert (@($server8Log | Select-String '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)').Count -eq 1) 'phase 7: the restarted server puts him back on (9, 2)'
+Assert (@($clientRLog | Select-String '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)').Count -eq 1) 'phase 7: and his client shows him there'
+Assert (@($clientRLog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)$').Count -eq 1) 'phase 7: and the room as it was, its entities sent again'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

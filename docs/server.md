@@ -76,10 +76,30 @@ It does, in order, in `~/psykinetic`: `git clean -f -- '*.uid' '*.import'`
 the repo brings its own copy; tracked and ignored files are untouched);
 `git pull --ff-only`; a headless import (`--import`), only ever after the
 pull; a headless export of the `Linux Server` preset to `build/`; copies the binary to
-`/opt/psykinetic/psykinetic-server` and the `.pck` next to it;
-`systemctl restart psykinetic`; prints the service status. Without
+`/opt/psykinetic/psykinetic-server` and the `.pck` next to it (the running
+server keeps the files it started from); restarts it gracefully; prints the
+service status. Without
 `GODOT_PATH` set (as over a non-interactive ssh, where `.bashrc` is not
 read) it uses the newest `~/godot/Godot_v*_linux.x86_64`.
+
+The graceful restart (decision 240): once the build is exported,
+`deploy.sh` asks the running server for `stop 60 update` on the console.
+The players are told in the party chat, from `Server`, now and at 10 and 3
+seconds left; at 0 the server saves the snapshot, lets everyone go and
+exits 0, which the unit's `Restart=on-failure` leaves down. Only then is
+the new build installed (a running server reads its `.pck` as it goes, so
+it is never replaced under one) and started with `systemctl restart`.
+Clients reconnect by themselves (every 2 seconds, for 3 minutes, the HUD
+saying `server restarting, reconnecting… (n)`) and are put back where they
+stood. If the server is still up a minute after the countdown, or anything
+fails once it has stopped, `deploy.sh` installs and restarts it anyway.
+`PSYKINETIC_RESTART_SECONDS` changes the countdown; `deploy.sh --now`
+installs and restarts at once, as does a server too old to know `stop`, or
+one not running.
+
+`restart` on the console is the same countdown with exit code 75, which
+systemd starts again after `RestartSec=5`, as the same build: a restart
+without a deploy.
 
 From the dev machine, `tools\ship.ps1` runs it over ssh as its last step
 (`$env:PSYKINETIC_BOX`, default `jequig@100.78.120.114`), streams its
@@ -120,7 +140,8 @@ kept.
 
 The sudo commands `deploy.sh` runs: `install` (three times),
 `systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the
-ones `/etc/sudoers.d/psykinetic-deploy` allows without a password.
+ones `/etc/sudoers.d/psykinetic-deploy` allows without a password. The
+countdown needs no sudo: `admin.sh` and `systemctl is-active`.
 
 `PSYKINETIC_REPO` overrides the repo location.
 
@@ -157,7 +178,11 @@ where, with what hp), `save` (write the snapshot now). Also `companions`,
 asleep, its tick and who is in it), `zone reset <name>` (rebuild that zone
 from its map, loading it if need be; `reset` alone rebuilds the default
 zone), `zone move <player> <zone>` (send a player and their companion
-there), and
+there), `version` (the build and protocol it runs), `restart [<seconds>]
+[<why>]` (60 by default: count down, telling the players, then save and
+exit 75 for systemd to start it again; the clients reconnect; see Deploy),
+`stop [<seconds>] [<why>]` (the same, exiting 0: down until started, as
+`deploy.sh` does), `restart cancel`, and
 `transcript <name> [<YYYY-MM-DD>]` (a companion's transcript, today's by
 default); `help` lists them.
 
@@ -177,6 +202,7 @@ bash's `/dev/tcp`, no netcat needed:
 ~/psykinetic/server/admin.sh respawn
 ~/psykinetic/server/admin.sh reset
 ~/psykinetic/server/admin.sh save
+~/psykinetic/server/admin.sh restart 30 a quick fix
 ~/psykinetic/server/admin.sh transcript pip
 ```
 

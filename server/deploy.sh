@@ -1,6 +1,12 @@
 #!/usr/bin/env sh
 # Deploys the dedicated server on this box: clean, pull, import, export,
 # install, restart.
+#   server/deploy.sh         once the build is made, the running server counts
+#                            down 60 s (PSYKINETIC_RESTART_SECONDS), telling
+#                            the players, saves and exits; the new build is
+#                            installed and started, and the clients reconnect
+#                            by themselves (decision 240)
+#   server/deploy.sh --now   installs and restarts at once, without a countdown
 # Expects the repo at ~/psykinetic (or $PSYKINETIC_REPO), a Linux Godot
 # editor binary with the Linux export templates installed (GODOT_PATH, or
 # the newest ~/godot/Godot_v*_linux.x86_64 when that is not set, as over a
@@ -8,6 +14,15 @@
 # server/psykinetic.service already installed. See docs/server.md.
 # Every sudo here is covered by /etc/sudoers.d/psykinetic-deploy.
 set -eu
+
+NOW=0
+for arg in "$@"; do
+	case "$arg" in
+		--now) NOW=1 ;;
+		*) echo "usage: $0 [--now]" >&2; exit 2 ;;
+	esac
+done
+COUNTDOWN="${PSYKINETIC_RESTART_SECONDS:-60}"
 
 REPO="${PSYKINETIC_REPO:-$HOME/psykinetic}"
 GODOT="${GODOT_PATH:-$(ls -1 "$HOME"/godot/Godot_v*_linux.x86_64 2>/dev/null | sort -V | tail -n 1)}"
@@ -32,10 +47,39 @@ mkdir -p build
 test -s build/psykinetic-server.x86_64
 test -s build/psykinetic-server.pck
 
+# The graceful restart (decision 240): the console's stop counts down,
+# telling the players, saves and exits 0, which the unit's Restart=on-failure
+# leaves down; the new build goes in only then (a running server reads its
+# .pck as it goes) and is started. Clients reconnect by themselves. A server
+# too old for it, none running, or --now: install and systemctl restart, as
+# before.
+graceful=0
+if [ "$NOW" -eq 0 ] && systemctl is-active --quiet psykinetic; then
+	reply="$(bash "$REPO/server/admin.sh" stop "$COUNTDOWN" update 2>&1 || true)"
+	echo "deploy: $reply"
+	case "$reply" in
+		restarting*) graceful=1 ;;
+	esac
+fi
+if [ "$graceful" -eq 1 ]; then
+	# Whatever goes wrong from here, the server is started again.
+	trap 'sudo systemctl restart psykinetic' EXIT
+	waited=0
+	while systemctl is-active --quiet psykinetic; do
+		waited=$((waited + 1))
+		if [ "$waited" -gt $((COUNTDOWN + 60)) ]; then
+			echo "deploy: still running ${waited} s after its stop; installing and restarting it"
+			break
+		fi
+		sleep 1
+	done
+fi
+
 sudo install -d -o psykinetic -g psykinetic "$INSTALL_DIR"
 sudo install -m 755 build/psykinetic-server.x86_64 "$INSTALL_DIR/psykinetic-server"
 sudo install -m 644 build/psykinetic-server.pck "$INSTALL_DIR/psykinetic-server.pck"
 
 sudo systemctl restart psykinetic
+trap - EXIT
 # Piped, so systemctl uses no pager; the exact words sudoers allows.
 sudo systemctl status psykinetic | head -n 12

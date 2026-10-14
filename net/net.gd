@@ -131,7 +131,10 @@ signal join_rejected(reason: String, server_version: String)
 ## kinds (MESSAGE_KINDS); the spawn spec format (EntityFactory.SPEC_VERSION).
 ## Bump PROTOCOL_REVISION for a wire change it cannot see: a message's or an
 ## RPC's fields or their meaning, a replicated value's meaning or units, a
-## spawn spec key, the order of anything sent. tests/protocol_test checks
+## spawn spec key, the order of anything sent. Not for a new spawn spec key
+## or message field that older peers ignore and whose absence means today's
+## behaviour (an "art" key, drawn as today's shape without it); one whose
+## presence or absence changes play needs it. tests/protocol_test checks
 ## that every message kind, RPC script and replicated property is listed
 ## here. 7: a carrier's slots are 6, the pack and two hands (decision 247).
 ## 8: crates and carts are Cargo, their slots replicated (decision 259).
@@ -1080,6 +1083,22 @@ func start() -> void:
 	multiplayer.multiplayer_peer = peer
 	local_id = multiplayer.get_unique_id()
 	online = true
+
+
+## Client: connects to the same server again, after it went away (a
+## restart, decision 240), with the same player id, so the server puts the
+## player back where it saved them. False if no connection could be begun.
+func reconnect() -> bool:
+	shutdown()
+	var peer := ENetMultiplayerPeer.new()
+	var error := peer.create_client(address, port)
+	if error != OK:
+		print("[net] cannot connect to %s:%d (%s)" % [address, port, error_string(error)])
+		return false
+	multiplayer.multiplayer_peer = peer
+	local_id = multiplayer.get_unique_id()
+	online = true
+	return true
 
 
 func _on_connected_to_server() -> void:
