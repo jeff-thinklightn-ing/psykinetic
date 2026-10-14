@@ -235,6 +235,38 @@ func _test_heights() -> void:
 		if around.has(stair_index) and around.has(upper_index):
 			shared = true
 	_check(upper_index >= 0 and shared, "the ramp's top meets the cell above it, no step between")
+	# No rock face where the sim walks: between cells at one height with no
+	# wall, or a stair and the cell it climbs to.
+	var heights: Dictionary = terrain["heights"]
+	var walked := []
+	for edge: Array in _rig._cliff_edges:
+		var from: Vector2i = edge[0]
+		var direction: Vector2i = edge[1]
+		var to := from + direction
+		if not _rig._grounds.has(to) or terrain["edges"].get(Terrain.edge_key(from, direction), Terrain.Edge.OPEN) == Terrain.Edge.WALL:
+			continue
+		var level: int = heights.get(from, 0)
+		var other: int = heights.get(to, 0)
+		if level == other or stairs.get(from) == direction or stairs.get(to) == -direction:
+			walked.append(edge)
+	_check(not _rig._cliff_edges.is_empty() and walked.is_empty(),
+			"a rock face only on a ledge, none where the sim walks (%d faces; on walked edges: %s)" % [_rig._cliff_edges.size(), walked])
+	# A ramp's side: the cell beside it at the stair's height shares the
+	# ramp's raised corner (one vertex for the stair, the cell above, and it).
+	var welded := 0
+	var sides := 0
+	for side: Vector2i in [Vector2i(up.y, up.x), -Vector2i(up.y, up.x)]:
+		var beside := stair + side
+		if not _rig._grounds.has(beside) or heights.get(beside, 0) != low:
+			continue
+		sides += 1
+		var wanted := [stair_index, upper_index, _rig._grounds[beside]]
+		for vertex in _rig._vertex_chunk.size():
+			var around := Array(_rig._vertex_cells.slice(vertex * 4, vertex * 4 + 4))
+			if wanted.all(func(index: int) -> bool: return around.has(index)):
+				welded += 1
+				break
+	_check(sides > 0 and welded == sides, "beside the ramp the ground slopes up with it, welded at its corner (%d of %d sides)" % [welded, sides])
 	_check(not _rig._room.find_children("Cliffs_*", "MeshInstance3D", false, false).is_empty()
 			and _rig._room.find_children("Stair_*", "", false, false).is_empty()
 			and _rig._room.find_children("Cliff_*", "", false, false).is_empty(),

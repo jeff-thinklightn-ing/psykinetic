@@ -616,6 +616,11 @@ var _sun: DirectionalLight3D
 var _outdoor := false
 ## Floor and water cells: the land the forest stands around.
 var _land: Dictionary[Vector2i, bool] = {}
+## Corner levels where they are not a cell's height: stairs' ramps and the
+## cells round them (_shape_ramps).
+var _ramp_levels: Dictionary[Vector2i, PackedInt32Array] = {}
+## Each rock face drawn: [the cell above, the direction it faces].
+var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
 var _see_through: Dictionary[Material, Material] = {}
 ## [piece, its bounds, is a tree, the pieces that fade with it], for every
@@ -1141,24 +1146,46 @@ func _ground_height(grid: Vector2) -> float:
 ## How high [param cell]'s ground is at [param point] (on it or its edge):
 ## flat at its height, or a stair's ramp, a level up across the cell.
 func _height_in(cell: Vector2i, point: Vector2) -> float:
-	var height := float(_height(cell))
-	var up := _stair(cell)
-	if up != Vector2i.ZERO:
-		height += clampf((point - Vector2(cell)).dot(Vector2(up)) + 0.5, 0.0, 1.0)
-	return height * LEVEL_RISE
+	var levels := _corner_levels(cell)
+	var at := (point - Vector2(cell) + Vector2(0.5, 0.5)).clamp(Vector2.ZERO, Vector2.ONE)
+	var top := lerpf(levels[0], levels[1], at.x)
+	var bottom := lerpf(levels[2], levels[3], at.x)
+	return lerpf(top, bottom, at.y) * LEVEL_RISE
 
 
-## The levels of [param cell]'s corners (GROUND_CORNERS): its height, and on
-## a stair, the two on its high side a level up.
+## The levels of [param cell]'s corners (GROUND_CORNERS): its height, or
+## as _shape_ramps left them round a stair.
 func _corner_levels(cell: Vector2i) -> PackedInt32Array:
+	if _ramp_levels.has(cell):
+		return _ramp_levels[cell]
 	var height := _height(cell)
-	var levels := PackedInt32Array([height, height, height, height])
-	var up := _stair(cell)
-	if up != Vector2i.ZERO:
+	return PackedInt32Array([height, height, height, height])
+
+
+## The corners a stair raises: its two on its high side a level up (a ramp
+## to the cell above), and the same corner of every cell round them at the
+## stair's own height, which the sim walks onto the stair from the side: so
+## the ground slopes off the ramp's side, all of it one vertex, where a step
+## up beside the ramp would show a ledge the sim does not have.
+func _shape_ramps() -> void:
+	_ramp_levels.clear()
+	var stairs: Dictionary = _terrain.get("stairs", {})
+	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
+	for stair: Vector2i in stairs:
+		var up: Vector2i = stairs[stair]
+		var height := _height(stair)
 		for c in 4:
-			if (Vector2(GROUND_CORNERS[c]) - Vector2(0.5, 0.5)).dot(Vector2(up)) > 0.0:
-				levels[c] += 1
-	return levels
+			if (Vector2(GROUND_CORNERS[c]) - Vector2(0.5, 0.5)).dot(Vector2(up)) <= 0.0:
+				continue
+			var corner := stair + GROUND_CORNERS[c]
+			for a in 4:
+				var cell := corner + around[a]
+				if cell != stair and (not _land.has(cell) or stairs.has(cell) or _height(cell) != height):
+					continue
+				var levels: PackedInt32Array = _ramp_levels.get(cell, PackedInt32Array([height, height, height, height]))
+				# The corner is this cell's corner 3 - a.
+				levels[3 - a] = height + 1
+				_ramp_levels[cell] = levels
 
 
 ## Lies a flat mark (hover, ripple) on [param cell]'s ground, [param lift]
@@ -1644,6 +1671,7 @@ func _build_room() -> void:
 	_land.clear()
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
+	_shape_ramps()
 	_build_ground(kinds)
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
@@ -2059,6 +2087,7 @@ func _add_cliffs() -> void:
 		Vector2i(0, 1): [[3, 2], [1, 0]], Vector2i(0, -1): [[0, 1], [2, 3]],
 	}
 	var faces: Dictionary[Vector2i, Array] = {}
+	_cliff_edges.clear()
 	for cell: Vector2i in floor_cells:
 		var own := _corner_levels(cell)
 		if own[0] == 0 and own[1] == 0 and own[2] == 0 and own[3] == 0:
@@ -2077,6 +2106,7 @@ func _add_cliffs() -> void:
 			var bottom := Vector2(mini(own[mine[0]], theirs[their[0]]), mini(own[mine[1]], theirs[their[1]]))
 			if top == bottom:
 				continue
+			_cliff_edges.append([cell, direction])
 			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 			if not faces.has(chunk):
 				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]

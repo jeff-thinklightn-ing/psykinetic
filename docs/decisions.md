@@ -2915,7 +2915,12 @@ and every other rise is a cliff. The ground (216) now gives each cell's
 corners a level (Client3D._corner_levels): its height, and on a stair the
 two corners on its high side a level up, so a stair is a ramp sharing its
 top corners with the cell above and its bottom ones with the cell below,
-and side by side stairs make one wide ramp. The stone steps are gone. The
+and side by side stairs make one wide ramp. The stone steps are gone.
+The sim also walks onto a stair from the side, from a cell at the stair's
+own height, so a ramp's raised corner is raised for every cell round it at
+that height too (_shape_ramps): the ground beside slopes up with it, one
+vertex for all of them, where a wedge of rock would have shown a ledge the
+sim does not have (view_test: no rock face on any edge the sim walks). The
 ground's normals follow it (each corner the sum of its faces). A puppet's
 height (_ground_height) follows the ramp across the cell, and the flat
 marks lie on it: the hover outline and click ripple at the ramp's middle,
