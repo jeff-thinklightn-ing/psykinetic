@@ -3,6 +3,19 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.123
+
+Client and server.
+
+- Big maps run smoother on the server: monsters far from every player
+  think less often, and those farther still are moved on by a slow world
+  tick instead of every tick. A monster left away from its post after a
+  fight goes back to it while nobody is around, even in a zone nobody is
+  in.
+- The network log line for a correction now says how far off you were.
+
+The server must be updated to v0.1.123 too, as it refuses any other version.
+
 ## v0.1.122
 
 Client and server.

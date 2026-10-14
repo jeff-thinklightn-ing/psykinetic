@@ -15,6 +15,9 @@ extends GridEntity
 ## a point, facing it. After a fight it walks back (home, its route, its
 ## place at the point) and goes on. Its facing is its level entry's, or one
 ## of its own from its name.
+##
+## Far from every player and companion it thinks less often, or not at all
+## (World.Tier); the world tick moves it on then (_world_tick).
 
 ## Mass reads off the body: the sprite runs from SHADE_LIGHT at
 ## SHADE_LIGHT_MASS to SHADE_DARK at SHADE_DARK_MASS. Darker is heavier.
@@ -140,6 +143,10 @@ var _glancing := false
 var _route_index := 0
 var _route_step := 1
 var _sits := false
+## How often it thinks (World.Tier), and the tick that was worked out (-1:
+## not yet). World's.
+var tier := 0
+var tier_tick := -1
 
 
 func _init() -> void:
@@ -591,6 +598,24 @@ func _idle_step(to: Vector2i) -> bool:
 	if path.is_empty():
 		return false
 	return World.try_move(self, path[0] - tile)
+
+
+## The world tick (far from everyone, or its zone asleep): [param seconds]
+## gone by in one coarse step. A fight is over; one on its way back after a
+## fight is back (home, its route, its place at the point), if that is
+## free. No walk, no hits.
+func _world_tick(_seconds: float) -> void:
+	target = null
+	slot = NO_TILE
+	_windup = {}
+	_glancing = false
+	if not _returning:
+		return
+	var back := _back_to()
+	if back != NO_TILE and (tile == back or World.place(self, back)):
+		_returning = false
+		_idle_goal = NO_TILE
+		move_ticks = _pace * IDLE_PACE
 
 
 ## The way a monster called [param monster_name] faces when its level entry

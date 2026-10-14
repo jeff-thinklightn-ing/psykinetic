@@ -54,6 +54,24 @@ const TICK_RATE := 10
 const TICK_DT := 1.0 / TICK_RATE
 ## Ticks run per frame at most; beyond this the sim slows down instead of spiralling.
 const MAX_CATCHUP_TICKS := 5
+## How often a monster thinks, by how far it is from the nearest player or
+## companion in its zone (Chebyshev tiles): NEAR every tick, MID every
+## MID_EVERY_TICKS (staggered by id), FAR not at all: the world tick moves
+## it on instead (_world_tick). A monster with a target (a fight) is always
+## NEAR. Each monster's tier is looked at again every TIER_EVERY_TICKS.
+## With nobody standing in the zone (a player dead, waiting to respawn) it
+## is measured from where they last stood; a zone that has never had anyone
+## (a test room) thinks at the full rate everywhere.
+enum Tier { NEAR, MID, FAR }
+const NEAR_TILES := 30
+const MID_TILES := 60
+const MID_EVERY_TICKS := 4
+const TIER_EVERY_TICKS := 5
+## The world tick: every so many steps, every zone, awake or asleep, moves
+## its far monsters (all of them, asleep) on in one coarse step
+## (Monster._world_tick: no paths cell by cell, no hits). It runs with
+## nobody connected too.
+const WORLD_TICK_STEPS := 300
 ## Orthogonals first so ties in pathfinding prefer straight steps.
 const DIRECTIONS: Array[Vector2i] = [
 	Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1),
@@ -276,8 +294,9 @@ func _process(delta: float) -> void:
 
 
 ## Advances the sim one tick: every awake zone (one with a player in it)
-## steps once, in turn; a zone with nobody sleeps. Driven by _process;
-## tests call it directly.
+## steps once, in turn; a zone with nobody sleeps, moved on only by the
+## world tick, every WORLD_TICK_STEPS. Driven by _process; tests call it
+## directly.
 func step() -> void:
 	if not Net.is_authority():
 		return
@@ -295,9 +314,30 @@ func step() -> void:
 		if awake:
 			enter(each)
 			_step_zone()
-	enter(was)
 	steps += 1
+	if steps % WORLD_TICK_STEPS == 0:
+		world_tick()
+	enter(was)
 	stepped.emit()
+
+
+## The world tick, every zone in turn (the one World is in if there are no
+## zones): its far monsters, or all of them in a zone asleep, moved on by
+## WORLD_TICK_STEPS of time. Called by step; tests call it directly.
+func world_tick() -> void:
+	var seconds := WORLD_TICK_STEPS * TICK_DT
+	var was := zone
+	var each_zone: Array[Zone] = []
+	each_zone.assign(zones.values())
+	if each_zone.is_empty():
+		each_zone.append(zone)
+	for each in each_zone:
+		enter(each)
+		var near := _tier_origins()
+		for entity in monsters().duplicate():
+			if _alive(entity) and (not each.awake or _tier(entity, near) == Tier.FAR):
+				entity._world_tick(seconds)
+	enter(was)
 
 
 ## Whether [param each] has a player in it: one standing there, or a
@@ -312,9 +352,9 @@ func _is_awake(each: Zone) -> bool:
 	return false
 
 
-## [param each] wakes after [param seconds] asleep. The place to catch up
-## on the time it slept (monsters wandering, fires burning down); nothing
-## yet: a zone comes back as it was left.
+## [param each] wakes after [param seconds] asleep, as the world tick left
+## it (it ran while the zone slept); from here it runs at the full tick,
+## each monster as near as it is to whoever came.
 func _woke(each: Zone, seconds: float) -> void:
 	print("[zone] %s wakes after %.0f s asleep" % [each.name, seconds])
 
@@ -326,9 +366,10 @@ func _step_zone() -> void:
 		if entity.protected and tick >= entity.protected_until_tick:
 			entity.protected = false
 	# 1. Act, in ascending id. Iterate a copy: entities may despawn mid-tick.
+	var near := _tier_origins()
 	for entity in _entities.duplicate():
 		# A stunned entity skips its turn; its orders wait for it.
-		if _alive(entity) and not is_stunned(entity):
+		if _alive(entity) and not is_stunned(entity) and _thinks(entity, near):
 			entity._sim_tick()
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_resolve_hits()
@@ -341,6 +382,63 @@ func _step_zone() -> void:
 	for peer in Net.sendable_peers():
 		if peer_sees(peer, zone.name):
 			_net_tick.rpc_id(peer, tick)
+
+
+## Where the zone's players and companions stand, that a monster's tier
+## is measured from, or where they last stood; empty if nobody ever has
+## (every monster NEAR).
+func _tier_origins() -> Array[Vector2i]:
+	var near: Array[Vector2i] = []
+	for entity in sought():
+		if entity.spawned:
+			near.append(entity.tile)
+	if near.is_empty():
+		return zone.tier_origins
+	zone.tier_origins = near
+	return near
+
+
+## Whether [param entity] thinks this tick (see Tier).
+func _thinks(entity: GridEntity, near: Array[Vector2i]) -> bool:
+	if not entity is Monster:
+		return true
+	match _tier(entity, near):
+		Tier.NEAR:
+			return true
+		Tier.MID:
+			return (tick + entity.id) % MID_EVERY_TICKS == 0
+	return false
+
+
+## [param entity]'s tier (a monster's), looked at again every
+## TIER_EVERY_TICKS, staggered by id; NEAR in a fight or with nobody to
+## measure from.
+func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
+	var monster := entity as Monster
+	if near.is_empty() or monster.target != null:
+		monster.tier = Tier.NEAR
+		monster.tier_tick = tick
+		return Tier.NEAR
+	if monster.tier_tick >= 0 and tick - monster.tier_tick < TIER_EVERY_TICKS \
+			and (tick + entity.id) % TIER_EVERY_TICKS != 0:
+		return monster.tier as Tier
+	var nearest := MID_TILES + 1
+	for at in near:
+		nearest = mini(nearest, distance(entity.tile, at))
+	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
+	monster.tier_tick = tick
+	return monster.tier as Tier
+
+
+## A coarse move, for the world tick: [param entity] straight to
+## [param to], with no walk between; false if [param to] is not walkable or
+## is taken. Nobody is near to see it go.
+func place(entity: GridEntity, to: Vector2i) -> bool:
+	if not entity.spawned or not is_walkable(to) or _occupancy.has(to) or is_burning(to):
+		return false
+	_relocate(entity, to)
+	entity._world_slide_from(to, tick, 0.0)
+	return true
 
 
 # --- Zones (server) -----------------------------------------------------------
@@ -472,6 +570,7 @@ func reset() -> void:
 	_stairs.clear()
 	_water.clear()
 	_next_id = 1
+	zone.tier_origins = []
 	tick = 0
 	tick_alpha = 0.0
 	_accumulator = 0.0

@@ -1,7 +1,7 @@
 extends Node
 ## Zones: many maps live at once. Two players, one takes a link and the
 ## other stays; each is sent only their own zone; a companion follows its
-## player across; an empty zone sleeps and wakes; a restart puts both back in
+## player across; an empty zone sleeps (the world tick alone moves it on) and wakes; a restart puts both back in
 ## their own zones; the console's zones, zone reset and zone move.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
@@ -147,6 +147,20 @@ func _test_empty_zone_sleeps() -> void:
 	_check(not sample.awake and sample.tick == asleep_at, "the sample, empty, does not tick (tick %d, was %d)" % [sample.tick, asleep_at])
 	_check(monster == null or monster.tile == monster_at, "its monsters stand frozen")
 	_check(World.tick == room_tick + 20, "while the test room goes on (%d -> %d)" % [room_tick, World.tick])
+	if monster != null:
+		# Left off its home after a fight: the world tick, asleep as the
+		# zone is, puts it back, and the zone's own tick stays where it was.
+		var was := World.enter(sample)
+		var off := Vector2i.ZERO
+		for direction in World.DIRECTIONS:
+			if World.place(monster, monster.home + direction):
+				off = direction
+				break
+		World.enter(was)
+		monster._returning = true
+		World.world_tick()
+		_check(off != Vector2i.ZERO and monster.tile == monster.home and not monster._returning and sample.tick == asleep_at,
+				"the world tick moves it on while it sleeps: back home (%s), its tick still %d" % [monster.tile, sample.tick])
 	_check(_main.travel(BO, "sample"), "Bo goes to the sample again")
 	World.step()
 	World.step()

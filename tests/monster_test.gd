@@ -40,6 +40,8 @@ func _ready() -> void:
 	_test_idle_pace()
 	_test_home_after_a_fight()
 	_test_roster()
+	_test_tiers()
+	_test_world_tick()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -462,6 +464,83 @@ func _test_roster() -> void:
 	World.enter(was)
 	_check(World.sought() == players and World.monsters() == [other, late], "and back, this zone's again")
 	World.zones.erase("roster_elsewhere")
+
+
+## A long hall: the player at one end, an imp NEAR (out of sight), one MID
+## and one FAR from it (World.Tier).
+func _tier_hall() -> Dictionary:
+	var floor := ".".repeat(78)
+	return _build(["#".repeat(80), "#" + floor + "#", "#P" + ".".repeat(9) + "i" + ".".repeat(34) + "i"
+			+ ".".repeat(29) + "i" + "...#", "#" + floor + "#", "#".repeat(80)])
+
+
+func _test_tiers() -> void:
+	print("
+== far from everyone a monster thinks less often, or not at all ==")
+	var e := _tier_hall()
+	var player: Player = e["P"][0]
+	var imps: Array = e["i"]
+	var near: Monster = imps[0]
+	var mid: Monster = imps[1]
+	var far: Monster = imps[2]
+	var homes: Array = imps.map(func(m: Monster) -> Vector2i: return m.tile)
+	var moved := [0, 0, 0]
+	var thought := [0, 0, 0]
+	var origins := World._tier_origins()
+	for i in 400:
+		for j in 3:
+			if World._thinks(imps[j], origins):
+				thought[j] += 1
+		World.step()
+		origins = World._tier_origins()
+		for j in 3:
+			moved[j] = maxi(moved[j], World.distance(homes[j], imps[j].tile))
+	_check([near.tier, mid.tier, far.tier] == [World.Tier.NEAR, World.Tier.MID, World.Tier.FAR],
+			"near, mid and far by distance (%s)" % [[near.tier, mid.tier, far.tier]])
+	_check(thought[0] == 400 and absi(thought[1] * World.MID_EVERY_TICKS - 400) <= World.MID_EVERY_TICKS and thought[2] == 0,
+			"near thinks every tick, mid one in %d, far never (%s)" % [World.MID_EVERY_TICKS, thought])
+	_check(moved[0] > 0 and moved[1] > 0 and moved[2] == 0, "near and mid wander, far stands (%s)" % [moved])
+	far.target = player
+	_check(World._tier(far, origins) == World.Tier.NEAR, "one in a fight thinks every tick, however far")
+	far.target = null
+	far.tier_tick = -1  # Looked at again at once, not on its next turn.
+	World.despawn(player)
+	_check(World._tier_origins() == origins and World._tier(far, World._tier_origins()) == World.Tier.FAR,
+			"the player dead and gone: measured from where they last stood (%s)" % [World._tier_origins()])
+	_build(["#####", "#.i.#", "#####"])
+	_check(World._tier_origins().is_empty() and World._thinks(World.monsters()[0], []),
+			"a room nobody has stood in thinks at the full rate")
+
+
+func _test_world_tick() -> void:
+	print("
+== the world tick moves a far monster on: back where it idles after a fight ==")
+	var e := _tier_hall()
+	var far: Monster = e["i"][2]
+	var near: Monster = e["i"][0]
+	var far_home := far.home
+	var near_home := near.home
+	World.step()
+	for m: Monster in [far, near]:
+		World.place(m, m.home + Vector2i(-2, 1))
+		m._returning = true
+	World.world_tick()
+	_check(far.tile == far_home and not far._returning,
+			"the far one is home in one step (%s, home %s)" % [far.tile, far_home])
+	_check(near.tile == near_home + Vector2i(-2, 1) and near._returning,
+			"a near one is left to walk back (%s)" % [near.tile])
+	var blocker := EntityFactory.build({"script": "res://sim/pushable.gd", "shape": "cube", "name": "Blocker", "tile": far_home})
+	_room.add_child(blocker)
+	World.place(far, far_home + Vector2i(-2, 1))
+	far._returning = true
+	World.spawn(blocker, far_home)
+	World.world_tick()
+	_check(far.tile == far_home + Vector2i(-2, 1) and far._returning, "home taken: it waits for the next")
+	World.despawn(blocker)
+	for i in World.WORLD_TICK_STEPS:
+		World.step()
+	_check(far.tile == far_home and not far._returning,
+			"the step's own world tick, every %d steps, takes it home once it is free" % World.WORLD_TICK_STEPS)
 
 
 func _build(rows: Array[String], extra := {}) -> Dictionary:

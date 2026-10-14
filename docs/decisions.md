@@ -2222,3 +2222,47 @@ world tick's own design: where a far group's position is kept, and how it
 moves along a route each slow tick. Rejected: one point per area, which
 cannot tell a short crossing of an area from a long one; and lengths by
 octile distance, which miss every wall.
+
+## 193. Far monsters think less often; the world moves on at a slow world tick
+
+Replaces 127 (empty zones sleep). The world is not paused where nobody
+is (docs/roadmap.md, "The world moves on"), but it does not need the
+10 Hz sim there either.
+
+tools/map_bench at 256x256 (2048 monsters, one player in a corner), the
+tick split by hand-placed timers: about 20 ms of find_path for monsters
+idling, 22 ms of light worked out again for the doors wanderers opened
+(4 ms a door), 2 ms for the door's log line, 2 ms looking for a target,
+the rest the loop itself. Fights were nothing; idling far from anyone
+was nearly all of it. (The bench's stdout matters: through a pipe its
+log lines cost another 40 ms a tick, so the 97 ms on record was 61.)
+
+- **Tiers.** A monster's distance (Chebyshev) to the nearest player or
+  companion in its zone sets how often it thinks (World.Tier): within
+  NEAR_TILES (30) every tick, to MID_TILES (60) one tick in
+  MID_EVERY_TICKS (4), staggered by id, beyond that not at all. One with
+  a target (a fight) is always NEAR. Each monster's tier is looked at
+  again every TIER_EVERY_TICKS (5), staggered by id. With nobody standing
+  in the zone (a player dead, waiting to respawn) it is measured from
+  where they last stood (Zone.tier_origins): measuring from nobody put
+  every monster back on the full tick at once (868 ms the tick it
+  happened). A zone nobody has ever stood in (a test room) runs at the
+  full rate everywhere.
+- **The world tick.** Every WORLD_TICK_STEPS (300 steps, 30 s) every zone,
+  awake or asleep, moves on its far monsters (all of them, asleep) in one
+  coarse step (Monster._world_tick): no paths cell by cell, no hits. For
+  now that step ends a fight and puts a monster on its way back after one
+  where it idles (World.place, straight there if it is free). Who holds
+  what, where groups are and what has grown go here as they come. It runs
+  with nobody connected, as World._process runs on the server regardless.
+- **Waking.** A zone wakes as the world tick left it; from there each
+  monster thinks as near as it is to whoever came (World._woke).
+
+tools/map_bench, average and worst tick, stdout to a file:
+128x128 15.4 ms and 44.6 to 3.7 and 16.2; 256x256 61 ms and 216 to 11
+and 27. Rejected: pausing far monsters (the roadmap's rule), and
+working each monster's tier out every tick (2048 distances a tick for a
+distance that changes slowly). Next for the tick: a door's light (only
+the sources it reaches are redone, but the list of every source is gone
+through, and built, for each door), and more players spread over the
+bench's map.

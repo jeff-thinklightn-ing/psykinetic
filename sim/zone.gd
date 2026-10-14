@@ -6,9 +6,9 @@ extends RefCounted
 ## anything asks the zone it is in. A client has one zone, the one its
 ## player is in. Main keeps its own per-zone state here too (main).
 ##
-## A zone with no player in it sleeps (World.step skips it): monsters
-## freeze, fire holds. asleep_since is when it fell asleep (msec), for
-## catching up on the time it slept one day (World._woke).
+## A zone with no player in it sleeps (World.step skips it): only the slow
+## world tick moves it on (World.world_tick), with nobody connected too.
+## asleep_since is when it fell asleep (msec; World._woke).
 
 var name := ""
 var tick := 0
@@ -33,6 +33,8 @@ var path_steps: Dictionary[Vector3i, int] = {}
 var main := {}
 var awake := true
 var asleep_since := -1
+## Where its players and companions last stood (World._tier_origins).
+var tier_origins: Array[Vector2i] = []
 
 
 func _init(zone_name := "") -> void:

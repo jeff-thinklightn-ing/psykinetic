@@ -764,8 +764,8 @@ func _mispredicted(reason: String) -> void:
 	else:
 		_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
 		_resend_walk()
-		print("[net] mispredict: %s predicted %s, server has %s: blending (%s)" % [
-			name, predicted, tile, reason])
+		print("[net] mispredict: %s predicted %s, server has %s: blending (%s), %.2f tiles off" % [
+			name, predicted, tile, reason, off])
 
 
 ## After a correction: the walk re-planned from the server's tile goes to
@@ -785,7 +785,8 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 	if not _prediction.is_active():
 		return
 	Net.record_mispredict()
-	Net.stats.record_correction((Iso.local_to_grid(position) - Vector2(tile)).length(), false)
+	var off := (Iso.local_to_grid(position) - Vector2(tile)).length()
+	Net.stats.record_correction(off, false)
 	_mirror_rest()
 	# A refused step into the destination itself, or a strike's closing in
 	# that the server gave up (World.ORDER_DROPPED): the server has dropped
@@ -795,8 +796,8 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 		_prediction.give_up()
 	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
 	_resend_walk()
-	print("[net] mispredict: %s step into %s refused, server has %s: %s" % [
-		name, refused, tile, "re-planned" if _prediction.has_target() else "order given up"])
+	print("[net] mispredict: %s step into %s refused, server has %s: %s, %.2f tiles off" % [
+		name, refused, tile, "re-planned" if _prediction.has_target() else "order given up", off])
 
 
 # Cosmetic only: they replay feedback, they carry no sim state.
