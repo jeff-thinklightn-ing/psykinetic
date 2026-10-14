@@ -10,7 +10,7 @@ extends Node
 
 const BO := 2
 const BO_ID := "b0b0b0b0-0000-4000-8000-0000000000b0"
-const OVERLAY := "user://builder_zone_test_levels/"
+var OVERLAY: String = preload("res://tests/test_ports.gd").scratch("builder_zone_test_levels/")
 const AREA := [3, 3, 9, 6]
 
 var _failures := 0

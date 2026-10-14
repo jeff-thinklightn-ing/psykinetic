@@ -257,7 +257,7 @@ func _test_saved_holdings() -> void:
 		"mill": {"at": [5, 5], "holder": "town"}}})
 	var names: Array[String] = ["h_land"]
 	var world_map := WorldMap.build(names)
-	var path := "user://world_map_test_snapshot.json"
+	var path: String = preload("res://tests/test_ports.gd").scratch("world_map_test_snapshot.json")
 	var old := FileAccess.open(path, FileAccess.WRITE)
 	old.store_string(JSON.stringify({"version": Snapshot.VERSION, "zones": {}, "players": [], "steps": 40}))
 	old.close()
@@ -280,8 +280,9 @@ func _test_saved_holdings() -> void:
 
 func _test_join() -> void:
 	print("join and unjoin (MapDocs, no screen)")
-	var a := MapDoc.open("user://wm_join_a/", Vector2i(4, 4))
-	var b := MapDoc.open("user://wm_join_b/", Vector2i(4, 4))
+	var ports := preload("res://tests/test_ports.gd")
+	var a := MapDoc.open(ports.scratch("wm_join_a/"), Vector2i(4, 4))
+	var b := MapDoc.open(ports.scratch("wm_join_b/"), Vector2i(4, 4))
 	b.config["neighbours"] = {"south": "elsewhere"}
 	var before := WorldMap.join(a, "east", b)
 	_check(a.config["neighbours"] == {"east": "wm_join_b"} and b.config["neighbours"] == {"south": "elsewhere", "west": "wm_join_a"},

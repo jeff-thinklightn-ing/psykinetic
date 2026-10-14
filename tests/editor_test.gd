@@ -6,7 +6,7 @@ extends Node
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
-const FOLDER := "user://editor_test/"
+var FOLDER: String = preload("res://tests/test_ports.gd").scratch("editor_test/")
 
 var _failures := 0
 

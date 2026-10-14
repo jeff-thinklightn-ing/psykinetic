@@ -36,7 +36,9 @@ which worktree owns each step, and the design rules not to break without asking 
   which holds the edited-level overlay every test reads. Tests, benches and tools never
   write levels there: register them in memory (`Level.register`), point `Level.overlay_dir`
   at a private folder, or run with `APPDATA` set to a temp folder. Ports come from
-  `tests/port_offsets.txt` (`tests/test_ports.gd`); temp folders are named per checkout.
+  `tests/port_offsets.txt` (`tests/test_ports.gd`); temp folders are named per checkout,
+  and any `user://` path a test writes comes from `test_ports.gd`'s `scratch(name)`
+  (`user://tests_<checkout>/name`), never a fixed `"user://x/"`.
 - Worktrees share one machine's CPU: take the bench lock before any run whose timings
   you report (map_bench, frame numbers, network benches with many processes):
   `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's

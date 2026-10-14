@@ -25,7 +25,7 @@ func _ready() -> void:
 ## A 40 x 30 level of grass, outdoors, with a brute at (30, 5).
 func _doc() -> MapDoc:
 	var doc := MapDoc.new()
-	doc.folder = "user://builder_test/"
+	doc.folder = preload("res://tests/test_ports.gd").scratch("builder_test/")
 	doc.map = LevelMap.new(Vector2i(40, 30))
 	for y in 30:
 		for x in 40:
