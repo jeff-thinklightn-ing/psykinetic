@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_roster()
 	_test_tiers()
 	_test_world_tick()
+	_test_monsters_write_no_log()
 	_test_look_skipped_far()
 	_test_straight_beyond_view()
 	_test_plans_per_step()
@@ -577,6 +578,30 @@ func _test_look_skipped_far() -> void:
 	World.spawn(late, m.tile + Vector2i(2, 0))
 	late.protected = false
 	_check(m._nearest_visible_target() == late, "a player come two tiles off is seen at once, its measure old or not")
+
+
+func _test_monsters_write_no_log() -> void:
+	print("
+== a fight among monsters writes no log lines: blows on one too heavy to shift, doors they open ==")
+	var e := _build(["#########", "#.......#", "#..iPi..#", "#...b...#", "#########"])
+	var player: Player = e["P"][0]
+	player.mass = 10000.0
+	player.max_hp = 100000
+	player.hp = player.max_hp
+	for m: Monster in e["i"] + e["b"]:
+		_bold(m)
+	var door := Door.build({"script": "res://sim/door.gd", "name": "Door", "edge": [1, 1, Terrain.EAST],
+		"props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}})
+	_room.add_child(door)
+	var before := World.logged
+	for i in 80:
+		World.step()
+	World.try_toggle_door(e["i"][0], Vector3i(1, 1, Terrain.EAST))
+	World._set_door(door, true, e["i"][0])
+	var hits := _damage_log.filter(func(d: Dictionary) -> bool: return d["entity"] == player).size()
+	_check(hits > 0 and World.logged == before, "%d blows landed, a door opened, %d log lines" % [hits, World.logged - before])
+	World._set_door(door, false, player)
+	_check(World.logged == before + 1, "a player shutting it is logged")
 
 
 func _test_world_tick() -> void:

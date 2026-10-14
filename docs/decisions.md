@@ -3307,3 +3307,21 @@ Monster.alert is replicated (on change; a wire change). The 3D view adds
 after someone (hunting or fighting), on the name's own Label3D. It is
 there for players to read a monster's mind (back off, hide, or run), and
 for clips.
+
+## 253. A monster's doors and fruitless blows are not logged
+
+enemy-ai's profile (Jeff's game running on the machine) had hit resolution
+at 46% of a tick with 16 players. It was printing, not hitting: the sim
+logged every door opened or shut and every blow that shoved nothing
+("push: Imp -> Player blocked: too heavy"), some 4.5 lines a tick with a
+crowd round a player, and a line is slow to write when the machine is
+busy or stdout is a pipe (a server's, into journald). Those lines (a door,
+a dropped hit, a push that moved nothing) are logged now only when a
+player or a companion does it (World._logs_for); a push that moves
+something is logged whoever does it, as before (net_test reads a player's).
+monster_test: a fight among monsters, doors and all, writes no line
+(World.logged counts them).
+
+tools/map_bench, 16 players, 256x256 at castle density, the median of
+five blocks (--repeat): to a file 27.2 ms to 21.5; through a pipe 69.3
+to 20.7.

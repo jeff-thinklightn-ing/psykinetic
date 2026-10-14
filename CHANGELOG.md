@@ -6,6 +6,8 @@ top section as the release notes.
 
 ## Unreleased
 
+- The server no longer writes a log line for every door a monster opens
+  or every blow that fails to shift someone: much less work in big fights.
 - A little smoother with many players: monsters far from anyone stop
   looking about for someone to fight until someone comes near.
 - Stairs are smooth ramps instead of steps, and the ground beside them

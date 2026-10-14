@@ -961,7 +961,8 @@ func _set_door(door: Door, open: bool, by: GridEntity) -> void:
 	if door.open == open:
 		return
 	door.open = open
-	_log("door: %s %s %s" % [by.name, "opened" if open else "closed", door.name])
+	if _logs_for(by):
+		_log("door: %s %s %s" % [by.name, "opened" if open else "closed", door.name])
 	noise(by.tile, Senses.NOISE_DOOR, &"door", by)
 	door_changed.emit(door, by)
 
@@ -1907,7 +1908,8 @@ func _resolve_hits() -> void:
 	for hit in hits:
 		if not _alive(hit.source) or not _alive(hit.target) \
 				or hit.target.tile != hit.source.tile + hit.direction:
-			_log("hit dropped: %s -> %s (no longer lined up)" % [hit.source_name, hit.target_name])
+			if is_instance_valid(hit.source) and _logs_for(hit.source):
+				_log("hit dropped: %s -> %s (no longer lined up)" % [hit.source_name, hit.target_name])
 			continue
 		if hit.damage > 0:
 			damage(hit.target, hit.damage, hit.source, &"attack")
@@ -1931,8 +1933,9 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		# An exhausted body counts as half its mass for everything below.
 		var body_mass := pushed_mass(body)
 		if body_mass > budget:
-			_log("push: %s -> %s blocked: too heavy (mass %s, %s left)" % [
-				mover.name, body.name, body_mass, budget])
+			if _logs_for(mover):
+				_log("push: %s -> %s blocked: too heavy (mass %s, %s left)" % [
+					mover.name, body.name, body_mass, budget])
 			return
 		budget -= body_mass
 
@@ -2766,5 +2769,20 @@ func _alive(entity: Variant) -> bool:
 	return is_instance_valid(entity) and entity.spawned
 
 
+## Whether a door, a dropped hit or a push that moved nothing is logged
+## when [param by] does it: a player's or a companion's, yes; a monster's,
+## no (a crowd's blows on a player too heavy to shift, its doors, were
+## lines a tick on a busy server, slow to write and of no use). A push that
+## moves something is logged whoever does it.
+func _logs_for(by: GridEntity) -> bool:
+	return by is Player or by is Companion
+
+
+## How many lines _log has written (tests check a fight among monsters
+## writes none).
+var logged := 0
+
+
 func _log(message: String) -> void:
+	logged += 1
 	print("[tick %d] %s" % [tick, message])
