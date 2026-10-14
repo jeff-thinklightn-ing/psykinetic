@@ -37,6 +37,10 @@ which worktree owns each step, and the design rules not to break without asking 
   write levels there: register them in memory (`Level.register`), point `Level.overlay_dir`
   at a private folder, or run with `APPDATA` set to a temp folder. Ports come from
   `tests/port_offsets.txt` (`tests/test_ports.gd`); temp folders are named per checkout.
+- Worktrees share one machine's CPU: take the bench lock before any run whose timings
+  you report (map_bench, frame numbers, network benches with many processes):
+  `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's
+  held, wait. Keep many-process runs short.
 - Server and client must be built from the same commit; a release that changes the wire
   format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
 - Never commit a real token: check the diff of `project.godot`.
