@@ -3001,3 +3001,36 @@ the town, sold or lent in the shop (step 5) or reworked by the smith
 the levels is kept, never dropped, and losing a run never touches it;
 raids (step 6) will take with a reason in the ledger, and what they take
 can be rebuilt.
+
+## 221. Dropped art is checked against its slot, in words that say what to change
+
+A slot's own art (220) is made in Blender, by hand, by someone who is not
+reading the code: a model in centimetres, an origin left at the corner, a
+door whose leaf is called "Cube.003" or turns about the wrong edge would
+each draw wrong in the game, quietly. ArtCheck (client3d/art_check.gd)
+holds a slot's .glb to its manifest entry: its size (within the slot's
+tolerance, 5% by default, plus 2 cm; even scaling off by a factor is named
+as such, "modelled in centimetres?"), its origin (the base's middle, on
+the edge's line for an edge piece; a held piece's is its grip), each
+moving part by name with its origin at the slot's pivot, a held piece's
+second grip, its triangles against the budget, at most three materials,
+a scatter piece as one mesh with one material and nothing else, state
+nodes the slot knows, a "source" in the manifest, and files in a slot's
+folder that are not named for it. Each problem is one line that says what
+to change, an error (it does not fit) or a warning (worth a look).
+
+tools/art_drop.ps1 is the one step for the artist: a .blend is copied
+into its slot's folder, exported to .glb through Blender
+(tools/blender/export_slot.py: binary, +Y up, modifiers applied, custom
+properties kept), imported, and checked; a .glb or .png is copied and
+checked. tools/art_check.gd checks every slot's art at once, and
+art_kit_test holds all of it to its slot, checks every grey box passes
+its own slot's check, and that each kind of mistake is named.
+
+A .blend saved after its .glb was exported is a warning in the tool, not
+a test: the times are the files' own, which a checkout sets to when it
+wrote them, so on another machine the order means nothing. The test asks
+only that a .blend has its .glb beside it. Rejected: the drop tool writing
+the slot's source into slots.json (rewriting the hand-kept JSON would lose
+its layout; the check says the exact line to add), and Blender's own
+validation add-on (it knows nothing of slots).

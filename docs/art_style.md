@@ -82,8 +82,16 @@ rock, wall stone) say their world size in the manifest's `tile_m`.
 3. Record where it came from: a scene custom property `source` (for example
    `"jeff, blender"`). The manifest's `source` field for the slot says the same, with the
    licence and date.
-4. Save `<slot>.blend` and export `<slot>.glb` into `art/kit/<category>/<slot>/`. Variants
-   are `<slot>.2.glb`, `<slot>.3.glb`. A texture slot takes `<slot>.png` instead.
+4. Save it as `<slot>.blend` (variants `<slot>.2.blend` ...) and drop it in:
+   `toolsrt_drop.ps1 <path to door.single.blend>`. It copies the file into
+   `art/kit/<category>/<slot>/`, exports `<slot>.glb` through Blender, imports it and checks
+   it against the slot, naming anything to change ("100.0 times the slot's size every way:
+   modelled in centimetres?", "no object named "leaf"", "4,200 triangles, the slot's budget
+   is 2,000"). Fix it in Blender and run the same line again. A `.glb` made elsewhere, or a
+   texture slot's `<slot>.png`, drops in the same way.
+5. `tools/art_check.gd` checks every slot's art at once
+   (`godot --headless --path . --script tools/art_check.gd`), and the tests hold all of it
+   to its slot.
 
 The game then draws it in place of the slot's fill or grey box. The `.blend` is committed
 beside its `.glb` as the source. Godot ignores `.blend` files here (Blender import is off),

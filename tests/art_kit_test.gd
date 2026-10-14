@@ -23,6 +23,9 @@ func _ready() -> void:
 	_test_kept()
 	_test_own_art_says_where_from()
 	_test_profile()
+	_test_check_passes_grey_boxes()
+	_test_check_names_mistakes()
+	_test_own_art_checks()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -176,6 +179,86 @@ func _test_profile() -> void:
 	var cap := float(entry.get("cap_y", -1.0))
 	_check(inside and cap > 0.0 and cap < top and ArtKit.has(str(entry.get("material", ""))),
 			"%d points in x [-%.2f, %.2f], cap at %.2f below the top %.2f, material %s" % [points.size(), half, half, cap, top, entry.get("material")])
+
+
+func _test_check_passes_grey_boxes() -> void:
+	print("
+== ArtCheck: every mesh slot's grey box is art that fits it ==")
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	for slot: String in ArtKit.slots():
+		if ArtKit.spec(slot).get("type") != "mesh":
+			continue
+		var node := ArtKit.instance(slot)
+		var problems := ArtCheck.check_node(slot, node)
+		_check(problems.is_empty(), "%s %s" % [slot, problems if not problems.is_empty() else "fits"])
+		node.free()
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+
+
+func _test_check_names_mistakes() -> void:
+	print("
+== ArtCheck: each mistake is named, with what to change ==")
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	var cases := {
+		"modelled in centimetres": func(door: Node3D) -> void: (door.get_node("Body") as Node3D).scale = Vector3.ONE * 100.0; door.get_node("leaf").position *= 100.0,
+		"too big,": func(door: Node3D) -> void: (door.get_node("Body") as Node3D).scale.x = 2.0,
+		"no object named \"leaf\"": func(door: Node3D) -> void: door.get_node("leaf").free(),
+		"\"leaf\" turns about": func(door: Node3D) -> void: door.get_node("leaf").position.z = 0.2,
+		"middle of its base": func(door: Node3D) -> void: (door.get_node("Body") as Node3D).position.x = 0.4; door.get_node("leaf").position.x = 0.4,
+		"its base is at y": func(door: Node3D) -> void: (door.get_node("Body") as Node3D).position.y = 0.5; door.get_node("leaf").position.y = 0.5,
+		"materials, at most": func(door: Node3D) -> void:
+			for mesh in door.find_children("*", "MeshInstance3D", true, false):
+				(mesh as MeshInstance3D).material_override = StandardMaterial3D.new(),
+	}
+	for expected: String in cases:
+		var door := ArtKit.instance("door.single")
+		(cases[expected] as Callable).call(door)
+		var problems := ArtCheck.check_node("door.single", door)
+		_check(problems.any(func(line: String) -> bool: return line.begins_with("error: ") and expected in line),
+				"door.single, %s: %s" % [expected, problems])
+		door.free()
+	var entry := ArtKit.spec("door.single")
+	var budget: int = entry["budget"]
+	entry["budget"] = 10
+	var door := ArtKit.instance("door.single")
+	var over := ArtCheck.check_node("door.single", door)
+	_check(over.any(func(line: String) -> bool: return "triangles, the slot's budget is 10" in line), "over budget: %s" % [over])
+	door.free()
+	entry["budget"] = budget
+	var rock := ArtKit.instance("rock.small")
+	var extra := MeshInstance3D.new()
+	extra.mesh = BoxMesh.new()
+	extra.scale = Vector3.ONE * 0.1
+	rock.get_node("Body").add_child(extra)
+	var scattered := ArtCheck.check_node("rock.small", rock)
+	_check(scattered.any(func(line: String) -> bool: return "one mesh with one material" in line), "a scatter piece of two meshes: %s" % [scattered])
+	rock.free()
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+
+
+func _test_own_art_checks() -> void:
+	print("
+== every slot's own art passes ArtCheck; every file in art/kit is a slot's; every .blend has its .glb ==")
+	for slot: String in ArtKit.slots():
+		if ArtKit.variant_count(slot) == 0:
+			continue
+		var errors := ArtCheck.check(slot).filter(func(line: String) -> bool: return line.begins_with("error"))
+		_check(errors.is_empty(), "%s %s" % [slot, errors if not errors.is_empty() else "fits its slot"])
+	var folders := ArtCheck.check_folders()
+	_check(folders.is_empty(), "art/kit's folders %s" % [folders if not folders.is_empty() else "are all slots', their files named for them"])
+	var orphans: Array[String] = []
+	for slot: String in ArtKit.slots():
+		var folder := ArtKit.folder(slot)
+		if not DirAccess.dir_exists_absolute(folder):
+			continue
+		for file in DirAccess.get_files_at(folder):
+			if file.ends_with(".blend") and not FileAccess.file_exists(folder + file.get_basename() + ".glb"):
+				orphans.append(folder + file)
+	_check(orphans.is_empty(), "every .blend has its .glb beside it %s" % [orphans if not orphans.is_empty() else ""])
 
 
 ## [param node]'s body's bounds, in the slot's space.
