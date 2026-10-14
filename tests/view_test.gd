@@ -942,7 +942,7 @@ func _test_settings() -> void:
 	Sfx.apply_volumes()
 	_check(is_equal_approx(AudioServer.get_bus_volume_db(0), linear_to_db(0.5)) and AudioServer.get_bus_index(Sfx.BUS) != -1,
 			"the Master bus at half, an SFX bus made")
-	var path := OS.get_user_data_dir().path_join("view_test.cfg")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("view_test.cfg")
 	var saved := [Net._settings_override, Net.player_id]
 	Net._settings_override = path
 	Net.save_settings("127.0.0.1", 17789, "", "Tester")

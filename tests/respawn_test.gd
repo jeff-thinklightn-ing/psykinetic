@@ -147,7 +147,7 @@ func _test_old_snapshot_gets_current_looks() -> void:
 	print("\n== level entities from an old snapshot look as the map says now ==")
 	# As builds before the generic entity scene wrote it: a type, no shape, no
 	# tint, no slot. The crate was pushed to (5, 5); the boulder to (9, 9).
-	Net.state_path = OS.get_user_data_dir().path_join("respawn_test_old_world.json")
+	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("respawn_test_old_world.json")
 	var no_props := {"type": "Dictionary", "args": []}
 	var file := FileAccess.open(Net.state_path, FileAccess.WRITE)
 	file.store_string(JSON.stringify({"version": 1, "tick": 0, "players": [], "respawns": [], "entities": [
@@ -251,7 +251,7 @@ func _test_renderer_setting() -> void:
 	_check(Net.renderer_from("2d") == "2d" and Net.renderer_from(" 2D ") == "2d", "2d is the 2D view")
 	_check(Net.renderer_from("3d") == "3d" and Net.renderer_from("") == "3d" and Net.renderer_from("iso") == "3d",
 			"3d, nothing or anything else is the 3D view")
-	var path := OS.get_user_data_dir().path_join("renderer_test.cfg")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("renderer_test.cfg")
 	var saved := [Net._settings_override, Net.renderer, Net._renderer_given, Net._settings_renderer, Net.player_id]
 	Net._settings_override = path
 	var file := FileAccess.open(path, FileAccess.WRITE)

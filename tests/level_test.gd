@@ -171,7 +171,7 @@ func _test_every_level() -> void:
 func _test_round_trip() -> void:
 	print("\n== round trip: the ASCII room to an image, to a PNG and back ==")
 	var image := Level.image_from_rows(LEGACY.LEVEL)
-	var path := OS.get_user_data_dir().path_join("round_trip.png")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("round_trip.png")
 	_check(image.save_png(path) == OK, "saved")
 	var back := Image.load_from_file(path)
 	var level := Level.parse(back, null, {})

@@ -240,7 +240,7 @@ func _test_persists_and_resumes() -> void:
 	pet.hp = 13
 	var pet_name := String(pet.name)
 	var pet_tile := pet.tile
-	Net.state_path = OS.get_user_data_dir().path_join("companion_test_world.json")
+	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("companion_test_world.json")
 	_main._save_state()
 	_main._start_level(true)
 	var back := _companion()
@@ -277,7 +277,7 @@ func _test_idles_while_owner_offline() -> void:
 func _test_old_record_gets_a_companion() -> void:
 	print("\n== a returning player whose record predates companions gets one ==")
 	# A snapshot as an older server wrote it: a player record, no companion.
-	Net.state_path = OS.get_user_data_dir().path_join("companion_test_old_world.json")
+	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("companion_test_old_world.json")
 	var file := FileAccess.open(Net.state_path, FileAccess.WRITE)
 	file.store_string(JSON.stringify({"version": 1, "tick": 0, "entities": [], "respawns": [], "players": [{
 		"player_id": Net.player_id, "index": 1, "name": "Talos", "tile": [11, 2], "hp": 20, "stamina": 100,
@@ -356,7 +356,7 @@ func _test_last_words() -> void:
 	var pet := _companion()
 	pet._last_speech_tick = World.tick  # The rate limit would drop anything now.
 	var saved_dir := Net.transcripts_dir
-	Net.transcripts_dir = OS.get_user_data_dir().path_join("last_words_test")
+	Net.transcripts_dir = preload("res://tests/test_ports.gd").scratch_path("last_words_test")
 	var transcript := Transcript.path_of(Net.transcripts_dir, String(pet.name), Time.get_date_string_from_system())
 	if FileAccess.file_exists(transcript):
 		DirAccess.remove_absolute(transcript)
@@ -654,7 +654,7 @@ func _test_bubbles() -> void:
 
 func _test_mind_log_rotates() -> void:
 	print("\n== the mind log rotates: the last 5 MB and one file before it ==")
-	var path := OS.get_user_data_dir().path_join("mind_rotate_test.log")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("mind_rotate_test.log")
 	for old: String in [path, path + ".1"]:
 		if FileAccess.file_exists(old):
 			DirAccess.remove_absolute(old)
@@ -1741,7 +1741,7 @@ func _test_surroundings_when_new() -> void:
 
 func _test_transcript() -> void:
 	print("\n== transcripts: what is said to her and by her, a file a day ==")
-	var dir := OS.get_user_data_dir().path_join("transcripts_test")
+	var dir: String = preload("res://tests/test_ports.gd").scratch_path("transcripts_test")
 	if DirAccess.dir_exists_absolute(dir):
 		for file in DirAccess.get_files_at(dir):
 			DirAccess.remove_absolute(dir.path_join(file))
@@ -1890,10 +1890,10 @@ func _test_death_triggers() -> void:
 
 func _test_transcript_rebuild() -> void:
 	print("\n== transcript rebuild: the exchange from the mind log, her player's lines kept ==")
-	var dir := OS.get_user_data_dir().path_join("transcripts_rebuild_test")
+	var dir: String = preload("res://tests/test_ports.gd").scratch_path("transcripts_rebuild_test")
 	var saved := Net.transcripts_dir
 	Net.transcripts_dir = dir
-	var log_path := OS.get_user_data_dir().path_join("rebuild_test.log")
+	var log_path: String = preload("res://tests/test_ports.gd").scratch_path("rebuild_test.log")
 	var stamp := Time.get_datetime_string_from_system(true)
 	var system := "system: You are Pip. You travel with Jeff by choice. A card.\n\nNow: things."
 	var asks := [
@@ -1997,7 +1997,7 @@ func _test_players_heal() -> void:
 
 func _test_mind_log_file() -> void:
 	print("\n== the mind log: one JSON line per answer ==")
-	var path := OS.get_user_data_dir().path_join("mind_test.log")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("mind_test.log")
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
 	var saved := Net.mind_log_path

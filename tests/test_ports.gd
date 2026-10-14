@@ -22,6 +22,11 @@ static func scratch(name: String) -> String:
 	return path
 
 
+## scratch() as an absolute path, for things that want one (a state file, a log).
+static func scratch_path(name: String) -> String:
+	return ProjectSettings.globalize_path(scratch(name))
+
+
 ## The checkout's folder name: psykinetic, perf, maps, ...
 static func checkout() -> String:
 	return ProjectSettings.globalize_path("res://").trim_suffix("/").get_file()

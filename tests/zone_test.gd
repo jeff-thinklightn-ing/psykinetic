@@ -17,7 +17,7 @@ func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17792)
 	Net.companions = true
-	Net.state_path = OS.get_user_data_dir().path_join("zone_test_world.json")
+	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("zone_test_world.json")
 	if FileAccess.file_exists(Net.state_path):
 		DirAccess.remove_absolute(Net.state_path)
 	_main = preload("res://main.tscn").instantiate()
