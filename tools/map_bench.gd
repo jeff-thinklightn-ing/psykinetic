@@ -9,7 +9,10 @@ extends Node
 ## their own) and stand spread over the map on a grid, so more monsters are
 ## near someone and fighting; every player is then too tough to die, so
 ## nobody is away respawning for part of the run.
-##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--players=1] [--ticks=200] [--seconds=8]
+## With --cells-per-monster=N, each room's monster spots are kept at the
+## rate that gives about N floor cells a monster (the castle has 42; the
+## default, every spot, 32).
+##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--seconds=8]
 
 const NAME := "bench"
 const ROOM := 8
@@ -17,6 +20,7 @@ const ROOM := 8
 var size := 64
 var monsters := 2
 var players := 1
+var cells_per_monster := 0.0
 var ticks := 200
 var seconds := 8.0
 var _main: Node
@@ -31,11 +35,13 @@ func _ready() -> void:
 			"size": size = pair[1].to_int()
 			"monsters": monsters = pair[1].to_int()
 			"players": players = maxi(1, pair[1].to_int())
+			"cells-per-monster": cells_per_monster = pair[1].to_float()
 			"ticks": ticks = pair[1].to_int()
 			"seconds": seconds = pair[1].to_float()
 	var windowed := DisplayServer.get_name() != "headless"
-	print("BENCH size=%d cells (%d floor), monsters/room=%d, players=%d, %s" % [size, size * size,
-		monsters, players, "windowed" if windowed else "headless"])
+	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
+		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
+		"windowed" if windowed else "headless"])
 	var memory_before := OS.get_static_memory_usage()
 
 	var started := Time.get_ticks_usec()
@@ -241,8 +247,10 @@ func _layout() -> Image:
 			elif x == 1 and y == 1:
 				meaning = "start"
 			else:
+				# The share of spots kept for cells_per_monster (all of them by default).
+				var keep := 1.0 if cells_per_monster <= 0.0 else ROOM * ROOM / cells_per_monster / monsters
 				for m in monsters:
-					if at == Vector2i(1 + (m * 3) % 6, 5 + m / 2 % 2):
+					if at == Vector2i(1 + (m * 3) % 6, 5 + m / 2 % 2) 							and absi(hash(Vector3i(x, y, m + 100))) % 1000 < keep * 1000.0:
 						meaning = kinds[absi(hash(Vector3i(x, y, m))) % kinds.size()]
 			image.set_pixel(x * 2, y * 2, colour.call(meaning))
 			# Ground-coloured filler east and south, so the picture reads.
