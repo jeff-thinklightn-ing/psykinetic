@@ -133,6 +133,18 @@ const OTHERS_SAID_TICKS := 200
 ## A line of fewer words than this, unasked, is a fragment and not said,
 ## unless it is a call ("Behind you!").
 const FRAGMENT_WORDS := 3
+## Noises she heard and did not see: so many kept, told to her voice for
+## NOISE_TOLD_TICKS; a loud one (NOISE_WORDS' asking kinds) asks her voice
+## when calm, at most once in NOISE_ASK_TICKS. Steps and speech are not
+## kept: speech reaches her as words (overheard), and steps are her party's.
+const NOISES_KEPT := 6
+const NOISE_TOLD_TICKS := 150
+const NOISE_ASK_TICKS := 300
+## Noise kind -> [how she is told it, whether it asks her voice].
+const NOISE_WORDS := {
+	&"fight": ["fighting", true], &"door": ["a door opening or shutting", false],
+	&"door_struck": ["something striking a door", true], &"door_broken": ["a door breaking", true],
+}
 ## She notes where she has seen things every so many ticks (_remember_sights).
 const MEMORY_EVERY := 10
 ## Speech carries this far (cells, in its own zone): what anyone says
@@ -357,6 +369,15 @@ var _fallen: Array[Dictionary] = []
 var _kinds_seen: Dictionary[String, bool] = {}
 var _kinds_fallen: Dictionary[String, bool] = {}
 var _fight_notable := false
+## What she sees, hears and remembers (Senses, as the monsters have):
+## sight all round, by light (DARK), within SIGHT_RANGE.
+var senses: Senses
+## What she heard and could not see, newest last: {kind, at, tick}; up to
+## NOISES_KEPT, told to her voice for NOISE_TOLD_TICKS; and the newest
+## World.tick of senses.heard taken, and when a noise last asked her voice.
+var _noises: Array[Dictionary] = []
+var _heard_upto := -1
+var _noise_asked_tick := -100000
 
 
 ## Her slots (Items): a pack and two hands, as a player's, empty at first;
@@ -371,6 +392,7 @@ func _init() -> void:
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")
 	mass = 75.0
+	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 	emit_light = 0.9  # Her lantern.
 	move_ticks = 2
 	max_hp = 20
@@ -785,6 +807,7 @@ func _sim_tick() -> void:
 		_keeper_back = true
 	if _joined_tick == -1:
 		_joined_tick = World.tick
+	_take_noises()
 	_watch()
 	if World.tick % MEMORY_EVERY == 0:
 		_remember_sights()
@@ -847,8 +870,7 @@ func _watch() -> void:
 	var fight := in_fight()
 	var new_kind := ""
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) <= SIGHT_RANGE \
-				and World.has_line_of_sight(tile, entity.tile) and not _known_hostiles.has(entity.get_instance_id()):
+		if entity is Monster and entity.spawned and not _known_hostiles.has(entity.get_instance_id()) and senses.sees(entity):
 			_known_hostiles[entity.get_instance_id()] = true
 			if not _kinds_seen.has(kind_of(entity)):
 				# The first of a kind this run: new to her, worth a word.
@@ -920,6 +942,44 @@ func _take_deaths(fight_over: bool) -> Array[String]:
 		spoken.append("%s died, the last of them." % _deaths.back()["who"])
 	_deaths.clear()
 	return spoken
+
+
+## Takes what her senses heard since last tick: a noise she cannot see
+## the maker of (NOISE_WORDS' kinds) is kept for her voice and narrated;
+## a loud one, while calm, asks her voice (once in NOISE_ASK_TICKS).
+func _take_noises() -> void:
+	if senses.heard.is_empty() or int(senses.heard.back()["tick"]) <= _heard_upto:
+		return
+	var loud := ""
+	for noise: Dictionary in senses.heard_since(_heard_upto):
+		var at: Vector2i = noise["at"]
+		if not NOISE_WORDS.has(noise["kind"]) or noise["source"] != null or senses.sees_cell(at):
+			continue  # Not hers to tell, or she sees who made it, or where.
+		var newest: Dictionary = _noises.back() if not _noises.is_empty() else {}
+		if not newest.is_empty() and newest["kind"] == noise["kind"] and World.distance(newest["at"], at) <= 2:
+			newest["tick"] = noise["tick"]  # The same fight, still going.
+			continue
+		_noises.append({"kind": noise["kind"], "at": at, "tick": noise["tick"]})
+		if _noises.size() > NOISES_KEPT:
+			_noises.pop_front()
+		var told := "You hear %s %s, out of sight." % [NOISE_WORDS[noise["kind"]][0], _paces_toward(Vector2(at))]
+		_narrate(told)
+		if NOISE_WORDS[noise["kind"]][1]:
+			loud = told
+	_heard_upto = int(senses.heard.back()["tick"])
+	if not loud.is_empty() and not in_fight() and World.tick - _noise_asked_tick >= NOISE_ASK_TICKS:
+		_noise_asked_tick = World.tick
+		_ask_voice(loud)
+
+
+## What she heard lately and did not see, for her voice: "You heard, out
+## of sight: fighting, some way off to the north." "" for nothing.
+func heard_words() -> String:
+	var told: Array[String] = []
+	for noise in _noises:
+		if World.tick - int(noise["tick"]) <= NOISE_TOLD_TICKS:
+			told.append("%s, %s" % [NOISE_WORDS[noise["kind"]][0], _paces_toward(Vector2(noise["at"]))])
+	return "" if told.is_empty() else "You heard, out of sight: %s." % "; ".join(told)
 
 
 ## Calm (nothing hostile within COMBAT_RANGE of her or her player) and no
@@ -1078,6 +1138,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	if asks_about_items(heard):
 		now.append(carried())
 	now.append(doing())
+	var heard_now := heard_words()
+	if not heard_now.is_empty():
+		now.append(heard_now)
 	var topics := mentioned_topics()
 	if not topics.is_empty():
 		now.append("You have already mentioned: %s." % ", ".join(topics))
@@ -1452,7 +1515,12 @@ func _cells_within(reach: int) -> Array[Vector2i]:
 
 
 func _sees(cell: Vector2i) -> bool:
-	return cell == tile or World.has_line_of_sight(tile, cell)
+	return senses.sees_cell(cell, DARK)
+
+
+## Whether she sees [param entity] now (Main: a death she witnessed).
+func witnessed(entity: GridEntity) -> bool:
+	return senses.sees(entity)
 
 
 ## A map of the GRID_SIZE x GRID_SIZE cells around her, her at the centre,

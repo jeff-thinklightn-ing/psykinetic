@@ -3562,3 +3562,36 @@ cleaning to show the difference.
 
 Rejected: embeddings or a model call to judge repeats (a call per line on
 the box's tick budget); dropping a whole reply when one sentence fails.
+
+## 237. Companions perceive through Senses: sight by light, deaths witnessed, noises heard
+
+A Companion has Senses (222) as the monsters do: Senses.new(self,
+SIGHT_RANGE, -1.0). Her sight is all round, not a cone: she looks about
+as she walks with her player, and a cone would hide from her what she is
+asked about behind her. It is gated by light at her DARK (0.35, the
+monsters' too) and line of sight last, so her map grid, her list of what
+is around and her memory of the zone hold only what is lit; a dark cell
+is "?", the ground for LOOK (her verb, next). Sightings of monsters
+(_watch) go through senses.sees.
+
+She knows only what she witnessed: Main tells her of a death only if she
+sees the creature die (Companion.witnessed), or it is her own player.
+Before, any creature within SIGHT_RANGE, walls or not.
+
+She hears: World.noise tells companions as it tells monsters. World's
+roster keeps _hearers (its companions), so a noise looks at those few,
+not every player; _hear takes any GridEntity with senses. Monsters hear
+as before. Each tick she takes what her senses heard since the last (one
+comparison when nothing came) and keeps the noises whose maker and place
+she cannot see: fighting, a door opened or shut, a door struck, a door
+broken (NOISE_WORDS); steps are her party's and speech reaches her as
+words (overheard), so neither is kept. A fight going on in one place is
+one noise. Each is narrated ("You hear fighting, some way off to the
+west, out of sight."), told in her voice's now for NOISE_TOLD_TICKS (15
+s), and a loud one, calm, asks her voice, at most once in NOISE_ASK_TICKS
+(30 s).
+
+No level sets "ambient" yet, so today sight by light changes nothing in
+the real maps; line of sight for deaths and the hearing do. Her hands
+(whom she fights, the retreat) still look as before; they come over when
+alertness does.

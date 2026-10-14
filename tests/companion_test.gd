@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_spoken()
 	_test_spoken_polish()
 	_test_quiet_after_minor()
+	_test_senses()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -518,6 +519,75 @@ func _test_quiet_after_minor() -> void:
 	_check(mind.triggers("voice").size() == 1 and "the first imp" in mind.triggers("voice")[0],
 			"a kind she has not seen this run: her voice (%s)" % [mind.triggers("voice")])
 	World.despawn(imp)
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _test_senses() -> void:
+	print("
+== she sees by light, knows a death only if she saw it, and hears what she cannot see ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(7, 6))
+	_put(pet, Vector2i(6, 6))
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var lights := [owner.emit_light, pet.emit_light]
+	owner.emit_light = 0.0
+	pet.emit_light = 0.0
+	World.fields.ambient = 0.0
+	World.fields_changed()
+	# A free cell in her line of sight, a few paces off, that the fire does not light.
+	var dark := Vector2i(-1, -1)
+	for y in range(pet.tile.y - 5, pet.tile.y + 6):
+		for x in range(pet.tile.x - 5, pet.tile.x + 6):
+			var at := Vector2i(x, y)
+			if dark.x < 0 and World.distance(pet.tile, at) >= 3 and World.is_free(at) and World.has_line_of_sight(pet.tile, at) \
+					and Senses.light_level(at) < Companion.DARK:
+				dark = at
+	_check(dark.x >= 0, "(a dark cell in her line of sight: %s)" % dark)
+	var imp := _spawn_imp(dark)
+	pet._kinds_seen = {"imp": true}
+	World.step()
+	_check(not pet.senses.sees(imp) and not pet._sees(dark), "in the dark, an imp four cells off is not seen")
+	_check(pet.senses.sees_cell(Vector2i(5, 6)), "the cell beside her is")
+	_check(not "imp" in pet.perception_list(), "and it is not in what she sees: %s" % pet.perception_list())
+	mind.clear()
+	pet._noises.clear()
+	pet._last_speech_tick = -1000
+	pet._noise_asked_tick = -100000
+	World.noise(dark, Senses.NOISE_FIGHT, &"fight", imp)
+	World.noise(dark + Vector2i(0, 1), Senses.NOISE_STEP, &"step", imp)
+	World.step()
+	_check(pet._noises.size() == 1 and pet._noises[0]["kind"] == &"fight", "a fight in the dark is heard; a step is not kept (%s)" % [pet._noises])
+	_check("You hear fighting" in pet.voice_prompt("test"), "it is in her exchange")
+	_check("You heard, out of sight: fighting" in pet.voice_prompt("test"), "and in what she knows now")
+	_check(mind.triggers("voice").size() == 1 and "You hear fighting" in mind.triggers("voice")[0], "calm, it asks her voice (%s)" % [mind.triggers("voice")])
+	World.noise(dark, Senses.NOISE_FIGHT, &"fight", imp)
+	World.step()
+	_check(pet._noises.size() == 1 and mind.triggers("voice").size() == 1, "the same fight going on is one noise, and asks once")
+	var fallen := pet._fallen.size()
+	World.damage(imp, 999)
+	_check(pet._fallen.size() == fallen, "its death, in the dark, she did not see")
+	imp = _spawn_imp(dark)
+	World.fields.ambient = 1.0
+	World.fields_changed()
+	pet._noises.clear()
+	World.step()
+	_check(pet.senses.sees(imp) and pet._sees(dark), "in the light it is seen")
+	World.noise(dark, Senses.NOISE_FIGHT, &"fight", imp)
+	World.step()
+	_check(pet._noises.is_empty(), "a noise whose maker she sees is not a noise out of sight")
+	pet._deaths.clear()
+	pet._fallen.clear()
+	World.damage(imp, 999)
+	_check(pet._fallen.size() == 1, "a death she sees, she knows")
+	owner.emit_light = lights[0]
+	pet.emit_light = lights[1]
+	pet._deaths.clear()
+	pet._noises.clear()
 	pet.mind = ScriptedMind.new()
 	_settle(pet)
 
@@ -1799,13 +1869,11 @@ func _test_death_triggers() -> void:
 	pet._kinds_fallen.clear()
 	pet._last_speech_tick = -1000
 	mind.clear()
-	World.damage(imps[0], 999)
-	World.step()
-	_check(mind.triggers("voice").size() == 1, "the first imp to fall this run: her voice (%s)" % [mind.triggers("voice")])
 	World.damage(imps[2], 999)
 	World.step()
-	_check(mind.triggers("voice").size() == 1, "another imp, next to Player: nothing new, no voice (%s)" % [mind.triggers("voice")])
-	_check("[An imp fell.]" in pet.voice_prompt("test") or "[The imp fell.]" in pet.voice_prompt("test"), "but it is in the exchange")
+	_check(mind.triggers("voice").size() == 1, "the first imp to fall this run: her voice (%s)" % [mind.triggers("voice")])
+	_check("[An imp fell.]" in pet.voice_prompt("test") or "[The imp fell.]" in pet.voice_prompt("test"), "it is in the exchange")
+	World.despawn(imps[0])  # Out of her sight from where she stands (_test_senses has that).
 	World.damage(brute, 999)
 	World.step()
 	_check(mind.triggers("voice").size() == 2 and "Brute" in mind.triggers("voice").back(), "the brute dies: her voice (%s)" % [mind.triggers("voice")])
@@ -2063,7 +2131,8 @@ func _free_tile_between(pet: Companion, low: int, high: int) -> Vector2i:
 		for dx in range(-high, high + 1):
 			var at := pet.tile + Vector2i(dx, dy)
 			var d := World.distance(pet.tile, at)
-			if d >= low and d <= high and World.distance(pet.keeper.tile, at) >= low and World.is_free(at) 					and World.has_line_of_sight(pet.tile, at):
+			if d >= low and d <= high and World.distance(pet.keeper.tile, at) >= low and World.is_free(at) \
+					and World.has_line_of_sight(pet.tile, at):
 				return at
 	return Vector2i(-1, -1)
 

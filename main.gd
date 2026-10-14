@@ -2067,8 +2067,8 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	elif entity.is_creature():
 		kind = "monster"
 	for pet: Companion in _companions.values():
-		if is_instance_valid(pet) and pet.spawned and pet != entity and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
-				and entity.is_creature():
+		if is_instance_valid(pet) and pet.spawned and pet != entity and entity.is_creature() \
+				and (entity == pet.keeper or pet.witnessed(entity)):
 			pet.note_death(_display_name(entity), entity == pet.keeper, entity)
 	var line := ""
 	if entity is Companion:

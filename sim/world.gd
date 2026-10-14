@@ -289,6 +289,8 @@ var _entities: Array[GridEntity] = []
 ## _entities' players and companions, and its monsters, in its order;
 ## made again when _entities changes (_roster_changed).
 var _sought: Array[GridEntity] = []
+## Those sought that hear by Senses (companions): noise tells them too.
+var _hearers: Array[GridEntity] = []
 var _monsters: Array[GridEntity] = []
 ## The zone's entities that have a turn (GridEntity.acts), in id order.
 var _actors: Array[GridEntity] = []
@@ -930,12 +932,17 @@ func carried_lights() -> Array[GridEntity]:
 
 ## A noise of [param kind] at [param at], heard [param radius] cells off
 ## (half that with no clear line to it: through a wall or a closed door):
-## told now to every monster that hears it (Senses.hear), not one listening
-## every tick. A small one looks only at the cells in reach; a big one goes
-## through the monsters. [param source] does not hear itself.
+## told now to every monster and companion that hears it (Senses.hear), not
+## one listening every tick. A small one looks only at the cells in reach;
+## a big one goes through the monsters. [param source] does not hear itself.
 func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = null) -> void:
 	if not Net.is_authority() or radius <= 0:
 		return
+	# Companions are few: each one in reach hears.
+	_take_roster()
+	for entity in _hearers:
+		if maxi(absi(entity.tile.x - at.x), absi(entity.tile.y - at.y)) <= radius:
+			_hear(entity, at, radius, kind, source)
 	if (2 * radius + 1) * (2 * radius + 1) <= monsters().size():
 		for dy in range(-radius, radius + 1):
 			for dx in range(-radius, radius + 1):
@@ -949,14 +956,15 @@ func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = nul
 				_hear(entity as Monster, at, radius, kind, source)
 
 
-func _hear(listener: Monster, at: Vector2i, radius: int, kind: StringName, source: GridEntity) -> void:
-	if listener == source or listener.senses == null or not listener.spawned:
+func _hear(listener: GridEntity, at: Vector2i, radius: int, kind: StringName, source: GridEntity) -> void:
+	var senses: Senses = listener.get("senses")
+	if listener == source or senses == null or not listener.spawned:
 		return
 	var d := maxi(absi(listener.tile.x - at.x), absi(listener.tile.y - at.y))
 	var muffled := d > 0 and not has_clear_line(at, listener.tile)
 	if muffled and d * 2 > radius:
 		return  # Through a wall or a closed door: only half as far.
-	listener.senses.hear(at, radius, kind, source, muffled)
+	senses.hear(at, radius, kind, source, muffled)
 
 
 ## Which way the heat at [param at] comes from, as a compass point ("" for none).
@@ -2570,6 +2578,7 @@ func _take_roster() -> void:
 		return
 	# New arrays, not cleared ones: one handed out before stays as it was.
 	_sought = []
+	_hearers = []
 	_monsters = []
 	_actors = []
 	for entity in _entities:
@@ -2577,6 +2586,8 @@ func _take_roster() -> void:
 			_actors.append(entity)
 		if entity is Player or entity is Companion:
 			_sought.append(entity)
+			if entity is Companion:
+				_hearers.append(entity)
 		elif entity is Monster:
 			_monsters.append(entity)
 	_roster_current = true
