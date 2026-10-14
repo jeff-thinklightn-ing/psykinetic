@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.119
+
+Client and server.
+
+- A faded wall is one clean see-through layer: no light seams where two
+  wall pieces meet, no inside faces showing through, and no flicker as
+  you or the camera move.
+
+The server must be updated to v0.1.119 too, as it refuses any other version.
+
 ## v0.1.118
 
 Client and server.

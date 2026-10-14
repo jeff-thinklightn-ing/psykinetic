@@ -119,6 +119,23 @@ const STONE := Color("ebb48e")
 ## The 2D floor tile's colour (the box floor).
 const FLOOR := Color("4b7164")
 const NEAR_ALPHA := 0.3
+## Near pieces blend only their nearest surface: every near piece's depth
+## is drawn first (NEAR_DEPTH_SHADER, at NEAR_DEPTH_PRIORITY), then their
+## colour where it matches (NEAR_PRIORITY). Plain alpha showed every face
+## behind the front one, doubled where two pieces meet (a light seam at
+## each joint), and flickered as the pieces' sort order flipped. Water,
+## rings and the target outline (priority 0) are drawn before, so what is
+## behind a near piece shows through it; the HP bars (10) after, on top.
+## (Godot's own depth pre-pass writes only nearly opaque pixels: none here.)
+const NEAR_DEPTH_PRIORITY := 1
+const NEAR_PRIORITY := 2
+const NEAR_DEPTH_SHADER := """shader_type spatial;
+render_mode unshaded, shadows_disabled, depth_draw_always;
+void fragment() {
+	ALBEDO = vec3(0.0);
+	ALPHA = 0.0;
+}
+"""
 const CAMERA_PITCH := 50.0
 const CAMERA_DISTANCE := 40.0
 ## Orthographic height in units: a 1.5-unit character, foreshortened by
@@ -1424,6 +1441,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 ## its instance is made, and loaded from disk again for the next (half a
 ## millisecond a wall).
 static var _kit_scenes: Dictionary[String, PackedScene] = {}
+## The depth pass every near material draws first (_make_near).
+static var _near_depth: ShaderMaterial
 
 
 func _kit(piece: String) -> Node3D:
@@ -1437,7 +1456,7 @@ func _stone(alpha: float) -> StandardMaterial3D:
 	material.albedo_color = Color(STONE, alpha)
 	material.roughness = 0.9
 	if alpha < 1.0:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_make_near(material)
 	return material
 
 
@@ -1451,9 +1470,23 @@ func _load_kit_materials() -> void:
 			break
 	sample.free()
 	var near := _kit_opaque.duplicate() as BaseMaterial3D
-	near.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	near.albedo_color = Color(near.albedo_color, NEAR_ALPHA)
+	_make_near(near)
 	_kit_near = near
+
+
+## [param material] as a near piece is drawn: see-through, its nearest
+## surface only (NEAR_DEPTH_SHADER first, as its next pass).
+static func _make_near(material: BaseMaterial3D) -> void:
+	if _near_depth == null:
+		var shader := Shader.new()
+		shader.code = NEAR_DEPTH_SHADER
+		_near_depth = ShaderMaterial.new()
+		_near_depth.shader = shader
+		_near_depth.render_priority = NEAR_DEPTH_PRIORITY
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.render_priority = NEAR_PRIORITY
+	material.next_pass = _near_depth
 
 
 func _descendants(node: Node) -> Array[Node]:
@@ -1634,8 +1667,8 @@ func _see_through_of(material: Material) -> Material:
 		var copy := material.duplicate() as BaseMaterial3D
 		if copy == null:
 			return material
-		copy.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		copy.albedo_color = Color(copy.albedo_color, NEAR_ALPHA)
+		_make_near(copy)
 		_see_through[material] = copy
 	return _see_through[material]
 

@@ -313,6 +313,11 @@ func _test_fade() -> void:
 	await get_tree().create_timer(1.5).timeout
 	var wall := _rig._walls[wall_key]
 	_check(_rig._faded.has(wall), "standing just behind a wall: it fades (%s, at %s)" % [wall_key, behind])
+	var faded_mesh: MeshInstance3D = _rig._descendants(wall).filter(func(node: Node) -> bool: return node is MeshInstance3D)[0]
+	var near_material := faded_mesh.material_override as BaseMaterial3D
+	_check(near_material != null and near_material.render_priority == Client3D.NEAR_PRIORITY
+			and near_material.next_pass is ShaderMaterial and near_material.next_pass.render_priority == Client3D.NEAR_DEPTH_PRIORITY,
+			"drawn as its nearest surface only: its depth first, then its colour (no seam where two pieces meet)")
 	var run: Array = _rig._wall_runs()[wall_key]
 	_check(run.size() > 1 and run.all(func(piece: Node3D) -> bool: return _rig._faded.has(piece)),
 			"and its whole run with it (%d pieces)" % run.size())

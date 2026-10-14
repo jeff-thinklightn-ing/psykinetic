@@ -1505,8 +1505,13 @@ along a wall does not flicker it. Near pieces take the `NEAR_ALPHA` (0.3)
 material and cast no shadow; everything else is opaque, however much
 floor is behind it. What hides them is worked out again whenever the
 camera (yaw, tilt, zoom, following, panning) or they move. The 2D view keeps its own rule
-(`WallEdge.is_near`). Near pieces blend as ordinary
-translucent meshes, so two overlapping ones do stack a little.
+(`WallEdge.is_near`). Near pieces show only their nearest surface, once
+(`_make_near`): every near material draws a depth-only pass first
+(`NEAR_DEPTH_SHADER`, render priority 1), then its colour where that depth
+matches (priority 2), so the faces behind it and the overlap where two
+pieces meet are not blended in. Water, rings and the target outline
+(priority 0) are drawn before them and show through; the HP bars (10)
+after, on top.
 
 **Entities** get a puppet each (`_make_puppet`): a primitive at the scale
 table's height (capsule for characters, box, cylinder, sphere, slabs),

@@ -2004,3 +2004,22 @@ mostly refusals (a monster took the tile first), which no prediction
 foresees. Rejected: planning round a refused tile for a while (in a
 passage it is the only way, freed a tick later; it sent a player on a long
 detour), and the server keeping to its own way each step (the cause).
+
+## 188. A faded wall shows its nearest surface only
+
+Faded walls blended as plain translucent meshes: every face behind the
+front one showed through (the inside of a tower, the far side of a wall),
+the end faces where two pieces meet doubled into a light seam at each
+joint, and as the camera or the player moved the pieces' back-to-front
+order flipped and those overlaps flickered. Godot's depth pre-pass
+transparency does not help: it writes depth only where a pixel is nearly
+opaque, and a near piece is 0.3. Each near material now has a depth-only
+pass (NEAR_DEPTH_SHADER: depth written, alpha 0) as its next pass, at a
+render priority below its colour's, so every near piece's depth is drawn
+first and its colour then only where it is the nearest surface: one layer,
+the same whatever the order. Priorities are placed among the other
+translucent things: water, the hover and click rings and the target
+outline (0) are drawn before, so they still show through a faded wall;
+the HP bars (10) after. The cost: something translucent in front of a
+faded wall is washed by it a little, as the wall's colour is drawn after.
+A faded wall now looks fainter than before, as it no longer stacks.
