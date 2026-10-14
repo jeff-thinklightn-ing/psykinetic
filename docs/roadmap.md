@@ -54,6 +54,15 @@ nothing far away is simply paused, but it doesn't need the 10 Hz sim either:
 - **Offline:** the world tick keeps running on the server with no one connected, at the
   same coarse rate.
 
+- **Movement is real** (Jeff, 2026-10-14): groups on the world tick walk real paths at their
+  own speed, never jump, inside areas as well as between them.
+- **Held ground is physical:** a group can't route through ground another faction holds
+  (the cells within a held place's radius; contested ground blocks everyone). It goes
+  around, or it meets the holders and the world tick makes the encounter (fight or take).
+- **Server downtime pauses the world:** the world tick's clock is saved and resumes where it
+  stopped; nothing is caught up for the time the server was down. Players being offline
+  pauses nothing.
+
 Perf should leave room for this when it builds the far-monster cut-off: the far tier
 hands over to the world tick, not to a stop.
 
