@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.134
+
+Client and server.
+
+- Fixed: a brute winding up a blow at a player who died or left meanwhile
+  made the server log an error; it now swings at the air.
+
+The server must be updated to v0.1.134 too, as it refuses any other version.
+
 ## v0.1.133
 
 Client only.

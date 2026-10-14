@@ -335,11 +335,13 @@ func _wind_on() -> void:
 		return
 	if World.tick < int(_windup["lands"]):
 		return
-	var aimed: GridEntity = _windup["target"]
+	# Untyped till checked: a target freed since (a player who died or left)
+	# cannot be put in a GridEntity.
+	var aimed: Variant = _windup["target"]
 	var direction: Vector2i = _windup["direction"]
 	_windup = {}
-	if is_instance_valid(aimed) and aimed.spawned and World.can_melee(tile, aimed.tile):
-		World.try_attack(self, aimed)
+	if is_instance_valid(aimed) and (aimed as GridEntity).spawned and World.can_melee(tile, (aimed as GridEntity).tile):
+		World.try_attack(self, aimed as GridEntity)
 	else:
 		World.try_swing(self, direction)
 

@@ -138,6 +138,21 @@ func _test_windup() -> void:
 	_check(landed.size() == 1 and int(landed[0]["amount"]) == 2 and int(landed[0]["tick"]) - int(wound[0][0]) == Monster.WINDUP_TICKS,
 			"and %d ticks on it lands, for 2 (%s)" % [Monster.WINDUP_TICKS, landed])
 
+	# Its target gone for good before the blow lands (a player who left),
+	# another in sight: it swings at the air where the first stood, no error.
+	e = _build(["#########", "#.......#", "#..Pb..P#", "#.......#", "#########"])
+	brute = e["b"][0]
+	_bold(brute)
+	var air := []
+	brute.swung.connect(func(direction: Vector2i) -> void: air.append(direction))
+	World.step()
+	var gone: GridEntity = e["P"][0]
+	World.despawn(gone)
+	gone.free()
+	for i in Monster.WINDUP_TICKS:
+		World.step()
+	_check(air.size() == 1 and brute._windup.is_empty(), "its target freed while it winds up: it swings at the air (%s)" % [air])
+
 	e = _build(["#########", "#.......#", "#..Pb...#", "#.......#", "#########"])
 	player = e["P"][0]
 	brute = e["b"][0]
