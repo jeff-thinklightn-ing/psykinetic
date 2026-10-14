@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.133
+
+Client only.
+
+- The ground no longer looks like tiles: grass, dirt and stone run into
+  each other along ragged, natural edges, with no seams between cells.
+  Stone floors are cobbled, dirt paths are brown, and the light from
+  torches and fires fades smoothly instead of in squares.
+- Fire on the ground is a flickering, ragged patch instead of a yellow
+  square.
+
 ## v0.1.132
 
 Client and server.
