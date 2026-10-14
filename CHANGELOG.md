@@ -3,6 +3,23 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.124
+
+Client and server.
+
+- Builder mode, for the people allowed to build (the host's own player;
+  on the server, the players the server names): press B, drag out an
+  area, and say what should be there ("a pond", "a goblin camp guarding a
+  chest"). Claude proposes it as a see-through ghost over the area, with a
+  line on what it made and what it cost. Enter keeps it, words in the box
+  change it ("bigger", "move it north"), Esc throws it away, Ctrl+Z takes
+  back the last change. Everyone in the area sees the change at once, and
+  so does anyone who comes later.
+- Keeping a change rebuilds the area: everyone stays where they are, but
+  monsters and chests come back as the map has them.
+
+The server must be updated to v0.1.124 too, as it refuses any other version.
+
 ## v0.1.123
 
 Client and server.
