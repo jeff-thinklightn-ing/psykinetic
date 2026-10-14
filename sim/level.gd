@@ -12,7 +12,7 @@ extends RefCounted
 ##   level.json   name; legend overrides; the entities' names and props by
 ##                tile (a monster's facing and idling too); the start order;
 ##                named spawn points; level links; neighbours (the level
-##                across each map edge).
+##                across each map edge); places (held by factions).
 ##
 ## A cell pixel is ground (stone, grass, dirt), fire, water, a stair, void
 ## (also any pixel more than half transparent), or a marker: a player start,
@@ -27,7 +27,7 @@ extends RefCounted
 ## no wall: nothing is built along it, and sight passes over it.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
-## links, neighbours, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
+## links, neighbours, places, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
 ## views take: floor, fire, edges (as Terrain.parse), and kinds (cell ->
 ## "stone" | "grass" | "dirt"), water, heights (cell -> 1..6; 0 is left
 ## out), stairs (cell -> the direction it climbs), torches.
@@ -78,6 +78,10 @@ const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "t
 ## each the way off the map it is.
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
+## What a place (level.json "places", Holdings) can be.
+const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "other"]
+## A place's radius when level.json gives none, in cells.
+const PLACE_RADIUS := 8
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## What a marker spawns, before level.json's props for that tile.
 ## Each kind fights its own way too (Monster.TACTICS): the brute plods and
@@ -480,6 +484,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 			warnings.append("the link marker at %s goes nowhere (no entry in level.json \"links\")" % at)
 	var centre: Variant = _tile(config.get("centre"))
 	level["neighbours"] = neighbours_from(config, warnings)
+	level["places"] = places_from(config, warnings)
 	level["entities"] = entities
 	level["starts"] = starts
 	level["spawn_points"] = spawn_points
@@ -504,6 +509,34 @@ static func neighbours_from(config: Dictionary, warnings: Array[String]) -> Dict
 		var to := str(listed[side])
 		if not to.is_empty():
 			out[str(side)] = to
+	return out
+
+
+## level.json's "places", key -> {key, cell, name, kind (PLACE_KINDS), radius
+## (cells, at least 1), worth (at least 0), holder (who holds it at the
+## start; "nobody" if not said)}: the places factions hold (Holdings). An
+## entry with no cell, or a kind there is not, is said in [param warnings].
+static func places_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
+	var out: Dictionary[String, Dictionary] = {}
+	var listed: Variant = config.get("places", {})
+	if not listed is Dictionary:
+		warnings.append("\"places\" in level.json is not an object")
+		return out
+	for key: Variant in listed:
+		var entry: Variant = listed[key]
+		var at: Variant = _tile(entry.get("at") if entry is Dictionary else null)
+		if at == null:
+			warnings.append("the place %s has no \"at\" cell" % [key])
+			continue
+		var kind := str(entry.get("kind", "other"))
+		if kind not in PLACE_KINDS:
+			warnings.append("the place %s is a %s: one of %s; it is other" % [key, kind, ", ".join(PLACE_KINDS)])
+			kind = "other"
+		var radius := int(entry.get("radius", PLACE_RADIUS))
+		if radius < 1:
+			warnings.append("the place %s has a radius under 1: it is 1" % [key])
+		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
+			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
 	return out
 
 

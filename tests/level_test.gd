@@ -136,6 +136,9 @@ func _test_test_room_unchanged() -> void:
 
 
 func _test_every_level() -> void:
+	_check(World.holdings != null and World.holdings.all_places().size() == WorldMap.build().areas.values().reduce(
+			func(count: int, area: Dictionary) -> int: return count + area["places"].size(), 0),
+			"the server's boot makes World.holdings, a holding for every place in the levels")
 	print("\n== every level in levels/ imports as Images and loads cleanly ==")
 	for folder in DirAccess.get_directories_at(Level.DIR):
 		if Level.DIR + folder + "/" == Prefab.DIR:

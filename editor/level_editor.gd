@@ -468,7 +468,7 @@ func stamp_corner(grid: Vector2) -> Vector2i:
 func stamp_at(at: Vector2i) -> void:
 	if _stamp.is_empty():
 		return
-	if apply_changes(Prefab.stamp_changes(_stamp, map, at)):
+	if apply_changes(Prefab.stamp_changes(_stamp, map, at, doc.config)):
 		report = "stamped %s at %d, %d" % [stamp_name, at.x, at.y]
 
 

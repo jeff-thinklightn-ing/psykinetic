@@ -150,7 +150,7 @@ func resized(left: int, top: int, right: int, bottom: int) -> LevelMap:
 ## [param config] (level.json) with every cell in it carried by [param move]
 ## (Vector2i -> Vector2i, or null for gone) and every facing turned
 ## [param turns] quarter turns clockwise: the centre, starts, spawn points,
-## links, and each entity's cell, route and gather point. What [param move]
+## links, places, and each entity's cell, route and gather point. What [param move]
 ## drops is left out (an entity's entry, a link, a start; a waypoint; a gather
 ## point), each said in [param dropped]. The rest of the file is kept.
 static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped: Array[String] = []) -> Dictionary:
@@ -195,6 +195,16 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 			else:
 				dropped.append("link %s" % [link])
 		out["links"] = links
+	if out.get("places") is Dictionary:
+		var places: Dictionary = out["places"]
+		for key: Variant in places.keys():
+			var place: Variant = places[key]
+			var to: Variant = cell.call(place.get("at") if place is Dictionary else null)
+			if to != null:
+				place["at"] = to
+			else:
+				places.erase(key)
+				dropped.append("place %s" % key)
 	if out.get("entities") is Array:
 		var entities: Array = []
 		for entry: Variant in out["entities"]:

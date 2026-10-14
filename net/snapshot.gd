@@ -92,8 +92,9 @@ static func _write(path: String, text: String) -> bool:
 ## (missing, unreadable, or malformed); otherwise "zones" holds each zone's
 ## {tick, entities, respawns}, "entities" one entry per restorable entity:
 ## {spec, hp, stamina, facing, slots (null if none saved)}, "players"
-## the records, and "steps" the world's clock (0 in a file from before it
-## was kept). Entries that make
+## the records, "steps" the world's clock (0 in a file from before it
+## was kept), and "holdings" who holds which place (Holdings.to_dict; {} in
+## a file from before them: the levels' own holders). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
@@ -139,8 +140,10 @@ static func load(path: String) -> Dictionary:
 			if record.zone.is_empty():
 				record.zone = _map_in(data)
 	var steps: Variant = data.get("steps", 0)
+	var holdings: Variant = data.get("holdings", {})
 	return {"ok": true, "zones": zones, "players": players,
-		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0}
+		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
+		"holdings": holdings if holdings is Dictionary else {}}
 
 
 ## One zone's {tick, entities, respawns} as read.

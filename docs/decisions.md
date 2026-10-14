@@ -2440,3 +2440,28 @@ The key is optional, with no new snapshot version: a file without it
 starts the clock at 0, as before. Snapshot.save takes a fourth argument,
 the world's own keys for the top level ({"steps": ...}), where the
 holdings (204) go too.
+
+## 204. Factions hold places; held ground is a place's radius
+
+What enemies win by holding is places: a cell and a radius in an area,
+declared in its level.json (`places`, with a kind, a worth and who holds it
+at the start), so a level, a prefab and builder mode's `mark_place` all
+make them the same way, and a resize, a turn or a stamp moves them as it
+moves the rest of level.json (`LevelMap.moved_config`). The factions are a
+small hand-written file, `levels/factions.json` (goblins and town for now,
+each with its monster kinds and who it is hostile to), and "nobody" holds
+what no faction does. Who holds what now is `Holdings`, on the server's
+World, made at boot from the levels and then the snapshot's `holdings` key
+(passed through Snapshot.save's world argument; a file from before it, or
+one an older server reads, still loads). It keeps each place's holder,
+strength and since (a World step; saved as an age, so it reads right on
+any clock), and says when a place changes hands. Held ground is the cells
+within a held place's radius, not the whole area: a goblin camp in the
+wilds holds its camp, not the wilds. An area's holder is a label (most
+worth of its places) for the view and the world tick, never passability.
+A place nobody holds is open ground and counts for no one; ground two
+factions' places cover is contested. Nothing in play shows it yet; the
+world map view colours areas and places by holder. Rejected: holding whole
+areas (one camp would close a 256-cell map), and a world file of places
+apart from the levels (it would fall out of step with them, as decision
+194 says of links).

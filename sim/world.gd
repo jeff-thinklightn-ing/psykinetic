@@ -261,6 +261,9 @@ signal zone_switched(from: Zone, to: Zone)
 signal stepped
 ## So many steps, all zones together.
 var steps := 0
+## Server: who holds which place (Holdings), the world tick's to change;
+## made by Main at boot, from the levels and the snapshot. Null on a client.
+var holdings: Holdings = null
 
 
 ## An attack or shove accepted this tick, waiting for the resolve phase.

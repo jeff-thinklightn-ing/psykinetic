@@ -16,7 +16,7 @@ extends RefCounted
 
 const DIR := "res://levels/prefabs/"
 ## level.json keys a prefab keeps.
-const KEEP: Array[String] = ["entities", "links", "legend", "monsters"]
+const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places"]
 
 
 ## The prefabs there are, by name, sorted.
@@ -63,9 +63,11 @@ static func rotated(prefab: Dictionary, turns: int) -> Dictionary:
 ## What stamping [param prefab] with its top-left at [param at] on
 ## [param map] (as it is) sets: {cells: cell -> meaning ("void" for none
 ## here), edges: key -> kind, heights: cell -> level, entries: their entries,
-## moved, links: theirs, moved, covers: the map cells the prefab's cells land on}.
-## Only what lands on the map.
-static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i) -> Dictionary:
+## moved, links: theirs, moved, covers: the map cells the prefab's cells land on,
+## and, if the prefab has places, config: {places: [param config]'s (the
+## map's level.json) with the prefab's added, moved, a key the map has
+## already taking _2, _3...}}. Only what lands on the map.
+static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, config := {}) -> Dictionary:
 	var piece: LevelMap = prefab["map"]
 	var cells: Dictionary[Vector2i, String] = {}
 	var heights: Dictionary[Vector2i, int] = {}
@@ -92,8 +94,20 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i) -> Di
 	var shift := func(cell: Vector2i) -> Variant:
 		return cell + at if map.in_bounds(cell + at) else null
 	var moved_config := LevelMap.moved_config(prefab["config"], shift)
-	return {"cells": cells, "edges": edges, "heights": heights, "covers": covers,
+	var out := {"cells": cells, "edges": edges, "heights": heights, "covers": covers,
 		"entries": moved_config.get("entities", []), "links": moved_config.get("links", [])}
+	var places: Variant = moved_config.get("places", {})
+	if places is Dictionary and not places.is_empty():
+		var merged: Dictionary = (config.get("places", {}) as Dictionary).duplicate(true) if config.get("places") is Dictionary else {}
+		for key: String in places:
+			var free := key
+			var n := 2
+			while merged.has(free):
+				free = "%s_%d" % [key, n]
+				n += 1
+			merged[free] = places[key]
+		out["config"] = {"places": merged}
+	return out
 
 
 ## Reads prefab [param prefab_name] ({} if there is none).

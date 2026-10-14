@@ -13,7 +13,9 @@ extends Control
 ## picked from the target's spawn points; x takes the link out of level.json
 ## (its marker stays: put one in or take it out in the level editor).
 ## Double-click a box to open that level in the level editor (unsaved
-## changes are saved first). Ctrl+S saves every changed level.json and where
+## changes are saved first). A box's title bar takes the colour of its area's
+## holder, and a row per place shows who holds it, as the levels start them
+## (Holdings: the server's own holdings are not read here). Ctrl+S saves every changed level.json and where
 ## the boxes are (levels/world_map.json, which is only for this view). The
 ## panel on the right lists WorldMap.problems() as they stand.
 
@@ -34,6 +36,8 @@ const SELECTED_TITLE := Color(0.3, 0.45, 0.7)
 
 var graph: GraphEdit
 var world_map: WorldMap
+## Who holds what, as the levels start it (the server's own is not here).
+var holdings: Holdings
 ## Levels opened for editing (name -> MapDoc), the ones changed or about to be.
 var docs: Dictionary[String, MapDoc] = {}
 ## Box positions, by level name.
@@ -99,6 +103,7 @@ func refresh() -> void:
 		sources[area_name] = {"layout": doc.map.to_image(), "config": doc.config,
 			"height": doc.map.to_height_image() if doc.had_heights or not doc.map.heights.is_empty() else null}
 	world_map = WorldMap.build(Level.names(), sources)
+	holdings = Holdings.new(world_map)
 	graph.clear_connections()
 	for node: GraphNode in _boxes():
 		graph.remove_child(node)
@@ -175,8 +180,13 @@ func _box(area_name: String) -> GraphNode:
 	node.gui_input.connect(_on_box_input.bind(area_name))
 	node.add_theme_stylebox_override("panel", _style(PANEL, false))
 	node.add_theme_stylebox_override("panel_selected", _style(PANEL, false))
-	node.add_theme_stylebox_override("titlebar", _style(TITLE, true))
-	node.add_theme_stylebox_override("titlebar_selected", _style(SELECTED_TITLE, true))
+	# The title bar is the area's holder's colour (grey: nobody's).
+	var held := holdings.area_holder(area_name)
+	var title_colour := TITLE.lerp(holdings.factions.colour(held), 0.0 if held == Factions.NOBODY else 0.55)
+	node.add_theme_stylebox_override("titlebar", _style(title_colour, true))
+	node.add_theme_stylebox_override("titlebar_selected", _style(title_colour.lerp(SELECTED_TITLE, 0.5), true))
+	if held != Factions.NOBODY:
+		node.title += "  - %s" % holdings.factions.display_name(held)
 	var left: Array = []
 	var right: Array = []
 	var row := 0
@@ -200,8 +210,26 @@ func _box(area_name: String) -> GraphNode:
 		node.set_slot(row, false, LINK, LINK_COLOUR, true, LINK, LINK_COLOUR)
 		right.append(link["tile"])
 		row += 1
+	for id in holdings.places_in(area_name):
+		node.add_child(_place_row(id))
 	_ports[area_name] = {"left": left, "right": right}
 	return node
+
+
+## A place's row: its holder's colour, key, kind, cell, radius and holder.
+func _place_row(id: String) -> HBoxContainer:
+	var place := holdings.place(id)
+	var held := holdings.holder(id)
+	var row := HBoxContainer.new()
+	var swatch := ColorRect.new()
+	swatch.color = holdings.factions.colour(held)
+	swatch.custom_minimum_size = Vector2(18, 18)
+	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(swatch)
+	var label := Label.new()
+	label.text = "%s: %s at %s, r %d, %s" % [place["key"], place["kind"], place["cell"], place["radius"], holdings.factions.display_name(held)]
+	row.add_child(label)
+	return row
 
 
 func _style(colour: Color, top: bool) -> StyleBoxFlat:

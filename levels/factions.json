@@ -1,0 +1,14 @@
+{
+	"goblins": {
+		"name": "the goblins",
+		"colour": "#6fa83a",
+		"monsters": ["imp", "brute", "sneak"],
+		"hostile_to": ["town"]
+	},
+	"town": {
+		"name": "the town",
+		"colour": "#d9b24a",
+		"monsters": [],
+		"hostile_to": ["goblins"]
+	}
+}

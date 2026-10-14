@@ -16,6 +16,7 @@ func _ready() -> void:
 	await _test_follow_up_and_errors()
 	await _test_spending_limit()
 	await _test_new_area()
+	await _test_mark_place()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -34,6 +35,28 @@ func _doc() -> MapDoc:
 	return doc
 
 
+func _test_mark_place() -> void:
+	print("
+== mark_place: a place factions hold, in the proposal's level.json ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "mark_place", "input": {"key": "camp", "kind": "camp", "at": [10, 10], "radius": 6, "holder": "goblins", "name": "the goblin camp"}},
+			{"name": "mark_place", "input": {"key": "Bad Key", "kind": "camp", "at": [11, 11], "holder": "goblins"}},
+			{"name": "mark_place", "input": {"key": "far", "kind": "camp", "at": [39, 29], "holder": "goblins"}},
+			{"name": "mark_place", "input": {"key": "elf", "kind": "camp", "at": [12, 12], "holder": "elves"}}],
+		"A goblin camp.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a goblin camp")
+	var proposal := session.proposal()
+	_check(proposal.get("config", {}).get("places") == {"camp": {"at": [10, 10], "kind": "camp", "radius": 6, "holder": "goblins", "name": "the goblin camp"}},
+			"the place is in the proposal's level.json; a bad key, a cell outside the area and a holder that is no faction are refused (%s)" % [proposal.get("config")])
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(results.slice(1).all(func(result: Dictionary) -> bool: return result.get("is_error", false)), "and Claude is told so")
+	session.accept()
+	_check(doc.config.get("places", {}).has("camp") and doc.undo_steps.size() == 1, "accepted: in the level, one undo step")
+
+
 func _test_prompt() -> void:
 	print("\n== what Claude is told ==")
 	var system := BuilderSession.system_prompt()
@@ -50,7 +73,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "mark_place", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:

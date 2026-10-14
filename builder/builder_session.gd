@@ -34,7 +34,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 ## Context shown round the area, in cells.
 const MARGIN := 3
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -202,6 +202,8 @@ Monsters idle until someone comes: guard (stands, glances about), wander (stroll
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them.
+
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
 %s""" % [", ".join(legend), ", ".join(Items.ALL.keys()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
@@ -222,6 +224,14 @@ func _situation() -> String:
 			var neighbour := str(doc.config.get("neighbours", {}).get(side, ""))
 			beyond.append("%s (%s)" % [side, "beyond it: %s" % neighbour if not neighbour.is_empty() else "nothing beyond it yet: new_area can make a level there"])
 		text += "\n\nThe area touches the map's edge on the " + ", ".join(beyond) + "."
+	var places := PackedStringArray()
+	var listed: Dictionary = Level.places_from(doc.config, [] as Array[String])
+	for key: String in listed:
+		var place: Dictionary = listed[key]
+		if area.grow(MARGIN).has_point(place["cell"]):
+			places.append("%s (%s at %s, radius %d, held by %s)" % [key, place["kind"], place["cell"], place["radius"], place["holder"]])
+	if not places.is_empty():
+		text += "\n\nPlaces here: " + ", ".join(places) + "."
 	return text
 
 
@@ -337,6 +347,15 @@ const TOOLS := [
 		"input_schema": {"type": "object", "properties": {"prefab": {"type": "string"}, "at": _CELL,
 			"turns": {"type": "integer", "minimum": 0, "maximum": 3}},
 			"required": ["prefab", "at"]}},
+	{"name": "mark_place", "description": "Marks a place factions hold: a cell in the area and a radius of ground round it, held at the start by the goblins, the town or nobody. A key already used is moved or changed.",
+		"input_schema": {"type": "object", "properties": {
+			"key": {"type": "string", "description": "lower case letters, digits and _, e.g. \"goblin_camp\""},
+			"kind": {"type": "string", "enum": ["camp", "keep", "farm", "gate", "mine", "other"]},
+			"at": _CELL,
+			"radius": {"type": "integer", "minimum": 1, "maximum": 32},
+			"holder": {"type": "string", "enum": ["goblins", "town", "nobody"]},
+			"name": {"type": "string", "description": "optional, how it is called, e.g. \"the old farmstead\""}},
+			"required": ["key", "kind", "at", "holder"]}},
 	{"name": "look", "description": "The area as it is now, with your changes so far, as a grid.",
 		"input_schema": {"type": "object", "properties": {}}},
 	{"name": "new_area", "description": "Makes a new level beyond the map's edge on a side the area touches (one with nothing beyond it yet), joined both ways, and carves a way from the middle of the area out to that edge. The new level is a first draft, its size given in cells (16 to 256).",
@@ -436,7 +455,9 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			var size: Vector2i = (prefab["map"] as LevelMap).size
 			if not area.encloses(Rect2i(at, size)):
 				return _no("%s turned so is %d x %d: at %s it does not fit in the area" % [prefab_name, size.x, size.y, at])
-			return _lay(Prefab.stamp_changes(prefab, working.map, at), "stamped %s" % prefab_name)
+			return _lay(Prefab.stamp_changes(prefab, working.map, at, working.config), "stamped %s" % prefab_name)
+		"mark_place":
+			return _mark_place(given)
 		"look":
 			return {"ok": true, "text": grid(working.map, working.config, area, area)}
 		"new_area":
@@ -487,6 +508,31 @@ func _new_area(given: Dictionary) -> Dictionary:
 		"gate": gate, "footprint": footprint}
 	return {"ok": true, "text": "a new level %s (%d x %d) beyond the %s edge, a way out to it from the middle of the area" % [
 		level_name, size.x, size.y, side]}
+
+
+func _mark_place(given: Dictionary) -> Dictionary:
+	var key := str(given.get("key", ""))
+	var at: Variant = Level._tile(given.get("at"))
+	var kind := str(given.get("kind", "other"))
+	var holder := str(given.get("holder", Factions.NOBODY))
+	if RegEx.create_from_string("^[a-z0-9_]{1,32}$").search(key) == null or at == null:
+		return _no("mark_place needs a key (lower case letters, digits, _) and at: [x, y]")
+	if not area.has_point(at):
+		return _no("%s is outside the area" % [at])
+	if working.map.cell(at) in ["void", "water"]:
+		return _no("%s is %s: a place stands on ground" % [at, working.map.cell(at)])
+	if kind not in Level.PLACE_KINDS:
+		return _no("kind is one of %s" % ", ".join(Level.PLACE_KINDS))
+	if not Factions.read().has(holder):
+		return _no("holder is goblins, town or nobody")
+	var places: Dictionary = (working.config["places"] as Dictionary).duplicate(true) if working.config.get("places") is Dictionary else {}
+	var place := {"at": [at.x, at.y], "kind": kind, "radius": clampi(int(given.get("radius", Level.PLACE_RADIUS)), 1, 32), "holder": holder}
+	if given.has("name"):
+		place["name"] = str(given["name"])
+	var again := places.has(key)
+	places[key] = place
+	working.apply_changes({"config": {"places": places}})
+	return {"ok": true, "text": "%s the place %s: a %s at %s, radius %d, held by %s" % ["changed" if again else "marked", key, kind, at, place["radius"], holder]}
 
 
 func _place(given: Dictionary) -> Dictionary:
@@ -560,6 +606,9 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 		kept[list] = (changes.get(list, []) as Array).filter(func(entry: Dictionary) -> bool:
 			return area.has_point(Level._tile(entry.get("at"))))
 	kept["covers"] = (changes.get("covers", cells.keys()) as Array).filter(func(cell: Vector2i) -> bool: return area.has_point(cell))
+	if changes.has("config"):
+		# A stamped prefab's places (it fits in the area, so they do).
+		kept["config"] = changes["config"]
 	working.apply_changes(kept)
 	return {"ok": true, "text": "%s%s" % [done, " (%d cells or edges outside the area left out)" % outside if outside > 0 else ""]}
 

@@ -18,6 +18,9 @@ func _ready() -> void:
 	_test_crossing()
 	_test_levels()
 	_test_join()
+	_test_places()
+	_test_holdings()
+	_test_saved_holdings()
 	_test_routes()
 	_test_level_routes()
 	await _test_view()
@@ -140,6 +143,138 @@ func _test_levels() -> void:
 		print("    " + problem)
 	_check(problems.is_empty(), "the levels connect with no problems")
 	_check(world_map.reachable(Level.DEFAULT_MAP).size() == names.size(), "every level is reachable from %s" % Level.DEFAULT_MAP)
+
+
+## h_land: 20 x 10 cells of floor, (5, 8) void; its places: a goblin camp
+## (15, 5) r 3 worth 2, a town farm (3, 5) r 2, a ford nobody holds (9, 5)
+## r 2, a town well (12, 5) r 1 inside the camp's ground; h_bad: places off
+## the map, on void, and held by elves.
+func _register_place_maps() -> void:
+	var land := _block(20, 10)
+	land.set_pixel(10, 16, Color(0, 0, 0, 0))
+	Level.register("h_land", land, null, {"places": {
+		"camp": {"at": [15, 5], "kind": "camp", "radius": 3, "worth": 2, "holder": "goblins", "name": "the goblin camp"},
+		"farm": {"at": [3, 5], "kind": "farm", "radius": 2, "holder": "town"},
+		"ford": {"at": [9, 5], "kind": "gate", "radius": 2},
+		"well": {"at": [12, 5], "kind": "other", "radius": 1, "holder": "town"}}})
+	Level.register("h_bad", land, null, {"places": {
+		"far": {"at": [40, 5]}, "pit": {"at": [5, 8], "holder": "goblins"}, "glade": {"at": [2, 2], "holder": "elves"},
+		"odd": {"at": [1, 1], "kind": "tower", "radius": 0}}})
+
+
+func _test_places() -> void:
+	print("places")
+	_register_place_maps()
+	var factions := Factions.read()
+	_check(factions.names() == _strings(["goblins", "town"]) and factions.of_kind("brute") == "goblins" and factions.of_kind("wolf") == "nobody",
+		"levels/factions.json: the goblins and the town; brutes act for the goblins (%s)" % [factions.names()])
+	_check(factions.hostile("goblins", "town") and not factions.hostile("town", "town") and factions.has("nobody") and not factions.has("elves"),
+		"goblins and town are hostile; nobody can hold, elves cannot")
+	var names: Array[String] = ["h_land", "h_bad"]
+	var world_map := WorldMap.build(names)
+	var camp: Dictionary = world_map.areas["h_land"]["places"]["camp"]
+	_check(camp == {"key": "camp", "cell": Vector2i(15, 5), "name": "the goblin camp", "kind": "camp", "radius": 3, "worth": 2, "holder": "goblins"},
+		"a place as level.json gives it (%s)" % [camp])
+	var ford: Dictionary = world_map.areas["h_land"]["places"]["ford"]
+	_check(ford["holder"] == "nobody" and ford["worth"] == 1 and ford["name"] == "Ford", "unsaid: held by nobody, worth 1, named from its key")
+	var problems := world_map.problems("h_land", factions)
+	var has := func(words: String) -> bool: return problems.any(func(problem: String) -> bool: return words in problem)
+	_check(has.call("place far is off the 20 x 10 map"), "a place off the map is a problem (moved_config moves places)")
+	_check(has.call("the place pit at (5, 8) is on no floor"), "a place on void is a problem")
+	_check(has.call("the place glade is held by elves, which is no faction"), "a holder that is no faction is a problem")
+	_check(has.call("the place odd is a tower") and has.call("the place odd has a radius under 1"), "a kind there is not, and a radius under 1, are warned of")
+	_check(not problems.any(func(problem: String) -> bool: return problem.begins_with("h_land:") and "place" in problem), "h_land's places are fine")
+	var moved := LevelMap.moved_config({"places": {"a": {"at": [1, 1]}, "b": {"at": [9, 9]}}},
+		func(at: Vector2i) -> Variant: return at + Vector2i(2, 0) if at.x < 5 else null)
+	_check(moved["places"] == {"a": {"at": [3, 1]}}, "moved_config carries places and drops one that falls off (%s)" % [moved["places"]])
+	var piece := LevelMap.new(Vector2i(3, 3), {})
+	for y in 3:
+		for x in 3:
+			piece.set_cell(Vector2i(x, y), "grass")
+	var prefab := {"map": piece, "config": {"places": {"camp": {"at": [1, 1], "kind": "camp", "holder": "goblins"}}}}
+	var stamped := Prefab.stamp_changes(prefab, LevelMap.new(Vector2i(10, 10), {}), Vector2i(5, 5), {"places": {"camp": {"at": [0, 0]}}})
+	_check(stamped.get("config", {}).get("places") == {"camp": {"at": [0, 0]}, "camp_2": {"at": [6, 6], "kind": "camp", "holder": "goblins"}},
+		"a stamped prefab's place joins the map's, moved, its key taken already: camp_2 (%s)" % [stamped.get("config")])
+	_check("places" in Prefab.KEEP, "and a prefab keeps the places in it")
+
+
+func _test_holdings() -> void:
+	print("holdings")
+	var names: Array[String] = ["h_land"]
+	var world_map := WorldMap.build(names)
+	var clock := [100]
+	var holdings := Holdings.new(world_map, null, {}, func() -> int: return clock[0])
+	_check(holdings.all_places() == _strings(["h_land/camp", "h_land/farm", "h_land/ford", "h_land/well"]),
+		"every place by id (%s)" % [holdings.all_places()])
+	_check(holdings.holder("h_land/camp") == "goblins" and holdings.holder("h_land/ford") == "nobody" and holdings.strength("h_land/camp") == 1
+		and holdings.since("h_land/camp") == 100, "held as the level starts them, strength 1, since now")
+	_check(holdings.places_of("town") == _strings(["h_land/farm", "h_land/well"]) and holdings.places_in("nowhere").is_empty(), "places_of and places_in")
+	_check(holdings.area_holder("h_land") == "contested", "goblins 2 worth, town 2 (farm and well): the area is contested")
+	_check(holdings.ground("h_land", Vector2i(17, 5)) == "goblins" and holdings.ground("h_land", Vector2i(3, 6)) == "town"
+		and holdings.ground("h_land", Vector2i(9, 5)) == "nobody" and holdings.ground("h_land", Vector2i(6, 1)) == "nobody",
+		"ground: the camp's radius is the goblins', the farm's the town's, a place nobody holds is no one's, and so is the rest")
+	_check(holdings.ground("h_land", Vector2i(12, 5)) == "contested", "the well inside the camp's ground: contested")
+	var for_town := holdings.blocked_cells("h_land", "town")
+	var for_goblins := holdings.blocked_cells("h_land", "goblins")
+	_check(for_town.has(Vector2i(15, 5)) and for_town.has(Vector2i(12, 5)) and not for_town.has(Vector2i(3, 5)) and not for_town.has(Vector2i(9, 5)),
+		"the town may not walk the camp's ground, the contested well among it; its farm and the ford are open to it")
+	_check(for_goblins.has(Vector2i(3, 5)) and for_goblins.has(Vector2i(12, 5)) and not for_goblins.has(Vector2i(16, 5)),
+		"the goblins may not walk the farm or the well; their own camp is open to them")
+	var events: Array = []
+	holdings.place_taken.connect(func(id: String, from: String, to: String) -> void: events.append(["taken", id, from, to]))
+	holdings.area_changed.connect(func(area: String, from: String, to: String) -> void: events.append(["area", area, from, to]))
+	clock[0] = 250
+	_check(holdings.take("h_land/ford", "goblins", 3), "the goblins take the ford")
+	_check(events == [["taken", "h_land/ford", "nobody", "goblins"], ["area", "h_land", "contested", "goblins"]],
+		"place_taken, and area_changed as the area tips to them (%s)" % [events])
+	_check(holdings.strength("h_land/ford") == 3 and holdings.since("h_land/ford") == 250, "at the strength given, since now")
+	_check(not holdings.take("h_land/ford", "goblins") and not holdings.take("h_land/ford", "elves") and not holdings.take("h_land/nope", "town"),
+		"no take of one's own, by no faction, or of no place")
+	_check(holdings.strengthen("h_land/ford", 2) == 5 and holdings.weaken("h_land/ford", 9) == 0 and holdings.holder("h_land/ford") == "goblins",
+		"strengthen and weaken (to 0 at least, still held)")
+	clock[0] = 300
+	var saved := holdings.to_dict()
+	_check(saved["h_land/ford"] == {"holder": "goblins", "strength": 0, "age": 50}, "saved: holder, strength, age (%s)" % [saved["h_land/ford"]])
+	clock[0] = 10
+	var back := Holdings.new(world_map, null, saved, func() -> int: return clock[0])
+	_check(back.holder("h_land/ford") == "goblins" and back.since("h_land/ford") == -40 and back.strength("h_land/ford") == 0,
+		"loaded from it on a clock that starts elsewhere: since keeps its age")
+	var stale := Holdings.new(world_map, null, {"h_land/gone": {"holder": "town"}, "h_land/farm": {"holder": "elves"}})
+	_check(stale.holder("h_land/farm") == "town" and stale.all_places().size() == 4, "a saved place no longer there, or held by no faction, is left out")
+	Level.register("h_land", _block(20, 10), null, {"places": {"camp": {"at": [15, 5], "radius": 3, "holder": "goblins"},
+		"mill": {"at": [5, 5], "holder": "town"}}})
+	var gone := back.rebind(WorldMap.build(names))
+	_check(gone == _strings(["h_land/farm", "h_land/ford", "h_land/well"]) and back.holder("h_land/mill") == "town" and back.holder("h_land/camp") == "goblins",
+		"rebind: places gone are dropped, a new one starts as its level says, the rest keep theirs (%s)" % [gone])
+
+
+## The snapshot: a file from before holdings loads with the levels' own
+## holders; one saved with them gives them back.
+func _test_saved_holdings() -> void:
+	print("holdings in the snapshot")
+	Level.register("h_land", _block(20, 10), null, {"places": {"camp": {"at": [15, 5], "radius": 3, "holder": "goblins"},
+		"mill": {"at": [5, 5], "holder": "town"}}})
+	var names: Array[String] = ["h_land"]
+	var world_map := WorldMap.build(names)
+	var path := "user://world_map_test_snapshot.json"
+	var old := FileAccess.open(path, FileAccess.WRITE)
+	old.store_string(JSON.stringify({"version": Snapshot.VERSION, "zones": {}, "players": [], "steps": 40}))
+	old.close()
+	var loaded := Snapshot.load(path)
+	_check(loaded["ok"] and loaded["holdings"] == {}, "a snapshot from before holdings loads, with none (%s)" % [loaded.get("holdings")])
+	var clock := [loaded["steps"]]
+	var holdings := Holdings.new(world_map, null, loaded["holdings"], func() -> int: return clock[0])
+	_check(holdings.holder("h_land/camp") == "goblins" and holdings.holder("h_land/mill") == "town",
+		"and the places are held as the levels start them")
+	holdings.take("h_land/mill", "goblins", 4)
+	clock[0] = 90
+	var players: Array[PlayerRecord] = []
+	_check(Snapshot.save(path, {}, players, {"steps": 90, "holdings": holdings.to_dict()}), "saved with them, through the world argument")
+	var again := Snapshot.load(path)
+	var back := Holdings.new(world_map, null, again["holdings"], func() -> int: return again["steps"])
+	_check(back.holder("h_land/mill") == "goblins" and back.strength("h_land/mill") == 4 and back.since("h_land/mill") == 40,
+		"loaded again: the goblins hold the mill, strength 4, since step 40 (%s)" % [again["holdings"]])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _test_join() -> void:
@@ -302,6 +437,13 @@ func _test_level_routes() -> void:
 	var ms := (Time.get_ticks_usec() - query) / 1000.0
 	print("    test_room to the wilds' far side %s: %.0f ms, %s steps" % [far, ms, legs.map(func(leg: Dictionary) -> float: return leg["steps"])])
 	_check(legs.size() == 3 and ms < 50.0, "to the wilds' far side, with the fields: %.0f ms" % ms)
+
+
+## [param values] as an Array[String], to compare typed arrays with.
+static func _strings(values: Array) -> Array[String]:
+	var out: Array[String] = []
+	out.assign(values)
+	return out
 
 
 func _check(ok: bool, label: String) -> void:

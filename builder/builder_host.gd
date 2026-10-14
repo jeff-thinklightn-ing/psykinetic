@@ -222,7 +222,11 @@ func _save_and_reload(zone_name: String) -> bool:
 		push_warning("[builder] " + doc.report)
 		return false
 	main.reload_zone(zone_name)
-	var problems := WorldMap.build().problems()
+	var world_map := WorldMap.build()
+	if World.holdings != null:
+		# Places added, moved or gone with the change.
+		World.holdings.rebind(world_map)
+	var problems := world_map.problems()
 	for problem in problems:
 		push_warning("[builder] after the change to %s: %s" % [zone_name, problem])
 	return true

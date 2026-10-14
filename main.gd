@@ -1201,6 +1201,9 @@ func _boot() -> void:
 	# The world's clock goes on from where it stopped: the world waits while
 	# the server is down.
 	World.steps = snapshot.get("steps", 0)
+	# Who holds which place: as the levels start them, then as the snapshot
+	# left them, on the world's clock.
+	World.holdings = Holdings.new(WorldMap.build(), Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1631,7 +1634,8 @@ func _save_state() -> void:
 				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns}
 	World.enter(was)
-	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps})
+	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
+		"holdings": World.holdings.to_dict() if World.holdings != null else {}})
 
 
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.

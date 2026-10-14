@@ -183,6 +183,11 @@ All of it is optional.
   off the east edge and arrive at the west edge of wilds at the same row
   (north and south keep the column). The neighbour names this level on its
   opposite side (see Edge links).
+- `places`: what factions hold here (see Places and who holds them), by
+  key: `{"goblin_camp": {"at": [200, 40], "kind": "camp", "radius": 12,
+  "worth": 2, "holder": "goblins", "name": "the goblin camp"}}`. `kind` is
+  camp, keep, farm, gate, mine or other; `radius` defaults to 8 cells,
+  `worth` to 1, `holder` (who holds it at the start) to nobody.
 
 ## Level links
 
@@ -230,6 +235,30 @@ and the ways between them, point links and neighbours alike. Its
 `godot --headless --path . --scene res://tools/check_world.tscn` prints the
 list (exit code 1 if there is anything on it).
 
+### Places and who holds them
+
+A place (level.json `places`) is a cell and a radius in an area that a
+faction holds. The factions are in `levels/factions.json` (the goblins and
+the town: a name, a colour, the monster kinds acting for each, who each is
+hostile to); "nobody" holds what no faction does. Held ground is the cells
+within a held place's radius (a disc); ground two factions' places both
+cover is contested; a place nobody holds is open ground and counts for no
+one. An area's holder is only a label: the faction holding the most worth
+of its places (contested on a tie, nobody with none).
+
+`Holdings` (`sim/holdings.gd`) is who holds each place now (by id,
+`<area>/<key>`), how strong they are there, and since which world step.
+The server makes it at boot (`World.holdings`): the levels' starting
+holders, then the snapshot's `holdings` over them (a snapshot from before
+holdings loads with the levels' own). The world tick reads it (`holder`,
+`places_in`, `places_of`, `ground`, `area_holder`, `blocked_cells`) and
+changes it (`take`, `strengthen`, `weaken`), and it says so
+(`place_taken`, `area_changed`, `strength_changed`). A builder change
+accepted takes up places added, moved or gone (`rebind`). A camp's place
+belongs on its gather point, where its group gathers. Prefabs keep their
+places, and stamping one gives a key the map already has a `_2`; builder
+mode's `mark_place` marks one. Nothing in play shows them yet.
+
 ### Routes between areas
 
 `world_map.routes()` (`WorldRoutes`, `sim/world_routes.gd`) finds the
@@ -270,7 +299,10 @@ drag a link to a box's "in" to send it there (arriving at `from_<this
 level>` if the target has that spawn point, else its first); drag a wire's
 end away to undo either. A new point link needs its marker, so it starts
 in the level editor; double-click a box to open its level there. The panel
-on the right lists the problems as they stand. Ctrl+S writes the changed
+on the right lists the problems as they stand. A box's title is tinted
+with the colour of its area's holder, and it lists its places, each with
+its holder's colour (as the levels start them: the server's holdings are
+not read here). Ctrl+S writes the changed
 level.json files and where the boxes are (`levels/world_map.json`, read by
 nothing else). For code (builder mode's new area at an edge),
 `WorldMap.join(doc_a, side, doc_b)` and `unjoin` do the same to two MapDocs

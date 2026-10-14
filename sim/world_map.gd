@@ -9,7 +9,8 @@ extends RefCounted
 
 ## Area name -> {name, display_name, size (cells), starts, spawn_points,
 ## links (as Level reads them), neighbours (side -> area), warnings (the
-## level's load warnings), floor (cell -> true), and, for walking it
+## level's load warnings), floor (cell -> true), places (as Level reads
+## them: key -> {key, cell, name, kind, radius, worth, holder}), and, for walking it
 ## (WorldRoutes), edges, heights and stairs as Level's terrain has them}.
 var areas: Dictionary[String, Dictionary] = {}
 ## Every way out of every area, in area order: {from, to, kind ("link" or
@@ -49,6 +50,7 @@ func _read(area_name: String, made: Dictionary) -> void:
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
+		"places": level["places"],
 	}
 	_configs[area_name] = config
 	for link: Dictionary in level["links"]:
@@ -204,14 +206,18 @@ func reachable(from: String, backwards := false) -> Array[String]:
 
 ## What is wrong with how the areas connect, one line each, "<area>: ...";
 ## [] when nothing is. Unreachable means not from [param root] (the default
-## map), or no way back to it.
-func problems(root := Level.DEFAULT_MAP) -> Array[String]:
+## map), or no way back to it. Places are checked against
+## [param factions] (levels/factions.json by default).
+func problems(root := Level.DEFAULT_MAP, factions: Factions = null) -> Array[String]:
 	var out: Array[String] = []
+	if factions == null:
+		factions = Factions.read()
 	for area_name: String in areas:
 		var area: Dictionary = areas[area_name]
 		for warning: String in area["warnings"]:
 			out.append("%s: %s" % [area_name, warning])
 		_check_cells(area_name, out)
+		_check_places(area_name, factions, out)
 	for way: Dictionary in ways:
 		_check_way(way, out)
 	if areas.has(root):
@@ -244,6 +250,20 @@ func _check_cells(area_name: String, out: Array[String]) -> void:
 	for start: Vector2i in area["starts"]:
 		if on_map.has_point(start) and not floor_cells.has(start):
 			out.append("%s: the start at %s is on no floor" % [area_name, start])
+
+
+## Places on no floor, and held by no faction there is.
+func _check_places(area_name: String, factions: Factions, out: Array[String]) -> void:
+	var area: Dictionary = areas[area_name]
+	var floor_cells: Dictionary = area["floor"]
+	var size: Vector2i = area["size"]
+	for key: String in area["places"]:
+		var place: Dictionary = area["places"][key]
+		if Rect2i(Vector2i.ZERO, size).has_point(place["cell"]) and not floor_cells.has(place["cell"]):
+			out.append("%s: the place %s at %s is on no floor" % [area_name, key, place["cell"]])
+		if not factions.has(place["holder"]):
+			out.append("%s: the place %s is held by %s, which is no faction (%s, or nobody)" % [
+				area_name, key, place["holder"], ", ".join(factions.names())])
 
 
 func _check_way(way: Dictionary, out: Array[String]) -> void:
