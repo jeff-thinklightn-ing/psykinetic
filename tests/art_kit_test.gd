@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_check_passes_grey_boxes()
 	_test_check_names_mistakes()
 	_test_own_art_checks()
+	_test_status_current()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -259,6 +260,18 @@ func _test_own_art_checks() -> void:
 			if file.ends_with(".blend") and not FileAccess.file_exists(folder + file.get_basename() + ".glb"):
 				orphans.append(folder + file)
 	_check(orphans.is_empty(), "every .blend has its .glb beside it %s" % [orphans if not orphans.is_empty() else ""])
+
+
+func _test_status_current() -> void:
+	print("
+== docs/art_status.md and THIRD_PARTY.md say what each slot is drawn from now ==")
+	var status := FileAccess.get_file_as_string("res://docs/art_status.md")
+	_check(status == ArtCheck.status_markdown(), "docs/art_status.md is current (run tools/art_status.gd if not)")
+	var third := FileAccess.get_file_as_string("res://THIRD_PARTY.md")
+	_check(ArtCheck.third_party_block() in third, "THIRD_PARTY.md's art slot block is current (run tools/art_status.gd if not)")
+	for name: String in ArtKit.manifest().get("sources", {}):
+		var source: Dictionary = ArtKit.manifest()["sources"][name]
+		_check(str(source.get("license_file", "")) in third, "THIRD_PARTY.md names %s's licence text" % name)
 
 
 ## [param node]'s body's bounds, in the slot's space.

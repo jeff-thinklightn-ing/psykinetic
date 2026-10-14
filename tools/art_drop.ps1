@@ -4,7 +4,8 @@
 #   tools\art_drop.ps1 art\kit\doors\door.single\door.single.blend   already in place: export again and check
 # A .blend is copied in and exported to <slot>.glb through Blender ($env:BLENDER_PATH, else
 # Steam's Blender); a .glb or .png is copied in. Then Godot imports it and tools/art_check.gd
-# checks it against the slot (art/kit/slots.json), naming anything to change. The game draws it
+# checks it against the slot (art/kit/slots.json), naming anything to change, and
+# tools/art_status.gd writes docs/art_status.md and THIRD_PARTY.md again. The game draws it
 # from then on: it replaces the slot's fill or grey box.
 param(
 	[Parameter(Mandatory = $true)][string]$File,
@@ -64,7 +65,11 @@ try {
 	& $godot --headless --path . --import 2>&1 | Out-Null
 	& $godot --headless --path . --script tools/art_check.gd -- $Slot 2>&1 | ForEach-Object { "$_" } |
 		Where-Object { "$_" -match '^(ok|error|warning|\d+ error)|: (error|warning):|SCRIPT ERROR|^ERROR' } | ForEach-Object { Write-Output "$_" }
-	exit $LASTEXITCODE
+	$checked = $LASTEXITCODE
+	# What each slot is drawn from now: docs/art_status.md and THIRD_PARTY.md.
+	& $godot --headless --path . --script tools/art_status.gd 2>&1 | ForEach-Object { "$_" } |
+		Where-Object { "$_" -match '^wrote|SCRIPT ERROR|^ERROR' } | ForEach-Object { Write-Output "$_" }
+	exit $checked
 } finally {
 	Pop-Location
 }
