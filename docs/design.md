@@ -1489,18 +1489,22 @@ in the kit's stone (`_box`, `_stone`, `STONE`) stay available for interior
 walls later (`BOX_WALLS`).
 
 **Near and far** (`_update_fade`): a wall, doorway frame, post or tree is
-near when it stands between the camera and the local player or their
-companion: a ray from each, at `FADE_HEIGHTS`, toward the camera passes
-through its bounds grown by `FADE_MARGIN`, and the piece's centre is on
-the camera's side of them across the ground (so in a corner the walls at
-their back, whose grown bounds they stand in, stay solid). A wall or
-doorway frame fades with its whole run (`_wall_runs`): the walls and
-frames in a straight line with it, and the posts along and at its ends,
-up to where it turns, ends or another wall meets it, so a room's side
-goes see-through together, not one piece of it. Near pieces take the
-`NEAR_ALPHA` (0.3) material and cast no shadow; everything else is opaque,
-however much floor is behind it. Worked out again whenever the camera
-(yaw, tilt, zoom, following) or they move. The 2D view keeps its own rule
+near when it hides the local player or their companion from the camera:
+the line from the camera to them, at each of `FADE_HEIGHTS` (feet,
+middle, head), passes through its bounds (`_hiding_pieces`; the camera is
+orthographic, so the line runs back from the point along the view), and
+the piece's centre is on the camera's side of them across the ground. The
+bounds are the meshes' own, not grown: grown, a wall at their back that
+they stood beside was grazed, and faded with its run. A wall or doorway
+frame fades with its whole run (`_wall_runs`): the walls and frames in a
+straight line with it, and the posts along and at its ends, up to where
+it turns, ends or another wall meets it, so a room's side goes
+see-through together, not one piece of it. A piece that stops hiding them stays near for
+`FADE_HOLD` (0.4 s, on `_fade_clock`) before it turns solid, so walking
+along a wall does not flicker it. Near pieces take the `NEAR_ALPHA` (0.3)
+material and cast no shadow; everything else is opaque, however much
+floor is behind it. What hides them is worked out again whenever the
+camera (yaw, tilt, zoom, following, panning) or they move. The 2D view keeps its own rule
 (`WallEdge.is_near`). Near pieces blend as ordinary
 translucent meshes, so two overlapping ones do stack a little.
 

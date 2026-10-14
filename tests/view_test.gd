@@ -270,7 +270,7 @@ func _test_ground_colours() -> void:
 
 
 func _test_fade() -> void:
-	print("\n== walls fade only between the camera and the player, a whole run at once, worked out again as the camera moves ==")
+	print("\n== walls fade, a whole run at once, only where they hide the player from the camera, a moment longer ==")
 	var player := _player()
 	var start := player.tile
 	var floor_cells: Array = _main._terrain["floor"]
@@ -308,6 +308,40 @@ func _test_fade() -> void:
 				near_runs[piece] = true
 	var far_faded := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return not near_runs.has(piece)).size()
 	_check(far_faded == 0, "and nothing else far from the player or the companion fades (%d of %d)" % [far_faded, _rig._faded.size()])
+	# Beside a wall at their back, anywhere in the cell (as they walk): the
+	# line to the camera never meets it, so it stays solid (its bounds, grown,
+	# were grazed, and its run faded).
+	var flat := Vector2(toward.x, toward.z).normalized()
+	var grazed := 0
+	var beside := 0
+	for cell: Vector2i in floor_cells:
+		for edge: Array in [[Vector3i(cell.x, cell.y, Terrain.EAST), Vector2(1, 0)], [Vector3i(cell.x - 1, cell.y, Terrain.EAST), Vector2(-1, 0)],
+				[Vector3i(cell.x, cell.y, Terrain.SOUTH), Vector2(0, 1)], [Vector3i(cell.x, cell.y - 1, Terrain.SOUTH), Vector2(0, -1)]]:
+			if not _rig._walls.has(edge[0]) or (edge[1] as Vector2).dot(flat) > -0.2:
+				continue
+			for nudge: Vector2 in [Vector2.ZERO, Vector2(0.3, 0.0), Vector2(-0.3, 0.0), Vector2(0.0, 0.3), Vector2(0.0, -0.3)]:
+				var at := _rig.to_global(_rig._tile_position(cell)) + Vector3(nudge.x, 0.0, nudge.y)
+				var points: Array[Vector3] = []
+				for height in Client3D.FADE_HEIGHTS:
+					points.append(at + Vector3(0.0, height, 0.0))
+				beside += 1
+				if _rig._hiding_pieces(points, toward).has(_rig._walls[edge[0]]):
+					grazed += 1
+	_check(beside > 0 and grazed == 0, "beside a wall at their back, it never fades (%d of %d spots)" % [grazed, beside])
+	# Out of the way: still faded for FADE_HOLD, so walking along a wall does
+	# not flicker it, then solid (the rig held still, its clock stepped).
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var was := puppet.global_position
+	_rig.set_process(false)
+	puppet.global_position = was + Vector3(-toward.x, 0.0, -toward.z).normalized() * 3.0
+	_rig._fade_clock += Client3D.FADE_HOLD * 0.5
+	_rig._update_fade()
+	_check(not _rig._hiding.has(wall) and _rig._faded.has(wall), "stepped out from behind it: it no longer hides them, but stays faded a moment")
+	_rig._fade_clock += Client3D.FADE_HOLD
+	_rig._update_fade()
+	_check(not _rig._faded.has(wall), "and after %s s, solid again" % Client3D.FADE_HOLD)
+	puppet.global_position = was
+	_rig.set_process(true)
 	# A corner whose two walls are at the player's back, away from the
 	# camera: neither fades.
 	var corner := Vector2i(-1, -1)

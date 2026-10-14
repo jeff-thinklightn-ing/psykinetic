@@ -1805,3 +1805,23 @@ that channel for the whole load.
 port 11434 since Oct 6 by a reverse tunnel from the desktop, so her asks
 went to the desktop's Ollama. The box's Ollama now listens on 11600, set
 in /etc/psykinetic/env; box config, not the repo's.)
+
+## 180. A wall at their back never fades; a faded one lingers
+
+Standing beside a wall at their back (away from the camera), it faded, with
+its run, about one spot in six in the castle and the test room: the
+pieces' bounds were grown by FADE_MARGIN (155) so a grazing ray would
+count, and a ray from a player beside a thick wall grazed the grown box of
+the next piece along it, whose centre was on the camera's side. The
+bounds are now the meshes' own, and the test is the line from the camera
+to the player or their companion at their feet, middle and head (the
+camera is orthographic: the line runs back from the point along the view,
+to the camera's plane). Measured over every floor cell, at spots a step
+off its centre and camera turns every 15 degrees: a wall at their back
+fades nowhere (old rule: 3373 of 19530 spots in the castle); a wall in
+front fades in 99% as before, the rest being where the line passes over
+it. A wall still fades with its whole run (155). A piece that stops
+hiding them stays faded for 0.4 s (FADE_HOLD), so walking along a wall,
+its pieces handing over one to the next, does not flicker. What hides
+them is worked out when the camera or they move (the camera's position is
+in the key now, so a pan counts); the hold is checked every frame.

@@ -3,6 +3,17 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.113
+
+Client and server.
+
+- A wall behind you no longer fades when you stand next to it: walls fade
+  only where they actually hide you or your companion from the camera (a
+  whole wall at once, as before). A wall you step out from behind stays
+  see-through a moment, so walking along one does not flicker.
+
+The server must be updated to v0.1.113 too, as it refuses any other version.
+
 ## v0.1.112
 
 Server.

@@ -18,10 +18,12 @@ extends Node3D
 ## quad with a small light. Flat-colour boxes in the kit's stone (_box,
 ## _stone) stay available for interior walls later (BOX_WALLS).
 ##
-## Near and far: a wall, doorway, post or tree that stands between the
-## camera and the local player or their companion is near and drawn at
-## NEAR_ALPHA, so they show through it; the rest are opaque. Recomputed
-## whenever the camera or they move (_update_fade).
+## Near and far: a wall, doorway, post or tree that hides the local player
+## or their companion from the camera (a line from it to their feet,
+## middle or head passes through it) is near and drawn at NEAR_ALPHA, so
+## they show through it, with the rest of its run; the rest are opaque.
+## Recomputed whenever the camera or they move; a piece stays near a
+## moment after it stops hiding them (_update_fade).
 ##
 ## Entities get a puppet each: a primitive at the scale table's size,
 ## coloured as the 2D sprite is, with a Label3D name on creatures, a warm-white light on players and companions, and an Area3D
@@ -187,12 +189,16 @@ const DAY_AMBIENT := Color(1.0, 1.0, 1.0)
 const DAY_AMBIENT_ENERGY := 0.6
 ## Below the water's bed.
 const FOREST_FLOOR_DEPTH := 0.2
-## A piece fades when a ray from the local player or their companion, at
-## each of these heights, toward the camera passes within FADE_MARGIN of
-## its bounds, and the piece stands on the camera's side of them (not a
-## wall at their back in a corner); a wall fades with its whole run.
+## A piece fades when the line from the camera to the local player or
+## their companion, at each of these heights (feet, middle, head), passes
+## through its bounds, and the piece stands on the camera's side of them
+## (not a wall at their back in a corner); a wall fades with its whole run.
+## The bounds are the meshes' own: grown, a wall at their back that they
+## stand beside was grazed by the line, and its run faded.
 const FADE_HEIGHTS: Array[float] = [0.3, 0.9, 1.5]
-const FADE_MARGIN := 0.3
+## How long a piece stays faded after it stops hiding them, so walking along
+## a wall does not make it flicker.
+const FADE_HOLD := 0.4
 const FOREST_DEPTH := 3
 ## Monster kinds drawn as an animated model instead of a capsule: the scene
 ## (retargeted on import to SkeletonProfileHumanoid, its skeleton
@@ -533,13 +539,18 @@ var _outdoor := false
 var _land: Dictionary[Vector2i, bool] = {}
 var _trees: Dictionary[Vector2i, Node3D] = {}
 var _see_through: Dictionary[Material, Material] = {}
-## [piece, its bounds grown by FADE_MARGIN, is a tree, the pieces that fade
-## with it], for every wall, doorway frame, post and tree, made once per
-## room; the pieces faded now, and what they were worked out for.
+## [piece, its bounds, is a tree, the pieces that fade with it], for every
+## wall, doorway frame, post and tree, made once per room; the pieces
+## faded now, those hiding them as last worked out and what for, and when
+## each piece last hid them (_fade_clock).
 var _occluders: Array[Array] = []
 var _occluders_built := false
 var _faded: Dictionary[Node3D, bool] = {}
+var _hiding: Dictionary[Node3D, bool] = {}
+var _hid_at: Dictionary[Node3D, float] = {}
 var _fade_key := ""
+## Seconds of frames drawn, for FADE_HOLD.
+var _fade_clock := 0.0
 var _kit_heights: Dictionary[String, float] = {}
 
 
@@ -600,6 +611,7 @@ func _process(delta: float) -> void:
 	_ease_zoom(delta)
 	_ease_pan(delta)
 	_follow(delta)
+	_fade_clock += delta
 	_update_fade()
 	_drop_departed()
 	_update_mourning(delta)
@@ -1364,6 +1376,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_occluders.clear()
 	_occluders_built = false
 	_faded.clear()
+	_hiding.clear()
+	_hid_at.clear()
 	_fade_key = ""
 	_apply_sky()
 	_build_room()
@@ -1907,9 +1921,10 @@ func _classify_walls() -> void:
 	_update_fade(true)
 
 
-## Fades what stands between the camera and the local player or their
-## companion, and only that, whenever the camera or they have moved
-## ([param force]: every piece set again).
+## Fades what hides the local player or their companion from the camera,
+## and only that: what hides them is worked out again whenever the camera or
+## they have moved, and a piece that stops hiding them stays faded for
+## FADE_HOLD ([param force]: every piece set again).
 func _update_fade(force := false) -> void:
 	if _camera == null or _room == null or not _camera.is_inside_tree():
 		return
@@ -1917,19 +1932,20 @@ func _update_fade(force := false) -> void:
 		_index_occluders()
 	var points := _focus_points()
 	var toward := _camera.global_transform.basis.z
-	var key := "%s %s" % [toward, points]
-	if key == _fade_key and not force:
-		return
-	_fade_key = key
+	var key := "%s %s %s" % [toward, _camera.global_position, points]
+	if key != _fade_key or force:
+		_fade_key = key
+		_hiding = _hiding_pieces(points, toward)
+	for piece in _hiding:
+		_hid_at[piece] = _fade_clock
 	var now: Dictionary[Node3D, bool] = {}
-	for entry in _occluders:
-		var bounds: AABB = entry[1]
-		for point in points:
-			var ahead := bounds.get_center() - point
-			if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_ray(point, toward) != null:
-				for piece: Node3D in entry[3]:
-					now[piece] = true
-				break
+	for piece: Node3D in _hid_at.keys():
+		if _fade_clock - _hid_at[piece] <= FADE_HOLD:
+			now[piece] = true
+		else:
+			_hid_at.erase(piece)
+	if not force and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)):
+		return
 	for entry in _occluders:
 		var piece: Node3D = entry[0]
 		var fade := now.has(piece)
@@ -1940,6 +1956,23 @@ func _update_fade(force := false) -> void:
 		else:
 			_set_stone(piece, fade)
 	_faded = now
+
+
+## The pieces the lines from the camera to [param points] pass through,
+## with what fades with them. The camera is orthographic: its line to a
+## point runs back from it along [param toward], up to the camera's plane.
+func _hiding_pieces(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D, bool]:
+	var out: Dictionary[Node3D, bool] = {}
+	for entry in _occluders:
+		var bounds: AABB = entry[1]
+		for point in points:
+			var ahead := bounds.get_center() - point
+			var reach := maxf((_camera.global_position - point).dot(toward), 0.0)
+			if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_segment(point, point + toward * reach) != null:
+				for piece: Node3D in entry[3]:
+					out[piece] = true
+				break
+	return out
 
 
 ## Where the local player and their companion are, at FADE_HEIGHTS: as
@@ -2012,7 +2045,7 @@ func _wall_runs() -> Dictionary[Vector3i, Array]:
 	return out
 
 
-## [param piece]'s meshes' bounds, in the world, grown by FADE_MARGIN.
+## [param piece]'s meshes' bounds, in the world.
 func _bounds(piece: Node3D) -> AABB:
 	var out := AABB()
 	var first := true
@@ -2023,7 +2056,7 @@ func _bounds(piece: Node3D) -> AABB:
 		var box := mesh.global_transform * mesh.mesh.get_aabb()
 		out = box if first else out.merge(box)
 		first = false
-	return out.grow(FADE_MARGIN)
+	return out
 
 
 ## A near piece is see-through and casts no shadow, so a lantern behind it
