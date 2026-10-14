@@ -3190,3 +3190,19 @@ art with a moving part. Rejected: an EditorPlugin preview (the art is made
 by someone not running the editor), and running an --import on each save
 (seconds of the whole project's import a save, against a few hundred
 milliseconds for one file).
+
+## 248. No look for a target while everyone is far beyond sight
+
+With full rate out to 22 tiles (238) some 930 monsters thought a tick with
+16 players, and every one looked for a target, nearly always finding
+nobody: sight is 7. World._tier keeps what it measured, the tiles to the
+nearest player or companion (Monster.nearest_sought), and the zone's
+comings then (Zone.comings: one more for each spawn, despawn and reset). A
+monster with no target does not look while that measure is under
+TIER_EVERY_TICKS old, nobody has come or gone since, and it is beyond its
+sight by more than LOOK_MARGIN_TILES (8), more than anyone walks or is
+shoved in that time. Someone arriving or respawning beside it is seen at
+once (monster_test). Hearing is as before.
+
+tools/map_bench, 256x256 at castle density over 600 ticks, 16 players:
+26.6 ms on average to 24.1.

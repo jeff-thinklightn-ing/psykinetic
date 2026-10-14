@@ -34,6 +34,9 @@ var grid_steps := PackedByteArray()
 ## node its entities are under and their spawner).
 var main := {}
 var awake := true
+## Counts every coming and going of its entities (a spawn, a despawn, a
+## reset): what was measured before a change may be out of date after it.
+var comings := 0
 var asleep_since := -1
 ## Where its players and companions last stood (World._tier_origins).
 var tier_origins: Array[Vector2i] = []

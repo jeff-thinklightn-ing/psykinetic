@@ -6,6 +6,8 @@ top section as the release notes.
 
 ## Unreleased
 
+- A little smoother with many players: monsters far from anyone stop
+  looking about for someone to fight until someone comes near.
 - Stairs are smooth ramps instead of steps, and the ground beside them
   slopes up with them. Ledges are rocky cliff faces instead of flat
   boxes, and the foot of each drop is shaded, so raised ground stands out.

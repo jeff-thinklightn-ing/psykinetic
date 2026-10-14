@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_roster()
 	_test_tiers()
 	_test_world_tick()
+	_test_look_skipped_far()
 	_test_straight_beyond_view()
 	_test_plans_per_step()
 	_test_walk_round_held_ground()
@@ -555,6 +556,24 @@ func _test_straight_beyond_view() -> void:
 	imp.next_move_tick = 0
 	_check(imp._idle_step(goal, Monster.IDLE_SEARCH_TILES, false) and imp.tile != from,
 			"in someone's view: a way round the wall (%s)" % [imp.tile])
+
+
+func _test_look_skipped_far() -> void:
+	print("
+== far beyond its sight it does not look; someone come beside it is seen at once ==")
+	var e := _build(["#" + "#".repeat(60) + "#", "#P" + ".".repeat(48) + "m" + ".".repeat(10) + "#", "#" + "#".repeat(60) + "#"])
+	var m: Monster = e["m"][0]
+	m.sight_range = 7
+	m.senses.sight_range = 7
+	for i in World.TIER_EVERY_TICKS:
+		World.step()
+	_check(m.nearest_sought > m.sight_range + Monster.LOOK_MARGIN_TILES and m._nearest_visible_target() == null,
+			"the nearest player %d tiles off: nobody to look at" % m.nearest_sought)
+	var late := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "Late", "tile": m.tile + Vector2i(2, 0)})
+	_room.add_child(late)
+	World.spawn(late, m.tile + Vector2i(2, 0))
+	late.protected = false
+	_check(m._nearest_visible_target() == late, "a player come two tiles off is seen at once, its measure old or not")
 
 
 func _test_world_tick() -> void:

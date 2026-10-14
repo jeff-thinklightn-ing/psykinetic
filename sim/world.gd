@@ -532,6 +532,7 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 		monster.tier = Tier.NEAR
 		monster.tier_tick = tick
 		monster.beyond_view = false
+		monster.nearest_sought = -1
 		return Tier.NEAR
 	if monster.tier_tick >= 0 and tick - monster.tier_tick < TIER_EVERY_TICKS \
 			and (tick + entity.id) % TIER_EVERY_TICKS != 0:
@@ -543,6 +544,8 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
 	monster.tier_tick = tick
 	monster.beyond_view = nearest > VIEW_TILES
+	monster.nearest_sought = nearest
+	monster.tier_comings = zone.comings
 	if was == Tier.FAR and monster.tier != Tier.FAR:
 		monster._woke_up()  # Thinking again: its idling starts in turn.
 	return monster.tier as Tier
@@ -750,6 +753,7 @@ func reset() -> void:
 			entity._world_remove()
 	_entities.clear()
 	_roster_changed()
+	zone.comings += 1
 	_occupancy.clear()
 	_hits.clear()
 	_grid_rect = Rect2i()
@@ -1251,6 +1255,7 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	_occupancy[at] = entity
 	_entities.append(entity)
 	_roster_changed()
+	zone.comings += 1
 	entity.zone = zone.name
 	entity._world_place(_next_id, at)
 	_next_id += 1
@@ -1265,6 +1270,7 @@ func despawn(entity: GridEntity) -> void:
 	_occupancy.erase(entity.tile)
 	_entities.erase(entity)
 	_roster_changed()
+	zone.comings += 1
 	entity._world_remove()
 	entity_despawned.emit(entity)
 	entity.queue_free()

@@ -61,6 +61,10 @@ const PAUSE_CHANCE_MAX := 0.12
 const PAUSE_TICKS := Vector2i(2, 6)
 const HOLD_BACK_BELOW := 0.3
 const HOLD_BACK_RANGE := 3
+## Looking out is skipped while the nearest player or companion was, at the
+## tier's last measure, this much beyond its sight: more than anyone walks,
+## or is shoved, in World.TIER_EVERY_TICKS.
+const LOOK_MARGIN_TILES := 8
 ## A nearer target is taken over the one it has only when this much nearer.
 const RETARGET_TILES := 2
 const NO_TILE := Vector2i(-9999, -9999)
@@ -188,6 +192,10 @@ var tier_tick := -1
 ## Beyond World.VIEW_TILES of everyone when its tier was worked out: on
 ## nobody's screen. World's.
 var beyond_view := false
+## The tiles to the nearest player or companion when its tier was worked
+## out (-1: not measured), and the zone's comings then. World's.
+var nearest_sought := -1
+var tier_comings := -1
 ## The World.steps of its last world tick (-1: none yet), and whether one
 ## is queued for it. World's.
 var world_step := -1
@@ -453,6 +461,12 @@ func _target_beset() -> bool:
 ## nearer.
 ## Entities still in their spawn grace are passed over.
 func _nearest_visible_target() -> GridEntity:
+	# Nobody near enough to be seen: its tier's measure (a few ticks old,
+	# nobody come or gone since) is beyond its sight by more than anyone
+	# could close meanwhile. Most looks end here.
+	if target == null and nearest_sought > sight_range + LOOK_MARGIN_TILES \
+			and tier_comings == World.zone.comings and World.tick - tier_tick < World.TIER_EVERY_TICKS:
+		return null
 	var nearest: GridEntity = null
 	var nearest_distance := sight_range + 1
 	var kept := -1
