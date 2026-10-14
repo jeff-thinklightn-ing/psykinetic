@@ -31,7 +31,7 @@ a story only matters if there's something to fight with.
 
 | # | Step | Done when | Worktree |
 |---|------|-----------|----------|
-| 1 | **Performance** | 256² map: load < 2 s (3D build included), server tick < 20 ms at castle density, 60 fps on the laptop; per-frame scripts < 4 ms at 128², < 8 ms at 256². Far-away monsters think less often (full rate within ~30 cells of a player/companion, reduced at 30–60; fights always full rate). Beyond that, and in zones nobody is in, the world is not paused: it moves on at a slow world tick (see "The world moves on" below). | `perf` |
+| 1 | **Performance** | 256² map: load < 2 s (3D build included), server tick < 20 ms at castle density with many players spread over the map (Jeff: "needs to accommodate larger numbers"; benched at 1, 4, 9 and 16 players), 60 fps on the laptop; per-frame scripts < 4 ms at 128², < 8 ms at 256². Far-away monsters think less often (full rate within ~30 cells of a player/companion, reduced at 30–60; fights always full rate). Beyond that, and in zones nobody is in, the world is not paused: it moves on at a slow world tick (see "The world moves on" below). | `perf` |
 | 2 | **Network smoothness** | No rubber-banding in a castle fight. Knockback sent as one event (direction, distance, start tick) every client plays identically; others drawn ~100–150 ms in the past and interpolated; corrections blended, not snapped; camera follows a smoothed position. Report corrections/min and worst snap before/after. | after `perf` (same client code) |
 | 3 | **Combat animation states** | Synced from sim state: wind-up (longer for heavy attacks), strike, recover, hit (direction-aware), pushed (matches knockback event), knocked down (fall/lie/get up, timed to sim), block, guard break, death. Clean blends, no popping. | after `pc-character` |
 | 4 | **Player character** | One shared humanoid body for players and companions, human proportions so the animation library fits, hand attach points for weapons. Replaces the capsule. | `pc-character` |
@@ -72,7 +72,7 @@ hands over to the world tick, not to a stop.
 |----------|-----|
 | `companions` | Repetition filter compares normalized text (curly/straight quotes, case, punctuation); stay silent more readily after minor events; a real OPEN/CLOSE DOOR action the voice can choose; record last words in transcripts. |
 | `live-updates` | Protocol version separate from build version (only a protocol mismatch blocks joining); graceful update (60 s chat warning, save, restart, clients auto-reconnect); client self-update on reconnect; live reload for data files; then auto-deploy in the ship flow; a staging port where a new build is checked before swapping in. |
-| `maps` | **World map and connectivity.** One graph of every area (nodes) and how they connect (edges): today's point links in each `level.json` plus edge links (`neighbours`: walk off one edge, arrive at the matching edge at the same position). A validation pass: links go both ways where they should, spawn points exist, no area is unreachable. A node map view in the editor (Godot's `GraphEdit`/`GraphNode`): areas as boxes, links as wires, add/remove/retarget links, open an area. Routing between areas over the graph (Godot's `AStar2D`) for the world tick to move groups across areas. Builder pass 4 builds on it. |
+| `maps` | **World map and connectivity.** One graph of every area (nodes) and how they connect (edges): today's point links in each `level.json` plus edge links (`neighbours`: walk off one edge, arrive at the matching edge at the same position). A validation pass: links go both ways where they should, spawn points exist, no area is unreachable. A node map view in the editor (Godot's `GraphEdit`/`GraphNode`): areas as boxes, links as wires, add/remove/retarget links, open an area. Routing between areas over the graph (Godot's `AStar2D`) for the world tick to move groups across areas. Builder pass 4 builds on it. Done (decisions 194–206, with territory: places, factions, holdings, routes that keep off held ground). Now: **send each player only nearby entities** (interest radius instead of the whole zone), for larger player counts. |
 
 Main folder = home base: pulls, plays the latest, small chores, keeps this file and
 `CLAUDE.md` current. One Claude Code session per folder.
@@ -156,7 +156,6 @@ but hasn't committed to; confirm before building them.
 - **Castle map fixes:** fire that looks like fire (flicker, flames, warm light), not flat yellow squares.
 
 ### Engine, network and tooling
-- **Send each player only nearby entities** (~30–40 cells) instead of the whole zone.
 - **Keep the map bench** as a release check at 128² and 256², with budgets for tick time, load time and frame rate.
 - **Staging server:** run a new build on a second port and check it before swapping it in.
 - **Licensing records:** `THIRD_PARTY.md`, a `source` per asset with a test that fails without one, and dated license copies (e.g. DINOv3, 2025-08-19).
