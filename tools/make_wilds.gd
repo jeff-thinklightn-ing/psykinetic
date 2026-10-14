@@ -71,10 +71,10 @@ func _initialize() -> void:
 				grove_cells[at] = true
 			elif ponds.get_noise_2d(x, y) > 0.62:
 				pond_cells[at] = true
-	for blob in _blobs(grove_cells, MIN_GROVE):
+	for blob in AreaTools.blobs(grove_cells, MIN_GROVE):
 		for at: Vector2i in blob:
 			map.set_cell(at, "void")
-	for blob in _blobs(pond_cells, MIN_POND):
+	for blob in AreaTools.blobs(pond_cells, MIN_POND):
 		for at: Vector2i in blob:
 			map.set_cell(at, "water")
 	# The link, the starts beside the arrival.
@@ -94,29 +94,6 @@ func _initialize() -> void:
 	print("[wilds] %d x %d cells, %d floor, %d things, link at %s; warnings: %s" % [SIZE.x, SIZE.y,
 		(level["terrain"]["floor"] as Array).size(), (level["entities"] as Array).size(), link, level["warnings"]])
 	quit()
-
-
-## The cells of [param cells] in joined pieces (four ways), only pieces of
-## at least [param least] cells.
-static func _blobs(cells: Dictionary[Vector2i, bool], least: int) -> Array[Array]:
-	var out: Array[Array] = []
-	var seen: Dictionary[Vector2i, bool] = {}
-	for start: Vector2i in cells:
-		if seen.has(start):
-			continue
-		var blob: Array[Vector2i] = [start]
-		seen[start] = true
-		var i := 0
-		while i < blob.size():
-			for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				var next: Vector2i = blob[i] + step
-				if cells.has(next) and not seen.has(next):
-					seen[next] = true
-					blob.append(next)
-			i += 1
-		if blob.size() >= least:
-			out.append(blob)
-	return out
 
 
 func _noise(noise_seed: int, frequency: float) -> FastNoiseLite:

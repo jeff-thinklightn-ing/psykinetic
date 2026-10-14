@@ -38,6 +38,14 @@ extends Node2D
 ## rectangle, and its panel saves what is in it as a named prefab. The stamp
 ## tool (P) lists the prefabs; the picked one follows the cursor as a ghost,
 ## R turns it a quarter, and a click lays it down as one undo step.
+##
+## Area tools (AreaTools): with an area dragged out, the panel fills it
+## with a pond (water and its shore), a grove (trees, a clearing if asked),
+## a scatter (boulders, crates, trees) or a fence round it (a gate on a
+## side), each from a seed: "again" takes the last fill back and lays it
+## with the next seed. The path tool (T) takes clicked points (right click
+## takes the last back) and Enter lays a winding path through them, [ and ]
+## its width. Each is one undo step.
 
 const CELL := 48.0
 const GRID := Color(1, 1, 1, 0.07)
@@ -65,10 +73,13 @@ const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", 
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link", "select", "area", "stamp",
+	"link", "select", "area", "stamp", "path",
 ]
 ## Tools, not things to paint, and the key that picks each.
-const TOOLS := {"select": "V", "area": "A", "stamp": "P"}
+const TOOLS := {"select": "V", "area": "A", "stamp": "P", "path": "T"}
+## What the area panel can fill an area with (AreaTools).
+const FILLS: Array[String] = ["pond", "grove", "scatter", "fence"]
+const PATH_GROUNDS: Array[String] = ["dirt", "stone", "grass"]
 const EDGE_BRUSHES: Array[String] = ["wall", "door", "clear"]
 ## A thing's letter on its cell.
 const LETTERS := {"start": "S", "crate": "C", "boulder": "O", "cart": "K", "chest": "H", "torch": "T",
@@ -121,6 +132,22 @@ var stamp_name := ""
 var stamp_turns := 0
 var _stamp: Dictionary = {}
 var _prefab_name: LineEdit
+## The area tools' settings; the seed is shared.
+var tool_seed := 1
+var pond_shore := 1
+var grove_density := 0.5
+var grove_clearing := false
+var scatter_density := 0.05
+var scatter_things: Array[String] = ["boulder", "crate"]
+var fence_gate := "south"
+## The path tool's points, width and ground.
+var path_points: Array[Vector2i] = []
+var path_width := 2
+var path_ground := "dirt"
+## The last fill, and the undo depth just after it ("again" redoes it only
+## while it is the last thing done).
+var _last_fill := ""
+var _last_fill_depth := -1
 var _canvas_size: Label
 
 
@@ -291,6 +318,14 @@ func begin_stroke(button: MouseButton, grid: Vector2) -> void:
 			stamp_at(stamp_corner(grid))
 		else:
 			rotate_stamp(1)
+		return
+	if brush == "path":
+		if button == MOUSE_BUTTON_LEFT and map.in_bounds(cell):
+			path_points.append(cell)
+		elif button == MOUSE_BUTTON_RIGHT and not path_points.is_empty():
+			path_points.pop_back()
+		_refresh_panel()
+		queue_redraw()
 		return
 	_stroke = {}
 	_stroke_button = button
@@ -547,9 +582,20 @@ func stamp_corner(grid: Vector2) -> Vector2i:
 func stamp_at(at: Vector2i) -> void:
 	if _stamp.is_empty():
 		return
-	var changes := Prefab.stamp_changes(_stamp, map, at)
+	if apply_changes(Prefab.stamp_changes(_stamp, map, at)):
+		report = "stamped %s at %d, %d" % [stamp_name, at.x, at.y]
+
+
+## Makes [param changes] as one undo step: {cells: cell -> meaning, edges:
+## key -> kind, and optionally heights: cell -> level, entries and links
+## (level.json's, at their cells), covers: the cells whose entries and links
+## go first (default: every cell in cells)}, as Prefab.stamp_changes and
+## AreaTools give them. Returns whether anything changed.
+func apply_changes(changes: Dictionary) -> bool:
 	var stroke := {}
-	for cell: Vector2i in changes["covers"]:
+	var cells: Dictionary = changes.get("cells", {})
+	var covers: Array = changes.get("covers", cells.keys())
+	for cell: Vector2i in covers:
 		# What the map held there goes: its entry and link with its cell.
 		if not entry_of(cell).is_empty():
 			stroke["entry %d %d" % [cell.x, cell.y]] = entry_of(cell).duplicate(true)
@@ -557,43 +603,97 @@ func stamp_at(at: Vector2i) -> void:
 		if not link_of(cell).is_empty():
 			stroke["link %d %d" % [cell.x, cell.y]] = link_of(cell).duplicate(true)
 			_put_link(cell, {})
-	var cells: Dictionary = changes["cells"]
 	for cell: Vector2i in cells:
 		var old := map.set_cell(cell, cells[cell])
 		if old != cells[cell]:
 			stroke[cell] = old
-	var edges: Dictionary = changes["edges"]
+	var edges: Dictionary = changes.get("edges", {})
 	for key: Vector3i in edges:
 		var old := map.set_edge(key, edges[key])
 		if old != edges[key]:
 			stroke[key] = old
-	var heights: Dictionary = changes["heights"]
+	var heights: Dictionary = changes.get("heights", {})
 	for cell: Vector2i in heights:
 		var old := _set_height(cell, heights[cell])
 		if old != heights[cell]:
 			stroke["height %d %d" % [cell.x, cell.y]] = old
-	for entry: Dictionary in changes["entries"]:
+	for entry: Dictionary in changes.get("entries", []):
 		var cell: Vector2i = Level._tile(entry.get("at"))
 		var key := "entry %d %d" % [cell.x, cell.y]
 		if not stroke.has(key):
 			stroke[key] = entry_of(cell).duplicate(true)
 		_put_entry(cell, entry)
-	for link: Dictionary in changes["links"]:
+	for link: Dictionary in changes.get("links", []):
 		var cell: Vector2i = Level._tile(link.get("at"))
 		var key := "link %d %d" % [cell.x, cell.y]
 		if not stroke.has(key):
 			stroke[key] = link_of(cell).duplicate(true)
 		_put_link(cell, link)
 	if stroke.is_empty():
-		return
+		return false
 	dirty = true
 	_undo.append(stroke)
 	if _undo.size() > UNDO_LIMIT:
 		_undo.pop_front()
 	_redo.clear()
 	_name_cells()
-	report = "stamped %s at %d, %d" % [stamp_name, at.x, at.y]
 	queue_redraw()
+	return true
+
+
+# --- Area tools ---------------------------------------------------------------------
+
+## What filling the area with [param fill] ("pond", "grove", "scatter",
+## "fence") would change, with the settings as they are.
+func fill_changes(fill: String) -> Dictionary:
+	match fill:
+		"pond":
+			return AreaTools.pond(map, area, tool_seed, pond_shore)
+		"grove":
+			return AreaTools.grove(map, area, tool_seed, grove_density, grove_clearing)
+		"scatter":
+			return AreaTools.scatter(map, area, tool_seed, scatter_things, scatter_density)
+		"fence":
+			return AreaTools.fence(map, area, fence_gate)
+	return {}
+
+
+## Fills the area with [param fill], as one undo step.
+func fill_area(fill: String) -> void:
+	if area.size == Vector2i.ZERO:
+		return
+	var changed := apply_changes(fill_changes(fill))
+	_last_fill = fill if changed else ""
+	_last_fill_depth = _undo.size()
+	report = "%s in %d x %d at %d, %d, seed %d%s" % [fill, area.size.x, area.size.y, area.position.x, area.position.y,
+		tool_seed, "" if changed else ": nothing to change"]
+	_refresh_panel()
+
+
+## The last fill taken back and laid again with the next seed.
+func fill_again() -> void:
+	if _last_fill.is_empty() or _undo.size() != _last_fill_depth:
+		return
+	undo()
+	tool_seed += 1
+	fill_area(_last_fill)
+
+
+## Lays the path through the points clicked, as one undo step, and starts a new one.
+func lay_path() -> void:
+	if path_points.is_empty():
+		return
+	var changed := apply_changes(AreaTools.path(map, path_points, tool_seed, path_width, path_ground))
+	report = "a path of %s, %d wide, through %d points%s" % [path_ground, path_width, path_points.size(),
+		"" if changed else ": nothing to change"]
+	path_points.clear()
+	_refresh_panel()
+	queue_redraw()
+
+
+func _set_tool(setting: String, value: Variant) -> void:
+	set(setting, value)
+	_refresh_panel()
 
 
 ## Sets cell [param at]'s height (0 for none); returns what it was. A
@@ -884,12 +984,15 @@ func _refresh_panel() -> void:
 	for child in _panel.get_children():
 		_panel.remove_child(child)
 		child.queue_free()
-	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp"]
+	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp", "path"]
 	if brush == "area":
 		_area_panel()
 		return
 	if brush == "stamp":
 		_stamp_panel()
+		return
+	if brush == "path":
+		_path_panel()
 		return
 	if selected == NOWHERE:
 		return
@@ -974,6 +1077,80 @@ func _area_panel() -> void:
 	_prefab_name.text_submitted.connect(func(text: String) -> void: save_prefab(text))
 	row.add_child(_prefab_name)
 	_panel_button(row, "save as prefab", func() -> void: save_prefab(_prefab_name.text))
+	_panel_label("Fill it with", 26)
+	var fills := HBoxContainer.new()
+	_panel.add_child(fills)
+	for fill in FILLS:
+		_panel_button(fills, fill, fill_area.bind(fill))
+	var again := _panel_button(fills, "again, next seed", fill_again)
+	again.disabled = _last_fill.is_empty() or _undo.size() != _last_fill_depth
+	_seed_row()
+	var pond_row := HBoxContainer.new()
+	_panel.add_child(pond_row)
+	_panel_label_in(pond_row, "pond: shore %d" % pond_shore)
+	_panel_button(pond_row, "-", _set_tool.bind("pond_shore", maxi(0, pond_shore - 1)))
+	_panel_button(pond_row, "+", _set_tool.bind("pond_shore", mini(4, pond_shore + 1)))
+	var grove_row := HBoxContainer.new()
+	_panel.add_child(grove_row)
+	_panel_label_in(grove_row, "grove: %d%%" % roundi(grove_density * 100))
+	_panel_button(grove_row, "-", _set_tool.bind("grove_density", maxf(0.1, snappedf(grove_density - 0.1, 0.1))))
+	_panel_button(grove_row, "+", _set_tool.bind("grove_density", minf(1.0, snappedf(grove_density + 0.1, 0.1))))
+	var clearing := _panel_button(grove_row, "clearing", _set_tool.bind("grove_clearing", not grove_clearing))
+	clearing.toggle_mode = true
+	clearing.button_pressed = grove_clearing
+	var scatter_row := HBoxContainer.new()
+	_panel.add_child(scatter_row)
+	_panel_label_in(scatter_row, "scatter: %d%%" % roundi(scatter_density * 100))
+	_panel_button(scatter_row, "-", _set_tool.bind("scatter_density", maxf(0.01, snappedf(scatter_density - 0.01, 0.01))))
+	_panel_button(scatter_row, "+", _set_tool.bind("scatter_density", minf(0.3, snappedf(scatter_density + 0.01, 0.01))))
+	for thing in AreaTools.SCATTER_THINGS:
+		var others := scatter_things.duplicate()
+		if thing in others:
+			others.erase(thing)
+		else:
+			others.append(thing)
+		var toggle := _panel_button(scatter_row, thing, _set_tool.bind("scatter_things", others))
+		toggle.toggle_mode = true
+		toggle.button_pressed = thing in scatter_things
+	var fence_row := HBoxContainer.new()
+	_panel.add_child(fence_row)
+	_panel_label_in(fence_row, "fence: gate")
+	for side: String in ["north", "east", "south", "west", ""]:
+		var gate := _panel_button(fence_row, side if not side.is_empty() else "none", _set_tool.bind("fence_gate", side))
+		gate.toggle_mode = true
+		gate.button_pressed = side == fence_gate
+
+
+## The seed the area and path tools use, to change by hand.
+func _seed_row() -> void:
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	_panel_label_in(row, "seed %d" % tool_seed)
+	_panel_button(row, "-", _set_tool.bind("tool_seed", tool_seed - 1))
+	_panel_button(row, "+", _set_tool.bind("tool_seed", tool_seed + 1))
+
+
+## The path tool's panel: its points, width, ground and seed.
+func _path_panel() -> void:
+	_panel_label("Path", 30)
+	_panel_label("%d points: click adds one, right click takes the last back" % path_points.size(), 22)
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	_panel_label_in(row, "width %d   [ ]" % path_width)
+	_panel_button(row, "-", _set_tool.bind("path_width", maxi(1, path_width - 1)))
+	_panel_button(row, "+", _set_tool.bind("path_width", mini(6, path_width + 1)))
+	for ground in PATH_GROUNDS:
+		var button := _panel_button(row, ground, _set_tool.bind("path_ground", ground))
+		button.toggle_mode = true
+		button.button_pressed = ground == path_ground
+	_seed_row()
+	var lay := HBoxContainer.new()
+	_panel.add_child(lay)
+	_panel_button(lay, "lay it (Enter)", lay_path)
+	_panel_button(lay, "clear (Esc)", func() -> void:
+		path_points.clear()
+		_refresh_panel()
+		queue_redraw())
 
 
 ## The stamp tool's panel: every prefab, the one picked lit, and its turn.
@@ -1080,6 +1257,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			pick("area")
 		elif key.keycode == KEY_P and not key.ctrl_pressed:
 			pick("stamp")
+		elif key.keycode == KEY_T and not key.ctrl_pressed:
+			pick("path")
+		elif brush == "path" and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+			lay_path()
+		elif brush == "path" and key.keycode == KEY_ESCAPE:
+			path_points.clear()
+			_refresh_panel()
+			queue_redraw()
+		elif brush == "path" and key.keycode in [KEY_BRACKETLEFT, KEY_BRACKETRIGHT]:
+			_set_tool("path_width", clampi(path_width + (1 if key.keycode == KEY_BRACKETRIGHT else -1), 1, 6))
 		elif key.keycode == KEY_R and not key.ctrl_pressed and brush == "stamp":
 			rotate_stamp(-1 if key.shift_pressed else 1)
 		elif key.keycode in [KEY_Q, KEY_E] and selected != NOWHERE:
@@ -1157,16 +1344,18 @@ func _status_text() -> String:
 	elif hover.has("edge"):
 		var key: Vector3i = hover["edge"]
 		over = "edge %s of %d, %d: %s" % ["east" if key.z == Terrain.EAST else "south", key.x, key.y, map.edge(key)]
-	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select  A area  P stamp"
+	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select  A area  P stamp  T path"
 	if brush == "select":
 		tools = "LMB pick a monster  Q / E turn it  Esc let go" if not editing_route \
 				else "LMB add a waypoint  RMB take the last back  Esc done"
 		if setting_point:
 			tools = "LMB the gather point  Esc never mind"
 	elif brush == "area":
-		tools = "LMB drag an area  RMB let go  (save it as a prefab in the panel)"
+		tools = "LMB drag an area  RMB let go  (fill it or save it as a prefab in the panel)"
 	elif brush == "stamp":
 		tools = "LMB lay %s  R / RMB turn it" % (stamp_name if not stamp_name.is_empty() else "(pick a prefab)")
+	elif brush == "path":
+		tools = "LMB add a point  RMB take the last back  Enter lay the path  [ ] width  Esc clear"
 	return "%s%s   %s   brush: %s   |   %s  Ctrl+R resize  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
 		map_name, " (unsaved)" if dirty else "", over, brush, tools, report]
 
@@ -1210,6 +1399,12 @@ func _draw() -> void:
 		draw_rect(rect, AREA, false, 4.0)
 	if brush == "stamp" and not _stamp.is_empty():
 		_draw_ghost(stamp_corner(_mouse_grid()))
+	if brush == "path":
+		for i in path_points.size():
+			var centre := (Vector2(path_points[i]) + Vector2(0.5, 0.5)) * CELL
+			if i > 0:
+				draw_line((Vector2(path_points[i - 1]) + Vector2(0.5, 0.5)) * CELL, centre, AREA, 4.0)
+			draw_circle(centre, CELL * 0.2, AREA)
 	if hover.has("cell"):
 		draw_rect(Rect2(Vector2(hover["cell"]) * CELL, Vector2.ONE * CELL), HOVER, false, 4.0)
 	elif hover.has("edge"):
@@ -1270,7 +1465,8 @@ func _build_ui() -> void:
 		button.add_theme_font_size_override("font_size", 26)
 		button.text = "%s  %s" % [TOOLS[meaning] + "   " if TOOLS.has(meaning) else key_name(i),
 			meaning.trim_prefix("monster_") + (" (edge)" if meaning in EDGE_BRUSHES else " (a monster)" if meaning == "select"
-				else " (save a prefab)" if meaning == "area" else " (a prefab)" if meaning == "stamp" else "")]
+				else " (fill, prefab)" if meaning == "area" else " (a prefab)" if meaning == "stamp"
+				else " (through points)" if meaning == "path" else "")]
 		button.icon = _swatch(meaning)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(pick.bind(meaning))

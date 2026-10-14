@@ -2082,3 +2082,19 @@ side of the link was a hand edit (a link marker and two level.json
 entries), so the tool never rewrites a map it did not make. Builder pass 2's
 area tools (pond, grove, path, scatter) will do the same jobs one area at
 a time, and the tool can then call them.
+
+## 192. Area tools return changes; the editor lays them
+
+The area tools (pond, grove, scatter, fence, path; `AreaTools`) are static
+functions of the map as it is, an area or points, a few settings and a
+seed, returning the changes they would make ({cells, edges}) without
+making them. `LevelEditor.apply_changes` lays any such set, a prefab's
+stamp too, as one undo step, taking the level.json entries and links of
+the cells it covers. Builder mode (pass 3) needs exactly this split: Claude
+calls a tool, the server shows the changes as a ghost, and only Enter lays
+them, through the same undo. A seed makes a result repeatable, so "again"
+is undo and the next seed, and a request can be replayed. A tree is a void
+cell (outdoors one is drawn as a tree), so a grove and a scattered tree
+need no new cell type; a fence is a wall, drawn as a castle wall until
+there is a fence edge kind, which needs the sim and the 3D view and is left
+for later.

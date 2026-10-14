@@ -22,6 +22,8 @@ func _ready() -> void:
 	await _test_resize()
 	_clear()
 	await _test_prefabs()
+	_clear()
+	await _test_area_tools()
 	_test_import_file()
 	_clear()
 	print("")
@@ -411,6 +413,125 @@ func _test_prefabs() -> void:
 	editor.queue_free()
 	await get_tree().process_frame
 	_remove_tree(ProjectSettings.globalize_path(prefabs))
+
+
+func _test_area_tools() -> void:
+	print("
+== area tools: pond, grove, scatter, fence, path; seeds, again, undo ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var map := LevelMap.new(Vector2i(30, 20))
+	for y in 20:
+		for x in 30:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(20, 15), "monster_imp")
+	map.to_image().save_png(dir.path_join("layout.png"))
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"entities": [{"at": [20, 15], "idle": "guard"}]}))
+	json.close()
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	var all_grass := func() -> bool:
+		return editor.map.cells.keys().all(func(at: Vector2i) -> bool: return editor.map.cell(at) == "grass" or at == Vector2i(20, 15))
+	var rect := Rect2i(2, 2, 12, 10)
+
+	var one := AreaTools.pond(editor.map, rect, 7)
+	_check(str(one) == str(AreaTools.pond(editor.map, rect, 7)) and str(one) != str(AreaTools.pond(editor.map, rect, 8)),
+			"a pond: the same seed, the same pond; another seed, another")
+	_key(editor, KEY_A)
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(2.5, 2.5))
+	editor.continue_stroke(Vector2(13.5, 11.5))
+	editor.end_stroke()
+	_check(editor.area == rect, "an area of 12 x 10")
+	editor.tool_seed = 7
+	var depth := editor._undo.size()
+	editor.fill_area("pond")
+	var water: Dictionary[Vector2i, bool] = {}
+	for at: Vector2i in editor.map.cells:
+		if editor.map.cell(at) == "water":
+			water[at] = true
+	_check(water.size() > 20 and water.keys().all(func(at: Vector2i) -> bool: return rect.has_point(at)),
+			"filled with a pond: %d cells of water, all in the area" % water.size())
+	_check(AreaTools.blobs(water, 1).size() == 1, "in one piece")
+	var shored := water.keys().all(func(at: Vector2i) -> bool:
+		return AreaTools.FOUR.all(func(step: Vector2i) -> bool:
+			return not rect.has_point(at + step) or editor.map.cell(at + step) in ["water", "dirt"]))
+	_check(shored, "with a shore of dirt round it")
+	_check(editor._undo.size() == depth + 1, "one undo step")
+	var first := str(editor.map.cells)
+	editor.fill_again()
+	_check(editor.tool_seed == 8 and str(editor.map.cells) != first and editor._undo.size() == depth + 1,
+			"again: the pond taken back and laid with seed 8, still one step")
+	_key(editor, KEY_Z, true)
+	_check(all_grass.call(), "Ctrl+Z: grass again")
+
+	editor.grove_density = 0.6
+	editor.grove_clearing = true
+	editor.fill_area("grove")
+	var trees := editor.map.cells.size()
+	var voids := 30 * 20 - trees
+	_check(voids > 15, "a grove: %d trees (void cells)" % voids)
+	_check(editor.map.cell(Vector2i(7, 6)) == "grass" and editor.map.cell(Vector2i(8, 7)) == "grass", "a clearing in its middle")
+	_check(editor.map.cell(Vector2i(2, 2)) == "grass" and editor.map.cell(Vector2i(13, 11)) == "grass", "its corners, outside the ellipse, left")
+	_key(editor, KEY_Z, true)
+
+	editor.scatter_things = ["boulder", "crate"]
+	editor.scatter_density = 0.2
+	editor.fill_area("scatter")
+	var things: Array = editor.map.cells.keys().filter(func(at: Vector2i) -> bool: return editor.map.cell(at) in ["boulder", "crate"])
+	_check(things.size() > 5 and things.all(func(at: Vector2i) -> bool: return rect.has_point(at)), "a scatter: %d boulders and crates in the area" % things.size())
+	_check(things.all(func(at: Vector2i) -> bool:
+		return AreaTools.FOUR.all(func(step: Vector2i) -> bool: return editor.map.cell(at + step) not in ["boulder", "crate"])),
+			"none side by side")
+	_key(editor, KEY_Z, true)
+
+	editor.fence_gate = "south"
+	editor.fill_area("fence")
+	_check(editor.map.edge(Vector3i(1, 5, Terrain.EAST)) == "wall" and editor.map.edge(Vector3i(13, 5, Terrain.EAST)) == "wall"
+			and editor.map.edge(Vector3i(5, 1, Terrain.SOUTH)) == "wall", "a fence: walls round the area")
+	_check(editor.map.edge(Vector3i(8, 11, Terrain.SOUTH)) == "door", "a gate in the middle of its south side")
+	_check(editor.map.edges.size() == 2 * 12 + 2 * 10, "and nothing else (%d edges)" % editor.map.edges.size())
+
+	print("
+== the path tool ==")
+	_key(editor, KEY_T)
+	_check(editor.brush == "path", "T picks the path tool")
+	for at: Vector2 in [Vector2(1.5, 16.5), Vector2(26.5, 16.5), Vector2(9.5, 9.5), Vector2(26.5, 3.5)]:
+		editor.begin_stroke(MOUSE_BUTTON_LEFT, at)
+		editor.end_stroke()
+	editor.begin_stroke(MOUSE_BUTTON_RIGHT, Vector2(1.5, 1.5))
+	editor.end_stroke()
+	_check(editor.path_points == [Vector2i(1, 16), Vector2i(26, 16), Vector2i(9, 9)], "clicks add points, a right click takes the last back")
+	_key(editor, KEY_BRACKETRIGHT)
+	_check(editor.path_width == 3, "] widens it")
+	_key(editor, KEY_ENTER)
+	var dirt: Dictionary[Vector2i, bool] = {}
+	for at: Vector2i in editor.map.cells:
+		if editor.map.cell(at) == "dirt":
+			dirt[at] = true
+	var joined := AreaTools.blobs(dirt, 1).any(func(blob: Array) -> bool:
+		return Vector2i(1, 16) in blob and Vector2i(26, 16) in blob and Vector2i(9, 9) in blob)
+	_check(joined, "Enter lays a path of dirt joining the three points (%d cells)" % dirt.size())
+	_check(editor.path_points.is_empty(), "and starts a new one")
+	_check(editor.map.cell(Vector2i(20, 15)) != "dirt" or editor.entry_of(Vector2i(20, 15)).is_empty(),
+			"the imp's entry goes with its cell if the path covers it")
+	var crossings := editor.map.edges.keys().filter(func(key: Vector3i) -> bool:
+		var ends := Terrain.edge_cells(key)
+		return dirt.has(ends[0]) and dirt.has(ends[1]))
+	_check(crossings.is_empty(), "the fence is opened where the path crosses it")
+	_key(editor, KEY_Z, true)
+	_check(not editor.map.cells.values().has("dirt") and editor.map.edge(Vector3i(8, 11, Terrain.SOUTH)) == "door",
+			"Ctrl+Z takes the path back, fence and all")
+	_key(editor, KEY_S, true)
+	var level := Level.parse(Image.load_from_file(dir.path_join("layout.png")), null,
+			JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json")))
+	var warnings: Array = level["warnings"].filter(func(warning: String) -> bool: return not warning.begins_with("no player start"))
+	_check(warnings.is_empty(), "saved, the game reads it cleanly (%s)" % [warnings])
+	editor.queue_free()
+	await get_tree().process_frame
 
 
 func _remove_tree(path: String) -> void:

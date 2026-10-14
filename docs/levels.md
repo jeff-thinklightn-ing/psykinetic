@@ -228,6 +228,27 @@ write its levels.
   tool (`P`) lists the prefabs: pick one and it follows the cursor as a
   see-through ghost, `R` (or a right click) turns it a quarter clockwise
   (`Shift+R` back), and a click lays it down, one undo step. See Prefabs below.
+- **Area tools** (`editor/area_tools.gd`): with an area dragged out, its
+  panel fills it, one undo step each, from the **seed** shown (`-` / `+`
+  to change it; the same seed gives the same result):
+  - **pond**: an uneven blob of water in one piece, with a shore of dirt
+    (0-4 cells wide) round it inside the area;
+  - **grove**: trees scattered over the ellipse in the area, thickest in
+    its middle, at a density (10-100%), with a clearing of grass in the
+    middle if asked. A tree is a void cell, drawn as one outdoors;
+  - **scatter**: boulders, crates and trees (pick which) on a share of its
+    ground cells (1-30%), never two side by side, never on a marker;
+  - **fence**: a wall round the area with a gate (a door) in the middle
+    of the side picked, or none.
+
+  **again, next seed** takes the last fill back and lays it with the next
+  seed, while it is still the last thing done.
+- **Path** (`T`): clicks add points (right click takes the last back);
+  `Enter` lays a winding path of dirt, stone or grass through them in
+  order, `[` and `]` its width (1-6). It crosses anything, water and void
+  included, and opens the walls and doors it runs through.
+- Anything a fill, a path or a stamp lays over takes that cell's
+  `level.json` entry and link with it.
 
 Saving writes the same double-resolution `layout.png` (the file's own size
 kept), its `.import` set to Image, and reports what the server would warn
@@ -236,7 +257,8 @@ facing or idling, a resize); `height.png` only after a resize. Run from the
 project, the game reads `layout.png` itself rather than its import, so a
 saved map plays at once with `--map=<name>`.
 
-Not yet: painting heights, and a 3D preview.
+Not yet: painting heights, a 3D preview, and fences that look like fences (a
+fence is a wall, drawn as the castle's).
 
 ## The wilds
 
