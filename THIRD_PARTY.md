@@ -47,6 +47,6 @@ Slots whose own art came from someone else: none.
 **Not to be used:** Qwen-Image-2.1 (installed in `C:\ComfyUI`). Its licence, the Qwen Research
 License, allows research and evaluation only, with no commercial use.
 
-Slot candidates from the art-gen session (`C:\devrt-gen`) land in
-`D:ssets\candidates\<slot>\` with a `notes.md` naming the model files, LoRA, prompts, seeds and
+Slot candidates from the art-gen session (`C:\dev\art-gen`) land in
+`D:\assets\candidates\<slot>\` with a `notes.md` naming the model files, LoRA, prompts, seeds and
 licences. A candidate picked for a slot cites that note in the slot's `source` (its `notes`).

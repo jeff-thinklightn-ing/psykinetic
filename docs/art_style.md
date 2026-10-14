@@ -86,7 +86,7 @@ rock, wall stone) say their world size in the manifest's `tile_m`.
    `"notes": "D:/assets/candidates/door.single/notes.md"` (the models and licences used are
    listed in `THIRD_PARTY.md`).
 4. Save it as `<slot>.blend` (variants `<slot>.2.blend` ...) and drop it in:
-   `toolsrt_drop.ps1 <path to door.single.blend>`. It copies the file into
+   `tools\art_drop.ps1 <path to door.single.blend>`. It copies the file into
    `art/kit/<category>/<slot>/`, exports `<slot>.glb` through Blender, imports it and checks
    it against the slot, naming anything to change ("100.0 times the slot's size every way:
    modelled in centimetres?", "no object named "leaf"", "4,200 triangles, the slot's budget
