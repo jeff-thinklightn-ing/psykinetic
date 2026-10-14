@@ -4,7 +4,7 @@ Newest first. Worktrees add their bullets under `## Unreleased`; the coordinator
 renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
 top section as the release notes.
 
-## Unreleased
+## v0.1.140
 
 - The server no longer writes a log line for every door a monster opens
   or every blow that fails to shift someone: much less work in big fights.
