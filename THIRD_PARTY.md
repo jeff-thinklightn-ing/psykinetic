@@ -68,5 +68,10 @@ marks something still to fill in, and a model with a dash in its verdict may not
 | Qwen-Image-2512-Lightning LoRA (lightx2v) | — | — | Apache-2.0 | — | approved | Apache-2.0; faster sampling only |
 | Qwen-Image-2.1 | — | — | Qwen Research License | — | **banned** | research and evaluation only, no commercial use |
 | TRELLIS.2 (Microsoft) | — | — | MIT | — | approved | MIT; meshes from concept images (the goblin, slot candidates) |
-| DINOv3 image encoder (Meta) | — | — | DINOv3 License | 2025-08-19 (the roadmap's dated copy; not yet in `docs/licenses/`) | — | its own licence, to be read against the rule and its text kept here before it is used again |
+| DINOv3 ViT-L/16 (facebook/dinov3-vitl16-pretrain-lvd1689m) | rev ea8dc2863c51be0a264bab82070e3e8836b02d51; model.safetensors SHA-256 dcb2e45127cccbf1601e5f42fef165eea275c8e5213197e8dcf3f48822718179 | https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m | DINOv3 License (Meta, last updated 2025-08-19); `docs/licenses/dinov3_2026-10-14.txt` | 2026-10-14 | approved | commercial use worldwide, royalty-free, no caps; outputs (meshes) aren't "DINO Materials" and carry no terms; the use limits are real-world ITAR/military/weapons, not a fantasy game |
 | BiRefNet (ZhengPeng7) | — | — | MIT | — | approved | MIT; background removal for concept images |
+
+**DINOv3 needs the monthly re-check.** Its licence's §8 lets Meta change the terms at any time, and
+continuing to use DINOv3 counts as agreeing to the change. Read it again each month against
+`docs/licenses/dinov3_2026-10-14.txt`. If it has changed, save the new text as a new dated file and
+review the verdict.
