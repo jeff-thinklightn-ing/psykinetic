@@ -81,7 +81,10 @@ rock, wall stone) say their world size in the manifest's `tile_m`.
 2. Model it in Blender, to the conventions above.
 3. Record where it came from: a scene custom property `source` (for example
    `"jeff, blender"`). The manifest's `source` field for the slot says the same, with the
-   licence and date.
+   licence and date: `{"by": "jeff", "tool": "blender", "license": "own", "date":
+   "2026-10-20"}`. Art that started as a generated candidate also cites its note:
+   `"notes": "D:/assets/candidates/door.single/notes.md"` (the models and licences used are
+   listed in `THIRD_PARTY.md`).
 4. Save it as `<slot>.blend` (variants `<slot>.2.blend` ...) and drop it in:
    `toolsrt_drop.ps1 <path to door.single.blend>`. It copies the file into
    `art/kit/<category>/<slot>/`, exports `<slot>.glb` through Blender, imports it and checks

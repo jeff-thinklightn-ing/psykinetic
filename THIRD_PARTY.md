@@ -33,8 +33,20 @@ Slots whose own art came from someone else: none.
 
 | Tool | By | Licence | Used for |
 |------|----|---------|----------|
-| TRELLIS.2 | Microsoft | MIT | the goblin's mesh, from a concept image (`art/models/SOURCES.txt`) |
+| TRELLIS.2 | Microsoft | MIT | meshes from a concept image: the goblin (`art/models/SOURCES.txt`), slot candidates |
 | DINOv3 image encoder | Meta | DINOv3 License | inside TRELLIS.2, for the goblin |
 | BiRefNet | ZhengPeng7 | MIT | background removal for the goblin's concept image |
+| Qwen-Image-2512 | Qwen (Alibaba) | Apache-2.0 | concept images for slot candidates (the art-gen session, run through ComfyUI) |
+| Qwen2.5-VL-7B (text encoder) | Qwen (Alibaba) | Apache-2.0 | inside Qwen-Image-2512 |
+| Qwen-Image ComfyUI repacks | Comfy-Org | Apache-2.0 | the model files ComfyUI loads |
+| Qwen-Image-2512-Lightning LoRA | lightx2v | Apache-2.0 | faster sampling for the same |
+| ComfyUI | Comfy-Org | GPL-3.0 (the program; what it makes is the maker's) | running the image models |
 | Blender | Blender Foundation | GPL (the program; what it makes is the maker's) | modelling, painting, rigging; slot exports (`tools/blender/export_slot.py`) |
 | Godot Engine | Godot contributors | MIT | the game |
+
+**Not to be used:** Qwen-Image-2.1 (installed in `C:\ComfyUI`). Its licence, the Qwen Research
+License, allows research and evaluation only, with no commercial use.
+
+Slot candidates from the art-gen session (`C:\devrt-gen`) land in
+`D:ssets\candidates\<slot>\` with a `notes.md` naming the model files, LoRA, prompts, seeds and
+licences. A candidate picked for a slot cites that note in the slot's `source` (its `notes`).
