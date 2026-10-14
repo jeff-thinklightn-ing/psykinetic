@@ -41,6 +41,8 @@ which worktree owns each step, and the design rules not to break without asking 
   you report (map_bench, frame numbers, network benches with many processes):
   `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's
   held, wait. Keep many-process runs short.
+- Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
+  name: that kills every tree's Godot, including other sessions' tests and benches.
 - Server and client must be built from the same commit; a release that changes the wire
   format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
 - Never commit a real token: check the diff of `project.godot`.

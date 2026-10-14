@@ -12,7 +12,12 @@ LOCK="${PSYKINETIC_BENCH_LOCK:-/c/dev/bench.lock}"
 STALE_SECONDS=1800
 
 held() { [ -d "$LOCK" ]; }
-age() { echo $(( $(date +%s) - $(cat "$LOCK/since" 2>/dev/null || echo 0) )); }
+# A lock another tree has only just taken may not have its time written yet: count it as new.
+age() {
+	since=$(cat "$LOCK/since" 2>/dev/null)
+	[ -n "$since" ] || since=$(date +%s)
+	echo $(( $(date +%s) - since ))
+}
 who() { echo "$(cat "$LOCK/owner" 2>/dev/null) ($(cat "$LOCK/what" 2>/dev/null)), $(( $(age) / 60 )) min"; }
 
 case "${1:-status}" in
