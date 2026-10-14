@@ -1,0 +1,408 @@
+class_name ArtKit
+extends RefCounted
+## The game's art, by slot: every model the 3D view draws is a named slot
+## in art/kit/slots.json (its size, origin, moving parts, budget, where it
+## is used and where its art came from), and ArtKit.instance(slot) is how
+## the view gets one. A slot is drawn from, in order:
+##
+## - its own art: art/kit/<category>/<slot>/<slot>.glb (variants
+##   <slot>.2.glb, <slot>.3.glb ...), made to the slot's conventions, so
+##   it is placed as is;
+## - else its fill: a third-party piece the manifest names (today the
+##   Kenney Castle Kit), moved and scaled to the slot's conventions by the
+##   fill's offset and scale;
+## - else a grey box: the slot's size (or its "grey" boxes), its moving
+##   parts boxes of their own so they still move, in its category's grey,
+##   with the slot's name over it when labels are on.
+##
+## Conventions (docs/art_style.md): metres, +Y up, one cell is 1 m. An edge
+## piece (a wall, a door) runs along z over [-0.5, 0.5], centred on the
+## edge's line at x = 0, its base at y = 0; a vertex piece (a post) and a
+## cell piece (a prop, a tree, a rock) stand centred on their origin, base
+## at y = 0, front to +Z. A held piece (an item, a weapon) has its origin
+## at its "grip" socket, where the hand holds it, its length along +Y; a
+## two-handed one has a "grip_2" socket for the other hand.
+##
+## An instance is a Node3D named for the slot (its "slot" meta the slot's
+## name) holding "Body", everything that does not move, and one child per
+## moving part, named as the part, its origin at the part's pivot: turn a
+## hinge's node about its axis, slide a slide's along its. How a slot is
+## put together is worked out once (_compile: which scenes, where, scaled
+## how), so an instance only makes its nodes, from what is kept: the .glb
+## scenes as loaded (decision 183: a scene nothing holds is let go and
+## loaded again for the next) and the grey boxes' meshes and materials;
+## every instance of a slot shares its meshes. (A slot packed once into a
+## PackedScene of its own and instantiated cost 2.7 MB and 4.5 ms an
+## instance on a 256x256 map's first build.)
+
+const MANIFEST := "res://art/kit/slots.json"
+const MORE := "slots_*.json"
+const ROOT := "res://art/kit/"
+## The greys a placeholder is drawn in, by category: told apart, all plainly
+## not art.
+const GREYS := {
+	"walls": Color(0.62, 0.62, 0.6),
+	"doors": Color(0.5, 0.47, 0.44),
+	"trees": Color(0.52, 0.56, 0.5),
+	"plants": Color(0.55, 0.6, 0.52),
+	"rocks": Color(0.5, 0.5, 0.52),
+	"buildings": Color(0.6, 0.57, 0.53),
+	"props": Color(0.58, 0.55, 0.5),
+}
+const GREY := Color(0.55, 0.55, 0.55)
+const LABEL_PIXEL := 0.004
+
+## Every slot drawn as its grey box, own art or fill notwithstanding
+## (settings.cfg art_placeholders=1): to see sizes in the real map.
+static var show_placeholders := false
+## The slot's name over each grey box (settings.cfg art_labels=1).
+static var show_labels := false
+
+static var _manifest: Dictionary = {}
+static var _scenes: Dictionary[String, PackedScene] = {}
+static var _boxes: Dictionary[Vector3, BoxMesh] = {}
+## Each slot's recipes (_compile), and its grey box's while
+## show_placeholders.
+static var _recipes: Dictionary[String, Array] = {}
+static var _grey_recipes: Dictionary[String, Array] = {}
+static var _variants: Dictionary[String, int] = {}
+static var _greys: Dictionary[Color, StandardMaterial3D] = {}
+
+
+## The manifest as read from MANIFEST, once, with the slots of every
+## generated manifest beside it (MORE: slots_<what>.json, written by a tool
+## from a catalog, as the items' are) added to its own; a slot named twice
+## is an error and the first kept.
+static func manifest() -> Dictionary:
+	if _manifest.is_empty():
+		var main := _read(MANIFEST)
+		if main.is_empty():
+			return {}
+		var slots: Dictionary = main.get("slots", {})
+		for file in DirAccess.get_files_at(ROOT):
+			if not file.match(MORE):
+				continue
+			var more: Dictionary = _read(ROOT + file).get("slots", {})
+			for slot: String in more:
+				if slots.has(slot):
+					push_error("ArtKit: %s names slot %s again" % [ROOT + file, slot])
+					continue
+				slots[slot] = more[slot]
+		main["slots"] = slots
+		_manifest = main
+	return _manifest
+
+
+static func _read(path: String) -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Dictionary:
+		push_error("ArtKit: %s is not a JSON object (%s)" % [path, FileAccess.get_open_error()])
+		return {}
+	return parsed
+
+
+static func slots() -> Dictionary:
+	return manifest().get("slots", {})
+
+
+static func has(slot: String) -> bool:
+	return slots().has(slot)
+
+
+## [param slot]'s entry; an unknown slot is an error and an empty entry.
+static func spec(slot: String) -> Dictionary:
+	if not has(slot):
+		push_error("ArtKit: no slot %s in %s" % [slot, MANIFEST])
+		return {}
+	return slots()[slot]
+
+
+## The slot's size in metres (x across, y up, z along).
+static func size(slot: String) -> Vector3:
+	return _vec(spec(slot).get("size", [1, 1, 1]))
+
+
+## The folder a slot's own files go in.
+static func folder(slot: String) -> String:
+	return ROOT + str(spec(slot).get("category", "misc")) + "/" + slot + "/"
+
+
+## The path of the slot's own model, variant [param variant] (1 is
+## <slot>.glb, 2 <slot>.2.glb, ...).
+static func own_path(slot: String, variant := 1) -> String:
+	return folder(slot) + slot + (".glb" if variant <= 1 else ".%d.glb" % variant)
+
+
+## The path of a texture slot's own image.
+static func texture_path(slot: String) -> String:
+	return folder(slot) + slot + ".png"
+
+
+## A texture slot's own image, or null while it has none (whoever draws
+## it then uses a stand-in of its own: terrain's procedural colour).
+static func texture(slot: String) -> Texture2D:
+	var path := texture_path(slot)
+	return load(path) as Texture2D if ResourceLoader.exists(path) else null
+
+
+## How many variants of its own the slot has; 0: none (its fill or grey box).
+## A texture slot has one or none.
+static func variant_count(slot: String) -> int:
+	if not _variants.has(slot):
+		var count := 0
+		if str(spec(slot).get("type", "mesh")) == "texture":
+			count = 1 if ResourceLoader.exists(texture_path(slot)) else 0
+		else:
+			while ResourceLoader.exists(own_path(slot, count + 1)):
+				count += 1
+		_variants[slot] = count
+	return _variants[slot]
+
+
+## Where the slot's art comes from: "own", "fill" (third-party) or
+## "placeholder".
+static func filled_by(slot: String) -> String:
+	if variant_count(slot) > 0:
+		return "own"
+	if spec(slot).has("fill"):
+		return "fill"
+	return "placeholder"
+
+
+## A new instance of [param slot] (variant [param variant] of its own art,
+## wrapped into range; its fill or grey box has one).
+static func instance(slot: String, variant := 1) -> Node3D:
+	var table := _grey_recipes if show_placeholders else _recipes
+	var recipes: Array = table.get(slot, [])
+	if recipes.is_empty():
+		recipes = _compile(slot)
+		table[slot] = recipes
+	return _make(recipes[posmod(variant - 1, recipes.size())])
+
+
+## Forgets what was made for [param slot] (every slot when empty), so the
+## next instance reads its files again.
+static func forget(slot := "") -> void:
+	if slot == "":
+		_scenes.clear()
+		_variants.clear()
+		_recipes.clear()
+		_grey_recipes.clear()
+		_manifest = {}
+		return
+	for variant in range(1, variant_count(slot) + 2):
+		_scenes.erase(own_path(slot, variant))
+	_variants.erase(slot)
+	_recipes.erase(slot)
+	_grey_recipes.erase(slot)
+
+
+## How [param slot] is put together, worked out once: a recipe per variant
+## (one for a fill or a grey box). A recipe is [its steps, its lifts, the
+## slot]: each step a node to make, [parent step (-1 for the root), name,
+## transform, what: a PackedScene to instantiate, [mesh, material] for a
+## box, a String for a label, null for a plain Node3D]; each lift a part
+## of the body's scene moved out beside it, [its path in the body, its
+## name, where it stands].
+static func _compile(slot: String) -> Array:
+	if show_placeholders:
+		return [_grey_recipe(slot)]
+	var count := variant_count(slot)
+	if count > 0:
+		var out: Array = []
+		for variant in range(1, count + 1):
+			out.append(_own_recipe(slot, variant))
+		return out
+	if spec(slot).has("fill"):
+		return [_fill_recipe(slot)]
+	return [_grey_recipe(slot)]
+
+
+## An instance from [param recipe].
+static func _make(recipe: Array) -> Node3D:
+	var nodes: Array[Node3D] = []
+	for step: Array in recipe[0]:
+		var what: Variant = step[3]
+		var node: Node3D
+		if what is PackedScene:
+			node = (what as PackedScene).instantiate()
+		elif what is Array:
+			var box := MeshInstance3D.new()
+			box.mesh = what[0]
+			box.material_override = what[1]
+			node = box
+		elif what is String:
+			var label := Label3D.new()
+			label.text = what
+			label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			label.pixel_size = LABEL_PIXEL
+			node = label
+		else:
+			node = Node3D.new()
+		node.name = step[1]
+		node.transform = step[2]
+		if step[0] >= 0:
+			nodes[step[0]].add_child(node)
+		nodes.append(node)
+	var root := nodes[0]
+	root.set_meta(&"slot", recipe[2])
+	for lift: Array in recipe[1]:
+		var part := nodes[1].get_node(lift[0]) as Node3D
+		part.get_parent().remove_child(part)
+		part.name = lift[1]
+		root.add_child(part)
+		part.transform = lift[2]
+	return root
+
+
+static func _step(steps: Array, parent: int, name: String, place: Transform3D, what: Variant) -> int:
+	steps.append([parent, StringName(name), place, what])
+	return steps.size() - 1
+
+
+## The slot's own model as the body: its part nodes (found by name
+## anywhere in it) are lifted out beside it, where they stood.
+static func _own_recipe(slot: String, variant: int) -> Array:
+	var steps: Array = []
+	_step(steps, -1, slot.replace(".", "_"), Transform3D.IDENTITY, null)
+	var scene := _scene(own_path(slot, variant))
+	_step(steps, 0, "Body", Transform3D.IDENTITY, scene)
+	var lifts: Array = []
+	var sample := scene.instantiate() as Node3D
+	for part: Dictionary in spec(slot).get("parts", []):
+		var node := sample.find_child(str(part["name"]), true, false) as Node3D
+		if node == null:
+			push_error("ArtKit: %s has no part %s (%s)" % [own_path(slot, variant), part["name"], spec(slot).get("uses", "")])
+			continue
+		lifts.append([sample.get_path_to(node), StringName(str(part["name"])), _place_in(node, sample)])
+	sample.free()
+	return [steps, lifts, slot]
+
+
+## The fill's piece as the body, and each part's piece under a node at the
+## fill's pivot for it.
+static func _fill_recipe(slot: String) -> Array:
+	var fill: Dictionary = spec(slot)["fill"]
+	var steps: Array = []
+	_step(steps, -1, slot.replace(".", "_"), Transform3D.IDENTITY, null)
+	_fill_step(steps, 0, "Body", fill, slot)
+	var parts: Dictionary = fill.get("parts", {})
+	for part: Dictionary in spec(slot).get("parts", []):
+		var name := str(part["name"])
+		var given: Dictionary = parts.get(name, {})
+		var pivot := _vec(given.get("pivot", part.get("pivot", [0, 0, 0])))
+		var node := _step(steps, 0, name, Transform3D(Basis.IDENTITY, pivot), null)
+		if not given.is_empty():
+			_fill_step(steps, node, "Piece", given, slot)
+	return [steps, [], slot]
+
+
+## A step for one third-party piece: [param fill]'s "from" source's
+## "piece", moved by "offset" and scaled by "scale" (a number or [x, y,
+## z]); "fit": "height" scales it evenly to stand as tall as the slot.
+static func _fill_step(steps: Array, parent: int, name: String, fill: Dictionary, slot: String) -> void:
+	var source: Dictionary = manifest().get("sources", {}).get(str(fill.get("from", "")), {})
+	var scene := _scene(str(source.get("path", "")) + str(fill["piece"]) + str(source.get("extension", ".glb")))
+	var scale_by: Variant = fill.get("scale", 1.0)
+	var factor := _vec(scale_by) if scale_by is Array else Vector3.ONE * float(scale_by)
+	if str(fill.get("fit", "")) == "height":
+		var sample := scene.instantiate() as Node3D
+		factor *= size(slot).y / maxf(top_of(sample), 0.001)
+		sample.free()
+	_step(steps, parent, name, Transform3D(Basis.from_scale(factor), _vec(fill.get("offset", [0, 0, 0]))), scene)
+
+
+## The grey box: the slot's "grey" boxes for its body (each {"at": centre,
+## "size"}), else one box its size standing on its origin; each part's own
+## "grey" boxes, or a box its "size", from its pivot; the slot's name over
+## it when show_labels.
+static func _grey_recipe(slot: String) -> Array:
+	var entry := spec(slot)
+	var material := _grey(GREYS.get(str(entry.get("category", "")), GREY))
+	var steps: Array = []
+	_step(steps, -1, slot.replace(".", "_"), Transform3D.IDENTITY, null)
+	var body := _step(steps, 0, "Body", Transform3D.IDENTITY, null)
+	var boxes: Array = entry.get("grey", [])
+	if boxes.is_empty():
+		var whole := size(slot)
+		var base := 0.0 if str(entry.get("origin", "base")) == "base" else -whole.y
+		boxes = [{"at": [0, base + whole.y * 0.5, 0], "size": [whole.x, whole.y, whole.z]}]
+	for i in boxes.size():
+		_grey_step(steps, body, "Box%d" % i, boxes[i], material)
+	for part: Dictionary in entry.get("parts", []):
+		var node := _step(steps, 0, str(part["name"]), Transform3D(Basis.IDENTITY, _vec(part.get("pivot", [0, 0, 0]))), null)
+		var own: Array = part.get("grey", [])
+		if own.is_empty() and part.has("size"):
+			var extent := _vec(part["size"])
+			own = [{"at": [0, extent.y * 0.5, extent.z * 0.5], "size": part["size"]}]
+		for i in own.size():
+			_grey_step(steps, node, "Box%d" % i, own[i], _grey((material.albedo_color as Color).darkened(0.15)))
+	if show_labels:
+		_step(steps, 0, "Label", Transform3D(Basis.IDENTITY, Vector3(0.0, size(slot).y + 0.2, 0.0)), slot)
+	return [steps, [], slot]
+
+
+static func _grey_step(steps: Array, parent: int, name: String, box: Dictionary, material: Material) -> void:
+	var extent := _vec(box["size"])
+	if not _boxes.has(extent):
+		var mesh := BoxMesh.new()
+		mesh.size = extent
+		_boxes[extent] = mesh
+	_step(steps, parent, name, Transform3D(Basis.IDENTITY, _vec(box["at"])), [_boxes[extent], material])
+
+
+static func _grey(colour: Color) -> StandardMaterial3D:
+	if not _greys.has(colour):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = colour
+		material.roughness = 0.9
+		_greys[colour] = material
+	return _greys[colour]
+
+
+## The scene at [param path], loaded once and kept.
+static func _scene(path: String) -> PackedScene:
+	if not _scenes.has(path):
+		_scenes[path] = load(path) as PackedScene
+	return _scenes[path]
+
+
+## How tall [param node] stands as modelled: the top of its meshes' bounds.
+static func top_of(node: Node3D) -> float:
+	return bounds_of(node).end.y
+
+
+## [param node]'s meshes' bounds, in its own space.
+static func bounds_of(node: Node3D) -> AABB:
+	var out := AABB()
+	var first := true
+	for child in _descendants(node):
+		var mesh := child as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		var box := _place_in(mesh, node) * mesh.mesh.get_aabb()
+		out = box if first else out.merge(box)
+		first = false
+	return out
+
+
+## [param node]'s transform in [param ancestor]'s space.
+static func _place_in(node: Node3D, ancestor: Node) -> Transform3D:
+	var place := Transform3D.IDENTITY
+	var at: Node = node
+	while at != ancestor and at is Node3D:
+		place = (at as Node3D).transform * place
+		at = at.get_parent()
+	return place
+
+
+static func _descendants(node: Node) -> Array[Node]:
+	var out: Array[Node] = [node]
+	for child in node.get_children():
+		out.append_array(_descendants(child))
+	return out
+
+
+static func _vec(value: Variant) -> Vector3:
+	var list: Array = value
+	return Vector3(float(list[0]), float(list[1]), float(list[2]))

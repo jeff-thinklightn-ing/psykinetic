@@ -2825,3 +2825,55 @@ loops (210, eight a step) and doors opened the first time (their light);
 loops are kept and doors stay open, so a server that has run a while
 sees little of it. Rejected for now: working loops out at zone load on
 the pool (worth it if fresh areas still spike in play).
+
+## 220. The art is slots: a manifest names everything drawn, ArtKit draws it
+
+The game is moving off the Kenney kits to its own art, made by Jeff over
+time, a piece at a time. Each thing the 3D view draws is now a named slot
+in art/kit/slots.json (wall.straight, door.single, tree.broadleaf, ...),
+with its size in metres, its kind (an edge piece runs along z centred on
+the edge's line; a vertex or cell piece stands on its origin), its
+triangle budget, its moving parts (named, with pivot, axis and range),
+where the game uses it and where its art came from. docs/art_style.md is
+the look and the conventions a slot's art follows. The terrain pass reads
+the same manifest: wall.profile (the section it sweeps along wall runs, a
+cap line above which a top is kept whole), wall.rubble (a gap's blocked
+piece), ground.<kind> and material.rock / material.wall (tileable
+textures, procedural colour while empty), and a scatter slot's placement
+fields; the density by terrain kind stays terrain's. Slots a tool makes
+from a catalog (the items', one a catalog entry) go in a manifest of their
+own beside it, art/kit/slots_<what>.json, merged in as read (a name taken
+twice is an error), so the tool never rewrites the hand-kept file. An
+item is a "held" slot: its origin at its "grip" socket, a two-handed
+one's other hand at "grip_2".
+
+ArtKit.instance(slot) is the one way the view gets a piece, at its real
+size: the slot's own art (art/kit/<category>/<slot>/<slot>.glb, variants
+<slot>.2.glb ...) if it has some; else its fill, a third-party piece the
+manifest names with an offset and scale that bring it to the slot's
+conventions (today's Kenney pieces, so the game looks as it did); else a
+grey box of the slot's size, its moving parts boxes of their own so a door
+still swings (settings.cfg art_placeholders=1 shows every slot so, and
+art_labels=1 names them). An instance is the slot's name holding "Body"
+and a node per moving part at its pivot (a door's leaf); the client turns
+the part, and fades the body. The .blend a slot's .glb was exported from is
+committed beside it as its source: Blender import is off in this project,
+so Godot ignores .blend files and the server's headless import needs no
+Blender.
+
+The fade (188) no longer assumes one shared kit material: a near piece's
+every material, a surface's own or an override, is swapped for its
+see-through copy (_see_through_of, as trees did), since a slot's own art
+may have several. Rejected: a .tres resource per slot (the tools and
+terrain read JSON as easily, and one file shows every slot at once); a
+slot packed once into a PackedScene and instantiated (on a 256x256 map's
+first build 2.7 MB and 4.5 ms an instance; ArtKit puts each together from
+the kept .glb scenes instead, as 183 keeps the kit's); grey boxes
+everywhere at once (the Kenney fills keep the game as it looks until a
+slot's own art comes).
+
+tools/map_bench 256x256, windowed, alternately with main (v0.1.135): the
+3D client rebuild 1.16 and 1.15 s (main 1.22 and 1.14), main ready 2.12
+and 2.09 s (main 2.12 and 2.08), 1089 more nodes (a post's wrapper), the
+same draw calls, frames and memory. The castle, screenshotted on each:
+the same but for the goblins' animation phase and the fire's flicker.

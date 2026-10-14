@@ -1,0 +1,199 @@
+extends Node
+## The art slots (ArtKit, art/kit/slots.json): the manifest is whole, every
+## slot is drawn at its size from its own art, its fill or its grey box,
+## with its moving parts where the manifest says, and every filled slot
+## says where its art came from. Run it with tests/run.ps1 or tests/run.sh.
+## Prints PASS/FAIL per assertion and quits with exit code 1 if any
+## assertion failed, 0 otherwise.
+
+const TYPES := ["mesh", "texture", "profile"]
+const KINDS := ["edge", "vertex", "cell", "floor", "held"]
+## How far a drawn slot's bounds may be from its size, a share of it.
+const TOLERANCE := 0.05
+
+var _failures := 0
+
+
+func _ready() -> void:
+	_test_manifest()
+	_test_sources()
+	_test_fills_fit()
+	_test_grey_boxes()
+	_test_parts()
+	_test_kept()
+	_test_own_art_says_where_from()
+	_test_profile()
+	print("")
+	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
+	get_tree().quit(1 if _failures > 0 else 0)
+
+
+func _test_manifest() -> void:
+	print("\n== the manifest: every slot has a category, a type, a use; a mesh slot a kind and a size ==")
+	var slots := ArtKit.slots()
+	_check(not slots.is_empty(), "slots.json has slots (%d)" % slots.size())
+	for slot: String in slots:
+		var entry: Dictionary = slots[slot]
+		var problems: Array[String] = []
+		if slot.get_slice(".", 0) == "" or not "." in slot:
+			problems.append("a name is <group>.<name>")
+		if str(entry.get("category", "")) == "":
+			problems.append("no category")
+		if str(entry.get("type", "")) not in TYPES:
+			problems.append("type %s, not one of %s" % [entry.get("type"), TYPES])
+		if str(entry.get("uses", "")) == "":
+			problems.append("no uses")
+		if entry.get("type") in ["mesh", "profile"]:
+			if str(entry.get("kind", "")) not in KINDS:
+				problems.append("kind %s, not one of %s" % [entry.get("kind"), KINDS])
+			if not entry.get("size") is Array or (entry["size"] as Array).size() != 3:
+				problems.append("no size [x, y, z]")
+		if entry.get("type") == "mesh" and not entry.has("budget"):
+			problems.append("no budget")
+		if entry.get("type") == "texture" and float(entry.get("tile_m", 0.0)) <= 0.0:
+			problems.append("no tile_m")
+		if entry.has("scatter") and bool((entry["scatter"] as Dictionary).get("blocks", false)):
+			problems.append("scatter is drawn only: blocks is false")
+		_check(problems.is_empty(), "%s %s" % [slot, problems if not problems.is_empty() else "whole"])
+
+
+func _test_sources() -> void:
+	print("\n== every fill names a source the manifest knows, with its licence, and a piece it has ==")
+	var sources: Dictionary = ArtKit.manifest().get("sources", {})
+	for name: String in sources:
+		var source: Dictionary = sources[name]
+		_check(str(source.get("license", "")) != "" and FileAccess.file_exists("res://" + str(source.get("license_file", ""))),
+				"source %s: licence %s, its text at %s" % [name, source.get("license"), source.get("license_file")])
+	for slot: String in ArtKit.slots():
+		var fill: Dictionary = ArtKit.spec(slot).get("fill", {})
+		var pieces: Array[Dictionary] = []
+		if not fill.is_empty():
+			pieces.append(fill)
+		for part: Dictionary in (fill.get("parts", {}) as Dictionary).values():
+			pieces.append(part)
+		for piece in pieces:
+			var source: Dictionary = sources.get(str(piece.get("from", "")), {})
+			var path := str(source.get("path", "")) + str(piece.get("piece", "")) + str(source.get("extension", ".glb"))
+			_check(not source.is_empty() and ResourceLoader.exists(path), "%s: %s from %s (%s)" % [slot, piece.get("piece"), piece.get("from"), path])
+
+
+func _test_fills_fit() -> void:
+	print("\n== a fill is drawn at its slot's size, standing on its origin as the slot's kind says ==")
+	for slot: String in ArtKit.slots():
+		if ArtKit.spec(slot).get("type") != "mesh" or ArtKit.filled_by(slot) != "fill":
+			continue
+		var node := ArtKit.instance(slot)
+		_check_fits(slot, _body_bounds(node), "its fill")
+		node.free()
+	# As the 3D view drew the Kenney pieces before slots (decision 220): a
+	# wall straddles its edge's line, 3 m tall, the leaf hinged at the
+	# doorway's opening.
+	var wall := ArtKit.instance("wall.straight")
+	var box := ArtKit.bounds_of(wall)
+	_check(box.position.is_equal_approx(Vector3(-0.25, 0.0, -0.5)) and box.size.is_equal_approx(Vector3(0.5, 3.0, 1.0)),
+			"wall.straight's fill straddles the edge, 3 m tall (%s)" % box)
+	wall.free()
+
+
+func _test_grey_boxes() -> void:
+	print("\n== every mesh slot's grey box is its size, labelled when labels are on ==")
+	ArtKit.show_placeholders = true
+	ArtKit.show_labels = true
+	ArtKit.forget()
+	for slot: String in ArtKit.slots():
+		if ArtKit.spec(slot).get("type") != "mesh":
+			continue
+		var node := ArtKit.instance(slot)
+		_check_fits(slot, ArtKit.bounds_of(node), "its grey box")
+		var label := node.get_node_or_null("Label") as Label3D
+		_check(label != null and label.text == slot and str(node.get_meta("slot")) == slot, "%s: labelled %s" % [slot, label.text if label != null else "-"])
+		node.free()
+	ArtKit.show_placeholders = false
+	ArtKit.show_labels = false
+	ArtKit.forget()
+	var node := ArtKit.instance("wall.rubble")
+	_check(ArtKit.filled_by("wall.rubble") == "placeholder" and node.get_node_or_null("Label") == null,
+			"a slot with no art and no fill is its grey box in the game too, without a label unless asked")
+	node.free()
+
+
+func _test_parts() -> void:
+	print("\n== a moving part is a node of its own at its pivot, beside the body, drawn or grey ==")
+	for placeholders in [false, true]:
+		ArtKit.show_placeholders = placeholders
+		ArtKit.forget()
+		for slot: String in ArtKit.slots():
+			for part: Dictionary in ArtKit.spec(slot).get("parts", []):
+				var node := ArtKit.instance(slot)
+				var moving := node.get_node_or_null(NodePath(str(part["name"]))) as Node3D
+				var pivot := ArtKit._vec(part["pivot"])
+				_check(moving != null and moving.position.distance_to(pivot) < 0.01 and not ArtKit.bounds_of(moving).size.is_zero_approx(),
+						"%s (%s): %s at %s, with something to see" % [slot, "grey" if placeholders else ArtKit.filled_by(slot), part["name"], moving.position if moving != null else "-"])
+				if moving != null and part.get("motion") == "hinge":
+					moving.rotation.y = PI * 0.5
+					var swung := _body_bounds(node).merge(ArtKit.bounds_of(moving))
+					_check(moving.position.distance_to(pivot) < 0.01, "%s: turning %s leaves it on its hinge (%s)" % [slot, part["name"], swung])
+				node.free()
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+
+
+func _test_kept() -> void:
+	print("\n== a slot's scene is made once: its instances share their meshes ==")
+	var one := ArtKit.instance("wall.straight")
+	var two := ArtKit.instance("wall.straight")
+	var meshes: Array[Mesh] = []
+	for node: Node3D in [one, two]:
+		for child in node.find_children("*", "MeshInstance3D", true, false):
+			meshes.append((child as MeshInstance3D).mesh)
+	_check(meshes.size() == 2 and meshes[0] == meshes[1], "two walls, one mesh")
+	one.free()
+	two.free()
+
+
+func _test_own_art_says_where_from() -> void:
+	print("\n== a slot with its own art says where it came from ==")
+	var own := 0
+	for slot: String in ArtKit.slots():
+		if ArtKit.filled_by(slot) != "own":
+			continue
+		own += 1
+		var source: Dictionary = ArtKit.spec(slot).get("source", {})
+		_check(str(source.get("by", "")) != "" and str(source.get("license", "")) != "", "%s: by %s, %s" % [slot, source.get("by"), source.get("license")])
+	print("  (%d slots with their own art)" % own)
+
+
+func _test_profile() -> void:
+	print("\n== wall.profile: a closed section within the wall's thickness, its cap line inside it ==")
+	var entry := ArtKit.spec("wall.profile")
+	var points: Array = entry.get("points", [])
+	var half := ArtKit.size("wall.profile").x * 0.5
+	var top := 0.0
+	var inside := points.size() >= 3
+	for point: Array in points:
+		inside = inside and absf(float(point[0])) <= half + 0.001 and float(point[1]) >= 0.0
+		top = maxf(top, float(point[1]))
+	var cap := float(entry.get("cap_y", -1.0))
+	_check(inside and cap > 0.0 and cap < top and ArtKit.has(str(entry.get("material", ""))),
+			"%d points in x [-%.2f, %.2f], cap at %.2f below the top %.2f, material %s" % [points.size(), half, half, cap, top, entry.get("material")])
+
+
+## [param node]'s body's bounds, in the slot's space.
+func _body_bounds(node: Node3D) -> AABB:
+	var body := node.get_node("Body") as Node3D
+	return body.transform * ArtKit.bounds_of(body)
+
+
+func _check_fits(slot: String, box: AABB, what: String) -> void:
+	var size := ArtKit.size(slot)
+	var off := (box.size - size).abs() / size
+	var centre := box.get_center()
+	var stands := absf(box.position.y) < 0.01 and absf(centre.x) < size.x * TOLERANCE + 0.01 and absf(centre.z) < size.z * TOLERANCE + 0.01
+	_check(off.x <= TOLERANCE and off.y <= TOLERANCE and off.z <= TOLERANCE and stands,
+			"%s: %s is %s, the slot %s, standing on its origin (%s)" % [slot, what, box.size, size, box.position])
+
+
+func _check(ok: bool, label: String) -> void:
+	print(("  PASS  " if ok else "  FAIL  ") + label)
+	if not ok:
+		_failures += 1

@@ -1,0 +1,145 @@
+{
+	"about": "The game's art slots: everything the 3D view draws, by name. Read by ArtKit (client3d/art_kit.gd), the terrain pass and the art tools; the fields and conventions are in docs/art_style.md. A slot's own art goes in art/kit/<category>/<slot>/: <slot>.glb (variants <slot>.2.glb ...) with its <slot>.blend beside it, or <slot>.png for a texture slot. Until then it is drawn from its fill (a third-party piece, from 'sources') or as a grey box.",
+	"version": 1,
+	"sources": {
+		"kenney-castle": {
+			"name": "Castle Kit 2.0, Kenney",
+			"path": "res://art/kenney-castle/Models/GLB format/",
+			"extension": ".glb",
+			"license": "CC0 1.0",
+			"license_file": "art/kenney-castle/License.txt",
+			"url": "https://kenney.nl/assets/castle-kit"
+		}
+	},
+	"slots": {
+		"wall.straight": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3.0, 1.0],
+			"budget": 300,
+			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.profile along runs",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]},
+			"fill": {"from": "kenney-castle", "piece": "wall-narrow", "offset": [0.25, 0, 0], "scale": [1, 2.290076, 1]}
+		},
+		"wall.post": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3.0, 0.5],
+			"budget": 200,
+			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post)",
+			"fill": {"from": "kenney-castle", "piece": "wall-narrow-corner", "scale": [1, 2.290076, 1]}
+		},
+		"wall.profile": {
+			"category": "walls",
+			"type": "profile",
+			"kind": "edge",
+			"size": [0.5, 3.0, 1.0],
+			"uses": "the cross-section terrain sweeps along each wall run (terrain part 4); the body below cap_y may be raised, lowered, notched or broken per segment, the band above it is kept whole",
+			"points": [[-0.25, 0.0], [0.25, 0.0], [0.25, 2.7], [0.22, 2.75], [0.22, 3.0], [-0.22, 3.0], [-0.22, 2.75], [-0.25, 2.7]],
+			"cap_y": 2.7,
+			"material": "material.wall"
+		},
+		"wall.rubble": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.8, 0.7, 1.0],
+			"budget": 400,
+			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through"
+		},
+		"door.single": {
+			"category": "doors",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3.0, 1.0],
+			"budget": 700,
+			"uses": "a door on a cell edge: the frame in the wall, its leaf swinging with the Door (Client3D._add_doorway, _sync_doors); the leaf is hidden while the door is broken",
+			"parts": [
+				{"name": "leaf", "motion": "hinge", "axis": "y", "pivot": [0, 0, -0.33], "range": [0, 90], "size": [0.15, 2.1, 0.66]}
+			],
+			"grey": [
+				{"at": [0, 1.5, -0.415], "size": [0.5, 3.0, 0.17]},
+				{"at": [0, 1.5, 0.415], "size": [0.5, 3.0, 0.17]},
+				{"at": [0, 2.55, 0], "size": [0.5, 0.9, 0.66]}
+			],
+			"fill": {
+				"from": "kenney-castle", "piece": "wall-doorway", "offset": [0.25, 0, 0], "scale": [1, 2.290076, 1],
+				"parts": {"leaf": {"from": "kenney-castle", "piece": "gate", "pivot": [0, 0, -0.331075], "offset": [0, 0, 0.331075], "scale": [1, 2.290076, 1]}}
+			}
+		},
+		"tree.broadleaf": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.75, 3.6, 1.75],
+			"budget": 800,
+			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 6 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
+			"grey": [
+				{"at": [0, 0.7, 0], "size": [0.3, 1.4, 0.3]},
+				{"at": [0, 2.5, 0], "size": [1.75, 2.2, 1.75]}
+			],
+			"fill": {"from": "kenney-castle", "piece": "tree-large", "fit": "height"}
+		},
+		"tree.small": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [2.0, 3.6, 2.0],
+			"budget": 600,
+			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 4 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
+			"grey": [
+				{"at": [0, 0.6, 0], "size": [0.25, 1.2, 0.25]},
+				{"at": [0, 2.3, 0], "size": [2.0, 2.6, 2.0]}
+			],
+			"fill": {"from": "kenney-castle", "piece": "tree-small", "fit": "height"}
+		},
+		"rock.small": {
+			"category": "rocks",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.03, 0.5, 1.1],
+			"budget": 200,
+			"uses": "rocks among the forest round an outdoor map (Client3D._add_forest), turned per cell",
+			"scatter": {"scale": [0.8, 1.2], "yaw": "free", "tilt_max": 10, "sink": 0.05, "footprint_r": 0.55, "blocks": false},
+			"fill": {"from": "kenney-castle", "piece": "rocks-small"}
+		},
+		"ground.grass": {
+			"category": "ground",
+			"type": "texture",
+			"tile_m": 2.0,
+			"uses": "terrain's ground shader on grass: blended, lit and noised there; procedural colour while empty"
+		},
+		"ground.dirt": {
+			"category": "ground",
+			"type": "texture",
+			"tile_m": 2.0,
+			"uses": "terrain's ground shader on dirt; procedural colour while empty"
+		},
+		"ground.stone": {
+			"category": "ground",
+			"type": "texture",
+			"tile_m": 2.0,
+			"uses": "terrain's ground shader on stone floors; procedural colour while empty"
+		},
+		"ground.sand": {
+			"category": "ground",
+			"type": "texture",
+			"tile_m": 2.0,
+			"uses": "terrain's ground shader on sand; procedural colour while empty"
+		},
+		"material.rock": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"uses": "the cliff faces terrain generates at ledges, mapped triplanar: no up or down in it"
+		},
+		"material.wall": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"uses": "the stone of swept wall runs (wall.profile): u is metres along the run, v metres up"
+		}
+	}
+}

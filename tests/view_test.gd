@@ -250,7 +250,7 @@ func _test_outdoor() -> void:
 	_check(outline_walls == 0 and inner_walls > 0, "no wall along the outline; the walls painted inside stand (%d)" % inner_walls)
 	_check(_rig._room.get_node_or_null("ForestFloor") != null, "over a forest floor")
 	var tree: Node3D = _rig._trees.values()[0]
-	_check(tree.scale.x * _rig._kit_height("tree-large" if "large" in str(tree.get_child(0).name) else "tree-small") > 2.5,
+	_check(tree.scale.x * ArtKit.size(str(tree.get_meta("slot"))).y > 2.5,
 			"trees stand taller than a player")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
@@ -327,7 +327,7 @@ func _test_fade() -> void:
 	var wall := _rig._walls[wall_key]
 	_check(_rig._faded.has(wall), "standing just behind a wall: it fades (%s, at %s)" % [wall_key, behind])
 	var faded_mesh: MeshInstance3D = _rig._descendants(wall).filter(func(node: Node) -> bool: return node is MeshInstance3D)[0]
-	var near_material := faded_mesh.material_override as BaseMaterial3D
+	var near_material := faded_mesh.get_active_material(0) as BaseMaterial3D
 	_check(near_material != null and near_material.render_priority == Client3D.NEAR_PRIORITY
 			and near_material.next_pass is ShaderMaterial and near_material.next_pass.render_priority == Client3D.NEAR_DEPTH_PRIORITY,
 			"drawn as its nearest surface only: its depth first, then its colour (no seam where two pieces meet)")
@@ -820,7 +820,7 @@ func _test_doors_swing() -> void:
 	if doors.is_empty():
 		return
 	var door: Door = doors[0]
-	var hinge := _rig._doorways[door.key].get_node("Hinge") as Node3D
+	var hinge := _rig._doorways[door.key].get_node(Client3D.DOOR_LEAF) as Node3D
 	for i in 30:
 		_rig._process(0.05)
 		await get_tree().process_frame

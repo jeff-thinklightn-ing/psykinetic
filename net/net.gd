@@ -419,10 +419,12 @@ func _apply_renderer_setting() -> void:
 		apply_view_options(settings)
 
 
-## hp_bars=, master_volume= and sfx_volume= from [param settings], and the
-## lines to keep. A volume is held to 0..1; a bad one keeps the default.
+## hp_bars=, master_volume=, sfx_volume=, art_placeholders= and art_labels=
+## (ArtKit) from [param settings], and the lines to keep. A volume is held to 0..1; a bad one keeps the default.
 func apply_view_options(settings: Dictionary) -> void:
 	hp_bars = str(settings.get("hp_bars", "1")).strip_edges().to_lower() not in ["0", "false", "off", "no"]
+	ArtKit.show_placeholders = _setting_on(settings, "art_placeholders")
+	ArtKit.show_labels = _setting_on(settings, "art_labels")
 	master_volume = _volume(settings.get("master_volume", ""), master_volume)
 	sfx_volume = _volume(settings.get("sfx_volume", ""), sfx_volume)
 	phrases = phrases_from(settings)
@@ -430,6 +432,11 @@ func apply_view_options(settings: Dictionary) -> void:
 	for key: String in settings:
 		if key not in WRITTEN_SETTINGS:
 			_settings_kept[key] = settings[key]
+
+
+## A yes-or-no line of [param settings], off unless it says so.
+static func _setting_on(settings: Dictionary, key: String) -> bool:
+	return str(settings.get(key, "0")).strip_edges().to_lower() in ["1", "true", "on", "yes"]
 
 
 ## phrase1= ... phrase4= from [param settings], each cut to a chat line's
