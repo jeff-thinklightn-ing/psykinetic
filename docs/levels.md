@@ -265,13 +265,16 @@ mode's `mark_place` marks one. Nothing in play shows them yet.
 A place of kind `stockpile` is where the town keeps what players bring
 home: gold, ore, wood, cloth and food as counts, and gear item by item
 (`Stockpile`, `sim/stockpile.gd`, kept as `World.stockpile` and saved in
-the snapshot). Things reach it through a depot: a chest with
-`"props": {"depot": true}` inside the place's radius. Whatever a player
-puts into the depot is banked at once (the slot empties, the store counts
-it, its ledger says who and when); picking loot up counts for nothing.
-A depot only banks while the town holds its place: if another faction
-takes it, the depot refuses. Players never take from the stockpile; the
-town's own work (production, the shop, raids) does.
+the snapshot). Things reach it physically: put into a depot (a chest
+with `"props": {"depot": true}` inside the place's radius), or put down
+or thrown onto the place's ground. Either way they are banked at once (a
+sack of ore as its ore, gear as itself; the store counts it, its ledger
+says who and when). Picking loot up counts for nothing, and so does
+carrying it onto the ground: only what is let go of there is banked.
+All of it only while the town holds the place: if another faction takes
+it, the depot refuses and what is put down there just lies there. Players
+never take from the stockpile; the town's own work (production, the
+shop, raids) does.
 
 ### Routes between areas
 

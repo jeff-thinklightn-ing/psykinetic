@@ -22,10 +22,7 @@ func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17794)
 	Net.companions = false
-	# A folder of this checkout's own: other worktrees run tests too.
-	var folder := OS.get_temp_dir().path_join("psykinetic-%s" % ProjectSettings.globalize_path("res://").md5_text().left(8))
-	DirAccess.make_dir_recursive_absolute(folder)
-	Net.state_path = folder.path_join("stockpile_test_world.json")
+	Net.state_path = preload("res://tests/test_ports.gd").scratch("stockpile_test_world.json")
 	if FileAccess.file_exists(Net.state_path):
 		DirAccess.remove_absolute(Net.state_path)
 	_register_town()
@@ -39,6 +36,7 @@ func _ready() -> void:
 	_test_resources()
 	_test_resource_items()
 	await _test_restart()
+	await _test_hauling()
 	_test_old_and_odd_snapshots()
 
 	remove_child(_main)
@@ -187,6 +185,65 @@ func _test_resource_items() -> void:
 	_check(not World.items.has(sack), "the sack's instance has ended (banked)")
 	var line: Dictionary = World.stockpile.ledger(STORE).back()
 	_check(line["what"] == "ore" and line["count"] == 5 and line["uid"] == 0, "the ledger counts the ore (%s)" % [line])
+
+
+func _test_hauling() -> void:
+	print("\n== hauling: what lands on the store's ground is banked; what is carried is not ==")
+	var stock := World.stockpile
+	var host := _player(Net.local_id)
+	var who := World._label_of(host)
+	var ore := stock.count(STORE, "ore")
+	var kits := stock.count(STORE, KIT)
+	World._relocate(host, Vector2i(9, 5))
+	World.set_slots(host, ["ore_sack", KIT, "", "", "", ""])
+	World._relocate(host, Vector2i(5, 4))
+	await get_tree().process_frame
+	_check(Stockpile.place_at(World.holdings, TOWN, host.tile) == STORE, "the host walks onto the store's ground at %s" % host.tile)
+	_check(stock.count(STORE, "ore") == ore and stock.count(STORE, KIT) == kits and Array(host.slots) == ["ore_sack", KIT, "", "", "", ""],
+		"carrying a sack and a kit in banks nothing (%s)" % [Array(host.slots)])
+	var sack := World.slot_uid(host, 0)
+	_check(World.try_drop(host, 0), "the host puts the sack down")
+	_check(World.ground_at(host.tile) == PackedStringArray(["ore_sack"]), "it lies on the ground until the change is done")
+	await get_tree().process_frame
+	_check(stock.count(STORE, "ore") == ore + 5 and World.ground_at(host.tile).is_empty() and not World.items.has(sack),
+		"then it's banked as 5 ore, off the ground, its instance ended (%d ore)" % stock.count(STORE, "ore"))
+	var line: Dictionary = stock.ledger(STORE).back()
+	_check(line["by"] == who and line["from"] == "the ground at %d,%d" % [host.tile.x, host.tile.y], "the ledger says who put it down, and where (%s)" % [line])
+	var kit := World.slot_uid(host, 1)
+	World.try_drop(host, 1)
+	await get_tree().process_frame
+	_check(stock.items(STORE).has(kit) and World.items.history(kit)["events"].back()["kind"] == "banked",
+		"the kit put down is banked as itself (#%d)" % kit)
+
+	World._relocate(host, Vector2i(8, 3))
+	World.set_slots(host, ["", "", "", "", "ore_sack", ""])
+	_check(Stockpile.place_at(World.holdings, TOWN, host.tile).is_empty(), "from %s, off the store's ground" % host.tile)
+	_check(World.try_throw(host, Items.RIGHT_HAND, Vector2i(5, 3)), "the host throws a sack toward the store")
+	await get_tree().process_frame
+	_check(stock.count(STORE, "ore") == ore + 10, "it lands on the store's ground and is banked (%d ore)" % stock.count(STORE, "ore"))
+
+	World.set_slots(host, ["ore_sack", "", "", "", "", ""])
+	World._relocate(host, Vector2i(10, 6))
+	World.try_drop(host, 0)
+	await get_tree().process_frame
+	_check(World.ground_at(Vector2i(10, 6)) == PackedStringArray(["ore_sack"]) and stock.count(STORE, "ore") == ore + 10,
+		"put down off the store's ground, it just lies there")
+	World.try_pick_up(host, Vector2i(10, 6))
+	World._relocate(host, Vector2i(5, 4))
+	World.holdings.take(STORE, "goblins")
+	World.try_drop(host, _slot_of(host, "ore_sack"))
+	await get_tree().process_frame
+	_check(World.ground_at(host.tile) == PackedStringArray(["ore_sack"]) and stock.count(STORE, "ore") == ore + 10,
+		"with the goblins holding the store, a sack put down there stays on the ground")
+	World.holdings.take(STORE, "town")
+	World.try_pick_up(host, host.tile)
+	World.try_drop(host, _slot_of(host, "ore_sack"))
+	await get_tree().process_frame
+	_check(stock.count(STORE, "ore") == ore + 15 and World.ground_at(host.tile).is_empty(), "the town takes it back: picked up and put down, it's banked")
+
+
+func _slot_of(entity: GridEntity, id: String) -> int:
+	return Array(entity.slots).find(id)
 
 
 func _test_restart() -> void:

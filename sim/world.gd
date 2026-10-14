@@ -1318,16 +1318,66 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 	taken_uids[from_slot] = 0
 	from.slots = taken
 	from.slot_items = taken_uids
-	var who := _label_of(by)
-	if yields.is_empty():
-		stockpile.bank(place, uid, who, _label_of(from), depot.zone, depot.tile)
-	else:
-		for what: String in yields:
-			stockpile.deposit(place, what, int(yields[what]), who, _label_of(from))
-		items.end(uid, "banked", "%s by %s" % [place, who], depot.zone, depot.tile)
+	_bank_thing(place, uid, _label_of(by), _label_of(from), depot.zone, depot.tile)
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
 	_slots_changed(from)
 	return true
+
+
+## Banks the instance [param uid] (held by nothing now) at stockpile
+## [param place], brought [param who] someone from [param from]: a resource
+## item as its yield (its instance ended, "banked"), gear as itself.
+func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i) -> void:
+	var yields := Items.yield_of(items.id_of(uid))
+	if yields.is_empty():
+		stockpile.bank(place, uid, who, from, at_zone, tile)
+		return
+	for what: String in yields:
+		stockpile.deposit(place, what, int(yields[what]), who, from)
+	items.end(uid, "banked", "%s by %s" % [place, who], at_zone, tile)
+
+
+## Who last put each thing on the ground (a drop or a throw), by uid, for
+## the stockpile's ledger; gone when it is taken off again.
+var _put_down_by: Dictionary[int, String] = {}
+
+
+func _ready() -> void:
+	ground_changed.connect(_on_ground_for_stockpile)
+
+
+## Something landed on (or left) [param cell] of [param zone_name]: if it
+## lies on stockpile ground the town holds, it is banked once the change is
+## done (deferred: taking it off now would change the ground again while
+## the others handling this change are still at it).
+func _on_ground_for_stockpile(zone_name: String, cell: Vector2i, _thrown_from: Vector2i) -> void:
+	if not Net.is_authority() or stockpile == null or Stockpile.place_at(holdings, zone_name, cell).is_empty():
+		return
+	_bank_ground.call_deferred(zone_name, cell)
+
+
+## Banks everything on [param cell] of [param zone_name], if it still lies
+## on stockpile ground the town holds; a resource item as its yield, gear
+## as itself, taken off the ground as it goes in.
+func _bank_ground(zone_name: String, cell: Vector2i) -> void:
+	var there: Zone = zones.get(zone_name, zone if zone.name == zone_name else null)
+	if there == null or stockpile == null:
+		return
+	var place := Stockpile.place_at(holdings, zone_name, cell)
+	if place.is_empty():
+		return
+	var was := enter(there)
+	var uids := ground_uids(cell)
+	for index in range(uids.size() - 1, -1, -1):
+		var uid := uids[index]
+		var yields := Items.yield_of(items.id_of(uid))
+		if yields.keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
+			continue  # A yield the stockpile has no count for: it stays where it is.
+		var who: String = _put_down_by.get(uid, "")
+		take_from_ground(cell, index)
+		_bank_thing(place, uid, who, "the ground at %d,%d" % [cell.x, cell.y], zone_name, cell)
+		_log("ground: %s banked at %s from %s" % [items.id_of(uid) if items.has(uid) else "a resource", place, cell])
+	enter(was)
 
 
 ## The things lying on [param cell] of the zone World is in: their ids,
@@ -1365,6 +1415,7 @@ func try_drop(by: GridEntity, slot: int, at: Variant = null) -> bool:
 	var uid := take_item(by, by, slot)
 	if uid == 0:
 		return false
+	_put_down_by[uid] = _label_of(by)
 	var landed := put_on_ground(uid, cell)
 	_log("ground: %s put %s down at %s" % [by.name, id, landed])
 	return true
@@ -1437,6 +1488,7 @@ func take_from_ground(cell: Vector2i, index: int) -> int:
 		return 0
 	var uid := there[index]
 	there.remove_at(index)
+	_put_down_by.erase(uid)
 	if there.is_empty():
 		zone.ground.erase(cell)
 	else:
@@ -1481,6 +1533,7 @@ func try_throw(by: GridEntity, slot: int, target: Vector2i) -> bool:
 	var uid := take_item(by, by, slot)
 	if uid == 0:
 		return false
+	_put_down_by[uid] = _label_of(by)
 	var landed := put_on_ground(uid, dry, by.tile)
 	_log("throw: %s threw %s from %s to %s%s" % [by.name, id, by.tile, landed, "" if hit == null else ", hitting %s" % hit.name])
 	if hit != null:

@@ -3595,3 +3595,36 @@ No level sets "ambient" yet, so today sight by light changes nothing in
 the real maps; line of sight for deaths and the hearing do. Her hands
 (whom she fights, the retreat) still look as before; they come over when
 alertness does.
+
+## 250. Hauling: what is let go of on the stockpile's ground is banked; carrying counts for nothing
+
+Economy, step 2. Loot comes home physically, and counts when it reaches
+the stockpile, never when it's picked up. Jeff: carrying something onto
+the stockpile's ground banks nothing; only what is let go of there is.
+
+- Dropped or thrown: World listens to its own ground_changed (items' step
+  2: drops, throws landing, spills, put_on_ground). When something lands
+  on a cell inside a stockpile place the town holds
+  (Stockpile.place_at), the cell is banked once the change is done
+  (call_deferred: taking it off inside the handler would change the
+  ground again while Main is still handling it). Each thing comes off
+  with take_from_ground and goes through the same banking as the depot
+  (World._bank_thing): a resource item as its yield, its instance ended
+  "banked"; gear as itself, its uid in the store. The ledger says who put
+  it down (World remembers the dropper or thrower of each thing lying on
+  the ground until it is taken off) and "the ground at x,y". Its pile
+  goes as the cell empties.
+- On ground the town doesn't hold, or with the place taken, things just
+  lie there; nothing sweeps them in later when the town takes it back
+  (someone moves them).
+- Carried: nothing. A player walking onto the ground with a sack and a
+  sword keeps both until they let go of them.
+- Containers (items' step 2b: crates and carts, Container): when one is
+  moved (World.entity_moved, pushes included) onto a town-held stockpile
+  place, its contents are emptied into the store (World.empty_container)
+  and the container stays for the town to send out again. It comes with
+  2b. Carts on tracks later move the same entity, so the same arrival
+  banks them.
+
+Hauling is physical and near players, so it runs on the full tick and
+only on those events: a cached lookup per landing, no scan.
