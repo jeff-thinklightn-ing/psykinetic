@@ -1,0 +1,67 @@
+{
+	"_about": "Who knows what (docs/lore/README.md): groups and characters, each with the regions it knows (where) and the tags it knows wherever they are.",
+	"knowers": [
+		{
+			"id": "townsfolk",
+			"name": "townsfolk",
+			"status": "draft",
+			"where": [
+				"town_lands"
+			],
+			"tags": []
+		},
+		{
+			"id": "scholar",
+			"name": "a scholar in the archive",
+			"status": "asked",
+			"ask": "E4",
+			"where": [
+				"town_lands"
+			],
+			"tags": [
+				"history"
+			]
+		},
+		{
+			"id": "wren",
+			"name": "Wren",
+			"status": "asked",
+			"ask": "E2",
+			"where": [
+				"town_lands"
+			],
+			"tags": []
+		},
+		{
+			"id": "pip",
+			"name": "Pip",
+			"status": "asked",
+			"ask": "E2",
+			"where": [
+				"town_lands"
+			],
+			"tags": []
+		},
+		{
+			"id": "nix",
+			"name": "Nix",
+			"status": "asked",
+			"ask": "E2",
+			"where": [
+				"town_lands"
+			],
+			"tags": []
+		},
+		{
+			"id": "smith",
+			"name": "the smith",
+			"status": "draft",
+			"where": [
+				"town_lands"
+			],
+			"tags": [
+				"materials"
+			]
+		}
+	]
+}

@@ -1,0 +1,208 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "town",
+			"type": "faction",
+			"name": "the town",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "The people the players fight for; what is found on the road comes home to the town.",
+			"relations": [
+				{
+					"to": "goblins",
+					"kind": "enemy"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "town.name",
+					"text": "The town's name.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A1"
+				},
+				{
+					"id": "town.stockpile",
+					"text": "Everything brought home goes into the town's shared stockpile.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"economy"
+					]
+				},
+				{
+					"id": "town.rescued",
+					"text": "People rescued from captivity come to live in the town and work their trade.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "town.ruler",
+					"text": "Who rules or speaks for the town.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A4"
+				}
+			]
+		},
+		{
+			"id": "goblins",
+			"type": "faction",
+			"name": "the goblins",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "They hold the overrun castle and raid the land around it.",
+			"relations": [
+				{
+					"to": "town",
+					"kind": "enemy"
+				},
+				{
+					"to": "castle",
+					"kind": "holds"
+				},
+				{
+					"to": "smith",
+					"kind": "took"
+				}
+			],
+			"tags": [
+				"raiders",
+				"captives"
+			],
+			"facts": [
+				{
+					"id": "goblins.hold_castle",
+					"text": "The goblins have overrun the castle near the town and hold it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "goblins.took_smith",
+					"text": "The goblins raided a farmstead near the castle and took the smith and his hammer.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"smith"
+					]
+				},
+				{
+					"id": "goblins.holding",
+					"text": "The goblins win by holding things, captives and ground, not by taking loot.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "goblins.imp",
+					"text": "The imp is small and darts in and out of a fight.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fighting"
+					]
+				},
+				{
+					"id": "goblins.brute",
+					"text": "The brute is big and heavy, and it stands guard.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fighting"
+					]
+				},
+				{
+					"id": "goblins.sneak",
+					"text": "The sneak patrols and comes at you from the side.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fighting"
+					]
+				},
+				{
+					"id": "goblins.nature",
+					"text": "What the goblins are: a people, beasts, or something made.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "C1"
+				},
+				{
+					"id": "goblins.kinds",
+					"text": "Whether imps, brutes and sneaks are one people or creatures the goblins keep.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "C2"
+				},
+				{
+					"id": "goblins.why_smith",
+					"text": "Why they took the smith and his hammer.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "C3"
+				}
+			]
+		},
+		{
+			"id": "blood_rot",
+			"type": "faction",
+			"name": "the Blood Rot",
+			"status": "asked",
+			"source": "Jeff",
+			"summary": "A clan whose lands lie under a blight.",
+			"ask": "D1",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "holds"
+				}
+			],
+			"tags": [
+				"blight"
+			],
+			"facts": [
+				{
+					"id": "blood_rot.lands",
+					"text": "The Blood Rot's lands lie under a blight.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"status": "draft",
+					"tags": [
+						"blight"
+					]
+				},
+				{
+					"id": "blood_rot.nature",
+					"text": "Who or what the Blood Rot are.",
+					"known": "common",
+					"where": [],
+					"ask": "D1"
+				}
+			]
+		}
+	]
+}

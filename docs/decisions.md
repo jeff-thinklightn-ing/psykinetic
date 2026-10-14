@@ -4048,3 +4048,46 @@ double the wall runs and fade as one block, not by the edge that hides the
 player). A well, 1x1 with no inside, is not yet one of these: how its
 cell stops walkers is its own question; it comes last, with its own
 decision.
+
+## 257. Lore: prose in docs/lore/, data in levels/lore/, one entry format, shared ids
+
+The world's facts (lore tree) are kept twice over. Prose for people goes in
+docs/lore/ (primer.md, style.md, README.md for the format). Data for code goes
+in levels/lore/*.json (world, factions, regions, materials, people, history,
+knowers). It sits under levels/ because the server reads and live-reloads
+levels/ and builds companions' prompts, and levels/*.json is in the export
+filter (a subfolder matches). docs/ doesn't ship. Where the two disagree, the
+data wins. Each file is {_about, entries}. An entry is {id, type, name,
+status, source, summary, relations [{to, kind}], tags, facts}, with id unique
+across the files. Ids are shared, not copied. A faction's id is its key in
+levels/factions.json, and maps keeps the mechanical fields (colour, monsters,
+hostile_to) there: lore adds no fields to that file and holds only the
+meaning. A material names its Stockpile.RESOURCES resource, a place its
+Level.PLACE_KINDS kind and its level, and a weapon its items.json id. A
+material says in words what it does when worked, with effect tags. Economy
+and items turn those into numbers, so lore never sets one. Facts are plain
+statements of what is true, never lines to say (companions' rule).
+tests/lore_test.gd checks it all. level_test and editor_test now skip
+folders under levels/ with no layout.png, the rule Level.names() already
+used. Rejected: lore fields inside levels/factions.json and items.json (two
+trees writing one file), and data under docs/ (it doesn't ship).
+
+## 258. Who knows what: common, rumour, secret, lived; only agreed lore is used
+
+Lore is local. Each fact has a knowledge level. A common fact is known to
+anyone who lives in, or knows, a region in its where (an empty where means
+everyone). A rumour is told as hearsay where it is heard, and must say whether
+it is true, so a false rumour can stand without the lore contradicting itself.
+A secret is known only to its knowers. A lived fact is one person's own
+experience, known only to its knowers and spoken of as memory.
+levels/lore/knowers.json lists the knowers (groups such as townsfolk and a
+scholar, and characters such as each companion and the smith), each with its
+where and its tags. A knower knows the common facts and rumours of its where,
+the common facts and rumours that share one of its tags wherever they are (a
+scholar's history), and the secret and lived facts that name it. Every entry
+and fact also has a status: agreed (Jeff or Dire decided it, or it is in the
+game), draft, or asked (an open question for them, naming its question's
+code). A fact without a status takes its entry's. Code uses a fact only when
+it and its entry are both agreed, so drafts and open questions can sit in the
+files without reaching a prompt. How a companion's prompt takes the facts is
+the companions tree's business.

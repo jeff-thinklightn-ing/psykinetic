@@ -1,0 +1,76 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "iron",
+			"type": "material",
+			"name": "iron",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Ordinary iron, found near the town.",
+			"resource": "ore",
+			"worked": {
+				"text": "Plain, sound tools and weapons.",
+				"effects": [
+					"sound"
+				]
+			},
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "from"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "iron.near_town",
+					"text": "Ordinary iron is found near the town.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				}
+			]
+		},
+		{
+			"id": "blighted_ore",
+			"type": "material",
+			"name": "blighted ore",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Ore from the Blood Rot lands, touched by the blight.",
+			"resource": "ore",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "from"
+				}
+			],
+			"tags": [
+				"blight"
+			],
+			"facts": [
+				{
+					"id": "blighted_ore.from",
+					"text": "Blighted ore comes from the Blood Rot lands.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"blight"
+					]
+				},
+				{
+					"id": "blighted_ore.worked",
+					"text": "What blighted ore does when worked.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "D3"
+				}
+			]
+		}
+	]
+}

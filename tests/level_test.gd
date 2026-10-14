@@ -146,7 +146,7 @@ func _test_every_level() -> void:
 			"the server's boot makes World.holdings, a holding for every place in the levels")
 	print("\n== every level in levels/ imports as Images and loads cleanly ==")
 	for folder in DirAccess.get_directories_at(Level.DIR):
-		if Level.DIR + folder + "/" == Prefab.DIR:
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
 			continue
 		var images_ok := load(Level.DIR + folder + "/layout.png") is Image
 		if ResourceLoader.exists(Level.DIR + folder + "/height.png"):

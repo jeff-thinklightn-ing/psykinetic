@@ -1,0 +1,89 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "the_land",
+			"type": "world",
+			"name": "the land",
+			"status": "draft",
+			"source": "game",
+			"summary": "Old stone places and the open ground around them, where monsters prowl.",
+			"relations": [],
+			"tags": [
+				"setting"
+			],
+			"facts": [
+				{
+					"id": "the_land.stone_places",
+					"text": "The land holds old stone places, rooms and corridors lit by lanterns and fires, and the open ground beyond them.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "the_land.monsters",
+					"text": "Monsters prowl the stone places and the open ground and attack whoever they see.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "the_land.fire",
+					"text": "Fire burns whoever stands in it.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "the_land.rising",
+					"text": "Whoever falls rises again after a while; it hurts, and no one wants to fall.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "the_land.why_rising",
+					"text": "Why the fallen rise again.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "B1"
+				},
+				{
+					"id": "the_land.directions",
+					"text": "People give directions as north, south, east and west.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "the_land.name",
+					"text": "The land's name.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A1"
+				},
+				{
+					"id": "the_land.law",
+					"text": "How the land is governed and what its law is.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A3"
+				},
+				{
+					"id": "the_land.magic",
+					"text": "How real magic is.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "B2"
+				},
+				{
+					"id": "the_land.gods",
+					"text": "Which gods are worshipped.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "B3"
+				}
+			]
+		}
+	]
+}

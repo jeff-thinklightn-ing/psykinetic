@@ -1,0 +1,73 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "raid_on_farmstead",
+			"type": "event",
+			"name": "the raid on the farmstead",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "The goblins raided a farmstead near the castle and took the smith and his hammer.",
+			"relations": [
+				{
+					"to": "goblins",
+					"kind": "member"
+				},
+				{
+					"to": "farmstead",
+					"kind": "in"
+				},
+				{
+					"to": "smith",
+					"kind": "took"
+				}
+			],
+			"tags": [
+				"smith"
+			],
+			"facts": [
+				{
+					"id": "raid_on_farmstead.recent",
+					"text": "The raid on the farmstead is recent.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				}
+			]
+		},
+		{
+			"id": "fall_of_castle",
+			"type": "event",
+			"name": "the fall of the castle",
+			"status": "asked",
+			"source": "roadmap",
+			"summary": "The goblins overran the castle near the town.",
+			"ask": "A2",
+			"relations": [
+				{
+					"to": "castle",
+					"kind": "in"
+				},
+				{
+					"to": "goblins",
+					"kind": "member"
+				}
+			],
+			"tags": [
+				"history"
+			],
+			"facts": [
+				{
+					"id": "fall_of_castle.overrun",
+					"text": "The goblins overran the castle near the town.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"status": "draft"
+				}
+			]
+		}
+	]
+}

@@ -34,7 +34,7 @@ func _ready() -> void:
 func _test_round_trip() -> void:
 	print("\n== every level read into the editor and written back plays the same ==")
 	for folder in DirAccess.get_directories_at(Level.DIR):
-		if Level.DIR + folder + "/" == Prefab.DIR:
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
 			continue
 		var config := {}
 		var json := Level.DIR + folder + "/level.json"

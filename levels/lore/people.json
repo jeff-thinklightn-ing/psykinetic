@@ -1,0 +1,124 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "smith",
+			"type": "person",
+			"name": "the smith",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "The town's smith, taken by the goblins from a farmstead and held in the castle's keep.",
+			"relations": [
+				{
+					"to": "farmstead",
+					"kind": "from"
+				},
+				{
+					"to": "castle",
+					"kind": "held_at"
+				},
+				{
+					"to": "smiths_hammer",
+					"kind": "carries"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "smith.taken",
+					"text": "The smith was taken from a farmstead near the castle, with his hammer.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "smith.held",
+					"text": "The smith is held in the castle's keep.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": true
+				},
+				{
+					"id": "smith.name",
+					"text": "The smith's name.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "E3"
+				}
+			]
+		},
+		{
+			"id": "smiths_hammer",
+			"type": "weapon",
+			"name": "the smith's hammer",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "The hammer the goblins took with the smith.",
+			"relations": [
+				{
+					"to": "smith",
+					"kind": "from"
+				}
+			],
+			"tags": [
+				"heirloom"
+			],
+			"facts": [
+				{
+					"id": "smiths_hammer.name",
+					"text": "Whether the hammer has a name of its own.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "E3"
+				}
+			]
+		},
+		{
+			"id": "wren",
+			"type": "person",
+			"name": "Wren",
+			"status": "asked",
+			"source": "game",
+			"summary": "A companion; her temper and manner are in her card (levels/companions.json).",
+			"ask": "E2",
+			"relations": [],
+			"tags": [
+				"companion"
+			],
+			"facts": []
+		},
+		{
+			"id": "pip",
+			"type": "person",
+			"name": "Pip",
+			"status": "asked",
+			"source": "game",
+			"summary": "A companion; her temper and manner are in her card (levels/companions.json).",
+			"ask": "E2",
+			"relations": [],
+			"tags": [
+				"companion"
+			],
+			"facts": []
+		},
+		{
+			"id": "nix",
+			"type": "person",
+			"name": "Nix",
+			"status": "asked",
+			"source": "game",
+			"summary": "A companion; his temper and manner are in his card (levels/companions.json).",
+			"ask": "E2",
+			"relations": [],
+			"tags": [
+				"companion"
+			],
+			"facts": []
+		}
+	]
+}

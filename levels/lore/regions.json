@@ -1,0 +1,143 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "town_lands",
+			"type": "region",
+			"name": "the town's lands",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "The town and the farmsteads, fields and castle near it.",
+			"relations": [],
+			"tags": [],
+			"facts": [
+				{
+					"id": "town_lands.fields",
+					"text": "Fields lie between the farmsteads and the castle.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				}
+			]
+		},
+		{
+			"id": "blood_rot_lands",
+			"type": "region",
+			"name": "the Blood Rot lands",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Blighted lands where the Blood Rot live and blighted ore is found.",
+			"relations": [],
+			"tags": [
+				"blight"
+			],
+			"facts": [
+				{
+					"id": "blood_rot_lands.blight",
+					"text": "The blight lies over the Blood Rot lands.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"blight"
+					]
+				},
+				{
+					"id": "blood_rot_lands.what_blight",
+					"text": "What the blight is.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "D2"
+				}
+			]
+		},
+		{
+			"id": "town_place",
+			"type": "place",
+			"name": "the town",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "Where the players and their companions belong, and where the stockpile is.",
+			"place_kind": "stockpile",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				},
+				{
+					"to": "town",
+					"kind": "member"
+				}
+			],
+			"tags": [],
+			"facts": []
+		},
+		{
+			"id": "farmstead",
+			"type": "place",
+			"name": "the raided farmstead",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "A farmstead near the castle, raided by the goblins.",
+			"place_kind": "farm",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "farmstead.raided",
+					"text": "The goblins raided the farmstead and took the smith from it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"smith"
+					]
+				}
+			]
+		},
+		{
+			"id": "castle",
+			"type": "place",
+			"name": "the castle",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "A castle near the town, overrun by the goblins, with a keep.",
+			"level": "castle",
+			"place_kind": "keep",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "castle.keep",
+					"text": "The castle has a keep.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "castle.whose",
+					"text": "Whose castle it was and when it fell.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A2"
+				}
+			]
+		}
+	]
+}
