@@ -3,6 +3,21 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.136
+
+Client and server.
+
+- Monsters see and hear. A monster sees in a cone in front of it, so you
+  can slip past one that faces away. In the dark it sees only what is lit:
+  press L to cover your lantern (and again to light it). A covered lantern
+  is seen only from right beside you, or by someone else's light.
+- Monsters hear footsteps, fighting, doors and speech. One that hears
+  something turns to look. Words in capitals carry much farther; whisper
+  with /w (heard only two steps away, by people and monsters alike).
+- Monsters with no kind still see all round, as before.
+
+The server must be updated to v0.1.136 too, as it refuses any other version.
+
 ## v0.1.135
 
 Client and server.

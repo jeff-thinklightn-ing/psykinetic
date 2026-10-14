@@ -12,6 +12,8 @@ extends GridEntity
 
 ## Slots a player has for things (Items), from the start, empty.
 const SLOTS := 4
+## Its lantern's light (GridEntity.emit_light) while lit.
+const LANTERN := 0.9
 
 ## WASD steps waiting for the movement timer: {direction, predicted}.
 var queued_steps: Array[Dictionary] = []
@@ -25,7 +27,7 @@ var refusals := 0
 func _init() -> void:
 	super()
 	mass = 80.0
-	emit_light = 0.9  # The lantern the 3D view draws above the head.
+	emit_light = LANTERN  # The lantern the 3D view draws above the head.
 	# 4 cells a second.
 	move_ticks = 2.5
 	max_hp = 20
@@ -35,7 +37,15 @@ func _init() -> void:
 	attack_ticks = 5
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
+	# Its lantern lit or covered (L): what the views draw and monsters see by.
+	replicate("emit_light")
 
+
+
+## L: its lantern covered (no light: it cannot be seen in the dark, nor see
+## by it), or lit again.
+func toggle_lantern() -> void:
+	emit_light = 0.0 if emit_light > 0.0 else LANTERN
 
 func _sim_tick() -> void:
 	if not queued_steps.is_empty():

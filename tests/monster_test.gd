@@ -44,6 +44,10 @@ func _ready() -> void:
 	_test_world_tick()
 	_test_plans_per_step()
 	_test_walk_round_held_ground()
+	_test_sight_cone()
+	_test_sight_by_light()
+	_test_hearing()
+	_test_noise_reach()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -457,6 +461,7 @@ func _bold(monster: Monster) -> void:
 	monster.pause_chance = 0.0
 	monster.reaction_ticks = 0
 	monster.sight_range = 12
+	monster.senses.cone_cos = -1.0  # All round: these test how it fights, not what it sees.
 
 
 ## [param extra]: per symbol, more for its spawn spec ({"b": {"facing": ...}}).
@@ -663,6 +668,124 @@ func _build(rows: Array[String], extra := {}) -> Dictionary:
 			World.spawn(entity, spawn[1])
 			out[symbol].append(entity)
 	return out
+
+
+func _test_sight_cone() -> void:
+	print("
+== a monster of a kind sees in a cone before it; one of no kind all round ==")
+	Monster.idling = false
+	var north := {"facing": Vector2i(0, -1)}
+	var e := _build(["#######", "#.....#", "#..b..#", "#.....#", "#..P..#", "#.....#", "#######"], {"b": north})
+	var brute: Monster = e["b"][0]
+	var player: GridEntity = e["P"][0]
+	brute.sight_range = 7
+	World.step()
+	_check(brute.target == null, "facing north, it does not see the player behind it")
+	_move_to(player, Vector2i(3, 1))
+	World.step()
+	_check(brute.target == player, "in front of it, it does (%s)" % [brute.target])
+	_move_to(player, Vector2i(3, 5))
+	World.step()
+	_check(brute.target == player, "and once it has someone it keeps them, behind it or not")
+	_check(brute.senses.last_seen(player).get("at") == Vector2i(3, 5), "it remembers where it saw them (%s)" % [brute.senses.last_seen(player)])
+	e = _build(["#######", "#.....#", "#..m..#", "#.....#", "#..P..#", "#######"], {"m": north})
+	var plain: Monster = e["m"][0]
+	plain.sight_range = 7
+	World.step()
+	_check(plain.target == e["P"][0], "a monster of no kind sees all round, as monsters did")
+	e = _build(["#######", "#.....#", "#..b..#", "#..P..#", "#######"], {"b": north})
+	(e["b"][0] as Monster).sight_range = 7
+	World.step()
+	_check((e["b"][0] as Monster).target == e["P"][0], "right behind it, it notices them anyway")
+	Monster.idling = true
+
+
+func _test_sight_by_light() -> void:
+	print("
+== in the dark it sees only what is lit, or carries a light ==")
+	Monster.idling = false
+	var e := _build(["#########", "#.......#", "#.......#", "#...b...#", "#.......#", "#########"], {"b": {"facing": Vector2i(0, -1)}})
+	World.fields.ambient = 0.0
+	World.fields_changed()
+	var brute: Monster = e["b"][0]
+	brute.sight_range = 7
+	var player: Player = EntityFactory.build(SPECS["P"].merged({"name": "Player1", "tile": Vector2i(4, 1)}))
+	_room.add_child(player)
+	World.spawn(player, Vector2i(4, 1))
+	player.toggle_lantern()
+	World.step()
+	_check(player.emit_light == 0.0 and brute.target == null, "its lantern covered, in the dark before it: unseen")
+	player.toggle_lantern()
+	World.step()
+	_check(player.emit_light > 0.0 and brute.target == player, "its lantern lit: seen")
+	_check(Senses.is_lit(Vector2i(5, 1)), "its lantern lights the cells by it")
+	player.toggle_lantern()
+	brute.target = null
+	var friend: Player = EntityFactory.build(SPECS["P"].merged({"name": "Player2", "tile": Vector2i(2, 1)}))
+	_room.add_child(friend)
+	World.spawn(friend, Vector2i(2, 1))
+	World.step()
+	_check(brute.senses.sees(player), "covered, but beside one with a lantern lit: seen")
+	friend.toggle_lantern()
+	brute.target = null
+	World.step()
+	_check(brute.target == null, "both covered: neither seen")
+	_check(Senses.is_lit(Vector2i(4, 1)) == false, "nothing lights the dark then")
+	_check(Senses.light_level(Vector2i(4, 1)) == 0.0 and brute.senses.sees_cell(Vector2i(4, 1), 0.0)
+			and not brute.senses.sees_cell(Vector2i(4, 1)), "how light it is there, and a cell seen by a threshold of the asker's")
+	World.fields.ambient = 1.0
+	World.fields_changed()
+	World.step()
+	_check(brute.target != null, "in the light, seen covered or not")
+	Monster.idling = true
+
+
+func _test_hearing() -> void:
+	print("
+== a monster hears steps, turns, and sees who made them ==")
+	var e := _build(["#######", "#.....#", "#..b..#", "#.....#", "#.....#", "#..P..#", "#######"], {"b": {"facing": Vector2i(0, -1)}})
+	var brute: Monster = e["b"][0]
+	var player: GridEntity = e["P"][0]
+	brute.sight_range = 7
+	World.step()
+	_check(brute.target == null, "behind it, unseen")
+	var moved := false
+	for i in 5:
+		if not moved:
+			moved = World.try_move(player, Vector2i(0, -1))
+		World.step()
+	_check(moved and not brute.senses.heard.is_empty() and brute.senses.heard.back()["kind"] == &"step",
+			"its step is heard (%s)" % [brute.senses.heard])
+	_check(brute.target == player, "it turned to the noise, and saw them (facing %s)" % [brute.facing])
+	_check(brute.senses.heard_since(0).back()["source"] == player, "who made it, now it sees them")
+	brute.senses.forget()
+	_check(brute.senses.heard_since(0).is_empty() and brute.senses.last_seen(player).is_empty(), "forget lets go of all of it")
+	_check(Senses.way_toward(Vector2i(0, 0), Vector2i(5, 1)) == Vector2i(1, 0)
+			and Senses.way_toward(Vector2i(0, 0), Vector2i(-3, -3)) == Vector2i(-1, -1), "a noise's way is the nearest of the eight")
+
+
+func _test_noise_reach() -> void:
+	print("
+== a noise carries its radius, half that through a wall; words further in capitals ==")
+	var e := _build(["#########", "#b..#..b#", "#...#...#", "#...#...#", "#########"])
+	var near: Monster = e["b"][0]
+	var walled: Monster = e["b"][1]
+	World.noise(Vector2i(3, 1), 6, &"test")
+	_check(near.senses.heard.size() == 1, "heard in the same room")
+	_check(walled.senses.heard.is_empty(), "not through the wall, 4 off (half of 6 is 3)")
+	World.noise(Vector2i(3, 1), 10, &"test")
+	_check(walled.senses.heard.size() == 1, "a louder one, through the wall")
+	World.noise(Vector2i(1, 1), 3, &"test", near)
+	_check(near.senses.heard.size() == 2, "its own noise it does not hear")
+	_check(Senses.speech_radius("HELP ME") == Senses.NOISE_SHOUT and Senses.speech_radius("Help me") == Senses.NOISE_SPEECH
+			and Senses.speech_radius("OK") == Senses.NOISE_SPEECH and Senses.speech_radius("WHO? 123!") == Senses.NOISE_SHOUT,
+			"capitals are a shout, a short word is not")
+
+
+## Moves [param entity] to [param to] at once (a test's hand).
+func _move_to(entity: GridEntity, to: Vector2i) -> void:
+	World.despawn(entity)
+	World.spawn(entity, to)
 
 
 func _check(ok: bool, label: String) -> void:

@@ -124,6 +124,9 @@ const HEARING_RANGE := Companion.HEARING_RANGE
 ## A chat line that starts with this is party chat: to every player on the
 ## server, whatever their zone; no companion hears it.
 const PARTY_PREFIX := "/p "
+## "/w words": a whisper, heard only WHISPER_RANGE off (Senses.NOISE_WHISPER).
+const WHISPER_PREFIX := "/w "
+const WHISPER_RANGE := Senses.NOISE_WHISPER
 ## Which mind new decisions use: "scripted" or "ollama" (console: mind ...).
 var mind_kind := "scripted"
 ## Server only: level_entities index -> the entity holding that slot now.
@@ -419,6 +422,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(me, "reset", {})
 		elif Net.is_authority():
 			_start_level()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_L:
+		var holder := _local_player()
+		if holder != null:
+			World.command(holder, "lantern", {})
 		return
 	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_4:
 		say_phrase(key.keycode - KEY_0)
@@ -1857,6 +1865,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "party" and entity is Player:
 		_party_said(entity, str(args.get("text", "")))
+	elif command_name == "lantern" and entity is Player:
+		(entity as Player).toggle_lantern()
 	elif command_name == "swing" and entity is Player:
 		var swing := _direction_arg(args)
 		if swing != Vector2i.ZERO:
@@ -2043,10 +2053,16 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 ## Server: [param player] said [param text] (the chat box). At most
 ## CHAT_MAX_CHARS, one line per CHAT_INTERVAL; to everyone as chat, into
 ## the party log, and to their companion as a decision, the words as data.
+## A whisper ("/w words") carries WHISPER_RANGE, not HEARING_RANGE; a line in
+## capitals is a shout, heard farther by monsters (Senses.speech_radius).
 func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var line := text.strip_edges().left(CHAT_MAX_CHARS)
+	var whisper := line.begins_with(WHISPER_PREFIX.strip_edges()) and (line.length() == 2 or line[2] == " ")
+	if whisper:
+		line = line.substr(2).strip_edges()
 	if line.is_empty():
 		return
+	var earshot := WHISPER_RANGE if whisper else HEARING_RANGE
 	var id := player.get_instance_id()
 	if World.tick - _chat_tick.get(id, -100000) < roundi(CHAT_INTERVAL * World.TICK_RATE):
 		print("[chat] %s: too soon after the last line; dropped" % _display_name(player))
@@ -2055,16 +2071,18 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
 	# She hears it only in the same zone and within earshot.
 	var hears := is_instance_valid(pet) and pet.spawned and pet.zone == player.zone \
-			and World.distance(pet.tile, player.tile) <= HEARING_RANGE
+			and World.distance(pet.tile, player.tile) <= earshot
 	var to := String(pet.name) if hears else ""
 	# Every other companion within earshot hears it too, labelled; her voice
 	# decides whether it was meant for her.
 	for entity in World.get_entities():
 		var other := entity as Companion
-		if other != null and other != pet and other.spawned and World.distance(other.tile, player.tile) <= HEARING_RANGE:
+		if other != null and other != pet and other.spawned and World.distance(other.tile, player.tile) <= earshot:
 			other.overheard(_display_name(player), line)
-	party_log.add("%s said%s: \"%s\"" % [_display_name(player), " to " + to if to != "" else "", line])
-	Net.broadcast_to(hearers(player.tile), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
+	party_log.add("%s %s%s: \"%s\"" % [_display_name(player), "whispered" if whisper else "said",
+		" to " + to if to != "" else "", line])
+	World.noise(player.tile, WHISPER_RANGE if whisper else Senses.speech_radius(line), &"speech", player)
+	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
 	if to != "":
 		pet.owner_spoke(line, phrase)
@@ -2073,13 +2091,13 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 ## The peers whose players can hear something said at [param at] in the
 ## zone World is in: there, within HEARING_RANGE; a fallen player, waiting
 ## to rise, hears from where they fell (but has no body to speak with).
-func hearers(at: Vector2i) -> Array[int]:
+func hearers(at: Vector2i, earshot := HEARING_RANGE) -> Array[int]:
 	var peers: Array[int] = []
 	for peer in World.peers_in(World.zone.name):
 		var player: Player = _players.get(peer)
 		var standing := is_instance_valid(player) and player.spawned and player.zone == World.zone.name
 		var from: Vector2i = player.tile if standing else _fell_at.get(peer, NONE)
-		if (standing or _fell_at.has(peer)) and World.distance(from, at) <= HEARING_RANGE:
+		if (standing or _fell_at.has(peer)) and World.distance(from, at) <= earshot:
 			peers.append(peer)
 	return peers
 
@@ -2400,7 +2418,7 @@ func hint_lines() -> Array[String]:
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",
-		"Enter\ttalk", "Tab\ttalk log",
+		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:
 		lines.append("B\tbuilder mode")

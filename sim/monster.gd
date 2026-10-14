@@ -16,6 +16,11 @@ extends GridEntity
 ## place at the point) and goes on. Its facing is its level entry's, or one
 ## of its own from its name.
 ##
+## It sees and hears by its Senses: a monster of a kind only what is lit
+## (or carries a light) in a cone before it, a monster of no kind all
+## round, as monsters did. Hearing something with nobody in sight it turns
+## that way (LISTEN_TICKS) and may see who made it.
+##
 ## Far from every player and companion it thinks less often, or not at all
 ## (World.Tier); the world tick moves it on then (_world_tick).
 
@@ -67,6 +72,11 @@ const SLOT_SEARCH_TILES := 120
 ## sight, so a way that needs more is round a crowd it cannot get through,
 ## not worth a search of the whole map every tick.
 const CHASE_SEARCH_TILES := 400
+## Hearing something with nobody in sight: it turns that way and holds
+## still so long (ticks); a noise heard more than LISTEN_STALE_TICKS ago
+## (it was not thinking then) is let go.
+const LISTEN_TICKS := 20
+const LISTEN_STALE_TICKS := 20
 ## With no way to its target at all (a crowd round it), it looks for one
 ## again only after this many ticks: a crowd does not open in a tick.
 const CHASE_RETRY_TICKS := 5
@@ -117,7 +127,13 @@ signal winding(direction: Vector2i, ticks: int)
 ## tests staged in a real level whose monsters must stay put.
 static var idling := true
 
-@export var sight_range := 7
+@export var sight_range := 7:
+	set(value):
+		sight_range = value
+		if senses != null:
+			senses.sight_range = value
+## What it sees, hears and remembers (the server's; null on a client).
+var senses: Senses
 ## Who it went for this tick (null for nobody), for the companions' minds.
 var target: GridEntity
 var tactic := Tactic.PLAIN
@@ -153,6 +169,9 @@ var _returning := false
 var _idle_goal := NO_TILE
 ## Pausing, or holding a glance, till then.
 var _idle_until := 0
+## The tick of the last noise it turned to, and till when it listens.
+var _listened_tick := -1
+var _listening_until := -1
 var _glancing := false
 var _route_index := 0
 var _route_step := 1
@@ -194,6 +213,8 @@ func _ready() -> void:
 	if Net.is_authority():
 		_temper()
 		_settle_idle()
+		var kind := str(spawn_spec.get("kind", ""))
+		senses = Senses.new(self, sight_range, Senses.CONE_COS if TACTICS.has(kind) else -1.0)
 
 
 ## How it idles, where its home is and which way it faces, from its spawn
@@ -252,6 +273,7 @@ func _sim_tick() -> void:
 	target = seen
 	if target == null:
 		_windup = {}
+		_listen()
 		_idle_tick()
 		return
 	if tactic == Tactic.PLAIN:
@@ -420,8 +442,9 @@ func _target_beset() -> bool:
 	return false
 
 
-## The nearest player, or companion whose owner is online, in sight; the
-## one it has kept unless another is RETARGET_TILES nearer.
+## The nearest player, or companion whose owner is online, it sees
+## (Senses.sees); the one it has kept unless another is RETARGET_TILES
+## nearer.
 ## Entities still in their spawn grace are passed over.
 func _nearest_visible_target() -> GridEntity:
 	var nearest: GridEntity = null
@@ -434,7 +457,8 @@ func _nearest_visible_target() -> GridEntity:
 		if d > sight_range or entity.protected:
 			continue  # Too far, or in its spawn grace.
 		if entity is Player or (entity is Companion and entity.keeper != null):
-			if World.has_line_of_sight(tile, at):
+			# Its target it follows, cone or not (it turns as it goes).
+			if senses.sees(entity, d, entity != target):
 				if entity == target:
 					kept = d
 				if d < nearest_distance:
@@ -445,12 +469,33 @@ func _nearest_visible_target() -> GridEntity:
 	return nearest
 
 
+## Nobody in sight: the newest noise it has not turned to yet, if fresh,
+## turns it that way, and it holds still a moment (LISTEN_TICKS) to look.
+func _listen() -> void:
+	if senses.heard.is_empty() or World.tick < next_move_tick or World.is_stunned(self):
+		return
+	var noise: Dictionary = senses.heard.back()
+	var heard_at := int(noise["tick"])
+	if heard_at <= _listened_tick:
+		return
+	_listened_tick = heard_at
+	if World.tick - heard_at > LISTEN_STALE_TICKS:
+		return
+	var way := Senses.way_toward(tile, noise["at"])
+	if way == Vector2i.ZERO:
+		return
+	World.face(self, way)
+	pose = Pose.STAND
+	_glancing = true  # A guard turns back to its way after (_guard).
+	_listening_until = World.tick + LISTEN_TICKS
+
+
 # --- Idling ---------------------------------------------------------------------
 
 ## Nobody in sight: back from a fight first, then as it idles; slower than
 ## it chases.
 func _idle_tick() -> void:
-	if not idling or idle == Idle.NONE or World.is_stunned(self) or World.tick < next_move_tick:
+	if not idling or idle == Idle.NONE or World.is_stunned(self) or World.tick < next_move_tick 			or World.tick < _listening_until:
 		return
 	move_ticks = _pace * IDLE_PACE
 	if _returning:

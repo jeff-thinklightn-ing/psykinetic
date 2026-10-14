@@ -189,6 +189,12 @@ func light_at(world: Node, cell: Vector2i, carried := true) -> float:
 	return minf(light, 1.0)
 
 
+## What a lantern of [param amount] carried at [param source] gives
+## [param cell] (Senses: a monster looking into the dark).
+func carried_light(world: Node, source: Vector2i, cell: Vector2i, amount: float) -> float:
+	return _reaching(world, source, cell, CARRIED_REACH, amount, false)
+
+
 ## Where the heat at [param cell] comes from: the sum of the offsets to its
 ## sources, each weighted by what it gives here (ZERO for none, or for a
 ## cell that is itself a source).

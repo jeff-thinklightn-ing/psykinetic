@@ -2729,3 +2729,80 @@ off, the worst frame 30 ms); 128x128 55 to 60 (255 off). Rendering is a
 millisecond of a frame on the CPU and less on the GPU. The bench's frame
 loop now turns vsync off and says the renderer's share. The 256x256 map
 loads in 1.97 s with the 3D build.
+
+## 222. Senses: a monster sees what is lit, in a cone before it, and remembers
+
+What an agent sees, hears and remembers is one layer, sim/senses.gd
+(class_name Senses), held by the agent and asked by it; it never acts.
+Monsters use it now; companions are to, so the LOOK verb and "you hear
+fighting to the north-east" come from the same rules as a monster's
+notice: sees(entity), sees_cell(cell, dark) and light_level(cell) (a
+threshold of the asker's: "it is dark there" is a reason to go and look),
+heard_since(tick) (each noise's maker named only if it is seen when asked,
+worked out then, not when the noise came), last_seen(entity), forget() (a
+new zone, a rebuilt one).
+
+Sight goes cheapest first, as the look did: in range (Chebyshev, the
+look's own sum), then the cone (a dot product of the offset and the
+facing, against cos 60 degrees: 120 degrees before it), then the light,
+then line of sight (walls and closed doors), the expensive part, last.
+Within NOTICE_ALWAYS (1) a monster notices you whatever the light or its
+facing. Lit is: the one looked at glows (emit_light, a lantern), or the
+map's light at its cell (light_at(cell, false), a lookup) is DARK (0.35,
+the companions' threshold) or more, or the lanterns carried near it
+(World.carried_lights, players and companions with a lit lantern, made
+once a tick) bring it there, each by distance before its line. Never
+light_at with carried lights per monster: that goes through every entity.
+
+A monster of a kind has the cone; a monster of no kind sees all round, as
+monsters did. The target it already has it follows cone or not: it turns
+as it chases (alertness, next, replaces this with memory). Memory is where
+and when (World.tick) it last saw each one, dropped after MEMORY_TICKS;
+every time is a tick, so a monster thinking one tick in four reads the same.
+
+No level sets "ambient" yet, so every map is fully lit and the light
+changes nothing there; the cone does. Rejected: a light test by flood or
+shadowcast (it would not match the line the light and the views use);
+light per monster through Fields.light_at with carried lights.
+
+## 223. A noise is told to those in reach when it happens
+
+World.noise(at, radius, kind, source) finds who hears it once, at the
+noise, and pushes it to each (Senses.hear): nobody listens every tick. A
+small noise looks at the cells in reach ((2r+1)^2 lookups, fewer than the
+monsters); a big one goes through the monsters with a distance sum. One
+with no clear line to it (a wall, a closed door between) hears it only
+half as far; the clear line is walked only for those in the outer half.
+Its maker does not hear itself. Each keeps its last HEARD_MAX (8).
+
+How far, in cells (Senses.NOISE_*): a step 3 (players and companions;
+monsters do not hear each other walk), speech 10 (HEARING_RANGE, as
+players hear it), a line in capitals 20 (a shout: three letters or more,
+none small), a whisper 2, a blow or a swing 8, a door opened or shut 6, a
+door struck 10, a door broken 14.
+
+What a monster does with it now: with nobody in sight, the newest noise
+it has not turned to (heard within LISTEN_STALE_TICKS) turns it that way,
+the nearest of its eight, and it holds still LISTEN_TICKS to look; a guard
+turns back to its way after. Alertness (suspicious, going to look) is next.
+
+## 224. A player covers or lights their lantern (L)
+
+Every player and companion carried a lit lantern, so with sight by light
+nobody could go unseen in the dark. L sends "lantern"; the server sets
+the player's emit_light to 0 or Player.LANTERN (0.9), which is now
+replicated, so every view draws it (the 3D view hides the lantern light)
+and the light fields use it. Covered, you are seen in the dark only from
+beside you, or by someone else's light. Companions keep theirs lit: a
+companion covering hers is a companion verb, later. The lantern's model
+and hand stay pc-character's.
+
+## 225. Whispers: "/w words" carry two cells
+
+A line starting "/w " is said, without the prefix, to the players and
+companions within WHISPER_RANGE (2, Senses.NOISE_WHISPER) rather than
+HEARING_RANGE, logged as whispered, and makes a noise of that radius. It
+is parsed on the server, so a client needs nothing new. Shouting is not a
+command: a line in capitals carries farther to monsters (223), not to
+people.
+

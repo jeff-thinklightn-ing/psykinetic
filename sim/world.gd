@@ -226,6 +226,9 @@ var _search_order := PackedInt32Array()
 ## _carried_heat's memo: for which (tick, entity count), and its answer.
 var _carried_heat_key := Vector2i(-1, -1)
 var _carried_heat_now := false
+## carried_lights' memo: for which (tick, entity count), and the list.
+var _carried_lights_key := Vector2i(-1, -1)
+var _carried_lights: Array[GridEntity] = []
 var _fire: Dictionary[Vector2i, bool] = {}
 ## Heights (cell -> 1..6 levels; 0 is absent), stairs (cell -> the way it
 ## climbs: to the orthogonal neighbour one level up) and water (not walkable,
@@ -647,6 +650,7 @@ func enter(to: Zone) -> Zone:
 	_grid_rect = to.grid_rect
 	_grid_steps = to.grid_steps
 	_carried_heat_key = Vector2i(-1, -1)
+	_carried_lights_key = Vector2i(-1, -1)
 	zone_switched.emit(from, to)
 	return from
 
@@ -817,6 +821,50 @@ func _carried_heat() -> bool:
 	return _carried_heat_now
 
 
+## The players and companions carrying a lit lantern (Senses.is_lit),
+## worked out once a tick (and again if the entities change in number).
+## Not a copy: read it, do not change it.
+func carried_lights() -> Array[GridEntity]:
+	var key := Vector2i(tick, _entities.size())
+	if key != _carried_lights_key:
+		_carried_lights_key = key
+		_carried_lights = []
+		for entity in sought():
+			if entity.emit_light > 0.0 and entity.spawned:
+				_carried_lights.append(entity)
+	return _carried_lights
+
+
+## A noise of [param kind] at [param at], heard [param radius] cells off
+## (half that with no clear line to it: through a wall or a closed door):
+## told now to every monster that hears it (Senses.hear), not one listening
+## every tick. A small one looks only at the cells in reach; a big one goes
+## through the monsters. [param source] does not hear itself.
+func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = null) -> void:
+	if not Net.is_authority() or radius <= 0:
+		return
+	if (2 * radius + 1) * (2 * radius + 1) <= monsters().size():
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				var listener := _occupancy.get(at + Vector2i(dx, dy)) as Monster
+				if listener != null:
+					_hear(listener, at, radius, kind, source)
+	else:
+		for entity in monsters():
+			var d := maxi(absi(entity.tile.x - at.x), absi(entity.tile.y - at.y))
+			if d <= radius:
+				_hear(entity as Monster, at, radius, kind, source)
+
+
+func _hear(listener: Monster, at: Vector2i, radius: int, kind: StringName, source: GridEntity) -> void:
+	if listener == source or listener.senses == null or not listener.spawned:
+		return
+	var d := maxi(absi(listener.tile.x - at.x), absi(listener.tile.y - at.y))
+	if d * 2 > radius and not has_clear_line(at, listener.tile):
+		return  # Muffled: through a wall or a closed door, only half as far.
+	listener.senses.hear(at, radius, kind, source)
+
+
 ## Which way the heat at [param at] comes from, as a compass point ("" for none).
 func heat_from(at: Vector2i) -> String:
 	var toward := fields.heat_from(self, at)
@@ -869,6 +917,7 @@ func _set_door(door: Door, open: bool, by: GridEntity) -> void:
 		return
 	door.open = open
 	_log("door: %s %s %s" % [by.name, "opened" if open else "closed", door.name])
+	noise(by.tile, Senses.NOISE_DOOR, &"door", by)
 	door_changed.emit(door, by)
 
 
@@ -879,9 +928,13 @@ func _hit_door(door: Door, amount: int, by: GridEntity) -> void:
 		return
 	door.hp = maxi(door.hp - amount, 0)
 	_log("door: %s takes %d from %s (%d left)" % [door.name, amount, by.name, door.hp])
+	var at: Vector2i = Terrain.edge_cells(door.key)[0]
 	if door.is_broken():
 		_log("door: %s broke" % door.name)
 		door.open = true
+		noise(at, Senses.NOISE_DOOR_BROKEN, &"door_broken", by)
+	else:
+		noise(at, Senses.NOISE_DOOR_STRUCK, &"door_struck", by)
 	door_changed.emit(door, by)
 
 
@@ -1040,6 +1093,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	entity.next_move_tick = start + duration
 	entity._world_set_facing(direction)
 	entity.protected = false  # Moving ends spawn grace.
+	if entity is Player or entity is Companion:
+		noise(entity.tile, Senses.NOISE_STEP, &"step", entity)
 	return true
 
 
@@ -1057,6 +1112,7 @@ func try_swing(entity: GridEntity, direction: Vector2i) -> bool:
 	entity.protected = false
 	entity._world_swung(direction)
 	entity_swung.emit(entity, direction)
+	noise(entity.tile, Senses.NOISE_FIGHT, &"fight", entity)
 	return true
 
 
@@ -1104,6 +1160,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
 	target.hp = maxi(target.hp - amount, 0)
+	if cause != &"fire":
+		noise(target.tile, Senses.NOISE_FIGHT, &"fight", source)
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
 	if target.hp == 0:

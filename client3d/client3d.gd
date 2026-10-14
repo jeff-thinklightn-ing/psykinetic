@@ -2561,6 +2561,10 @@ func _sync_puppets() -> void:
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null and not is_equal_approx(facing.rotation.y, yaw):
 			facing.rotation.y = yaw
+		if entity is Player:
+			var lantern := puppet.get_node_or_null("Lantern") as Node3D
+			if lantern != null and lantern.visible != (entity.emit_light > 0.0):
+				lantern.visible = entity.emit_light > 0.0  # Covered (L).
 		if puppet.has_meta("animator"):
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
