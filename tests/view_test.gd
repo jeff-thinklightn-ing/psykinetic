@@ -605,8 +605,10 @@ func _test_goblin() -> void:
 	for pace: Array in [[0.7, Client3D.CLIP_WALK], [1.4, Client3D.CLIP_WALK], [2.5, Client3D.CLIP_JOG], [1.2, Client3D.CLIP_JOG],
 			[0.9, Client3D.CLIP_WALK], [5.5, Client3D.CLIP_SPRINT], [4.0, Client3D.CLIP_SPRINT], [3.5, Client3D.CLIP_JOG]]:
 		puppet.set_meta("speed", float(pace[0]))
-		puppet.set_meta("last_at", puppet.position - Vector3(float(pace[0]) * 0.1, 0.0, 0.0))
-		puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
+		# A second's walk, so the moment between this and _animate's own
+		# clock (a few ms on a busy machine) is a tenth of a percent of it.
+		puppet.set_meta("last_at", puppet.position - Vector3(float(pace[0]), 0.0, 0.0))
+		puppet.set_meta("last_ms", Time.get_ticks_msec() - 1000)
 		_rig._animate(puppet)
 		var own := 0.0
 		for gait: Array in Client3D.GAITS:
