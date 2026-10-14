@@ -13,7 +13,9 @@ extends Node2D
 ## opaque on a far one; the panel is always opaque, so a door reads as an
 ## object. World changes open and hp; nothing else does.
 
-const REPLICATED := ["open", "hp"]
+const REPLICATED := ["open", "hp", "lock"]
+## How it is, for the views and the art (state).
+const STATES: Array[String] = ["open", "closed", "locked", "barred", "broken"]
 const SWING_SECONDS := 0.25
 const PANEL := Color(0.62, 0.45, 0.28)
 const PANEL_EDGE := Color(0.25, 0.17, 0.1, 0.9)
@@ -39,6 +41,12 @@ var hp := 20:
 			hp = value
 			_shown_changed()
 var max_hp := 20
+## The key that opens it (World.has_key), "" for none: locked while shut.
+var lock := "":
+	set(value):
+		if lock != value:
+			lock = value
+			_shown_changed()
 var body_material := GridEntity.BodyMaterial.WOOD
 ## 0 closed .. 1 fully open, eased toward the state each frame.
 var _swing := 0.0
@@ -95,6 +103,16 @@ func _exit_tree() -> void:
 
 func is_broken() -> bool:
 	return max_hp > 0 and hp <= 0
+
+
+## How it is (STATES): broken, open, locked (shut with a lock), or closed.
+## "barred" (shut from one side) is kept for later.
+func state() -> String:
+	if is_broken():
+		return "broken"
+	if open:
+		return "open"
+	return "locked" if lock != "" else "closed"
 
 
 ## Open, or broken: either way the edge is passable and see-through.

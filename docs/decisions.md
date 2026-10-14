@@ -4160,3 +4160,51 @@ took its shadow with it and lit the inside as the open ground; hiding
 every roof while the player is inside any, which opens the whole town;
 and a second fade for buildings' walls beside 188's, which would fight it
 over the same materials.
+
+## 255. Doors: imps and sneaks open them with a reason, brutes break them, and a shut door hides you
+
+Opening a door is no longer free to every creature. Players and companions
+open any door they may (256); a monster opens one only if its kind does
+(Monster.DOOR_OPENERS: imp, sneak; a monster of no kind, as before; a
+level entry's "opens_doors" says otherwise) and only when it has a reason
+(Monster.opens_doors_now): idling, going back and fighting are ordinary
+movement and open doors; looking or hunting, it opens one only for
+something real behind its lead, heard or seen there within
+DOOR_FRESH_TICKS (4 s). A hunt's lead past where it last saw you is a
+guess, and no reason. So a monster that comes to a shut door with nothing
+heard or seen beyond it since it lost you goes to the door, looks round
+and gives up: you can hide behind a shut door, quietly. A word behind it
+(muffled, so heard half as far), or having been seen through it as it
+shut, brings it in.
+
+A monster that cannot open doors (the brute) breaks one when it has the
+same reason: World.try_bash_door, a blow (its attack's cooldown) of
+attack_damage times DOOR_FORCE (3 for HEAVY) at a wooden door's 20 hp, so
+a brute is through in about 4 blows, with the door-struck noise each
+time. It keeps at it till the door breaks or it gives up the hunt.
+
+Ways: find_path takes opens_doors (default true). The memo of steps
+(_path_step) is shared by every walker and says a door is passable, so
+the parameter is asked at search time, on door steps only (PATH_STEP_DOOR
+across a closed door, and the ASK steps). World.walk (the world tick)
+passes the walker's own say, so a far brute does not walk through a door
+either; walking into a closed door one may not open bumps it (_shift).
+When no way without the door reaches its lead, the monster looks for the
+first closed door on the way doors open (the same capped search; a
+diagonal step's two straight ways both checked), and goes to it.
+
+Rejected: brutes opening doors too (Jeff: they break them); monsters
+opening every door they meet (a shut door would hide nothing).
+
+## 256. Locks are a key id on the door; whether you hold the key is the items' to say
+
+Door.lock is a key id ("" for none), replicated. A locked door does not
+open for anyone who does not hold its key, by hand (try_toggle_door) or
+walking into it; World.has_key asks World.key_check, a Callable the items
+set (until then nobody holds any key). No level sets a lock yet, and the
+level format for one waits for a level that needs it. Paths do not know
+locks: a way through a locked door ends in a bump.
+
+What a door shows is Door.state(), one of Door.STATES, the names agreed
+with art-kit for door slots: "open", "closed", "locked", "broken", and
+"barred" (shut from one side) kept for later.

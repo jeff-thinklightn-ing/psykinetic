@@ -75,6 +75,15 @@ top section as the release notes.
   and the land fades into the forest floor instead of ending in a stepped
   edge.
 
+- Doors matter to monsters. Imps and sneaks open doors, but while looking
+  for you only if they heard or saw something behind it: shut a door and
+  keep quiet, and a monster that lost you will come to the door, listen
+  and go away. A word or a fight behind the door brings it in. Brutes
+  can't open doors at all; they break them down instead.
+- Doors can be locked; a locked door opens only for someone with its key
+  (no keys or locked doors in the game yet).
+- Changes what the server sends (a door's lock): the server must be
+  updated with this release.
 
 ## v0.1.140
 

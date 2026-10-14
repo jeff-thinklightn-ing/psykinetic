@@ -4,7 +4,10 @@
 # into <out>.mp4 (with the game's sound) and a smaller, silent <out>.gif;
 # the per-tick log beside them as
 # <out>.log. User data goes to a temp folder (never the shared user://).
-#   tools/clip.sh <scenario> <out path without extension> [fps=30]
+#   tools/clip.sh <scenario> <out path without extension> [fps=30] [max seconds=60]
+# Godot quits after max seconds of frames whatever the scenario does (--quit-after,
+# so even a scenario whose script does not load stops), and clip.gd stops itself
+# then too.
 set -u
 GODOT="${GODOT_PATH:-godot}"
 case "$GODOT" in
@@ -14,12 +17,14 @@ esac
 SCENARIO="$1"
 OUT="$2"
 FPS="${3:-30}"
+MAX="${4:-60}"
 cd "$(dirname "$0")/.."
 FRAMES="$(mktemp -d)"
+trap 'rm -rf "$FRAMES"' EXIT  # Frames are big: gone however this ends.
 mkdir -p "$FRAMES/appdata" "$(dirname "$OUT")"
 export APPDATA="$(cygpath -w "$FRAMES/appdata" 2>/dev/null || echo "$FRAMES/appdata")"
-"$GODOT" --path . --resolution 1280x720 --write-movie "$FRAMES/frame.png" --fixed-fps "$FPS" \
-	--scene res://tools/clip.tscn -- "--scenario=$SCENARIO" </dev/null 2>&1 | grep "^\[clip\]\|ERROR" >"$OUT.log"
+"$GODOT" --path . --resolution 1280x720 --write-movie "$FRAMES/frame.png" --fixed-fps "$FPS" --quit-after $((MAX * FPS)) \
+	--scene res://tools/clip.tscn -- "--scenario=$SCENARIO" "--clip-max-seconds=$MAX" </dev/null 2>&1 | grep "^\[clip\]\|ERROR" >"$OUT.log"
 # The movie maker writes the game's sound beside the frames (frame.wav): the
 # mp4 carries it (the gif can't).
 AUDIO=()

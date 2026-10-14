@@ -54,6 +54,10 @@ func _ready() -> void:
 	_test_hunt()
 	_test_leash()
 	_test_roused()
+	_test_door_openers()
+	_test_hiding()
+	_test_brute_breaks()
+	_test_locks()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -472,8 +476,7 @@ func _bold(monster: Monster) -> void:
 
 ## [param extra]: per symbol, more for its spawn spec ({"b": {"facing": ...}}).
 func _test_roster() -> void:
-	print("
-== what a monster looks for: the zone's players and companions, its monsters, kept up ==")
+	print("\n== what a monster looks for: the zone's players and companions, its monsters, kept up ==")
 	var e := _build(["#######", "#PicmP#", "#.....#", "#######"])
 	var players: Array = e["P"]
 	var imp: Monster = e["i"][0]
@@ -503,8 +506,7 @@ func _tier_hall() -> Dictionary:
 
 
 func _test_tiers() -> void:
-	print("
-== far from everyone a monster thinks less often, or not at all ==")
+	print("\n== far from everyone a monster thinks less often, or not at all ==")
 	var e := _tier_hall()
 	var player: Player = e["P"][0]
 	var imps: Array = e["i"]
@@ -549,8 +551,7 @@ func _test_tiers() -> void:
 
 
 func _test_straight_beyond_view() -> void:
-	print("
-== on nobody's screen an idler walks only straight; on someone's it finds a way round ==")
+	print("\n== on nobody's screen an idler walks only straight; on someone's it finds a way round ==")
 	var e := _build(["#######", "#..#..#", "#.i#..#", "#.....#", "#######"])
 	var imp: Monster = e["i"][0]
 	var goal := Vector2i(4, 2)
@@ -563,8 +564,7 @@ func _test_straight_beyond_view() -> void:
 
 
 func _test_look_skipped_far() -> void:
-	print("
-== far beyond its sight it does not look; someone come beside it is seen at once ==")
+	print("\n== far beyond its sight it does not look; someone come beside it is seen at once ==")
 	var e := _build(["#" + "#".repeat(60) + "#", "#P" + ".".repeat(48) + "m" + ".".repeat(10) + "#", "#" + "#".repeat(60) + "#"])
 	var m: Monster = e["m"][0]
 	m.sight_range = 7
@@ -581,8 +581,7 @@ func _test_look_skipped_far() -> void:
 
 
 func _test_monsters_write_no_log() -> void:
-	print("
-== a fight among monsters writes no log lines: blows on one too heavy to shift, doors they open ==")
+	print("\n== a fight among monsters writes no log lines: blows on one too heavy to shift, doors they open ==")
 	var e := _build(["#########", "#.......#", "#..iPi..#", "#...b...#", "#########"])
 	var player: Player = e["P"][0]
 	player.mass = 10000.0
@@ -605,8 +604,7 @@ func _test_monsters_write_no_log() -> void:
 
 
 func _test_world_tick() -> void:
-	print("
-== the world tick moves a far monster on: back where it idles after a fight ==")
+	print("\n== the world tick moves a far monster on: back where it idles after a fight ==")
 	var e := _tier_hall()
 	var far: Monster = e["i"][2]
 	var near: Monster = e["i"][0]
@@ -645,8 +643,7 @@ func _test_world_tick() -> void:
 
 
 func _test_plans_per_step() -> void:
-	print("
-== a crowd that comes near at once works its patrols out over a few steps ==")
+	print("\n== a crowd that comes near at once works its patrols out over a few steps ==")
 	var rows: Array[String] = ["#".repeat(42)]
 	for y in 4:
 		rows.append("#" + ("s......." if y % 2 == 0 else "........").repeat(5) + "#")
@@ -663,8 +660,7 @@ func _test_plans_per_step() -> void:
 
 
 func _test_walk_round_held_ground() -> void:
-	print("
-== a far monster walking back does not walk over ground another faction holds ==")
+	print("\n== a far monster walking back does not walk over ground another faction holds ==")
 	# A hall with the town's farm across it at x 15 (radius 1: the whole
 	# column, and the cells beside its middle), an imp (the goblins') home at x 5, sent back from x 25.
 	var floor := "#" + ".".repeat(30) + "#"
@@ -698,7 +694,10 @@ func _test_walk_round_held_ground() -> void:
 	World.zone.name = was_name
 
 
-func _build(rows: Array[String], extra := {}) -> Dictionary:
+## [param edges]: walls ("#") and doors ("+", each with its Door) at
+## positions of the expanded rows (Terrain.expand: the edge east of cell
+## (x, y) is at (2x + 1, 2y)).
+func _build(rows: Array[String], extra := {}, edges := {}) -> Dictionary:
 	World.reset()
 	if _room != null:
 		_room.free()
@@ -717,7 +716,19 @@ func _build(rows: Array[String], extra := {}) -> Dictionary:
 				cells += "."
 				spawns.append([symbol, Vector2i(x, y)])
 		cell_rows.append(cells)
-	World.load_terrain(Terrain.parse(Terrain.expand(cell_rows)))
+	var expanded := Terrain.expand(cell_rows)
+	for at: Vector2i in edges:
+		var row := expanded[at.y]
+		while row.length() <= at.x:
+			row += " "
+		expanded[at.y] = row.substr(0, at.x) + str(edges[at]) + row.substr(at.x + 1)
+	World.load_terrain(Terrain.parse(expanded))
+	for at: Vector2i in edges:
+		if edges[at] == "+":
+			var key := Vector3i((at.x - 1) / 2, at.y / 2, Terrain.EAST) if at.x % 2 == 1 \
+					else Vector3i(at.x / 2, (at.y - 1) / 2, Terrain.SOUTH)
+			_room.add_child(Door.build({"script": "res://sim/door.gd", "name": "Door%d_%d" % [key.x, key.y],
+				"edge": [key.x, key.y, key.z], "props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}}))
 	var out := {}
 	for symbol: String in SPECS:
 		out[symbol] = []
@@ -741,8 +752,7 @@ func _build(rows: Array[String], extra := {}) -> Dictionary:
 
 
 func _test_sight_cone() -> void:
-	print("
-== a monster of a kind sees in a cone before it; one of no kind all round ==")
+	print("\n== a monster of a kind sees in a cone before it; one of no kind all round ==")
 	Monster.idling = false
 	var north := {"facing": Vector2i(0, -1)}
 	var e := _build(["#######", "#.....#", "#..b..#", "#.....#", "#..P..#", "#.....#", "#######"], {"b": north})
@@ -771,8 +781,7 @@ func _test_sight_cone() -> void:
 
 
 func _test_sight_by_light() -> void:
-	print("
-== in the dark it sees only what is lit, or carries a light ==")
+	print("\n== in the dark it sees only what is lit, or carries a light ==")
 	Monster.idling = false
 	var e := _build(["#########", "#.......#", "#.......#", "#...b...#", "#.......#", "#########"], {"b": {"facing": Vector2i(0, -1)}})
 	World.fields.ambient = 0.0
@@ -811,8 +820,7 @@ func _test_sight_by_light() -> void:
 
 
 func _test_hearing() -> void:
-	print("
-== a monster hears steps, turns, and sees who made them ==")
+	print("\n== a monster hears steps, turns, and sees who made them ==")
 	var e := _build(["#######", "#.....#", "#..b..#", "#.....#", "#.....#", "#..P..#", "#######"], {"b": {"facing": Vector2i(0, -1)}})
 	var brute: Monster = e["b"][0]
 	var player: GridEntity = e["P"][0]
@@ -835,8 +843,7 @@ func _test_hearing() -> void:
 
 
 func _test_noise_reach() -> void:
-	print("
-== a noise carries its radius, half that through a wall; words further in capitals ==")
+	print("\n== a noise carries its radius, half that through a wall; words further in capitals ==")
 	var e := _build(["#########", "#b..#..b#", "#...#...#", "#...#...#", "#########"])
 	var near: Monster = e["b"][0]
 	var walled: Monster = e["b"][1]
@@ -980,6 +987,151 @@ func _test_roused() -> void:
 	brute._world_tick(1.0)
 	_check(brute.alert == Monster.Alert.IDLE, "the world tick (far off) calms it")
 	Monster.idling = true
+
+## Two rooms split between x = 6 and 7, a door at (6, 3) east: the rows,
+## and the edges for _build.
+const SPLIT: Array[String] = ["##############", "#............#", "#............#", "#............#",
+	"#............#", "#............#", "##############"]
+const SPLIT_DOOR := Vector3i(6, 3, Terrain.EAST)
+
+
+func _split_edges() -> Dictionary:
+	var edges := {}
+	for y in range(1, 6):
+		edges[Vector2i(13, y * 2)] = "+" if y == 3 else "#"
+	return edges
+
+
+func _test_door_openers() -> void:
+	print("\n== doors: imps and sneaks open them, brutes do not; the way and the world tick's walk know it ==")
+	Monster.idling = false
+	var rows := SPLIT.duplicate()
+	rows[2] = "#.b..........#"
+	rows[4] = "#.i..........#"
+	var e := _build(rows, {}, _split_edges())
+	var brute: Monster = e["b"][0]
+	var imp: Monster = e["i"][0]
+	var door: Door = World.door_on(SPLIT_DOOR)
+	_check(door != null and not door.open, "a shut door between the rooms")
+	_check(imp.opens_doors and not brute.opens_doors, "an imp opens doors, a brute does not")
+	_check(World.find_path(brute.tile, Vector2i(10, 2), false, null, 400, false, {}, false).is_empty(),
+			"no way through a shut door for one that does not open it")
+	_check(not World.find_path(imp.tile, Vector2i(10, 4), false, null, 400, false, {}, true).is_empty(),
+			"a way through for one that does")
+	_check(not World.walk(brute, Vector2i(10, 2), 200.0) and brute.tile.x <= 6, "a brute's world-tick walk stops at the door (%s)" % brute.tile)
+	_check(World.walk(imp, Vector2i(10, 4), 200.0) and imp.tile == Vector2i(10, 4), "an imp's goes through (%s)" % imp.tile)
+	World._relocate(brute, Vector2i(6, 3))
+	World.step()
+	_check(not World.try_move(brute, Vector2i(1, 0)) and not door.open, "a brute walking into it does not open it")
+	World._relocate(imp, Vector2i(6, 3))
+	World.step()
+	_check(World.try_move(imp, Vector2i(1, 0)) and door.open, "an idle imp walking into it opens it")
+	Monster.idling = true
+
+
+func _test_hiding() -> void:
+	print("\n== behind a shut door, quiet, you can hide; a noise from there brings it in ==")
+	Monster.idling = false
+	var rows := SPLIT.duplicate()
+	rows[3] = "#..i.........#"
+	var e := _build(rows, {"i": {"facing": Vector2i(1, 0)}}, _split_edges())
+	var imp: Monster = e["i"][0]
+	imp.sight_range = 7
+	imp.reaction_ticks = 0
+	var door: Door = World.door_on(SPLIT_DOOR)
+	var player: Player = EntityFactory.build(SPECS["P"].merged({"name": "Player1", "tile": Vector2i(10, 1)}))
+	_room.add_child(player)
+	World.spawn(player, Vector2i(10, 1))
+	# It saw them in its room, running for the door; then they were gone
+	# through it, and it is shut.
+	imp.alert = Monster.Alert.FIGHTING
+	imp._post = imp.tile
+	imp._quarry_from = Vector2i(5, 3)
+	imp._quarry_at = Vector2i(6, 3)
+	imp._hunt(player)
+	_check(imp.alert == Monster.Alert.HUNTING and imp._lead == Vector2i(6, 3),
+			"it hunts to where it saw them, this side of the door: no seeing on past it (%s)" % imp._lead)
+	var opened := false
+	for i in 120:
+		World.step()
+		opened = opened or door.open
+	_check(not opened and World.distance(imp.tile, Vector2i(6, 3)) <= 1, "it comes to the door, and does not open it (at %s)" % imp.tile)
+	_check(imp.alert != Monster.Alert.FIGHTING, "it does not find them")
+	for i in Monster.HUNT_TICKS + Monster.SUSPICIOUS_TICKS:
+		World.step()
+		opened = opened or door.open
+	_check(not opened and imp.alert == Monster.Alert.IDLE, "and gives up, the door shut (%s)" % Monster.Alert.keys()[imp.alert])
+	# Again, and this time a noise behind the door.
+	imp._post = imp.tile
+	imp.alert = Monster.Alert.FIGHTING
+	imp._quarry_from = Vector2i(5, 3)
+	imp._quarry_at = Vector2i(6, 3)
+	World._relocate(imp, Vector2i(5, 3))
+	imp._hunt(player)
+	for i in 20:
+		World.step()
+	World.noise(Vector2i(8, 3), Senses.NOISE_SPEECH, &"speech", player)
+	for i in 40:
+		World.step()
+		opened = opened or door.open
+	_check(opened, "a voice behind the door: it opens it and comes in (at %s)" % imp.tile)
+	# Seen beyond the door as it shut: after them, fresh, it opens it.
+	e = _build(rows, {"i": {"facing": Vector2i(1, 0)}}, _split_edges())
+	imp = e["i"][0]
+	door = World.door_on(SPLIT_DOOR)
+	player = EntityFactory.build(SPECS["P"].merged({"name": "Player1", "tile": Vector2i(11, 5)}))
+	_room.add_child(player)
+	World.spawn(player, Vector2i(11, 5))
+	imp.alert = Monster.Alert.FIGHTING
+	imp._post = imp.tile
+	imp._quarry_from = Vector2i(7, 3)
+	imp._quarry_at = Vector2i(8, 3)
+	imp._hunt(player)
+	opened = false
+	for i in 60:
+		World.step()
+		opened = opened or door.open
+	_check(opened, "seen beyond it as it shut: it opens it, the hunt fresh (at %s)" % imp.tile)
+	Monster.idling = true
+
+
+func _test_brute_breaks() -> void:
+	print("\n== a brute with a reason behind the door breaks it down ==")
+	Monster.idling = false
+	var rows := SPLIT.duplicate()
+	rows[3] = "#....b.......#"
+	var e := _build(rows, {"b": {"facing": Vector2i(1, 0)}}, _split_edges())
+	var brute: Monster = e["b"][0]
+	var door: Door = World.door_on(SPLIT_DOOR)
+	World.noise(Vector2i(9, 3), Senses.NOISE_FIGHT * 2, &"fight", null)
+	var broke_at := -1
+	for i in 120:
+		World.step()
+		if door.is_broken() and broke_at < 0:
+			broke_at = i
+	_check(broke_at > 0 and door.state() == "broken", "a fight behind it: it breaks the door down (in %d ticks)" % broke_at)
+	_check(brute.tile.x >= 7, "and goes through (at %s)" % brute.tile)
+	Monster.idling = true
+
+
+func _test_locks() -> void:
+	print("\n== a locked door opens only for one with its key (World.key_check, the items') ==")
+	var rows := SPLIT.duplicate()
+	rows[3] = "#.....P......#"
+	var e := _build(rows, {}, _split_edges())
+	var player: Player = e["P"][0]
+	var door: Door = World.door_on(SPLIT_DOOR)
+	door.lock = "keep"
+	_check(door.state() == "locked", "shut with a lock: locked")
+	_check(not World.try_toggle_door(player, SPLIT_DOOR) and not World.try_move(player, Vector2i(1, 0)) and not door.open,
+			"no key: it will not open, by hand or walking into it")
+	var was := World.key_check
+	World.key_check = func(entity: GridEntity, lock: String) -> bool: return entity == player and lock == "keep"
+	_check(World.try_toggle_door(player, SPLIT_DOOR) and door.open and door.state() == "open", "with the key it opens")
+	World.key_check = was
+	door.lock = ""
+	door.open = false
+	_check(door.state() == "closed" and Door.STATES.has("barred"), "unlocked and shut: closed (barred is kept for later)")
 
 ## Moves [param entity] to [param to] at once (a test's hand).
 func _move_to(entity: GridEntity, to: Vector2i) -> void:

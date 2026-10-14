@@ -6,7 +6,10 @@ extends Node
 ## runs in step with them); tools/clip.sh runs it and stitches the frames
 ## with ffmpeg. A log line a tick: where the player is, its lantern, and
 ## what the monster faces, sees, hears and how alert it is.
-##   godot --path . --write-movie <dir>/frame.png --fixed-fps 30 --scene res://tools/clip.tscn -- --scenario=sneak
+##   godot --path . --write-movie <dir>/frame.png --fixed-fps 30 --scene res://tools/clip.tscn -- --scenario=sneak [--clip-max-seconds=60]
+## Whatever happens it stops after --clip-max-seconds of game time (60 by
+## default; the movie maker's frames are game time): a scenario that never
+## gets to its end does not record for ever.
 ##
 ## Scenarios:
 ##   sneak: a dark room, an imp on guard facing north. The player, lantern
@@ -27,17 +30,26 @@ extends Node
 ##     (footsteps), opens a chest, opens a door into the next room and
 ##     fights the imp there to its death; each caption names the slot it
 ##     plays, and the log every sound played.
+##   door_hide: an imp chases the player down a corridor; they go through
+##     the door at its end, shut it and keep quiet: it comes, finds
+##     nothing beyond, and goes back.
+##   door_noise: the same, and a word behind the door brings it in.
+##   door_brute: the same with a brute, which cannot open doors and is
+##     slower: a shout behind the door and it breaks the door down.
 
 const NAME := "clip"
 
 var scenario := "sneak"
+var max_seconds := 60.0
+var _elapsed := 0.0
 var _main: Node
 var _player: Player
 var _monster: Monster
 ## [kind, value, caption]: "say" (a caption, held value ticks), "lantern"
 ## (true lit), "walk" (to a tile), "lure" ([tile, n]: toward it, a step
 ## only while the monster is within n, till the monster gives up), "wait"
-## (ticks).
+## (ticks), "work_door" (a door's edge: the player works it, as a click does),
+## "speak" (words the player says, as typed).
 var _script: Array = []
 var _at := 0
 var _wait_until := -1
@@ -56,6 +68,8 @@ func _ready() -> void:
 		var pair := arg.trim_prefix("--").split("=")
 		if pair.size() == 2 and pair[0] == "scenario":
 			scenario = pair[1]
+		elif pair.size() == 2 and pair[0] == "clip-max-seconds":
+			max_seconds = pair[1].to_float()
 	match scenario:
 		"sneak":
 			_sneak()
@@ -67,6 +81,8 @@ func _ready() -> void:
 			_items()
 		"sounds":
 			_sounds()
+		"door_hide", "door_noise", "door_brute":
+			_door(scenario)
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -107,6 +123,11 @@ func _ready() -> void:
 
 ## The camera on the middle of the player and the monster, so both are seen.
 func _process(delta: float) -> void:
+	_elapsed += delta
+	if _elapsed > max_seconds:
+		push_warning("clip: %s ran past %d s; stopped" % [scenario, max_seconds])
+		get_tree().quit(1)
+		return
 	var view: Node = _main._client3d if _main != null else null
 	if view == null or _player == null or not is_instance_valid(_monster):
 		return
@@ -117,13 +138,19 @@ func _process(delta: float) -> void:
 		view.pan = view.pan.lerp(middle, 1.0 - exp(-3.0 * delta)).limit_length(view.PAN_MAX)
 
 
-## Registers the scenario's room: [param rows] of cells, a start, one imp at
-## [param imp] on guard facing [param facing].
-func _room(rows: Array[String], start: Vector2i, imp: Vector2i, facing: Vector2i, ambient := 1.0) -> void:
-	var markers := {start: "start", imp: "monster_imp"}
+## Registers the scenario's room: [param rows] of cells, a start, one
+## monster of [param kind] at [param at] on guard facing [param facing];
+## [param doors]: cells whose east edge is a door.
+func _room(rows: Array[String], start: Vector2i, at: Vector2i, facing: Vector2i, ambient := 1.0, kind := "imp",
+		doors: Array[Vector2i] = []) -> void:
+	var markers := {start: "start", at: "monster_" + kind}
 	var config := {"name": "Clip", "ambient": ambient,
-		"entities": [{"at": [imp.x, imp.y], "facing": [facing.x, facing.y], "idle": {"mode": "guard"}}]}
-	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+		"entities": [{"at": [at.x, at.y], "facing": [facing.x, facing.y], "idle": {"mode": "guard"}}]}
+	var expanded := Terrain.expand(rows)
+	for cell in doors:
+		var row := expanded[cell.y * 2]
+		expanded[cell.y * 2] = row.substr(0, cell.x * 2 + 1) + "+" + row.substr(cell.x * 2 + 2)
+	Level.register(NAME, Level.image_from_rows(expanded, markers, config), null, config)
 
 
 func _sneak() -> void:
@@ -267,6 +294,33 @@ func _sounds() -> void:
 		["fight", 400, "A fight: sfx.swing, sfx.hit_flesh, heard 5 cells."],
 		["say", 60, "Its death: sfx.goblin_death."],
 	]
+func _door(which: String) -> void:
+	var rows: Array[String] = [
+		"###########################",
+		"#......##############.....#",
+		"#......##############.....#",
+		"#.........................#",
+		"#......##############.....#",
+		"#......##############.....#",
+		"###########################",
+	]
+	var brute := which == "door_brute"
+	_room(rows, Vector2i(5, 3), Vector2i(2, 3), Vector2i(1, 0), 1.0, "brute" if brute else "imp", [Vector2i(20, 3)])
+	var door := [20, 3, Terrain.EAST]
+	_script = [
+		["say", 15, "A %s sees you." % ("brute" if brute else "imp")],
+		["walk", Vector2i(21, 3), "Run for the door, out of its sight."],
+		["work_door", door, "Shut it behind you..."],
+		["walk", Vector2i(23, 2), "...and keep quiet."],
+	]
+	if which == "door_hide":
+		_script.append(["say", 220, "It comes to the door. Nothing beyond it: it goes back."])
+	else:
+		_script.append_array([
+			["say", 50, "It comes to the door." if not brute else "It loses you."],
+			["speak", "OVER HERE!" if brute else "Over here!", "A shout behind the door..." if brute else "A word behind the door..."],
+			["say", 120, "...and it %s." % ("breaks the door down" if brute else "opens it and comes in")],
+		])
 
 
 func _on_tick(tick: int) -> void:
@@ -318,6 +372,12 @@ func _on_tick(tick: int) -> void:
 					else:
 						World.order_attack(_player, _monster)
 					return
+		"work_door":
+			if tick < _player.next_move_tick:
+				return
+			World.command(_player, "door", {"edge": step[1]})
+		"speak":
+			World.command(_player, "say", {"text": str(step[1])})
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return

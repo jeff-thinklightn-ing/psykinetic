@@ -108,6 +108,15 @@ const HUNT_ON_TILES := 2
 ## comes within LEASH / 2 of there or strikes it.
 const LEASH := 20
 const GIVE_UP_TICKS := 100
+## Doors: the kinds that open them (the rest, the brute, break them, DOOR_FORCE
+## times their blow on a door; a level entry's "opens_doors" says otherwise).
+## Looking or hunting, it opens a closed door only with a reason beyond it,
+## heard or seen there no longer than DOOR_FRESH_TICKS ago (opens_doors_now):
+## a shut door and quiet behind it, you can hide.
+const DOOR_OPENERS: Array[String] = ["imp", "sneak"]
+const DOOR_FORCE := {Tactic.HEAVY: 3}
+const DOOR_FRESH_TICKS := 40
+const NO_DOOR := Vector3i(-9999, -9999, 0)
 ## With no way to its target at all (a crowd round it), it looks for one
 ## again only after this many ticks: a crowd does not open in a tick.
 const CHASE_RETRY_TICKS := 5
@@ -222,6 +231,15 @@ var _quarry_from := NO_TILE
 var _post := NO_TILE
 var _given_up: Dictionary[int, int] = {}
 var _glimpsed := NO_TILE
+## Whether it opens doors (DOOR_OPENERS); whether its lead is a guess (a
+## hunt's tiles on past where it saw them) and, if so, where it saw them;
+## when it last heard or saw something real for its lead; the door it is
+## breaking (NO_DOOR: none).
+var opens_doors := true
+var _lead_guess := false
+var _lead_seen := NO_TILE
+var _evidence_tick := -1
+var _bash_key := NO_DOOR
 var _glancing := false
 var _route_index := 0
 var _route_step := 1
@@ -276,6 +294,8 @@ func _ready() -> void:
 		_settle_idle()
 		var kind := str(spawn_spec.get("kind", ""))
 		_wary = TACTICS.has(kind)
+		var opens: Variant = spawn_spec.get("opens_doors")
+		opens_doors = bool(opens) if opens != null else not _wary or kind in DOOR_OPENERS
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 
 
@@ -357,7 +377,7 @@ func _sim_tick() -> void:
 		if World.can_melee(tile, target.tile):
 			World.try_attack(self, target)
 		elif World.tick >= next_move_tick:
-			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES)
+			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 			if not path.is_empty():
 				World.try_move(self, path[0] - tile)
 			else:
@@ -401,7 +421,7 @@ func _sim_tick() -> void:
 	slot = _pick_slot()
 	if slot == NO_TILE or not _go_to(slot):
 		# Nowhere free beside it: as near as it can get.
-		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES)
+		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 		if not path.is_empty():
 			World.try_move(self, path[0] - tile)
 		else:
@@ -467,7 +487,7 @@ func _step_out() -> void:
 
 ## A step toward [param to]; false if there is no way there.
 func _go_to(to: Vector2i) -> bool:
-	var path := World.find_path(tile, to, false, null, SLOT_SEARCH_TILES)
+	var path := World.find_path(tile, to, false, null, SLOT_SEARCH_TILES, false, {}, opens_doors_now())
 	if path.is_empty():
 		return false
 	World.try_move(self, path[0] - tile)
@@ -644,19 +664,26 @@ func _hunt(lost: GridEntity) -> bool:
 			if World.is_walkable(on) and World.has_clear_line(_quarry_at, on):
 				lead = on
 				break
-	_follow(lead, Alert.HUNTING, HUNT_TICKS)
+	_follow(lead, Alert.HUNTING, HUNT_TICKS, lead != _quarry_at)
+	_lead_seen = _quarry_at
+	_evidence_tick = World.tick
 	return true
 
 
 ## Off to [param lead] at [param level] (a hunt stays a hunt for a lesser
-## lead), for [param ticks] from now; it looks round when there.
-func _follow(lead: Vector2i, level: Alert, ticks: int) -> void:
+## lead), for [param ticks] from now; it looks round when there. A
+## [param guess] is no reason to open a door to it.
+func _follow(lead: Vector2i, level: Alert, ticks: int, guess := false) -> void:
 	if alert == Alert.IDLE:
 		_post = tile
 	if not (alert == Alert.HUNTING and level == Alert.SUSPICIOUS):
 		alert = level
 	_alert_until = World.tick + ticks
 	_lead = lead
+	_lead_guess = guess
+	_lead_seen = NO_TILE
+	if not guess:
+		_evidence_tick = World.tick
 	_looks = 0
 	_look_until = -1
 	_returning = false
@@ -670,10 +697,28 @@ func _search() -> void:
 			or World.tick < _look_until:
 		return
 	move_ticks = _pace if alert == Alert.HUNTING else _pace * IDLE_PACE
+	if _bash_key != NO_DOOR and _bash():
+		return
 	if _lead != NO_TILE and tile != _lead:
 		if _idle_step(_lead):
 			return
-		# No way there (a closed door, a crowd): it looks from here.
+		if _lead_guess and _lead_seen != NO_TILE and _lead_seen != _lead:
+			_lead = _lead_seen  # No way on: where it saw them, then.
+			_lead_guess = false
+			return
+		var door := _door_on_way(_lead)
+		if not door.is_empty():
+			# A closed door it will not open now: it breaks it (one that
+			# cannot open doors, with a reason), else it goes to the door
+			# and listens there.
+			if not opens_doors and _has_reason():
+				_bash_key = door["key"]
+				return
+			if tile != door["near"]:
+				_lead = door["near"]
+				_lead_guess = true  # Nothing beyond the door says go on.
+				return
+		# No way there (a crowd, a wall): it looks from here.
 		_lead = NO_TILE
 		next_move_tick = World.tick + CHASE_RETRY_TICKS
 		return
@@ -681,6 +726,60 @@ func _search() -> void:
 		World.face(self, turned(facing, LOOK_ROUND[_looks]))
 		_looks += 1
 		_look_until = World.tick + LOOK_TICKS
+
+
+## Whether it walks through closed doors now: one that opens doors does
+## as it idles, goes back and fights; looking or hunting, only with a
+## reason beyond (_has_reason).
+func opens_doors_now() -> bool:
+	if not opens_doors:
+		return false
+	if alert == Alert.SUSPICIOUS or alert == Alert.HUNTING:
+		return _has_reason()
+	return true
+
+
+## Something real behind its lead, heard or seen no longer than
+## DOOR_FRESH_TICKS ago.
+func _has_reason() -> bool:
+	return not _lead_guess and World.tick - _evidence_tick <= DOOR_FRESH_TICKS
+
+
+## The first closed door on its way to [param to] were doors open, and the
+## tile before it ({key, near}); {} for none (the same capped search).
+func _door_on_way(to: Vector2i) -> Dictionary:
+	var path := World.find_path(tile, to, true, null, IDLE_SEARCH_TILES)  # Someone may stand there.
+	var at := tile
+	for next in path:
+		var step := next - at
+		# A diagonal step goes by one of its two straight ways: either's doors.
+		var legs: Array = [[at, step]] if step.x == 0 or step.y == 0 else [
+			[at, Vector2i(step.x, 0)], [at + Vector2i(step.x, 0), Vector2i(0, step.y)],
+			[at, Vector2i(0, step.y)], [at + Vector2i(0, step.y), Vector2i(step.x, 0)]]
+		for leg: Array in legs:
+			var door := World.door_across(leg[0], leg[1])
+			if door != null and not door.is_open():
+				return {"key": door.key, "near": leg[0]}
+		at = next
+	return {}
+
+
+## Breaking the door _bash_key: to it, then a blow whenever it can. False
+## (and done with it) once it is open or broken.
+func _bash() -> bool:
+	var door := World.door_on(_bash_key)
+	if door == null or door.is_open():
+		_bash_key = NO_DOOR
+		return false
+	var sides := Terrain.edge_cells(_bash_key)
+	if tile in sides:
+		World.try_bash_door(self, _bash_key, attack_damage * int(DOOR_FORCE.get(tactic, 1)))
+		return true
+	var near: Vector2i = sides[0] if World.distance(tile, sides[0]) <= World.distance(tile, sides[1]) else sides[1]
+	if not _idle_step(near):
+		_bash_key = NO_DOOR
+		return false
+	return true
 
 
 ## More than LEASH from where it took up the chase.
@@ -716,7 +815,9 @@ func _calm() -> void:
 		_idle_goal = NO_TILE
 	alert = Alert.IDLE
 	_lead = NO_TILE
+	_lead_guess = false
 	_quarry = null
+	_bash_key = NO_DOOR
 
 
 # --- Idling ---------------------------------------------------------------------
@@ -817,7 +918,7 @@ func _wander_goal() -> Vector2i:
 			return at
 		if beyond_view:
 			continue  # On nobody's screen: a spot it can walk to straight, or none.
-		var path := World.find_path(tile, at, false, null, _about_search(wander_radius))
+		var path := World.find_path(tile, at, false, null, _about_search(wander_radius), false, {}, opens_doors)
 		if not path.is_empty():
 			# The way there is the walk's first plan (_idle_step).
 			_idle_path = path
@@ -896,7 +997,7 @@ func _ensure_route() -> void:
 			# Straight from home if it can be walked so; a search only if not.
 			if World.is_walkable(at) and not World.is_fire(at) and at not in route \
 					and (_straight(home, at, PATROL_LOOP_RADIUS * 2) \
-						or not World.find_path(home, at, true, null, _about_search(PATROL_LOOP_RADIUS)).is_empty()):
+						or not World.find_path(home, at, true, null, _about_search(PATROL_LOOP_RADIUS), false, {}, opens_doors).is_empty()):
 				route.append(at)
 				break
 	route_loop = true
@@ -966,7 +1067,7 @@ func _idle_step(to: Vector2i, max_tiles := IDLE_SEARCH_TILES, straight_only := f
 			return World.try_move(self, direct)
 		if straight_only:
 			return false  # Out of everyone's view: it waits, or goes elsewhere.
-		_idle_path = World.find_path(tile, to, false, null, max_tiles)
+		_idle_path = World.find_path(tile, to, false, null, max_tiles, false, {}, opens_doors_now())
 		_idle_path_to = to
 		if _idle_path.is_empty():
 			return false

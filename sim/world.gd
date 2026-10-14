@@ -251,6 +251,9 @@ var _search_order := PackedInt32Array()
 ## _carried_heat's memo: for which (tick, entity count), and its answer.
 var _carried_heat_key := Vector2i(-1, -1)
 var _carried_heat_now := false
+## Whether an entity holds the key to a lock (entity, lock id) -> bool: set
+## by the items; till then nobody does (has_key).
+var key_check: Callable = func(_entity: GridEntity, _lock: String) -> bool: return false
 ## carried_lights' memo: for which (tick, entity count), and the list.
 var _carried_lights_key := Vector2i(-1, -1)
 var _carried_lights: Array[GridEntity] = []
@@ -645,7 +648,7 @@ func walk(entity: GridEntity, to: Vector2i, ticks: float) -> bool:
 	var walls := held_against(entity)
 	if walls.has(entity.tile):
 		return false
-	var path := find_path(entity.tile, to, false, entity, reach * WALK_SEARCH_PER_STEP, true, walls)
+	var path := find_path(entity.tile, to, false, entity, reach * WALK_SEARCH_PER_STEP, true, walls, opens_doors_now(entity))
 	var at := entity.tile
 	var spent := 0.0
 	for next in path:
@@ -1019,8 +1022,55 @@ func try_toggle_door(entity: GridEntity, key: Vector3i) -> bool:
 	var door: Door = _doors.get(key)
 	if door == null or door.is_broken() or entity.tile not in Terrain.edge_cells(key):
 		return false
+	if not door.open and door.lock != "" and not has_key(entity, door.lock):
+		return false  # Locked, and no key.
 	_set_door(door, not door.open, entity)
 	entity.next_move_tick = tick + entity.move_ticks
+	return true
+
+
+## Whether [param entity] may open [param door] by walking into it: a
+## creature, with the key to its lock if it has one, and a monster only if
+## it opens doors and will now (Monster.opens_doors_now).
+func may_open(entity: GridEntity, door: Door) -> bool:
+	if not entity.is_creature():
+		return false
+	if door.lock != "" and not has_key(entity, door.lock):
+		return false
+	return opens_doors_now(entity)
+
+
+## Whether [param entity]'s walks go through closed doors now (a monster's
+## own say; any other creature does).
+func opens_doors_now(entity: GridEntity) -> bool:
+	return (entity as Monster).opens_doors_now() if entity is Monster else entity.is_creature()
+
+
+## Whether [param entity] holds the key to [param lock]: key_check, which
+## the items say (none of anyone's till they do).
+func has_key(entity: GridEntity, lock: String) -> bool:
+	return bool(key_check.call(entity, lock))
+
+
+## A blow at a closed door from beside it (a monster that cannot open it,
+## breaking through): [param amount] of damage, wood only (_hit_door), at
+## the cost of an attack's cooldown, as a swing that way. False if it
+## cannot now.
+func try_bash_door(entity: GridEntity, key: Vector3i, amount: int) -> bool:
+	if not Net.is_authority():
+		return false
+	if not entity.spawned or not entity.is_creature() or is_stunned(entity) \
+			or tick < entity.next_attack_tick or tick < entity.next_move_tick:
+		return false
+	var door: Door = _doors.get(key)
+	var sides := Terrain.edge_cells(key)
+	if door == null or door.is_open() or entity.tile not in sides:
+		return false
+	var direction: Vector2i = (sides[1] if entity.tile == sides[0] else sides[0]) - entity.tile
+	entity.next_attack_tick = tick + entity.attack_ticks
+	entity._world_set_facing(direction)
+	entity._world_swung(direction)
+	_hit_door(door, amount, entity)
 	return true
 
 
@@ -2569,15 +2619,17 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	var to: Vector2i = from + direction
 	if _terrain_blocks_step(from, direction, entity.is_creature()):
 		return false
+	var door := _closed_door_across(from, direction)
+	if door != null and not may_open(entity, door):
+		return false
 	var blocker: GridEntity = _occupancy.get(to)
 	if blocker != null:
 		if not blocker.pushable or blocker.mass > push_budget:
 			return false
 		if not _shift(mover, blocker, direction, push_budget - blocker.mass, duration, start):
 			return false
-	var door := _closed_door_across(from, direction)
 	if door != null:
-		_set_door(door, true, entity)  # A creature; anything else was blocked above.
+		_set_door(door, true, entity)  # A creature that may; anything else was blocked above.
 	_relocate(entity, to)
 	entity._world_slide_from(from, start, duration)
 	if entity != mover:
@@ -2972,8 +3024,12 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## equals; empty if that is [param from]): as far as a walk can get.
 ## [param walls]: cells it never steps into ({cell: anything}; another
 ## faction's held ground), the goal among them.
+## Without [param opens_doors] a closed door is shut to it (a monster that
+## cannot open doors, or will not now: Monster.opens_doors_now); the memo of
+## steps (_path_step) is shared and says a door is passable, so that is
+## asked here, on door steps only.
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
-		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}) -> Array[Vector2i]:
+		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}, opens_doors := true) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
@@ -3047,7 +3103,9 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			var step: int = _grid_steps[at * 8 + way] - 1
 			if step == -1:
 				step = _path_step(current, way)
-			if step == PATH_STEP_BLOCKED or step == PATH_STEP_ASK and _terrain_blocks_step(current, direction, true):
+			if step == PATH_STEP_BLOCKED or step == PATH_STEP_ASK and _terrain_blocks_step(current, direction, opens_doors):
+				continue
+			if step == PATH_STEP_DOOR and not opens_doors and _closed_door_across(current, direction) != null:
 				continue
 			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore:
 				continue
