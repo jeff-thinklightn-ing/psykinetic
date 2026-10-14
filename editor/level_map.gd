@@ -72,6 +72,17 @@ static func from_image(image: Image, config := {}) -> LevelMap:
 	return map
 
 
+## A copy of this map that can change without changing it.
+func copy() -> LevelMap:
+	var out := LevelMap.new(size)
+	out.pixels = pixels
+	out.colours = colours.duplicate()
+	out.cells = cells.duplicate()
+	out.edges = edges.duplicate()
+	out.heights = heights.duplicate()
+	return out
+
+
 ## Reads [param image] (height.png, the size of layout.png) into
 ## [member heights]; false, reading nothing, if its size is not [member pixels].
 func read_heights(image: Image) -> bool:

@@ -2152,3 +2152,32 @@ so an edit Claude proposed and a player accepted is an undo step like one
 painted by hand, and is saved by the same code. The editor's own strokes
 (painting cells and edges, a monster's facing and idling) still change
 the map directly and hand their undo step to `MapDoc.push`.
+
+## 197. Builder mode: Claude's tools change a copy, the proposal is the difference
+
+A builder request (an area of a level and a sentence) is a `BuilderSession`
+(builder/). Claude is given the area as a character grid with a margin,
+its walls, doors and level.json settings, the legend, the items and the
+prefabs (each drawn the same way), and tools: paint, edges, path, pond,
+grove, scatter, fence, place (a thing and its settings), stamp, and look.
+The tools are the editor's own (AreaTools, Prefab, MapDoc.apply_changes),
+run on a working copy of the level and kept to the area; a call that cannot
+be done (a thing outside the area, a prefab that is not there) goes back to
+Claude as an error, which it can correct. The proposal is not the list of
+calls but the difference between the copy and the level, as one change set
+(cells, edges, heights, and the entries and links of the cells where any of
+those differ): that is what the ghost shows, and accepting it is one
+`MapDoc.apply_changes`, one undo step, the same as a stamp in the editor.
+A follow-up ("bigger", "move it north") goes on in the same conversation,
+from the level as it was: Claude remakes the whole proposal knowing what it
+did, rather than patching a proposal it can no longer see whole.
+
+The conversation is only ever added to, Claude's turns sent back as they
+came (thinking blocks included, which a changed history would invalidate),
+with the system prompt and tools first and cached, so a follow-up reads the
+long prefix from the cache. Every response's usage is logged with its cost,
+and a request stops at a dollar limit of its own (the Console's limit is the
+account's). `ClaudeClient` asks the Messages API with raw HTTP (no SDK in
+GDScript) on Claude Opus 5.5 at medium effort, with server-side refusal
+fallback, the key read from the server's environment only; `StubClaude`
+answers from a script, so the whole flow is tested without a key.
