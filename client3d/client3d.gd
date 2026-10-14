@@ -2533,7 +2533,13 @@ func _sync_puppets() -> void:
 		if not made and Vector2(entity.tile).distance_to(aim) > reach:
 			# Far off: unseen and unheard. Its tile and hp are kept, so it
 			# makes no footstep for the way it came and its bar shows a
-			# fight it had, when it comes near.
+			# fight it had, when it comes near. Its puppet (animation,
+			# skeleton) and its entity's drawing are stopped meanwhile: a
+			# thousand idle animations a frame were most of a big map's
+			# frame.
+			if not _far.has(id):
+				puppet.process_mode = Node.PROCESS_MODE_DISABLED
+				entity.set_process(false)
 			_far[id] = true
 			_last_tile[id] = entity.tile
 			if _last_hp.get(id, entity.hp) != entity.hp:
@@ -2543,6 +2549,9 @@ func _sync_puppets() -> void:
 		if _far.has(id):
 			_far.erase(id)
 			puppet.remove_meta("last_at")  # Not a run from where it was last drawn.
+			puppet.process_mode = Node.PROCESS_MODE_INHERIT
+			entity.set_process(true)
+			entity._display_caught_up()
 		var grid := Iso.local_to_grid(entity.position)
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:

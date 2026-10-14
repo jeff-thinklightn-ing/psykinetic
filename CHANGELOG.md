@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.135
+
+Client and server.
+
+- Big maps run far smoother on your screen: monsters out of sight no
+  longer keep animating unseen. A large map went from about 14 frames a
+  second to a steady 60 on the test machine.
+
+The server must be updated to v0.1.135 too, as it refuses any other version.
+
 ## v0.1.134
 
 Client and server.

@@ -351,6 +351,19 @@ func is_breakable() -> bool:
 static var draws_2d := true
 
 
+## The view takes it up again after it was far off and not drawn
+## (Client3D stops its _process meanwhile): shown where it is now, with
+## none of the slides it was sent meanwhile played out.
+func _display_caught_up() -> void:
+	_slides.clear()
+	_present = false
+	_from_tile = tile
+	_to_tile = tile
+	_from_pos = Vector2(tile)
+	_move_duration = 0.0
+	position = Iso.grid_to_local(Vector2(tile))
+
+
 func _process(delta: float) -> void:
 	var wanted := Vector2(facing)
 	if _prediction != null and _prediction.advance(delta):

@@ -2705,3 +2705,27 @@ the corners (a path one cell wide came out half dirt), a vertex at each
 cell centre too (more corners to write on each change; the kinds texture
 gives the same for nothing), and noise worked out per pixel (it cost
 frames; a lookup is cheap).
+
+## 227. A far puppet stops altogether, and its entity's drawing with it
+
+Amends 185. terrain measured map_bench windowed at 256x256 at 11 to 12
+fps. Not a regression: the commit of 185 does 8.9 fps on this machine
+today, the head 13.7 (both with the bench lock, nothing else running).
+185 stopped placing, turning and animating far puppets from the script,
+but each puppet's AnimationPlayer went on playing its clip, and its
+skeleton posing, every frame: some 3000 rigs nobody could see; and every
+entity's _process (its drawn position, slides and turn) went on too.
+
+A puppet going far (beyond the view's reach and earshot, as 185) has its
+processing stopped (PROCESS_MODE_DISABLED: its animation, skeleton and
+all under it) and its entity's _process with it; coming near, both go on,
+and the entity is shown where it is now (GridEntity._display_caught_up:
+no slides it was sent meanwhile played out, as 185 already kept no
+footsteps for the way it came). On the host its drawing is all _process
+does; the sim's tick is World's.
+
+tools/map_bench, windowed: 256x256 13.7 fps to 60 with vsync (95 with it
+off, the worst frame 30 ms); 128x128 55 to 60 (255 off). Rendering is a
+millisecond of a frame on the CPU and less on the GPU. The bench's frame
+loop now turns vsync off and says the renderer's share. The 256x256 map
+loads in 1.97 s with the 3D build.

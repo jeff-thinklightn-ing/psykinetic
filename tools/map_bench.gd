@@ -179,15 +179,24 @@ func _ready() -> void:
 	get_tree().quit()
 
 
-## Frames for [member seconds] with the world ticking as in play: the
-## average and worst frame, draw calls and video memory.
+## Frames for [member seconds] with the world ticking as in play, vsync
+## off: the average and worst frame, draw calls and video memory, and the
+## renderer's share of a frame.
 func _frames() -> void:
 	World.set_process(true)
+	var viewport := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(viewport, true)
+	# Uncapped, so the frame rate shows what a frame costs, not the screen's.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	for i in 30:
 		await get_tree().process_frame
 	var frames := 0
 	var worst := 0.0
 	var draws := 0.0
+	# The renderer's own time a frame, on the CPU and on the GPU; the rest
+	# of a frame is the scripts and the engine's own nodes.
+	var render_cpu := 0.0
+	var render_gpu := 0.0
 	var started := Time.get_ticks_usec()
 	var last := started
 	while Time.get_ticks_usec() - started < seconds * 1000000.0:
@@ -197,11 +206,15 @@ func _frames() -> void:
 		last = now
 		frames += 1
 		draws = maxf(draws, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+		render_cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport) 				+ RenderingServer.get_frame_setup_time_cpu()
+		render_gpu += RenderingServer.viewport_get_measured_render_time_gpu(viewport)
 	var elapsed := (Time.get_ticks_usec() - started) / 1000000.0
 	print("BENCH frames: %.1f fps avg, worst frame %.1f ms, draw calls up to %d, objects in frame %d, video memory %.0f MB" % [
 		frames / elapsed, worst, draws,
 		Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
+	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
+		render_cpu / frames, render_gpu / frames])
 
 
 ## players - 1 more players, each at the free tile nearest a point of a grid
