@@ -1266,6 +1266,82 @@ func _make_flat(mesh: Mesh, color: Color) -> MeshInstance3D:
 	return flat
 
 
+# --- Builder mode: the area picked, the proposal as a ghost ------------------------------
+
+const BUILDER_AREA := Color(0.45, 0.8, 1.0, 0.9)
+const BUILDER_GHOST_ALPHA := 0.6
+## A ghost's void cell: forest outdoors, nothing indoors.
+const BUILDER_VOID := Color(0.08, 0.3, 0.12)
+var _builder_marks: Node3D
+
+
+## Builder mode's marks: [param area]'s outline (size zero: none) and, over
+## it, the cells and edges a proposal would change ([[x, y, meaning]...],
+## [[x, y, side, kind]...]), see-through, coloured as the legend.
+func show_builder(area: Rect2i, cells: Array = [], edges: Array = []) -> void:
+	clear_builder()
+	if area.size == Vector2i.ZERO:
+		return
+	_builder_marks = Node3D.new()
+	add_child(_builder_marks)
+	var a := Vector2(area.position) - Vector2(0.5, 0.5)
+	var b := Vector2(area.end) - Vector2(0.5, 0.5)
+	var line := 0.08
+	var outline: Array[PackedVector2Array] = [
+		PackedVector2Array([a, Vector2(b.x, a.y), Vector2(b.x, a.y + line), Vector2(a.x, a.y + line)]),
+		PackedVector2Array([Vector2(a.x, b.y - line), Vector2(b.x, b.y - line), b, Vector2(a.x, b.y)]),
+		PackedVector2Array([a, Vector2(a.x + line, a.y), Vector2(a.x + line, b.y), Vector2(a.x, b.y)]),
+		PackedVector2Array([Vector2(b.x - line, a.y), Vector2(b.x, a.y), b, Vector2(b.x - line, b.y)]),
+	]
+	var frame := _make_flat(_flat_mesh(outline), BUILDER_AREA)
+	frame.position.y = ON_FLOOR * 3.0 + _height(area.position) * LEVEL_RISE
+	_builder_marks.add_child(frame)
+	# Cells, one mesh a colour; a thing as a smaller square on its cell.
+	var by_colour := {}
+	for each: Variant in cells:
+		var at := Vector2i(int(each[0]), int(each[1]))
+		var meaning := str(each[2])
+		var colour := BUILDER_VOID if meaning == "void" else Color(str(Level.LEGEND.get(meaning, "#ff00ff")))
+		var half := 0.5 if meaning in Level.GROUNDS or meaning in ["void", "water", "fire", "stair"] else 0.3
+		var centre := Vector2(at)
+		var quad := PackedVector2Array([centre + Vector2(-half, -half), centre + Vector2(half, -half),
+			centre + Vector2(half, half), centre + Vector2(-half, half)])
+		var key := colour.to_html()
+		if not by_colour.has(key):
+			by_colour[key] = {"colour": colour, "quads": [] as Array[PackedVector2Array], "rise": 0.0}
+		by_colour[key]["quads"].append(quad)
+		by_colour[key]["rise"] = maxf(by_colour[key]["rise"], _height(at) * LEVEL_RISE + (ON_FLOOR * 4.0 if half < 0.5 else ON_FLOOR * 2.0))
+	for key: String in by_colour:
+		var ghost := _make_flat(_flat_mesh(by_colour[key]["quads"]), Color(by_colour[key]["colour"], BUILDER_GHOST_ALPHA))
+		ghost.position.y = by_colour[key]["rise"]
+		_builder_marks.add_child(ghost)
+	# Edges: a see-through wall or door standing on each, nothing for clear.
+	for each: Variant in edges:
+		var kind := str(each[3])
+		if kind == "clear":
+			continue
+		var key := Vector3i(int(each[0]), int(each[1]), int(each[2]))
+		var cell := Vector2i(key.x, key.y)
+		var box := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.08, 0.7, 1.0) if key.z == Terrain.EAST else Vector3(1.0, 0.7, 0.08)
+		box.mesh = mesh
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.albedo_color = Color(Color(str(Level.LEGEND[kind])).lightened(0.3), BUILDER_GHOST_ALPHA)
+		box.material_override = material
+		box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		box.position = _tile_position(cell) + (Vector3(0.5, 0.35, 0.0) if key.z == Terrain.EAST else Vector3(0.0, 0.35, 0.5))
+		_builder_marks.add_child(box)
+
+
+func clear_builder() -> void:
+	if _builder_marks != null:
+		_builder_marks.queue_free()
+		_builder_marks = null
+
+
 ## The hover outline on [param tile], or hidden.
 func hover(tile: Vector2i, show: bool) -> void:
 	_hover.visible = show

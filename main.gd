@@ -102,6 +102,10 @@ const RESPAWN_MIN_DISTANCE := 6
 var _players: Dictionary[int, Player] = {}
 ## Server only: peer id -> the player_id it joined with.
 var _peer_ids: Dictionary[int, String] = {}
+## Builder mode on this server or host (null when it is off: no key, no stub).
+var _builder: BuilderHost
+## Builder mode on this client (B): selecting, asking, the ghost.
+var _builder_ui: BuilderUI
 ## Server only: everyone who has ever joined, by player_id. Saved in the
 ## snapshot, so a player comes back where they left off, in their colour.
 var _records: Dictionary[String, PlayerRecord] = {}
@@ -256,6 +260,11 @@ func _ready() -> void:
 	near_walls.self_modulate.a = NEAR_WALL_ALPHA
 	World.zone_switched.connect(_on_zone_switched)
 	_build_talk()
+	if Net.mode != Net.Mode.SERVER:
+		_builder_ui = BuilderUI.new()
+		_builder_ui.name = "BuilderUI"
+		_builder_ui.main = self
+		add_child(_builder_ui)
 	_load_level(Net.map_name if not Net.map_name.is_empty() else Level.DEFAULT_MAP)
 	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
 		_show_3d()
@@ -307,6 +316,11 @@ func _go_online() -> void:
 		World.entity_died.connect(_on_entity_died)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
+		BuilderHost.warn_overlays()
+		if BuilderHost.available():
+			_builder = BuilderHost.new()
+			_builder.main = self
+			add_child(_builder)
 		if Net.llm_url != "" and Net.llm_model != "":
 			mind_kind = "ollama"
 		if Net.mode == Net.Mode.SERVER:
@@ -374,6 +388,9 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if is_typing():
+		return
+	if _builder_ui != null and _builder_ui.handle_input(event):
+		get_viewport().set_input_as_handled()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_TAB:
 		talk.visible = not talk.visible
@@ -1117,6 +1134,51 @@ func _load_level(level_name: String) -> bool:
 	return true
 
 
+## Server: zone [param zone_name] read again from its level (edited in the
+## game: Level reads the overlay first) and rebuilt as "zone reset" does,
+## but not healed: the players stay where they are, everything else is
+## spawned again. Everyone in it is sent the new terrain. Nothing if the
+## zone is not open (it reads the edited level when it opens).
+func reload_zone(zone_name: String) -> void:
+	if not Net.is_authority() or not World.zones.has(zone_name):
+		return
+	var was := World.enter_named(zone_name)
+	_load_level(zone_name)
+	_start_level(false, false)
+	World.enter(was)
+	var message := BuilderHost.terrain_message(zone_name)
+	for peer in World.peers_in(zone_name):
+		if peer != Net.local_id:
+			Net.message_to(peer, "terrain", message)
+	_view_zone = ""  # A host in that zone draws it again.
+
+
+## Server: the game's edits to level [param level_name] are gone (the
+## console's "builder drop"): builder mode forgets its copy, the zone reads
+## the repo's level again.
+func forget_level_edits(level_name: String) -> void:
+	if _builder != null:
+		_builder.docs.erase(level_name)
+		for peer: int in _builder.sessions.keys():
+			if _builder._session_zone.get(peer, "") == level_name:
+				_builder.sessions.erase(peer)
+	reload_zone(level_name)
+
+
+## A client: a "terrain" message, level [param data]'s files as the server
+## has them (edited in the game). Read so from now on; drawn again now if
+## this client is in it.
+func _on_terrain(data: Dictionary) -> void:
+	if Net.is_authority() or not BuilderHost.register_terrain(data):
+		return
+	var level_name := str(data.get("name", ""))
+	if level_name == map_name:
+		_load_level(level_name)
+		World.mirror_terrain(_terrain)
+		_repaint()
+		print("[zone] %s changed" % level_name)
+
+
 ## Draws the terrain afresh in both views (a map loaded live).
 func _repaint() -> void:
 	_paint_level()
@@ -1288,6 +1350,9 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 				entity.sync.update_visibility(peer)
 	if not old.is_empty() and old != zone_name:
 		World.update_visibility(peer, old)
+	if Level.overlaid(zone_name):
+		# Edited in the game: the client's own copy (its pck's) is not it.
+		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
 	Net.message_to(peer, "map", {"name": zone_name})
 	World.update_visibility(peer, zone_name)
 
@@ -1810,6 +1875,12 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		print("[world] %s reset the room" % who)
 		_start_level()
 		party_log.add("%s reset the room." % who)
+	elif command_name == "builder" and entity is Player:
+		var id: String = _peer_ids.get(entity.owner_peer, Net.player_id if entity.owner_peer == Net.local_id else "")
+		if _builder == null:
+			Net.broadcast_to([entity.owner_peer], "builder", {"state": "error", "error": "builder mode is off on this server"})
+		else:
+			_builder.command(entity.owner_peer, id, entity.zone, args)
 
 
 ## {"dir": [x, y]} as one of the eight directions, or ZERO.
@@ -1888,7 +1959,7 @@ func _bubble_tile_px() -> float:
 
 ## The chat box is open: the game's keys are the box's.
 func is_typing() -> bool:
-	return _chat_box != null and _chat_box.visible
+	return _chat_box != null and _chat_box.visible or _builder_ui != null and _builder_ui.is_typing()
 
 
 func _open_chat() -> void:
@@ -2045,6 +2116,13 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
+	if kind == "terrain":
+		_on_terrain(data)
+		return
+	if kind == "builder":
+		if _builder_ui != null:
+			_builder_ui.on_message(data)
+		return
 	if kind == "map":
 		# The zone this client's player is in: it draws and predicts on that
 		# map, and its entities arrive under that zone's node.
@@ -2294,6 +2372,9 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_move(player)
 	_run_test_contest(player, tick)
 	_run_test_reset(player, tick)
+	if player != null and Net.test_builder != "" and _builder_ui != null and tick > 20:
+		_builder_ui.test_ask(Net.test_builder)
+		Net.test_builder = ""
 	_run_test_door(player, tick)
 	_run_test_chest(player)
 
@@ -2314,6 +2395,8 @@ func hint_lines() -> Array[String]:
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB companion\ther pack", "I\tyour pack",
 		"Enter\ttalk", "Tab\ttalk log",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
+	if Net.mode == Net.Mode.HOST:
+		lines.append("B\tbuilder mode")
 	return lines
 
 
@@ -2577,6 +2660,12 @@ func admin_command(line: String) -> String:
 			return _zones_text()
 		"zone":
 			return _zone_command(words)
+		"builder":
+			if _builder != null:
+				return _builder.admin(words)
+			if words.size() > 1:
+				return BuilderHost.overlay_command(words, self)
+			return "builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); edited levels: %s" % ", ".join(Level.overlay_names())
 		"reset":
 			var reset_zone := World.zone.name
 			_start_level()
@@ -2672,7 +2761,7 @@ func admin_command(line: String) -> String:
 		"help":
 			return "reset | respawn | players | net | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
-				+ "transcript <name> [<date>] | save"
+				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name>"
 	return "unknown command %s (try help)" % words[0]
 
 

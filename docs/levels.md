@@ -388,6 +388,44 @@ A camp's group is its gather point: every monster gathering at one cell is
 that camp, so a coarse world tick can move the group (or hand the place
 over) by that cell, without the per-tick AI.
 
+## Builder mode
+
+In the game, `B` turns builder mode on for a player allowed to build (a
+host's own player; on a server, the player ids in `--builders` or
+`PSYKINETIC_BUILDERS`). It is on only where the server has
+`ANTHROPIC_API_KEY` in its environment (`/etc/psykinetic/env`, never in a
+client), or runs with `--builder-stub`, which answers from a script.
+
+- A left drag picks an area (up to 64 x 64), outlined on the ground, and a
+  box opens: say what to make there ("a pond", "a goblin camp guarding a
+  chest"). The server asks Claude (`builder/`, decision 197), which changes
+  a copy of the level with the editor's own tools, kept to the area.
+- The proposal shows over the area as a ghost, coloured as the legend,
+  with what Claude says it made and what the request cost. `Enter` (the box
+  empty) accepts it; words in the box are a follow-up ("bigger", "move it
+  north") that remakes it; `Esc` discards it. `Ctrl+Z` takes back the last
+  change to the level. `B` leaves; walking waits while it is on.
+- Accepted, it is one undo step on the level, saved to the **overlay**
+  (`user://levels/<name>/`, decision 199): a level there is read instead of
+  `levels/<name>/`, by the server and by `Level` everywhere. The zone is
+  rebuilt from it as `zone reset` does, without healing: players stay where
+  they are, monsters and chests are spawned again (so a chest can be looted
+  twice; a known gap of a dev tool). Everyone in the zone, and everyone who
+  comes in later, is sent the edited level (the "terrain" message, decision
+  200), since a client's own copy is its pck's.
+- The server logs every request: what was asked, its tokens in and out,
+  what it cost, the request id. A request stops at `--builder-max-cost`
+  dollars (default 1); the account's limit is set in the Claude Console.
+  `--builder-model` (default `claude-opus-5-5`) and `--builder-effort`
+  (default medium) choose how it thinks.
+- On the server's console: `builder` (how it is, the money spent, the
+  edited levels), `builder export` (each edited level's files and where
+  they go in the repo), `builder drop <name>` (the edits forgotten, the
+  repo's level again, the zone rebuilt). Once an edited level is copied
+  into `levels/` and committed, drop it: at boot the server warns about
+  every level it reads from the overlay, as a later change to that level
+  in the repo would not be seen.
+
 ## Making a level
 
 1. Draw `layout.png` in the level editor (above) or in any paint program (at 1 pixel per cell or edge, no

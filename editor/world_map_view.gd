@@ -324,7 +324,7 @@ func doc(area_name: String) -> MapDoc:
 ## Where level [param area_name]'s files are: the one place this view
 ## names a folder, to follow Level's own lookup (a user:// overlay first).
 static func folder_of(area_name: String) -> String:
-	return Level.DIR + area_name + "/"
+	return Level.folder_of(area_name)
 
 
 func _mark(level_doc: MapDoc) -> void:

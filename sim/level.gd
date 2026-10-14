@@ -33,6 +33,11 @@ extends RefCounted
 ## out), stairs (cell -> the direction it climbs), torches.
 
 const DIR := "res://levels/"
+## Levels edited in the running game (builder mode) are saved here, and a
+## level here wins over the same level in DIR: an exported server's res://
+## is its read-only pck. Tests point it elsewhere.
+const OVERLAY := "user://levels/"
+static var overlay_dir := OVERLAY
 const DEFAULT_MAP := "test_room"
 ## Grey per height level in height.png.
 const GREY_PER_LEVEL := 40
@@ -109,16 +114,40 @@ static func unregister(level_name: String) -> void:
 
 ## Whether there is a level called [param level_name].
 static func exists(level_name: String) -> bool:
-	return _registered.has(level_name) or ResourceLoader.exists(DIR + level_name + "/layout.png")
+	return _registered.has(level_name) or overlaid(level_name) or ResourceLoader.exists(DIR + level_name + "/layout.png")
+
+
+## Whether level [param level_name] has been edited in the game: its files
+## are in the overlay, which wins over DIR.
+static func overlaid(level_name: String) -> bool:
+	return not level_name.is_empty() and FileAccess.file_exists(overlay_dir + level_name + "/layout.png")
+
+
+## The folder level [param level_name]'s files are read from: the overlay's
+## if it is there, else DIR's.
+static func folder_of(level_name: String) -> String:
+	return (overlay_dir if overlaid(level_name) else DIR) + level_name + "/"
+
+
+## The levels in the overlay, sorted.
+static func overlay_names() -> Array[String]:
+	var out: Array[String] = []
+	if DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(overlay_dir)):
+		for level_name in DirAccess.get_directories_at(ProjectSettings.globalize_path(overlay_dir)):
+			if overlaid(level_name):
+				out.append(level_name)
+	out.sort()
+	return out
 
 
 ## Every level in the game: the folders under levels/ with a layout.png
-## (prefabs left out; not the levels made in code), sorted.
+## (prefabs left out; not the levels made in code), and those in the
+## overlay (a level made in the game is only there), sorted.
 static func names() -> Array[String]:
-	var out: Array[String] = []
+	var out: Array[String] = overlay_names()
 	for folder in ResourceLoader.list_directory(DIR):
 		var level_name := folder.trim_suffix("/")
-		if folder.ends_with("/") and level_name != "prefabs" and ResourceLoader.exists(DIR + level_name + "/layout.png"):
+		if folder.ends_with("/") and level_name != "prefabs" and level_name not in out 				and ResourceLoader.exists(DIR + level_name + "/layout.png"):
 			out.append(level_name)
 	out.sort()
 	return out
@@ -126,11 +155,11 @@ static func names() -> Array[String]:
 
 ## What level [param level_name] is made of: {layout: Image or null,
 ## height: Image or null, config: Dictionary}, from the levels made in code
-## or the folder. Warns when level.json is not a JSON object.
+## or the folder (the overlay's first). Warns when level.json is not a JSON object.
 static func source(level_name: String) -> Dictionary:
 	if _registered.has(level_name):
 		return _registered[level_name]
-	var folder := DIR + level_name + "/"
+	var folder := folder_of(level_name)
 	var config := {}
 	if FileAccess.file_exists(folder + "level.json"):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json"))
@@ -147,7 +176,7 @@ static func load_level(level_name: String) -> Dictionary:
 	var made := source(level_name)
 	var layout: Image = made["layout"]
 	if layout == null:
-		push_warning("[level] no level %s (%slayout.png)" % [level_name, DIR + level_name + "/"])
+		push_warning("[level] no level %s (%slayout.png)" % [level_name, folder_of(level_name)])
 		return {}
 	var level := parse(layout, made["height"], made["config"])
 	level["name"] = level_name

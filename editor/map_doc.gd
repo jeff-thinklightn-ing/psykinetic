@@ -61,6 +61,29 @@ static func open(level_folder: String, new_size := LevelMap.NEW_SIZE) -> MapDoc:
 	return doc
 
 
+## Level [param level_name] as the game reads it (Level.source: the overlay
+## first, then levels/, from the imports in an exported game), to be saved
+## in the overlay (Level.overlay_dir): builder mode's doc on a server, whose
+## res:// is read-only. Null if there is no such level. Saved the first
+## time, it writes every file, so the overlay is a whole level.
+static func from_level(level_name: String) -> MapDoc:
+	var made := Level.source(level_name)
+	if made["layout"] == null:
+		return null
+	var doc := MapDoc.new()
+	doc.folder = Level.overlay_dir + level_name + "/"
+	doc.config = (made["config"] as Dictionary).duplicate(true)
+	doc.map = LevelMap.from_image(made["layout"], doc.config)
+	doc.had_heights = made["height"] != null
+	if doc.had_heights:
+		doc.map.read_heights(made["height"])
+	if not Level.overlaid(level_name):
+		doc.config_dirty = true
+		doc.heights_dirty = doc.had_heights
+	doc.report = "loaded %s: %d x %d cells" % [level_name, doc.map.size.x, doc.map.size.y]
+	return doc
+
+
 ## Writes layout.png and its .import (as Image), level.json if it changed,
 ## height.png if it changed. False if it could not; [member report] says.
 func save() -> bool:

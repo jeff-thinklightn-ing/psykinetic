@@ -2182,6 +2182,16 @@ GDScript) on Claude Opus 5.5 at medium effort, with server-side refusal
 fallback, the key read from the server's environment only; `StubClaude`
 answers from a script, so the whole flow is tested without a key.
 
+Who may build: a host's own player, and on a server the player ids in
+`--builders` (`PSYKINETIC_BUILDERS`); it is on only with the key in the
+server's environment or `--builder-stub`, so no client can spend money it
+was not given. Accepting rebuilds the zone the way `zone reset` does, not
+healed, the players where they were: simple, and correct for anything the
+level spawns, but everything else in the zone is spawned again, so a chest
+already emptied is full again (a builder can duplicate loot) and a fight is
+interrupted. That is acceptable for a dev tool; changing only what the
+proposal touched is the better way when it matters.
+
 ## 198. The world map editor edits level.json, through MapDocs
 
 The node map (`--world-map`, `editor/world_map_view`, Godot's GraphEdit)
@@ -2266,3 +2276,37 @@ distance that changes slowly). Next for the tick: a door's light (only
 the sources it reaches are redone, but the list of every source is gone
 through, and built, for each door), and more players spread over the
 bench's map.
+
+## 199. Levels edited in the game live in a user:// overlay
+
+An exported game reads its levels from its pck, which cannot be written,
+and a deployed server is one. So a level changed in the game (builder mode)
+is saved under `user://levels/<name>/` (`Level.OVERLAY`), as a whole level
+(layout.png, level.json, height.png), and `Level` reads a level there
+before `res://levels/<name>/`: `exists`, `source`, `load_level`, `names`
+(a level made in the game is only there) and `folder_of`, the one function
+that says where a level's files are (the world map editor's view uses it).
+The repo stays the source of truth: the console's `builder export` lists
+the overlay's files and where they go in levels/, they are committed there,
+and `builder drop <name>` removes the overlay's copy. Until then the server
+warns at boot about each level it reads from the overlay, since a later
+change to that level in the repo would be hidden by it. Rejected: writing
+into the install directory (replaced by every deploy, and the service may
+not write there), and keeping the edits as a list of changes replayed on
+the pck's level (a replay breaks as soon as the level in the repo moves on).
+
+## 200. An edited level is sent to clients: the "terrain" message
+
+Terrain was never sent over the network: every peer reads a level from its
+own pck, by name. A level edited in the game differs from that, so the
+server sends it: a "terrain" message carries the level's layout.png and
+height.png (as PNG bytes) and its level.json, as the server reads it. A
+client registers it (`Level.register`), so the level is read so from then on
+(a zone switch, a reconnect), and if it is in that zone it parses it, has
+World mirror the new terrain and draws it again; its entities come and go
+through the spawners as ever. The server sends it to everyone in the zone
+after an edit, and to a player entering an edited zone just before its
+"map" message, so a player who joins later sees the edit too. A whole
+level rather than the changed cells: it is small (a 256 x 256 level's PNG
+is tens of kilobytes), it cannot fall out of step, and it is the same
+format the files and `Level.parse` already use. PROTOCOL_REVISION is 5.

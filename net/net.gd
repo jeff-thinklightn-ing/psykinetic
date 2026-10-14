@@ -25,6 +25,11 @@ extends Node
 ##                                /var/lib/psykinetic/transcripts when it can); see Transcript
 ##   --voice-url=<url>            her voice on this endpoint instead (stances and the check stay on
 ##   --voice-model=<m>            --llm-url); and this model (or PSYKINETIC_VOICE_URL / _MODEL)
+##   --builders=<id,id>           server/host: these player ids may use builder mode (B) besides a
+##                                host's own player (or PSYKINETIC_BUILDERS); it asks Claude with
+##                                ANTHROPIC_API_KEY from the environment, never from a client
+##   --builder-stub               builder mode answers from a script, no key (tests, trying the UI)
+##   --builder-model=<m>          and --builder-effort=<e>, --builder-max-cost=<dollars a request>
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
 ##                                (or PSYKINETIC_MIND_WHY=1)
 ##   --perception=list|grid|both  what the minds are told she sees around her: a list of the
@@ -111,7 +116,7 @@ signal join_rejected(reason: String, server_version: String)
 
 ## Bump for a wire change that protocol() cannot see by itself (the
 ## meaning of an existing RPC argument, say).
-const PROTOCOL_REVISION := 4
+const PROTOCOL_REVISION := 5
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -160,6 +165,16 @@ var edit_map := ""
 var world_map := false
 ## --edit-size=<w>x<h>: a new map's size in cells.
 var edit_size := LevelMap.NEW_SIZE
+## Builder mode (BuilderHost), server/host: --builders=<id,id> (or
+## PSYKINETIC_BUILDERS) the player ids allowed to build besides a host's
+## own player; --builder-stub answers with StubClaude instead of the API
+## (no key needed); --builder-model, --builder-effort, --builder-max-cost
+## (dollars per request) for Claude. It needs ANTHROPIC_API_KEY or the stub.
+var builders: PackedStringArray = []
+var builder_stub := false
+var builder_model := ClaudeClient.DEFAULT_MODEL
+var builder_effort := "medium"
+var builder_max_cost := 1.0
 var _mind_log_given := false
 ## Where the companions' transcripts go ("" for none); see Transcript.
 const DEFAULT_TRANSCRIPTS := "/var/lib/psykinetic/transcripts"
@@ -254,6 +269,9 @@ var test_move := Vector2i.ZERO
 var test_contest_tile := Vector2i.ZERO
 var test_contest_tick := 0
 var test_reset_tick := 0
+## --test-builder=<x>,<y>,<w>,<h>:<request>: once the local player is in,
+## builder mode asks that for that area (for screenshots of the ghost).
+var test_builder := ""
 var test_exit_after := 0.0
 var screenshot_path := ""
 var test_hover_tile := Vector2i(-1, -1)
@@ -292,6 +310,8 @@ func _enter_tree() -> void:
 	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
 	voice_url = OS.get_environment("PSYKINETIC_VOICE_URL")
 	voice_model = OS.get_environment("PSYKINETIC_VOICE_MODEL")
+	if OS.get_environment("PSYKINETIC_BUILDERS") != "":
+		_set_option("--builders", OS.get_environment("PSYKINETIC_BUILDERS"))
 	if OS.get_environment("PSYKINETIC_MIND_WHY") in ["1", "true", "on", "yes"]:
 		mind_why = true
 	if OS.get_environment("PSYKINETIC_PERCEPTION") != "":
@@ -970,9 +990,12 @@ func _parse_args() -> void:
 				mind_why = true
 			"--world-map":
 				world_map = true
+			"--builder-stub":
+				builder_stub = true
 			"--address", "--port", "--state", "--admin-port", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
-					"--test-move", "--test-contest", "--test-reset", "--test-exit-after", "--test-version", "--test-protocol", \
+					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
+					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
 				if not has_value and i + 1 < args.size():
@@ -1037,6 +1060,16 @@ func _set_option(key: String, value: String) -> void:
 				print("[net] --perception=%s: not one of %s; keeping %s" % [value, "|".join(PERCEPTIONS), perception])
 		"--map":
 			map_name = value
+		"--builders":
+			builders = PackedStringArray(Array(value.split(",", false)).map(func(id: String) -> String: return id.strip_edges()))
+		"--builder-model":
+			builder_model = value.strip_edges()
+		"--builder-effort":
+			if value in ["low", "medium", "high", "xhigh", "max"]:
+				builder_effort = value
+		"--builder-max-cost":
+			if value.is_valid_float():
+				builder_max_cost = maxf(0.01, value.to_float())
 		"--edit":
 			edit_map = value.strip_edges()
 		"--edit-size":
@@ -1064,6 +1097,8 @@ func _set_option(key: String, value: String) -> void:
 				test_contest_tick = parts[2].to_int()
 		"--test-reset":
 			test_reset_tick = value.to_int()
+		"--test-builder":
+			test_builder = value
 		"--test-exit-after":
 			test_exit_after = value.to_float()
 		"--screenshot":

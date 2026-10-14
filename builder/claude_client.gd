@@ -2,7 +2,10 @@ class_name ClaudeClient
 extends Node
 ## Asks Claude through the Messages API (POST /v1/messages), for builder
 ## mode, on the server only. The key is the environment's ANTHROPIC_API_KEY
-## (on the server box, /etc/psykinetic/env), never in the client or the repo.
+## (on the server box, /etc/psykinetic/env), never in the client or the repo,
+## and ANTHROPIC_WORKSPACE_ID when the key is not scoped to a workspace (sent
+## as anthropic-workspace-id). Neither is ever logged; each response's
+## request-id is.
 ## send() is awaited: one request at a time, each on an HTTPRequest of its
 ## own, with a long timeout (a turn with thinking and tool calls takes a
 ## while). Refusals fall back server side to another model ("fallbacks":
@@ -22,6 +25,7 @@ const PRICES := {
 const FALLBACK_BETA := "server-side-fallback-2026-07-01"
 
 var api_key := ""
+var workspace_id := ""
 ## Logged with each request (the player who asked, the level).
 var log_tag := ""
 
@@ -29,6 +33,8 @@ var log_tag := ""
 func _ready() -> void:
 	if api_key.is_empty():
 		api_key = OS.get_environment("ANTHROPIC_API_KEY")
+	if workspace_id.is_empty():
+		workspace_id = OS.get_environment("ANTHROPIC_WORKSPACE_ID")
 
 
 func has_key() -> bool:
@@ -57,6 +63,8 @@ func send(body: Dictionary) -> Dictionary:
 		"anthropic-version: 2023-06-01",
 		"anthropic-beta: " + FALLBACK_BETA,
 	])
+	if not workspace_id.is_empty():
+		headers.append("anthropic-workspace-id: " + workspace_id)
 	var started := Time.get_ticks_msec()
 	var error := http.request(URL, headers, HTTPClient.METHOD_POST, JSON.stringify(request))
 	if error != OK:
@@ -67,6 +75,10 @@ func send(body: Dictionary) -> Dictionary:
 	var result: int = done[0]
 	var code: int = done[1]
 	var text: String = (done[3] as PackedByteArray).get_string_from_utf8()
+	var request_id := ""
+	for header: String in done[2]:
+		if header.to_lower().begins_with("request-id:"):
+			request_id = header.substr(header.find(":") + 1).strip_edges()
 	if result != HTTPRequest.RESULT_SUCCESS:
 		return {"error": "timed out" if result == HTTPRequest.RESULT_TIMEOUT else "no answer (%d)" % result}
 	var json := JSON.new()
@@ -75,10 +87,11 @@ func send(body: Dictionary) -> Dictionary:
 	var response: Dictionary = json.data
 	if code != 200:
 		var message: String = str(response.get("error", {}).get("message", text.left(200))) if response.get("error") is Dictionary else text.left(200)
+		print("[builder] %s: HTTP %d, request %s: %s" % [log_tag, code, request_id, message])
 		return {"error": "HTTP %d: %s" % [code, message]}
 	var used: Dictionary = response.get("usage", {})
 	var model := str(response.get("model", body.get("model", DEFAULT_MODEL)))
-	print("[builder] %s %s: %d in, %d out, %d cache read, %d cache write, $%.4f, %.1f s, %s" % [log_tag, model,
+	print("[builder] %s %s (request %s): %d in, %d out, %d cache read, %d cache write, $%.4f, %.1f s, %s" % [log_tag, model, request_id,
 		int(used.get("input_tokens", 0)), int(used.get("output_tokens", 0)), int(used.get("cache_read_input_tokens", 0)),
 		int(used.get("cache_creation_input_tokens", 0)),
 		cost(model, int(used.get("input_tokens", 0)), int(used.get("output_tokens", 0)),
