@@ -2339,3 +2339,30 @@ routes stops the task at its next portal and waits for it. Rejected: making
 the fields on the server's thread at load (seconds once the wilds has a
 few more ways), and fields per area pair instead of per portal (no cheaper
 to make, and along() needs the per-portal ones).
+
+## 203. A light's lines are worked out once; a door asks only its doors
+
+A door a monster opened cost 3.6 to 4.5 ms (tools/map_bench, now
+measured on its own: "door flip"), 85% of it each light that reaches the
+door walking its line to every cell in its reach again (has_clear_line,
+some 81 lines a torch). Only a door on the way can change those lines:
+walls, heights and where the doors are stay put till the map changes.
+
+Fields now keeps, for each fixed light, the cells in its reach whose line
+the terrain lets through, each with the doors that line crosses
+(World.line_doors, the same walk as has_clear_line with every door left
+to the end); a light done again asks only whether those doors are there
+and open. A line that passes a door on a diagonal step, where it depends
+on either of two ways round, is walked as before (World.LINE_ASK). The
+lines are worked out with the light's first share and again only on a
+whole recompute (a new map, a door node added or gone). The list of
+lights is kept too, not made again for every door. The amounts are the
+same to the bit: the same cells, the same distances, the same sums in the
+same order; edge_test compares the lines with walking them for every light
+and every cell in its reach, the castle's and a random maze's, doors shut,
+open and mixed.
+
+Door flip 3.6 ms to 0.85 at 128x128, 4.5 to 1.04 at 256x256; the
+256x256 tick 11 ms to 8.4 on average, 27 to 20 at worst. Rejected: a
+light spread by flood or shadowcasting (it would not light the same
+cells as the line its creature's sight and heat use).

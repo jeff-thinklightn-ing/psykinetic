@@ -3,6 +3,15 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.125
+
+Client and server.
+
+- Smoother on big maps when monsters walk through doors: working out the
+  light and heat a door lets through is about four times quicker.
+
+The server must be updated to v0.1.125 too, as it refuses any other version.
+
 ## v0.1.124
 
 Client and server.

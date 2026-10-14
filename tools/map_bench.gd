@@ -90,6 +90,25 @@ func _ready() -> void:
 	print("BENCH find_path corner to corner: avg %.2f ms, worst %.2f ms (%d/%d found)" % [
 		path_total / 1000.0 / tries, path_worst / 1000.0, found, tries])
 
+	# A door opened and shut, and the light and heat it lets through worked
+	# out again, as a monster walking through does it.
+	var doors := World.get_doors()
+	var door_total := 0
+	var door_worst := 0
+	var flips := mini(40, doors.size())
+	for i in flips:
+		var door: Door = doors[rng.randi_range(0, doors.size() - 1)]
+		for open: bool in [not door.open, door.open]:
+			started = Time.get_ticks_usec()
+			door.open = open
+			World.light_at(Terrain.edge_cells(door.key)[0], false)
+			var took := Time.get_ticks_usec() - started
+			door_total += took
+			door_worst = maxi(door_worst, took)
+	if flips > 0:
+		print("BENCH door flip (light and heat again): avg %.2f ms, worst %.2f ms (%d doors)" % [
+			door_total / 1000.0 / (flips * 2), door_worst / 1000.0, doors.size()])
+
 	print("BENCH nodes: %d, objects: %d, static memory: +%.1f MB" % [
 		Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 		Performance.get_monitor(Performance.OBJECT_COUNT),

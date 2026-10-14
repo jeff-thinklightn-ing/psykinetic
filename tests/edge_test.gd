@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_near_walls()
 	_test_paths_remember_the_terrain()
 	_test_fields_by_door()
+	_test_lines_owe_doors()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -281,6 +282,76 @@ func _test_fields_by_door() -> void:
 			changed = World.fields._light != before
 	_check(same, "after each of six, every cell's heat and light are exactly as worked out afresh")
 	_check(changed, "and the door does change them")
+
+
+func _test_lines_owe_doors() -> void:
+	print("
+== what a light's line owes to doors, worked out once, sees as walking the line does ==")
+	var castle: Dictionary = Level.load_level("castle")["terrain"]
+	var seen := _compare_lines(castle)
+	_check(seen["doors"] > 0 and seen["through"] > 0, "the castle: %d doors, %d lines through them" % [seen["doors"], seen["through"]])
+	_check(seen["wrong"] == 0, "every cell in reach of every light, doors shut, open and mixed: %d of %d differ" % [seen["wrong"], seen["checked"]])
+	# A maze: every edge open, a wall or a door, at random, and torches.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var size := 12
+	var rows: Array[String] = []
+	for y in size * 2 - 1:
+		var row := ""
+		for x in size * 2 - 1:
+			if x % 2 == 0 and y % 2 == 0:
+				row += "."
+			elif x % 2 == 1 and y % 2 == 1:
+				row += " "
+			else:
+				row += [" ", " ", "#", "+"][rng.randi_range(0, 3)]
+		rows.append(row)
+	var maze := Terrain.parse(rows)
+	maze["torches"] = [Vector2i(2, 2), Vector2i(9, 3), Vector2i(5, 6), Vector2i(1, 10), Vector2i(10, 10)]
+	seen = _compare_lines(maze)
+	_check(seen["through"] > 20 and seen["ask"] > 0, "a maze: %d doors, %d lines through them, %d past one on a diagonal" % [
+			seen["doors"], seen["through"], seen["ask"]])
+	_check(seen["wrong"] == 0, "the same there: %d of %d differ" % [seen["wrong"], seen["checked"]])
+
+
+## [param terrain] loaded with a node on each door, its doors all shut, all
+## open, then half at random: for every fixed light and every cell in its
+## reach, whether the cached lines (Fields._lines_of) see it against
+## whether walking the line does.
+func _compare_lines(terrain: Dictionary) -> Dictionary:
+	_build()
+	World.load_terrain(terrain)
+	var doors: Array[Door] = []
+	for key: Vector3i in terrain["edges"]:
+		if terrain["edges"][key] == Terrain.Edge.DOOR:
+			doors.append(_door(key, 20))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var fields := World.fields
+	var sources := fields._sources()
+	var out := {"doors": doors.size(), "checked": 0, "wrong": 0, "through": 0, "ask": 0}
+	for round in 3:
+		for door in doors:
+			door.open = round == 1 or (round == 2 and rng.randf() < 0.5)
+		for i in sources.size():
+			var source: Vector2i = sources[i][0]
+			var reach: int = sources[i][1]["reach"]
+			var lines: Dictionary = fields._lines_of(World, i, source, reach)
+			var cached := {}
+			for k in lines["cells"].size():
+				var owed: Variant = lines["doors"][k]
+				if round == 0 and owed is int:
+					out["ask"] += 1
+				elif round == 0 and not owed.is_empty():
+					out["through"] += 1
+				if owed is int and World.has_clear_line(source, lines["cells"][k]) 						or owed is Array and Fields._all_open(World, owed):
+					cached[lines["cells"][k]] = true
+			for cell in Fields._reachable(source, reach):
+				var walked := cell == source or World.has_clear_line(source, cell)
+				out["checked"] += 1
+				if walked != cached.has(cell):
+					out["wrong"] += 1
+	return out
 
 
 # --- helpers ------------------------------------------------------------------

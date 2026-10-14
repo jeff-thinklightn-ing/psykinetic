@@ -22,7 +22,9 @@ extends RefCounted
 ## cells those reach are added up again, from the shares in the same order
 ## as ever, so they come out the same to the last bit (the whole castle
 ## took 16 ms a door, and adding up the whole map again made a door's cost
-## grow with the map).
+## grow with the map). And what a source's line to each cell owes to doors
+## is worked out once (_lines, World.line_doors), so a source done again
+## for a door only asks which of those doors are open.
 
 ## What each fixed source gives at its own cell, and how far it reaches.
 const FIRE := {"heat": 10.0, "light": 0.8, "reach": 4}
@@ -54,6 +56,13 @@ var _covering: Dictionary[Vector2i, PackedInt32Array] = {}
 ## (a whole recompute): what a view shading the floor has to shade again.
 var _touched: Dictionary[Vector2i, bool] = {}
 var _touched_all := true
+## _sources(), kept till the map changes.
+var _source_list: Array = []
+## For each fixed source (indices into _parts), or null till worked out:
+## {"cells": the cells within its reach whose line the terrain does not
+## stop, in the order _spread looks at them, "doors": for each, what its
+## line owes to doors (World.line_doors)}.
+var _lines: Array = []
 
 
 func load(terrain: Dictionary) -> void:
@@ -61,12 +70,14 @@ func load(terrain: Dictionary) -> void:
 	_torches.assign(terrain.get("torches", []))
 	_lanterns.assign(terrain.get("lanterns", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
+	_source_list = []
 	mark_dirty()
 
 
 func mark_dirty() -> void:
 	_parts.clear()
 	_redo.clear()
+	_lines.clear()
 	_dirty = true
 
 
@@ -89,7 +100,10 @@ func mark_dirty_near(cells: Array[Vector2i]) -> void:
 
 
 ## Every fixed source in the order its share is added: [cell, spec].
+## Not a copy: read it, do not change it.
 func _sources() -> Array:
+	if not _source_list.is_empty():
+		return _source_list
 	var sources := []
 	for cell in _fire:
 		sources.append([cell, FIRE])
@@ -97,6 +111,7 @@ func _sources() -> Array:
 		sources.append([cell, TORCH])
 	for cell in _lanterns:
 		sources.append([cell, LANTERN])
+	_source_list = sources
 	return sources
 
 
@@ -176,7 +191,7 @@ func _refresh(world: Node) -> void:
 		return
 	_parts.resize(sources.size())
 	for i in sources.size():
-		_parts[i] = _spread(world, sources[i][0], sources[i][1])
+		_parts[i] = _spread(world, i, sources[i][0], sources[i][1])
 	_touched_all = true
 	_touched.clear()
 	_covering.clear()
@@ -202,7 +217,7 @@ func _refresh(world: Node) -> void:
 func _refresh_redone(world: Node, sources: Array) -> void:
 	var cells: Dictionary[Vector2i, bool] = {}
 	for i: int in _redo:
-		_parts[i] = _spread(world, sources[i][0], sources[i][1])
+		_parts[i] = _spread(world, i, sources[i][0], sources[i][1])
 		for cell in _reachable(sources[i][0], sources[i][1]["reach"]):
 			cells[cell] = true
 	_redo.clear()
@@ -245,27 +260,64 @@ static func _reachable(source: Vector2i, reach: int) -> Array[Vector2i]:
 	return cells
 
 
-## One source's share: {"heat": {cell: amount}, "light": {cell: amount}},
-## each cell's line from it traced once for both.
-func _spread(world: Node, source: Vector2i, spec: Dictionary) -> Dictionary:
+## One source's share (the [param index]th): {"heat": {cell: amount},
+## "light": {cell: amount}}, from the cells it can see: those whose line
+## the terrain lets through and whose doors on the way are open.
+func _spread(world: Node, index: int, source: Vector2i, spec: Dictionary) -> Dictionary:
 	var reach: int = spec["reach"]
 	var heat_share: Dictionary[Vector2i, float] = {}
 	var light_share: Dictionary[Vector2i, float] = {}
+	var lines: Dictionary = _lines_of(world, index, source, reach)
+	var cells: Array[Vector2i] = lines["cells"]
+	var doors: Array = lines["doors"]
+	for k in cells.size():
+		var cell := cells[k]
+		var owed: Variant = doors[k]
+		if owed is int:
+			if not world.has_clear_line(source, cell):
+				continue
+		elif not _all_open(world, owed):
+			continue
+		var distance := Vector2(cell - source).length()
+		var heat := _given(distance, reach, spec["heat"], true)
+		if heat > 0.0:
+			heat_share[cell] = heat
+		var light := _given(distance, reach, spec["light"], false)
+		if light > 0.0:
+			light_share[cell] = light
+	return {"heat": heat_share, "light": light_share}
+
+
+## The [param index]th source's lines (_lines), worked out the first time.
+func _lines_of(world: Node, index: int, source: Vector2i, reach: int) -> Dictionary:
+	if _lines.size() <= index:
+		_lines.resize(_sources().size())
+	if _lines[index] != null:
+		return _lines[index]
+	var cells: Array[Vector2i] = []
+	var doors := []
 	for dy in range(-reach, reach + 1):
 		for dx in range(-reach, reach + 1):
 			var cell := source + Vector2i(dx, dy)
-			var distance := Vector2(cell - source).length()
-			if distance > reach + 0.5:
+			if Vector2(cell - source).length() > reach + 0.5:
 				continue
-			if cell != source and not world.has_clear_line(source, cell):
+			var owed: Variant = [] if cell == source else world.line_doors(source, cell)
+			if owed == null:
 				continue
-			var heat := _given(distance, reach, spec["heat"], true)
-			if heat > 0.0:
-				heat_share[cell] = heat
-			var light := _given(distance, reach, spec["light"], false)
-			if light > 0.0:
-				light_share[cell] = light
-	return {"heat": heat_share, "light": light_share}
+			cells.append(cell)
+			doors.append(owed)
+	_lines[index] = {"cells": cells, "doors": doors}
+	return _lines[index]
+
+
+## Whether every door at [param keys] is there and open (a door that has
+## not arrived counts as shut, as World.edge_blocks_sight has it).
+static func _all_open(world: Node, keys: Array) -> bool:
+	for key: Vector3i in keys:
+		var door: Door = world.door_on(key)
+		if door == null or not door.is_open():
+			return false
+	return true
 
 
 ## What a source at [param source] giving [param amount] gives at

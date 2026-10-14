@@ -1931,6 +1931,74 @@ func has_clear_line(from: Vector2i, to: Vector2i) -> bool:
 	return seen
 
 
+## What a clear line (has_clear_line) from [param from] to [param to]
+## owes to doors: null if the terrain alone stops it, else the keys of the
+## doors it crosses, each of which must be open for it to be clear ([] for
+## none); LINE_ASK when it passes a door on a diagonal step, where it
+## depends on more than one door being open. Walls, heights and where the
+## doors are stay put, so this is worked out once (Fields).
+const LINE_ASK := -1
+func line_doors(from: Vector2i, to: Vector2i) -> Variant:
+	var eye := height_at(from)
+	var top := maxi(eye, height_at(to))
+	var doors: Array[Vector3i] = []
+	var d: Vector2i = (to - from).abs()
+	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
+	var err: int = d.x - d.y
+	var at: Vector2i = from
+	while at != to:
+		var e2: int = 2 * err
+		var step := Vector2i.ZERO
+		if e2 > -d.y:
+			err -= d.y
+			step.x = s.x
+		if e2 < d.x:
+			err += d.x
+			step.y = s.y
+		if step.x == 0 or step.y == 0:
+			var crossing: Variant = _sight_edge(at, step, eye)
+			if crossing == null:
+				return null
+			if crossing is Vector3i:
+				doors.append(crossing)
+		else:
+			var via_x := Vector2i(step.x, 0)
+			var via_y := Vector2i(0, step.y)
+			var routes := [[_sight_edge(at, via_x, eye), _sight_edge(at + via_x, via_y, eye)],
+				[_sight_edge(at, via_y, eye), _sight_edge(at + via_y, via_x, eye)]]
+			var open_route := false
+			var door_route := false
+			for route: Array in routes:
+				if route.has(null):
+					continue
+				if route[0] is Vector3i or route[1] is Vector3i:
+					door_route = true
+				else:
+					open_route = true
+			if not open_route:
+				if not door_route:
+					return null
+				return LINE_ASK
+		at += step
+		if at != to and height_at(at) > top:
+			return null
+	return doors
+
+
+## An edge as sight (edge_blocks_sight, from an eye at [param eye]) meets
+## it, whatever its door is doing: null for a wall, the key for a door,
+## true for open.
+func _sight_edge(from: Vector2i, direction: Vector2i, eye: int) -> Variant:
+	if eye >= 0 and eye > maxi(height_at(from), height_at(from + direction)):
+		return true
+	match edge_kind(from, direction):
+		Terrain.Edge.WALL:
+			return null
+		Terrain.Edge.DOOR:
+			return Terrain.edge_key(from, direction)
+	return true
+
+
 ## The walk itself. Ground higher than both ends stops it too.
 func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	var top := maxi(height_at(from), height_at(to))
