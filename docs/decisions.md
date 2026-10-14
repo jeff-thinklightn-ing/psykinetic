@@ -2118,3 +2118,17 @@ way back on purpose says `"one_way": true`. Rejected: a separate
 `levels/world.json` listing areas and links, which would repeat what each
 level.json already holds; and checking only that a link's target exists,
 which misses dead ends a player can walk into and not out of.
+
+## 196. The editor's level is a MapDoc, with no screen
+
+The level editor kept the map, level.json, the undo stack and saving in its
+own Node2D, mixed with its panels and drawing, so nothing else could edit a
+level the way it does. `MapDoc` (editor/map_doc.gd) now holds them:
+opening and saving the three files, `apply_changes` (a prefab stamp, an
+area tool's fill), `resize`, entries and links by cell, and undo and redo
+of every step, with a `changed` signal. The editor delegates to one and
+redraws on `changed`; builder mode's server side edits one the same way,
+so an edit Claude proposed and a player accepted is an undo step like one
+painted by hand, and is saved by the same code. The editor's own strokes
+(painting cells and edges, a monster's facing and idling) still change
+the map directly and hand their undo step to `MapDoc.push`.

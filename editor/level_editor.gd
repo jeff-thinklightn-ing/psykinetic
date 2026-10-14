@@ -57,7 +57,6 @@ const DOOR := Color(0.95, 0.6, 0.2)
 const HOVER := Color(1.0, 0.9, 0.3, 0.9)
 const FONT_SIZE := 30
 const PAN_SPEED := 1400.0
-const UNDO_LIMIT := 200
 const ARROW := Color(1, 1, 1, 0.95)
 const ARROW_OWN := Color(1, 1, 1, 0.35)
 const ROUTE := Color(0.35, 0.85, 1.0, 0.85)
@@ -88,22 +87,34 @@ const LETTERS := {"start": "S", "crate": "C", "boulder": "O", "cart": "K", "ches
 var map_name := ""
 ## Where layout.png lives (res://levels/<map>/; tests use user://).
 var folder := ""
-var map: LevelMap
-var config := {}
+## The level being edited: its map, level.json, undo, saving (MapDoc).
+var doc: MapDoc
+var map: LevelMap:
+	get: return doc.map
+	set(value): doc.map = value
+var config: Dictionary:
+	get: return doc.config
+	set(value): doc.config = value
+var dirty: bool:
+	get: return doc.dirty
+	set(value): doc.dirty = value
+## The last load, save or change's report, shown in the status line.
+var report: String:
+	get: return doc.report if doc != null else ""
+	set(value): doc.report = value
+var _undo: Array[Dictionary]:
+	get: return doc.undo_steps
+var _redo: Array[Dictionary]:
+	get: return doc.redo_steps
 ## What the palette offers: PALETTE, then level.json's own legend entries.
 var palette: Array[String] = []
 var brush := "stone"
-var dirty := false
-## The last save's report, shown in the status line.
-var report := ""
 
 ## What the cursor is over: {"cell": Vector2i} or {"edge": Vector3i}, or {}.
 var hover := {}
 var _stroke: Dictionary = {}  # "cell"/"edge" key -> value before the stroke
 var _stroke_button := MOUSE_BUTTON_NONE
 var _stroke_from: Variant = null
-var _undo: Array[Dictionary] = []
-var _redo: Array[Dictionary] = []
 var _panning := false
 var _camera: Camera2D
 var _status: Label
@@ -113,11 +124,6 @@ var _buttons: Dictionary[String, Button] = {}
 var selected := NOWHERE
 var editing_route := false
 var setting_point := false
-## level.json has changes to write.
-var config_dirty := false
-## height.png was there when loaded, and has changes to write.
-var had_heights := false
-var heights_dirty := false
 ## Each monster cell's name as the game will give it (for its own facing).
 var _names: Dictionary[Vector2i, String] = {}
 var _panel: VBoxContainer
@@ -179,32 +185,10 @@ func _test_exit() -> void:
 
 ## Reads the map (and level.json for its legend), or starts a blank one.
 func load_map() -> void:
-	config = {}
-	var json_path := folder + "level.json"
-	if FileAccess.file_exists(json_path):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(json_path))
-		if parsed is Dictionary:
-			config = parsed
-	var png := folder + "layout.png"
-	var image: Image = null
-	if FileAccess.file_exists(png):
-		image = Image.load_from_file(ProjectSettings.globalize_path(png))
-	if image != null:
-		map = LevelMap.from_image(image, config)
-		var heights_png := folder + "height.png"
-		had_heights = FileAccess.file_exists(heights_png)
-		if had_heights:
-			map.read_heights(Image.load_from_file(ProjectSettings.globalize_path(heights_png)))
-		report = "loaded %s: %d x %d cells%s" % [png, map.size.x, map.size.y,
-			", %d pixels of colours not in the legend (void when saved)" % map.unknown_pixels if map.unknown_pixels > 0 else ""]
-	else:
-		had_heights = false
-		map = LevelMap.new(Net.edit_size, config)
-		report = "new map %s: %d x %d cells (not saved yet)" % [map_name, map.size.x, map.size.y]
+	doc = MapDoc.open(folder, Net.edit_size)
+	doc.changed.connect(_on_doc_changed)
 	palette = PALETTE.duplicate()
 	selected = NOWHERE
-	config_dirty = false
-	heights_dirty = false
 	_name_cells()
 	for meaning: String in map.colours:
 		if meaning not in palette and meaning != "door" and meaning != "wall":
@@ -212,47 +196,12 @@ func load_map() -> void:
 	print("[editor] " + report)
 
 
-## Writes layout.png and its .import (as Image). False if it could not.
+## Writes layout.png and its .import (as Image), level.json and height.png
+## if they changed (MapDoc.save). False if it could not.
 func save() -> bool:
-	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(folder)):
-		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))
-	var png := folder + "layout.png"
-	var image := map.to_image()
-	var error := image.save_png(ProjectSettings.globalize_path(png))
-	if error != OK:
-		report = "could not save %s (%s)" % [png, error_string(error)]
-		print("[editor] " + report)
-		return false
-	var imported := LevelMap.ensure_image_import(ProjectSettings.globalize_path(png), png)
-	if config_dirty:
-		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
-		if json == null:
-			report = "could not save %slevel.json" % folder
-			print("[editor] " + report)
-			return false
-		json.store_string(JSON.stringify(config, "	", false) + "
-")
-		json.close()
-		config_dirty = false
-	if heights_dirty:
-		var heights_png := folder + "height.png"
-		error = map.to_height_image().save_png(ProjectSettings.globalize_path(heights_png))
-		if error != OK:
-			report = "could not save %s (%s)" % [heights_png, error_string(error)]
-			print("[editor] " + report)
-			return false
-		LevelMap.ensure_image_import(ProjectSettings.globalize_path(heights_png), heights_png)
-		had_heights = true
-		heights_dirty = false
-	dirty = false
-	var level := Level.parse(image, map.to_height_image() if had_heights else null, config)
-	var warnings: Array = level["warnings"]
-	report = "saved %s (%d x %d cells, %d floor, %d things)%s%s" % [png, map.size.x, map.size.y,
-		(level["terrain"]["floor"] as Array).size(), (level["entities"] as Array).size(),
-		"; import set to Image" if imported else "",
-		"; warnings: " + "; ".join(warnings) if not warnings.is_empty() else ""]
+	var ok := doc.save()
 	print("[editor] " + report)
-	return true
+	return ok
 
 
 # --- Tools and strokes -----------------------------------------------------------
@@ -372,10 +321,7 @@ func end_stroke() -> void:
 	if _stroke.is_empty():
 		return
 	_name_cells()
-	_undo.append(_stroke)
-	if _undo.size() > UNDO_LIMIT:
-		_undo.pop_front()
-	_redo.clear()
+	doc.push(_stroke)
 	_stroke = {}
 
 
@@ -404,48 +350,23 @@ func _apply(target: Dictionary) -> void:
 
 
 func undo() -> void:
-	if _undo.is_empty():
-		return
-	_redo.append(_swap(_undo.pop_back()))
+	doc.undo()
 
 
 func redo() -> void:
-	if _redo.is_empty():
-		return
-	_undo.append(_swap(_redo.pop_back()))
+	doc.redo()
 
 
-## Puts [param stroke]'s values back; returns the values it replaced.
-func _swap(stroke: Dictionary) -> Dictionary:
-	var back := {}
-	for key: Variant in stroke:
-		if key is Vector2i:
-			back[key] = map.set_cell(key, stroke[key])
-		elif key is Vector3i:
-			back[key] = map.set_edge(key, stroke[key])
-		elif key == "canvas":
-			back[key] = _canvas_state()
-			_set_canvas_state(stroke[key])
-		elif str(key).begins_with("height "):
-			var parts := str(key).split(" ")
-			var at := Vector2i(int(parts[1]), int(parts[2]))
-			back[key] = _set_height(at, int(stroke[key]))
-		elif str(key).begins_with("link "):
-			var parts := str(key).split(" ")
-			var at := Vector2i(int(parts[1]), int(parts[2]))
-			back[key] = link_of(at).duplicate(true)
-			_put_link(at, stroke[key])
-		else:
-			# A monster's entry: "entry x y" -> the entry as it was ({}: none).
-			var parts := str(key).split(" ")
-			var at := Vector2i(int(parts[1]), int(parts[2]))
-			back[key] = entry_of(at).duplicate(true)
-			_put_entry(at, stroke[key])
+## After any change to the level through its MapDoc: the names, the panel,
+## the picture.
+func _on_doc_changed() -> void:
+	if selected != NOWHERE and not is_monster(selected):
+		selected = NOWHERE
 	_name_cells()
 	_refresh_panel()
-	dirty = true
 	queue_redraw()
-	return back
+	if _canvas_size != null:
+		_canvas_size.text = "%d x %d cells" % [map.size.x, map.size.y]
 
 
 ## The cells from [param a] to [param b], both ends in (Bresenham).
@@ -472,52 +393,17 @@ static func _line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 # --- The canvas: resizing ------------------------------------------------------------
 
 ## Grows the map [param left], [param top], [param right], [param bottom]
-## cells on those sides (negative shrinks it), as one undo step. Returns
-## what fell off ("" for nothing).
+## cells on those sides (negative shrinks it), as one undo step
+## (MapDoc.resize). Returns what fell off ("" for nothing).
 func resize(left: int, top: int, right: int, bottom: int) -> String:
-	var bigger := map.resized(left, top, right, bottom)
-	if bigger.size == map.size and left == 0 and top == 0:
+	var before := map
+	var lost := doc.resize(left, top, right, bottom)
+	if map == before:
 		return ""
-	var before := _canvas_state()
-	var offset := Vector2i(left, top)
-	var dropped: Array[String] = []
-	var lost := map.cells.keys().filter(func(at: Vector2i) -> bool: return not bigger.in_bounds(at + offset)).size()
-	var moved := LevelMap.moved_config(config, func(at: Vector2i) -> Variant:
-		return at + offset if bigger.in_bounds(at + offset) else null, 0, dropped)
-	_set_canvas_state({"map": bigger, "config": moved})
-	_undo.append({"canvas": before})
-	if _undo.size() > UNDO_LIMIT:
-		_undo.pop_front()
-	_redo.clear()
 	if _camera != null:
-		_camera.position += Vector2(offset) * CELL
-	var lost_text := ""
-	if lost > 0 or not dropped.is_empty():
-		lost_text = "dropped %d cells%s" % [lost, (", " + ", ".join(dropped)) if not dropped.is_empty() else ""]
-	report = "resized to %d x %d cells%s" % [map.size.x, map.size.y, "; " + lost_text if not lost_text.is_empty() else ""]
+		_camera.position += Vector2(left, top) * CELL
 	print("[editor] " + report)
-	return lost_text
-
-
-## What a resize changes: the map (heights in it) and level.json.
-func _canvas_state() -> Dictionary:
-	return {"map": map, "config": config.duplicate(true)}
-
-
-func _set_canvas_state(state: Dictionary) -> void:
-	map = state["map"]
-	config = state["config"]
-	# height.png must match layout.png's size, after an undo too.
-	heights_dirty = had_heights or not map.heights.is_empty()
-	config_dirty = true
-	dirty = true
-	if selected != NOWHERE and not is_monster(selected):
-		selected = NOWHERE
-	_name_cells()
-	_refresh_panel()
-	queue_redraw()
-	if _canvas_size != null:
-		_canvas_size.text = "%d x %d cells" % [map.size.x, map.size.y]
+	return lost
 
 
 func toggle_canvas() -> void:
@@ -586,59 +472,9 @@ func stamp_at(at: Vector2i) -> void:
 		report = "stamped %s at %d, %d" % [stamp_name, at.x, at.y]
 
 
-## Makes [param changes] as one undo step: {cells: cell -> meaning, edges:
-## key -> kind, and optionally heights: cell -> level, entries and links
-## (level.json's, at their cells), covers: the cells whose entries and links
-## go first (default: every cell in cells)}, as Prefab.stamp_changes and
-## AreaTools give them. Returns whether anything changed.
+## Makes [param changes] as one undo step (MapDoc.apply_changes).
 func apply_changes(changes: Dictionary) -> bool:
-	var stroke := {}
-	var cells: Dictionary = changes.get("cells", {})
-	var covers: Array = changes.get("covers", cells.keys())
-	for cell: Vector2i in covers:
-		# What the map held there goes: its entry and link with its cell.
-		if not entry_of(cell).is_empty():
-			stroke["entry %d %d" % [cell.x, cell.y]] = entry_of(cell).duplicate(true)
-			_put_entry(cell, {})
-		if not link_of(cell).is_empty():
-			stroke["link %d %d" % [cell.x, cell.y]] = link_of(cell).duplicate(true)
-			_put_link(cell, {})
-	for cell: Vector2i in cells:
-		var old := map.set_cell(cell, cells[cell])
-		if old != cells[cell]:
-			stroke[cell] = old
-	var edges: Dictionary = changes.get("edges", {})
-	for key: Vector3i in edges:
-		var old := map.set_edge(key, edges[key])
-		if old != edges[key]:
-			stroke[key] = old
-	var heights: Dictionary = changes.get("heights", {})
-	for cell: Vector2i in heights:
-		var old := _set_height(cell, heights[cell])
-		if old != heights[cell]:
-			stroke["height %d %d" % [cell.x, cell.y]] = old
-	for entry: Dictionary in changes.get("entries", []):
-		var cell: Vector2i = Level._tile(entry.get("at"))
-		var key := "entry %d %d" % [cell.x, cell.y]
-		if not stroke.has(key):
-			stroke[key] = entry_of(cell).duplicate(true)
-		_put_entry(cell, entry)
-	for link: Dictionary in changes.get("links", []):
-		var cell: Vector2i = Level._tile(link.get("at"))
-		var key := "link %d %d" % [cell.x, cell.y]
-		if not stroke.has(key):
-			stroke[key] = link_of(cell).duplicate(true)
-		_put_link(cell, link)
-	if stroke.is_empty():
-		return false
-	dirty = true
-	_undo.append(stroke)
-	if _undo.size() > UNDO_LIMIT:
-		_undo.pop_front()
-	_redo.clear()
-	_name_cells()
-	queue_redraw()
-	return true
+	return doc.apply_changes(changes)
 
 
 # --- Area tools ---------------------------------------------------------------------
@@ -696,51 +532,9 @@ func _set_tool(setting: String, value: Variant) -> void:
 	_refresh_panel()
 
 
-## Sets cell [param at]'s height (0 for none); returns what it was. A
-## change means height.png is written on save.
-func _set_height(at: Vector2i, level: int) -> int:
-	var old: int = map.heights.get(at, 0)
-	if level <= 0:
-		map.heights.erase(at)
-	else:
-		map.heights[at] = level
-	if old != level:
-		heights_dirty = true
-		dirty = true
-	return old
-
-
 ## level.json's link on [param at] ({} for none).
 func link_of(at: Vector2i) -> Dictionary:
-	var listed: Variant = config.get("links", [])
-	if listed is Array:
-		for link: Variant in listed:
-			if link is Dictionary and Level._tile(link.get("at")) == at:
-				return link
-	return {}
-
-
-## Puts [param link] as the link on [param at] ({} takes it out).
-func _put_link(at: Vector2i, link: Dictionary) -> void:
-	if not config.get("links") is Array:
-		config["links"] = []
-	var listed: Array = config["links"]
-	var index := -1
-	for i in listed.size():
-		if listed[i] is Dictionary and Level._tile(listed[i].get("at")) == at:
-			index = i
-			break
-	if link.is_empty():
-		if index >= 0:
-			listed.remove_at(index)
-	elif index >= 0:
-		listed[index] = link
-	else:
-		listed.append(link)
-	if listed.is_empty():
-		config.erase("links")
-	config_dirty = true
-	dirty = true
+	return doc.link_of(at)
 
 
 # --- Monsters: facing and idling ----------------------------------------------------
@@ -779,37 +573,7 @@ func _select_click(button: MouseButton, at: Vector2i) -> void:
 
 ## level.json's entry for the entity at [param at] ({} for none).
 func entry_of(at: Vector2i) -> Dictionary:
-	var listed: Variant = config.get("entities", [])
-	if listed is Array:
-		for entry: Variant in listed:
-			if entry is Dictionary and Level._tile(entry.get("at")) == at:
-				return entry
-	return {}
-
-
-## Puts [param entry] as the entry for [param at]: replaced where it is in
-## the list, added at the end, or ({} or only "at") taken out.
-func _put_entry(at: Vector2i, entry: Dictionary) -> void:
-	if not config.get("entities") is Array:
-		config["entities"] = []
-	var listed: Array = config["entities"]
-	var index := -1
-	for i in listed.size():
-		if listed[i] is Dictionary and Level._tile(listed[i].get("at")) == at:
-			index = i
-			break
-	var empty := entry.keys().all(func(key: Variant) -> bool: return str(key) == "at")
-	if empty:
-		if index >= 0:
-			listed.remove_at(index)
-	elif index >= 0:
-		listed[index] = entry
-	else:
-		listed.append(entry)
-	if listed.is_empty():
-		config.erase("entities")
-	config_dirty = true
-	dirty = true
+	return doc.entry_of(at)
 
 
 ## Changes the selected monster's entry with [param change] (given the
@@ -823,11 +587,8 @@ func _edit_selected(change: Callable) -> void:
 	change.call(entry)
 	if entry == before:
 		return
-	_put_entry(selected, entry)
-	_undo.append({"entry %d %d" % [selected.x, selected.y]: before})
-	if _undo.size() > UNDO_LIMIT:
-		_undo.pop_front()
-	_redo.clear()
+	doc.put_entry(selected, entry)
+	doc.push({"entry %d %d" % [selected.x, selected.y]: before})
 	_refresh_panel()
 	queue_redraw()
 
