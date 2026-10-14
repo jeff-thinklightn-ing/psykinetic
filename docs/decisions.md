@@ -2023,3 +2023,21 @@ outline (0) are drawn before, so they still show through a faded wall;
 the HP bars (10) after. The cost: something translucent in front of a
 faded wall is washed by it a little, as the wall's colour is drawn after.
 A faded wall now looks fainter than before, as it no longer stacks.
+
+## 189. A resize moves level.json and height.png with the ground
+
+The editor's resize (grow or shrink from any side) keeps everything where it
+stands on the ground: a cell at (x, y) moves to (x + left, y + top), and so
+does every cell named in level.json (an entity's tile, its patrol route and
+gather point, the starts, spawn points, links and centre) and every height.
+A level's cells live in three places (layout.png, height.png, level.json),
+so a resize that moved only the picture would leave monsters on the wrong
+tiles and links on no marker; `LevelMap.moved_config` is the one place that
+knows every cell level.json holds, and `LevelMap.transformed` the one that
+moves a picture's cells, edges and heights by any mapping, so prefabs
+(extract and stamp with rotation) use the same two. What falls off a shrunk
+side is dropped and named, rather than refusing the shrink. The editor now
+reads height.png and writes it back after a resize, so the two images stay
+the same size; it still does not paint heights. A resize is one undo step
+holding the whole map and level.json before it, not a diff: maps are small
+enough (256 x 256 is 65k cells) that a copy per step is cheap.

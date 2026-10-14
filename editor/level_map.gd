@@ -18,6 +18,8 @@ var size := NEW_SIZE
 var pixels := Vector2i(NEW_SIZE.x * 2 - 1, NEW_SIZE.y * 2 - 1)
 var cells: Dictionary[Vector2i, String] = {}
 var edges: Dictionary[Vector3i, String] = {}
+## height.png: cell -> level 1..Level.MAX_HEIGHT (0 is left out).
+var heights: Dictionary[Vector2i, int] = {}
 ## Meaning -> colour: the default legend with level.json's overrides.
 var colours: Dictionary[String, Color] = {}
 ## Pixels whose colour is not in the legend, found on load (they become
@@ -68,6 +70,165 @@ static func from_image(image: Image, config := {}) -> LevelMap:
 				var edge := Vector3i(x / 2, y / 2, Terrain.EAST if x % 2 == 1 else Terrain.SOUTH)
 				map.edges[edge] = meaning
 	return map
+
+
+## Reads [param image] (height.png, the size of layout.png) into
+## [member heights]; false, reading nothing, if its size is not [member pixels].
+func read_heights(image: Image) -> bool:
+	heights.clear()
+	if image == null or image.get_size() != pixels:
+		return false
+	for y in size.y:
+		for x in size.x:
+			var level := clampi(roundi(image.get_pixel(x * 2, y * 2).r8 / float(Level.GREY_PER_LEVEL)), 0, Level.MAX_HEIGHT)
+			if level > 0:
+				heights[Vector2i(x, y)] = level
+	return true
+
+
+## [member heights] as height.png, [member pixels] big.
+func to_height_image() -> Image:
+	var image := Image.create_empty(pixels.x, pixels.y, false, Image.FORMAT_RGBA8)
+	image.fill(Color.BLACK)
+	for at: Vector2i in heights:
+		if in_bounds(at):
+			var grey := clampi(heights[at], 0, Level.MAX_HEIGHT) * Level.GREY_PER_LEVEL / 255.0
+			image.set_pixel(at.x * 2, at.y * 2, Color(grey, grey, grey))
+	return image
+
+
+## A map [param new_size] cells big with every cell, edge and height of this
+## one carried to where [param move] (Vector2i -> Vector2i, or null to leave
+## it out) puts it. An edge goes with its two cells (so a quarter turn turns
+## it too); what lands out of bounds is left out.
+func transformed(new_size: Vector2i, move: Callable) -> LevelMap:
+	var out := LevelMap.new(new_size)
+	out.colours = colours.duplicate()
+	for at: Vector2i in cells:
+		var to: Variant = move.call(at)
+		if to != null and out.in_bounds(to):
+			out.cells[to] = cells[at]
+	for at: Vector2i in heights:
+		var to: Variant = move.call(at)
+		if to != null and out.in_bounds(to):
+			out.heights[to] = heights[at]
+	for key: Vector3i in edges:
+		var ends := Terrain.edge_cells(key)
+		var a: Variant = move.call(ends[0])
+		var b: Variant = move.call(ends[1])
+		if a == null or b == null:
+			continue
+		var moved := Terrain.edge_key(a, b - a)
+		if out.edge_in_bounds(moved):
+			out.edges[moved] = edges[key]
+	return out
+
+
+## This map grown (or, negative, shrunk) by that many cells on each side.
+## Everything keeps its place on the ground: what was at (x, y) is at
+## (x + [param left], y + [param top]). The picture keeps any spare edge
+## column or row it had.
+func resized(left: int, top: int, right: int, bottom: int) -> LevelMap:
+	var new_size := Vector2i(maxi(1, size.x + left + right), maxi(1, size.y + top + bottom))
+	var offset := Vector2i(left, top)
+	var out := transformed(new_size, func(at: Vector2i) -> Variant: return at + offset)
+	out.pixels = pixels + (new_size - size) * 2
+	return out
+
+
+## [param config] (level.json) with every cell in it carried by [param move]
+## (Vector2i -> Vector2i, or null for gone) and every facing turned
+## [param turns] quarter turns clockwise: the centre, starts, spawn points,
+## links, and each entity's cell, route and gather point. What [param move]
+## drops is left out (an entity's entry, a link, a start; a waypoint; a gather
+## point), each said in [param dropped]. The rest of the file is kept.
+static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped: Array[String] = []) -> Dictionary:
+	var out := config.duplicate(true)
+	var cell := func(value: Variant) -> Variant:
+		var at: Variant = Level._tile(value)
+		if at == null:
+			return null
+		var to: Variant = move.call(at)
+		return [to.x, to.y] if to != null else null
+	if out.has("centre"):
+		var to: Variant = cell.call(out["centre"])
+		if to == null:
+			out.erase("centre")
+		else:
+			out["centre"] = to
+	if out.get("starts") is Array:
+		var starts: Array = []
+		for start: Variant in out["starts"]:
+			var to: Variant = cell.call(start)
+			if to != null:
+				starts.append(to)
+			else:
+				dropped.append("start %s" % [start])
+		out["starts"] = starts
+	if out.get("spawn_points") is Dictionary:
+		var points: Dictionary = out["spawn_points"]
+		for spawn_name: Variant in points.keys():
+			var to: Variant = cell.call(points[spawn_name])
+			if to != null:
+				points[spawn_name] = to
+			else:
+				points.erase(spawn_name)
+				dropped.append("spawn point %s" % spawn_name)
+	if out.get("links") is Array:
+		var links: Array = []
+		for link: Variant in out["links"]:
+			var to: Variant = cell.call(link.get("at") if link is Dictionary else null)
+			if to != null:
+				link["at"] = to
+				links.append(link)
+			else:
+				dropped.append("link %s" % [link])
+		out["links"] = links
+	if out.get("entities") is Array:
+		var entities: Array = []
+		for entry: Variant in out["entities"]:
+			var to: Variant = cell.call(entry.get("at") if entry is Dictionary else null)
+			if to == null:
+				dropped.append("entity %s" % [entry])
+				continue
+			entry["at"] = to
+			var facing: Variant = Level.facing_from(entry.get("facing"))
+			if facing != null and turns != 0:
+				var turned := turn(facing, turns)
+				entry["facing"] = [turned.x, turned.y]
+			var idle: Variant = entry.get("idle")
+			if idle is Dictionary:
+				if idle.get("route") is Array:
+					var route: Array = []
+					for point: Variant in idle["route"]:
+						var moved: Variant = cell.call(point)
+						if moved != null:
+							route.append(moved)
+						else:
+							dropped.append("waypoint %s" % [point])
+					if route.is_empty():
+						idle.erase("route")
+						idle.erase("loop")
+					else:
+						idle["route"] = route
+				if idle.has("point"):
+					var moved: Variant = cell.call(idle["point"])
+					if moved != null:
+						idle["point"] = moved
+					else:
+						dropped.append("gather point %s" % [idle["point"]])
+						idle.erase("point")
+			entities.append(entry)
+		out["entities"] = entities
+	return out
+
+
+## [param direction] turned [param turns] quarter turns clockwise (y down).
+static func turn(direction: Vector2i, turns: int) -> Vector2i:
+	var out := direction
+	for i in posmod(turns, 4):
+		out = Vector2i(-out.y, out.x)
+	return out
 
 
 ## The map as layout.png, [member pixels] big. A clear edge between

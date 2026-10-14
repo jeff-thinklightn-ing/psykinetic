@@ -215,10 +215,17 @@ write its levels.
   redoes it. Middle drag or the arrow keys pan, the wheel zooms.
 - The faint lines along the floor's outline are the outer walls the game
   builds by itself; you never need to draw them.
+- `Ctrl+R` shows the **canvas** panel: grow or shrink the map by 1 or 8
+  cells on any side. Everything keeps its place on the ground, and
+  `level.json`'s cells move with it (entities, routes, gather points,
+  starts, spawn points, links, the centre), as does `height.png`. What falls
+  off a shrunk side is dropped, and the status line names it. Each change is
+  one undo step.
 
 Saving writes the same double-resolution `layout.png` (the file's own size
 kept), its `.import` set to Image, and reports what the server would warn
-about. `height.png` and `level.json` are left as they are. Run from the
+about. `level.json` is written when something in it changed (a monster's
+facing or idling, a resize); `height.png` only after a resize. Run from the
 project, the game reads `layout.png` itself rather than its import, so a
 saved map plays at once with `--map=<name>`.
 

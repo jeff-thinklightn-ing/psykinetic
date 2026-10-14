@@ -26,7 +26,13 @@ extends Node2D
 ## and its .import as Image, and says what the game will warn about
 ## (Level.parse); level.json too, when a monster's facing or idling was
 ## set, with only those in its entry (the rest of the file as it was).
-## height.png is left as it is.
+## height.png is read and written back only when a resize moved it.
+##
+## Ctrl+R shows the canvas panel: grow or shrink the map from any side.
+## Everything on it keeps its place on the ground, and level.json's cells
+## (entities, routes, gather points, starts, spawn points, links, the
+## centre) and height.png move with it; what falls off a shrunk side is
+## dropped, and the status line says what. One undo step per change.
 
 const CELL := 48.0
 const GRID := Color(1, 1, 1, 0.07)
@@ -90,9 +96,14 @@ var editing_route := false
 var setting_point := false
 ## level.json has changes to write.
 var config_dirty := false
+## height.png was there when loaded, and has changes to write.
+var had_heights := false
+var heights_dirty := false
 ## Each monster cell's name as the game will give it (for its own facing).
 var _names: Dictionary[Vector2i, String] = {}
 var _panel: VBoxContainer
+var _canvas: PanelContainer
+var _canvas_size: Label
 
 
 func _ready() -> void:
@@ -135,14 +146,20 @@ func load_map() -> void:
 		image = Image.load_from_file(ProjectSettings.globalize_path(png))
 	if image != null:
 		map = LevelMap.from_image(image, config)
+		var heights_png := folder + "height.png"
+		had_heights = FileAccess.file_exists(heights_png)
+		if had_heights:
+			map.read_heights(Image.load_from_file(ProjectSettings.globalize_path(heights_png)))
 		report = "loaded %s: %d x %d cells%s" % [png, map.size.x, map.size.y,
 			", %d pixels of colours not in the legend (void when saved)" % map.unknown_pixels if map.unknown_pixels > 0 else ""]
 	else:
+		had_heights = false
 		map = LevelMap.new(Net.edit_size, config)
 		report = "new map %s: %d x %d cells (not saved yet)" % [map_name, map.size.x, map.size.y]
 	palette = PALETTE.duplicate()
 	selected = NOWHERE
 	config_dirty = false
+	heights_dirty = false
 	_name_cells()
 	for meaning: String in map.colours:
 		if meaning not in palette and meaning != "door" and meaning != "wall":
@@ -172,8 +189,18 @@ func save() -> bool:
 ")
 		json.close()
 		config_dirty = false
+	if heights_dirty:
+		var heights_png := folder + "height.png"
+		error = map.to_height_image().save_png(ProjectSettings.globalize_path(heights_png))
+		if error != OK:
+			report = "could not save %s (%s)" % [heights_png, error_string(error)]
+			print("[editor] " + report)
+			return false
+		LevelMap.ensure_image_import(ProjectSettings.globalize_path(heights_png), heights_png)
+		had_heights = true
+		heights_dirty = false
 	dirty = false
-	var level := Level.parse(image, null, config)
+	var level := Level.parse(image, map.to_height_image() if had_heights else null, config)
 	var warnings: Array = level["warnings"]
 	report = "saved %s (%d x %d cells, %d floor, %d things)%s%s" % [png, map.size.x, map.size.y,
 		(level["terrain"]["floor"] as Array).size(), (level["entities"] as Array).size(),
@@ -315,6 +342,9 @@ func _swap(stroke: Dictionary) -> Dictionary:
 			back[key] = map.set_cell(key, stroke[key])
 		elif key is Vector3i:
 			back[key] = map.set_edge(key, stroke[key])
+		elif key == "canvas":
+			back[key] = _canvas_state()
+			_set_canvas_state(stroke[key])
 		else:
 			# A monster's entry: "entry x y" -> the entry as it was ({}: none).
 			var parts := str(key).split(" ")
@@ -347,6 +377,62 @@ static func _line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 			error += d.x
 			at.y += s.y
 	return out
+
+
+# --- The canvas: resizing ------------------------------------------------------------
+
+## Grows the map [param left], [param top], [param right], [param bottom]
+## cells on those sides (negative shrinks it), as one undo step. Returns
+## what fell off ("" for nothing).
+func resize(left: int, top: int, right: int, bottom: int) -> String:
+	var bigger := map.resized(left, top, right, bottom)
+	if bigger.size == map.size and left == 0 and top == 0:
+		return ""
+	var before := _canvas_state()
+	var offset := Vector2i(left, top)
+	var dropped: Array[String] = []
+	var lost := map.cells.keys().filter(func(at: Vector2i) -> bool: return not bigger.in_bounds(at + offset)).size()
+	var moved := LevelMap.moved_config(config, func(at: Vector2i) -> Variant:
+		return at + offset if bigger.in_bounds(at + offset) else null, 0, dropped)
+	_set_canvas_state({"map": bigger, "config": moved})
+	_undo.append({"canvas": before})
+	if _undo.size() > UNDO_LIMIT:
+		_undo.pop_front()
+	_redo.clear()
+	if _camera != null:
+		_camera.position += Vector2(offset) * CELL
+	var lost_text := ""
+	if lost > 0 or not dropped.is_empty():
+		lost_text = "dropped %d cells%s" % [lost, (", " + ", ".join(dropped)) if not dropped.is_empty() else ""]
+	report = "resized to %d x %d cells%s" % [map.size.x, map.size.y, "; " + lost_text if not lost_text.is_empty() else ""]
+	print("[editor] " + report)
+	return lost_text
+
+
+## What a resize changes: the map (heights in it) and level.json.
+func _canvas_state() -> Dictionary:
+	return {"map": map, "config": config.duplicate(true)}
+
+
+func _set_canvas_state(state: Dictionary) -> void:
+	map = state["map"]
+	config = state["config"]
+	# height.png must match layout.png's size, after an undo too.
+	heights_dirty = had_heights or not map.heights.is_empty()
+	config_dirty = true
+	dirty = true
+	if selected != NOWHERE and not is_monster(selected):
+		selected = NOWHERE
+	_name_cells()
+	_refresh_panel()
+	queue_redraw()
+	if _canvas_size != null:
+		_canvas_size.text = "%d x %d cells" % [map.size.x, map.size.y]
+
+
+func toggle_canvas() -> void:
+	if _canvas != null:
+		_canvas.visible = not _canvas.visible
 
 
 # --- Monsters: facing and idling ----------------------------------------------------
@@ -739,6 +825,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			redo()
 		elif key.ctrl_pressed and key.keycode == KEY_Z:
 			undo()
+		elif key.ctrl_pressed and key.keycode == KEY_R:
+			toggle_canvas()
 		elif key.keycode == KEY_V and not key.ctrl_pressed:
 			pick("select")
 		elif key.keycode in [KEY_Q, KEY_E] and selected != NOWHERE:
@@ -822,7 +910,7 @@ func _status_text() -> String:
 				else "LMB add a waypoint  RMB take the last back  Esc done"
 		if setting_point:
 			tools = "LMB the gather point  Esc never mind"
-	return "%s%s   %s   brush: %s   |   %s  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
+	return "%s%s   %s   brush: %s   |   %s  Ctrl+R resize  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
 		map_name, " (unsaved)" if dirty else "", over, brush, tools, report]
 
 
@@ -921,11 +1009,50 @@ func _build_ui() -> void:
 	_panel = VBoxContainer.new()
 	_panel.add_theme_constant_override("separation", 8)
 	side.add_child(_panel)
+	_build_canvas_panel(layer, style)
 	_status = Label.new()
 	_status.position = Vector2(30, 20)
 	_status.add_theme_font_size_override("font_size", FONT_SIZE)
 	_status.add_theme_color_override("font_color", Color(0.93, 0.92, 0.88))
 	layer.add_child(_status)
+
+
+## The canvas panel (Ctrl+R): the size, and per side buttons to grow or
+## shrink it by 1 or 8 cells.
+func _build_canvas_panel(layer: CanvasLayer, style: StyleBox) -> void:
+	_canvas = PanelContainer.new()
+	_canvas.add_theme_stylebox_override("panel", style)
+	_canvas.anchor_left = 0.5
+	_canvas.anchor_right = 0.5
+	_canvas.offset_left = -330.0
+	_canvas.offset_right = 330.0
+	_canvas.offset_top = 140.0
+	_canvas.visible = false
+	layer.add_child(_canvas)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 8)
+	_canvas.add_child(list)
+	var title := Label.new()
+	title.text = "Canvas   (Ctrl+R hides)"
+	title.add_theme_font_size_override("font_size", 28)
+	list.add_child(title)
+	_canvas_size = Label.new()
+	_canvas_size.text = "%d x %d cells" % [map.size.x, map.size.y]
+	_canvas_size.add_theme_font_size_override("font_size", 24)
+	list.add_child(_canvas_size)
+	var sides: Array[String] = ["left", "top", "right", "bottom"]
+	for side in sides:
+		var row := HBoxContainer.new()
+		list.add_child(row)
+		var label := Label.new()
+		label.text = side
+		label.custom_minimum_size = Vector2(110, 0)
+		label.add_theme_font_size_override("font_size", 24)
+		row.add_child(label)
+		for amount: int in [-8, -1, 1, 8]:
+			var grow := [0, 0, 0, 0]
+			grow[sides.find(side)] = amount
+			_panel_button(row, "%+d" % amount, func() -> void: resize(grow[0], grow[1], grow[2], grow[3]))
 
 
 ## The key that picks palette entry [param index]: "1" .. "0", "Shift+1" ..

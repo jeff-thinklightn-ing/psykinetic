@@ -18,6 +18,8 @@ func _ready() -> void:
 	await _test_painting()
 	_clear()
 	await _test_monsters()
+	_clear()
+	await _test_resize()
 	_test_import_file()
 	_clear()
 	print("")
@@ -247,6 +249,77 @@ func _test_monsters() -> void:
 	_check(again.facing_of(Vector2i(2, 2)) == [facing, true] and again.idle_of(Vector2i(5, 2)).get("loop") == false,
 			"opened again, it is as saved")
 	again.queue_free()
+	await get_tree().process_frame
+
+
+func _test_resize() -> void:
+	print("
+== resize: grow and shrink from any side, level.json and height.png move with it ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	# 10 x 8 cells of stone; a brute, a sneak on a route, a start, a link.
+	var rows: Array[String] = []
+	for y in 15:
+		rows.append(".".repeat(19))
+	var markers := {Vector2i(2, 2): "monster_brute", Vector2i(8, 6): "monster_sneak", Vector2i(1, 1): "start", Vector2i(9, 7): "link"}
+	var layout := Level.image_from_rows(rows, markers)
+	layout.save_png(dir.path_join("layout.png"))
+	Level.height_image(layout, {Vector2i(3, 3): 2}).save_png(dir.path_join("height.png"))
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"name": "Resize", "centre": [5, 4], "starts": [[1, 1]],
+		"spawn_points": {"door": [9, 6]}, "links": [{"at": [9, 7], "to_map": "test_room", "to_spawn": ""}],
+		"entities": [{"at": [2, 2], "facing": [1, 0], "idle": {"mode": "gather", "point": [3, 3]}},
+			{"at": [8, 6], "idle": {"mode": "patrol", "route": [[8, 6], [8, 2], [2, 6]], "loop": true}}]}, "	"))
+	json.close()
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	_check(editor.map.size == Vector2i(10, 8) and editor.map.heights == {Vector2i(3, 3): 2}, "a 10 x 8 map with one raised cell")
+
+	editor.resize(3, 2, 0, 0)
+	var shift := Vector2i(3, 2)
+	_check(editor.map.size == Vector2i(13, 10), "3 more on the left, 2 on top: 13 x 10")
+	_check(editor.map.cell(Vector2i(2, 2) + shift) == "monster_brute" and editor.map.cell(Vector2i(0, 0) + shift) == "stone"
+			and editor.map.cell(Vector2i(0, 0)) == "void", "every cell keeps its place on the ground; the new strip is void")
+	_check(editor.map.heights == {Vector2i(3, 3) + shift: 2}, "and so does the height")
+	var brute := editor.entry_of(Vector2i(5, 4))
+	_check(brute.get("idle", {}).get("point") == [6, 5] and Level.facing_from(brute.get("facing")) == Vector2i(1, 0), "the brute's entry and gather point moved (%s)" % [brute])
+	_check(editor.entry_of(Vector2i(11, 8)).get("idle", {}).get("route") == [[11, 8], [11, 4], [5, 8]], "the sneak's route moved")
+	_check(editor.config["starts"] == [[4, 3]] and editor.config["centre"] == [8, 6] and editor.config["spawn_points"]["door"] == [12, 8]
+			and editor.config["links"][0]["at"] == [12, 9], "starts, centre, spawn points and links moved")
+
+	var lost := editor.resize(0, 0, -4, 0)
+	_check(editor.map.size == Vector2i(9, 10) and editor.map.cell(Vector2i(11, 8)) == "void", "4 off the right: 9 x 10, the sneak's column gone")
+	_check(editor.entry_of(Vector2i(11, 8)).is_empty() and (editor.config["links"] as Array).is_empty()
+			and not editor.config["spawn_points"].has("door"), "its entry, the link and the spawn point there are dropped")
+	_check("dropped" in lost and "link" in lost, "and it says so: %s" % lost)
+	_key(editor, KEY_Z, true)
+	_check(editor.map.size == Vector2i(13, 10) and editor.entry_of(Vector2i(11, 8)).has("idle"), "Ctrl+Z puts the strip back, entry and all")
+	_key(editor, KEY_Z, true)
+	_check(editor.map.size == Vector2i(10, 8) and editor.entry_of(Vector2i(2, 2)).has("idle") and editor.map.heights == {Vector2i(3, 3): 2},
+			"and again: back as loaded")
+	_key(editor, KEY_Y, true)
+	_check(editor.map.size == Vector2i(13, 10), "Ctrl+Y grows it again")
+	_key(editor, KEY_R, true)
+	_check(editor._canvas.visible, "Ctrl+R shows the canvas panel")
+
+	_key(editor, KEY_S, true)
+	var image := Image.load_from_file(dir.path_join("layout.png"))
+	var heights := Image.load_from_file(dir.path_join("height.png"))
+	_check(image.get_size() == Vector2i(25, 19) and heights.get_size() == image.get_size(), "saved: layout.png and height.png both 25 x 19")
+	var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json"))
+	var level := Level.parse(image, heights, saved)
+	var by_name := {}
+	for spec: Dictionary in level["entities"]:
+		by_name[spec["name"]] = spec
+	_check(level["warnings"].is_empty(), "the game reads it without a warning (%s)" % [level["warnings"]])
+	_check(by_name["Brute1"]["tile"] == Vector2i(5, 4) and by_name["Brute1"]["idle"]["point"] == Vector2i(6, 5)
+			and by_name["Sneak1"]["idle"]["route"][1] == Vector2i(11, 4), "the brute, its point and the sneak's route where they moved to")
+	_check(level["terrain"]["heights"] == {Vector2i(6, 5): 2} and level["starts"] == [Vector2i(4, 3)]
+			and level["links"][0]["tile"] == Vector2i(12, 9), "the height, the start and the link too")
+	editor.queue_free()
 	await get_tree().process_frame
 
 
