@@ -158,7 +158,6 @@ but hasn't committed to; confirm before building them.
 ### Engine, network and tooling
 - **Send each player only nearby entities** (~30–40 cells) instead of the whole zone.
 - **Keep the map bench** as a release check at 128² and 256², with budgets for tick time, load time and frame rate.
-- **Configurable test ports per worktree** so parallel sessions don't collide.
 - **Staging server:** run a new build on a second port and check it before swapping it in.
 - **Licensing records:** `THIRD_PARTY.md`, a `source` per asset with a test that fails without one, and dated license copies (e.g. DINOv3, 2025-08-19).
 - **Goblin model touch-ups** when it matters in game: rest pose (stands upright like the mannequin), feet pointing forward.
