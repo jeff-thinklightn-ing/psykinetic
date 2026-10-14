@@ -98,18 +98,23 @@ opened it runs offline instead.
   jump (decision 161).
 
 **Joining.** A peer is admitted only once it has sent its version, its
-build fingerprint and, if the server has one, the token (`Net.authenticate`, an `any_peer` RPC the
-client fires on connect). Unauthenticated peers get no player and their
-order RPCs are ignored; a version mismatch, a wrong or empty token, or
-nothing within 5 seconds, gets the peer told why (`Net.rejected`),
-disconnected, and logged with its address. Up to 4 authenticated peers.
-`--server` refuses to start without a token; `--host` without one lets any
-matching version in. The version is `version.txt` at the project root.
-The fingerprint (`Net.protocol()`) is a hash of everything on the wire —
-the replicated properties, the RPC methods, the spawn spec format and a
-hand-bumped revision — so two builds that share a version number but not a
-wire format are refused with `build mismatch` instead of failing on the
-first packet one of them cannot read.
+protocol and, if the server has one, the token (`Net.authenticate`, an
+`any_peer` RPC the client fires on connect). Unauthenticated peers get no
+player and their order RPCs are ignored; a protocol mismatch, a wrong or
+empty token, or nothing within 5 seconds, gets the peer told why
+(`Net.rejected`), disconnected, and logged with its address. Up to 16
+authenticated peers (`--max-players`). `--server` refuses to start without a
+token; `--host` without one lets anyone with the same protocol in. The
+version is `version.txt` at the project root; it only says which side is
+behind. The protocol (`Net.protocol()`, decision 239) is a hash of
+everything on the wire: the RPC methods of `Net.RPC_SCRIPTS` with their
+arguments' names, the replicated properties (`GridEntity.REPLICATED`,
+`Door.REPLICATED`, `Net.SUBCLASS_REPLICATED`), the message kinds
+(`Net.MESSAGE_KINDS`), the spawn spec format, and a hand-bumped
+`PROTOCOL_REVISION` for what those cannot show (see its comment in
+net/net.gd). Builds with the same protocol play together whatever their
+version; `tests/protocol_test` fails, naming the file and line, on a
+message kind, RPC script or replicated property missing from those lists.
 
 **Leaving.** ENet frees a peer's channels the moment either side begins a
 disconnect, up to a round trip before Godot reports the peer gone; any

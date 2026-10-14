@@ -49,10 +49,13 @@ start client3 --client --address=127.0.0.1 --token=wrong-secret --test-move=0,1 
 printf 'address=127.0.0.1\nport=%s\ntoken=%s\nplayer_id=%s\nname=Casey\n' "$PORT" "$TOKEN" "$ID_C" >"$LOGS/settings.cfg"
 sleep 1
 start client4 "--settings=$LOGS/settings.cfg" --test-move=0,1 --test-exit-after=4
-# A fifth has the right token but claims another version: turned away as out of date.
-start client5 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=0.0.1 --test-exit-after=4
+# A fifth has the right token but is an older build with another protocol:
+# turned away as out of date (decision 239: only the protocol decides).
+start client5 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=0.0.1 --test-protocol=old-build --test-exit-after=4
 # A sixth has the right token and version number but is a different build.
 start client6 --client --address=127.0.0.1 "--token=$TOKEN" --test-protocol=stale-build --test-exit-after=4
+# A seventh is a newer build with another protocol: the server is the one out of date.
+start client7 --client --address=127.0.0.1 "--token=$TOKEN" --test-version=99.0.0 --test-protocol=new-build --test-exit-after=4
 wait
 
 # Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
@@ -69,7 +72,8 @@ wait
 # the bottom of the room, then at tick 70 cross it toward each other.
 start server3 --server --still-monsters --no-companions "--token=$TOKEN" --test-exit-after=15
 sleep 2
-start clientF --client --address=127.0.0.1 "--token=$TOKEN" --name=Fay --test-move=-6,9 --test-contest=12,12,70 --test-exit-after=12
+# Fay is another build with the same protocol: she plays (decision 239).
+start clientF --client --address=127.0.0.1 "--token=$TOKEN" --name=Fay --test-version=0.0.2 --test-move=-6,9 --test-contest=12,12,70 --test-exit-after=12
 sleep 1
 start clientG --client --address=127.0.0.1 "--token=$TOKEN" --name=Gus --test-move=1,9 --test-contest=5,12,70 --test-exit-after=11
 wait
@@ -106,9 +110,10 @@ arrived2=$(count '\[test\] Player[0-9]+ arrived' "$LOGS/client2.log")
 check "$joined" 3 "server spawned a player for each client with the right token and version"
 check "$(count '\[net\] peer [0-9]+ authenticated' "$LOGS/server.log")" 3 "server authenticated the three good clients"
 check "$(count '\[net\] using .*settings\.cfg' "$LOGS/client4.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/client4.log")" 11 "a client with no arguments joins from settings.cfg and plays"
-check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client 0\.0\.1, server ' "$LOGS/server.log")" 1 "server rejected the out-of-date client, naming both versions"
+check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client v0\.0\.1 protocol old-build, server v[0-9.]+ protocol [0-9a-f]+\)' "$LOGS/server.log")" 1 "server rejected the out-of-date client, naming both builds and protocols"
 check "$(count '\[net\] client out of date' "$LOGS/client5.log")" 1 "the out-of-date client was told so"
-check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client protocol stale-build, server [0-9a-f]+\)' "$LOGS/server.log")" 1 "server rejected the same-version, different-build client"
+check "$(count '\[net\] server out of date' "$LOGS/client7.log")$(count '\[test\] Player' "$LOGS/client7.log")" 10 "a newer client with another protocol is told the server is out of date, and gets no player"
+check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(client v[0-9.]+ protocol stale-build, server v[0-9.]+ protocol [0-9a-f]+\)' "$LOGS/server.log")" 1 "server rejected the same-version, different-build client"
 check "$(count '\[net\] build mismatch: this client and the server are different builds' "$LOGS/client6.log")$(count '\[test\] Player' "$LOGS/client6.log")" 10 "that client was told it is a build mismatch and never got a player"
 check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(wrong token\)' "$LOGS/server.log")" 1 "server rejected the wrong-token client with its address"
 check "$(count 'authentication failed' "$LOGS/client3.log")" 1 "the wrong-token client reports authentication failed"
@@ -148,6 +153,7 @@ check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(already connected as c
 check "$(count '\[net\] already connected' "$LOGS/clientE.log")" 1 "phase 2: and told so"
 check "$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientF.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientG.log")" 11 "phase 3: both reached their ends of the passage"
 check "$(count '\[test\] display: .*server_tile=\(12, 12\)' "$LOGS/clientF.log")" 1 "phase 3: Fay crossed to (12, 12)"
+check "$(count '\[net\] peer [0-9]+ is v0\.0\.2, the server v[0-9.]+: the same protocol' "$LOGS/server3.log")" 1 "phase 3: Fay is another build with the same protocol, and the server let her play"
 check "$(count '\[test\] display: .*server_tile=\(5, 12\)' "$LOGS/clientG.log")" 1 "phase 3: Gus crossed to (5, 12)"
 check "$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -c 'display: .*snaps=0 ' || true)" 2 "phase 3: neither client snapped more than 2 tiles"
 check "$(count 'push: Player1 -> Crate1' "$LOGS/server4.log")$(count '\[world\] Ivy reset the room' "$LOGS/server4.log")" 11 "phase 4: Hal pushed the crate, then Ivy's reset reached the server"

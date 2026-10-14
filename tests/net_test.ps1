@@ -53,13 +53,16 @@ $settings = Join-Path $logs 'settings.cfg'
 Set-Content $settings "address=127.0.0.1`nport=$port`ntoken=$token`nplayer_id=$idC`nname=Casey`n" -Encoding ascii
 Start-Sleep -Seconds 1
 $client4 = Start-Instance 'client4' @("--settings=`"$settings`"", '--test-move=0,1', '--test-exit-after=4')
-# A fifth has the right token but claims another version: turned away as out of date.
-$client5 = Start-Instance 'client5' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=0.0.1', '--test-exit-after=4')
+# A fifth has the right token but is an older build with another protocol:
+# turned away as out of date (decision 239: only the protocol decides).
+$client5 = Start-Instance 'client5' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=0.0.1', '--test-protocol=old-build', '--test-exit-after=4')
+# A seventh is a newer build with another protocol: the server is the one out of date.
+$client7 = Start-Instance 'client7' @('--client', '--address=127.0.0.1', "--token=$token", '--test-version=99.0.0', '--test-protocol=new-build', '--test-exit-after=4')
 
 # A sixth has the right token and version number but is a different build.
 $client6 = Start-Instance 'client6' @('--client', '--address=127.0.0.1', "--token=$token", '--test-protocol=stale-build', '--test-exit-after=4')
 
-$all = @($server, $client1, $client2, $client3, $client4, $client5, $client6)
+$all = @($server, $client1, $client2, $client3, $client4, $client5, $client6, $client7)
 $all | Wait-Process -Timeout 40 -ErrorAction SilentlyContinue
 $all | Where-Object { -not $_.HasExited } | Stop-Process -Force
 
@@ -79,7 +82,8 @@ $phase2 | Where-Object { -not $_.HasExited } | Stop-Process -Force
 # the bottom of the room, then at tick 70 cross it toward each other.
 $server3 = Start-Instance 'server3' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-exit-after=15')
 Start-Sleep -Seconds 2
-$clientF = Start-Instance 'clientF' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Fay', '--test-move=-6,9', '--test-contest=12,12,70', '--test-exit-after=12')
+# Fay is another build with the same protocol: she plays (decision 239).
+$clientF = Start-Instance 'clientF' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Fay', '--test-version=0.0.2', '--test-move=-6,9', '--test-contest=12,12,70', '--test-exit-after=12')
 Start-Sleep -Seconds 1
 $clientG = Start-Instance 'clientG' @('--client', '--address=127.0.0.1', "--token=$token", '--name=Gus', '--test-move=1,9', '--test-contest=5,12,70', '--test-exit-after=11')
 $phase3 = @($server3, $clientF, $clientG)
@@ -133,6 +137,7 @@ $client3Log = Read-Log 'client3'
 $client4Log = Read-Log 'client4'
 $client5Log = Read-Log 'client5'
 $client6Log = Read-Log 'client6'
+$client7Log = Read-Log 'client7'
 $server2Log = Read-Log 'server2'
 $clientCLog = Read-Log 'clientC'
 $clientDLog = Read-Log 'clientD'
@@ -164,9 +169,10 @@ $inconsistent = @(($serverLog + $client1Log + $client2Log) | Select-String 'occu
 Assert ($joined.Count -eq 3) "server spawned a player for each client with the right token and version (saw $($joined.Count))"
 Assert (@($serverLog | Select-String '\[net\] peer \d+ authenticated').Count -eq 3) 'server authenticated the three good clients'
 Assert (@($client4Log | Select-String '\[net\] using .*settings\.cfg').Count -eq 1 -and @($client4Log | Select-String '\[test\] Player\d+ arrived').Count -eq 1) 'a client with no arguments joins from settings.cfg and plays'
-Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client 0\.0\.1, server ').Count -eq 1) 'server rejected the out-of-date client, naming both versions'
+Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client v0\.0\.1 protocol old-build, server v[0-9.]+ protocol [0-9a-f]+\)').Count -eq 1) 'server rejected the out-of-date client, naming both builds and protocols'
 Assert (@($client5Log | Select-String '\[net\] client out of date').Count -eq 1) 'the out-of-date client was told so'
-Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client protocol stale-build, server [0-9a-f]+\)').Count -eq 1) 'server rejected the same-version, different-build client'
+Assert (@($client7Log | Select-String '\[net\] server out of date').Count -eq 1 -and @($client7Log | Select-String '\[test\] Player').Count -eq 0) 'a newer client with another protocol is told the server is out of date, and gets no player'
+Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client v[0-9.]+ protocol stale-build, server v[0-9.]+ protocol [0-9a-f]+\)').Count -eq 1) 'server rejected the same-version, different-build client'
 Assert (@($client6Log | Select-String '\[net\] build mismatch: this client and the server are different builds').Count -eq 1 -and @($client6Log | Select-String '\[test\] Player').Count -eq 0) 'that client was told it is a build mismatch and never got a player'
 $rejected = @($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(wrong token\)')
 Assert ($rejected.Count -eq 1) "server rejected the wrong-token client with its address (saw $($rejected.Count))"
@@ -205,6 +211,7 @@ Assert (@($server2Log | Select-String '\[net\] Dana \(d0d0d0d0\) joined as Playe
 Assert (@($server2Log | Select-String '\[net\] rejected peer \d+ from \S+ \(already connected as c0ffee00\)').Count -eq 1) 'phase 2: a second connection with an online id is rejected'
 Assert (@($clientELog | Select-String '\[net\] already connected').Count -eq 1) 'phase 2: and told so'
 Assert (@($clientFLog | Select-String '\[test\] Player\d+ arrived') | Measure-Object).Count -eq 1 -and (@($clientGLog | Select-String '\[test\] Player\d+ arrived') | Measure-Object).Count -eq 1 -and $true 'phase 3: both reached their ends of the passage'
+Assert (@($server3Log | Select-String '\[net\] peer \d+ is v0\.0\.2, the server v[0-9.]+: the same protocol').Count -eq 1) 'phase 3: Fay is another build with the same protocol, and the server let her play'
 $fay = @($clientFLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
 $gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
 Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "phase 3: Fay crossed to (12, 12) ($($fay | ForEach-Object { $_.Line }))"

@@ -85,6 +85,7 @@ extends Node
 ##   --test-door=<tick>           at that server tick, open or close the door the local player stands beside
 ##   --test-chest=take|put        walk to the nearest chest and drag its first item into the player's slots (take),
 ##                                or the player's first item into it (put)
+##   --print-protocol             print this build's version and protocol (PROTOCOL v<x.y.z> <id>) and quit
 ##   --test-version=<x.y.z>       client: claim this version instead of the real one
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##   --test-lag=<seconds>         client: hold every order this long before sending it
@@ -117,9 +118,24 @@ signal peer_authenticated(peer: int, player_id: String, player_name: String)
 ## disconnecting it.
 signal join_rejected(reason: String, server_version: String)
 
-## Bump for a wire change that protocol() cannot see by itself (the
-## meaning of an existing RPC argument, say).
-const PROTOCOL_REVISION := 5
+## What decides whether a client may join is protocol(), not the build
+## (decision 239): a client and a server of different builds play together
+## as long as what goes over the wire is the same. protocol() sees by itself:
+## the RPC methods of RPC_SCRIPTS and their arguments' names; the properties
+## entities and doors replicate (GridEntity.REPLICATED, Door.REPLICATED,
+## SUBCLASS_REPLICATED); the message kinds (MESSAGE_KINDS); the spawn spec
+## format (EntityFactory.SPEC_VERSION). Bump PROTOCOL_REVISION for a wire
+## change it cannot see: a message's or an RPC's fields or their meaning, a
+## replicated value's meaning or units, a spawn spec key, the order of
+## anything sent. tests/protocol_test checks that every message kind,
+## RPC script and replicated property is listed here.
+const PROTOCOL_REVISION := 6
+## The scripts whose RPCs are part of the wire.
+const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
+## Every kind of message (message, message_to, broadcast, broadcast_to).
+const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "speech", "terrain"]
+## Properties entity subclasses add with replicate().
+const SUBCLASS_REPLICATED: Array[String] = ["alert", "emit_light", "keeper_peer", "move_ticks", "pose", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -259,6 +275,12 @@ var _window_save: SceneTreeTimer
 var _mode_given := false
 var _settings_override := ""
 var _test_version := ""
+## --print-protocol: print this build's version and protocol and quit (the
+## release flow compares them with the box's: decision 239).
+var print_protocol := false
+## Client: the build the server runs, as its "map" message says ("" until
+## then). It may differ from this one's with the same protocol (decision 239).
+var server_version := ""
 var _test_protocol := ""
 var _protocol := ""
 ## True once an ENet peer is in place. False means offline single-player.
@@ -325,6 +347,10 @@ func _enter_tree() -> void:
 	if OS.get_environment("PSYKINETIC_PERCEPTION") != "":
 		_set_option("--perception", OS.get_environment("PSYKINETIC_PERCEPTION"))
 	_parse_args()
+	if print_protocol:
+		print("PROTOCOL v%s %s" % [version, protocol()])
+		get_tree().quit.call_deferred()
+		return
 	if not _mode_given:
 		_apply_settings()
 	_apply_renderer_setting()
@@ -728,9 +754,12 @@ func is_peer_authenticated(peer: int) -> bool:
 
 
 ## The hello a client sends right after it connects: {token, version,
-## player_id, name}. On the server, a matching version, the right token (if
-## one is required) and an id nobody else is using let the peer in; anything
-## else gets it told why and disconnected.
+## player_id, name, protocol}. On the server, the same protocol (whatever
+## the build: decision 239), the right token (if one is required) and an id
+## nobody else is using let the peer in; anything else gets it told why and
+## disconnected. A different protocol is "client out of date" when the
+## server's build is newer, "server out of date" when the client's is, and
+## "build mismatch" when they claim the same build.
 @rpc("any_peer", "call_remote", "reliable")
 func authenticate(hello: Dictionary) -> void:
 	if not is_authority():
@@ -743,12 +772,15 @@ func authenticate(hello: Dictionary) -> void:
 	var client_protocol := str(hello.get("protocol", ""))
 	var id := str(hello.get("player_id", "")).strip_edges()
 	var player_name_given := tidy_name(str(hello.get("name", "")))
-	if client_version != version:
-		_reject(peer, "client out of date", "client %s, server %s" % [client_version, version])
+	var why := "client v%s protocol %s, server v%s protocol %s" % [
+		client_version, client_protocol if client_protocol != "" else "none", version, protocol()]
+	if client_protocol != protocol() and newer_version(version, client_version):
+		_reject(peer, "client out of date", why)
+	elif client_protocol != protocol() and newer_version(client_version, version):
+		_reject(peer, "server out of date", why)
 	elif client_protocol != protocol():
 		# Same version number, different build: what goes over the wire differs.
-		_reject(peer, "build mismatch: this client and the server are different builds of v%s" % version,
-				"client protocol %s, server %s" % [client_protocol if client_protocol != "" else "none", protocol()])
+		_reject(peer, "build mismatch: this client and the server are different builds of v%s" % version, why)
 	elif token != "" and offered != token:
 		_reject(peer, "authentication failed", "empty token" if offered == "" else "wrong token")
 	elif id.is_empty() or id.length() > 64:
@@ -758,6 +790,9 @@ func authenticate(hello: Dictionary) -> void:
 	elif _authenticated.size() >= max_players:
 		_reject(peer, "server full")
 	else:
+		if client_version != version:
+			print("[net] peer %d is v%s, the server v%s: the same protocol %s, so it plays" % [
+				peer, client_version, version, protocol()])
 		_admit(peer, id, player_name_given)
 
 
@@ -846,16 +881,45 @@ func protocol() -> String:
 		var parts: Array[String] = [
 			"rev%d" % PROTOCOL_REVISION, "spec%d" % EntityFactory.SPEC_VERSION]
 		parts.append_array(GridEntity.REPLICATED)
-		for path: String in ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd"]:
-			var config: Variant = (load(path) as Script).get_rpc_config()
-			if config is Dictionary:
-				var methods: Array[String] = []
-				for method: Variant in config.keys():
-					methods.append(str(method))
-				methods.sort()
-				parts.append_array(methods)
+		parts.append_array(Door.REPLICATED)
+		parts.append_array(SUBCLASS_REPLICATED)
+		parts.append_array(MESSAGE_KINDS)
+		for path in RPC_SCRIPTS:
+			parts.append_array(rpc_signatures(load(path) as Script))
 		_protocol = "|".join(parts).sha256_text().left(12)
 	return _protocol
+
+
+## [param script]'s RPC methods, each with its arguments' names
+## ("_net_tick(tick)"), sorted: what protocol() takes of it.
+static func rpc_signatures(script: Script) -> Array[String]:
+	var out: Array[String] = []
+	var config: Variant = script.get_rpc_config()
+	if not config is Dictionary:
+		return out
+	var args := {}
+	for method: Dictionary in script.get_script_method_list():
+		var names: Array[String] = []
+		for arg: Dictionary in method.get("args", []):
+			names.append(str(arg.get("name", "")))
+		args[str(method["name"])] = ",".join(names)
+	for method: Variant in config.keys():
+		out.append("%s(%s)" % [method, args.get(str(method), "")])
+	out.sort()
+	return out
+
+
+## Whether version [param a] ("0.1.140") is newer than [param b]; one that
+## does not read as numbers is older than any that does.
+static func newer_version(a: String, b: String) -> bool:
+	var left := a.split(".")
+	var right := b.split(".")
+	for i in maxi(left.size(), right.size()):
+		var x := int(left[i]) if i < left.size() and left[i].is_valid_int() else -1
+		var y := int(right[i]) if i < right.size() and right[i].is_valid_int() else -1
+		if x != y:
+			return x > y
+	return false
 
 
 ## What this client tells the server it is: the real version, unless a test
@@ -874,6 +938,8 @@ func _peer_address(peer: int) -> String:
 
 ## Server: tells every peer (and itself) something that is not sim state.
 func broadcast(kind: String, data: Dictionary) -> void:
+	if kind not in MESSAGE_KINDS:
+		push_error("[net] message kind %s is not in Net.MESSAGE_KINDS: add it there (and so to protocol())" % kind)
 	message_received.emit(kind, data)
 	if online:
 		for peer in sendable_peers():
@@ -883,6 +949,8 @@ func broadcast(kind: String, data: Dictionary) -> void:
 ## Server: tells only [param peers] (a zone's, World.peers_in); itself
 ## too when its own player is among them.
 func broadcast_to(peers: Array[int], kind: String, data: Dictionary) -> void:
+	if kind not in MESSAGE_KINDS:
+		push_error("[net] message kind %s is not in Net.MESSAGE_KINDS: add it there (and so to protocol())" % kind)
 	if local_id in peers:
 		message_received.emit(kind, data)
 	if online:
@@ -1005,6 +1073,8 @@ func _parse_args() -> void:
 				mind_why = true
 			"--no-interest":
 				interest.enabled = false
+			"--print-protocol":
+				print_protocol = true
 			"--world-map":
 				world_map = true
 			"--builder-stub":

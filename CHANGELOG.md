@@ -4,6 +4,16 @@ Newest first. Worktrees add their bullets under `## Unreleased`; the coordinator
 renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
 top section as the release notes.
 
+## Unreleased
+
+- A client and the server no longer need to be the very same build to
+  play together: only what they send each other has to match. A release
+  that changes only how the game looks no longer needs the server updated,
+  and the server no longer turns away such a client. When they don't
+  match, you're told which side is behind: "client out of date" (update
+  through launch.bat) or "server out of date" (the server is due an
+  update). This release itself still needs the server updated.
+
 ## v0.1.140
 
 - The server no longer writes a log line for every door a monster opens

@@ -259,9 +259,18 @@ the exe. Nothing in the zip carries an address or token.
 ## Releasing the client
 
 Versions live in `version.txt` at the project root (`0.1.0`). The game reads
-it at start, a client sends it when it joins, and the server rejects any
-other version with a `client out of date` message, so the server and the
-clients must be released together.
+it at start and a client sends it when it joins, but what decides whether it
+may join is the protocol, `Net.protocol()`: a fingerprint of everything that
+goes over the wire (decision 239). A client of another build with the same
+protocol plays; so a release that changes only the client (looks, art, the
+view) needs no server deploy, and a server deploy that changes nothing on
+the wire leaves the clients as they are.
+
+To tell which a release is: `--print-protocol` prints a build's version and
+protocol (`PROTOCOL v0.1.140 3f2a91c0d4e7`) and quits; on the box, the
+console's `version` says what the server runs. The same protocol: a
+client-only release, the server stays. A different one: deploy the server
+from the release's commit too.
 
 On a Windows machine with the Windows export templates installed, a clean
 working tree, and `gh` logged in:
@@ -280,14 +289,16 @@ notes. Without `gh` it prints the manual steps instead. It refuses to zip if
 any bundled text file carries a real token.
 
 So before releasing: add a `## vX.Y.Z` section at the top of `CHANGELOG.md`
-and commit it. Then deploy the server (`server/deploy.sh`) from the same
-commit so the versions match.
+and commit it. Then, if the protocol changed, deploy the server
+(`server/deploy.sh`) from the same commit.
 
-Deploying the server from a newer commit *without* releasing leaves clients
-on the old build with the same version number. The server refuses those with
-`build mismatch` (it compares a fingerprint of the wire format, shown as
-`build:` in the F3 overlay), so: every server deploy that changes what goes
-over the wire needs a client release from the same commit.
+A server and a client with different protocols cannot play: the one that is
+behind is named (`client out of date` when the server's build is newer,
+`server out of date` when the client's is). Deploying the server from a
+newer commit that changes the wire *without* releasing leaves clients with
+the same version number and another protocol: `build mismatch`. The F3
+overlay shows the build and protocol (`build:`), and the server's build when
+it differs.
 
 Clients update themselves: `launch.bat` runs `update.ps1`, which asks the
 GitHub API for the latest release, and if its tag is newer than the local
@@ -298,19 +309,23 @@ and starts the game anyway.
 
 ## Join authentication
 
-The server only accepts a peer that sends the token and its version
-(`Net.authenticate`, which the client does the moment it connects). Until
-then the peer has no player and every gameplay RPC from it is ignored. A
-version mismatch, or a wrong or empty token, is rejected at once; a peer
-that sends nothing is dropped after 5 seconds. The log line is
+The server only accepts a peer that sends the token, its version and its
+protocol (`Net.authenticate`, which the client does the moment it connects).
+Until then the peer has no player and every gameplay RPC from it is ignored.
+A protocol mismatch, or a wrong or empty token, is rejected at once; another
+build with the same protocol is let in, logged as `[net] peer N is vX, the
+server vY: the same protocol ..., so it plays`. A peer that sends nothing is
+dropped after 5 seconds. The log line is
 `[net] rejected peer N from <address> (<why>)`. At most 16 peers can be
 authenticated at once (`--max-players=<n>` for fewer, or more); the rest
 are refused as `server full`.
 
 A rejected client is told why before it is cut off and shows it:
-`authentication failed`, `client out of date` (with both versions),
-`build mismatch` (same version number, but the server was built from
-different code: release and deploy from the same commit),
+`authentication failed`, `client out of date` (another protocol, and the
+server's build is newer: run launch.bat), `server out of date` (another
+protocol, and the client's build is newer: the server is due a deploy),
+`build mismatch` (another protocol under the same version number: release
+and deploy from the same commit),
 `already connected` (that player id is online already), or `server full`.
 
 The hello also carries the client's `player_id` and name. The id is a UUID

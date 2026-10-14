@@ -1379,7 +1379,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	if Level.overlaid(zone_name):
 		# Edited in the game: the client's own copy (its pck's) is not it.
 		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
-	Net.message_to(peer, "map", {"name": zone_name})
+	Net.message_to(peer, "map", {"name": zone_name, "server": Net.version})
 	World.update_visibility(peer, zone_name)
 
 
@@ -2180,6 +2180,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		# The zone this client's player is in: it draws and predicts on that
 		# map, and its entities arrive under that zone's node.
 		var wanted := str(data.get("name", ""))
+		Net.server_version = str(data.get("server", Net.server_version))
 		if not Net.is_authority() and wanted != map_name and Level.exists(wanted):
 			_client_zone(wanted)
 		return
@@ -2607,7 +2608,8 @@ func _debug_text() -> String:
 		lines.append("worst correction: %.2f tiles this minute (%.2f ever)" % [
 			Net.stats.worst_correction(), Net.stats.worst_correction_ever])
 		lines.append("display delay: %d ms" % roundi(World.display_delay_ticks * 1000.0 / World.TICK_RATE))
-		lines.append("build: v%s %s" % [Net.version, Net.protocol()])
+		lines.append("build: v%s %s%s" % [Net.version, Net.protocol(),
+			", server v%s" % Net.server_version if Net.server_version not in ["", Net.version] else ""])
 	else:
 		lines.append("rtt: n/a (this peer is the authority)")
 		lines.append("mispredicts: n/a (nothing is predicted here)")
@@ -2624,6 +2626,9 @@ func _on_join_rejected(reason: String, server_version: String) -> void:
 	_rejected = true
 	if reason == "client out of date":
 		hud.text = "client out of date: the server runs v%s, this is v%s. Run launch.bat to update." % [
+			server_version, Net.version]
+	elif reason == "server out of date":
+		hud.text = "the server is out of date: it runs v%s, this is v%s. It will be updated soon; try again later." % [
 			server_version, Net.version]
 	else:
 		hud.text = reason
@@ -2805,6 +2810,8 @@ func admin_command(line: String) -> String:
 				if is_instance_valid(pet) and String(pet.name).to_lower() == who.to_lower():
 					who = String(pet.name)
 			return Transcript.show(who, words[2] if words.size() >= 3 else "")
+		"version":
+			return "v%s protocol %s" % [Net.version, Net.protocol()]
 		"net":
 			var peers: Array[String] = []
 			var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
@@ -2815,7 +2822,7 @@ func admin_command(line: String) -> String:
 			return "%s
 %s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+			return "reset | respawn | players | net | version | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name>"
 	return "unknown command %s (try help)" % words[0]

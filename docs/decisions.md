@@ -3325,3 +3325,32 @@ monster_test: a fight among monsters, doors and all, writes no line
 tools/map_bench, 16 players, 256x256 at castle density, the median of
 five blocks (--repeat): to a file 27.2 ms to 21.5; through a pipe 69.3
 to 20.7.
+
+## 239. Only the protocol decides who may join, not the build
+
+A client used to be refused for any other version.txt (and, with the same
+version, for another protocol fingerprint), so every client-only release
+(the ground, art slots) forced a server deploy and turned away clients that
+were only cosmetically different. Now the join compares Net.protocol()
+alone; a client of another build with the same protocol plays, and the
+server logs that it did. The version only says which side is behind when
+the protocols differ: "client out of date" when the server's build is
+newer, "server out of date" when the client's is (so a client never
+mistakes an old server for a reason to update), "build mismatch" when
+both claim the same version. Because joining now rests on it, the
+fingerprint sees more by itself: each RPC with its arguments' names, for
+every script in Net.RPC_SCRIPTS (monster.gd added); Door.REPLICATED and
+every property entity subclasses replicate (Net.SUBCLASS_REPLICATED); every
+message kind (Net.MESSAGE_KINDS, which Net.broadcast_to also checks at run
+time). tests/protocol_test greps the project and fails, naming the file and
+line, on a message kind, an RPC script or a replicated property not listed,
+so a tree adding one finds out before landing. PROTOCOL_REVISION (now 6)
+remains for what the fingerprint cannot see: a message's or RPC's fields,
+a value's meaning, a spawn spec key; net.gd's comment above it is the list.
+--print-protocol and the console's version let the release flow tell a
+client-only release (same protocol: the server stays) from one that needs
+a deploy. The "map" message now carries the server's build, shown in F3
+when it differs. The first release with this still needs a deploy, since
+older servers compare versions. Rejected: semver ranges (a version number
+says nothing about the wire), and a separate hand-kept protocol number with
+no fingerprint (it would be forgotten).
