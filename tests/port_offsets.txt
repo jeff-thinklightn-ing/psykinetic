@@ -15,3 +15,4 @@ companions 1600
 items 1800
 economy 2000
 lore 2200
+buildings 2400
