@@ -3063,3 +3063,18 @@ worst 47 to 88 to 36 to 39; 4 players 12.6 to 14.4 to 8.9 to 9.7. Full rate
 out to 28 cells (Jeff's ask, so that what is on a screen walks at its
 pace) costs about 7 ms with 16 players (26.6 to 29.7); his choice between
 that, a closer zoom, or 16 is open, NEAR_TILES stays 16 till then.
+
+## 238. Full rate out to the view's widest reach, and the view a little nearer
+
+Amends 215 (Jeff's call). Maps measured the view's widest reach at 24 to 28
+tiles (zoom out to 1.4, a peek, a wide screen), so monsters 16 to 28 tiles
+off, idling at one tick in four, could be on a screen, walking a little
+slow. Of the three ways out (NEAR_TILES 28; the view no wider than 16; the
+two met halfway) Jeff took the middle: Client3D.ZOOM_MAX 1.4 to 1.1 (the
+widest reach about 19 to 22 tiles), and World.NEAR_TILES 16 to 22, so what
+is on a screen thinks every tick. VIEW_TILES (235) stays 30.
+
+tools/map_bench, 256x256 at castle density over 600 ticks, head of main:
+16 players 21.8 ms on average with NEAR_TILES 16, 27.2 with 22 (28: about
+28.6); 9 players 17.0, 4 players 10.9 with 22. Over 20 ms with 16 players
+spread out, about 5 ms of it this choice.

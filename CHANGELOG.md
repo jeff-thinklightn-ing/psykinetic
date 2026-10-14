@@ -16,6 +16,8 @@ top section as the release notes.
   for the town at once, as long as the town holds that ground; picking
   loot up out in the world doesn't count until it's brought home. There is
   no town map yet, so no depot appears in the game's levels so far.
+- The camera zooms out a little less far (to 1.1, from 1.4), and every
+  monster you can see acts at full pace.
 - Smoother server with many players on a big map: monsters far off
   everyone's screen stroll about more simply, and the server spends less
   time on monsters that are not due to act.

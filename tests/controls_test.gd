@@ -329,7 +329,7 @@ func _test_diamonds() -> void:
 
 
 func _test_wheel_zoom() -> void:
-	print("\n== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.4x, saved; a middle click does nothing ==")
+	print("\n== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.1x, saved; a middle click does nothing ==")
 	var saved: String = Net.controls
 	var rig := _rig()
 	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "it starts at 1x")
@@ -365,17 +365,17 @@ func _test_wheel_zoom() -> void:
 		rig._ease_zoom(1.0 / 60.0)
 	_check(is_equal_approx(rig.zoom, Client3D.ZOOM_MAX) and is_equal_approx(Net.camera_zoom, Client3D.ZOOM_MAX) and is_equal_approx(rig.yaw, yaw)
 			and is_equal_approx(rig.pitch, pitch), "%s: a middle click leaves the zoom (and all else) as it was" % Net.controls)
-	_check(is_equal_approx(Net.saved_zoom("1.2", -1.0), 1.2) and is_equal_approx(Net.saved_zoom("2", -1.0), Client3D.ZOOM_MAX)
+	_check(is_equal_approx(Net.saved_zoom("1.05", -1.0), 1.05) and is_equal_approx(Net.saved_zoom("2", -1.0), Client3D.ZOOM_MAX)
 			and is_equal_approx(Net.saved_zoom("0.6", -1.0), Client3D.ZOOM_MIN) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
-			"a saved zoom loads held to 0.8..1.4; none keeps 1x")
+			"a saved zoom loads held to 0.8..1.1; none keeps 1x")
 	Net.camera_zoom = 1.25
 	var again := _rig()
 	_free_rig(again)
-	Net.camera_zoom = 1.25
+	Net.camera_zoom = 1.05
 	var reload: Client3D = preload("res://client3d/client3d.tscn").instantiate()
 	_main.add_child(reload)
 	reload.setup(_main._terrain)
-	_check(is_equal_approx(reload.zoom, 1.25) and is_equal_approx(reload._camera.size, Client3D.CAMERA_SIZE * 1.25),
+	_check(is_equal_approx(reload.zoom, 1.05) and is_equal_approx(reload._camera.size, Client3D.CAMERA_SIZE * 1.05),
 			"a saved zoom is where a new view starts (%s)" % reload.zoom)
 	reload.queue_free()
 	Net.camera_zoom = 1.0

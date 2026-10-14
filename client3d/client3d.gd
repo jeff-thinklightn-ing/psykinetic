@@ -160,7 +160,10 @@ const ORBIT_STEP := 90.0
 ## exponential rate a second: a notch is all but done in a quarter second).
 const ZOOM_STEP := 1.1
 const ZOOM_MIN := 0.8
-const ZOOM_MAX := 1.4
+## ZOOM_MAX keeps the view's widest reach (_view_reach: about 19 to 22
+## tiles, wide screens and a peek the most) within World.NEAR_TILES, so what
+## is on screen thinks every tick (decision 238).
+const ZOOM_MAX := 1.1
 const ZOOM_RATE := 14.0
 ## Click scheme, a middle drag: the view slides off the player, the ground
 ## under the cursor kept under it, no further than PAN_MAX tiles; a middle
