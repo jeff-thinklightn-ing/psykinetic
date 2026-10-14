@@ -21,6 +21,10 @@ top section as the release notes.
 - Smoother server with many players on a big map: monsters far off
   everyone's screen stroll about more simply, and the server spends less
   time on monsters that are not due to act.
+- Ponds and lakes are one body of water each, with a soft, irregular
+  shoreline and foam instead of blue squares. They are slightly clear,
+  deeper toward the middle, and ripple gently. Where water meets land is
+  still exactly where you can and can't walk.
 
 ## v0.1.139
 

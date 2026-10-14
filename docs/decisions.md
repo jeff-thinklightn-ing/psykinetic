@@ -3078,3 +3078,36 @@ tools/map_bench, 256x256 at castle density over 600 ticks, head of main:
 16 players 21.8 ms on average with NEAR_TILES 16, 27.2 with 22 (28: about
 28.6); 9 players 17.0, 4 players 10.9 with 22. Over 20 ms with 16 players
 spread out, about 5 ms of it this choice.
+
+## 236. Water is one surface a body, over a bed the ground sinks into
+
+Water was two quads a cell (a flat blue surface, a flat bed under it):
+every water cell a square, every shore a cell's edge. Its cells now join
+the ground's mesh (216) as its bed: a corner with water on all four sides
+sinks WATER_BED_DEPTH (less than FOREST_FLOOR_DEPTH, or the forest floor
+under the map would hide it), so a pond deepens toward its middle and
+meets its bank with no edge; a bed takes the ground of the land beside it
+(_bed_kind), so the bank runs on under the water, and the ground shader
+darkens what is wet. Over it, a body of water (cells joined side to side)
+is one flat mesh just above the ground (WATER_LIFT), over its cells and
+the land round them at its level that no wall parts from them, drawn by
+client3d/water.gdshader.
+
+The sim's rule is the cells: water is not walkable, land is. So the shore
+must not mislead (the coordinator's guard): it is where the distance into
+the water's cells (worked out exactly in the shader, from the mask, a
+texel a cell, over the 9 cells round the point) equals a noise of at most
+SHORE_WANDER, 0.2 of a cell, whatever the cells' shape, with foam on the
+land side out to 0.1 more. A bilinear blur of the mask was tried first and
+rejected: on a diagonal shore it filled a land cell's corner to within
+0.2 of its middle. The water is deeper and less clear toward the middle,
+ripples drift (two layers of the ground's noise, scrolled), and it is
+drawn at render priority -1: under the hover outline, the click ripple
+and builder's ghost (0, all above the water's height), and before faded
+walls (188) as before. The sim and the map format are unchanged.
+
+tools/map_bench (its dungeon has no water: the cost where there is none),
+windowed, under the bench lock, alternately with main, three runs each:
+256x256 46.3 / 48.2 / 59.1 fps (main 41.4 / 54.6 / 52.1), rendering 1.2
+to 1.4 ms CPU and 0.3 GPU a frame both; 128x128 177 / 199 / 199 (main 194
+/ 184 / 195); the 3D rebuild at 256x256 1.55 to 1.87 s (main 1.47 to 1.90).

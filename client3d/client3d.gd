@@ -99,10 +99,20 @@ const CLIFF_JITTER := 0.07
 const GROUND_COLOURS := {"grass": Color(0.21, 0.64, 0.25), "dirt": Color(0.46, 0.36, 0.22),
 		"stone": Color(0.56, 0.56, 0.54), "sand": Color(0.78, 0.7, 0.5)}
 const GROUND_CHANNELS := {"grass": 0, "dirt": 1, "stone": 2, "sand": 3}
-const WATER := Color(0.2, 0.42, 0.85, 0.75)
-## Under water, so it is never drawn over the void or the forest floor.
-const WATER_BED := Color(0.16, 0.24, 0.3)
-const WATER_DEPTH := 0.08
+## Water (_build_water): its colours (sRGB) shallow and deep, its foam; its
+## surface this far above its level, its bed's middle this far below, the
+## bed's ground (in the kinds texture, under the water's own tint).
+const WATER_SHALLOW := Color(0.25, 0.55, 0.7)
+const WATER_DEEP := Color(0.08, 0.22, 0.42)
+const WATER_FOAM := Color(0.85, 0.92, 0.95)
+const WATER_LIFT := 0.01
+## (Above FOREST_FLOOR_DEPTH, or the forest floor under the map hides it.)
+const WATER_BED_DEPTH := 0.15
+const WATER_BED_KIND := "dirt"
+const WATER_SHADER := preload("res://client3d/water.gdshader")
+## Drawn before the marks on it (hover, ripple, builder's ghost: 0) and the
+## faded walls (188).
+const WATER_PRIORITY := -1
 const TORCH := Color(1.0, 0.72, 0.38)
 ## The ground is drawn in squares this many cells across, a mesh each: few
 ## draws, and squares off screen are culled.
@@ -622,6 +632,12 @@ var _land: Dictionary[Vector2i, bool] = {}
 ## Corner levels where they are not a cell's height: stairs' ramps and the
 ## cells round them (_shape_ramps).
 var _ramp_levels: Dictionary[Vector2i, PackedInt32Array] = {}
+## Where the map's water is, a texel a cell (_build_ground), for the ground's
+## wet shore and the water's own; its first cell and size; the bodies drawn.
+var _water_mask: ImageTexture
+var _mask_origin := Vector2i.ZERO
+var _mask_size := Vector2i.ONE
+var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
@@ -1617,6 +1633,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_ground_shades.clear()
 	_shade_all = true
 	_trees.clear()
+	_water_bodies.clear()
 	_occluders.clear()
 	_occluders_built = false
 	_faded.clear()
@@ -1681,8 +1698,7 @@ func _build_room() -> void:
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
 			_add_fire(cell)
-	for cell: Vector2i in _terrain.get("water", []):
-		_add_water(cell)
+	_build_water()
 	_add_cliffs()
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
@@ -1837,7 +1853,11 @@ func _box(size: Vector3, material: Material) -> Node3D:
 ## the light and heat on each corner go in its CUSTOM0 bytes, updated where
 ## they change (_shade_floor).
 func _build_ground(kinds: Dictionary) -> void:
-	var cells: Array = _terrain["floor"]
+	# Water's cells are the ground too, its bed: a corner with water all
+	# round it sinks WATER_BED_DEPTH, so a pond deepens toward its middle
+	# and meets its shore with no edge (the surface is _build_water's).
+	var floor_count: int = _terrain["floor"].size()
+	var cells: Array = _terrain["floor"] + _terrain.get("water", [])
 	_cell_shades = PackedByteArray()
 	_vertex_chunk = PackedInt32Array()
 	_vertex_byte = PackedInt32Array()
@@ -1867,10 +1887,12 @@ func _build_ground(kinds: Dictionary) -> void:
 	levels.resize(cells.size() * 4)
 	var kind_bytes := PackedByteArray()
 	kind_bytes.resize(across * down * 4)
+	var water_bytes := PackedByteArray()
+	water_bytes.resize(across * down)
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
-		var kind := str(kinds.get(cell, "stone"))
+		var kind := str(kinds.get(cell, "stone")) if i < floor_count else _bed_kind(cell, kinds, floor_count)
 		if not GROUND_CHANNELS.has(kind):
 			kind = "stone"
 		_grounds[cell] = i
@@ -1881,6 +1903,8 @@ func _build_ground(kinds: Dictionary) -> void:
 		var place := (cell.y - origin.y) * across + cell.x - origin.x
 		at[place] = i
 		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
+		if i >= floor_count:
+			water_bytes[place] = 255
 		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 		if not chunks.has(chunk):
 			chunks[chunk] = PackedInt32Array()
@@ -1892,6 +1916,9 @@ func _build_ground(kinds: Dictionary) -> void:
 			| Mesh.ARRAY_FORMAT_CUSTOM0 | (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
 	_ground_stride = RenderingServer.mesh_surface_get_format_attribute_stride(format, 1)
 	_ground_custom = RenderingServer.mesh_surface_get_format_offset(format, 1, Mesh.ARRAY_CUSTOM0)
+	_water_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_L8, water_bytes))
+	_mask_origin = origin
+	_mask_size = Vector2i(across, down)
 	var material := _ground_material(kind_bytes, across, down, origin)
 	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
 	var pair_cell := PackedInt32Array()
@@ -1925,7 +1952,11 @@ func _build_ground(kinds: Dictionary) -> void:
 				if vertex < 0:
 					vertex = positions.size()
 					local[key] = vertex
-					positions.append(Vector3(corner.x - 0.5, level * LEVEL_RISE, corner.y - 0.5))
+					var sunk := true
+					for a in 4:
+						var next := corner + around[a]
+						sunk = sunk and at[(next.y - origin.y) * across + next.x - origin.x] >= floor_count
+					positions.append(Vector3(corner.x - 0.5, level * LEVEL_RISE - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
 					var global := _vertex_chunk.size()
 					_vertex_chunk.append(chunk_index)
 					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
@@ -2002,6 +2033,19 @@ func _build_ground(kinds: Dictionary) -> void:
 		filled[cell] += 1
 
 
+## What a water cell's bed is: the ground of the land beside it, so its bank
+## runs on under the water; out of sight of land, WATER_BED_KIND.
+## ([param floor_count]: the indices below it are floor, already placed.)
+func _bed_kind(cell: Vector2i, kinds: Dictionary, floor_count: int) -> String:
+	for y in range(-1, 2):
+		for x in range(-1, 2):
+			var near := cell + Vector2i(x, y)
+			if _grounds.get(near, floor_count) < floor_count:
+				var kind := str(kinds.get(near, "stone"))
+				return kind if GROUND_CHANNELS.has(kind) else "stone"
+	return WATER_BED_KIND
+
+
 ## The ground's material: ground.gdshader with the kinds texture
 ## [param bytes] ([param across] by [param down] texels, the first at
 ## [param origin]) and the kinds' colours.
@@ -2016,6 +2060,7 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 		material.set_shader_parameter(kind, GROUND_COLOURS[kind])
 	material.set_shader_parameter("warm", WARM)
 	material.set_shader_parameter("noise_tex", _ground_noise())
+	material.set_shader_parameter("water", _water_mask)
 	return material
 
 
@@ -2046,30 +2091,99 @@ func _ground_colour(kind: String, bright: float, warm: float) -> Color:
 	return (GROUND_COLOURS[kind] * bright).lerp(WARM, warm)
 
 
-func _add_water(cell: Vector2i) -> void:
-	var quad := MeshInstance3D.new()
-	quad.name = "Water_%d_%d" % [cell.x, cell.y]
-	var mesh := PlaneMesh.new()
-	mesh.size = Vector2.ONE
-	var material := StandardMaterial3D.new()
-	material.albedo_color = WATER
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 0.15
-	mesh.material = material
-	quad.mesh = mesh
-	quad.position = _tile_position(cell) - Vector3(0.0, WATER_DEPTH, 0.0)
-	_room.add_child(quad)
-	var bed := MeshInstance3D.new()
-	bed.name = "WaterBed_%d_%d" % [cell.x, cell.y]
-	var bed_mesh := PlaneMesh.new()
-	bed_mesh.size = Vector2.ONE
-	var bed_material := StandardMaterial3D.new()
-	bed_material.albedo_color = WATER_BED
-	bed_material.roughness = 1.0
-	bed_mesh.material = bed_material
-	bed.mesh = bed_mesh
-	bed.position = _tile_position(cell) - Vector3(0.0, (WATER_DEPTH + FOREST_FLOOR_DEPTH) * 0.5, 0.0)
-	_room.add_child(bed)
+## Water: one surface a body of water (its cells, joined side to side),
+## just above the ground, over its cells and the land round them at its
+## level, so water.gdshader can draw its shore off the cells' edges (by
+## the water mask, a texel a cell, read through noise, never more than
+## about a third of a cell from the true edge) with foam on the land side.
+## The bed under it is the ground's (_build_ground).
+func _build_water() -> void:
+	var water: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain.get("water", []):
+		water[cell] = true
+	if water.is_empty():
+		return
+	var material := _water_material()
+	var seen: Dictionary[Vector2i, bool] = {}
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for start: Vector2i in water:
+		if seen.has(start):
+			continue
+		seen[start] = true
+		var body: Array[Vector2i] = [start]
+		var level := 0
+		var head := 0
+		while head < body.size():
+			var cell := body[head]
+			head += 1
+			level = maxi(level, _height(cell))
+			for side in sides:
+				var next := cell + side
+				if water.has(next) and not seen.has(next):
+					seen[next] = true
+					body.append(next)
+		# Its cells, and the land beside them at its level that no wall
+		# parts from them: water never shows past a wall.
+		var covered: Dictionary[Vector2i, bool] = {}
+		for cell in body:
+			covered[cell] = true
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					var near := cell + Vector2i(x, y)
+					if covered.has(near) or water.has(near) or not _grounds.has(near) or _height(near) != level:
+						continue
+					var walled := false
+					for step: Vector2i in [Vector2i(x, 0), Vector2i(0, y)]:
+						if step != Vector2i.ZERO:
+							walled = walled or _edge_kind(cell, step) == Terrain.Edge.WALL \
+									or _edge_kind(near, -step) == Terrain.Edge.WALL
+					if not walled:
+						covered[near] = true
+		var top := level * LEVEL_RISE + WATER_LIFT
+		var positions := PackedVector3Array()
+		var indices := PackedInt32Array()
+		for cell: Vector2i in covered:
+			var first := positions.size()
+			for corner in GROUND_CORNERS:
+				positions.append(Vector3(cell.x + corner.x - 0.5, top, cell.y + corner.y - 0.5))
+			indices.append_array([first, first + 1, first + 2, first + 1, first + 3, first + 2])
+		var normals := PackedVector3Array()
+		normals.resize(positions.size())
+		normals.fill(Vector3.UP)
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = positions
+		arrays[Mesh.ARRAY_NORMAL] = normals
+		arrays[Mesh.ARRAY_INDEX] = indices
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var drawn := MeshInstance3D.new()
+		drawn.name = "Water_%d_%d" % [start.x, start.y]
+		drawn.mesh = mesh
+		drawn.material_override = material
+		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_room.add_child(drawn)
+		_water_bodies.append(drawn)
+
+
+## What stands on [param cell]'s side toward [param direction].
+func _edge_kind(cell: Vector2i, direction: Vector2i) -> int:
+	return _terrain["edges"].get(Terrain.edge_key(cell, direction), Terrain.Edge.OPEN)
+
+
+## The water's material, for this map's water mask.
+func _water_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = WATER_SHADER
+	material.render_priority = WATER_PRIORITY
+	material.set_shader_parameter("water", _water_mask)
+	material.set_shader_parameter("mask_origin", Vector2(_mask_origin))
+	material.set_shader_parameter("mask_size", Vector2(_mask_size))
+	material.set_shader_parameter("noise_tex", _ground_noise())
+	material.set_shader_parameter("shallow", WATER_SHALLOW)
+	material.set_shader_parameter("deep", WATER_DEEP)
+	material.set_shader_parameter("foam", WATER_FOAM)
+	return material
 
 
 ## Cliff faces: wherever a cell's edge stands above its neighbour's (or

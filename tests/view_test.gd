@@ -34,6 +34,7 @@ func _ready() -> void:
 	await _test_fade()
 	_test_outdoor()
 	_test_heights()
+	_test_water()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -209,6 +210,40 @@ func _test_player_death() -> void:
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
 
 
+func _test_water() -> void:
+	print("\n== water: a surface a body over a bed the ground sinks into, drawn under the marks ==")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	_rig.rebuild(terrain, castle["centre"])
+	var water: Array = terrain["water"]
+	# Bodies by hand: cells joined side to side.
+	var left: Dictionary = {}
+	for cell: Vector2i in water:
+		left[cell] = true
+	var bodies := 0
+	while not left.is_empty():
+		bodies += 1
+		var open: Array = [left.keys()[0]]
+		while not open.is_empty():
+			var cell: Vector2i = open.pop_back()
+			if left.erase(cell):
+				for side: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					open.append(cell + side)
+	_check(bodies > 0 and _rig._water_bodies.size() == bodies
+			and _rig._room.find_children("WaterBed_*", "", false, false).is_empty(),
+			"one water surface a body (%d), no quads a cell" % bodies)
+	var material := _rig._water_bodies[0].material_override as ShaderMaterial
+	_check(material.shader == Client3D.WATER_SHADER and material.render_priority < 0,
+			"drawn by the water shader, before the hover outline, ripples and builder's ghost")
+	var all_in := water.all(func(cell: Vector2i) -> bool: return _rig._grounds.has(cell))
+	var sunk := 0
+	for point: Vector3 in _rig._ground_meshes.map(func(mesh: ArrayMesh) -> Array: return Array(mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX])).reduce(func(a: Array, b: Array) -> Array: return a + b, []):
+		if point.y < -0.1:
+			sunk += 1
+	_check(all_in and sunk > 0, "the ground runs on under the water as its bed, sunk where water is all round (%d corners)" % sunk)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 func _test_heights() -> void:
 	print("\n== heights: a stair is a ramp the ground runs up, a ledge a rock face, marks lie on the slope ==")
 	var sample := Level.load_level("sample")
@@ -305,11 +340,14 @@ func _test_outdoor() -> void:
 			"its ambient light is neutral, not the sky's green-bottomed colour (%s)" % ambient)
 	var water: Array = terrain.get("water", [])
 	if not water.is_empty():
-		var cell: Vector2i = water[0]
-		var surface := _rig._room.get_node("Water_%d_%d" % [cell.x, cell.y]) as Node3D
-		var bed := _rig._room.get_node_or_null("WaterBed_%d_%d" % [cell.x, cell.y]) as Node3D
+		# The bed is the ground's lowest corners; the surface a flat mesh.
+		var bed := INF
+		for mesh: ArrayMesh in _rig._ground_meshes:
+			for point: Vector3 in mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+				bed = minf(bed, point.y)
+		var surface: float = (_rig._water_bodies[0].mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX][0].y
 		var forest_floor := _rig._room.get_node("ForestFloor") as Node3D
-		_check(bed != null and forest_floor.position.y < bed.position.y and bed.position.y < surface.position.y,
+		_check(forest_floor.position.y < bed and bed < surface,
 				"its water is drawn above its bed, and both above the forest floor, not hidden under it")
 	var land: Dictionary = _rig._land
 	var bare: Array[Vector2i] = []

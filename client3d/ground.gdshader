@@ -20,6 +20,9 @@ uniform vec3 stone : source_color = vec3(0.56, 0.56, 0.54);
 uniform vec3 sand : source_color = vec3(0.78, 0.7, 0.5);
 uniform vec3 warm : source_color = vec3(1.0, 0.5, 0.2);
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
+// Where the water is, a texel a cell like kinds (Client3D._build_ground):
+// the bed and the shore beside it darker, wet.
+uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
 
 varying vec3 world;
 varying vec2 shade;
@@ -125,6 +128,8 @@ void fragment() {
 	}
 
 	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);
+	float wet = smoothstep(0.25, 0.6, texture(water, (at - kinds_origin + 0.5) / kinds_size).r);
+	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
 
 	// Light and heat as the old floor had them, worked out in sRGB.
 	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * shade.r;
