@@ -36,7 +36,7 @@ a story only matters if there's something to fight with.
 | 3 | **Combat animation states** | Synced from sim state: wind-up (longer for heavy attacks), strike, recover, hit (direction-aware), pushed (matches knockback event), knocked down (fall/lie/get up, timed to sim), block, guard break, death. Clean blends, no popping. | after `pc-character` |
 | 4 | **Player character** | One shared humanoid body for players and companions, human proportions so the animation library fits, hand attach points for weapons. Replaces the capsule. | `pc-character` |
 | 5 | **Weapon models** | Hammer, sword, shield, giant axe, spear, dagger, bow — flat, faceted style, attach to hand bones. | art session (Blender MCP) |
-| 6 | **Weapons as verbs** | See "How it plays". Each weapon changes what the attack does in the physics; one of each in the castle chests; tests per verb. | later |
+| 6 | **Weapons as verbs** | See "How it plays". Each weapon changes what the attack does in the physics; one of each in the castle chests; tests per verb. Items become instances (today an item is a bare id) and start recording their history here. | later |
 | 7 | **The smith scenario** | A map and story to use it all in (see below). | later |
 
 ### The world moves on (design rule for the performance work)
@@ -92,7 +92,7 @@ fields and the overrun castle, find him held in the keep, bring him home.
   - Bow: range; longer draw = stronger shot.
 - **You become what you do** — slowly. Habits shift the body (heavier/leaner/sharper mind); it's a trade, not a climb (heavy is slow, light is easy to throw). Two hands = choices (sword or the staff that feeds mind).
 - **Gear is kept; buffs are earned.** Weapons are never consumable. Food, magic items and social time (cards with a local) give temporary buffs, found in town or on the road (larders, libraries, puzzles); companions remind you when they fade. Buffs never drop you below baseline.
-- **Items have history.** Each item records carriers (with time held) and up to five notable events. Later: items take the name of a long-time holder ("Wren's dagger") and slowly absorb that holder's strength (capped, slow, drifts to a new owner). Record history from the start even before naming is built.
+- **Items have history.** Each item records carriers (with time held) and up to five notable events. Later: items take the name of a long-time holder ("Wren's dagger") and slowly absorb that holder's strength (capped, slow, drifts to a new owner). Record history from the moment items become instances (step 6), even before naming is built.
 - **The long game is the world**, not the character: town grows with rescued people, enemies hold and retake ground, companions remember.
 - **Companion prompts say what's true and what to do, never what to say.**
 - **Licensing:** no assets with non-commercial or regional restrictions; record every third-party asset/tool/model in `THIRD_PARTY.md` with a `source` per asset.
@@ -130,7 +130,7 @@ but hasn't committed to; confirm before building them.
 - **Companion LOOK verb** (go check a dark or unseen spot and report back), built on the same sight machinery.
 
 ### Items
-- **Item history** from the start: carriers with time held, up to five notable events.
+- **Item history** (parked until step 6, weapons as verbs, which makes items instances): carriers with time held, up to five notable events.
 - Later: items take a long-time holder's name ("Wren's dagger"); slowly absorb the holder's strength (a caster's staff gains mind) — capped, slow, drifts to a new owner; gifts between companions, townsfolk and players.
 - *Ideas from Gísla saga:* cursed heirlooms (strong, but bring ill luck to whoever won't let go); reforging a broken heirloom into something new that keeps its name; a split token (two halves of a coin) carried by two friends.
 - **Upkeep buffs:** food (mass), magic items (aura), social time like cards with a local (wits); found on the road too (larders, libraries, puzzles); companions mention when they fade, once.
