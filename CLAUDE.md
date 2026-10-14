@@ -27,6 +27,11 @@ which worktree owns each step, and the design rules not to break without asking 
 - Releases take turns the same way: ask the coordinator for the version before running
   `tools/release_client.ps1`, so a release being retested doesn't lose its number to
   another tree's.
+- After a pull or rebase that brings in a new `class_name`, run
+  `godot --headless --path . --import` before testing: each worktree has its own `.godot`
+  class cache, and without it scripts naming the new class fail to compile. Name any new
+  `class_name` when you report a landing.
+- The coordinator deploys the server to the box after releases; worktree sessions don't.
 - Server and client must be built from the same commit; a release that changes the wire
   format needs the server redeployed (`server/deploy.sh`, on Jeff's box).
 - Never commit a real token: check the diff of `project.godot`.
