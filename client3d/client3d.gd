@@ -162,6 +162,11 @@ const PEEK_DRAG_PX := 300.0
 const PEEK_PULL_BACK := 1.2
 const PEEK_RETURN_SECONDS := 0.25
 const PLAYER_LIGHT_RANGE := 6.0
+## A light casts shadows only while its reach overlaps the ground the camera
+## shows, give or take this (cells); checked when the view moves a cell or
+## changes size, and every SHADOW_RECHECK seconds for lights that move.
+const SHADOW_MARGIN := 2.0
+const SHADOW_RECHECK := 0.5
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
 const FIRE := Color(1.0, 0.45, 0.1)
@@ -491,6 +496,11 @@ var _grounds: Dictionary[Vector2i, Array] = {}
 var _ground_kinds: Dictionary[Vector2i, String] = {}
 var _ground_shades: Dictionary[Vector2i, Vector2] = {}
 var _shade_due := false
+## The lights that may cast shadows (torches, carried lanterns), and the
+## view they were last sorted for (_update_shadows).
+var _shadow_lights: Array[OmniLight3D] = []
+var _shadow_key := Vector3i(1 << 30, 0, 0)
+var _shadow_checked := 0.0
 ## A new floor: every cell is shaded, whatever the fields say changed.
 var _shade_all := true
 ## The kit's own material and a see-through copy of it; the flat stone
@@ -622,6 +632,7 @@ func _process(delta: float) -> void:
 	_follow(delta)
 	_fade_clock += delta
 	_update_fade()
+	_update_shadows()
 	_drop_departed()
 	_update_mourning(delta)
 
@@ -1871,9 +1882,9 @@ func _add_torch(cell: Vector2i) -> void:
 	light.light_color = TORCH
 	light.light_energy = 1.4
 	light.omni_range = 4.5
-	light.shadow_enabled = true
 	light.position = at + Vector3(0.0, 1.3, 0.0)
 	_room.add_child(light)
+	_cast_shadows(light)
 
 
 ## The base of an edge's wall: the higher of the cells it stands between.
@@ -1977,6 +1988,58 @@ func _add_fire(cell: Vector2i) -> void:
 	light.omni_range = 2.5
 	light.position = _tile_position(cell) + Vector3(0.0, 0.5, 0.0)
 	_room.add_child(light)
+
+
+# --- Shadows -------------------------------------------------------------------
+
+## [param light] casts shadows while it can reach what the camera shows:
+## on until the next frame's _update_shadows (it may not be placed yet).
+func _cast_shadows(light: OmniLight3D) -> void:
+	_shadow_lights.append(light)
+	light.shadow_enabled = true
+	_shadow_key = Vector3i(1 << 30, 0, 0)
+
+
+## How far from the camera's aim, on the ground, the screen reaches: the
+## ortho view's half diagonal, its height stretched by the pitch.
+func _view_reach() -> float:
+	if _camera == null:
+		return INF
+	var screen := get_viewport().get_visible_rect().size
+	var half_height := _camera.size * 0.5 / maxf(sin(deg_to_rad(pitch)), 0.1)
+	var half_width := _camera.size * 0.5 * screen.x / maxf(screen.y, 1.0)
+	return Vector2(half_width, half_height).length()
+
+
+func _shows_light(light: OmniLight3D, reach: float) -> bool:
+	var at := light.global_position
+	var away := Vector2(at.x - _camera_target.x, at.z - _camera_target.z).length()
+	return away <= reach + light.omni_range + SHADOW_MARGIN
+
+
+## Shadows on for the lights that reach the view, off for the rest, so a
+## big map's many torches and lanterns hold no shadow maps for ground
+## nobody is looking at (the camera's culling leaves out most of them
+## already; this leaves out the rest).
+func _update_shadows() -> void:
+	if _camera == null or _shadow_lights.is_empty():
+		return
+	var reach := _view_reach()
+	var key := Vector3i(roundi(_camera_target.x), roundi(_camera_target.z), roundi(reach * 2.0))
+	var now := Time.get_ticks_msec() / 1000.0
+	if key == _shadow_key and now - _shadow_checked < SHADOW_RECHECK:
+		return
+	_shadow_key = key
+	_shadow_checked = now
+	var kept: Array[OmniLight3D] = []
+	for light in _shadow_lights:
+		if not is_instance_valid(light):
+			continue
+		kept.append(light)
+		var shows := _shows_light(light, reach)
+		if light.shadow_enabled != shows:
+			light.shadow_enabled = shows
+	_shadow_lights = kept
 
 
 # --- Near and far ----------------------------------------------------------------
@@ -2744,7 +2807,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		light.light_color = PLAYER_LIGHT
 		light.light_energy = 1.2
 		light.omni_range = PLAYER_LIGHT_RANGE
-		light.shadow_enabled = true
+		_cast_shadows(light)
 		# Above the head: inside the body it would light the body from within
 		# and leave its outside in its own shadow.
 		light.position.y = height + 0.6

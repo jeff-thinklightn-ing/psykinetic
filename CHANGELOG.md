@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.116
+
+Client and server.
+
+- Big maps start faster again: the old 2D map is no longer drawn behind
+  the 3D view (or on the server), a 256x256 map in 1.6 s, from 4.3.
+- Only lights near what is on screen cast shadows.
+
+The server must be updated to v0.1.116 too, as it refuses any other version.
+
 ## v0.1.115
 
 Client.

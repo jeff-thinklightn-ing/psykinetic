@@ -37,6 +37,8 @@ func _ready() -> void:
 	await _test_target_marked()
 	await _test_goblin()
 	_test_goblins_differ()
+	_test_shadows_in_view()
+	_test_no_2d_under_3d()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -744,6 +746,49 @@ func _test_settings() -> void:
 	_check(Net.hp_bars and is_equal_approx(Net.master_volume, 0.5), "no line: bars on; a volume keeps what it had")
 	Net.master_volume = 1.0
 	Sfx.apply_volumes()
+
+
+func _test_shadows_in_view() -> void:
+	print("
+== a light casts shadows only while its reach overlaps the ground in view ==")
+	var near := OmniLight3D.new()
+	near.omni_range = 4.5
+	_rig._room.add_child(near)
+	near.global_position = _rig._camera_target + Vector3(1.0, 1.3, 1.0)
+	var edge := OmniLight3D.new()
+	edge.omni_range = 4.5
+	_rig._room.add_child(edge)
+	var reach: float = _rig._view_reach()
+	edge.global_position = _rig._camera_target + Vector3(reach + 4.0, 1.3, 0.0)
+	var far := OmniLight3D.new()
+	far.omni_range = 4.5
+	_rig._room.add_child(far)
+	far.global_position = _rig._camera_target + Vector3(reach + 40.0, 1.3, 0.0)
+	for light in [near, edge, far]:
+		_rig._cast_shadows(light)
+	_check(near.shadow_enabled and edge.shadow_enabled and far.shadow_enabled, "each is on as it comes, until it is placed")
+	_rig._update_shadows()
+	_check(near.shadow_enabled, "one by the player casts shadows")
+	_check(edge.shadow_enabled, "one off screen whose light reaches onto it does too (%.1f out)" % (reach + 4.0))
+	_check(not far.shadow_enabled, "one far off does not")
+	far.global_position = near.global_position
+	_rig._shadow_checked = -INF
+	_rig._update_shadows()
+	_check(far.shadow_enabled, "and comes on once it is near (a carried lantern walking up)")
+	for light in [near, edge, far]:
+		light.free()
+	_rig._shadow_checked = -INF
+	_rig._update_shadows()
+	_check(_rig._shadow_lights.all(func(light: Variant) -> bool: return is_instance_valid(light)),
+			"lights gone are forgotten")
+
+
+func _test_no_2d_under_3d() -> void:
+	print("
+== under the 3D view the 2D view is not drawn ==")
+	_main._paint_level()
+	_check(_main._walls.is_empty() and _main.ground.get_used_cells().is_empty(),
+			"no 2D walls or floor tiles (%d, %d)" % [_main._walls.size(), _main.ground.get_used_cells().size()])
 
 
 # --- helpers ------------------------------------------------------------------

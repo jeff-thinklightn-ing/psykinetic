@@ -251,12 +251,12 @@ func _ready() -> void:
 	World.zone_switched.connect(_on_zone_switched)
 	_build_talk()
 	_load_level(Net.map_name if not Net.map_name.is_empty() else Level.DEFAULT_MAP)
+	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
+		_show_3d()
 	_paint_level()
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
 	camera.position = Iso.tile_to_local(level_centre)
-	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
-		_show_3d()
 	RenderingServer.set_default_clear_color(FOREST_VOID if _terrain.get("outdoor", false) else VOID)
 
 	World.ticked.connect(_on_world_ticked)
@@ -730,7 +730,7 @@ func _is_own_companion(entity: GridEntity) -> bool:
 func _apply_azimuth() -> void:
 	ground.transform = Iso.ground_transform() * Transform2D(Vector2(Iso.HALF.x, Iso.HALF.y),
 			Vector2(-Iso.HALF.x, Iso.HALF.y), Vector2.ZERO).affine_inverse()
-	var floor_at := func(cell: Vector2i) -> bool: return cell in _terrain["floor"]
+	var floor_at := _floor_test() if not _walls.is_empty() else Callable()
 	for wall in _walls:
 		var layer: Node = near_walls if WallEdge.is_near(wall.key, floor_at) else $YSort
 		if wall.get_parent() != layer:
@@ -1006,15 +1006,21 @@ func _mouse_tile() -> Vector2i:
 ## WallEdges, the far ones in the Y-sorted layer and the near ones (see
 ## WallEdge.is_near) in the translucent NearWalls group above it. Doors are
 ## spawned by the server with the level (see _spawn_doors): they have state.
+##
+## Only where the 2D view is the one seen: not under the 3D view, nor on a
+## server, where nobody looks (a big map took seconds to draw).
 func _paint_level() -> void:
 	RenderingServer.set_default_clear_color(FOREST_VOID if _terrain.get("outdoor", false) else VOID)
 	ground.clear()
 	for wall in _walls:
 		wall.queue_free()
 	_walls.clear()
+	if not _draws_2d():
+		return
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
-	var fire: Array[Vector2i] = _terrain["fire"]
+	var fire := _cell_set(_terrain["fire"])
+	var floor_at := _floor_test()
 	var kinds: Dictionary = _terrain.get("kinds", {})
 	var heights: Dictionary = _terrain.get("heights", {})
 	var stairs: Dictionary = _terrain.get("stairs", {})
@@ -1031,12 +1037,31 @@ func _paint_level() -> void:
 			continue
 		var wall := WallEdge.new()
 		wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
-		if WallEdge.is_near(key, func(cell: Vector2i) -> bool: return cell in _terrain["floor"]):
+		if WallEdge.is_near(key, floor_at):
 			near_walls.add_child(wall)
 		else:
 			$YSort.add_child(wall)
 		wall.setup(key, kind_at, WALL_VALUE)
 		_walls.append(wall)
+
+
+## Whether this peer shows the 2D view: no 3D view, and not a server.
+func _draws_2d() -> bool:
+	return _client3d == null and Net.mode != Net.Mode.SERVER
+
+
+## [param cells] as a set, for lookups that do not go through the list.
+static func _cell_set(cells: Array) -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in cells:
+		out[cell] = true
+	return out
+
+
+## Whether a cell is floor, by a set of the map's floor.
+func _floor_test() -> Callable:
+	var floor_set := _cell_set(_terrain["floor"])
+	return func(cell: Vector2i) -> bool: return floor_set.has(cell)
 
 
 ## 2D: how each ground looks, as a tint of the floor tile, and lighter by

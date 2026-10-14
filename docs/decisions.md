@@ -1894,3 +1894,25 @@ is now marked as showing it.
 
 tools/map_bench, 3D build: 128x128 3.0 s to 0.28, 256x256 12 s to 1.15
 (49 s before 182).
+
+## 184. The 2D view is drawn only where it is seen; shadows only near the view
+
+Main drew the 2D view (floor tiles, a WallEdge node a wall) on every peer,
+the 3D client and the server too, where nobody sees it: 1.5 s at 256x256,
+18 s at 512x512, as it asked whether each cell was fire and each wall's
+neighbours floor by going through the map's lists. It is drawn now only
+where it is the view (_draws_2d: no 3D view, not a server), and where it
+is, by sets: the 3D client starting a 256x256 map, 4.3 s to 1.6.
+
+Torches and carried lanterns cast shadows only while their reach
+overlaps the ground the camera shows (the ortho view's half diagonal on
+the ground, plus the light's range, plus SHADOW_MARGIN), sorted again when
+the view moves a cell or changes size and every SHADOW_RECHECK (0.5 s) for
+lights that move. Measured, it changes little: Godot already draws no
+shadow for a light off screen (1025 shadowed lights at 256x256, 36.5 fps;
+all shadows off, 37.1). It keeps that so for lights the view's frustum
+would still take in. Rejected: a fixed range in cells round the player
+(a monster's sight, 7) — torches on screen would lose their shadows.
+
+What holds a big map's frame rate down is the scripts each frame (35 ms
+at 256x256, 3D view hidden or not), next.
