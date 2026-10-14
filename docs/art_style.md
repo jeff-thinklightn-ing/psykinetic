@@ -89,7 +89,13 @@ rock, wall stone) say their world size in the manifest's `tile_m`.
    modelled in centimetres?", "no object named "leaf"", "4,200 triangles, the slot's budget
    is 2,000"). Fix it in Blender and run the same line again. A `.glb` made elsewhere, or a
    texture slot's `<slot>.png`, drops in the same way.
-5. `tools/art_check.gd` checks every slot's art at once
+5. To see it as the game will while you work: `godot --path . tools/art_preview.tscn --
+   --slot=door.single`. It shows the slot from the game's camera, on a 1 m grid inside the
+   slot's outline, with the goblin beside it for scale. Its moving parts swing, its states
+   take turns, and what the check says is on screen. Every save of the `.blend` is exported
+   and shown again (Left/Right for other slots, Q/E to turn, G for the grey box, L for
+   torchlight).
+6. `tools/art_check.gd` checks every slot's art at once
    (`godot --headless --path . --script tools/art_check.gd`), and the tests hold all of it
    to its slot.
 

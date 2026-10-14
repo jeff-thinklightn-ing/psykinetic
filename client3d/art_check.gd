@@ -31,7 +31,7 @@ static func check(slot: String) -> Array[String]:
 	else:
 		for variant in range(1, ArtKit.variant_count(slot) + 1):
 			var path := ArtKit.own_path(slot, variant)
-			var node := (load(path) as PackedScene).instantiate() as Node3D
+			var node := ArtKit._scene(path).instantiate() as Node3D
 			for problem in check_node(slot, node):
 				var cut := problem.find(": ") + 2
 				out.append(problem.left(cut) + path.get_file() + ": " + problem.substr(cut))

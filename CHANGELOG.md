@@ -30,6 +30,8 @@ top section as the release notes.
   it to whom. Nothing shows it yet; it is kept from now on. Your packs
   and chests carry over as they were.
 - Companions can hand things over and take them back, as players do.
+- Behind the scenes: a door or other piece with its own moving part, made
+  for the game, no longer logs a warning as it is drawn.
 
 ## v0.1.139
 

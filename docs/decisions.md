@@ -3160,3 +3160,33 @@ tools/items_art_slots.gd): held, a grip at the origin, grip_2 up a
 two-handed one. ArtKit's grey box now carries a held slot's sockets but
 the grip as empties, as its art must (ArtCheck), so a two-handed grey box
 passes its own slot and the other hand has somewhere to go.
+
+## 246. The slot preview reads art as it is saved
+
+Making a slot's art is a loop of save and look, and the game shows a
+.glb only once Godot has imported it, which needs the editor or a
+headless --import of the whole project. tools/art_preview shows one slot
+as the game's camera does (pitch, distance and default size from
+Client3D; out no farther than ZOOM_MAX), on a 1 m grid inside the slot's
+outline, the goblin beside it for scale, its moving parts swinging
+through their range and its states in turn, and ArtCheck's lines on
+screen. It looks at the slot's folder every half second: a saved .glb or
+.png is shown again at once, and a saved .blend is exported through
+Blender (tools/blender/export_slot.py, as tools/art_drop.ps1 does) and
+then shown.
+
+For that, ArtKit.live reads a slot's own .glb straight from disk through
+GLTFDocument (packed as a scene once, as an import would be) and its .png
+through Image, instead of the imported resource. Only the preview sets
+it: art_kit_test fails if any other script does, so the game, its tools
+and every export draw imported resources, as on the server box's
+headless import. art_kit_test also writes a grey door as a .glb, reads it
+back the live way, and holds it to its slot, so a part's name and pivot
+survive the round trip.
+
+Folded in: ArtKit._make clears a lifted part's owners (the .glb scene's
+root) before moving it beside the body, which Godot warned of for any own
+art with a moving part. Rejected: an EditorPlugin preview (the art is made
+by someone not running the editor), and running an --import on each save
+(seconds of the whole project's import a save, against a few hundred
+milliseconds for one file).

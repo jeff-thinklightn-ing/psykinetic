@@ -57,6 +57,11 @@ const LABEL_PIXEL := 0.004
 static var show_placeholders := false
 ## The slot's name over each grey box (settings.cfg art_labels=1).
 static var show_labels := false
+## A slot's own files are read as they are on disk (a .glb through
+## GLTFDocument, a .png as an image), not as Godot imported them: the
+## preview (tools/art_preview) sets it, to show a file the moment it is
+## saved, with no editor to import it.
+static var live := false
 
 static var _manifest: Dictionary = {}
 static var _scenes: Dictionary[String, PackedScene] = {}
@@ -142,7 +147,12 @@ static func texture_path(slot: String) -> String:
 ## it then uses a stand-in of its own: terrain's procedural colour).
 static func texture(slot: String) -> Texture2D:
 	var path := texture_path(slot)
-	return load(path) as Texture2D if ResourceLoader.exists(path) else null
+	if not _exists(path):
+		return null
+	if live:
+		var image := Image.load_from_file(ProjectSettings.globalize_path(path))
+		return ImageTexture.create_from_image(image) if image != null else null
+	return load(path) as Texture2D
 
 
 ## How many variants of its own the slot has; 0: none (its fill or grey box).
@@ -151,9 +161,9 @@ static func variant_count(slot: String) -> int:
 	if not _variants.has(slot):
 		var count := 0
 		if str(spec(slot).get("type", "mesh")) == "texture":
-			count = 1 if ResourceLoader.exists(texture_path(slot)) else 0
+			count = 1 if _exists(texture_path(slot)) else 0
 		else:
-			while ResourceLoader.exists(own_path(slot, count + 1)):
+			while _exists(own_path(slot, count + 1)):
 				count += 1
 		_variants[slot] = count
 	return _variants[slot]
@@ -248,6 +258,8 @@ static func _make(recipe: Array) -> Node3D:
 	root.set_meta(&"slot", recipe[2])
 	for lift: Array in recipe[1]:
 		var part := nodes[1].get_node(lift[0]) as Node3D
+		for node in _descendants(part):
+			node.owner = null  # The body's scene's; the part leaves it.
 		part.get_parent().remove_child(part)
 		part.name = lift[1]
 		root.add_child(part)
@@ -370,8 +382,34 @@ static func _grey(colour: Color) -> StandardMaterial3D:
 ## The scene at [param path], loaded once and kept.
 static func _scene(path: String) -> PackedScene:
 	if not _scenes.has(path):
-		_scenes[path] = load(path) as PackedScene
+		_scenes[path] = _read_glb(path) if live and path.begins_with(ROOT) else load(path) as PackedScene
 	return _scenes[path]
+
+
+## A slot's file there to read: imported, or (live) on disk.
+static func _exists(path: String) -> bool:
+	return FileAccess.file_exists(path) if live else ResourceLoader.exists(path)
+
+
+## A .glb read from disk as the importer would make it, packed as a scene.
+static func _read_glb(path: String) -> PackedScene:
+	var document := GLTFDocument.new()
+	var state := GLTFState.new()
+	var error := document.append_from_file(ProjectSettings.globalize_path(path), state)
+	var scene := PackedScene.new()
+	if error != OK:
+		push_error("ArtKit: could not read %s (%s)" % [path, error_string(error)])
+		var empty := Node3D.new()
+		scene.pack(empty)
+		empty.free()
+		return scene
+	var root := document.generate_scene(state) as Node3D
+	for node in _descendants(root):
+		if node != root:
+			node.owner = root
+	scene.pack(root)
+	root.free()
+	return scene
 
 
 ## How tall [param node] stands as modelled: the top of its meshes' bounds.

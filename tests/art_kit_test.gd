@@ -27,6 +27,8 @@ func _ready() -> void:
 	_test_check_names_mistakes()
 	_test_own_art_checks()
 	_test_status_current()
+	_test_live_read()
+	_test_live_is_preview_only()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -272,6 +274,58 @@ func _test_status_current() -> void:
 	for name: String in ArtKit.manifest().get("sources", {}):
 		var source: Dictionary = ArtKit.manifest()["sources"][name]
 		_check(str(source.get("license_file", "")) in third, "THIRD_PARTY.md names %s's licence text" % name)
+
+
+func _test_live_read() -> void:
+	print("
+== live (the preview): a .glb read from disk as saved keeps its parts and fits as imported ==")
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	var door := ArtKit.instance("door.single")
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+	var document := GLTFDocument.new()
+	var state := GLTFState.new()
+	document.append_from_scene(door, state)
+	var folder := OS.get_temp_dir().path_join("psykinetic-art-kit-%s" % ProjectSettings.globalize_path("res://").md5_text().left(8))
+	DirAccess.make_dir_recursive_absolute(folder)
+	var path := folder.path_join("door.single.glb")
+	var error := document.write_to_filesystem(state, path)
+	door.free()
+	_check(error == OK, "a grey door written as a .glb (%s)" % error_string(error))
+	var read := ArtKit._read_glb(path).instantiate() as Node3D
+	var problems := ArtCheck.check_node("door.single", read)
+	_check(read.find_child("leaf", true, false) != null and problems.is_empty(), "read back from disk, its leaf is there and it fits its slot %s" % [problems])
+	read.free()
+	DirAccess.remove_absolute(path)
+
+
+## Only the preview reads art live: the game, its tools and the export
+## always draw imported resources (decision 246).
+func _test_live_is_preview_only() -> void:
+	print("
+== ArtKit.live is set by tools/art_preview alone ==")
+	_check(not ArtKit.live, "off unless set")
+	var setters: Array[String] = []
+	var pattern := RegEx.create_from_string("ArtKit[.]live[ \t]*=[^=]")
+	for path in _scripts("res://"):
+		if path in ["res://tools/art_preview.gd", "res://tests/art_kit_test.gd"]:
+			continue
+		if pattern.search(FileAccess.get_file_as_string(path)) != null:
+			setters.append(path)
+	_check(setters.is_empty(), "no other script sets it %s" % [setters])
+
+
+## Every .gd under [param folder], outside .godot and the Kenney packs.
+func _scripts(folder: String) -> Array[String]:
+	var out: Array[String] = []
+	for file in DirAccess.get_files_at(folder):
+		if file.ends_with(".gd"):
+			out.append(folder.path_join(file))
+	for sub in DirAccess.get_directories_at(folder):
+		if not sub.begins_with(".") and sub != "art":
+			out.append_array(_scripts(folder.path_join(sub)))
+	return out
 
 
 ## [param node]'s body's bounds, in the slot's space.
