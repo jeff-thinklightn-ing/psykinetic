@@ -1220,6 +1220,8 @@ func _boot() -> void:
 	World.holdings = Holdings.new(WorldMap.build(), Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
 	# The town's stores, as the snapshot left them.
 	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), func() -> int: return World.steps)
+	# Every thing in the world and its history, as the snapshot left them.
+	World.items = ItemBook.from_dict(snapshot.get("items", {}), World.steps_now)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1536,6 +1538,7 @@ func _start_level(from_snapshot := false, whole := true) -> void:
 		if id != "":
 			_join_player(peer, id, _records[id].name if _records.has(id) else (Net.player_name if peer == Net.local_id
 				else Net.DEFAULT_NAME))
+	World.end_unclaimed_items()
 	if not from_snapshot and whole:
 		# A rebuilt room starts whole: every player at full hp and stamina.
 		for player: Player in _players.values():
@@ -1559,7 +1562,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 			continue
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
 		if entry.get("slots") != null:
-			World.set_slots(entity, entry["slots"])
+			World.set_slots(entity, entry["slots"], entry.get("items", []))
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
 		if not _alive_slots.has(respawn["spawn"]):
@@ -1651,11 +1654,14 @@ func _save_state() -> void:
 		for slot: int in _dead_since:
 			respawns.append({"spawn": slot,
 				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
+		for entity in World.get_entities():
+			World.slot_uids(entity)  # A chest's things get their instances before the book is saved.
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns}
 	World.enter(was)
 	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
-		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {}})
+		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
+		"items": World.items.to_dict()})
 
 
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.
@@ -1727,7 +1733,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	if known and not respawn:
 		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
 	World.protect(player, SPAWN_GRACE_TICKS)
-	World.set_slots(player, record.slots)
+	player.player_id = id
+	World.set_slots(player, record.slots, record.slot_items)
 	record.remember(player)
 	record.zone = World.zone.name
 	if not World.peer_zone.has(peer):
@@ -1809,7 +1816,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		pet.card = authored
 	record.companion["card"] = pet.card
 	pet.restore_said(record.companion.get("said", []))
-	World.set_slots(pet, record.companion.get("slots", []))
+	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
 	pet.party_log = party_log
 	pet.mind = _make_mind()
 	pet.mind.warm()  # The model loads now, not on her first ask.
@@ -1869,6 +1876,7 @@ func _remember_companion(id: String) -> void:
 	record.companion["alive"] = true
 	record.companion["said"] = pet.said_lines()
 	record.companion["slots"] = Array(pet.slots)
+	record.companion["items"] = Array(World.slot_uids(pet))
 
 
 ## "say" {text}: chat, typed or a quick phrase (_player_said).
@@ -2554,10 +2562,12 @@ func _on_slots_changed(entity: GridEntity) -> void:
 		var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
 		if record != null and _players.get(entity.owner_peer) == entity:
 			record.slots = entity.slots.duplicate()
+			record.slot_items = World.slot_uids(entity)
 	elif entity is Companion:
 		var keeper: PlayerRecord = _records.get((entity as Companion).keeper_id)
 		if keeper != null and _companions.get(keeper.player_id) == entity:
 			keeper.companion["slots"] = Array(entity.slots)
+			keeper.companion["items"] = Array(World.slot_uids(entity))
 
 
 ## H: the controls list shown or hidden, and remembered.

@@ -24,6 +24,8 @@ var companion: Dictionary = {}
 ## What is in the player's slots (Items ids, "" empty), kept through
 ## death, travel and leaving.
 var slots := Items.tidy([], Player.SLOTS)
+## The instance in each slot (ItemBook uids, 0 none), beside slots.
+var slot_items := PackedInt32Array()
 
 
 ## Copies the live state off the player's entity.
@@ -35,6 +37,7 @@ func remember(entity: GridEntity) -> void:
 	stamina = entity.stamina
 	facing = entity.facing
 	slots = entity.slots.duplicate()
+	slot_items = World.slot_uids(entity)
 	last_seen = int(Time.get_unix_time_from_system())
 
 
@@ -52,6 +55,7 @@ func to_dict() -> Dictionary:
 		"last_seen": last_seen,
 		"companion": companion.duplicate(true),
 		"slots": Array(slots),
+		"items": Array(slot_items),
 	}
 
 
@@ -76,6 +80,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.last_seen = int(entry.get("last_seen", 0))
 	record.zone = str(entry.get("zone", ""))
 	record.slots = Items.tidy(entry.get("slots", []), Player.SLOTS)
+	record.slot_items = _uids(entry.get("items", []))
 	var pet: Variant = entry.get("companion", {})
 	if pet is Dictionary and pet.get("name") is String:
 		record.companion = {
@@ -87,8 +92,18 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			"alive": bool(pet.get("alive", true)),
 			"said": _lines(pet.get("said", [])),
 			"slots": Array(Items.tidy(pet.get("slots", []), Companion.SLOTS)),
+			"items": Array(_uids(pet.get("items", []))),
 		}
 	return record
+
+
+## [param value] as ItemBook uids (0 for none), or none.
+static func _uids(value: Variant) -> PackedInt32Array:
+	var uids := PackedInt32Array()
+	if value is Array:
+		for uid: Variant in value:
+			uids.append(int(uid) if uid is float or uid is int else 0)
+	return uids
 
 
 ## [param value] as lines of text, or none.

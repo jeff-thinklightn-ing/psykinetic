@@ -128,6 +128,10 @@ var facing := Vector2i(0, 1)
 ## things; a player and a chest have theirs (Player.SLOTS, Chest.SLOTS),
 ## replicated (replicate). Written only by World (try_transfer, set_slots).
 var slots := PackedStringArray()
+## Server only, never sent: the instance in each slot (ItemBook uid), 0 for
+## none yet (a level's chest: made on first need, World.slot_uid). Kept
+## beside slots by the same World calls.
+var slot_items := PackedInt32Array()
 var spawned := false
 ## The tick (maybe fractional) the next step may start; see World.try_move.
 var next_move_tick := 0.0

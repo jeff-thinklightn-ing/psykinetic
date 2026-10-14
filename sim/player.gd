@@ -22,6 +22,9 @@ var queued_steps: Array[Dictionary] = []
 ## older count and is dropped (see World.order_step): the client had
 ## already given that walk up.
 var refusals := 0
+## Server only: whose player this is (PlayerRecord.player_id), so the
+## things it carries know (World.holder_key).
+var player_id := ""
 
 
 func _init() -> void:

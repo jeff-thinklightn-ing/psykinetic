@@ -295,6 +295,12 @@ var holdings: Holdings = null
 ## Server: the town's stores (Stockpile), which depots bank into; made by
 ## Main at boot, from the snapshot. Null on a client.
 var stockpile: Stockpile = null
+## Server: every thing in the world, with its history (ItemBook). Main
+## replaces it at boot with the snapshot's.
+var items := ItemBook.new(steps_now)
+## Uids that level entities held when the room was reset: ended as lost
+## unless the rebuild puts them back (end_unclaimed_items).
+var _unclaimed: Array[int] = []
 
 
 ## An attack or shove accepted this tick, waiting for the resolve phase.
@@ -733,6 +739,13 @@ func reset() -> void:
 	if not Net.is_authority():
 		return
 	for entity in _entities:
+		if is_instance_valid(entity) and entity.owner_peer == 0 and entity.keeper_peer == 0:
+			# A level's chest goes with the room; a snapshot may bring it back.
+			for uid in entity.slot_items:
+				if uid != 0:
+					items.place(uid, "")
+					_unclaimed.append(uid)
+	for entity in _entities:
 		if is_instance_valid(entity):
 			entity._world_remove()
 	_entities.clear()
@@ -967,12 +980,15 @@ func _hit_door(door: Door, amount: int, by: GridEntity) -> void:
 
 ## [param by] moves what is in [param from]'s slot [param from_slot] into
 ## [param to]'s slot [param to_slot], swapping with whatever is there. Each
-## side is [param by] itself or a chest it can reach (reaches); the slot
-## taken from must hold something. False, and nothing moves, otherwise.
+## side is [param by] itself or something it can reach (reaches); the slot
+## taken from must hold something. [param by] is a player or a companion,
+## alike. Each instance moves with its id and its history is written: a
+## new carrier, "found" the first time anyone carries it, "given" from one
+## carrier to another. False, and nothing moves, otherwise.
 func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> bool:
 	if not Net.is_authority():
 		return false
-	if not by is Player or not by.spawned or by.hp <= 0 or not reaches(by, from) or not reaches(by, to):
+	if not _can_handle(by) or not reaches(by, from) or not reaches(by, to):
 		return false
 	if from_slot < 0 or from_slot >= from.slots.size() or to_slot < 0 or to_slot >= to.slots.size():
 		return false
@@ -983,18 +999,31 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		return false
 	if to is Chest and (to as Chest).depot:
 		return _bank(by, from, from_slot, to)
+	var uid := slot_uid(from, from_slot)
+	var other_uid := slot_uid(to, to_slot)
 	# New arrays, so each synchronizer sees a change.
 	var taken := from.slots.duplicate()
+	var taken_uids := from.slot_items.duplicate()
 	var other := to.slots[to_slot]
 	taken[from_slot] = other
+	taken_uids[from_slot] = other_uid
 	if from == to:
 		taken[to_slot] = item
+		taken_uids[to_slot] = uid
 		from.slots = taken
+		from.slot_items = taken_uids
 	else:
 		var given := to.slots.duplicate()
+		var given_uids := to.slot_items.duplicate()
 		given[to_slot] = item
+		given_uids[to_slot] = uid
 		from.slots = taken
+		from.slot_items = taken_uids
 		to.slots = given
+		to.slot_items = given_uids
+		_moved_item(uid, from, to)
+		if other_uid != 0:
+			_moved_item(other_uid, to, from)
 	_log("slots: %s moved %s from %s %d to %s %d%s" % [by.name, item, from.name, from_slot, to.name, to_slot,
 		"" if other.is_empty() else " (swapping %s)" % other])
 	slots_changed.emit(from)
@@ -1003,10 +1032,146 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	return true
 
 
+## [param by] takes the thing in [param from]'s slot [param slot] out of the
+## slots altogether (to the stockpile, to be eaten...): its uid, and the
+## slot is empty; 0, and nothing moves, if it cannot (try_transfer's
+## rules). Whoever has it now says where it is (items.place) or ends it.
+func take_item(by: GridEntity, from: GridEntity, slot: int) -> int:
+	if not Net.is_authority() or not _can_handle(by) or not reaches(by, from):
+		return 0
+	if slot < 0 or slot >= from.slots.size() or from.slots[slot].is_empty():
+		return 0
+	var uid := slot_uid(from, slot)
+	var taken := from.slots.duplicate()
+	var taken_uids := from.slot_items.duplicate()
+	_log("slots: %s took %s out of %s %d" % [by.name, taken[slot], from.name, slot])
+	taken[slot] = ""
+	taken_uids[slot] = 0
+	from.slots = taken
+	from.slot_items = taken_uids
+	items.place(uid, "")
+	slots_changed.emit(from)
+	return uid
+
+
+## [param by] puts the instance [param uid] (from the stockpile...) into
+## [param to]'s empty slot [param slot]. False, and nothing moves, if it
+## cannot (try_transfer's rules; an unknown uid; a full slot).
+func put_item(by: GridEntity, to: GridEntity, slot: int, uid: int) -> bool:
+	if not Net.is_authority() or not _can_handle(by) or not reaches(by, to):
+		return false
+	var id := items.id_of(uid)
+	if id.is_empty() or not Items.exists(id) or slot < 0 or slot >= to.slots.size() or not to.slots[slot].is_empty():
+		return false
+	_fit_uids(to)
+	var given := to.slots.duplicate()
+	var given_uids := to.slot_items.duplicate()
+	given[slot] = id
+	given_uids[slot] = uid
+	to.slots = given
+	to.slot_items = given_uids
+	var carrier := _carrier_of(to)
+	items.place(uid, holder_key(to), carrier[0], carrier[1])
+	_log("slots: %s put %s into %s %d" % [by.name, id, to.name, slot])
+	slots_changed.emit(to)
+	return true
+
+
+## The instance in [param entity]'s slot [param slot]: 0 for an empty slot;
+## made now (ItemBook.mint, "stocked" there) for a thing that has none yet,
+## as a level's chest has until someone first needs it.
+func slot_uid(entity: GridEntity, slot: int) -> int:
+	if slot < 0 or slot >= entity.slots.size() or entity.slots[slot].is_empty():
+		return 0
+	_fit_uids(entity)
+	var uid := entity.slot_items[slot]
+	if uid != 0 and items.id_of(uid) == entity.slots[slot]:
+		return uid
+	uid = items.mint(entity.slots[slot], "stocked", _label_of(entity), entity.zone, entity.tile)
+	var carrier := _carrier_of(entity)
+	items.place(uid, holder_key(entity), carrier[0], carrier[1])
+	entity.slot_items[slot] = uid
+	return uid
+
+
+## Every slot's instance (slot_uid), made where missing: what a save keeps.
+func slot_uids(entity: GridEntity) -> PackedInt32Array:
+	for slot in entity.slots.size():
+		slot_uid(entity, slot)
+	return entity.slot_items.duplicate()
+
+
+## Where [param entity]'s things are, in an item's history: "player:<id>",
+## "companion:<keeper id>:<name>", or "<zone>/<name>".
+func holder_key(entity: GridEntity) -> String:
+	var player_id: Variant = entity.get("player_id")
+	if player_id is String and not player_id.is_empty():
+		return "player:" + player_id
+	var keeper_id: Variant = entity.get("keeper_id")
+	if keeper_id is String and not keeper_id.is_empty():
+		return "companion:%s:%s" % [keeper_id, entity.name]
+	return "%s/%s" % [entity.zone, entity.name]
+
+
+## Ends, as lost, what the room's level entities held when it was reset
+## (reset) and the rebuild did not put back (set_slots). Main calls it
+## once the room is rebuilt.
+func end_unclaimed_items() -> void:
+	for uid in _unclaimed:
+		if items.has(uid) and items.at_of(uid).is_empty():
+			items.end(uid, "lost", "", zone.name)
+	_unclaimed.clear()
+
+
+func steps_now() -> int:
+	return steps
+
+
+## A player, or a companion (keeper_peer: not named, companion.gd uses
+## World), alive: who may move things.
+func _can_handle(by: GridEntity) -> bool:
+	return is_instance_valid(by) and by.spawned and by.hp > 0 and (by is Player or by.keeper_peer != 0)
+
+
+## [carrier key, name] for an item's history: "" for a chest (a place, not
+## a carrier).
+func _carrier_of(entity: GridEntity) -> Array[String]:
+	if entity is Chest:
+		return ["", ""]
+	return [holder_key(entity), _label_of(entity)]
+
+
+func _label_of(entity: GridEntity) -> String:
+	var label := str(entity.spawn_spec.get("label", ""))
+	return label if not label.is_empty() else String(entity.name)
+
+
+## slot_items as long as slots (0 for none yet).
+func _fit_uids(entity: GridEntity) -> void:
+	if entity.slot_items.size() != entity.slots.size():
+		entity.slot_items.resize(entity.slots.size())
+
+
+## [param uid] went from [param from]'s slots to [param to]'s: where it is
+## now, and the history: "found" the first time anyone carries it, "given"
+## from one carrier to another.
+func _moved_item(uid: int, from: GridEntity, to: GridEntity) -> void:
+	var giver := _carrier_of(from)
+	var taker := _carrier_of(to)
+	var carried_before: bool = not items.history(uid).get("carriers", []).is_empty()
+	items.place(uid, holder_key(to), taker[0], taker[1])
+	if taker[0].is_empty() or giver[0] == taker[0]:
+		return
+	if not giver[0].is_empty():
+		items.note(uid, "given", "%s to %s" % [giver[1], taker[1]], to.zone, to.tile)
+	elif not carried_before:
+		items.note(uid, "found", "%s by %s" % [_label_of(from), taker[1]], from.zone, from.tile)
+
+
 ## Whether [param by] can get at [param entity]'s slots: its own; a chest
-## in its zone next to it with no wall or closed door between; or its own
-## companion's pack, within COMPANION_REACH and in sight (she follows a
-## couple of cells off).
+## in its zone next to it with no wall or closed door between; or, within
+## COMPANION_REACH and in sight, a player's own companion's pack or a
+## companion's own player's.
 func reaches(by: GridEntity, entity: GridEntity) -> bool:
 	if entity == by:
 		return true
@@ -1014,9 +1179,11 @@ func reaches(by: GridEntity, entity: GridEntity) -> bool:
 		return false
 	if entity is Chest:
 		return can_melee(by.tile, entity.tile)
+	var near := entity.hp > 0 and distance(by.tile, entity.tile) <= COMPANION_REACH and has_line_of_sight(by.tile, entity.tile)
 	if entity.keeper_peer != 0:  # A companion (not named: companion.gd uses World).
-		return by.owner_peer != 0 and entity.keeper_peer == by.owner_peer and entity.hp > 0 \
-				and distance(by.tile, entity.tile) <= COMPANION_REACH and has_line_of_sight(by.tile, entity.tile)
+		return by.owner_peer != 0 and entity.keeper_peer == by.owner_peer and near
+	if entity is Player and by.keeper_peer != 0:
+		return entity.owner_peer == by.keeper_peer and near
 	return false
 
 
@@ -1032,22 +1199,46 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 	if stockpile == null or place.is_empty() or not stockpile.deposit(place, item, 1, String(by.name), String(from.name)):
 		_log("slots: %s refused %s: no stockpile the town holds there" % [depot.name, item])
 		return false
+	# The instance: gear is never ended, so it waits in the book, at the
+	# store (the stockpile keeps ids for now; its uids next).
+	var uid := slot_uid(from, from_slot)
+	items.place(uid, "stockpile:" + place)
+	items.note(uid, "banked", "%s by %s" % [place, _label_of(by)], depot.zone, depot.tile)
 	var taken := from.slots.duplicate()
+	var taken_uids := from.slot_items.duplicate()
 	taken[from_slot] = ""
+	taken_uids[from_slot] = 0
 	from.slots = taken
+	from.slot_items = taken_uids
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
 	slots_changed.emit(from)
 	return true
 
 
 ## Puts saved contents back into [param entity]'s slots (unknown items
-## dropped, cut or padded to its size). Server only.
-func set_slots(entity: GridEntity, contents: Variant) -> void:
+## dropped, cut or padded to its size), each with its saved instance from
+## [param uids] where the book still has it, a new one ("migrated": a save
+## from before instances, or one it lost) where not. Server only.
+func set_slots(entity: GridEntity, contents: Variant, uids: Variant = []) -> void:
 	if not Net.is_authority():
 		return
 	var tidy := Items.tidy(contents, entity.slots.size())
-	if tidy != entity.slots:
+	var kept := PackedInt32Array()
+	kept.resize(tidy.size())
+	var carrier := _carrier_of(entity)
+	for slot in tidy.size():
+		if tidy[slot].is_empty():
+			continue
+		var uid := 0
+		if (uids is Array or uids is PackedInt32Array) and slot < uids.size() and (uids[slot] is int or uids[slot] is float):
+			uid = int(uids[slot])
+		if uid in kept or items.id_of(uid) != tidy[slot]:
+			uid = items.mint(tidy[slot], "migrated", _label_of(entity), entity.zone, entity.tile)
+		items.place(uid, holder_key(entity), carrier[0], carrier[1])
+		kept[slot] = uid
+	if tidy != entity.slots or kept != entity.slot_items:
 		entity.slots = tidy
+		entity.slot_items = kept
 		slots_changed.emit(entity)
 
 

@@ -3111,3 +3111,52 @@ windowed, under the bench lock, alternately with main, three runs each:
 256x256 46.3 / 48.2 / 59.1 fps (main 41.4 / 54.6 / 52.1), rendering 1.2
 to 1.4 ms CPU and 0.3 GPU a frame both; 128x128 177 / 199 / 199 (main 194
 / 184 / 195); the 3D rebuild at 256x256 1.55 to 1.87 s (main 1.47 to 1.90).
+
+## 231. Items are instances in a server-only book beside id slots; history on events
+
+Items step 1 (roadmap: items). What a thing is lives in one catalog,
+levels/items.json, read by Items (id, name, short, color, art slot
+item.<id>, kind held/cell, size, weight, hands 0/1/2, tags, effects, use,
+verb, yield); nothing is defined in code. levels/ because the export
+already ships levels/*.json and the catalog is world data like
+companions.json and factions.json.
+
+Each thing in the world is an instance with a uid in ItemBook (World.items,
+server only, saved in the snapshot's "items"): its id, where it is, who
+carried it with steps held (World.steps; counted when a carrier lets go,
+never polled; eight rows at most, the shortest-held dropped) and five
+events at most (where it came from kept, the oldest other dropped).
+Slots stay a replicated PackedStringArray of ids, so the wire does not
+change and clients draw what they did; beside them GridEntity.slot_items
+holds the uids and is never sent. History goes to a client only when it
+asks (a later step), not with every slot change. Thousands of instances
+are one Dictionary and cost nothing per tick.
+
+World is still the only writer: try_transfer moves both arrays and writes
+the history ("found" the first time anyone carries a thing, "given"
+carrier to carrier; chests and the stockpile are places, not carriers);
+take_item and put_item take a thing out of slots and put one back, for
+holders without slots (economy's stockpile, later the ground). A
+companion moves things as a player does, under the same reach rules (and
+reaches its own player's pack). An instance lives until something ends
+it (ItemBook.end: banked, eaten); gear is never ended. No sweep at save:
+holders outside slots keep bare uids, and a test checks the book against
+everything that holds one (orphans). Banking at a depot (230) keeps the
+thing's instance, at "stockpile:<place>" with a "banked" event, until
+the stockpile keeps uids instead of ids (economy's next change).
+
+Levels, prefabs and the builder keep naming ids: they are specs. A level
+chest's things get their instances when first needed (slot_uid: taken,
+or saved), "stocked" there; a rebuilt room ends, as lost, what its
+chests held unless the snapshot puts it back. A save from before
+instances (slots with no "items") gets new ones, "migrated". Rejected: a
+reference set per holder (every holder registering and releasing), and
+gathering live uids from every holder at save (each new holder another
+place to remember); replicating uids or history with the slots (a wire
+change and bytes per move for something seldom looked at).
+
+The catalog writes the items' ArtKit slots (art/kit/slots_items.json,
+tools/items_art_slots.gd): held, a grip at the origin, grip_2 up a
+two-handed one. ArtKit's grey box now carries a held slot's sockets but
+the grip as empties, as its art must (ArtCheck), so a two-handed grey box
+passes its own slot and the other hand has somewhere to go.

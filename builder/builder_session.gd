@@ -205,7 +205,7 @@ Levels join at their edges: walking off one edge arrives on the neighbour's oppo
 Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % [", ".join(legend), ", ".join(Items.ALL.keys()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % [", ".join(legend), ", ".join(Items.ids()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
@@ -570,7 +570,7 @@ func _place(given: Dictionary) -> Dictionary:
 		var slots := Items.tidy(given["items"], Chest.SLOTS)
 		var unknown: Array = (given["items"] as Array).filter(func(id: Variant) -> bool: return not Items.exists(str(id)))
 		if not unknown.is_empty():
-			return _no("no items %s (there are: %s)" % [unknown, ", ".join(Items.ALL.keys())])
+			return _no("no items %s (there are: %s)" % [unknown, ", ".join(Items.ids())])
 		entry["props"] = {"slots": Array(slots)}
 	var changes := {"cells": {at: meaning}, "covers": [at]}
 	if entry.size() > 1:

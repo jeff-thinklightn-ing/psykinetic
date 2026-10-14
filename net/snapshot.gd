@@ -67,6 +67,7 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			entry["kind"] = str(spec["kind"])
 		if not entity.slots.is_empty():
 			entry["slots"] = Array(entity.slots)
+			entry["items"] = Array(World.slot_uids(entity))
 		list.append(entry)
 	return list
 
@@ -92,11 +93,13 @@ static func _write(path: String, text: String) -> bool:
 ## Reads [param path]. The result's "ok" is false if there was nothing usable
 ## (missing, unreadable, or malformed); otherwise "zones" holds each zone's
 ## {tick, entities, respawns}, "entities" one entry per restorable entity:
-## {spec, hp, stamina, facing, slots (null if none saved)}, "players"
+## {spec, hp, stamina, facing, slots (null if none saved), items (their
+## ItemBook uids; [] in a file from before instances)}, "players"
 ## the records, "steps" the world's clock (0 in a file from before it
 ## was kept), and "holdings" who holds which place (Holdings.to_dict; {} in
 ## a file from before them: the levels' own holders), and "stockpile" the
-## town's stores (Stockpile.to_dict; {} in a file from before it). Entries that make
+## town's stores (Stockpile.to_dict; {} in a file from before it), and
+## "items" the ItemBook (ItemBook.to_dict; {} before instances). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
@@ -144,10 +147,12 @@ static func load(path: String) -> Dictionary:
 	var steps: Variant = data.get("steps", 0)
 	var holdings: Variant = data.get("holdings", {})
 	var stockpile: Variant = data.get("stockpile", {})
+	var items: Variant = data.get("items", {})
 	return {"ok": true, "zones": zones, "players": players,
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
 		"holdings": holdings if holdings is Dictionary else {},
-		"stockpile": stockpile if stockpile is Dictionary else {}}
+		"stockpile": stockpile if stockpile is Dictionary else {},
+		"items": items if items is Dictionary else {}}
 
 
 ## One zone's {tick, entities, respawns} as read.
@@ -226,6 +231,7 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		"stamina": int(entry.get("stamina", 0)),
 		"facing": facing if facing != null else Vector2i(0, 1),
 		"slots": entry["slots"] if entry.get("slots") is Array else null,
+		"items": entry["items"] if entry.get("items") is Array else [],
 	}
 
 

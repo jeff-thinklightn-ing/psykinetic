@@ -314,8 +314,9 @@ static func _fill_step(steps: Array, parent: int, name: String, fill: Dictionary
 
 ## The grey box: the slot's "grey" boxes for its body (each {"at": centre,
 ## "size"}), else one box its size standing on its origin; each part's own
-## "grey" boxes, or a box its "size", from its pivot; the slot's name over
-## it when show_labels.
+## "grey" boxes, or a box its "size", from its pivot; a held piece's
+## sockets but its grip as empties; the slot's name over it when
+## show_labels.
 static func _grey_recipe(slot: String) -> Array:
 	var entry := spec(slot)
 	var material := _grey(GREYS.get(str(entry.get("category", "")), GREY))
@@ -337,6 +338,12 @@ static func _grey_recipe(slot: String) -> Array:
 			own = [{"at": [0, extent.y * 0.5, extent.z * 0.5], "size": part["size"]}]
 		for i in own.size():
 			_grey_step(steps, node, "Box%d" % i, own[i], _grey((material.albedo_color as Color).darkened(0.15)))
+	# A held piece's sockets (grip_2: the other hand) as empties, as its art has them.
+	var sockets: Variant = entry.get("sockets", {})
+	if str(entry.get("kind", "")) == "held" and sockets is Dictionary:
+		for socket: String in sockets:
+			if socket != "grip":
+				_step(steps, 0, socket, Transform3D(Basis.IDENTITY, _vec(sockets[socket])), null)
 	if show_labels:
 		_step(steps, 0, "Label", Transform3D(Basis.IDENTITY, Vector3(0.0, size(slot).y + 0.2, 0.0)), slot)
 	return [steps, [], slot]

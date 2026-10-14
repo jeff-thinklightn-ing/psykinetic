@@ -25,6 +25,11 @@ top section as the release notes.
   shoreline and foam instead of blue squares. They are slightly clear,
   deeper toward the middle, and ripple gently. Where water meets land is
   still exactly where you can and can't walk.
+- Every item in the world is now one of a kind and remembers its story:
+  where it came from, who has carried it and for how long, and who gave
+  it to whom. Nothing shows it yet; it is kept from now on. Your packs
+  and chests carry over as they were.
+- Companions can hand things over and take them back, as players do.
 
 ## v0.1.139
 

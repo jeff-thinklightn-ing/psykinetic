@@ -1,0 +1,124 @@
+{
+	"about": "Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand.",
+	"slots": {
+		"item.bandaging_kit": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.18,
+				0.12,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bandaging kit (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.cloth_bolt": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.2,
+				0.6,
+				0.2
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bolt of cloth (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.coin_purse": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.1,
+				0.12,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "coin purse (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.food_sack": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.35,
+				0.4,
+				0.3
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "sack of food (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.ore_sack": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.35,
+				0.45,
+				0.3
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "sack of ore (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.wood_bundle": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.3,
+				0.9,
+				0.3
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				],
+				"grip_2": [
+					0,
+					0.54,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bundle of wood (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		}
+	}
+}
