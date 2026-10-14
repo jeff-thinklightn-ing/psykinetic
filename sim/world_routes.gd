@@ -1,7 +1,7 @@
 class_name WorldRoutes
 extends RefCounted
 ## Routing between areas over the world map, for the world tick to move
-## groups from one area to another without walking them cell by cell.
+## groups from one area to another along real walks.
 ##
 ## The graph's points are portals, not areas: each way (WorldMap.ways) has
 ## an exit in its area (a link's marker cell; for an edge link, the floor
@@ -15,19 +15,26 @@ extends RefCounted
 ## them, a diagonal costing DIAGONAL). Costs are in steps, so a group's
 ## speed turns them into time.
 ##
-## Those lengths come from a distance field per portal (the steps from it to
-## every cell of its area, a PackedFloat32Array by cell, -1 where it cannot
-## walk), made on a WorkerThreadPool task when the routes are made, from
-## copies of the areas taken then, so the task touches nothing else. Until
-## an area's fields are in, a route through it walks the area there and then
-## (slow on a big map: a quarter of a second for the wilds), so the world
-## tick may rather wait for is_ready(). With the fields, a route's first and
-## last legs are lookups too; only a route that stays inside one area still
-## walks from its start to its end.
+## Held ground is physical (Holdings, decision 206): a group may not walk
+## through cells another faction holds. So the routes are kept in layers,
+## one per faction that moves (its obstacles: the cells it may not walk,
+## each naming the place that holds it) and one with none (""). Each layer
+## has its own graph (the crossings are the same; a crossing whose exit or
+## arrival is in held ground is closed to it) and its own distance fields.
 ##
-## [member blocked] and [member extra_cost] are asked of every way a route
-## would take, each time one is found, so who holds a way can close or slow
-## it later without the routes being made again.
+## A distance field is a portal's steps to every cell of its area, a
+## PackedFloat32Array by cell (-1 where it cannot walk), made on a
+## WorkerThreadPool task from copies of the areas and of that layer's
+## obstacles, so the task touches nothing else. When a layer's obstacles in
+## an area change (a place taken), that area's fields are made again on the
+## pool; until they are in, a route through it walks the area there and
+## then (correct, slow on a big map), so the world tick may rather wait for
+## is_ready(). With the fields, a route's first and last legs are lookups;
+## a route inside one area still walks from its start to its end.
+##
+## [member blocked] is asked of every way a route would take, each time one
+## is found, so a closed gate can shut a way without the routes being made
+## again.
 
 ## What a diagonal step costs (World.DIAGONAL_TICK_SCALE).
 const DIAGONAL := 1.5
@@ -37,14 +44,15 @@ const CROSSING := 1.0
 const BLOCKED := 1.0e9
 const STRAIGHTS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 const DIAGONALS: Array[Vector2i] = [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1)]
+## The layer with no obstacles.
+const OPEN := ""
 
-## (way: Dictionary) -> bool: true closes that way to every route. Unset:
-## every way is open.
+## (way: Dictionary, faction: String) -> bool: true closes that way to that
+## faction's routes (faction "" for a route with no faction). Unset: every
+## way is open.
 var blocked := Callable()
-## (way: Dictionary) -> float: steps added to crossing that way. Unset: none.
-var extra_cost := Callable()
-## Area name -> how long making its distance fields took, in milliseconds
-## (filled in as the task finishes each area; read it after is_ready).
+## "<faction> <area>" -> how long making that layer's distance fields there
+## took, in milliseconds (faction "" for the open layer), as tasks finish.
 var build_ms: Dictionary[String, float] = {}
 ## Ways the routes leave out, one line each: an edge with no floor along it,
 ## a link into an area or spawn point that is not there.
@@ -53,27 +61,41 @@ var gaps: Array[String] = []
 ## WorldMap's areas and ways (not the WorldMap, which holds these routes).
 var _areas: Dictionary[String, Dictionary]
 var _ways: Array[Dictionary]
-var _graph := PortalGraph.new()
+## Area name -> a copy of what walking it needs, for the tasks (never changed).
+var _copies: Dictionary[String, Dictionary] = {}
+## Faction ("" for none) -> its Layer.
+var _layers: Dictionary[String, Layer] = {}
 ## Portal id -> {area, cell}.
 var _portals: Dictionary[int, Dictionary] = {}
 ## "area x y" -> portal id.
 var _portal_at: Dictionary[String, int] = {}
 ## Area name -> its portals' ids.
 var _in_area: Dictionary[String, Array] = {}
-## Vector2i(from id, to id) -> steps, inside an area.
-var _costs: Dictionary[Vector2i, float] = {}
 ## Vector2i(exit id, arrival id) -> the index of its way in WorldMap.ways.
 var _crossings: Dictionary[Vector2i, int] = {}
-## Areas whose portals are joined to each other in the graph.
-var _joined: Dictionary[String, bool] = {}
-## Written by the task, under _mutex: portal id -> its distance field, and
-## the areas whose fields are all in.
-var _fields: Dictionary[int, PackedFloat32Array] = {}
-var _ready: Dictionary[String, bool] = {}
 var _mutex := Mutex.new()
-var _task := -1
-## Set when the routes are freed: the task stops at its next portal.
+var _tasks: Array[int] = []
+var _threaded := true
+var _make_fields := true
+## Set when the routes are freed: the tasks stop at their next portal.
 var _stopping := false
+
+
+## One faction's routes: its graph, its obstacles, its fields.
+class Layer:
+	var faction := ""
+	var graph := PortalGraph.new()
+	## Vector2i(from id, to id) -> steps, inside an area.
+	var costs: Dictionary[Vector2i, float] = {}
+	## Areas whose portals are joined to each other in the graph.
+	var joined: Dictionary[String, bool] = {}
+	## Area name -> {cell: the place holding it}: what this faction may not walk.
+	var obstacles: Dictionary[String, Dictionary] = {}
+	## Under the routes' mutex: area -> its obstacles' version, and the
+	## version its fields are in for (missing: none in yet); portal id -> field.
+	var version: Dictionary[String, int] = {}
+	var ready: Dictionary[String, int] = {}
+	var fields: Dictionary[int, PackedFloat32Array] = {}
 
 
 ## The A* graph, its cost taken from the routes: per edge, not by distance
@@ -82,66 +104,131 @@ var _stopping := false
 class PortalGraph extends AStar2D:
 	## The WorldRoutes it belongs to, weakly: it holds this graph.
 	var routes: WeakRef
+	var faction := ""
 
 	func _compute_cost(from_id: int, to_id: int) -> float:
-		return routes.get_ref()._cost(from_id, to_id)
+		return routes.get_ref()._cost(faction, from_id, to_id)
 
 	func _estimate_cost(_from_id: int, _to_id: int) -> float:
 		return 0.0
 
 
-## The routes over [param world_map]; its distance fields made on a
-## WorkerThreadPool task, or, with [param threaded] false, here and now, or,
-## with [param make_fields] false, never (every route walks: tests).
-func _init(world_map: WorldMap, threaded := true, make_fields := true) -> void:
+## The routes over [param world_map], with a layer for each faction in
+## [param obstacles] (faction -> area -> {cell: place id}, Holdings.obstacles)
+## besides the open one. Their distance fields are made on WorkerThreadPool
+## tasks, or, with [param threaded] false, here and now, or, with
+## [param make_fields] false, never (every route walks: tests).
+func _init(world_map: WorldMap, threaded := true, make_fields := true, obstacles := {}) -> void:
 	_areas = world_map.areas
 	_ways = world_map.ways
-	_graph.routes = weakref(self)
+	_threaded = threaded
+	_make_fields = make_fields
+	for faction: String in [OPEN] + obstacles.keys():
+		var layer := Layer.new()
+		layer.faction = faction
+		layer.graph.routes = weakref(self)
+		layer.graph.faction = faction
+		_layers[faction] = layer
 	for index in _ways.size():
 		_add_way(index)
-	var job: Array[Dictionary] = []
 	for area_name: String in _in_area:
 		var area: Dictionary = _areas[area_name]
-		var portals: Array[Array] = []
-		for id: int in _in_area[area_name]:
-			portals.append([id, _portals[id]["cell"]])
-		job.append({"name": area_name, "portals": portals, "area": {"size": area["size"],
-			"floor": area["floor"].duplicate(), "edges": area["edges"].duplicate(),
-			"heights": area["heights"].duplicate(), "stairs": area["stairs"].duplicate()}})
-	if job.is_empty() or not make_fields:
-		return
-	if threaded:
-		_task = WorkerThreadPool.add_task(_make_fields.bind(job), false, "world routes: distance fields")
-	else:
-		_make_fields(job)
+		_copies[area_name] = {"size": area["size"], "floor": area["floor"].duplicate(), "edges": area["edges"].duplicate(),
+			"heights": area["heights"].duplicate(), "stairs": area["stairs"].duplicate()}
+	var job: Array[Dictionary] = []
+	for faction: String in _layers:
+		var layer := _layers[faction]
+		var given: Dictionary = obstacles.get(faction, {})
+		for area_name: String in _in_area:
+			layer.obstacles[area_name] = (given.get(area_name, {}) as Dictionary).duplicate()
+			layer.version[area_name] = 0
+			job.append(_job(layer, area_name))
+	_start(job)
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and _task >= 0:
+	if what == NOTIFICATION_PREDELETE:
 		_stopping = true
-		WorkerThreadPool.wait_for_task_completion(_task)
+		for task in _tasks:
+			WorkerThreadPool.wait_for_task_completion(task)
 
 
-## Whether every area's distance fields are in: from then on no route walks
-## an area to find a way through it.
-func is_ready() -> bool:
+## The factions with a layer of their own.
+func factions() -> Array[String]:
+	var out: Array[String] = []
+	for faction: String in _layers:
+		if faction != OPEN:
+			out.append(faction)
+	return out
+
+
+## Sets what [param faction] may not walk in [param area_name]
+## ({cell: place id}). If that changes it, the area's fields for that layer
+## are made again on the pool, and its routes there walk until they are in.
+func set_obstacles(faction: String, area_name: String, cells: Dictionary) -> void:
+	var layer: Layer = _layers.get(faction)
+	if layer == null or not _in_area.has(area_name) or layer.obstacles.get(area_name, {}) == cells:
+		return
+	layer.obstacles[area_name] = cells.duplicate()
 	_mutex.lock()
-	var count := _ready.size()
+	layer.version[area_name] = layer.version.get(area_name, 0) + 1
 	_mutex.unlock()
-	return count == _in_area.size()
+	_unjoin(layer, area_name)
+	_start([_job(layer, area_name)])
 
 
-## Waits for the distance fields (tests and tools; the world tick asks
-## is_ready instead).
+## Whether every layer's distance fields are in for every area (only
+## [param faction]'s layer, if given): from then on no route walks an area
+## to find a way through it.
+func is_ready(faction: Variant = null) -> bool:
+	_reap()
+	for each: String in _layers:
+		if faction != null and each != faction:
+			continue
+		for area_name: String in _in_area:
+			if not _area_ready(_layers[each], area_name):
+				return false
+	return true
+
+
+## Waits for every distance field being made (tests and tools; the world
+## tick asks is_ready instead).
 func wait() -> void:
-	if _task >= 0:
-		WorkerThreadPool.wait_for_task_completion(_task)
-		_task = -1
+	for task in _tasks:
+		WorkerThreadPool.wait_for_task_completion(task)
+	_tasks.clear()
 
 
-## The task: a distance field per portal, area by area, from the copies in
-## [param job] only.
-func _make_fields(job: Array[Dictionary]) -> void:
+func _job(layer: Layer, area_name: String) -> Dictionary:
+	var portals: Array[Array] = []
+	for id: int in _in_area[area_name]:
+		portals.append([id, _portals[id]["cell"]])
+	return {"layer": layer, "name": area_name, "version": layer.version[area_name], "portals": portals,
+		"area": _copies[area_name], "obstacles": layer.obstacles[area_name].duplicate()}
+
+
+func _start(job: Array[Dictionary]) -> void:
+	if job.is_empty() or not _make_fields:
+		return
+	_reap()
+	if _threaded:
+		_tasks.append(WorkerThreadPool.add_task(_make.bind(job), false, "world routes: distance fields"))
+	else:
+		_make(job)
+
+
+## Lets go of the tasks that are done.
+func _reap() -> void:
+	for task in _tasks.duplicate():
+		if WorkerThreadPool.is_task_completed(task):
+			WorkerThreadPool.wait_for_task_completion(task)
+			_tasks.erase(task)
+
+
+## A task: a distance field per portal, area by area, from the copies in
+## [param job] only. An area whose obstacles changed meanwhile is dropped
+## (a newer task makes it).
+func _make(job: Array[Dictionary]) -> void:
 	for entry in job:
 		var started := Time.get_ticks_usec()
 		var area: Dictionary = entry["area"]
@@ -153,87 +240,69 @@ func _make_fields(job: Array[Dictionary]) -> void:
 			var field := PackedFloat32Array()
 			field.resize(size.x * size.y)
 			field.fill(-1.0)
-			_flood(area, portal[1], {}, field)
+			_flood(area, portal[1], {}, field, entry["obstacles"])
 			made[portal[0]] = field
+		var layer: Layer = entry["layer"]
 		_mutex.lock()
-		_fields.merge(made)
-		_ready[entry["name"]] = true
-		build_ms[entry["name"]] = (Time.get_ticks_usec() - started) / 1000.0
+		if layer.version.get(entry["name"], 0) == entry["version"]:
+			layer.fields.merge(made, true)
+			layer.ready[entry["name"]] = entry["version"]
+			build_ms["%s %s" % [layer.faction, entry["name"]]] = (Time.get_ticks_usec() - started) / 1000.0
 		_mutex.unlock()
 
 
+# --- Routes --------------------------------------------------------------------------
+
 ## The cheapest way from [param from_cell] in [param from_area] to
-## [param to_cell] in [param to_area], as legs, one per area passed through:
+## [param to_cell] in [param to_area] for a group of [param faction] ("" for
+## none: held ground stops nothing), as legs, one per area passed through:
 ## {area, from (cell), to (cell), steps, way (the way it leaves by,
-## WorldMap.ways' entry; {} on the last leg)}. [] when there is none (no
-## such area, a cell no floor reaches, or every way there blocked).
-func route(from_area: String, from_cell: Vector2i, to_area: String, to_cell: Vector2i) -> Array[Dictionary]:
+## WorldMap.ways' entry; {} on the last leg)}.
+##
+## Held ground another faction holds is not walked: the route goes round it.
+## If there is no way round, it is the cheapest route ignoring held ground,
+## cut off at its first held cell: its last leg ends on the open cell before
+## it and carries "meets", the id of the place holding that ground, for the
+## world tick to make the encounter. A goal in held ground is reached the
+## same way (to its edge, with "meets"); a group standing in held ground
+## gets one leg going nowhere, with "meets". No last leg with "meets" means
+## it gets there. [] when there is no route at all (no such area, a cell no
+## floor reaches, a one-way dead end, every way blocked).
+func route(from_area: String, from_cell: Vector2i, to_area: String, to_cell: Vector2i, faction := OPEN) -> Array[Dictionary]:
 	var none: Array[Dictionary] = []
 	if not _areas.has(from_area) or not _areas.has(to_area):
 		return none
-	for area_name in _areas_from(from_area):
-		_join_area(area_name)
-	var start := _graph.get_available_point_id()
-	_graph.add_point(start, Vector2.ZERO)
-	var finish := _graph.get_available_point_id()
-	_graph.add_point(finish, Vector2.ZERO)
-	_portals[start] = {"area": from_area, "cell": from_cell}
-	_portals[finish] = {"area": to_area, "cell": to_cell}
-	# Walking is the same length either way, so the walk from each portal
-	# to the end is the walk from the end to each portal.
-	var lengths := _to_portals(from_area, from_cell)
-	for id: int in lengths:
-		_join(start, id, lengths[id])
-	lengths = _to_portals(to_area, to_cell)
-	for id: int in lengths:
-		_join(id, finish, lengths[id])
-	if from_area == to_area:
-		var direct := steps_from(from_area, from_cell, [to_cell] as Array[Vector2i])
-		if direct.has(to_cell):
-			_join(start, finish, direct[to_cell])
-	var path := _graph.get_id_path(start, finish)
-	var legs: Array[Dictionary] = []
-	var total := 0.0
-	if not path.is_empty():
-		var leg := {"area": from_area, "from": from_cell, "steps": 0.0}
-		for i in range(1, path.size()):
-			var step := _cost(path[i - 1], path[i])
-			total += step
-			var key := Vector2i(path[i - 1], path[i])
-			if _crossings.has(key):
-				leg["to"] = _portals[path[i - 1]]["cell"]
-				leg["way"] = _ways[_crossings[key]]
-				legs.append(leg)
-				leg = {"area": _portals[path[i]]["area"], "from": _portals[path[i]]["cell"], "steps": 0.0}
-			else:
-				leg["steps"] += step
-		leg["to"] = to_cell
-		leg["way"] = {}
-		legs.append(leg)
-	for id in [start, finish]:
-		_graph.remove_point(id)
-		_portals.erase(id)
-	for key: Vector2i in _costs.keys():
-		if key.x == start or key.y == start or key.x == finish or key.y == finish:
-			_costs.erase(key)
-	return legs if total < BLOCKED else none
+	var layer: Layer = _layers.get(faction)
+	if layer == null:
+		push_warning("[routes] no layer for %s: its route ignores held ground" % faction)
+		layer = _layers[OPEN]
+	var held: Variant = _held(layer, from_area, from_cell)
+	if held != null:
+		var stay: Array[Dictionary] = [{"area": from_area, "from": from_cell, "to": from_cell, "steps": 0.0, "way": {}, "meets": held}]
+		return stay
+	var legs := _route_in(layer, from_area, from_cell, to_area, to_cell)
+	if not legs.is_empty() or layer.faction == OPEN:
+		return legs
+	return _cut_at_held(layer, from_area, from_cell, _route_in(_layers[OPEN], from_area, from_cell, to_area, to_cell))
 
 
 ## Where a group is after covering [param cells] steps of [param legs] (a
-## route): {area, cell, leg (its index), done (at the end)}; {} for no
+## route for [param faction]): {area, cell, leg (its index), done (at the
+## end; at the edge of held ground, if the route meets it)}; {} for no
 ## route. Crossing a way takes CROSSING steps; a group partway through one
-## is where it arrives. The cell is on a shortest walk where the distance
-## fields have it (a leg from or to a portal whose fields are in); otherwise
-## it is the floor cell nearest the straight line's point, which is coarse.
-func along(legs: Array[Dictionary], cells: float) -> Dictionary:
+## is where it arrives. The cell is on a shortest walk where that layer's
+## distance fields have it (a leg from or to a portal whose fields are in);
+## otherwise it is the floor cell nearest the straight line's point.
+func along(legs: Array[Dictionary], cells: float, faction := OPEN) -> Dictionary:
 	if legs.is_empty():
 		return {}
+	var layer: Layer = _layers.get(faction, _layers[OPEN])
 	var left := cells
 	for index in legs.size():
 		var leg: Dictionary = legs[index]
 		var steps: float = leg["steps"]
 		if left < steps:
-			return {"area": leg["area"], "cell": _cell_along(leg, maxf(left, 0.0)), "leg": index, "done": false}
+			return {"area": leg["area"], "cell": _cell_along(layer, leg, maxf(left, 0.0)), "leg": index, "done": false}
 		left -= steps
 		if index + 1 < legs.size():
 			left -= CROSSING
@@ -248,71 +317,173 @@ func along(legs: Array[Dictionary], cells: float) -> Dictionary:
 ## [param targets] in [param area_name] (the ones it can reach), walking as
 ## World does: floor only, no wall edge (doors open), no corner cut past a
 ## wall or void, no ledge (stairs climb one level), a diagonal costing
-## DIAGONAL. Stops once every target is found.
-func steps_from(area_name: String, from: Vector2i, targets: Array[Vector2i]) -> Dictionary[Vector2i, float]:
+## DIAGONAL; for [param faction], not through ground another faction holds.
+## Stops once every target is found.
+func steps_from(area_name: String, from: Vector2i, targets: Array[Vector2i], faction := OPEN) -> Dictionary[Vector2i, float]:
 	var wanted := {}
 	for cell in targets:
 		wanted[cell] = true
-	return _flood(_areas[area_name], from, wanted, PackedFloat32Array())
+	var layer: Layer = _layers.get(faction, _layers[OPEN])
+	return _flood(_areas[area_name], from, wanted, PackedFloat32Array(), layer.obstacles.get(area_name, {}))
 
 
-## Dijkstra by buckets over [param area] from [param from], costs in half
-## steps (2 straight, 3 diagonal). Returns the steps to each cell of
-## [param wanted] it reaches, stopping once it has them all, unless
-## [param field] (one float per cell, by y * width + x) is to be filled, in
-## which case it walks the whole area and writes every cell's steps there.
-static func _flood(area: Dictionary, from: Vector2i, wanted: Dictionary, field: PackedFloat32Array) -> Dictionary[Vector2i, float]:
-	var found: Dictionary[Vector2i, float] = {}
-	var floor_cells: Dictionary = area["floor"]
-	if not floor_cells.has(from):
-		return found
-	var width: int = area["size"].x
-	var filling := not field.is_empty()
-	var best: Dictionary[Vector2i, int] = {from: 0}
-	var buckets: Array[Array] = [[from]]
-	var cost := 0
-	var left := wanted.size()
-	while cost < buckets.size() and (left > 0 or filling):
-		for cell: Vector2i in buckets[cost]:
-			if best[cell] != cost:
-				continue
-			if filling:
-				field[cell.y * width + cell.x] = cost / 2.0
-			if wanted.has(cell) and not found.has(cell):
-				found[cell] = cost / 2.0
-				left -= 1
-			for direction in STRAIGHTS:
-				_relax(area, cell, direction, cost + 2, best, buckets)
-			for direction in DIAGONALS:
-				_relax(area, cell, direction, cost + 3, best, buckets)
-		buckets[cost] = []
-		cost += 1
-	return found
+## The cheapest route in [param layer], ignoring nothing; [] if none.
+func _route_in(layer: Layer, from_area: String, from_cell: Vector2i, to_area: String, to_cell: Vector2i) -> Array[Dictionary]:
+	var none: Array[Dictionary] = []
+	for area_name in _areas_from(from_area):
+		_join_area(layer, area_name)
+	var graph := layer.graph
+	var start := graph.get_available_point_id()
+	graph.add_point(start, Vector2.ZERO)
+	var finish := graph.get_available_point_id()
+	graph.add_point(finish, Vector2.ZERO)
+	_portals[start] = {"area": from_area, "cell": from_cell}
+	_portals[finish] = {"area": to_area, "cell": to_cell}
+	# Walking is the same length either way, so the walk from each portal
+	# to the end is the walk from the end to each portal.
+	var lengths := _to_portals(layer, from_area, from_cell)
+	for id: int in lengths:
+		_join(layer, start, id, lengths[id])
+	lengths = _to_portals(layer, to_area, to_cell)
+	for id: int in lengths:
+		_join(layer, id, finish, lengths[id])
+	if from_area == to_area:
+		var direct := _flood(_areas[from_area], from_cell, {to_cell: true}, PackedFloat32Array(), layer.obstacles.get(from_area, {}))
+		if direct.has(to_cell):
+			_join(layer, start, finish, direct[to_cell])
+	var path := graph.get_id_path(start, finish)
+	var legs: Array[Dictionary] = []
+	var total := 0.0
+	if not path.is_empty():
+		var leg := {"area": from_area, "from": from_cell, "steps": 0.0}
+		for i in range(1, path.size()):
+			var step := _cost(layer.faction, path[i - 1], path[i])
+			total += step
+			var key := Vector2i(path[i - 1], path[i])
+			if _crossings.has(key):
+				leg["to"] = _portals[path[i - 1]]["cell"]
+				leg["way"] = _ways[_crossings[key]]
+				legs.append(leg)
+				leg = {"area": _portals[path[i]]["area"], "from": _portals[path[i]]["cell"], "steps": 0.0}
+			else:
+				leg["steps"] += step
+		leg["to"] = to_cell
+		leg["way"] = {}
+		legs.append(leg)
+	for id in [start, finish]:
+		graph.remove_point(id)
+		_portals.erase(id)
+	for key: Vector2i in layer.costs.keys():
+		if key.x == start or key.y == start or key.x == finish or key.y == finish:
+			layer.costs.erase(key)
+	return legs if total < BLOCKED else none
 
 
-static func _relax(area: Dictionary, cell: Vector2i, direction: Vector2i, cost: int, best: Dictionary[Vector2i, int], buckets: Array[Array]) -> void:
-	var to := cell + direction
-	if best.get(to, 1 << 30) <= cost or not can_step(area, cell, direction):
-		return
-	best[to] = cost
-	while buckets.size() <= cost:
-		buckets.append([])
-	buckets[cost].append(to)
+## Where [param layer]'s faction meets held ground it cannot get round, on
+## its way along [param legs] (the open route from [param from_area]'s
+## [param from_cell]): held ground on that route it can get round (it can
+## still reach the open cell past it) is passed; at the first it cannot, the
+## faction's own route to the open cell before it, its last leg ending there
+## with "meets" (the place holding it). [] if none stops it (what closed
+## its way was not held ground: a blocked way).
+func _cut_at_held(layer: Layer, from_area: String, from_cell: Vector2i, legs: Array[Dictionary]) -> Array[Dictionary]:
+	var none: Array[Dictionary] = []
+	# The open route cell by cell, [area, cell], crossings included.
+	var walk: Array[Array] = []
+	for leg in legs:
+		for cell in _walk_cells(_layers[OPEN], leg):
+			walk.append([leg["area"], cell])
+	var i := 1
+	while i < walk.size():
+		var held: Variant = _held(layer, walk[i][0], walk[i][1])
+		if held == null:
+			i += 1
+			continue
+		var past := i
+		while past < walk.size() and _held(layer, walk[past][0], walk[past][1]) != null:
+			past += 1
+		var before: Array = walk[i - 1]
+		if past < walk.size() and not _route_in(layer, from_area, from_cell, walk[past][0], walk[past][1]).is_empty():
+			i = past
+			continue
+		var out := _route_in(layer, from_area, from_cell, before[0], before[1])
+		if out.is_empty():
+			return none
+		out[-1]["meets"] = held
+		return out
+	return none
+
+
+## The cells of [param leg], from its start to its end, along a shortest
+## walk in [param layer]: down the field of the portal it leaves by, or
+## back from its end down the field of the portal it started at, or down a
+## field walked for it now.
+func _walk_cells(layer: Layer, leg: Dictionary) -> Array[Vector2i]:
+	var area_name: String = leg["area"]
+	var area: Dictionary = _areas[area_name]
+	var from: Vector2i = leg["from"]
+	var to: Vector2i = leg["to"]
+	var exit := _field(layer, _portal_id(area_name, to))
+	if _at(exit, area_name, from) >= 0.0:
+		return _down(area, exit, from)
+	var entry := _field(layer, _portal_id(area_name, from))
+	var backwards := true
+	var field := entry
+	if _at(entry, area_name, to) < 0.0:
+		var size: Vector2i = area["size"]
+		field = PackedFloat32Array()
+		field.resize(size.x * size.y)
+		field.fill(-1.0)
+		_flood(area, to, {}, field, layer.obstacles.get(area_name, {}))
+		backwards = false
+	if backwards:
+		var cells := _down(area, field, to)
+		cells.reverse()
+		return cells
+	return _down(area, field, from)
+
+
+## The cells from [param cell] down [param field] to its 0 (its portal or
+## start), each one real step nearer.
+func _down(area: Dictionary, field: PackedFloat32Array, cell: Vector2i) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = [cell]
+	var here := cell
+	while true:
+		var next: Variant = _step_down(area, field, here)
+		if next == null:
+			break
+		here = next
+		cells.append(here)
+	return cells
 
 
 # --- Using the fields ----------------------------------------------------------------
 
-## [param id]'s distance field, or an empty one if it is not in yet.
-func _field(id: int) -> PackedFloat32Array:
+## The place holding [param cell] of [param area_name] against
+## [param layer]'s faction, or null if it may walk there.
+func _held(layer: Layer, area_name: String, cell: Vector2i) -> Variant:
+	var cells: Dictionary = layer.obstacles.get(area_name, {})
+	return cells.get(cell)
+
+
+func _portal_id(area_name: String, cell: Vector2i) -> int:
+	return _portal_at.get("%s %d %d" % [area_name, cell.x, cell.y], -1)
+
+
+## [param id]'s distance field in [param layer], or an empty one if it is
+## not in yet (or is out of date).
+func _field(layer: Layer, id: int) -> PackedFloat32Array:
+	if id < 0 or not _area_ready(layer, _portals[id]["area"]):
+		return PackedFloat32Array()
 	_mutex.lock()
-	var field: PackedFloat32Array = _fields.get(id, PackedFloat32Array())
+	var field: PackedFloat32Array = layer.fields.get(id, PackedFloat32Array())
 	_mutex.unlock()
 	return field
 
 
-func _area_ready(area_name: String) -> bool:
+func _area_ready(layer: Layer, area_name: String) -> bool:
 	_mutex.lock()
-	var ready: bool = _ready.has(area_name)
+	var ready: bool = layer.ready.has(area_name) and layer.ready[area_name] == layer.version.get(area_name, 0)
 	_mutex.unlock()
 	return ready
 
@@ -327,40 +498,54 @@ func _at(field: PackedFloat32Array, area_name: String, cell: Vector2i) -> float:
 
 
 ## The steps from [param cell] to each portal of [param area_name] it can
-## walk to (portal id -> steps): from the fields, or by walking the area.
-func _to_portals(area_name: String, cell: Vector2i) -> Dictionary[int, float]:
+## walk to in [param layer] (portal id -> steps): from the fields, or by
+## walking the area.
+func _to_portals(layer: Layer, area_name: String, cell: Vector2i) -> Dictionary[int, float]:
 	var out: Dictionary[int, float] = {}
 	var ids: Array = _in_area.get(area_name, [])
-	if _area_ready(area_name):
+	if _area_ready(layer, area_name):
 		for id: int in ids:
-			var steps := _at(_field(id), area_name, cell)
+			var steps := _at(_field(layer, id), area_name, cell)
 			if steps >= 0.0:
 				out[id] = steps
 		return out
-	var targets: Array[Vector2i] = []
+	var wanted := {}
 	for id: int in ids:
-		targets.append(_portals[id]["cell"])
-	var lengths := steps_from(area_name, cell, targets)
+		wanted[_portals[id]["cell"]] = true
+	var lengths := _flood(_areas[area_name], cell, wanted, PackedFloat32Array(), layer.obstacles.get(area_name, {}))
 	for id: int in ids:
 		if lengths.has(_portals[id]["cell"]):
 			out[id] = lengths[_portals[id]["cell"]]
 	return out
 
 
-## Joins [param area_name]'s portals to each other in the graph, once.
-func _join_area(area_name: String) -> void:
-	if _joined.has(area_name) or not _in_area.has(area_name):
+## Joins [param area_name]'s portals to each other in [param layer]'s
+## graph, once (until its obstacles change).
+func _join_area(layer: Layer, area_name: String) -> void:
+	if layer.joined.has(area_name) or not _in_area.has(area_name):
 		return
 	var started := Time.get_ticks_usec()
 	for from_id: int in _in_area[area_name]:
-		var lengths := _to_portals(area_name, _portals[from_id]["cell"])
+		var lengths := _to_portals(layer, area_name, _portals[from_id]["cell"])
 		for to_id: int in lengths:
 			if to_id != from_id:
-				_join(from_id, to_id, lengths[to_id])
-	_joined[area_name] = true
+				_join(layer, from_id, to_id, lengths[to_id])
+	layer.joined[area_name] = true
 	var ms := (Time.get_ticks_usec() - started) / 1000.0
 	if ms > 50.0:
-		print("[routes] %s walked for its routes in %.0f ms (its distance fields were not in yet)" % [area_name, ms])
+		print("[routes] %s walked for %s's routes in %.0f ms (its distance fields were not in yet)" % [area_name, layer.faction, ms])
+
+
+## Takes [param area_name]'s portals' joins out of [param layer]'s graph.
+func _unjoin(layer: Layer, area_name: String) -> void:
+	layer.joined.erase(area_name)
+	for from_id: int in _in_area.get(area_name, []):
+		for to_id: int in _in_area[area_name]:
+			var key := Vector2i(from_id, to_id)
+			if layer.costs.has(key):
+				layer.costs.erase(key)
+				if not _crossings.has(key):
+					layer.graph.disconnect_points(from_id, to_id, false)
 
 
 ## The areas [param from] leads to, itself included.
@@ -380,16 +565,16 @@ func _areas_from(from: String) -> Array[String]:
 ## portal it leaves by (towards it), or down the field of the portal it
 ## started at (back from its end), whichever is in; else the floor cell
 ## nearest the straight line's point.
-func _cell_along(leg: Dictionary, covered: float) -> Vector2i:
+func _cell_along(layer: Layer, leg: Dictionary, covered: float) -> Vector2i:
 	var area_name: String = leg["area"]
 	var area: Dictionary = _areas[area_name]
 	var from: Vector2i = leg["from"]
 	var to: Vector2i = leg["to"]
-	var exit := _field(_portal_at.get("%s %d %d" % [area_name, to.x, to.y], -1))
+	var exit := _field(layer, _portal_id(area_name, to))
 	if _at(exit, area_name, from) >= 0.0:
 		# Towards the exit: down its field until covered steps are spent.
 		return _descend(area, exit, from, _at(exit, area_name, from) - covered)
-	var entry := _field(_portal_at.get("%s %d %d" % [area_name, from.x, from.y], -1))
+	var entry := _field(layer, _portal_id(area_name, from))
 	if _at(entry, area_name, to) >= 0.0:
 		# Back from the end, down the entry's field to covered steps from it.
 		return _descend(area, entry, to, covered)
@@ -397,27 +582,35 @@ func _cell_along(leg: Dictionary, covered: float) -> Vector2i:
 	return _nearest_floor(area, Vector2i(point), from)
 
 
-## From [param cell], step down [param field] (each step to a cell one
-## real step nearer its portal) until the field is at most [param down_to].
+## From [param cell], step down [param field] until the field is at most
+## [param down_to].
 func _descend(area: Dictionary, field: PackedFloat32Array, cell: Vector2i, down_to: float) -> Vector2i:
 	var size: Vector2i = area["size"]
 	var here := cell
 	while field[here.y * size.x + here.x] > down_to + 0.001:
-		var value := field[here.y * size.x + here.x]
-		var moved := false
-		for direction in STRAIGHTS + DIAGONALS:
-			var next := here + direction
-			if not Rect2i(Vector2i.ZERO, size).has_point(next):
-				continue
-			var step := DIAGONAL if direction.x != 0 and direction.y != 0 else 1.0
-			var there := field[next.y * size.x + next.x]
-			if there >= 0.0 and absf(there + step - value) < 0.001 and can_step(area, here, direction):
-				here = next
-				moved = true
-				break
-		if not moved:
+		var next: Variant = _step_down(area, field, here)
+		if next == null:
 			break
+		here = next
 	return here
+
+
+## The cell one real step from [param cell] down [param field] (one step
+## nearer its 0), or null at the bottom.
+func _step_down(area: Dictionary, field: PackedFloat32Array, cell: Vector2i) -> Variant:
+	var size: Vector2i = area["size"]
+	var value := field[cell.y * size.x + cell.x]
+	if value <= 0.0:
+		return null
+	for direction in STRAIGHTS + DIAGONALS:
+		var next := cell + direction
+		if not Rect2i(Vector2i.ZERO, size).has_point(next):
+			continue
+		var step := DIAGONAL if direction.x != 0 and direction.y != 0 else 1.0
+		var there := field[next.y * size.x + next.x]
+		if there >= 0.0 and absf(there + step - value) < 0.001 and can_step(area, cell, direction):
+			return next
+	return null
 
 
 ## The floor cell nearest [param cell] (within 8), or [param fallback].
@@ -429,6 +622,53 @@ static func _nearest_floor(area: Dictionary, cell: Vector2i, fallback: Vector2i)
 				if maxi(absi(dx), absi(dy)) == radius and floor_cells.has(cell + Vector2i(dx, dy)):
 					return cell + Vector2i(dx, dy)
 	return fallback
+
+
+# --- Walking -------------------------------------------------------------------------
+
+## Dijkstra by buckets over [param area] from [param from], costs in half
+## steps (2 straight, 3 diagonal), never into [param obstacles] (nor out of
+## one: a start in them reaches nothing). Returns the steps to each cell of
+## [param wanted] it reaches, stopping once it has them all, unless
+## [param field] (one float per cell, by y * width + x) is to be filled, in
+## which case it walks the whole area and writes every cell's steps there.
+static func _flood(area: Dictionary, from: Vector2i, wanted: Dictionary, field: PackedFloat32Array, obstacles: Dictionary = {}) -> Dictionary[Vector2i, float]:
+	var found: Dictionary[Vector2i, float] = {}
+	var floor_cells: Dictionary = area["floor"]
+	if not floor_cells.has(from) or obstacles.has(from):
+		return found
+	var width: int = area["size"].x
+	var filling := not field.is_empty()
+	var best: Dictionary[Vector2i, int] = {from: 0}
+	var buckets: Array[Array] = [[from]]
+	var cost := 0
+	var left := wanted.size()
+	while cost < buckets.size() and (left > 0 or filling):
+		for cell: Vector2i in buckets[cost]:
+			if best[cell] != cost:
+				continue
+			if filling:
+				field[cell.y * width + cell.x] = cost / 2.0
+			if wanted.has(cell) and not found.has(cell):
+				found[cell] = cost / 2.0
+				left -= 1
+			for direction in STRAIGHTS:
+				_relax(area, cell, direction, cost + 2, best, buckets, obstacles)
+			for direction in DIAGONALS:
+				_relax(area, cell, direction, cost + 3, best, buckets, obstacles)
+		buckets[cost] = []
+		cost += 1
+	return found
+
+
+static func _relax(area: Dictionary, cell: Vector2i, direction: Vector2i, cost: int, best: Dictionary[Vector2i, int], buckets: Array[Array], obstacles: Dictionary) -> void:
+	var to := cell + direction
+	if best.get(to, 1 << 30) <= cost or obstacles.has(to) or not can_step(area, cell, direction):
+		return
+	best[to] = cost
+	while buckets.size() <= cost:
+		buckets.append([])
+	buckets[cost].append(to)
 
 
 ## Whether a group can step from [param from] by [param direction] in an
@@ -503,7 +743,8 @@ func _add_way(index: int) -> void:
 		return
 	var exit_id := _portal(from, exit)
 	var arrival_id := _portal(to, arrival)
-	_graph.connect_points(exit_id, arrival_id, false)
+	for faction: String in _layers:
+		_layers[faction].graph.connect_points(exit_id, arrival_id, false)
 	_crossings[Vector2i(exit_id, arrival_id)] = index
 
 
@@ -532,12 +773,15 @@ func _edge_cell(area: Dictionary, side: String, near: int) -> Variant:
 	return null
 
 
+## The portal at [param cell] of [param area_name], made (in every layer's
+## graph) if it is new.
 func _portal(area_name: String, cell: Vector2i) -> int:
 	var key := "%s %d %d" % [area_name, cell.x, cell.y]
 	if _portal_at.has(key):
 		return _portal_at[key]
-	var id := _graph.get_available_point_id()
-	_graph.add_point(id, Vector2.ZERO)
+	var id := _layers[OPEN].graph.get_available_point_id()
+	for faction: String in _layers:
+		_layers[faction].graph.add_point(id, Vector2.ZERO)
 	_portals[id] = {"area": area_name, "cell": cell}
 	_portal_at[key] = id
 	if not _in_area.has(area_name):
@@ -546,16 +790,20 @@ func _portal(area_name: String, cell: Vector2i) -> int:
 	return id
 
 
-func _join(from_id: int, to_id: int, steps: float) -> void:
-	_costs[Vector2i(from_id, to_id)] = steps
-	_graph.connect_points(from_id, to_id, false)
+func _join(layer: Layer, from_id: int, to_id: int, steps: float) -> void:
+	layer.costs[Vector2i(from_id, to_id)] = steps
+	layer.graph.connect_points(from_id, to_id, false)
 
 
-func _cost(from_id: int, to_id: int) -> float:
+func _cost(faction: String, from_id: int, to_id: int) -> float:
+	var layer: Layer = _layers[faction]
 	var key := Vector2i(from_id, to_id)
 	if _crossings.has(key):
 		var way: Dictionary = _ways[_crossings[key]]
-		if blocked.is_valid() and blocked.call(way):
+		if blocked.is_valid() and blocked.call(way, faction):
 			return BLOCKED
-		return CROSSING + (float(extra_cost.call(way)) if extra_cost.is_valid() else 0.0)
-	return _costs.get(key, BLOCKED)
+		if _held(layer, _portals[from_id]["area"], _portals[from_id]["cell"]) != null \
+				or _held(layer, _portals[to_id]["area"], _portals[to_id]["cell"]) != null:
+			return BLOCKED
+		return CROSSING
+	return layer.costs.get(key, BLOCKED)

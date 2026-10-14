@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_saved_holdings()
 	_test_routes()
 	_test_level_routes()
+	_test_territory_routes()
 	await _test_view()
 
 	print("")
@@ -375,13 +376,10 @@ func _test_routes() -> void:
 	_check(routes.route("r_field", Vector2i(0, 1), "r_room", Vector2i(0, 0)).is_empty(), "no route back over a one-way link")
 	var back := routes.route("r_east", Vector2i(1, 1), "r_field", Vector2i(0, 1))
 	_check(back.size() == 2 and back[0]["way"]["side"] == "west", "but back west across the edge (%s)" % [back])
-	routes.blocked = func(way: Dictionary) -> bool: return way["kind"] == "edge"
+	routes.blocked = func(way: Dictionary, _faction: String) -> bool: return way["kind"] == "edge"
 	_check(routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).is_empty(), "a blocked way closes the route")
 	routes.blocked = Callable()
-	routes.extra_cost = func(_way: Dictionary) -> float: return 5.0
-	_check(routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).size() == 3, "an extra cost slows a way without closing it")
 	_check(routes.route("r_room", Vector2i(0, 0), "nowhere", Vector2i.ZERO).is_empty(), "no route to an area that is not there")
-	routes.extra_cost = Callable()
 	_test_along(routes)
 
 
@@ -398,6 +396,64 @@ func _test_along(routes: WorldRoutes) -> void:
 	_check(at.call(13.0)["cell"] == Vector2i(2, 1), "1.5 steps into r_field: down the east edge's field, at (2, 1) (%s)" % [at.call(13.0)])
 	_check(at.call(16.5) == {"area": "r_east", "cell": Vector2i(1, 1), "leg": 2, "done": true}, "after every step and crossing (16.5): there, done")
 	_check(at.call(99.0)["done"] and routes.along([] as Array[Dictionary], 3.0).is_empty(), "further is still there; no route is nowhere")
+
+
+## t_mid (21 x 9 cells of floor) has a goblin camp at (10, 4), radius 2, a
+## ford nobody holds at (8, 4), radius 4, and t_east (5 x 9) east of it,
+## whose arrival from t_mid, (0, 4), is a goblin gate's ground.
+func _register_territory_maps() -> void:
+	Level.register("t_mid", _block(21, 9), null, {"neighbours": {"east": "t_east"}, "places": {
+		"camp": {"at": [10, 4], "kind": "camp", "radius": 2, "holder": "goblins"},
+		"ford": {"at": [8, 4], "kind": "gate", "radius": 4}}})
+	Level.register("t_east", _block(5, 9), null, {"neighbours": {"west": "t_mid"}, "places": {
+		"gate": {"at": [0, 4], "kind": "gate", "radius": 1, "holder": "goblins"}}})
+
+
+func _test_territory_routes() -> void:
+	print("routes round held ground")
+	_register_territory_maps()
+	var names: Array[String] = ["t_mid", "t_east"]
+	var world_map := WorldMap.build(names)
+	var holdings := Holdings.new(world_map)
+	var routes := holdings.make_routes(world_map)
+	routes.wait()
+	_check(routes.factions() == _strings(["goblins", "town"]) and routes.is_ready(), "a layer per faction, every field in (%s)" % [routes.build_ms])
+	var town := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
+	var goblins := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")
+	_check(goblins.size() == 1 and goblins[0]["steps"] == 20.0, "the goblins walk straight through their own camp: 20 steps (%s)" % [goblins])
+	_check(town.size() == 1 and town[0]["steps"] > 20.0 and not town[0].has("meets"), "the town goes round it, further (%s)" % [town])
+	var stepped_on := []
+	for half in range(0, int(town[0]["steps"] * 2) + 1):
+		var cell: Vector2i = routes.along(town, half / 2.0, "town")["cell"]
+		if holdings.ground("t_mid", cell) == "goblins":
+			stepped_on.append(cell)
+	_check(stepped_on.is_empty(), "and never sets foot on the camp's ground on the way (%s)" % [stepped_on])
+	var into := routes.route("t_mid", Vector2i(0, 4), "t_east", Vector2i(3, 4), "town")
+	_check(into.size() == 1 and into[0].get("meets") == "t_east/gate" and into[0]["to"] == Vector2i(20, 4) and into[0]["way"].is_empty(),
+		"the only way into t_east arrives on the goblins' gate: the route stops at the edge it would cross, meeting it (%s)" % [into])
+	var attack := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(10, 4), "town")
+	var edge: Vector2i = attack[-1]["to"] if not attack.is_empty() else Vector2i(-1, -1)
+	_check(attack.size() == 1 and attack[0].get("meets") == "t_mid/camp" and holdings.ground("t_mid", edge) == "nobody"
+		and (edge - Vector2i(10, 4)).length() <= 3.5, "to the camp itself: to the edge of its ground, meeting it (%s)" % [attack])
+	var inside := routes.route("t_mid", Vector2i(10, 5), "t_mid", Vector2i(0, 4), "town")
+	_check(str(inside) == str([{"area": "t_mid", "from": Vector2i(10, 5), "to": Vector2i(10, 5), "steps": 0.0, "way": {}, "meets": "t_mid/camp"}]),
+		"a town group standing in the camp's ground meets it where it is")
+	_check(not routes.route("t_mid", Vector2i(0, 4), "t_east", Vector2i(3, 4), "goblins").is_empty()
+		and not routes.route("t_mid", Vector2i(0, 4), "t_east", Vector2i(3, 4), "goblins")[-1].has("meets"), "the goblins go through their gate")
+	print("held ground taken")
+	holdings.take("t_mid/ford", "goblins")
+	var cut := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
+	_check(cut.size() == 1 and cut[0].get("meets") == "t_mid/ford" and holdings.ground("t_mid", cut[0]["to"]) == "nobody",
+		"the goblins take the ford, wall to wall: at once the town's way across meets it, before its fields are made again (%s)" % [cut])
+	routes.wait()
+	_check(routes.is_ready("town") and str(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")) == str(cut),
+		"its fields made again on the pool: the same answer")
+	_check(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")[0]["steps"] == 20.0, "the goblins' own ground stays open to them")
+	_check(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4)).size() == 1, "a route with no faction ignores held ground")
+	routes.blocked = func(way: Dictionary, faction: String) -> bool: return faction == "goblins" and way["kind"] == "edge"
+	_check(routes.route("t_mid", Vector2i(0, 4), "t_east", Vector2i(3, 4), "goblins").is_empty(),
+		"a way blocked for a faction (not by ground) gives it no route, not one to meet anything")
+	routes.blocked = Callable()
 
 
 func _test_level_routes() -> void:

@@ -280,9 +280,20 @@ world tick can wait a tick instead. With them, a route's first and last
 legs are lookups; a route inside one area still walks from start to end.
 `along(legs, cells)` says where a group is after that many steps of a
 route ({area, cell, leg, done}), the cell on a shortest walk where the
-fields have it. `blocked` and `extra_cost` (Callables taking a way) can
-close or slow a way for every route found after. A WorldMap built again (a
-level edited, a builder change accepted) makes new routes and new fields.
+fields have it. `blocked` (a Callable taking a way and a faction) can close
+a way for every route found after. A WorldMap built again (a level edited,
+a builder change accepted) makes new routes and new fields.
+
+Held ground is physical: `World.holdings.make_routes(world_map)` gives
+routes with a layer per faction, and `route(..., faction)` never walks
+ground another faction holds (contested ground among it). It goes round;
+if it cannot, it walks as far as it can, past held ground it can get
+round, to the edge of the first it cannot, and its last leg says so:
+`"meets": "<place id>"`, for the world tick to make the encounter (a goal
+in held ground is met the same way; a group standing in it meets it where
+it is). Each layer has its own fields; a place taken makes that area's
+fields again on the pool, and until they are in its routes walk the area.
+A route with no faction ignores held ground.
 
 ### The world map editor
 

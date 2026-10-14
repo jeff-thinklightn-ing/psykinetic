@@ -2517,3 +2517,34 @@ The four together, the same bench: 4 players 31 ms on average and 54 at
 worst; 9 players 46 and 80; 1 player 7.4 and 14. Still over the 20 ms
 target with players spread out; what is left is idle monsters within
 NEAR_TILES of someone (about 20 ms at 4 players).
+
+## 206. Routes keep off held ground: a layer per faction, and "meets" where they cannot
+
+Jeff's rule: held ground is physical. A group may not walk through cells
+another faction holds (a held place's radius; contested ground blocks
+everyone; a place nobody holds blocks no one), inside areas as well as at
+crossings. WorldRoutes keeps a layer per faction that moves, plus an open
+one: each layer has its own obstacles (cell -> the place holding it, from
+Holdings.blocked_cells), its own A* graph (the same crossings, closed where
+an exit or arrival is held), and its own distance fields, flooded with the
+obstacles as walls. Holdings.make_routes builds them with today's
+obstacles and attach keeps them current: a place taken changes ground in
+its own area only, so only that area's fields are made again, on the pool;
+a version per area and layer drops a task's fields if the ground changed
+again meanwhile, and until the new ones are in, a route through that area
+floods it with the new obstacles (always right, slow on a big map; never a
+stale field, because movement is real). When there is no way round,
+route() does not just say no: it takes the open route and walks it,
+passing held ground the faction can get round (it can still reach the
+open cell past it) and stopping at the first ground it cannot; the
+faction's own route to the open cell before it comes back, its last leg
+carrying "meets" and the place's id, so the world tick knows whose ground
+it reached and can make the encounter (fight or take). A goal in held
+ground is reached the same way, to its edge; a group standing in held
+ground gets one leg going nowhere, meeting it. [] only when there is no
+route even ignoring held ground, or a blocked(way, faction) hook closed it.
+The extra_cost hook is gone: ground is not dearer to cross, it cannot be
+crossed. Rejected: costs instead of walls (against the rule); obstacles
+applied per query on the open fields (a flood of the area every route);
+cutting the open route at its first held cell (a town group would stop at
+a camp it could walk round).

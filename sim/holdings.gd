@@ -157,9 +157,10 @@ func covers(id: String, cell: Vector2i) -> bool:
 
 
 ## The cells of [param area_name] [param faction] may not walk: every cell a
-## place held by another faction covers (contested ground among them).
-func blocked_cells(area_name: String, faction: String) -> Dictionary[Vector2i, bool]:
-	var out: Dictionary[Vector2i, bool] = {}
+## place held by another faction covers (contested ground among them), each
+## with the id of a place holding it.
+func blocked_cells(area_name: String, faction: String) -> Dictionary[Vector2i, String]:
+	var out: Dictionary[Vector2i, String] = {}
 	for id in places_in(area_name):
 		var held: String = _holder[id]
 		if held == Factions.NOBODY or held == faction:
@@ -168,8 +169,62 @@ func blocked_cells(area_name: String, faction: String) -> Dictionary[Vector2i, b
 		var radius: int = _places[id]["radius"]
 		for dy in range(-radius, radius + 1):
 			for dx in range(-radius, radius + 1):
-				if dx * dx + dy * dy <= radius * radius:
-					out[centre + Vector2i(dx, dy)] = true
+				if dx * dx + dy * dy <= radius * radius and not out.has(centre + Vector2i(dx, dy)):
+					out[centre + Vector2i(dx, dy)] = id
+	return out
+
+
+# --- Routes --------------------------------------------------------------------------
+
+## What each faction may not walk, area by area, as WorldRoutes takes it:
+## faction -> area -> {cell: place id}, for [param world_map]'s areas.
+func obstacles(world_map: WorldMap) -> Dictionary:
+	var out := {}
+	for faction in factions.names():
+		var areas := {}
+		for area_name: String in world_map.areas:
+			areas[area_name] = blocked_cells(area_name, faction)
+		out[faction] = areas
+	return out
+
+
+## Routes over [param world_map] that keep to held ground as it is now and
+## as it changes (attach): a layer per faction.
+func make_routes(world_map: WorldMap) -> WorldRoutes:
+	var routes := WorldRoutes.new(world_map, true, true, obstacles(world_map))
+	attach(routes)
+	return routes
+
+
+## Keeps [param routes]' obstacles up with who holds what: now, and on every
+## place taken (only that place's area is made again). The routes are held
+## weakly: once they are freed, this stops.
+func attach(routes: WorldRoutes) -> void:
+	var held: WeakRef = weakref(routes)
+	for faction in routes.factions():
+		for area_name in _areas():
+			routes.set_obstacles(faction, area_name, blocked_cells(area_name, faction))
+	# A bound method, not a lambda: a lambda here would hold this Holdings
+	# in its own signal, and neither would ever be freed.
+	place_taken.connect(_retake_routes.bind(held))
+
+
+func _retake_routes(id: String, _from: String, _to: String, held: WeakRef) -> void:
+	var live: WorldRoutes = held.get_ref()
+	if live == null:
+		return
+	var area_name: String = _places[id]["area"]
+	for faction in live.factions():
+		live.set_obstacles(faction, area_name, blocked_cells(area_name, faction))
+
+
+## The areas with places, sorted.
+func _areas() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in _places:
+		if _places[id]["area"] not in out:
+			out.append(_places[id]["area"])
+	out.sort()
 	return out
 
 
