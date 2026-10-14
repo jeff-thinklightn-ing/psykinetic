@@ -2198,3 +2198,27 @@ the level editor's to place, and a double-click opens it there. Rejected:
 a world file the node map owns (it would repeat level.json, decision 194),
 and laying the boxes out by the maps' places in the world (there are none
 yet: the edges a neighbour joins are its only geometry).
+
+## 201. Routes between areas run over the ways' ends, at real walking lengths
+
+The world tick's routing (`WorldRoutes`, from `WorldMap.routes()`) is an
+AStar2D whose points are portals, the ends of each way, not areas: an exit
+(a link's marker; an edge's floor cell nearest its middle) leads one way to
+its arrival (the link's spawn point; the matching cell across the edge) for
+one step, and inside an area each portal is joined to each other at the
+length of the real walk between them. Those lengths are worked out once,
+when the routes are made, by a walk over the area under World's own step
+rules (walls, corners, ledges, stairs; doors open, as a group opens them;
+a diagonal 1.5 steps, World.DIAGONAL_TICK_SCALE), because a straight-line
+guess goes badly wrong through a castle's walls. Costs are in steps, so a
+group's speed turns a route into time. The A* graph takes its cost per edge
+from the routes (there is no geometry between areas, so no estimate: it is
+Dijkstra), and asks `blocked(way)` and `extra_cost(way)` on every crossing
+each time, so ownership or a locked gate can later close or slow a way with
+nothing rebuilt. Built with a WorldMap and kept with it: an edited level
+means a new WorldMap and new routes. WorldRoutes keeps the map's areas and
+ways, not the WorldMap, so the two do not hold each other. Left for the
+world tick's own design: where a far group's position is kept, and how it
+moves along a route each slow tick. Rejected: one point per area, which
+cannot tell a short crossing of an area from a long one; and lengths by
+octile distance, which miss every wall.

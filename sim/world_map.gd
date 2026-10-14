@@ -9,7 +9,8 @@ extends RefCounted
 
 ## Area name -> {name, display_name, size (cells), starts, spawn_points,
 ## links (as Level reads them), neighbours (side -> area), warnings (the
-## level's load warnings), floor (cell -> true)}.
+## level's load warnings), floor (cell -> true), and, for walking it
+## (WorldRoutes), edges, heights and stairs as Level's terrain has them}.
 var areas: Dictionary[String, Dictionary] = {}
 ## Every way out of every area, in area order: {from, to, kind ("link" or
 ## "edge"), at (the link's cell; Vector2i.ZERO for an edge), side (the
@@ -17,6 +18,7 @@ var areas: Dictionary[String, Dictionary] = {}
 var ways: Array[Dictionary] = []
 ## What config each area was read with (level.json), for the cell check.
 var _configs: Dictionary[String, Dictionary] = {}
+var _routes: WorldRoutes = null
 
 
 ## The world map of the levels [param names] (every level by default),
@@ -46,6 +48,7 @@ func _read(area_name: String, made: Dictionary) -> void:
 		"size": Vector2i((layout.get_width() + 1) / 2, (layout.get_height() + 1) / 2),
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
+		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
 	}
 	_configs[area_name] = config
 	for link: Dictionary in level["links"]:
@@ -157,6 +160,14 @@ static func put_neighbours(doc: MapDoc, neighbours: Dictionary) -> void:
 ## The level name a MapDoc is for: its folder's name.
 static func doc_name(doc: MapDoc) -> String:
 	return doc.folder.trim_suffix("/").get_file()
+
+
+## Routing between areas over this map (WorldRoutes), made the first time
+## it is asked for: a WorldMap built again (a level edited) makes its own.
+func routes() -> WorldRoutes:
+	if _routes == null:
+		_routes = WorldRoutes.new(self)
+	return _routes
 
 
 ## The ways out of [param area_name].

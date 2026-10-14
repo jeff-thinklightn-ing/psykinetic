@@ -230,6 +230,22 @@ and the ways between them, point links and neighbours alike. Its
 `godot --headless --path . --scene res://tools/check_world.tscn` prints the
 list (exit code 1 if there is anything on it).
 
+### Routes between areas
+
+`world_map.routes()` (`WorldRoutes`, `sim/world_routes.gd`) finds the
+cheapest way from a cell in one area to a cell in another, for the world
+tick to move groups without walking them cell by cell:
+`route(from_area, from_cell, to_area, to_cell)` gives the legs, one per
+area passed through ({area, from, to, steps, way}), or [] if there is none.
+Its graph's points are the ways' ends (a link's marker and its spawn point;
+an edge's middle floor cell and the matching cell across), joined inside
+each area at the real length of the walk (walls, doors, corners, ledges
+and stairs as World walks; a diagonal is 1.5 steps), worked out once when
+the routes are made. `blocked` and `extra_cost` (Callables taking a way)
+can close or slow a way for every route found after. Making them costs a
+walk over the area per way end; the longest, a flood of the whole wilds,
+is about a quarter of a second.
+
 ### The world map editor
 
 ```

@@ -18,6 +18,8 @@ func _ready() -> void:
 	_test_crossing()
 	_test_levels()
 	_test_join()
+	_test_routes()
+	_test_level_routes()
 	await _test_view()
 
 	print("")
@@ -184,6 +186,86 @@ func _test_view() -> void:
 		"taking the link out leaves its marker going nowhere, and says so")
 	_check(FileAccess.get_file_as_string("res://levels/castle/level.json").contains("\"to_map\": \"test_room\""), "nothing was saved")
 	view.queue_free()
+
+
+## r_room (5 x 5, a wall between columns 1 and 2 on rows 0-3) links from
+## (4, 0), one way, to r_field's gate; r_field (4 x 3) has r_east (3 x 3)
+## east of it, both ways.
+func _register_route_maps() -> void:
+	var rows: Array[String] = []
+	for y in 9:
+		var row := ".".repeat(9) if y % 2 == 0 else ".".repeat(9)
+		if y % 2 == 0 and y <= 6:
+			row = row.substr(0, 3) + "#" + row.substr(4)
+		rows.append(row)
+	Level.register("r_room", Level.image_from_rows(rows, {Vector2i(0, 0): "start", Vector2i(4, 0): "link"}), null,
+		{"links": [{"at": [4, 0], "to_map": "r_field", "to_spawn": "gate", "one_way": true}]})
+	Level.register("r_field", _block(4, 3), null, {"spawn_points": {"gate": [0, 1]}, "neighbours": {"east": "r_east"}})
+	Level.register("r_east", _block(3, 3), null, {"neighbours": {"west": "r_field"}})
+
+
+## A [param width] x [param height] block of floor.
+static func _block(width: int, height: int) -> Image:
+	var rows: Array[String] = []
+	for y in 2 * height - 1:
+		rows.append(".".repeat(2 * width - 1))
+	return Level.image_from_rows(rows)
+
+
+func _test_routes() -> void:
+	print("routes")
+	_register_route_maps()
+	var names: Array[String] = ["r_room", "r_field", "r_east"]
+	var world_map := WorldMap.build(names)
+	var routes := world_map.routes()
+	_check(routes.gaps.is_empty(), "every way has its portals (%s)" % [routes.gaps])
+	var around := routes.steps_from("r_room", Vector2i(0, 0), [Vector2i(4, 0)] as Array[Vector2i])
+	_check(around.get(Vector2i(4, 0), -1.0) == 10.5, "the walk round the wall is 10.5 steps, not the 4 of a straight line (%s)" % [around])
+	var same := routes.route("r_room", Vector2i(0, 0), "r_room", Vector2i(4, 0))
+	_check(same.size() == 1 and same[0]["steps"] == 10.5 and same[0]["way"].is_empty(), "a route inside one area is one leg (%s)" % [same])
+	var legs := routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1))
+	var areas := legs.map(func(leg: Dictionary) -> String: return leg["area"])
+	_check(areas == ["r_room", "r_field", "r_east"], "r_room to r_east goes by r_field (%s)" % [areas])
+	if legs.size() == 3:
+		_check(legs[0]["to"] == Vector2i(4, 0) and legs[0]["steps"] == 10.5 and legs[0]["way"]["kind"] == "link", "out of r_room by its link, round the wall")
+		_check(legs[1]["from"] == Vector2i(0, 1) and legs[1]["to"] == Vector2i(3, 1) and legs[1]["steps"] == 3.0 and legs[1]["way"]["side"] == "east",
+			"across r_field from its gate to the middle of its east edge (%s)" % [legs[1]])
+		_check(legs[2]["from"] == Vector2i(0, 1) and legs[2]["to"] == Vector2i(1, 1) and legs[2]["steps"] == 1.0, "and into r_east at the matching cell (%s)" % [legs[2]])
+	_check(routes.route("r_field", Vector2i(0, 1), "r_room", Vector2i(0, 0)).is_empty(), "no route back over a one-way link")
+	var back := routes.route("r_east", Vector2i(1, 1), "r_field", Vector2i(0, 1))
+	_check(back.size() == 2 and back[0]["way"]["side"] == "west", "but back west across the edge (%s)" % [back])
+	routes.blocked = func(way: Dictionary) -> bool: return way["kind"] == "edge"
+	_check(routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).is_empty(), "a blocked way closes the route")
+	routes.blocked = Callable()
+	routes.extra_cost = func(_way: Dictionary) -> float: return 5.0
+	_check(routes.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).size() == 3, "an extra cost slows a way without closing it")
+	_check(routes.route("r_room", Vector2i(0, 0), "nowhere", Vector2i.ZERO).is_empty(), "no route to an area that is not there")
+
+
+func _test_level_routes() -> void:
+	print("routes on levels/")
+	var started := Time.get_ticks_usec()
+	var world_map := WorldMap.build()
+	var built := Time.get_ticks_usec()
+	var routes := world_map.routes()
+	var routed := Time.get_ticks_usec()
+	print("    WorldMap.build %.0f ms; routes %.0f ms (in-area lengths: %s)" % [(built - started) / 1000.0, (routed - built) / 1000.0,
+		", ".join(routes.build_ms.keys().map(func(area: String) -> String: return "%s %.0f ms" % [area, routes.build_ms[area]]))])
+	_check(routes.gaps.is_empty(), "every way on the levels has its portals (%s)" % [routes.gaps])
+	# The worst a pair of portals can cost: a walk that floods the whole area.
+	for area_name: String in world_map.areas:
+		var area: Dictionary = world_map.areas[area_name]
+		var flood := Time.get_ticks_usec()
+		routes.steps_from(area_name, area["starts"][0], [Vector2i(-1, -1)] as Array[Vector2i])
+		print("    flooding %s (%d floor cells) from its start: %.0f ms" % [area_name, area["floor"].size(), (Time.get_ticks_usec() - flood) / 1000.0])
+	var room: Dictionary = world_map.areas["test_room"]
+	var wilds: Dictionary = world_map.areas["wilds"]
+	var query := Time.get_ticks_usec()
+	var legs := routes.route("test_room", room["starts"][0], "wilds", wilds["spawn_points"]["from_castle"])
+	print("    test_room to wilds: %.0f ms, %s" % [(Time.get_ticks_usec() - query) / 1000.0,
+		" / ".join(legs.map(func(leg: Dictionary) -> String: return "%s %s->%s %.1f" % [leg["area"], leg["from"], leg["to"], leg["steps"]]))])
+	_check(legs.map(func(leg: Dictionary) -> String: return leg["area"]) == ["test_room", "castle", "wilds"],
+		"the test room's start to the wilds goes through the castle")
 
 
 func _check(ok: bool, label: String) -> void:
