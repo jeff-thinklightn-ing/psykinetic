@@ -50,6 +50,10 @@ var _redo: Dictionary[int, bool] = {}
 ## For each cell a source can reach, the sources that can, in order
 ## (indices into _parts): who to add up again when one changes.
 var _covering: Dictionary[Vector2i, PackedInt32Array] = {}
+## The cells added up again since the last take_touched(), or all of them
+## (a whole recompute): what a view shading the floor has to shade again.
+var _touched: Dictionary[Vector2i, bool] = {}
+var _touched_all := true
 
 
 func load(terrain: Dictionary) -> void:
@@ -94,6 +98,17 @@ func _sources() -> Array:
 	for cell in _lanterns:
 		sources.append([cell, LANTERN])
 	return sources
+
+
+## The cells whose fixed heat or light may have changed since the last
+## take: {"all": true} after a whole recompute, else {"all": false,
+## "cells": [...]}; worked out first if due. Forgets them.
+func take_touched(world: Node) -> Dictionary:
+	_refresh(world)
+	var taken := {"all": _touched_all, "cells": _touched.keys()}
+	_touched_all = false
+	_touched.clear()
+	return taken
 
 
 ## Heat at [param cell]: fixed sources and carried ones.
@@ -162,6 +177,8 @@ func _refresh(world: Node) -> void:
 	_parts.resize(sources.size())
 	for i in sources.size():
 		_parts[i] = _spread(world, sources[i][0], sources[i][1])
+	_touched_all = true
+	_touched.clear()
 	_covering.clear()
 	for i in sources.size():
 		for cell in _reachable(sources[i][0], sources[i][1]["reach"]):
@@ -189,6 +206,8 @@ func _refresh_redone(world: Node, sources: Array) -> void:
 		for cell in _reachable(sources[i][0], sources[i][1]["reach"]):
 			cells[cell] = true
 	_redo.clear()
+	if not _touched_all:
+		_touched.merge(cells)
 	for cell: Vector2i in cells:
 		var heat := 0.0
 		var light := 0.0

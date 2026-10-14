@@ -263,10 +263,26 @@ func _test_ground_colours() -> void:
 	_check(grass.albedo_texture != null and grass != stone, "grass: the kit's piece, tinted")
 	for cell: Vector2i in _rig._grounds:
 		if _rig._ground_kinds[cell] == "stone":
-			var mesh := _rig._grounds[cell].find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
-			var drawn := mesh.material_override as BaseMaterial3D
-			_check(drawn != null and drawn.albedo_texture == null, "a stone floor cell in the room is drawn grey (%s)" % cell)
+			var multimesh: MultiMesh = _rig._grounds[cell][0]
+			var holder: MultiMeshInstance3D = null
+			for node in _rig._room.find_children("Floor_*", "MultiMeshInstance3D", false, false):
+				if (node as MultiMeshInstance3D).multimesh == multimesh:
+					holder = node
+			var drawn := holder.material_override as ShaderMaterial if holder != null else null
+			# (A headless MultiMesh keeps no colours: what is set on it, from its shade.)
+			var shade: Vector2 = _rig._ground_shades[cell]
+			var colour: Color = _rig._ground_shade("stone", shade.x, shade.y)[0]
+			_check(drawn != null and drawn.get_shader_parameter("texture_albedo") == null
+					and colour.r > 0.1 and is_equal_approx(colour.r, colour.g) and absf(colour.g - colour.b) < 0.05,
+					"a stone floor cell in the room is drawn grey, untextured (%s: %s)" % [cell, colour])
 			break
+	var lit := 0
+	for cell: Vector2i in _rig._grounds:
+		var shade: Vector2 = _rig._ground_shades.get(cell, Vector2(-1.0, -1.0))
+		var light := World.light_at(cell, false)
+		if is_equal_approx(shade.x, snappedf(lerpf(Client3D.FLOOR_DARKEST, 1.0, light), 0.1)):
+			lit += 1
+	_check(lit == _rig._grounds.size(), "every floor cell is shaded by the light on it (%d of %d)" % [lit, _rig._grounds.size()])
 
 
 func _test_fade() -> void:

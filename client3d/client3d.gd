@@ -101,6 +101,10 @@ const WATER_BED := Color(0.16, 0.24, 0.3)
 const WATER_DEPTH := 0.08
 const TORCH := Color(1.0, 0.72, 0.38)
 const KIT_WALL_HEIGHT := 1.31
+## The floor is drawn in squares this many cells across, one MultiMesh per
+## square and ground kind: few draws, and squares off screen are culled.
+const FLOOR_CHUNK := 16
+const FLOOR_SHADER := preload("res://client3d/floor.gdshader")
 ## The kit's walls are this thick and occupy x in [-0.5, 0] of their
 ## module; they are shifted to straddle the edge.
 const WALL_THICKNESS := 0.5
@@ -479,11 +483,16 @@ var _room: Node3D
 var _centre := Vector2i.ZERO
 ## Kit floor material per ground kind, made once.
 var _ground_materials: Dictionary[String, Material] = {}
-## Each floor cell's ground and kind, shaded by the light and heat fields
-## (_shade_floor) whenever World says they changed.
-var _grounds: Dictionary[Vector2i, Node3D] = {}
+## Each floor cell's place in the floor's MultiMeshes [multimesh, index],
+## its kind, and the shade last drawn on it [bright, warm]: shaded by the
+## light and heat fields (_shade_floor) whenever World says they changed,
+## only the cells that changed.
+var _grounds: Dictionary[Vector2i, Array] = {}
 var _ground_kinds: Dictionary[Vector2i, String] = {}
+var _ground_shades: Dictionary[Vector2i, Vector2] = {}
 var _shade_due := false
+## A new floor: every cell is shaded, whatever the fields say changed.
+var _shade_all := true
 ## The kit's own material and a see-through copy of it; the flat stone
 ## pair likewise.
 var _kit_opaque: Material
@@ -1372,6 +1381,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_doorways.clear()
 	_grounds.clear()
 	_ground_kinds.clear()
+	_ground_shades.clear()
+	_shade_all = true
 	_trees.clear()
 	_occluders.clear()
 	_occluders_built = false
@@ -1436,15 +1447,9 @@ func _build_room() -> void:
 	_land.clear()
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
-	for cell: Vector2i in _terrain["floor"]:
-		var ground := _kit("ground")
-		ground.name = "Floor_%d_%d" % [cell.x, cell.y]
-		ground.position = _tile_position(cell)
-		_tint_ground(ground, str(kinds.get(cell, "stone")))
-		_room.add_child(ground)
-		_grounds[cell] = ground
-		_ground_kinds[cell] = str(kinds.get(cell, "stone"))
-		if cell in fire:
+	_build_floor(kinds)
+	for cell: Vector2i in fire:
+		if _grounds.has(cell):
 			_add_fire(cell)
 	for cell: Vector2i in _terrain.get("water", []):
 		_add_water(cell)
@@ -1639,12 +1644,70 @@ func _kit_wall(piece: String) -> Node3D:
 	return holder
 
 
-## The kit's floor in its kind's colour: grass and dirt tinted, stone grey.
-func _tint_ground(ground: Node3D, kind: String) -> void:
-	var material := _ground_base(kind)
-	for node in _descendants(ground):
+## The floor: the kit's floor piece on every floor cell, in its kind's
+## colour, by MultiMesh, one per FLOOR_CHUNK square and kind (a node a cell
+## took half a millisecond each to make).
+func _build_floor(kinds: Dictionary) -> void:
+	var piece := _kit("ground")
+	var mesh: Mesh = null
+	for node in _descendants(piece):
 		if node is MeshInstance3D:
-			(node as MeshInstance3D).material_override = material
+			mesh = (node as MeshInstance3D).mesh
+			break
+	piece.free()
+	var groups: Dictionary[String, Array] = {}
+	for cell: Vector2i in _terrain["floor"]:
+		var kind := str(kinds.get(cell, "stone"))
+		_ground_kinds[cell] = kind
+		var key := "%d_%d_%s" % [floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)), kind]
+		if not groups.has(key):
+			groups[key] = []
+		groups[key].append(cell)
+	for key: String in groups:
+		var cells: Array = groups[key]
+		var kind := _ground_kinds[cells[0]]
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.use_colors = true
+		multimesh.use_custom_data = true
+		multimesh.mesh = mesh
+		multimesh.instance_count = cells.size()
+		var plain := _ground_base(kind).albedo_color.srgb_to_linear()
+		for i in cells.size():
+			var cell: Vector2i = cells[i]
+			multimesh.set_instance_transform(i, Transform3D(Basis(), _tile_position(cell)))
+			multimesh.set_instance_color(i, plain)
+			multimesh.set_instance_custom_data(i, Color(0.0, 0.0, 0.0, 0.0))
+			_grounds[cell] = [multimesh, i]
+		var drawn := MultiMeshInstance3D.new()
+		drawn.name = "Floor_" + key
+		drawn.multimesh = multimesh
+		drawn.material_override = _floor_material(kind)
+		_room.add_child(drawn)
+
+
+## The floor's material for a kind: floor.gdshader with the kind's texture
+## (none for stone); the colour is each cell's own.
+func _floor_material(kind: String) -> ShaderMaterial:
+	var key := "floor/" + kind
+	if not _ground_materials.has(key):
+		var base := _ground_base(kind)
+		var material := ShaderMaterial.new()
+		material.shader = FLOOR_SHADER
+		material.set_shader_parameter("texture_albedo", base.albedo_texture)
+		material.set_shader_parameter("roughness", base.roughness)
+		material.set_shader_parameter("metallic", base.metallic)
+		material.set_shader_parameter("specular", base.metallic_specular)
+		_ground_materials[key] = material
+	return _ground_materials[key]
+
+
+## What a floor cell of [param kind] is drawn as, shaded [param bright]
+## (1: fully lit) and warmed [param warm]: [colour, glow], as the kit's
+## material would have them (sRGB).
+func _ground_shade(kind: String, bright: float, warm: float) -> Array[Color]:
+	var colour: Color = _ground_base(kind).albedo_color * bright
+	return [colour.lerp(WARM, warm), WARM * warm if warm > 0.0 else Color.BLACK]
 
 
 ## A floor kind's plain material: the kit's grass tinted (GROUND_TINTS), or
@@ -1737,35 +1800,29 @@ func _on_fields_changed() -> void:
 ## warmed by the heat on it: the glow around a fire.
 func _shade_floor() -> void:
 	_shade_due = false
-	for cell: Vector2i in _grounds:
-		var ground := _grounds[cell]
-		if not is_instance_valid(ground):
+	if _grounds.is_empty():
+		return
+	var touched := World.fields.take_touched(World)
+	var cells: Array = _grounds.keys() if touched["all"] or _shade_all else touched["cells"]
+	_shade_all = false
+	# Heat as World.is_burning reads it: the map's alone while nobody
+	# carries any (heat_at goes through every entity, for every cell).
+	var carried := World.fields.any_carried_heat(World)
+	for cell: Vector2i in cells:
+		if not _grounds.has(cell):
 			continue
 		var light := World.light_at(cell, false)
-		var warmth := clampf((World.heat_at(cell) - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
-		var bright := snappedf(lerpf(FLOOR_DARKEST, 1.0, light), 0.1)
-		var warm := snappedf(warmth * WARM_MOST, 0.05)
-		var kind := _ground_kinds[cell]
-		if bright >= 1.0 and warm <= 0.0:
-			_restore_ground(ground, kind)
+		var heat := World.heat_at(cell) if carried else World.fields.map_heat_at(World, cell)
+		var warmth := clampf((heat - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
+		var shade := Vector2(snappedf(lerpf(FLOOR_DARKEST, 1.0, light), 0.1), snappedf(warmth * WARM_MOST, 0.05))
+		if _ground_shades.get(cell) == shade:
 			continue
-		var key := "%s_%.1f_%.2f" % [kind, bright, warm]
-		if not _ground_materials.has(key):
-			var material := _ground_base(kind).duplicate() as BaseMaterial3D
-			var colour: Color = material.albedo_color * bright
-			material.albedo_color = colour.lerp(WARM, warm)
-			if warm > 0.0:
-				material.emission_enabled = true
-				material.emission = WARM * warm
-			_ground_materials[key] = material
-		for node in _descendants(ground):
-			if node is MeshInstance3D:
-				(node as MeshInstance3D).material_override = _ground_materials[key]
-
-
-## A floor back to its kind's plain colour.
-func _restore_ground(ground: Node3D, kind: String) -> void:
-	_tint_ground(ground, kind)
+		_ground_shades[cell] = shade
+		var drawn := _ground_shade(_ground_kinds[cell], minf(shade.x, 1.0), shade.y)
+		var multimesh: MultiMesh = _grounds[cell][0]
+		var index: int = _grounds[cell][1]
+		multimesh.set_instance_color(index, drawn[0].srgb_to_linear())
+		multimesh.set_instance_custom_data(index, drawn[1].srgb_to_linear())
 
 
 ## A lantern hung on a short post, and its pale light.

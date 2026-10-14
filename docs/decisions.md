@@ -1854,3 +1854,29 @@ The same bench: 769 entities 28 ms, 3073 110 ms, now four times the time
 for four times the monsters (about 36 us a monster). What is left grows
 with how many monsters think at once; a monster far from every player
 could think less often, a choice for later.
+
+## 182. The floor is drawn by MultiMesh, and shaded only where it changed
+
+The 3D client made a node of the kit's floor piece for every floor cell,
+half a millisecond each: 12 s to build a 128x128 map, 49 s for 256x256
+(tools/map_bench), most of the build. The floor is now one MultiMesh per
+16x16 square (FLOOR_CHUNK) and ground kind, the same piece, each cell's
+colour and glow in its instance colour and custom data, drawn by
+client3d/floor.gdshader: the kit material's lighting (rough, not metal),
+the kind's texture (none for stone) times the cell's colour, plus its
+glow. A cell's colour is worked out as before (its kind's, darkened by the
+light it lacks, warmed by the heat on it), so the castle and the sample
+map look the same (screenshots before and after: the sample within 8 of
+255 everywhere; the castle differs only where monsters had moved).
+
+Shading the floor went through every cell, and heat_at through every
+entity for each, on every change of the fields: half a second at 128x128,
+on every door a monster opened. Fields now keeps the cells it added up
+again since the client last took them (take_touched; all of them after a
+whole recompute), and the client shades only those, sets a cell only when
+its shade changes, and reads the map's heat alone while nobody carries
+any, as World.is_burning does. Rejected: one MultiMesh for the whole map
+(no culling off screen) and per-cell materials kept as before with fewer
+of them (the nodes were the cost, not the materials).
+
+128x128: 12.0 s to 3.0; 256x256: 49 s to 12, the rest mostly walls.
