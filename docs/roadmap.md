@@ -31,13 +31,31 @@ a story only matters if there's something to fight with.
 
 | # | Step | Done when | Worktree |
 |---|------|-----------|----------|
-| 1 | **Performance** | 128² map: load < 2 s, server tick < 20 ms at castle density, 60 fps on the laptop; per-frame scripts < 4 ms at 128², < 8 ms at 256². Far-away monsters think less often (full rate within ~30 cells of a player/companion, reduced at 30–60, idle paused beyond; fights always full rate). | `perf` |
+| 1 | **Performance** | 128² map: load < 2 s, server tick < 20 ms at castle density, 60 fps on the laptop; per-frame scripts < 4 ms at 128², < 8 ms at 256². Far-away monsters think less often (full rate within ~30 cells of a player/companion, reduced at 30–60; fights always full rate). Beyond that, and in zones nobody is in, the world is not paused: it moves on at a slow world tick (see "The world moves on" below). | `perf` |
 | 2 | **Network smoothness** | No rubber-banding in a castle fight. Knockback sent as one event (direction, distance, start tick) every client plays identically; others drawn ~100–150 ms in the past and interpolated; corrections blended, not snapped; camera follows a smoothed position. Report corrections/min and worst snap before/after. | after `perf` (same client code) |
 | 3 | **Combat animation states** | Synced from sim state: wind-up (longer for heavy attacks), strike, recover, hit (direction-aware), pushed (matches knockback event), knocked down (fall/lie/get up, timed to sim), block, guard break, death. Clean blends, no popping. | after `pc-character` |
 | 4 | **Player character** | One shared humanoid body for players and companions, human proportions so the animation library fits, hand attach points for weapons. Replaces the capsule. | `pc-character` |
 | 5 | **Weapon models** | Hammer, sword, shield, giant axe, spear, dagger, bow — flat, faceted style, attach to hand bones. | art session (Blender MCP) |
 | 6 | **Weapons as verbs** | See "How it plays". Each weapon changes what the attack does in the physics; one of each in the castle chests; tests per verb. | later |
 | 7 | **The smith scenario** | A map and story to use it all in (see below). | later |
+
+### The world moves on (design rule for the performance work)
+
+Activity while players are away or out of range is part of the game (camps grow, captives
+are moved, enemies hold and retake ground; see the backlog's offline consequences). So
+nothing far away is simply paused, but it doesn't need the 10 Hz sim either:
+
+- **Near players:** the full tick, as now.
+- **Far, or a zone with nobody in it:** a slow world tick (seconds to minutes apart) that
+  moves things on in coarse steps: who holds what, where groups are, what has grown or
+  been taken. No pathfinding cell by cell and no hits.
+- **When players arrive:** the area is settled from where the world tick left it (on wake,
+  where `World._woke` logs the time asleep today), then runs at the full tick.
+- **Offline:** the world tick keeps running on the server with no one connected, at the
+  same coarse rate.
+
+Perf should leave room for this when it builds the far-monster cut-off: the far tier
+hands over to the world tick, not to a stop.
 
 ## Running in parallel (not on the critical path)
 
