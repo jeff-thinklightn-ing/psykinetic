@@ -11,8 +11,10 @@ extends Node
 ## nobody is away respawning for part of the run.
 ## With --cells-per-monster=N, each room's monster spots are kept at the
 ## rate that gives about N floor cells a monster (the castle has 42; the
-## default, every spot, 32).
-##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--seconds=8]
+## default, every spot, 32). With --repeat=N, the ticks are timed in N
+## blocks, and the median block and the spread are printed too: compare
+## medians (a single run's average moves by several ms on a shared machine).
+##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--repeat=1] [--seconds=8]
 
 const NAME := "bench"
 const ROOM := 8
@@ -21,6 +23,7 @@ var size := 64
 var monsters := 2
 var players := 1
 var cells_per_monster := 0.0
+var repeat := 1
 var ticks := 200
 var seconds := 8.0
 var _main: Node
@@ -36,6 +39,7 @@ func _ready() -> void:
 			"monsters": monsters = pair[1].to_int()
 			"players": players = maxi(1, pair[1].to_int())
 			"cells-per-monster": cells_per_monster = pair[1].to_float()
+			"repeat": repeat = maxi(1, pair[1].to_int())
 			"ticks": ticks = pair[1].to_int()
 			"seconds": seconds = pair[1].to_float()
 	var windowed := DisplayServer.get_name() != "headless"
@@ -75,14 +79,28 @@ func _ready() -> void:
 	World.step()
 	var worst := 0
 	var total := 0
-	for i in ticks:
-		started = Time.get_ticks_usec()
-		World.step()
-		var took := Time.get_ticks_usec() - started
-		total += took
-		worst = maxi(worst, took)
+	# --repeat=N: N blocks of [member ticks], one after another; each
+	# block's average is a sample, and their median and spread are what to
+	# compare (one run's average moves by several ms on a shared machine).
+	var averages: Array[float] = []
+	for block in repeat:
+		var block_total := 0
+		for i in ticks:
+			started = Time.get_ticks_usec()
+			World.step()
+			var took := Time.get_ticks_usec() - started
+			block_total += took
+			worst = maxi(worst, took)
+		total += block_total
+		averages.append(block_total / 1000.0 / ticks)
 	print("BENCH tick: avg %.2f ms, worst %.2f ms over %d ticks (%d entities in the zone)" % [
-		total / 1000.0 / ticks, worst / 1000.0, ticks, World.get_entities().size()])
+		total / 1000.0 / (ticks * repeat), worst / 1000.0, ticks * repeat, World.get_entities().size()])
+	if repeat > 1:
+		var sorted := averages.duplicate()
+		sorted.sort()
+		print("BENCH tick median: %.2f ms over %d blocks of %d ticks (blocks %.2f to %.2f: %s)" % [
+			sorted[sorted.size() / 2], repeat, ticks, sorted[0], sorted[-1],
+			", ".join(averages.map(func(a: float) -> String: return "%.1f" % a))])
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
