@@ -13,3 +13,4 @@ art-kit 1200
 enemy-ai 1400
 companions 1600
 items 1800
+economy 2000
