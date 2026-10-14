@@ -3519,3 +3519,46 @@ history ("thrown", at whom). Rejected: reach from mass_ratio (clamped 0.5
 to 1.5, so a kit and a sack went nearly as far), and a projectile entity
 (a node, the occupancy and the tick for a flight a client can draw from
 two cells).
+
+## 228. What she says: near repeats, nothing new, the event log, her player as you
+
+From the transcripts of 10-08 to 10-13. A companion's line is cleaned
+before it is said (Companion.spoken, decision 151), and now:
+
+- Lines are compared as plain words: lower case, punctuation gone,
+  apostrophes straight or curly gone ("I’ll" and "I'll" are one; Pip said
+  "I'm not leaving you" twice that way). Unasked, a sentence is also held
+  back when it near_repeats one of her last REPEAT_LINES lines, a line
+  another companion said within OTHERS_SAID_TICKS (20 s), or the
+  narration in her exchange: its words, COMMON_WORDS aside and plural or
+  -ing/-ed endings folded, are all in that sentence (two words or more),
+  or share NEAR_SHARE (0.8) of both. Asked by her player, only the same
+  line is held back; "Yes." to two questions is fine.
+- Unasked, a sentence reporting a monster dead, down or fallen
+  (event_report: "The imp to the north-east is dead.", "Brute is down.")
+  is the event log said back and is not said. Asked, it may be.
+- Her player is spoken to, never of: a sentence naming them other than
+  as a call ("Jeff, behind you!") is not said, unless she is speaking to
+  someone else. The voice rules say the same: speak to them as you, never
+  of them by name.
+- A reply of fewer than FRAGMENT_WORDS (3) words, unasked, is not said
+  unless it is a call ending in "!". Asked or ordered, "Yes." and "On it."
+  stand.
+- Her voice is asked when something is new, not for every death: a
+  monster's death only if it is big, the first of its kind she has seen
+  fall this run, or the last of a fight; the first of a kind coming into
+  sight asks too. After a fight, "you have said nothing since" is asked
+  only if something in it was notable (someone's HP crossed a threshold,
+  something big or new). What is new is kept on the Companion, which is
+  made afresh on each zone and reset, so it clears there. On the logs,
+  269 of 880 voice asks were deaths of a kind already seen to fall.
+
+The castle playtest's other issues (10-09, 22:00) were already fixed by
+decision 151, which landed that night: another player's words set no
+stance, a player's words go to their own companion and another only if
+named, she speaks to other players only when they named her or once a
+minute in danger. tools/speech_replay replays a transcript through the
+cleaning to show the difference.
+
+Rejected: embeddings or a model call to judge repeats (a call per line on
+the box's tick budget); dropping a whole reply when one sentence fails.

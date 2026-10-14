@@ -120,6 +120,19 @@ const PERCEPTION_NEAR := 2
 const GRID_SIZE := 13
 ## A monster this heavy or heavier (a brute) is worth her voice when it dies.
 const BIG_MONSTER_MASS := 70.0
+## A sentence is said again (near_repeat) when its words, these aside, are
+## all in a sentence said lately, or share NEAR_SHARE of their words with
+## it; plurals and -ing/-ed endings count as the same word.
+const COMMON_WORDS: Array[String] = ["i", "ill", "im", "ive", "id", "we", "well", "were", "weve", "you", "youre", "youll",
+	"the", "a", "an", "is", "are", "was", "it", "its", "to", "of", "and", "then", "now", "still", "will", "be", "me", "my",
+	"us", "our", "on", "in", "at", "this", "that", "there", "here", "just", "so", "lets", "let", "all", "your", "up", "for"]
+const NEAR_SHARE := 0.8
+## What the other companions near her said in the last OTHERS_SAID_TICKS
+## is not hers to say again.
+const OTHERS_SAID_TICKS := 200
+## A line of fewer words than this, unasked, is a fragment and not said,
+## unless it is a call ("Behind you!").
+const FRAGMENT_WORDS := 3
 ## She notes where she has seen things every so many ticks (_remember_sights).
 const MEMORY_EVERY := 10
 ## Speech carries this far (cells, in its own zone): what anyone says
@@ -181,7 +194,7 @@ useful to say; from %s with no one else near, it is for you. When a line is mean
 even if only to say you don't know; when it is not, you usually stay quiet and answer with just: ... Never say again
 what you have already said, and never repeat anyone's words back. Only when nothing has been said to you and there is
 truly nothing worth saying, answer with just: ...
-Speak to %s as "you", and to no one else unless they have just spoken to you or are in danger you must warn them
+Speak to %s as "you", never of them by name, and to no one else unless they have just spoken to you or are in danger you must warn them
 of; say a name only to call out. In what anyone says, "I" and "me" are the one speaking.
 Never repeat back what you were asked to do, and never describe yourself or recite who you are.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
@@ -315,7 +328,7 @@ var _lapse_why := ""
 ## Her player died and has not respawned yet.
 var _keeper_down := false
 var _keeper_back := false
-## Her own last lines, newest last; her player's words, {text, tick}.
+## Her own last lines, newest last; words heard, {text, tick, speaker}.
 var _said: Array[String] = []
 ## What was around her (surroundings_keys) when she last spoke: the voice
 ## is told her surroundings again only once they change, or when asked.
@@ -337,6 +350,13 @@ var _silence_due := false
 ## monster's kind or an ally's name, monster}).
 var _joined_tick := -1
 var _fallen: Array[Dictionary] = []
+## What is new to her this run (a new Companion each zone and each
+## reset): the kinds of monster she has seen, and seen fall. The first of a
+## kind is worth her voice; the rest are told and pass. A fight is worth
+## a word after it only if something in it was (_fight_notable).
+var _kinds_seen: Dictionary[String, bool] = {}
+var _kinds_fallen: Dictionary[String, bool] = {}
+var _fight_notable := false
 
 
 ## Her slots (Items): a pack and two hands, as a player's, empty at first;
@@ -409,7 +429,7 @@ func bumped(direction: Vector2i) -> bool:
 ## [param ask] (a player's words) her voice is asked, to decide whether it
 ## was meant for her; anyone's words but her player's never set a stance.
 func overheard(speaker: String, text: String, ask := true) -> void:
-	_heard.append({"text": text, "tick": World.tick})
+	_heard.append({"text": text, "tick": World.tick, "speaker": speaker})
 	_add_turn("user", text, false, speaker)
 	var heard := "%s just said: \"%s\"" % [speaker, text]
 	if _says_name(heard):
@@ -591,7 +611,7 @@ func others_here() -> String:
 ## (PHRASE_STANCES) and stands as the instruction; her voice still answers
 ## it, but its stance, if any, is not taken.
 func owner_spoke(text: String, phrase := 0) -> void:
-	_heard.append({"text": text, "tick": World.tick})
+	_heard.append({"text": text, "tick": World.tick, "speaker": keeper_name()})
 	var meaning := meaning_of(text, keeper_name())
 	var heard := meaning if not meaning.is_empty() else "%s just said to you: \"%s\"" % [keeper_name(), text]
 	if meaning.is_empty():
@@ -614,15 +634,19 @@ func owner_spoke(text: String, phrase := 0) -> void:
 ## the voice as narration. [param her_player]: it was the player she
 ## travels with, who is down until they respawn (its own event). Her voice
 ## speaks to an ally's death; to a monster's only if it was a big one
-## (BIG_MONSTER_MASS), next to her player, or the last of a fight (_watch).
+## (BIG_MONSTER_MASS), the first of its kind she has seen fall this run, or
+## the last of a fight (_watch).
 func note_death(who: String, her_player := false, entity: GridEntity = null) -> void:
 	if her_player:
 		_keeper_down = true
 	var monster := entity is Monster
 	var big := monster and entity.mass >= BIG_MONSTER_MASS
-	var by_them := monster and _alive(keeper) and World.distance(entity.tile, keeper.tile) <= 1
-	_deaths.append({"who": who, "told": refer(entity, true) if monster else who,
-		"speak": not monster or big or by_them, "monster": monster})
+	var first := monster and not _kinds_fallen.has(kind_of(entity))
+	if monster:
+		_kinds_fallen[kind_of(entity)] = true
+	var speak := not monster or big or first
+	_fight_notable = _fight_notable or speak
+	_deaths.append({"who": who, "told": refer(entity, true) if monster else who, "speak": speak, "monster": monster})
 	_fallen.append({"word": kind_of(entity) if monster else who, "monster": monster})
 	if _fallen.size() > 8:
 		_fallen.pop_front()
@@ -797,6 +821,7 @@ func _watch() -> void:
 				_narrate("%s a little stronger now." % ["You are" if whose == "hp_band" else "%s is" % keeper_name()])
 				continue
 			threshold = true
+			_fight_notable = true
 			var mine := whose == "hp_band"
 			var event := "%s %s" % ["Your HP" if mine else "%s's HP" % keeper_name(), _hp_change(_seen[whose], now[whose])]
 			var body: GridEntity = self if mine else keeper
@@ -820,10 +845,16 @@ func _watch() -> void:
 		_adjacent_before[id] = true
 	_seen = now
 	var fight := in_fight()
+	var new_kind := ""
 	for entity in World.get_entities():
 		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) <= SIGHT_RANGE \
 				and World.has_line_of_sight(tile, entity.tile) and not _known_hostiles.has(entity.get_instance_id()):
 			_known_hostiles[entity.get_instance_id()] = true
+			if not _kinds_seen.has(kind_of(entity)):
+				# The first of a kind this run: new to her, worth a word.
+				_kinds_seen[kind_of(entity)] = true
+				new_kind = "%s came into sight, the first %s you have seen here." % [_name_of(entity), kind_of(entity)]
+				_fight_notable = true
 			# In a fight a sighting is no event; only what changes is.
 			if not fight and not _was_in_fight:
 				events.append("%s came into sight." % _name_of(entity))
@@ -846,14 +877,21 @@ func _watch() -> void:
 	# A lapse is spoken to once her new stance is known (_take_result).
 	if (threshold or not deaths.is_empty()) and not lapsing and _lapsed_from.is_empty():
 		_ask_voice(" ".join(deaths if not deaths.is_empty() else events))
+	elif not new_kind.is_empty() and not lapsing and _lapsed_from.is_empty():
+		_ask_voice(new_kind)
 	elif had_deaths and deaths.is_empty():
 		_log({"kind": "voice", "companion": String(name), "trigger": " ".join(dead_names),
-			"outcome": "not asked", "note": "a monster's death: not big, not by %s, not the last" % keeper_name()})
+			"outcome": "not asked", "note": "nothing new: a monster's death, not big, not the first of its kind, not the last"})
 	if _silence_due and not fight and World.tick - _fight_ended_tick >= SILENCE_TICKS:
 		_silence_due = false
 		if _last_speech_tick < _fight_ended_tick:
 			_narrate("The fighting is over. It is quiet.")
-			_ask_voice("The fight is over, and you have said nothing since.")
+			if _fight_notable:
+				_ask_voice("The fight is over, and you have said nothing since.")
+			else:
+				_log({"kind": "voice", "companion": String(name), "trigger": "The fight is over.",
+					"outcome": "not asked", "note": "nothing new in that fight: no one hurt, nothing big or new"})
+		_fight_notable = false
 	if not fight:
 		_pending_stance = ""
 	if not _pending_stance.is_empty() and mind != null and not mind.busy("stance"):
@@ -1745,7 +1783,7 @@ func _take_result(result: Dictionary) -> void:
 	# A whole line said back is dropped as such; then what is left of it
 	# once cleaned (spoken) is what she says.
 	var echo := _echo_of(raw_line)
-	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, asks_about_items(str(result.get("heard", "")))))
+	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, asks_about_items(str(result.get("heard", ""))), spoken_to))
 	if echo.is_empty() and line != raw_line:
 		entry["say_raw"] = raw_line
 	if raw_line.is_empty():
@@ -1758,6 +1796,11 @@ func _take_result(result: Dictionary) -> void:
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = raw_line
 		entry["note"] = "nothing left once cleaned: said lately, narration, her own things, or not hers to say"
+	elif not spoken_to and _plain(line).split(" ", false).size() < FRAGMENT_WORDS and not line.ends_with("!"):
+		entry["outcome"] = "dropped"
+		entry["say_dropped"] = line
+		entry["note"] = "a fragment, unasked"
+		line = ""
 	elif not _say(line, always):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
@@ -1799,7 +1842,11 @@ static func asks_about_items(heard: String) -> bool:
 
 ## [param line] as she will say it: one reply (its first paragraph, on one
 ## line); no narration of what she does; no sentence she said in her last
-## REPEAT_LINES lines, nor twice in this one; her own things (lantern,
+## REPEAT_LINES lines, nor twice in this one, and, unless [param asked]
+## (her player's words to her), none that near_repeats one of those, what
+## another companion said in the last OTHERS_SAID_TICKS, or the narration
+## in her exchange, and no report of a monster falling (EVENT_REPORT); her
+## player never spoken of by name, only to; her own things (lantern,
 ## bandages, her pack) only when [param items_asked]; her player spoken to
 ## as "you" (their name off the front or the end of a sentence, and a bare
 ## name gone), unless they are further than CALL_OUT_PACES; anyone else
@@ -1807,7 +1854,7 @@ static func asks_about_items(heard: String) -> bool:
 ## ADDRESS_OTHER_TICKS, when they are in danger: otherwise those sentences
 ## go; and no one-word fragment (ONE_WORD_ANSWERS aside). "" if nothing is
 ## left.
-func spoken(line: String, items_asked := false) -> String:
+func spoken(line: String, items_asked := false, asked := false) -> String:
 	var text := line.strip_edges().get_slice("\n\n", 0).replace("\n", " ")
 	text = RegEx.create_from_string("\\*[^*]*\\*|\\([^)]*\\)").sub(text, " ", true)
 	var keeper_word := keeper_name()
@@ -1819,6 +1866,20 @@ func spoken(line: String, items_asked := false) -> String:
 	for said_line in _said.slice(-REPEAT_LINES):
 		for sentence in _sentences(said_line):
 			repeated[_plain(sentence)] = true
+	# Unasked, a sentence like any of these is not said either.
+	var alike: Array[String] = []
+	if not asked:
+		alike.assign(repeated.keys())
+		for heard: Dictionary in _heard:
+			if str(heard.get("speaker", keeper_word)) != keeper_word and World.tick - int(heard["tick"]) <= OTHERS_SAID_TICKS:
+				for sentence in _sentences(str(heard["text"])):
+					alike.append(_plain(sentence))
+		for turn: Dictionary in _exchange:
+			if turn["role"] == "user" and str(turn.get("speaker", "")).is_empty():
+				for sentence in _sentences(str(turn["text"]).trim_prefix("[").trim_suffix("]")):
+					alike.append(_plain(sentence))
+	var report := event_report(_kinds_seen.keys() + _kinds_fallen.keys())
+	var keeper_named := RegEx.create_from_string("(?i)\\b%s\\b" % _escaped(keeper_word))
 	var narration := RegEx.create_from_string(NARRATION % RegEx.create_from_string("\\W").sub(_name_of(self), "", true))
 	var items := RegEx.create_from_string("(?i)" + OWN_ITEMS)
 	var kept: Array[String] = []
@@ -1857,9 +1918,14 @@ func spoken(line: String, items_asked := false) -> String:
 		plain = _plain(sentence)
 		if plain.is_empty() or repeated.has(plain):
 			continue
+		if not asked and (report.search(sentence) != null or near_repeat(plain, alike)):
+			continue
+		if (called.is_empty() or called == keeper_word) and not keeper_word.is_empty() and keeper_named.search(sentence) != null:
+			continue  # Her player, spoken of: she speaks to them, as you.
 		if not " " in plain and plain not in ONE_WORD_ANSWERS and not sentence.ends_with("?"):
 			continue  # A one-word fragment; a one-word question is an answer.
 		repeated[plain] = true
+		alike.append(plain)
 		if called == keeper_word and _alive(keeper) and World.distance(tile, keeper.tile) > CALL_OUT_PACES:
 			sentence = "%s, %s" % [keeper_word, _after_name(sentence, [keeper_word] + others)]
 		elif not called.is_empty() and called != keeper_word:
@@ -1943,12 +2009,65 @@ static func _same_words(a: String, b: String) -> bool:
 	return shorter.length() >= 6 and (" %s " % shorter) in (" %s " % longer)
 
 
-## Lower case, letters, digits and single spaces.
+## Lower case, letters, digits and single spaces; apostrophes, straight
+## or curly, gone ("I’ll" and "I'll" are both "ill").
 static func _plain(text: String) -> String:
 	var out := ""
 	for c in text.to_lower():
-		out += c if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") or c == "'" else " "
+		if c in "'’‘ʼ`":
+			continue
+		out += c if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") else " "
 	return " ".join(out.split(" ", false))
+
+
+## Whether [param plain] (a _plain sentence) is near one of [param others]:
+## its words, COMMON_WORDS aside, all in one of them (two or more of
+## them: one word alone is too little to tell), or sharing NEAR_SHARE of
+## the words of both. A sentence of common words alone is near only one
+## the same.
+static func near_repeat(plain: String, others: Array[String]) -> bool:
+	var words := _word_set(plain)
+	for other in others:
+		if other == plain:
+			return true
+		var theirs := _word_set(other)
+		if words.is_empty() or theirs.is_empty():
+			continue
+		var shared := 0
+		for word: String in words:
+			if theirs.has(word):
+				shared += 1
+		if shared == words.size() and shared >= 2 or float(shared) / (words.size() + theirs.size() - shared) >= NEAR_SHARE:
+			return true
+	return false
+
+
+## [param plain]'s words, COMMON_WORDS aside, each without a plural or
+## -ing/-ed ending ("doors" "door", "moving" "move" are one).
+static func _word_set(plain: String) -> Dictionary[String, bool]:
+	var out: Dictionary[String, bool] = {}
+	for word in plain.split(" ", false):
+		if word in COMMON_WORDS:
+			continue
+		for ending: String in ["ing", "ed", "es", "s", "e"]:
+			if word.length() > ending.length() + 2 and word.ends_with(ending):
+				word = word.left(word.length() - ending.length())
+				break
+		out[word] = true
+	return out
+
+
+## A sentence that reports a monster falling or dead ("The imp to the
+## north-east is dead.", "Brute is down."): the event log said back, not
+## said. [param kinds]: the kinds of monster she knows, with the common
+## words for one.
+static func event_report(kinds: Array) -> RegEx:
+	var names: Array[String] = ["monster", "one", "thing", "beast", "enemy", "foe", "it", "they", "them"]
+	for kind: Variant in kinds:
+		names.append(_escaped(str(kind).to_lower()))
+	var kind := "(%s)(s|es)?" % "|".join(names)
+	return RegEx.create_from_string(("(?i)^[^,;]*?\\b%s\\b[^,;]*?\\b((is|are|was|were|lies|lie)\\s+(now\\s+)?"
+		+ "(dead|down|fallen|not moving)|fell|died|dropped)\\s*([.!;,]|$)") % kind)
 
 
 # --- The hands ----------------------------------------------------------------

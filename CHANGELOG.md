@@ -67,6 +67,19 @@ top section as the release notes.
   only come to look). A blow from one it can't see sends it after them.
 - Changes what the server sends (how alert a monster is): the server must
   be updated with this release.
+- Companions talk less and repeat themselves less. A line is not said
+  again in other words, or with a curly apostrophe; a line another
+  companion just said is not said again.
+- They speak when something new happens (the first of a kind of monster,
+  something big, the end of a fight that mattered), not for every imp that
+  falls, and they no longer read back what just happened ("The imp is
+  dead.") unless you ask.
+- They speak to you, not about you: no more "Jeff is hurt" to Jeff.
+- No more one- and two-word fragments ("Cylinder. West.") unless they
+  are answering you or calling out a warning.
+- About a third fewer calls to the companions' voice model
+  (269 of 880 on the last week's logs), so the box's model has more room
+  for the lines that matter.
 
 ## v0.1.139
 

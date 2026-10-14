@@ -68,6 +68,8 @@ func _ready() -> void:
 	_test_situation()
 	_test_bubbles()
 	_test_spoken()
+	_test_spoken_polish()
+	_test_quiet_after_minor()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -429,6 +431,95 @@ func _test_spoken() -> void:
 	_check(pet.spoken("Cylinder, get away.") == "Cylinder, get away.", "a minute on, again")
 	pet._addressed.clear()
 	World.despawn(other)
+
+
+## Lines from the transcripts of 10-09 to 10-13, each as she said it then.
+func _test_spoken_polish() -> void:
+	print("\n== near repeats, the event log said back, her player spoken of, fragments ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	pet._said.clear()
+	pet._heard.clear()
+	pet._exchange.clear()
+	pet._kinds_seen = {"imp": true, "sneak": true, "brute": true}
+	var who := pet.keeper_name()
+	pet.remember_said("I'll check the chest.")
+	_check(pet.spoken("I’ll check the chest.").is_empty(), "a curly apostrophe is the same line: %s" % pet.spoken("I’ll check the chest."))
+	pet.remember_said("I'm not leaving you.")
+	_check(pet.spoken("I’m NOT leaving you!").is_empty(), "nor case or a stop")
+	pet.remember_said("We keep moving.")
+	_check(pet.spoken("We keep on moving.").is_empty() and pet.spoken("Keep moving!").is_empty(), "a near repeat is not said, unasked")
+	_check(pet.spoken("We keep on moving.", false, true) == "We keep on moving.", "asked, only the same line is held back")
+	_check(pet.spoken("The fire is to the north.") == "The fire is to the north.", "a new line is said")
+	pet._said.clear()
+	_check(pet.spoken("The imp to the north-east is dead. Stay close.") == "Stay close.", "the event log said back goes: %s"
+			% pet.spoken("The imp to the north-east is dead. Stay close."))
+	_check(pet.spoken("Brute is down.").is_empty() and pet.spoken("The sneak fell.").is_empty() and pet.spoken("Two imps are dead.").is_empty(),
+			"any monster's fall, told back")
+	_check(pet.spoken("The brute is down the corridor.") == "The brute is down the corridor.", "but not a place")
+	_check(pet.spoken("The brute is dead.", false, true) == "The brute is dead.", "asked, she may say it")
+	pet._narrate("The fighting is over. It is quiet.")
+	_check(pet.spoken("The fighting is over.").is_empty(), "nor narration said back")
+	_check(pet.spoken("%s is hurt. I will not leave." % who) == "I will not leave.", "her player spoken of by name goes: %s"
+			% pet.spoken("%s is hurt. I will not leave." % who))
+	_check(pet.spoken("Stay near %s." % who).is_empty(), "nor spoken of in an order")
+	_check(pet.spoken("%s, behind you!" % who) == "Behind you!", "called by name, near: as you")
+	_put(owner, Vector2i(2, 6))
+	_check(pet.spoken("%s, behind you!" % who) == "%s, behind you!" % who, "called by name from far off: kept")
+	_put(owner, Vector2i(9, 6))
+	pet.overheard("Nix", "Stay close, they are coming.", false)
+	_check(pet.spoken("They are coming. Hold here.") == "Hold here.", "what another companion just said is not said again: %s"
+			% pet.spoken("They are coming. Hold here."))
+	print("\n== a reply under %d words, unasked, is a fragment ==" % Companion.FRAGMENT_WORDS)
+	var said_before := pet.said_lines().size()
+	for case: Array in [["Stay back.", false, false], ["Behind you!", false, true], ["Yes.", true, true], ["On it.", true, true],
+			["I see more coming from the west.", false, true]]:
+		pet._last_speech_tick = -1000
+		pet._take_result({"kind": "voice", "serial": 0, "answer": {"say": case[0]}, "spoken_to": case[1], "asked": false})
+		var said: bool = pet.said_lines().size() > said_before and pet.said_lines().back() == case[0]
+		said_before = pet.said_lines().size()
+		_check(said == case[2], "\"%s\"%s: %s" % [case[0], " asked" if case[1] else "", "said" if case[2] else "not said"])
+	pet._said.clear()
+	pet._heard.clear()
+	pet._exchange.clear()
+
+
+func _test_quiet_after_minor() -> void:
+	print("\n== a fight with nothing new in it passes without a word; a hurt one does not ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(7, 1))
+	_put(pet, Vector2i(6, 1))
+	var mind := CountingMind.new()
+	pet.mind = mind
+	pet._kinds_seen = {"imp": true}
+	pet._kinds_fallen = {"imp": true}
+	pet._fight_notable = false
+	var imp := _spawn_imp(Vector2i(4, 1))
+	for i in 3:
+		World.step()
+	mind.clear()
+	pet._last_speech_tick = -1000
+	World.damage(imp, 999)
+	for i in Companion.SILENCE_TICKS + 5:
+		World.step()
+	_check(mind.triggers("voice").size() == 1 and "the last of them" in mind.triggers("voice")[0],
+			"one imp, not the first: only the last of the fight is asked (%s)" % [mind.triggers("voice")])
+	_check(not "The fight is over, and you have said nothing since." in mind.triggers("voice"), "and nothing after it")
+	mind.clear()
+	pet._kinds_seen.erase("imp")
+	imp = _spawn_imp(Vector2i(4, 1))
+	World.step()
+	_check(mind.triggers("voice").size() == 1 and "the first imp" in mind.triggers("voice")[0],
+			"a kind she has not seen this run: her voice (%s)" % [mind.triggers("voice")])
+	World.despawn(imp)
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
 
 
 func _test_log_collapsed() -> void:
@@ -1688,7 +1779,7 @@ func _test_monsters_by_kind() -> void:
 
 
 func _test_death_triggers() -> void:
-	print("\n== a monster's death speaks only if big, by her player, or the last; an ally's always ==")
+	print("\n== a monster's death speaks only if new (the first of its kind), big, or the last; an ally's always ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
@@ -1704,15 +1795,17 @@ func _test_death_triggers() -> void:
 		"tile": Vector2i(10, 2), "kind": "brute", "props": {"mass": 70.0, "sight_range": 0}}) as Monster
 	for i in 3:
 		World.step()
+	_check(pet._kinds_seen.has("imp") and pet._kinds_seen.has("brute"), "the kinds she has seen are known to her (%s)" % [pet._kinds_seen.keys()])
+	pet._kinds_fallen.clear()
 	pet._last_speech_tick = -1000
 	mind.clear()
 	World.damage(imps[0], 999)
 	World.step()
-	_check(mind.triggers("voice").is_empty(), "an imp dies away from Player, others left: no voice (%s)" % [mind.triggers("voice")])
-	_check("[An imp fell.]" in pet.voice_prompt("test") or "[The imp fell.]" in pet.voice_prompt("test"), "but it is in the exchange")
+	_check(mind.triggers("voice").size() == 1, "the first imp to fall this run: her voice (%s)" % [mind.triggers("voice")])
 	World.damage(imps[2], 999)
 	World.step()
-	_check(mind.triggers("voice").size() == 1, "an imp dies next to Player: her voice (%s)" % [mind.triggers("voice")])
+	_check(mind.triggers("voice").size() == 1, "another imp, next to Player: nothing new, no voice (%s)" % [mind.triggers("voice")])
+	_check("[An imp fell.]" in pet.voice_prompt("test") or "[The imp fell.]" in pet.voice_prompt("test"), "but it is in the exchange")
 	World.damage(brute, 999)
 	World.step()
 	_check(mind.triggers("voice").size() == 2 and "Brute" in mind.triggers("voice").back(), "the brute dies: her voice (%s)" % [mind.triggers("voice")])
