@@ -262,6 +262,8 @@ var _entities: Array[GridEntity] = []
 ## made again when _entities changes (_roster_changed).
 var _sought: Array[GridEntity] = []
 var _monsters: Array[GridEntity] = []
+## The zone's entities that have a turn (GridEntity.acts), in id order.
+var _actors: Array[GridEntity] = []
 var _roster_current := false
 var _hits: Array[Hit] = []
 var _next_id := 1
@@ -442,9 +444,12 @@ func _step_zone() -> void:
 	for entity in _entities:
 		if entity.protected and tick >= entity.protected_until_tick:
 			entity.protected = false
-	# 1. Act, in ascending id. Iterate a copy: entities may despawn mid-tick.
+	# 1. Act, in ascending id: those that have a turn (a crate has none). The
+	# roster is made anew when the entities change, so one despawned
+	# mid-tick leaves this one as it was.
 	var near := _tier_origins()
-	for entity in _entities.duplicate():
+	_take_roster()
+	for entity in _actors:
 		# A stunned entity skips its turn; its orders wait for it.
 		if _alive(entity) and not is_stunned(entity) and _thinks(entity, near):
 			entity._sim_tick()
@@ -515,6 +520,13 @@ func held_against(entity: GridEntity) -> Dictionary:
 		return {}
 	var kind := str(entity.spawn_spec.get("kind", ""))
 	return holdings.blocked_cells(zone.name, holdings.factions.of_kind(kind) if holdings.factions != null else Factions.NOBODY)
+
+
+## Whether a creature may step from [param from] the way [param direction]
+## points by the terrain (walls, corners, ledges; doors it opens) and not
+## into fire: what find_path would let it, but for who stands there.
+func terrain_step_open(from: Vector2i, direction: Vector2i) -> bool:
+	return not _terrain_blocks_step(from, direction, true) and not is_burning(from + direction)
 
 
 var _plans_step := -1
@@ -1969,7 +1981,10 @@ func _take_roster() -> void:
 	# New arrays, not cleared ones: one handed out before stays as it was.
 	_sought = []
 	_monsters = []
+	_actors = []
 	for entity in _entities:
+		if entity.acts:
+			_actors.append(entity)
 		if entity is Player or entity is Companion:
 			_sought.append(entity)
 		elif entity is Monster:

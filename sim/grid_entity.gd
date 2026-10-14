@@ -307,6 +307,12 @@ func _exit_tree() -> void:
 		World.mirror_remove(self)
 
 
+## Whether it has a turn of its own (_sim_tick): false for those that only
+## ever move when moved (a crate, a chest), which World's act phase then
+## passes over without asking.
+var acts := true
+
+
 ## One sim step. Called by World on the server, in ascending id order. Decide
 ## what to do and ask World to do it (try_move, try_attack, try_shove).
 func _sim_tick() -> void:

@@ -2618,3 +2618,42 @@ machine for part of it). Still over 20 ms with players spread out; what is
 left is idle walking within 60 cells and going over every entity each
 tick. Rejected for now: the monsters' thinking in C# or a GDExtension
 (Jeff: not now).
+
+## 218. An idle monster walks straight when it can
+
+With many players spread out, most of the tick was idle monsters walking
+(215 cut who thinks every tick; those that do still walk): a path search
+for nearly every stroll and patrol leg, a few tiles over open floor.
+
+An idle step goes straight at its goal now (Monster._direct_step: the
+step toward it, or one of that step's two halves, each nearer, never
+farther), if the terrain allows it (World.terrain_step_open: walls,
+corners, ledges, doors it opens, not into fire) and the tile is free; it
+plans a way (find_path, kept as in 211) only when that is shut. A stroll's
+spot, and a patrol loop's waypoints, are taken without a search when they
+can be walked to straight from where it stands, or from home
+(Monster._straight); a search only for the rest. Path searches with 16
+players spread: about 26 a tick to 12. Around a corner it may walk a
+step or two the plain way where a planned way would cut it; it is idling.
+
+And the act phase goes only through the entities that have a turn
+(GridEntity.acts; a crate's or a chest's _sim_tick does nothing), kept in
+id order with the rest of the roster: the same turns in the same order,
+a thousand fewer looked at on the bench's map.
+
+## 219. A monster with no way to its target looks again in a moment
+
+A monster round a crowd with nowhere free beside its target looked for a
+spot beside it (120 tiles) and then for any way to it (400, 209) every
+tick, and with players too tough to die on the bench, crowds only grew
+(7.5 ms a tick with 16 players, rising through a run). With no way at all
+it now waits CHASE_RETRY_TICKS (5) before looking again: a crowd does not
+open in a tick, and it still strikes at once if its target comes beside
+it.
+
+The two together, tools/map_bench at 256x256 and castle density over
+1000 ticks (the steady state; the 200-tick runs include the start, doors
+opened the first time and loops worked out): 16 players about 30 ms on
+average to 24, 9 players 15 to 18, 4 players 13, 1 player 3.9. Worst ticks
+are still the start, when players arrive and hundreds of monsters wake at
+once; next.

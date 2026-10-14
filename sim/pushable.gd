@@ -8,6 +8,7 @@ func _init() -> void:
 	# GridEntity._init builds the synchronizer; it is not called implicitly.
 	super()
 	pushable = true
+	acts = false
 	body_material = BodyMaterial.WOOD
 	mass = 30.0
 	max_hp = 12

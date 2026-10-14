@@ -3,6 +3,16 @@
 Newest first. `tools/release_client.ps1` uses the top section as the release
 notes.
 
+## v0.1.132
+
+Client and server.
+
+- Smoother server with many players on a big map: monsters strolling
+  about walk straight to where they are going when they can, and monsters
+  that cannot get through a crowd round someone stop trying every moment.
+
+The server must be updated to v0.1.132 too, as it refuses any other version.
+
 ## v0.1.131
 
 Client and server.

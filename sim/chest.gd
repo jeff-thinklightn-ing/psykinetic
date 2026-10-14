@@ -11,6 +11,7 @@ const SLOTS := 4
 
 func _init() -> void:
 	super()
+	acts = false
 	body_material = BodyMaterial.WOOD
 	mass = 200.0
 	max_hp = 0
