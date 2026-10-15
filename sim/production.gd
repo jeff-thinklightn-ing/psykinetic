@@ -54,6 +54,14 @@ var holdings: Holdings
 var clock := Callable()
 ## () -> Dictionary: id -> {id, tags, made}, the recipes (items_catalog).
 var catalog := Callable()
+## (workshop) -> bool: whether a workshop may work (its building stands;
+## Towns sets it). Every workshop may by default.
+var workshop_open := Callable()
+## (workshop) -> int: its level (its building's; Towns sets it), 1 by
+## default. Each level past the first makes its jobs level_speed faster.
+var workshop_level := Callable()
+## (town, building id) -> void: a "build" job is done (Towns sets it).
+var on_built := Callable()
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away}.
 var _workers: Dictionary[String, Dictionary] = {}
@@ -170,6 +178,19 @@ func set_away(worker_id: String, away: bool) -> void:
 	_workers[worker_id]["away"] = away
 
 
+## The workshop [param worker_id] works at ("" for none).
+func workshop_of(worker_id: String) -> String:
+	for id: String in _workshops:
+		if _workshops[id]["worker"] == worker_id:
+			return id
+	return ""
+
+
+## Whether [param town] has a "build" job queued or under way.
+func building_in(town: String) -> bool:
+	return _jobs.values().any(func(each: Dictionary) -> bool: return each["kind"] == "build" and each["town"] == town)
+
+
 func worker(id: String) -> Dictionary:
 	return _workers.get(id, {}).duplicate(true)
 
@@ -277,15 +298,19 @@ func _advance(at: int, cat: Dictionary) -> void:
 
 func _present(worker_id: String, workshop_id: String) -> bool:
 	var worker_record: Dictionary = _workers.get(worker_id, {})
-	return not worker_record.is_empty() and not worker_record["away"] \
-			and _workshops.get(workshop_id, {}).get("worker", "") == worker_id
+	var shop: Dictionary = _workshops.get(workshop_id, {})
+	return not worker_record.is_empty() and not worker_record["away"] and shop.get("worker", "") == worker_id \
+			and (not workshop_open.is_valid() or workshop_open.call(shop))
 
 
 func _finish(each: Dictionary, cat: Dictionary) -> void:
 	var worker_record: Dictionary = _workers[each["worker"]]
 	var made_at := "%s at %s" % [worker_record["name"], each["workshop"]]
 	var uid := 0
-	if each["kind"] == "rework":
+	if each["kind"] == "build":
+		if on_built.is_valid():
+			on_built.call(each["town"], each["recipe"])
+	elif each["kind"] == "rework":
 		uid = int(each["uids"][0])
 		book().place(uid, "")
 		book().note(uid, "reworked", made_at)
@@ -295,7 +320,8 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		for used: int in each["uids"]:
 			book().end(used, "used", "made into %s #%d" % [each["recipe"], uid])
 	each["uids"] = []
-	stockpile.stock_shop(each["town"], uid, worker_record["name"])
+	if uid != 0:
+		stockpile.stock_shop(each["town"], uid, worker_record["name"])
 	# The wage, less its tax, which stays in the treasury.
 	var wage: int = taxed(int(rules.get("wage", 0)), "wage", rules)[1]
 	var floor_gold := int(rules.get("gold_floor", 0))
@@ -492,7 +518,9 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 	var starved := 0 if int(shop["waited"]) >= int(rules.get("starve_after", 3)) else 1
 	for id in jobs():
 		var each: Dictionary = _jobs[id]
-		if each["workshop"] == shop["id"] and each["state"] == "queued":
+		var builds_here: bool = each["kind"] == "build" and each["workshop"] == "" and each["trade"] == shop["trade"] \
+				and each["town"] == shop["town"]
+		if each["state"] == "queued" and (each["workshop"] == shop["id"] or builds_here):
 			return {"workshop": shop["id"], "recipe": each["recipe"], "kind": each["kind"], "want": "order", "job": id,
 				"rework": int(each.get("rework", 0)), "key": [starved, 0, 0.0, -int(shop["waited"]), shop["id"]]}
 	var recipes: Array = cat.values().filter(func(entry: Dictionary) -> bool:
@@ -588,7 +616,11 @@ static func _before(a: Array, b: Array) -> bool:
 func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	var shop: Dictionary = _workshops[bid["workshop"]]
 	var town: String = shop["town"]
-	var made: Dictionary = cat[bid["recipe"]]["made"]
+	var queued: Dictionary = _jobs.get(int(bid["job"]), {})
+	if int(bid["job"]) != 0 and queued.get("state") != "queued":
+		return false  # Another workshop took it this tick.
+	var made: Dictionary = {"from": queued["cost"], "steps": queued["steps"]} if bid["kind"] == "build" \
+			else cat[bid["recipe"]]["made"]
 	var rework := int(bid["rework"])
 	if rework != 0 and rework not in stockpile.items(town):
 		return false
@@ -612,10 +644,14 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 		stockpile.take_item(town, rework, reason)
 		book().place(rework, "job:%d" % id)
 		each["uids"].append(rework)
-	each["kind"] = "rework" if rework != 0 else "make"
+	if each["kind"] != "build":
+		each["kind"] = "rework" if rework != 0 else "make"
+	each["workshop"] = shop["id"]
 	each["state"] = "working"
 	each["worker"] = shop["worker"]
-	each["needed"] = int(made["steps"]) / (2 if rework != 0 else 1)
+	var level := int(workshop_level.call(shop)) if workshop_level.is_valid() else 1
+	var speed := 1.0 + float(rules.get("level_speed", 0.25)) * maxi(level - 1, 0)
+	each["needed"] = ceili(int(made["steps"]) / (2.0 if rework != 0 else 1.0) / speed)
 	each["worked"] = 0
 	each["last"] = now()
 	shop["job"] = id
@@ -629,7 +665,22 @@ func _new_job(kind: String, recipe: String, shop: Dictionary) -> int:
 	var id := _next_job
 	_next_job += 1
 	_jobs[id] = {"id": id, "kind": kind, "recipe": recipe, "town": shop["town"], "workshop": shop["id"], "worker": "",
-		"state": "queued", "ordered": false, "rework": 0, "resources": {}, "uids": [], "needed": 0, "worked": 0, "last": 0}
+		"state": "queued", "ordered": false, "rework": 0, "resources": {}, "uids": [], "needed": 0, "worked": 0, "last": 0,
+		"trade": shop.get("trade", ""), "cost": {}, "steps": 0}
+	return id
+
+
+## A job building [param building_id] in [param town]: taken by the first
+## free workshop of [param trade] there, ahead of what the town would
+## choose; [param cost] taken from the stockpile when it starts,
+## [param steps] of work; on_built when done. Its id.
+func order_build(town: String, building_id: String, trade: String, cost: Dictionary, steps: int) -> int:
+	var id := _new_job("build", building_id, {"town": town, "id": "", "trade": trade})
+	_jobs[id]["ordered"] = true
+	_jobs[id]["cost"] = cost.duplicate()
+	_jobs[id]["steps"] = maxi(steps, 1)
+	_town(town)
+	print("[production] %s orders %s built by a %s (%s, %d steps)" % [town, building_id, trade, cost, steps])
 	return id
 
 
@@ -716,7 +767,12 @@ func from_dict(saved: Dictionary) -> void:
 				"town": str(entry.get("town", "")), "workshop": str(entry.get("workshop", "")), "worker": str(entry.get("worker", "")),
 				"state": str(entry.get("state", "queued")), "ordered": bool(entry.get("ordered", false)),
 				"rework": int(entry.get("rework", 0)), "resources": {}, "uids": [], "needed": int(entry.get("needed", 0)),
-				"worked": int(entry.get("worked", 0)), "last": int(entry.get("last", 0))}
+				"worked": int(entry.get("worked", 0)), "last": int(entry.get("last", 0)),
+				"trade": str(entry.get("trade", "")), "cost": {}, "steps": int(entry.get("steps", 0))}
+			var cost: Variant = entry.get("cost", {})
+			if cost is Dictionary:
+				for what: String in cost:
+					each["cost"][what] = int(cost[what])
 			var resources: Variant = entry.get("resources", {})
 			if resources is Dictionary:
 				for what: String in resources:
@@ -726,7 +782,7 @@ func from_dict(saved: Dictionary) -> void:
 					each["uids"].append(int(uid))
 			_next_job = maxi(_next_job, each["id"] + 1)
 			_jobs[each["id"]] = each
-			if not _workshops.has(each["workshop"]):
+			if not _workshops.has(each["workshop"]) and not (each["kind"] == "build" and each["state"] == "queued"):
 				print("[production] the snapshot's job #%d is at %s, which is gone; its materials go back" % [each["id"], each["workshop"]])
 				_give_back(each)
 				_jobs.erase(each["id"])

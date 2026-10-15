@@ -18,5 +18,14 @@
 	"tax": {"sale": 0.2, "buy": 0.1, "trade": 0.1, "wage": 0.1},
 	"rent": 3,
 	"rent_every": 6000,
-	"gold_floor": 20
+	"gold_floor": 20,
+	"level_speed": 0.25,
+	"xp": {"rescue": 10, "objective": 50},
+	"residents": {"base": 3, "per_inn": 3},
+	"buildings": {
+		"forge": {"trade": "smith", "built_by": "carpenter", "xp": 20, "cost": {"wood": 10, "ore": 5}, "steps": 6000, "max_level": 3},
+		"kitchen": {"trade": "cook", "built_by": "carpenter", "xp": 10, "cost": {"wood": 6}, "steps": 3000, "max_level": 3},
+		"inn": {"built_by": "carpenter", "xp": 30, "cost": {"wood": 15, "cloth": 5}, "steps": 9000, "max_level": 3},
+		"walls": {"built_by": "carpenter", "xp": 25, "cost": {"wood": 20}, "steps": 9000, "max_level": 3}
+	}
 }

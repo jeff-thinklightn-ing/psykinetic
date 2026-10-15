@@ -1265,6 +1265,8 @@ func _boot() -> void:
 	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), World.steps_now, World.items)
 	# The town's workers, workshops and jobs, as the snapshot left them.
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
+	# How each town grows: its experience, residents and buildings.
+	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1710,6 +1712,7 @@ func _save_state() -> void:
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
+		"towns": World.towns.to_dict() if World.towns != null else {},
 		"items": World.items.to_dict()})
 
 

@@ -3923,3 +3923,58 @@ with others. A house's walls carry a roof at WALL_HEIGHT: a ruined top
 made a house look abandoned, and the sway pushed walls through the roof.
 Whoever knows a building's outline fills the set before the room is
 built; the sim is untouched.
+
+## 274. Towns: experience, residents and buildings; the town chooses what to build
+
+Economy, step 4. `Towns` (`sim/towns.gd`), kept as `World.towns`: server
+only, made by Main at boot after Production, saved in the snapshot as
+"towns" (no version bump). One record per town (a stockpile place):
+experience earned and spent, residents (Production worker ids), buildings
+({kind, level, state planned|building|standing|damaged, since, job}),
+objectives done, a log. Rules in levels/economy.json ("xp", "residents",
+"buildings", "level_speed").
+
+Experience comes in only through hooks, which whatever decides these
+things calls; economy decides none of them:
+- add_xp(town, amount, reason): any accomplishment;
+- note_rescue(town, who, name, trade): a rescued person reaches the town
+  alive, once freed (Jeff: physical, like hauling): a resident, a
+  Production worker with origin "rescued:<who>"; 10 experience (data);
+- note_objective(town, objective, worth): a story objective done ("the
+  smith brought home"), once per objective; 50 times worth (data).
+Jeff: there are no "runs" (a relic of a dungeon-crawl loop), so no run
+hooks. Nothing ever takes experience; only the town's own spending.
+Losing never takes what's banked.
+
+Companions count as residents while they are in town (Jeff): the
+companions tree calls note_companion_in(town, name, trade) when one stays
+and note_companion_out when it leaves with its player; its worker record
+("companion:<name>") is away meanwhile, so its job waits with its
+materials and goes on when it comes back. Its trade will come from its
+card; until then the caller passes it (levels/companions.json).
+
+Buildings: each kind may house a trade (forge: smith, kitchen: cook) or
+not (inn: room for residents, walls: for step 6's raids). A workshop
+whose trade a building houses works only while that building stands
+(Production.workshop_open; raising it a level doesn't stop it), and each
+level past the first makes its jobs level_speed (a quarter) faster
+(Production.workshop_level). A trade no building houses (the carpenter)
+works from the start. A resident whose building doesn't stand yet waits,
+and is seated at its workshop the moment it does.
+
+Upgrades: experience unlocks a building's next level (its xp times the
+level), and then it is built as a Production "build" job (Jeff's
+default: experience unlocks, materials and time build): its cost times
+the level from the stockpile, its steps times the level, taken by the
+first free workshop of its builder's trade (the carpenter) ahead of the
+tier's choice. The town chooses by itself (Jeff), on the world tick
+before Production so the job is taken that tick, one build at a time:
+walls when its tier is DEFEND, then the building a waiting resident
+needs, then an inn when residents fill its room, then its lowest
+building that houses a trade; whatever it can afford first, up to each
+kind's max_level. Raids take residents captive, never kill them
+(Jeff's default; step 6).
+
+Also in this step: a crate or cart unloaded at the stockpile credits who
+pushed it there (World keeps each cargo's last pusher from
+entity_pushed until it is unloaded or gone).

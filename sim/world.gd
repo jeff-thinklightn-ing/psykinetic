@@ -320,6 +320,9 @@ var stockpile: Stockpile = null
 ## Server: the town's work (Production), moved on by the world tick's first
 ## slice; made by Main at boot, from the snapshot. Null on a client.
 var production: Production = null
+## Server: how each town grows (Towns), choosing its buildings on the same
+## slice; made by Main at boot, from the snapshot. Null on a client.
+var towns: Towns = null
 ## Server: every thing in the world, with its history (ItemBook). Main
 ## replaces it at boot with the snapshot's.
 var items := ItemBook.new(steps_now)
@@ -409,6 +412,10 @@ func step() -> void:
 ## for -1. Called by step, a slice at a time; tests call it directly.
 func world_tick(slice := -1) -> void:
 	if production != null and slice <= 0:
+		# The towns choose what to build first, so its build job is taken
+		# on the same tick.
+		if towns != null:
+			towns.tick()
 		production.tick()
 	var was := zone
 	var each_zone: Array[Zone] = []
@@ -1378,6 +1385,19 @@ var _put_down_by: Dictionary[int, String] = {}
 func _ready() -> void:
 	ground_changed.connect(_on_ground_for_stockpile)
 	entity_moved.connect(_on_moved_for_stockpile)
+	entity_pushed.connect(_on_pushed_for_stockpile)
+	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
+
+
+## Who last pushed each crate or cart, by entity, for the stockpile's
+## ledger when it is unloaded there.
+var _pushed_by: Dictionary[GridEntity, String] = {}
+
+
+func _on_pushed_for_stockpile(entity: GridEntity, by: GridEntity, _direction: Vector2i, _tiles: int, _impact: int,
+		_stopped_by: String) -> void:
+	if entity is Cargo and is_instance_valid(by):
+		_pushed_by[entity] = _label_of(by)
 
 
 ## A crate or cart (Cargo) moved onto [param to]: if that is stockpile
@@ -1404,12 +1424,14 @@ func _bank_cargo(cargo: GridEntity) -> void:
 		return
 	var was := enter(there)
 	var label := _label_of(cargo)
+	var who: String = _pushed_by.get(cargo, "")
+	_pushed_by.erase(cargo)
 	for uid in empty_container(cargo):
 		var yields := Items.yield_of(items.id_of(uid))
 		if yields.keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
 			put_on_ground(uid, cargo.tile)
 			continue
-		_bank_thing(place, uid, "", label, area, cargo.tile)
+		_bank_thing(place, uid, who, label, area, cargo.tile)
 	_log("cargo: %s unloaded into %s at %s" % [cargo.name, place, cargo.tile])
 	enter(was)
 

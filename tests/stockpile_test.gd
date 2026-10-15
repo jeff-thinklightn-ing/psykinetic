@@ -271,6 +271,16 @@ func _test_cart() -> void:
 	await get_tree().process_frame
 	_check(cart.slots[0] == "ore_sack" and stock.count(STORE, "ore") == ore + 10, "with the goblins holding the store, a cart pushed in keeps its load")
 	World.holdings.take(STORE, "town")
+	World._relocate(cart, Vector2i(2, 3))
+	World.set_slots(cart, [KIT, "", "", "", "", "", "", ""])
+	var host := _player(Net.local_id)
+	World._relocate(host, Vector2i(1, 3))
+	var pushed := World.slot_uid(cart, 0)
+	_check(World.try_move(host, Vector2i(1, 0)) and cart.tile == Vector2i(3, 3), "the host pushes the cart onto the store's ground (%s)" % cart.tile)
+	await get_tree().process_frame
+	line = stock.ledger(STORE).back()
+	_check(stock.items(STORE).has(pushed) and line["by"] == World._label_of(host) and line["from"] == World._label_of(cart),
+		"its kit is banked, the ledger crediting who pushed it home (%s)" % [line])
 	World._relocate(cart, Vector2i(1, 5))
 	World.set_slots(cart, [])
 
