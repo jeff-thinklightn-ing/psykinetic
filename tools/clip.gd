@@ -58,6 +58,10 @@ extends Node
 ##   items_spear: the spear (decision 344): a boar, made to charge (staged:
 ##     item_provoke), meets the hunter standing still with a spear
 ##     (braced): the charge is stopped and the boar thrown back.
+##   items_pickup: monsters take up weapons (decision 347): a dagger is
+##     dropped by an imp; it takes it up (its AI's call, made here by
+##     item_pick: World.try_pick_up_weapon), heavier by it, and fights
+##     with it.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -163,6 +167,8 @@ func _ready() -> void:
 			_items_axe()
 		"items_spear":
 			_items_spear()
+		"items_pickup":
+			_items_pickup()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -601,6 +607,27 @@ func _items_spear() -> void:
 	]
 
 
+func _items_pickup() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(6, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [{"at": [6, 2], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["dagger", Player.RIGHT_HAND], "A dagger in hand; an imp, facing away."],
+		["walk", Vector2i(4, 2), ""],
+		["item_key", ["drop", null], "G: the dagger put down beside it."],
+		["walk", Vector2i(2, 2), ""],
+		["item_pick", null, "The imp takes it up: it has a hand for it."],
+		["wait", 60, "Armed, and heavier by it."],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -976,6 +1003,10 @@ func _on_tick(tick: int) -> void:
 					(entity as Animal)._foe = _player
 					(entity as Animal)._charge_until = tick + Animal.CHARGE_TICKS
 					entity.alert = Monster.Alert.FIGHTING
+		"item_pick":
+			# The first monster takes up a weapon beside it, when there is one.
+			if not World.try_pick_up_weapon(_monster):
+				return
 		"item_bold":
 			# The clip's monsters of kind step[1] made bold, so they close in.
 			for entity in World.monsters():
@@ -1192,6 +1223,13 @@ func _log(tick: int) -> void:
 		for entity in World.monsters():
 			them.append("%s at %s hp %d %s%s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert], " DOWN" if World.is_down(entity) else ""])
 		print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp, ", ".join(them)])
+		return
+	if scenario == "items_pickup":
+		var hands := "gone"
+		if is_instance_valid(_monster):
+			hands = "%s at %s mass %.1f hands %s" % [_monster.name, _monster.tile, _monster.mass, _monster.slots]
+		print("[clip] tick %d: player %s hands %s; ground %s; %s" % [tick, _player.tile, [_player.slots[Player.RIGHT_HAND], _player.slots[Player.LEFT_HAND]],
+			World.zone.ground.keys(), hands])
 		return
 	if scenario == "items_block":
 		var them := []

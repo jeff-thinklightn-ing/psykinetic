@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Monsters can pick up a weapon left lying beside them, and fight with it.
+  What a monster carries now makes it heavier to shove.
+
 ## v0.1.146
 
 - Spears reach two cells, through an empty one. Stand still a moment and the

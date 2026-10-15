@@ -1370,6 +1370,87 @@ func hands_allow(entity: GridEntity, slots: PackedStringArray) -> bool:
 	return right.is_empty() or int(Items.def(right)["hands"]) < 2 or left.is_empty()
 
 
+## A weapon (a thing with a verb) lying on [param monster]'s cell or a
+## cell beside it in reach, that it has a free hand for (decision 347):
+## that cell, else NO_CELL. Cheap: at most nine ground lookups. For the
+## monster's AI to ask before try_pick_up_weapon.
+func weapon_near(monster: GridEntity) -> Vector2i:
+	if not monster is Monster or not monster.spawned:
+		return NO_CELL
+	for cell: Vector2i in [monster.tile] + Array(DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return monster.tile + d):
+		if not zone.ground.has(cell) or cell != monster.tile and not can_melee(monster.tile, cell):
+			continue
+		if _weapon_index(monster, cell) >= 0:
+			return cell
+	return NO_CELL
+
+
+## The first weapon in the pile on [param cell] that [param monster] has a
+## free hand for, by its index there; -1 for none.
+func _weapon_index(monster: GridEntity, cell: Vector2i) -> int:
+	var ids := ground_at(cell)
+	for i in ids.size():
+		if not Items.verb_of(ids[i]).is_empty() and _free_hand(monster, ids[i]) >= 0:
+			return i
+	return -1
+
+
+## The hand [param entity] could hold [param id] in (Items.RIGHT_HAND,
+## LEFT_HAND), -1 for none: a two-handed thing only with both hands empty,
+## in the right; a monster with no hands yet has both free.
+func _free_hand(entity: GridEntity, id: String) -> int:
+	var hands := int(Items.def(id).get("hands", 0))
+	if hands == 0:
+		return -1
+	var right := entity.slots[Items.RIGHT_HAND] if entity.slots.size() == Items.CARRIED else ""
+	var left := entity.slots[Items.LEFT_HAND] if entity.slots.size() == Items.CARRIED else ""
+	if not right.is_empty() and int(Items.def(right).get("hands", 1)) == 2:
+		return -1
+	if hands == 2:
+		return Items.RIGHT_HAND if right.is_empty() and left.is_empty() else -1
+	if right.is_empty():
+		return Items.RIGHT_HAND
+	return Items.LEFT_HAND if left.is_empty() else -1
+
+
+## [param monster] takes up a weapon lying beside it (weapon_near) into a
+## free hand (decision 347): its slots become a carrier's if they were
+## not (the pack, then the hands; decision 338), the thing's history says
+## who took it up, and it weighs on the monster's mass. The monster's AI
+## decides when (a monster kind's "picks_up"). False, cheaply, with none
+## near or no free hand.
+func try_pick_up_weapon(monster: GridEntity) -> bool:
+	if not Net.is_authority() or not monster is Monster or not monster.spawned or monster.hp <= 0 or is_stunned(monster):
+		return false
+	var cell := weapon_near(monster)
+	if cell == NO_CELL:
+		return false
+	var index := _weapon_index(monster, cell)
+	var id := ground_at(cell)[index]
+	var hand := _free_hand(monster, id)
+	var uid := take_from_ground(cell, index)
+	if uid == 0:
+		return false
+	if monster.slots.size() != Items.CARRIED:
+		var kept := Items.tidy(monster.slots, Items.CARRIED)
+		_fit_uids(monster)
+		var uids := monster.slot_items.duplicate()
+		uids.resize(Items.CARRIED)
+		monster.slots = kept
+		monster.slot_items = uids
+	var given := monster.slots.duplicate()
+	var given_uids := monster.slot_items.duplicate()
+	given[hand] = id
+	given_uids[hand] = uid
+	monster.slots = given
+	monster.slot_items = given_uids
+	items.place(uid, holder_key(monster), holder_key(monster), _label_of(monster))
+	items.note(uid, "taken up", "by %s" % _label_of(monster), zone.name, monster.tile)
+	_log("pick up: %s takes up %s from %s" % [monster.name, id, cell])
+	_slots_changed(monster)
+	return true
+
+
 ## A player or a companion: something with hands (Items.CARRIED slots).
 func has_hands(entity: GridEntity) -> bool:
 	return (entity is Player or entity.keeper_peer != 0) and entity.slots.size() == Items.CARRIED
@@ -2463,8 +2544,8 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	_occupancy[at] = entity
 	_entities.append(entity)
 	_roster_changed()
-	if entity is Cargo:
-		_weigh(entity)  # What its spawn spec put in it weighs from the start.
+	if entity is Cargo or entity is Monster and not entity.slots.is_empty():
+		_weigh(entity)  # What its spawn spec put in it (loot, its hands) weighs from the start.
 	zone.comings += 1
 	entity.zone = zone.name
 	entity._world_place(_next_id, at)

@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_block()
 	_test_axe()
 	_test_spear()
+	_test_pickup()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -798,6 +799,60 @@ func _test_spear() -> void:
 	World.despawn(boar)
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	World._relocate(host, home)
+
+
+func _test_pickup() -> void:
+	print("
+== monsters: what they carry weighs; a free hand takes up a weapon lying beside it (decision 347) ==")
+	var host := _player(Net.local_id)
+	var spot := World.NO_CELL
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var cell := host.tile + Vector2i(dx, dy)
+			if spot == World.NO_CELL and World.distance(cell, host.tile) > 2 and World.is_free(cell) 					and World.DIRECTIONS.all(func(d: Vector2i) -> bool: return World.is_free(cell + d) and World.can_melee(cell, cell + d)):
+				spot = cell
+	_check(spot != World.NO_CELL, "an open spot for an imp")
+	if spot == World.NO_CELL:
+		return
+	var laden := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "LadenImp%d" % World.tick,
+		"tile": spot, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0, "slots": Items.tidy(["sword", "ration"], 4)}}) as GridEntity
+	_check(is_equal_approx(laden.mass, 40.0 + Items.weight_of("sword") + Items.weight_of("ration")),
+			"an imp spawned carrying a sword and a ration weighs 40 and them (%.1f)" % laden.mass)
+	World.despawn(laden)
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "PickImp%d" % World.tick,
+		"tile": spot, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
+	imp.acts = false
+	_check(World.weapon_near(imp) == World.NO_CELL and not World.try_pick_up_weapon(imp), "nothing lying near: nothing to take up")
+	var beside := spot + Vector2i(1, 0)
+	World.put_on_ground(World.items.mint("ration", "built"), beside)
+	_check(World.weapon_near(imp) == World.NO_CELL, "a ration is no weapon")
+	var dagger := World.items.mint("dagger", "built")
+	World.put_on_ground(dagger, beside)
+	_check(World.weapon_near(imp) == beside, "a dagger beside it: there")
+	var mass := imp.mass
+	_check(World.try_pick_up_weapon(imp) and imp.slots.size() == Items.CARRIED and imp.slots[Items.RIGHT_HAND] == "dagger"
+			and imp.slot_items[Items.RIGHT_HAND] == dagger and World.wielded(imp) == "dagger",
+			"taken up into its right hand: it has hands now, and fights with it (%s)" % imp.slots)
+	_check(is_equal_approx(imp.mass, mass + Items.weight_of("dagger")) and World.ground_at(beside) == PackedStringArray(["ration"]),
+			"it weighs on it (%.1f); the ration still lies there" % imp.mass)
+	var events: Array = World.items.history(dagger)["events"]
+	_check(events[-1]["kind"] == "taken up" and str(events[-1]["what"]).begins_with("by PickImp"), "the dagger's history says who took it up (%s)" % [events[-1]])
+	World.put_on_ground(World.items.mint("giant_axe", "built"), beside)
+	_check(World.weapon_near(imp) == World.NO_CELL, "a giant axe needs both hands: not for it now")
+	World.put_on_ground(World.items.mint("shield", "built"), spot + Vector2i(0, 1))
+	_check(World.try_pick_up_weapon(imp) and imp.slots[Items.LEFT_HAND] == "shield" and World.guard(imp)["absorb"] == 1.0, "a shield, into the left")
+	_check(not World.try_pick_up_weapon(imp), "hands full: no more")
+	var at := imp.tile
+	World.damage(imp, 1000, host)
+	var lying := []
+	for cell: Vector2i in World.zone.ground.keys():
+		if World.distance(cell, at) <= 2:
+			while not World.ground_uids(cell).is_empty():
+				var uid := World.take_from_ground(cell, 0)
+				lying.append(World.items.id_of(uid))
+				World.items.end(uid, "gone")
+	lying.sort()
+	_check("dagger" in lying and "shield" in lying, "beaten, it drops what it took up (%s)" % [lying])
 
 func _test_loot() -> void:
 	print("

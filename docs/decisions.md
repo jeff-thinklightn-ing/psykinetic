@@ -6582,3 +6582,25 @@ log. No new replicated state or RPC: the protocol is unchanged.
 Seen in the clip: a boar running from a hunter does not turn to charge
 when struck while it flees (Animal's own rule); the clip stages the
 charge (tools/clip.gd item_provoke) to show the brace.
+
+## 347. Monsters take up weapons lying beside them; what they carry weighs
+
+Two of decision 330's leftovers (the coordinator, 2026-10-15). What a
+monster carries now weighs on it: World.spawn weighs a monster with slots
+(its loot, its hands, decision 338) as it does a cart, so a brute with a
+giant axe is heavier to shove. (Decision 346 was set aside for this and
+is unused: the change is that one line.)
+
+A monster with a free hand takes up a weapon (a thing with a verb) lying
+on its cell or one beside it in reach: World.weapon_near(monster), the
+cell or NO_CELL, at most nine ground lookups; World.try_pick_up_weapon,
+which takes the first fitting weapon there into a free hand (a two-handed
+one only with both hands empty, in the right), turns a monster without
+hands into a carrier's six slots (pack, then hands), notes "taken up by"
+in the thing's history and weighs it on the monster. When to do it is
+the monster's AI's (enemy-ai: a kind's "picks_up" row key, an idle or
+suspicious monster with an empty hand every 10 ticks, a fighting one with
+both hands empty when it is not striking), since it costs a turn. Nothing
+judges one weapon better than another: there are no tiers. What it took
+up drops where it falls (decision 330). Server side only (a monster's
+slots are not replicated, so the views do not show it in hand yet).
