@@ -1521,6 +1521,7 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	_offering = []
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
+	_sky_asked = asks_about_sky(heard)
 	var now: Array[String] = [voice_situation(), others_here()]
 	if asks_about_items(heard):
 		now.append(carried())
@@ -1661,6 +1662,14 @@ const WEATHER_WORDS := {"clear": "the sky is clear", "overcast": "the sky is gre
 	"fog": "fog lies thick", "wind": "a strong wind is blowing", "storm": "a storm is raging"}
 
 
+## Words that ask about the hour or the sky: then her voice is told them
+## in full (where_words). Otherwise only a storm: told every time, a voice
+## brought the sky up in 10 of 24 lines unasked, and still 6 when told to
+## leave it out; told the night, in most lines at night. The night reaches
+## her when it matters, with the wolves (_warn_wolves).
+const SKY_WORDS := "(?i)\\b(time|hour|late|early|day|night|dark\\w*|light|dawn|dusk|morning|evening|noon|midday|sun\\w*|moon|stars?|sky|weather|rain\\w*|wet|fog\\w*|mist\\w*|storm\\w*|wind\\w*|cloud\\w*|cold|warm)\\b"
+## Whether the words her voice answers now ask about the hour or the sky.
+var _sky_asked := false
 ## The kind of place this zone is (level.json's "zone", DayNight.ZONES),
 ## by zone name, read once.
 static var _zone_kinds: Dictionary[String, String] = {}
@@ -1669,8 +1678,10 @@ static var _zone_kinds: Dictionary[String, String] = {}
 ## Where she is and the hour, for her voice, in one sentence: outdoors
 ## under the sky (or under a roof there) with the weather (Fields.weather),
 ## indoors, in a cave or a dungeon.
-func where_words() -> String:
+func where_words(full := true) -> String:
 	var hour := time_words(DayNight.hour(DayNight.now()))
+	if not full:
+		return _where_briefly()
 	if World.outdoor:
 		var sky := ""
 		if WEATHER_WORDS.has(str(World.fields.weather.get("kind", ""))):
@@ -1689,6 +1700,32 @@ func where_words() -> String:
 			return "You are in a dungeon, under the ground; above it is %s." % hour
 		_:
 			return "You are indoors; outside it is %s." % hour
+
+
+## where_words when nothing asked about the hour or the sky: the place,
+## and a storm.
+func _where_briefly() -> String:
+	if World.outdoor:
+		var storm := " A storm is raging." if str(World.fields.weather.get("kind", "")) == "storm" else ""
+		if World.fields.outdoor and not World.fields.under_sky(tile):
+			return "You are under a roof.%s" % storm
+		return "You are outdoors, under the sky, with forest all around the edge of this place.%s" % storm
+	var zone_name := World.zone.name if World.zone != null else ""
+	if not _zone_kinds.has(zone_name):
+		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
+		_zone_kinds[zone_name] = str(level.get("terrain", {}).get("zone", "indoors"))
+	match _zone_kinds[zone_name]:
+		"cave":
+			return "You are in a cave."
+		"dungeon":
+			return "You are in a dungeon, under the ground."
+		_:
+			return "You are indoors."
+
+
+## Whether [param heard] asks about the hour or the sky (SKY_WORDS).
+static func asks_about_sky(heard: String) -> bool:
+	return not heard.is_empty() and RegEx.create_from_string(SKY_WORDS).search(heard) != null
 
 
 ## How hurt [param entity] is, in words.
@@ -1712,7 +1749,6 @@ func voice_situation() -> String:
 	sentences.append("%s monster%s next to you." % [NUMBERS[mini(next_to_her, NUMBERS.size() - 1)],
 		" is" if next_to_her == 1 else "s are"])
 	sentences.append("You are %s." % health_words(self))
-	sentences.append(where_words())
 	var who := keeper_name()
 	var her_danger := _in_danger(self)
 	var their_danger := false
@@ -1744,6 +1780,7 @@ func voice_situation() -> String:
 		sentences.append("Nothing is near enough to strike.")
 	else:
 		sentences.append("Neither of you is in danger.")
+	sentences.append(where_words(_sky_asked))
 	return " ".join(sentences)
 
 

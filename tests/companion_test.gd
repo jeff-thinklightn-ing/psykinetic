@@ -2050,6 +2050,7 @@ func _test_how_she_speaks() -> void:
 	_check(not RegEx.create_from_string("\\d+ paces?").search(prompt), "no number of paces anywhere in her voice's prompt")
 	_check("You carry a lantern" not in prompt and "You carry a lantern, and in your pack nothing." in pet.voice_prompt("", "Player just said to you: \"What are you carrying?\""),
 			"what she carries is in her prompt only when asked about it")
+	pet._sky_asked = true  # Asked about the sky: told it in full (unasked, briefly: _test_sky_unasked).
 	_check("outdoors" not in pet.voice_situation() and "# wall," in pet.perception_grid(), "under stone she is told nothing of the sky")
 	World.outdoor = true
 	_check("You are outdoors, under the sky, with forest all around the edge of this place." in pet.voice_situation()
@@ -2059,6 +2060,18 @@ func _test_how_she_speaks() -> void:
 	World.fields.weather = Weather.at("test", 0.0).merged({"kind": "rain"}, true)
 	World.fields.outdoor = true
 	_check("It is dusk, and it is raining. You are outdoors" in pet.voice_situation(), "and the weather: %s" % pet.where_words())
+	pet._sky_asked = false
+	_check("dusk" not in pet.voice_situation() and "raining" not in pet.voice_situation() and "You are outdoors" in pet.voice_situation(),
+		"not asked about the hour or the sky, she is told neither (only where she is)")
+	DayNight.set_hour(1.0)
+	World.fields.weather = World.fields.weather.merged({"kind": "storm"}, true)
+	_check("night" not in pet.voice_situation() and "A storm is raging." in pet.voice_situation(),
+		"not the night either (the wolves bring it), but a storm: %s" % pet.where_words(false))
+	_check(Companion.asks_about_sky("Player just said to you: \"Is it getting dark?\"") and not Companion.asks_about_sky("Player just said to you: \"Ready to go?\""),
+		"a question about the dark asks about the sky; \"Ready to go?\" does not")
+	pet.voice_prompt("", "Player just said to you: \"Ready to go?\"")
+	_check(not pet._sky_asked, "and her prompt follows what was said")
+	pet._sky_asked = true
 	World.fields.weather = {}
 	World.fields.outdoor = false
 	World.outdoor = false

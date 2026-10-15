@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions bring up the hour and the weather when you ask about them (or
+  in a storm), not in every other line.
 - The camera no longer jumps when the game corrects where your character is
   drawn: it glides over the gap in a few frames, and still follows a
   knockback exactly.
