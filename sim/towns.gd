@@ -60,6 +60,15 @@ var clock := Callable()
 ## (town) -> float 0..1: how threatened [param town] is (maps' camps set
 ## it); by default from Holdings' safety (rules' raids threat_default).
 var threat := Callable()
+## Companions as captives (decision 314; Main sets these): (town) -> bool,
+## whether [param town]'s zone is in play (its raiders are real there and
+## take a companion by beating her down, not here); (player_id, group) ->
+## bool, Main.companion_taken; (player_id, town) -> bool,
+## Main.companion_freed; (player_id) -> {name, trade}, her record's.
+var in_play := Callable()
+var companion_taken := Callable()
+var companion_freed := Callable()
+var companion_of := Callable()
 
 ## Town -> {xp, spent, residents: Array[String] (worker ids), buildings:
 ## {kind: {kind, level, state, since, job}}, objectives (done, by id),
@@ -182,6 +191,15 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 	if who_id in record["residents"]:
 		return false
 	var held: Array = record["captives"].filter(func(each: Dictionary) -> bool: return each["id"] == who_id)
+	if not held.is_empty() and who_id.begins_with("companion:"):
+		# A companion (decision 314): Main frees her into this town, a
+		# resident working her trade till her player comes.
+		record["captives"].erase(held[0])
+		_note(town, "%s, a companion taken by %s, is rescued and home" % [held[0]["name"], held[0]["by"]])
+		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
+		if companion_freed.is_valid():
+			companion_freed.call(who_id.trim_prefix("companion:"), town)
+		return true
 	if not held.is_empty() and not production.worker(who_id).is_empty():
 		# Taken in a raid: back as themselves, their work where it was.
 		record["captives"].erase(held[0])
@@ -216,12 +234,15 @@ func note_objective(town: String, objective_id: String, worth := 1) -> int:
 ## Companion [param companion_name] is in [param town], away from its
 ## player: a resident working [param trade] (from its record's traits,
 ## levels/companion_traits.json), seated as a rescued person is. Back to work where it
-## left off if it was here before.
-func note_companion_in(town: String, companion_name: String, trade: String) -> void:
+## left off if it was here before. [param player_id], her player's, is
+## her origin ("companion:<player id>"), by which a raid takes her.
+func note_companion_in(town: String, companion_name: String, trade: String, player_id := "") -> void:
 	var who := "companion:%s" % companion_name
 	var record := _town(town)
 	if production.worker(who).is_empty():
 		production.add_worker(who, companion_name, [trade], town, who)
+	if not player_id.is_empty():
+		production.set_origin(who, "companion:%s" % player_id)
 	production.set_away(who, false)
 	if who not in record["residents"]:
 		record["residents"].append(who)
@@ -472,6 +493,31 @@ func captive_held(who_id: String, holder: String) -> bool:
 	return false
 
 
+## Raid group [param group_id] of [param faction] is home with
+## [param captives] (the ids it carries, as Raids and raid_arrives name
+## them) from its raid on [param town], held by [param holder] (its camp's
+## place): each is a captive held there. A companion it took in play
+## ("companion:<player id>", beaten down: decision 314) has no entry yet;
+## she gets one in [param town], her name and trade from companion_of.
+## The ids now held, in order.
+func carried_home(town: String, group_id: String, faction: String, captives: Array, holder: String) -> Array[String]:
+	var out: Array[String] = []
+	for each: Variant in captives:
+		var who := str(each)
+		if captive_held(who, holder):
+			out.append(who)
+			continue
+		if not who.begins_with("companion:"):
+			continue
+		var her: Dictionary = companion_of.call(who.trim_prefix("companion:")) if companion_of.is_valid() else {}
+		var her_name := str(her.get("name", who))
+		_town(town)["captives"].append({"id": who, "name": her_name, "trade": str(her.get("trade", "")), "origin": who,
+			"purse": 0, "taken_at": now(), "by": faction, "held_by": holder})
+		_note(town, "%s, a companion, is held by %s (%s)" % [her_name, faction, group_id])
+		out.append(who)
+	return out
+
+
 ## A raiding [param group] ({id, faction, strength, from}: its strength
 ## after anything done to it on the way) has reached [param town]'s ground,
 ## travelled there or walked there in play, alike. Its strength less the
@@ -479,8 +525,9 @@ func captive_held(who_id: String, holder: String) -> bool:
 ## Else it takes rules' raids takes in order, each scaled by margin /
 ## strength (only food: never gold, materials, experience or buildings),
 ## damages one building past damage.margin and carries off up to
-## captives.count residents (the newest first, never a companion) past
-## captives.margin. The report, also emitted on raided: {town, group,
+## captives.count residents (the newest first; a companion only when the
+## town is not in play, by her player's id, "companion:<player id>", and
+## Main told: companion_taken) past captives.margin. The report, also emitted on raided: {town, group,
 ## faction, repelled, margin, took: {resource: count, items: [uids]},
 ## damaged (a kind or ""), captives: [{id, name, trade}]}: what the group
 ## carries off is maps' to move home with it.
@@ -544,7 +591,22 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 			if report["captives"].size() >= int(taking.get("count", 0)):
 				break
 			var worker := production.worker(who)
-			if worker.is_empty() or worker["away"] or str(worker["origin"]).begins_with("companion:"):
+			if worker.is_empty() or worker["away"]:
+				continue
+			if who.begins_with("companion:"):
+				# A companion resident (decision 314): taken here only when
+				# nobody plays the town (in play, real raiders beat her down),
+				# and only by her player's id.
+				var origin := str(worker["origin"])
+				if origin == who or not origin.begins_with("companion:") or (in_play.is_valid() and in_play.call(town)):
+					continue
+				record["residents"].erase(who)
+				production.set_away(who, true)
+				record["captives"].append({"id": origin, "name": worker["name"], "trade": worker["trades"][0],
+					"origin": origin, "purse": 0, "taken_at": now(), "by": faction, "held_by": group_id})
+				report["captives"].append({"id": origin, "name": worker["name"], "trade": worker["trades"][0]})
+				if companion_taken.is_valid():
+					companion_taken.call(origin.trim_prefix("companion:"), group_id)
 				continue
 			record["residents"].erase(who)
 			production.set_away(who, true)
@@ -608,7 +670,8 @@ func from_dict(saved: Dictionary) -> void:
 		for done: Variant in entry.get("objectives", []):
 			record["objectives"].append(str(done))
 		for each: Variant in entry.get("captives", []):
-			if each is Dictionary and not production.worker(str(each.get("id", ""))).is_empty():
+			# A companion captive is her player's (no worker by that id).
+			if each is Dictionary and (not production.worker(str(each.get("id", ""))).is_empty() or str(each.get("id", "")).begins_with("companion:")):
 				record["captives"].append({"id": str(each["id"]), "name": str(each.get("name", "")),
 					"trade": str(each.get("trade", "")), "origin": str(each.get("origin", "")),
 					"purse": int(each.get("purse", 0)), "taken_at": int(each.get("taken_at", 0)),

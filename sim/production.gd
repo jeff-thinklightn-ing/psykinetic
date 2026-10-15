@@ -178,6 +178,13 @@ func set_away(worker_id: String, away: bool) -> void:
 	_workers[worker_id]["away"] = away
 
 
+## Where worker [param worker_id] came from, said again (a companion's
+## player, once known: Towns.note_companion_in).
+func set_origin(worker_id: String, origin: String) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["origin"] = origin
+
+
 ## The workshop [param worker_id] works at ("" for none).
 func workshop_of(worker_id: String) -> String:
 	for id: String in _workshops:

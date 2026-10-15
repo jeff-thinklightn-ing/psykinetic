@@ -1461,6 +1461,17 @@ func _boot() -> void:
 	World.raid_groups.hook(World.raids)
 	if Net.raids:
 		World.raid_groups.set_on(true)
+	# Companions taken and freed in raids (decision 314).
+	World.towns.in_play = func(town: String) -> bool:
+		var zone: Zone = World.zones.get(str(World.holdings.place(town).get("area", "")))
+		return zone != null and zone.awake
+	World.towns.companion_taken = companion_taken
+	World.towns.companion_freed = companion_freed
+	World.towns.companion_of = func(player_id: String) -> Dictionary:
+		var record: PlayerRecord = _records.get(player_id)
+		if record == null or record.companion.is_empty():
+			return {}
+		return {"name": str(record.companion.get("name", "")), "trade": str(record.companion.get("traits", {}).get("trade", ""))}
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	# Raiders come into a played zone as its level's monsters do.
@@ -2328,7 +2339,7 @@ func companion_freed(player_id: String, place := "") -> bool:
 		var zone := str(World.holdings.place(place).get("area", ""))
 		record.companion["resident"] = {"place": place, "zone": zone, "trade": trade}
 		if not trade.is_empty() and World.towns != null:
-			World.towns.note_companion_in(place, pet_name, trade)
+			World.towns.note_companion_in(place, pet_name, trade, player_id)
 		town = str(Level.load_level(zone).get("display_name", zone)) if Level.exists(zone) else zone
 	var grown := CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
 	grown.add_fact("%s was freed from the raiders%s." % [pet_name, " and brought to " + town if not town.is_empty() else ""],
@@ -2418,7 +2429,7 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if place.is_empty() or trade.is_empty():
 		return false
-	World.towns.note_companion_in(place, pet_name, trade)
+	World.towns.note_companion_in(place, pet_name, trade, record.player_id)
 	record.companion["resident"] = {"place": place, "zone": World.zone.name, "trade": trade}
 	pet.works_as = trade
 	print("[town] %s's companion %s stays in %s and works as its %s" % [record.name, pet_name, place, trade])
@@ -2447,7 +2458,7 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
 	var pet_name := String(record.companion.get("name", pet.name))
 	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if not trade.is_empty():
-		World.towns.note_companion_in(place, pet_name, trade)
+		World.towns.note_companion_in(place, pet_name, trade, record.player_id)
 	record.companion["resident"] = {"place": place, "zone": str(World.holdings.place(place).get("area", "")), "trade": trade}
 	record.companion["tile"] = null  # Wherever she rests: beside her player when they come.
 	_travelling = true  # She leaves; she does not die.

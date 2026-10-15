@@ -5,12 +5,15 @@ extends Node
 ## in town) is fought off; a stronger one takes food only (stockpile food,
 ## then meals from the shop), its losses in the ledger by "raid:<faction>",
 ## which turns the town to defend; past a margin it damages a building
-## (walls first), past a greater one it carries off a resident (never a
-## companion); gold, ore, wood, experience and levels are never taken. A
+## (walls first), past a greater one it carries off a resident; gold, ore, wood, experience and levels are never taken. A
 ## damaged building stops its work and a carpenter repairs it first, for
 ## half its cost and time; a captive waits, held where maps says, and is
 ## home as themselves when rescued; a restart keeps the captives; threat
-## from a hook, else from the town's safety, puts walls first.
+## from a hook, else from the town's safety, puts walls first. A companion
+## (decision 331): a resident whose player is known is taken only when
+## nobody plays the town, Main told; one taken in play gets her captive
+## entry when her group is home (carried_home); rescued, Main frees her
+## into the town.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -65,6 +68,7 @@ func _ready() -> void:
 	_test_rescue()
 	_test_restart()
 	_test_threat()
+	_test_companions()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -224,6 +228,49 @@ func _test_threat() -> void:
 	_towns.threat = func(_town: String) -> float: return 0.7
 	_check(_towns.threat_of(TOWN) == 0.7 and _towns.choose(TOWN) == "walls", "maps says 0.7: walls first")
 	_check(_reports.size() >= 5, "raided told each time")
+
+
+func _test_companions() -> void:
+	print("
+== companions as captives (decision 331) ==")
+	_fresh()
+	var calls: Array[String] = []
+	var playing := [true]
+	_towns.in_play = func(_town: String) -> bool: return playing[0]
+	_towns.companion_taken = func(player_id: String, by: String) -> bool:
+		calls.append("taken %s by %s" % [player_id, by])
+		return true
+	_towns.companion_freed = func(player_id: String, place: String) -> bool:
+		calls.append("freed %s to %s" % [player_id, place])
+		return true
+	_towns.companion_of = func(player_id: String) -> Dictionary:
+		return {"name": {"p1": "Wren", "p2": "Nix"}.get(player_id, ""), "trade": "cook"}
+	_towns.note_companion_in(TOWN, "Wren", "cook", "p1")
+	_check(_work.worker("companion:Wren")["origin"] == "companion:p1", "Wren in town: her origin her player's id")
+	_now = 20000
+	var report := _towns.raid_arrives(TOWN, {"id": "g6", "faction": "goblins", "strength": 30.0})
+	_check(report["captives"].is_empty() and "companion:Wren" in _towns.residents(TOWN) and calls.is_empty(),
+		"the town in play: the raid's own raiders take her or not, not raid_arrives (%s)" % [report["captives"]])
+	playing[0] = false
+	report = _towns.raid_arrives(TOWN, {"id": "g7", "faction": "goblins", "strength": 30.0})
+	_check(report["captives"] == [{"id": "companion:p1", "name": "Wren", "trade": "cook"}] and calls == ["taken p1 by g7"],
+		"nobody there: Wren carried off by her player's id, Main told (%s, %s)" % [report["captives"], calls])
+	_check("companion:Wren" not in _towns.residents(TOWN) and _work.worker("companion:Wren")["away"]
+		and _towns.captives(TOWN)[0]["held_by"] == "g7", "no resident now, her work waits, held by g7")
+	var held := _towns.carried_home(TOWN, "g8", "goblins", ["companion:p1", "companion:p2", "nobody"], "forest/camp")
+	var captives := _towns.captives(TOWN)
+	_check(held == ["companion:p1", "companion:p2"] and captives.size() == 2 and captives.all(func(each: Dictionary) -> bool: return each["held_by"] == "forest/camp")
+		and captives[1]["name"] == "Nix" and captives[1]["origin"] == "companion:p2" and captives[1]["by"] == "goblins",
+		"home at forest/camp: Wren held there, and Nix, taken in play, gets her entry (%s)" % [captives])
+	var clock := func() -> int: return _now
+	var saved: Variant = JSON.parse_string(JSON.stringify(_towns.to_dict()))
+	_check(Towns.new(saved, _work, RULES, clock).captives(TOWN) == captives, "a restart keeps both")
+	var xp := _towns.xp_earned(TOWN)
+	_check(_towns.note_rescue(TOWN, "companion:p2", "Nix", "cook") and calls.back() == "freed p2 to %s" % TOWN
+		and _towns.captives(TOWN).size() == 1 and _towns.xp_earned(TOWN) == xp + 10,
+		"Nix rescued: Main frees her into the town, the rescue's experience (%s)" % [calls])
+	_check(_towns.note_rescue(TOWN, "companion:p1", "Wren", "cook") and calls.back() == "freed p1 to %s" % TOWN
+		and _towns.captives(TOWN).is_empty(), "and Wren")
 
 
 func _check(ok: bool, label: String) -> void:

@@ -7,7 +7,7 @@ extends RefCounted
 ## real raiders (World.raids, enemy-ai's), and comes back here when that zone
 ## sleeps or it leaves the area; at a town nobody watches it raids by the
 ## numbers (Towns.raid_arrives) and carries what it took and whom home,
-## where its captives are held at the camp (Towns.captive_held). The camps
+## where its captives are held at the camp (Towns.carried_home). The camps
 ## also make each town's threat (Towns.threat). Server only, on the world
 ## tick, saved in the snapshot. Off until switched on (--raids, or the
 ## console's raids on): nothing is sent and nothing moves while it is off.
@@ -285,8 +285,9 @@ func _arrive(id: String, last: Dictionary) -> void:
 			_route(id)
 		return
 	if group["state"] == HOME:
-		for captive: Variant in group["carries"].get("captives", []):
-			towns.captive_held(str(captive), group["from"])
+		# Its captives held at the camp; a companion taken in play gets her
+		# entry here (Towns.carried_home, decision 331).
+		towns.carried_home(group["town"], id, group["faction"], group["carries"].get("captives", []), group["from"])
 		print("[raids] %s is home at %s with %s" % [id, group["from"], group["carries"]])
 		_end(id)
 		return

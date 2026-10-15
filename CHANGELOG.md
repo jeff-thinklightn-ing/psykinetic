@@ -20,6 +20,9 @@ notes (decision 324).
 - Companions leave deer, stags, rabbits and boar alone unless you say "Get
   them!" with one in front of you. They keep still and quiet while you
   stalk, warn you of wolves at night, and remember the game you bring down.
+- Raiders can carry off a companion who stays in town while nobody is there.
+  A companion taken in a raid is held at the raiders' camp; rescue her and
+  she waits in the town for her player.
 - Companions know the weather when outdoors: rain, fog, wind, a storm or a clear
   sky.
 - A deer or stag that hears you lifts its head with a quiet snort: freeze

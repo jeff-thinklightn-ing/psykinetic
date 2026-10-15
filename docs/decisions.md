@@ -6089,3 +6089,30 @@ fight reads these yet: what a raised shield absorbs and what a loosed
 arrow does belong to the roadmap's weapons as verbs, which reads
 raised and listens to loosed. The name is not "stance": a companion's
 stance is her fighting mood.
+## 331. A companion as a raid captive in Towns
+
+Decision 314 lets raiders take companions and residents, never kill them.
+Towns keeps them as it keeps a taken resident, by her player's id
+("companion:<player id>", as Raids carries her), so a rescue frees her to
+her own record.
+- note_companion_in takes her player's id and sets it as her worker's
+  origin (Production.set_origin); Main passes it at its three calls.
+- raid_arrives may carry off a companion resident, newest first like
+  anyone, only when the town is not in play (Towns.in_play: its zone is
+  awake). In play, the real raiders beat her down or don't (World.spared),
+  so the abstract roll must not take her as well. Taken: no resident, her
+  work waits, a captive entry by her player's id, and Main.companion_taken
+  (her record "taken", decision 314).
+- carried_home(town, group, faction, captives, holder): maps calls it when
+  a raid group is home. Each id it carries is held there (captive_held);
+  a companion taken in play has no entry yet and gets one in the raided
+  town, her name and trade from her record (Towns.companion_of).
+  WorldRaids (maps, decision 328) calls it in _arrive for a group home,
+  in place of captive_held for each.
+- note_rescue of "companion:<player id>" drops the entry, gives the
+  rescue's experience, and calls Main.companion_freed(player id, town): she
+  rests there as a resident working her trade until her player comes.
+- A restart keeps a companion's captive entry (she has no worker by that
+  id).
+Main sets in_play, companion_taken, companion_freed and companion_of after
+Towns is made. Server only; protocol unchanged; raids_test.
