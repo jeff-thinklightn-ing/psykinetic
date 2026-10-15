@@ -32,6 +32,9 @@ extends Node
 ##   items_use: using things: a locked door rattles; from a chest a coin
 ##     purse, opened into gold, and the key, which opens the door; a sack
 ##     of ore put down beyond it, and the imp there hears the thud.
+##   items_weapons: the seven weapons (Items.VERBS): sword and shield in
+##     the hands, hammer, spear and dagger in the pack, the giant axe and
+##     the bow in a chest; each caption names the verb.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -116,6 +119,8 @@ func _ready() -> void:
 			_items_use()
 		"items_buffs":
 			_items_buffs()
+		"items_weapons":
+			_items_weapons()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -337,6 +342,36 @@ func _items_icons() -> void:
 		["wait", 30, "The chest empty, the pack full."],
 		["item_open", false, ""],
 		["wait", 30, ""],
+	]
+
+
+func _items_weapons() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(3, 1): "chest", Vector2i(7, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["giant_axe", "bow", "", ""]}},
+			{"at": [7, 3], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["walk", Vector2i(3, 2), "Weapons are verbs, not damage tiers."],
+		["item_give", ["sword", Player.RIGHT_HAND], "Sword: a light guard ahead (block, half a blow)."],
+		["wait", 15, ""],
+		["item_give", ["shield", Player.LEFT_HAND], "Shield: a guard three cells wide (block, a whole blow)."],
+		["wait", 15, ""],
+		["item_give", ["hammer", 0], "Hammer: knockback (three times the push)."],
+		["wait", 15, ""],
+		["item_give", ["spear", 1], "Spear: reach, two cells; braced, it stops a charge."],
+		["wait", 15, ""],
+		["item_give", ["dagger", 2], "Dagger: quick, light; twice from behind (backstab)."],
+		["wait", 15, ""],
+		["item_open", true, "Giant axe: slow, both hands, knocks down. Bow: both hands, ranged; the longer the draw, the stronger."],
+		["wait", 40, ""],
 	]
 
 
@@ -589,6 +624,8 @@ func _on_tick(tick: int) -> void:
 			World.try_transfer(_player, _chest(), int(step[1][0]), _player, int(step[1][1]))
 		"item_use":
 			_main.use_slot(int(step[1]))
+		"item_give":
+			World.put_item(_player, _player, int(step[1][1]), World.items.mint(str(step[1][0]), "built", "clip"))
 		"item_open":
 			if bool(step[1]):
 				_main._open_pack(_player, _chest())

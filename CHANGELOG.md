@@ -6,6 +6,10 @@ top section as the release notes.
 
 ## Unreleased
 
+- Seven weapons exist as things you can carry: hammer, sword, shield, giant
+  axe, spear, dagger and bow, each with what it will do in a fight
+  (knockback, block, knockdown, reach, backstab, range). The smith makes
+  them. They don't fight differently yet.
 - A goblin that spots you and calls its pack is heard calling (a brute
   lower, an imp higher), and a smashed crate or cart sounds like one.
 - The town's smith makes knives, axe heads and nails from ore, and its

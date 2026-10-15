@@ -1,5 +1,5 @@
 {
-	"_about": "The item catalog (Items): one definition per id. Slots, levels, prefabs and the builder name these ids; each thing in the world is an instance of one (ItemBook). art: the ArtKit slot (item.<id>); kind: held (in a hand, origin at the grip) or cell (only lies on the ground); size: metres, the grey box until art; weight: kg; hands: 0 pack only, 1 or 2; tags: what it is; effects: [{kind, amount, ticks}] (buffs, consumed); use: the verb it is used with (bandage, purse: opened into gold; World.try_use); opens: the lock a key opens (Door.lock); value: what it is worth in gold; yield: a resource's counts when banked (tag resource).",
+	"_about": "The item catalog (Items): one definition per id. Slots, levels, prefabs and the builder name these ids; each thing in the world is an instance of one (ItemBook). art: the ArtKit slot (item.<id>); kind: held (in a hand, origin at the grip) or cell (only lies on the ground); size: metres, the grey box until art; weight: kg; hands: 0 pack only, 1 or 2; tags: what it is; effects: [{kind, amount, ticks}] (buffs, consumed); use: the verb it is used with (bandage, purse: opened into gold; World.try_use); opens: the lock a key opens (Door.lock); verb: a weapon's {kind, ...numbers} (Items.VERBS: knockback, block, knockdown, reach, backstab, ranged; speed, damage, force for all); value: what it is worth in gold; yield: a resource's counts when banked (tag resource).",
 	"items": [
 		{"id": "bandaging_kit", "name": "bandaging kit", "short": "Bandages", "color": "ebe6d6",
 			"art": "item.bandaging_kit", "kind": "held", "size": [0.18, 0.12, 0.08], "weight": 0.5, "hands": 1,
@@ -31,6 +31,34 @@
 			"tags": ["tool", "part"], "made": {"by": "smith", "from": {"ore": 2}, "steps": 1800}},
 		{"id": "nails", "name": "bag of nails", "short": "Nails", "color": "7a7d82",
 			"art": "item.nails", "kind": "held", "size": [0.1, 0.1, 0.08], "weight": 1.0, "hands": 1,
-			"tags": ["part"], "made": {"by": "smith", "from": {"ore": 1}, "steps": 600}}
+			"tags": ["part"], "made": {"by": "smith", "from": {"ore": 1}, "steps": 600}},
+		{"id": "hammer", "name": "war hammer", "short": "Hammer", "color": "9a8f80",
+			"art": "item.hammer", "kind": "held", "size": [0.14, 0.7, 0.07], "weight": 3.0, "hands": 1,
+			"tags": ["weapon"], "verb": {"kind": "knockback", "force": 3.0, "speed": 1.3},
+			"made": {"by": "smith", "from": {"ore": 2, "wood": 1}, "steps": 2400}},
+		{"id": "sword", "name": "sword", "short": "Sword", "color": "c8ccd4",
+			"art": "item.sword", "kind": "held", "size": [0.08, 0.9, 0.03], "weight": 1.5, "hands": 1,
+			"tags": ["weapon"], "verb": {"kind": "block", "arc": 0, "absorb": 0.5, "stamina": 10, "breaks_at": 1.5},
+			"made": {"by": "smith", "from": {"ore": 3, "wood": 1}, "steps": 3000}},
+		{"id": "shield", "name": "round shield", "short": "Shield", "color": "8a6a44",
+			"art": "item.shield", "kind": "held", "size": [0.6, 0.6, 0.06], "weight": 4.0, "hands": 1,
+			"tags": ["shield"], "verb": {"kind": "block", "arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.5, "damage": 0.0},
+			"made": {"by": "smith", "from": {"wood": 2, "ore": 1}, "steps": 2400}},
+		{"id": "giant_axe", "name": "giant axe", "short": "Great axe", "color": "8c9098",
+			"art": "item.giant_axe", "kind": "held", "size": [0.4, 1.4, 0.06], "weight": 5.0, "hands": 2,
+			"tags": ["weapon"], "verb": {"kind": "knockdown", "arc": 1, "down_ticks": 15, "speed": 2.0, "damage": 1.5},
+			"made": {"by": "smith", "from": {"ore": 4, "wood": 2}, "steps": 4200}},
+		{"id": "spear", "name": "spear", "short": "Spear", "color": "a08458",
+			"art": "item.spear", "kind": "held", "size": [0.05, 2.0, 0.05], "weight": 2.0, "hands": 1,
+			"tags": ["weapon"], "verb": {"kind": "reach", "cells": 2, "brace": true},
+			"made": {"by": "smith", "from": {"wood": 2, "ore": 1}, "steps": 1800}},
+		{"id": "dagger", "name": "dagger", "short": "Dagger", "color": "b0b4bc",
+			"art": "item.dagger", "kind": "held", "size": [0.03, 0.3, 0.02], "weight": 0.5, "hands": 1,
+			"tags": ["weapon"], "verb": {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5},
+			"made": {"by": "smith", "from": {"ore": 1}, "steps": 1200}},
+		{"id": "bow", "name": "hunting bow", "short": "Bow", "color": "8a6038",
+			"art": "item.bow", "kind": "held", "size": [0.06, 1.3, 0.25], "weight": 1.0, "hands": 2,
+			"tags": ["weapon", "ranged"], "verb": {"kind": "ranged", "cells": 8, "draw_min": 5, "draw_full": 20},
+			"made": {"by": "smith", "from": {"wood": 2, "cloth": 1}, "steps": 2400}}
 	]
 }

@@ -5503,3 +5503,38 @@ have a storm.
 Hook points agreed with enemy-ai (who owns Senses and World.noise's
 rules). Wind does not move heat or fire in the sim yet; that needs a
 go-ahead.
+## 323. Weapons are verbs, as catalog data: Items.VERBS, verb_of, World.wielded and guard
+
+Items step 5. The roadmap's weapons (hammer, sword, shield, giant axe,
+spear, dagger, bow) are catalog entries with a `verb`: a kind and its
+numbers, never a damage tier. Each kind's numbers and their defaults are
+`Items.VERBS`; every verb also has `Items.COMMON`'s speed (a multiple of
+the wielder's attack time), damage and force (multiples of its blow):
+
+- knockback (hammer): force 3, slower (speed 1.3);
+- block (sword: arc 0, absorbs half a blow; shield: arc 1, the three
+  cells in front, a whole blow, no damage of its own): stamina per blow
+  taken, breaks_at (a blow that strong breaks the guard);
+- knockdown (giant axe, two hands): arc 1 (three cells), down 15 ticks,
+  slow (speed 2), damage 1.5;
+- reach (spear): two cells, brace (stops a charge);
+- backstab (dagger): quick (0.6), half damage, twice from behind;
+- ranged (bow, two hands): 8 cells, draw_min 5 and draw_full 20 ticks.
+
+The numbers are a starting point to tune in play. `Items.verb_from`
+fills a verb in at load: an unknown kind is no verb, a number that isn't
+one (or is under 0) its default, an unknown key left out, each with a
+warning. `Items.verb_of(id)` gives it ({} for anything not a weapon: a
+knife is a tool and a shop's weapon, with no verb).
+
+What an entity fights with is `World.wielded(entity)`: the right hand's
+weapon, else the left's, a guard only when nothing else is held; its
+guard is `World.guard(entity)`: the block verb with the larger absorb in
+either hand (a shield over a sword). Combat (the roadmap's "weapons as
+verbs", a later step) reads these; nothing here changes an attack yet, so
+the knockback threshold (decision 305) still decides today's pushes.
+
+Every weapon is made by the smith (the only item trade with a workshop),
+from ore, wood and, for the bow, cloth, so the town's "weapon" and
+"shield" wants are met. Blocking and drawing need a button: that is Jeff's
+choice between layouts (the coordinator has it), landed separately.

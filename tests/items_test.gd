@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_icons()
 	_test_use()
 	_test_buffs()
+	_test_weapons()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -417,6 +418,37 @@ func _test_buffs() -> void:
 	_check(faded.has("mass") and host.buffs.is_empty() and is_equal_approx(host.mass, mass),
 			"then the meal: back to baseline, not below (%.1f)" % host.mass)
 	World.buff_changed.disconnect(on_faded)
+
+
+func _test_weapons() -> void:
+	print("\n== weapons are verbs: seven in the catalog, each a verb, hands and a recipe ==")
+	var kinds := {"hammer": "knockback", "sword": "block", "shield": "block", "giant_axe": "knockdown",
+		"spear": "reach", "dagger": "backstab", "bow": "ranged"}
+	for id: String in kinds:
+		var verb := Items.verb_of(id)
+		_check(verb.get("kind") == kinds[id] and verb.has("speed") and Items.def(id)["made"].get("by") == "smith",
+				"%s: %s, %d-handed, %.1f kg, made by the smith (%s)" % [id, kinds[id], Items.def(id)["hands"], Items.weight_of(id), verb])
+	_check(Items.def("giant_axe")["hands"] == 2 and Items.def("bow")["hands"] == 2, "the giant axe and the bow take both hands")
+	_check(Items.verb_of("dagger")["speed"] < 1.0 and Items.verb_of("giant_axe")["speed"] > 1.0 and Items.verb_of("spear")["cells"] == 2,
+			"a dagger is quick, a giant axe slow, a spear hits two cells away")
+	_check(Items.verb_of(KIT).is_empty() and Items.verb_of("knife").is_empty(), "a kit or a knife is no weapon verb")
+	var odd := Items.read('{"items": [{"id": "a", "verb": {"kind": "smite"}}, {"id": "b", "verb": {"kind": "reach", "cells": -1, "glow": 2}}]}')
+	_check(odd["a"]["verb"].is_empty() and odd["b"]["verb"]["cells"] == 2 and not odd["b"]["verb"].has("glow"),
+			"an unknown verb is none; a bad number its default; an unknown key left out")
+	var host := _player(Net.local_id)
+	var right := host.slots[Player.RIGHT_HAND]
+	var left := host.slots[Player.LEFT_HAND]
+	_check(right.is_empty() and left.is_empty() and World.wielded(host) == "" and World.guard(host).is_empty(),
+			"bare hands: no weapon, no guard")
+	_give(host, "shield", Player.LEFT_HAND)
+	_check(World.wielded(host) == "shield" and World.guard(host)["absorb"] == 1.0, "a shield alone: it is what guards")
+	_give(host, "hammer", Player.RIGHT_HAND)
+	_check(World.wielded(host) == "hammer" and World.guard(host)["kind"] == "block", "hammer and shield: fights with the hammer, guards with the shield")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "sword", Player.RIGHT_HAND)
+	_check(World.wielded(host) == "sword" and World.guard(host)["absorb"] == 1.0, "sword and shield: the sword, the shield's guard over the sword's")
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		World.items.end(World.take_item(host, host, slot), "gone")
 
 
 func _test_icons() -> void:

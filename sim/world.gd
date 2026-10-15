@@ -1869,6 +1869,36 @@ func _thud(cell: Vector2i, id: String, by: GridEntity) -> void:
 		noise(cell, Senses.NOISE_THUD_HEAVY if heavy else Senses.NOISE_THUD_LIGHT, &"thud", by)
 
 
+## The weapon [param entity] fights with: what is in its right hand if it
+## has a verb (Items.verb_of), else its left hand's, else "" (bare hands,
+## or no hands). A guard (block) counts only if nothing else is held: a
+## shield in the left hand guards (guard) while the right hand fights.
+func wielded(entity: GridEntity) -> String:
+	if not has_hands(entity):
+		return ""
+	var guard_only := ""
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		var id := entity.slots[slot]
+		var kind := str(Items.verb_of(id).get("kind", "")) if not id.is_empty() else ""
+		if kind == "block":
+			guard_only = id if guard_only.is_empty() else guard_only
+		elif not kind.is_empty():
+			return id
+	return guard_only
+
+
+## [param entity]'s guard: the block verb of what it holds (the shield
+## over a sword's, the larger absorb), {} for none.
+func guard(entity: GridEntity) -> Dictionary:
+	var best := {}
+	if has_hands(entity):
+		for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+			var verb := Items.verb_of(entity.slots[slot]) if not entity.slots[slot].is_empty() else {}
+			if verb.get("kind") == "block" and float(verb["absorb"]) > float(best.get("absorb", -1.0)):
+				best = verb
+	return best
+
+
 ## Whether [param entity] carries the key to [param lock] (a thing whose
 ## catalog "opens" is it), in its pack or a hand: World.key_check's own.
 func holds_key(entity: GridEntity, lock: String) -> bool:

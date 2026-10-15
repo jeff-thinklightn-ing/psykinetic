@@ -125,7 +125,7 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"use": str(entry.get("use", "")),
 		"opens": str(entry.get("opens", "")),
 		"value": maxi(int(entry.get("value", 0)), 0) if entry.get("value") is float or entry.get("value") is int else 0,
-		"verb": entry.get("verb", {}) if entry.get("verb") is Dictionary else {},
+		"verb": verb_from(id, entry["verb"]) if entry.get("verb") is Dictionary else {},
 		"yield": yields,
 		"made": _made(entry.get("made")),
 	}
@@ -190,6 +190,64 @@ static func color_of(id: String) -> Color:
 
 static func weight_of(id: String) -> float:
 	return float(def(id).get("weight", 0.0))
+
+
+## Weapons are verbs, not damage tiers (the roadmap's rules): what a held
+## weapon makes an attack do. Each kind with its own numbers and their
+## defaults; every verb also has COMMON's. Combat reads them (roadmap's
+## "weapons as verbs"); nothing here acts on them.
+##   knockback (hammer): force, a multiple of the blow's push force.
+##   block (sword, shield): the guard's arc (cells either side of facing:
+##     0 straight ahead, 1 the three in front), absorb (the share of a
+##     blow's damage taken off), stamina per blow taken, breaks_at (a blow
+##     with this force or more breaks the guard).
+##   knockdown (giant axe): arc, down_ticks (prone, can't act or resist).
+##   reach (spear): cells (how far it hits), brace (stops a charge).
+##   backstab (dagger): behind (damage multiple from behind, by facing).
+##   ranged (bow): cells, draw_min and draw_full (ticks: the shortest draw
+##     that shoots, and the one that shoots at full strength).
+const VERBS := {
+	"knockback": {"force": 3.0},
+	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0},
+	"knockdown": {"arc": 1, "down_ticks": 15},
+	"reach": {"cells": 2, "brace": true},
+	"backstab": {"behind": 2.0},
+	"ranged": {"cells": 8, "draw_min": 5, "draw_full": 20},
+}
+## Every verb's: speed (a multiple of the wielder's attack time: under 1
+## quicker), damage and force (multiples of the wielder's blow).
+const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0}
+
+
+## [param verb] as the catalog gives it, every number filled in from its
+## kind's defaults; {} (and a warning) for no known kind. A number that is
+## not one, or under 0, takes the default; an unknown key is warned about
+## and left out. [param id] for warnings.
+static func verb_from(id: String, verb: Dictionary) -> Dictionary:
+	var kind := str(verb.get("kind", ""))
+	if not VERBS.has(kind):
+		push_warning("Items: %s's verb %s is not one of %s; none" % [id, kind, ", ".join(VERBS.keys())])
+		return {}
+	var defaults: Dictionary = COMMON.merged(VERBS[kind])
+	var out := {"kind": kind}
+	for key: String in defaults:
+		var given: Variant = verb.get(key, defaults[key])
+		if defaults[key] is bool:
+			out[key] = bool(given) if given is bool else defaults[key]
+		elif (given is int or given is float) and float(given) >= 0.0:
+			out[key] = int(given) if defaults[key] is int else float(given)
+		else:
+			push_warning("Items: %s's verb %s is %s; %s" % [id, key, given, defaults[key]])
+			out[key] = defaults[key]
+	for key: String in verb:
+		if key != "kind" and not defaults.has(key):
+			push_warning("Items: %s's verb has an unknown %s; left out" % [id, key])
+	return out
+
+
+## [param id]'s verb, every number filled in ({} for anything not a weapon).
+static func verb_of(id: String) -> Dictionary:
+	return def(id).get("verb", {})
 
 
 static func has_tag(id: String, tag: String) -> bool:
