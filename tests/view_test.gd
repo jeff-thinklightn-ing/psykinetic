@@ -477,6 +477,20 @@ func _test_water() -> void:
 		if point.y < -0.1:
 			sunk += 1
 	_check(all_in and sunk > 0, "the ground runs on under the water as its bed, sunk where water is all round (%d corners)" % sunk)
+	# Dry water (a well's): drawn as the land beside it, no surface, no bed.
+	for cell: Vector2i in water:
+		_rig._dry_water[cell] = true
+	_rig.rebuild(terrain, castle["centre"])
+	var dry_sunk := 0
+	for mesh: ArrayMesh in _rig._ground_meshes:
+		for point: Vector3 in mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			dry_sunk += 1 if point.y < -0.1 else 0
+	var as_land := water.all(func(cell: Vector2i) -> bool:
+		return _rig._grounds.has(cell) and _rig._grounds[cell] < _rig._ground_floor_end)
+	_check(_rig._water_bodies.is_empty() and dry_sunk == 0 and as_land and terrain["water"].size() == water.size(),
+			"dry water: no surface, no sunk bed, drawn as the land; the map still has it as water")
+	_rig._dry_water.clear()
+	_rig.rebuild(terrain, castle["centre"])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
@@ -615,11 +629,13 @@ func _test_outdoor() -> void:
 
 func _test_ground_colours() -> void:
 	print("\n== the ground: a mesh a chunk, stone grey, grass green, dirt brown, light and heat on each corner ==")
-	var stone: Color = Client3D.GROUND_COLOURS["stone"]
-	var grass: Color = Client3D.GROUND_COLOURS["grass"]
-	var dirt: Color = Client3D.GROUND_COLOURS["dirt"]
+	var stone: Color = Client3D.ground_colour("stone")
+	var grass: Color = Client3D.ground_colour("grass")
+	var dirt: Color = Client3D.ground_colour("dirt")
 	_check(is_equal_approx(stone.r, stone.g) and absf(stone.g - stone.b) < 0.05, "stone: grey (%s)" % stone)
 	_check(grass.g > grass.r and grass.g > grass.b and dirt.r > dirt.g and dirt.g > dirt.b, "grass green, dirt brown")
+	_check(grass.s < 0.6 and dirt.s < 0.6 and Client3D.swatch(4, 3) == grass,
+			"from art-kit's palette, muted and earthy (grass %s, saturation %.2f)" % [grass.to_html(false), grass.s])
 	var chunks := _rig._room.find_children("Ground_*", "MeshInstance3D", false, false)
 	_check(chunks.size() == _rig._ground_meshes.size() and chunks.size() > 0
 			and _rig._room.find_children("Floor_*", "", false, false).is_empty(),

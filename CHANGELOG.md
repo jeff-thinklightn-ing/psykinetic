@@ -78,6 +78,9 @@ top section as the release notes.
   rather than in rows. Forests grow in clumps of trees of different sizes,
   and the land fades into the forest floor instead of ending in a stepped
   edge.
+- The land's colours are softer and earthier: olive grass, brown earth,
+  grey stone and muted water, from the game's shared art palette, so the
+  ground sits with the rest of the art.
 
 - Doors matter to monsters. Imps and sneaks open doors, but while looking
   for you only if they heard or saw something behind it: shut a door and

@@ -104,28 +104,44 @@ const WALL_RUBBLE_LOW := 0.9
 const WALL_RUBBLE_HIGH := 1.15
 const WALL_RUBBLE_HALF := 0.35
 const WALL_TILE := 2.0
+## The walls' stone until material.wall has a texture: a palette swatch.
+const WALL_SWATCH := Vector2i(0, 1)
 ## What an edge of a run is drawn as.
 enum { WALL_WHOLE, WALL_TOPLESS, WALL_RUBBLE }
 ## One height level (height.png) in units; a stair is a ramp up one.
 const LEVEL_RISE := 0.5
 ## Cliffs: rock's colour (sRGB), a row of facets this tall at most, this
 ## many facets along a cell's edge, points pushed about this far.
-const CLIFF_ROCK := Color(0.5, 0.47, 0.43)
+## The cliffs' rock: a palette swatch (row, column).
+const CLIFF_ROCK := Vector2i(1, 5)
 const CLIFF_ROW := 0.2
 const CLIFF_ACROSS := 4
 const CLIFF_JITTER := 0.07
-## Each ground kind's colour (sRGB), and its channel in the ground's kinds
-## texture (ground.gdshader); a kind not here is stone. Grass is the kit's
-## floor piece as it was tinted; sand is ready for a map that paints it.
-const GROUND_COLOURS := {"grass": Color(0.21, 0.64, 0.25), "dirt": Color(0.46, 0.36, 0.22),
-		"stone": Color(0.56, 0.56, 0.54), "sand": Color(0.78, 0.7, 0.5)}
+## Each ground kind's colour: a swatch of art-kit's palette (row, column;
+## docs/art_style.md), read from art/kit/palette.png, so a repainted swatch
+## repaints the ground; and its channel in the ground's kinds texture
+## (ground.gdshader). A kind not here is stone; sand is ready for a map
+## that paints it.
+const GROUND_SWATCHES := {"grass": Vector2i(4, 3), "dirt": Vector2i(3, 4), "stone": Vector2i(1, 3), "sand": Vector2i(3, 1)}
+## art-kit's palette atlas, and its swatches as the style guide gives them.
+const PALETTE_IMAGE := "res://art/kit/palette.png"
+const PALETTE_FALLBACK: PackedStringArray = [
+	"#f2c9a6", "#ebb48e", "#d49c78", "#b8845f", "#9a6c4c", "#7c573d", "#5f4330", "#433024",
+	"#c9c7c0", "#b0aea6", "#97958d", "#8f8f8a", "#77766f", "#6b6660", "#545049", "#3b3834",
+	"#b8946a", "#9e7c55", "#8a6a48", "#796145", "#6a523a", "#5e4c41", "#4a3a2c", "#3b2e24",
+	"#d8c89a", "#c7b380", "#a88e5e", "#8c7148", "#755c38", "#5f4a2e", "#4a3a25", "#2c2418",
+	"#a8bf6a", "#8fa857", "#7a8f4a", "#5d7742", "#4f6a35", "#36a340", "#2f5a2a", "#2c4224",
+	"#c2b8a0", "#9c8f74", "#7a6e58", "#4c4a3b", "#6b4a35", "#55392a", "#3d2a1f", "#29231b",
+	"#c7c9cc", "#a3a6ab", "#7d8086", "#55575c", "#3e4044", "#c79a55", "#a37d40", "#8a6a3a",
+	"#ffd27a", "#ffb861", "#e8792e", "#b8322a", "#2f5aa8", "#7a4fb0", "#3fb8a8", "#f4efe6",
+]
 const GROUND_CHANNELS := {"grass": 0, "dirt": 1, "stone": 2, "sand": 3}
 ## Water (_build_water): its colours (sRGB) shallow and deep, its foam; its
 ## surface this far above its level, its bed's middle this far below, the
 ## bed's ground (in the kinds texture, under the water's own tint).
-const WATER_SHALLOW := Color(0.25, 0.55, 0.7)
-const WATER_DEEP := Color(0.08, 0.22, 0.42)
-const WATER_FOAM := Color(0.85, 0.92, 0.95)
+const WATER_SHALLOW := Color("5f8a8c")
+const WATER_DEEP := Color("2f4f5c")
+const WATER_FOAM := Color("f4efe6")
 const WATER_LIFT := 0.01
 ## (Above FOREST_FLOOR_DEPTH, or the forest floor under the map hides it.)
 const WATER_BED_DEPTH := 0.15
@@ -415,7 +431,9 @@ const SCATTER_EDGE_ROOTS := 0.3
 const SCATTER_REEDS := 1.6
 const SCATTER_SIZES := {"tuft": Vector2(0.7, 1.3), "flower": Vector2(0.8, 1.1), "stone": Vector2(0.6, 1.6), "root": Vector2(0.8, 1.4),
 		"reeds": Vector2(0.8, 1.3)}
-const FLOWER_COLOURS: Array[Color] = [Color(1.0, 0.92, 0.45), Color(1.0, 1.0, 1.0), Color(0.82, 0.65, 1.0), Color(1.0, 0.6, 0.55)]
+## Flowers: the palette's accents (row 7: flame, bone, banner red, magic
+## violet), the few saturated things on the ground.
+const FLOWER_SWATCHES: Array[Vector2i] = [Vector2i(7, 0), Vector2i(7, 7), Vector2i(7, 3), Vector2i(7, 5)]
 ## Label3D: units per font pixel, with the font size, for a name about a
 ## quarter unit tall.
 const LABEL_SIZE := 0.004
@@ -641,6 +659,10 @@ var _wall_breaches: Array[Vector3i] = []
 var _plain_walls: Dictionary[Vector3i, bool] = {}
 ## The edges in _plain_walls that are there for a building's outline.
 var _building_walls: Array[Vector3i] = []
+## Water cells drawn as plain ground (a well's, whose rim stands round it):
+## no surface, no sunk bed, no wet shore; their ground the land's beside
+## them. The sim still has them as water. Filled the same way.
+var _dry_water: Dictionary[Vector2i, bool] = {}
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge).
 var _doorways: Dictionary[Vector3i, Node3D] = {}
@@ -2011,7 +2033,7 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 	var placed: Dictionary[String, Array] = {}
 	for index: int in _scatter_chunks[chunk]:
 		var cell: Vector2i = _ground_cells[index]
-		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell):
+		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell):
 			continue
 		var forest := index >= _ground_water_end
 		var ground := "forest" if forest else _ground_kinds[cell]
@@ -2067,10 +2089,11 @@ func _forest_edge(cell: Vector2i) -> bool:
 
 
 ## An item's colour: its kind's, varied, darker under the forest; a flower
-## one of FLOWER_COLOURS.
+## one of FLOWER_SWATCHES.
 func _scatter_tint(kind: String, cell: Vector2i, salt: int, forest: bool) -> Color:
 	var shade := lerpf(0.82, 1.12, _roll(cell, 107 + salt))
-	var colour: Color = FLOWER_COLOURS[floori(_roll(cell, 108 + salt) * FLOWER_COLOURS.size()) % FLOWER_COLOURS.size()] \
+	var flower: Vector2i = FLOWER_SWATCHES[floori(_roll(cell, 108 + salt) * FLOWER_SWATCHES.size()) % FLOWER_SWATCHES.size()]
+	var colour: Color = swatch(flower.x, flower.y) \
 			if kind == "flower" else Color.WHITE * shade
 	if forest:
 		colour = colour * Color(0.6, 0.72, 0.6)
@@ -2131,8 +2154,8 @@ static func _make_scatter(kind: String) -> ArrayMesh:
 				var side := Vector3(-out.z, 0.0, out.x) * 0.04
 				var root := out * rng.randf_range(0.0, 0.05)
 				var tip := root + out * rng.randf_range(0.05, 0.12) + Vector3.UP * rng.randf_range(0.12, 0.22)
-				var base := Color(0.2, 0.5, 0.18)
-				var top := Color(0.5, 0.82, 0.32)
+				var base := swatch(4, 4)
+				var top := swatch(4, 1)
 				_scatter_triangle(surface, [root - side, root + side, tip], [base, base, top])
 			if kind == "flower":
 				for p in 3:
@@ -2143,9 +2166,9 @@ static func _make_scatter(kind: String) -> ArrayMesh:
 					_scatter_triangle(surface, [at + Vector3(-r, 0, 0), at + Vector3(r, 0, 0), at + Vector3(0, 0, r)], [white, white, white])
 		"reeds":
 			# Tall thin blades, a few with a brown head.
-			var stalk := Color(0.42, 0.52, 0.26)
-			var tip := Color(0.62, 0.66, 0.38)
-			var head := Color(0.4, 0.27, 0.16)
+			var stalk := swatch(4, 3)
+			var tip := swatch(3, 1)
+			var head := swatch(2, 5)
 			for b in 7:
 				var turn := b * TAU / 7.0 + rng.randf_range(-0.4, 0.4)
 				var out := Vector3(cos(turn), 0.0, sin(turn))
@@ -2164,13 +2187,13 @@ static func _make_scatter(kind: String) -> ArrayMesh:
 			var points: Array[Vector3] = []
 			for direction: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK, Vector3.UP, Vector3.DOWN]:
 				points.append(direction * Vector3(0.12, 0.07, 0.1) * rng.randf_range(0.75, 1.25) + Vector3(0, 0.03, 0))
-			var grey := Color(0.6, 0.58, 0.54)
+			var grey := swatch(1, 2)
 			for face: Array in [[0, 4, 2], [2, 4, 1], [1, 4, 3], [3, 4, 0], [0, 2, 5], [2, 1, 5], [1, 3, 5], [3, 0, 5]]:
 				var shade := grey * rng.randf_range(0.85, 1.1)
 				_scatter_triangle(surface, [points[face[0]], points[face[1]], points[face[2]]], [shade, shade, shade])
 		"root":
 			# A low arching strip, bent, thinning to its end.
-			var brown := Color(0.45, 0.32, 0.2)
+			var brown := swatch(2, 3)
 			var steps := 5
 			for s in steps:
 				var t0 := s / float(steps)
@@ -2374,8 +2397,15 @@ func _build_ground(kinds: Dictionary) -> void:
 	# Outdoors, the void's first FOREST_GROUND cells are the ground too,
 	# under the forest: the land runs into the forest floor along a ragged
 	# line (the mask's g), not the cells' outline.
-	var floor_count: int = _terrain["floor"].size()
-	var cells: Array = _terrain["floor"] + _terrain.get("water", [])
+	# Dry water (_dry_water) is drawn as the land: placed with it, before
+	# the water; floor_count is where the land ends.
+	var floor_size: int = _terrain["floor"].size()
+	var dry: Array = []
+	var wet: Array = []
+	for cell: Vector2i in _terrain.get("water", []):
+		(dry if _dry_water.has(cell) else wet).append(cell)
+	var cells: Array = _terrain["floor"] + dry + wet
+	var floor_count := floor_size + dry.size()
 	var water_end := cells.size()
 	for cell: Vector2i in _forest_distance:
 		if _forest_distance[cell] >= 1 and _forest_distance[cell] <= FOREST_GROUND:
@@ -2418,7 +2448,7 @@ func _build_ground(kinds: Dictionary) -> void:
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
-		var kind := str(kinds.get(cell, "stone")) if i < floor_count else _bed_kind(cell, kinds, floor_count) if i < water_end else "grass"
+		var kind := str(kinds.get(cell, "stone")) if i < floor_size else _bed_kind(cell, kinds, floor_size) if i < water_end else "grass"
 		if not GROUND_CHANNELS.has(kind):
 			kind = "stone"
 		_grounds[cell] = i
@@ -2586,8 +2616,8 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("kinds", ImageTexture.create_from_image(image))
 	material.set_shader_parameter("kinds_origin", Vector2(origin))
 	material.set_shader_parameter("kinds_size", Vector2(across, down))
-	for kind: String in GROUND_COLOURS:
-		material.set_shader_parameter(kind, GROUND_COLOURS[kind])
+	for kind: String in GROUND_SWATCHES:
+		material.set_shader_parameter(kind, ground_colour(kind))
 	material.set_shader_parameter("warm", WARM)
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("water", _water_mask)
@@ -2616,10 +2646,37 @@ static func _ground_noise() -> NoiseTexture2D:
 	return _noise_texture
 
 
+## A ground kind's colour (sRGB), from the palette.
+static func ground_colour(kind: String) -> Color:
+	var at: Vector2i = GROUND_SWATCHES.get(kind, GROUND_SWATCHES["stone"])
+	return swatch(at.x, at.y)
+
+
+## Swatch [param column] of row [param row] of art-kit's palette (sRGB):
+## read from art/kit/palette.png (8 by 8 swatches), so Jeff's repaints show;
+## the style guide's colours if it cannot be read.
+static var _palette: Image
+
+
+static func swatch(row: int, column: int) -> Color:
+	if _palette == null:
+		var texture := load(PALETTE_IMAGE) as Texture2D if ResourceLoader.exists(PALETTE_IMAGE) else null
+		_palette = texture.get_image() if texture != null else null
+		if _palette != null and _palette.is_compressed():
+			_palette.decompress()
+		if _palette == null or _palette.get_width() < 8:
+			_palette = Image.create(8, 8, false, Image.FORMAT_RGB8)
+			for y in 8:
+				for x in 8:
+					_palette.set_pixel(x, y, Color(PALETTE_FALLBACK[y * 8 + x]))
+	var size := _palette.get_width() / 8
+	return _palette.get_pixel(column * size + size / 2, row * size + size / 2)
+
+
 ## What a ground cell of [param kind] is drawn as, shaded [param bright]
 ## (1: fully lit) and warmed [param warm], before the shader's noise (sRGB).
 func _ground_colour(kind: String, bright: float, warm: float) -> Color:
-	return (GROUND_COLOURS[kind] * bright).lerp(WARM, warm)
+	return (ground_colour(kind) * bright).lerp(WARM, warm)
 
 
 ## Water: one surface a body of water (its cells, joined side to side),
@@ -2631,7 +2688,8 @@ func _ground_colour(kind: String, bright: float, warm: float) -> Color:
 func _build_water() -> void:
 	var water: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain.get("water", []):
-		water[cell] = true
+		if not _dry_water.has(cell):
+			water[cell] = true
 	if water.is_empty():
 		return
 	var material := _water_material()
@@ -2826,7 +2884,7 @@ func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom:
 				var shade := lerpf(0.8, 1.15, _roll(Vector2i(roundi(middle.x * 16.0), roundi(middle.z * 16.0)), roundi(middle.y * 16.0)))
 				# Darker toward the foot.
 				shade *= lerpf(0.72, 1.0, clampf(inverse_lerp(minf(bottom.x, bottom.y), maxf(top.x, top.y), middle.y), 0.0, 1.0))
-				var colour := Color(CLIFF_ROCK * shade, 1.0)
+				var colour := Color(swatch(CLIFF_ROCK.x, CLIFF_ROCK.y) * shade, 1.0)
 				positions.append_array([p0, p1, p2])
 				normals.append_array([normal, normal, normal])
 				colours.append_array([colour, colour, colour])
@@ -3269,7 +3327,7 @@ static func _wall_material() -> StandardMaterial3D:
 		_wall_stone = StandardMaterial3D.new()
 		var own := ArtKit.texture("material.wall")
 		_wall_stone.albedo_texture = own if own != null else _stone_courses()
-		_wall_stone.albedo_color = Color.WHITE if own != null else STONE
+		_wall_stone.albedo_color = Color.WHITE if own != null else swatch(WALL_SWATCH.x, WALL_SWATCH.y)
 		_wall_stone.roughness = 0.9
 		_wall_stone.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	return _wall_stone

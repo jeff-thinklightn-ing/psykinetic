@@ -4242,3 +4242,26 @@ speech carries for chat (Main.hearers), for the monsters' hearing and for
 this is one constant. Stance asks are not gated: they come only in a
 fight near her or her player. Town NPCs and companions left in town will
 come under the same rule as the always-on world runs them.
+
+## 276. The terrain's colours are art-kit's palette, read from its image
+
+Jeff wants muted and earthy (stone, wood, moss, leather) with a few
+saturated accents (docs/art_style.md), and the terrain's own colours were
+the most saturated things on screen (the grass at saturation 0.67).
+Client3D.swatch(row, column) reads art-kit's atlas, art/kit/palette.png (8
+rows of 8 swatches), once, so a swatch Jeff repaints repaints what uses
+it; the style guide's colours are the stand-in if the image cannot be
+read. The ground's kinds (GROUND_SWATCHES: grass, dirt, stone floor,
+sand), the cliffs' rock, the walls' stone (until material.wall has a
+texture) and the scatter's colours are swatches; flowers are the accent
+row's, the few saturated things on the ground. Water has no swatch yet:
+its hues are muted by hand and its foam is the palette's bone. The forest
+floor already was a swatch (foliage's darkest). Grass is now foliage
+#5d7742 (#7a8f4a, the next lighter, read as dry khaki in the sun).
+
+Dry water (for buildings-89, amending 236): a water cell in
+Client3D._dry_water is drawn as the land beside it (a well's water, its
+rim built round it): no surface, no sunk bed, no wet shore, no scatter, its
+ground the neighbouring land's kind. The sim still has it as water
+(unwalkable, sight passes). Whoever places it fills the set before the
+room is built.
