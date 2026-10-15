@@ -285,14 +285,17 @@ static func _own_recipe(slot: String, variant: int) -> Array:
 	var scene := _scene(own_path(slot, variant))
 	_step(steps, 0, "Body", Transform3D.IDENTITY, scene)
 	var lifts: Array = []
-	var sample := scene.instantiate() as Node3D
+	var nodes := _scene_nodes(scene)
 	for part: Dictionary in spec(slot).get("parts", []):
-		var node := sample.find_child(str(part["name"]), true, false) as Node3D
-		if node == null:
+		var found: Array = []
+		for node: Array in nodes.slice(1):
+			if str(node[0]).get_file() == str(part["name"]):
+				found = node
+				break
+		if found.is_empty():
 			push_error("ArtKit: %s has no part %s (%s)" % [own_path(slot, variant), part["name"], spec(slot).get("uses", "")])
 			continue
-		lifts.append([sample.get_path_to(node), StringName(str(part["name"])), _place_in(node, sample)])
-	sample.free()
+		lifts.append([NodePath(found[0]), StringName(str(part["name"])), found[1]])
 	return [steps, lifts, slot]
 
 
@@ -323,9 +326,7 @@ static func _fill_step(steps: Array, parent: int, name: String, fill: Dictionary
 	var scale_by: Variant = fill.get("scale", 1.0)
 	var factor := _vec(scale_by) if scale_by is Array else Vector3.ONE * float(scale_by)
 	if str(fill.get("fit", "")) == "height":
-		var sample := scene.instantiate() as Node3D
-		factor *= size(slot).y / maxf(top_of(sample), 0.001)
-		sample.free()
+		factor *= size(slot).y / maxf(_scene_bounds(scene).end.y, 0.001)
 	_step(steps, parent, name, Transform3D(Basis.from_scale(factor), _vec(fill.get("offset", [0, 0, 0]))), scene)
 
 
@@ -401,16 +402,66 @@ static func _scene(path: String) -> PackedScene:
 ## shared PALETTE instead (set on the meshes, which every instance shares).
 static func _share_palette(scene: PackedScene) -> void:
 	var shared := load(PALETTE) as Material
-	var sample := scene.instantiate()
-	for node in _descendants(sample):
-		var mesh := node as MeshInstance3D
-		if mesh == null or mesh.mesh == null:
+	for node: Array in _scene_nodes(scene):
+		var mesh: Mesh = node[2]
+		if mesh == null:
 			continue
-		for surface in mesh.mesh.get_surface_count():
-			var own := mesh.mesh.surface_get_material(surface)
+		for surface in mesh.get_surface_count():
+			var own := mesh.surface_get_material(surface)
 			if own != null and own != shared and own.resource_name == PALETTE_NAME:
-				mesh.mesh.surface_set_material(surface, shared)
-	sample.free()
+				mesh.surface_set_material(surface, shared)
+
+
+## [param scene]'s nodes read from its state, none made (decision 296: in
+## Godot 4.7.2 freeing a VisualInstance3D while thousands of new ones are
+## still undrawn stalls for seconds, so nothing here makes a sample to free):
+## each [its path from the root as the root's get_path_to gives it, its
+## transform in the root's space, its mesh or null], parents first; an
+## instanced scene's nodes under the node that instances it.
+static func _scene_nodes(scene: PackedScene, base := Transform3D.IDENTITY, prefix := "") -> Array:
+	var state := scene.get_state()
+	var out: Array = []
+	var placed: Dictionary[String, Transform3D] = {}
+	for i in state.get_node_count():
+		var path := str(state.get_node_path(i)).trim_prefix(".").trim_prefix("/")
+		var parent := str(state.get_node_path(i, true)).trim_prefix(".").trim_prefix("/")
+		var local := Transform3D.IDENTITY
+		var mesh: Mesh = null
+		for property in state.get_node_property_count(i):
+			match state.get_node_property_name(i, property):
+				&"transform":
+					local = state.get_node_property_value(i, property)
+				&"mesh":
+					mesh = state.get_node_property_value(i, property) as Mesh
+		var full := path if prefix == "" else (prefix if path == "" else prefix + "/" + path)
+		# The root stands where it is put: its own transform is not its nodes'.
+		var place: Transform3D = base if i == 0 else placed.get(parent, base) * local
+		placed[path] = place
+		var inner := state.get_node_instance(i)
+		if inner != null:
+			var nested := _scene_nodes(inner, place, full)
+			if mesh == null and not nested.is_empty():
+				mesh = nested[0][2]
+			out.append([full, place, mesh])
+			out.append_array(nested.slice(1))
+			continue
+		out.append([full, place, mesh])
+	return out
+
+
+## [param scene]'s meshes' bounds in its root's space, as bounds_of an
+## instance's, none made.
+static func _scene_bounds(scene: PackedScene) -> AABB:
+	var out := AABB()
+	var first := true
+	for node: Array in _scene_nodes(scene):
+		var mesh: Mesh = node[2]
+		if mesh == null:
+			continue
+		var box: AABB = (node[1] as Transform3D) * mesh.get_aabb()
+		out = box if first else out.merge(box)
+		first = false
+	return out
 
 
 ## A slot's file there to read: imported, or (live) on disk.

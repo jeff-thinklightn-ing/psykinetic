@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_live_read()
 	_test_live_is_preview_only()
 	_test_palette_shared()
+	_test_scene_read()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -353,6 +354,59 @@ func _test_palette_shared() -> void:
 	door.free()
 	ArtKit.show_placeholders = false
 	ArtKit.forget()
+
+
+func _test_scene_read() -> void:
+	print("
+== a scene read without making it (decision 296): its bounds and parts as an instance's ==")
+	var sources: Dictionary = ArtKit.manifest().get("sources", {})
+	var pieces := 0
+	var same := true
+	for slot: String in ArtKit.slots():
+		var fill: Dictionary = ArtKit.spec(slot).get("fill", {})
+		if fill.is_empty():
+			continue
+		var source: Dictionary = sources.get(str(fill["from"]), {})
+		var scene := ArtKit._scene(str(source.get("path", "")) + str(fill["piece"]) + str(source.get("extension", ".glb")))
+		var made := scene.instantiate() as Node3D
+		var read := ArtKit._scene_bounds(scene)
+		var drawn := ArtKit.bounds_of(made)
+		made.free()
+		pieces += 1
+		if not (read.position.is_equal_approx(drawn.position) and read.size.is_equal_approx(drawn.size)):
+			same = false
+			print("    %s: read %s, drawn %s" % [slot, read, drawn])
+	_check(pieces > 0 and same, "%d fills' pieces: the same bounds read as made" % pieces)
+	# A packed door with its leaf deeper in it, moved and turned, as a .glb's.
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	var door := ArtKit.instance("door.single")
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+	var frame := Node3D.new()
+	frame.name = "Frame"
+	frame.position = Vector3(0.1, 0.2, 0.0)
+	frame.rotation.y = 0.3
+	var leaf := door.get_node("leaf") as Node3D
+	door.remove_child(leaf)
+	door.add_child(frame)
+	frame.add_child(leaf)
+	for node in ArtKit._descendants(door):
+		if node != door:
+			node.owner = door
+	var place := ArtKit._place_in(leaf, door)
+	var made_bounds := ArtKit.bounds_of(door)
+	var scene := PackedScene.new()
+	scene.pack(door)
+	door.free()
+	var found: Array = []
+	for node: Array in ArtKit._scene_nodes(scene):
+		if str(node[0]) == "Frame/leaf":
+			found = node
+	var read_bounds := ArtKit._scene_bounds(scene)
+	_check(not found.is_empty() and (found[1] as Transform3D).is_equal_approx(place)
+			and read_bounds.position.is_equal_approx(made_bounds.position) and read_bounds.size.is_equal_approx(made_bounds.size),
+			"its leaf found at Frame/leaf where it stands (%s), and its bounds as made" % [found[1] if not found.is_empty() else "none"])
 
 
 ## Only the preview reads art live: the game, its tools and the export
