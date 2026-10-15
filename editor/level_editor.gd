@@ -26,7 +26,20 @@ extends Node2D
 ## and its .import as Image, and says what the game will warn about
 ## (Level.parse); level.json too, when a monster's facing or idling was
 ## set, with only those in its entry (the rest of the file as it was).
-## height.png is read and written back only when a resize moved it.
+## height.png is written whenever a height changed (all black if every
+## height went back to 0).
+##
+## Heights (decision 357; the changes are HeightTools', as builder mode's
+## are): the height tool (H) raises the cells under its brush a level with
+## a click or a drag (each cell once a stroke), a right click lowers them,
+## Shift+click sets them to the picked level, Alt+click picks a cell's
+## level; [ and ] size the brush (1, 3, 5, 9). The stairs tool (S): press
+## on the low cell and drag the way it climbs, one cell for a stair, more
+## for a flight up a level a cell. With an area dragged out, the area panel
+## raises, lowers or levels it, or makes a hill in it. While either tool is
+## picked (Ctrl+H for always), each cell is tinted by its level, the level
+## written on it, cliffs drawn heavier and stairs with their climb; the
+## status line says the hovered cell's level.
 ##
 ## Ctrl+R shows the canvas panel: grow or shrink the map from any side.
 ## Everything on it keeps its place on the ground, and level.json's cells
@@ -72,10 +85,14 @@ const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", 
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link", "select", "area", "stamp", "path",
+	"link", "select", "area", "stamp", "path", "height", "stairs",
 ]
 ## Tools, not things to paint, and the key that picks each.
-const TOOLS := {"select": "V", "area": "A", "stamp": "P", "path": "T"}
+const TOOLS := {"select": "V", "area": "A", "stamp": "P", "path": "T", "height": "H", "stairs": "S"}
+## The height tool's brush sizes (cells across).
+const HEIGHT_BRUSHES: Array[int] = [1, 3, 5, 9]
+const CLIFF := Color(0.05, 0.04, 0.03, 0.85)
+const CLIMB := Color(1.0, 0.95, 0.5, 0.95)
 ## What the area panel can fill an area with (AreaTools).
 const FILLS: Array[String] = ["pond", "grove", "scatter", "fence"]
 const PATH_GROUNDS: Array[String] = ["dirt", "stone", "grass"]
@@ -155,6 +172,16 @@ var path_ground := "dirt"
 var _last_fill := ""
 var _last_fill_depth := -1
 var _canvas_size: Label
+## The height tool's brush (cells across) and the level Shift+click sets;
+## the cells a stroke has changed (each once); the stairs tool's drag
+## (NOWHERE: none); the heights tint shown with the other tools too.
+var height_brush := 1
+var height_level := 1
+var _height_touched: Dictionary[Vector2i, bool] = {}
+var _stairs_from := NOWHERE
+var _stairs_to := NOWHERE
+var show_heights := false
+var _height_set := false
 
 
 func _ready() -> void:
@@ -246,9 +273,25 @@ func target_at(grid: Vector2) -> Dictionary:
 
 
 ## Starts a stroke with [param button] (left paints, right erases) at grid
-## point [param grid].
-func begin_stroke(button: MouseButton, grid: Vector2) -> void:
+## point [param grid]; [param shift] and [param alt] held (the height tool's
+## set and pick).
+func begin_stroke(button: MouseButton, grid: Vector2, shift := false, alt := false) -> void:
 	var cell := Vector2i(floori(grid.x), floori(grid.y))
+	if brush == "height" and alt:
+		if map.in_bounds(cell):
+			_set_tool("height_level", maxi(1, int(map.heights.get(cell, 0))))
+			report = "picked level %d (cell %d, %d is %d)" % [height_level, cell.x, cell.y, int(map.heights.get(cell, 0))]
+		return
+	if brush == "stairs":
+		if button == MOUSE_BUTTON_LEFT and map.in_bounds(cell):
+			_stairs_from = cell
+			_stairs_to = cell
+			_stroke_button = button
+		queue_redraw()
+		return
+	if brush == "height":
+		_height_touched.clear()
+		_height_set = shift and button == MOUSE_BUTTON_LEFT
 	if brush == "select":
 		_select_click(button, cell)
 		return
@@ -286,6 +329,12 @@ func begin_stroke(button: MouseButton, grid: Vector2) -> void:
 ## The stroke goes on to [param grid]: every cell on the line from the last
 ## one, or every edge along the first edge's line.
 func continue_stroke(grid: Vector2) -> void:
+	if _stairs_from != NOWHERE:
+		var to := Vector2i(clampi(floori(grid.x), 0, map.size.x - 1), clampi(floori(grid.y), 0, map.size.y - 1))
+		if to != _stairs_to:
+			_stairs_to = to
+			queue_redraw()
+		return
 	if _area_from != NOWHERE:
 		var to := Vector2i(clampi(floori(grid.x), 0, map.size.x - 1), clampi(floori(grid.y), 0, map.size.y - 1))
 		var corner := Vector2i(mini(to.x, _area_from.x), mini(to.y, _area_from.y))
@@ -318,6 +367,13 @@ func end_stroke() -> void:
 	_area_from = NOWHERE
 	_stroke_button = MOUSE_BUTTON_NONE
 	_stroke_from = null
+	_height_touched.clear()
+	if _stairs_from != NOWHERE:
+		var from := _stairs_from
+		_stairs_from = NOWHERE
+		lay_stairs(from, _stairs_to)
+		queue_redraw()
+		return
 	if _stroke.is_empty():
 		return
 	_name_cells()
@@ -327,6 +383,10 @@ func end_stroke() -> void:
 
 func _apply(target: Dictionary) -> void:
 	var erase := _stroke_button == MOUSE_BUTTON_RIGHT
+	if brush == "height":
+		if target.has("cell"):
+			_apply_height(target["cell"], erase)
+		return
 	if target.has("cell"):
 		var at: Vector2i = target["cell"]
 		var meaning := "void" if erase else brush
@@ -525,6 +585,105 @@ func lay_path() -> void:
 	path_points.clear()
 	_refresh_panel()
 	queue_redraw()
+
+
+# --- Heights (HeightTools) -----------------------------------------------------------
+
+## The cells under the height brush centred on [param at], in the map.
+func height_footprint(at: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var reach := height_brush / 2
+	for y in range(at.y - reach, at.y + reach + 1):
+		for x in range(at.x - reach, at.x + reach + 1):
+			if map.in_bounds(Vector2i(x, y)):
+				out.append(Vector2i(x, y))
+	return out
+
+
+## The height stroke reaches [param at]: the cells under the brush it has
+## not changed yet go up a level (down with [param lower], to the picked
+## level with Shift), into the stroke's undo step.
+func _apply_height(at: Vector2i, lower: bool) -> void:
+	var fresh: Array[Vector2i] = []
+	for cell in height_footprint(at):
+		if not _height_touched.has(cell):
+			_height_touched[cell] = true
+			fresh.append(cell)
+	if fresh.is_empty():
+		return
+	var changes := HeightTools.level(map, fresh, height_level) if _height_set else HeightTools.raise(map, fresh, -1 if lower else 1)
+	var heights: Dictionary = changes.get("heights", {})
+	for cell: Vector2i in heights:
+		var key := "height %d %d" % [cell.x, cell.y]
+		var old := doc.set_height(cell, int(heights[cell]))
+		if old != int(heights[cell]) and not _stroke.has(key):
+			_stroke[key] = old
+	queue_redraw()
+
+
+## A stair from [param from] climbing toward [param to] (the drag's main
+## way), or a flight of them when it is more than a cell, as one undo step.
+func lay_stairs(from: Vector2i, to: Vector2i) -> bool:
+	var along := to - from
+	if along == Vector2i.ZERO:
+		return false
+	along = Vector2i(along.x, 0) if absi(along.x) >= absi(along.y) else Vector2i(0, along.y)
+	var dir := along.sign()
+	var length := absi(along.x + along.y)
+	var changes := HeightTools.stair(map, from, dir) if length == 1 else HeightTools.flight(map, from, from + along)
+	var reason := str(changes.get("reason", ""))
+	if not reason.is_empty():
+		report = "no stair from %d, %d: %s" % [from.x, from.y, reason]
+		return false
+	var changed := apply_changes(changes)
+	report = "%s from %d, %d climbing %s%s" % ["a stair" if length == 1 else "a flight of %d" % length, from.x, from.y,
+		World.COMPASS[Monster.AROUND.find(dir)], "" if changed else ": nothing to change"]
+	return changed
+
+
+## The area's heights: raised [param by] levels (lowered if negative).
+func raise_area(by: int) -> void:
+	_area_heights(HeightTools.raise(map, _area_cells(), by), "raised %d" % by if by > 0 else "lowered %d" % -by)
+
+
+## The area levelled at the picked level.
+func level_area() -> void:
+	_area_heights(HeightTools.level(map, _area_cells(), height_level), "levelled at %d" % height_level)
+
+
+## A hill filling the area, its top the picked level at the middle.
+func hill_area() -> void:
+	var centre := area.position + area.size / 2
+	var radius := maxi(1, mini(area.size.x, area.size.y) / 2)
+	_area_heights(HeightTools.hill(map, centre, radius, height_level), "a hill to level %d" % height_level)
+
+
+func _area_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			out.append(Vector2i(x, y))
+	return out
+
+
+func _area_heights(changes: Dictionary, what: String) -> void:
+	if area.size == Vector2i.ZERO:
+		return
+	var reason := str(changes.get("reason", ""))
+	var changed := reason.is_empty() and apply_changes(changes)
+	report = "%d x %d at %d, %d %s%s" % [area.size.x, area.size.y, area.position.x, area.position.y, what,
+		"" if changed else ": " + (reason if not reason.is_empty() else "nothing to change")]
+	_refresh_panel()
+
+
+func toggle_heights() -> void:
+	show_heights = not show_heights
+	queue_redraw()
+
+
+## Whether the heights tint is drawn.
+func heights_shown() -> bool:
+	return show_heights or brush in ["height", "stairs"]
 
 
 func _set_tool(setting: String, value: Variant) -> void:
@@ -745,9 +904,16 @@ func _refresh_panel() -> void:
 	for child in _panel.get_children():
 		_panel.remove_child(child)
 		child.queue_free()
-	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp", "path"]
+	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp", "path", "height", "stairs"]
 	if brush == "area":
 		_area_panel()
+		return
+	if brush == "height":
+		_height_panel()
+		return
+	if brush == "stairs":
+		_panel_label("Stairs", 30)
+		_panel_label("press on the low cell, drag the way it climbs:\none cell a stair, more a flight (a level a cell)", 22)
 		return
 	if brush == "stamp":
 		_stamp_panel()
@@ -880,6 +1046,38 @@ func _area_panel() -> void:
 		var gate := _panel_button(fence_row, side if not side.is_empty() else "none", _set_tool.bind("fence_gate", side))
 		gate.toggle_mode = true
 		gate.button_pressed = side == fence_gate
+	_panel_label("Heights", 26)
+	var heights_row := HBoxContainer.new()
+	_panel.add_child(heights_row)
+	_panel_button(heights_row, "raise", raise_area.bind(1))
+	_panel_button(heights_row, "lower", raise_area.bind(-1))
+	_panel_button(heights_row, "level", level_area)
+	_panel_button(heights_row, "hill", hill_area)
+	_height_level_row()
+
+
+## The height tool's panel: its brush and the level Shift+click sets.
+func _height_panel() -> void:
+	_panel_label("Height", 30)
+	_panel_label("LMB raise  RMB lower  Shift+LMB set  Alt+LMB pick", 22)
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	_panel_label_in(row, "brush")
+	for size in HEIGHT_BRUSHES:
+		var button := _panel_button(row, "%dx%d" % [size, size], _set_tool.bind("height_brush", size))
+		button.toggle_mode = true
+		button.button_pressed = size == height_brush
+	_panel_label_in(row, "[ ]")
+	_height_level_row()
+
+
+## The picked level, to change by hand.
+func _height_level_row() -> void:
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	_panel_label_in(row, "level %d" % height_level)
+	_panel_button(row, "-", _set_tool.bind("height_level", maxi(1, height_level - 1)))
+	_panel_button(row, "+", _set_tool.bind("height_level", mini(Level.MAX_HEIGHT, height_level + 1)))
 
 
 ## The seed the area and path tools use, to change by hand.
@@ -1020,6 +1218,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			pick("stamp")
 		elif key.keycode == KEY_T and not key.ctrl_pressed:
 			pick("path")
+		elif key.keycode == KEY_H and key.ctrl_pressed:
+			toggle_heights()
+		elif key.keycode == KEY_H:
+			pick("height")
+		elif key.keycode == KEY_S:
+			pick("stairs")
+		elif brush == "height" and key.keycode in [KEY_BRACKETLEFT, KEY_BRACKETRIGHT]:
+			var index := clampi(HEIGHT_BRUSHES.find(height_brush) + (1 if key.keycode == KEY_BRACKETRIGHT else -1), 0, HEIGHT_BRUSHES.size() - 1)
+			_set_tool("height_brush", HEIGHT_BRUSHES[index])
 		elif brush == "path" and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
 			lay_path()
 		elif brush == "path" and key.keycode == KEY_ESCAPE:
@@ -1061,7 +1268,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_zoom(1.15 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15)
 		elif button.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 			if button.pressed and _stroke_button == MOUSE_BUTTON_NONE:
-				begin_stroke(button.button_index, _mouse_grid())
+				begin_stroke(button.button_index, _mouse_grid(), button.shift_pressed, button.alt_pressed)
 			elif not button.pressed and button.button_index == _stroke_button:
 				end_stroke()
 		return
@@ -1101,11 +1308,11 @@ func _status_text() -> String:
 	var over := ""
 	if hover.has("cell"):
 		var at: Vector2i = hover["cell"]
-		over = "cell %d, %d: %s" % [at.x, at.y, map.cell(at)]
+		over = "cell %d, %d: %s, level %d" % [at.x, at.y, map.cell(at), int(map.heights.get(at, 0))]
 	elif hover.has("edge"):
 		var key: Vector3i = hover["edge"]
 		over = "edge %s of %d, %d: %s" % ["east" if key.z == Terrain.EAST else "south", key.x, key.y, map.edge(key)]
-	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select  A area  P stamp  T path"
+	var tools := "LMB paint  RMB erase  1-0 / Shift / Alt pick  V select  A area  P stamp  T path  H height  S stairs  Ctrl+H levels"
 	if brush == "select":
 		tools = "LMB pick a monster  Q / E turn it  Esc let go" if not editing_route \
 				else "LMB add a waypoint  RMB take the last back  Esc done"
@@ -1117,6 +1324,10 @@ func _status_text() -> String:
 		tools = "LMB lay %s  R / RMB turn it" % (stamp_name if not stamp_name.is_empty() else "(pick a prefab)")
 	elif brush == "path":
 		tools = "LMB add a point  RMB take the last back  Enter lay the path  [ ] width  Esc clear"
+	elif brush == "height":
+		tools = "LMB raise  RMB lower  Shift+LMB set to %d  Alt+LMB pick  [ ] brush %dx%d" % [height_level, height_brush, height_brush]
+	elif brush == "stairs":
+		tools = "LMB on the low cell, drag the way it climbs (one cell a stair, more a flight)"
 	return "%s%s   %s   brush: %s   |   %s  Ctrl+R resize  Ctrl+S save  Ctrl+Z undo  Ctrl+Y redo  MMB / arrows pan  wheel zoom\n%s" % [
 		map_name, " (unsaved)" if dirty else "", over, brush, tools, report]
 
@@ -1139,6 +1350,8 @@ func _draw() -> void:
 				draw_rect(rect.grow(-CELL * 0.18), map.colours.get(meaning, Color.MAGENTA))
 				var letter: String = LETTERS.get(meaning, meaning.trim_prefix("monster_").left(1).to_upper())
 				draw_string(font, rect.position + Vector2(0, CELL * 0.68), letter, HORIZONTAL_ALIGNMENT_CENTER, CELL, 26, Color(0, 0, 0, 0.8))
+	if heights_shown():
+		_draw_heights()
 	for x in map.size.x + 1:
 		draw_line(Vector2(x, 0) * CELL, Vector2(x, map.size.y) * CELL, GRID)
 	for y in map.size.y + 1:
@@ -1166,11 +1379,57 @@ func _draw() -> void:
 			if i > 0:
 				draw_line((Vector2(path_points[i - 1]) + Vector2(0.5, 0.5)) * CELL, centre, AREA, 4.0)
 			draw_circle(centre, CELL * 0.2, AREA)
+	if _stairs_from != NOWHERE:
+		var along := _stairs_to - _stairs_from
+		along = Vector2i(along.x, 0) if absi(along.x) >= absi(along.y) else Vector2i(0, along.y)
+		var a := (Vector2(_stairs_from) + Vector2(0.5, 0.5)) * CELL
+		draw_line(a, a + Vector2(along) * CELL, CLIMB, 6.0)
+		draw_circle(a, CELL * 0.18, CLIMB)
+	if hover.has("cell") and brush == "height":
+		for cell in height_footprint(hover["cell"]):
+			draw_rect(Rect2(Vector2(cell) * CELL, Vector2.ONE * CELL), Color(HOVER, 0.5), false, 2.0)
 	if hover.has("cell"):
 		draw_rect(Rect2(Vector2(hover["cell"]) * CELL, Vector2.ONE * CELL), HOVER, false, 4.0)
 	elif hover.has("edge"):
 		_draw_edge(hover["edge"], HOVER, 10.0)
 	draw_rect(Rect2(Vector2.ZERO, Vector2(map.size) * CELL), Color(1, 1, 1, 0.3), false, 2.0)
+
+
+## Each cell tinted by its level (darker at 0, lighter each level up), its
+## level written on it when big enough to read, cliffs heavier the higher
+## they are, and each stair's climb (as Level.parse finds it; red: none).
+func _draw_heights() -> void:
+	var font := ThemeDB.fallback_font
+	var numbers := _camera == null or _camera.zoom.x * CELL >= 26.0
+	for at: Vector2i in map.cells:
+		var level := int(map.heights.get(at, 0))
+		var rect := Rect2(Vector2(at) * CELL, Vector2.ONE * CELL)
+		draw_rect(rect, Color(0, 0, 0, 0.22) if level == 0 else Color(1, 1, 1, 0.05 + 0.07 * level))
+		if numbers and level > 0:
+			draw_string(font, rect.position + Vector2(CELL * 0.06, CELL * 0.3), str(level), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0, 0, 0, 0.75))
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var next := at + step
+			if map.cell(next) == "void":
+				continue
+			var rise := absi(int(map.heights.get(next, 0)) - level)
+			if rise > 0:
+				var key := Terrain.edge_key(at, step)
+				var a := Vector2(key.x + 1, key.y) if key.z == Terrain.EAST else Vector2(key.x, key.y + 1)
+				var b := a + (Vector2(0, 1) if key.z == Terrain.EAST else Vector2(1, 0))
+				draw_line(a * CELL, b * CELL, CLIFF, 2.0 + 2.0 * rise)
+	for at: Vector2i in map.cells:
+		if map.cell(at) != "stair":
+			continue
+		var centre := (Vector2(at) + Vector2(0.5, 0.5)) * CELL
+		var climb := HeightTools.climbs(map, at)
+		if climb == Vector2i.ZERO:
+			draw_circle(centre, CELL * 0.2, Color(1, 0.2, 0.2, 0.9))
+			continue
+		var tip := centre + Vector2(climb) * CELL * 0.42
+		draw_line(centre - Vector2(climb) * CELL * 0.3, tip, CLIMB, 4.0)
+		var side := Vector2(climb).orthogonal() * CELL * 0.14
+		draw_colored_polygon(PackedVector2Array([tip + Vector2(climb) * CELL * 0.06, tip - Vector2(climb) * CELL * 0.16 + side,
+			tip - Vector2(climb) * CELL * 0.16 - side]), CLIMB)
 
 
 ## The picked prefab, see-through, with its top-left at [param at].
@@ -1227,7 +1486,8 @@ func _build_ui() -> void:
 		button.text = "%s  %s" % [TOOLS[meaning] + "   " if TOOLS.has(meaning) else key_name(i),
 			meaning.trim_prefix("monster_") + (" (edge)" if meaning in EDGE_BRUSHES else " (a monster)" if meaning == "select"
 				else " (fill, prefab)" if meaning == "area" else " (a prefab)" if meaning == "stamp"
-				else " (through points)" if meaning == "path" else "")]
+				else " (through points)" if meaning == "path" else " (raise, lower)" if meaning == "height"
+				else " (a stair, a flight)" if meaning == "stairs" else "")]
 		button.icon = _swatch(meaning)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(pick.bind(meaning))
@@ -1302,7 +1562,7 @@ static func key_name(index: int) -> String:
 
 func _swatch(meaning: String) -> Texture2D:
 	var image := Image.create(36, 36, false, Image.FORMAT_RGBA8)
-	var colour: Color = map.colours.get(meaning, Color.WHITE) if meaning not in ["clear", "select"] else Color(0, 0, 0, 0)
+	var colour: Color = map.colours.get(meaning, Color.WHITE) if meaning not in ["clear", "select", "height"] else Color(0, 0, 0, 0)
 	if meaning == "wall":
 		colour = WALL
 	image.fill(colour)

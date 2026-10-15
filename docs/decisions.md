@@ -7185,3 +7185,31 @@ field whose absence means today's behaviour).
 
 height_tools_test; builder_test _test_heights; view_test (a raised cell
 in the ghost).
+
+## 357. Painting heights in the level editor
+
+The level editor paints heights, which it only carried through a resize
+before. Two tools: Height (`H`) raises a brush of cells (1, 3, 5, 9
+across) a level per click or drag, lowers with the right button, sets to a
+picked level with Shift and picks one with Alt; Stairs (`S`) is a press on
+the low cell and a drag the way it climbs, one cell a stair, more a flight.
+The area panel raises, lowers, levels or makes a hill in a dragged area.
+
+The changes come from `HeightTools` (builder's, decision 356): static
+functions that take the map and return a change set, the way `AreaTools`
+does, so the editor and builder mode make the same heights and stairs and
+undo them the same way (`MapDoc.apply_changes`; a brush stroke is one step
+of "height x y" entries, each cell changed once a stroke so a drag back
+over a cell does not climb it again). Nothing new in `MapDoc`:
+`set_height` already marked `height.png` for saving, and it is written
+whenever a height changed, all black when every height went back to 0
+(kept, not deleted, so a level that had heights still reads as flat).
+
+Seeing them: with either tool (Ctrl+H for any), a tint by level, the
+number on each cell when zoomed in enough to read, cliffs drawn heavier
+the higher, and each stair's climb found the way `Level.parse` finds it
+(a red dot where it would play as floor); the status line says the hovered
+cell's level. editor_test paints, lowers, sets, picks, undoes, lays a
+flight, raises and levels an area, and reads the saved `height.png` back
+through `Level.parse`. Editor only; no protocol change.
+

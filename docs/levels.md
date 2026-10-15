@@ -512,15 +512,35 @@ write its levels.
   included, and opens the walls and doors it runs through.
 - Anything a fill, a path or a stamp lays over takes that cell's
   `level.json` entry and link with it.
+- **Height** (`H`, decision 357): a click raises the cells under the
+  brush a level, a drag every cell it passes (each once a stroke); a right
+  click lowers them; `Shift`+click sets them to the picked level, `Alt`+click
+  picks a cell's level. `[` and `]` size the brush (1, 3, 5 or 9 across).
+  Levels run 0 to 6; void cells have none.
+- **Stairs** (`S`): press on the low cell and drag the way it climbs. One
+  cell makes a stair, its high side raised a level if it isn't and the edge
+  between opened; a longer drag makes a flight, a level a cell. If it can't
+  (the top level, void beyond), the status line says why.
+- With an area dragged out, the area panel's **Heights** row raises,
+  lowers or levels it (at the picked level), or makes a stepped hill in it,
+  its top the picked level.
+- While Height or Stairs is picked (`Ctrl`+`H` for every tool), each cell is
+  tinted by its level (darker at 0, lighter each level up) with the level
+  written on it, cliffs are drawn heavier the higher they are, and each
+  stair shows the way it climbs (a red dot: it climbs nowhere and plays as
+  floor). The status line says the hovered cell's level.
+
+  These changes are `HeightTools`' (`editor/height_tools.gd`), the same
+  ones builder mode lays.
 
 Saving writes the same double-resolution `layout.png` (the file's own size
 kept), its `.import` set to Image, and reports what the server would warn
 about. `level.json` is written when something in it changed (a monster's
-facing or idling, a resize); `height.png` only after a resize. Run from the
+facing or idling, a resize); `height.png` when a height changed. Run from the
 project, the game reads `layout.png` itself rather than its import, so a
 saved map plays at once with `--map=<name>`.
 
-Not yet: painting heights, a 3D preview, and fences that look like fences (a
+Not yet: a 3D preview, and fences that look like fences (a
 fence is a wall, drawn as the castle's).
 
 ## The wilds

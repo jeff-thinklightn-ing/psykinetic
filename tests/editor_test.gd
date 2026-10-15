@@ -24,6 +24,8 @@ func _ready() -> void:
 	await _test_prefabs()
 	_clear()
 	await _test_area_tools()
+	_clear()
+	await _test_heights()
 	_test_import_file()
 	_clear()
 	print("")
@@ -530,6 +532,100 @@ func _test_area_tools() -> void:
 			JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json")))
 	var warnings: Array = level["warnings"].filter(func(warning: String) -> bool: return not warning.begins_with("no player start"))
 	_check(warnings.is_empty(), "saved, the game reads it cleanly (%s)" % [warnings])
+	editor.queue_free()
+	await get_tree().process_frame
+
+
+func _test_heights() -> void:
+	print("\n== heights: the height tool, stairs, the area's heights, height.png ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var map := LevelMap.new(Vector2i(12, 10))
+	for y in 10:
+		for x in 12:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.to_image().save_png(dir.path_join("layout.png"))
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	_check(not editor.heights_shown(), "no tint while painting cells")
+	_key(editor, KEY_H)
+	_check(editor.brush == "height" and editor.heights_shown(), "H picks the height tool, and the tint shows")
+	_key(editor, KEY_BRACKETRIGHT)
+	_check(editor.height_brush == 3, "] makes the brush 3 x 3")
+	var depth := editor._undo.size()
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(4.5, 4.5))
+	editor.continue_stroke(Vector2(5.5, 4.5))
+	editor.continue_stroke(Vector2(4.5, 4.5))
+	editor.end_stroke()
+	var raised := editor.map.heights.keys()
+	_check(raised.size() == 12 and editor.map.heights.values().all(func(level: int) -> bool: return level == 1),
+			"a drag raises the 4 x 3 cells under the brush a level, each once (%d cells: %s)" % [raised.size(), editor.map.heights.values()])
+	_check(editor._undo.size() == depth + 1, "one undo step")
+	_key(editor, KEY_BRACKETLEFT)
+	editor.begin_stroke(MOUSE_BUTTON_RIGHT, Vector2(4.5, 4.5))
+	editor.end_stroke()
+	_check(not editor.map.heights.has(Vector2i(4, 4)) and editor.map.heights.size() == 11, "[ and a right click lowers one cell back to 0")
+	editor.height_level = 4
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(9.5, 1.5), true)
+	editor.end_stroke()
+	_check(editor.map.heights.get(Vector2i(9, 1), 0) == 4, "Shift+click sets the cell to the picked level, 4")
+	editor.height_level = 1
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(9.5, 1.5), false, true)
+	editor.end_stroke()
+	_check(editor.height_level == 4 and editor.map.heights.get(Vector2i(9, 1), 0) == 4, "Alt+click picks its level and changes nothing")
+	editor.hover = {"cell": Vector2i(9, 1)}
+	_check("level 4" in editor._status_text(), "the status line says the hovered cell's level")
+	_key(editor, KEY_Z, true)
+	_check(not editor.map.heights.has(Vector2i(9, 1)), "Ctrl+Z takes the Shift+click back")
+
+	_key(editor, KEY_S)
+	_check(editor.brush == "stairs", "S picks the stairs tool")
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(1.5, 8.5))
+	editor.continue_stroke(Vector2(4.5, 8.7))
+	editor.end_stroke()
+	var level := editor.doc.parsed()
+	var stairs: Dictionary = level["terrain"]["stairs"]
+	var stair_warnings: Array = level["warnings"].filter(func(warning: String) -> bool: return warning.begins_with("the stair"))
+	_check(stairs.get(Vector2i(1, 8)) == Vector2i(1, 0) and stairs.size() >= 2, "a drag east makes a flight climbing east (%s; %s)" % [stairs, editor.report])
+	_check(stair_warnings.is_empty(), "every stair in it climbs (%s)" % [stair_warnings])
+	var top := int(editor.map.heights.get(Vector2i(1, 8), 0))
+	_check(range(1, 4).all(func(x: int) -> bool: return int(editor.map.heights.get(Vector2i(x + 1, 8), 0)) >= int(editor.map.heights.get(Vector2i(x, 8), 0))),
+			"going up a level a cell from level %d" % top)
+	depth = editor._undo.size()
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(7.5, 7.5))
+	editor.end_stroke()
+	_check(editor._undo.size() == depth, "a click without a drag makes nothing")
+
+	_key(editor, KEY_A)
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(8.5, 0.5))
+	editor.continue_stroke(Vector2(11.5, 3.5))
+	editor.end_stroke()
+	editor.raise_area(2)
+	_check(range(8, 12).all(func(x: int) -> bool: return editor.map.heights.get(Vector2i(x, 0), 0) == 2 and editor.map.heights.get(Vector2i(x, 3), 0) == 2),
+			"the area panel raises the area 2 levels")
+	editor.height_level = 1
+	editor.level_area()
+	_check(editor.map.heights.get(Vector2i(9, 2), 0) == 1, "and levels it at the picked level")
+	_check(not editor.heights_shown(), "the tint is off with the area tool")
+	_key(editor, KEY_H, true)
+	_check(editor.heights_shown(), "until Ctrl+H")
+
+	_key(editor, KEY_S, true)
+	var png := FOLDER + "height.png"
+	_check(FileAccess.file_exists(png), "Ctrl+S writes height.png")
+	var read := Level.parse(Image.load_from_file(dir.path_join("layout.png")), Image.load_from_file(ProjectSettings.globalize_path(png)), {})
+	var read_heights: Dictionary = read["terrain"]["heights"]
+	var same := read_heights.size() == editor.map.heights.size() and editor.map.heights.keys().all(func(at: Vector2i) -> bool:
+		return read_heights.get(at, 0) == editor.map.heights[at])
+	_check(same, "the game reads the heights as painted (%d cells)" % read_heights.size())
+	for at: Vector2i in editor.map.heights.keys():
+		editor.doc.set_height(at, 0)
+	editor.save()
+	var flat := Level.parse(Image.load_from_file(dir.path_join("layout.png")), Image.load_from_file(ProjectSettings.globalize_path(png)), {})
+	_check((flat["terrain"]["heights"] as Dictionary).is_empty(), "every height back to 0 is written too (all black)")
 	editor.queue_free()
 	await get_tree().process_frame
 

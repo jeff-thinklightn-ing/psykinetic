@@ -13,6 +13,13 @@ notes (decision 324).
   hill with stairs up its sides, or put stairs onto a ledge. The proposal's
   ghost shows the new heights, lighter the higher, and Claude is told when
   something is left stranded on a ledge with no way up.
+- The level editor can paint heights. `H` raises the cells under a brush a
+  level (right click lowers, Shift+click sets a level, Alt+click picks one
+  up); `S` drags out a stair or a flight of them; the area panel raises,
+  lowers or levels an area, or makes a hill in it. Each cell is tinted and
+  numbered by its level, with cliffs and the way each stair climbs drawn,
+  and the status line shows the level under the cursor. `height.png` is
+  now saved whenever a height changed.
 
 ## v0.1.147
 
