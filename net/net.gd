@@ -89,6 +89,7 @@ extends Node
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
+##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
 ##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
@@ -339,6 +340,8 @@ var test_builder := ""
 var test_exit_after := 0.0
 var test_exit_on := ""
 var test_minimap := false
+## --raids: raid groups on from the start (World.raid_groups; the console can too).
+var raids := false
 var test_wait_players := 0
 var test_hold_tick := 0
 var test_hold_orders := 0
@@ -1199,6 +1202,8 @@ func _parse_args() -> void:
 				print_protocol = true
 			"--test-minimap":
 				test_minimap = true
+			"--raids":
+				raids = true
 			"--world-map":
 				world_map = true
 			"--builder-stub":

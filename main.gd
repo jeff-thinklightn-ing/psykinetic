@@ -1405,6 +1405,13 @@ func _boot() -> void:
 	World.towns.building_changed.connect(_on_town_building_changed)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
+	# Raid groups (decision 328): off until switched on (--raids, the console).
+	World.raid_groups = WorldRaids.new(world_map, World.holdings, World.towns, snapshot.get("raid_groups", {}))
+	World.raid_groups.clock = func() -> int: return World.steps
+	World.raid_groups.live = func(area: String) -> bool: return World.zones.has(area) and (World.zones[area] as Zone).awake
+	World.raid_groups.hook(World.raids)
+	if Net.raids:
+		World.raid_groups.set_on(true)
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	# Raiders come into a played zone as its level's monsters do.
@@ -1862,6 +1869,7 @@ func _save_state() -> void:
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
+		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"items": World.items.to_dict(),
 		"sky": _sky_saved()})
@@ -1946,6 +1954,9 @@ func _exit_tree() -> void:
 	# saved now would overwrite.
 	if not _released:
 		_save_state()
+	# Routes still being made on pool tasks would crash a server on its way out.
+	if World.raid_groups != null:
+		World.raid_groups.finish()
 	# The stdin thread runs this node's method: it must have stopped before
 	# the node goes, or the server crashes on its way out (one stopped within
 	# 2 s of starting found it still waiting out stdin's end; decision 299).
@@ -3511,6 +3522,25 @@ func _count_down_restart() -> void:
 	get_tree().quit(_restart_exit)
 
 
+## Server: the console's raids (decision 328): on, off, the groups out, or
+## one sent at once from a camp at a town.
+func _raids_command(words: PackedStringArray) -> String:
+	var groups := World.raid_groups
+	if groups == null:
+		return "no raid groups here"
+	if words.size() >= 2 and words[1] in ["on", "off"]:
+		groups.set_on(words[1] == "on")
+		return "raids %s: %s" % [words[1], "camps send groups at their towns" if groups.on else "nothing is sent and nothing moves"]
+	if words.size() >= 4 and words[1] == "send":
+		var id := groups.send(words[2], words[3])
+		return "sent %s" % id if id != "" else "no camp %s, no town %s, or no way between" % [words[2], words[3]]
+	var lines: Array[String] = ["raids %s; %d camps, %d groups out" % ["on" if groups.on else "off", groups.camps().size(), groups.groups.size()]]
+	for group: Dictionary in groups.groups.values():
+		lines.append("%s %s, %s at %s %s, strength %.1f, carries %s" % [group["id"], group["state"], group["faction"],
+			group["area"], group["cell"], group["strength"], group["carries"]])
+	return "\n".join(lines)
+
+
 ## Server: a line to every player, from "Server", in the party chat.
 func _server_says(text: String) -> void:
 	print("[admin] told everyone: %s" % text)
@@ -3725,6 +3755,8 @@ func admin_command(line: String) -> String:
 			return "v%s protocol %s" % [Net.version, Net.protocol()]
 		"restart", "stop":
 			return _restart_command(words)
+		"raids":
+			return _raids_command(words)
 		"reload":
 			return _reload_command(words)
 		"net":
@@ -3736,7 +3768,7 @@ func admin_command(line: String) -> String:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
 	return "unknown command %s (try help)" % words[0]

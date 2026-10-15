@@ -373,6 +373,8 @@ var production: Production = null
 ## Server: how each town grows (Towns), choosing its buildings on the same
 ## slice; made by Main at boot, from the snapshot. Null on a client.
 var towns: Towns = null
+## Raid groups on the world map (decision 328), server only; null on a client.
+var raid_groups: WorldRaids = null
 ## Server: prices, players' gold and trade with the town (Economy); made by
 ## Main at boot, from the snapshot. Null on a client.
 var economy: Economy = null
@@ -489,6 +491,8 @@ func world_tick(slice := -1) -> void:
 		if towns != null:
 			towns.tick()
 		production.tick()
+		if raid_groups != null:
+			raid_groups.world_tick()
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())

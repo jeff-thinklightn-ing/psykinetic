@@ -366,6 +366,19 @@ yard with its depot and shop counter, and the stockpile place the town
 holds (decision 301). The place tool's `use` (`depot` or `shop`) makes any
 chest one, and `Stockpile.check` says what is wrong with a level's store.
 
+### Raid groups
+
+A place of kind `camp` that a faction holds sends raid groups at the towns
+of factions hostile to it (decision 328): a group walks the world routes on
+its faction's layer on the world tick, raids a town nobody watches by the
+numbers (economy's `Towns.raid_arrives`), carries food and captives home,
+and in a zone with a player in it becomes real raiders (enemy-ai's
+`World.raids`). The camps also make each town's threat. A camp's `worth`
+is its size: bigger camps threaten more and send stronger groups. Raids are
+off until the console's `raids on` (or `--raids`); `raids` lists the groups,
+`raids send <camp> <town>` sends one now. Camps are content: none is in a
+real level until Jeff asks.
+
 ### Routes between areas
 
 `world_map.routes()` (`WorldRoutes`, `sim/world_routes.gd`) finds the

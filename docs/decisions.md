@@ -5957,3 +5957,42 @@ wilds' first read 55 ms more), the wilds' within the spread, frames as
 before. Rejected: drawing it from WorldMap's areas, which keep no ground
 kinds or water; and making its cells walkable void with a rule that they
 are not, which every path and pick would have to know.
+## 328. Raid groups travel the world map; camps make a town's threat; off until switched on
+
+Jeff: raids are "real raiders on the world tick": a group sets out from a
+raider camp, travels the routes and reaches the town. Economy owns what
+happens at the town (Towns.raid_arrives) and enemy-ai the raiders in a
+played zone (World.raids); this is the part between, sim/world_raids.gd
+(WorldRaids, World.raid_groups), server only, on the world tick, saved in
+the snapshot as "raid_groups".
+
+The camps are Holdings places of kind "camp" a faction holds; the towns a
+camp raids are Towns' towns whose place a faction hostile to it holds
+(factions.json). A town's threat (Towns.threat, which economy left for
+this) is one less the chance no camp comes: each hostile camp pulls by its
+worth (full at size_full) and less the further its route (halved at
+threat_tiles steps). A camp with no group out sends one at its most
+threatened town with send_chance times that threat a world tick, one group
+a camp and a town at a time; its strength is the camp's worth times
+strength_per_size; its id "raid:<camp>:<step>". It walks the route on its
+faction's layer (WorldRoutes), steps_per_world_tick a world tick, so held
+ground is physical: it goes round another's ground, and where there is no
+way round it stops there and turns back. At a town nobody is watching it
+raids by the numbers: Towns.raid_arrives, whose report's took and captives
+are what it carries home, where each captive is held at the camp
+(Towns.captive_held). Walking into an area whose zone is awake it is handed
+to World.raids (enter, marching on the town if it is there, else for the
+cell its route leaves by) and stands still on the world map until
+raid_left hands it back where and as strong as it is, carrying what it
+carries (it does not walk straight back into the area it left), or
+raid_beaten ends it; raid_done marks the town as hit. A group in play when
+the server stopped (raiders are not saved) goes on from where it was last.
+The rules are levels/economy.json raids.groups, with defaults in the code.
+
+It is off until switched on (--raids, or the console's raids on, kept in
+the snapshot): the box has Jeff's town being built, and no real level has a
+camp yet, so raids stay a test until he says. While off nothing is sent,
+nothing moves, and the towns keep economy's own threat. The console's
+raids lists the groups, and raids send <camp> <town> sends one at once.
+tests/raid_groups_test plays it on two fixture areas, the hand-over through
+a stand-in World.raids.
