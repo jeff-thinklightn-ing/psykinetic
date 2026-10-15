@@ -369,8 +369,8 @@ func _test_building_links() -> void:
 	var links := (level["buildings"] as Array).map(func(b: Dictionary) -> String: return "%s:%s" % [b["use"], b["town"]])
 	_check(links == ["forge:square", ":", ":", ":", "kitchen:square"], "linked: the first forge and the kitchen; a second forge, a use there is not and a town that is no stockpile stand unlinked (%s)" % [links])
 	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("linked") or text.contains("radius"))
-	_check(said.size() == 4 and str(said).contains("already has its forge") and str(said).contains("is outside its place"),
-			"each said, and the kitchen is outside the square's radius (%s)" % [said])
+	_check(said.size() == 3 and str(said).contains("already has its forge") and not str(said).contains("radius"),
+			"each said; the kitchen far from the store is linked all the same: a town is more than its store's yard (%s)" % [said])
 	var turned := Prefab.rotated({"map": map, "config": config}, 1)
 	_check((turned["config"]["buildings"] as Array)[0].get("use") == "forge", "a link moves with its building")
 

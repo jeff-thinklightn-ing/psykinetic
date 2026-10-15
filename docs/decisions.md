@@ -4643,8 +4643,9 @@ stockpile place on that map; the town's id is "<area>/<key>", as
 Holdings and Stockpile have it). Level.buildings_from checks the link
 (Level._link) and leaves a building unlinked, standing as scenery, with a
 warning, when the use is no economy building, the town no stockpile place
-here, or the town already has a building of that use; one whose middle is
-outside its place's radius is linked, with a warning. A link moves and
+here, or the town already has a building of that use. Where it stands is not
+checked: a stockpile place's radius is its banking yard (250), not the
+town's extent, and a town's buildings stand round its store. A link moves and
 turns with its building (it is part of the entry), so a stamped prefab
 keeps it.
 

@@ -213,8 +213,9 @@ All of it is optional.
   "square"}`. The town's records (economy's Towns) then give its state:
   damaged after a raid, standing again once repaired. One a town already
   has, a use there is not, or a town that is no stockpile place stands
-  unlinked, with a warning; one outside its place's radius is linked, with
-  a warning. A building with no use is scenery and always stands.
+  unlinked, with a warning. It may stand anywhere on the map: the place's
+  radius is the store's yard, not the town. A building with no use is
+  scenery and always stands.
 - `town_walls`: which ring of this map's walls is a town's wall, a list of
   `{"town": "square", "rect": [x, y, w, h]}`. `town` is a stockpile place's
   key, as for buildings; `rect` is the cells the wall encloses, and the wall

@@ -744,10 +744,6 @@ static func _link(building: Dictionary, entry: Dictionary, config: Dictionary, l
 		warnings.append("the %s at %s: %s already has its %s at %s; not linked" % [building["slot"], at, town, use, linked[town + "/" + use]])
 		return
 	linked[town + "/" + use] = at
-	var rect: Rect2i = building["rect"]
-	var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
-	if middle.distance_to(Vector2(place["cell"])) > float(place["radius"]):
-		warnings.append("the %s at %s, %s's %s, is outside its place's radius" % [building["slot"], at, town, use])
 	building["use"] = use
 	building["town"] = town
 
