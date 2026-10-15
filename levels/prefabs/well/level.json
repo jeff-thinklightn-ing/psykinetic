@@ -1,1 +1,11 @@
-{}
+{
+	"buildings": [
+		{
+			"slot": "building.well",
+			"at": [
+				2,
+				2
+			]
+		}
+	]
+}

@@ -78,7 +78,8 @@ func _test_stamp_building() -> void:
 	var level := Level.parse(doc.map.to_image(), null, doc.config)
 	_check(level["buildings"].size() == 3 and doc.undo_steps.size() == 1, "all three stand in the level, one undo step (%s)" % [level["warnings"]])
 	var prompt := BuilderSession.system_prompt()
-	_check(prompt.contains("building_hut (5 x 5), a building: hut") and prompt.contains("building_house (6 x 8), a building: house"),
+	_check(prompt.contains("building_hut (5 x 5), a building: hut") and prompt.contains("building_house (6 x 8), a building: house")
+			and prompt.contains("well (5 x 5), a building: well"),
 			"Claude is told which prefabs are buildings")
 
 

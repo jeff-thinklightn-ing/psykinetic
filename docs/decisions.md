@@ -4050,6 +4050,17 @@ player). A well, 1x1 with no inside, is not yet one of these: how its
 cell stops walkers is its own question; it comes last, with its own
 decision.
 
+Amended (the well): building.well (1x1, art-kit's rim and posts, a
+"roof" part over them) stands on a water cell, not floor (Level.ON_WATER):
+the water is what stops walkers and lets sight pass, as is right for a
+well, so the sim is unchanged. Level.parse asks for water under it; it has
+no walls (no open-edge warning), no inside (its roof never goes) and no
+plain outline. The client gives its cell to terrain's Client3D._dry_water,
+so the water is drawn as the ground round it, not as a pond under the rim.
+The kit's "well" prefab carries its record. Rejected: a new "well" cell
+kind (a legend and sim change for what water already does) and walls on
+its four edges (wall runs would draw stone round it).
+
 ## 257. Lore: prose in docs/lore/, data in levels/lore/, one entry format, shared ids
 
 The world's facts (lore tree) are kept twice over. Prose for people goes in

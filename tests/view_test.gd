@@ -356,7 +356,7 @@ func _building_terrain() -> Dictionary:
 		for x in 16:
 			map.set_cell(Vector2i(x, y), "grass")
 	var config := {"outdoor": true}
-	for stamp: Array in [["building_house", Vector2i(2, 2), 0], ["building_hut", Vector2i(9, 2), 1]]:
+	for stamp: Array in [["building_house", Vector2i(2, 2), 0], ["building_hut", Vector2i(9, 2), 1], ["well", Vector2i(9, 8), 0]]:
 		var changes := Prefab.stamp_changes(Prefab.rotated(Prefab.load_prefab(stamp[0]), stamp[2]), map, stamp[1], config)
 		for cell: Vector2i in changes["cells"]:
 			map.set_cell(cell, changes["cells"][cell])
@@ -380,7 +380,8 @@ func _test_buildings() -> void:
 		by_rect[building["rect"]] = building
 	var house: Dictionary = by_rect.get(Rect2i(3, 3, 4, 6), {})
 	var hut: Dictionary = by_rect.get(Rect2i(10, 3, 3, 3), {})
-	_check(_rig._buildings.size() == 2 and not house.is_empty() and not hut.is_empty(), "two buildings drawn (%s)" % [by_rect.keys()])
+	var well: Dictionary = by_rect.get(Rect2i(11, 10, 1, 1), {})
+	_check(_rig._buildings.size() == 3 and not house.is_empty() and not hut.is_empty() and not well.is_empty(), "three buildings drawn (%s)" % [by_rect.keys()])
 	if house.is_empty() or hut.is_empty():
 		_rig.rebuild(_main._terrain, Vector2i.ZERO)
 		return
@@ -390,6 +391,8 @@ func _test_buildings() -> void:
 		var footprint: Array = ArtKit.spec(slot).get("footprint", [])
 		return footprint.size() == 2 and Vector2i(int(footprint[0]), int(footprint[1])) == Level.BUILDINGS[slot]),
 			"the sim's footprints are art-kit's slots' (Level.BUILDINGS)")
+	_check(not well.is_empty() and not _rig._building_at.has(Vector2i(11, 10)) and _rig._dry_water.has(Vector2i(11, 10))
+			and not _rig._plain_walls.has(Vector3i(11, 10, Terrain.EAST)), "the well: no inside, no walls, its water drawn dry under its rim")
 	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return _rig._plain_walls.has(key)),
 			"its outline is drawn plain, level under its roof (decision 252)")
 	_check(node.position.is_equal_approx(Vector3(4.5, Client3D.BUILDING_LIFT, 5.5)) and is_equal_approx(node.rotation.y, 0.0),

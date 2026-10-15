@@ -333,6 +333,16 @@ func _test_buildings() -> void:
 	_check(level["buildings"].size() == 2 and level["buildings"][1]["rect"] == Rect2i(15, 15, 3, 3), "an unknown slot and one off the floor are left out (%s)" % [level["buildings"]])
 	var warned: Array = said.call(level["warnings"])
 	_check(warned.size() == 3 and str(warned[2]).contains("open edges"), "said, and the hut in the open said to have open edges (%s)" % [warned])
+	config = _stamp(map, config, "well", Vector2i(12, 12))
+	level = Level.parse(map.to_image(), null, config)
+	var wells := (level["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == "building.well")
+	_check(wells.size() == 1 and wells[0]["rect"] == Rect2i(14, 14, 1, 1) and Vector2i(14, 14) in level["terrain"]["water"],
+			"the well prefab's well stands on its water (%s)" % [wells])
+	_check(said.call(level["warnings"]).is_empty(), "a well has no walls, and is not said to be open")
+	bad = config.duplicate(true)
+	bad["buildings"] = [{"slot": "building.well", "at": [20, 2]}]
+	level = Level.parse(map.to_image(), null, bad)
+	_check(level["buildings"].is_empty() and str(said.call(level["warnings"])).contains("water"), "a well on grass is left out: it stands on water")
 	var hut_at := Rect2i(13, 3, 3, 3)
 	_check(Level.rect_cells(hut_at).size() == 9 and Level.outline(hut_at).size() == 12, "a 3 x 3 footprint: nine cells, twelve outline edges")
 

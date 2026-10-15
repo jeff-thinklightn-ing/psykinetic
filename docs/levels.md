@@ -192,14 +192,17 @@ All of it is optional.
 - `buildings`: the buildings standing here, a list of `{"slot":
   "building.house", "at": [12, 4], "facing": [0, 1]}`. `slot` is one of
   `Level.BUILDINGS` (building.hut 3 x 3, building.house 4 x 6,
-  building.shed 2 x 3, across by deep facing north or south, the other way
+  building.shed 2 x 3, building.well 1 x 1, across by deep facing north or south, the other way
   round facing east or west); `at` is the footprint's top-left cell;
   `facing` is the side its front is on (south if not given). The
   footprint is the inside, ordinary floor; the building's walls and door
   are the map's own edges round it, drawn in the layout as any wall, so a
   building changes no rule: it says where the roof, the inside floor and
   the trim are drawn (art-kit's `building.*` slots), and what counts as
-  inside. One not on floor of one height, or overlapping another, is left
+  inside. A well stands on a water cell instead (`Level.ON_WATER`): the
+  water stops walkers and lets sight pass, it has no walls and no inside,
+  and its water is drawn as ground under its rim. One not on floor (or
+  water) of one height, or overlapping another, is left
   out with a warning; one whose outline has open edges stands, with a
   warning. The building prefabs below lay the walls and the record together
   (decision 265).
@@ -475,7 +478,7 @@ changing a drawing):
 | `small_house` | 6 x 6 | a stone room with a door south, a chest (a bandaging kit) and a lantern, a ring of dirt |
 | `campfire_camp` | 7 x 7 | a round dirt clearing, three imps gathered at the fire, a chest and crates |
 | `fenced_field` | 10 x 6 | dirt behind a fence with a gate south, a ring of grass |
-| `well` | 5 x 5 | water ringed with stone |
+| `well` | 5 x 5 | a building.well on water ringed with stone |
 | `building_hut` | 5 x 5 | a building.hut: 3 x 3 of stone in walls, a door south, a ring of dirt |
 | `building_house` | 6 x 8 | a building.house: 4 x 6 of stone in walls, a door south, a ring of dirt |
 | `building_shed` | 4 x 5 | a building.shed: 2 x 3 of stone in walls, a door south, a ring of dirt |

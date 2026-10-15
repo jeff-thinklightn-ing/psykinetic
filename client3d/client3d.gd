@@ -661,8 +661,10 @@ var _wall_breaches: Array[Vector3i] = []
 ## broken nor breached (a building's walls, which a roof sits on); filled
 ## by whoever knows them before the room is built.
 var _plain_walls: Dictionary[Vector3i, bool] = {}
-## The edges in _plain_walls that are there for a building's outline.
+## The edges in _plain_walls that are there for a building's outline,
+## and the cells in _dry_water that are there for a well.
 var _building_walls: Array[Vector3i] = []
+var _building_dry: Array[Vector2i] = []
 ## Water cells drawn as plain ground (a well's, whose rim stands round it):
 ## no surface, no sunk bed, no wet shore; their ground the land's beside
 ## them. The sim still has them as water. Filled the same way.
@@ -1826,10 +1828,20 @@ func _build_room() -> void:
 	# A building's walls are plain, level under its roof (decision 252):
 	# the last map's buildings' outlines out, this one's in, what else is
 	# in the set left as it is.
+	# A well's water is drawn as the ground round it, under its rim.
 	for key in _building_walls:
 		_plain_walls.erase(key)
 	_building_walls.clear()
+	for cell in _building_dry:
+		_dry_water.erase(cell)
+	_building_dry.clear()
 	for building: Dictionary in _terrain.get("buildings", []):
+		if building["slot"] in Level.ON_WATER:
+			for cell in Level.rect_cells(building["rect"]):
+				if not _dry_water.has(cell):
+					_building_dry.append(cell)
+					_dry_water[cell] = true
+			continue
 		for key in Level.outline(building["rect"]):
 			if not _plain_walls.has(key):
 				_building_walls.append(key)
@@ -1906,6 +1918,8 @@ func _add_buildings() -> void:
 		_room.add_child(node)
 		var index := _buildings.size()
 		_buildings.append({"rect": rect, "node": node, "roof": node.get_node_or_null("roof"), "off": false})
+		if slot in Level.ON_WATER:
+			continue  # Nobody stands in a well: it has no inside.
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
 

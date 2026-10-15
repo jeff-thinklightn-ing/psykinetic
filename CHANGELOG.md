@@ -54,6 +54,8 @@ top section as the release notes.
   camera's side go see-through while you're in. Seen from outside, a roof
   that hides you fades like a wall. A building's walls are whole and level,
   never ruined like the castle's.
+- Wells: the well piece in builder mode and the editor now has a proper
+  well on its water, its rim and little roof, instead of a bare pond.
 - A client and the server no longer need to be the very same build to
   play together: only what they send each other has to match. A release
   that changes only how the game looks no longer needs the server updated,

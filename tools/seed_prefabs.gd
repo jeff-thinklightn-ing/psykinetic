@@ -79,7 +79,8 @@ const PREFABS := {
 		],
 		"config": {},
 	},
-	# A well: water ringed with stone.
+	# A well: water ringed with stone; art-kit's building.well stands on the
+	# water (decision 265), which is what stops walkers.
 	"well": {
 		"rows": [
 			"  _ _ _  ",
@@ -92,7 +93,7 @@ const PREFABS := {
 			"         ",
 			"  _ _ _  ",
 		],
-		"config": {},
+		"config": {"buildings": [{"slot": "building.well", "at": [2, 2]}]},
 	},
 	# The buildings (Level.BUILDINGS, decision 265): the footprint in stone,
 	# its walls on the outline, a door in its front (south), a ring of dirt

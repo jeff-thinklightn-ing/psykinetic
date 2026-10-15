@@ -91,7 +91,11 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## in cells, across by deep as it faces north or south (the other way round
 ## facing east or west). The footprint is the inside; its walls and door
 ## are the map's own edges on its outline (decision 265).
-const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3)}
+const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
+	"building.well": Vector2i(1, 1)}
+## The buildings that stand on water, not floor: no inside, no walls (a
+## well: its water is what stops walkers, and sight passes over it).
+const ON_WATER: Array[String] = ["building.well"]
 ## A building's facing (the side its front is on) when level.json gives none.
 const BUILDING_FACING := Vector2i(0, 1)
 ## What a marker spawns, before level.json's props for that tile.
@@ -562,9 +566,10 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 ## level.json's "buildings", [{slot, at: its footprint's top-left cell,
 ## facing: [dx, dy], the side its front is on}], as {slot, cell, facing
 ## (Vector2i), rect (the footprint, Rect2i)}. A building stands only on
-## floor of one height, clear of the others: one that does not, or of a
-## slot there is not, is left out and said in [param warnings]; one whose
-## outline has open edges stands, said (a shed may be open).
+## floor (water, for ON_WATER's) of one height, clear of the others: one
+## that does not, or of a slot there is not, is left out and said in
+## [param warnings]; one whose outline has open edges stands, said (a shed
+## may be open; a well has no walls).
 static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var listed: Variant = config.get("buildings", [])
@@ -574,6 +579,9 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 	var ground: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in terrain["floor"]:
 		ground[cell] = true
+	var wet: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("water", []):
+		wet[cell] = true
 	var taken: Dictionary[Vector2i, bool] = {}
 	for entry: Variant in listed:
 		var rect: Variant = building_rect(entry)
@@ -581,16 +589,18 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 			warnings.append("the building %s has no \"at\" cell or no slot of %s" % [entry, ", ".join(BUILDINGS.keys())])
 			continue
 		var cells := rect_cells(rect)
+		var on_water := str(entry["slot"]) in ON_WATER
+		var under := wet if on_water else ground
 		var height: int = terrain["heights"].get(cells[0], 0)
 		var bad := cells.filter(func(cell: Vector2i) -> bool:
-			return not ground.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
+			return not under.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
 		if not bad.is_empty():
-			warnings.append("the %s at %s is not all on clear floor of one height (%s): left out" % [entry["slot"], rect.position, bad[0]])
+			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [entry["slot"], rect.position, "water" if on_water else "clear floor", bad[0]])
 			continue
 		for cell in cells:
 			taken[cell] = true
 		var open: Array[Vector3i] = []
-		for key in outline(rect):
+		for key in outline(rect) if not on_water else []:
 			if not terrain["edges"].has(key):
 				open.append(key)
 		if not open.is_empty():
