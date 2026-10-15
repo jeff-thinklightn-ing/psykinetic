@@ -840,7 +840,7 @@ func accept() -> bool:
 	if not new_area.is_empty():
 		# A level beyond an edge is out of doors unless the one it leads from says otherwise.
 		var zone := Level.zone_of(doc.config) if doc.config.has("zone") or doc.config.has("outdoor") else "outdoors"
-		created_doc = draft_level(new_area, map_name, zone)
+		created_doc = draft_level(new_area, map_name, zone, Level.region_of(doc.config))
 		created = str(new_area["name"])
 	var changed := doc.apply_changes(changes)
 	_fresh_working()
@@ -849,13 +849,14 @@ func accept() -> bool:
 
 ## The new level [param plan] (new_area's) as a MapDoc to save in the
 ## overlay, joined back to [param beside] on its opposite side, its
-## [param zone] (DayNight.ZONES: how it is lit) that of the level it leads from.
-static func draft_level(plan: Dictionary, beside: String, zone: String) -> MapDoc:
+## [param zone] (DayNight.ZONES: how it is lit) and [param region] (a lore
+## region: its weather) those of the level it leads from.
+static func draft_level(plan: Dictionary, beside: String, zone: String, region := Level.DEFAULT_REGION) -> MapDoc:
 	var joined: String = Level.OPPOSITE[plan["side"]]
 	var made := MapDoc.new()
 	made.folder = Level.overlay_dir + str(plan["name"]) + "/"
 	made.map = AreaDraft.draft(plan["size"], int(plan["seed"]), joined, int(plan["gate"]))
-	made.config = {"name": plan["title"], "zone": zone}
+	made.config = {"name": plan["title"], "zone": zone, "region": region}
 	if not str(plan.get("description", "")).is_empty():
 		made.config["about"] = plan["description"]
 	WorldMap.put_neighbours(made, {joined: beside})

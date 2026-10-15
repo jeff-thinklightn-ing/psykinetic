@@ -275,6 +275,7 @@ func _test_new_area() -> void:
 			{"name": "new_area", "input": {"side": "east", "width": 32, "height": 24, "name": "Ashen Wood", "description": "a burnt wood", "seed": 4}}],
 		"A way east, into the Ashen Wood.",
 	])
+	doc.config["region"] = "blood_rot_lands"
 	var session := BuilderSession.new(doc, area, "test_field", stub)
 	_check("touches the map's edge on the east (nothing beyond it yet" in session._situation(), "Claude is told the area touches the east edge, with nothing beyond")
 	var result: Dictionary = await session.ask("a new area to the east")
@@ -290,8 +291,9 @@ func _test_new_area() -> void:
 	_check(session.accept() and session.created == "ashen_wood" and doc.undo_steps.size() == 1, "accepted: one undo step, the new level made")
 	var made := session.created_doc
 	_check(made.map.size == Vector2i(32, 24) and made.config.get("neighbours") == {"west": "test_field"}
-			and made.config.get("name") == "Ashen Wood" and made.config.get("about") == "a burnt wood" and made.config.get("zone") == "outdoors",
-			"the new level: 32 x 24, joined back on its west, named, outdoors like the field it leads from")
+			and made.config.get("name") == "Ashen Wood" and made.config.get("about") == "a burnt wood" and made.config.get("zone") == "outdoors"
+			and made.config.get("region") == "blood_rot_lands",
+			"the new level: 32 x 24, joined back on its west, named, outdoors and in the same land as the field it leads from")
 	var arrive := WorldMap.arrival("east", exit + Vector2i(1, 0), made.map.size)
 	_check(made.map.walkable(arrive) and made.map.walkable(arrive + Vector2i(3, 0)), "walking off the edge at %s arrives on open ground at %s" % [exit, arrive])
 	_check(made.map.cell(Vector2i(31, 0)) == "void" and made.map.cell(Vector2i(16, 23)) == "void", "with forest round its other sides")
