@@ -153,12 +153,13 @@ const PALETTE_FALLBACK: PackedStringArray = [
 	"#f4efe6", "#8fb3b0", "#5f8a8c", "#46707a", "#2f4f5c", "#213a45", "#16272f", "#0d181d",
 ]
 const GROUND_CHANNELS := {"grass": 0, "dirt": 1, "stone": 2, "sand": 3}
-## Water (_build_water): its colours (sRGB) shallow and deep, its foam; its
-## surface this far above its level, its bed's middle this far below, the
-## bed's ground (in the kinds texture, under the water's own tint).
-const WATER_SHALLOW := Color("5f8a8c")
-const WATER_DEEP := Color("2f4f5c")
-const WATER_FOAM := Color("f4efe6")
+## Water (_build_water): its colours shallow and deep, its foam (swatches
+## of art-kit's water row, 8); its surface this far above its level, its
+## bed's middle this far below, the bed's ground (in the kinds texture,
+## under the water's own tint).
+const WATER_SHALLOW := Vector2i(8, 2)
+const WATER_DEEP := Vector2i(8, 4)
+const WATER_FOAM := Vector2i(8, 0)
 const WATER_LIFT := 0.01
 ## (Above FOREST_FLOOR_DEPTH, or the forest floor under the map hides it.)
 const WATER_BED_DEPTH := 0.15
@@ -3106,9 +3107,9 @@ func _water_material() -> ShaderMaterial:
 	material.set_shader_parameter("mask_origin", Vector2(_mask_origin))
 	material.set_shader_parameter("mask_size", Vector2(_mask_size))
 	material.set_shader_parameter("noise_tex", _ground_noise())
-	material.set_shader_parameter("shallow", WATER_SHALLOW)
-	material.set_shader_parameter("deep", WATER_DEEP)
-	material.set_shader_parameter("foam", WATER_FOAM)
+	material.set_shader_parameter("shallow", swatch(WATER_SHALLOW.x, WATER_SHALLOW.y))
+	material.set_shader_parameter("deep", swatch(WATER_DEEP.x, WATER_DEEP.y))
+	material.set_shader_parameter("foam", swatch(WATER_FOAM.x, WATER_FOAM.y))
 	return material
 
 

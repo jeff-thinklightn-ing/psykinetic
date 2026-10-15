@@ -4279,6 +4279,10 @@ ground the neighbouring land's kind. The sim still has it as water
 (unwalkable, sight passes). Whoever places it fills the set before the
 room is built.
 
+Amended: the water's shallow, deep and foam are art-kit's water row now
+(palette row 8: columns 2, 4 and 0), read like the ground's, the same
+colours as the hand-muted ones they replace.
+
 ## 284. A companion left in town works there as a resident
 
 Jeff: companions left in town work a trade as residents. Economy's Towns
