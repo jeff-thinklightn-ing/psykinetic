@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_prediction_does_not_walk_into_a_pinned_crate()
 	_test_prediction_gives_up_when_the_server_has()
 	_test_the_camera_eases_over_a_jump_not_a_slide()
+	_test_a_large_correction_slides_not_snaps()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -253,6 +254,44 @@ func _test_prediction_gives_up_when_the_server_has() -> void:
 			"a shown step nobody confirms counts once and the order is given up, not re-planned for ever (%d mispredicts)" % (Net.mispredicts_total - mispredicts))
 	_check(not me._prediction.is_active() and me.position.is_equal_approx(Iso.tile_to_local(Vector2i(6, 21))),
 			"and the sprite is back on the server's tile")
+
+
+## A misprediction of more than SNAP_TILES (decision 339): the walk ends
+## and the sprite slides from where it is drawn to the server's tile over
+## 2-4 ticks, never a jump; TELEPORT_TILES or more is still snapped.
+func _test_a_large_correction_slides_not_snaps() -> void:
+	print("
+== a large correction slides there, a teleport snaps ==")
+	var me := _me(Vector2i(6, 21))
+	me.predict_move(Vector2i(8, 21))
+	me._process(0.05)
+	var snaps := Net.snaps_total
+	var mispredicts := Net.mispredicts_total
+	var drawn := Iso.local_to_grid(me.position)
+	World.tick_alpha = 0.0
+	me.tile = Vector2i(6, 25)  # The server has it four rows away.
+	var worst := 0.0
+	var last := drawn
+	var frames := 0
+	while frames < 80 and not Iso.local_to_grid(me.position).is_equal_approx(Vector2(6, 25)):
+		World.tick_alpha += 0.1
+		me._process(0.01)
+		var at := Iso.local_to_grid(me.position)
+		worst = maxf(worst, (at - last).length())
+		last = at
+		frames += 1
+	_check(Net.mispredicts_total == mispredicts + 1 and Net.snaps_total == snaps and not me._prediction.is_active(),
+			"a misprediction, no snap, and the walk ended")
+	_check(frames >= 25 and frames <= 35 and worst < 0.2,
+			"it slides there from %s in %d tenths of a tick, at most %.2f tiles a tenth" % [drawn, frames, worst])
+	World.tick_alpha = 0.0
+	var far := _me(Vector2i(6, 21))
+	far.predict_move(Vector2i(8, 21))
+	far._process(0.05)
+	far.tile = Vector2i(6, 40)
+	far._process(0.0)
+	_check(Net.snaps_total == snaps + 1 and Iso.local_to_grid(far.position).is_equal_approx(Vector2(6, 40)),
+			"nineteen tiles off is snapped (at %s)" % Iso.local_to_grid(far.position))
 
 
 # --- helpers ------------------------------------------------------------------

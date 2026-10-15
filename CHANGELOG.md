@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your character no longer snaps when the server puts them somewhere else: they
+  slide there quickly instead. A walk you start after being knocked back starts
+  from where you are drawn, without a hop back first.
 - Monsters can pick up a weapon left lying beside them, and fight with it.
   What a monster carries now makes it heavier to shove.
 

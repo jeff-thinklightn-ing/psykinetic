@@ -15,8 +15,9 @@ extends RefCounted
 ##   - it is anything else, or no confirmation arrives in time, or the server
 ##     says a step was refused: a misprediction. The owner then calls
 ##     rebase(): the sprite blends from where it is to the server's tile over
-##     a couple of ticks and the path is re-planned from there. Only an error
-##     of more than SNAP_TILES is snapped (see GridEntity).
+##     a couple of ticks and the path is re-planned from there. An error of
+##     more than SNAP_TILES ends the walk and slides there instead, and only
+##     TELEPORT_TILES or more is snapped (see GridEntity._mispredicted).
 ## Only walking is predicted. Being pushed is never predicted.
 ##
 ## A new move order keeps the steps already showing, and the order sent
@@ -111,11 +112,14 @@ func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	cancel_unstarted()
 	var at: Vector2i = _entity.tile
 	var start := _clock
+	var drawn := Vector2.INF
 	if is_active():
 		var last: Step = _steps.back()
 		at = last.to
 		start = maxf(_clock, last.start + last.duration)
-	_append_path(at, start)
+	else:
+		drawn = _drawn()
+	_append_path(at, start, drawn)
 	return unconfirmed()
 
 
@@ -163,10 +167,14 @@ func step(direction: Vector2i) -> bool:
 	# Straight on from the last step if it has only just ended, so a held
 	# key makes one steady walk; after a pause, from now.
 	var start := _ended_at
+	var from_grid := Vector2(at)
 	if is_active():
 		var last: Step = _steps.back()
 		at = last.to
 		start = last.start + last.duration
+		from_grid = Vector2(at)
+	else:
+		from_grid = _drawn()
 	if start < _clock - 1.0:
 		start = _clock
 	if _blocked(at, direction):
@@ -174,7 +182,7 @@ func step(direction: Vector2i) -> bool:
 	var next := Step.new()
 	next.from = at
 	next.to = at + direction
-	next.from_grid = Vector2(at)
+	next.from_grid = from_grid
 	next.to_grid = Vector2(next.to)
 	next.start = start
 	next.duration = World.step_ticks(_entity, direction)
@@ -339,9 +347,18 @@ func _current() -> Step:
 	return current
 
 
+## Where the entity is drawn now (grid units): a walk that starts from rest
+## starts there, not from its tile, which a slide still under way (a push,
+## a correction's, decision 339) has not reached; from the tile it would
+## jump back to it first.
+func _drawn() -> Vector2:
+	return Iso.local_to_grid(_entity.position)
+
+
 ## Appends the predicted steps from [param at] toward the target, the first
-## beginning at [param start].
-func _append_path(at: Vector2i, start: float) -> void:
+## beginning at [param start], and from [param drawn] if given (a walk from
+## rest: _drawn).
+func _append_path(at: Vector2i, start: float, drawn := Vector2.INF) -> void:
 	if not _has_target:
 		return
 	var latency := Net.rtt_ticks()
@@ -353,7 +370,8 @@ func _append_path(at: Vector2i, start: float) -> void:
 		var step := Step.new()
 		step.from = at
 		step.to = next
-		step.from_grid = Vector2(at)
+		step.from_grid = Vector2(at) if drawn == Vector2.INF else drawn
+		drawn = Vector2.INF
 		step.to_grid = Vector2(next)
 		step.start = start
 		step.duration = World.step_ticks(_entity, next - at)

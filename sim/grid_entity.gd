@@ -40,9 +40,15 @@ enum Order { NONE, ATTACK, SHOVE, SWING }
 ## The only state sent over the network, besides World's tick.
 const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected"]
 ## Reconciliation: a misprediction this far off or less is blended away over
-## this many ticks; anything further is snapped.
+## RECONCILE_BLEND_TICKS and the walk goes on; anything further ends the
+## walk and slides there from where it is drawn, RECOVER_TICKS_PER_TILE a
+## tile of the way, between RECONCILE_BLEND_TICKS and RECOVER_MAX_TICKS
+## (decision 339); only TELEPORT_TILES or more is snapped.
 const SNAP_TILES := 2
 const RECONCILE_BLEND_TICKS := 2.0
+const RECOVER_TICKS_PER_TILE := 0.75
+const RECOVER_MAX_TICKS := 4.0
+const TELEPORT_TILES := 8
 const HOP_HEIGHT := 6.0
 ## A body tossed overhead arcs this high instead, and for longer.
 const LOFT_HEIGHT := 20.0
@@ -824,25 +830,42 @@ func shown_tile() -> Vector2i:
 
 ## The server's result wins: snap to its tile and forget the predicted path.
 ## The server's result wins. A small error is blended away over
-## RECONCILE_BLEND_TICKS and the path re-planned from the server's tile; an
-## error of more than SNAP_TILES is snapped.
+## RECONCILE_BLEND_TICKS and the path re-planned from the server's tile; a
+## larger one ends the walk and slides there from where the body is drawn
+## (_recover); only TELEPORT_TILES or more is snapped.
 func _mispredicted(reason: String) -> void:
 	var predicted := _prediction.predicted_tile()
 	var error := World.distance(predicted, tile)
 	var off := (Iso.local_to_grid(position) - Vector2(tile)).length()
+	var drawn := Iso.local_to_grid(position)
 	Net.record_mispredict()
-	Net.stats.record_correction(off, error > SNAP_TILES)
+	Net.stats.record_correction(off, error >= TELEPORT_TILES)
 	_mirror_rest()
-	if error > SNAP_TILES:
+	if error >= TELEPORT_TILES:
 		_prediction.clear()
 		Net.record_snap()
 		print("[net] mispredict: %s predicted %s, server has %s, %d tiles off: snapped (%s)" % [
 			name, predicted, tile, error, reason])
+	elif error > SNAP_TILES:
+		_prediction.clear()
+		var ticks := _recover(drawn)
+		print("[net] mispredict: %s predicted %s, server has %s, %d tiles off: walk ended, sliding there over %.1f ticks (%s)" % [
+			name, predicted, tile, error, ticks, reason])
 	else:
 		_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
 		_resend_walk()
 		print("[net] mispredict: %s predicted %s, server has %s: blending (%s), %.2f tiles off" % [
 			name, predicted, tile, reason, off])
+
+
+## A slide from [param drawn] to the tile, at once (on the present clock),
+## its length by how far that is: no snap on a large correction. Returns
+## the slide's ticks.
+func _recover(drawn: Vector2) -> float:
+	var ticks := clampf(drawn.distance_to(Vector2(tile)) * RECOVER_TICKS_PER_TILE, RECONCILE_BLEND_TICKS, RECOVER_MAX_TICKS)
+	_slides.append({"from": tile, "to": tile, "tick": World.tick + World.tick_alpha, "duration": ticks,
+		"present": true, "from_pos": drawn})
+	return ticks
 
 
 ## After a correction: the walk re-planned from the server's tile goes to

@@ -184,7 +184,9 @@ sim state.
   happens. Anything else is a **misprediction**: if the error is at most
   `SNAP_TILES` (2), the sprite blends from where it is to the server's tile
   over `RECONCILE_BLEND_TICKS` (2) and the path is re-planned from there;
-  only a larger error is **snapped**. A shown step that the server never
+  a larger error ends the walk and slides the sprite from where it is to
+  the server's tile over 2-4 ticks, by how far (decision 339); only
+  `TELEPORT_TILES` (8) or more is **snapped**. A shown step that the server never
   confirms counts as a misprediction once it is `RECONCILE_GRACE_TICKS` (4)
   plus the round trip time overdue, and a step the server refuses outright
   is told to the client at once (`World.move_refused`) so it re-plans

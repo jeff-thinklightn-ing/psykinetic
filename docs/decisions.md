@@ -6622,3 +6622,51 @@ A FLANK monster (a sneak) treats a target guarding against it
 (World.guarding) as a front to go round, as it does a target facing it,
 so it looks for the open side. Which kinds carry shields is content, as
 with bows: none in a real level until Jeff says.
+## 339. Network smoothness C: corrections slide, never snap
+
+Smoothness step C (decision 337 lists the five). Measured with
+tools/net_smooth.sh as there: two runs a profile, two clients each, rates
+per client-minute.
+
+B first, measured and not built: a walking player's tile arriving before
+its push's word (_net_pushed) would be called a misprediction, so the
+client was made to wait for the word up to a round trip and a tick. In
+12 runs it waited 58 times and the word never came after the tile: the
+server sends the push during step() and the tile with the next poll, so
+even on a lossy link the push is first (its slide then starts from where
+the body is drawn, no misprediction). The waits only held real
+mispredictions back, and the player's own jumps rose (wan 1.5 to 3.5 a
+minute, bad 6.4 to 10.1). Taken out.
+
+What snapped: a misprediction more than SNAP_TILES (2) off put the sprite
+on the server's tile in one frame (grid_entity's `_mispredicted`), 2.2 a
+minute on the bad link, worst 4.5 tiles; "no confirmation from the
+server" (a shown step overdue) and "the server moved it elsewhere" alike.
+
+C, two parts, both client only:
+- A misprediction of more than SNAP_TILES ends the walk, as the snap did,
+  and slides the sprite from where it is drawn to the server's tile on
+  the present clock (`_recover`): 0.75 ticks a tile of the way, between 2
+  and 4 ticks, so at most a tenth of a tile a frame. Only TELEPORT_TILES
+  (8) or more is still snapped (and counted as a snap). Up to 2 tiles is
+  blended as before.
+- A walk that starts from rest (a move order, a WASD step, with nothing
+  predicted showing) starts where the body is drawn
+  (`MovePrediction._drawn`), not from its tile: after a push's or a
+  correction's slide, not yet on its tile, an order jumped it back to the
+  tile first. This was most of the own jumps left after the first part.
+
+mirror_test: a 4-tile misprediction slides in 3 ticks at most 0.13 tiles
+a tenth of a tick, no snap, the walk ended; 19 tiles off is snapped.
+
+| link | snaps/min before | after | own jumps/min before | after | worst own jump before | after |
+|---|---|---|---|---|---|---|
+| clean | 0 | 0 | 1.3 | 0 | 2.88 tiles | 0 |
+| wan | 0 | 0 | 1.5 | 1.5 | 0.72 | 4.04 (a respawn) |
+| bad | 2.2 | 0 | 6.4 | 2.0 | 4.54 | 7.62 (a respawn) |
+
+What is left of own jumps is mostly respawns on the start tile (4 to 7
+tiles: under the meter's 8-tile teleport, but meant) and a few 0.4-0.5
+tile frames of a fast blend; the camera (337) eases over those. Corrections
+a minute are much the same (2.2 / 13.5 / 33.5): it is how they are drawn
+that changed. Others' jumps are D's.
