@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.145
+
 - Weapons change the blow: a war hammer knocks foes back where a fist would
   not, a dagger is quick and strikes twice as hard from behind, a giant axe is
   slow. Monsters can be given weapons too.
