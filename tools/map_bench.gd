@@ -266,6 +266,9 @@ func _ready() -> void:
 	print("BENCH world tick, every monster walking back: a slice of %d queued, gone through in %d steps of %.2f ms at most; all at once (no step does it) %.2f ms" % [
 		queued, drains, drain_worst / 1000.0, (Time.get_ticks_usec() - started) / 1000.0])
 
+	# A frame or two first, so what was freed this run (queue_free) is gone.
+	await get_tree().process_frame
+	await get_tree().process_frame
 	print("BENCH nodes: %d, objects: %d, static memory: +%.1f MB" % [
 		Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 		Performance.get_monitor(Performance.OBJECT_COUNT),

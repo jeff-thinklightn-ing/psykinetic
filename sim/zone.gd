@@ -45,6 +45,11 @@ var comings := 0
 var asleep_since := -1
 ## Where its players and companions last stood (World._tier_origins).
 var tier_origins: Array[Vector2i] = []
+## Its monsters far from everyone, kept as records instead of nodes
+## (decision 352), by World.RECORD_CHUNK square: {chunk: [record]}. A
+## record is {entry: Snapshot.entry, route: [[x, y]], route_index,
+## route_step}; Main makes and recalls them (_retire, _recall).
+var records := {}
 
 
 func _init(zone_name := "") -> void:

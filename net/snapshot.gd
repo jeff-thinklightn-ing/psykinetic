@@ -31,7 +31,8 @@ static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] =
 		var entities: Array[GridEntity] = []
 		entities.assign(section.get("entities", []))
 		saved[zone_name] = {"tick": int(section.get("tick", 0)), "entities": _entries(entities),
-			"respawns": section.get("respawns", []), "ground": section.get("ground", [])}
+			"respawns": section.get("respawns", []), "ground": section.get("ground", []),
+			"records": section.get("records", [])}
 	var records: Array[Dictionary] = []
 	for record in players:
 		records.append(record.to_dict())
@@ -39,6 +40,18 @@ static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] =
 	data.merge(world)
 	var text := JSON.stringify(data, "\t")
 	return _write(path, text)
+
+
+## [param entity] as a saved entry (_entries), for a record of it kept
+## instead of the node (Main._retire, decision 352); {} if it is not saved.
+static func entry(entity: GridEntity) -> Dictionary:
+	var list := _entries([entity])
+	return list[0] if not list.is_empty() else {}
+
+
+## A saved entry read back (_parse_entry): {} if it makes no sense.
+static func parse_entry(raw: Variant) -> Dictionary:
+	return _parse_entry(raw)
 
 
 static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
@@ -192,7 +205,15 @@ static func _parse_zone(raw: Dictionary) -> Dictionary:
 		var cell: Variant = vector(pile.get("cell")) if pile is Dictionary else null
 		if cell != null and pile.get("ids") is Array:
 			ground.append({"cell": cell, "ids": pile["ids"], "items": pile["items"] if pile.get("items") is Array else []})
-	return {"tick": int(raw.get("tick", 0)), "entities": entities, "respawns": respawns, "ground": ground}
+	# Monsters kept as records (decision 352): kept as they are (Main reads
+	# each when it recalls it); none in a snapshot from before them.
+	var records: Array[Dictionary] = []
+	for record: Variant in raw.get("records", []) if raw.get("records") is Array else []:
+		if record is Dictionary and not _parse_entry(record.get("entry")).is_empty():
+			records.append(record)
+		else:
+			push_warning("[state] skipping a record that makes no sense: %s" % [record])
+	return {"tick": int(raw.get("tick", 0)), "entities": entities, "respawns": respawns, "ground": ground, "records": records}
 
 
 ## A version 1 snapshot's map (the test room for one from before maps).

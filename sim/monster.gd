@@ -339,6 +339,9 @@ var tier_comings := -1
 ## is queued for it. World's.
 var world_step := -1
 var world_queued := false
+## The tick its tier last became FAR (-1: not FAR): far long enough, it is
+## kept as a record instead (Main._retire, decision 352). World's.
+var far_since := -1
 
 
 func _init() -> void:

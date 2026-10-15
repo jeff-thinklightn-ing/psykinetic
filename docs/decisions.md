@@ -6899,3 +6899,85 @@ haulers and town work.
 - Rent is now the largest drain: 3 a day each takes 150 down by 65 in
   3 days with no players. `rent` 1 or 2 slows that.
 - (b), the treasury hiring more officials as it grows, is a later step.
+## 352. The far tier hands over to records: far monsters stop being nodes
+
+Roadmap: "the far tier hands over to the world tick, not to a stop".
+Approved by the coordinator in three steps; this is (a), level monsters
+(b: residents' bodies by distance; c: animals to economy's Herds through
+the keepers below).
+
+Before: a monster FAR from everyone (decision 193's tiers) already skipped
+its think and was moved on by the world tick, but stayed a node: in the
+1-player 256x256 dungeon (about 2,600 entities, nearly all far) the step
+was 1.9 ms, of which thinking was 0.7 and the rest the step's loops over
+every entity (act, protection, stamina, wounds, buffs), and the map held
+40,400 objects, 341 MB.
+
+Now (`Main._retire_and_recall`, every `RETIRE_EVERY_TICKS` = 10):
+- A monster FAR for `RETIRE_AFTER_TICKS` (300, a world-tick period,
+  `Monster.far_since` stamped by World._tier), more than `retire_tiles`
+  (80, exported) from every player and companion of its zone, calm (no
+  target, alert IDLE, not going back after a fight, not on a march short
+  of its end, not stunned), nobody's and not a raider (Raids holds those as
+  nodes) is kept as a record (`_retire`): its `Snapshot.entry` (spec, slot,
+  tile, hp, stamina, facing, slots and item uids) and its route, route
+  index and step, on its Zone (`Zone.records`, by 16-cell square). Retired
+  for `RETIRE_BUDGET_USEC` (2 ms) a pass at most.
+- Only monsters the world tick would not move are retired:
+  `Monster._world_tick` walks one going back or marching and leaves every
+  other where it is, so a record stays exactly where the node would have
+  been; walls, doors and held ground hold as they did (enemy-ai: nothing
+  else of its far state needs keeping; what is drawn from its name comes
+  back with the name).
+- It is made again as it was once someone is within `recall_tiles` (70,
+  exported): the snapshot path (`_level_spec_for`, `_spawn`, `restore`,
+  `set_slots`), on its tile or the nearest free one, its patrol going on
+  from its waypoint. Nearest first for `RECALL_BUDGET_USEC` (4 ms) a pass;
+  all within `RECALL_NOW_TILES` (44, where Interest would already show
+  one: only after a join, a travel or a jump) at once; and those within 70
+  of where a player joins, before spawn safety looks for hostiles. Interest
+  leaves at about 44 cells and the view reaches 28, so nobody sees one go
+  or come.
+- Not a death: the despawn is under Main's `_travelling` (no slot marked
+  dead, no "died" in the party log), the slot is neither alive nor dead
+  while it is a record (`_recorded_slots`: no respawn, and a snapshot's
+  "new in the level" pass does not make it again), its things stay held
+  under "<zone>/<name>", and a room reset or a load treats them as a level
+  entity's (`World.reset`, `World.set_records`).
+- Saved: each zone's `records` in the snapshot; a snapshot from before
+  them (no "records") loads exactly as before (far_tier_test loads one
+  with its three monsters as nodes).
+- Keepers (`World.keepers`, docs/design.md "Zones"): a kind with a
+  world-tick store of its own registers an object with `takes`, `retire`
+  and `recall_near`; a monster one takes goes to it instead of a record,
+  and it is asked to make what it keeps near whoever comes. Economy's
+  Herds (W3) and enemy-ai's wake spawn (W4) are to use it.
+
+tests/far_tier_test (a 140-cell strip, the monsters 100+ cells off):
+retired after the wait, no death, no respawn after the respawn delay, the
+node freed, the dagger still Imp2's; saved and loaded as records with no
+duplicate, and the first save after loading keeps them; walked near, all
+three back with their hp, their dagger and the patrol's waypoint; an old
+snapshot loads with its three monsters; a keeper takes the brute and is
+asked about what it keeps.
+
+map_bench (256x256, a monster per 42 cells, 400 ticks settled with the
+host alone, then the players spread on a grid, 3x600 ticks):
+
+| players | step median before | after | entities | objects | static memory |
+|---|---|---|---|---|---|
+| 1 | 1.94 ms | 0.74 ms | 2,593 to 1,182 | 40,418 to 29,130 | 341 to 293 MB |
+| 4 | 6.6-9.5 | 7.3-8.0 | 2,596 to 2,085 | | |
+| 16 | 16.4-17.9 | 17.1-20.2 | all recalled | same | same |
+
+With players spread over the whole map nothing is 80 cells from everyone,
+so there is nothing to gain, and the pass costs about 0.02 ms a tick (16
+players spread from the start: 17.7 before, 17.1 after); the 16-player
+medians after a mass recall move by 3 ms from run to run either way
+(fights land differently). The worst step, about 390 ms, is the bench's
+own: 15 players put down at once on ground whose monsters are records,
+1,400 recalled within 44 cells in one pass. A player who walks has them
+back 20 or so a pass well before they could be seen; a join recalls those
+within 44 of it at once (castle density: about 180, some 50 ms).
+Server only; no protocol change. map_bench reads nodes and memory a frame
+or two after the run, so what was freed is gone.

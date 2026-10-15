@@ -387,6 +387,37 @@ holds, respawn timers wait. It wakes when someone arrives
 (`World._woke`, the place to catch up on the time it slept; nothing
 there yet).
 
+**Far monsters are records** (decision 352): a monster FAR from every
+player and companion of its zone (World's tiers) for `RETIRE_AFTER_TICKS`
+(300), more than `Main.retire_tiles` (80) from all of them, calm (no
+target, not alert, not going back after a fight, not on a march, not
+stunned), nobody's and not a raider is kept as a record instead of a node
+(`Main._retire`): its snapshot entry (`Snapshot.entry`: spec, slot, tile,
+hp, stamina, facing, things) and where it is on its route, on its Zone
+(`Zone.records`, by `World.RECORD_CHUNK` square). As a record it is where
+the world tick would have left it: `Monster._world_tick` moves only one
+going back or marching, and those are not retired. It is made again as it
+was (`Main._recall`: the snapshot path, its tile or the nearest free one,
+its place on its route) once someone is within `Main.recall_tiles` (70),
+looked at every `RETIRE_EVERY_TICKS` (10) and when a player comes into the
+zone (before spawn safety looks for hostiles). Both distances are past
+what a client is sent (Interest leaves at about 44), so nobody sees one go
+or come. Its slot is neither alive nor dead meanwhile (no respawn, no
+death in the party log), its things stay held under its name, and records
+are saved with their zone (`records`; a snapshot from before them loads
+as it did).
+
+*Keepers* (the hook for wildlife's herds, W4, and any other kind with a
+world-tick store of its own): an object in `World.keepers` with
+`takes(monster) -> bool`, `retire(monster)` and `recall_near(at: Vector2i,
+reach: int)`. When a monster is retired, the first keeper that takes it is
+given it (`retire`, before it is despawned, not a death: Herds.give its
+kind to the area's count) and no record is made; when someone is within
+`recall_tiles` of a cell (the same passes as records), every keeper is
+asked to make what it keeps there (`recall_near`: Herds.take and spawn by
+`World.spawn_spec`, as W4's zone wake does). A keeper decides what its
+record is and how its world tick moves it; World decides when.
+
 **Persistence**: the snapshot (version 2) has every loaded zone's
 entities and respawn timers, and each player's zone in their record. On a
 restart every saved zone is loaded again as saved, and each player comes

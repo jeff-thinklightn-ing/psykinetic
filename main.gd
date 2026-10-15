@@ -120,6 +120,26 @@ const SNAPSHOT_EVERY_TICKS := 30
 const RESPAWN_DELAY_TICKS := 600
 ## ...and no player is within this many tiles of that spawn tile.
 const RESPAWN_MIN_DISTANCE := 6
+## The far tier hands over to records (decision 352): a monster FAR from
+## every player and companion for RETIRE_AFTER_TICKS, more than
+## retire_tiles from all of them, calm and with nowhere the world tick
+## would walk it (Monster._world_tick moves only one going back or on a
+## march), is kept as a record on its Zone instead of a node (_retire); it
+## is made again, as it was, once someone comes within recall_tiles
+## (_recall). Both are past what a client is sent (Interest leaves at about
+## 44 cells), so nobody sees one go or come. Looked at every
+## RETIRE_EVERY_TICKS: records within recall_tiles are made again nearest
+## first for RECALL_BUDGET_USEC at most (the rest on the next pass), but
+## all within RECALL_NOW_TILES (where Interest would already show it: only
+## after a jump, a join or a travel) at once; then monsters are retired
+## for RETIRE_BUDGET_USEC at most.
+@export var retire_tiles := 80
+@export var recall_tiles := 70
+const RECALL_NOW_TILES := 44
+const RETIRE_AFTER_TICKS := 300
+const RETIRE_EVERY_TICKS := 10
+const RETIRE_BUDGET_USEC := 2000
+const RECALL_BUDGET_USEC := 4000
 
 ## Server only: peer id -> that peer's player entity.
 var _players: Dictionary[int, Player] = {}
@@ -1903,8 +1923,13 @@ func _free_cell_near(near: Vector2i, reach: int, draw: RandomNumberGenerator) ->
 ## entities in the room again. False if it has none to restore.
 func _spawn_saved(section: Dictionary) -> bool:
 	var saved: Array = section.get("entities", [])
-	if saved.is_empty() and section.get("respawns", []).is_empty():
+	var records: Array = section.get("records", [])
+	if saved.is_empty() and section.get("respawns", []).is_empty() and records.is_empty():
 		return false
+	# Monsters kept as records stay records, holding their slots (and their
+	# things) till someone comes near (decision 352); none before them.
+	World.set_records(records)
+	var recorded := _recorded_slots()
 	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
 		var entity := _spawn(spec)
@@ -1915,16 +1940,169 @@ func _spawn_saved(section: Dictionary) -> bool:
 			World.set_slots(entity, entry["slots"], entry.get("items", []))
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
-		if not _alive_slots.has(respawn["spawn"]):
+		if not _alive_slots.has(respawn["spawn"]) and not recorded.has(respawn["spawn"]):
 			_dead_since[respawn["spawn"]] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
 	# Slots with neither are new in the level since the save (every dead
 	# slot's timer is saved): there now, or dead from now if their tile is taken.
 	for slot in level_entities.size():
-		if not _alive_slots.has(slot) and not _dead_since.has(slot):
+		if not _alive_slots.has(slot) and not _dead_since.has(slot) and not recorded.has(slot):
 			print("[state] %s is new in the level since the save" % level_entities[slot]["name"])
 			if _spawn(_slot_spec(slot)) == null:
 				_dead_since[slot] = World.tick
 	return true
+
+
+# --- Far monsters kept as records (decision 352) -------------------------------
+
+## Monsters near someone come back from their records; then those far from
+## everyone long enough, and calm, become records (see retire_tiles).
+func _retire_and_recall() -> void:
+	var near := World._tier_origins()
+	if near.is_empty():
+		return  # Nobody has ever been here (a test room): nothing is far.
+	var started := Time.get_ticks_usec()
+	if not World.zone.records.is_empty():
+		for at in near:
+			_recall_near(at, RECALL_NOW_TILES)
+		# Further out, nearest first, as long as the budget lasts.
+		var waiting: Array[Dictionary] = []
+		for at in near:
+			waiting.append_array(World.take_records_near(at, recall_tiles))
+		waiting.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return _nearest_of(World.record_tile(a), near) < _nearest_of(World.record_tile(b), near))
+		for record in waiting:
+			if Time.get_ticks_usec() - started > RECALL_BUDGET_USEC or _recall(record) == null:
+				World.add_record(record)  # Its turn on the next pass.
+	for keeper: Object in World.keepers:
+		for at in near:
+			keeper.recall_near(at, recall_tiles)
+	started = Time.get_ticks_usec()
+	var due := World.tick - RETIRE_AFTER_TICKS
+	for entity: GridEntity in World.monsters().duplicate():
+		var monster := entity as Monster
+		# Most are not far, or not for long yet: passed over with a look.
+		if monster == null or monster.far_since < 0 or monster.far_since > due:
+			continue
+		if Time.get_ticks_usec() - started > RETIRE_BUDGET_USEC:
+			break
+		if _retirable(monster, near):
+			_retire(monster)
+
+
+## How far [param at] is from the nearest of [param near].
+static func _nearest_of(at: Vector2i, near: Array[Vector2i]) -> int:
+	var nearest := 1 << 30
+	for each in near:
+		nearest = mini(nearest, World.distance(at, each))
+	return nearest
+
+
+## Whether [param monster] can be kept as a record: far from everyone in
+## [param near] for long enough, past retire_tiles, calm, nobody's, not a
+## raider (Raids holds those as nodes), and with nothing for the world tick
+## to walk it to (going back after a fight, or still on a march), so as a
+## record it stays exactly where the world tick would have left it.
+func _retirable(monster: Monster, near: Array[Vector2i]) -> bool:
+	if not monster.spawned or monster.raid != "" or monster.owner_peer != 0 or monster.keeper_peer != 0:
+		return false
+	if monster.far_since < 0 or World.tick - monster.far_since < RETIRE_AFTER_TICKS:
+		return false
+	if monster.target != null or monster.alert != Monster.Alert.IDLE or monster._returning or World.is_stunned(monster):
+		return false
+	if monster.idle == Monster.Idle.MARCH and not monster.route.is_empty() and monster.tile != monster.route.back():
+		return false
+	for at in near:
+		if World.distance(monster.tile, at) <= retire_tiles:
+			return false
+	return true
+
+
+## [param monster] kept as a record on its zone instead of a node: what a
+## snapshot keeps of it (its slot, hp, stamina, facing, things) and where
+## it is on its route. Not a death: its slot is neither alive nor dead
+## meanwhile (_recorded_slots), and its things stay where they are held.
+func _retire(monster: Monster) -> void:
+	# A kind with a world-tick store of its own (wildlife's herds) takes it
+	# there instead: its keeper's record, not one of ours.
+	for keeper: Object in World.keepers:
+		if keeper.takes(monster):
+			keeper.retire(monster)
+			_despawn_kept(monster)
+			return
+	var entry := Snapshot.entry(monster)
+	if entry.is_empty():
+		return
+	var route: Array = []
+	for point in monster.route:
+		route.append([point.x, point.y])
+	var record := {"entry": entry, "route": route, "route_index": monster._route_index, "route_step": monster._route_step}
+	_despawn_kept(monster)
+	World.add_record(record)
+
+
+## [param monster] gone from the room but kept (a record, a keeper's): not
+## a death, its slot neither alive nor dead.
+func _despawn_kept(monster: Monster) -> void:
+	var slot := int(monster.spawn_spec.get("spawn", -1))
+	if slot >= 0 and _alive_slots.get(slot) == monster:
+		_alive_slots.erase(slot)
+	_travelling = true  # Kept, not dead.
+	World.despawn(monster)
+	_travelling = false
+	# Freed at the end of the frame (despawn); its name let go now, so one
+	# made again under it this frame keeps it. (Taken out of the tree instead,
+	# a node queued to be freed is not.)
+	monster.name = "%s_kept_%d" % [monster.name, monster.get_instance_id()]
+
+
+## The records within [param reach] (recall_tiles if -1) of [param at]
+## made again, and what keepers keep there.
+func _recall_near(at: Vector2i, reach := -1) -> void:
+	reach = recall_tiles if reach < 0 else reach
+	for record in World.take_records_near(at, reach):
+		if _recall(record) == null:
+			World.add_record(record)  # No room for it now: kept, tried again later.
+	for keeper: Object in World.keepers:
+		keeper.recall_near(at, reach)
+
+
+## [param record] made again as it was kept (_retire): as the snapshot
+## path makes a saved entity, on its tile or the nearest free one, then its
+## place on its route, so a patrol goes on from there. Null if it cannot be.
+func _recall(record: Dictionary) -> GridEntity:
+	var parsed := Snapshot.parse_entry(record["entry"])
+	if parsed.is_empty():
+		return null
+	var spec := _level_spec_for(parsed["spec"])
+	spec["tile"] = _nearest_free(spec["tile"])
+	var entity := _spawn(spec)
+	if entity == null:
+		return null
+	World.restore(entity, parsed["hp"], parsed["stamina"], parsed["facing"])
+	if parsed.get("slots") != null:
+		World.set_slots(entity, parsed["slots"], parsed.get("items", []))
+	var monster := entity as Monster
+	if monster != null:
+		var route: Array[Vector2i] = []
+		for point: Variant in record.get("route", []):
+			var tile: Variant = Snapshot.vector(point)
+			if tile is Vector2i:
+				route.append(tile)
+		if not route.is_empty():
+			monster.route = route
+		monster._route_index = clampi(int(record.get("route_index", 0)), 0, maxi(monster.route.size() - 1, 0))
+		monster._route_step = int(record.get("route_step", 1))
+	return entity
+
+
+## The spawn slots the zone's records hold.
+func _recorded_slots() -> Dictionary:
+	var slots := {}
+	for record in World.record_list():
+		var slot: Variant = record["entry"].get("spawn", -1)
+		if (slot is int or slot is float) and int(slot) >= 0:
+			slots[int(slot)] = true
+	return slots
 
 
 ## What a level entity is — script, shape, tint, scale, props — always comes
@@ -2009,7 +2187,8 @@ func _save_state() -> void:
 		var ground: Array[Dictionary] = []
 		for cell: Vector2i in each.ground:
 			ground.append({"cell": [cell.x, cell.y], "items": Array(each.ground[cell]), "ids": Array(World.ground_at(cell))})
-		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns, "ground": ground}
+		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns, "ground": ground,
+			"records": World.record_list()}
 	World.enter(was)
 	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
@@ -2150,6 +2329,10 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	if not World.is_free(tile):
 		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
 		return
+	# Monsters kept as records near where they come in are back first
+	# (decision 352): they count for spawn safety, and are there when the
+	# player's view arrives.
+	_recall_near(tile)
 	# Spawn safety: not next to a hostile. Applies to coming back and to
 	# respawning; a first join is at a start tile anyway and gets the same check.
 	var intended := tile
@@ -3476,6 +3659,8 @@ func _on_world_ticked(tick: int) -> void:
 		_check_respawns(tick)
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
+		if tick % RETIRE_EVERY_TICKS == 0:
+			_retire_and_recall()
 		_resident_voices()
 	if World.zone != World.home():
 		return  # Another zone's tick: the HUD and the test hooks are this view's.

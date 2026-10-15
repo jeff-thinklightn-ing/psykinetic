@@ -714,6 +714,10 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 		nearest = mini(nearest, distance(entity.tile, at))
 	var was: int = monster.tier if monster.tier_tick >= 0 else Tier.FAR
 	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
+	if monster.tier != Tier.FAR:
+		monster.far_since = -1
+	elif monster.far_since < 0:
+		monster.far_since = tick
 	monster.tier_tick = tick
 	monster.beyond_view = nearest > VIEW_TILES
 	monster.nearest_sought = nearest
@@ -930,6 +934,14 @@ func reset() -> void:
 			_unclaimed.append(uid)
 	zone.ground.clear()
 	zone.piles.clear()
+	# Its monsters kept as records go with the room too, their things as a
+	# level entity's do.
+	for record: Dictionary in record_list():
+		for uid: Variant in record["entry"].get("items", []):
+			if (uid is int or uid is float) and int(uid) != 0:
+				items.place(int(uid), "")
+				_unclaimed.append(int(uid))
+	zone.records = {}
 	for entity in _entities:
 		if is_instance_valid(entity):
 			entity._world_remove()
@@ -951,6 +963,84 @@ func reset() -> void:
 	tick = 0
 	tick_alpha = 0.0
 	_accumulator = 0.0
+
+
+# --- Far monsters kept as records (decision 352) -------------------------------
+
+## Records are kept by square of this many cells (Zone.records), so those
+## within a reach of someone are found without going through them all.
+const RECORD_CHUNK := 16
+## The kinds with a world-tick store of their own: objects with
+## takes(monster) -> bool, retire(monster) and recall_near(at, reach). A
+## monster Main retires that one takes goes to it instead of a record; and
+## when someone is near a cell, each is asked to make what it keeps there
+## (docs/design.md, Zones: keepers; wildlife's herds, W4).
+var keepers: Array[Object] = []
+
+
+## [param record] kept in the zone World is in (Main._retire).
+func add_record(record: Dictionary) -> void:
+	var chunk := _record_chunk(record)
+	if not zone.records.has(chunk):
+		zone.records[chunk] = []
+	zone.records[chunk].append(record)
+
+
+## The zone's records within [param reach] of [param at], taken out of it
+## (Main._recall_near recalls them).
+func take_records_near(at: Vector2i, reach: int) -> Array[Dictionary]:
+	var taken: Array[Dictionary] = []
+	var low := Vector2i(floori(float(at.x - reach) / RECORD_CHUNK), floori(float(at.y - reach) / RECORD_CHUNK))
+	var high := Vector2i(floori(float(at.x + reach) / RECORD_CHUNK), floori(float(at.y + reach) / RECORD_CHUNK))
+	for cy in range(low.y, high.y + 1):
+		for cx in range(low.x, high.x + 1):
+			var chunk := Vector2i(cx, cy)
+			if not zone.records.has(chunk):
+				continue
+			var kept: Array = []
+			for record: Dictionary in zone.records[chunk]:
+				if distance(record_tile(record), at) <= reach:
+					taken.append(record)
+				else:
+					kept.append(record)
+			if kept.is_empty():
+				zone.records.erase(chunk)
+			else:
+				zone.records[chunk] = kept
+	return taken
+
+
+## Every record of the zone World is in, in no particular order (saving).
+func record_list() -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	for chunk: Vector2i in zone.records:
+		for record: Dictionary in zone.records[chunk]:
+			list.append(record)
+	return list
+
+
+## The zone's records, as a snapshot had them (Main._start_level): the
+## things they hold are theirs again, so a rebuild does not end them as lost.
+func set_records(list: Array) -> void:
+	zone.records = {}
+	for record: Dictionary in list:
+		add_record(record)
+		var holder := "%s/%s" % [zone.name, record["entry"].get("name", "")]
+		var label := str(record["entry"].get("label", "")) if str(record["entry"].get("label", "")) != "" else str(record["entry"].get("name", ""))
+		for uid: Variant in record["entry"].get("items", []):
+			if (uid is int or uid is float) and int(uid) != 0 and items.has(int(uid)):
+				items.place(int(uid), holder, holder, label)
+
+
+## Where [param record] stands.
+static func record_tile(record: Dictionary) -> Vector2i:
+	var tile: Variant = Snapshot.vector(record["entry"].get("tile"))
+	return tile if tile is Vector2i else Vector2i.ZERO
+
+
+static func _record_chunk(record: Dictionary) -> Vector2i:
+	var tile := record_tile(record)
+	return Vector2i(floori(float(tile.x) / RECORD_CHUNK), floori(float(tile.y) / RECORD_CHUNK))
 
 
 ## [param terrain] is what Terrain.parse returns.
