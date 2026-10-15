@@ -81,6 +81,8 @@ func _ready() -> void:
 	_test_wild_wolf()
 	_test_wild_remains()
 	_test_lead_occupied()
+	_test_raid_townsfolk()
+	_test_charging()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1678,4 +1680,55 @@ func _test_lead_occupied() -> void:
 		World.step()
 		closest = mini(closest, World.distance(monster.tile, crate.tile))
 	_check(closest <= 1, "it got beside the crate on its lead (%d off at best)" % closest)
+	Monster.idling = true
+
+
+func _test_raid_townsfolk() -> void:
+	print("\n== a raider goes for a town's resident too, and takes one it beats down; other monsters let them be ==")
+	Monster.idling = false
+	var raids := _raid_room(["############", "#..........#", "#......i...#", "#..........#", "############"], Vector2i(10, 1))
+	var imp: Monster = World.monsters()[0]
+	raids.enter({"id": "g5", "faction": "goblins", "strength": 1.0, "town": "t"}, World.zone.name, Vector2i(2, 2))
+	var raider := raids.raiders("g5")[0]
+	var smith := EntityFactory.build({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Smith"}) as Resident
+	smith.worker_id = "w1"
+	_room.add_child(smith)
+	World.spawn(smith, Vector2i(4, 2))
+	_bold(raider)
+	_bold(imp)
+	World.step()
+	World.step()
+	_check(raider.target == smith, "the raider goes for the resident (%s)" % [raider.target])
+	_check(imp.target == null, "the imp that is no raider lets the resident be")
+	var taken: Array = []
+	var on_taken := func(e: GridEntity, by: String) -> void: taken.append([e, by])
+	World.entity_taken.connect(on_taken)
+	World.damage(smith, 999, raider)
+	_check(taken.size() == 1 and taken[0][0] == smith and taken[0][1] == "g5", "beaten down, the resident is taken")
+	_check("resident:w1" in raids.carries("g5")["captives"], "the group carries them off (%s)" % [raids.carries("g5")])
+	World.entity_taken.disconnect(on_taken)
+	World.spawn_spec = Callable()
+	raids.clear()
+	Monster.idling = true
+
+
+func _test_charging() -> void:
+	print("\n== charging(): a brute closing its last tiles, a boar in its charge ==")
+	Monster.idling = false
+	var e := _build(["##############", "#P..........b#", "##############"])
+	var brute: Monster = e["b"][0]
+	_bold(brute)
+	var charged := false
+	for i in 40:
+		World.step()
+		if brute.charging():
+			charged = World.distance(brute.tile, e["P"][0].tile) <= Monster.CHARGE_RANGE
+			break
+	_check(charged, "the brute charges its last CHARGE_RANGE tiles")
+	e = _build(["############", "#..........#", "#....Po....#", "#..........#", "############"])
+	var boar: Animal = e["o"][0]
+	_check(not boar.charging(), "a boar grazing is not charging")
+	World.damage(boar, 2, e["P"][0])
+	World.step()
+	_check(boar.charging(), "struck, the boar charges")
 	Monster.idling = true

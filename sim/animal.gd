@@ -254,6 +254,11 @@ func _settle_bold() -> void:
 	_night_bonus = bonus
 
 
+## A boar in its charge, or charging as Monster's HEAVY do.
+func charging() -> bool:
+	return super() or role == Role.GAME and World.tick < _charge_until and is_instance_valid(_foe) and _foe.spawned
+
+
 ## Its side is its herd.
 func _same_side(other: GridEntity) -> bool:
 	return other is Animal and (other as Animal).herd == herd

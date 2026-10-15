@@ -5626,6 +5626,16 @@ lines, no "alive": false) and World.entity_taken(target, by) is: Main takes
 her off the map and keeps her record "taken" (companions' side), and the
 group carries "companion:<keeper id>" among its captives, the origin Towns
 names her by. entity_damaged is emitted first as ever, so the blow is seen.
+
+Amended (decision 333, residents as bodies in town): a Resident beaten down
+by a raider is taken the same way, the group carrying "resident:<worker
+id>"; Main hands it to Towns.resident_taken and ends the body. A beaten
+group frees only its companions at once; a resident comes home by
+economy's note_rescue. Raiders (only: Monster.raid set) look over
+World.townsfolk() for a target as well as World.sought(), so a resident
+is chased like anyone else; other monsters let residents be (the sense
+cost stays per monster as perf set it, and a stray imp does not empty a
+town).
 ## 285. Walls and floors are drawn in sets
 
 The map says which set its walls and floors are drawn in (level.json

@@ -189,18 +189,20 @@ func _hook() -> void:
 ## World.spared: a raider's blow that would kill a companion takes it
 ## instead (decision 314): the group's id, else "".
 func _spared(target: GridEntity, source: GridEntity, _cause: StringName) -> String:
-	if target is Companion and source is Monster and (source as Monster).raid != "" \
+	if (target is Companion or target is Resident) and source is Monster and (source as Monster).raid != "" \
 			and _groups.has((source as Monster).raid):
 		return (source as Monster).raid
 	return ""
 
 
-## A companion taken by group [param by]: it carries her off (her keeper's
-## id, "companion:<id>", as Towns' captives name her origin).
+## A companion or a resident taken by group [param by]: it carries them
+## off ("companion:<keeper id>", as Towns' captives name her origin;
+## "resident:<worker id>", decision 333, the body Main's to end).
 func _on_taken(entity: GridEntity, by: String) -> void:
-	if not _groups.has(by) or not entity is Companion:
+	if not _groups.has(by) or not (entity is Companion or entity is Resident):
 		return
-	var who := "companion:%s" % (entity as Companion).keeper_id
+	var who := "companion:%s" % (entity as Companion).keeper_id if entity is Companion \
+			else "resident:%s" % (entity as Resident).worker_id
 	if who not in _groups[by]["carries"]["captives"]:
 		_groups[by]["carries"]["captives"].append(who)
 	print("[raids] %s takes %s" % [by, entity.name])

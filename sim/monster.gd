@@ -305,6 +305,8 @@ var _sits := false
 var _idle_from := 0
 ## The way it is walking as it idles, and where to (_idle_step).
 var _idle_path: Array[Vector2i] = []
+## A HEAVY one closing its last CHARGE_RANGE at CHARGE_PACE (charging).
+var _charging := false
 var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
 ## not yet). World's.
@@ -492,9 +494,9 @@ func _sim_tick() -> void:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
 		return
 	if tactic == Tactic.HEAVY:
-		var charging := World.distance(tile, target.tile) <= CHARGE_RANGE \
+		_charging = World.distance(tile, target.tile) <= CHARGE_RANGE \
 				and World.has_clear_line(tile, target.tile)
-		move_ticks = _pace * (CHARGE_PACE if charging else 1.0)
+		move_ticks = _pace * (CHARGE_PACE if _charging else 1.0)
 	slot = _pick_slot()
 	if slot == NO_TILE or not _go_to(slot):
 		# Nowhere free beside it: as near as it can get.
@@ -637,7 +639,7 @@ func _nearest_visible_target() -> GridEntity:
 	# Nobody near enough to be seen: its tier's measure (a few ticks old,
 	# nobody come or gone since) is beyond its sight by more than anyone
 	# could close meanwhile. Most looks end here.
-	if target == null and nearest_sought > sight_range + LOOK_MARGIN_TILES \
+	if target == null and raid == "" and nearest_sought > sight_range + LOOK_MARGIN_TILES \
 			and tier_comings == World.zone.comings and World.tick - tier_tick < World.TIER_EVERY_TICKS:
 		return null
 	var nearest: GridEntity = null
@@ -662,6 +664,16 @@ func _nearest_visible_target() -> GridEntity:
 					nearest_distance = d
 			elif _wary and alert == Alert.IDLE and _glimpsed == NO_TILE and senses.glimpses(entity, d):
 				_glimpsed = at
+	if raid != "":
+		# A raider goes for the town's folk too (decision 333): they run, and
+		# beaten down they are taken (Raids._spared).
+		for entity in World.townsfolk():
+			var d := World.distance(tile, entity.tile)
+			if d <= sight_range and d < nearest_distance and senses.sees(entity, d, entity != target):
+				if entity == target:
+					kept = d
+				nearest = entity
+				nearest_distance = d
 	if tactic != Tactic.PLAIN and kept >= 0 and kept - nearest_distance < RETARGET_TILES:
 		return target
 	return nearest
@@ -835,6 +847,13 @@ func _search() -> void:
 		World.face(self, turned(facing, LOOK_ROUND[_looks]))
 		_looks += 1
 		_look_until = World.tick + LOOK_TICKS
+
+
+## Whether it is charging as it steps: a HEAVY one closing its last
+## CHARGE_RANGE on its target at CHARGE_PACE (a braced spear stops it, items'
+## weapons-as-verbs).
+func charging() -> bool:
+	return _charging and alert == Alert.FIGHTING and is_instance_valid(target)
 
 
 ## Whether it walks through closed doors now: one that opens doors does
