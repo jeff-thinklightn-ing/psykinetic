@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
 	await _test_doors_swing()
+	await _test_door_states()
 	_test_art_puppets()
 	_test_piles()
 	_test_heard_as_monsters_hear()
@@ -1409,6 +1410,53 @@ func _test_doors_swing() -> void:
 		_rig._process(0.05)
 
 
+func _test_door_states() -> void:
+	print("
+== a door's art shows its state_<name> nodes in that state alone; with state_broken a broken door keeps its leaf, open ==")
+	var doors := World.get_doors()
+	if doors.is_empty():
+		return
+	var door: Door = doors[0]
+	var doorway: Node3D = _rig._doorways[door.key]
+	var hinge := doorway.get_node(Client3D.DOOR_LEAF) as Node3D
+	var kept := {"open": door.open, "lock": door.lock, "hp": door.hp}
+	_rig._door_open.erase(door.key)
+	door.open = false
+	door.hp = 0
+	await _settle_doors()
+	_check(not hinge.visible, "art with no state_broken (a fill, a grey box): a broken door's leaf is gone, as before")
+	# Art of its own with states, as a dropped .glb's: a lock plate on the
+	# frame, splintered boards on the leaf.
+	var locked := Node3D.new()
+	locked.name = "state_locked"
+	doorway.get_node(^"Door/Body").add_child(locked)
+	var broken := Node3D.new()
+	broken.name = "state_broken"
+	hinge.add_child(broken)
+	doorway.remove_meta(&"states")
+	door.hp = door.max_hp
+	door.lock = "test key"
+	await _settle_doors()
+	_check(door.state() == "locked" and locked.visible and not broken.visible, "locked: its lock plate shows, not the boards (%s)" % door.state())
+	door.lock = ""
+	await _settle_doors()
+	_check(door.state() == "closed" and not locked.visible and not broken.visible, "closed: neither")
+	door.hp = 0
+	await _settle_doors()
+	_check(door.state() == "broken" and hinge.visible and broken.visible and not locked.visible
+			and is_equal_approx(hinge.rotation.y, PI * 0.5),
+			"broken: the leaf stays, swung open, its boards splintered (leaf %s, %.2f)" % [hinge.visible, hinge.rotation.y])
+	locked.free()
+	broken.free()
+	doorway.remove_meta(&"states")
+	_rig._door_open.erase(door.key)
+	door.hp = kept["hp"]
+	door.lock = kept["lock"]
+	door.open = kept["open"]
+	await _settle_doors()
+	_check(hinge.visible, "mended: its leaf is back")
+
+
 func _test_art_puppets() -> void:
 	print("
 == a crate is drawn as prop.crate's own art once it has some, else its tinted cube ==")
@@ -1462,6 +1510,15 @@ func _test_art_puppets() -> void:
 
 
 # --- helpers ------------------------------------------------------------------
+
+## The doors' leaves swung and shown, as some frames would, without their
+## sounds (one playing at quit holds its stream).
+func _settle_doors() -> void:
+	_rig._door_open.clear()
+	for i in 20:
+		await get_tree().process_frame
+		_rig._process(0.05)
+
 
 ## [param entity]'s signals' connections to the rig, undone (a test puppet's).
 func _disconnect_rig(entity: GridEntity) -> void:

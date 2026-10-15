@@ -4876,7 +4876,17 @@ func _sync_doors() -> void:
 			sfx.play("sfx.door_wood_open" if door.is_open() else "sfx.door_wood_close", doorway.position + Vector3.UP)
 		_door_open[door.key] = door.is_open()
 		_door_node[door.key] = door.get_instance_id()
-		hinge.visible = not door.is_broken()
+		# The art's "state_<name>" nodes (art_style.md) show in that state
+		# alone; a broken door whose art has state_broken keeps its leaf,
+		# open and splintered, else the leaf goes.
+		if not doorway.has_meta(&"states"):
+			doorway.set_meta(&"states", doorway.get_node(^"Door").find_children("state_*", "Node3D", true, false))
+		var shown := "state_" + door.state()
+		var broken_art := false
+		for node: Node3D in doorway.get_meta(&"states"):
+			node.visible = str(node.name) == shown
+			broken_art = broken_art or str(node.name) == "state_broken"
+		hinge.visible = not door.is_broken() or broken_art
 		var target: float = PI * 0.5 if door.is_open() else 0.0
 		hinge.rotation.y = move_toward(hinge.rotation.y, target, get_process_delta_time() / Door.SWING_SECONDS * PI * 0.5)
 		if is_equal_approx(hinge.rotation.y, target):  # (A float32 angle: never == PI / 2.)
