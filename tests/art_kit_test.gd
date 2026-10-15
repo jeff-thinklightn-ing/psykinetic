@@ -291,6 +291,12 @@ func _test_status_current() -> void:
 == docs/art_status.md and THIRD_PARTY.md say what each slot is drawn from now ==")
 	var status := FileAccess.get_file_as_string("res://docs/art_status.md")
 	_check(status == ArtCheck.status_markdown(), "docs/art_status.md is current (run tools/art_status.gd if not)")
+	_check(FileAccess.get_file_as_string("res://art/kit/status.json") == ArtCheck.status_json(), "art/kit/status.json is current (run tools/art_status.gd if not)")
+	var priority := ArtCheck.check_priority()
+	_check(priority.is_empty(), "art/kit/priority.json names each slot once at most %s" % [priority if not priority.is_empty() else ""])
+	var order := ArtCheck.priority_order()
+	_check(order.size() == ArtKit.slots().size() and order[0].slot == "ground.grass" and order[-1].group in ["rest", "profiles"],
+		"every slot is in the priority order once, grass first")
 	var third := FileAccess.get_file_as_string("res://THIRD_PARTY.md")
 	_check(ArtCheck.third_party_block() in third, "THIRD_PARTY.md's art slot block is current (run tools/art_status.gd if not)")
 	for name: String in ArtKit.manifest().get("sources", {}):

@@ -1,0 +1,74 @@
+{
+	"about": "The order art-kit wants slots' art in, group by group, first to last (hand-edited; art-kit's to keep). tools/art_status.gd joins it with what each slot is drawn from now into art/kit/status.json; a slot no group names comes last, in the group \"rest\". A group with \"for\" names who makes its art when that isn't art-gen.",
+	"groups": [
+		{
+			"name": "town and wilds",
+			"why": "on screen most: the ground and trees cover the wilds, the homes and their walls the town",
+			"slots": [
+				"ground.grass", "ground.dirt", "material.rock", "ground.stone", "ground.sand",
+				"tree.pine", "tree.stump", "tree.log", "tree.dead", "plant.bush", "plant.fern",
+				"rock.large", "rock.boulder",
+				"scatter.tuft", "scatter.stone", "scatter.flower", "scatter.root", "scatter.reeds",
+				"building.hut", "building.house", "building.shed", "building.well",
+				"material.wall.wood", "floor.wood",
+				"wall.wood.straight", "wall.wood.post", "wall.wood.end", "wall.wood.corner", "wall.wood.t", "wall.wood.cross",
+				"wall.wood.window", "wall.wood.straight_ruined", "wall.wood.rubble", "wall.wood.tower",
+				"prop.palisade", "prop.fence", "prop.fence_post",
+				"prop.campfire", "prop.tent", "prop.market_stall", "prop.anvil", "prop.forge",
+				"prop.barrel", "prop.crate", "prop.sack", "prop.cart", "prop.signpost",
+				"prop.lantern", "prop.torch", "prop.banner", "prop.bench", "prop.table", "prop.bridge",
+				"creature.boar", "creature.rabbit",
+				"material.wall.stone", "wall.stone.straight", "wall.stone.post", "wall.stone.end", "wall.stone.corner",
+				"wall.stone.t", "wall.stone.tower", "wall.stone.straight_ruined", "wall.stone.rubble",
+				"material.wall.castle", "floor.castle", "door.gate",
+				"wall.castle.tower", "wall.castle.end", "wall.castle.corner", "wall.castle.t", "wall.castle.cross",
+				"wall.castle.window", "wall.castle.straight_ruined", "wall.castle.end_ruined", "wall.castle.rubble"
+			]
+		},
+		{
+			"name": "dungeon",
+			"why": "the mine, crypts and caves the rescues lead to",
+			"slots": [
+				"floor.stone", "material.wall.cave", "floor.cave",
+				"wall.cave.end", "wall.cave.pillar", "wall.cave.rubble",
+				"wall.stone.cross", "wall.stone.window", "wall.stone.end_ruined",
+				"wall.stone.straight_tall", "wall.stone.post_tall", "wall.stone.end_tall", "wall.stone.corner_tall", "wall.stone.t_tall", "wall.stone.cross_tall",
+				"wall.stone.straight_low", "wall.stone.post_low", "wall.stone.end_low",
+				"door.portcullis", "door.double", "door.trapdoor",
+				"prop.chest", "prop.cage", "prop.stairs", "prop.ladder", "prop.bed", "prop.bookshelf", "prop.grave"
+			]
+		},
+		{
+			"name": "items",
+			"why": "in hands, packs and chests everywhere; small on screen, so after the places",
+			"slots": [
+				"item.sword", "item.dagger", "item.knife", "item.spear", "item.bow", "item.hammer", "item.giant_axe", "item.shield",
+				"item.ration", "item.bandaging_kit", "item.food_sack", "item.ore_sack", "item.wood_bundle", "item.cloth_bolt",
+				"item.coin_purse", "item.nails", "item.axe_head"
+			]
+		},
+		{
+			"name": "castle heights",
+			"why": "the castle set's 1 m and 4.5 m modules, for walls that step",
+			"slots": [
+				"wall.castle.straight_low", "wall.castle.post_low", "wall.castle.end_low", "wall.castle.corner_low", "wall.castle.t_low", "wall.castle.cross_low",
+				"wall.castle.straight_tall", "wall.castle.post_tall", "wall.castle.end_tall", "wall.castle.corner_tall", "wall.castle.t_tall", "wall.castle.cross_tall"
+			]
+		},
+		{
+			"name": "fills to replace",
+			"why": "drawn from the Kenney Castle Kit today, so they already look fine",
+			"slots": ["wall.castle.straight", "wall.castle.post", "tree.broadleaf", "tree.small", "rock.small", "door.single"]
+		},
+		{
+			"name": "from the Quaternius pack",
+			"for": "pc-character: the pack's animals moved onto palette swatches (art-kit drops them in)",
+			"slots": ["creature.deer", "creature.stag", "creature.wolf"]
+		},
+		{
+			"name": "profiles",
+			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, not a model",
+			"slots": ["wall.castle.profile", "wall.wood.profile", "wall.stone.profile", "wall.cave.profile"]
+		}
+	]
+}
