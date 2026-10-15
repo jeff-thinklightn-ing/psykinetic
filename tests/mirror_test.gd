@@ -27,6 +27,8 @@ func _ready() -> void:
 	_test_prediction_gives_up_when_the_server_has()
 	_test_the_camera_eases_over_a_jump_not_a_slide()
 	_test_a_large_correction_slides_not_snaps()
+	_test_a_slow_step_overtaken_is_not_cut_short()
+	_test_the_display_clock_waits_out_a_stall()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -88,6 +90,7 @@ func _test_the_display_clock_rides_out_late_ticks() -> void:
 	var server := float(_tick)
 	World._net_tick(_tick)
 	World._clock = _tick
+	World._clock_drift = 0.0
 	var shown: Array[float] = []
 	var arrivals := 0
 	# Six seconds of 60 fps; the ticks come every 100 ms, but every fifth is
@@ -292,6 +295,63 @@ func _test_a_large_correction_slides_not_snaps() -> void:
 	far._process(0.0)
 	_check(Net.snaps_total == snaps + 1 and Iso.local_to_grid(far.position).is_equal_approx(Vector2(6, 40)),
 			"nineteen tiles off is snapped (at %s)" % Iso.local_to_grid(far.position))
+
+
+## A mirror's slow step (an idle pace) is overtaken by its next, sooner
+## than the slow step would end, as a monster that starts to run does
+## (decision 350): the next waits for it to end, then catches up at no more
+## than twice its pace; never a jump to the slow step's end.
+func _test_a_slow_step_overtaken_is_not_cut_short() -> void:
+	print("
+== a slow step overtaken by the next is not cut short ==")
+	var imp := _mirror("Overtaken", Vector2i(2, 13), 10)
+	var moves: Array[float] = []
+	_run_tick(imp, moves, Vector2i(1, 0))  # A 10-tick step...
+	for i in 3:
+		_run_tick(imp, moves)
+	imp.move_ticks = 2
+	_run_tick(imp, moves, Vector2i(1, 0))  # ...and 4 ticks on, a 2-tick one.
+	for i in 3:
+		_run_tick(imp, moves, Vector2i(1, 0) if i == 1 else Vector2i.ZERO)
+	for i in 20:
+		_run_tick(imp, moves)
+	var slow := _tile_pixels(Vector2i(1, 0)) / (10.0 * SAMPLES_PER_TICK)
+	var fast := _tile_pixels(Vector2i(1, 0)) / (World.step_ticks(imp, Vector2i(1, 0)) * SAMPLES_PER_TICK)
+	_check(moves.max() <= fast * 2.0 * 1.05, "no jump: at most %.2f px a sample (the fast step's pace %.2f, twice it %.2f, the slow %.2f)" % [
+			moves.max(), fast, fast * 2.0, slow])
+	_check(imp.position.is_equal_approx(Iso.tile_to_local(Vector2i(5, 13))), "and it ends on its tile (%s)" % Iso.local_to_grid(imp.position))
+
+
+## No ticks for a second (the server stalled): the display clock waits
+## within CLOCK_LEAD_MAX of the last tick instead of running on, and when
+## the ticks come again it is never set back (decision 350).
+func _test_the_display_clock_waits_out_a_stall() -> void:
+	print("
+== the display clock waits out a stall, and is never set back ==")
+	World.set_process(true)
+	var frame := 1.0 / 60.0
+	World._net_tick(_tick)
+	World._clock = _tick
+	World._clock_drift = 0.0
+	var shown: Array[float] = []
+	for f in 60:  # A second of frames, no ticks.
+		World._process(frame)
+		shown.append(World.tick + World.tick_alpha)
+	var lead: float = shown.back() - float(_tick)
+	_tick += 10
+	World._net_tick(_tick)  # They come again, ten ticks on.
+	for f in 60:
+		World._process(frame)
+		shown.append(World.tick + World.tick_alpha)
+		if f % 6 == 5:
+			_tick += 1
+			World._net_tick(_tick)
+	World.set_process(false)
+	var back := 0.0
+	for i in range(1, shown.size()):
+		back = minf(back, shown[i] - shown[i - 1])
+	_check(lead <= World.CLOCK_LEAD_MAX + 0.001, "stalled, it waits %.2f ticks past the last tick" % lead)
+	_check(back >= 0.0, "and never goes back (%.2f)" % back)
 
 
 # --- helpers ------------------------------------------------------------------

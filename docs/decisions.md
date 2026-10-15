@@ -6700,3 +6700,53 @@ its feet is in its hand before its first blow. Fighting armed it does not
 stop for another. weapon_near is nine ground lookups and only a kind that
 picks up asks, so a monster that never would costs nothing. No row picks
 up yet: which kinds do is content (goblins, say), Jeff's to say.
+## 350. Network smoothness D: others' slides wait their turn and catch up
+
+Smoothness step D (decision 337 lists the five). Measured with
+tools/net_smooth.sh as there, two runs a profile, two clients each, rates
+per client-minute, after C (339).
+
+What jumped: of others' jumps (15 / 23 / 63 a minute on clean / wan /
+bad) nearly all were a slide replaced before it ended. A mirror's slide
+was taken from the queue as soon as the display clock reached its tick,
+whatever was on screen, and drawn from its own from-tile: a monster's
+slow idle step (6 to 11 ticks, guessed from its replicated pace) was
+overtaken by its next, faster one, and the body jumped to the slow step's
+end; after a lost or late packet's burst several came due at once and the
+body jumped to the last. The rest were the display clock: with no ticks
+coming (a server hitch) it ran on, more than 3 ticks past the last tick,
+and was set back when one came, every slide under way jumping back.
+
+D, client only, two parts:
+- A slide on the display clock is taken from the queue only once the one
+  on screen has ended (a present push still takes over at once, from
+  where the body is drawn). One that starts late starts from where the
+  body is at that moment and is drawn faster, to end when it would have,
+  but at most `CATCH_UP_SPEED` (2) times its pace; what is left of the lag
+  is made up by the ones after (`GridEntity._catch_up`).
+- The display clock never runs more than `CLOCK_LEAD_MAX` (2.5 ticks)
+  past the last tick: a stall freezes what is drawn on what is known. When
+  the ticks come again, a clock more than a tick behind runs up to
+  `CLOCK_SLEW_FAR` (50%) fast instead of 10%, and is set outright only
+  beyond `CLOCK_SNAP_TICKS`, now 10 (was 3): setting it forward jumped
+  every slide under way toward its end, where running fast lets the
+  catch-up draw what came due.
+
+mirror_test: a 10-tick step overtaken by a 2-tick one ends on its tile with
+no sample faster than twice the fast step's pace; a second with no ticks
+leaves the clock 2.5 ticks past the last and never set back.
+
+| link | others' jumps/min after C | slides only | D | own jumps/min after C | D |
+|---|---|---|---|---|---|
+| clean | 15.1 | 10.8 | 11.0 | 0 | 1.0 |
+| wan | 22.9 | 1.3 | 4.8 | 1.5 | 0.3 |
+| bad | 62.6 | 1.5 | 5.9 | 2.0 | 2.8 |
+
+What is left comes in clusters, several bodies in one frame, at the
+moment the local player respawns on the start tile (their own jump to it
+is in the same frame): the whole view moves then and the camera cuts with
+it (337), so it is not rubber banding, but the meter cannot tell that
+frame from others and counts each body. The clock part's gain is not in
+these runs (no server stall happened in them; the baseline's one clean run
+with a stall had 28 of its first 40 logged jumps from it); mirror_test
+covers it. Corrections a minute are unchanged (5 / 16 / 27).

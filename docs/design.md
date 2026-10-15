@@ -155,11 +155,18 @@ sim state.
   hand before its slide has to begin, with room for latency and jitter.
   Changes wait in a queue until their turn: the next step of a walk arrives
   while the slide for the one before is still on screen, and must not
-  replace it early. The display clock (`World._clock`) runs on its own at
+  replace it early: a slide starts only when the one before has ended, and
+  one that starts late (its turn came after a slow one, or a burst came in
+  at once) starts from where the body is and is drawn up to twice as fast
+  until it is back on time (`GridEntity._catch_up`, decision 350). The display clock (`World._clock`) runs on its own at
   the tick rate; each server tick as it arrives says how far off it is, and
   half of that is made up by running at most `CLOCK_SLEW` (10%) fast or
   slow, so a late or bunched packet neither freezes nor jumps what is drawn
-  (more than `CLOCK_SNAP_TICKS`, 3, off, it is set outright).
+  (more than a tick behind it runs up to `CLOCK_SLEW_FAR`, 50%, fast,
+  and what came due meanwhile is drawn faster in turn; only more than
+  `CLOCK_SNAP_TICKS`, 10, off is it set outright). It never runs more than
+  `CLOCK_LEAD_MAX` (2.5 ticks) past the last tick: a stall freezes what is
+  drawn instead of running it on to be set back (decision 350).
 - *Pushes the local player makes or takes* are drawn on the present clock,
   not the display clock (`GridEntity._present`): as soon as the server's
   word comes, from wherever the body is drawn, for the server's duration;

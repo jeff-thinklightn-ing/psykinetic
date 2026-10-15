@@ -49,6 +49,10 @@ const RECONCILE_BLEND_TICKS := 2.0
 const RECOVER_TICKS_PER_TILE := 0.75
 const RECOVER_MAX_TICKS := 4.0
 const TELEPORT_TILES := 8
+## A mirror's slide that starts late (its turn came after the one before
+## ended, or a burst arrived) is drawn up to this many times faster until
+## it is back on time (_catch_up, decision 350).
+const CATCH_UP_SPEED := 2.0
 const HOP_HEIGHT := 6.0
 ## A body tossed overhead arcs this high instead, and for longer.
 const LOFT_HEIGHT := 20.0
@@ -433,10 +437,18 @@ func _process(delta: float) -> void:
 			var to := tile
 			if _mirroring:
 				var shown := now - World.display_delay_ticks
-				# A present push plays out before anything after it.
+				# A present push plays out before anything after it, and a
+				# slide on the display clock before the next (decision 350):
+				# one that came due meanwhile starts as it ends, never cutting
+				# it short (a jump to its end).
 				var held := _present and now < _move_tick + _move_duration
+				var busy := not _present and shown < _move_tick + _move_duration
+				# Where the slide on screen has the body at this frame's time:
+				# a slide that takes over starts here (_catch_up), not where
+				# the last frame drew it, a sample behind.
+				var here := _from_pos.lerp(Vector2(_to_tile), clampf((shown - _move_tick) / _move_duration, 0.0, 1.0)) 						if _move_duration > 0.0 else Iso.local_to_grid(position)
 				while not held and not _slides.is_empty() \
-						and (_slides[0].get("present", false) or shown >= _slides[0]["tick"]):
+						and (_slides[0].get("present", false) or not busy and shown >= _slides[0]["tick"]):
 					var slide: Dictionary = _slides.pop_front()
 					if Net.test_smooth and _move_duration > 0.0 and shown < _move_tick + _move_duration - 0.05 and not _present:
 						# --test-smooth: a slide replaced before it ended (net_smooth.sh).
@@ -458,6 +470,9 @@ func _process(delta: float) -> void:
 					_move_duration = slide["duration"]
 					_present = slide.get("present", false)
 					_from_pos = slide.get("from_pos", Vector2(_from_tile))
+					if not _present:
+						_catch_up(shown, here)
+						busy = shown < _move_tick + _move_duration
 					held = _present
 				if not _present:
 					now = shown
@@ -706,6 +721,23 @@ func _mirror_rest() -> void:
 	_move_duration = 0.0
 	_present = false
 	_slides.clear()
+
+
+## The slide just taken from the queue (_from_pos.._to_tile from
+## _move_tick for _move_duration), on the display clock at [param shown]:
+## late (it waited for the one before, or a burst of changes came at once
+## after a delay on the way), it starts now from where the body is drawn,
+## and is drawn faster to end when it would have, but at no more than
+## CATCH_UP_SPEED times its pace; the lag left is made up by the slides
+## after it. On time, it is drawn as it is. [param here]: where the body
+## is at [param shown] by the slide before.
+func _catch_up(shown: float, here: Vector2) -> void:
+	var late := shown - _move_tick
+	if late <= 0.0:
+		return
+	_from_pos = here
+	_move_duration = maxf(_move_duration - late, _move_duration / CATCH_UP_SPEED)
+	_move_tick = shown
 
 
 ## A replicated tile arrived.

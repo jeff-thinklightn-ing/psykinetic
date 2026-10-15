@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Monsters and other players no longer hop forward over a laggy connection: a
+  step that arrives late plays out a little faster instead of jumping, and a
+  server hiccup freezes the view for a moment instead of snapping it back.
 - What raiders carry off from a town is kept at their camp, not lost.
 - Your character no longer snaps when the server puts them somewhere else: they
   slide there quickly instead. A walk you start after being knocked back starts

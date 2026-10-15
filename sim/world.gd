@@ -162,11 +162,22 @@ var display_delay_ticks := NET_DISPLAY_DELAY_TICKS
 ## A client's display clock (ticks) runs at the tick rate on its own, and
 ## each server tick as it arrives says how far off it is: half of that is
 ## made up by running up to CLOCK_SLEW faster or slower, so a late or
-## bunched packet neither freezes nor jumps what is drawn. More than
-## CLOCK_SNAP_TICKS off (a stall, a reconnect), it is set outright.
+## bunched packet neither freezes nor jumps what is drawn. More than a tick
+## off (behind after a stall or a burst of lost ticks), it runs up to
+## CLOCK_SLEW_FAR fast to catch up: what came due meanwhile is drawn
+## faster in turn (GridEntity._catch_up), where setting the clock would
+## jump every slide under way to its end. More than CLOCK_SNAP_TICKS off (a
+## reconnect), it is set outright (decision 350).
 const CLOCK_PULL := 0.5
 const CLOCK_SLEW := 0.1
-const CLOCK_SNAP_TICKS := 3.0
+const CLOCK_SLEW_FAR := 0.5
+const CLOCK_SNAP_TICKS := 10.0
+## The display clock never runs more than this ahead of the last tick that
+## came: with none coming (the server stalled, the link held them up) it
+## waits, and what is drawn rests on what is known instead of running on
+## to be set back, every slide under way jumping back with it, when the
+## next tick comes (decision 350). Late ticks of up to 150 ms are inside it.
+const CLOCK_LEAD_MAX := 2.5
 ## A diagonal step takes this many times the ticks of an orthogonal one, so
 ## world speed is roughly constant in every direction (a diagonal cell is
 ## sqrt(2) as long). Steps may take a fraction of a tick: the movement
@@ -456,8 +467,9 @@ func _process(delta: float) -> void:
 	if not Net.is_authority():
 		# Mirror: no sim, only the display clock, running on smoothly.
 		var advance := delta * TICK_RATE
-		var slew := clampf(_clock_drift, -advance * CLOCK_SLEW, advance * CLOCK_SLEW)
-		_clock += advance + slew
+		var most := advance * (CLOCK_SLEW if absf(_clock_drift) <= 1.0 else CLOCK_SLEW_FAR)
+		var slew := clampf(_clock_drift, -most, most)
+		_clock = minf(_clock + advance + slew, tick + CLOCK_LEAD_MAX)
 		_clock_drift -= slew
 		tick_alpha = _clock - tick
 		return
