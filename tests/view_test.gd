@@ -273,6 +273,15 @@ func _test_scatter() -> void:
 		sizes[snappedf(tree.scale.y, 0.05)] = true
 		leaning += 1 if absf(tree.rotation.x) + absf(tree.rotation.z) > 0.02 else 0
 	_check(sizes.size() > 5 and leaning > _rig._trees.size() / 2, "trees of many sizes (%d), most leaning a little" % sizes.size())
+	var inside := 0
+	for cell: Vector2i in _rig._saplings:
+		var sapling: Node3D = _rig._saplings[cell]
+		var off := Vector2(sapling.position.x - cell.x, sapling.position.z - cell.y)
+		if not _rig._land.has(cell) and absf(off.x) <= 0.45 and absf(off.y) <= 0.45 and off.length() > 0.1 \
+				and sapling.scale.y < _rig._trees[cell].scale.y:
+			inside += 1
+	_check(_rig._saplings.size() > 0 and inside == _rig._saplings.size(),
+			"saplings at the edge, smaller than its trees, off their void cell's middle and in it (%d of %d)" % [inside, _rig._saplings.size()])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

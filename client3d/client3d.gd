@@ -417,6 +417,10 @@ const TREE_LEAN := 0.1
 const TREE_NUDGE := 0.42
 const FOREST_CLUMP := 6.0
 const FOREST_GROUND := 3
+## Saplings: how often an edge cell has one besides its tree, and their
+## size against a tree's (252, 277).
+const SAPLING_CHANCE := 0.6
+const SAPLING_SIZE := Vector2(0.35, 0.6)
 ## Scatter: how many of each, on average, a cell of each ground has (the
 ## forest's ring is "forest"), and roots more on the land at the forest's
 ## edge; each kind's size range; a flower's colours.
@@ -745,6 +749,8 @@ var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
+## The saplings at the forest's edge (_add_sapling), faded as trees are.
+var _saplings: Dictionary[Vector2i, Node3D] = {}
 ## Each building drawn (_add_buildings): {rect: its footprint, node: the
 ## slot's instance, roof: its "roof" part (null if it has none), off: the
 ## roof hidden as the local player is inside}; which building each
@@ -1757,6 +1763,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_ground_shades.clear()
 	_shade_all = true
 	_trees.clear()
+	_saplings.clear()
 	_buildings.clear()
 	_building_at.clear()
 	_roofs_off.clear()
@@ -1928,6 +1935,10 @@ func _add_forest() -> void:
 		var roll := _roll(cell, 0)
 		if away == 1 or away <= FOREST_DEPTH and roll < 0.35 + 0.6 * clump or roll < 0.08 + 0.45 * clump:
 			_add_tree(cell, clump)
+			# At the edge, now and then a sapling too, toward the land: the
+			# edge's line, and its shadow, no longer a tree a cell.
+			if away == 1 and _roll(cell, 50) < SAPLING_CHANCE:
+				_add_sapling(cell, distance)
 		elif roll < 0.33:
 			var rock := ArtKit.instance("rock.small")
 			rock.name = "Rock_%d_%d" % [cell.x, cell.y]
@@ -2329,6 +2340,29 @@ func _fly(thing: Node3D, from: Vector3, to: Vector3) -> void:
 		if is_instance_valid(thing):
 			thing.position = from.lerp(to, t) + Vector3.UP * sin(t * PI) * (0.6 + from.distance_to(to) * 0.15),
 		0.0, 1.0, THROW_FLIGHT_SECONDS)
+
+
+## A young tree on edge [param cell] (a void cell beside the land), small,
+## set off toward the land and sideways, still in its own cell.
+func _add_sapling(cell: Vector2i, distance: Dictionary[Vector2i, int]) -> void:
+	var toward := Vector2.ZERO
+	for direction: Vector2i in World.DIRECTIONS:
+		if distance.get(cell + direction, -1) == 0:
+			toward += Vector2(direction)
+	if toward == Vector2.ZERO:
+		return
+	toward = toward.normalized()
+	var side := Vector2(-toward.y, toward.x) * (_roll(cell, 51) - 0.5) * 0.5
+	var at := toward * lerpf(0.25, 0.42, _roll(cell, 52)) + side
+	at = at.clamp(-Vector2.ONE * 0.45, Vector2.ONE * 0.45)
+	var slot := "tree.small"
+	var sapling := ArtKit.instance(slot)
+	sapling.name = "Sapling_%d_%d" % [cell.x, cell.y]
+	sapling.scale = Vector3.ONE * TREE_HEIGHT * lerpf(SAPLING_SIZE.x, SAPLING_SIZE.y, _roll(cell, 53)) / ArtKit.size(slot).y
+	sapling.rotation = Vector3((_roll(cell, 54) - 0.5) * 2.0 * TREE_LEAN, _roll(cell, 55) * TAU, (_roll(cell, 56) - 0.5) * 2.0 * TREE_LEAN)
+	sapling.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
+	_room.add_child(sapling)
+	_saplings[cell] = sapling
 
 
 ## Smooth noise 0..1 over the cells, features about [param size] cells
@@ -3661,7 +3695,7 @@ func _index_occluders() -> void:
 		_occluders.append([frame, _bounds(frame), false, runs[key]])
 	for post: Node3D in _posts.values():
 		_occluders.append([post, _bounds(post), false, [post]])
-	for tree: Node3D in _trees.values():
+	for tree: Node3D in _trees.values() + _saplings.values():
 		_occluders.append([tree, _bounds(tree), true, [tree]])
 	# A roof between the camera and a player outside fades as a wall does.
 	for building in _buildings:

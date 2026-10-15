@@ -106,6 +106,9 @@ top section as the release notes.
   (no keys or locked doors in the game yet).
 - Changes what the server sends (a door's lock): the server must be
   updated with this release.
+- Young trees grow among the old along the forest's edge, so it no longer
+  lines up cell by cell.
+
 
 ## v0.1.140
 

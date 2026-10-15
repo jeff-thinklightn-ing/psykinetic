@@ -25,6 +25,9 @@ var size := 64
 var monsters := 2
 var players := 1
 var cells_per_monster := 0.0
+## --outdoor=1: the dungeon outdoors, a forest round its outline (its trees,
+## saplings and forest floor in the 3D build and the frames).
+var outdoor := false
 var repeat := 1
 var settle := 0
 var ticks := 200
@@ -42,6 +45,7 @@ func _ready() -> void:
 			"monsters": monsters = pair[1].to_int()
 			"players": players = maxi(1, pair[1].to_int())
 			"cells-per-monster": cells_per_monster = pair[1].to_float()
+			"outdoor": outdoor = pair[1] != "0"
 			"repeat": repeat = maxi(1, pair[1].to_int())
 			"settle": settle = maxi(0, pair[1].to_int())
 			"ticks": ticks = pair[1].to_int()
@@ -55,7 +59,7 @@ func _ready() -> void:
 	var started := Time.get_ticks_usec()
 	var layout := _layout()
 	_report("make layout.png", started)
-	Level.register(NAME, layout, null, {"name": "Bench"})
+	Level.register(NAME, layout, null, {"name": "Bench", "outdoor": outdoor})
 	started = Time.get_ticks_usec()
 	var level := Level.load_level(NAME)
 	_report("Level.load_level (parse)", started)

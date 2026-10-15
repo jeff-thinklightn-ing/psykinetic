@@ -4352,3 +4352,15 @@ town, gold, goods [{uid, id, price}], offers {id: gold}, why}), sent only
 to that player's peer. A protocol change (MESSAGE_KINDS). The client's
 ShopPanel (render/shop_panel.gd) shows the gold over the pack and the
 open shop's goods beside it, in PackPanel's look.
+
+## 277. Saplings at the forest's edge
+
+The forest's first ring is a tree on every void cell beside the land (so
+the edge reads closed, and the sim's wall there is never mistaken for a
+way in), which left the edge's trunks, and their shadows in the sun, in
+a stair of cells (252). Now an edge cell has, often (SAPLING_CHANCE), a
+sapling as well: tree.small at a third to three fifths of a tree's size
+(SAPLING_SIZE), set off toward the land and sideways, still inside its
+own void cell, leaning as trees do; faded as trees are when it hides the
+player. Visual only. tools/map_bench takes --outdoor=1 to bench a forest
+round its dungeon.
