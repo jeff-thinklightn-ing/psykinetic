@@ -16,7 +16,7 @@ also writes `docs/art_status.md`; `art_kit_test` fails while either is out of da
 |--------|---------|-------|---------------------|
 | [Castle Kit 2.0, Kenney](https://kenney.nl/assets/castle-kit) | CC0 1.0 (`art/kenney-castle/License.txt`) | `art/kenney-castle/Models/GLB format/` | door.single, rock.small, tree.broadleaf, tree.small, wall.castle.post, wall.castle.straight |
 
-Slots whose own art came from someone else: none.
+Slots whose own art came from someone else: tree.stump (art-gen, cleaned up by art-kit, own).
 
 <!-- end of art slots -->
 
