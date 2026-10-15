@@ -2267,8 +2267,8 @@ func _add_buildings() -> void:
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false})
 		_show_state(_buildings[index])
-		if slot in Level.ON_WATER:
-			continue  # Nobody stands in a well: it has no inside.
+		if slot in Level.ON_WATER or _glimpse:
+			continue  # Nobody stands in a well (or a glimpse): no inside.
 		# The rain stops on its roof even while the roof is cut away
 		# (decision 309; WeatherView's heightfield sees only what is drawn).
 		var keep_dry := GPUParticlesCollisionBox3D.new()
@@ -2915,9 +2915,16 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		var sides := Terrain.edge_cells(ours)
 		if cells.has(sides[0]) and cells.has(sides[1]):
 			edges[ours] = terrain["edges"][key]
+	# Its buildings wholly in the glimpse, as built (no town's state: it
+	# is drawn only).
+	var buildings: Array[Dictionary] = []
+	for building: Dictionary in terrain.get("buildings", []):
+		var rect := Rect2i((building["rect"] as Rect2i).position + shift, (building["rect"] as Rect2i).size)
+		if Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return cells.has(cell)):
+			buildings.append({"slot": building["slot"], "rect": rect, "facing": building["facing"]})
 	return {"to": str(way["to_map"]), "cells": cells, "terrain": {
 		"floor": floor_cells, "water": water, "kinds": kinds, "heights": heights, "stairs": stairs, "edges": edges,
-		"fire": [], "torches": [], "lanterns": [], "buildings": [], "outdoor": true, "zone": "outdoors",
+		"fire": [], "torches": [], "lanterns": [], "buildings": buildings, "outdoor": true, "zone": "outdoors",
 		"walls": terrain.get("walls", DEFAULT_SET), "floors": terrain.get("floors", DEFAULT_SET), "border": "none"}}
 
 
@@ -2933,8 +2940,9 @@ func _near_land(cell: Vector2i, reach: int) -> bool:
 
 ## A glimpse drawn: a view of its own under the room, built from the plan's
 ## terrain and nothing else (its ground, water, ledges, walls and doors,
-## shut; no forest, which ours grows round it; no light of its own, lit by
-## our sky; nothing in it picked, faded or thought about).
+## shut, and its buildings, roofed; no forest, which ours grows round it;
+## no light of its own, lit by our sky; nothing in it picked, faded or
+## thought about).
 func _add_glimpse(plan: Dictionary) -> void:
 	var view := Client3D.new()
 	view.name = "Glimpse_" + str(plan["to"])
@@ -2964,6 +2972,7 @@ func _draw_glimpse(terrain: Dictionary) -> void:
 	_build_water()
 	_add_cliffs()
 	_add_walls()
+	_add_buildings()
 
 
 ## A tree slot on [param cell], sized by [param clump] (the biggest in a

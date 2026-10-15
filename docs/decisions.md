@@ -5996,3 +5996,9 @@ nothing moves, and the towns keep economy's own threat. The console's
 raids lists the groups, and raids send <camp> <town> sends one at once.
 tests/raid_groups_test plays it on two fixture areas, the hand-over through
 a stand-in World.raids.
+
+Amended (buildings): a glimpse draws the target's buildings that lie
+wholly in it, roofed, by `_add_buildings` as ours are, moved into our
+cells; with no use or town (drawn only, no town state, standing), and with
+no inside (no rain box, no cells for the roof fade). A building cut by the
+glimpse's edge is left out, so no half a house stands at its edge.

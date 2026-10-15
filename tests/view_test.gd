@@ -1045,6 +1045,27 @@ func _test_outdoor() -> void:
 					and view._ground_bytes.size() > 0 and Array(view._ground_bytes).all(func(byte: int) -> bool: return true)
 					and range(0, view._ground_bytes.size(), view._ground_stride).all(func(at: int) -> bool: return view._ground_bytes[at + view._ground_custom] == 0),
 					"nothing in it picked or thought about; its ground lit by our sky alone")
+		# Its buildings: those wholly in it, roofed and drawn only.
+		var far: Array[Vector2i] = []
+		for y in 10:
+			for x in 10:
+				far.append(Vector2i(x, y))
+		var huts: Array[Dictionary] = [{"slot": "building.hut", "rect": Rect2i(2, 2, 3, 3), "facing": Vector2i(0, 1), "use": "forge", "town_id": "x/store"},
+			{"slot": "building.hut", "rect": Rect2i(8, 8, 3, 3), "facing": Vector2i(0, 1)}]
+		var seen := _rig._glimpse_plan({"kind": "edge", "out": Vector2i(0, 1), "to_ours": Transform2D(0.0, Vector2(500, 500)), "from_cell": Vector2i.ZERO, "to_map": "x"},
+				{"floor": far, "buildings": huts}, Vector2i(10, 10), Vector2i(64, 64))
+		var shown: Array = seen["terrain"]["buildings"]
+		_check(shown.size() == 1 and shown[0]["rect"] == Rect2i(502, 502, 3, 3) and not shown[0].has("use"),
+				"a glimpse keeps the buildings wholly in it, moved, with no town (%s)" % [shown])
+		var glimpsed := Client3D.new()
+		glimpsed._glimpse = true
+		_rig._room.add_child(glimpsed)
+		glimpsed.set_process(false)
+		glimpsed._draw_glimpse(seen["terrain"])
+		_check(glimpsed._buildings.size() == 1 and glimpsed._buildings[0]["roof"] != null and (glimpsed._buildings[0]["roof"] as Node3D).visible
+				and glimpsed._building_at.is_empty() and glimpsed.find_children("*", "GPUParticlesCollisionBox3D", true, false).is_empty(),
+				"drawn roofed, with no inside")
+		glimpsed.free()
 		var bare_terrain := terrain.duplicate()
 		bare_terrain["border"] = "none"
 		_rig.rebuild(bare_terrain, castle["centre"])
