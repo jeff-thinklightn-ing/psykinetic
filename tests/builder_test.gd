@@ -19,6 +19,7 @@ func _ready() -> void:
 	await _test_mark_place()
 	await _test_stamp_building()
 	await _test_set_building()
+	await _test_town_wall()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -114,6 +115,33 @@ func _test_set_building() -> void:
 	_check("building {" in session.grid(doc.map, doc.config, Rect2i(5, 5, 12, 10), Rect2i(5, 5, 12, 10)), "and sees the buildings in the area, with theirs")
 
 
+func _test_town_wall() -> void:
+	print("
+== town_wall: a ring of walls round a town, gates in it ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "mark_place", "input": {"key": "square", "kind": "stockpile", "at": [12, 11], "holder": "town"}},
+			{"name": "town_wall", "input": {"town": "nowhere", "rect": {"x": 8, "y": 8, "w": 10, "h": 8}}},
+			{"name": "town_wall", "input": {"town": "square", "rect": {"x": 5, "y": 8, "w": 10, "h": 8}}},
+			{"name": "town_wall", "input": {"town": "square", "rect": {"x": 8, "y": 8, "w": 10, "h": 8}, "gates": [[12, 12]]}},
+			{"name": "town_wall", "input": {"town": "square", "rect": {"x": 8, "y": 8, "w": 10, "h": 8}}}],
+		"A wall round the square.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(6, 6, 16, 12), "test_field", stub)
+	await session.ask("wall the town")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(results[1]["is_error"] and "stockpile" in str(results[1]["content"]), "a town that is no stockpile place: an error (%s)" % results[1]["content"])
+	_check(results[2]["is_error"] and "a cell in from the area" in str(results[2]["content"]), "a ring outside the area: an error (%s)" % results[2]["content"])
+	_check(results[3]["is_error"] and "inside it" in str(results[3]["content"]), "a gate not on the border: an error (%s)" % results[3]["content"])
+	_check(not results[4]["is_error"] and "36 edges, 4 of them gates" in str(results[4]["content"]), "the wall: %s" % results[4]["content"])
+	session.accept()
+	_check(doc.map.edge(Terrain.edge_key(Vector2i(8, 9), Vector2i(-1, 0))) == "wall" and doc.map.edge(Terrain.edge_key(Vector2i(13, 8), Vector2i(0, -1))) == "door",
+			"walls on the ring, a gate in the middle of the north side")
+	var level := Level.parse(doc.map.to_image(), null, doc.config)
+	var about := (level["warnings"] as Array).filter(func(warning: String) -> bool: return "town wall" in warning)
+	_check(level["town_walls"].size() == 1 and about.is_empty(), "the level reads the square's wall, with nothing to say (%s)" % [about])
+
+
 func _test_prompt() -> void:
 	print("\n== what Claude is told ==")
 	var system := BuilderSession.system_prompt()
@@ -130,7 +158,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "mark_place", "set_building", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "mark_place", "set_building", "town_wall", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:

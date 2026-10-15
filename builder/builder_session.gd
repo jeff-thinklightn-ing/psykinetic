@@ -207,7 +207,7 @@ Monsters idle until someone comes: guard (stands, glances about), wander (stroll
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first).
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
 %s""" % [", ".join(legend), ", ".join(Items.ids()), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
@@ -371,6 +371,12 @@ const TOOLS := [
 			"use": {"type": "string", "description": "what the town does there (the uses are in the system prompt); empty for none"},
 			"town": {"type": "string", "description": "the key of a stockpile place in this level; empty for none"}},
 			"required": ["at"]}},
+	{"name": "town_wall", "description": "Walls a town in: a wall on the edges just outside a rectangle of cells, gates (doors) in it, recorded as that town's wall (a town walled again gets the new one). Leaves the cells as they are.",
+		"input_schema": {"type": "object", "properties": {
+			"town": {"type": "string", "description": "the key of the town's stockpile place in this level"},
+			"rect": _RECT,
+			"gates": {"type": "array", "items": _CELL, "description": "cells just inside the wall where a gate goes (on the rectangle's border); none given: one in the middle of each side"}},
+			"required": ["town", "rect"]}},
 	{"name": "look", "description": "The area as it is now, with your changes so far, as a grid.",
 		"input_schema": {"type": "object", "properties": {}}},
 	{"name": "new_area", "description": "Makes a new level beyond the map's edge on a side the area touches (one with nothing beyond it yet), joined both ways, and carves a way from the middle of the area out to that edge. The new level is a first draft, its size given in cells (16 to 256).",
@@ -475,6 +481,8 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			return _mark_place(given)
 		"set_building":
 			return _set_building(given)
+		"town_wall":
+			return _town_wall(given)
 		"look":
 			return {"ok": true, "text": grid(working.map, working.config, area, area)}
 		"new_area":
@@ -608,6 +616,62 @@ func _set_building(given: Dictionary) -> Dictionary:
 	if town.is_empty():
 		return {"ok": true, "text": "the %s is a %s, but in no town: it does nothing until it has one" % [what, use]}
 	return {"ok": true, "text": "the %s %s, in %s" % [what, "is a %s" % use if not use.is_empty() else "has no use", town]}
+
+
+func _town_wall(given: Dictionary) -> Dictionary:
+	var town := str(given.get("town", ""))
+	var rect: Variant = _rect(given.get("rect"))
+	if rect == null or rect.size.x < 2 or rect.size.y < 2:
+		return _no("town_wall needs a town and a rect (x, y, w, h), 2 x 2 or more")
+	var places: Dictionary = Level.places_from(working.config, [] as Array[String])
+	if not places.has(town) or places[town]["kind"] != "stockpile":
+		var stockpiles := places.keys().filter(func(key: String) -> bool: return places[key]["kind"] == "stockpile")
+		return _no("town is the key of a stockpile place here (%s)" % (", ".join(stockpiles) if not stockpiles.is_empty() else "there is none: mark_place one, kind stockpile"))
+	var ring := Level.outline(rect).filter(func(key: Vector3i) -> bool: return working.map.edge_in_bounds(key))
+	for key: Vector3i in ring:
+		var ends := Terrain.edge_cells(key)
+		if not area.has_point(ends[0]) or not area.has_point(ends[1]):
+			return _no("the wall stands just outside the rect, so the rect must be a cell in from the area's sides (the area: x %d-%d, y %d-%d)" % [
+				area.position.x, area.end.x - 1, area.position.y, area.end.y - 1])
+	# A gate: a border cell, through the side it is on (a corner's: north or south first).
+	var sides := {"north": Vector2i(0, -1), "south": Vector2i(0, 1), "west": Vector2i(-1, 0), "east": Vector2i(1, 0)}
+	var gates: Array[Vector3i] = []
+	var asked: Array = given.get("gates", []) if given.get("gates") is Array else []
+	if asked.is_empty():
+		var middle: Vector2i = rect.position + rect.size / 2
+		for at in [Vector2i(middle.x, rect.position.y), Vector2i(middle.x, rect.end.y - 1), Vector2i(rect.position.x, middle.y), Vector2i(rect.end.x - 1, middle.y)]:
+			asked.append([at.x, at.y])
+	for value: Variant in asked:
+		var at: Variant = Level._tile(value)
+		if at == null or not rect.has_point(at):
+			return _no("a gate is a cell on the rect's border: %s is not" % [value])
+		var on := ""
+		for side: String in sides:
+			var beyond: Vector2i = at + sides[side]
+			if not rect.has_point(beyond):
+				on = side
+				break
+		if on.is_empty():
+			return _no("a gate is a cell on the rect's border: %s is inside it" % [value])
+		var key := Terrain.edge_key(at, sides[on])
+		if key in ring and key not in gates:
+			gates.append(key)
+	var changes := {"edges": {}}
+	for key: Vector3i in ring:
+		changes["edges"][key] = "door" if key in gates else "wall"
+	var walls: Array = (working.config["town_walls"] as Array).duplicate(true) if working.config.get("town_walls") is Array else []
+	var again := walls.any(func(entry: Variant) -> bool: return entry is Dictionary and str(entry.get("town", "")) == town)
+	walls = walls.filter(func(entry: Variant) -> bool: return not (entry is Dictionary and str(entry.get("town", "")) == town))
+	walls.append({"town": town, "rect": [rect.position.x, rect.position.y, rect.size.x, rect.size.y]})
+	changes["config"] = {"town_walls": walls}
+	var laid := _lay(changes, "")
+	if not laid["ok"]:
+		return laid
+	var text := "%s %s's wall round x %d-%d, y %d-%d: %d edges, %d of them gates" % ["moved" if again else "built", town,
+		rect.position.x, rect.end.x - 1, rect.position.y, rect.end.y - 1, ring.size(), gates.size()]
+	if not rect.has_point(places[town]["cell"]):
+		text += "; the store's place %s is outside it" % [places[town]["cell"]]
+	return {"ok": true, "text": text}
 
 
 func _place(given: Dictionary) -> Dictionary:
