@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.147
+
 - The town's gold is now a bank: a resident short of gold borrows from it
   (10% interest, up to 30 owed), pays it back from what they earn, and one
   who owes too much works it off as town labour. The town feeds people for
