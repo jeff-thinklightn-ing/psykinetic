@@ -41,8 +41,8 @@ which worktree owns each step, and the design rules not to break without asking 
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
-  release session cuts releases: it freezes `main` briefly, runs the suite on `main`, renames
-  `## Unreleased` to the next `## vX.Y.Z`, runs the release script, deploys the server,
+  release session cuts releases: it freezes `main` briefly, runs the suite on `main`, inserts
+  the next `## vX.Y.Z` heading under `## Unreleased` (decision 324), runs the release script, deploys the server,
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
   After a rebase, check your bullet still sits under `## Unreleased`, above the first
