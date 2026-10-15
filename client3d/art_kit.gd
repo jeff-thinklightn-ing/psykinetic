@@ -340,8 +340,11 @@ static func _grey_recipe(slot: String) -> Array:
 	var steps: Array = []
 	_step(steps, -1, slot.replace(".", "_"), Transform3D.IDENTITY, null)
 	var body := _step(steps, 0, "Body", Transform3D.IDENTITY, null)
-	var boxes: Array = entry.get("grey", [])
-	if boxes.is_empty():
+	# "grey": "none": a body of no boxes (a building, all of whose grey is
+	# its named parts: its roof, floor and trim).
+	var given: Variant = entry.get("grey", [])
+	var boxes: Array = given if given is Array else []
+	if boxes.is_empty() and not given is String:
 		var whole := size(slot)
 		var base := 0.0 if str(entry.get("origin", "base")) == "base" else -whole.y
 		boxes = [{"at": [0, base + whole.y * 0.5, 0], "size": [whole.x, whole.y, whole.z]}]

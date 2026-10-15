@@ -236,6 +236,8 @@ func _move_parts() -> void:
 		if node == null or not _rest.has(node):
 			continue
 		var rest: Transform3D = _rest[node]
+		if part.get("motion", "hinge") == "fixed":
+			continue  # A named piece that does not move (a building's roof).
 		var reach: Array = part.get("range", [0, 90])
 		var amount := lerpf(float(reach[0]), float(reach[1]), share)
 		var axis := {"x": Vector3.RIGHT, "y": Vector3.UP, "z": Vector3.BACK}.get(str(part.get("axis", "y")), Vector3.UP) as Vector3

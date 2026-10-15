@@ -3796,3 +3796,36 @@ are both cubes, and items is changing crates' and carts' script), and grey
 boxes for these four now (a grey crate would look worse than a tinted one
 until Jeff's lands). A chest's lid stays shut: chests have no opened state
 yet; when they do, the lid is the slot's "lid" hinge, as a door's leaf.
+
+## 263. The rest of the catalogue: Jeff's slot list, with buildings as roof, floor and trim
+
+Jeff kept every slot proposed and added twelve props (docs/art_slots_review.md).
+How they are named and shaped:
+
+- **Buildings are a roof, an interior floor and trim, never walls.** A
+  building's walls are the map's wall edges, drawn by terrain's runs and
+  faded per edge; walls in the slot would double them and fade as one
+  block. So building.hut (3 x 3 cells), building.house (4 x 6) and
+  building.shed (2 x 3) have no body of their own ("grey": "none") and
+  three named parts that do not move ("motion": "fixed"): "roof", its
+  pivot at the eaves (3 m, the wall height), so the buildings tree can
+  hide it while someone is inside; "floor" on the ground; "trim" for
+  eaves, ridge, chimney and porch. "footprint" gives the cells; the
+  origin is the footprint's middle, the size the roof's overhang
+  included. building.well is a whole piece in the open (rim and posts,
+  a small roof part, no floor).
+- **Scatter keeps terrain's names.** Jeff's plant.tuft, plant.flowers and
+  plant.roots are scatter.tuft, scatter.flower and scatter.root, which
+  terrain reads; plant.reeds is scatter.reeds; rock.small stays the
+  forest's larger rock; rock.material is material.rock.
+- **Wall heights are slots, not variants**: wall.<x>_low (1 m) and
+  wall.<x>_tall (4.5 m) beside the 3 m wall.<x>, since a height is
+  chosen, where variants are picked at random.
+- **Doors** wider than an edge (door.double, door.gate) run 2 m along z
+  with two leaves, leaf_a and leaf_b; door.portcullis's grate slides up;
+  door.trapdoor is a floor piece, its lid hinged on x. All carry the
+  states locked, barred and broken (256).
+- **Ground textures** are 512 px tiling every 4 m (tile_m 4).
+
+The buildings land first, as the buildings tree waits on them; the rest
+follows in its own landing under this decision.

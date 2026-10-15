@@ -62,6 +62,12 @@ are texture slots, not materials on a model (see Budgets).
 - **Held pieces** (items, weapons) have their origin at the `grip` socket, where the hand
   holds them, with their length along +Y. A two-handed one has a second socket `grip_2` (an
   empty named `grip_2`) for the other hand, so it fits the character's hand attach points.
+- **Buildings** are a roof, an interior floor and trim, **never walls**. The walls are the map's
+  wall edges, drawn by terrain's wall runs and faded edge by edge. The slot's `footprint` is in
+  cells, its origin is the footprint's middle, and its size includes the roof's 0.3 m overhang.
+  The named objects `roof` (origin at the eaves, 3 m up, the wall height), `floor` (origin on
+  the ground) and `trim` (eaves, ridge, chimney, porch) are separate, so the game can hide the
+  roof while you're inside.
 - A **moving part** is its own object, named as the manifest names it (`leaf` for a door),
   with its origin at the pivot: a hinge's on the hinge line, a slide's at its closed position.
 - **States** are optional objects named `state_<name>`, shown only in that state, as the slot's
