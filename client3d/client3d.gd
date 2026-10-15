@@ -85,29 +85,45 @@ extends Node3D
 ## is Main's; this view only answers its picks and draws what it is told.
 
 const WALL_HEIGHT := 3.0
-## Wall runs (_add_wall_runs): at most this many edges a mesh; a height
-## every WALL_SWAY edges, the body up to WALL_HEIGHT_SWAY of cap_y either
-## way; an edge's top broken off this often (WALL_BROKEN_LOW to _HIGH of
-## cap_y, over WALL_BROKEN_STEPS steps); a breach of rubble this often in a
-## run of WALL_GAP_RUN edges or more (WALL_RUBBLE_LOW to _HIGH tall, a half
-## width of WALL_RUBBLE_HALF); its stone's texture this many metres a tile.
+## Wall runs (_add_wall_runs), each in its set's profile and variation
+## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
+## many edges a mesh; a height every WALL_SWAY edges, the body up to the
+## set's sway of cap_y either way; an edge's top broken off as often as
+## the set's broken (WALL_BROKEN_LOW to _HIGH of cap_y, over
+## WALL_BROKEN_STEPS steps); a breach of rubble as often as its gap in a
+## run of WALL_GAP_RUN edges or more (WALL_RUBBLE_LOW to _HIGH tall,
+## WALL_RUBBLE_SPREAD wider than the wall each side); its stone's texture
+## this many metres a tile.
 const WALL_RUN_MOST := 16
 const WALL_SWAY := 3
-const WALL_HEIGHT_SWAY := 0.1
-const WALL_BROKEN := 0.1
 const WALL_BROKEN_LOW := 0.45
 const WALL_BROKEN_HIGH := 0.8
 const WALL_BROKEN_STEPS := 4
-const WALL_GAP := 0.05
 const WALL_GAP_RUN := 6
 const WALL_RUBBLE_LOW := 0.9
 const WALL_RUBBLE_HIGH := 1.15
-const WALL_RUBBLE_HALF := 0.35
+const WALL_RUBBLE_SPREAD := 0.1
 const WALL_TILE := 2.0
-## The walls' stone until material.wall.castle has a texture: a palette swatch.
-const WALL_SWATCH := Vector2i(0, 1)
+## The set a map's walls and floors are in when level.json names none, or
+## names one art-kit has not (decision 285).
+const DEFAULT_SET := "castle"
+## Each set's wall stone until material.wall.<set> has a texture: a palette
+## swatch, and its courses (_stone_courses): rows a tile, and the blocks'
+## shortest and longest, as a share of the tile (wood's are planks).
+const WALL_LOOKS := {
+	"castle": [Vector2i(0, 1), 5, 0.3, 0.55],
+	"wood": [Vector2i(2, 3), 12, 0.7, 1.0],
+	"stone": [Vector2i(1, 2), 4, 0.35, 0.6],
+	"cave": [Vector2i(1, 5), 3, 0.5, 0.9],
+}
+## The floor sets the ground draws (ground.gdshader's floors texture, a
+## byte a cell: 0 the ground's own look), and their colours: swatches.
+const FLOOR_SETS := {"castle": 0, "wood": 1, "stone": 2, "cave": 3}
+const FLOOR_SWATCHES := {"wood": Vector2i(2, 2), "stone": Vector2i(1, 2), "cave": Vector2i(1, 5)}
 ## What an edge of a run is drawn as.
-enum { WALL_WHOLE, WALL_TOPLESS, WALL_RUBBLE }
+## (WALL_PIECE: an art-kit piece in its place, wall.<set>.straight_ruined
+## or .rubble, when the set has its art.)
+enum { WALL_WHOLE, WALL_TOPLESS, WALL_RUBBLE, WALL_PIECE }
 ## One height level (height.png) in units; a stair is a ramp up one.
 const LEVEL_RISE := 0.5
 ## Cliffs: rock's colour (sRGB), a row of facets this tall at most, this
@@ -707,13 +723,29 @@ var _stone_opaque: StandardMaterial3D
 var _walls: Dictionary[Vector3i, Node3D] = {}
 ## The wall edges drawn as a breach of rubble (_add_wall_run).
 var _wall_breaches: Array[Vector3i] = []
-## Wall edges drawn plain: whole, level, the cap at WALL_HEIGHT, never
-## broken nor breached (a building's walls, which a roof sits on); filled
-## by whoever knows them before the room is built.
-var _plain_walls: Dictionary[Vector3i, bool] = {}
-## The edges in _plain_walls that are there for a building's outline,
-## and the cells in _dry_water that are there for a well.
+## Each wall edge's set where it is not the map's (_walls_set, level.json
+## "walls"): a building's outline is in its slot's wall_set (wood for
+## homes, its variation whole and level enough for a roof); filled by
+## whoever knows them before the room is built, or before rebuild_walls.
+var _wall_sets: Dictionary[Vector3i, String] = {}
+var _walls_set := DEFAULT_SET
+## Wall edges drawn "broken" (a ragged stub, never under WALL_BROKEN_LOW of
+## the cap; wall.<set>.straight_ruined when the set has its art) or
+## "rubble" (a low bank, never a way through; wall.<set>.rubble when it
+## has art), whatever their set; the sim's wall stands either way.
+## Buildings fills and clears its own, then calls rebuild_walls.
+var _wall_states: Dictionary[Vector3i, String] = {}
+## Each floor cell's set where it is not the map's (_floors_set, level.json
+## "floors", on its stone ground): a building's inside is its slot's
+## floor_set. The floors' bytes as sent (FLOOR_SETS), a texel a cell.
+var _floor_sets: Dictionary[Vector2i, String] = {}
+var _floors_set := DEFAULT_SET
+var _floor_bytes := PackedByteArray()
+var _floor_mask: ImageTexture
+## The edges in _wall_sets and cells in _floor_sets that are there for a
+## building, and the cells in _dry_water that are there for a well.
 var _building_walls: Array[Vector3i] = []
+var _building_floors: Array[Vector2i] = []
 var _building_dry: Array[Vector2i] = []
 ## Water cells drawn as plain ground (a well's, whose rim stands round it):
 ## no surface, no sunk bed, no wet shore; their ground the land's beside
@@ -1973,13 +2005,18 @@ func _build_room() -> void:
 	_room.name = "Room"
 	add_child(_room)
 	_stone_opaque = _stone(1.0)
-	# A building's walls are plain, level under its roof (decision 252):
-	# the last map's buildings' outlines out, this one's in, what else is
-	# in the set left as it is.
+	# The map's sets; a building's walls and inside in its slot's sets
+	# (decision 285): the last map's buildings' out, this one's in, what
+	# else is in the sets left as it is.
 	# A well's water is drawn as the ground round it, under its rim.
+	_walls_set = _known_set(str(_terrain.get("walls", DEFAULT_SET)))
+	_floors_set = _known_set(str(_terrain.get("floors", DEFAULT_SET)))
 	for key in _building_walls:
-		_plain_walls.erase(key)
+		_wall_sets.erase(key)
 	_building_walls.clear()
+	for cell in _building_floors:
+		_floor_sets.erase(cell)
+	_building_floors.clear()
 	for cell in _building_dry:
 		_dry_water.erase(cell)
 	_building_dry.clear()
@@ -1990,10 +2027,18 @@ func _build_room() -> void:
 					_building_dry.append(cell)
 					_dry_water[cell] = true
 			continue
+		var spec := ArtKit.spec(str(building["slot"]))
+		var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
 		for key in Level.outline(building["rect"]):
-			if not _plain_walls.has(key):
+			if not _wall_sets.has(key):
 				_building_walls.append(key)
-				_plain_walls[key] = true
+				_wall_sets[key] = wall_set
+		if spec.has("floor_set"):
+			var floor_set := _known_set(str(spec["floor_set"]))
+			for cell in Level.rect_cells(building["rect"]):
+				if not _floor_sets.has(cell):
+					_building_floors.append(cell)
+					_floor_sets[cell] = floor_set
 	_warm_art()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
@@ -2038,7 +2083,7 @@ func _build_room() -> void:
 			vertices[WallEdge.vertex_at(key, end)] = true
 	_add_wall_runs(wall_keys)
 	for vertex in vertices:
-		if _needs_post(vertex, kind_at):
+		if _needs_post(vertex, kind_at) or _sets_meet(vertex):
 			_add_post(vertex)
 	if _outdoor:
 		_add_forest()
@@ -2723,6 +2768,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	kind_bytes.resize(across * down * 4)
 	var water_bytes := PackedByteArray()
 	water_bytes.resize(across * down * 2)
+	_floor_bytes = PackedByteArray()
+	_floor_bytes.resize(across * down)
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
@@ -2737,6 +2784,8 @@ func _build_ground(kinds: Dictionary) -> void:
 		var place := (cell.y - origin.y) * across + cell.x - origin.x
 		at[place] = i
 		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
+		if i < floor_count:
+			_floor_bytes[place] = FLOOR_SETS.get(_floor_set(cell, kind), 0)
 		if i >= water_end:
 			water_bytes[place * 2 + 1] = 255
 		elif i >= floor_count:
@@ -2754,6 +2803,7 @@ func _build_ground(kinds: Dictionary) -> void:
 	_ground_stride = RenderingServer.mesh_surface_get_format_attribute_stride(format, 1)
 	_ground_custom = RenderingServer.mesh_surface_get_format_offset(format, 1, Mesh.ARRAY_CUSTOM0)
 	_water_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_RG8, water_bytes))
+	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
 	var material := _ground_material(kind_bytes, across, down, origin)
@@ -2901,6 +2951,13 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("water", _water_mask)
 	material.set_shader_parameter("forest_floor", FOREST_FLOOR)
 	material.set_shader_parameter("sky_floor", _sky_floor)
+	material.set_shader_parameter("floors", _floor_mask)
+	for floor_set: String in FLOOR_SWATCHES:
+		var at: Vector2i = FLOOR_SWATCHES[floor_set]
+		material.set_shader_parameter("floor_" + floor_set, swatch(at.x, at.y))
+		var own := ArtKit.texture("floor." + floor_set)
+		material.set_shader_parameter("floor_%s_tex" % floor_set, own)
+		material.set_shader_parameter("floor_%s_own" % floor_set, own != null)
 	_ground_shader_material = material
 	return material
 
@@ -3316,26 +3373,28 @@ func _add_wall(key: Vector3i) -> void:
 	_walls[key] = wall
 
 
-## The walls: each straight run of wall edges (to where it turns, meets
-## another wall, a door, a change of height, or WALL_RUN_MOST edges) is one
-## mesh, wall.castle.profile swept along it: the body under the profile's cap_y
-## rises and falls along the run (a height every WALL_SWAY edges, straight
-## between), the cap band on top kept whole; now and then an edge's top is
-## broken off (WALL_BROKEN), and in a long run, rarely, an edge is a breach
-## filled with rubble (WALL_GAP), low but never a way through (the sim
-## keeps the wall). Every edge of a run is in _walls as the run's node, so
-## the run fades as one (_wall_runs, 188).
+## The walls: each straight run of wall edges of one set (to where it
+## turns, meets another wall or set, a door, a change of height, or
+## WALL_RUN_MOST edges) is one mesh, its set's wall.<set>.profile swept
+## along it, varied as the set's variation says: the body under the
+## profile's cap_y rises and falls along the run (sway: a height every
+## WALL_SWAY edges, straight between), the cap band on top kept whole; now
+## and then an edge's top is broken off (broken), and in a long run,
+## rarely, an edge is a breach filled with rubble (gap), low but never a
+## way through (the sim keeps the wall); the run leans a little (lean,
+## degrees at most), its top sags between its ends (sag, metres) and its
+## faces are pushed about (jitter, metres). An edge in _wall_states is
+## broken or rubble whatever its set says. Every edge of a run is in
+## _walls as the run's node, so the run fades as one (_wall_runs, 188).
 func _add_wall_runs(keys: Array[Vector3i]) -> void:
 	var lines: Dictionary[Vector2i, Array] = {}
 	for key in keys:
-		# East edges run along z at x + 0.5, south edges along x at y + 0.5.
-		var line := Vector2i(key.z, key.x if key.z == Terrain.EAST else key.y)
+		var line := _line_of(key)
 		if not lines.has(line):
 			lines[line] = []
 		lines[line].append(key)
 	var standing := func(key: Vector3i) -> int:
 		return _terrain["edges"].get(key, Terrain.Edge.OPEN) if not (_outdoor and _is_outline(key)) else Terrain.Edge.OPEN
-	var material := _wall_material()
 	for line: Vector2i in lines:
 		var along: Array = lines[line]
 		along.sort_custom(func(a: Vector3i, b: Vector3i) -> bool: return _along(a) < _along(b))
@@ -3344,14 +3403,95 @@ func _add_wall_runs(keys: Array[Vector3i]) -> void:
 			if not run.is_empty():
 				var last := run[-1]
 				var joined := _along(key) == _along(last) + 1 and _edge_base(key) == _edge_base(last) \
-						and _plain_walls.has(key) == _plain_walls.has(last) \
+						and _set_of(key) == _set_of(last) \
 						and run.size() < WALL_RUN_MOST and not _needs_post(WallEdge.vertex_at(key, 1 if key.z == Terrain.EAST else 0), standing)
 				if not joined:
-					_add_wall_run(run, material)
+					_add_wall_run(run)
 					run = []
 			run.append(key)
 		if not run.is_empty():
-			_add_wall_run(run, material)
+			_add_wall_run(run)
+
+
+## Draws the wall runs on the lines of [param edges] again, with their
+## posts, after their sets or states changed (_wall_sets, _wall_states):
+## buildings sets a town's walls broken or rubble and calls this. The rest
+## of the room stays; what hides the player is indexed again. The old runs
+## are hidden at once and freed two frames later (a 3D node freed before
+## the room's first frame is drawn costs seconds: 296).
+func rebuild_walls(edges: Array[Vector3i]) -> void:
+	if _room == null or BOX_WALLS:
+		return
+	var lines: Dictionary[Vector2i, bool] = {}
+	for key in edges:
+		lines[_line_of(key)] = true
+	var old: Dictionary[Node3D, bool] = {}
+	for key: Vector3i in _walls.keys():
+		if lines.has(_line_of(key)):
+			old[_walls[key]] = true
+			_walls.erase(key)
+	_wall_breaches = _wall_breaches.filter(func(key: Vector3i) -> bool: return not lines.has(_line_of(key)))
+	var keys: Array[Vector3i] = []
+	var vertices: Dictionary[Vector2i, bool] = {}
+	for key: Vector3i in _terrain["edges"]:
+		if not lines.has(_line_of(key)) or _outdoor and _is_outline(key):
+			continue
+		if _terrain["edges"][key] == Terrain.Edge.WALL:
+			keys.append(key)
+		if _terrain["edges"][key] != Terrain.Edge.OPEN:
+			for end in 2:
+				vertices[WallEdge.vertex_at(key, end)] = true
+	for vertex in vertices:
+		if _posts.has(vertex):
+			old[_posts[vertex]] = true
+			_posts.erase(vertex)
+	for piece in old:
+		piece.visible = false
+		_faded.erase(piece)
+		_hiding.erase(piece)
+		_hid_at.erase(piece)
+	_free_later(old.keys())
+	_add_wall_runs(keys)
+	var kind_at := func(key: Vector3i) -> int: return _terrain["edges"].get(key, Terrain.Edge.OPEN)
+	for vertex in vertices:
+		if _needs_post(vertex, kind_at) or _sets_meet(vertex):
+			_add_post(vertex)
+	_occluders_built = false
+	_update_fade()
+
+
+## Frees [param pieces] two frames from now, if a rebuild has not already.
+func _free_later(pieces: Array) -> void:
+	for frame in 2:
+		await get_tree().process_frame
+	for piece: Node3D in pieces:
+		if is_instance_valid(piece):
+			piece.queue_free()
+
+
+## The line an edge stands on: east edges run along z at x + 0.5, south
+## edges along x at y + 0.5.
+static func _line_of(key: Vector3i) -> Vector2i:
+	return Vector2i(key.z, key.x if key.z == Terrain.EAST else key.y)
+
+
+## The set a wall edge is drawn in (_wall_sets, else the map's).
+func _set_of(key: Vector3i) -> String:
+	return _wall_sets.get(key, _walls_set)
+
+
+## The set a floor cell is drawn in: its own (_floor_sets), else the map's
+## on its stone ground, else the ground's own look.
+func _floor_set(cell: Vector2i, kind: String) -> String:
+	if _floor_sets.has(cell):
+		return _floor_sets[cell]
+	return _floors_set if kind == "stone" else DEFAULT_SET
+
+
+## [param set_name] if art-kit has the set (its wall.<set>.profile), else
+## DEFAULT_SET.
+static func _known_set(set_name: String) -> String:
+	return set_name if ArtKit.has("wall.%s.profile" % set_name) else DEFAULT_SET
 
 
 ## Where an edge is along its line: its z for an east edge, its x for a
@@ -3360,9 +3500,12 @@ static func _along(key: Vector3i) -> int:
 	return key.y if key.z == Terrain.EAST else key.x
 
 
-## One run of wall edges, in order along its line, as one mesh.
-func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
+## One run of wall edges of one set, in order along its line, as one mesh.
+func _add_wall_run(run: Array[Vector3i]) -> void:
 	var first := run[0]
+	var set_name := _set_of(first)
+	var wall_set := _wall_set(set_name)
+	var variation: Dictionary = wall_set["variation"]
 	var east := first.z == Terrain.EAST
 	# Built in the run's own frame (x across, y up from its base, z along
 	# from its first vertex) and placed by its node: an east run as it is,
@@ -3371,39 +3514,64 @@ func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
 	var start := _along(first) - 0.5
 	var base := _edge_base(first)
 	var count := run.size()
-	# What each edge is: whole, broken off, or a breach of rubble.
+	# What each edge is: whole, broken off, or a breach of rubble: as
+	# _wall_states says, else as the set's variation rolls.
 	var states := PackedInt32Array()
 	states.resize(count)
-	var plain := _plain_walls.has(first)
+	var gap: float = variation["gap"]
+	var broken: float = variation["broken"]
+	var sway: float = variation["sway"]
+	var sag: float = variation["sag"]
+	for i in count:
+		match _wall_states.get(run[i], ""):
+			"rubble": states[i] = WALL_RUBBLE
+			"broken": states[i] = WALL_TOPLESS
 	for i in count:
 		var cell := Vector2i(run[i].x, run[i].y)
-		if not plain and count >= WALL_GAP_RUN and i >= 2 and i <= count - 3 and _roll(cell, 20 + run[i].z) < WALL_GAP \
+		if states[i] == WALL_WHOLE and count >= WALL_GAP_RUN and i >= 2 and i <= count - 3 and _roll(cell, 20 + run[i].z) < gap \
 				and (i < 3 or states[i - 1] != WALL_RUBBLE and states[i - 2] != WALL_RUBBLE):
 			states[i] = WALL_RUBBLE
 	for i in count:
-		if states[i] == WALL_WHOLE and not plain and (_roll(Vector2i(run[i].x, run[i].y), 22 + run[i].z) < WALL_BROKEN
+		if states[i] == WALL_WHOLE and (_roll(Vector2i(run[i].x, run[i].y), 22 + run[i].z) < broken
 				or i > 0 and states[i - 1] == WALL_RUBBLE or i < count - 1 and states[i + 1] == WALL_RUBBLE):
 			states[i] = WALL_TOPLESS
+	# A broken or rubble edge the set has art for is that piece.
+	var pieces: Dictionary[int, String] = {}
 	for k in count:
 		if states[k] == WALL_RUBBLE:
 			_wall_breaches.append(run[k])
-	var profile := _wall_profile()
-	var points: PackedVector2Array = profile[0]
-	var cap: float = profile[1]
-	var faces: PackedInt32Array = profile[2]
+		var piece := ""
+		if states[k] == WALL_RUBBLE:
+			piece = "wall.%s.rubble" % set_name
+		elif states[k] == WALL_TOPLESS and _wall_states.has(run[k]):
+			piece = "wall.%s.straight_ruined" % set_name
+		if piece != "" and ArtKit.has(piece) and ArtKit.filled_by(piece) != "placeholder":
+			pieces[k] = piece
+	for k: int in pieces:
+		states[k] = WALL_PIECE
+	var points: PackedVector2Array = wall_set["points"]
+	var cap: float = wall_set["cap"]
+	var faces: PackedInt32Array = wall_set["faces"]
+	var half: float = wall_set["half"]
+	# The top's sag between the run's ends, at a vertex s along it.
+	var sagged := func(s: int) -> float: return sag * 4.0 * s * (count - s) / float(count * count)
 	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
 	var i := 0
 	while i < count:
-		if states[i] != WALL_WHOLE:
-			_wall_broken(mesh, i, run, states, cap)
+		if states[i] == WALL_PIECE:
 			i += 1
 			continue
-		# A span of whole edges, to the next sway point or broken edge.
+		if states[i] != WALL_WHOLE:
+			_wall_broken(mesh, i, run, states, cap, half, sway)
+			i += 1
+			continue
+		# A span of whole edges, to the next sway point or broken edge (a
+		# sagging set's every edge, for its curve).
 		var j := i + 1
-		while j < count and states[j] == WALL_WHOLE and (_along(run[j]) % WALL_SWAY) != 0:
+		while j < count and states[j] == WALL_WHOLE and sag <= 0.0 and (_along(run[j]) % WALL_SWAY) != 0:
 			j += 1
-		var low := cap if plain else _wall_height(run[i], 0, cap)
-		var high := cap if plain else _wall_height(run[j - 1], 1, cap)
+		var low: float = _wall_height(run[i], 0, cap, sway) - sagged.call(i)
+		var high: float = _wall_height(run[j - 1], 1, cap, sway) - sagged.call(j)
 		for k in points.size():
 			var p := points[k]
 			var q := points[(k + 1) % points.size()]
@@ -3418,6 +3586,23 @@ func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
 		if j == count or states[j] != WALL_WHOLE:
 			_wall_cap(mesh, j, points, faces, cap, high, 1.0)
 		i = j
+	var lean := deg_to_rad((_roll(Vector2i(first.x, first.y), 34 + first.z) - 0.5) * 2.0 * float(variation["lean"]))
+	_wall_bend(mesh, tan(lean), float(variation["jitter"]), first)
+	var holder := Node3D.new()
+	holder.position = Vector3(line, base, start) if east else Vector3(start, base, line)
+	holder.rotation.y = 0.0 if east else PI * 0.5
+	holder.name = "Wall_%d_%d_%s" % [first.x, first.y, "e" if east else "s"]
+	for k: int in pieces:
+		var made := ArtKit.instance(pieces[k])
+		made.name = "Piece_%d" % k
+		made.position = Vector3(0.0, 0.0, k + 0.5)
+		holder.add_child(made)
+	if mesh[0].is_empty() and pieces.is_empty():
+		holder.free()
+		return
+	_room.add_child(holder)
+	for key in run:
+		_walls[key] = holder
 	if mesh[0].is_empty():
 		return
 	var arrays := []
@@ -3429,29 +3614,44 @@ func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
 	var array_mesh := ArrayMesh.new()
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var drawn := MeshInstance3D.new()
-	drawn.name = "Wall_%d_%d_%s" % [first.x, first.y, "e" if east else "s"]
-	drawn.mesh = array_mesh
-	drawn.material_override = material
-	var holder := Node3D.new()
-	holder.position = Vector3(line, base, start) if east else Vector3(start, base, line)
-	holder.rotation.y = 0.0 if east else PI * 0.5
-	holder.name = drawn.name
 	drawn.name = "Body"
+	drawn.mesh = array_mesh
+	drawn.material_override = _wall_material(set_name)
 	holder.add_child(drawn)
-	_room.add_child(holder)
-	for key in run:
-		_walls[key] = holder
+
+
+## A run's mesh leant across by [param shear] (metres across a metre up:
+## the base stays on its line) and its points pushed across and up by up to
+## [param jitter] metres, the same push wherever a point is shared, so no
+## seam opens; the normals turned with the lean.
+func _wall_bend(mesh: Array, shear: float, jitter: float, first: Vector3i) -> void:
+	if shear == 0.0 and jitter <= 0.0:
+		return
+	var positions: PackedVector3Array = mesh[0]
+	var normals: PackedVector3Array = mesh[1]
+	for k in positions.size():
+		var p := positions[k]
+		if jitter > 0.0 and p.y > 0.001:
+			var at := Vector2i(roundi(p.x * 997.0) + roundi(p.y * 991.0) * 31 + first.x * 7 + first.y * 13, roundi(p.z * 983.0))
+			p += Vector3(_roll(at, 36) - 0.5, (_roll(at, 37) - 0.5) * 0.5, 0.0) * 2.0 * jitter
+		p.x += p.y * shear
+		positions[k] = p
+		var n := normals[k]
+		normals[k] = Vector3(n.x, n.y - n.x * shear, n.z).normalized()
+	mesh[0] = positions
+	mesh[1] = normals
 
 
 ## How tall the body under the cap stands at [param key]'s end [param end]
 ## (0 its start, 1 its end): a height at every WALL_SWAY-th vertex along
-## the line, straight between, so neighbouring runs on one line agree.
-func _wall_height(key: Vector3i, end: int, cap: float) -> float:
+## the line, up to [param sway] of [param cap] either way, straight
+## between, so neighbouring runs on one line agree.
+func _wall_height(key: Vector3i, end: int, cap: float, sway_by: float) -> float:
 	var at := _along(key) + end
 	var before := at - posmod(at, WALL_SWAY)
 	var after := before + WALL_SWAY
 	var line := Vector2i(key.x if key.z == Terrain.EAST else key.y, key.z)
-	var sway := func(along: int) -> float: return (_roll(Vector2i(line.x * 7 + line.y, along), 24) - 0.5) * 2.0 * WALL_HEIGHT_SWAY
+	var sway := func(along: int) -> float: return (_roll(Vector2i(line.x * 7 + line.y, along), 24) - 0.5) * 2.0 * sway_by
 	return cap * (1.0 + lerpf(sway.call(before), sway.call(after), float(at - before) / WALL_SWAY))
 
 
@@ -3461,12 +3661,13 @@ static func _profile_y(y: float, cap: float, body: float) -> float:
 	return y * body / cap if y <= cap else body + (y - cap)
 
 
-## A broken or rubble edge [param i] of [param run]: a slab with a ragged
-## top (lower, wider and lumpier for rubble), over WALL_BROKEN_STEPS steps.
-func _wall_broken(mesh: Array, i: int, run: Array[Vector3i], states: PackedInt32Array, cap: float) -> void:
+## A broken or rubble edge [param i] of [param run]: a slab [param wall_half]
+## a side with a ragged top (lower, wider and lumpier for rubble), over
+## WALL_BROKEN_STEPS steps.
+func _wall_broken(mesh: Array, i: int, run: Array[Vector3i], states: PackedInt32Array, cap: float, wall_half: float, sway: float) -> void:
 	var key := run[i]
 	var rubble := states[i] == WALL_RUBBLE
-	var half := WALL_RUBBLE_HALF if rubble else WALL_THICKNESS * 0.5
+	var half := wall_half + WALL_RUBBLE_SPREAD if rubble else wall_half
 	var heights := PackedFloat32Array()
 	var lean := PackedFloat32Array()
 	for step in WALL_BROKEN_STEPS + 1:
@@ -3475,9 +3676,9 @@ func _wall_broken(mesh: Array, i: int, run: Array[Vector3i], states: PackedInt32
 		if rubble:
 			heights.append(lerpf(WALL_RUBBLE_LOW, WALL_RUBBLE_HIGH, roll))
 		elif step == 0 and i > 0 and states[i - 1] == WALL_WHOLE:
-			heights.append(_wall_height(key, 0, cap) * 0.85)
+			heights.append(_wall_height(key, 0, cap, sway) * 0.85)
 		elif step == WALL_BROKEN_STEPS and i < run.size() - 1 and states[i + 1] == WALL_WHOLE:
-			heights.append(_wall_height(key, 1, cap) * 0.85)
+			heights.append(_wall_height(key, 1, cap, sway) * 0.85)
 		else:
 			heights.append(cap * lerpf(WALL_BROKEN_LOW, WALL_BROKEN_HIGH, roll))
 		lean.append((_roll(cell, 28) - 0.5) * (0.24 if rubble else 0.0))
@@ -3581,44 +3782,59 @@ func _wall_quad(mesh: Array, a: Vector3, b: Vector3, c: Vector3, d: Vector3, out
 	mesh[3] = indices
 
 
-## wall.castle.profile from the art slots: its points (x across, y up), its cap_y,
-## and its face as triangles (indices into the points), made once.
-static var _profile: Array = []
+## A wall set from the art slots (wall.<set>.profile): its points (x
+## across, y up), its cap_y (the top, for the cave's, which has none: all
+## body), its face as triangles (indices into the points), its half
+## thickness, and its variation (sway, broken, gap, lean, jitter, sag; 0
+## where it says none); made once a set.
+static var _sets: Dictionary[String, Dictionary] = {}
 
 
-static func _wall_profile() -> Array:
-	if _profile.is_empty():
-		var spec := ArtKit.spec("wall.castle.profile")
+static func _wall_set(set_name: String) -> Dictionary:
+	if not _sets.has(set_name):
+		var spec := ArtKit.spec("wall.%s.profile" % set_name)
 		var points := PackedVector2Array()
+		var top := 0.0
+		var half := 0.0
 		for each: Array in spec.get("points", [[-0.25, 0.0], [0.25, 0.0], [0.25, 3.0], [-0.25, 3.0]]):
 			points.append(Vector2(each[0], each[1]))
-		_profile = [points, float(spec.get("cap_y", 2.7)), Geometry2D.triangulate_polygon(points)]
-	return _profile
+			top = maxf(top, float(each[1]))
+			half = maxf(half, absf(float(each[0])))
+		var given: Dictionary = spec.get("variation", {})
+		var variation := {}
+		for key: String in ["sway", "broken", "gap", "lean", "jitter", "sag"]:
+			variation[key] = float(given.get(key, 0.0))
+		_sets[set_name] = {"points": points, "cap": float(spec.get("cap_y", top)), "faces": Geometry2D.triangulate_polygon(points),
+				"half": half, "top": top, "variation": variation}
+	return _sets[set_name]
 
 
-## The walls' material: material.wall.castle's texture if it has one, else a
-## stone-course texture made here, in the castle's stone; a plain
-## StandardMaterial3D, so a near run's see-through copy is made as any
-## other's (_see_through_of).
-static var _wall_stone: StandardMaterial3D
+## A set's walls' material: material.wall.<set>'s texture if it has one,
+## else courses made here (_stone_courses) in its swatch (WALL_LOOKS); a
+## plain StandardMaterial3D, so a near run's see-through copy is made as
+## any other's (_see_through_of). One a set.
+static var _wall_stones: Dictionary[String, StandardMaterial3D] = {}
 
 
-static func _wall_material() -> StandardMaterial3D:
-	if _wall_stone == null:
-		_wall_stone = StandardMaterial3D.new()
-		var own := ArtKit.texture("material.wall.castle")
-		_wall_stone.albedo_texture = own if own != null else _stone_courses()
-		_wall_stone.albedo_color = Color.WHITE if own != null else swatch(WALL_SWATCH.x, WALL_SWATCH.y)
-		_wall_stone.roughness = 0.9
-		_wall_stone.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	return _wall_stone
+static func _wall_material(set_name: String) -> StandardMaterial3D:
+	if not _wall_stones.has(set_name):
+		var look: Array = WALL_LOOKS.get(set_name, WALL_LOOKS[DEFAULT_SET])
+		var material := StandardMaterial3D.new()
+		var own := ArtKit.texture("material.wall." + set_name)
+		material.albedo_texture = own if own != null else _stone_courses(look[1], look[2], look[3], 0 if set_name == DEFAULT_SET else set_name.hash())
+		material.albedo_color = Color.WHITE if own != null else swatch(look[0].x, look[0].y)
+		material.roughness = 0.9
+		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		_wall_stones[set_name] = material
+	return _wall_stones[set_name]
 
 
-## Courses of stone blocks, WALL_TILE metres square, tiling: rows of
-## blocks of random length, each its own shade, mortar between.
-static func _stone_courses() -> ImageTexture:
+## Courses of stone blocks (or planks), WALL_TILE metres square, tiling:
+## [param rows] rows of blocks [param shortest] to [param longest] of the
+## tile long, each its own shade, mortar between; [param salt] for a set's
+## own (0: the castle's, as it always was).
+static func _stone_courses(rows: int, shortest: float, longest: float, salt: int) -> ImageTexture:
 	var size := 128
-	var rows := 5
 	var bytes := PackedByteArray()
 	bytes.resize(size * size * 3)
 	for row in rows:
@@ -3626,11 +3842,11 @@ static func _stone_courses() -> ImageTexture:
 		var bottom := (row + 1) * size / rows
 		# The row's joints across, from a shift so rows do not line up.
 		var joints: Array[int] = []
-		var x := int(_roll(Vector2i(row, 1), 30) * size * 0.5)
+		var x := int(_roll(Vector2i(row, 1 + salt), 30) * size * 0.5)
 		var end := x + size
 		while x < end - size * 0.15:
 			joints.append(x % size)
-			x += int(lerpf(0.3, 0.55, _roll(Vector2i(row, x), 31)) * size)
+			x += int(lerpf(shortest, longest, _roll(Vector2i(row, x + salt), 31)) * size)
 		for y in range(top, bottom):
 			for px in size:
 				# The block: the last joint at or before px, round the tile.
@@ -3642,7 +3858,7 @@ static func _stone_courses() -> ImageTexture:
 						gap = behind
 						block = k
 				var mortar := y - top < 2 or gap < 2
-				var shade := 0.78 if mortar else lerpf(0.9, 1.0, _roll(Vector2i(row, block), 32)) * lerpf(0.97, 1.0, _roll(Vector2i(px, y), 33))
+				var shade := 0.78 if mortar else lerpf(0.9, 1.0, _roll(Vector2i(row, block + salt), 32)) * lerpf(0.97, 1.0, _roll(Vector2i(px, y), 33))
 				var value := int(shade * 255.0)
 				var at := (y * size + px) * 3
 				bytes[at] = value
@@ -3692,12 +3908,50 @@ static func _needs_post(vertex: Vector2i, kind_at: Callable) -> bool:
 	return directions[0].dot(directions[1]) > -0.9
 
 
+## Whether walls of two sets meet at [param vertex]: a post between them,
+## so the step from one thickness to the other is not seen.
+func _sets_meet(vertex: Vector2i) -> bool:
+	var seen := ""
+	for entry: Array in WallEdge.edges_at_vertex(vertex):
+		var key: Vector3i = entry[0]
+		if _terrain["edges"].get(key, Terrain.Edge.OPEN) != Terrain.Edge.WALL or _outdoor and _is_outline(key):
+			continue
+		if seen != "" and _set_of(key) != seen:
+			return true
+		seen = _set_of(key)
+	return false
+
+
+## The set a post at [param vertex] is in: the thickest of its walls'.
+func _post_set(vertex: Vector2i) -> String:
+	var out := _walls_set
+	var widest := -1.0
+	for entry: Array in WallEdge.edges_at_vertex(vertex):
+		var key: Vector3i = entry[0]
+		if _terrain["edges"].get(key, Terrain.Edge.OPEN) == Terrain.Edge.OPEN:
+			continue
+		var half: float = _wall_set(_set_of(key))["half"]
+		if half > widest:
+			widest = half
+			out = _set_of(key)
+	return out
+
+
+## A post in its set (_post_set): wall.<set>.post, or .end for a set with
+## no post (the cave's); a column of the set's own stone where the slot has
+## no art yet.
 func _add_post(vertex: Vector2i) -> void:
 	var post: Node3D
+	var set_name := _post_set(vertex)
+	var slot := "wall.%s.post" % set_name if ArtKit.has("wall.%s.post" % set_name) else "wall.%s.end" % set_name
 	if BOX_WALLS:
 		post = _box(Vector3(POST_SIZE, WALL_HEIGHT, POST_SIZE), _stone_opaque)
+	elif not ArtKit.has(slot) or ArtKit.filled_by(slot) == "placeholder" and set_name != DEFAULT_SET:
+		var wall_set := _wall_set(set_name)
+		var side: float = wall_set["half"] * 2.0
+		post = _box(Vector3(side, wall_set["top"], side), _wall_material(set_name))
 	else:
-		post = ArtKit.instance("wall.castle.post")
+		post = ArtKit.instance(slot)
 	post.name = "Post_%d_%d" % [vertex.x, vertex.y]
 	var base := 0
 	for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:
@@ -4018,11 +4272,12 @@ func _wall_runs() -> Dictionary[Vector3i, Array]:
 	return out
 
 
-## A wall edge's own share of its run: the wall's thickness across, the
+## A wall edge's own share of its run: its set's thickness across, the
 ## edge along, WALL_HEIGHT up from its base.
 func _edge_bounds(key: Vector3i) -> AABB:
 	var middle := _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
-	var half := Vector3(WALL_THICKNESS * 0.5, 0.0, 0.5) if key.z == Terrain.EAST else Vector3(0.5, 0.0, WALL_THICKNESS * 0.5)
+	var across: float = _wall_set(_set_of(key))["half"]
+	var half := Vector3(across, 0.0, 0.5) if key.z == Terrain.EAST else Vector3(0.5, 0.0, across)
 	return AABB(middle - half, half * 2.0 + Vector3(0.0, WALL_HEIGHT, 0.0))
 
 

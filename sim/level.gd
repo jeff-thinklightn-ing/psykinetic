@@ -439,6 +439,9 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			# Lit by the sky on the world clock, unless level.json sets its
 			# light outright (decision 291).
 			"daylight": zone == "outdoors" and not config.has("ambient"),
+			# The wall and floor sets it is drawn in (decision 285).
+			"walls": str(config.get("walls", "castle")),
+			"floors": str(config.get("floors", "castle")),
 		},
 		"size": cells,
 		"warnings": warnings,

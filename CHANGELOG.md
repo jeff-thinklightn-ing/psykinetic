@@ -6,6 +6,11 @@ top section as the release notes.
 
 ## Unreleased
 
+- Homes are built of wood: timber walls a little thinner and not quite
+  straight, and plank floors inside. Maps can say which set their walls and
+  floors are drawn in (castle, wood, stone or cave); every map today keeps
+  its castle walls.
+
 ## v0.1.142
 
 - Seven weapons exist as things you can carry: hammer, sword, shield, giant

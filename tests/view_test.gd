@@ -36,7 +36,7 @@ func _ready() -> void:
 	_test_outdoor()
 	_test_heights()
 	_test_water()
-	_test_wall_runs()
+	await _test_wall_runs()
 	_test_scatter()
 	_test_buildings()
 	_test_building_states()
@@ -399,20 +399,96 @@ func _test_wall_runs() -> void:
 				top = maxf(top, point.y - _rig._edge_base(key))
 		_check(terrain["edges"].get(key) == Terrain.Edge.WALL and top >= Client3D.WALL_RUBBLE_LOW,
 				"the breach at %s is rubble %.2f m high where the sim keeps its wall" % [key, top])
-	# Plain walls (a building's): whole and level, the cap at WALL_HEIGHT.
+	# The castle's walls are its set's: half a metre thick (_edge_bounds).
+	var some: Vector3i = _rig._walls.keys()[0]
+	var castle_width := _rig._edge_bounds(some).size.x if some.z == Terrain.EAST else _rig._edge_bounds(some).size.z
+	_check(_rig._set_of(some) == "castle" and is_equal_approx(castle_width, 0.5), "a map's walls are in its set, castle by default, %.2f m thick" % castle_width)
+	# In the wood set (a home's): no breach, no broken top, the cap at the
+	# profile's top less its sag, 0.3 m thick at the foot, leaning a little.
 	for key: Vector3i in terrain["edges"]:
 		if terrain["edges"][key] == Terrain.Edge.WALL:
-			_rig._plain_walls[key] = true
+			_rig._wall_sets[key] = "wood"
 	_rig.rebuild(terrain, castle["centre"])
 	var level := true
+	var thin := true
+	var leant := 0
+	var sag: float = Client3D._wall_set("wood")["variation"]["sag"]
+	var wood_runs: Dictionary[Node3D, bool] = {}
 	for key: Vector3i in _rig._walls:
-		var body := _rig._walls[key].get_node("Body") as MeshInstance3D
+		wood_runs[_rig._walls[key]] = true
+	for run: Node3D in wood_runs:
+		var body := run.get_node("Body") as MeshInstance3D
 		var top := -INF
+		var low_top := INF
+		var top_x := 0.0
 		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 			top = maxf(top, point.y)
-		level = level and is_equal_approx(top, Client3D.WALL_HEIGHT)
-	_check(_rig._wall_breaches.is_empty() and level, "plain walls: no breach, no broken top, every cap at %s m" % Client3D.WALL_HEIGHT)
-	_rig._plain_walls.clear()
+			if point.y > Client3D.WALL_HEIGHT - 0.1:
+				low_top = minf(low_top, point.y)
+				top_x = maxf(top_x, absf(point.x))
+			if point.y < 0.001:
+				thin = thin and absf(point.x) <= 0.15 + 0.0001
+		level = level and top <= Client3D.WALL_HEIGHT + 0.0001 and low_top >= Client3D.WALL_HEIGHT - sag - 0.0001
+		leant += 1 if absf(top_x - 0.15) > 0.005 else 0
+	var bounds := _rig._edge_bounds(some)
+	_check(_rig._wall_breaches.is_empty() and level, "wood walls: no breach, no broken top, every cap within %.2f m of %s m" % [sag, Client3D.WALL_HEIGHT])
+	_check(thin and is_equal_approx(bounds.size.x if some.z == Terrain.EAST else bounds.size.z, 0.3),
+			"0.3 m thick, as the set's profile, in what hides the player too")
+	_check(leant > wood_runs.size() / 3, "most runs lean a little (%d of %d)" % [leant, wood_runs.size()])
+	_rig._wall_sets.clear()
+	_rig.rebuild(terrain, castle["centre"])
+	# A town's walls broken or in rubble (buildings: _wall_states and
+	# rebuild_walls): that line's runs drawn again, the rest kept.
+	var by_run: Dictionary[Node3D, Array] = {}
+	for key: Vector3i in _rig._walls:
+		if not by_run.has(_rig._walls[key]):
+			by_run[_rig._walls[key]] = []
+		by_run[_rig._walls[key]].append(key)
+	var long_run: Array[Vector3i] = []
+	for run: Node3D in by_run:
+		if by_run[run].size() >= 5:
+			long_run.assign(by_run[run])
+			break
+	long_run.sort_custom(func(a: Vector3i, b: Vector3i) -> bool: return Client3D._along(a) < Client3D._along(b))
+	_check(long_run.size() >= 5, "a run of five walls or more (%d)" % long_run.size())
+	if long_run.size() >= 5:
+		var rubble_at := long_run[2]
+		var broken_at := long_run[4]
+		var kept: Dictionary[Node3D, bool] = {}
+		for key: Vector3i in _rig._walls:
+			if Client3D._line_of(key) != Client3D._line_of(rubble_at):
+				kept[_rig._walls[key]] = true
+		var before: Node3D = _rig._walls[rubble_at]
+		_rig._wall_states[rubble_at] = "rubble"
+		_rig._wall_states[broken_at] = "broken"
+		_rig.rebuild_walls([rubble_at, broken_at])
+		_check(not before.visible and _rig._walls[rubble_at] != before and not _rig._occluders_built or _rig._occluders.all(func(entry: Array) -> bool: return entry[0] != before),
+				"the old run hidden, a new one in its place, and what can fade indexed again")
+		var tops := {}
+		for key: Vector3i in [rubble_at, broken_at]:
+			var middle := Client3D._edge_midpoint(key)
+			var top := 0.0
+			var body := _rig._walls[key].get_node("Body") as MeshInstance3D
+			for local: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+				var point := body.global_transform * local
+				if Vector2(point.x - middle.x, point.z - middle.z).length() < 0.45:
+					top = maxf(top, point.y - _rig._edge_base(key))
+			tops[key] = top
+		var cap: float = Client3D._wall_set("castle")["cap"]
+		_check(rubble_at in _rig._wall_breaches and tops[rubble_at] >= Client3D.WALL_RUBBLE_LOW and tops[rubble_at] <= Client3D.WALL_RUBBLE_HIGH + 0.01
+				and terrain["edges"].get(rubble_at) == Terrain.Edge.WALL, "rubble: a bank %.2f m high, never a way through, the sim's wall kept" % tops[rubble_at])
+		_check(tops[broken_at] >= cap / 3.0 and tops[broken_at] < cap, "broken: a stub %.2f m high, never under a third of the wall" % tops[broken_at])
+		var still := 0
+		for key: Vector3i in _rig._walls:
+			if Client3D._line_of(key) != Client3D._line_of(rubble_at) and kept.has(_rig._walls[key]):
+				still += 1
+		var others := _rig._walls.keys().filter(func(key: Vector3i) -> bool: return Client3D._line_of(key) != Client3D._line_of(rubble_at)).size()
+		_check(still == others, "every run on another line kept as it was (%d of %d edges)" % [still, others])
+		await get_tree().process_frame
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check(not is_instance_valid(before), "and the old run freed, frames later")
+		_rig._wall_states.clear()
 	_rig.rebuild(terrain, castle["centre"])
 	runs.clear()
 	for key: Vector3i in _rig._walls:
@@ -474,9 +550,18 @@ func _test_buildings() -> void:
 		return footprint.size() == 2 and Vector2i(int(footprint[0]), int(footprint[1])) == Level.BUILDINGS[slot]),
 			"the sim's footprints are art-kit's slots' (Level.BUILDINGS)")
 	_check(not well.is_empty() and not _rig._building_at.has(Vector2i(11, 10)) and _rig._dry_water.has(Vector2i(11, 10))
-			and not _rig._plain_walls.has(Vector3i(11, 10, Terrain.EAST)), "the well: no inside, no walls, its water drawn dry under its rim")
-	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return _rig._plain_walls.has(key)),
-			"its outline is drawn plain, level under its roof (decision 252)")
+			and not _rig._wall_sets.has(Vector3i(11, 10, Terrain.EAST)), "the well: no inside, no walls, its water drawn dry under its rim")
+	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return _rig._set_of(key) == "wood"),
+			"its outline is drawn in its slot's wall set, wood (decision 285)")
+	var planks := 0
+	var footprint := Level.rect_cells(house["rect"])
+	for cell: Vector2i in footprint:
+		var place := (cell.y - _rig._mask_origin.y) * _rig._mask_size.x + cell.x - _rig._mask_origin.x
+		planks += 1 if _rig._floor_bytes[place] == Client3D.FLOOR_SETS["wood"] else 0
+	var lawn := Vector2i(1, 1)
+	var lawn_place := (lawn.y - _rig._mask_origin.y) * _rig._mask_size.x + lawn.x - _rig._mask_origin.x
+	_check(planks == footprint.size() and _rig._floor_bytes[lawn_place] == 0,
+			"and its inside floored in its floor set, wood, cell by cell to its walls (%d of %d), the grass outside as it was" % [planks, footprint.size()])
 	_check(node.position.is_equal_approx(Vector3(4.5, Client3D.BUILDING_LIFT, 5.5)) and is_equal_approx(node.rotation.y, 0.0),
 			"the house stands over the middle of its footprint, its front south (%s, %s)" % [node.position, node.rotation.y])
 	_check(is_equal_approx((hut["node"] as Node3D).rotation.y, -PI / 2.0), "the hut turned with its front west")

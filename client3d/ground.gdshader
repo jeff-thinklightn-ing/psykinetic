@@ -31,6 +31,21 @@ uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
 // the brighter of the two, so a torch's pool shows at night and the hour
 // changes one number, not every cell (decision 304). 0 indoors.
 uniform float sky_floor = 0.0;
+// The floor sets (Client3D._floor_sets, decision 285), a byte a cell like
+// kinds but read cell by cell, so a floor ends at the walls' line: 0 the
+// ground's own look, 1 wood (planks), 2 stone (flagstones), 3 cave (rock).
+// Each in its swatch, or its floor.<set> texture (4 m a tile) once it has
+// one.
+uniform sampler2D floors : filter_nearest, repeat_disable;
+uniform vec3 floor_wood : source_color = vec3(0.54, 0.42, 0.28);
+uniform vec3 floor_stone : source_color = vec3(0.59, 0.58, 0.55);
+uniform vec3 floor_cave : source_color = vec3(0.42, 0.4, 0.38);
+uniform sampler2D floor_wood_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D floor_stone_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D floor_cave_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform bool floor_wood_own = false;
+uniform bool floor_stone_own = false;
+uniform bool floor_cave_own = false;
 
 varying vec3 world;
 varying vec2 shade;
@@ -94,6 +109,42 @@ vec2 cobbles(vec2 p) {
 	return vec2(second - nearest, tint);
 }
 
+// Boards (or slabs) laid in rows row deep, each about run
+// long, every row shifted: how far p is from the nearest joint (in
+// metres) and the board's own random tint.
+vec2 boards(vec2 p, float row, float run) {
+	float r = floor(p.y / row);
+	vec2 seed = hash2(vec2(r, 7.0));
+	float size = run * (0.7 + 0.6 * seed.x);
+	float along = p.x / size + seed.y;
+	float across = fract(p.y / row);
+	float joint = min(min(across, 1.0 - across) * row, min(fract(along), 1.0 - fract(along)) * size);
+	return vec2(joint, hash2(vec2(r, floor(along) + 101.0)).x);
+}
+
+vec3 floor_look(int floor_set, vec2 at, float fine) {
+	if (floor_set == 1) {
+		if (floor_wood_own) {
+			return texture(floor_wood_tex, at / 4.0).rgb;
+		}
+		vec2 board = boards(at, 0.2, 1.6);
+		vec3 here = floor_wood * (0.8 + 0.32 * board.y) * (0.93 + 0.14 * noise(vec2(at.x * 0.9, at.y * 28.0)));
+		return here * mix(0.5, 1.0, smoothstep(0.004, 0.016, board.x));
+	}
+	if (floor_set == 2) {
+		if (floor_stone_own) {
+			return texture(floor_stone_tex, at / 4.0).rgb;
+		}
+		vec2 slab = boards(mat2(vec2(0.0, 1.0), vec2(-1.0, 0.0)) * at, 0.7, 0.9);
+		vec3 here = floor_stone * (0.84 + 0.22 * slab.y) * (0.92 + 0.16 * fbm(at * 1.3 + slab.y * 9.0)) * (0.95 + 0.1 * fine);
+		return here * mix(0.58, 1.0, smoothstep(0.012, 0.04, slab.x));
+	}
+	if (floor_cave_own) {
+		return texture(floor_cave_tex, at / 4.0).rgb;
+	}
+	return floor_cave * (0.72 + 0.42 * fbm(at * 0.7 + 60.0)) * (0.9 + 0.2 * noise(at * 5.0 + 3.0));
+}
+
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	shade = CUSTOM0.rg;
@@ -133,6 +184,12 @@ void fragment() {
 	if (weights.a > 0.0) {
 		colour += sand * (0.92 + 0.12 * noise(at * 0.5 + 21.0))
 				* (0.96 + 0.08 * noise(vec2(at.x * 1.5 + at.y * 0.4, at.y * 6.0))) * weights.a;
+	}
+
+	ivec2 cell = ivec2(floor(at - kinds_origin + 0.5));
+	int floor_set = int(round(texelFetch(floors, clamp(cell, ivec2(0), ivec2(kinds_size) - 1), 0).r * 255.0));
+	if (floor_set > 0) {
+		colour = floor_look(floor_set, at, fine);
 	}
 
 	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);

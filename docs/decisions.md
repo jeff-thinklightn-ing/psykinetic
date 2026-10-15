@@ -5602,3 +5602,55 @@ lines, no "alive": false) and World.entity_taken(target, by) is: Main takes
 her off the map and keeps her record "taken" (companions' side), and the
 group carries "companion:<keeper id>" among its captives, the origin Towns
 names her by. entity_damaged is emitted first as ever, so the blow is seen.
+## 285. Walls and floors are drawn in sets
+
+The map says which set its walls and floors are drawn in (level.json
+`"walls"` and `"floors"`: castle, wood, stone or cave, art-kit's sets of
+decision 287; castle when not given or not a set, so every map today looks
+as it did). A building's outline and inside are drawn in its slot's
+`wall_set` and `floor_set` (wood for the hut, house and shed), whatever the
+map's are. Drawing only: the sim's walls, floors and every rule are the
+same in any set.
+
+Walls: `Client3D._wall_sets` (edge to set, filled for buildings at build
+time, open to others) replaces `_plain_walls`. A run is one set; its sweep
+reads the set's `wall.<set>.profile` (points, cap_y, none for the cave: all
+body) and its `variation`, so Jeff tunes a set without code: sway (the
+body's rise and fall, of cap_y), broken (a share of edges' tops broken
+off), gap (a share of breaches of rubble), lean (degrees a run leans at
+most, its base on its line), sag (metres the top dips between the run's
+ends) and jitter (metres its points are pushed, the same push where a
+point is shared so no seam opens). Castle's 0.1, 0.1 and 0.05 are the
+constants it had, so it is unchanged; a home's wood leans up to 2 degrees
+and sags 3 cm, nothing broken, under its roof. Its thickness is the
+profile's, in what hides the player too (`_edge_bounds`: castle 0.5 m,
+wood 0.3). Its material is `material.wall.<set>` once it has a texture,
+else courses made here in a swatch of the set's (wood's are long planks).
+A post is the set's `wall.<set>.post` (`.end` for the cave), a column of
+the set's own stone while that slot is only a grey box, and stands where
+two sets meet on a line as well as at turns and ends.
+
+`Client3D._wall_states` (edge to "broken" or "rubble", for buildings: a
+town's walls by their level) draws an edge broken, a ragged stub never
+under 0.45 of the cap, or as rubble, a bank 0.9 to 1.15 m high and wider
+than the wall, never a way through; `wall.<set>.straight_ruined` and
+`wall.<set>.rubble` stand there instead once they have art. The sim's wall
+stays either way. `Client3D.rebuild_walls(edges)` draws again only the runs
+on those edges' lines and their posts, and indexes what can fade again;
+the old runs are hidden at once and freed two frames later, so a call
+right after a build never frees a 3D node before a frame is drawn (296).
+
+Floors: the ground stays one mesh and one shader (decision 216). A second
+texture, a byte a cell read cell by cell (so a floor ends at the walls'
+line, not along the ragged border kinds have), says each cell's floor set:
+0 the ground's own look, then wood (planks), stone (flagstones) and cave
+(rock), each in a palette swatch, or its `floor.<set>` texture (4 m a tile)
+once it has one. `Client3D._floor_sets` (cell to set) holds the
+buildings' insides; the map's floor set is drawn on its stone ground,
+grass, dirt and sand left as they are. Buildings keep no floor of their own
+(287): no double floor at the door, one lit surface.
+
+Rejected: a set a building or region paints per cell in the editor (later,
+if Jeff asks); a mesh per floor set over the ground, which would double the
+ground's draws and light it twice; and keeping plain walls as a flag beside
+the sets, which the wood set's own variation now says.

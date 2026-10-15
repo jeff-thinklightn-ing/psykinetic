@@ -179,6 +179,12 @@ All of it is optional.
   `to_spawn` the spawn point there ("" for its first start); `"one_way":
   true` for a link with no way back on purpose (a drop, a trapdoor), so the
   world map's check does not flag it.
+- `walls` and `floors`: the wall and floor sets the map is drawn in
+  (art-kit's `wall.<set>.*` and `floor.<set>`: castle, wood, stone, cave;
+  castle if not given or not a set). The floor set is drawn on the map's
+  stone ground; grass, dirt and sand stay as they are. A building's walls
+  and inside are drawn in its slot's `wall_set` and `floor_set` (wood for
+  homes) whatever the map's are. Drawing only: the sets change no rule.
 - `neighbours`: the level across each map edge, `{"east": "wilds"}`: walk
   off the east edge and arrive at the west edge of wilds at the same row
   (north and south keep the column). The neighbour names this level on its
