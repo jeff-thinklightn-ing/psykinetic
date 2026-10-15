@@ -16,6 +16,10 @@ which worktree owns each step, and the design rules not to break without asking 
   run the full suite (plus net_test and state_test for anything the server runs), commit,
   and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
   moved: rebase, retest, push again. A branch never collects unlanded work.
+- Take the landing lock for your final retest and push, so nobody lands between them:
+  `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, retest, push, and
+  `sh tools/land_lock.sh release <tree>`. If it's held, keep working and try again in a
+  few minutes; never push while another tree holds it. Don't hold it for anything else.
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
@@ -45,6 +49,8 @@ which worktree owns each step, and the design rules not to break without asking 
   held, wait. Keep many-process runs short.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
+  Stopping a background task can leave its shell script and Godot children running: after
+  stopping one, find its children by command line and stop them by PID too.
 - Joining depends on `Net.protocol()`, not the build (decision 239). A new message kind,
   RPC script, or property you `replicate()` must be listed in `net/net.gd`
   (`MESSAGE_KINDS`, `RPC_SCRIPTS`, `SUBCLASS_REPLICATED`); `tests/protocol_test` names

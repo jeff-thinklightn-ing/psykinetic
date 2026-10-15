@@ -16,3 +16,4 @@ items 1800
 economy 2000
 lore 2200
 buildings 2400
+sound 2600
