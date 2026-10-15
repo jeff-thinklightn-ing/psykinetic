@@ -1036,11 +1036,15 @@ func _test_goblin() -> void:
 	await get_tree().create_timer(0.6).timeout
 	var was := (puppet.get_node("Body") as Node3D).rotation.y
 	_push_imp(imp, Vector2i(1, 0))
-	await _run_clock(0.05)
-	var yaw := (puppet.get_node("Body") as Node3D).rotation.y
-	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL and absf(angle_difference(yaw, PI)) > 0.05
-			and absf(angle_difference(yaw, PI)) < absf(angle_difference(was, PI)),
-			"pushed back (+x): it backpedals, turning (not snapping) toward whence it came (-x), yaw %.2f from %.2f" % [yaw, was])
+	# The first frame that turns it, against the ease for that frame's own
+	# length: a wall-clock wait let one slow frame bring it all the way round.
+	var turn := await _first_turn(puppet)
+	var yaw: float = turn[0]
+	var eased := absf(angle_difference(was, PI)) * exp(-GridEntity.TURN_RATE * float(turn[1]))
+	_check(animator.current_animation == Client3D.CLIP_BACKPEDAL and absf(angle_difference(yaw, PI)) > 0.0
+			and absf(absf(angle_difference(yaw, PI)) - eased) <= 0.1 * eased + 0.001,
+			"pushed back (+x): it backpedals, turning (not snapping) toward whence it came (-x), yaw %.2f from %.2f (%.2f expected after a %.0f ms frame)"
+			% [yaw, was, PI - eased, float(turn[1]) * 1000.0])
 	await _run_clock(0.3)
 	yaw = (puppet.get_node("Body") as Node3D).rotation.y
 	_check(absf(angle_difference(yaw, PI)) < 0.05, "and comes round to face it, yaw %.2f" % yaw)
@@ -1128,6 +1132,28 @@ func _run_clock(seconds: float) -> void:
 		while World.tick_alpha >= 1.0:
 			World.tick += 1
 			World.tick_alpha -= 1.0
+
+
+## Runs the drawing clock as _run_clock does, a frame at a time, until
+## [param puppet]'s body turns (a second at most): [yaw, the delta of the
+## frame that turned it]. process_frame comes before the frame's _process,
+## so a turn is seen a frame after the one that made it.
+func _first_turn(puppet: Node3D) -> Array:
+	var body := puppet.get_node("Body") as Node3D
+	var until := Time.get_ticks_msec() + 1000
+	var before := body.rotation.y
+	var delta := 0.0
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		var turned := [body.rotation.y, delta]
+		delta = get_process_delta_time()
+		World.tick_alpha += delta * World.TICK_RATE
+		while World.tick_alpha >= 1.0:
+			World.tick += 1
+			World.tick_alpha -= 1.0
+		if turned[0] != before:
+			return turned
+	return [body.rotation.y, 0.0]
 
 
 func _test_settings() -> void:
