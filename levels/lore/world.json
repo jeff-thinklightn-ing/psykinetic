@@ -76,6 +76,21 @@
 					"ask": "B2"
 				},
 				{
+					"id": "the_land.no_knights",
+					"text": "No one has been knighted in ages.",
+					"known": "common",
+					"where": [],
+					"source": "Jeff"
+				},
+				{
+					"id": "the_land.knights_once",
+					"text": "Whether there were ever knights in the land, and who made them.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A4"
+				},
+				{
 					"id": "the_land.gods",
 					"text": "Which gods are worshipped, and whether anyone besides the Blood Rot worships or fears the fallen star.",
 					"known": "common",

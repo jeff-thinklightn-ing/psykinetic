@@ -128,14 +128,6 @@
 					"where": [
 						"town_lands"
 					]
-				},
-				{
-					"id": "pip.squire_to",
-					"text": "Whom Pip would squire for: there is no lord or knight in the draft.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "H10"
 				}
 			]
 		},

@@ -33,6 +33,9 @@ Whoever falls rises again after a while. It hurts, and no one wants to fall. Why
 this happens, and whether any death is one the fallen do not rise from, is open
 *(asked: B1)*.
 
+No one has been knighted in ages. Whether there were ever knights in the land,
+and who made them, is open *(asked: A4, H1)*.
+
 How the land is governed and what its laws are *(asked: A3, A4)*, how real magic
 is and what "the gift" is *(asked: B2)*, and which gods are worshipped *(asked:
 B3)* are all open.
@@ -116,8 +119,8 @@ she witnesses and what is said to her. Lore doesn't write companions' pasts. It
 gives the world they are rolled into.
 
 Wren, Nix and Pip stay as named companions (Jeff). Wren and Nix are women. Pip is
-a young man who wants to become a squire. Whom he would squire for is open, since
-the draft has no lord or knight *(asked: H10)*. All three rest in town between
+a young man who wants to become a squire, and can't: no one has been knighted in
+ages. All three rest in town between
 trips. Beyond that, who each one is comes from their own card.
 
 ## Who knows what
