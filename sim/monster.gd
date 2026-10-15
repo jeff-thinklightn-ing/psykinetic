@@ -937,6 +937,27 @@ func _calm() -> void:
 ## idle (Idle), opens_doors, door_force, leash, temperament (Temper ->
 ## weight)}. A row that will not read is left out, with a warning; a field
 ## missing or wrong falls back to a monster of no kind's.
+## What it leaves where it falls (decision 318): its kind's "drops" (each
+## {item, count: [least, most]}, levels/monsters.json), made now
+## (ItemBook.mint, "remains" of it), as many of each as a roll between
+## least and most, seeded by its name and the tick. World.damage lays them
+## on the ground. Server only.
+func remains() -> Array[int]:
+	var uids: Array[int] = []
+	var row: Dictionary = kinds().get(str(spawn_spec.get("kind", "")), {})
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("%s/remains/%d" % [name, World.tick])
+	for drop: Variant in row.get("drops", []):
+		if not drop is Dictionary or str(drop.get("item", "")).is_empty():
+			continue
+		var count: Variant = drop.get("count", [1, 1])
+		var least := int(count[0]) if count is Array and count.size() > 0 else 1
+		var most := int(count[1]) if count is Array and count.size() > 1 else least
+		for i in roll.randi_range(least, maxi(least, most)):
+			uids.append(World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile))
+	return uids
+
+
 static func kinds() -> Dictionary:
 	if _kinds.is_empty():
 		_kinds = read_kinds(KINDS_PATH)

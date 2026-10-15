@@ -2354,6 +2354,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		var spilt: Array[int] = []
 		if target is Cargo:
 			spilt = empty_container(target)
+		elif target is Monster:
+			spilt = (target as Monster).remains()  # An animal's meat and hide (decision 318).
 		var at := target.tile
 		despawn(target)
 		for uid in spilt:

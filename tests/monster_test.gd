@@ -79,6 +79,7 @@ func _ready() -> void:
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
+	_test_wild_remains()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1632,3 +1633,28 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+func _test_wild_remains() -> void:
+	print("
+== a slain animal leaves its kind's drops on the ground; an imp leaves nothing ==")
+	Monster.idling = true
+	var e := _build(["############", "#..........#", "#..D....i..#", "#..........#", "############"])
+	var stag: Animal = e["D"][0]
+	var imp: Monster = e["i"][0]
+	var at := stag.tile
+	World.damage(stag, stag.hp)
+	var laid: Array[String] = []
+	for cell: Vector2i in World.zone.ground:
+		if World.distance(cell, at) <= World.GROUND_SPILL:
+			for id in World.ground_at(cell):
+				laid.append(id)
+	var meat := laid.count("meat")
+	_check(not stag.spawned and meat >= 4 and meat <= 5 and laid.count("hide") == 1 and laid.count("antlers") == 1
+			and laid.size() == meat + 2, "the stag: 4-5 meat, a hide, its antlers, about where it fell (%s)" % [laid])
+	var uid: int = World.ground_uids(World.zone.ground.keys().filter(
+			func(cell: Vector2i) -> bool: return "antlers" in World.ground_at(cell))[0])[0]
+	_check(World.items.history(uid)["events"][0]["kind"] == "remains", "the antlers' history begins as its remains")
+	var before := World.zone.ground.size()
+	World.damage(imp, imp.hp)
+	_check(not imp.spawned and World.zone.ground.size() == before, "an imp's row drops nothing")

@@ -6043,3 +6043,20 @@ Facts drop exact repeats, so a kind is noted once a place.
 Rejected: a companion who hunts on her own (she follows her
 player's lead); warning of wolves by day, when they leave people be unless
 in a pack (her sighting is still told as any sighting).
+## 318. A slain monster leaves its kind's drops where it fell
+
+A monster killed (World.damage at 0 hp, not spared) leaves what its kind's
+row of levels/monsters.json says it drops: "drops", each {item, count:
+[least, most]}, an Items id and how many. Monster.remains makes them then,
+one ItemBook instance each, minted "remains" of the animal (its label, zone
+and cell, so a hide's history begins with the deer it came off), as many of
+each as a roll between least and most seeded by its name and the tick; World
+lays them on the ground where it fell (put_on_ground, spilling to the
+nearest cells with room, as a broken crate's cargo does), where they are
+picked up, and economy banks what lands on stockpile ground, like any other
+thing. Rows say it, not code: today the animals (meat and a hide; a stag's
+antlers, a boar's tusks; a wolf only its hide), and no monster of a faction,
+whose things are what they carried (items' decision 330, which can add to
+remains). A companion or resident taken in a raid (decision 314) is not
+slain and leaves nothing. items_test checks every drop names a catalog
+thing.
