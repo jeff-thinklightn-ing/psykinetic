@@ -3619,12 +3619,14 @@ the stockpile's ground banks nothing; only what is let go of there is.
   (someone moves them).
 - Carried: nothing. A player walking onto the ground with a sack and a
   sword keeps both until they let go of them.
-- Containers (items' step 2b: crates and carts, Container): when one is
-  moved (World.entity_moved, pushes included) onto a town-held stockpile
-  place, its contents are emptied into the store (World.empty_container)
-  and the container stays for the town to send out again. It comes with
-  2b. Carts on tracks later move the same entity, so the same arrival
-  banks them.
+- Crates and carts (items' step 2b, Cargo): when one moves onto a cell
+  of a town-held stockpile place (World.entity_moved, which every push
+  fires), what it carries is banked once the move is done (deferred, as
+  the ground): World.empty_container, then the same banking, the ledger
+  saying it came on that cart (the pusher isn't known there). The crate
+  or cart stays, empty, for the town to send out again. A thing with a
+  yield the stockpile has no count for is put down beside it. Carts on
+  tracks later move the same entity, so the same arrival banks them.
 
 Hauling is physical and near players, so it runs on the full tick and
 only on those events: a cached lookup per landing, no scan.

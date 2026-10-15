@@ -266,8 +266,9 @@ A place of kind `stockpile` is where the town keeps what players bring
 home: gold, ore, wood, cloth and food as counts, and gear item by item
 (`Stockpile`, `sim/stockpile.gd`, kept as `World.stockpile` and saved in
 the snapshot). Things reach it physically: put into a depot (a chest
-with `"props": {"depot": true}` inside the place's radius), or put down
-or thrown onto the place's ground. Either way they are banked at once (a
+with `"props": {"depot": true}` inside the place's radius), put down
+or thrown onto the place's ground, or carried in on a crate or cart
+pushed onto it (the cart is unloaded and stays). Either way they are banked at once (a
 sack of ore as its ore, gear as itself; the store counts it, its ledger
 says who and when). Picking loot up counts for nothing, and so does
 carrying it onto the ground: only what is let go of there is banked.

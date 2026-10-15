@@ -1377,6 +1377,41 @@ var _put_down_by: Dictionary[int, String] = {}
 
 func _ready() -> void:
 	ground_changed.connect(_on_ground_for_stockpile)
+	entity_moved.connect(_on_moved_for_stockpile)
+
+
+## A crate or cart (Cargo) moved onto [param to]: if that is stockpile
+## ground the town holds, what it carries is banked once the move is done.
+func _on_moved_for_stockpile(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
+	if not Net.is_authority() or stockpile == null or not entity is Cargo:
+		return
+	var area := entity.zone if not entity.zone.is_empty() else zone.name
+	if not Stockpile.place_at(holdings, area, to).is_empty():
+		_bank_cargo.call_deferred(entity)
+
+
+## Banks everything [param cargo] carries, if it still stands on stockpile
+## ground the town holds; the crate or cart stays, empty, for the town to
+## send out again. A thing whose yield the stockpile has no count for is
+## put down beside it instead.
+func _bank_cargo(cargo: GridEntity) -> void:
+	if not is_instance_valid(cargo) or not cargo.spawned or stockpile == null:
+		return
+	var area := cargo.zone if not cargo.zone.is_empty() else zone.name
+	var place := Stockpile.place_at(holdings, area, cargo.tile)
+	var there: Zone = zones.get(area, zone if zone.name == area else null)
+	if place.is_empty() or there == null:
+		return
+	var was := enter(there)
+	var label := _label_of(cargo)
+	for uid in empty_container(cargo):
+		var yields := Items.yield_of(items.id_of(uid))
+		if yields.keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
+			put_on_ground(uid, cargo.tile)
+			continue
+		_bank_thing(place, uid, "", label, area, cargo.tile)
+	_log("cargo: %s unloaded into %s at %s" % [cargo.name, place, cargo.tile])
+	enter(was)
 
 
 ## Something landed on (or left) [param cell] of [param zone_name]: if it

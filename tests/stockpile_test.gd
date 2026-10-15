@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_resource_items()
 	await _test_restart()
 	await _test_hauling()
+	await _test_cart()
 	_test_old_and_odd_snapshots()
 
 	remove_child(_main)
@@ -58,13 +59,14 @@ func _register_town() -> void:
 	var rows: Array[String] = []
 	for y in 15:
 		rows.append("#".repeat(23) if y == 0 or y == 14 else "#" + ".".repeat(21) + "#")
-	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "chest", Vector2i(9, 2): "chest", Vector2i(9, 5): "chest"}
+	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "chest", Vector2i(9, 2): "chest", Vector2i(9, 5): "chest", Vector2i(1, 6): "cart"}
 	Level.register(TOWN, Level.image_from_rows(rows, markers), null, {
 		"name": "Stockpile town", "centre": [6, 4], "starts": [[2, 2]],
 		"entities": [
 			{"at": [5, 2], "name": "Depot1", "props": {"depot": true}},
 			{"at": [9, 2], "name": "StrayDepot", "props": {"depot": true}},
 			{"at": [9, 5], "name": "Chest1", "props": {"slots": [KIT, "", "", ""]}},
+			{"at": [1, 6], "name": "Cart1"},
 		],
 		"places": {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}},
 	})
@@ -240,6 +242,37 @@ func _test_hauling() -> void:
 	World.try_drop(host, _slot_of(host, "ore_sack"))
 	await get_tree().process_frame
 	_check(stock.count(STORE, "ore") == ore + 15 and World.ground_at(host.tile).is_empty(), "the town takes it back: picked up and put down, it's banked")
+
+
+func _test_cart() -> void:
+	print("
+== a cart pushed onto the store's ground is unloaded into it, and stays ==")
+	var stock := World.stockpile
+	var cart := _entity("Cart1")
+	_check(cart is Cargo and cart.slots.size() == 8, "Cart1 is a cart: 8 slots")
+	World.set_slots(cart, ["ore_sack", "ore_sack", KIT, "", "", "", "", ""])
+	var kit := World.slot_uid(cart, 2)
+	var ore := stock.count(STORE, "ore")
+	World._relocate(cart, Vector2i(1, 5))
+	await get_tree().process_frame
+	_check(stock.count(STORE, "ore") == ore and cart.slots[0] == "ore_sack", "moved about off the store's ground, it keeps its load")
+	World._relocate(cart, Vector2i(3, 3))
+	await get_tree().process_frame
+	_check(stock.count(STORE, "ore") == ore + 10 and stock.items(STORE).has(kit),
+		"pushed onto it: two sacks become 10 ore, the kit is banked as itself (%d ore)" % stock.count(STORE, "ore"))
+	_check(is_instance_valid(cart) and cart.spawned and cart.tile == Vector2i(3, 3) and Array(cart.slots).all(func(id: String) -> bool: return id.is_empty()),
+		"the cart stays where it is, empty (%s)" % [Array(cart.slots)])
+	var line: Dictionary = stock.ledger(STORE).back()
+	_check(line["from"] == World._label_of(cart), "the ledger says it came on the cart (%s)" % [line])
+	World._relocate(cart, Vector2i(1, 5))
+	World.set_slots(cart, ["ore_sack", "", "", "", "", "", "", ""])
+	World.holdings.take(STORE, "goblins")
+	World._relocate(cart, Vector2i(3, 4))
+	await get_tree().process_frame
+	_check(cart.slots[0] == "ore_sack" and stock.count(STORE, "ore") == ore + 10, "with the goblins holding the store, a cart pushed in keeps its load")
+	World.holdings.take(STORE, "town")
+	World._relocate(cart, Vector2i(1, 5))
+	World.set_slots(cart, [])
 
 
 func _slot_of(entity: GridEntity, id: String) -> int:
