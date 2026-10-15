@@ -65,6 +65,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 		}
 		if spec.has("kind"):
 			entry["kind"] = str(spec["kind"])
+		if spec.has("art"):
+			entry["art"] = str(spec["art"])
 		if not entity.slots.is_empty():
 			entry["slots"] = Array(entity.slots)
 			entry["items"] = Array(World.slot_uids(entity))
@@ -229,6 +231,8 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		spec["label"] = entry["label"]
 	if entry.get("spawn") is float and int(entry["spawn"]) >= 0:
 		spec["spawn"] = int(entry["spawn"])
+	if entry.get("art") is String and not entry["art"].is_empty():
+		spec["art"] = entry["art"]
 	if entry.get("kind") is String and not entry["kind"].is_empty():
 		# A monster that is no level entity (a level's own takes its kind,
 		# as all it is, from the level).

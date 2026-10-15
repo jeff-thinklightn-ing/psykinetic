@@ -3769,3 +3769,28 @@ fight talk; a thing named narrows the list to it. An answer that gives or
 fetches, and her report, may speak of her things (the bandages), which
 her lines otherwise leave out unless asked. Bandaging an ally waits on
 items' bandaging action (its step 4), which takes a companion as `by`.
+
+## 264. A crate, chest, boulder or cart is drawn as its slot's art once it has some
+
+Jeff is modelling the crate and the chest among his first slots, and his
+art must show in the game, not only in the preview. The four pushable and
+chest entities' spawn specs name their slot ("art": "prop.crate",
+"prop.chest", "rock.boulder", "prop.cart"); a world snapshot keeps it, as
+it keeps "kind". Client3D.art_slot_for(entity) gives that slot only once
+it has art of its own (ArtKit.filled_by == "own"): then the puppet's Body
+is a Node3D holding ArtKit.instance(slot), standing on the tile, and its
+pick shape a box of the slot's size; till then it is its shape, tinted, as
+before, so nothing changes until a slot is filled. The puppet stays a
+puppet: its body under "Body", made once, paused with the rest when far
+(185, 227); the outline finds the body's meshes as it does a model's.
+
+"art" needs no PROTOCOL_REVISION bump: it is additive and ignored where
+it isn't known (EntityFactory reads only the keys it uses), and a spec
+without it draws today's look, so a client and a server of different
+builds play the same; --print-protocol gives the same id before and after.
+
+Rejected: the slot from the entity's script and shape (a crate and a chest
+are both cubes, and items is changing crates' and carts' script), and grey
+boxes for these four now (a grey crate would look worse than a tinted one
+until Jeff's lands). A chest's lid stays shut: chests have no opened state
+yet; when they do, the lid is the slot's "lid" hinge, as a door's leaf.

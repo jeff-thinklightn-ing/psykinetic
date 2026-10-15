@@ -93,13 +93,15 @@ const MONSTER_TYPES := {
 	"sneak": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 8},
 }
 ## A crate and a cart carry things (Cargo: 4 and 8); props {"slots": [...]}
-## say what is in them, as a chest's.
-const CRATE := {"script": CARGO, "shape": "cube", "tint": Color(0.8, 0.6, 0.35), "props": {"capacity": 4}}
-const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.55, 0.6),
+## say what is in them, as a chest's. "art": the art slot the 3D view draws
+## each of these as once the slot has art of its own (ArtKit; decision 264);
+## till then the shape, tinted.
+const CRATE := {"script": CARGO, "shape": "cube", "tint": Color(0.8, 0.6, 0.35), "art": "prop.crate", "props": {"capacity": 4}}
+const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.55, 0.6), "art": "rock.boulder",
 	"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}}
-const CART := {"script": CARGO, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "props": {"mass": 60.0, "capacity": 8}}
+const CART := {"script": CARGO, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "art": "prop.cart", "props": {"mass": 60.0, "capacity": 8}}
 ## Empty; level.json's props say what is in it ({"slots": ["bandaging_kit"]}).
-const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12)}
+const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12), "art": "prop.chest"}
 ## The idle modes level.json may give a monster (Monster.IDLE_MODES).
 const IDLE_MODES: Array[String] = ["guard", "wander", "patrol", "gather", "none"]
 ## An entity entry of only these keys leaves the spawn order as it was.

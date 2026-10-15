@@ -182,6 +182,27 @@
 				{"at": [0, 0.2, 0], "size": [0.9, 0.4, 0.6]}
 			]
 		},
+		"rock.boulder": {
+			"category": "rocks",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.1, 1.2, 1.1],
+			"budget": 300,
+			"uses": "the boulder, heavy and pushable, that sinks in water (the boulder entity; drawn as a sphere until the slot has art of its own, decision 264)"
+		},
+		"prop.cart": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.9, 0.6, 1.2],
+			"budget": 800,
+			"uses": "a hand cart, pushable, to haul loot on (the cart entity; drawn as a slab until the slot has art of its own, decision 264); its length along z",
+			"grey": [
+				{"at": [0, 0.45, 0], "size": [0.9, 0.3, 1.2]},
+				{"at": [0.4, 0.2, 0], "size": [0.1, 0.4, 0.4]},
+				{"at": [-0.4, 0.2, 0], "size": [0.1, 0.4, 0.4]}
+			]
+		},
 		"ground.grass": {
 			"category": "ground",
 			"type": "texture",

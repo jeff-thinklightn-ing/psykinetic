@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
 	await _test_doors_swing()
+	_test_art_puppets()
 	_test_piles()
 
 	print("")
@@ -1034,7 +1035,67 @@ func _test_doors_swing() -> void:
 		_rig._process(0.05)
 
 
+func _test_art_puppets() -> void:
+	print("
+== a crate is drawn as prop.crate's own art once it has some, else its tinted cube ==")
+	var crate: GridEntity = null
+	for entity in World.get_entities():
+		if str(entity.spawn_spec.get("art", "")) == "prop.crate":
+			crate = entity
+			break
+	_check(crate != null, "the test room has a crate, its spec naming its slot")
+	if crate == null:
+		return
+	# Its own puppet's connections, set aside while test puppets are made for
+	# it (each connects the crate's signals again), and put back after.
+	var kept: Array[Callable] = []
+	for signal_name: StringName in [&"impacted"]:
+		for connection: Dictionary in crate.get_signal_connection_list(signal_name):
+			if (connection["callable"] as Callable).get_object() == _rig:
+				kept.append(connection["callable"])
+				crate.disconnect(signal_name, connection["callable"])
+	var before := _rig._make_puppet(crate)
+	_check(before.get_node("Body") is MeshInstance3D and Client3D.art_slot_for(crate) == "",
+			"no art of its own yet: its cube, as before")
+	before.free()
+	_disconnect_rig(crate)
+	# Art of its own, as a dropped .glb would be: the grey box, packed.
+	ArtKit.show_placeholders = true
+	var grey := ArtKit.instance("prop.crate")
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+	for node in ArtKit._descendants(grey):
+		if node != grey:
+			node.owner = grey
+	var scene := PackedScene.new()
+	scene.pack(grey)
+	grey.free()
+	ArtKit._scenes[ArtKit.own_path("prop.crate")] = scene
+	ArtKit._variants["prop.crate"] = 1
+	var after := _rig._make_puppet(crate)
+	var body := after.get_node("Body") as Node3D
+	var drawn := body.get_child(0) as Node3D if body.get_child_count() > 0 else null
+	var pick := (after.get_node("Pick").find_children("*", "CollisionShape3D", false, false)[0] as CollisionShape3D).shape as BoxShape3D
+	_check(not body is MeshInstance3D and drawn != null and str(drawn.get_meta("slot", "")) == "prop.crate"
+			and pick != null and pick.size.is_equal_approx(ArtKit.size("prop.crate")),
+			"with art of its own: drawn as prop.crate, standing on its tile, picked by its size")
+	after.free()
+	_disconnect_rig(crate)
+	for callable in kept:
+		crate.impacted.connect(callable)
+	ArtKit.forget("prop.crate")
+	_check(Client3D.art_slot_for(crate) == "", "and back to its cube when the art is gone")
+
+
 # --- helpers ------------------------------------------------------------------
+
+## [param entity]'s signals' connections to the rig, undone (a test puppet's).
+func _disconnect_rig(entity: GridEntity) -> void:
+	for signal_info: Dictionary in entity.get_signal_list():
+		for connection: Dictionary in entity.get_signal_connection_list(signal_info["name"]):
+			if (connection["callable"] as Callable).get_object() == _rig:
+				entity.disconnect(signal_info["name"], connection["callable"])
+
 
 ## The sound sets [param action] made the view play.
 func _heard(action: Callable) -> Array[String]:

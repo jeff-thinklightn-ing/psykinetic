@@ -3508,6 +3508,16 @@ func _update_mourning(delta: float) -> void:
 	_apply_size()
 
 
+## The art slot [param entity] is drawn as (its spawn spec's "art": a crate,
+## a chest, a boulder, a cart), once that slot has art of its own; "" while
+## it has none, and the entity is its shape, tinted, as before (decision 264).
+static func art_slot_for(entity: GridEntity) -> String:
+	var slot := str(entity.spawn_spec.get("art", ""))
+	if slot == "" or not ArtKit.has(slot) or ArtKit.filled_by(slot) != "own":
+		return ""
+	return slot
+
+
 ## MODELS' entry for [param entity] (a monster of a kind that has one), or {}.
 static func model_for(entity: GridEntity) -> Dictionary:
 	if not entity is Monster:
@@ -3800,7 +3810,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var model := model_for(entity)
 	if not model.is_empty():
 		_vary(entity, puppet)
-	var height: float = float(model["height"]) * float(puppet.get_meta("model_scale", 1.0)) if not model.is_empty() else Iso.HEIGHTS[shape]
+	var art := art_slot_for(entity)
+	var height: float = float(model["height"]) * float(puppet.get_meta("model_scale", 1.0)) if not model.is_empty() 			else ArtKit.size(art).y if art != "" else Iso.HEIGHTS[shape]
 	var material := StandardMaterial3D.new()
 	var sprite := entity.get_node_or_null("Sprite") as Sprite2D
 	material.albedo_color = sprite.modulate if sprite != null else Color.WHITE
@@ -3815,7 +3826,16 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var collision := CollisionShape3D.new()
 	collision.position.y = height * 0.5
 	area.add_child(collision)
-	if model.is_empty():
+	if art != "":
+		# Its slot's own art, standing on the tile; the pick shape its size.
+		var drawn := Node3D.new()
+		drawn.name = "Body"
+		drawn.add_child(ArtKit.instance(art))
+		puppet.add_child(drawn)
+		var box := BoxShape3D.new()
+		box.size = ArtKit.size(art)
+		collision.shape = box
+	elif model.is_empty():
 		var body := MeshInstance3D.new()
 		body.name = "Body"
 		body.mesh = (_shapes[shape] as Callable).call()
