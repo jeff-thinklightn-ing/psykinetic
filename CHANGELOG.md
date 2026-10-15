@@ -18,6 +18,9 @@ top section as the release notes.
 - When the server is updated, everyone is told a minute ahead in the party
   chat, and the game reconnects by itself once the server is back,
   putting you where you stood (it keeps trying for 3 minutes).
+- If the server has been updated past your game, the game updates itself
+  and starts again, instead of just saying it is out of date. If a newer
+  game is out but yours still plays, you're told so once.
 - A client and the server no longer need to be the very same build to
   play together: only what they send each other has to match. A release
   that changes only how the game looks no longer needs the server updated,

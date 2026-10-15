@@ -278,6 +278,7 @@ Assert (@($serverLog | Select-String '\[net\] peer \d+ authenticated').Count -eq
 Assert (@($client4Log | Select-String '\[net\] using .*settings\.cfg').Count -eq 1 -and @($client4Log | Select-String '\[test\] Player\d+ arrived').Count -eq 1) 'a client with no arguments joins from settings.cfg and plays'
 Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client v0\.0\.1 protocol old-build, server v[0-9.]+ protocol [0-9a-f]+\)').Count -eq 1) 'server rejected the out-of-date client, naming both builds and protocols'
 Assert (@($client5Log | Select-String '\[net\] client out of date').Count -eq 1) 'the out-of-date client was told so'
+Assert (@($client5Log | Select-String '\[update\] not updating itself: not an exported game').Count -eq 1 -and @($client7Log | Select-String '\[update\]').Count -eq 0) 'it would update itself if it were an exported game; the newer client, never (decision 241)'
 Assert (@($client7Log | Select-String '\[net\] server out of date').Count -eq 1 -and @($client7Log | Select-String '\[test\] Player').Count -eq 0) 'a newer client with another protocol is told the server is out of date, and gets no player'
 Assert (@($serverLog | Select-String '\[net\] rejected peer \d+ from \S+ \(client v[0-9.]+ protocol stale-build, server v[0-9.]+ protocol [0-9a-f]+\)').Count -eq 1) 'server rejected the same-version, different-build client'
 Assert (@($client6Log | Select-String '\[net\] build mismatch: this client and the server are different builds').Count -eq 1 -and @($client6Log | Select-String '\[test\] Player').Count -eq 0) 'that client was told it is a build mismatch and never got a player'
@@ -323,6 +324,7 @@ $fay = @($clientFLog | Select-String '\[test\] display: .*server_tile=\((\d+), (
 $gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
 Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "phase 3: Fay crossed to (12, 12) ($($fay | ForEach-Object { $_.Line }))"
 Assert ($gus.Count -eq 1 -and $gus[0].Line -match 'server_tile=\(5, 12\)') "phase 3: Gus crossed to (5, 12) ($($gus | ForEach-Object { $_.Line }))"
+Assert (@($clientFLog | Select-String '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: launch\.bat updates it').Count -eq 1 -and @($clientGLog | Select-String '\[update\]').Count -eq 0) 'phase 3: Fay is told once that a newer game is out; Gus, the same build, is not'
 Assert ($fay.Count -eq 1 -and $gus.Count -eq 1 -and $fay[0].Matches[0].Groups[3].Value -eq '0' -and $gus[0].Matches[0].Groups[3].Value -eq '0') 'phase 3: neither client snapped more than 2 tiles'
 Assert (@($server4Log | Select-String 'push: Player1 -> Crate1').Count -eq 1 -and @($server4Log | Select-String '\[world\] Ivy reset the room').Count -eq 1) "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
 Assert (@($server4Log | Select-String '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player').Count -eq 4) 'phase 4: both players were put back into the rebuilt room'

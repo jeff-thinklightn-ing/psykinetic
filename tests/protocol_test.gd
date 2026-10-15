@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_rpc_scripts(scripts)
 	_test_replicated(scripts)
 	_test_versions()
+	_test_self_update()
 	_test_fingerprint()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -110,6 +111,29 @@ func _test_versions() -> void:
 	_check(not Net.newer_version("0.1.139", "0.1.139"), "a build is not newer than itself")
 	_check(Net.newer_version("0.0.1", "0.0.0") and Net.newer_version("0.0.1", "nonsense") and not Net.newer_version("", "0.0.1"),
 		"a version that does not read as numbers is older than any that does")
+
+
+func _test_self_update() -> void:
+	print("== when a client updates itself (decision 241) ==")
+	var dir := preload("res://tests/test_ports.gd").scratch_path("self_update")
+	DirAccess.make_dir_recursive_absolute(dir)
+	for name in [SelfUpdate.SCRIPT, SelfUpdate.MARKER]:
+		DirAccess.remove_absolute(dir.path_join(name))
+	var now := int(Time.get_unix_time_from_system())
+	var newer := "99.0.0"
+	_check(SelfUpdate.refusal("server out of date", newer, dir, now) != "", "never when the server is the one behind")
+	_check(SelfUpdate.refusal("client out of date", "0.0.1", dir, now) != "", "never for a server that is not a newer build")
+	_check(SelfUpdate.refusal("client out of date", newer, "", now) == "not an exported game", "never run from the editor or a checkout")
+	var why := SelfUpdate.refusal("client out of date", newer, dir, now)
+	_check(why.begins_with("no update.ps1"), "never without update.ps1 beside the game (%s)" % why)
+	FileAccess.open(dir.path_join(SelfUpdate.SCRIPT), FileAccess.WRITE).store_line("# a stand-in")
+	why = SelfUpdate.refusal("client out of date", newer, dir, now)
+	_check(why == "", "a newer server and update.ps1 there: it updates (%s)" % why)
+	FileAccess.open(dir.path_join(SelfUpdate.MARKER), FileAccess.WRITE).store_line("just now")
+	why = SelfUpdate.refusal("client out of date", newer, dir, now)
+	_check(why.begins_with("it updated"), "but not again within 10 minutes of the last (%s)" % why)
+	why = SelfUpdate.refusal("client out of date", newer, dir, now + SelfUpdate.MIN_GAP_SEC + 5)
+	_check(why == "", "and again once they are past (%s)" % why)
 
 
 func _test_fingerprint() -> void:

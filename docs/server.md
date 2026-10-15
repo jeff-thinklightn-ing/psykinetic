@@ -329,9 +329,23 @@ it differs.
 Clients update themselves: `launch.bat` runs `update.ps1`, which asks the
 GitHub API for the latest release, and if its tag is newer than the local
 `version.txt`, downloads the zip and unpacks it over the client folder,
-keeping `settings.cfg`. It never runs while `psykinetic.exe` is running,
-needs no admin rights, and on any failure writes one line to `update.log`
-and starts the game anyway.
+keeping `settings.cfg`. It waits for a running `psykinetic.exe` to quit
+(15 seconds at most, then leaves the files alone), needs no admin rights,
+and on any failure writes one line to `update.log` and starts the game
+anyway.
+
+The game also updates itself (decision 241): turned away as `client out of
+date` by a server of a newer build (after a deploy that changed the
+protocol, say, the clients reconnecting), an exported game starts
+`update.ps1` and quits; it waits for the game, installs the latest release
+and starts it again, which then joins. Never on `server out of date`, never
+from the editor or a checkout, and never twice in 10 minutes: it writes
+`update_marker.txt` beside the game first, so a release that still does not
+match (the server deployed before the release was published) cannot loop;
+the game then says it is out of date as before. So release the client
+before deploying a server whose protocol changed. A client of an older
+build with the same protocol plays, and is told once in the party chat
+that a newer game is out.
 
 ## Join authentication
 

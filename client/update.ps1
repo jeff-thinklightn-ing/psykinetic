@@ -1,4 +1,5 @@
-# Psykinetic client updater. Run by launch.bat.
+# Psykinetic client updater. Run by launch.bat, and by the game itself when
+# a newer server turns it away as out of date (decision 241).
 # Checks GitHub for a newer release, installs it over this folder (keeping
 # settings.cfg), then starts the game. Anything that goes wrong is one line
 # in update.log and the game starts anyway. Needs no admin rights: it only
@@ -14,10 +15,16 @@ function Log($message) {
 }
 
 try {
-	# Never replace files while the game has them open.
-	$running = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
+	# Never replace files while the game has them open. A game that found
+	# itself out of date started this and is quitting (decision 241): wait
+	# for it, 15 s at most.
+	$deadline = (Get-Date).AddSeconds(15)
+	do {
+		$running = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
+		if ($running) { Start-Sleep -Milliseconds 250 }
+	} while ($running -and (Get-Date) -lt $deadline)
 	if ($running) {
-		Log 'game already running; not updating'
+		Log 'game still running after 15 s; not updating'
 	} else {
 		$current = (Get-Content (Join-Path $dir 'version.txt') -Raw).Trim()
 		[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

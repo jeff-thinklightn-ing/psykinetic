@@ -3860,3 +3860,28 @@ connection, so the protocol is unchanged. net_test's restart phase has a
 client play, the console restart the server in 3 s, the script start it
 again from the snapshot as systemd would, and the client come back on its
 tile by itself.
+
+## 241. An out-of-date client updates itself once, and starts again
+
+A client turned away as "client out of date" used to say so and stop:
+after a deploy that changed the protocol, every player had to quit and run
+launch.bat. Now an exported game whose server is a newer build starts
+update.ps1 (beside it in every release) and quits; update.ps1 waits for it
+to exit (15 s at most, where it used to refuse while the game ran),
+installs the latest GitHub release over the folder as launch.bat does, and
+starts the game again, which joins. With decision 240's reconnect, a deploy
+that changes the protocol brings everyone back on the new build by
+themselves.
+
+It never loops: before starting update.ps1 the game writes
+update_marker.txt beside itself, and does not update itself again while
+that is less than 10 minutes old (nor at all if it cannot write it); a
+release that still does not match, say a server deployed before the
+release was published, leaves the old message on screen. It never updates
+on "server out of date" (the server is behind; the client is fine), from
+the editor or a checkout (only OS.has_feature("template")), or without
+update.ps1 beside it. The choice is SelfUpdate.refusal, unit-tested in
+protocol_test; net_test checks that an out-of-date dev client would update
+were it exported, and that a newer one never tries. A client of an older
+build with the same protocol plays on and is told once, in the party chat,
+that a newer game is out (the map message carries the server's build).

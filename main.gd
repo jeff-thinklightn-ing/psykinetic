@@ -190,6 +190,8 @@ var _had_player := false
 var _rejected := false
 ## Client: trying to get back to the server (decision 240).
 var _reconnecting := false
+## Client: told once that the server runs a newer build of the same protocol.
+var _told_newer := false
 ## Server: when the console's restart is due (msec), -1 when none is, and
 ## what the server exits with then (RESTART_EXIT_CODE, or 0 for stop).
 var _restart_at := -1
@@ -2230,6 +2232,11 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		# map, and its entities arrive under that zone's node.
 		var wanted := str(data.get("name", ""))
 		Net.server_version = str(data.get("server", Net.server_version))
+		if not Net.is_authority() and Net.newer_version(Net.server_version, Net.claimed_version()) and not _told_newer:
+			# The same protocol, so it plays; the next start updates it.
+			_told_newer = true
+			print("[update] the server runs v%s, newer than this v%s: launch.bat updates it" % [Net.server_version, Net.claimed_version()])
+			talk.add_line("Server", "A newer game, v%s, is out: start the game again with launch.bat to update." % Net.server_version, true, true)
 		if not Net.is_authority() and wanted != map_name and Level.exists(wanted):
 			_client_zone(wanted)
 		return
@@ -2768,6 +2775,15 @@ func _log_player_move(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 func _on_join_rejected(reason: String, server_version: String) -> void:
 	_rejected = true
 	if reason == "client out of date":
+		# An exported game updates itself and starts again (decision 241).
+		var dir := SelfUpdate.game_dir()
+		var why_not := SelfUpdate.refusal(reason, server_version, dir, int(Time.get_unix_time_from_system()))
+		if why_not.is_empty() and SelfUpdate.start(dir):
+			print("[update] the server runs v%s: updating this v%s and starting again" % [server_version, Net.claimed_version()])
+			hud.text = "updating to the server's v%s, then starting again…" % server_version
+			get_tree().quit()
+			return
+		print("[update] not updating itself: %s" % (why_not if not why_not.is_empty() else "update.ps1 could not be started"))
 		hud.text = "client out of date: the server runs v%s, this is v%s. Run launch.bat to update." % [
 			server_version, Net.version]
 	elif reason == "server out of date":
