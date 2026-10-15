@@ -2,55 +2,56 @@
 	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
 	"entries": [
 		{
+			"id": "blood_rot_lands",
+			"type": "region",
+			"name": "the Blood Rot's land",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "The region the Blood Rot raid, with their mine at its heart and the town at a distance from it.",
+			"relations": [],
+			"tags": [
+				"rot"
+			],
+			"facts": [
+				{
+					"id": "blood_rot_lands.dead",
+					"text": "The land around the mine is dead: no crops, no game, nothing living.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "blood_rot_lands.neighbours",
+					"text": "Other regions lie beyond the Blood Rot's land.",
+					"known": "common",
+					"where": [],
+					"source": "lore"
+				}
+			]
+		},
+		{
 			"id": "town_lands",
 			"type": "region",
 			"name": "the town's lands",
 			"status": "draft",
 			"source": "roadmap",
-			"summary": "The town and the farmsteads, fields and castle near it.",
-			"relations": [],
+			"summary": "The town and the farmsteads and fields around it, far from the mine.",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
 			"tags": [],
 			"facts": [
 				{
-					"id": "town_lands.fields",
-					"text": "Fields lie between the farmsteads and the castle.",
+					"id": "town_lands.farms",
+					"text": "Farmsteads and fields lie near the town.",
 					"known": "common",
 					"where": [
 						"town_lands"
 					]
-				}
-			]
-		},
-		{
-			"id": "blood_rot_lands",
-			"type": "region",
-			"name": "the Blood Rot lands",
-			"status": "draft",
-			"source": "Jeff",
-			"summary": "Blighted lands where the Blood Rot live and blighted ore is found.",
-			"relations": [],
-			"tags": [
-				"blight"
-			],
-			"facts": [
-				{
-					"id": "blood_rot_lands.blight",
-					"text": "The blight lies over the Blood Rot lands.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"tags": [
-						"blight"
-					]
-				},
-				{
-					"id": "blood_rot_lands.what_blight",
-					"text": "What the blight is.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "D2"
 				}
 			]
 		},
@@ -78,10 +79,10 @@
 		{
 			"id": "farmstead",
 			"type": "place",
-			"name": "the raided farmstead",
+			"name": "a farmstead",
 			"status": "draft",
 			"source": "roadmap",
-			"summary": "A farmstead near the castle, raided by the goblins.",
+			"summary": "A farmstead near the town.",
 			"place_kind": "farm",
 			"relations": [
 				{
@@ -93,14 +94,11 @@
 			"facts": [
 				{
 					"id": "farmstead.raided",
-					"text": "The goblins raided the farmstead and took the smith from it.",
+					"text": "Whether a farmstead was raided and the smith taken from it.",
 					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"tags": [
-						"smith"
-					]
+					"where": [],
+					"status": "asked",
+					"ask": "C3"
 				}
 			]
 		},
@@ -108,9 +106,10 @@
 			"id": "castle",
 			"type": "place",
 			"name": "the castle",
-			"status": "draft",
+			"status": "asked",
 			"source": "roadmap",
-			"summary": "A castle near the town, overrun by the goblins, with a keep.",
+			"summary": "A castle; the one in the first draft was a placeholder.",
+			"ask": "A2",
 			"level": "castle",
 			"place_kind": "keep",
 			"relations": [
@@ -122,20 +121,163 @@
 			"tags": [],
 			"facts": [
 				{
-					"id": "castle.keep",
-					"text": "The castle has a keep.",
+					"id": "castle.whose",
+					"text": "Whether there is a castle in the region, whose it is, and whether it has a keep.",
+					"known": "common",
+					"where": [],
+					"ask": "A2"
+				}
+			]
+		},
+		{
+			"id": "mine",
+			"type": "place",
+			"name": "the mine",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "An old mine, the heart of the Blood Rot's land, over the fallen star.",
+			"place_kind": "mine",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"rot"
+			],
+			"facts": [
+				{
+					"id": "mine.heart",
+					"text": "The old mine is the heart of the Blood Rot's land, and they live in and around it.",
 					"known": "common",
 					"where": [
-						"town_lands"
+						"blood_rot_lands"
 					]
 				},
 				{
-					"id": "castle.whose",
-					"text": "Whose castle it was and when it fell.",
-					"known": "common",
+					"id": "mine.deeper",
+					"text": "The deeper into the mine, the stronger the Blood Rot are.",
+					"known": "rumour",
+					"where": [
+						"blood_rot_lands"
+					],
+					"true": true
+				},
+				{
+					"id": "mine.dug_toward",
+					"text": "The mine was dug toward where the star fell.",
+					"known": "secret",
 					"where": [],
-					"status": "asked",
-					"ask": "A2"
+					"knowers": [
+						"blood_rot",
+						"learned"
+					],
+					"source": "proposal",
+					"tags": [
+						"history"
+					]
+				}
+			]
+		},
+		{
+			"id": "tower",
+			"type": "place",
+			"name": "the tower",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "A tower built by the earlier humans, standing over the mine and still holding their artifacts and treasures.",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				},
+				{
+					"to": "mine",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"history"
+			],
+			"facts": [
+				{
+					"id": "tower.over_mine",
+					"text": "A tower built by humans who lived before stands over the Blood Rot's mine.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "tower.treasures",
+					"text": "The tower still holds the earlier humans' artifacts and treasures.",
+					"known": "rumour",
+					"where": [
+						"blood_rot_lands"
+					],
+					"true": true
+				}
+			]
+		},
+		{
+			"id": "star_chamber",
+			"type": "place",
+			"name": "the fallen star",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Deep in the mine lies the source of the rot: a star that fell into the land many thousands of years ago.",
+			"aka": [
+				"the rot-source"
+			],
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "mine",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"rot",
+				"faith"
+			],
+			"facts": [
+				{
+					"id": "star_chamber.source",
+					"text": "Deep in the Blood Rot's mine lies a fallen star, the source of the rot.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"tags": [
+						"rot"
+					]
+				},
+				{
+					"id": "star_chamber.common_name",
+					"text": "Common folk call it a fallen star.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "star_chamber.near_name",
+					"text": "Those who live near the mine call it the rot-source.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "star_chamber.taken",
+					"text": "Those the Blood Rot take are carried down toward the star and are not seen again.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"tags": [
+						"captives"
+					]
 				}
 			]
 		}

@@ -7,16 +7,8 @@
 			"name": "the smith",
 			"status": "draft",
 			"source": "roadmap",
-			"summary": "The town's smith, taken by the goblins from a farmstead and held in the castle's keep.",
+			"summary": "The smith the town must bring home, taken with his hammer.",
 			"relations": [
-				{
-					"to": "farmstead",
-					"kind": "from"
-				},
-				{
-					"to": "castle",
-					"kind": "held_at"
-				},
 				{
 					"to": "smiths_hammer",
 					"kind": "carries"
@@ -26,20 +18,11 @@
 			"facts": [
 				{
 					"id": "smith.taken",
-					"text": "The smith was taken from a farmstead near the castle, with his hammer.",
+					"text": "Who took the smith, from where, and where he is held.",
 					"known": "common",
-					"where": [
-						"town_lands"
-					]
-				},
-				{
-					"id": "smith.held",
-					"text": "The smith is held in the castle's keep.",
-					"known": "rumour",
-					"where": [
-						"town_lands"
-					],
-					"true": true
+					"where": [],
+					"status": "asked",
+					"ask": "C3"
 				},
 				{
 					"id": "smith.name",
@@ -57,7 +40,7 @@
 			"name": "the smith's hammer",
 			"status": "draft",
 			"source": "roadmap",
-			"summary": "The hammer the goblins took with the smith.",
+			"summary": "The hammer taken with the smith.",
 			"relations": [
 				{
 					"to": "smith",

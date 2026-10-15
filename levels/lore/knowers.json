@@ -6,9 +6,20 @@
 			"name": "townsfolk",
 			"status": "draft",
 			"where": [
-				"town_lands"
+				"town_lands",
+				"blood_rot_lands"
 			],
 			"tags": []
+		},
+		{
+			"id": "learned",
+			"name": "the learned",
+			"status": "draft",
+			"where": [],
+			"tags": [
+				"history",
+				"rot"
+			]
 		},
 		{
 			"id": "scholar",
@@ -16,10 +27,23 @@
 			"status": "asked",
 			"ask": "E4",
 			"where": [
-				"town_lands"
+				"town_lands",
+				"blood_rot_lands"
 			],
 			"tags": [
 				"history"
+			]
+		},
+		{
+			"id": "blood_rot",
+			"name": "the Blood Rot",
+			"status": "draft",
+			"where": [
+				"blood_rot_lands"
+			],
+			"tags": [
+				"rot",
+				"faith"
 			]
 		},
 		{
@@ -28,7 +52,8 @@
 			"status": "asked",
 			"ask": "E2",
 			"where": [
-				"town_lands"
+				"town_lands",
+				"blood_rot_lands"
 			],
 			"tags": []
 		},
@@ -38,7 +63,8 @@
 			"status": "asked",
 			"ask": "E2",
 			"where": [
-				"town_lands"
+				"town_lands",
+				"blood_rot_lands"
 			],
 			"tags": []
 		},
@@ -48,7 +74,8 @@
 			"status": "asked",
 			"ask": "E2",
 			"where": [
-				"town_lands"
+				"town_lands",
+				"blood_rot_lands"
 			],
 			"tags": []
 		},
@@ -57,7 +84,8 @@
 			"name": "the smith",
 			"status": "draft",
 			"where": [
-				"town_lands"
+				"town_lands",
+				"blood_rot_lands"
 			],
 			"tags": [
 				"materials"

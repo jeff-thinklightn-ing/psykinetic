@@ -12,6 +12,11 @@ rules once it is answered. Until then:
   players) inside the world's facts.
 - Tone after *Gísla saga*: understated, fated, loyal. Say what happened and leave
   the feeling to the reader.
+- Dark like *Diablo* 1, restrained in the showing (Jeff): terrible things are
+  stated plainly and found as aftermath (what is left lying around), never
+  depicted as scenes. Changed and wrong, not gory.
+- The world has no modern words for what it does not understand. Facts say what
+  people see and know (a fallen star, the rot), not the cause behind it.
 - One fact per statement, so each can carry its own knowledge level.
 - Don't invent big things (names of the land and the town, the core history, the
   nature of the Blood Rot). Ask through main.

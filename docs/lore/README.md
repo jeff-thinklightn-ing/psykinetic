@@ -47,7 +47,10 @@ Each file is `{"_about": "...", "entries": [...]}`.
   `draft` (written from what is decided but not yet confirmed), `asked` (an open
   question; `ask` names its code, e.g. `"A2"`). Code uses only `agreed`.
 - `source`: who it comes from: `Jeff`, `Dire`, `roadmap`, `game` (already true in
-  play), `lore` (written here).
+  play), `lore` (written here), `proposal` (suggested in a session with Jeff, not
+  yet taken up). A fact can carry its own `source`, which wins over its entry's.
+  Where a fact's text is Jeff's, its knowledge level may still be lore's choice
+  until confirmed.
 - `summary`: one true sentence, never a line for anyone to say.
 - `relations`: `{to, kind}`, with `to` naming another entry's id. Kinds: in (a place
   in a region), holds, enemy, feud, ally, from (a material or person's origin),
@@ -70,6 +73,7 @@ Each file is `{"_about": "...", "entries": [...]}`.
 
 - `id`: the entry's id, a dot, then a name.
 - `text`: one plain statement of what is true (or, for a rumour, what is said).
+- `source` (optional): defaults to the entry's.
 - `status` (optional): defaults to the entry's. A fact is used only when both it
   and its entry are `agreed`. An `asked` fact names its `ask`.
 - `known`, the knowledge level:

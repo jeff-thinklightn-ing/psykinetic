@@ -39,36 +39,60 @@
 			"name": "blighted ore",
 			"status": "draft",
 			"source": "Jeff",
-			"summary": "Ore from the Blood Rot lands, touched by the blight.",
+			"summary": "Ore from the Blood Rot's mine, carrying the rot.",
 			"resource": "ore",
+			"worked": {
+				"text": "Carries the rot into whoever works it or carries it long.",
+				"effects": [
+					"cursed"
+				]
+			},
 			"relations": [
 				{
-					"to": "blood_rot_lands",
+					"to": "mine",
 					"kind": "from"
 				}
 			],
 			"tags": [
-				"blight"
+				"rot"
 			],
 			"facts": [
 				{
 					"id": "blighted_ore.from",
-					"text": "Blighted ore comes from the Blood Rot lands.",
+					"text": "Blighted ore comes from the Blood Rot's mine.",
 					"known": "common",
 					"where": [
-						"town_lands"
+						"blood_rot_lands"
 					],
 					"tags": [
-						"blight"
+						"rot"
 					]
 				},
 				{
-					"id": "blighted_ore.worked",
-					"text": "What blighted ore does when worked.",
-					"known": "common",
+					"id": "blighted_ore.learned",
+					"text": "The learned have tied the rot to the ore, some by watching and some by the gift.",
+					"known": "secret",
 					"where": [],
-					"status": "asked",
-					"ask": "D3"
+					"knowers": [
+						"learned"
+					],
+					"tags": [
+						"rot"
+					]
+				},
+				{
+					"id": "blighted_ore.carries",
+					"text": "Ore from the mine carries the rot into those who work it or carry it long.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"learned",
+						"smith"
+					],
+					"source": "proposal",
+					"tags": [
+						"rot"
+					]
 				}
 			]
 		}

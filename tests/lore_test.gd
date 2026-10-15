@@ -82,7 +82,8 @@ func _test_facts() -> void:
 			var fid: Variant = fact.get("id")
 			var ok: bool = fid is String and fid.begins_with(id + ".") and not ids.has(fid) \
 					and fact.get("text") is String and fact.get("known") in KNOWN \
-					and _regions_ok(fact.get("where")) and _status_ok(fact, false)
+					and _regions_ok(fact.get("where")) and _status_ok(fact, false) \
+					and (not fact.has("source") or fact["source"] is String)
 			ids[fid] = true
 			var known: Variant = fact.get("known")
 			if known == "rumour":

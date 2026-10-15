@@ -10,6 +10,10 @@
 			"summary": "The people the players fight for; what is found on the road comes home to the town.",
 			"relations": [
 				{
+					"to": "blood_rot",
+					"kind": "enemy"
+				},
+				{
 					"to": "goblins",
 					"kind": "enemy"
 				}
@@ -23,6 +27,24 @@
 					"where": [],
 					"status": "asked",
 					"ask": "A1"
+				},
+				{
+					"id": "town.in_region",
+					"text": "The town lies in the Blood Rot's region, at a distance from their mine.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff"
+				},
+				{
+					"id": "town.threat",
+					"text": "The town and the whole region live under constant threat from Blood Rot raiders.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff"
 				},
 				{
 					"id": "town.stockpile",
@@ -58,90 +80,74 @@
 			"type": "faction",
 			"name": "the goblins",
 			"status": "draft",
-			"source": "roadmap",
-			"summary": "They hold the overrun castle and raid the land around it.",
+			"source": "game",
+			"summary": "Imps, brutes and sneaks, the goblin kinds met in the land today.",
 			"relations": [
 				{
 					"to": "town",
 					"kind": "enemy"
-				},
-				{
-					"to": "castle",
-					"kind": "holds"
-				},
-				{
-					"to": "smith",
-					"kind": "took"
 				}
 			],
 			"tags": [
-				"raiders",
-				"captives"
+				"raiders"
 			],
 			"facts": [
-				{
-					"id": "goblins.hold_castle",
-					"text": "The goblins have overrun the castle near the town and hold it.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					]
-				},
-				{
-					"id": "goblins.took_smith",
-					"text": "The goblins raided a farmstead near the castle and took the smith and his hammer.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"tags": [
-						"smith"
-					]
-				},
 				{
 					"id": "goblins.holding",
 					"text": "The goblins win by holding things, captives and ground, not by taking loot.",
 					"known": "common",
 					"where": [
-						"town_lands"
-					]
+						"blood_rot_lands"
+					],
+					"source": "roadmap"
 				},
 				{
 					"id": "goblins.imp",
 					"text": "The imp is small and darts in and out of a fight.",
 					"known": "common",
 					"where": [
-						"town_lands"
+						"blood_rot_lands"
 					],
 					"tags": [
 						"fighting"
-					]
+					],
+					"source": "lore"
 				},
 				{
 					"id": "goblins.brute",
 					"text": "The brute is big and heavy, and it stands guard.",
 					"known": "common",
 					"where": [
-						"town_lands"
+						"blood_rot_lands"
 					],
 					"tags": [
 						"fighting"
-					]
+					],
+					"source": "lore"
 				},
 				{
 					"id": "goblins.sneak",
 					"text": "The sneak patrols and comes at you from the side.",
 					"known": "common",
 					"where": [
-						"town_lands"
+						"blood_rot_lands"
 					],
 					"tags": [
 						"fighting"
-					]
+					],
+					"source": "lore"
+				},
+				{
+					"id": "goblins.blood_rot",
+					"text": "How these goblins stand to the Blood Rot: the same clan, kin in a feud, or unrelated.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "H4"
 				},
 				{
 					"id": "goblins.nature",
-					"text": "What the goblins are: a people, beasts, or something made.",
+					"text": "Whether goblins can be bargained with, and whether one could leave its own.",
 					"known": "common",
 					"where": [],
 					"status": "asked",
@@ -149,15 +155,23 @@
 				},
 				{
 					"id": "goblins.kinds",
-					"text": "Whether imps, brutes and sneaks are one people or creatures the goblins keep.",
+					"text": "Whether imps, brutes and sneaks are one people (perhaps ranks of the Blood Rot) or creatures the goblins keep.",
 					"known": "common",
 					"where": [],
 					"status": "asked",
 					"ask": "C2"
 				},
 				{
+					"id": "goblins.castle",
+					"text": "Whether the goblins hold a castle near the town.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "A2"
+				},
+				{
 					"id": "goblins.why_smith",
-					"text": "Why they took the smith and his hammer.",
+					"text": "Who took the smith and his hammer, and why.",
 					"known": "common",
 					"where": [],
 					"status": "asked",
@@ -169,38 +183,232 @@
 			"id": "blood_rot",
 			"type": "faction",
 			"name": "the Blood Rot",
-			"status": "asked",
+			"status": "draft",
 			"source": "Jeff",
-			"summary": "A clan whose lands lie under a blight.",
-			"ask": "D1",
+			"summary": "A band of goblins born changed, who live in and around an old mine over a fallen star, worship it, and raid the region for food and people.",
 			"relations": [
+				{
+					"to": "town",
+					"kind": "enemy"
+				},
+				{
+					"to": "mine",
+					"kind": "holds"
+				},
+				{
+					"to": "tower",
+					"kind": "holds"
+				},
 				{
 					"to": "blood_rot_lands",
 					"kind": "holds"
 				}
 			],
 			"tags": [
-				"blight"
+				"rot",
+				"raiders",
+				"captives"
 			],
 			"facts": [
 				{
-					"id": "blood_rot.lands",
-					"text": "The Blood Rot's lands lie under a blight.",
+					"id": "blood_rot.goblins",
+					"text": "The Blood Rot are a band of goblins who live in and around an old mine.",
 					"known": "common",
 					"where": [
-						"town_lands"
-					],
-					"status": "draft",
-					"tags": [
-						"blight"
+						"blood_rot_lands"
 					]
 				},
 				{
-					"id": "blood_rot.nature",
-					"text": "Who or what the Blood Rot are.",
+					"id": "blood_rot.born_changed",
+					"text": "The Blood Rot's children are born changed; that is why they are called the Blood Rot.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "blood_rot.nearer_stronger",
+					"text": "The nearer to the mine a Blood Rot lives, the stronger and more changed it is.",
+					"known": "rumour",
+					"where": [
+						"blood_rot_lands"
+					],
+					"true": true
+				},
+				{
+					"id": "blood_rot.thrive",
+					"text": "What the rest of the land calls a curse, the Blood Rot thrive in.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "blood_rot.creed",
+					"text": "The Blood Rot took the name as their own; to them it is a creed, not an insult.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "blood_rot.kept_away",
+					"text": "The rot kept the Blood Rot's enemies away, and they worship its source.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"blood_rot",
+						"learned"
+					]
+				},
+				{
+					"id": "blood_rot.worship",
+					"text": "The Blood Rot worship the fallen star in the deep of their mine.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"tags": [
+						"faith"
+					]
+				},
+				{
+					"id": "blood_rot.hunger",
+					"text": "The land around the mine is dead, so the Blood Rot cannot feed themselves from it, and they raid outside it for food and game.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "blood_rot.priests",
+					"text": "The Blood Rot's high priests demand bounty and sacrifice for the fallen star.",
+					"known": "rumour",
+					"where": [
+						"blood_rot_lands"
+					],
+					"true": true,
+					"tags": [
+						"faith"
+					]
+				},
+				{
+					"id": "blood_rot.take_people",
+					"text": "Blood Rot raiders take food, game and people.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"tags": [
+						"captives"
+					]
+				},
+				{
+					"id": "blood_rot.camps",
+					"text": "Blood Rot raiders keep small camps in the region's forests.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					]
+				},
+				{
+					"id": "blood_rot.spill",
+					"text": "When the Blood Rot's numbers grow too high, their raids spill into neighbouring regions.",
+					"known": "common",
+					"where": []
+				},
+				{
+					"id": "blood_rot.wretched",
+					"text": "The Blood Rot are sick and wretched.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": false,
+					"source": "proposal"
+				},
+				{
+					"id": "blood_rot.catching",
+					"text": "The rot is catching: touching one of the Blood Rot rots you.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": false,
+					"source": "proposal"
+				},
+				{
+					"id": "blood_rot.weaker_far",
+					"text": "The Blood Rot grow weaker the farther they go from the star, which is why their raiders are the weakest of them.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"blood_rot"
+					],
+					"source": "proposal"
+				}
+			]
+		},
+		{
+			"id": "earlier_humans",
+			"type": "people",
+			"name": "the earlier humans",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "The humans who built the tower over the mine and died off from the rot.",
+			"relations": [
+				{
+					"to": "tower",
+					"kind": "from"
+				},
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"history"
+			],
+			"facts": [
+				{
+					"id": "earlier_humans.built",
+					"text": "Humans who lived before built the tower over the mine.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"tags": [
+						"history"
+					]
+				},
+				{
+					"id": "earlier_humans.died",
+					"text": "Those humans died off from the rot, and the goblins grew stronger from it.",
+					"known": "rumour",
+					"where": [
+						"blood_rot_lands"
+					],
+					"true": true,
+					"tags": [
+						"history",
+						"rot"
+					]
+				},
+				{
+					"id": "earlier_humans.who",
+					"text": "Who the earlier humans were: the town's forebears or a people wholly gone, and whether any survived.",
 					"known": "common",
 					"where": [],
-					"ask": "D1"
+					"status": "asked",
+					"ask": "H1"
+				},
+				{
+					"id": "earlier_humans.worship",
+					"text": "Whether the earlier humans worshipped the star, and the Blood Rot took that worship from them.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "H2"
 				}
 			]
 		}
