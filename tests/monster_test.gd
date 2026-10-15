@@ -1230,10 +1230,13 @@ func _test_call_and_rout() -> void:
 	other.facing = Vector2i(1, 0)  # Looking away.
 	caller.sight_range = 7
 	caller.reaction_ticks = 0
+	var cries: Array[StringName] = []
+	caller.cried.connect(func(kind: StringName) -> void: cries.append(kind))
 	World.step()
 	World.step()
 	_check(caller.alert == Monster.Alert.FIGHTING and other.senses.heard.any(func(n: Dictionary) -> bool: return n["kind"] == &"call"),
 			"a cautious one that sees someone calls, and its side hears it")
+	_check(cries == [&"call"], "and cries out, for views and sound (%s)" % [cries])
 	_check(other.alert == Monster.Alert.HUNTING and other._lead == e["P"][0].tile,
 			"and comes after whom it fights (%s, %s)" % [Monster.Alert.keys()[other.alert], other._lead])
 	e = _build(["################", "#..............#", "#.P.i...i...b..#", "#..............#", "################"])
@@ -1242,9 +1245,12 @@ func _test_call_and_rout() -> void:
 	var bold: Monster = e["b"][0]
 	coward.temper = Monster.Temper.COWARDLY
 	bold.temper = Monster.Temper.BOLD
+	var routs: Array[StringName] = []
+	breaking.cried.connect(func(kind: StringName) -> void: routs.append(kind))
 	breaking._flee(e["P"][0].tile)
 	World.step()
 	_check(coward.alert == Monster.Alert.FLEEING, "one breaking: a coward who hears it breaks too")
+	_check(routs == [&"rout"], "the one breaking cries out (%s)" % [routs])
 	_check(bold.alert != Monster.Alert.FLEEING, "a bold one does not")
 	bold._world_tick(1.0)
 	coward._world_tick(1.0)

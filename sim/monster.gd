@@ -188,6 +188,9 @@ const AROUND: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0
 
 ## A blow is coming (HEAVY): which way, over how many ticks. Views wind up.
 signal winding(direction: Vector2i, ticks: int)
+## It cried out: a noise of [param kind] (&"call", &"rout") its side hears,
+## and views and sound play (a client never sees World.noise).
+signal cried(kind: StringName)
 
 ## Off: no monster idles (they stand where they are, as before idling). For
 ## tests staged in a real level whose monsters must stay put.
@@ -1030,7 +1033,7 @@ func _flee(threat: Vector2i, routs := true) -> void:
 	_lead = NO_TILE
 	move_ticks = _pace
 	if routs:
-		World.noise(tile, Senses.NOISE_ROUT, &"rout", self)
+		_cry(&"rout", Senses.NOISE_ROUT)
 
 
 ## FLEEING: a step away from what it runs from, toward its post if that is
@@ -1076,7 +1079,7 @@ func _call_for_help() -> void:
 	if World.tick - _called_tick < CALL_EVERY_TICKS:
 		return
 	_called_tick = World.tick
-	World.noise(tile, Senses.NOISE_CALL, &"call", self)
+	_cry(&"call", Senses.NOISE_CALL)
 
 
 ## Whether [param other] is of its side (Factions.of_kind; with no factions,
@@ -1426,3 +1429,17 @@ func _world_winding(direction: Vector2i, ticks: int) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_winding(direction: Vector2i, ticks: int) -> void:
 	winding.emit(direction, ticks)
+
+
+## A cry of [param kind], heard [param radius] cells off (World.noise), and
+## told to whoever sees it (cried).
+func _cry(kind: StringName, radius: int) -> void:
+	World.noise(tile, radius, kind, self)
+	cried.emit(kind)
+	for peer in viewers():
+		_net_cried.rpc_id(peer, kind)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_cried(kind: StringName) -> void:
+	cried.emit(kind)

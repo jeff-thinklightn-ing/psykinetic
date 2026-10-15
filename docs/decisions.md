@@ -4891,6 +4891,11 @@ rout is read by a monster even mid-fight (its newest noises, each think),
 where other noises are only heard with nobody in sight. Both are events:
 no cost per tick. The call is the sound worktree's alert bark.
 
+Amended: a client never sees World.noise, so a monster's call or rout is
+also an event its viewers get (Monster.cried(kind), sent like winding),
+for the view and sound to play; animals' cries (a herd bolting, a howl)
+will use the same signal with their own kinds.
+
 ## 278. The suite runs its scenes at once, and a landing runs it beside net_test and state_test
 
 A landing ran the suite's scenes one after another, then net_test, then
