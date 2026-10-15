@@ -1786,7 +1786,8 @@ func _test_fields() -> void:
 	_check(World.heat_at(Vector2i(8, 9)) < World.heat_at(Vector2i(8, 7)), "heat falls off with distance")
 	_check(not World.has_clear_line(Vector2i(7, 5), Vector2i(4, 8)) and World.heat_at(Vector2i(4, 8)) == 0.0,
 			"within reach but behind the room's south wall: none (%.2f)" % World.heat_at(Vector2i(4, 8)))
-	_check(World.light_at(Vector2i(1, 1)) == 1.0, "the test room is fully lit (ambient 1)")
+	_check(is_equal_approx(World.light_at(Vector2i(1, 1), false), DayNight.base_ambient("indoors")),
+			"the test room has an indoor level's light (%.2f)" % World.light_at(Vector2i(1, 1), false))
 	# A small level of its own: a ring of fire, a wall, a door, in the dark.
 	var floor_cells: Array[Vector2i] = []
 	for y in 5:

@@ -26,6 +26,11 @@ uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
 // Outdoors, the forest's floor (the mask's g): the land runs into it along
 // a ragged line.
 uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
+// Outdoors, the sky's light on the floor (as a brightness, like CUSTOM0's
+// r, which then holds the cell's own sources alone): the floor is lit to
+// the brighter of the two, so a torch's pool shows at night and the hour
+// changes one number, not every cell (decision 304). 0 indoors.
+uniform float sky_floor = 0.0;
 
 varying vec3 world;
 varying vec2 shade;
@@ -137,7 +142,7 @@ void fragment() {
 	colour = mix(colour, forest_floor * (0.8 + 0.4 * fbm(at * 0.4 + 50.0)), forest);
 
 	// Light and heat as the old floor had them, worked out in sRGB.
-	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * shade.r;
+	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * max(shade.r, sky_floor);
 	vec3 warm_srgb = pow(warm, vec3(1.0 / 2.2));
 	ALBEDO = pow(mix(lit, warm_srgb, shade.g), vec3(2.2));
 	EMISSION = pow(warm_srgb * shade.g, vec3(2.2));

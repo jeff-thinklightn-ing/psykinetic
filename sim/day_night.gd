@@ -27,9 +27,13 @@ const TWILIGHT_LOW := -6.0
 const TWILIGHT_HIGH := 12.0
 ## The zone kinds level.json's "zone" names (Level.zone_of), and the light
 ## each has where no daylight reaches, 0..1 (a level's "ambient" overrides
-## it). Outdoors under a roof is lit as indoors.
+## it); outdoors under a roof is lit as indoors (decision 304). Against
+## Senses' thresholds: indoors is dim but over DARK (light through doors
+## and windows: you are seen), a cave is moonlight's (glimpsed only), a
+## dungeon is under GLIMPSE (blind without a light). Every player and
+## companion carries a lantern, so nothing is black.
 const ZONES: Array[String] = ["outdoors", "indoors", "cave", "dungeon"]
-const ZONE_AMBIENT := {"outdoors": 1.0, "indoors": 1.0, "cave": 1.0, "dungeon": 1.0}
+const ZONE_AMBIENT := {"outdoors": 0.4, "indoors": 0.4, "cave": 0.2, "dungeon": 0.1}
 
 ## Steps a day takes.
 static var day_steps := int(DEFAULT_DAY_MINUTES * 60.0 * 10.0)
@@ -92,7 +96,12 @@ static func sun_at(at: float) -> Vector3:
 
 ## The light under the open sky at [param steps]: NIGHT to 1.
 static func daylight(steps: float) -> float:
-	return NIGHT + (1.0 - NIGHT) * smoothstep(TWILIGHT_LOW, TWILIGHT_HIGH, elevation(steps))
+	return daylight_at(fraction(steps))
+
+
+## The light under the open sky at the day's [param at] (fraction).
+static func daylight_at(at: float) -> float:
+	return NIGHT + (1.0 - NIGHT) * smoothstep(TWILIGHT_LOW, TWILIGHT_HIGH, elevation_at(at))
 
 
 ## Keeps [member light] up with the clock (World, once a tick).
@@ -145,4 +154,4 @@ static func set_day_minutes(minutes: float) -> void:
 
 ## The light where no daylight reaches in a zone of [param zone] (ZONES).
 static func base_ambient(zone: String) -> float:
-	return float(ZONE_AMBIENT.get("indoors" if zone == "outdoors" else zone, 1.0))
+	return float(ZONE_AMBIENT.get("indoors" if zone == "outdoors" else zone, ZONE_AMBIENT["indoors"]))

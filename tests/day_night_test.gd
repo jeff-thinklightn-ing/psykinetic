@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_sun()
 	_test_daylight_in_the_field()
 	_test_zones()
+	_test_zone_light()
 	_test_saved()
 	_test_sky_look()
 	DayNight.reset()
@@ -93,8 +94,9 @@ func _test_daylight_in_the_field() -> void:
 	_check(is_equal_approx(inside, 1.0), "under the hut's roof, its own light, not the sky's (%.2f)" % inside)
 	var by_torch := World.light_at(Vector2i(0, 4), false)
 	_check(by_torch >= Senses.DARK, "beside a torch at night, light enough to be seen (%.2f)" % by_torch)
-	_check(is_equal_approx(World.light_at(Vector2i(7, 5), false, false), 1.0),
-			"without the sky (the view's floor shading), the level's ambient light (%.2f)" % World.light_at(Vector2i(7, 5), false, false))
+	_check(is_equal_approx(World.light_at(Vector2i(7, 5), false, false), 0.0) and World.light_at(Vector2i(0, 4), false, false) > 0.5,
+			"without the sky (the view's floor, which the sky lifts), only the sources' light: none in the open, the torch's pool")
+	_check(is_equal_approx(World.light_at(Vector2i(5, 2), false, false), 1.0), "under the roof, the level's own light still")
 	# A step on, the field follows with no recompute of its own.
 	World.steps += 1
 	DayNight.update()
@@ -132,6 +134,20 @@ func _test_zones() -> void:
 			"an unknown zone is said and read as indoors (%s)" % [bad["warnings"]])
 	_check(Level.load_level("castle")["terrain"]["zone"] == "outdoors",
 			"the castle is outdoors")
+
+
+func _test_zone_light() -> void:
+	print("
+== each kind of place's own light, against Senses' thresholds ==")
+	var indoors := DayNight.base_ambient("indoors")
+	_check(indoors >= Senses.DARK and indoors < 1.0, "indoors is dim, but you are seen (%.2f)" % indoors)
+	_check(DayNight.base_ambient("outdoors") == indoors, "outdoors under a roof is lit as indoors")
+	var cave := DayNight.base_ambient("cave")
+	_check(cave >= Senses.GLIMPSE and cave < Senses.DARK, "a cave: glimpsed only (%.2f)" % cave)
+	var dungeon := DayNight.base_ambient("dungeon")
+	_check(dungeon < Senses.GLIMPSE and dungeon > 0.0, "a dungeon: blind without a light, never black (%.2f)" % dungeon)
+	_check(Fields.LANTERN["light"] + dungeon >= Senses.DARK and Fields.TORCH["light"] + dungeon >= Senses.DARK,
+			"a lantern or a torch makes its own cell seen even in a dungeon")
 
 
 func _test_saved() -> void:

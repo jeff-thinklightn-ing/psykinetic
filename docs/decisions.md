@@ -4806,3 +4806,37 @@ Rejected: walls that appear in the sim as the town builds them (live edge
 changes, paths and fields reworked, for what reads as well as a rubble
 bank that blocks); the ring written into the level as economy builds it
 (game state in content); and a ring round the place's radius.
+## 304. Each kind of place has its own light; the floor shows where you are seen
+
+Jeff's environment step 3: how dark interiors, caves and night really are,
+so torches and lanterns stand out and matter, but nothing is unplayably
+black; one setting per zone type.
+
+The sim's base light per zone kind (DayNight.ZONE_AMBIENT, decision 291's
+kinds), placed against Senses' thresholds (GLIMPSE 0.15, DARK 0.35):
+indoors 0.4, dim but over DARK, so a body there is seen (light through
+doors and windows); a cave 0.2, the moon's light outdoors, so an unlit body
+is only glimpsed; a dungeon 0.1, under GLIMPSE, so a monster is blind to
+anyone without a light. Outdoors under a roof is lit as indoors. Every
+player and companion carries a lantern, which lifts its own cell over DARK
+even in a dungeon, so nothing is black to them. A level's "ambient" still
+sets its light outright. test_room and sample name no zone and read as
+indoors: their light goes from 1 to 0.4, still over DARK, so sight there
+gives the same answers.
+
+What the floor shows: brightness is no longer linear in the light. It
+rises smoothly over 0.2 to 0.7 (Client3D.floor_brightness, FLOOR_LIGHT_LOW
+and _HIGH), so ground where a body is seen reads plainly brighter than
+ground where it is only glimpsed, and a torch's pool has an edge.
+Outdoors, a cell's floor brightness (the ground's CUSTOM0 r) holds only its
+sources' light (Fields.light_at with sky = false: nothing for the open
+sky). The sky's light is one uniform on the ground's material, sky_floor,
+set when the sky's step changes. The shader lights the floor to the
+brighter of the two, so torch pools show at night and the hour still
+rewrites no cell (terrain's rule, decision 292). Indoors sky_floor is 0.
+
+Away from the sky the 3D view's ambient light has a colour and energy per
+kind (Client3D.ZONE_LOOK), spread as the sim's values are: a room is dim
+but all of it shows, warm-grey, the fire a warm patch; a cave is cool
+moonlight, shapes with little colour, the fire the only warmth; a dungeon
+is near black past the fire and the lanterns.

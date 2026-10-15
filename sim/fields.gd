@@ -192,11 +192,12 @@ func any_carried_heat(world: Node) -> bool:
 
 ## Light at [param cell], 0 (dark) to 1; [param carried]: with the lights
 ## creatures carry (the 3D view draws those itself); [param sky]: with the
-## sky's light outdoors (the 3D view draws that as its sun), else the
-## level's ambient light there.
+## sky's light outdoors; without it a cell under the open sky has only its
+## sources' (the 3D view's floor: the sky is a level its shader lifts the
+## floor to, so the hour rewrites no cell).
 func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> float:
 	_refresh(world)
-	var light: float = ambient_at(cell) if sky else ambient
+	var light: float = ambient_at(cell) if sky else (0.0 if open_sky(cell) else ambient)
 	light += _light.get(cell, 0.0)
 	if carried:
 		for entity: GridEntity in world.get_entities():
@@ -208,9 +209,13 @@ func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> floa
 ## The light at [param cell] before any source's: the sky's (DayNight.light)
 ## outdoors and not under a roof, else the level's ambient light.
 func ambient_at(cell: Vector2i) -> float:
-	if daylight and not _roofed.has(cell):
-		return DayNight.light
-	return ambient
+	return DayNight.light if open_sky(cell) else ambient
+
+
+## Whether the sky lights [param cell]: a level lit by daylight, and not
+## under a roof.
+func open_sky(cell: Vector2i) -> bool:
+	return daylight and not _roofed.has(cell)
 
 
 ## What a lantern of [param amount] carried at [param source] gives

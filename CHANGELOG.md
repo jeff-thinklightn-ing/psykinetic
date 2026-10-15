@@ -47,6 +47,11 @@ top section as the release notes.
   the day's length (also `--hour`, `--day-minutes`).
 - Levels can say what kind of place they are (`"zone"`: outdoors, indoors,
   cave or dungeon); `"outdoor": true` still works.
+- Indoors, caves and dungeons each have their own darkness: rooms are dim
+  but you can be seen, in caves you're only glimpsed, and in dungeons a
+  goblin can't see you at all unless you carry a light. Torches, fires and
+  lanterns now light a clear pool on the ground, at night outdoors too, so
+  you can tell where you'd be seen.
 
 ## v0.1.141
 

@@ -259,6 +259,12 @@ const FIRE_SPREAD := 1.5
 ## The floor where there is no light at all (Fields), as a share of its
 ## colour; the glow it takes on near heat, at most WARM_MOST of the way.
 const FLOOR_DARKEST := 0.3
+## The floor's brightness rises over this band of light (smoothly), so
+## ground where a body is seen (Senses.DARK, inside it) reads plainly
+## brighter than ground where it is only glimpsed: a torch's pool has an
+## edge (decision 304).
+const FLOOR_LIGHT_LOW := 0.2
+const FLOOR_LIGHT_HIGH := 0.7
 const WARM := Color(1.0, 0.5, 0.2)
 const WARM_MOST := 0.45
 const LANTERN := Color(1.0, 0.93, 0.7)
@@ -304,6 +310,12 @@ const MOON_BELOW := -1.0
 ## Shadows are cast from at least this high (degrees): a low sun's
 ## shadows, tens of metres long, would crawl and flicker.
 const SHADOW_LOW := 14.0
+## Away from the sky, each kind of place's ambient light, [colour, energy]
+## (decision 304), spread as the sim's light is: a room is dim but all of
+## it shows, warm-grey; a cave is moonlight, shapes without colour; a
+## dungeon is near black past the lamps.
+const ZONE_LOOK := {"indoors": [Color(0.62, 0.56, 0.48), 0.55], "cave": [Color(0.42, 0.48, 0.62), 0.22],
+	"dungeon": [AMBIENT, 0.5]}
 ## The sky moves on in steps of a game minute (a day's 1440th): the sun's
 ## direction stays put between, so shadow edges do not crawl (decision 292).
 const SKY_STEPS := 1440
@@ -758,6 +770,10 @@ var _outdoor := false
 ## none yet.
 var _sky_material: ProceduralSkyMaterial
 var _sky_step := -1
+## The ground's material, and the sky's light on its floor (its sky_floor:
+## 0 indoors).
+var _ground_shader_material: ShaderMaterial
+var _sky_floor := 0.0
 ## Floor and water cells: the land the forest stands around.
 var _land: Dictionary[Vector2i, bool] = {}
 ## Corner levels where they are not a cell's height: stairs' ramps and the
@@ -921,6 +937,7 @@ func _apply_sky() -> void:
 	_outdoor = bool(_terrain.get("outdoor", false))
 	_sky_step = -1
 	_environment.fog_enabled = false
+	_set_sky_floor(0.0)
 	if _outdoor:
 		_sky_material = ProceduralSkyMaterial.new()
 		_sky_material.ground_horizon_color = FOREST_FLOOR.lightened(0.2)
@@ -940,10 +957,24 @@ func _apply_sky() -> void:
 		_environment.background_mode = Environment.BG_COLOR
 		_environment.background_color = BACKGROUND
 		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-		_environment.ambient_light_color = AMBIENT
-		_environment.ambient_light_energy = 1.0
+		var look: Array = ZONE_LOOK.get(str(_terrain.get("zone", "indoors")), ZONE_LOOK["indoors"])
+		_environment.ambient_light_color = look[0]
+		_environment.ambient_light_energy = look[1]
 		_sun.light_color = SUN
 		_sun.light_energy = SUN_ENERGY
+
+
+## The floor's brightness, a share of its colour, for [param light] on it
+## (Fields): FLOOR_DARKEST in the dark, full from FLOOR_LIGHT_HIGH.
+static func floor_brightness(light: float) -> float:
+	return lerpf(FLOOR_DARKEST, 1.0, smoothstep(FLOOR_LIGHT_LOW, FLOOR_LIGHT_HIGH, light))
+
+
+## The sky's light on the outdoor floor, as a brightness (0 indoors).
+func _set_sky_floor(level: float) -> void:
+	_sky_floor = level
+	if _ground_shader_material != null:
+		_ground_shader_material.set_shader_parameter("sky_floor", level)
 
 
 ## Outdoors: the sky, its light and the sun or moon as the world clock
@@ -967,6 +998,7 @@ func _update_sky() -> void:
 	_environment.fog_density = look["fog_density"]
 	_sun.light_color = look["light"]
 	_sun.light_energy = look["energy"]
+	_set_sky_floor(floor_brightness(DayNight.daylight_at(fraction)) if bool(_terrain.get("daylight", false)) else 0.0)
 	# The moon by night, opposite the sun; either casts from at least
 	# SHADOW_LOW up.
 	var toward := DayNight.sun_at(fraction)
@@ -2851,6 +2883,8 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("water", _water_mask)
 	material.set_shader_parameter("forest_floor", FOREST_FLOOR)
+	material.set_shader_parameter("sky_floor", _sky_floor)
+	_ground_shader_material = material
 	return material
 
 
@@ -3164,7 +3198,7 @@ func _shade_floor() -> void:
 		var light := World.light_at(cell, false, false)
 		var heat := World.heat_at(cell) if carried else World.fields.map_heat_at(World, cell)
 		var warmth := clampf((heat - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
-		var shade := Vector2(snappedf(lerpf(FLOOR_DARKEST, 1.0, light), 0.1), snappedf(warmth * WARM_MOST, 0.05))
+		var shade := Vector2(snappedf(floor_brightness(light), 0.1), snappedf(warmth * WARM_MOST, 0.05))
 		if _ground_shades.get(cell) == shade:
 			continue
 		_ground_shades[cell] = shade

@@ -724,8 +724,8 @@ func _test_ground_colours() -> void:
 	var lit := 0
 	for cell: Vector2i in _rig._grounds:
 		var shade: Vector2 = _rig._ground_shades.get(cell, Vector2(-1.0, -1.0))
-		var light := World.light_at(cell, false)
-		if is_equal_approx(shade.x, snappedf(lerpf(Client3D.FLOOR_DARKEST, 1.0, light), 0.1)):
+		var light := World.light_at(cell, false, false)
+		if is_equal_approx(shade.x, snappedf(Client3D.floor_brightness(light), 0.1)):
 			lit += 1
 	_check(lit == _rig._grounds.size(), "every floor cell is shaded by the light on it (%d of %d)" % [lit, _rig._grounds.size()])
 
