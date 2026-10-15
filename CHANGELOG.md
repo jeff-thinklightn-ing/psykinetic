@@ -9,6 +9,9 @@ notes (decision 324).
 
 - A deer or stag that hears you lifts its head with a quiet snort: freeze
   before it sees you.
+- You can see where a road leads: from the end of the wilds' castle road
+  the castle's wall and gate stand beyond a band of trees, and from the
+  castle the road south runs on into the wilds.
 - The forest goes on past the edge of outdoor maps: dense treetops as far
   as the view reaches, so panning near an edge no longer shows a void
   under the map.

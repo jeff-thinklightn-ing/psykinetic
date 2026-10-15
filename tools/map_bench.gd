@@ -340,6 +340,14 @@ func _frames() -> void:
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
 		render_cpu / frames, render_gpu / frames])
+	if view != null:
+		for plan: Dictionary in view._glimpse_plans:
+			var low := Vector2i(1 << 20, 1 << 20)
+			var high := -low
+			for cell: Vector2i in plan["cells"]:
+				low = low.min(cell)
+				high = high.max(cell)
+			print("BENCH glimpse of %s: %d cells, %s to %s" % [plan["to"], plan["cells"].size(), low, high])
 	if view != null and view._border != null:
 		print("BENCH border: %d canopy chunks, %d nodes, task %d" % [view._border.chunks.size(), view._border.get_child_count(), view._border._task])
 	if shot != "":

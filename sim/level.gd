@@ -205,6 +205,7 @@ static func load_level(level_name: String) -> Dictionary:
 		return {}
 	var level := parse(layout, made["height"], made["config"])
 	level["name"] = level_name
+	level["terrain"]["level"] = level_name
 	# A linked building's town by its id, as Towns and Holdings name it.
 	for building: Dictionary in level["buildings"]:
 		building["town_id"] = "%s/%s" % [level_name, building["town"]] if not building["town"].is_empty() else ""

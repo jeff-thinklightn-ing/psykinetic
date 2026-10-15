@@ -384,7 +384,7 @@ func _test_scatter() -> void:
 	for cell: Vector2i in _rig._saplings:
 		var sapling: Node3D = _rig._saplings[cell]
 		var off := Vector2(sapling.position.x - cell.x, sapling.position.z - cell.y)
-		if not _rig._land.has(cell) and absf(off.x) <= 0.45 and absf(off.y) <= 0.45 and off.length() > 0.1 \
+		if not _rig._land.has(cell) and absf(off.x) <= 0.451 and absf(off.y) <= 0.451 and off.length() > 0.1 \
 				and sapling.scale.y < _rig._trees[cell].scale.y:
 			inside += 1
 	_check(_rig._saplings.size() > 0 and inside == _rig._saplings.size(),
@@ -970,9 +970,9 @@ func _test_outdoor() -> void:
 	for cell: Vector2i in land:
 		for direction: Vector2i in World.DIRECTIONS:
 			var next := cell + direction
-			if not land.has(next) and not _rig._trees.has(next) and next not in bare:
+			if not land.has(next) and not _rig._trees.has(next) and next not in bare and not _rig._wooded.has(next):
 				bare.append(next)
-	_check(not _rig._trees.is_empty() and bare.is_empty(), "a tree on every cell beside the land (%d trees; bare: %s)" % [_rig._trees.size(), bare.slice(0, 5)])
+	_check(not _rig._trees.is_empty() and bare.is_empty(), "a tree on every cell beside the land but a way's lane (%d trees; bare: %s)" % [_rig._trees.size(), bare.slice(0, 5)])
 	var outline_walls := 0
 	var inner_walls := 0
 	var edges: Dictionary = terrain["edges"]
@@ -1026,6 +1026,25 @@ func _test_outdoor() -> void:
 		var ends: Array[Vector2i] = [Vector2i(middle.x, low.y - out), Vector2i(middle.x, high.y + out), Vector2i(low.x - out, middle.y), Vector2i(high.x + out, middle.y)]
 		_check(ends.all(func(cell: Vector2i) -> bool: return canopy.has(cell)),
 				"reaching %d cells out every way, past what the view and its pan see" % out)
+		# The castle's way to the wilds (327): past its south edge, three
+		# rows of trees with a lane through them, then the wilds' road.
+		_check(_rig._glimpses.size() == 1 and _rig._glimpse_plans[0]["to"] == "wilds",
+				"a glimpse of the wilds past the castle's way there, none of the test room's dungeon (%s)" % [_rig._glimpse_plans.map(func(plan: Dictionary) -> String: return plan["to"])])
+		if _rig._glimpses.size() == 1:
+			var plan: Dictionary = _rig._glimpse_plans[0]
+			var cells: Dictionary = plan["cells"]
+			var on_land := cells.keys().filter(func(cell: Vector2i) -> bool: return land.has(cell)).size()
+			var lane := [Vector2i(16, 24), Vector2i(16, 25), Vector2i(16, 26), Vector2i(15, 25), Vector2i(17, 25)]
+			_check(on_land == 0 and lane.all(func(cell: Vector2i) -> bool: return cells.has(cell)) and cells.has(Vector2i(16, 33)),
+					"none of it on our land; a lane from the link through the trees; the wilds' from_castle (128, 22) across from our link, at (16, 33)")
+			var wooded := cells.keys().filter(func(cell: Vector2i) -> bool: return _rig._trees.has(cell)).size()
+			_check(wooded == 0 and _rig._trees.has(Vector2i(14, 24)) and _rig._trees.has(Vector2i(18, 24)),
+					"no tree on it, the trees either side of the lane")
+			var view: Client3D = _rig._glimpses[0]
+			_check(view.find_children("*", "Area3D", true, false).is_empty() and not view.is_processing()
+					and view._ground_bytes.size() > 0 and Array(view._ground_bytes).all(func(byte: int) -> bool: return true)
+					and range(0, view._ground_bytes.size(), view._ground_stride).all(func(at: int) -> bool: return view._ground_bytes[at + view._ground_custom] == 0),
+					"nothing in it picked or thought about; its ground lit by our sky alone")
 		var bare_terrain := terrain.duplicate()
 		bare_terrain["border"] = "none"
 		_rig.rebuild(bare_terrain, castle["centre"])

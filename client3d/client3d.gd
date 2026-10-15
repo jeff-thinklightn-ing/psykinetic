@@ -496,6 +496,15 @@ const PICK_SLACK := 0.45
 ## door) for the entity under the cursor.
 const PICK_DEPTH := 8
 const FOREST_REACH := 8
+## A glimpse of the level past a way out (_plan_glimpses): this many of its
+## cells deep from the side it shows us, this many cells of trees between
+## our land and it, a lane through them this many cells either side of the
+## way's line.
+const GLIMPSE_DEPTH := 18
+const GLIMPSE_GAP := 3
+const GLIMPSE_LANE := 1
+## A link's glimpse reaches this many cells either side of the way's line.
+const GLIMPSE_WIDE := 20
 const TREE_HEIGHT := 3.6
 ## A thing thrown onto a pile is drawn flying there if the pile shows it
 ## within this many ticks of the throw, for THROW_FLIGHT_SECONDS.
@@ -892,6 +901,16 @@ var _trees: Dictionary[Vector2i, Node3D] = {}
 ## Past the forest, outdoors: its canopy and far floor (TerrainBorder),
 ## under the room; null indoors or where level.json says "border": "none".
 var _border: TerrainBorder
+## Glimpses of the levels past this one's ways out (decision 327): each
+## planned ({to, terrain: the target's cells nearest us, moved into ours,
+## cells: theirs and the lane to them}) before the forest is measured, so
+## the forest grows round them, then drawn by a view of their own; the
+## cells the forest grows round (the land and the glimpses); whether this
+## view is a glimpse (built only: no camera, puppets, picks or light).
+var _glimpse_plans: Array[Dictionary] = []
+var _glimpses: Array[Client3D] = []
+var _wooded: Dictionary[Vector2i, bool] = {}
+var _glimpse := false
 ## The saplings at the forest's edge (_add_sapling), faded as trees are.
 var _saplings: Dictionary[Vector2i, Node3D] = {}
 ## Each building drawn (_add_buildings): {rect: its footprint, node: the
@@ -1074,6 +1093,8 @@ func _set_sky_floor(level: float) -> void:
 	_sky_floor = level
 	if _ground_shader_material != null:
 		_ground_shader_material.set_shader_parameter("sky_floor", level)
+	for view in _glimpses:
+		view._set_sky_floor(level)
 
 
 ## Outdoors: the sky, its light and the sun or moon as the world clock
@@ -2038,6 +2059,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_trees.clear()
 	_saplings.clear()
 	_border = null
+	_glimpses.clear()
 	_buildings.clear()
 	_building_at.clear()
 	_roofs_off.clear()
@@ -2146,6 +2168,15 @@ func _build_room() -> void:
 	_land = {}
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
+	_glimpse_plans.clear()
+	if _outdoor:
+		_glimpse_plans = _plan_glimpses()
+	_wooded = _land
+	if not _glimpse_plans.is_empty():
+		_wooded = _land.duplicate()
+		for plan: Dictionary in _glimpse_plans:
+			for cell: Vector2i in plan["cells"]:
+				_wooded[cell] = true
 	_forest_distance.clear()
 	if _outdoor:
 		_forest_distance = _measure_forest()
@@ -2163,6 +2194,29 @@ func _build_room() -> void:
 	if not World.fields_changed_signal.is_connected(_on_fields_changed):
 		World.fields_changed_signal.connect(_on_fields_changed)
 	_on_fields_changed()
+	_add_walls()
+	if _outdoor:
+		_add_forest()
+		if str(_terrain.get("border", "forest")) != "none":
+			_border = TerrainBorder.new()
+			_border.name = "Border"
+			_room.add_child(_border)
+			_border.build(_wooded, _terrain.get("heights", {}), LEVEL_RISE, FOREST_FLOOR, FOREST_FLOOR_DEPTH)
+		for plan: Dictionary in _glimpse_plans:
+			_add_glimpse(plan)
+	_add_buildings()
+	_add_town_walls()
+	# Every door's leaf set once; from then on those that change.
+	if not World.door_shown.is_connected(_on_door_shown):
+		World.door_shown.connect(_on_door_shown)
+	for door in World.get_doors():
+		_doors_due[door.key] = true
+	_show_piles()
+
+
+## The walls, doorways and posts of the terrain's edges; none along an
+## outdoor map's outline, which is the forest's edge.
+func _add_walls() -> void:
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
@@ -2186,21 +2240,6 @@ func _build_room() -> void:
 	for vertex in vertices:
 		if _needs_post(vertex, kind_at) or _sets_meet(vertex):
 			_add_post(vertex)
-	if _outdoor:
-		_add_forest()
-		if str(_terrain.get("border", "forest")) != "none":
-			_border = TerrainBorder.new()
-			_border.name = "Border"
-			_room.add_child(_border)
-			_border.build(_land, _terrain.get("heights", {}), LEVEL_RISE, FOREST_FLOOR, FOREST_FLOOR_DEPTH)
-	_add_buildings()
-	_add_town_walls()
-	# Every door's leaf set once; from then on those that change.
-	if not World.door_shown.is_connected(_on_door_shown):
-		World.door_shown.connect(_on_door_shown)
-	for door in World.get_doors():
-		_doors_due[door.key] = true
-	_show_piles()
 
 
 ## The terrain's buildings (Level.buildings_from): art-kit's slot over each
@@ -2729,9 +2768,9 @@ func _measure_forest() -> Dictionary[Vector2i, int]:
 	# a 256x256 map 65,536 cells to reach a few thousand.
 	var distance: Dictionary[Vector2i, int] = {}
 	var frontier: Array[Vector2i] = []
-	for cell: Vector2i in _land:
+	for cell: Vector2i in _wooded:
 		for direction: Vector2i in World.DIRECTIONS:
-			if not _land.has(cell + direction):
+			if not _wooded.has(cell + direction):
 				distance[cell] = 0
 				frontier.append(cell)
 				break
@@ -2743,10 +2782,188 @@ func _measure_forest() -> Dictionary[Vector2i, int]:
 			continue
 		for direction: Vector2i in World.DIRECTIONS:
 			var next := cell + direction
-			if not distance.has(next) and not _land.has(next):
+			if not distance.has(next) and not _wooded.has(next):
 				distance[next] = distance[cell] + 1
 				frontier.append(next)
 	return distance
+
+
+## The glimpses past this level's ways out (WorldMap.ways_out, maps'
+## decision 325), each as _add_glimpse draws it: the target level's cells
+## within GLIMPSE_DEPTH of the side it shows us, moved into our cells, none
+## on our land; its heights lifted so the way's two ends stand level. An
+## edge's target is placed as crossing it arrives; a link's land GLIMPSE_GAP
+## cells past where our land ends along the way (ways_out places their map
+## there; a map with void round its land, as the wilds is, is slid in to
+## its land), and a lane of the marker's ground runs to it through the
+## trees, the glimpse GLIMPSE_WIDE cells either side of it. A way with no
+## way back (a drop), or into a level not outdoors (a dungeon's door),
+## shows nothing.
+func _plan_glimpses() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var area := str(_terrain.get("level", ""))
+	if area.is_empty() or not Level.names().has(area):
+		return out
+	var world := WorldMap.build()
+	if not world.areas.has(area):
+		return out
+	var size: Vector2i = world.areas[area]["size"]
+	for way: Dictionary in world.ways_out(area, GLIMPSE_GAP):
+		if way["one_way"]:
+			continue
+		var target := _glimpse_level(str(way["to_map"]))
+		# Only a place under the same sky shows past the trees: a door
+		# down into a dungeon shows nothing.
+		if target.is_empty() or not bool(target["terrain"].get("outdoor", false)):
+			continue
+		var plan := _glimpse_plan(way, target["terrain"], target["size"], size)
+		if not (plan["cells"] as Dictionary).is_empty():
+			out.append(plan)
+	return out
+
+
+## Level [param level_name] as last read for a glimpse, read again only
+## when WorldMap's digest of it changed (a parse of the wilds is 55 ms).
+static var _glimpse_levels: Dictionary[String, Array] = {}
+
+
+static func _glimpse_level(level_name: String) -> Dictionary:
+	var digest := str(WorldMap._read_before.get(level_name, {}).get("digest", ""))
+	var kept: Array = _glimpse_levels.get(level_name, [])
+	if kept.is_empty() or digest.is_empty() or kept[0] != digest:
+		kept = [digest, Level.load_level(level_name)]
+		_glimpse_levels[level_name] = kept
+	return kept[1]
+
+
+func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size: Vector2i) -> Dictionary:
+	var away: Vector2i = way["out"]
+	var shift := Vector2i((way["to_ours"] as Transform2D).origin.round())
+	var lift := 0
+	var margin := 0
+	var lane: Array[Vector2i] = []
+	var lane_kind := "grass"
+	var lane_height := 0
+	if way["kind"] == "link":
+		var marker: Vector2i = way["from_cell"]
+		var edge := marker
+		var steps := 0
+		while _land.has(edge + away) and steps < size.x + size.y:
+			edge += away
+			steps += 1
+		edge += away
+		# ways_out puts their map's edge GLIMPSE_GAP past where our land
+		# ends; their land's edge goes there instead (the wilds' begins 16
+		# rows into its map), their depth counted from it.
+		var arrive: Vector2i = way["to_cell"]
+		var their_land: Dictionary[Vector2i, bool] = {}
+		for cell: Vector2i in terrain.get("floor", []) + terrain.get("water", []):
+			their_land[cell] = true
+		var back := 0
+		while their_land.has(arrive - away * (back + 1)) and back < to_size.x + to_size.y:
+			back += 1
+		var to_their_edge: int = {Vector2i(0, -1): to_size.y - arrive.y, Vector2i(0, 1): arrive.y + 1,
+				Vector2i(-1, 0): to_size.x - arrive.x, Vector2i(1, 0): arrive.x + 1}.get(away, 0)
+		margin = to_their_edge - (back + 1)
+		shift -= away * margin
+		lift = _height(marker) - int(terrain.get("heights", {}).get(arrive, 0))
+		lane_kind = str(_terrain.get("kinds", {}).get(marker, "grass"))
+		lane_height = _height(marker)
+		var across := Vector2i(absi(away.y), absi(away.x))
+		for k in GLIMPSE_GAP:
+			for w in range(-GLIMPSE_LANE, GLIMPSE_LANE + 1):
+				var cell := edge + away * k + across * w
+				if not _land.has(cell):
+					lane.append(cell)
+	# How deep a target cell is from the side it shows us (facing -away).
+	var deep := func(cell: Vector2i) -> int:
+		match away:
+			Vector2i(0, -1): return to_size.y - 1 - cell.y
+			Vector2i(0, 1): return cell.y
+			Vector2i(-1, 0): return to_size.x - 1 - cell.x
+			_: return cell.x
+	var floor_cells: Array[Vector2i] = []
+	var water: Array[Vector2i] = []
+	var kinds := {}
+	var heights := {}
+	var stairs := {}
+	var cells: Dictionary[Vector2i, bool] = {}
+	var theirs: Dictionary = terrain.get("kinds", {})
+	for list: String in ["floor", "water"]:
+		for cell: Vector2i in terrain.get(list, []):
+			var ours := cell + shift
+			var aside := ours - (way["from_cell"] as Vector2i) if way["kind"] == "link" else Vector2i.ZERO
+			if deep.call(cell) - margin >= GLIMPSE_DEPTH or absi(aside.x * away.y) + absi(aside.y * away.x) > GLIMPSE_WIDE 					or _near_land(ours, GLIMPSE_GAP):
+				continue
+			(floor_cells if list == "floor" else water).append(ours)
+			cells[ours] = true
+			if theirs.has(cell):
+				kinds[ours] = theirs[cell]
+			heights[ours] = clampi(int(terrain.get("heights", {}).get(cell, 0)) + lift, 0, Level.MAX_HEIGHT)
+			if terrain.get("stairs", {}).has(cell):
+				stairs[ours] = terrain["stairs"][cell]
+	for cell in lane:
+		if cells.has(cell):
+			continue
+		floor_cells.append(cell)
+		cells[cell] = true
+		kinds[cell] = lane_kind
+		heights[cell] = lane_height
+	var edges := {}
+	for key: Vector3i in terrain.get("edges", {}):
+		var ours := Vector3i(key.x + shift.x, key.y + shift.y, key.z)
+		var sides := Terrain.edge_cells(ours)
+		if cells.has(sides[0]) and cells.has(sides[1]):
+			edges[ours] = terrain["edges"][key]
+	return {"to": str(way["to_map"]), "cells": cells, "terrain": {
+		"floor": floor_cells, "water": water, "kinds": kinds, "heights": heights, "stairs": stairs, "edges": edges,
+		"fire": [], "torches": [], "lanterns": [], "buildings": [], "outdoor": true, "zone": "outdoors",
+		"walls": terrain.get("walls", DEFAULT_SET), "floors": terrain.get("floors", DEFAULT_SET), "border": "none"}}
+
+
+## Whether any of our land is within [param reach] cells of [param cell]
+## (eight ways): a glimpse keeps that far off, the trees between.
+func _near_land(cell: Vector2i, reach: int) -> bool:
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			if _land.has(cell + Vector2i(dx, dy)):
+				return true
+	return false
+
+
+## A glimpse drawn: a view of its own under the room, built from the plan's
+## terrain and nothing else (its ground, water, ledges, walls and doors,
+## shut; no forest, which ours grows round it; no light of its own, lit by
+## our sky; nothing in it picked, faded or thought about).
+func _add_glimpse(plan: Dictionary) -> void:
+	var view := Client3D.new()
+	view.name = "Glimpse_" + str(plan["to"])
+	view._glimpse = true
+	_room.add_child(view)
+	# (After it is in the tree: being ready turns _process on.)
+	view.set_process(false)
+	view._draw_glimpse(plan["terrain"])
+	view._set_sky_floor(_sky_floor)
+	_glimpses.append(view)
+
+
+func _draw_glimpse(terrain: Dictionary) -> void:
+	_terrain = terrain
+	_outdoor = true
+	_room = Node3D.new()
+	_room.name = "Room"
+	add_child(_room)
+	_walls_set = _known_set(str(terrain.get("walls", DEFAULT_SET)))
+	_floors_set = _known_set(str(terrain.get("floors", DEFAULT_SET)))
+	_land = {}
+	for cell: Vector2i in terrain["floor"] + terrain["water"]:
+		_land[cell] = true
+	_wooded = _land
+	_shape_ramps()
+	_build_ground(terrain["kinds"])
+	_build_water()
+	_add_cliffs()
+	_add_walls()
 
 
 ## A tree slot on [param cell], sized by [param clump] (the biggest in a
@@ -3082,10 +3299,11 @@ func _build_ground(kinds: Dictionary) -> void:
 		_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
 		for v in positions.size():
 			var byte := byte_start + v * _ground_stride + _ground_custom
-			custom[v * 4] = 255
+			# (A glimpse's own light is none: the sky's alone, sky_floor.)
+			custom[v * 4] = 0 if _glimpse else 255
 			custom[v * 4 + 2] = feet[v]
 			custom[v * 4 + 3] = tops[v]
-			_ground_bytes[byte] = 255
+			_ground_bytes[byte] = 0 if _glimpse else 255
 			_ground_bytes[byte + 2] = feet[v]
 			_ground_bytes[byte + 3] = tops[v]
 		# Up, but tilted on and beside a ramp: each corner the sum of the
@@ -4304,6 +4522,10 @@ func _add_doorway(key: Vector3i) -> void:
 	var piece := ArtKit.instance("door.single")
 	piece.name = "Door"
 	doorway.add_child(piece)
+	if _glimpse:
+		_room.add_child(doorway)
+		_doorways[key] = doorway
+		return  # Nothing in a glimpse is picked.
 	var area := Area3D.new()
 	area.name = "Pick"
 	area.set_meta("door", key)

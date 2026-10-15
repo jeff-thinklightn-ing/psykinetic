@@ -5923,3 +5923,37 @@ smooths its ticks). Nothing here is in the sim or on the wire.
   materials, which would need the same vertex code (agreed with terrain).
 - `--weather=<kind>` (and map_bench's) starts every region already in a
   weather, for clips, shots and benches.
+## 327. A glimpse of the level past a way out
+
+Jeff: "maybe the castle gets a little area where you can see it just beyond
+the map edge". Past each of an outdoor level's ways out (WorldMap.ways_out,
+decision 325), the client draws a piece of the level it leads to: from the
+wilds' castle road the castle's south wall and gate stand past a band of
+trees, and from the castle the wilds' road runs on south. Drawing only:
+nothing in it is walked, picked, faded, lit by its own torches or on the
+minimap, and no entity, item or fire of it is shown.
+
+What is drawn: the target's cells within GLIMPSE_DEPTH (18) of the side it
+shows us and GLIMPSE_WIDE (20) either side of the way, moved into our cells
+by ways_out's to_ours, its heights lifted so the way's ends stand level.
+ways_out puts the target's map GLIMPSE_GAP (3) cells past where our land
+ends; where the target's own land starts in from its map's edge (the
+wilds' starts 16 rows in), it is slid in by that much, so land faces land
+across the gap, and its depth is counted from its land. No cell of it comes
+within the gap of our land (a ragged edge would touch it otherwise). A lane
+of the marker's ground, three wide, runs from our land to it. Its cells and
+the lane count as land to our forest (`_wooded`): the trees and the border's
+canopy (326) grow round them and stand in the gap either side of the lane.
+A way with no way back, or into a level not outdoors (a door down into a
+dungeon), shows nothing.
+
+How: a second `Client3D` under the room, never processing, draws it with
+the same builders (`_draw_glimpse`: ground, water, ledges, walls in its own
+sets, doorways shut and without picks, posts), its ground lit by our sky
+alone (`sky_floor`, passed on from ours each hour). The target is read with
+`Level.load_level`, kept by WorldMap's digest of it, so a rebuild reads it
+again only if it changed: the castle's rebuild 40 ms to about 105 (the
+wilds' first read 55 ms more), the wilds' within the spread, frames as
+before. Rejected: drawing it from WorldMap's areas, which keep no ground
+kinds or water; and making its cells walkable void with a rule that they
+are not, which every path and pick would have to know.
