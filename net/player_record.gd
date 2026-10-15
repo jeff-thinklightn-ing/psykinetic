@@ -21,7 +21,9 @@ var last_seen := 0
 ## said: her last lines, newest last, slots: her pack, traits (rolled:
 ## CompanionCard), how_we_met, card_by ("plain" or "model"), facts and
 ## beliefs (CompanionFacts), talk (not yet read for them), and resident while
-## she stays in a town working: {place, zone, trade} (decision 284)}.
+## she stays in a town working: {place, zone, trade} (decision 284), and
+## taken while raiders hold her: {by: the group's id, zone, at: the world
+## step} (decision 314)}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
 ## What is in the player's slots (Items ids, "" empty), kept through
@@ -117,6 +119,9 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		if resident is Dictionary and str(resident.get("place", "")) != "" and str(resident.get("zone", "")) != "":
 			record.companion["resident"] = {"place": str(resident["place"]), "zone": str(resident["zone"]),
 				"trade": str(resident.get("trade", ""))}
+		var taken: Variant = pet.get("taken")
+		if taken is Dictionary and str(taken.get("by", "")) != "":
+			record.companion["taken"] = {"by": str(taken["by"]), "zone": str(taken.get("zone", "")), "at": int(taken.get("at", 0))}
 	return record
 
 

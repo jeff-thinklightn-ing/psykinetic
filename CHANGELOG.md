@@ -12,6 +12,9 @@ notes (decision 324).
   floors are drawn in (castle, wood, stone or cave); every map today keeps
   its castle walls.
 
+- A companion beaten down by raiders is carried off, not killed. They are held
+  until freed, and then wait for you in the town that freed them. Companions who
+  saw it remember it.
 ## v0.1.142
 
 - Seven weapons exist as things you can carry: hammer, sword, shield, giant

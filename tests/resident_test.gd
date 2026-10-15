@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_stays_when_left()
 	_test_goes_when_not_told()
 	_test_legacy_rests_in_town()
+	_test_taken_by_raiders()
 
 	remove_child(_main)
 	_main.free()
@@ -161,6 +162,43 @@ func _test_legacy_rests_in_town() -> void:
 	_check(pet != null and World.distance(pet.tile, _player().tile) <= 2 and not record.companion.has("resident"),
 		"in the town she joins them again, beside them")
 	record.companion["name"] = was
+
+
+func _test_taken_by_raiders() -> void:
+	print("\n== beaten down by raiders, she is taken, not killed: held till freed, then she waits in the town that freed her (decision 314) ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var pet := _companion()
+	_settle(pet)
+	var was_spared: Callable = World.spared
+	World.spared = func(target: GridEntity, _source: GridEntity, _cause: StringName) -> String:
+		return "raid-7" if target is Companion else ""
+	var told: Array[String] = []
+	var note := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(note)
+	World.damage(pet, pet.hp + 5)
+	World.spared = was_spared
+	_check(not pet.spawned and _companion() == null and record.companion.get("alive", false)
+		and record.companion.get("taken", {}).get("by", "") == "raid-7", "off the map, alive, held by the group (%s)" % [record.companion.get("taken", {})])
+	_check(record.companion.get("facts", []).any(func(fact: Dictionary) -> bool: return "carried off by raiders" in str(fact["text"])),
+		"carried off is a fact about her")
+	_check(told.any(func(line: String) -> bool: return "carried them off" in line), "her player is told (%s)" % [told])
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("taken", {}) == record.companion["taken"], "kept through a save and a load")
+	told.clear()
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	Net.message_received.disconnect(note)
+	_check(_companion() == null and told.any(func(line: String) -> bool: return "held by them still" in line),
+		"held, she is not spawned beside them, and they are told why (%s)" % [told])
+	_check(_main.companion_freed(Net.player_id, STORE) and not record.companion.has("taken")
+		and record.companion.get("resident", {}).get("place", "") == STORE, "freed by the town: she waits there (%s)" % [record.companion.get("resident", {})])
+	_check(record.companion["facts"].any(func(fact: Dictionary) -> bool: return "freed from the raiders" in str(fact["text"])), "and that is a fact about her")
+	_check(not _main.companion_freed(Net.player_id, STORE), "not freed twice")
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	_check(_companion() != null and not record.companion.has("resident"), "her player in the town: she joins them again")
 
 
 # --- helpers ------------------------------------------------------------------

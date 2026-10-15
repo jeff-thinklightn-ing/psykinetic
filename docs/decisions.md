@@ -5674,3 +5674,17 @@ tree's bullets hang from never moves, so a rebase keeps them under it.
 section when there is one (the top section only when there is none), so the
 empty Unreleased section above it is not the notes. Rejected: asking every
 tree to check after a rebase (they did; it still slipped twice).
+
+Companions' side (Main._on_entity_taken): the companions who saw it are
+told it as a fact ("<name> saw <her> carried off by raiders in <place>")
+and in their exchange; she gets one ("<name> was beaten down and carried
+off by raiders in <place>"); her record is kept as at a journey's end (her
+pack, facts) and marked "taken": {by, zone, at} (Main.companion_taken; a
+resident leaves her town's work); her player is told; she leaves the map
+as one who travels, not one who dies. While taken she is not spawned, and
+her player, joining, is told she is held. Main.companion_freed(player_id,
+place) frees her: with a stockpile place she rests in that town as a
+resident (as Wren and Nix do between trips) till her player comes, without
+one she comes back beside her player; a fact either way. Towns calls
+companion_taken for a resident taken in a raid on a town nobody is in, and
+companion_freed on a rescue.

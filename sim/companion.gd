@@ -740,6 +740,20 @@ func note_death(who: String, her_player := false, entity: GridEntity = null) -> 
 		note_fact("%s saw %s killed in %s." % [_name_of(self), refer(entity), _place_words()])
 
 
+## [param who] (another companion) beaten down and carried off by raiders
+## where she saw it (Main, decision 314): a fact about her, and told to her
+## exchange, so her voice knows it the next time it speaks.
+func note_taken(who: String) -> void:
+	note_fact("%s saw %s carried off by raiders in %s." % [_name_of(self), who, _place_words()])
+	_narrate("Raiders beat %s down and carried them off." % who)
+
+
+## Beaten down herself and carried off by raiders (Main, decision 314),
+## just before she is taken off the map: a fact about her.
+func note_carried_off() -> void:
+	note_fact("%s was beaten down and carried off by raiders in %s." % [_name_of(self), _place_words()])
+
+
 ## A monster's kind ("imp", "brute"), from its level marker or, for one
 ## made otherwise, its name; "monster" when neither says.
 static func kind_of(entity: GridEntity) -> String:

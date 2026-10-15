@@ -365,6 +365,7 @@ func _go_online() -> void:
 		World.entity_damaged.connect(_narrate_damage)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
+		World.entity_taken.connect(_on_entity_taken)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
 		World.ground_changed.connect(_on_ground_changed)
@@ -2095,6 +2096,13 @@ func _on_shop_message(data: Dictionary) -> void:
 func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not Net.companions:
 		return
+	# Carried off by raiders (decision 314): held till she is freed.
+	if record.companion.has("taken"):
+		print("[net] %s's companion %s is held by raiders (%s); none spawned" % [record.name, record.companion.get("name", "?"),
+			record.companion["taken"].get("by", "?")])
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s was carried off by raiders and is held by them still." % [
+			record.companion.get("name", "Your companion")]})
+		return
 	# Working in a town (decision 284): elsewhere, she stays at it; here,
 	# she leaves it and goes with them, her job waiting.
 	var resident: Dictionary = record.companion.get("resident", {})
@@ -2177,6 +2185,82 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	_companions[record.player_id] = pet
 	print("[net] %s's companion %s is at %s%s" % [
 		record.name, pet.name, tile, " (new)" if is_new else ""])
+
+
+## Server: a raid group ([param by]) beat [param entity] down and took it
+## (World.entity_taken, decision 314). A companion: the companions who saw
+## it and she herself are told it as facts, her record says who holds her
+## (companion_taken), her player is told, and she leaves the map as one who
+## travels, not one who dies (her pack and facts kept with her record).
+func _on_entity_taken(entity: GridEntity, by: String) -> void:
+	var pet := entity as Companion
+	if pet == null:
+		return
+	var id := pet.keeper_id
+	for other: Companion in _companions.values():
+		if is_instance_valid(other) and other.spawned and other != pet and other.witnessed(pet):
+			other.note_taken(_display_name(pet))
+	pet.note_carried_off()
+	_remember_companion(id)
+	companion_taken(id, by)
+	party_log.add("%s was carried off by raiders." % _display_name(pet))
+	var player: Player = _players.get(pet.keeper_peer)
+	if pet.keeper_peer != 0 and is_instance_valid(player):
+		Net.broadcast_to([pet.keeper_peer], "party", {"from": "Server", "text": "Raiders beat %s down and carried them off." % _display_name(pet)})
+	_travelling = true  # Taken, not dead.
+	World.despawn(pet)
+	_travelling = false
+	_companions.erase(id)
+
+
+## The companion of player [param player_id] is held by raid group
+## [param by] (decision 314): her record says so ("taken": {by, zone, at}),
+## so she is not spawned (_join_companion); a resident leaves her town's
+## work. Called on World.entity_taken, and by Towns for a resident taken in
+## a raid on a town nobody is in. False if that player has no companion.
+func companion_taken(player_id: String, by: String) -> bool:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or record.companion.is_empty():
+		return false
+	var resident: Dictionary = record.companion.get("resident", {})
+	if not resident.is_empty() and World.towns != null:
+		World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion.get("name", "")))
+	record.companion.erase("resident")
+	record.companion["taken"] = {"by": by, "zone": World.zone.name if World.zone != null else "", "at": World.steps}
+	record.companion["tile"] = null
+	print("[raids] %s's companion %s is held by %s" % [record.name, record.companion.get("name", "?"), by])
+	return true
+
+
+## The companion of player [param player_id] is freed from the raiders who
+## held her (decision 314): with [param place] (a stockpile place, the
+## town that freed her) she rests there, a resident working her trade, till
+## her player comes (as _rest_in_town); without, she comes back beside her
+## player the next time they are put down. A fact about her either way.
+## False if she was not held.
+func companion_freed(player_id: String, place := "") -> bool:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or not record.companion.has("taken"):
+		return false
+	record.companion.erase("taken")
+	record.companion["tile"] = null
+	var pet_name := str(record.companion.get("name", "?"))
+	var town := ""
+	if not place.is_empty() and World.holdings != null and not World.holdings.place(place).is_empty():
+		var trade := str(record.companion.get("traits", {}).get("trade", ""))
+		var zone := str(World.holdings.place(place).get("area", ""))
+		record.companion["resident"] = {"place": place, "zone": zone, "trade": trade}
+		if not trade.is_empty() and World.towns != null:
+			World.towns.note_companion_in(place, pet_name, trade)
+		town = str(Level.load_level(zone).get("display_name", zone)) if Level.exists(zone) else zone
+	var grown := CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
+	grown.add_fact("%s was freed from the raiders%s." % [pet_name, " and brought to " + town if not town.is_empty() else ""],
+		"event", player_id)
+	record.companion["facts"] = grown.facts
+	record.companion["beliefs"] = grown.beliefs
+	print("[raids] %s's companion %s is free%s" % [record.name, pet_name, " in " + town if not town.is_empty() else ""])
+	party_log.add("%s is free%s." % [pet_name, " and waits in " + town if not town.is_empty() else ""])
+	return true
 
 
 ## A rebuilt room starts whole: companions that died come back with it, at
