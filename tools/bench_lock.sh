@@ -5,11 +5,11 @@
 #   tools/bench_lock.sh take <tree> "<what>"   exit 1 if another tree holds it (prints who)
 #   tools/bench_lock.sh release <tree>
 #   tools/bench_lock.sh status
-# The lock is the folder C:/dev/bench.lock (mkdir is atomic); one older than 30 minutes is
-# stale and may be taken over.
+# The lock is the folder C:/dev/bench.lock (mkdir is atomic); one older than 30 minutes
+# (PSYKINETIC_LOCK_STALE seconds) is stale and may be taken over.
 set -u
 LOCK="${PSYKINETIC_BENCH_LOCK:-/c/dev/bench.lock}"
-STALE_SECONDS=1800
+STALE_SECONDS="${PSYKINETIC_LOCK_STALE:-1800}"
 LABEL="${PSYKINETIC_LOCK_LABEL:-bench lock}"
 
 held() { [ -d "$LOCK" ]; }

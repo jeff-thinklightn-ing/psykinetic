@@ -19,7 +19,10 @@ which worktree owns each step, and the design rules not to break without asking 
 - Take the landing lock for your final retest and push, so nobody lands between them:
   `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, retest, push, and
   `sh tools/land_lock.sh release <tree>`. If it's held, keep working and try again in a
-  few minutes; never push while another tree holds it. Don't hold it for anything else.
+  few minutes; never push while another tree holds it. Don't hold it for anything else
+  (record clips and run benches before taking it): a landing takes under 10 minutes, and
+  a land lock older than 15 is stale and may be taken over. If taking it fails, stop: a
+  script must never push after a failed take.
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
