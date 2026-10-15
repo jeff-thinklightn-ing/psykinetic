@@ -1374,7 +1374,8 @@ func _boot() -> void:
 		DayNight.set_hour(Net.start_hour)
 	# Who holds which place: as the levels start them, then as the snapshot
 	# left them, on the world's clock.
-	World.holdings = Holdings.new(WorldMap.build(), Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
+	var world_map := WorldMap.build()
+	World.holdings = Holdings.new(world_map, Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
 	# Every thing in the world and its history, as the snapshot left them.
 	World.items = ItemBook.from_dict(snapshot.get("items", {}), World.steps_now)
 	# The town's stores, as the snapshot left them, their gear in the book.
@@ -1384,6 +1385,8 @@ func _boot() -> void:
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
 	World.towns.building_changed.connect(_on_town_building_changed)
+	# The buildings the maps already have, for towns with no record of them.
+	World.towns.seed_from(world_map)
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	_records.clear()

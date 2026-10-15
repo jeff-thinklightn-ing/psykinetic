@@ -5003,6 +5003,7 @@ their 3D art: icons are for the HUD only. Icons are kept by item and
 whether placeholders are on; `forget(id)` (or `forget()`) draws again,
 for when art-kit says an item's art changed (a signal of theirs, asked
 for). Client only: nothing is sent, and the protocol is unchanged.
+
 ## 301. The town's store in builder mode: a prefab, a chest's use, and a check
 
 Economy's pieces get into real levels through builder mode, not by hand
@@ -5220,3 +5221,24 @@ its first floor cell in, which is no place for everyone to begin); the world
 map view lays out from it and marks it. A file rather than a key in a level:
 one place, so two levels cannot both claim to be the start. It is set to the
 wilds, where the town is, once the town is in that level.
+## 306. Towns are seeded from the buildings the maps already have
+
+A town's buildings live only in Towns (decision 297), but a map can put a
+forge or kitchen down already standing: the starter town in the wilds,
+or one the builder links with set_building. Towns.seed_from(world_map)
+squares the two. Each building a level links to a town ("use" one of the
+economy rules' buildings, "town" a stockpile place there, as
+Level._link allows) stands in that town at level 1 when the town has no
+record of that kind yet: logged, building_changed emitted (so the views
+and the "town" message follow), and residents waiting for it seated.
+A record the town already has is left alone: never lowered, nor its
+damage mended, nor a level a map can't show taken away; a building
+unlinked or removed from the map takes nothing from the town either (the
+record outlives the scenery, as it would a fire). The building's art does
+not set its level: Towns does, and the views draw it so.
+- Main._boot builds the WorldMap once, gives it to Holdings and, after
+  Towns is made, to seed_from.
+- BuilderHost._save_and_reload seeds again after each accept (beside
+  Holdings.rebind), so a building linked live stands at once.
+- WorldMap's areas carry Level's "buildings" (with use and town) for it.
+Server only; protocol unchanged; tests/towns_seed_test.

@@ -22,7 +22,9 @@ extends RefCounted
 ## first times the level. A workshop works only while its building stands
 ## (Production.workshop_open), and each level past the first makes it
 ## faster (Production.workshop_level). The town chooses what to build by
-## itself (tick, from World's world tick).
+## itself (tick, from World's world tick). A building the map already has,
+## linked to the town, stands at level 1 if the town has no record of it
+## (seed_from, at boot and after a builder change).
 ##
 ## Raids (step 6, decision 295): a raiding group that reaches the town's
 ## stockpile ground, travelled there by maps on the world tick or walked
@@ -321,6 +323,33 @@ func unlock(town: String, kind: String) -> bool:
 	else:
 		entry["job"] = production.order_build(town, kind, by, cost, int(spec.get("steps", 1)) * level)
 	return true
+
+
+## The buildings the map already has (decision 306): each of
+## [param world_map]'s buildings linked to a town ("use" one of rules'
+## buildings, "town" a stockpile place: Level._link) stands in that town at
+## level 1 if the town has no record of that kind yet; one it has a record
+## of is left as it is (never lowered, nor its damage undone). Main calls it
+## at boot and after a builder change. The "town/kind" ids seeded, sorted.
+func seed_from(world_map: WorldMap) -> Array[String]:
+	var out: Array[String] = []
+	var kinds: Dictionary = rules.get("buildings", {})
+	for area_name: String in world_map.areas:
+		for house: Dictionary in world_map.areas[area_name].get("buildings", []):
+			var kind := str(house.get("use", ""))
+			if kind.is_empty() or str(house.get("town", "")).is_empty() or not kinds.has(kind):
+				continue
+			var town := "%s/%s" % [area_name, house["town"]]
+			var record := _town(town)
+			if record["buildings"].has(kind):
+				continue
+			record["buildings"][kind] = {"kind": kind, "level": 1, "state": STANDING, "since": now(), "job": 0}
+			_note(town, "the %s stands, level 1, as the map has it" % kind)
+			building_changed.emit(town, kind)
+			_seat(town)
+			out.append("%s/%s" % [town, kind])
+	out.sort()
+	return out
 
 
 ## Production.on_built: [param kind] in [param town] is up a level and

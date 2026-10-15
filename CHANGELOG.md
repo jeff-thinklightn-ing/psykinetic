@@ -20,6 +20,9 @@ top section as the release notes.
   and shutting, footsteps on grass and on dirt, and a goblin's death.
   More are ready for when the game makes them (bandaging, a sword cut, a
   blow on wood, a crate smashed, a goblin calling its pack).
+- A forge, kitchen or inn that a map shows standing, the starter town's or one
+  you tie to a town in builder mode, now counts as built for that town at
+  once: its workers start work there instead of waiting for it to be built.
 - Builder mode: accepting a change no longer sends players across the map. Someone
   standing where a pond went in steps out to the nearest shore, and players near
   monsters stay where they were.

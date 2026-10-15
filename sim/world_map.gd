@@ -10,7 +10,8 @@ extends RefCounted
 ## Area name -> {name, display_name, size (cells), starts, spawn_points,
 ## links (as Level reads them), neighbours (side -> area), warnings (the
 ## level's load warnings), floor (cell -> true), places (as Level reads
-## them: key -> {key, cell, name, kind, radius, worth, holder}), and, for walking it
+## them: key -> {key, cell, name, kind, radius, worth, holder}), buildings (as
+## Level reads them, with their use and town), and, for walking it
 ## (WorldRoutes), edges, heights and stairs as Level's terrain has them}.
 var areas: Dictionary[String, Dictionary] = {}
 ## Every way out of every area, in area order: {from, to, kind ("link" or
@@ -91,7 +92,7 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
-		"places": level["places"],
+		"places": level["places"], "buildings": level["buildings"],
 	}
 	_configs[area_name] = config
 	for link: Dictionary in level["links"]:

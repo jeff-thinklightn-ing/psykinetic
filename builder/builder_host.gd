@@ -229,6 +229,9 @@ func _save_and_reload(zone_name: String) -> bool:
 	if World.holdings != null:
 		# Places added, moved or gone with the change.
 		World.holdings.rebind(world_map)
+	if World.towns != null:
+		# A building linked to its town with the change stands in it.
+		World.towns.seed_from(world_map)
 	var problems := world_map.problems()
 	for problem in problems:
 		push_warning("[builder] after the change to %s: %s" % [zone_name, problem])
