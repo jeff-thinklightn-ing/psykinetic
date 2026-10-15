@@ -27,8 +27,11 @@ extends Node
 ##     picks it up (F), throws it across the room (T), then throws the sack
 ##     at the imp, who staggers; the pack (I) is open throughout.
 ##   items_icons: the pack's icons (ItemIcons): a chest of four things
-##     opened, two taken into the hands, two into the pack, one dragged;
-##     each box its item's icon over its name.
+##     opened, one taken into the hands, three into the pack; each box its
+##     item's icon over its name.
+##   items_use: using things: a locked door rattles; from a chest a coin
+##     purse, opened into gold, and the key, which opens the door; a sack
+##     of ore put down beyond it, and the imp there hears the thud.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
 ##     (footsteps), opens a chest, opens a door into the next room and
 ##     fights the imp there to its death; each caption names the slot it
@@ -101,6 +104,8 @@ func _ready() -> void:
 			_items()
 		"items_icons":
 			_items_icons()
+		"items_use":
+			_items_use()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -137,6 +142,8 @@ func _ready() -> void:
 		_main.hint_panel.visible = false  # The controls list would cover the caption.
 	if scenario.begins_with("items"):
 		_main.pack_panel.shown = true
+	if scenario == "items_use":
+		World.get_doors()[0].lock = "cellar"
 	_caption = Label.new()
 	_caption.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -321,6 +328,52 @@ func _items_icons() -> void:
 	]
 
 
+## Two rooms with a locked door between (the cellar's), a chest in the
+## first with a purse, the key (a catalog entry of the clip's own) and a
+## sack of ore, an imp on guard in the second.
+func _items_use() -> void:
+	Items.add_for_test({"id": "items_clip_key", "name": "cellar key", "short": "Key", "color": "c8a050",
+		"size": [0.04, 0.1, 0.01], "weight": 0.1, "opens": "cellar"})
+	var cells: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var rows := Terrain.expand(cells)
+	for y in range(1, rows.size() - 1):
+		rows[y] = rows[y].substr(0, 11) + ("+" if y == 6 else "#") + rows[y].substr(12)
+	var markers := {Vector2i(1, 3): "start", Vector2i(3, 1): "chest", Vector2i(10, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["coin_purse", "items_clip_key", "ore_sack", ""]}},
+			{"at": [10, 2], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(rows, markers, config), null, config)
+	_script = [
+		["walk", Vector2i(5, 3), "A door to the cellar."],
+		["sound_door", true, "Locked: it rattles."],
+		["wait", 25, ""],
+		["walk", Vector2i(3, 2), "A chest."],
+		["item_open", true, "A coin purse, the cellar key, a sack of ore."],
+		["wait", 20, ""],
+		["item_take", [0, 0], "The purse into the pack."],
+		["wait", 15, ""],
+		["item_use", 0, "Right click it in the pack: opened, 10 gold."],
+		["wait", 30, ""],
+		["item_take", [1, 1], "The key: carried, it opens the cellar."],
+		["item_take", [2, Player.RIGHT_HAND], "The ore in hand."],
+		["item_open", false, ""],
+		["walk", Vector2i(5, 3), ""],
+		["sound_door", true, "The key in the pack: the door opens."],
+		["wait", 20, ""],
+		["walk", Vector2i(7, 4), "Into the cellar, the imp looking away."],
+		["item_key", ["drop", null], "G: the ore put down. A heavy thud: the imp hears it."],
+		["wait", 50, ""],
+	]
+
+
 ## Two rooms with a door between, a chest in the first, an imp on guard in
 ## the second.
 func _sounds() -> void:
@@ -478,6 +531,8 @@ func _on_tick(tick: int) -> void:
 				_player.toggle_lantern()
 		"item_take":
 			World.try_transfer(_player, _chest(), int(step[1][0]), _player, int(step[1][1]))
+		"item_use":
+			_main.use_slot(int(step[1]))
 		"item_open":
 			if bool(step[1]):
 				_main._open_pack(_player, _chest())
@@ -619,6 +674,13 @@ func _log(tick: int) -> void:
 		if tick % 30 == 0:
 			print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp,
 				"%s at %s hp %d %s" % [_monster.name, _monster.tile, _monster.hp, Monster.Alert.keys()[_monster.alert]] if is_instance_valid(_monster) else "monster gone"])
+		return
+	if scenario == "items_use":
+		var door: Door = World.get_doors()[0]
+		print("[clip] tick %d: player %s slots %s gold %d key %s; door %s; %s at %s %s, heard %s" % [tick, _player.tile, _player.slots,
+			World.gold_of(_player.get("player_id")), World.has_key(_player, door.lock), "open" if door.open else "shut",
+			_monster.name, _monster.tile, Monster.Alert.keys()[_monster.alert],
+			_monster.senses.heard.back()["kind"] if not _monster.senses.heard.is_empty() else "-"])
 		return
 	if scenario == "items_icons":
 		var shown: Array[String] = []

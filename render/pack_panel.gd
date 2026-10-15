@@ -33,6 +33,9 @@ const TEXT := Color(0.93, 0.92, 0.88, 0.95)
 var transfer: Callable
 ## Called with (sound set name, entity) for an item landing.
 var sound: Callable
+## Called with (slot) for a right click on a thing in the player's own row:
+## use it.
+var use: Callable
 ## Where icons come from; null: names only.
 var icons: ItemIcons
 ## Whose pack the bottom row shows; null for none (no player).
@@ -90,6 +93,15 @@ class SlotBox:
 			preview.add_theme_font_size_override("font_size", PackPanel.FONT_SIZE)
 			set_drag_preview(preview)
 		return {"slots_of": entity, "slot": index}
+
+	func _gui_input(event: InputEvent) -> void:
+		var click := event as InputEventMouseButton
+		if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_RIGHT or not mine:
+			return
+		var entity := owner_entity()
+		if is_instance_valid(entity) and index < entity.slots.size() and not entity.slots[index].is_empty() and panel.use.is_valid():
+			panel.use.call(index)
+			accept_event()
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
 		return data is Dictionary and data.has("slots_of") and is_instance_valid(owner_entity())

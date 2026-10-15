@@ -1,5 +1,5 @@
 {
-	"_about": "The item catalog (Items): one definition per id. Slots, levels, prefabs and the builder name these ids; each thing in the world is an instance of one (ItemBook). art: the ArtKit slot (item.<id>); kind: held (in a hand, origin at the grip) or cell (only lies on the ground); size: metres, the grey box until art; weight: kg; hands: 0 pack only, 1 or 2; tags: what it is; effects: [{kind, amount, ticks}] (buffs, consumed); use: the verb it is used with; yield: a resource's counts when banked (tag resource).",
+	"_about": "The item catalog (Items): one definition per id. Slots, levels, prefabs and the builder name these ids; each thing in the world is an instance of one (ItemBook). art: the ArtKit slot (item.<id>); kind: held (in a hand, origin at the grip) or cell (only lies on the ground); size: metres, the grey box until art; weight: kg; hands: 0 pack only, 1 or 2; tags: what it is; effects: [{kind, amount, ticks}] (buffs, consumed); use: the verb it is used with (bandage, purse: opened into gold; World.try_use); opens: the lock a key opens (Door.lock); value: what it is worth in gold; yield: a resource's counts when banked (tag resource).",
 	"items": [
 		{"id": "bandaging_kit", "name": "bandaging kit", "short": "Bandages", "color": "ebe6d6",
 			"art": "item.bandaging_kit", "kind": "held", "size": [0.18, 0.12, 0.08], "weight": 0.5, "hands": 1,
@@ -18,6 +18,6 @@
 			"tags": ["resource"], "yield": {"food": 5}},
 		{"id": "coin_purse", "name": "coin purse", "short": "Coins", "color": "e0c050",
 			"art": "item.coin_purse", "kind": "held", "size": [0.1, 0.12, 0.1], "weight": 0.5, "hands": 1,
-			"tags": ["resource"], "yield": {"gold": 10}}
+			"tags": ["resource"], "yield": {"gold": 10}, "use": "purse"}
 	]
 }

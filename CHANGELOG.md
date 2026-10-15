@@ -6,6 +6,10 @@ top section as the release notes.
 
 ## Unreleased
 
+- Right-click a thing in your pack to use it: a coin purse opens into
+  your gold. Keys open their locked doors when you carry them (none in the
+  world yet). Things you put down or throw land with a thud that monsters
+  hear, louder for heavy ones.
 - Builder mode: accepting a change no longer sends players across the map. Someone
   standing where a pond went in steps out to the nearest shore, and players near
   monsters stay where they were.

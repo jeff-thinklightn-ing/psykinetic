@@ -2270,6 +2270,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var patient := get_node_or_null(NodePath(str(args.get("target", "")))) as GridEntity
 		if patient != null:
 			World.try_bandage(entity, patient)
+	elif command_name == "use" and entity is Player:
+		World.try_use(entity, int(args.get("slot", -1)))
 	elif command_name in ["pick_up", "drop", "throw"] and entity is Player:
 		_item_command(entity, command_name, args)
 	elif command_name == "lantern" and entity is Player:
@@ -2347,6 +2349,7 @@ func _build_talk() -> void:
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
 	pack_panel.sound = _sound
+	pack_panel.use = use_slot
 	item_icons = ItemIcons.new()
 	item_icons.name = "ItemIcons"
 	add_child(item_icons)
@@ -2864,6 +2867,7 @@ func hint_lines() -> Array[String]:
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB crate, cart\topen it, beside you", "RMB companion\ther pack", "I\tyour pack",
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
 		"RMB hold\tbandage yourself or an ally beside you (a kit, out of combat)",
+		"RMB in pack\tuse it (open a purse, bandage)",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
 		"R\treset the room", "O\toptions", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:
@@ -2983,6 +2987,14 @@ func _sound(slot: String, entity: GridEntity) -> void:
 	sounds.append("%s %s" % [slot, entity.name])
 	if _client3d != null and is_instance_valid(entity) and DisplayServer.get_name() != "headless":
 		_client3d.play_at(slot, entity)
+
+
+## A right click on [param slot] of the local player's pack: use what is
+## there (World.try_use, on the server).
+func use_slot(slot: int) -> void:
+	var me := _local_player()
+	if me != null:
+		World.command(me, "use", {"slot": slot})
 
 
 ## F, G or T ([param what]: pick_up, drop, throw): a command for the local

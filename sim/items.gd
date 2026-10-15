@@ -28,7 +28,8 @@ const PACK := 4
 const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const CARRIED := 6
-const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made"]
+const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
+	"opens", "value"]
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter"]
 
@@ -63,6 +64,8 @@ static func read(text: String) -> Dictionary:
 			if key not in FIELDS:
 				push_warning("Items: %s has an unknown field %s" % [id, key])
 		definitions[id] = _definition(id, entry)
+		if entry.has("value") and (entry["value"] is not float and entry["value"] is not int or float(entry["value"]) < 0.0):
+			push_warning("Items: %s's value %s is not a count of gold; none" % [id, entry["value"]])
 	for id: String in definitions:
 		var made: Dictionary = definitions[id]["made"]
 		var problem := made_problem(made, definitions)
@@ -120,6 +123,8 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"tags": tags,
 		"effects": entry.get("effects", []) if entry.get("effects") is Array else [],
 		"use": str(entry.get("use", "")),
+		"opens": str(entry.get("opens", "")),
+		"value": maxi(int(entry.get("value", 0)), 0) if entry.get("value") is float or entry.get("value") is int else 0,
 		"verb": entry.get("verb", {}) if entry.get("verb") is Dictionary else {},
 		"yield": yields,
 		"made": _made(entry.get("made")),
@@ -192,6 +197,16 @@ static func has_tag(id: String, tag: String) -> bool:
 
 
 ## What banking a resource gives ({"ore": 5}); {} for anything else.
+## The lock [param id] opens (a key: Door.lock), "" for none.
+static func opens_of(id: String) -> String:
+	return str(def(id).get("opens", ""))
+
+
+## What [param id] is worth in gold (the catalog's value; 0 if it gives none).
+static func value_of(id: String) -> int:
+	return int(def(id).get("value", 0))
+
+
 static func yield_of(id: String) -> Dictionary:
 	return def(id).get("yield", {}).duplicate() if has_tag(id, "resource") else {}
 

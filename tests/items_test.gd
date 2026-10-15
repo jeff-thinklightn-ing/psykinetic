@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_containers()
 	_test_bandage()
 	_test_icons()
+	_test_use()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -339,6 +340,41 @@ func _test_containers() -> void:
 			"emptied at once (the stockpile's way): its kit's uid, the crate empty")
 	World.items.end(emptied[0], "gone")
 	World.despawn(box)
+
+
+func _test_use() -> void:
+	print("\n== using things: a key by carrying it, a purse opened into gold; thuds ==")
+	var host := _player(Net.local_id)
+	Items.add_for_test({"id": "test_key", "name": "cellar key", "weight": 0.1, "opens": "cellar", "value": 3})
+	_check(Items.opens_of("test_key") == "cellar" and Items.value_of("test_key") == 3 and Items.value_of(KIT) == 0,
+			"the catalog says what a key opens and what a thing is worth")
+	_check(Items.read('{"items": [{"id": "x", "value": -2}]}')["x"]["value"] == 0, "a value under 0 is none")
+	_check(not World.has_key(host, "cellar"), "no key: the cellar stays locked to the host")
+	var slot := host.slots.find("")
+	_give(host, "test_key", slot)
+	_check(World.has_key(host, "cellar") and not World.has_key(host, "keep"), "carrying the cellar key opens the cellar, not the keep")
+	_check(not World.try_use(host, slot), "a key is not used up or used: carrying it is enough")
+	World.items.end(World.take_item(host, host, slot), "gone")
+	var purse := _give(host, "coin_purse", slot)
+	var player_id: String = host.get("player_id")
+	var gold := World.gold_of(player_id)
+	_check(World.try_use(host, slot), "the host opens the coin purse")
+	_check(World.gold_of(player_id) == gold + 10 or World.economy == null, "10 gold: %d to %d" % [gold, World.gold_of(player_id)])
+	_check(host.slots[slot].is_empty() and not World.items.has(purse), "the purse is gone (opened)")
+	_check(not World.try_use(host, slot), "an empty slot: nothing to use")
+	var imp: Monster = World.monsters()[0] if not World.monsters().is_empty() else null
+	if imp != null:
+		var was := imp.tile
+		World._relocate(imp, _free_near(host, 3))
+		imp.senses.heard.clear()
+		_give(host, "ore_sack", slot)
+		World.try_drop(host, slot)
+		var heard: Dictionary = imp.senses.heard.back() if not imp.senses.heard.is_empty() else {}
+		_check(heard.get("kind") == &"thud", "a sack of ore put down: the imp hears a thud (%s)" % heard)
+		World.try_pick_up(host, host.tile)
+		World.items.end(World.take_item(host, host, host.slots.find("ore_sack")), "gone")
+		World._relocate(imp, was)
+	Items.reset()
 
 
 func _test_icons() -> void:

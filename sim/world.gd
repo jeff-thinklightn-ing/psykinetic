@@ -207,6 +207,9 @@ const BANDAGE_CALM_TICKS := 30
 const BANDAGE_HEAL := 10
 const BANDAGE_REGEN_TICKS := 10
 const THROW_PER_STRENGTH := 0.5
+## A thing put down or landing makes a thud monsters hear (Senses), a heavy
+## one from THUD_HEAVY_KG.
+const THUD_HEAVY_KG := 5.0
 const THROW_FORCE_PER_KG := 0.3
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
@@ -1572,6 +1575,7 @@ var _put_down_by: Dictionary[int, String] = {}
 
 
 func _ready() -> void:
+	key_check = holds_key
 	ground_changed.connect(_on_ground_for_stockpile)
 	entity_moved.connect(_on_moved_for_stockpile)
 	entity_pushed.connect(_on_pushed_for_stockpile)
@@ -1697,6 +1701,7 @@ func try_drop(by: GridEntity, slot: int, at: Variant = null) -> bool:
 	_put_down_by[uid] = _label_of(by)
 	var landed := put_on_ground(uid, cell)
 	_log("ground: %s put %s down at %s" % [by.name, id, landed])
+	_thud(landed, id, by)
 	return true
 
 
@@ -1814,6 +1819,7 @@ func try_throw(by: GridEntity, slot: int, target: Vector2i) -> bool:
 		return false
 	_put_down_by[uid] = _label_of(by)
 	var landed := put_on_ground(uid, dry, by.tile)
+	_thud(landed, id, by)
 	_log("throw: %s threw %s from %s to %s%s" % [by.name, id, by.tile, landed, "" if hit == null else ", hitting %s" % hit.name])
 	if hit != null:
 		var force := Items.weight_of(id) * THROW_FORCE_PER_KG
@@ -1823,6 +1829,54 @@ func try_throw(by: GridEntity, slot: int, target: Vector2i) -> bool:
 		if impact > 0:
 			_impact(hit, impact, by, &"body")
 	return true
+
+
+## A thud where [param id] came down at [param cell] (put down or thrown
+## by [param by]), heard as far as its weight says.
+func _thud(cell: Vector2i, id: String, by: GridEntity) -> void:
+	if cell != NO_CELL:
+		var heavy := Items.weight_of(id) >= THUD_HEAVY_KG
+		noise(cell, Senses.NOISE_THUD_HEAVY if heavy else Senses.NOISE_THUD_LIGHT, &"thud", by)
+
+
+## Whether [param entity] carries the key to [param lock] (a thing whose
+## catalog "opens" is it), in its pack or a hand: World.key_check's own.
+func holds_key(entity: GridEntity, lock: String) -> bool:
+	if lock.is_empty() or not is_instance_valid(entity):
+		return false
+	for id in entity.slots:
+		if not id.is_empty() and Items.opens_of(id) == lock:
+			return true
+	return false
+
+
+## [param by] uses what is in its slot [param slot], by the thing's catalog
+## use: a bandaging kit ("bandage") bandages [param by] (try_bandage); a
+## coin purse ("purse", a player's) is opened into their gold, its yield's
+## gold (add_gold), and is gone. A key is used by carrying it (holds_key).
+## False, and nothing happens, if it cannot.
+func try_use(by: GridEntity, slot: int) -> bool:
+	if not Net.is_authority() or not _can_handle(by) or is_stunned(by):
+		return false
+	if slot < 0 or slot >= by.slots.size() or by.slots[slot].is_empty():
+		return false
+	var id := by.slots[slot]
+	match str(Items.def(id).get("use", "")):
+		"bandage":
+			return try_bandage(by, by)
+		"purse":
+			var player_id: Variant = by.get("player_id")
+			var gold := int(Items.def(id)["yield"].get("gold", 0))
+			if player_id is not String or str(player_id).is_empty() or gold <= 0:
+				return false
+			var uid := take_item(by, by, slot)
+			if uid == 0:
+				return false
+			items.end(uid, "opened", "by %s" % _label_of(by), zone.name, by.tile)
+			add_gold(player_id, gold, "purse")
+			_log("use: %s opened %s: %d gold" % [by.name, id, gold])
+			return true
+	return false
 
 
 ## How many cells [param by] can throw [param id]: its strength over the

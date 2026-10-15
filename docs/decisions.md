@@ -5106,3 +5106,36 @@ under her player still takes them). No voice call; she yields a moment so
 she does not walk straight back into them. "There's no room for me to
 move" is left for when even that cannot be (her player stunned, a wall
 edge between).
+
+
+## 311. Using things: keys by carrying them, a "use" verb, a thing's value, thuds
+
+Items step 4b.
+
+**Keys.** A door's lock (Door.lock, a string) is opened by whoever
+carries a thing whose catalog `opens` is that lock, in the pack or a hand
+(`World.holds_key`, which `World._ready` gives to enemy-ai's
+`World.key_check` seam; tests may still set their own). A key is an
+entry in the catalog, one per lock, not an instance with a lock of its
+own: a key is data like everything else, the slot it sits in (which
+replicates ids only) says which key it is, and there is no per-instance
+state to save or send. The catalog has no keys yet (no content in real
+levels); tests and the `items_use` clip add one with Items.add_for_test.
+A key is never used up; it is not "used" either: carrying it is enough.
+
+**Use.** `World.try_use(by, slot)` acts on the thing's catalog `use`:
+"bandage" bandages oneself (try_bandage), "purse" opens a coin purse into
+the player's gold (its yield's gold, through economy's `World.add_gold`,
+"purse") and ends the instance ("opened"). Anything else is not usable
+yet; buffs (decision 312) come in through it. The input is a right click
+on a thing in your own pack row (PackPanel.use, Main.use_slot, the
+command "use" with the slot): a command like the others, so no new RPC.
+
+**Value.** The catalog's optional `value` (gold, an int 0 or more;
+anything else is warned about at load and is 0): `Items.value_of`, for
+economy's prices.
+
+**Thuds.** A thing put down (try_drop) or landing from a throw makes a
+noise of kind "thud" (Senses.NOISE_THUD_LIGHT, or _HEAVY from
+THUD_HEAVY_KG 5 kg), so monsters hear a dropped sack. Things laid down by
+the world (restores, spills) make none.
