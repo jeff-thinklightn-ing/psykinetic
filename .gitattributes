@@ -4,3 +4,7 @@
 *.png binary
 *.wav binary
 *.ogg binary
+# Append-only files every landing adds to: a merge or rebase keeps both
+# sides instead of stopping on a conflict (decision 322).
+docs/decisions.md merge=union
+CHANGELOG.md merge=union

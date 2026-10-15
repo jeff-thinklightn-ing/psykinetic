@@ -5301,3 +5301,18 @@ looks only at entities with one on (_buffed), in the zone ticking.
 `World.buff_changed(entity, kind, state)` (&"started", &"renewed",
 &"faded") is for companions to mention a fade, once, and the views. Buffs
 are not saved: a restart drops them, as it drops bandaging under way.
+
+## 322. decisions.md and CHANGELOG.md merge by keeping both sides
+
+Every landing appends to `docs/decisions.md` and adds bullets under
+`## Unreleased` in `CHANGELOG.md`, so any two trees landing close together
+conflicted in those two files on the second one's rebase, and the landing
+stopped while it held the lock (art-kit lost its turn twice). Both files are
+append-only, so `.gitattributes` gives them git's built-in `merge=union`
+driver: a merge or rebase keeps both sides' lines, in order, and only a real
+conflict elsewhere stops a landing. The cost: two edits to the same line are
+both kept, so a landing that amends an older entry, or a release cut that
+renames `## Unreleased`, checks the file reads right after its rebase (the
+release session checks the changelog's top on every cut). Rejected: each
+tree resolving by hand (the conflicts were never real) and a custom merge
+driver (needs setup in every clone; union is built into git).
