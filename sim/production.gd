@@ -108,9 +108,9 @@ static func items_catalog() -> Dictionary:
 ## [param amount] of gold changing hands in a [param kind] of transaction
 ## ("sale", "buy", "trade", "wage": rules' "tax"), split [to the town, to
 ## the payee]: the tax rounded down, the payee the rest.
+## Economy.taxed's, kept here for the callers that had it.
 static func taxed(amount: int, kind: String, with_rules: Dictionary) -> Array[int]:
-	var cut := int(floor(amount * float(with_rules.get("tax", {}).get(kind, 0.0))))
-	return [cut, amount - cut]
+	return Economy.taxed(amount, kind, with_rules)
 
 
 func now() -> int:
@@ -261,6 +261,15 @@ func cancel(id: int) -> bool:
 
 ## Players sold [param amount] of resource [param what] to [param town]'s
 ## shop (the shop calls this; tests too): its workshops work it up.
+## Pays [param amount] gold into worker [param worker_id]'s purse (a sale of
+## what they made, the tax already taken) for [param why].
+func pay(worker_id: String, amount: int, why := "") -> void:
+	if not _workers.has(worker_id) or amount <= 0:
+		return
+	_workers[worker_id]["purse"] = int(_workers[worker_id]["purse"]) + amount
+	print("[production] %s paid %d gold (%s), step %d" % [_workers[worker_id]["name"], amount, why, now()])
+
+
 func note_sale(town: String, what: String, amount: int) -> void:
 	_town(town)["sales"].append({"step": now(), "what": what, "count": amount})
 
@@ -321,7 +330,7 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 			book().end(used, "used", "made into %s #%d" % [each["recipe"], uid])
 	each["uids"] = []
 	if uid != 0:
-		stockpile.stock_shop(each["town"], uid, worker_record["name"])
+		stockpile.stock_shop(each["town"], uid, worker_record["name"], worker_record["id"])
 	# The wage, less its tax, which stays in the treasury.
 	var wage: int = taxed(int(rules.get("wage", 0)), "wage", rules)[1]
 	var floor_gold := int(rules.get("gold_floor", 0))

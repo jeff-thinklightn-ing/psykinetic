@@ -291,6 +291,13 @@ it, the depot refuses and what is put down there just lies there. Players
 never take from the stockpile; the town's own work (production, the
 shop, raids) does.
 
+A shop counter is a chest with `"props": {"shop": true}` inside a
+stockpile place's radius (decision 280). A player beside it sees what the
+town's workshops have made for sale, with prices, and buys with their
+own gold; something put into the counter is sold to the town, if the
+town is short of it. Like a depot it keeps nothing, and works only while
+the town holds the place.
+
 ### Routes between areas
 
 `world_map.routes()` (`WorldRoutes`, `sim/world_routes.gd`) finds the

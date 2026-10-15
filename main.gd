@@ -266,6 +266,10 @@ var hint_panel: HintPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
+## An open shop's goods, and the player's gold over the pack (ShopPanel).
+var shop_panel: ShopPanel
+## The local player's gold, as the server last said ("shop" messages).
+var gold := 0
 ## A chest or companion right-clicked from afar: opened once in reach.
 var _pack_wanted: GridEntity
 ## The pack sounds asked for, "set entity" each, newest last (tests).
@@ -359,6 +363,8 @@ func _go_online() -> void:
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
 		World.ground_changed.connect(_on_ground_changed)
+		World.gold_changed.connect(_on_gold_changed)
+		World.traded.connect(_on_traded)
 		BuilderHost.warn_overlays()
 		if BuilderHost.available():
 			_builder = BuilderHost.new()
@@ -1318,6 +1324,8 @@ func _boot() -> void:
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
+	# Prices, and each player's own gold.
+	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
@@ -1767,6 +1775,7 @@ func _save_state() -> void:
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
+		"economy": World.economy.to_dict() if World.economy != null else {},
 		"items": World.items.to_dict()})
 
 
@@ -1854,6 +1863,47 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		player_name, id.left(8), player.name, tile, " (back)" if back else ""])
 	party_log.add("%s joined." % player_name)
 	_join_companion(record, player)
+	_on_gold_changed(id, World.gold_of(id))
+
+
+# --- Trade -----------------------------------------------------------------------
+
+## Server: a player's gold changed; their client is told ("shop" {gold}).
+func _on_gold_changed(id: String, gold: int) -> void:
+	for peer: int in _peer_ids:
+		if _peer_ids[peer] == id:
+			Net.message_to(peer, "shop", {"gold": gold})
+
+
+## Server: [param by] traded at [param shop], or was refused ([param why]):
+## they are sent the shop again, and the refusal.
+func _on_traded(by: GridEntity, shop: GridEntity, why: String) -> void:
+	if by is Player and by.owner_peer != 0 and is_instance_valid(shop):
+		_send_shop(by as Player, shop, why)
+
+
+## Server: sends [param player]'s client what [param shop]'s town sells and
+## what it would pay for the things they carry ("shop" {shop, town, gold,
+## goods [{uid, id, price}], offers {id: gold}, why}); a shop the town
+## doesn't hold is sent with none.
+func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
+	var place := World.shop_place(shop)
+	var data := {"shop": str(shop.get_path()), "town": place, "gold": World.gold_of(player.player_id),
+		"goods": [], "offers": {}, "why": why}
+	if not place.is_empty() and World.economy != null:
+		data["goods"] = World.economy.goods(place)
+		data["offers"] = World.economy.offers(place, Array(player.slots))
+	Net.message_to(player.owner_peer, "shop", data)
+
+
+## The client's shop panel and the gold beside the pack.
+func _on_shop_message(data: Dictionary) -> void:
+	if data.has("gold"):
+		gold = int(data["gold"])
+	if shop_panel != null:
+		shop_panel.gold = gold
+		if data.has("shop"):
+			shop_panel.show_shop(data)
 
 
 # --- Companions ----------------------------------------------------------------
@@ -2063,6 +2113,14 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var edge: Variant = args.get("edge")
 		if edge is Array and edge.size() == 3:
 			World.try_toggle_door(entity, Vector3i(int(edge[0]), int(edge[1]), int(edge[2])))
+	elif command_name == "shop" and entity is Player:
+		var shop := get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
+		if shop == null or not World.reaches(entity, shop):
+			return
+		if str(args.get("do", "")) == "buy":
+			World.try_buy(entity, shop, int(args.get("uid", 0)))  # Answered by traded.
+		else:
+			_send_shop(entity as Player, shop)
 	elif command_name == "reset" and entity is Player:
 		var who := _display_name(entity)  # The rebuild frees the entity.
 		if not Net.player_reset and entity.owner_peer != Net.local_id:
@@ -2108,6 +2166,11 @@ func _build_talk() -> void:
 	pack_panel.transfer = _transfer
 	pack_panel.sound = _sound
 	$HUD.add_child(pack_panel)
+	shop_panel = ShopPanel.new()
+	shop_panel.name = "Shop"
+	shop_panel.pack = pack_panel
+	shop_panel.buy = _buy
+	$HUD.add_child(shop_panel)
 	talk = TalkPanel.new()
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
@@ -2331,6 +2394,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "builder":
 		if _builder_ui != null:
 			_builder_ui.on_message(data)
+		return
+	if kind == "shop":
+		_on_shop_message(data)
 		return
 	if kind == "map":
 		# The zone this client's player is in: it draws and predicts on that
@@ -2681,12 +2747,27 @@ func open_other(target: GridEntity) -> void:
 		if pack_panel.other != target:
 			_sound(SoundKit.opening(target), target)
 		pack_panel.open(target)
+	if shop_panel != null and target is Chest and (target as Chest).shop and shop_panel.shop != target:
+		shop_panel.open(target)
+		var player := _local_player()
+		if player != null:
+			World.command(player, "shop", {"shop": str(target.get_path())})
 
 
 func close_other() -> void:
 	_pack_wanted = null
 	if pack_panel != null:
 		pack_panel.open(null)
+	if shop_panel != null:
+		shop_panel.open(null)
+
+
+## The shop panel's Buy on [param uid] at [param shop]: asked of the server,
+## which answers with the shop again (and the gold).
+func _buy(shop: GridEntity, uid: int) -> void:
+	var player := _local_player()
+	if player != null and is_instance_valid(shop):
+		World.command(player, "shop", {"do": "buy", "shop": str(shop.get_path()), "uid": uid})
 
 
 ## Each frame: the panel follows the local player; a chest or companion

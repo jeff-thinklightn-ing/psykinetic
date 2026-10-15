@@ -142,7 +142,7 @@ const PROTOCOL_REVISION := 8
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "speech", "terrain"]
+const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "shop", "speech", "terrain"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["alert", "emit_light", "keeper_peer", "move_ticks", "pose", "slots"]
 const SETTINGS_FILE := "settings.cfg"

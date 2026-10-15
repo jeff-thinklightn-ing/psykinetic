@@ -11,6 +11,11 @@ const SLOTS := 4
 
 ## Whether this is a stockpile's depot.
 var depot := false
+## Whether this is a shop's counter (props {"shop": true}): it keeps
+## nothing either; what is put in is sold to the town (World.try_transfer,
+## Economy.sell), and a player beside it buys from the town's shop
+## (World.try_buy).
+var shop := false
 
 
 func _init() -> void:

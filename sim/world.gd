@@ -41,6 +41,12 @@ signal slots_changed(entity: GridEntity)
 ## [param thrown_from], else NO_CELL), or taken away. Main keeps its
 ## GroundPile; economy banks what lands on stockpile ground. Server only.
 signal ground_changed(zone_name: String, cell: Vector2i, thrown_from: Vector2i)
+## A player's gold changed (add_gold, a sale, a purchase): Main tells their
+## client. Server only.
+signal gold_changed(player_id: String, gold: int)
+## [param by] traded at [param shop] (or was refused, [param why] said):
+## Main sends them the shop again. Server only.
+signal traded(by: GridEntity, shop: GridEntity, why: String)
 ## A GroundPile came, changed or went, for the views (any peer).
 signal pile_shown(pile: GroundPile)
 signal pile_gone(pile: GroundPile)
@@ -326,6 +332,9 @@ var production: Production = null
 ## Server: how each town grows (Towns), choosing its buildings on the same
 ## slice; made by Main at boot, from the snapshot. Null on a client.
 var towns: Towns = null
+## Server: prices, players' gold and trade with the town (Economy); made by
+## Main at boot, from the snapshot. Null on a client.
+var economy: Economy = null
 ## Server: every thing in the world, with its history (ItemBook). Main
 ## replaces it at boot with the snapshot's.
 var items := ItemBook.new(steps_now)
@@ -1123,6 +1132,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		return false
 	if to is Chest and (to as Chest).depot:
 		return _bank(by, from, from_slot, to)
+	if to is Chest and (to as Chest).shop:
+		return _sell(by, from, from_slot, to)
 	var uid := slot_uid(from, from_slot)
 	var other_uid := slot_uid(to, to_slot)
 	_fit_uids(from)
@@ -1430,6 +1441,104 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 	for what: String in yields:
 		stockpile.deposit(place, what, int(yields[what]), who, from)
 	items.end(uid, "banked", "%s by %s" % [place, who], at_zone, tile)
+
+
+## Gives player [param player_id] [param amount] gold (taken, under 0) for
+## [param why]: a coin purse opened ("purse"), a sale... Their gold now; 0
+## with no economy (a client). The one way players' gold changes.
+func add_gold(player_id: String, amount: int, why := "") -> int:
+	if economy == null or player_id.is_empty():
+		return 0
+	var now_gold := economy.add_gold(player_id, amount, why)
+	gold_changed.emit(player_id, now_gold)
+	return now_gold
+
+
+## Player [param player_id]'s gold (0 on a client).
+func gold_of(player_id: String) -> int:
+	return economy.gold(player_id) if economy != null else 0
+
+
+## The town's place a shop counter [param shop] stands in, if the town
+## holds it: "" if not.
+func shop_place(shop: GridEntity) -> String:
+	if not shop is Chest or not (shop as Chest).shop or stockpile == null:
+		return ""
+	return Stockpile.place_at(holdings, shop.zone if not shop.zone.is_empty() else zone.name, shop.tile)
+
+
+## A player [param by] puts [param from]'s [param from_slot] into shop
+## counter [param shop]: the town buys it (Economy.sell) if it will, a raw
+## banked as its yield, gear into the shop to sell on; refused (false,
+## nothing moves) if it won't, and [param by] told why (traded).
+func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -> bool:
+	var place := shop_place(shop)
+	if not by is Player or (by as Player).player_id.is_empty() or place.is_empty() or economy == null:
+		traded.emit(by, shop, "no shop the town holds here")
+		return false
+	var who := (by as Player).player_id
+	var item := from.slots[from_slot]
+	var deal := economy.sell(who, place, item)
+	if not deal["ok"]:
+		_log("shop: %s refused %s at %s: %s" % [by.name, item, place, deal["why"]])
+		traded.emit(by, shop, str(deal["why"]))
+		return false
+	var uid := slot_uid(from, from_slot)
+	var taken := from.slots.duplicate()
+	var taken_uids := from.slot_items.duplicate()
+	taken[from_slot] = ""
+	taken_uids[from_slot] = 0
+	from.slots = taken
+	from.slot_items = taken_uids
+	if Items.yield_of(item).is_empty():
+		items.place(uid, "")
+		items.note(uid, "sold", "to %s by %s for %d gold" % [place, who, deal["paid"]])
+		stockpile.stock_shop(place, uid, "sold:%s" % who)
+	else:
+		_bank_thing(place, uid, "sold:%s" % who, _label_of(from), shop.zone, shop.tile)
+	_log("shop: %s sold %s at %s for %d gold" % [by.name, item, place, deal["paid"]])
+	_slots_changed(from)
+	gold_changed.emit(who, economy.gold(who))
+	traded.emit(by, shop, "")
+	return true
+
+
+## Player [param by], within reach of shop counter [param shop], buys
+## [param uid] from the town's shop there: into the first of their slots
+## it fits (the pack, then the hands), paid from their gold. False, and
+## nothing changes, if it isn't for sale, they can't pay or have no room;
+## they are told why (traded).
+func try_buy(by: GridEntity, shop: GridEntity, uid: int) -> bool:
+	if not Net.is_authority():
+		return false
+	var place := shop_place(shop)
+	if not by is Player or (by as Player).player_id.is_empty() or place.is_empty() or economy == null \
+			or not reaches(by, shop):
+		traded.emit(by, shop, "no shop the town holds here")
+		return false
+	var id := items.id_of(uid)
+	var slot := -1
+	_fit_uids(by)
+	for i in by.slots.size():
+		if by.slots[i].is_empty():
+			var given := by.slots.duplicate()
+			given[i] = id
+			if hands_allow(by, given):
+				slot = i
+				break
+	if slot < 0 or id.is_empty():
+		traded.emit(by, shop, "no room to carry it" if not id.is_empty() else "that is no longer for sale")
+		return false
+	var who := (by as Player).player_id
+	var deal := economy.buy(who, place, uid)
+	if not deal["ok"]:
+		traded.emit(by, shop, str(deal["why"]))
+		return false
+	put_item(by, by, slot, uid)
+	_log("shop: %s bought %s at %s for %d gold" % [by.name, id, place, deal["price"]])
+	gold_changed.emit(who, economy.gold(who))
+	traded.emit(by, shop, "")
+	return true
 
 
 ## Who last put each thing on the ground (a drop or a throw), by uid, for

@@ -12,7 +12,8 @@ extends RefCounted
 ## stockpile place the town holds: World.try_transfer banks what is put in
 ## at once, a resource item (Items.yield_of) as its yield, its instance
 ## ended, gear as itself. Picking loot up counts for nothing. Players never take from it:
-## take is for the town's own use (production, the shop, raids), and a
+## take is for the town's own use (production, the shop, raids); they buy
+## from its shop (Economy.buy, take_from_shop), and a
 ## store whose place is gone from the levels is kept, never dropped.
 ## World keeps one (World.stockpile), made by Main at boot from the
 ## snapshot ("stockpile": to_dict). Null on a client.
@@ -197,14 +198,37 @@ func take_item(place: String, uid: int, reason := "") -> bool:
 
 
 ## Puts [param uid] (in the book, held by no store) in [param place]'s
-## shop, made or reworked [param by] someone. False if it can't.
-func stock_shop(place: String, uid: int, by := "") -> bool:
+## shop, made or reworked [param by] someone: [param maker], a Production
+## worker's id ("" for none, as for a thing the town bought), is paid when
+## it sells (Economy.buy). False if it can't.
+func stock_shop(place: String, uid: int, by := "", maker := "") -> bool:
 	if place.is_empty() or not book.has(uid) or uid in all_items():
 		return false
 	var store := _store(place)
 	store["shop"].append(uid)
+	if not maker.is_empty():
+		store["makers"][str(uid)] = maker
 	book.place(uid, shop_holder(place))
 	_record(store, book.id_of(uid), 1, by, "to the shop", uid)
+	return true
+
+
+## The worker who made [param uid], in [param place]'s shop ("" for none).
+func maker_of(place: String, uid: int) -> String:
+	return str(_stores[place]["makers"].get(str(uid), "")) if _stores.has(place) else ""
+
+
+## Takes [param uid] out of [param place]'s shop ([param reason]: sold to a
+## player): in the book it is nowhere until World.put_item puts it
+## somewhere. False (nothing taken) if it isn't there.
+func take_from_shop(place: String, uid: int, reason := "") -> bool:
+	if not _stores.has(place) or uid not in _stores[place]["shop"]:
+		return false
+	var store: Dictionary = _stores[place]
+	store["shop"].erase(uid)
+	store["makers"].erase(str(uid))
+	book.place(uid, "")
+	_record(store, book.id_of(uid), -1, reason, "", uid)
 	return true
 
 
@@ -218,7 +242,7 @@ func _store(place: String) -> Dictionary:
 		var counts := {}
 		for name in RESOURCES:
 			counts[name] = 0
-		_stores[place] = {"resources": counts, "items": [], "shop": [], "ledger": []}
+		_stores[place] = {"resources": counts, "items": [], "shop": [], "makers": {}, "ledger": []}
 	return _stores[place]
 
 
@@ -273,6 +297,11 @@ func from_dict(saved: Dictionary) -> void:
 					store["shop"].append(int(item))
 				else:
 					print("[stockpile] the snapshot's %s shop holds %s, which is no item in the book; left out" % [place, item])
+		var makers: Variant = entry.get("makers", {})
+		if makers is Dictionary:
+			for uid: Variant in makers:
+				if str(uid).is_valid_int() and int(str(uid)) in store["shop"]:
+					store["makers"][str(uid)] = str(makers[uid])
 		var lines: Variant = entry.get("ledger", [])
 		if lines is Array:
 			for line: Variant in lines.slice(-LEDGER_SIZE):

@@ -19,6 +19,12 @@ top section as the release notes.
   they have no key for.
 - Companions with no player near enough to hear them stay quiet instead
   of calling the voice model (a few percent of its calls).
+- You now have your own gold, shown above your pack. You keep it when you
+  die. Towns can have shops: beside a shop counter you see what the town's
+  workers have made, priced by how much the town needs it, and buy it
+  with your gold. Put something the town is short of into the counter and
+  it pays you for it. A share of every sale goes to the town, and the
+  rest to the resident who made the thing. No town has a shop counter yet.
 - Companions can hand you what they carry, and fetch something from a
   chest they can see and bring it to you ("I'll get you the bandages
   from the chest").

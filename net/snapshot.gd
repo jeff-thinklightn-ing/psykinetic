@@ -103,7 +103,8 @@ static func _write(path: String, text: String) -> bool:
 ## town's stores (Stockpile.to_dict; {} in a file from before it), and
 ## "items" the ItemBook (ItemBook.to_dict; {} before instances), and
 ## "production" the town's work (Production.to_dict; {} before it), and
-## "towns" how each grows (Towns.to_dict; {} before it). Entries that make
+## "towns" how each grows (Towns.to_dict; {} before it), and "economy"
+## the players' gold (Economy.to_dict; {} before it). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
@@ -154,13 +155,15 @@ static func load(path: String) -> Dictionary:
 	var items: Variant = data.get("items", {})
 	var production: Variant = data.get("production", {})
 	var towns: Variant = data.get("towns", {})
+	var economy: Variant = data.get("economy", {})
 	return {"ok": true, "zones": zones, "players": players,
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
 		"holdings": holdings if holdings is Dictionary else {},
 		"stockpile": stockpile if stockpile is Dictionary else {},
 		"items": items if items is Dictionary else {},
 		"production": production if production is Dictionary else {},
-		"towns": towns if towns is Dictionary else {}}
+		"towns": towns if towns is Dictionary else {},
+		"economy": economy if economy is Dictionary else {}}
 
 
 ## One zone's {tick, entities, respawns} as read.

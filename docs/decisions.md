@@ -4310,3 +4310,45 @@ well, and an asked fact never counts. tools/lore_known.gd prints it for a knower
 How a companion's prompt uses the facts stays the companions tree's business.
 Rejected: each reader filtering the JSON itself (the status gate and the truth
 flag would be repeated, and one day missed).
+
+## 280. Prices from value and need; players' own gold; trade at a shop counter, taxed for the town
+
+Economy step 5 (sim/economy.gd, World.economy, saved as "economy").
+Prices are worked out when asked, never stored, from the rules in
+levels/economy.json: an item's value is its catalog "value" (items adds
+the field; economy only reads it), else what it is made of ("value" per
+resource, a thing at its own value) plus its work (made.steps / 600 x
+"labour"), else its yield, else 1. The town's need scales it: how short
+it is of what it wants (wants by tag, uneasy_extra too while its tier is
+DEFEND; comfort for raws) takes it up to trade.max_factor (2) for none at
+all, plenty down to min_factor (0.5). Deterministic: the same stores give
+the same prices.
+
+A player's gold is theirs (Jeff): kept by Economy by player id, saved,
+never touched by death or anything else but buying. It is kept there
+rather than on PlayerRecord so the sim pays it without Main;
+World.add_gold(player_id, n, why) is the one way it changes (items' coin
+purse "use" calls it), and World.gold_changed tells Main, which tells the
+client.
+
+Trade happens at a shop counter: a Chest with props {"shop": true} inside
+a stockpile place the town holds (as a depot). A player beside it buys a
+thing in the town's shop at its price: the sale tax goes to the treasury
+(the stockpile's gold), the rest to the purse of the resident who made it
+(Stockpile.stock_shop now keeps the maker's worker id, saved), or all of
+it to the treasury if no one did; Production.note_sale is told. Putting a
+thing into the counter sells it to the town, only if the town is short of
+it, at trade.buy_ratio (0.5) of its own price, less the buy tax, which
+stays in the treasury, and never below gold_floor: buying back and forth
+always loses, so trade builds the town, not a player's fortune. A raw is
+banked as its yield, gear goes into the shop to sell on; gold (a coin
+purse) is given at the depot, not sold. Production.taxed moved to
+Economy.taxed (Production's calls it).
+
+Wire: client to server is the existing "command" ("shop" {shop, do: buy,
+uid}, or no do to ask for the list; selling is the existing transfer);
+server to client is a new message kind "shop" ({gold} alone, or {shop,
+town, gold, goods [{uid, id, price}], offers {id: gold}, why}), sent only
+to that player's peer. A protocol change (MESSAGE_KINDS). The client's
+ShopPanel (render/shop_panel.gd) shows the gold over the pack and the
+open shop's goods beside it, in PackPanel's look.
