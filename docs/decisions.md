@@ -5445,3 +5445,61 @@ walks (100-220 ms corner to corner today, on world-tick walks or
 click-to-move across a big map) or pathfinding grow into the stall, first
 do the GDScript work above. Only then move find_path alone, as a
 GDExtension or C#, with these numbers as the bar.
+
+## 307. Weather is a function of the world clock and each region's climate
+
+Jeff's environment step 4: clear, overcast, rain, fog, wind and storms,
+changing on the world clock with gradual transitions, chosen per region by
+a simple climate.
+
+Weather (sim/weather.gd, static, beside DayNight) works it out the way the
+hour is worked out: the day is cut into spells (a climate's "spell", a
+quarter day by default), each spell's kind is picked from the region's
+climate weights by a hash of (region, spell), and the change from one
+spell's kind to the next is blended over the climate's "change" (a tenth
+of a spell by default). Each kind is an amount of cloud, rain, fog and wind
+(Weather.KINDS), and the blend is of those, so a fog bank rolls in and out
+over the change. The wind blows a way of its own per spell, turned through
+the change. Nothing is stepped or saved, and every peer gets the same
+weather from the clock it already has.
+
+The climates are data, levels/climates.json, keyed by lore region id (only
+entries of type "region" in levels/lore/regions.json; lore gives words,
+this file the numbers), with a "default". Every number in it is a
+placeholder until lore and Jeff agree each region's character: the Blood
+Rot's land weighted to fog and overcast is environment's guess. A level
+names its region in level.json "region" (Level.region_of; none is
+town_lands, and an id that is no lore region is warned of and read as
+town_lands); Level's terrain carries it.
+
+The one state is the console's override, `weather <kind>|auto|reload
+[<minutes>] [<region>|all]` (30 minutes by default): {kind, from, until}
+per region, in and out over a change, saved in the snapshot's "sky" while
+it runs. The "sky" message (decision 290) now also carries the overrides
+and the server's climates, so a client of another build works out the same
+weather, and a reloaded climates.json reaches everyone with the next sky
+message. That changes what the message carries: PROTOCOL_REVISION goes up.
+
+## 308. What weather does in play: outdoors only, one lookup a zone a tick
+
+Fields.update_weather, called by World.step for each awake zone (a
+client's on each tick it is told), keeps that zone's Weather.at and what
+it does. Only outdoors, out from under a roof (Fields.under_sky): rooms,
+huts, caves and dungeons are untouched, even in a world whose other zones
+have a storm.
+
+- Light: cloud takes up to CLOUD_DIM (a quarter) of the sky's light over
+  the night's (a storm's noon is about 0.8, well over Senses.DARK).
+- Sight: World.weather_sight_at(cell), 1 − 0.55·fog − 0.25·rain (thick
+  fog: about half), scales a looker's sight range at its own cell in
+  Senses.sees, glimpses and sees_cell alike. Adjacent (NOTICE_ALWAYS) is
+  not scaled, and a body carrying a light is seen at full range: a lantern
+  shows in fog.
+- Hearing: World.weather_hearing_at(cell), 1 − 0.3·rain − 0.25·wind (a
+  storm: under half), scales a noise's radius at its cell in World.noise,
+  before anyone is asked, so muffling halves the scaled reach. Speech is
+  not scaled: World.noise carries chat and whispers between players too.
+
+Hook points agreed with enemy-ai (who owns Senses and World.noise's
+rules). Wind does not move heat or fire in the sim yet; that needs a
+go-ahead.

@@ -1,0 +1,6 @@
+{
+	"_about": "Each region's weather (Weather, sim/weather.gd): weights for picking each spell's kind (clear, overcast, rain, fog, wind, storm), spell (how long a spell lasts, a share of a day) and change (how long the turn to the next takes, a share of a spell). Keys are lore region ids (levels/lore/regions.json, type region), and default for a region with none. Every number here is a placeholder until lore and Jeff agree each region's character: the Blood Rot's land foggier and more overcast is environment's guess, not lore.",
+	"default": {"spell": 0.25, "change": 0.1, "weights": {"clear": 4, "overcast": 3, "rain": 2, "fog": 1, "wind": 1.5, "storm": 0.5}},
+	"town_lands": {"spell": 0.25, "change": 0.1, "weights": {"clear": 4, "overcast": 3, "rain": 2, "fog": 1, "wind": 1.5, "storm": 0.5}},
+	"blood_rot_lands": {"spell": 0.25, "change": 0.1, "weights": {"clear": 1, "overcast": 3, "rain": 2, "fog": 4, "wind": 1, "storm": 0.7}}
+}

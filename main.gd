@@ -1368,6 +1368,9 @@ func _boot() -> void:
 	# --hour or --day-minutes say otherwise.
 	DayNight.reset()
 	DayNight.from_dict(snapshot.get("sky", {}))
+	Weather.reload()
+	var saved_weather: Variant = snapshot.get("sky", {}).get("overrides", {})
+	Weather.overrides = saved_weather if saved_weather is Dictionary else {}
 	if Net.day_minutes > 0.0:
 		DayNight.set_day_minutes(Net.day_minutes)
 	if Net.start_hour >= 0.0:
@@ -1842,7 +1845,7 @@ func _save_state() -> void:
 		"towns": World.towns.to_dict() if World.towns != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"items": World.items.to_dict(),
-		"sky": DayNight.to_dict()})
+		"sky": _sky_saved()})
 
 
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.
@@ -1857,9 +1860,48 @@ func _on_world_stepped() -> void:
 ## The "sky" message: the world clock (DayNight.to_dict) and the server's
 ## World.steps now, which a client counts on from (decision 290).
 func sky_message() -> Dictionary:
-	var data := DayNight.to_dict()
+	var data := _sky_saved()
 	data["steps"] = World.steps
+	# The server's climates: a client works the weather out from them.
+	data["climates"] = Weather.climates()
 	return data
+
+
+## The clock and the weather's overrides, as the snapshot keeps them.
+func _sky_saved() -> Dictionary:
+	var data := DayNight.to_dict()
+	data["overrides"] = Weather.live_overrides(World.steps)
+	return data
+
+
+## The console's weather: [param words] after it. With none, each open
+## zone's weather now.
+func _weather_command(words: PackedStringArray) -> String:
+	if words.size() >= 2:
+		var kind := words[1].to_lower()
+		if kind == "reload":
+			Weather.reload()
+		elif kind != "auto" and not Weather.KINDS.has(kind):
+			return "usage: weather [%s|auto|reload] [<minutes>] [<region>|all]" % "|".join(Weather.KINDS.keys())
+		else:
+			var minutes := words[2].to_float() if words.size() >= 3 and words[2].is_valid_float() else 30.0
+			var region := words[3] if words.size() >= 4 else "all"
+			if region != "all" and not Weather.climates().has(region):
+				return "no climate for region %s (regions: %s)" % [region, ", ".join(Weather.climates().keys())]
+			Weather.set_override(region, kind, minutes)
+		if Net.state_path != "":
+			_save_state()
+		Net.broadcast("sky", sky_message())
+	var lines: Array[String] = []
+	var was := World.zone
+	for each: Zone in World.zones.values():
+		World.enter(each)
+		var here: Dictionary = Weather.at(World.fields.region, World.steps) if World.outdoor else {}
+		lines.append("%s (%s): %s" % [each.name, World.fields.region, "indoors" if here.is_empty() else
+			"%s, cloud %.2f rain %.2f fog %.2f wind %.2f" % [here["kind"], here["cloud"], here["rain"], here["fog"], here["wind"]]])
+	World.enter(was)
+	return "
+".join(lines) if not lines.is_empty() else "no open zones"
 
 
 ## The console's hour and day_minutes: [param words] after the command.
@@ -2600,6 +2642,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "sky":
 		if not Net.is_authority():
 			DayNight.from_dict(data)
+			if data.get("climates") is Dictionary:
+				Weather.use(data["climates"])
+			Weather.overrides = data["overrides"] if data.get("overrides") is Dictionary else {}
 		return
 	if kind == "builder":
 		if _builder_ui != null:
@@ -3435,6 +3480,8 @@ func admin_command(line: String) -> String:
 			return _zones_text()
 		"hour", "day_minutes":
 			return _sky_command(words)
+		"weather":
+			return _weather_command(words)
 		"zone":
 			return _zone_command(words)
 		"builder":
@@ -3545,7 +3592,7 @@ func admin_command(line: String) -> String:
 		"help":
 			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
-				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>]"
+				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
 	return "unknown command %s (try help)" % words[0]
 
 

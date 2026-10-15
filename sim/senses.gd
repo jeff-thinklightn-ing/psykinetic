@@ -83,7 +83,8 @@ func sees(entity: GridEntity, d := -1, in_cone := true) -> bool:
 	var from := agent.tile
 	if d < 0:
 		d = maxi(absi(at.x - from.x), absi(at.y - from.y))
-	if d > sight_range:
+	# Fog and rain shorten sight (Weather), but a carried light shows as far.
+	if d > (sight_range if entity.emit_light > 0.0 else sight_range * World.weather_sight_at(from)):
 		return false
 	if d > NOTICE_ALWAYS:
 		if in_cone and not _in_cone(at):
@@ -103,7 +104,7 @@ func glimpses(entity: GridEntity, d := -1) -> bool:
 	var at := entity.tile
 	if d < 0:
 		d = maxi(absi(at.x - agent.tile.x), absi(at.y - agent.tile.y))
-	if d <= NOTICE_ALWAYS or d > sight_range or entity.emit_light > 0.0 or not _in_cone(at):
+	if d <= NOTICE_ALWAYS or d > sight_range * World.weather_sight_at(agent.tile) or entity.emit_light > 0.0 or not _in_cone(at):
 		return false
 	var light := _light(at, DARK)
 	return light >= GLIMPSE and light < DARK and World.has_line_of_sight(agent.tile, at)
@@ -116,7 +117,7 @@ func sees_cell(cell: Vector2i, dark := DARK) -> bool:
 	if cell == from:
 		return true
 	var d := maxi(absi(cell.x - from.x), absi(cell.y - from.y))
-	if d > sight_range:
+	if d > NOTICE_ALWAYS and d > sight_range * World.weather_sight_at(from):
 		return false
 	if d > NOTICE_ALWAYS and (not _in_cone(cell) or not is_lit(cell, dark)):
 		return false

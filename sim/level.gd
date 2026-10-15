@@ -98,6 +98,8 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 const ON_WATER: Array[String] = ["building.well"]
 ## A building's facing (the side its front is on) when level.json gives none.
 const BUILDING_FACING := Vector2i(0, 1)
+## The region of a level that names none (region_of).
+const DEFAULT_REGION := "town_lands"
 ## What a marker spawns, before level.json's props for that tile: each
 ## kind's body, from its row in levels/monsters.json (Monster.kinds), where
 ## its tactics, idling, doors and temperaments are too: the brute plods and
@@ -432,6 +434,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
 			"zone": zone,
+			"region": region_of(config, warnings),
 			"outdoor": zone == "outdoors",
 			# Lit by the sky on the world clock, unless level.json sets its
 			# light outright (decision 291).
@@ -668,6 +671,19 @@ static func zone_of(config: Dictionary) -> String:
 	if zone in DayNight.ZONES:
 		return zone
 	return "outdoors" if bool(config.get("outdoor", false)) else "indoors"
+
+
+## The lore region level.json [param config] is in (its "region": an entry
+## of type "region" in levels/lore/regions.json), "town_lands" if it names
+## none; one that is no lore region is said in [param warnings] and read
+## as town_lands. Weather is chosen by it (Weather).
+static func region_of(config: Dictionary, warnings: Array[String] = []) -> String:
+	var region := str(config.get("region", DEFAULT_REGION))
+	var entry: Variant = Lore.entries().get(region)
+	if entry is Dictionary and entry.get("type") == "region":
+		return region
+	warnings.append("\"region\" in level.json is %s, which is no lore region: it is %s" % [region, DEFAULT_REGION])
+	return DEFAULT_REGION
 
 
 ## level.json's "buildings", [{slot, at: its footprint's top-left cell,

@@ -57,6 +57,16 @@ top section as the release notes.
   must be updated with this release.
 - Your pack and chests show each thing's picture, drawn from its model,
   with its name under it.
+- Weather outdoors: clear spells, overcast, rain, fog, wind and storms
+  come and go on the world clock, each region by its own climate (the
+  Blood Rot's land is foggier). For now this changes play, not the look:
+  fog and rain shorten how far monsters see (a lantern still shows),
+  rain and wind cover footsteps and other noise, and clouds dim the day.
+  Rain, fog banks and wind on screen come next. Rooms, caves and
+  dungeons are untouched.
+- Server console: `weather <kind> [<minutes>] [<region>]` sets the
+  weather for a while; `weather auto` hands it back to the climate.
+- Levels can say which region they are in (`"region"`, a lore region).
 - A town's buildings show their state: after a raid a damaged forge, inn or
   kitchen has a caved-in roof, and it stands whole again once the carpenter
   has repaired it. Its inside still works. Needs the server updated.

@@ -24,6 +24,7 @@ func _ready() -> void:
 		_damage_log.append({"entity": entity, "amount": amount, "source": source, "cause": cause, "tick": World.tick}))
 
 	_test_temper()
+	_test_weather()
 	_test_surround()
 	_test_dart()
 	_test_windup()
@@ -822,6 +823,47 @@ func _test_sight_by_light() -> void:
 	World.fields_changed()
 	World.step()
 	_check(brute.target != null, "in the light, seen covered or not")
+	Monster.idling = true
+
+
+func _test_weather() -> void:
+	print("
+== outdoors, fog shortens sight and a storm covers noise; not indoors, not a lantern ==")
+	Monster.idling = false
+	var e := _build(["#########", "#.......#", "#.......#", "#.......#", "#.......#", "#.......#", "#.......#", "#...b...#", "#########"],
+			{"b": {"facing": Vector2i(0, -1)}})
+	var brute: Monster = e["b"][0]
+	brute.sight_range = 7
+	var player: Player = EntityFactory.build(SPECS["P"].merged({"name": "Player1", "tile": Vector2i(4, 2)}))
+	_room.add_child(player)
+	World.spawn(player, Vector2i(4, 2))
+	player.toggle_lantern()
+	World.step()
+	_check(brute.senses.sees(player), "indoors, in the light, five cells off: seen")
+	World.fields.outdoor = true
+	Weather.overrides = {Level.DEFAULT_REGION: {"kind": "fog", "from": -1000000, "until": 1000000}}
+	World.step()
+	_check(World.weather_sight_at(brute.tile) < 0.6, "outdoors in fog, sight is cut (%.2f)" % World.weather_sight_at(brute.tile))
+	_check(not brute.senses.sees(player) and not brute.senses.sees_cell(player.tile), "in fog, five cells off: unseen, its cell too")
+	player.toggle_lantern()
+	_check(brute.senses.sees(player), "a lantern in the fog still shows")
+	player.toggle_lantern()
+	Weather.overrides = {Level.DEFAULT_REGION: {"kind": "storm", "from": -1000000, "until": 1000000}}
+	World.step()
+	var near := brute.tile + Vector2i(0, -2)
+	brute.senses.heard.clear()
+	World.noise(near, 3, &"step", player)
+	_check(brute.senses.heard.is_empty(), "in a storm a step two cells off is not heard (cover %.2f)" % World.weather_hearing_at(near))
+	World.noise(near, 3, &"speech", player)
+	_check(not brute.senses.heard.is_empty(), "speech keeps its reach")
+	World.fields.outdoor = false
+	World.step()
+	near = brute.tile + Vector2i(0, -2)
+	brute.senses.heard.clear()
+	World.noise(near, 3, &"step", player)
+	_check(World.weather_hearing_at(near) == 1.0 and not brute.senses.heard.is_empty(),
+			"indoors the same storm is nothing: the step is heard")
+	Weather.overrides = {}
 	Monster.idling = true
 
 

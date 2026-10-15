@@ -426,6 +426,7 @@ func step() -> void:
 		return
 	var was := zone
 	if zones.is_empty():
+		fields.update_weather(steps)
 		_step_zone()
 	for each: Zone in zones.values():
 		var awake := _is_awake(each)
@@ -437,6 +438,8 @@ func step() -> void:
 		each.awake = awake
 		if awake:
 			enter(each)
+			# This zone's weather on the clock (Weather; Fields keeps it).
+			fields.update_weather(steps)
 			_step_zone()
 	steps += 1
 	# The sky's light on the new hour (DayNight; the light field reads it).
@@ -886,6 +889,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	north = terrain.get("north", Vector2i(0, -1))
 	outdoor = bool(terrain.get("outdoor", false))
 	fields.load(terrain)
+	fields.update_weather(DayNight.now())
 	fields_changed()
 	var heights: Dictionary = terrain.get("heights", {})
 	for cell: Vector2i in heights:
@@ -954,6 +958,18 @@ func light_at(at: Vector2i, carried := true, sky := true) -> float:
 	return fields.light_at(self, at, carried, sky)
 
 
+## How far one sees from [param cell] under the weather, a share of one's
+## sight range: 1 indoors or under a roof (Fields.update_weather).
+func weather_sight_at(cell: Vector2i) -> float:
+	return fields.weather_sight if fields.under_sky(cell) else 1.0
+
+
+## How far a noise at [param cell] carries under the weather, a share of
+## its radius: 1 indoors or under a roof.
+func weather_hearing_at(cell: Vector2i) -> float:
+	return fields.weather_hearing if fields.under_sky(cell) else 1.0
+
+
 ## Whether a creature standing at [param at] burns. Asked of every cell a
 ## path or a flood looks at: with nobody carrying heat (as now, always) it
 ## is the map's heat alone, a lookup, where heat_at goes through every
@@ -996,6 +1012,12 @@ func carried_lights() -> Array[GridEntity]:
 func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = null) -> void:
 	if not Net.is_authority() or radius <= 0:
 		return
+	if kind != &"speech":
+		# Rain and wind cover it (Weather); speech is chat between players
+		# too, and keeps its reach.
+		var cover := weather_hearing_at(at)
+		if cover < 1.0:
+			radius = maxi(1, roundi(radius * cover))
 	# Companions are few: each one in reach hears.
 	_take_roster()
 	for entity in _hearers:
@@ -2623,6 +2645,7 @@ func _net_tick(server_tick: int) -> void:
 		_clock_drift = error * CLOCK_PULL
 	tick_alpha = _clock - tick
 	DayNight.update()
+	fields.update_weather(DayNight.now())
 	ticked.emit(tick)
 
 

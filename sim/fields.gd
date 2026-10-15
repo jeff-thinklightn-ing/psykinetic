@@ -41,6 +41,18 @@ const HEAT_FALLOFF := 0.35
 var ambient := 1.0
 ## Whether the open sky lights this level (Level's terrain "daylight").
 var daylight := false
+## Under the sky (the level is outdoors, level.json "outdoor" or "zone"):
+## the weather reaches its cells not under a roof (under_sky).
+var outdoor := false
+## The level's region (Level.region_of): whose weather it has.
+var region := Level.DEFAULT_REGION
+## The weather here now (Weather.at), set by World once a tick
+## (update_weather), and what it does: how much of the sky's light it
+## takes, how far one sees and a noise carries under it (a share each).
+var weather := {}
+var sky_dim := 0.0
+var weather_sight := 1.0
+var weather_hearing := 1.0
 ## The cells under a roof (inside a building's footprint): out of the sky's
 ## light. {cell: true}.
 var _roofed: Dictionary[Vector2i, bool] = {}
@@ -82,6 +94,8 @@ func load(terrain: Dictionary) -> void:
 	_lanterns.assign(terrain.get("lanterns", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
 	daylight = bool(terrain.get("daylight", false))
+	outdoor = bool(terrain.get("outdoor", false))
+	region = str(terrain.get("region", Level.DEFAULT_REGION))
 	_roofed.clear()
 	for building: Dictionary in terrain.get("buildings", []):
 		for cell in Level.rect_cells(building["rect"]):
@@ -209,7 +223,30 @@ func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> floa
 ## The light at [param cell] before any source's: the sky's (DayNight.light)
 ## outdoors and not under a roof, else the level's ambient light.
 func ambient_at(cell: Vector2i) -> float:
-	return DayNight.light if open_sky(cell) else ambient
+	if open_sky(cell):
+		return DayNight.NIGHT + (DayNight.light - DayNight.NIGHT) * (1.0 - sky_dim)
+	return ambient
+
+
+## Whether the weather reaches [param cell]: outdoors, not under a roof.
+func under_sky(cell: Vector2i) -> bool:
+	return outdoor and not _roofed.has(cell)
+
+
+## The weather here at world step [param steps] (World, once a tick):
+## Weather.at for this level's region, and its shares of light, sight and
+## hearing; none of it indoors.
+func update_weather(steps: float) -> void:
+	if not outdoor:
+		weather = {}
+		sky_dim = 0.0
+		weather_sight = 1.0
+		weather_hearing = 1.0
+		return
+	weather = Weather.at(region, steps)
+	sky_dim = Weather.CLOUD_DIM * weather["cloud"]
+	weather_sight = Weather.sight_factor(weather)
+	weather_hearing = Weather.hearing_factor(weather)
 
 
 ## Whether the sky lights [param cell]: a level lit by daylight, and not
