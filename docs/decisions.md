@@ -4928,7 +4928,7 @@ medians of three under the bench lock: the suite alone 47 s (from 150), and
 of process starts on Windows); a whole landing 111 s (from 290), net_test
 now its long pole (decision 279 runs its phases at once).
 
-## 299. A server goes cleanly: zone spawners leave after their entities, and the stdin thread is stopped and joined
+## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
 server printed some 50 "Attempt to disconnect a nonexistent connection
@@ -4959,6 +4959,23 @@ net_test's restart phase checks both: the server it restarts holds three
 zones (sample and castle opened on the console) and must go without an
 ERROR line, and a fresh server told `stop 0` the moment its console is up
 must exit 0.
+
+Amended: the spawner order was not the cause, and the box still printed the
+ERRORs with it (62, four zones). Godot 4.7 takes a node's children out of
+the tree first to last, so before the change the spawners already left
+after the entities, and after it before; neither order errors on Windows,
+and both do on the box, where a debug build showed the ERRORs come as each
+spawner leaves, one an entity still under its zone, their one-shot
+connections still there: a spawner leaving the tree with nodes tracked
+fails every disconnect on Linux. The fix is that no spawner leaves holding
+any: _release_zones, before every quit (stop and restart, the test exits,
+and a window closed or SIGTERM, Godot's close request), saves the world,
+stops the sim and frees each zone's entities while their spawners are
+still in the tree, so each one's leaving untracks it; Main's exit then
+does not save again (it would write an empty world). The order change is
+reverted. On the box, twice from one copy of the live world (50
+entities, 6 player records, four zones), it stops with no ERROR and the
+world comes back whole.
 
 ## 275. Item icons are rendered from each item's art slot, on demand, on the client
 

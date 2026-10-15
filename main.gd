@@ -145,6 +145,8 @@ var _stdin_mutex := Mutex.new()
 var _stdin_lines: Array[String] = []
 ## Set on exit: the stdin thread stops at its next look (decision 299).
 var _stdin_stop := false
+## The zones' entities are gone, the world saved before they went (decision 299).
+var _released := false
 var _admin: TCPServer
 var _admin_clients: Array[StreamPeerTCP] = []
 var _test_target := Vector2i.ZERO
@@ -1431,11 +1433,6 @@ func _zone_nodes(zone_name: String) -> void:
 	var made := MultiplayerSpawner.new()
 	made.name = "Spawner_" + zone_name
 	add_child(made)
-	# Before $YSort: the tree takes a node's children out last first, so the
-	# zone's entities leave before the spawner that tracks them, not after it
-	# (each then found its spawner's connection gone: an ERROR an entity on a
-	# server's exit, or a crash; decision 299).
-	move_child(made, 0)
 	made.spawn_path = made.get_path_to(holder)
 	# Every peer builds entities the same way; only the server decides when.
 	made.spawn_function = _build_entity
@@ -1874,8 +1871,11 @@ func _sky_command(words: PackedStringArray) -> String:
 
 
 func _exit_tree() -> void:
-	# Clean shutdown (quit, window closed): keep the last state.
-	_save_state()
+	# Clean shutdown (quit, window closed): keep the last state, unless it was
+	# kept before the zones were let go (_release_zones), which an empty world
+	# saved now would overwrite.
+	if not _released:
+		_save_state()
 	# The stdin thread runs this node's method: it must have stopped before
 	# the node goes, or the server crashes on its way out (one stopped within
 	# 2 s of starting found it still waiting out stdin's end; decision 299).
@@ -3304,6 +3304,7 @@ func _count_down_restart() -> void:
 	for peer in multiplayer.get_peers():
 		multiplayer.multiplayer_peer.disconnect_peer(peer)
 	await get_tree().create_timer(0.5).timeout
+	_release_zones()
 	get_tree().quit(_restart_exit)
 
 
@@ -3789,6 +3790,7 @@ func _exit_on_file() -> void:
 		var deadline := Time.get_ticks_msec() + 30000
 		while not FileAccess.file_exists(Net.test_exit_on + ".quit") and Time.get_ticks_msec() < deadline:
 			await get_tree().create_timer(0.25).timeout
+	_release_zones()
 	Net.shutdown()
 	get_tree().quit()
 
@@ -3798,8 +3800,36 @@ func _on_test_exit() -> void:
 		return
 	_test_exiting = true
 	_report_test()
+	_release_zones()
 	Net.shutdown()
 	get_tree().quit()
+
+
+## Godot asks before it quits for a window closed or a SIGTERM (systemctl
+## stop): the zones go cleanly then too.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_release_zones()
+
+
+## The world saved, then every zone's entities freed while their spawners
+## are still in the tree, before the tree goes (decision 299). A
+## MultiplayerSpawner tracks each node it spawned by a one-shot tree_exiting
+## connection; one that leaves the tree with nodes still tracked disconnects
+## each, and on the box (Linux; not on Windows) every such disconnect fails:
+## an ERROR an entity, some 60 on each exit, which stage.sh refuses. Freed
+## here, each entity's leaving untracks it first, and a spawner leaves with
+## nothing. The sim stops first, so nothing reaches for them after.
+func _release_zones() -> void:
+	if _released:
+		return
+	_save_state()
+	_released = true
+	World.set_process(false)
+	set_process(false)
+	for holder in $YSort/Entities.get_children():
+		for entity in holder.get_children():
+			entity.free()
 
 
 ## What a test reads at the end: the walk, where everything is, who holds what.
