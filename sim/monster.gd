@@ -629,13 +629,14 @@ func _alert_tick() -> void:
 	_search()
 
 
-## What a noise rouses it to: a fight (not through a wall), a door struck,
-## a shout, to hunt; the rest to look. A blow on itself from someone it
-## does not see, to hunt the one who struck it.
+## What a noise rouses it to: a fight (not through a wall), a door struck
+## or broken, something smashed, a shout, to hunt; the rest to look. A
+## blow on itself from someone it does not see, to hunt the one who struck
+## it.
 func _heard(noise: Dictionary) -> void:
 	var at: Vector2i = noise["at"]
 	var kind: StringName = noise["kind"]
-	var urgent: bool = (kind == &"fight" and not noise.get("muffled", false)) or kind in [&"door_struck", &"door_broken"] \
+	var urgent: bool = (kind == &"fight" and not noise.get("muffled", false)) or kind in [&"door_struck", &"door_broken", &"break"] \
 			or int(noise["radius"]) >= Senses.NOISE_SHOUT
 	var source: Variant = noise["source"]
 	if at == tile and kind == &"fight" and is_instance_valid(source) and source != self:

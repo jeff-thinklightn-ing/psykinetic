@@ -1023,7 +1023,8 @@ func try_toggle_door(entity: GridEntity, key: Vector3i) -> bool:
 	if door == null or door.is_broken() or entity.tile not in Terrain.edge_cells(key):
 		return false
 	if not door.open and door.lock != "" and not has_key(entity, door.lock):
-		return false  # Locked, and no key.
+		noise(entity.tile, Senses.NOISE_RATTLE, &"door_rattle", entity)
+		return false  # Locked, and no key: it rattles.
 	_set_door(door, not door.open, entity)
 	entity.next_move_tick = tick + entity.move_ticks
 	return true
@@ -1158,6 +1159,10 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	_slots_changed(from)
 	if to != from:
 		_slots_changed(to)
+	for side in [from, to]:
+		if side is Chest:
+			noise(side.tile, Senses.NOISE_RUMMAGE, &"rummage", by)
+			break
 	return true
 
 
@@ -1830,7 +1835,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	entity._world_set_facing(direction)
 	entity.protected = false  # Moving ends spawn grace.
 	if entity is Player or entity is Companion:
-		noise(entity.tile, Senses.NOISE_STEP, &"step", entity)
+		noise(entity.tile, Senses.step_radius(entity), &"step", entity)
 	return true
 
 
@@ -1901,6 +1906,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
 	if target.hp == 0:
+		if not target.is_creature():
+			noise(target.tile, Senses.NOISE_BREAK, &"break", source)  # A crate or a barrel smashed.
 		entity_died.emit(target, cause)
 		var spilt: Array[int] = []
 		if target is Cargo:

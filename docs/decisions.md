@@ -4208,3 +4208,19 @@ locks: a way through a locked door ends in a bump.
 What a door shows is Door.state(), one of Door.STATES, the names agreed
 with art-kit for door slots: "open", "closed", "locked", "broken", and
 "barred" (shut from one side) kept for later.
+
+## 271. Every sound the sim makes is a noise of a kind, and the sound plays as far as it carries
+
+The sound worktree plays a positional sound as far as its noise carries
+(Senses.NOISE_*, Chebyshev, half with no clear line, as World._hear): you
+hear it where a monster would. So the kinds are named once, in Senses:
+door_rattle 6 (a locked door tried, World.try_toggle_door), rummage 4 (a
+chest's things taken or put, try_transfer), break 8 (a breakable that is
+not a creature smashed, World.damage; a monster hunts it, as a fight),
+latch 3 and thud 2 / 4 (light, heavy) for the items to make when locks
+are worked and things dropped or land. A step carries by mass
+(Senses.step_radius: mass / 27, 2 to 4; a player's and a companion's 3,
+as before). Knockdowns, pain and deaths are a blow's "fight" already.
+Goblin chatter, bandaging and the alert bark make no noise: chatter heard
+would rouse a camp by itself; the bark becomes a call for help with the
+groups (step 4).

@@ -24,9 +24,14 @@ const NOTICE_ALWAYS := 1
 ## A cone of 120 degrees: the cosine of half of it.
 const CONE_COS := 0.5
 const HEARD_MAX := 8
-## How far (cells) each noise carries (World.noise): a step, words (in
-## capitals, a shout; /w, a whisper), a blow or a swing, a door opened or
-## shut, a door struck, a door broken.
+## How far (cells) each noise carries (World.noise), by kind: "step" (a
+## player's; others' by their mass, step_radius), "speech" (in capitals a
+## shout; /w, a whisper), "fight" (a blow or a swing), "door" (opened or
+## shut), "door_struck", "door_broken", "door_rattle" (a locked door
+## tried), "latch" (a lock or a bar worked), "thud" (something dropped or
+## landing, light or heavy), "rummage" (a chest's things taken or put),
+## "break" (a crate or a barrel smashed). The sound of each is played as
+## far as it carries (the sound worktree's slots name these kinds).
 const NOISE_STEP := 3
 const NOISE_SPEECH := 10
 const NOISE_SHOUT := 20
@@ -35,6 +40,17 @@ const NOISE_FIGHT := 5
 const NOISE_DOOR := 6
 const NOISE_DOOR_STRUCK := 10
 const NOISE_DOOR_BROKEN := 14
+const NOISE_RATTLE := 6
+const NOISE_LATCH := 3
+const NOISE_THUD_LIGHT := 2
+const NOISE_THUD_HEAVY := 4
+const NOISE_RUMMAGE := 4
+const NOISE_BREAK := 8
+## A step's noise by mass: NOISE_STEP for a player's (80), STEP_MASS a cell
+## of it, from STEP_RADIUS_MIN to STEP_RADIUS_MAX.
+const STEP_MASS := 27.0
+const STEP_RADIUS_MIN := 2
+const STEP_RADIUS_MAX := 4
 const MEMORY_TICKS := 600
 
 var agent: GridEntity
@@ -174,6 +190,12 @@ func last_seen(entity: GridEntity) -> Dictionary:
 		_seen.erase(id)
 		return {}
 	return seen
+
+
+## How far [param entity]'s steps carry: by its mass (a sneak's 2, a
+## player's 3, anything of 100 or more 4).
+static func step_radius(entity: GridEntity) -> int:
+	return clampi(roundi(entity.mass / STEP_MASS), STEP_RADIUS_MIN, STEP_RADIUS_MAX)
 
 
 ## How far [param line] carries said aloud: a shout when it has three

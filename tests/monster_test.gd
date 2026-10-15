@@ -857,6 +857,17 @@ func _test_noise_reach() -> void:
 	_check(Senses.speech_radius("HELP ME") == Senses.NOISE_SHOUT and Senses.speech_radius("Help me") == Senses.NOISE_SPEECH
 			and Senses.speech_radius("OK") == Senses.NOISE_SPEECH and Senses.speech_radius("WHO? 123!") == Senses.NOISE_SHOUT,
 			"capitals are a shout, a short word is not")
+	var sneak: GridEntity = EntityFactory.build(SPECS["s"].merged({"name": "S", "props": Level.MONSTER_TYPES["sneak"]}))
+	var player: GridEntity = EntityFactory.build(SPECS["P"].merged({"name": "P"}))
+	var heavy: GridEntity = EntityFactory.build(SPECS["c"].merged({"name": "C", "props": {"mass": 200.0}}))
+	_check(Senses.step_radius(player) == Senses.NOISE_STEP and Senses.step_radius(sneak) == 2 and Senses.step_radius(heavy) == 4,
+			"steps carry by mass: a player's 3, a sneak's 2, a heavy thing's 4")
+	for entity: GridEntity in [sneak, player, heavy]:
+		entity.free()
+	e = _build(["#########", "#b.c....#", "#########"])
+	near = e["b"][0]
+	World.damage(e["c"][0], 999, null, &"impact")
+	_check(not near.senses.heard.is_empty() and near.senses.heard.back()["kind"] == &"break", "a crate smashed is heard: break")
 
 
 func _test_hunt() -> void:
@@ -1117,14 +1128,16 @@ func _test_brute_breaks() -> void:
 func _test_locks() -> void:
 	print("\n== a locked door opens only for one with its key (World.key_check, the items') ==")
 	var rows := SPLIT.duplicate()
-	rows[3] = "#.....P......#"
+	rows[3] = "#...b.P......#"
 	var e := _build(rows, {}, _split_edges())
 	var player: Player = e["P"][0]
+	var listener: Monster = e["b"][0]
 	var door: Door = World.door_on(SPLIT_DOOR)
 	door.lock = "keep"
 	_check(door.state() == "locked", "shut with a lock: locked")
 	_check(not World.try_toggle_door(player, SPLIT_DOOR) and not World.try_move(player, Vector2i(1, 0)) and not door.open,
 			"no key: it will not open, by hand or walking into it")
+	_check(listener.senses.heard.back()["kind"] == &"door_rattle", "and the rattle is heard")
 	var was := World.key_check
 	World.key_check = func(entity: GridEntity, lock: String) -> bool: return entity == player and lock == "keep"
 	_check(World.try_toggle_door(player, SPLIT_DOOR) and door.open and door.state() == "open", "with the key it opens")
