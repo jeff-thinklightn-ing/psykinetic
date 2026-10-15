@@ -122,12 +122,20 @@ func _test_unseen_raid() -> void:
 	var carries: Dictionary = group.get("carries", {})
 	_check(int(carries.get("food", 0)) > 0 and carries.get("captives", []).has("dag"),
 		"it carries off food and Dag (%s)" % [carries])
+	var book := _towns.production.book()
+	var sword := book.mint("sword", "stocked")
+	book.place(sword, "raid:%s" % id)
+	if carries.has("items"):
+		carries["items"].append(sword)
 	for i in 60:
 		if not _groups.groups.has(id):
 			break
 		_tick()
 	var held: Array = _towns.captives(TOWN).map(func(captive: Dictionary) -> String: return str(captive.get("held_by", "")))
 	_check(not _groups.groups.has(id) and held.has(CAMP), "home, its captive held at the camp (%s)" % [held])
+	var events: Array = book.history(sword).get("events", [])
+	_check(book.at_of(sword) == "camp:" + CAMP and not events.is_empty() and events[-1]["kind"] == "carried home",
+		"and a sword it took is kept at the camp, its history saying so (decision 348; %s, %s)" % [book.at_of(sword), events.back() if not events.is_empty() else {}])
 
 
 func _test_handed_over() -> void:

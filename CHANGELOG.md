@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- What raiders carry off from a town is kept at their camp, not lost.
 - Your character no longer snaps when the server puts them somewhere else: they
   slide there quickly instead. A walk you start after being knocked back starts
   from where you are drawn, without a hop back first.

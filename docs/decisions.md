@@ -6670,3 +6670,19 @@ tiles: under the meter's 8-tile teleport, but meant) and a few 0.4-0.5
 tile frames of a fast blend; the camera (337) eases over those. Corrections
 a minute are much the same (2.2 / 13.5 / 33.5): it is how they are drawn
 that changed. Others' jumps are D's.
+
+## 348. Raid loot is kept: placed at the camp when a group gets home
+
+The last of decision 330's leftovers (the coordinator, 2026-10-15). What
+a raid takes from a town's store (Towns.raid: ItemBook uids, placed at
+"raid:<group>") travels with the group's carries, which are saved with
+the group (WorldRaids.to_dict), handed to World.raids in play and back.
+Two ends already placed them: beaten in play, they lie on the ground where
+the group fell (Raids._beaten, put_on_ground). The one that lost them was
+the world map's: a group home, or stopped on its way home by ground it
+cannot cross, ended with its uids still at "raid:<group>", a group that no
+longer exists. WorldRaids._stow now places each at its camp,
+"camp:<place>", with a "carried home" note in its history, before the
+group ends; a stopped group is taken to make its way home in the end. The
+camp's pile (what a camp holds, retaking it) is economy's to build on
+these. Protocol unchanged.

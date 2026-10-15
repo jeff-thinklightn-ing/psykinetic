@@ -279,6 +279,7 @@ func _arrive(id: String, last: Dictionary) -> void:
 		# Ground another holds is in the way and there is no way round.
 		print("[raids] %s is stopped by %s's ground: it turns back" % [id, last["meets"]])
 		if group["state"] == HOME:
+			_stow(id)  # It makes its way home in the end, what it took with it.
 			_end(id)
 		else:
 			group["state"] = HOME
@@ -289,6 +290,7 @@ func _arrive(id: String, last: Dictionary) -> void:
 		# entry here (Towns.carried_home, decision 331).
 		towns.carried_home(group["town"], id, group["faction"], group["carries"].get("captives", []), group["from"])
 		print("[raids] %s is home at %s with %s" % [id, group["from"], group["carries"]])
+		_stow(id)
 		_end(id)
 		return
 	# At a town nobody watches: by the numbers.
@@ -312,6 +314,19 @@ static func _carried(report: Dictionary, had: Dictionary) -> Dictionary:
 		if key != "items":
 			out[key] = report["took"][key]
 	return out
+
+
+## What group [param id] carried home (decision 348): each thing it took
+## (ItemBook uids, "raid:<id>" till now) is placed at its camp,
+## "camp:<place>", with a "carried home" note, so it outlives the group;
+## the camp's pile is economy's to build on.
+func _stow(id: String) -> void:
+	var group := groups[id]
+	var book := towns.production.book()
+	for uid: Variant in group["carries"].get("items", []):
+		if book.has(int(uid)):
+			book.place(int(uid), "camp:%s" % group["from"])
+			book.note(int(uid), "carried home", "by %s (%s) to %s" % [group["faction"], id, group["from"]])
 
 
 func _end(id: String) -> void:
