@@ -4122,3 +4122,41 @@ Rejected: renaming Kenney's files into slot folders (churn, and their
 SOURCES.txt already names each original), slots as a GDScript table
 (the tools, the status and the art side all read JSON), and silence for
 an empty slot (a missing sound goes unnoticed).
+
+## 266. Inside is a cell of a footprint: the roof goes, its shadow stays, the near side fades
+
+Whether a player is inside a building is asked by each client of its own
+local player and their companion only (the same two the near-fade is
+for, decision 188): inside is their cell being in a building's footprint
+(265). Nothing is sent: what one screen leaves out is how that screen
+draws, not a rule, so a player outside sees the roof over someone who is
+in. Client3D._update_roofs and _inside_walls run with the fade
+(_update_fade), from its focus points, footprint cells looked up in one
+table, so a map of many buildings costs one lookup a point.
+
+The roof. While they are inside, that building's "roof" part (art-kit's
+building.* slots, 263: its pivot at the eaves, on the walls' tops) draws
+only its shadow (SHADOWS_ONLY), so the room keeps the shade it had and
+does not jump into sunlight; it comes back FADE_HOLD after they leave, as
+a faded wall does, so stepping in and out of a doorway does not flicker
+it. From outside, a roof between the camera and the player is one more
+occluder and fades as a wall does.
+
+The near side. While they are inside, the building's outline edges whose
+outward side faces the camera (flat, by more than NEAR_SIDE, so in a
+diamond view the two sides toward it and not the two it looks along),
+with their runs, join what hides them (_hiding) and fade by 188's
+see-through material, whether or not the line to the camera meets them:
+in a corner of the room the wall beside the player hid them from the ray
+test's three heights. They follow the camera as it turns and are held
+FADE_HOLD as any faded wall. Faded, not cut away: Jeff's choice for now; a
+cutaway to a low stub may come later. A building's outline is drawn plain
+(terrain's Client3D._plain_walls, decision 252: level at WALL_HEIGHT,
+never broken), so the roof sits on it.
+
+Rejected: hiding by replicated state (who is inside where), which would
+send what only one screen needs; hiding the roof's node outright, which
+took its shadow with it and lit the inside as the open ground; hiding
+every roof while the player is inside any, which opens the whole town;
+and a second fade for buildings' walls beside 188's, which would fight it
+over the same materials.

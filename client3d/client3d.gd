@@ -278,6 +278,14 @@ const FADE_HEIGHTS: Array[float] = [0.3, 0.9, 1.5]
 ## How long a piece stays faded after it stops hiding them, so walking along
 ## a wall does not make it flicker.
 const FADE_HOLD := 0.4
+## A building (_add_buildings) stands this far above its ground, so its
+## inside floor clears it.
+const BUILDING_LIFT := 0.01
+## A building's side is near the camera, and fades while the player is
+## inside (_inside_walls), when its outward way and the camera's, flat,
+## agree more than this (the cosine): both sides toward the camera in a
+## diamond view, not the sides it looks along.
+const NEAR_SIDE := 0.2
 const FOREST_DEPTH := 3
 ## Monster kinds drawn as an animated model instead of a capsule: the scene
 ## (retargeted on import to SkeletonProfileHumanoid, its skeleton
@@ -631,6 +639,8 @@ var _wall_breaches: Array[Vector3i] = []
 ## broken nor breached (a building's walls, which a roof sits on); filled
 ## by whoever knows them before the room is built.
 var _plain_walls: Dictionary[Vector3i, bool] = {}
+## The edges in _plain_walls that are there for a building's outline.
+var _building_walls: Array[Vector3i] = []
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge).
 var _doorways: Dictionary[Vector3i, Node3D] = {}
@@ -713,6 +723,16 @@ var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
+## Each building drawn (_add_buildings): {rect: its footprint, node: the
+## slot's instance, roof: its "roof" part (null if it has none), off: the
+## roof hidden as the local player is inside}; which building each
+## footprint cell is in; the roofs off now and when each was last wanted off.
+var _buildings: Array[Dictionary] = []
+var _building_at: Dictionary[Vector2i, int] = {}
+var _roofs_off: Dictionary[int, float] = {}
+## For each wall and doorway edge, the pieces of its run (_wall_runs), as
+## the occluders were indexed.
+var _runs: Dictionary[Vector3i, Array] = {}
 ## Each GroundPile's heap of things (_show_piles), under the room.
 var _pile_nodes: Dictionary[GroundPile, Node3D] = {}
 var _pile_ring_mesh: Mesh
@@ -1715,6 +1735,10 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_ground_shades.clear()
 	_shade_all = true
 	_trees.clear()
+	_buildings.clear()
+	_building_at.clear()
+	_roofs_off.clear()
+	_runs.clear()
 	_water_bodies.clear()
 	_occluders.clear()
 	_occluders_built = false
@@ -1770,6 +1794,17 @@ func _build_room() -> void:
 	_room.name = "Room"
 	add_child(_room)
 	_stone_opaque = _stone(1.0)
+	# A building's walls are plain, level under its roof (decision 252):
+	# the last map's buildings' outlines out, this one's in, what else is
+	# in the set left as it is.
+	for key in _building_walls:
+		_plain_walls.erase(key)
+	_building_walls.clear()
+	for building: Dictionary in _terrain.get("buildings", []):
+		for key in Level.outline(building["rect"]):
+			if not _plain_walls.has(key):
+				_building_walls.append(key)
+				_plain_walls[key] = true
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
 	_land.clear()
@@ -1817,12 +1852,33 @@ func _build_room() -> void:
 			_add_post(vertex)
 	if _outdoor:
 		_add_forest()
+	_add_buildings()
 	# Every door's leaf set once; from then on those that change.
 	if not World.door_shown.is_connected(_on_door_shown):
 		World.door_shown.connect(_on_door_shown)
 	for door in World.get_doors():
 		_doors_due[door.key] = true
 	_show_piles()
+
+
+## The terrain's buildings (Level.buildings_from): art-kit's slot over each
+## footprint, its front (+Z) to the building's facing, standing on its
+## ground; the slot's "roof" part is what hides while the local player is
+## inside (_update_roofs). The walls are the map's own wall runs.
+func _add_buildings() -> void:
+	for building: Dictionary in _terrain.get("buildings", []):
+		var rect: Rect2i = building["rect"]
+		var slot := str(building["slot"])
+		var facing: Vector2i = building["facing"]
+		var node := ArtKit.instance(slot)
+		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+		node.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + BUILDING_LIFT, middle.y)
+		node.rotation.y = atan2(float(facing.x), float(facing.y))
+		_room.add_child(node)
+		var index := _buildings.size()
+		_buildings.append({"rect": rect, "node": node, "roof": node.get_node_or_null("roof"), "off": false})
+		for cell in Level.rect_cells(rect):
+			_building_at[cell] = index
 
 
 ## An edge between the land and the void: the map's outline.
@@ -3408,11 +3464,13 @@ func _update_fade(force := false) -> void:
 	if not _occluders_built:
 		_index_occluders()
 	var points := _focus_points()
+	var roofs_changed := _update_roofs(points)
 	var toward := _camera.global_transform.basis.z
 	var key := "%s %s %s" % [toward, _camera.global_position, points]
 	if key != _fade_key or force:
 		_fade_key = key
 		_hiding = _hiding_pieces(points, toward)
+		_hiding.merge(_inside_walls(points, toward))
 	for piece in _hiding:
 		_hid_at[piece] = _fade_clock
 	var now: Dictionary[Node3D, bool] = {}
@@ -3421,7 +3479,7 @@ func _update_fade(force := false) -> void:
 			now[piece] = true
 		else:
 			_hid_at.erase(piece)
-	if not force and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)):
+	if not force and not roofs_changed and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)):
 		return
 	for entry in _occluders:
 		var piece: Node3D = entry[0]
@@ -3430,6 +3488,71 @@ func _update_fade(force := false) -> void:
 			continue
 		_set_near(piece, fade)
 	_faded = now
+	# A roof off draws nothing but its shadow, so the inside stays shaded.
+	for building in _buildings:
+		var roof: Node3D = building["roof"]
+		if roof == null or not building["off"]:
+			continue
+		_set_near(roof, false)
+		for node in _descendants(roof):
+			if node is GeometryInstance3D:
+				node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+
+
+## The walls of the buildings [param points] are inside that face the
+## camera ([param toward]), each with its run: the near side of the room,
+## faded whether or not it hides them, so a player in a corner of it is
+## not hidden by the wall beside them. A side the camera looks along is
+## not near.
+func _inside_walls(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D, bool]:
+	var out: Dictionary[Node3D, bool] = {}
+	if _buildings.is_empty():
+		return out
+	var flat := Vector2(toward.x, toward.z).normalized()
+	var inside: Dictionary[int, bool] = {}
+	for point in points:
+		var at := to_local(point)
+		var cell := Vector2i(roundi(at.x), roundi(at.z))
+		if _building_at.has(cell):
+			inside[_building_at[cell]] = true
+	for index in inside:
+		var rect: Rect2i = _buildings[index]["rect"]
+		for key in Level.outline(rect):
+			if not _runs.has(key):
+				continue
+			var outward := Vector2(1, 0) if key.z == Terrain.EAST else Vector2(0, 1)
+			if (key.z == Terrain.EAST and key.x < rect.position.x) or (key.z == Terrain.SOUTH and key.y < rect.position.y):
+				outward = -outward
+			if outward.dot(flat) > NEAR_SIDE:
+				for piece: Node3D in _runs[key]:
+					out[piece] = true
+	return out
+
+
+## Which buildings' roofs are off: those the local player or their
+## companion ([param points]) is inside, and for FADE_HOLD after they
+## leave. A roof back on is set as the fade has it. Whether any changed.
+func _update_roofs(points: Array[Vector3]) -> bool:
+	if _buildings.is_empty():
+		return false
+	for point in points:
+		var at := to_local(point)
+		var cell := Vector2i(roundi(at.x), roundi(at.z))
+		if _building_at.has(cell):
+			_roofs_off[_building_at[cell]] = _fade_clock
+	var changed := false
+	for index in _buildings.size():
+		var off := _roofs_off.has(index) and _fade_clock - _roofs_off[index] <= FADE_HOLD
+		if not off:
+			_roofs_off.erase(index)
+		var building := _buildings[index]
+		if off == building["off"]:
+			continue
+		building["off"] = off
+		changed = true
+		if not off and building["roof"] != null:
+			_set_near(building["roof"], _faded.has(building["roof"]))
+	return changed
 
 
 ## The pieces the lines from the camera to [param points] pass through,
@@ -3468,6 +3591,7 @@ func _focus_points() -> Array[Vector3]:
 func _index_occluders() -> void:
 	_occluders.clear()
 	var runs := _wall_runs()
+	_runs = runs
 	# A run of wall is one node for all its edges (_add_wall_runs), but
 	# what hides the player is still asked edge by edge, by the edge's own
 	# bounds: a run's would reach far past the player either way.
@@ -3481,6 +3605,10 @@ func _index_occluders() -> void:
 		_occluders.append([post, _bounds(post), false, [post]])
 	for tree: Node3D in _trees.values():
 		_occluders.append([tree, _bounds(tree), true, [tree]])
+	# A roof between the camera and a player outside fades as a wall does.
+	for building in _buildings:
+		if building["roof"] != null:
+			_occluders.append([building["roof"], _bounds(building["roof"]), false, [building["roof"]]])
 	_occluders_built = true
 
 

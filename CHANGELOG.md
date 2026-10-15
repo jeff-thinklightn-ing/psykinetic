@@ -28,8 +28,13 @@ top section as the release notes.
   game is out but yours still plays, you're told so once.
 - Builder mode and the level editor can lay buildings: a hut, a house and a
   shed, each a walled room with a door, stamped whole and turned as you
-  like. They're grey stand-ins for now; roofs that lift away when you walk
-  inside come next.
+  like. They're grey stand-ins for now.
+- Buildings have roofs, and a building's roof lifts away while you or your
+  companion are inside it, so you see the room (its shade stays). It comes
+  back a moment after you step out, and the building's walls on the
+  camera's side go see-through while you're in. Seen from outside, a roof
+  that hides you fades like a wall. A building's walls are whole and level,
+  never ruined like the castle's.
 - A client and the server no longer need to be the very same build to
   play together: only what they send each other has to match. A release
   that changes only how the game looks no longer needs the server updated,

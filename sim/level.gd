@@ -31,7 +31,8 @@ extends RefCounted
 ## links, neighbours, places, buildings, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
 ## views take: floor, fire, edges (as Terrain.parse), and kinds (cell ->
 ## "stone" | "grass" | "dirt"), water, heights (cell -> 1..6; 0 is left
-## out), stairs (cell -> the direction it climbs), torches.
+## out), stairs (cell -> the direction it climbs), torches, buildings (as
+## level["buildings"], for the views).
 
 const DIR := "res://levels/"
 ## Levels edited in the running game (builder mode) are saved here, and a
@@ -365,6 +366,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	}
 	_place(level, markers, config, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
+	# The views draw them (roofs, inside floors) from the terrain they are given.
+	level["terrain"]["buildings"] = level["buildings"]
 	return level
 
 

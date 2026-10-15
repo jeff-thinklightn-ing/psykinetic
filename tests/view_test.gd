@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_water()
 	_test_wall_runs()
 	_test_scatter()
+	_test_buildings()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -335,6 +336,113 @@ func _test_wall_runs() -> void:
 	_check(faded != null and faded.albedo_color.a < 1.0 and faded.next_pass != null, "a near run is see-through, its depth drawn first")
 	_rig._set_near(run, false)
 	_check((body.material_override as BaseMaterial3D).albedo_color.a == 1.0, "and solid again after")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A grass field with a house (front south) at (2, 2) and a hut turned a
+## quarter (front west) at (9, 2), stamped from the kit prefabs: its terrain.
+func _building_terrain() -> Dictionary:
+	var map := LevelMap.new(Vector2i(16, 14))
+	for y in 14:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := {"outdoor": true}
+	for stamp: Array in [["building_house", Vector2i(2, 2), 0], ["building_hut", Vector2i(9, 2), 1]]:
+		var changes := Prefab.stamp_changes(Prefab.rotated(Prefab.load_prefab(stamp[0]), stamp[2]), map, stamp[1], config)
+		for cell: Vector2i in changes["cells"]:
+			map.set_cell(cell, changes["cells"][cell])
+		for key: Vector3i in changes["edges"]:
+			map.set_edge(key, changes["edges"][key])
+		config.merge(changes.get("config", {}), true)
+	return Level.parse(map.to_image(), null, config)["terrain"]
+
+
+func _roof_shadow_only(building: Dictionary) -> bool:
+	return _rig._descendants(building["roof"]).all(func(node: Node) -> bool:
+		return not node is GeometryInstance3D or node.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY)
+
+
+func _test_buildings() -> void:
+	print("
+== buildings: the slot's roof and floor over the footprint; the roof off, its shadow kept, while the player is inside ==")
+	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
+	var by_rect := {}
+	for building: Dictionary in _rig._buildings:
+		by_rect[building["rect"]] = building
+	var house: Dictionary = by_rect.get(Rect2i(3, 3, 4, 6), {})
+	var hut: Dictionary = by_rect.get(Rect2i(10, 3, 3, 3), {})
+	_check(_rig._buildings.size() == 2 and not house.is_empty() and not hut.is_empty(), "two buildings drawn (%s)" % [by_rect.keys()])
+	if house.is_empty() or hut.is_empty():
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var node: Node3D = house["node"]
+	_check(house["roof"] != null and node.get_node_or_null("floor") != null, "each has its roof and its inside floor")
+	_check(Level.BUILDINGS.keys().all(func(slot: String) -> bool:
+		var footprint: Array = ArtKit.spec(slot).get("footprint", [])
+		return footprint.size() == 2 and Vector2i(int(footprint[0]), int(footprint[1])) == Level.BUILDINGS[slot]),
+			"the sim's footprints are art-kit's slots' (Level.BUILDINGS)")
+	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return _rig._plain_walls.has(key)),
+			"its outline is drawn plain, level under its roof (decision 252)")
+	_check(node.position.is_equal_approx(Vector3(4.5, Client3D.BUILDING_LIFT, 5.5)) and is_equal_approx(node.rotation.y, 0.0),
+			"the house stands over the middle of its footprint, its front south (%s, %s)" % [node.position, node.rotation.y])
+	_check(is_equal_approx((hut["node"] as Node3D).rotation.y, -PI / 2.0), "the hut turned with its front west")
+	_check(is_equal_approx((house["roof"] as Node3D).global_position.y - node.global_position.y, Client3D.WALL_HEIGHT), "its roof on the walls' tops")
+	_check(_rig._occluders.any(func(entry: Array) -> bool: return entry[0] == house["roof"]), "a roof can fade as a wall does when it hides a player outside")
+	# The player inside, the companion far off: the house's roof is off.
+	_rig.set_process(false)
+	var player := _player()
+	var companion := _companion()
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var other: Node3D = _rig._puppets.get(companion.get_instance_id()) if companion != null else null
+	var was := puppet.global_position
+	var other_was := other.global_position if other != null else Vector3.ZERO
+	var outside := _rig.to_global(_rig._tile_position(Vector2i(14, 12)))
+	if other != null:
+		other.global_position = outside
+	puppet.global_position = outside
+	_rig._update_fade(true)
+	_check(not house["off"] and not hut["off"] and not _roof_shadow_only(house), "both outside: every roof on")
+	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(4, 6)))
+	_rig._update_fade()
+	_check(house["off"] and _roof_shadow_only(house), "the player inside the house: its roof draws only its shadow")
+	_check(not hut["off"] and not _roof_shadow_only(hut), "the hut's roof stays on")
+	# Its sides toward the camera fade, the others stay solid, at two yaws.
+	for turn in 2:
+		var toward := _rig._camera.global_transform.basis.z
+		var flat := Vector2(toward.x, toward.z).normalized()
+		var near := 0
+		var wrong := 0
+		for key in Level.outline(house["rect"]):
+			if not _rig._walls.has(key) and not _rig._doorways.has(key):
+				continue
+			var piece: Node3D = _rig._walls[key] if _rig._walls.has(key) else _rig._doorways[key].get_node(Client3D.DOOR_FRAME)
+			var outward := Vector2(1, 0) if key.z == Terrain.EAST else Vector2(0, 1)
+			if key.x < 4 and key.z == Terrain.EAST or key.y < 3 and key.z == Terrain.SOUTH:
+				outward = -outward
+			var faces := outward.dot(flat) > Client3D.NEAR_SIDE
+			near += 1 if faces else 0
+			if faces != _rig._faded.has(piece):
+				wrong += 1
+		_check(near > 0 and wrong == 0, "yaw %d: the house's %d outline edges toward the camera fade, the rest stay solid (%d wrong)" % [roundi(_rig.yaw), near, wrong])
+		# Turned: the sides that were near stay faded FADE_HOLD, as any wall.
+		_rig._set_yaw(_rig.yaw + 90.0)
+		_rig._fade_clock += Client3D.FADE_HOLD + 0.1
+		_rig._update_fade()
+	_rig._set_yaw(_rig.yaw - 180.0)
+	puppet.global_position = outside
+	_rig._fade_clock += Client3D.FADE_HOLD * 0.5
+	_rig._update_fade()
+	_check(house["off"], "stepped out: it stays off a moment")
+	_rig._fade_clock += Client3D.FADE_HOLD
+	_rig._update_fade()
+	_check(not house["off"] and not _roof_shadow_only(house), "and after %s s, it is back" % Client3D.FADE_HOLD)
+	if other != null:
+		other.global_position = _rig.to_global(_rig._tile_position(Vector2i(11, 4)))
+		_rig._update_fade()
+		_check(hut["off"] and not house["off"], "the companion inside the hut: its roof is off")
+		other.global_position = other_was
+	puppet.global_position = was
+	_rig.set_process(true)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
