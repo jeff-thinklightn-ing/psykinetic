@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_live_is_preview_only()
 	_test_palette_shared()
 	_test_scene_read()
+	_test_changed_told()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -407,6 +408,33 @@ func _test_scene_read() -> void:
 	_check(not found.is_empty() and (found[1] as Transform3D).is_equal_approx(place)
 			and read_bounds.position.is_equal_approx(made_bounds.position) and read_bounds.size.is_equal_approx(made_bounds.size),
 			"its leaf found at Frame/leaf where it stands (%s), and its bounds as made" % [found[1] if not found.is_empty() else "none"])
+
+
+func _test_changed_told() -> void:
+	print("
+== a slot's art changing is told: what drew from it (an item's icon) is drawn again ==")
+	var heard: Array[String] = []
+	var listener := func(slot: String) -> void: heard.append(slot)
+	ArtKit.on_changed(listener)
+	ArtKit.forget("prop.crate")
+	ArtKit.forget()
+	ArtKit.off_changed(listener)
+	ArtKit.forget("prop.chest")
+	_check(heard == ["prop.crate", ""], "told prop.crate, then every slot (\"\"), and nothing once off (%s)" % [heard])
+	# An item's icon, kept, goes when its slot's art changes; another's stays.
+	var icons := ItemIcons.new()
+	var ids: Array = Items.ids().filter(func(id: String) -> bool: return ItemIcons._slot(id) != "")
+	if ids.size() < 2:
+		icons.free()
+		return
+	var slot := ItemIcons._slot(ids[0])
+	var other: String = ids.filter(func(id: String) -> bool: return ItemIcons._slot(id) != slot).front()
+	icons._cache[ItemIcons._key(ids[0])] = ImageTexture.new()
+	icons._cache[ItemIcons._key(other)] = ImageTexture.new()
+	icons._art_changed(slot)
+	_check(not icons._cache.has(ItemIcons._key(ids[0])) and icons._cache.has(ItemIcons._key(other)),
+			"%s's art changed: %s's icon is drawn again, %s's kept" % [slot, ids[0], other])
+	icons.free()
 
 
 ## Only the preview reads art live: the game, its tools and the export

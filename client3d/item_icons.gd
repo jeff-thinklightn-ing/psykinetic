@@ -72,6 +72,7 @@ static func pose(size: Vector3) -> Basis:
 func _ready() -> void:
 	if not enabled:
 		return
+	ArtKit.on_changed(_art_changed)
 	_viewport = SubViewport.new()
 	_viewport.name = "Icons"
 	_viewport.size = Vector2i(SIZE, SIZE)
@@ -123,6 +124,20 @@ func forget(id := "") -> void:
 		return
 	_cache.erase(_key(id))
 	_cache.erase(_key(id, not ArtKit.show_placeholders))
+
+
+func _exit_tree() -> void:
+	ArtKit.off_changed(_art_changed)
+
+
+## A slot's art changed (ArtKit.forget): the icons drawn from it, again.
+func _art_changed(slot: String) -> void:
+	if slot.is_empty():
+		forget()
+		return
+	for id: String in Items.ids():
+		if _slot(id) == slot:
+			forget(id)
 
 
 func _process(_delta: float) -> void:

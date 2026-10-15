@@ -77,6 +77,10 @@ static var _recipes: Dictionary[String, Array] = {}
 static var _grey_recipes: Dictionary[String, Array] = {}
 static var _variants: Dictionary[String, int] = {}
 static var _greys: Dictionary[Color, StandardMaterial3D] = {}
+## Told the slot whose art changed ("" for every slot) each time forget
+## runs (a drop, the preview's reload): what keeps something drawn from a
+## slot, as ItemIcons' icons, draws it again (on_changed, off_changed).
+static var _listeners: Array[Callable] = []
 
 
 ## The manifest as read from MANIFEST, once, with the slots of every
@@ -204,12 +208,28 @@ static func forget(slot := "") -> void:
 		_recipes.clear()
 		_grey_recipes.clear()
 		_manifest = {}
-		return
-	for variant in range(1, variant_count(slot) + 2):
-		_scenes.erase(own_path(slot, variant))
-	_variants.erase(slot)
-	_recipes.erase(slot)
-	_grey_recipes.erase(slot)
+	else:
+		for variant in range(1, variant_count(slot) + 2):
+			_scenes.erase(own_path(slot, variant))
+		_variants.erase(slot)
+		_recipes.erase(slot)
+		_grey_recipes.erase(slot)
+	for listener in _listeners.duplicate():
+		if listener.is_valid():
+			listener.call(slot)
+		else:
+			_listeners.erase(listener)  # Its object is gone.
+
+
+## [param listener] is called with a slot each time its art changes, "" for
+## every slot (forget).
+static func on_changed(listener: Callable) -> void:
+	if listener not in _listeners:
+		_listeners.append(listener)
+
+
+static func off_changed(listener: Callable) -> void:
+	_listeners.erase(listener)
 
 
 ## How [param slot] is put together, worked out once: a recipe per variant
