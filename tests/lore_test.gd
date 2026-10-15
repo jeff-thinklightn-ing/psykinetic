@@ -4,7 +4,7 @@ extends Node
 ## knowledge level; an asked one names its question; relations, where and
 ## knowers name ids that exist; a rumour says whether it is true; ids shared
 ## with other files (factions, resources, place kinds, items, levels) are
-## theirs.
+## theirs, and every region has a climate.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -131,6 +131,14 @@ func _test_shared_ids() -> void:
 				if entry.has("item") and not Items.exists(entry["item"]):
 					bad.append(id)
 	_check(bad.is_empty(), "factions, resources, place kinds, levels and items named exist %s" % [bad])
+	# Environment owns levels/climates.json (keyed by region id); an asked region needs none yet.
+	var climates: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/climates.json"))
+	bad = []
+	for id in _entries:
+		if _entries[id]["type"] == "region" and _entries[id]["status"] != "asked" \
+				and not (climates is Dictionary and climates.has(id)):
+			bad.append(id)
+	_check(bad.is_empty(), "every region has a climate in levels/climates.json %s" % [bad])
 
 
 func _test_known_by_files() -> void:

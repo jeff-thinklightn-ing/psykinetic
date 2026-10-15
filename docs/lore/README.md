@@ -41,7 +41,9 @@ Each file is `{"_about": "...", "entries": [...]}`.
 - `id`: lower_snake_case and unique across all the lore files. These ids are shared
   with other files. A `faction` id is a key of `levels/factions.json` (maps owns that
   file: colour, monsters, hostile_to; lore adds no fields to it). A new faction stays
-  out of `agreed` until maps has added its key.
+  out of `agreed` until maps has added its key. A `region` id is what a level's
+  `region` names, and a key of `levels/climates.json` (environment owns it and its
+  weather numbers; a region that isn't `asked` needs a key there).
 - `type`: world, faction, people, region, place, material, person, weapon, event.
 - `status`: `agreed` (Jeff or Dire decided it, or it is already in the game),
   `draft` (written from what is decided but not yet confirmed), `asked` (an open
