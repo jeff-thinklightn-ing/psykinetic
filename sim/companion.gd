@@ -217,7 +217,7 @@ const VOICE_WORLD := """You walk the old stone places and the land around them: 
 by fires, and the open ground beyond. Monsters prowl there, imps and brutes and worse, and they attack whoever they
 see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
 Wounds close slowly when you rest away from danger.
-Whoever falls rises again after a while, but it hurts, and no one wants to fall.
+Whoever falls can be brought back, but it hurts, and no one wants to fall.
 Directions are spoken as north, south, east and west."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in one or two short sentences. However few
 your words, say them as whole sentences, never a single word or a bare name. Your words are only what you say aloud:
