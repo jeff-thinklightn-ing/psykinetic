@@ -98,14 +98,11 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 const ON_WATER: Array[String] = ["building.well"]
 ## A building's facing (the side its front is on) when level.json gives none.
 const BUILDING_FACING := Vector2i(0, 1)
-## What a marker spawns, before level.json's props for that tile.
-## Each kind fights its own way too (Monster.TACTICS): the brute plods and
+## What a marker spawns, before level.json's props for that tile: each
+## kind's body, from its row in levels/monsters.json (Monster.kinds), where
+## its tactics, idling, doors and temperaments are too: the brute plods and
 ## hits hard and seldom, the sneak is quick and frail.
-const MONSTER_TYPES := {
-	"imp": {"mass": 40.0},
-	"brute": {"mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
-	"sneak": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 8},
-}
+static var MONSTER_TYPES: Dictionary = Monster.bodies()
 ## A crate and a cart carry things (Cargo: 4 and 8); props {"slots": [...]}
 ## say what is in them, as a chest's. "art": the art slot the 3D view draws
 ## each of these as once the slot has art of its own (ArtKit; decision 264);

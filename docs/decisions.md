@@ -4840,3 +4840,52 @@ kind (Client3D.ZONE_LOOK), spread as the sim's values are: a room is dim
 but all of it shows, warm-grey, the fire a warm patch; a cave is cool
 moonlight, shapes with little colour, the fire the only warmth; a dungeon
 is near black past the fire and the lanterns.
+## 281. A monster's kind is a row of levels/monsters.json
+
+What a kind is was spread over four tables in code (Level.MONSTER_TYPES,
+Monster.TACTICS, IDLE_BY_KIND, DOOR_OPENERS and DOOR_FORCE). It is now one
+row of levels/monsters.json per kind: "body" (the props a marker of that
+kind spawns with: mass, hp, pace, blows), "tactic", "idle", "opens_doors",
+"door_force", "leash" and "temperament" (weights). Monster.kinds() reads it
+once, with a warning for a row or a field it cannot use (falling back to
+a monster of no kind's); JSON's whole numbers come back as ints, but for
+mass and move_ticks. Level.MONSTER_TYPES keeps its name and use (each
+kind's body; a level's own "monsters" still add to it), now a static var
+read from the table; sim/level.gd's only change. The editor asks
+Monster.idle_of(kind). Imp, brute and sneak are its first rows, as they
+were; the ranks of the lore draft (raiders, haulers, wardens...) would be
+more rows.
+
+## 282. Temperament: bold, cautious or cowardly, and a monster that breaks runs
+
+Each monster of a kind is BOLD, CAUTIOUS or COWARDLY (Monster.Temper): its
+level entry's "temperament", else drawn by its name from its kind's
+weights (an imp mostly cautious, a brute mostly bold and never cowardly,
+a sneak cautious or cowardly). Today's random boldness is drawn within
+its temperament's span (BOLDNESS), so holding back follows it: a bold one
+never does, a cautious one till one other is at its target, a coward till
+two. A bold one's leash is half as long again.
+
+It breaks below FLEE_BELOW of its hp (bold 15%, cautious 35%, cowardly
+60%), or, a coward, alone against two or more within 3 tiles; a new alert,
+FLEEING (shown " ~"; PROTOCOL_REVISION 10, as old clients would not know
+it): it strikes no one and runs, to where it took up the chase if that
+is away from the threat, else straight away (a capped search, the usual
+back-off), till nobody has been within 4 tiles for FLEE_TICKS (6 s); then
+a look about and back. Met again still hurt, it breaks again. The world
+tick calms a runner like a hunter.
+
+## 283. Calls for help and routs are noises its side hears
+
+A cautious or cowardly monster that first sees someone calls (World.noise
+"call", 12 tiles, at most every 10 s). Those of its side that hear it
+(Factions.of_kind; with no factions, every monster of a kind) hunt whom
+the caller fights: a real lead, so they open doors to it. Others only look.
+
+One that breaks of itself (hurt or outnumbered) makes a "rout" (8 tiles):
+of its side, a coward who hears it breaks, a cautious one under 70% of
+its hp breaks, a bold one fights on. One broken by a rout does not rout
+others again: routs echoing round a camp kept it breaking for ever. The
+rout is read by a monster even mid-fight (its newest noises, each think),
+where other noises are only heard with nobody in sight. Both are events:
+no cost per tick. The call is the sound worktree's alert bark.

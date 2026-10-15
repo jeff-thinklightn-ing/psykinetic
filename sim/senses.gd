@@ -30,7 +30,9 @@ const HEARD_MAX := 8
 ## shut), "door_struck", "door_broken", "door_rattle" (a locked door
 ## tried), "latch" (a lock or a bar worked), "thud" (something dropped or
 ## landing, light or heavy), "rummage" (a chest's things taken or put),
-## "break" (a crate or a barrel smashed). The sound of each is played as
+## "break" (a crate or a barrel smashed), "call" (a monster calling its
+## side for help), "rout" (a monster breaking and running). The sound of
+## each is played as
 ## far as it carries (the sound worktree's slots name these kinds).
 const NOISE_STEP := 3
 const NOISE_SPEECH := 10
@@ -46,6 +48,8 @@ const NOISE_THUD_LIGHT := 2
 const NOISE_THUD_HEAVY := 4
 const NOISE_RUMMAGE := 4
 const NOISE_BREAK := 8
+const NOISE_CALL := 12
+const NOISE_ROUT := 8
 ## A step's noise by mass: NOISE_STEP for a player's (80), STEP_MASS a cell
 ## of it, from STEP_RADIUS_MIN to STEP_RADIUS_MAX.
 const STEP_MASS := 27.0
@@ -59,6 +63,9 @@ var sight_range := 7
 var cone_cos := CONE_COS
 ## {at, radius, kind, source, tick}, oldest first.
 var heard: Array[Dictionary] = []
+## When it last heard anything (World.tick; -1 never): a number to compare
+## each think, where looking at what it heard is not.
+var last_tick := -1
 ## Instance id -> {at, tick}.
 var _seen: Dictionary[int, Dictionary] = {}
 
@@ -158,6 +165,7 @@ func hear(at: Vector2i, radius: int, kind: StringName, source: GridEntity, muffl
 	if heard.size() >= HEARD_MAX:
 		heard.pop_front()
 	heard.append({"at": at, "radius": radius, "kind": kind, "source": source, "tick": World.tick, "muffled": muffled})
+	last_tick = World.tick
 
 
 ## The noises heard after [param tick], oldest first: {at, radius, kind,
@@ -178,6 +186,7 @@ func heard_since(tick: int) -> Array[Dictionary]:
 ## Lets go of all it saw and heard (a new zone, a rebuilt one).
 func forget() -> void:
 	heard.clear()
+	last_tick = -1
 	_seen.clear()
 
 

@@ -65,7 +65,7 @@ const POINT := Color(1.0, 0.55, 0.15, 0.9)
 const SELECTED := Color(0.3, 1.0, 0.5, 0.95)
 const AREA := Color(0.45, 0.8, 1.0, 0.9)
 const NOWHERE := Vector2i(-1, -1)
-## The idle modes the panel offers; "" is the kind's own (Monster.IDLE_BY_KIND).
+## The idle modes the panel offers; "" is the kind's own (Monster.idle_of).
 const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", "none"]
 
 ## Palette order: what the number keys pick, ten to a row.
@@ -723,7 +723,7 @@ func set_wander_radius(radius: int) -> void:
 ## The idle mode the selected monster's kind has of its own, by name.
 func kind_mode(at: Vector2i) -> String:
 	var kind := map.cell(at).trim_prefix("monster_")
-	var mode: int = Monster.IDLE_BY_KIND.get(kind, Monster.Idle.NONE)
+	var mode: int = Monster.idle_of(kind)
 	return str(Monster.IDLE_MODES.find_key(mode))
 
 

@@ -143,7 +143,8 @@ signal join_rejected(reason: String, server_version: String)
 ## 8: crates and carts are Cargo, their slots replicated (decision 259).
 ## 9: the "sky" message, the world clock; the sim's light outdoors follows
 ## the hour on every peer (decisions 290, 291).
-const PROTOCOL_REVISION := 9
+## 10: a monster's alert can be FLEEING (decision 282).
+const PROTOCOL_REVISION := 10
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

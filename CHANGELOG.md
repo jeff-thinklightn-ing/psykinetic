@@ -6,6 +6,15 @@ top section as the release notes.
 
 ## Unreleased
 
+- Monsters have tempers. Bold ones fight to the end and chase you farther;
+  cautious ones hang back until a friend is at you and call for help when
+  they spot you; cowards call, hang back longer and run early. A badly hurt
+  monster breaks and runs ("~" over its name), and its running can set
+  off the cowards and the wounded around it, while the bold ones fight on.
+- Monsters that hear a call for help come after whoever the caller is
+  fighting, opening doors to get there.
+- Changes what the server sends (a monster can now be running): the server
+  must be updated with this release.
 - A town's buildings show their state: after a raid a damaged forge, inn or
   kitchen has a caved-in roof, and it stands whole again once the carpenter
   has repaired it. Its inside still works. Needs the server updated.

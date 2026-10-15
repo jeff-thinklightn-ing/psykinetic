@@ -4,7 +4,8 @@ extends GridEntity
 ## Attacks if that player is in melee reach, otherwise walks toward them.
 ##
 ## A monster of a kind (its level marker's, spawn_spec "kind") fights as
-## that kind does (TACTICS), in a manner of its own (_temper, from its name):
+## that kind does (its row in levels/monsters.json: kinds), in a manner of
+## its own (_temper, from its name) and a temperament (Temper):
 ## it makes for a tile beside its target that no other monster is making
 ## for, so a pack surrounds rather than queues (_pick_slot).
 ##
@@ -48,7 +49,31 @@ const SHADE_DARK := Color(0.33, 0.04, 0.08)
 ##   (FLANK_PATIENCE_TICKS from the front at most); from behind, its blow
 ##   does BACKSTAB_DAMAGE more.
 enum Tactic { PLAIN, DART, HEAVY, FLANK }
-const TACTICS := {"imp": Tactic.DART, "brute": Tactic.HEAVY, "sneak": Tactic.FLANK}
+const TACTIC_NAMES := {"plain": Tactic.PLAIN, "dart": Tactic.DART, "heavy": Tactic.HEAVY, "flank": Tactic.FLANK}
+## Each kind's body, tactic, idling, doors, leash and temperaments (kinds).
+const KINDS_PATH := "res://levels/monsters.json"
+const FLOAT_PROPS: Array[String] = ["mass", "move_ticks"]
+## BOLD: never holds back, a longer leash (BOLD_LEASH), breaks only when
+## nearly dead. CAUTIOUS: holds back till another is at its target, calls
+## for help when it first sees someone. COWARDLY: calls for help, holds
+## back till two others are at its target, breaks early, or alone against
+## two or more (COWARD_ODDS_TILES). Each breaks below FLEE_BELOW of its hp;
+## its boldness (holding back) is drawn within BOLDNESS.
+enum Temper { BOLD, CAUTIOUS, COWARDLY }
+const TEMPER_NAMES := {"bold": Temper.BOLD, "cautious": Temper.CAUTIOUS, "cowardly": Temper.COWARDLY}
+const BOLDNESS := {Temper.BOLD: Vector2(0.6, 1.0), Temper.CAUTIOUS: Vector2(0.1, 0.29), Temper.COWARDLY: Vector2(0.0, 0.09)}
+const FLEE_BELOW := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
+const BOLD_LEASH := 1.5
+const COWARD_ODDS_TILES := 3
+## Fleeing (Alert.FLEEING): it runs FLEE_TILES at most at a time, and
+## recovers after FLEE_TICKS with nobody within FLEE_NEAR_TILES.
+const FLEE_TICKS := 60
+const FLEE_TILES := 6
+const FLEE_NEAR_TILES := 4
+## A call for help (Senses.NOISE_CALL) at most so often; a rout
+## (Senses.NOISE_ROUT) breaks a cautious one under ROUT_HURT of its hp.
+const CALL_EVERY_TICKS := 100
+const ROUT_HURT := 0.7
 const DART_AFTER_TICKS := 3
 const CHARGE_RANGE := 4
 const CHARGE_PACE := 0.5
@@ -91,8 +116,9 @@ const LISTEN_STALE_TICKS := 20
 ## How alert it is (shown over its head): IDLE, as it idles; SUSPICIOUS, a
 ## noise or a glimpse to look into, at its idle pace; HUNTING, a target
 ## lost from sight or a fight heard, at its chase pace; FIGHTING, a target
-## in sight. A monster of no kind only idles and fights.
-enum Alert { IDLE, SUSPICIOUS, HUNTING, FIGHTING }
+## in sight; FLEEING, broken and running (_flee). A monster of no kind only
+## idles and fights.
+enum Alert { IDLE, SUSPICIOUS, HUNTING, FIGHTING, FLEEING }
 ## So long (ticks) since the last thing that roused it before it gives up.
 const SUSPICIOUS_TICKS := 100
 const HUNT_TICKS := 150
@@ -108,15 +134,16 @@ const HUNT_ON_TILES := 2
 ## comes within LEASH / 2 of there or strikes it.
 const LEASH := 20
 const GIVE_UP_TICKS := 100
-## Doors: the kinds that open them (the rest, the brute, break them, DOOR_FORCE
-## times their blow on a door; a level entry's "opens_doors" says otherwise).
+## Doors: the kinds that open them (kinds' "opens_doors"; the rest, the
+## brute, break them, "door_force" times their blow on a door; a level
+## entry's "opens_doors" says otherwise).
 ## Looking or hunting, it opens a closed door only with a reason beyond it,
 ## heard or seen there no longer than DOOR_FRESH_TICKS ago (opens_doors_now):
 ## a shut door and quiet behind it, you can hide.
-const DOOR_OPENERS: Array[String] = ["imp", "sneak"]
-const DOOR_FORCE := {Tactic.HEAVY: 3}
 const DOOR_FRESH_TICKS := 40
 const NO_DOOR := Vector3i(-9999, -9999, 0)
+## _door_on_way's answer is kept so long (ticks) for the same goal.
+const DOOR_WAY_TICKS := 20
 ## With no way to its target at all (a crowd round it), it looks for one
 ## again only after this many ticks: a crowd does not open in a tick.
 const CHASE_RETRY_TICKS := 5
@@ -126,7 +153,6 @@ const CHASE_RETRY_TICKS := 5
 enum Idle { NONE, GUARD, WANDER, PATROL, GATHER }
 const IDLE_MODES := {"none": Idle.NONE, "guard": Idle.GUARD, "wander": Idle.WANDER, "patrol": Idle.PATROL,
 	"gather": Idle.GATHER}
-const IDLE_BY_KIND := {"imp": Idle.WANDER, "brute": Idle.GUARD, "sneak": Idle.PATROL}
 ## Idling it walks this much slower than it chases (its step time times this).
 const IDLE_PACE := 1.6
 ## GUARD: a glance aside every so often (ticks), up to GLANCE_STEPS_MAX
@@ -236,10 +262,24 @@ var _glimpsed := NO_TILE
 ## when it last heard or saw something real for its lead; the door it is
 ## breaking (NO_DOOR: none).
 var opens_doors := true
+var door_force := 1
+## Its temperament, and how far from where it took up a chase it gives up
+## (its kind's "leash", longer if bold).
+var temper := Temper.CAUTIOUS
+var leash := LEASH
+## Fleeing from; when it last called for help; the newest noise it has
+## looked at for a rout.
+var _flee_from := NO_TILE
+var _called_tick := -100000
+var _rout_tick := -1
+## kinds(), read once.
+static var _kinds := {}
 var _lead_guess := false
 var _lead_seen := NO_TILE
 var _evidence_tick := -1
 var _bash_key := NO_DOOR
+## _door_on_way's last answer: {to, from, tick, door}.
+var _door_way := {}
 var _glancing := false
 var _route_index := 0
 var _route_step := 1
@@ -293,9 +333,12 @@ func _ready() -> void:
 		_temper()
 		_settle_idle()
 		var kind := str(spawn_spec.get("kind", ""))
-		_wary = TACTICS.has(kind)
+		_wary = kinds().has(kind)
+		var row: Dictionary = kinds().get(kind, {})
 		var opens: Variant = spawn_spec.get("opens_doors")
-		opens_doors = bool(opens) if opens != null else not _wary or kind in DOOR_OPENERS
+		opens_doors = bool(opens) if opens != null else bool(row.get("opens_doors", true))
+		door_force = int(row.get("door_force", 1))
+		leash = roundi(int(row.get("leash", LEASH)) * (BOLD_LEASH if temper == Temper.BOLD else 1.0))
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 
 
@@ -311,7 +354,7 @@ func _settle_idle() -> void:
 	facing = home_facing
 	var given: Dictionary = spawn_spec.get("idle", {})
 	var mode := str(given.get("mode", ""))
-	idle = IDLE_MODES[mode] if IDLE_MODES.has(mode) else IDLE_BY_KIND.get(str(spawn_spec.get("kind", "")), Idle.NONE)
+	idle = IDLE_MODES[mode] if IDLE_MODES.has(mode) else idle_of(str(spawn_spec.get("kind", "")))
 	route.assign(given.get("route", []))
 	route_loop = bool(given.get("loop", true))
 	var point: Variant = given.get("point")
@@ -326,9 +369,9 @@ func _settle_idle() -> void:
 func _temper() -> void:
 	var kind := str(spawn_spec.get("kind", ""))
 	_pace = move_ticks
-	if not TACTICS.has(kind):
+	if not kinds().has(kind):
 		return
-	tactic = TACTICS[kind]
+	tactic = kinds()[kind]["tactic"]
 	_rng.seed = hash(String(name))
 	_pace = move_ticks * (1.0 + _rng.randf_range(-PACE_SPREAD, PACE_SPREAD))
 	move_ticks = _pace
@@ -336,9 +379,15 @@ func _temper() -> void:
 	reaction_ticks = _rng.randi_range(0, REACTION_TICKS_MAX)
 	boldness = _rng.randf()
 	pause_chance = _rng.randf_range(0.0, PAUSE_CHANCE_MAX)
+	_settle_temper(kind)
 
 
 func _sim_tick() -> void:
+	if alert == Alert.FLEEING:
+		_flee_tick()
+		return
+	if _wary and senses.last_tick > _rout_tick and _heard_rout():
+		return
 	var seen := _nearest_visible_target()
 	if seen != null and _wary and _beyond_leash():
 		_give_up(seen)
@@ -366,6 +415,7 @@ func _sim_tick() -> void:
 		_windup = {}
 		_alert_tick()
 		return
+	var took_up := alert != Alert.FIGHTING
 	if alert == Alert.IDLE:
 		_post = tile
 	alert = Alert.FIGHTING
@@ -373,6 +423,12 @@ func _sim_tick() -> void:
 	if target.tile != _quarry_at:
 		_quarry_from = _quarry_at
 		_quarry_at = target.tile
+	if _wary:
+		if took_up and temper != Temper.BOLD:
+			_call_for_help()
+		if _should_flee():
+			_flee(target.tile)
+			return
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
 			World.try_attack(self, target)
@@ -409,7 +465,8 @@ func _sim_tick() -> void:
 		return  # Out of reach, cooling down.
 	if World.tick < next_move_tick:
 		return
-	if boldness < HOLD_BACK_BELOW and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset():
+	if boldness < HOLD_BACK_BELOW and World.distance(tile, target.tile) <= HOLD_BACK_RANGE \
+			and not _target_beset(2 if temper == Temper.COWARDLY else 1):
 		return  # Waits for the others.
 	if _rng.randf() < pause_chance:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
@@ -529,13 +586,18 @@ func _in_front() -> bool:
 	return Vector2(tile - target.tile).normalized().dot(Vector2(target.facing).normalized()) > 0.5
 
 
-## Someone is already at its target, or its target is under half its hp.
-func _target_beset() -> bool:
+## [param need] others already at its target, or its target under half its hp.
+func _target_beset(need := 1) -> bool:
 	if target.max_hp > 0 and target.hp * 2 < target.max_hp:
 		return true
-	for entity in World.monsters():
-		if entity != self and entity is Monster and World.are_adjacent(entity.tile, target.tile):
-			return true
+	var at := 0
+	for direction in World.DIRECTIONS:
+		# The cells round it, not every monster (perf: most hold back now).
+		var other := World.get_entity_at(target.tile + direction)
+		if other != null and other != self and other is Monster and World.are_adjacent(other.tile, target.tile):
+			at += 1
+			if at >= need:
+				return true
 	return false
 
 
@@ -639,6 +701,14 @@ func _heard(noise: Dictionary) -> void:
 	var urgent: bool = (kind == &"fight" and not noise.get("muffled", false)) or kind in [&"door_struck", &"door_broken", &"break"] \
 			or int(noise["radius"]) >= Senses.NOISE_SHOUT
 	var source: Variant = noise["source"]
+	if kind == &"rout":
+		return  # Its side breaking: _heard_rout.
+	if kind == &"call" and source is Monster and _same_side(source):
+		# Its side calling for help: after whom they fight.
+		var caller := source as Monster
+		_listening_until = -1
+		_follow(caller.target.tile if is_instance_valid(caller.target) else caller.tile, Alert.HUNTING, HUNT_TICKS)
+		return
 	if at == tile and kind == &"fight" and is_instance_valid(source) and source != self:
 		var striker := source as GridEntity
 		_given_up.erase(striker.get_instance_id())
@@ -707,7 +777,8 @@ func _search() -> void:
 			_lead = _lead_seen  # No way on: where it saw them, then.
 			_lead_guess = false
 			return
-		var door := _door_on_way(_lead)
+		# A way that failed with doors open has no door to blame.
+		var door := {} if opens_doors_now() else _door_on_way(_lead)
 		if not door.is_empty():
 			# A closed door it will not open now: it breaks it (one that
 			# cannot open doors, with a reason), else it goes to the door
@@ -749,6 +820,17 @@ func _has_reason() -> bool:
 ## The first closed door on its way to [param to] were doors open, and the
 ## tile before it ({key, near}); {} for none (the same capped search).
 func _door_on_way(to: Vector2i) -> Dictionary:
+	# The answer kept a while for the same goal from the same tile (perf: a
+	# search of IDLE_SEARCH_TILES each time it was asked).
+	if _door_way.get("to") == to and _door_way.get("from") == tile \
+			and World.tick - int(_door_way.get("tick", -100000)) < DOOR_WAY_TICKS:
+		return _door_way["door"]
+	var found := _first_door_on_way(to)
+	_door_way = {"to": to, "from": tile, "tick": World.tick, "door": found}
+	return found
+
+
+func _first_door_on_way(to: Vector2i) -> Dictionary:
 	var path := World.find_path(tile, to, true, null, IDLE_SEARCH_TILES)  # Someone may stand there.
 	var at := tile
 	for next in path:
@@ -774,7 +856,7 @@ func _bash() -> bool:
 		return false
 	var sides := Terrain.edge_cells(_bash_key)
 	if tile in sides:
-		World.try_bash_door(self, _bash_key, attack_damage * int(DOOR_FORCE.get(tactic, 1)))
+		World.try_bash_door(self, _bash_key, attack_damage * door_force)
 		return true
 	var near: Vector2i = sides[0] if World.distance(tile, sides[0]) <= World.distance(tile, sides[1]) else sides[1]
 	if not _idle_step(near):
@@ -785,7 +867,7 @@ func _bash() -> bool:
 
 ## More than LEASH from where it took up the chase.
 func _beyond_leash() -> bool:
-	return _post != NO_TILE and World.distance(tile, _post) > LEASH
+	return _post != NO_TILE and World.distance(tile, _post) > leash
 
 
 ## Lets [param who] be for GIVE_UP_TICKS (null: nobody in particular), and
@@ -805,13 +887,13 @@ func _letting_be(entity: GridEntity) -> bool:
 	if until < World.tick:
 		_given_up.erase(id)
 		return false
-	return _post == NO_TILE or World.distance(entity.tile, _post) > LEASH / 2
+	return _post == NO_TILE or World.distance(entity.tile, _post) > leash / 2
 
 
 ## Back to IDLE: a monster that was looking or hunting goes back to where it
 ## idles (the world tick's walk, when far).
 func _calm() -> void:
-	if alert == Alert.SUSPICIOUS or alert == Alert.HUNTING:
+	if alert == Alert.SUSPICIOUS or alert == Alert.HUNTING or alert == Alert.FLEEING:
 		_returning = idle != Idle.NONE
 		_idle_goal = NO_TILE
 	alert = Alert.IDLE
@@ -819,6 +901,216 @@ func _calm() -> void:
 	_lead_guess = false
 	_quarry = null
 	_bash_key = NO_DOOR
+
+
+# --- Kinds (levels/monsters.json) ---------------------------------------------------
+
+## Every kind's row in KINDS_PATH, read once: kind -> {body, tactic (Tactic),
+## idle (Idle), opens_doors, door_force, leash, temperament (Temper ->
+## weight)}. A row that will not read is left out, with a warning; a field
+## missing or wrong falls back to a monster of no kind's.
+static func kinds() -> Dictionary:
+	if _kinds.is_empty():
+		_kinds = read_kinds(KINDS_PATH)
+	return _kinds
+
+
+## The kinds in [param path] (see kinds).
+static func read_kinds(path: String) -> Dictionary:
+	var out := {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+	if not parsed is Dictionary:
+		push_warning("[monsters] %s is missing or not a JSON object: no kinds" % path)
+		return out
+	for kind: String in parsed:
+		var row: Variant = parsed[kind]
+		if not row is Dictionary:
+			push_warning("[monsters] %s: %s is not a kind" % [path, kind])
+			continue
+		var body: Variant = row.get("body", {})
+		var tactic_name := str(row.get("tactic", "plain"))
+		var idle_name := str(row.get("idle", "none"))
+		if not TACTIC_NAMES.has(tactic_name):
+			push_warning("[monsters] %s: %s's tactic %s is none of %s" % [path, kind, tactic_name, TACTIC_NAMES.keys()])
+		if not IDLE_MODES.has(idle_name):
+			push_warning("[monsters] %s: %s's idle %s is none of %s" % [path, kind, idle_name, IDLE_MODES.keys()])
+		var weights := {}
+		var given: Variant = row.get("temperament", {})
+		for temper_name: String in TEMPER_NAMES:
+			weights[TEMPER_NAMES[temper_name]] = maxf(0.0, float(given.get(temper_name, 0)) if given is Dictionary else 0.0)
+		var props := {}
+		if body is Dictionary:
+			for key: String in body:
+				# JSON's numbers are floats: a whole one is an int, as the
+				# props were, but for those that are floats (FLOAT_PROPS).
+				var value: Variant = body[key]
+				props[key] = int(value) if value is float and value == floorf(value) and key not in FLOAT_PROPS else value
+		out[kind] = {"body": props, "tactic": TACTIC_NAMES.get(tactic_name, Tactic.PLAIN),
+			"idle": IDLE_MODES.get(idle_name, Idle.NONE), "opens_doors": bool(row.get("opens_doors", true)),
+			"door_force": int(row.get("door_force", 1)), "leash": int(row.get("leash", LEASH)), "temperament": weights}
+	return out
+
+
+## Each kind's body (mass, hp, pace, blows): what Level.MONSTER_TYPES gives a
+## marker of that kind.
+static func bodies() -> Dictionary:
+	var out := {}
+	for kind: String in kinds():
+		out[kind] = (kinds()[kind]["body"] as Dictionary).duplicate()
+	return out
+
+
+## How a monster of [param kind] idles when its level entry does not say.
+static func idle_of(kind: String) -> Idle:
+	return kinds()[kind]["idle"] if kinds().has(kind) else Idle.NONE
+
+
+## Its temperament: its level entry's ("temperament"), else one of its
+## kind's by their weights, drawn by its name (the same every time).
+func _settle_temper(kind: String) -> void:
+	var given := str(spawn_spec.get("temperament", ""))
+	if TEMPER_NAMES.has(given):
+		temper = TEMPER_NAMES[given]
+	else:
+		var weights: Dictionary = kinds()[kind]["temperament"]
+		var total := 0.0
+		for w: float in weights.values():
+			total += w
+		var draw := RandomNumberGenerator.new()
+		draw.seed = hash(String(name) + "/temper")
+		var pick := draw.randf() * total
+		temper = Temper.CAUTIOUS
+		for t: Temper in [Temper.BOLD, Temper.CAUTIOUS, Temper.COWARDLY]:
+			pick -= float(weights.get(t, 0.0))
+			if pick < 0.0 and float(weights.get(t, 0.0)) > 0.0:
+				temper = t
+				break
+	# Its boldness (holding back, _target_beset) within its temperament's span.
+	var span: Vector2 = BOLDNESS[temper]
+	boldness = lerpf(span.x, span.y, boldness)
+
+
+# --- Fleeing, calls and routs -------------------------------------------------------
+
+## Fighting: whether it breaks and runs (FLEE_BELOW of its hp, or a coward
+## alone against two or more near).
+func _should_flee() -> bool:
+	if max_hp > 0 and hp < max_hp * float(FLEE_BELOW[temper]):
+		return true
+	if temper != Temper.COWARDLY:
+		return false
+	var foes := 0
+	for entity in World.sought():
+		if World.distance(tile, entity.tile) <= COWARD_ODDS_TILES:
+			foes += 1
+	if foes < 2:
+		return false
+	for dy in range(-COWARD_ODDS_TILES, COWARD_ODDS_TILES + 1):
+		for dx in range(-COWARD_ODDS_TILES, COWARD_ODDS_TILES + 1):
+			var other := World.get_entity_at(tile + Vector2i(dx, dy))
+			if other != null and other != self and other is Monster:
+				return false  # Not alone.
+	return true
+
+
+## It breaks: away from [param threat] for FLEE_TICKS (more while the threat
+## is near); one that breaks of itself ([param routs]: hurt, outnumbered,
+## not routed) is a rout to those of its side who hear it, who may break
+## too. A routed one does not rout others again, or a rout would echo.
+func _flee(threat: Vector2i, routs := true) -> void:
+	if alert == Alert.IDLE:
+		_post = tile
+	alert = Alert.FLEEING
+	_flee_from = threat
+	_alert_until = World.tick + FLEE_TICKS
+	target = null
+	slot = NO_TILE
+	_windup = {}
+	_bash_key = NO_DOOR
+	_lead = NO_TILE
+	move_ticks = _pace
+	if routs:
+		World.noise(tile, Senses.NOISE_ROUT, &"rout", self)
+
+
+## FLEEING: a step away from what it runs from, toward its post if that is
+## away from it; recovering (SUSPICIOUS, then back) once nobody has been
+## near for FLEE_TICKS.
+func _flee_tick() -> void:
+	for entity in World.sought():
+		if World.distance(tile, entity.tile) <= FLEE_NEAR_TILES:
+			_alert_until = World.tick + FLEE_TICKS
+			_flee_from = entity.tile
+			break
+	if World.tick >= _alert_until:
+		alert = Alert.SUSPICIOUS
+		_follow(tile, Alert.SUSPICIOUS, SUSPICIOUS_TICKS / 2)  # A look about, then back.
+		return
+	if World.is_stunned(self) or World.tick < next_move_tick:
+		return
+	var goal := _flee_goal()
+	if goal == NO_TILE or goal == tile or not _idle_step(goal):
+		next_move_tick = World.tick + CHASE_RETRY_TICKS  # Cornered: a moment, then again.
+
+
+## Where it runs to: its post if that is farther from the threat than it
+## is, else the farthest walkable tile of a few straight away from it.
+func _flee_goal() -> Vector2i:
+	if _post != NO_TILE and _post != tile \
+			and World.distance(_post, _flee_from) > World.distance(tile, _flee_from) + 1:
+		return _post
+	var away := Vector2i(signi(tile.x - _flee_from.x), signi(tile.y - _flee_from.y))
+	if away == Vector2i.ZERO:
+		away = -facing
+	for n in range(FLEE_TILES, 0, -1):
+		for way: Vector2i in [away, Vector2i(away.x, 0), Vector2i(0, away.y)]:
+			var at := tile + way * n
+			if way != Vector2i.ZERO and World.is_walkable(at) and World.is_free(at):
+				return at
+	return NO_TILE
+
+
+## A call for help, at most every CALL_EVERY_TICKS: those of its side who
+## hear it come after its target.
+func _call_for_help() -> void:
+	if World.tick - _called_tick < CALL_EVERY_TICKS:
+		return
+	_called_tick = World.tick
+	World.noise(tile, Senses.NOISE_CALL, &"call", self)
+
+
+## Whether [param other] is of its side (Factions.of_kind; with no factions,
+## every monster of a kind is).
+func _same_side(other: GridEntity) -> bool:
+	if not other is Monster or not (other as Monster)._wary:
+		return false
+	var mine := str(spawn_spec.get("kind", ""))
+	var theirs := str(other.spawn_spec.get("kind", ""))
+	var factions: Factions = World.holdings.factions if World.holdings != null else null
+	if factions == null:
+		return true
+	return factions.of_kind(mine) == factions.of_kind(theirs)
+
+
+## A rout heard since it last looked, from its side: a coward breaks, and
+## a cautious one under ROUT_HURT of its hp.
+func _heard_rout() -> bool:
+	if senses.last_tick <= _rout_tick:
+		return false
+	var since := _rout_tick
+	_rout_tick = int(senses.heard.back()["tick"])
+	if temper == Temper.BOLD:
+		return false
+	for noise: Dictionary in senses.heard:
+		if int(noise["tick"]) <= since or noise["kind"] != &"rout":
+			continue
+		var source: Variant = noise["source"]
+		if source == self or not is_instance_valid(source) or not _same_side(source):
+			continue
+		if temper == Temper.COWARDLY or (max_hp > 0 and hp < max_hp * ROUT_HURT):
+			_flee(noise["at"], false)
+			return true
+	return false
 
 
 # --- Idling ---------------------------------------------------------------------

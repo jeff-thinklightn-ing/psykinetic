@@ -58,6 +58,10 @@ func _ready() -> void:
 	_test_hiding()
 	_test_brute_breaks()
 	_test_locks()
+	_test_kinds_table()
+	_test_temperament()
+	_test_flee()
+	_test_call_and_rout()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -234,6 +238,7 @@ func _test_hold_back() -> void:
 	_bold(timid)
 	_bold(other)
 	timid.boldness = 0.0
+	timid.temper = Monster.Temper.CAUTIOUS  # Waits for one other at its target.
 	other.sight_range = 0
 	for i in 40:
 		World.step()
@@ -468,6 +473,7 @@ func _set_of(values: Array) -> Dictionary:
 ## No hanging back, no pause, no delay: what a test is after, at once.
 func _bold(monster: Monster) -> void:
 	monster.boldness = 1.0
+	monster.temper = Monster.Temper.BOLD
 	monster.pause_chance = 0.0
 	monster.reaction_ticks = 0
 	monster.sight_range = 12
@@ -1145,6 +1151,105 @@ func _test_locks() -> void:
 	door.lock = ""
 	door.open = false
 	_check(door.state() == "closed" and Door.STATES.has("barred"), "unlocked and shut: closed (barred is kept for later)")
+
+func _test_kinds_table() -> void:
+	print("\n== a kind is a row of levels/monsters.json: body, tactic, idling, doors, temperaments ==")
+	var kinds := Monster.kinds()
+	_check(kinds.has("imp") and kinds.has("brute") and kinds.has("sneak"), "imp, brute and sneak are its rows")
+	_check(kinds["imp"]["tactic"] == Monster.Tactic.DART and kinds["brute"]["tactic"] == Monster.Tactic.HEAVY
+			and kinds["sneak"]["tactic"] == Monster.Tactic.FLANK, "each its tactic, as before")
+	_check(Monster.idle_of("imp") == Monster.Idle.WANDER and Monster.idle_of("brute") == Monster.Idle.GUARD
+			and Monster.idle_of("sneak") == Monster.Idle.PATROL and Monster.idle_of("nobody") == Monster.Idle.NONE,
+			"and its idling, as before")
+	_check(Level.MONSTER_TYPES["brute"]["mass"] == 70.0 and Level.MONSTER_TYPES["sneak"]["max_hp"] is int
+			and Level.MONSTER_TYPES["brute"]["attack_ticks"] == 14,
+			"Level.MONSTER_TYPES is each kind's body (%s)" % [Level.MONSTER_TYPES])
+	var e := _build(["#######", "#i.b.s#", "#######"])
+	_check(e["i"][0].opens_doors and not e["b"][0].opens_doors and e["b"][0].door_force == 3, "doors from the table")
+	_check(Monster.read_kinds("res://levels/nothing_here.json").is_empty(), "a missing table gives no kinds (with a warning)")
+
+
+func _test_temperament() -> void:
+	print("\n== each monster a temperament: its level entry's, else its kind's by name ==")
+	var e := _build(["#########", "#i.i.i.b#", "#########"], {"b": {"temperament": "cowardly"}})
+	var brute: Monster = e["b"][0]
+	_check(brute.temper == Monster.Temper.COWARDLY, "a level entry's temperament")
+	var span: Vector2 = Monster.BOLDNESS[Monster.Temper.COWARDLY]
+	_check(brute.boldness >= span.x and brute.boldness <= span.y, "its boldness within its temperament's (%.2f)" % brute.boldness)
+	var first: Array = e["i"].map(func(m: Monster) -> int: return m.temper)
+	var again := _build(["#########", "#i.i.i.b#", "#########"])
+	_check(again["i"].map(func(m: Monster) -> int: return m.temper) == first, "the same name, the same temperament (%s)" % [first])
+	var drawn := {}
+	for i in 60:
+		var m: Monster = EntityFactory.build(SPECS["b"].merged({"name": "Brute%d" % i, "props": Level.MONSTER_TYPES["brute"]}))
+		_room.add_child(m)
+		drawn[m.temper] = drawn.get(m.temper, 0) + 1
+	_check(not drawn.has(Monster.Temper.COWARDLY) and drawn.get(Monster.Temper.BOLD, 0) > drawn.get(Monster.Temper.CAUTIOUS, 0),
+			"brutes are bold more than cautious, never cowardly (%s)" % [drawn])
+	e = _build(["#########", "#b......#", "#########"], {"b": {"temperament": "bold"}})
+	_check(e["b"][0].leash == roundi(Monster.LEASH * Monster.BOLD_LEASH), "a bold one's leash is longer (%d)" % e["b"][0].leash)
+
+
+func _test_flee() -> void:
+	print("\n== hurt past its temperament's mark it breaks and runs; nobody near, it comes back ==")
+	Monster.idling = false
+	var e := _build(["##############", "#............#", "#..P.i.......#", "#............#", "##############"],
+			{"i": {"temperament": "cowardly", "facing": Vector2i(-1, 0)}})
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	imp.sight_range = 7
+	imp.reaction_ticks = 0
+	imp.hp = 6  # Under 60% of 12.
+	World.step()
+	_check(imp.alert == Monster.Alert.FLEEING and imp.target == null, "a coward at half hp sees them and breaks (%s)" % Monster.Alert.keys()[imp.alert])
+	var hits_before := _damage_log.size()
+	for i in 30:
+		World.step()
+	_check(World.distance(imp.tile, player.tile) > 3, "and runs from them (%d off)" % World.distance(imp.tile, player.tile))
+	_check(_damage_log.slice(hits_before).all(func(hit: Dictionary) -> bool: return hit["source"] != imp), "striking no one")
+	World.despawn(player)
+	for i in Monster.FLEE_TICKS + 10:
+		World.step()
+	_check(imp.alert != Monster.Alert.FLEEING, "with nobody near it recovers (%s)" % Monster.Alert.keys()[imp.alert])
+	e = _build(["##########", "#..P.b...#", "##########"], {"b": {"temperament": "bold", "facing": Vector2i(-1, 0)}})
+	var brute: Monster = e["b"][0]
+	brute.sight_range = 7
+	brute.hp = 4  # A third of 12: over a bold one's 15%.
+	World.step()
+	_check(brute.alert == Monster.Alert.FIGHTING, "a bold one at a third of its hp fights on")
+	Monster.idling = true
+
+
+func _test_call_and_rout() -> void:
+	print("\n== a call brings its side; one breaking breaks the cowards and the hurt ==")
+	Monster.idling = false
+	var e := _build(["################", "#..............#", "#.P.i..........#", "#..............#", "#..........i...#",
+		"################"], {"i": {"temperament": "cautious", "facing": Vector2i(-1, 0)}})
+	var caller: Monster = e["i"][0]
+	var other: Monster = e["i"][1]
+	other.facing = Vector2i(1, 0)  # Looking away.
+	caller.sight_range = 7
+	caller.reaction_ticks = 0
+	World.step()
+	World.step()
+	_check(caller.alert == Monster.Alert.FIGHTING and other.senses.heard.any(func(n: Dictionary) -> bool: return n["kind"] == &"call"),
+			"a cautious one that sees someone calls, and its side hears it")
+	_check(other.alert == Monster.Alert.HUNTING and other._lead == e["P"][0].tile,
+			"and comes after whom it fights (%s, %s)" % [Monster.Alert.keys()[other.alert], other._lead])
+	e = _build(["################", "#..............#", "#.P.i...i...b..#", "#..............#", "################"])
+	var breaking: Monster = e["i"][0]
+	var coward: Monster = e["i"][1]
+	var bold: Monster = e["b"][0]
+	coward.temper = Monster.Temper.COWARDLY
+	bold.temper = Monster.Temper.BOLD
+	breaking._flee(e["P"][0].tile)
+	World.step()
+	_check(coward.alert == Monster.Alert.FLEEING, "one breaking: a coward who hears it breaks too")
+	_check(bold.alert != Monster.Alert.FLEEING, "a bold one does not")
+	bold._world_tick(1.0)
+	coward._world_tick(1.0)
+	_check(coward.alert == Monster.Alert.IDLE, "the world tick calms a runner too")
+	Monster.idling = true
 
 ## Moves [param entity] to [param to] at once (a test's hand).
 func _move_to(entity: GridEntity, to: Vector2i) -> void:

@@ -4234,7 +4234,7 @@ func on_death(data: Dictionary) -> void:
 
 
 ## A monster's name with how alert it is (Monster.Alert): "?" looking into
-## something, "!" after someone.
+## something, "!" after someone, "~" running.
 func _sync_alert(monster: Monster, puppet: Node3D) -> void:
 	if int(puppet.get_meta("alert", Monster.Alert.IDLE)) == monster.alert:
 		return
@@ -4242,7 +4242,8 @@ func _sync_alert(monster: Monster, puppet: Node3D) -> void:
 	var label := puppet.get_node_or_null("Name") as Label3D
 	if label == null:
 		return
-	var marks := {Monster.Alert.SUSPICIOUS: " ?", Monster.Alert.HUNTING: " !", Monster.Alert.FIGHTING: " !"}
+	var marks := {Monster.Alert.SUSPICIOUS: " ?", Monster.Alert.HUNTING: " !", Monster.Alert.FIGHTING: " !",
+		Monster.Alert.FLEEING: " ~"}
 	label.text = str(puppet.get_meta("caption", label.text)) + str(marks.get(monster.alert, ""))
 
 

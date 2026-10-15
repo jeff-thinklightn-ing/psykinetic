@@ -1,0 +1,29 @@
+{
+	"imp": {
+		"body": {"mass": 40.0},
+		"tactic": "dart",
+		"idle": "wander",
+		"opens_doors": true,
+		"door_force": 1,
+		"leash": 20,
+		"temperament": {"bold": 1, "cautious": 2, "cowardly": 1}
+	},
+	"brute": {
+		"body": {"mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
+		"tactic": "heavy",
+		"idle": "guard",
+		"opens_doors": false,
+		"door_force": 3,
+		"leash": 20,
+		"temperament": {"bold": 3, "cautious": 1, "cowardly": 0}
+	},
+	"sneak": {
+		"body": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 8},
+		"tactic": "flank",
+		"idle": "patrol",
+		"opens_doors": true,
+		"door_force": 1,
+		"leash": 20,
+		"temperament": {"bold": 0, "cautious": 2, "cowardly": 2}
+	}
+}

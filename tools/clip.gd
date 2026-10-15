@@ -36,6 +36,10 @@ extends Node
 ##   door_noise: the same, and a word behind the door brings it in.
 ##   door_brute: the same with a brute, which cannot open doors and is
 ##     slower: a shout behind the door and it breaks the door down.
+##   pack: four imps round a camp, a coward, two cautious and a bold one.
+##     The coward sees the player and calls; the rest come. Hurt, each breaks
+##     at its temperament's mark, and its rout breaks the coward and the
+##     hurt; the bold one fights on.
 
 const NAME := "clip"
 
@@ -49,7 +53,8 @@ var _monster: Monster
 ## (true lit), "walk" (to a tile), "lure" ([tile, n]: toward it, a step
 ## only while the monster is within n, till the monster gives up), "wait"
 ## (ticks), "work_door" (a door's edge: the player works it, as a click does),
-## "speak" (words the player says, as typed).
+## "speak" (words the player says, as typed), "brawl" (ticks: the player
+## fights the nearest monster that is not running).
 var _script: Array = []
 var _at := 0
 var _wait_until := -1
@@ -83,6 +88,8 @@ func _ready() -> void:
 			_sounds()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
+		"pack":
+			_pack()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -96,7 +103,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario == "sneak" or scenario == "sounds":
+	if scenario in ["sneak", "sounds", "pack"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	var layer := CanvasLayer.new()
@@ -294,6 +301,36 @@ func _sounds() -> void:
 		["sound_fight", 400, "A fight: sfx.swing, sfx.hit_flesh, heard 5 cells."],
 		["say", 60, "Its death: sfx.goblin_death."],
 	]
+func _pack() -> void:
+	var rows: Array[String] = [
+		"####################",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"####################",
+	]
+	var camp := Vector2i(13, 4)
+	var at: Array[Vector2i] = [Vector2i(11, 4), Vector2i(13, 2), Vector2i(15, 4), Vector2i(13, 6)]
+	var tempers := ["cautious", "cautious", "cowardly", "bold"]  # The coward faces the way you come.
+	var markers := {Vector2i(2, 4): "start"}
+	var entities: Array = []
+	for i in at.size():
+		markers[at[i]] = "monster_imp"
+		entities.append({"at": [at[i].x, at[i].y], "temperament": tempers[i], "idle": {"mode": "gather", "point": [camp.x, camp.y]}})
+	var config := {"name": "Clip", "ambient": 1.0, "entities": entities}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["say", 20, "Four imps round a camp: a coward, two cautious, a bold one."],
+		["walk", Vector2i(8, 4), "The coward sees you, and calls the others."],
+		["say", 25, ""],
+		["brawl", 220, "Hurt, each breaks as its temper says (~); a rout takes the rest. The bold one fights on."],
+		["say", 60, ""],
+	]
+
+
 func _door(which: String) -> void:
 	var rows: Array[String] = [
 		"###########################",
@@ -378,6 +415,18 @@ func _on_tick(tick: int) -> void:
 			World.command(_player, "door", {"edge": step[1]})
 		"speak":
 			World.command(_player, "say", {"text": str(step[1])})
+		"brawl":
+			if _fight_until < 0:
+				_fight_until = tick + int(step[1])
+			if tick < _fight_until:
+				var foe := _nearest_standing()
+				if foe != null:
+					if World.distance(_player.tile, foe.tile) > 1:
+						_walk(foe.tile)
+					else:
+						World.order_attack(_player, foe)
+				return
+			_fight_until = -1
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -421,7 +470,26 @@ func _chest() -> Chest:
 	return null
 
 
+## The nearest monster not running, or null.
+func _nearest_standing() -> Monster:
+	var best: Monster = null
+	for entity in World.monsters():
+		var monster := entity as Monster
+		if monster.alert != Monster.Alert.FLEEING and (best == null
+				or World.distance(_player.tile, monster.tile) < World.distance(_player.tile, best.tile)):
+			best = monster
+	return best
+
+
 func _log(tick: int) -> void:
+	if scenario == "pack":
+		var each: Array[String] = []
+		for entity in World.monsters():
+			var monster := entity as Monster
+			each.append("%s %s at %s hp %d %s" % [monster.name, Monster.Temper.keys()[monster.temper], monster.tile, monster.hp,
+				Monster.Alert.keys()[monster.alert]])
+		print("[clip] tick %d: player %s; %s" % [tick, _player.tile, "; ".join(each)])
+		return
 	if scenario == "sounds":
 		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
 		if sfx != null:
