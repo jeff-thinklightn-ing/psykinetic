@@ -2193,9 +2193,22 @@ func _player_within(tile: Vector2i, distance: int) -> bool:
 	return false
 
 
-func _save_state() -> void:
+## The snapshot's writer (decision 360): the world is gathered here, on the
+## main thread (it reads the nodes), copied whole, and the JSON made and
+## written (a temp file, renamed over the snapshot) on this thread. One at a
+## time, in order: a periodic save while one is still being written is
+## skipped (the next comes in SNAPSHOT_EVERY_TICKS), and any other waits
+## for that one first, then for its own; quitting waits for the last.
+var _saver: Thread = null
+
+
+## The snapshot, written before this returns; with [param wait] false (the
+## periodic one), written on _saver while the game goes on.
+func _save_state(wait := true) -> void:
 	if not Net.is_authority() or Net.state_path == "":
 		return
+	if not wait and _saver != null and _saver.is_alive():
+		return  # The last is still being written: this one is skipped.
 	for peer: int in _players.keys():
 		var player: Player = _players[peer]
 		if is_instance_valid(player) and player.spawned and _records.has(_peer_ids.get(peer, "")):
@@ -2220,7 +2233,7 @@ func _save_state() -> void:
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns, "ground": ground,
 			"records": World.record_list()}
 	World.enter(was)
-	Snapshot.save(Net.state_path, zones, records, {"steps": World.steps,
+	var data := Snapshot.data_of(zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
@@ -2228,13 +2241,26 @@ func _save_state() -> void:
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"items": World.items.to_dict(),
-		"sky": _sky_saved()})
+		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
+	_finish_saving()
+	_saver = Thread.new()
+	_saver.start(Snapshot.write.bind(Net.state_path, data))
+	if wait:
+		_finish_saving()
 
 
-## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.
+## Waits for the snapshot being written, if one is.
+func _finish_saving() -> void:
+	if _saver != null:
+		_saver.wait_to_finish()
+		_saver = null
+
+
+## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS,
+## written on a thread (decision 360).
 func _on_world_stepped() -> void:
 	if Net.is_authority() and World.steps % SNAPSHOT_EVERY_TICKS == 0:
-		_save_state()
+		_save_state(false)
 	if Net.is_authority() and World.steps % World.WORLD_TICK_STEPS == 0:
 		# The clients' clocks, kept from drifting off the world's.
 		Net.broadcast("sky", sky_message())
@@ -2310,6 +2336,8 @@ func _exit_tree() -> void:
 	# saved now would overwrite.
 	if not _released:
 		_save_state()
+	# A periodic snapshot still being written finishes first (decision 360).
+	_finish_saving()
 	# Routes still being made on pool tasks would crash a server on its way out.
 	if World.raid_groups != null:
 		World.raid_groups.finish()

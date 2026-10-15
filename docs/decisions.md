@@ -7097,3 +7097,31 @@ resident_test (distances made 4 and 6 for its small room): everyone far,
 no bodies and not in play; the player 3 cells off, bodies and in play; 5
 off, kept; far again, gone and out of play, the resident still the
 town's. Server only; no protocol change.
+## 360. The snapshot is encoded and written on a thread
+
+From the frame-budget pass (coordinator): a host with a snapshot path
+saved every SNAPSHOT_EVERY_TICKS (30, 3 s) on the main thread, 3.3 to 3.9
+ms in the wilds town (12 residents, 52 animals), the frame's worst every
+3 s (7 to 10 ms against a 1.4 ms median); a dedicated server paid it in a
+tick.
+
+Now (`Main._save_state`): the world is gathered on the main thread as
+before (it reads the nodes: `Snapshot.data_of`), copied whole
+(`duplicate(true)`, so nothing the sim does meanwhile reaches it), and the
+JSON made and written (`Snapshot.write`: a temp file renamed over the
+snapshot, so the file is always a whole one) on `Main._saver`, a Thread.
+Only the periodic save (`_on_world_stepped`) goes on while it is written;
+every other (the console's `save`, a reset, a stop, a test) waits for its
+own. One write at a time, in order: a periodic save while one is still
+being written is skipped (the next is 3 s on); any other first waits for
+the one being written, so an older snapshot never lands after a newer.
+Stopping (systemctl stop or a closed window: `_release_zones`; or
+`_exit_tree`) waits for one being written, then writes and waits for the
+last, so nothing of the last 30 ticks is lost.
+
+The main thread's part: 1.9 ms a save on average (4.8 at worst) where it
+was 3.5; the 3-second frames 5 ms at worst where they were 7 to 10.
+far_tier_test: a periodic save, another at once, a tick, then a stop: the
+file parses, is the stop's (its steps the world's), no temp file is left
+and nothing is still being written. Server and host only; the snapshot's
+format is unchanged.

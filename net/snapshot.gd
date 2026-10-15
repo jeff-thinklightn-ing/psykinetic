@@ -25,6 +25,12 @@ const VERSION := 2
 ## level beside them ("steps": World.steps). Returns false and logs on
 ## failure.
 static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] = [], world := {}) -> bool:
+	return write(path, data_of(zones, players, world))
+
+
+## What save writes, gathered now: it reads the entities, so on the main
+## thread; then it can be written anywhere (write, on a thread: decision 360).
+static func data_of(zones: Dictionary, players: Array[PlayerRecord] = [], world := {}) -> Dictionary:
 	var saved := {}
 	for zone_name: String in zones:
 		var section: Dictionary = zones[zone_name]
@@ -38,8 +44,14 @@ static func save(path: String, zones: Dictionary, players: Array[PlayerRecord] =
 		records.append(record.to_dict())
 	var data := {"version": VERSION, "zones": saved, "players": records}
 	data.merge(world)
-	var text := JSON.stringify(data, "\t")
-	return _write(path, text)
+	return data
+
+
+## [param data] (data_of) as JSON to [param path], whole or not at all (a
+## temp file, then renamed over it). Safe on a thread if nothing else
+## touches [param data] meanwhile.
+static func write(path: String, data: Dictionary) -> bool:
+	return _write(path, JSON.stringify(data, "\t"))
 
 
 ## [param entity] as a saved entry (_entries), for a record of it kept

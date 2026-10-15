@@ -39,6 +39,7 @@ func _run() -> void:
 	_test_an_old_snapshot_loads_as_before(old_world)
 	_test_a_keeper_takes_its_own()
 	_test_a_join_recalls_over_ticks()
+	_test_a_stop_right_after_a_save()  # Last: it lets the zones go.
 
 	DirAccess.remove_absolute(preload("res://tests/test_ports.gd").scratch_path("far_world.json"))
 	Net.state_path = ""
@@ -213,6 +214,27 @@ func _test_a_join_recalls_over_ticks() -> void:
 		World.step()
 	_check(_monsters() == 2 and World.zone.recalls_due.is_empty() and World.record_list().is_empty(),
 			"a tick or two on, both are back (%d)" % _monsters())
+
+
+## The snapshot is written on a thread (decision 360): a stop straight after
+## a periodic save (systemctl stop: _release_zones) waits for it, then
+## writes the last; the file is whole and the newest, no temp file left.
+func _test_a_stop_right_after_a_save() -> void:
+	print("
+== stopped straight after a save on the thread: the file is whole, and the last ==")
+	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("stop_world.json")
+	_main._save_state(false)  # The periodic one, on the thread.
+	var busy: bool = _main._saver != null
+	_main._save_state(false)  # Another while it may still be busy: skipped, or after it.
+	World.step()
+	var steps := World.steps
+	_main._release_zones()  # As a stop does.
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
+	_check(busy and data is Dictionary and data.has("zones") and int(data.get("steps", -1)) == steps,
+			"the snapshot is whole and from the stop (steps %s, the world at %d)" % [data.get("steps") if data is Dictionary else "unreadable", steps])
+	_check(_main._saver == null and not FileAccess.file_exists(Net.state_path + ".tmp"), "nothing left being written, no temp file")
+	DirAccess.remove_absolute(Net.state_path)
+	Net.state_path = ""
 
 
 # --- helpers ------------------------------------------------------------------
