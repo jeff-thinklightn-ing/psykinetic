@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_projection()
 	_test_near_walls()
 	_test_paths_remember_the_terrain()
+	_test_steps_filled_by_cell()
 	_test_fields_by_door()
 	_test_lines_owe_doors()
 
@@ -254,6 +255,87 @@ func _test_paths_remember_the_terrain() -> void:
 	]))
 	var walled := World.find_path(Vector2i(0, 0), Vector2i(2, 0))
 	_check(across.size() == 2 and walled.is_empty(), "a new map: its own walls, not the old map's open floor (%s, then %s)" % [across, walled])
+
+
+## find_path's memo of steps is filled a cell's eight at a time
+## (World._fill_path_steps): each answer as the step alone says it, by the
+## edges and _terrain_blocks_step, on every cell of the levels and of a maze
+## with ledges, stairs, walls and doors.
+func _test_steps_filled_by_cell() -> void:
+	print("
+== find_path's steps, a cell's eight worked out at once, as each step alone says ==")
+	for level_name in ["castle", "sample", "wilds", "test_room"]:
+		var terrain: Dictionary = Level.load_level(level_name)["terrain"]
+		var seen := _compare_steps(terrain)
+		_check(seen["wrong"] == 0 and seen["checked"] > 0, "%s: %d of %d steps differ (%d ask, %d door, %d ledge or stair)" % [
+				level_name, seen["wrong"], seen["checked"], seen["ask"], seen["door"], seen["height"]])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var size := 14
+	var rows: Array[String] = []
+	for y in size * 2 - 1:
+		var row := ""
+		for x in size * 2 - 1:
+			if x % 2 == 0 and y % 2 == 0:
+				row += "." if rng.randf() < 0.9 else " "
+			elif x % 2 == 1 and y % 2 == 1:
+				row += " "
+			else:
+				row += [" ", " ", " ", "#", "+"][rng.randi_range(0, 4)]
+		rows.append(row)
+	var maze := Terrain.parse(rows)
+	var heights := {}
+	var stairs := {}
+	for cell: Vector2i in maze["floor"]:
+		heights[cell] = [0, 0, 0, 1, 2][rng.randi_range(0, 4)]
+		if rng.randf() < 0.3:
+			stairs[cell] = World.DIRECTIONS[rng.randi_range(0, 3)]
+	maze["heights"] = heights
+	maze["stairs"] = stairs
+	var seen := _compare_steps(maze)
+	_check(seen["wrong"] == 0 and seen["ask"] > 0 and seen["door"] > 0 and seen["height"] > 0,
+			"a maze with ledges and stairs: %d of %d steps differ (%d ask, %d door, %d ledge or stair)" % [
+			seen["wrong"], seen["checked"], seen["ask"], seen["door"], seen["height"]])
+
+
+## Every step of every cell of [param terrain]'s grid: the memo's answer
+## (World._path_step) against the step alone, as the memo was once filled.
+func _compare_steps(terrain: Dictionary) -> Dictionary:
+	World.load_terrain(terrain)
+	World._ensure_grid()
+	var rect: Rect2i = World._grid_rect
+	var out := {"checked": 0, "wrong": 0, "ask": 0, "door": 0, "height": 0}
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var from := Vector2i(x, y)
+			for way in 8:
+				var direction: Vector2i = World.DIRECTIONS[way]
+				if not rect.has_point(from + direction):
+					continue  # find_path never asks off the grid.
+				var via_x := Vector2i(direction.x, 0)
+				var via_y := Vector2i(0, direction.y)
+				var expected: int
+				if direction.x != 0 and direction.y != 0 and Terrain.Edge.DOOR in [World.edge_kind(from, via_x),
+						World.edge_kind(from + via_x, via_y), World.edge_kind(from, via_y), World.edge_kind(from + via_y, via_x)]:
+					expected = World.PATH_STEP_ASK
+				elif World._terrain_blocks_step(from, direction, true):
+					expected = World.PATH_STEP_BLOCKED
+				elif World.edge_kind(from, direction) == Terrain.Edge.DOOR:
+					expected = World.PATH_STEP_DOOR
+				else:
+					expected = World.PATH_STEP_OPEN
+				out["checked"] += 1
+				if expected == World.PATH_STEP_ASK:
+					out["ask"] += 1
+				elif expected == World.PATH_STEP_DOOR:
+					out["door"] += 1
+				if World.is_walkable(from) and World.is_walkable(from + direction) 						and World.height_at(from) != World.height_at(from + direction):
+					out["height"] += 1
+				if World._path_step(from, way) != expected:
+					out["wrong"] += 1
+					if out["wrong"] <= 3:
+						print("  %s way %s: %d, the step alone %d" % [from, direction, World._path_step(from, way), expected])
+	return out
 
 
 func _test_fields_by_door() -> void:

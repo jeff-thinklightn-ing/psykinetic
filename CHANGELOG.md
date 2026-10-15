@@ -23,6 +23,8 @@ notes (decision 324).
 - Raiders can carry off a companion who stays in town while nobody is there.
   A companion taken in a raid is held at the raiders' camp; rescue her and
   she waits in the town for her player.
+- Monsters work out their way faster, most where they first move after players
+  arrive: the server's tick with 9 players nearby is about a fifth shorter.
 - Companions know the weather when outdoors: rain, fog, wind, a storm or a clear
   sky.
 - A deer or stag that hears you lifts its head with a quiet snort: freeze

@@ -3614,6 +3614,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	var best_left := _path_heuristic(from, to)
 	var heat_carried := _carried_heat()
 	var hot: Dictionary = {} if heat_carried else fields.hot_set(self, HEAT_BURN)
+	var hot_any := not hot.is_empty()
 	# The open cells (indices) in a binary heap keyed by (f, the order each
 	# was first opened in): the cheapest, the earliest of equals, comes out
 	# first, as a scan of a list in that order would pick it, without the
@@ -3624,16 +3625,52 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	var heap_keys := PackedInt64Array()
 	var heap_cells := PackedInt32Array()
 	var walled := not walls.is_empty()
-	_heap_push_at(heap_keys, heap_cells, best_left << PATH_ORDER_BITS, from_at)
+	heap_keys.append(best_left << PATH_ORDER_BITS)
+	heap_cells.append(from_at)
 	var offsets := PackedInt32Array()
 	for direction in DIRECTIONS:
 		offsets.append(direction.y * width + direction.x)
+	# In grid coordinates (from the grid's corner) from here: the heuristic
+	# (_path_heuristic) worked out inline, and a cell off the grid's rim
+	# only checked for on the rim.
+	var to_x := to.x - origin.x
+	var to_y := to.y - origin.y
+	var last_x := width - 1
+	var last_y := _grid_rect.size.y - 1
 
 	while not heap_keys.is_empty():
+		# The heap's top taken off and its last sifted down from the top,
+		# inline (a call per cell looked at was a good part of the search).
 		var key := heap_keys[0]
-		var at := _heap_pop_at(heap_keys, heap_cells)
-		var current := Vector2i(origin.x + at % width, origin.y + at / width)
-		if _search_closed[at] == stamp or key >> PATH_ORDER_BITS != _search_cost[at] + _path_heuristic(current, to):
+		var at: int = heap_cells[0]
+		var heap_last := heap_keys.size() - 1
+		var sift_key := heap_keys[heap_last]
+		var sift_cell: int = heap_cells[heap_last]
+		heap_keys.resize(heap_last)
+		heap_cells.resize(heap_last)
+		if heap_last > 0:
+			var hole := 0
+			while true:
+				var child := hole * 2 + 1
+				if child >= heap_last:
+					break
+				if child + 1 < heap_last and heap_keys[child + 1] < heap_keys[child]:
+					child += 1
+				if heap_keys[child] >= sift_key:
+					break
+				heap_keys[hole] = heap_keys[child]
+				heap_cells[hole] = heap_cells[child]
+				hole = child
+			heap_keys[hole] = sift_key
+			heap_cells[hole] = sift_cell
+		var x := at % width
+		var y := at / width
+		var dx := absi(x - to_x)
+		var dy := absi(y - to_y)
+		var diagonals := mini(dx, dy)
+		var left := diagonals * PATH_DIAGONAL_COST + (maxi(dx, dy) - diagonals) * PATH_STEP_COST
+		var cost: int = _search_cost[at]
+		if _search_closed[at] == stamp or key >> PATH_ORDER_BITS != cost + left:
 			continue  # Stale: closed already, or pushed again since, cheaper.
 		if max_tiles > 0 and closed_count >= max_tiles:
 			break
@@ -3645,38 +3682,40 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			return path
 		_search_closed[at] = stamp
 		closed_count += 1
-		if nearest:
-			var left := _path_heuristic(current, to)
-			if left < best_left:
-				best = at
-				best_left = left
+		if nearest and left < best_left:
+			best = at
+			best_left = left
+		var current := Vector2i(origin.x + x, origin.y + y)
+		var rim := x == 0 or y == 0 or x == last_x or y == last_y
+		var steps_at := at * 8
 		for way in 8:
 			var direction: Vector2i = DIRECTIONS[way]
-			var next: Vector2i = current + direction
-			if not _grid_rect.has_point(next):
+			if rim and (x + direction.x < 0 or y + direction.y < 0 or x + direction.x > last_x or y + direction.y > last_y):
 				continue  # Off the grid: not floor, so blocked.
 			var next_at := at + offsets[way]
 			if _search_closed[next_at] == stamp:
 				continue
-			var step: int = _grid_steps[at * 8 + way] - 1
+			var step: int = _grid_steps[steps_at + way] - 1
 			if step == -1:
 				step = _path_step(current, way)
 			if step == PATH_STEP_BLOCKED or step == PATH_STEP_ASK and _terrain_blocks_step(current, direction, opens_doors):
 				continue
-			if step == PATH_STEP_DOOR and not opens_doors and _closed_door_across(current, direction) != null:
+			var shut := step == PATH_STEP_DOOR and _closed_door_across(current, direction) != null
+			if shut and not opens_doors:
 				continue
+			var next := current + direction
 			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore:
 				continue
 			if walled and walls.has(next):
 				continue
-			var next_cost: int = _search_cost[at]
+			var next_cost := cost
 			if way >= 4:
 				next_cost += PATH_DIAGONAL_COST + PATH_DIAGONAL_EXTRA
 			else:
 				next_cost += PATH_STEP_COST
-				if step == PATH_STEP_DOOR and _closed_door_across(current, direction) != null:
+				if shut:
 					next_cost += PATH_DOOR_EXTRA
-			if hot.has(next) if not heat_carried else is_burning(next):
+			if is_burning(next) if heat_carried else hot_any and hot.has(next):
 				next_cost += PATH_FIRE_EXTRA
 			var seen := _search_opened[next_at] == stamp
 			if not seen or next_cost < _search_cost[next_at]:
@@ -3686,8 +3725,24 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 					_search_opened[next_at] = stamp
 					_search_order[next_at] = opened_count
 					opened_count += 1
-				_heap_push_at(heap_keys, heap_cells,
-						((next_cost + _path_heuristic(next, to)) << PATH_ORDER_BITS) | _search_order[next_at], next_at)
+				dx = absi(x + direction.x - to_x)
+				dy = absi(y + direction.y - to_y)
+				diagonals = mini(dx, dy)
+				# Onto the heap, sifted up, inline.
+				var push_key := ((next_cost + diagonals * PATH_DIAGONAL_COST
+						+ (maxi(dx, dy) - diagonals) * PATH_STEP_COST) << PATH_ORDER_BITS) | _search_order[next_at]
+				var hole := heap_keys.size()
+				heap_keys.append(push_key)
+				heap_cells.append(next_at)
+				while hole > 0:
+					var parent := (hole - 1) >> 1
+					if heap_keys[parent] <= push_key:
+						break
+					heap_keys[hole] = heap_keys[parent]
+					heap_cells[hole] = heap_cells[parent]
+					hole = parent
+				heap_keys[hole] = push_key
+				heap_cells[hole] = next_at
 	if nearest:
 		var at := best
 		while at != from_at:
@@ -3699,29 +3754,71 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 
 ## What the terrain lets a walker who opens doors do stepping from
 ## [param from] the way DIRECTIONS[[param way]] points (PATH_STEP_*),
-## worked out once a zone's terrain (_terrain_blocks_step, which asks a
-## dozen things of it) and remembered: walls, heights and stairs stay put,
-## and a door edge never blocks one who opens doors going straight through;
-## only a diagonal past one depends on the door (PATH_STEP_ASK).
+## worked out once a zone's terrain and remembered: walls, heights and
+## stairs stay put, and a door edge never blocks one who opens doors going
+## straight through; only a diagonal past one depends on the door
+## (PATH_STEP_ASK). A cell's eight are worked out together the first time
+## one is asked (_fill_path_steps).
 func _path_step(from: Vector2i, way: int) -> int:
 	_ensure_grid()
-	var key := ((from.y - _grid_rect.position.y) * _grid_rect.size.x + from.x - _grid_rect.position.x) * 8 + way
-	var step: int = _grid_steps[key] - 1
-	if step == -1:
+	var base := ((from.y - _grid_rect.position.y) * _grid_rect.size.x + from.x - _grid_rect.position.x) * 8
+	if _grid_steps[base + way] == 0:
+		_fill_path_steps(from, base)
+	return _grid_steps[base + way] - 1
+
+
+## _path_step's eight answers for [param from], into _grid_steps from
+## [param base]: what _terrain_blocks_step(from, direction, true) and the
+## edges say, each cell, edge and height around it looked up once, not
+## once a step (perf: a step at a time was most of a search on ground not
+## searched before, 7.6 us a step). A step is BLOCKED onto a cell that is
+## not floor, up or down a ledge (a straight step by a stair excepted),
+## across a wall, or on a diagonal past a cell that is not floor or a
+## height that differs; a diagonal past a door edge is ASK, a straight one
+## through a door DOOR.
+func _fill_path_steps(from: Vector2i, base: int) -> void:
+	var x := from.x
+	var y := from.y
+	var level: int = _height.get(from, 0)
+	# The four edges round the cell, by way (DIRECTIONS 0..3: east, south,
+	# west, north), and whether each straight neighbour is floor at its height.
+	var sides := PackedInt32Array([
+		_edges.get(Vector3i(x, y, Terrain.EAST), Terrain.Edge.OPEN),
+		_edges.get(Vector3i(x, y, Terrain.SOUTH), Terrain.Edge.OPEN),
+		_edges.get(Vector3i(x - 1, y, Terrain.EAST), Terrain.Edge.OPEN),
+		_edges.get(Vector3i(x, y - 1, Terrain.SOUTH), Terrain.Edge.OPEN)])
+	var level_with := PackedByteArray([0, 0, 0, 0])
+	for way in 4:
 		var direction: Vector2i = DIRECTIONS[way]
-		var via_x := Vector2i(direction.x, 0)
-		var via_y := Vector2i(0, direction.y)
-		if direction.x != 0 and direction.y != 0 and Terrain.Edge.DOOR in [edge_kind(from, via_x),
-				edge_kind(from + via_x, via_y), edge_kind(from, via_y), edge_kind(from + via_y, via_x)]:
+		var to := from + direction
+		var step := PATH_STEP_BLOCKED
+		if _floor.has(to):
+			var rise: int = _height.get(to, 0) - level
+			if rise == 0:
+				level_with[way] = 1
+			if sides[way] != Terrain.Edge.WALL and (rise == 0 or rise == 1 and _stairs.get(from, Vector2i.ZERO) == direction
+					or rise == -1 and _stairs.get(to, Vector2i.ZERO) == -direction):
+				step = PATH_STEP_DOOR if sides[way] == Terrain.Edge.DOOR else PATH_STEP_OPEN
+		_grid_steps[base + way] = step + 1
+	for way in range(4, 8):
+		var direction: Vector2i = DIRECTIONS[way]
+		# Its two straight halves' ways: x first, then y.
+		var way_x := 0 if direction.x > 0 else 2
+		var way_y := 1 if direction.y > 0 else 3
+		# The edges past the corner: from the x neighbour going y, from the
+		# y neighbour going x.
+		var beyond_x: int = _edges.get(Vector3i(x + direction.x, y if direction.y > 0 else y - 1, Terrain.SOUTH), Terrain.Edge.OPEN)
+		var beyond_y: int = _edges.get(Vector3i(x if direction.x > 0 else x - 1, y + direction.y, Terrain.EAST), Terrain.Edge.OPEN)
+		var step := PATH_STEP_OPEN
+		if sides[way_x] == Terrain.Edge.DOOR or sides[way_y] == Terrain.Edge.DOOR \
+				or beyond_x == Terrain.Edge.DOOR or beyond_y == Terrain.Edge.DOOR:
 			step = PATH_STEP_ASK
-		elif _terrain_blocks_step(from, direction, true):
+		elif not _floor.has(from + direction) or level_with[way_x] == 0 or level_with[way_y] == 0 \
+				or _height.get(from + direction, 0) != level \
+				or sides[way_x] == Terrain.Edge.WALL or sides[way_y] == Terrain.Edge.WALL \
+				or beyond_x == Terrain.Edge.WALL or beyond_y == Terrain.Edge.WALL:
 			step = PATH_STEP_BLOCKED
-		elif edge_kind(from, direction) == Terrain.Edge.DOOR:
-			step = PATH_STEP_DOOR
-		else:
-			step = PATH_STEP_OPEN
-		_grid_steps[key] = step + 1
-	return step
+		_grid_steps[base + way] = step + 1
 
 
 ## _grid_rect and _grid_steps worked out, if not yet, and find_path's own
@@ -3746,50 +3843,6 @@ func _ensure_grid() -> void:
 		_search_cost.resize(cells)
 		_search_from.resize(cells)
 		_search_order.resize(cells)
-
-
-## find_path's heap of cell indices: [param cell] in under [param key],
-## sifted up.
-static func _heap_push_at(keys: PackedInt64Array, cells: PackedInt32Array, key: int, cell: int) -> void:
-	keys.append(key)
-	cells.append(cell)
-	var at := keys.size() - 1
-	while at > 0:
-		var parent := (at - 1) >> 1
-		if keys[parent] <= key:
-			break
-		keys[at] = keys[parent]
-		cells[at] = cells[parent]
-		at = parent
-	keys[at] = key
-	cells[at] = cell
-
-
-## find_path's heap of cell indices: the cell under the least key, taken out.
-static func _heap_pop_at(keys: PackedInt64Array, cells: PackedInt32Array) -> int:
-	var top: int = cells[0]
-	var last := keys.size() - 1
-	var key := keys[last]
-	var cell: int = cells[last]
-	keys.resize(last)
-	cells.resize(last)
-	if last == 0:
-		return top
-	var at := 0
-	while true:
-		var child := at * 2 + 1
-		if child >= last:
-			break
-		if child + 1 < last and keys[child + 1] < keys[child]:
-			child += 1
-		if keys[child] >= key:
-			break
-		keys[at] = keys[child]
-		cells[at] = cells[child]
-		at = child
-	keys[at] = key
-	cells[at] = cell
-	return top
 
 
 ## Cheapest possible cost between two tiles on an empty grid.

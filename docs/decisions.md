@@ -6125,3 +6125,48 @@ longer a resident, the work waits, a captive held by that group (its
 faction, else rules' raiders). It returns false for a companion, whose own
 body goes through Main.companion_taken, and for no such resident. Main
 calls it on World.entity_taken for a Resident body (companions' side).
+## 334. find_path cheaper per tile
+
+Coordinator's next step after decision 288 (stay in GDScript): try the
+GDScript-first options for pathfinding and land what pays. Every call
+find_path got in 600 ticks of map_bench (256x256, a monster per 42 cells,
+9 players: 4,386 calls) was replayed on the same state, and the new code
+returns exactly the same paths (md5 of every answer equal).
+
+Where the time went: on ground not searched before, the memo of steps
+(_path_step, decision 178) was most of it. It filled a step at a time,
+each asking _terrain_blocks_step and the edges a dozen lookups, 7.6 us a
+step; monsters only search once players come near, so a zone's memo fills
+as players go about it (on the bench 275,000 fills in 600 ticks, 2.1 s of
+find_path's 3.4 s at 9 players).
+
+What changed, all in World:
+- `_fill_path_steps` works out a cell's eight steps at once the first time
+  one is asked, each cell, edge and height round it looked up once.
+  edge_test checks every step of every grid cell of castle, sample, wilds,
+  test_room and a maze with ledges, stairs, walls and doors against the
+  step alone.
+- find_path's loop works in grid coordinates: the heuristic inline, the
+  heap's push and pop inline (`_heap_push_at` and `_heap_pop_at` are
+  gone), the grid's rim checked only on the rim, a door asked once a step.
+  Warm replay 599 ms to 414 (-31%).
+
+Result: find_path in play 3,372 ms to 1,250 over 600 ticks at 9 players,
+1,236 to 541 at 4. map_bench ticks (3 blocks of 600, two rounds, main and
+new in turn): 9 players avg 15.1 / 15.4 ms to 11.5 / 12.2, the first block
+(the memo cold) 20.9 / 19.2 to 14.1 / 14.7; 1 player worst 10.4 / 8.5 to
+6.0 / 5.9; 4 players within the noise.
+
+Measured and not done:
+- Reachability regions (impossible searches fail at once): of the failed
+  searches on the bench none went to another region with doors passable
+  (the map is one), and with closed doors walls 5 of 303 at 4 players and
+  1 of 208 at 9. Searches fail on crowds and the tile cap, not terrain.
+- The whole memo worked out at zone open: about 2.5 s for a 256x256 grid at the
+  old rate, too slow for the open decision 303 cut to 85 ms; filled as
+  searched it is paid where it is needed.
+- Fewer retries: the biggest caller is Monster._door_on_way after
+  _idle_step toward a lead failed, most often because the lead's tile is
+  occupied (an early, free failure), so the door search finds a way with
+  no door and the monster gives up anyway. Skipping it there changes what a
+  monster does, enemy-ai's to decide; told to the coordinator.
