@@ -11,7 +11,8 @@ extends Node
 ## home as themselves when rescued; a restart keeps the captives; threat
 ## from a hook, else from the town's safety, puts walls first. A companion
 ## (decision 331): a resident whose player is known is taken only when
-## nobody plays the town, Main told; one taken in play gets her captive
+## nobody plays the town, Main told (in play nobody is carried off by
+## the numbers; a resident beaten down is taken by resident_taken); one taken in play gets her captive
 ## entry when her group is home (carried_home); rescued, Main frees her
 ## into the town.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
@@ -245,12 +246,13 @@ func _test_companions() -> void:
 		return true
 	_towns.companion_of = func(player_id: String) -> Dictionary:
 		return {"name": {"p1": "Wren", "p2": "Nix"}.get(player_id, ""), "trade": "cook"}
+	_towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
 	_towns.note_companion_in(TOWN, "Wren", "cook", "p1")
 	_check(_work.worker("companion:Wren")["origin"] == "companion:p1", "Wren in town: her origin her player's id")
 	_now = 20000
 	var report := _towns.raid_arrives(TOWN, {"id": "g6", "faction": "goblins", "strength": 30.0})
-	_check(report["captives"].is_empty() and "companion:Wren" in _towns.residents(TOWN) and calls.is_empty(),
-		"the town in play: the raid's own raiders take her or not, not raid_arrives (%s)" % [report["captives"]])
+	_check(report["captives"].is_empty() and "companion:Wren" in _towns.residents(TOWN) and "dag" in _towns.residents(TOWN) and calls.is_empty(),
+		"the town in play: its raiders' blows take people, not raid_arrives: Wren and Dag stay (%s)" % [report["captives"]])
 	playing[0] = false
 	report = _towns.raid_arrives(TOWN, {"id": "g7", "faction": "goblins", "strength": 30.0})
 	_check(report["captives"] == [{"id": "companion:p1", "name": "Wren", "trade": "cook"}] and calls == ["taken p1 by g7"],
@@ -271,6 +273,12 @@ func _test_companions() -> void:
 		"Nix rescued: Main frees her into the town, the rescue's experience (%s)" % [calls])
 	_check(_towns.note_rescue(TOWN, "companion:p1", "Wren", "cook") and calls.back() == "freed p1 to %s" % TOWN
 		and _towns.captives(TOWN).is_empty(), "and Wren")
+	_check(_towns.resident_taken(TOWN, "dag", "g9") and "dag" not in _towns.residents(TOWN) and _work.worker("dag")["away"]
+		and _towns.captives(TOWN).back()["held_by"] == "g9" and _towns.captives(TOWN).back()["by"] == "goblins",
+		"Dag beaten down in play: a captive of the goblins, held by g9 (%s)" % [_towns.captives(TOWN).back()])
+	_check(not _towns.resident_taken(TOWN, "dag", "g9") and not _towns.resident_taken(TOWN, "nobody", "g9"),
+		"no such resident (or one taken already): false")
+	_check(_towns.note_rescue(TOWN, "dag", "Dag", "carpenter") and "dag" in _towns.residents(TOWN), "and home again when rescued")
 
 
 func _check(ok: bool, label: String) -> void:

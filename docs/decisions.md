@@ -6116,3 +6116,12 @@ her own record.
   id).
 Main sets in_play, companion_taken, companion_freed and companion_of after
 Towns is made. Server only; protocol unchanged; raids_test.
+
+Amended (residents with bodies, companions' decision 333): in play,
+raid_arrives carries off nobody at all, companion or not; the raiders'
+blows decide there. Towns.resident_taken(town, worker id, group, faction)
+takes a resident beaten down in play exactly as raid_arrives would: no
+longer a resident, the work waits, a captive held by that group (its
+faction, else rules' raiders). It returns false for a companion, whose own
+body goes through Main.companion_taken, and for no such resident. Main
+calls it on World.entity_taken for a Resident body (companions' side).
