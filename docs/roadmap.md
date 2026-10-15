@@ -142,9 +142,9 @@ but hasn't committed to; confirm before building them.
 - **Hauling:** physical loot you carry or drag home; carts on laid tracks for crates, Minecraft-style *(idea)*.
 
 ### Combat and bodies
-- **Fighter controls** (from the combat discussion): left click = quick swing; left hold-release = charged swing; right click = grapple; right drag = toss.
+- **Fighter controls** (from the combat discussion; layout B, Jeff 2026-10-15, decision 329): left click = quick swing; left hold-release = charged swing; right button = the off hand (a shield raises, a bow draws and looses on release; empty-handed it grapples, and a drag tosses); E tap opens what's beside you, E hold bandages.
 - **Resources stay diegetic:** stamina (fighters), focus (archers/rogues), mind (casters); no bars. Mind is its own channel — body damage doesn't silence a caster; magic items and spells feed it.
-- **Bandaging replaces passive regen:** right-click-hold on an adjacent ally, out of combat, bandage sound, then regen starts and you can step away. A reason to break off from a fight. The bandaging kit item exists; the action doesn't yet. Companions need matching verbs (bandage an ally, hand an item over).
+- **Bandaging replaces passive regen** (done, decisions 272 and 320): E held on an adjacent ally (or yourself), out of combat, with a kit; the bandage sound, then mending starts and you can step away. A reason to break off from a fight. Companions bandage too.
 - **Bodies come in a range:** heavy, lean, in between, for men and women alike, sharing one skeleton. Bigger = more mass (harder to shove, hits harder, slower) — Dire's point, and the physics already says so.
 - **Body variation for monsters:** desynced animation phase and ±10% speed, ±12% scale with mass to match, colour variants, hood up/down, hand props (club, dagger, torch), temperament (bold, cautious, cowardly). Brutes visibly bigger than imps. Labels show just the kind ("Imp"), and only for monsters in sight.
 - **Water physics:** crates float (walkable), boulders sink, creatures that fall in are slowed/stunned and can climb out; heavy ones drown.
