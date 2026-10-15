@@ -20,6 +20,9 @@ age() {
 	echo $(( $(date +%s) - since ))
 }
 who() { echo "$(cat "$LOCK/owner" 2>/dev/null) ($(cat "$LOCK/what" 2>/dev/null)), $(( $(age) / 60 )) min"; }
+# Every take, takeover and release, with the time, beside the lock (<lock>.log), so two
+# landings that overlapped can be traced afterwards. Refusals are not logged (loops retry).
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOCK.log" 2>/dev/null || true; }
 
 case "${1:-status}" in
 	take)
@@ -27,6 +30,7 @@ case "${1:-status}" in
 		if ! mkdir "$LOCK" 2>/dev/null; then
 			if [ "$(age)" -gt "$STALE_SECONDS" ]; then
 				echo "$LABEL: taking over a stale lock from $(who)"
+				log "takeover by $tree from $(who)"
 				rm -rf "$LOCK"; mkdir "$LOCK" || exit 1
 			else
 				echo "$LABEL: held by $(who); wait and retry"
@@ -34,12 +38,13 @@ case "${1:-status}" in
 			fi
 		fi
 		echo "$tree" >"$LOCK/owner"; echo "$what" >"$LOCK/what"; date +%s >"$LOCK/since"
+		log "taken by $tree ($what)"
 		echo "$LABEL: taken by $tree ($what)"
 		;;
 	release)
 		tree="${2:?tree name}"
 		if held && [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
-			rm -rf "$LOCK"; echo "$LABEL: released by $tree"
+			rm -rf "$LOCK"; log "released by $tree"; echo "$LABEL: released by $tree"
 		elif held; then
 			echo "$LABEL: held by $(who), not $tree; not released"; exit 1
 		else
