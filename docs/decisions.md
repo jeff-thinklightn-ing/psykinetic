@@ -6421,3 +6421,37 @@ jumps are what the camera showed before):
 
 Client only; no protocol change. The 2D view's camera already followed
 with a lerp (Main.CAMERA_FOLLOW_RATE) and is unchanged.
+
+## 338. The weapon in the blow; monsters wield
+
+Weapons as verbs in the fight, part 2 of 5. A blow (World._try_hit, not a
+shove) is struck with World.blow_verb(attacker): the verb of the weapon
+it fights with (wielded), but a bow's is no club's, so a blow with a bow
+in hand is bare-handed. Its common numbers act on the blow:
+- speed: the time to the next blow is attack_ticks times speed
+  (attack_ticks_of; a swing at air too). A dagger 0.6 (3 ticks for a
+  player), a hammer 1.3 (7), a giant axe 2.0.
+- damage: the blow's damage times it, rounded, at least 1 (a dagger 0.5,
+  so 1 for a player's 2).
+- force: the push times it, before knockback_min_force is applied. A
+  hammer's 3 knocks back where a fist would not: a player's push on a
+  brute is under the threshold bare-handed, a cell or two with a hammer.
+- backstab (the dagger): damage times "behind" (2) when the attacker
+  stands behind the target (World.is_behind: the side away from its
+  facing, the flanker's own test). A monster's FLANK bonus still adds to
+  the blow first.
+The verbs' own numbers (block, knockdown, reach) are parts 3 to 5.
+
+Monsters fight with what is in their hands. A row of levels/monsters.json,
+or a level's entity entry, may say "wields": {"right": id, "left": id}
+(Monster.kinds reads it; an entry's wins; an orderless key). Level._arm
+makes such a monster's slots a carrier's (Items.CARRIED: the pack, which
+loot fills, decision 330, then the two hands), a two-handed thing in the
+right hand with the left empty, anything else warned about and left out.
+World.holds_in_hands (has_hands, or a monster with CARRIED slots) is what
+wielded, guard, off_hand and the bow read, so a monster's blow, guard and
+shot go through the same code as a player's. A monster's hands are not a
+carrier's: has_hands stays players' and companions' (nothing hands it
+things or bandages it). Its things drop with the rest when it dies. Server
+side only: a monster's slots are not replicated (the views do not show
+what it holds yet), so the protocol is unchanged.

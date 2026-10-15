@@ -1033,7 +1033,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"strength": maxf(0.0, float(row.get("strength", 0.0))), "side": str(row.get("side", "")),
 			"role": str(row.get("role", "")), "herd": str(row.get("herd", kind)),
 			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
-			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else []}
+			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
+			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {}}
 	return out
 
 

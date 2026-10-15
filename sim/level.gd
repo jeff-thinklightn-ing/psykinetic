@@ -120,7 +120,7 @@ const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 
 ## The idle modes level.json may give a monster (Monster.IDLE_MODES).
 const IDLE_MODES: Array[String] = ["guard", "wander", "patrol", "gather", "none"]
 ## An entity entry of only these keys leaves the spawn order as it was.
-const ORDERLESS_KEYS: Array[String] = ["at", "facing", "idle", "loot"]
+const ORDERLESS_KEYS: Array[String] = ["at", "facing", "idle", "loot", "wields"]
 ## What a monster can carry from a loot table (_stock), dropped where it falls.
 const MONSTER_CARRIES := 4
 
@@ -561,6 +561,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 			for key: String in more:
 				props[key] = _prop(key, more[key])
 		_stock(props, spec, entry, config, warnings, at)
+		_arm(props, spec, entry, warnings, at)
 		if not props.is_empty():
 			spec["props"] = props
 		if spec.get("script") == MONSTER:
@@ -939,6 +940,39 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 	var rolled := Items.roll_loot(table, "%s:%d,%d" % [str(config.get("name", "")), at.x, at.y], empty.size())
 	for i in rolled.size():
 		slots[empty[i]] = rolled[i]
+	props["slots"] = slots
+
+
+## A monster's hands (decision 338): its entry's "wields", else its
+## kind's (levels/monsters.json), {"right": id, "left": id}. Its slots
+## become a carrier's (Items.CARRIED: the pack, what loot gave it, then the
+## two hands), and it fights with them (World.holds_in_hands). A two-handed
+## thing goes in the right hand only, the left then empty; an unknown id,
+## one that cannot be held, or a left hand that has no room is warned
+## about and left out.
+static func _arm(props: Dictionary, spec: Dictionary, entry: Dictionary, warnings: Array[String], at: Vector2i) -> void:
+	var script := str(spec.get("script", ""))
+	if script != MONSTER and script != ANIMAL:
+		if entry.has("wields"):
+			warnings.append("wields at %s: only a monster wields things" % at)
+		return
+	var row: Dictionary = Monster.kinds().get(str(spec.get("kind", "")), {})
+	var given: Variant = entry.get("wields", row.get("wields", {}))
+	if not given is Dictionary or given.is_empty():
+		return
+	var slots := Items.tidy(props.get("slots", []), Items.CARRIED)
+	for hand: Array in [["right", Items.RIGHT_HAND], ["left", Items.LEFT_HAND]]:
+		var id := str(given.get(hand[0], ""))
+		if id.is_empty():
+			continue
+		if not Items.exists(id) or int(Items.def(id)["hands"]) == 0:
+			warnings.append("wields at %s: %s cannot be held" % [at, id])
+			continue
+		var right := slots[Items.RIGHT_HAND]
+		if hand[1] == Items.LEFT_HAND and (int(Items.def(id)["hands"]) == 2 or not right.is_empty() and int(Items.def(right)["hands"]) == 2):
+			warnings.append("wields at %s: no left hand free for %s" % [at, id])
+			continue
+		slots[hand[1]] = id
 	props["slots"] = slots
 
 

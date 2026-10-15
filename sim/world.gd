@@ -1345,6 +1345,34 @@ func has_hands(entity: GridEntity) -> bool:
 	return (entity is Player or entity.keeper_peer != 0) and entity.slots.size() == Items.CARRIED
 
 
+## Whether [param entity] fights with what is in its hands: one with hands
+## (has_hands), or a monster given them (its kind's or its entry's
+## "wields", Level; decision 338). Only for fighting: a monster's hands are
+## not a carrier's (nobody hands it things or bandages it).
+func holds_in_hands(entity: GridEntity) -> bool:
+	return has_hands(entity) or entity is Monster and entity.slots.size() == Items.CARRIED
+
+
+## The verb [param attacker]'s blow is struck with (decision 338): its
+## wielded weapon's (Items.verb_of), but for a bow, which is no club (its
+## numbers are the shot's); {} for bare hands.
+func blow_verb(attacker: GridEntity) -> Dictionary:
+	var verb := Items.verb_of(wielded(attacker))
+	return {} if verb.get("kind") == "ranged" else verb
+
+
+## [param attacker]'s time between blows: its attack_ticks times its
+## weapon's speed (blow_verb; a dagger quicker, a giant axe slower).
+func attack_ticks_of(attacker: GridEntity) -> int:
+	return maxi(1, roundi(attacker.attack_ticks * float(blow_verb(attacker).get("speed", 1.0))))
+
+
+## Whether [param attacker] stands behind [param target]: on the side
+## away from where it faces (as a flanker's backstab reads it).
+func is_behind(attacker: GridEntity, target: GridEntity) -> bool:
+	return Vector2(attacker.tile - target.tile).dot(Vector2(target.facing)) < 0.0
+
+
 ## [param entity]'s slots changed: its mass follows what it carries (its
 ## base_mass and the things' weights), a stance whose thing left the hand
 ## ends, and slots_changed is emitted.
@@ -1918,7 +1946,7 @@ func _thud(cell: Vector2i, id: String, by: GridEntity) -> void:
 ## or no hands). A guard (block) counts only if nothing else is held: a
 ## shield in the left hand guards (guard) while the right hand fights.
 func wielded(entity: GridEntity) -> String:
-	if not has_hands(entity):
+	if not holds_in_hands(entity):
 		return ""
 	var guard_only := ""
 	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
@@ -1935,7 +1963,7 @@ func wielded(entity: GridEntity) -> String:
 ## over a sword's, the larger absorb), {} for none.
 func guard(entity: GridEntity) -> Dictionary:
 	var best := {}
-	if has_hands(entity):
+	if holds_in_hands(entity):
 		for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
 			var verb := Items.verb_of(entity.slots[slot]) if not entity.slots[slot].is_empty() else {}
 			if verb.get("kind") == "block" and float(verb["absorb"]) > float(best.get("absorb", -1.0)):
@@ -1948,7 +1976,7 @@ func guard(entity: GridEntity) -> Dictionary:
 ## with a ranged one in a hand (a bow, held in both), "" for neither: the
 ## button shoves and tosses, as with empty hands.
 func off_hand(entity: GridEntity) -> String:
-	if not has_hands(entity):
+	if not holds_in_hands(entity):
 		return ""
 	var left := entity.slots[Items.LEFT_HAND]
 	if not left.is_empty() and Items.verb_of(left).get("kind") == "block":
@@ -1960,6 +1988,8 @@ func off_hand(entity: GridEntity) -> String:
 
 ## The ranged thing in [param entity]'s hands (left first), "" for none.
 func _drawn_with(entity: GridEntity) -> String:
+	if not holds_in_hands(entity):
+		return ""
 	for slot in [Items.LEFT_HAND, Items.RIGHT_HAND]:
 		var id := entity.slots[slot]
 		if not id.is_empty() and Items.verb_of(id).get("kind") == "ranged":
@@ -2440,7 +2470,7 @@ func try_swing(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	if tick < entity.next_attack_tick or tick < entity.next_move_tick:
 		return false
-	entity.next_attack_tick = tick + entity.attack_ticks
+	entity.next_attack_tick = tick + attack_ticks_of(entity)
 	entity._world_set_facing(direction)
 	entity.protected = false
 	entity._world_swung(direction)
@@ -2963,7 +2993,10 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	elif push_direction == -aim and not _can_land_behind(attacker, push_direction):
 		# Overhead toss with nowhere to come down: refused, costs nothing.
 		return false
-	attacker.next_attack_tick = tick + attacker.attack_ticks
+	# The weapon in the blow (decision 338): its speed, and below its
+	# damage (twice from behind with a dagger) and its force.
+	var verb := {} if is_shove else blow_verb(attacker)
+	attacker.next_attack_tick = tick + attack_ticks_of(attacker) if not is_shove else tick + attacker.attack_ticks
 	attacker._world_set_facing(target.tile - attacker.tile)
 	if not is_shove:
 		attacker._world_swung(aim)
@@ -2982,9 +3015,14 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 			else:
 				attacker.stamina -= cost
 	else:
-		force *= ATTACK_FORCE_FACTOR
+		force *= ATTACK_FORCE_FACTOR * float(verb.get("force", 1.0))
 		if force < knockback_min_force:
 			force = 0.0  # A blow too light to knock back: damage only.
+		if hit_damage > 0 and not verb.is_empty():
+			var scale := float(verb["damage"])
+			if verb.get("kind") == "backstab" and is_behind(attacker, target):
+				scale *= float(verb["behind"])
+			hit_damage = maxi(1, roundi(hit_damage * scale))
 	var hit := Hit.new()
 	hit.source = attacker
 	hit.target = target

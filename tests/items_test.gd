@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_use()
 	_test_buffs()
 	_test_weapons()
+	_test_blows()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -527,6 +528,73 @@ func _test_weapons() -> void:
 		World.items.end(World.take_item(host, host, slot), "gone")
 
 
+
+
+func _test_blows() -> void:
+	print("
+== the weapon in the blow: its speed, damage and force; a dagger from behind; monsters wield (decision 338) ==")
+	var host := _player(Net.local_id)
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not host.slots[slot].is_empty():
+			World.items.end(World.take_item(host, host, slot), "gone")
+	var imp: GridEntity = null
+	for monster in World.monsters():
+		imp = monster
+		break
+	var beside := World.NO_CELL
+	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_free(host.tile + direction) and World.can_melee(host.tile, host.tile + direction):
+			beside = host.tile + direction
+			break
+	_check(imp != null and beside != World.NO_CELL, "an imp beside the host")
+	if imp == null or beside == World.NO_CELL:
+		return
+	World._relocate(imp, beside)
+	imp.acts = false
+	# A blow queued and taken back before it lands: its damage, force and the wait after it.
+	var blow := func(by: GridEntity, at: GridEntity) -> Array:
+		by.next_attack_tick = 0
+		by.next_move_tick = 0
+		var queued: int = World._hits.size()
+		if not World.try_attack(by, at) or World._hits.size() == queued:
+			return []
+		var hit: Variant = World._hits.pop_back()
+		return [hit.damage, hit.force, by.next_attack_tick - World.tick]
+	var bare: Array = blow.call(host, imp)
+	_check(bare.size() == 3 and bare[0] == 2 and bare[2] == 5, "bare hands: 2, every 5 ticks (%s)" % [bare])
+	_give(host, "hammer", Player.RIGHT_HAND)
+	var hammer: Array = blow.call(host, imp)
+	_check(hammer[0] == 2 and hammer[1] >= World.knockback_min_force and hammer[1] > bare[1] and hammer[2] == 7,
+			"a hammer: the same 2, but three times the push, enough to knock back (%.2f against %.2f bare), and slower: 7 ticks" % [hammer[1], bare[1]])
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "dagger", Player.RIGHT_HAND)
+	imp._world_set_facing(host.tile - imp.tile)
+	var front: Array = blow.call(host, imp)
+	imp._world_set_facing(imp.tile - host.tile)
+	var back: Array = blow.call(host, imp)
+	_check(front[0] == 1 and back[0] == 2 and front[2] == 3, "a dagger: quick (3 ticks), 1 to the face, 2 in the back (%s, %s)" % [front, back])
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "bow", Player.RIGHT_HAND)
+	_check((blow.call(host, imp) as Array)[0] == 2, "a bow is no club: a blow with it is bare-handed")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	imp.slots = Items.tidy(["", "", "", "", "dagger", "shield"], Items.CARRIED)
+	_check(World.holds_in_hands(imp) and not World.has_hands(imp) and World.wielded(imp) == "dagger" and World.guard(imp)["absorb"] == 1.0,
+			"a monster given hands fights with them: a dagger, a shield's guard; it is no carrier")
+	host._world_set_facing(imp.tile - host.tile)
+	_check((blow.call(imp, host) as Array)[2] == roundi(imp.attack_ticks * 0.6), "its blows come at a dagger's pace")
+	imp.slots = PackedStringArray()
+	var rows: Array[String] = ["#####", "#...#", "#####"]
+	var markers := {Vector2i(1, 1): "monster_imp", Vector2i(2, 1): "monster_brute", Vector2i(3, 1): "start"}
+	var config := {"name": "arms_test", "entities": [{"at": [1, 1], "wields": {"right": "spear", "left": "shield"}},
+		{"at": [2, 1], "wields": {"right": "giant_axe", "left": "shield"}}]}
+	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var by_tile := {}
+	for spec: Dictionary in level["entities"]:
+		by_tile[spec["tile"]] = spec["props"].get("slots", PackedStringArray())
+	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield"]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
+	_check(by_tile[Vector2i(2, 1)][Items.RIGHT_HAND] == "giant_axe" and by_tile[Vector2i(2, 1)][Items.LEFT_HAND] == ""
+			and level["warnings"].any(func(w: String) -> bool: return "no left hand" in w), "a giant axe takes both: the shield left out, and said")
+	imp.acts = true
 
 func _test_loot() -> void:
 	print("

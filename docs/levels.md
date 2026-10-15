@@ -163,6 +163,10 @@ All of it is optional.
   chest's empty slots filled, a monster carrying up to 4 things, which it
   drops where it falls. It leaves the spawn order as it was; the
   builder's `place` tool takes `loot` the same way.
+  A monster's entry may say what it holds, `"wields": {"right": "spear",
+  "left": "shield"}` (catalog ids; its kind's row in levels/monsters.json
+  may say the same, and the entry wins; decision 338): it fights with them
+  as a player does, and drops them where it falls.
   A monster's entry may also say which way it faces, `"facing": [dx, dy]`
   (each -1, 0 or 1; without one it faces a way of its own, from its name),
   and how it idles with nobody in sight, `"idle"`: a mode, or the mode

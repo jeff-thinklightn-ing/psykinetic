@@ -45,6 +45,9 @@ extends Node
 ##   items_bow: the bow shoots (decision 335): at dusk, the lantern
 ##     covered, a rabbit shot at a full draw and killed; the deer runs from
 ##     the kill, comes back, and is shot (4) as it comes in range: it bolts.
+##   items_blows: the weapon in the blow (decision 338): a war hammer
+##     knocks a brute back a cell a blow, where a fist would not move it;
+##     then a dagger, quick, in the back of an imp that faces away.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -142,6 +145,8 @@ func _ready() -> void:
 			_items_loot()
 		"items_bow":
 			_items_bow()
+		"items_blows":
+			_items_blows()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -482,6 +487,32 @@ func _items_bow() -> void:
 		["item_wait_near", ["deer", 8], ""],
 		["item_lower", "deer", "At 8 cells, the bow's reach: loosed. Hit for 4; it bolts, wounded."],
 		["wait", 50, ""],
+	]
+
+
+func _items_blows() -> void:
+	var rows: Array[String] = [
+		"###############",
+		"#.............#",
+		"#.............#",
+		"#.............#",
+		"#.............#",
+		"###############",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "monster_brute", Vector2i(12, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [5, 2], "facing": [-1, 0], "idle": {"mode": "guard"}},
+			{"at": [12, 3], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["hammer", Player.RIGHT_HAND], "A war hammer: no more damage than a fist, three times the push."],
+		["walk", Vector2i(4, 2), "A brute, 70 kg: a fist would not move it."],
+		["brawl", 90, "Each blow knocks it back."],
+		["item_clear", Player.RIGHT_HAND, "A dagger: quick, light."],
+		["item_give", ["dagger", Player.RIGHT_HAND], ""],
+		["walk", Vector2i(11, 3), "Up behind the imp, which faces away."],
+		["brawl", 40, "Quick blows; in the back, twice the damage (2, not 1)."],
+		["wait", 20, ""],
 	]
 
 
@@ -1046,7 +1077,7 @@ func _log(tick: int) -> void:
 			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
 		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
 		return
-	if scenario == "items_bow":
+	if scenario in ["items_bow", "items_blows"]:
 		var game := []
 		for entity in World.monsters():
 			game.append("%s at %s hp %d %s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert]])

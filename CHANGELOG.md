@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Weapons change the blow: a war hammer knocks foes back where a fist would
+  not, a dagger is quick and strikes twice as hard from behind, a giant axe is
+  slow. Monsters can be given weapons too.
 - Companions bring up the hour and the weather when you ask about them (or
   in a storm), not in every other line.
 - The camera no longer jumps when the game corrects where your character is
