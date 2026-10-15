@@ -7,17 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
-## v0.1.144
 - Loot tables: a level or the builder can name a table for a chest or a monster.
   A chest is stocked from it when the level is built, and a monster carries
   its share and drops it where it falls. No real level uses one yet.
-- Controls: the right button now does what your off hand holds. With a shield it
-  blocks while held; with a bow it draws, and letting go shoots at the cursor
-  (what a block or an arrow does in a fight comes with combat). With empty
-  hands it still shoves and tosses. Opening chests, crates, carts, doors and
-  your companion's pack moves to E; hold E to bandage.
 
-## v0.1.143
+## v0.1.144
 
 - New things for hunters: a cut of meat (banks as food), a raw hide, a pair of
   antlers and a pair of tusks, ready for the animals to drop.
