@@ -21,6 +21,9 @@ top section as the release notes.
   raiders set out yet.
 - Big outdoor maps like the wilds load in about half the time (about 3 s
   instead of 6 to 7 on a fast machine).
+- Behind the scenes, the game can now use sounds from licensed sound
+  libraries that may not be shared publicly: they are kept on our own
+  storage and added to the game when a release is built.
 
 ## v0.1.141
 

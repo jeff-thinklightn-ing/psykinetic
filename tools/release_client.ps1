@@ -5,7 +5,8 @@
 # Order of work, so a missing tool never leaves a half-done release:
 #   1. checks: Godot runs, the Windows export templates are installed, the
 #      tree is clean, this commit has origin's main in it, the tag is free
-#      on origin too                              (nothing touched yet)
+#      on origin too; tools\sound_sync.ps1 copies in the sound takes kept
+#      outside the repo, or stops the release (nothing tracked touched yet)
 #   2. write version.txt, export the "Windows Client" preset to build\client\,
 #      bundle launch.bat, update.ps1, settings.example.cfg, README.txt and
 #      version.txt, zip to build\psykinetic-client-v<version>.zip
@@ -76,6 +77,12 @@ if (-not (Select-String -Path CHANGELOG.md -Pattern "^## $tag\b" -Quiet)) {
 	Write-Warning "CHANGELOG.md has no '## $tag' section; the release notes will be the top section as it is"
 }
 Write-Output "Godot $godotVersion, templates in $templateDir, releasing $current -> $Version"
+
+# Sound takes kept outside the repo (decision 268): every one takes.json lists is copied
+# in and checked, or the release stops here, before anything is touched.
+$env:GODOT_PATH = $godot
+& (Join-Path $PSScriptRoot 'sound_sync.ps1')
+if ($LASTEXITCODE -ne 0) { Fail 'sound_sync failed (above): the release would ship placeholders for those sounds' }
 
 # --- 2. build -----------------------------------------------------------------
 $out = Join-Path $root 'build\client'

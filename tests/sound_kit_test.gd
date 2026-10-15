@@ -18,6 +18,7 @@ func _ready() -> void:
 	_test_noises_are_the_sims()
 	_test_fallbacks()
 	_test_placeholder()
+	_test_takes()
 	_test_folders()
 	_test_sfx_plays_slots()
 	_test_status_current()
@@ -113,6 +114,31 @@ func _test_fallbacks() -> void:
 	_check(SoundKit.played_from("sfx.block_shield") == "" and SoundKit.files("sfx.block_shield").is_empty(), "a block: nothing yet, the placeholder")
 
 
+func _test_takes() -> void:
+	print("
+== a third-party take: listed is filled (the status says so everywhere), played once it is there ==")
+	_check(SoundKit.takes("sfx.block_shield").is_empty(), "takes.json lists no take of a block yet")
+	var sonniss := SoundKit.source("sonniss-gdc-2024")
+	_check(sonniss.get("store") == "external" and str(sonniss.get("path")) == "res://art/audio/external/",
+			"a Sonniss source is stored external, synced into art/audio/external/")
+	# A take listed but not synced (as on a machine without the sound library).
+	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "sfx.block_shield.ogg", "from": "sonniss-gdc-2024", "sha256": "0"}]
+	SoundKit._files.clear()
+	_check(SoundKit.take_files("sfx.block_shield") == ["res://art/audio/external/sfx.block_shield/sfx.block_shield.ogg"], "it is looked for in art/audio/external/<slot>/")
+	_check(SoundKit.filled_by("sfx.block_shield") == "fill" and SoundKit.played_from("sfx.block_shield", false) == "sfx.block_shield",
+			"listed: filled, by the lists alone")
+	_check(SoundKit.played_from("sfx.block_shield") == "" and SoundKit.files("sfx.block_shield").is_empty(), "not synced: the placeholder meanwhile")
+	_check("sonniss-gdc-2024" in SoundKit._sources_of("sfx.block_shield") and "sfx.block_shield" in SoundKit.third_party_block(),
+			"THIRD_PARTY's block names it under its source")
+	# Synced: a take that is there (a Kenney file, through its path from the slot's folder).
+	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "../sfx/hit_1.ogg", "from": "kenney-impact", "sha256": "0"}]
+	SoundKit.source("kenney-impact")["path"] = "res://art/audio/"
+	SoundKit._files.clear()
+	_check(SoundKit.files("sfx.block_shield").size() == 1, "there: played (%s)" % [SoundKit.files("sfx.block_shield")])
+	SoundKit.reload()
+	_check(SoundKit.takes("sfx.block_shield").is_empty() and SoundKit.source("kenney-impact")["path"] == "res://art/audio/sfx/", "reload reads the files again")
+
+
 func _test_placeholder() -> void:
 	print("\n== the placeholder: a short blip by bus, silence for a bed ==")
 	var blip := SoundKit.placeholder("sfx")
@@ -152,9 +178,9 @@ func _test_sfx_plays_slots() -> void:
 func _test_status_current() -> void:
 	print("\n== docs/sound_status.md and THIRD_PARTY.md say what each slot plays from now ==")
 	var status := FileAccess.get_file_as_string("res://docs/sound_status.md")
-	_check(status == SoundKit.status_markdown(), "docs/sound_status.md is current (run tools/sound_status.gd if not)")
+	_check(status == SoundKit.status_markdown(), "docs/sound_status.md is current (run tools/sound_status.tscn if not)")
 	var third := FileAccess.get_file_as_string("res://THIRD_PARTY.md")
-	_check(SoundKit.third_party_block() in third, "THIRD_PARTY.md's sound slot block is current (run tools/sound_status.gd if not)")
+	_check(SoundKit.third_party_block() in third, "THIRD_PARTY.md's sound slot block is current (run tools/sound_status.tscn if not)")
 
 
 func _check(ok: bool, label: String) -> void:

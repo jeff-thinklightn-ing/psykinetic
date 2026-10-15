@@ -1,0 +1,4 @@
+{
+	"about": "Third-party takes of the sound slots: slot -> [{file, from (a source in slots.json), original (where in the source it was cut from), sha256, ...}]. Written by tools/sound_take.ps1; read by SoundKit. A take of a source stored external is kept outside the repo (the sound library takes/<slot>/<file>) and copied into art/audio/external/<slot>/ by tools/sound_sync.ps1.",
+	"takes": {}
+}

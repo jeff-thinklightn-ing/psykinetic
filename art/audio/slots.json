@@ -1,5 +1,5 @@
 {
-	"about": "The game's sound slots: everything the game plays, by name. Read by SoundKit (client3d/sound_kit.gd), which Sfx plays them through; tools/sound_status.gd writes docs/sound_status.md and THIRD_PARTY.md's sound block from it. A slot is played from, in order: its own takes in art/audio/<category>/<slot>/ (<slot>.ogg, <slot>.2.ogg ...; .wav too), named in 'source'; its fill, files of a third-party source (its 'path' + each of 'files'); its fallback, another slot; else a placeholder blip (a bed: silence). 'noise' is the sim noise the sound goes with (a key of SoundKit.NOISES: World.noise's kind, or one radius of it such as thud_light; Senses' radius is how far both monsters and players hear it); null means monsters do not hear it, and 'range' (cells) is how far players do. 'positional': false plays it flat (UI, beds). 'type' is oneshot, loop or bed; 'bus' is sfx, ambience, voice, ui or music.",
+	"about": "The game's sound slots: everything the game plays, by name. Read by SoundKit (client3d/sound_kit.gd), which Sfx plays them through; tools/sound_status.gd writes docs/sound_status.md and THIRD_PARTY.md's sound block from it. A slot is played from, in order: its own takes in art/audio/<category>/<slot>/ (<slot>.ogg, <slot>.2.ogg ...; .wav too), named in 'source'; its fill, files of a third-party source (its 'path' + each of 'files'); its fallback, another slot; else a placeholder blip (a bed: silence). 'noise' is the sim noise the sound goes with (a key of SoundKit.NOISES: World.noise's kind, or one radius of it such as thud_light; Senses' radius is how far both monsters and players hear it); null means monsters do not hear it, and 'range' (cells) is how far players do. 'positional': false plays it flat (UI, beds). 'type' is oneshot, loop or bed; 'bus' is sfx, ambience, voice, ui or music. A source stored 'external' keeps its files outside the repo (its licence forbids sharing them); art/audio/takes.json lists each take of one.",
 	"version": 1,
 	"sources": {
 		"kenney-impact": {
@@ -17,6 +17,24 @@
 			"license_file": "art/audio/sfx/LICENSE-kenney-rpg-audio.txt",
 			"url": "https://kenney.nl/assets/rpg-audio",
 			"notes": "copied unchanged and renamed; art/audio/sfx/SOURCES.txt names each original"
+		},
+		"sonniss-gdc-2024": {
+			"name": "#GameAudioGDC 2024 bundle, Sonniss",
+			"path": "res://art/audio/external/",
+			"store": "external",
+			"license": "Sonniss #GameAudioGDC Bundle licence v2.0",
+			"license_file": "docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt",
+			"url": "https://sonniss.com/gameaudiogdc",
+			"notes": "never in the repo: its licence forbids supplying the sounds as sounds, edited or not; takes are cut into the sound library's takes/ (tools/sound_take.ps1) and copied into the game by tools/sound_sync.ps1; never used to train or feed AI"
+		},
+		"sonniss-gdc-2021-23": {
+			"name": "#GameAudioGDC 2021 to 2023 bundle, Sonniss",
+			"path": "res://art/audio/external/",
+			"store": "external",
+			"license": "Sonniss #GameAudioGDC Bundle licence v2.0",
+			"license_file": "docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt",
+			"url": "https://sonniss.com/gameaudiogdc",
+			"notes": "never in the repo: its licence forbids supplying the sounds as sounds, edited or not; takes are cut into the sound library's takes/ (tools/sound_take.ps1) and copied into the game by tools/sound_sync.ps1; never used to train or feed AI"
 		}
 	},
 	"slots": {

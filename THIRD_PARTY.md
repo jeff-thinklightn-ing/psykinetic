@@ -33,6 +33,8 @@ files are copied unchanged and renamed; `art/audio/sfx/SOURCES.txt` names each o
 |--------|---------|-------|----------------------|
 | [Impact Sounds 1.0, Kenney](https://kenney.nl/assets/impact-sounds) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-impact-sounds.txt`) | `art/audio/sfx/` | sfx.break_wood, sfx.death_player, sfx.footstep, sfx.goblin_death, sfx.hit_flesh, sfx.knockback_body, sfx.knockback_body_soft, sfx.knockback_stone, sfx.knockback_wood |
 | [RPG Audio, Kenney](https://kenney.nl/assets/rpg-audio) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-rpg-audio.txt`) | `art/audio/sfx/` | sfx.chest_open, sfx.death_companion, sfx.door_wood_close, sfx.door_wood_open, sfx.pack_open, sfx.swing |
+| [#GameAudioGDC 2021 to 2023 bundle, Sonniss](https://sonniss.com/gameaudiogdc) | Sonniss #GameAudioGDC Bundle licence v2.0 (`docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt`) | outside the repo (the sound library's `takes/`), copied to `art/audio/external/` by `tools/sound_sync.ps1` | none now |
+| [#GameAudioGDC 2024 bundle, Sonniss](https://sonniss.com/gameaudiogdc) | Sonniss #GameAudioGDC Bundle licence v2.0 (`docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt`) | outside the repo (the sound library's `takes/`), copied to `art/audio/external/` by `tools/sound_sync.ps1` | none now |
 
 Slots whose own takes came from someone else: none.
 

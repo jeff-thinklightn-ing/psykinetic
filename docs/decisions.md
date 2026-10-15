@@ -4517,3 +4517,39 @@ tools/map_bench, windowed, under the bench lock, alternately with main:
 frames and nodes unchanged. Rejected for now: trees by MultiMesh (the
 forest builds in 140 ms now; it would save about 14,000 nodes, but the
 near-fade swaps materials by node and would need per-instance alpha).
+
+## 268. Sound takes the licence forbids sharing live outside the repo, synced in by hash
+
+The repo is public, and the Sonniss #GameAudioGDC licence (v2.0, in
+docs/licenses/) forbids supplying its sounds "as sound effects to any other
+person ... whether unmodified, modified or re-designed": a file in the repo
+is that, a trimmed take too. Its sounds inside the exported game are allowed.
+So a sound source in art/audio/slots.json may be stored "external": its takes
+are kept in the sound library, N:\assets\sound (the NAS; PSYK_SOUND_DIR
+points elsewhere), as takes/<slot>/<slot>.ogg, .2.ogg ..., and
+art/audio/takes.json (in the repo) lists each third-party take: its slot,
+file, source, where in the source it was cut from, and its sha256.
+tools/sound_sync.ps1 copies each listed external take into
+art/audio/external/<slot>/ (git ignores it), checks its hash, removes what
+is no longer listed and reimports. tools/release_client.ps1 runs it before
+exporting and stops on any take missing or changed, so a release never
+quietly ships placeholders; with no external take listed it doesn't look
+for the library at all. The library is asked on a thread-pool thread with a
+timeout (tools/sound_library.ps1), so a NAS that is down fails the sync in
+seconds with a message instead of hanging. tools/sound_take.ps1 adds a take:
+ffmpeg cuts it, trims a one-shot's silences, makes a positional slot's take
+mono, encodes Ogg Vorbis, stores it (an external source's in the library,
+another's in the repo at its source's path), and tools/sound_take.tscn lists
+it and rewrites the status.
+
+A slot plays its own takes, else its third-party takes that are there, else
+its fill, else its fallback's, else the blip (267). The status and
+THIRD_PARTY.md go by the lists, not the disk, so they read the same on every
+machine, synced or not. The Linux Server export leaves art/audio/ out: a
+dedicated server plays nothing, so the box never needs the library. The
+sound tools run as scenes, not --script, because SoundKit reads Senses,
+which needs the autoloads. Rejected: Git LFS or a private submodule (the
+files would still be supplied to whoever can read it, and the repo is
+public), downloading from Sonniss at build time (their server refuses
+scripted downloads, and a release shouldn't depend on it), and leaving the
+copies' hashes out (a changed or half-copied file would ship unnoticed).

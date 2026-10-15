@@ -8,6 +8,14 @@ extends RefCounted
 ##
 ## - its own takes: art/audio/<category>/<slot>/<slot>.ogg (more takes
 ##   <slot>.2.ogg, <slot>.3.ogg ...; .wav too), its "source" saying whose;
+## - else its third-party takes, listed in art/audio/takes.json (written by
+##   tools/sound_take.ps1): each a file cut from a source the manifest
+##   names, with its original and its sha256. A source stored "external"
+##   (the Sonniss bundles, whose licence forbids sharing the files) keeps
+##   its takes outside the repo, in the sound library's takes/ folder,
+##   copied into art/audio/external/ (git ignores it) by
+##   tools/sound_sync.ps1; until they are copied there, the slot plays as
+##   if it had none;
 ## - else its fill: files of a third-party source the manifest names (today
 ##   Kenney's two CC0 packs, in art/audio/sfx/);
 ## - else its fallback, another slot (a footstep on grass sounds as the
@@ -21,6 +29,7 @@ extends RefCounted
 ## monsters; its "range" is how far players hear it.
 
 const MANIFEST := "res://art/audio/slots.json"
+const TAKES := "res://art/audio/takes.json"
 const ROOT := "res://art/audio/"
 const TYPES := ["oneshot", "loop", "bed"]
 const BUSES := ["sfx", "ambience", "voice", "ui", "music"]
@@ -45,6 +54,8 @@ const PLACEHOLDER_SECONDS := 0.09
 const PLACEHOLDER_DB := -14.0
 
 static var _manifest: Dictionary = {}
+static var _takes: Dictionary = {}
+static var _takes_read := false
 ## Slot -> the files it plays (res:// paths), resolved once.
 static var _files: Dictionary[String, Array] = {}
 static var _placeholders: Dictionary[String, AudioStreamWAV] = {}
@@ -55,6 +66,16 @@ static func manifest() -> Dictionary:
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST))
 		_manifest = parsed if parsed is Dictionary else {"slots": {}}
 	return _manifest
+
+
+## Slot -> its third-party takes ({file, from, original, sha256, ...} each),
+## from TAKES.
+static func all_takes() -> Dictionary:
+	if not _takes_read:
+		_takes_read = true
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(TAKES)) if FileAccess.file_exists(TAKES) else {}
+		_takes = parsed.get("takes", {}) if parsed is Dictionary else {}
+	return _takes
 
 
 static func slots() -> Dictionary:
@@ -134,21 +155,52 @@ static func fill_files(slot: String) -> Array[String]:
 	return out
 
 
-## What [param slot] plays from now: "own", "fill" (a third party's) or
-## "placeholder" (its fallback's sound or the blip).
+## [param slot]'s third-party takes, as TAKES lists them.
+static func takes(slot: String) -> Array:
+	return all_takes().get(slot, [])
+
+
+## The source the manifest names [param key].
+static func source(key: String) -> Dictionary:
+	return manifest().get("sources", {}).get(key, {})
+
+
+## Where [param take] of [param slot] is (a res:// path), there or not.
+static func take_path(slot: String, take: Dictionary) -> String:
+	return str(source(str(take.get("from", ""))).get("path", ROOT)) + slot + "/" + str(take.get("file", ""))
+
+
+## [param slot]'s third-party take files (res:// paths), whether or not
+## they are there (an external one is there once synced).
+static func take_files(slot: String) -> Array[String]:
+	var out: Array[String] = []
+	for take: Dictionary in takes(slot):
+		out.append(take_path(slot, take))
+	return out
+
+
+## What [param slot] is filled from, by the manifest and the takes list
+## (the same on every machine, synced or not): "own", "fill" (a third
+## party's: takes or a fill) or "placeholder" (its fallback's sound or the
+## blip).
 static func filled_by(slot: String) -> String:
 	if not own_files(slot).is_empty():
 		return "own"
+	if not takes(slot).is_empty():
+		return "fill"
 	return "fill" if not _existing(fill_files(slot)).is_empty() else "placeholder"
 
 
 ## The slot whose takes [param slot] plays: itself, or the first along its
-## fallbacks that has some; "" for none (the placeholder).
-static func played_from(slot: String) -> String:
+## fallbacks that has some; "" for none (the placeholder). On disk (the
+## default) a slot whose takes are listed but not synced has none; by the
+## lists alone (on_disk false: the status) it has them.
+static func played_from(slot: String, on_disk := true) -> String:
 	var seen: Array[String] = []
 	var at := slot
 	while has(at) and at not in seen:
-		if filled_by(at) != "placeholder":
+		var filled := not _playing(at).is_empty() if on_disk else filled_by(at) != "placeholder"
+		if filled:
 			return at
 		seen.append(at)
 		at = str(spec(at).get("fallback", ""))
@@ -159,13 +211,19 @@ static func played_from(slot: String) -> String:
 static func files(slot: String) -> Array:
 	if not _files.has(slot):
 		var from := played_from(slot)
-		var found: Array[String] = []
-		if from != "":
-			found = own_files(from)
-			if found.is_empty():
-				found = _existing(fill_files(from))
-		_files[slot] = found
+		_files[slot] = _playing(from) if from != "" else []
 	return _files[slot]
+
+
+## [param slot]'s own takes there, else its third-party takes there, else
+## its fill there.
+static func _playing(slot: String) -> Array[String]:
+	var found := own_files(slot)
+	if found.is_empty():
+		found = _existing(take_files(slot))
+	if found.is_empty():
+		found = _existing(fill_files(slot))
+	return found
 
 
 ## The slot for opening [param entity]'s slots: a chest's lid, a crate's or
@@ -179,6 +237,8 @@ static func opening(entity: GridEntity) -> String:
 ## Forget what was resolved (after takes land, for tools and tests).
 static func reload() -> void:
 	_manifest = {}
+	_takes = {}
+	_takes_read = false
 	_files.clear()
 
 
@@ -273,14 +333,21 @@ static func status_markdown() -> String:
 		"|------|------|-----|-------|-----------|----------|",
 	]
 	for slot: String in groups.placeholder:
-		var from := played_from(slot)
+		var from := played_from(slot, false)
 		var meanwhile := ("`%s`" % from) if from != "" else ("silence" if placeholder(bus(slot)) == null else "blip")
 		lines.append(_row(slot, [_type(slot), bus(slot), _heard(slot), meanwhile, _uses(slot)]))
 	lines.append_array(["", "## Third-party fills to replace", "",
 		"| Slot | Takes | Heard | From | Licence |", "|------|-------|-------|------|---------|"])
 	for slot: String in groups.fill:
-		var source: Dictionary = manifest().get("sources", {}).get(str(spec(slot)["fill"].get("from", "")), {})
-		lines.append(_row(slot, [str(files(slot).size()), _heard(slot), str(source.get("name", "?")), str(source.get("license", "?"))]))
+		var from_names: Array[String] = []
+		var licenses: Array[String] = []
+		for key in _sources_of(slot):
+			if str(source(key).get("name", key)) not in from_names:
+				from_names.append(str(source(key).get("name", key)))
+			if str(source(key).get("license", "?")) not in licenses:
+				licenses.append(str(source(key).get("license", "?")))
+		var count := takes(slot).size() if not takes(slot).is_empty() else fill_files(slot).size()
+		lines.append(_row(slot, [str(count), _heard(slot), ", ".join(from_names), ", ".join(licenses)]))
 	lines.append_array(["", "## Own takes", "", "| Slot | Takes | By | Licence | Date |", "|------|-------|----|---------|------|"])
 	for slot: String in groups.own:
 		var source: Dictionary = spec(slot).get("source", {})
@@ -301,13 +368,15 @@ static func third_party_block() -> String:
 	var all := slots().keys()
 	all.sort()
 	for name: String in names:
-		var source: Dictionary = sources[name]
+		var from: Dictionary = sources[name]
 		var played: Array[String] = []
 		for slot: String in all:
-			if filled_by(slot) == "fill" and str(spec(slot)["fill"].get("from", "")) == name:
+			if filled_by(slot) == "fill" and name in _sources_of(slot):
 				played.append(slot)
-		lines.append("| [%s](%s) | %s (`%s`) | `%s` | %s |" % [source.get("name", name), source.get("url", ""), source.get("license", "?"),
-			source.get("license_file", ""), str(source.get("path", "")).trim_prefix("res://"), ", ".join(played) if not played.is_empty() else "none now"])
+		var path := str(from.get("path", "")).trim_prefix("res://")
+		var where := ("outside the repo (the sound library's `takes/`), copied to `%s` by `tools/sound_sync.ps1`" % path) if str(from.get("store", "")) == "external" else "`%s`" % path
+		lines.append("| [%s](%s) | %s (`%s`) | %s | %s |" % [from.get("name", name), from.get("url", ""), from.get("license", "?"),
+			from.get("license_file", ""), where, ", ".join(played) if not played.is_empty() else "none now"])
 	var own: Array[String] = []
 	for slot: String in all:
 		var by := str(spec(slot).get("source", {}).get("by", ""))
@@ -318,6 +387,17 @@ static func third_party_block() -> String:
 	lines.append("")
 	lines.append(THIRD_PARTY_END)
 	return "\n".join(lines)
+
+
+## The sources [param slot] is filled from: its takes', else its fill's.
+static func _sources_of(slot: String) -> Array[String]:
+	var out: Array[String] = []
+	for take: Dictionary in takes(slot):
+		if str(take.get("from", "")) not in out:
+			out.append(str(take.get("from", "")))
+	if out.is_empty() and spec(slot).has("fill"):
+		out.append(str(spec(slot)["fill"].get("from", "")))
+	return out
 
 
 static func _row(slot: String, cells: Array) -> String:

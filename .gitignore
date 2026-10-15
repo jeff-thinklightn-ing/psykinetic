@@ -11,8 +11,12 @@ art/kenney-castle/Models/OBJ format/
 art/kenney-castle/Previews/
 # A player's client settings and updater log, never the repo's.
 settings.cfg
-update.log# Kenney's audio packs as downloaded: never committed or exported (each has
+update.log
+# Kenney's audio packs as downloaded: never committed or exported (each has
 # a .gdignore). The game's sounds are the copies in art/audio/sfx/.
 art/audio/kenney_rpg-audio/
 art/audio/kenney_impact-sounds/
 /.box/
+# Sound takes from sources whose licence forbids sharing them (Sonniss): kept in the
+# sound library outside the repo, copied here by tools/sound_sync.ps1 (decision 268).
+art/audio/external/
