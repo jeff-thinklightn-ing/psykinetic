@@ -14,6 +14,8 @@ extends Node
 ## default, every spot, 32). With --repeat=N, the ticks are timed in N
 ## blocks, and the median block and the spread are printed too: compare
 ## medians (a single run's average moves by several ms on a shared machine).
+## With --settle=N the map runs N ticks with the host alone before the
+## other players come and the timing starts.
 ##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--repeat=1] [--seconds=8]
 
 const NAME := "bench"
@@ -24,6 +26,7 @@ var monsters := 2
 var players := 1
 var cells_per_monster := 0.0
 var repeat := 1
+var settle := 0
 var ticks := 200
 var seconds := 8.0
 var _main: Node
@@ -40,6 +43,7 @@ func _ready() -> void:
 			"players": players = maxi(1, pair[1].to_int())
 			"cells-per-monster": cells_per_monster = pair[1].to_float()
 			"repeat": repeat = maxi(1, pair[1].to_int())
+			"settle": settle = maxi(0, pair[1].to_int())
 			"ticks": ticks = pair[1].to_int()
 			"seconds": seconds = pair[1].to_float()
 	var windowed := DisplayServer.get_name() != "headless"
@@ -74,6 +78,11 @@ func _ready() -> void:
 		_main._client3d.rebuild(_main._terrain, _main.level_centre)
 		_report("  3D client rebuild again", started)
 
+	# --settle=N: the map runs N ticks with the host alone in its corner
+	# before the others come, as a server's zone has run before players
+	# arrive somewhere (what was worked out ahead is ready).
+	for i in settle:
+		World.step()
 	if players > 1:
 		_spread_players()
 	World.step()
