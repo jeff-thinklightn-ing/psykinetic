@@ -4123,9 +4123,11 @@ sound block, and sound_kit_test fails while either is stale.
 
 Each positional slot names the sim's noise kind it goes with (World.noise:
 step, fight, door, ...), and how far it carries comes from that kind's
-radius (SoundKit.NOISES, Senses' own constants, plus thud, rummage, break,
-latch and door_rattle as enemy-ai agreed them, until Senses has them): the
-one number sets how far monsters and players hear it, so they can't drift.
+radius (SoundKit.NOISES, Senses' own constants; thud, rummage, break, latch and
+door_rattle were provisional numbers until enemy-ai put them in Senses, and
+now are Senses' too, a thud named by weight as thud_light or thud_heavy,
+items' split at 5 kg): the one number sets how far monsters and players
+hear it, so they can't drift.
 A slot monsters don't hear (goblin chatter, picking an item up) says
 "noise": null and gives a range; the status lists them. UI and ambience
 beds are flat (positional false). Playback still uses Sfx's fixed

@@ -1,5 +1,5 @@
 {
-	"about": "The game's sound slots: everything the game plays, by name. Read by SoundKit (client3d/sound_kit.gd), which Sfx plays them through; tools/sound_status.gd writes docs/sound_status.md and THIRD_PARTY.md's sound block from it. A slot is played from, in order: its own takes in art/audio/<category>/<slot>/ (<slot>.ogg, <slot>.2.ogg ...; .wav too), named in 'source'; its fill, files of a third-party source (its 'path' + each of 'files'); its fallback, another slot; else a placeholder blip (a bed: silence). 'noise' is the sim's noise kind the sound goes with (World.noise; its radius is how far both monsters and players hear it); null means monsters do not hear it, and 'range' (cells) is how far players do. 'positional': false plays it flat (UI, beds). 'type' is oneshot, loop or bed; 'bus' is sfx, ambience, voice, ui or music.",
+	"about": "The game's sound slots: everything the game plays, by name. Read by SoundKit (client3d/sound_kit.gd), which Sfx plays them through; tools/sound_status.gd writes docs/sound_status.md and THIRD_PARTY.md's sound block from it. A slot is played from, in order: its own takes in art/audio/<category>/<slot>/ (<slot>.ogg, <slot>.2.ogg ...; .wav too), named in 'source'; its fill, files of a third-party source (its 'path' + each of 'files'); its fallback, another slot; else a placeholder blip (a bed: silence). 'noise' is the sim noise the sound goes with (a key of SoundKit.NOISES: World.noise's kind, or one radius of it such as thud_light; Senses' radius is how far both monsters and players hear it); null means monsters do not hear it, and 'range' (cells) is how far players do. 'positional': false plays it flat (UI, beds). 'type' is oneshot, loop or bed; 'bus' is sfx, ambience, voice, ui or music.",
 	"version": 1,
 	"sources": {
 		"kenney-impact": {
@@ -592,9 +592,9 @@
 			"category": "items",
 			"type": "oneshot",
 			"bus": "sfx",
-			"noise": "thud",
+			"noise": "thud_light",
 			"volume_db": -4.0,
-			"uses": "a light item dropped; not played yet"
+			"uses": "a light item dropped (under 5 kg); not played yet"
 		},
 		"sfx.item_pickup_heavy": {
 			"category": "items",
@@ -609,9 +609,9 @@
 			"category": "items",
 			"type": "oneshot",
 			"bus": "sfx",
-			"noise": "thud",
+			"noise": "thud_heavy",
 			"volume_db": -4.0,
-			"uses": "a heavy item dropped; not played yet"
+			"uses": "a heavy item dropped (from 5 kg); not played yet"
 		},
 		"sfx.throw": {
 			"category": "items",
@@ -623,21 +623,21 @@
 			"uses": "an item thrown, the release; not played yet",
 			"fallback": "sfx.swing"
 		},
-		"sfx.thrown_land_soft": {
+		"sfx.thrown_land_light": {
 			"category": "items",
 			"type": "oneshot",
 			"bus": "sfx",
-			"noise": "thud",
+			"noise": "thud_light",
 			"volume_db": -4.0,
-			"uses": "a thrown item landing on earth or a body; not played yet"
+			"uses": "a thrown item under 5 kg landing; not played yet"
 		},
-		"sfx.thrown_land_hard": {
+		"sfx.thrown_land_heavy": {
 			"category": "items",
 			"type": "oneshot",
 			"bus": "sfx",
-			"noise": "thud",
+			"noise": "thud_heavy",
 			"volume_db": -4.0,
-			"uses": "a thrown item landing on stone or wood; not played yet"
+			"uses": "a thrown item from 5 kg landing; not played yet"
 		},
 		"sfx.bandage": {
 			"category": "items",

@@ -61,16 +61,16 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `sfx.hit_fist_flesh` | oneshot | sfx | fight 5 | `sfx.hit_flesh` | a fist blow on flesh; not played yet |
 | `sfx.hit_stone` | oneshot | sfx | fight 5 | `sfx.knockback_stone` | a blow on stone; not played yet |
 | `sfx.hit_wood` | oneshot | sfx | fight 5 | `sfx.knockback_wood` | a blow on a door, crate or wooden prop; not played yet |
-| `sfx.item_drop_heavy` | oneshot | sfx | thud 4 | blip | a heavy item dropped; not played yet |
-| `sfx.item_drop_light` | oneshot | sfx | thud 4 | blip | a light item dropped; not played yet |
+| `sfx.item_drop_heavy` | oneshot | sfx | thud_heavy 4 | blip | a heavy item dropped (from 5 kg); not played yet |
+| `sfx.item_drop_light` | oneshot | sfx | thud_light 2 | blip | a light item dropped (under 5 kg); not played yet |
 | `sfx.item_pickup_heavy` | oneshot | sfx | players 2 | blip | a heavy item picked up; not played yet |
 | `sfx.item_pickup_light` | oneshot | sfx | players 2 | blip | a light item picked up; not played yet |
 | `sfx.knockdown` | oneshot | sfx | fight 5 | `sfx.knockback_body_soft` | a body knocked off its feet; not played yet |
 | `sfx.splash` | oneshot | sfx | players 4 | blip | a body or thing falling into water; not played yet |
 | `sfx.swing_heavy` | oneshot | sfx | fight 5 | `sfx.swing` | a two-handed or heavy weapon's swing; not played yet |
 | `sfx.throw` | oneshot | sfx | players 3 | `sfx.swing` | an item thrown, the release; not played yet |
-| `sfx.thrown_land_hard` | oneshot | sfx | thud 4 | blip | a thrown item landing on stone or wood; not played yet |
-| `sfx.thrown_land_soft` | oneshot | sfx | thud 4 | blip | a thrown item landing on earth or a body; not played yet |
+| `sfx.thrown_land_heavy` | oneshot | sfx | thud_heavy 4 | blip | a thrown item from 5 kg landing; not played yet |
+| `sfx.thrown_land_light` | oneshot | sfx | thud_light 2 | blip | a thrown item under 5 kg landing; not played yet |
 | `ui.chat_ping` | oneshot, flat | ui |  | blip | a chat line for you; not played yet |
 | `ui.click` | oneshot, flat | ui |  | blip | a button pressed; not played yet |
 | `ui.error` | oneshot, flat | ui |  | blip | something you can't do; not played yet |

@@ -25,15 +25,20 @@ const ROOT := "res://art/audio/"
 const TYPES := ["oneshot", "loop", "bed"]
 const BUSES := ["sfx", "ambience", "voice", "ui", "music"]
 const EXTENSIONS := ["ogg", "wav"]
-## The sim's noise kinds, cells heard (Chebyshev; half with no clear line).
-## The first are Senses' own; the rest enemy-ai agreed for sounds the sim
-## does not make yet, and move to Senses when it does.
+## The sim's noises a slot may name, cells heard (Chebyshev; half with no
+## clear line): Senses' own radii, so a sound carries as far for players as
+## for monsters. A footstep's is the body's (Senses.step_radius) where the
+## body is known.
 const NOISES := {
 	"step": Senses.NOISE_STEP, "speech": Senses.NOISE_SPEECH, "shout": Senses.NOISE_SHOUT,
 	"whisper": Senses.NOISE_WHISPER, "fight": Senses.NOISE_FIGHT, "door": Senses.NOISE_DOOR,
 	"door_struck": Senses.NOISE_DOOR_STRUCK, "door_broken": Senses.NOISE_DOOR_BROKEN,
-	"thud": 4, "rummage": 4, "break": 8, "latch": 3, "door_rattle": 6,
+	"door_rattle": Senses.NOISE_RATTLE, "latch": Senses.NOISE_LATCH, "rummage": Senses.NOISE_RUMMAGE,
+	"break": Senses.NOISE_BREAK, "thud_light": Senses.NOISE_THUD_LIGHT, "thud_heavy": Senses.NOISE_THUD_HEAVY,
 }
+## A slot's noise that is one radius of a sim kind: the kind World.noise
+## makes for it.
+const NOISE_KINDS := {"thud_light": "thud", "thud_heavy": "thud"}
 ## The placeholder blip: its pitch by bus (Hz), how long (s) and how loud.
 const PLACEHOLDER_PITCH := {"sfx": 660.0, "voice": 440.0, "ui": 990.0}
 const PLACEHOLDER_SECONDS := 0.09
@@ -76,11 +81,16 @@ static func positional(slot: String) -> bool:
 	return bool(spec(slot).get("positional", true))
 
 
-## The sim noise kind [param slot] goes with, or "" when monsters do not
-## hear it.
+## The noise [param slot] names (a key of NOISES), or "" when monsters do
+## not hear it.
 static func noise(slot: String) -> String:
 	var kind: Variant = spec(slot).get("noise")
 	return str(kind) if kind != null else ""
+
+
+## The sim noise kind [param slot] goes with (World.noise's), or "".
+static func noise_kind(slot: String) -> String:
+	return str(NOISE_KINDS.get(noise(slot), noise(slot)))
 
 
 ## How far [param slot] is heard, in cells: its noise's radius, else its
