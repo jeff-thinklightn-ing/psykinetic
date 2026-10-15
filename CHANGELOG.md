@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Cave walls are ready for maps that ask for them: rough rock, thick at
+  the foot, with ragged tops, and a rock floor.
 - Homes are built of wood: timber walls a little thinner and not quite
   straight, and plank floors inside. Maps can say which set their walls and
   floors are drawn in (castle, wood, stone or cave); every map today keeps

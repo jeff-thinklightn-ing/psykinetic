@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_heights()
 	_test_water()
 	await _test_wall_runs()
+	_test_cave_walls()
 	_test_scatter()
 	_test_buildings()
 	_test_building_states()
@@ -507,6 +508,68 @@ func _test_wall_runs() -> void:
 	_check(faded != null and faded.albedo_color.a < 1.0 and faded.next_pass != null, "a near run is see-through, its depth drawn first")
 	_rig._set_near(run, false)
 	_check((body.material_override as BaseMaterial3D).albedo_color.a == 1.0, "and solid again after")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+func _test_cave_walls() -> void:
+	print("
+== cave walls: rock, not a profile; 0.6 to 0.9 m thick, a ragged top, never far into a walkable cell, no seam ==")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"].duplicate()
+	terrain["walls"] = "cave"
+	_rig.rebuild(terrain, castle["centre"])
+	var by_run: Dictionary[Node3D, Array] = {}
+	for key: Vector3i in _rig._walls:
+		if not by_run.has(_rig._walls[key]):
+			by_run[_rig._walls[key]] = []
+		by_run[_rig._walls[key]].append(key)
+	var reach := true
+	var feet := true
+	var tops := true
+	var heights: Dictionary[float, bool] = {}
+	for run: Node3D in by_run:
+		var body := run.get_node("Body") as MeshInstance3D
+		var foot := 0.0
+		var top := 0.0
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			reach = reach and absf(point.x) <= Client3D.CAVE_REACH + 0.0001
+			if point.y < 0.001:
+				foot = maxf(foot, absf(point.x))
+			top = maxf(top, point.y)
+		feet = feet and foot >= 0.3 - 0.0001 and foot <= Client3D.CAVE_REACH + 0.0001
+		tops = tops and top >= Client3D.CAVE_TOP_LOW * 0.55 and top <= Client3D.CAVE_TOP_HIGH + Client3D.CAVE_RIDGE + Client3D.CAVE_BUMP
+		heights[snappedf(top, 0.05)] = true
+	_check(by_run.size() > 0 and _rig._set_of(by_run[by_run.keys()[0]][0]) == "cave" and (by_run.keys()[0].get_node("Body") as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR] != null,
+			"a map whose walls are \"cave\": its runs are rock, coloured facets (%d runs)" % by_run.size())
+	_check(reach, "nothing more than %.2f m from the edge's line, into a walkable cell" % Client3D.CAVE_REACH)
+	_check(feet, "between 0.6 and 0.9 m thick at the foot")
+	_check(tops and heights.size() > 3, "tops ragged, %.1f to %.1f m and a ridge (%d heights)" % [Client3D.CAVE_TOP_LOW, Client3D.CAVE_TOP_HIGH, heights.size()])
+	# Runs that meet on a line share their points: no seam.
+	var pairs := 0
+	var seams := 0
+	var runs := by_run.keys()
+	for a: Node3D in runs:
+		for b: Node3D in runs:
+			var a_keys: Array = by_run[a]
+			var b_keys: Array = by_run[b]
+			a_keys.sort_custom(func(x: Vector3i, y: Vector3i) -> bool: return Client3D._along(x) < Client3D._along(y))
+			b_keys.sort_custom(func(x: Vector3i, y: Vector3i) -> bool: return Client3D._along(x) < Client3D._along(y))
+			if Client3D._line_of(a_keys[0]) != Client3D._line_of(b_keys[0]) or Client3D._along(a_keys[-1]) + 1 != Client3D._along(b_keys[0]):
+				continue
+			pairs += 1
+			var ends: Array[Dictionary] = [{}, {}]
+			for side in 2:
+				var body := ([a, b][side] as Node3D).get_node("Body") as MeshInstance3D
+				var at := float(a_keys.size()) if side == 0 else 0.0
+				for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+					if absf(point.z - at) < 0.0001:
+						ends[side][(body.global_transform * point).snappedf(0.001)] = true
+			seams += 0 if ends[0].keys().all(func(point: Vector3) -> bool: return ends[1].has(point)) and ends[0].size() == ends[1].size() else 1
+	_check(seams == 0, "runs meeting on a line share every point where they meet (%d pairs, %d with a seam)" % [pairs, seams])
+	var lumps := _rig._posts.values().filter(func(post: Node3D) -> bool:
+		var body := post.get_node_or_null("Body") as MeshInstance3D
+		return body != null and body.mesh is ArrayMesh)
+	_check(_rig._posts.size() > 0 and lumps.size() == _rig._posts.size(), "its posts lumps of the same rock while wall.cave.end has no art (%d of %d)" % [lumps.size(), _rig._posts.size()])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

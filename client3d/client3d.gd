@@ -133,6 +133,24 @@ const CLIFF_ROCK := Vector2i(1, 5)
 const CLIFF_ROW := 0.2
 const CLIFF_ACROSS := 4
 const CLIFF_JITTER := 0.07
+## The cave set's walls (decision 286): rock, not a swept profile. A run is
+## faceted as the cliffs are, CAVE_ALONG facets a metre along and CAVE_ROWS
+## up; its thickness at the foot is the profile's times CAVE_THICK_LOW to
+## _HIGH (0.6 to 0.9 m), its top CAVE_TOP_LOW to _HIGH along it, a ragged
+## ridge CAVE_RIDGE above, its faces pushed up to CAVE_BUMP; nothing past
+## CAVE_REACH from the edge's line, into a walkable cell. A post where the
+## set has no art is a lump of the same rock, CAVE_LUMP_SIDES round.
+const CAVE_SET := "cave"
+const CAVE_ALONG := 4
+const CAVE_ROWS := 8
+const CAVE_THICK_LOW := 0.75
+const CAVE_THICK_HIGH := 1.12
+const CAVE_TOP_LOW := 2.4
+const CAVE_TOP_HIGH := 3.4
+const CAVE_RIDGE := 0.15
+const CAVE_BUMP := 0.1
+const CAVE_REACH := 0.45
+const CAVE_LUMP_SIDES := 8
 ## Each ground kind's colour: a swatch of art-kit's palette (row, column;
 ## docs/art_style.md), read from art/kit/palette.png, so a repainted swatch
 ## repaints the ground; and its channel in the ground's kinds texture
@@ -3538,6 +3556,12 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		if states[i] == WALL_WHOLE and (_roll(Vector2i(run[i].x, run[i].y), 22 + run[i].z) < broken
 				or i > 0 and states[i - 1] == WALL_RUBBLE or i < count - 1 and states[i + 1] == WALL_RUBBLE):
 			states[i] = WALL_TOPLESS
+	if set_name == CAVE_SET:
+		for k in count:
+			if states[k] == WALL_RUBBLE:
+				_wall_breaches.append(run[k])
+		_add_cave_run(run, states)
+		return
 	# A broken or rubble edge the set has art for is that piece.
 	var pieces: Dictionary[int, String] = {}
 	for k in count:
@@ -3621,6 +3645,220 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 	drawn.mesh = array_mesh
 	drawn.material_override = _wall_material(set_name)
 	holder.add_child(drawn)
+
+
+## A run of the cave set (286): rock in the run's frame (x across, y up,
+## z along), its shape read from where it is in the world, so runs on one
+## line meet without a seam: each column along it CAVE_ROWS points up each
+## side, the profile's width at that height times a thickness that wanders
+## along the line, pushed about; a ragged ridge on top; the run's own ends
+## closed. A broken edge stands about half as tall, rubble as rubble does
+## (WALL_RUBBLE_LOW to _HIGH). Faceted, coloured as the cliffs.
+func _add_cave_run(run: Array[Vector3i], states: PackedInt32Array) -> void:
+	var first := run[0]
+	var east := first.z == Terrain.EAST
+	var line := first.x + 0.5 if east else first.y + 0.5
+	var start := _along(first) - 0.5
+	var base := _edge_base(first)
+	var count := run.size()
+	var seed := _line_of(first)
+	var wall_set := _wall_set(CAVE_SET)
+	var profile: PackedVector2Array = wall_set["points"]
+	var tall: float = wall_set["top"]
+	# Each column's top and width, and its points: left side up, the ridge,
+	# right side down.
+	var steps := count * CAVE_ALONG
+	var columns: Array[PackedVector3Array] = []
+	for step in steps + 1:
+		var z := step / float(CAVE_ALONG)
+		var along := start + z
+		var top := INF
+		for i: int in [floori(z - 0.001), floori(z + 0.001)]:
+			if i < 0 or i >= count:
+				continue
+			var whole := lerpf(CAVE_TOP_LOW, CAVE_TOP_HIGH, _cave_noise(along, seed, 0))
+			match states[i]:
+				WALL_TOPLESS: top = minf(top, whole * 0.55)
+				WALL_RUBBLE: top = minf(top, lerpf(WALL_RUBBLE_LOW, WALL_RUBBLE_HIGH, _cave_noise(along, seed, 2)))
+				_: top = minf(top, whole)
+		var thick := lerpf(CAVE_THICK_LOW, CAVE_THICK_HIGH, _cave_noise(along, seed, 1))
+		var column := PackedVector3Array()
+		for side: float in [-1.0, 1.0]:
+			for r in CAVE_ROWS + 1:
+				var row := r if side < 0.0 else CAVE_ROWS - r
+				var v := row / float(CAVE_ROWS)
+				var y := v * top
+				var x := side * _profile_half(profile, v * tall) * thick
+				if row > 0:
+					var bump := _cave_bump(along, y, side, seed)
+					x += bump.x * minf(1.0, y)
+					y += bump.y if row < CAVE_ROWS else 0.0
+				column.append(Vector3(clampf(x, -CAVE_REACH, CAVE_REACH), y, z))
+			if side < 0.0:
+				var ridge := _cave_bump(along, top, 0.0, seed)
+				column.append(Vector3(clampf(ridge.x, -CAVE_REACH, CAVE_REACH), top + CAVE_RIDGE * (0.5 + ridge.y / CAVE_BUMP * 0.5), z))
+		columns.append(column)
+	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
+	var points := columns[0].size()
+	for step in steps:
+		var a := columns[step]
+		var b := columns[step + 1]
+		# Up the left side, over the ridge, down the right.
+		for k in points - 1:
+			var out := Vector3(-1.0 if k <= CAVE_ROWS else 1.0, 0.0, 0.0)
+			if k == CAVE_ROWS or k == CAVE_ROWS + 1:
+				out = Vector3(out.x * 0.3, 1.0, 0.0)
+			_rock_quad(mesh, a[k], b[k], b[k + 1], a[k + 1], out, 0.0, tall)
+	# The run's ends: the column as a face.
+	for end in 2:
+		var column := columns[0 if end == 0 else steps]
+		var out := Vector3(0.0, 0.0, -1.0 if end == 0 else 1.0)
+		for k in CAVE_ROWS:
+			_rock_quad(mesh, column[k], column[k + 1], column[points - 2 - k], column[points - 1 - k], out, 0.0, tall)
+		_rock_quad(mesh, column[CAVE_ROWS], column[CAVE_ROWS + 1], column[CAVE_ROWS + 2], column[CAVE_ROWS], out, 0.0, tall)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = mesh[0]
+	arrays[Mesh.ARRAY_NORMAL] = mesh[1]
+	arrays[Mesh.ARRAY_COLOR] = mesh[2]
+	var array_mesh := ArrayMesh.new()
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var holder := Node3D.new()
+	holder.position = Vector3(line, base, start) if east else Vector3(start, base, line)
+	holder.rotation.y = 0.0 if east else PI * 0.5
+	holder.name = "Wall_%d_%d_%s" % [first.x, first.y, "e" if east else "s"]
+	var drawn := MeshInstance3D.new()
+	drawn.name = "Body"
+	drawn.mesh = array_mesh
+	drawn.material_override = _rock_material()
+	holder.add_child(drawn)
+	_room.add_child(holder)
+	for key in run:
+		_walls[key] = holder
+
+
+## A quad a b c d of rock into [param mesh] ([positions, normals, colours]),
+## as two flat facets facing [param out], each its own shade of the cliffs'
+## rock, darker toward the foot ([param low] to [param high]).
+func _rock_quad(mesh: Array, a: Vector3, b: Vector3, c: Vector3, d: Vector3, out: Vector3, low: float, high: float) -> void:
+	for triangle: Array in [[a, b, c], [a, c, d]]:
+		var p0: Vector3 = triangle[0]
+		var p1: Vector3 = triangle[1]
+		var p2: Vector3 = triangle[2]
+		var normal := (p1 - p0).cross(p2 - p0)
+		if normal.length_squared() < 0.0000001:
+			continue
+		normal = normal.normalized()
+		if normal.dot(out) < 0.0:
+			normal = -normal
+			var swap := p1
+			p1 = p2
+			p2 = swap
+		var middle := (p0 + p1 + p2) / 3.0
+		var shade := lerpf(0.8, 1.15, _roll(Vector2i(roundi(middle.x * 16.0) + roundi(middle.y * 16.0) * 131, roundi(middle.z * 16.0)), 38))
+		shade *= lerpf(0.72, 1.0, clampf(inverse_lerp(low, high, middle.y), 0.0, 1.0))
+		var colour := Color(swatch(CLIFF_ROCK.x, CLIFF_ROCK.y) * shade, 1.0)
+		mesh[0].append_array([p0, p1, p2])
+		mesh[1].append_array([normal, normal, normal])
+		mesh[2].append_array([colour, colour, colour])
+
+
+## A lump of the cave's rock at [param vertex] (its post, while wall.cave.end
+## has no art): CAVE_LUMP_SIDES round, as wide as the walls are at their
+## thickest, as tall as they are there, pushed about as they are.
+func _cave_lump(vertex: Vector2i) -> Node3D:
+	var wall_set := _wall_set(CAVE_SET)
+	var profile: PackedVector2Array = wall_set["points"]
+	var tall: float = wall_set["top"]
+	var seed := Vector2i(vertex.x * 7, vertex.y * 13)
+	var top := lerpf(CAVE_TOP_LOW, CAVE_TOP_HIGH, _cave_noise(vertex.x * 1.7 + vertex.y, seed, 0)) + CAVE_RIDGE
+	var rings: Array[PackedVector3Array] = []
+	for r in CAVE_ROWS + 1:
+		var v := r / float(CAVE_ROWS)
+		var ring := PackedVector3Array()
+		var radius := minf(_profile_half(profile, v * tall) * CAVE_THICK_HIGH, CAVE_REACH) if r < CAVE_ROWS else 0.08
+		for k in CAVE_LUMP_SIDES:
+			var angle := TAU * k / CAVE_LUMP_SIDES
+			var bump := _cave_bump(angle * 3.0 + vertex.x, v * top, 1.0, seed) if r > 0 else Vector2.ZERO
+			var reach := clampf(radius + bump.x, 0.05, CAVE_REACH)
+			ring.append(Vector3(cos(angle) * reach, v * top + (bump.y if r > 0 and r < CAVE_ROWS else 0.0), sin(angle) * reach))
+		rings.append(ring)
+	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
+	for r in CAVE_ROWS:
+		for k in CAVE_LUMP_SIDES:
+			var next := (k + 1) % CAVE_LUMP_SIDES
+			var middle := (rings[r][k] + rings[r][next]) * 0.5
+			_rock_quad(mesh, rings[r][k], rings[r][next], rings[r + 1][next], rings[r + 1][k], Vector3(middle.x, 0.2, middle.z), 0.0, top)
+	# Its top closed.
+	var peak := Vector3(0.0, top + CAVE_RIDGE, 0.0)
+	for k in CAVE_LUMP_SIDES:
+		_rock_quad(mesh, rings[CAVE_ROWS][k], rings[CAVE_ROWS][(k + 1) % CAVE_LUMP_SIDES], peak, peak, Vector3.UP, 0.0, top)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = mesh[0]
+	arrays[Mesh.ARRAY_NORMAL] = mesh[1]
+	arrays[Mesh.ARRAY_COLOR] = mesh[2]
+	var array_mesh := ArrayMesh.new()
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var holder := Node3D.new()
+	var drawn := MeshInstance3D.new()
+	drawn.name = "Body"
+	drawn.mesh = array_mesh
+	drawn.material_override = _rock_material()
+	holder.add_child(drawn)
+	return holder
+
+
+## How wide [param profile] is either side of its middle at [param y] (the
+## widest of where its sides cross that height).
+static func _profile_half(profile: PackedVector2Array, y: float) -> float:
+	var half := 0.0
+	for k in profile.size():
+		var p := profile[k]
+		var q := profile[(k + 1) % profile.size()]
+		if (p.y <= y and q.y >= y or q.y <= y and p.y >= y) and p.y != q.y:
+			half = maxf(half, absf(lerpf(p.x, q.x, (y - p.y) / (q.y - p.y))))
+		elif is_equal_approx(p.y, y):
+			half = maxf(half, absf(p.x))
+	return half
+
+
+## Smooth noise 0..1 along a line of the cave's walls ([param seed] the
+## line, [param channel] which wander: 0 the top, 1 the thickness, 2
+## rubble's top), the same for every run on the line.
+static var _cave_noise_source: FastNoiseLite
+
+
+static func _cave_noise(along: float, seed: Vector2i, channel: int) -> float:
+	if _cave_noise_source == null:
+		_cave_noise_source = FastNoiseLite.new()
+		_cave_noise_source.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		_cave_noise_source.seed = 286
+		_cave_noise_source.frequency = 0.45
+	var value := _cave_noise_source.get_noise_2d(along, seed.x * 37.0 + seed.y * 11.3 + channel * 101.0)
+	return clampf(value * 0.5 + 0.5, 0.0, 1.0)
+
+
+## How far a cave wall's point is pushed (across, up), by where it is alone
+## (its place along, its height, its side), so the runs that share it push
+## it alike.
+static func _cave_bump(along: float, y: float, side: float, seed: Vector2i) -> Vector2:
+	var key := Vector2i(roundi(along * 64.0) * 3 + roundi(side) + 1, seed.x * 100003 + seed.y)
+	var level := roundi(y * 32.0)
+	return Vector2((_roll(key, level) - 0.5) * 2.0, (_roll(key, level + 5) - 0.5) * 0.6) * CAVE_BUMP
+
+
+## The rock's material: the cliffs' (vertex colour, flat facets), made once.
+static var _rock: StandardMaterial3D
+
+
+static func _rock_material() -> StandardMaterial3D:
+	if _rock == null:
+		_rock = StandardMaterial3D.new()
+		_rock.vertex_color_use_as_albedo = true
+		_rock.roughness = 1.0
+		_rock.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _rock
 
 
 ## A run's mesh leant across by [param shear] (metres across a metre up:
@@ -3949,6 +4187,8 @@ func _add_post(vertex: Vector2i) -> void:
 	var slot := "wall.%s.post" % set_name if ArtKit.has("wall.%s.post" % set_name) else "wall.%s.end" % set_name
 	if BOX_WALLS:
 		post = _box(Vector3(POST_SIZE, WALL_HEIGHT, POST_SIZE), _stone_opaque)
+	elif set_name == CAVE_SET and (not ArtKit.has(slot) or ArtKit.filled_by(slot) == "placeholder"):
+		post = _cave_lump(vertex)
 	elif not ArtKit.has(slot) or ArtKit.filled_by(slot) == "placeholder" and set_name != DEFAULT_SET:
 		var wall_set := _wall_set(set_name)
 		var side: float = wall_set["half"] * 2.0

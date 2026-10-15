@@ -5719,3 +5719,24 @@ Found on the way: decision 299's _release_zones also runs on a host's exit,
 where its 3D view answered each freed entity at once and read the rest
 (a SCRIPT ERROR in Fields.any_carried_heat); it now pauses the tree and frees
 the 3D view before the entities.
+## 286. Cave walls are rock, not a swept profile
+
+A map or edge in the cave set (decision 285) is drawn as rock, the way the
+cliffs are (decision 226): flat facets in the cliffs' swatch, each its own
+shade, darker toward the foot, one mesh a run. A run is columns a quarter
+metre apart along it, each CAVE_ROWS points up either side and a ragged
+ridge on top. Its width at a height is wall.cave.profile's (wide at the
+foot, narrowing up), times a thickness that wanders along the line (0.6 to
+0.9 m at the foot); its top wanders 2.4 to 3.4 m; its points are pushed up
+to 0.1 m. All of it is read from where the point is in the world (the
+line, the place along it, the height), so two runs on a line meet on the
+same points with no seam. Nothing reaches more than 0.45 m from the edge's
+line, so a walkable cell keeps half a metre clear. The profile has no
+cap_y and nothing on top is kept level. A broken edge stands about half as
+tall, rubble as low as the other sets' rubble, still rock and still a
+wall to the sim. Posts at turns and ends are wall.cave.end once it has
+art, until then a lump of the same rock, eight sides round. No texture:
+material.wall.cave and material.rock can replace the swatch later, as
+they can on the cliffs. Rejected: sweeping the profile with jitter (its
+long flat faces read as masonry, not rock), and a separate rock mesh per
+cell edge (seams at every metre).
