@@ -13,6 +13,12 @@ top section as the release notes.
   it. Pip, Wren and Nix stay as they were named (Wren and Nix are women;
   Pip is a young man who wants to become a squire) with the rest of their
   story rolled, and rest in the town between your trips.
+- Behind the scenes, towns can now be raided. Raiders who reach a town
+  are fought by its walls and residents. Whatever gets past takes food
+  and may carry a resident off, and can damage a building, which a
+  carpenter then repairs. Raiders never take gold, materials or the
+  town's progress, and anyone carried off waits to be rescued. No
+  raiders set out yet.
 
 ## v0.1.141
 

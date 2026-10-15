@@ -4426,3 +4426,59 @@ message carries her card and "How you and Jeff met: ...", as facts;
 nothing in it is a line to say. Her trade for 284 comes from her
 profession. Lore will supply birthplaces and names per region once Jeff
 agrees facts.
+
+## 295. Raids on a town: one entry point, food and people only, damage repaired, captives kept until rescued
+
+Economy step 6 (sim/towns.gd). A raid is a real group of raiders: maps
+sends it out from a raider camp on the world tick and moves it along
+its routes, and enemy-ai plays it as monsters wherever players are. The
+town side has one entry point, Towns.raid_arrives(town, group) -> report,
+called when a group ({id, faction, strength, from}) reaches the town's
+stockpile ground. It is the same call whether the group got there on
+maps' world tick or walked there in a played zone, so the town has one
+path whether or not anyone watched. Fighting on the way lowers the
+strength the caller passes; economy never rolls dice. The same group
+against the same town gives the same report.
+
+The town's defence is its walls (standing or being raised, by level) and
+its residents in town, at the rules' raids.defence. Strength less defence
+is what gets past (the margin). With none, the raid is fought off.
+Otherwise:
+- It takes the rules' raids.takes in order, each scaled by margin /
+  strength: stockpile food, then food-tagged things from the shop and
+  store. Food and people only (Jeff): never gold, ore, wood, cloth,
+  experience or levels.
+- Every loss is a ledger line by "raid:<faction>", which the town's
+  safety already reads (DEFEND for a window).
+- A taken thing stays in the item book, carried by "raid:<group id>",
+  for whoever beats the group to drop.
+- Past damage.margin, one standing building is DAMAGED, in damage.prefer
+  order (walls first). It is never lost: its workshop stops, damaged walls
+  defend nothing, and the town's tick orders a carpenter's
+  "repair:<kind>" job before anything else. The repair costs repair.share
+  (0.5) of the level's cost and time, and no experience.
+- Past captives.margin, up to captives.count residents are carried off:
+  the newest first, never a companion. Each one's Production worker is
+  kept and set away (their work waits), and their record (trade, purse,
+  origin, taken_at, by, held_by) is in Towns.captives(town).
+- There is no clock (Jeff): a captive waits. Maps says where captives are
+  held (captive_held: the camp, once the group is home). note_rescue
+  brings a captive back as themselves, at their old work, with the
+  rescue's experience.
+
+The report ({town, group, faction, repelled, margin, took, damaged,
+captives}) goes back to the caller and out on Towns.raided: what the
+group carries off is maps' to move home with it.
+
+Towns.threat (town) -> 0..1 is how threatened maps' camps make a town;
+until maps sets it, it comes from the town's safety (raids.threat_default).
+At walls_from and above, the town wants walls first. The raids numbers
+in levels/economy.json (defence, takes, margins, repair share, threat,
+the "goblins" raiders) are placeholders until the Blood Rot and their
+faction are agreed.
+
+Towns.building_changed(town, kind) is emitted whenever a building's state
+or level changes (unlocked, built, raised, damaged, repaired), and
+Towns.buildings_of(town) gives {kind: {state, level}}. They are what the
+buildings worktree's views draw from (agreed with buildings): the state
+lives only in Towns, never in level files.

@@ -430,6 +430,11 @@ func _gear_by_tag(town: String, cat: Dictionary) -> Dictionary:
 	return out
 
 
+## [param id]'s tags, from the recipes or the item catalog.
+func tags_of(id: String) -> Array:
+	return _tags_of(id, catalog.call())
+
+
 func _tags_of(id: String, cat: Dictionary) -> Array:
 	return cat[id]["tags"] if cat.has(id) else Items.def(id).get("tags", [])
 

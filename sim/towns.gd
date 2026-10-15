@@ -22,8 +22,18 @@ extends RefCounted
 ## first times the level. A workshop works only while its building stands
 ## (Production.workshop_open), and each level past the first makes it
 ## faster (Production.workshop_level). The town chooses what to build by
-## itself (tick, from World's world tick). Damage and repair (step 6) act
-## on the same records.
+## itself (tick, from World's world tick).
+##
+## Raids (step 6, decision 295): a raiding group that reaches the town's
+## stockpile ground, travelled there by maps on the world tick or walked
+## there in a played zone, alike, calls raid_arrives. The town's defence
+## (its walls by level, its residents in town) fights it; what gets past
+## takes food and people only (rules' "raids" takes, never gold, materials,
+## experience or buildings), may damage a building (repaired by a
+## carpenter's "repair:<kind>" job, first of all) and carries residents off
+## as captives, kept here (captives) until rescued (note_rescue). The
+## report goes back to the caller and out on raided. threat is what maps'
+## camps say of a town; Holdings' safety until they do.
 
 ## Building id ("forge") -> state: planned (unlocked, not yet built),
 ## building (being built or raised a level), standing, damaged.
@@ -32,15 +42,27 @@ const BUILDING := "building"
 const STANDING := "standing"
 const DAMAGED := "damaged"
 const LOG_SIZE := 50
+## A repair job's building id: REPAIR + the kind.
+const REPAIR := "repair:"
+
+## A raid reached [param town]: raid_arrives' report.
+signal raided(town: String, report: Dictionary)
+## A building of [param town]'s changed state or level (unlocked, built,
+## raised, damaged, repaired): the views redraw it (buildings_of).
+signal building_changed(town: String, kind: String)
 
 var rules := {}
 var production: Production
 ## () -> int: the World's steps.
 var clock := Callable()
+## (town) -> float 0..1: how threatened [param town] is (maps' camps set
+## it); by default from Holdings' safety (rules' raids threat_default).
+var threat := Callable()
 
 ## Town -> {xp, spent, residents: Array[String] (worker ids), buildings:
 ## {kind: {kind, level, state, since, job}}, objectives (done, by id),
-## log: Array[{step, what}]}.
+## captives: Array[{id, name, trade, origin, purse, taken_at, by,
+## held_by}], log: Array[{step, what}]}.
 var _towns: Dictionary[String, Dictionary] = {}
 
 
@@ -81,6 +103,15 @@ func residents(town: String) -> Array[String]:
 ## {} if it has none.
 func building(town: String, kind: String) -> Dictionary:
 	return _towns.get(town, {}).get("buildings", {}).get(kind, {}).duplicate(true)
+
+
+## Every building of [param town]: kind -> {state, level}, for the views.
+func buildings_of(town: String) -> Dictionary:
+	var out := {}
+	var houses: Dictionary = _towns.get(town, {}).get("buildings", {})
+	for kind: String in houses:
+		out[kind] = {"state": houses[kind]["state"], "level": houses[kind]["level"]}
+	return out
 
 
 ## How many residents [param town] has room for: rules' residents base,
@@ -148,6 +179,16 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 	var record := _town(town)
 	if who_id in record["residents"]:
 		return false
+	var held: Array = record["captives"].filter(func(each: Dictionary) -> bool: return each["id"] == who_id)
+	if not held.is_empty() and not production.worker(who_id).is_empty():
+		# Taken in a raid: back as themselves, their work where it was.
+		record["captives"].erase(held[0])
+		record["residents"].append(who_id)
+		production.set_away(who_id, false)
+		_note(town, "%s the %s, taken by %s, is rescued and home" % [held[0]["name"], held[0]["trade"], held[0]["by"]])
+		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
+		_seat(town)
+		return true
 	if not production.add_worker(who_id, name, [trade], town, "rescued:%s" % (origin if not origin.is_empty() else who_id)):
 		return false
 	record["residents"].append(who_id)
@@ -171,8 +212,8 @@ func note_objective(town: String, objective_id: String, worth := 1) -> int:
 
 
 ## Companion [param companion_name] is in [param town], away from its
-## player: a resident working [param trade] (its card's; levels/companions.json
-## until cards come), seated as a rescued person is. Back to work where it
+## player: a resident working [param trade] (from its record's traits,
+## levels/companion_traits.json), seated as a rescued person is. Back to work where it
 ## left off if it was here before.
 func note_companion_in(town: String, companion_name: String, trade: String) -> void:
 	var who := "companion:%s" % companion_name
@@ -210,6 +251,8 @@ func tick() -> void:
 	for town in towns:
 		if production.building_in(town):
 			continue
+		if _repair(town):
+			continue
 		var kind := choose(town)
 		if not kind.is_empty():
 			unlock(town, kind)
@@ -219,7 +262,8 @@ func tick() -> void:
 func choose(town: String) -> String:
 	var kinds: Dictionary = rules.get("buildings", {})
 	var wants: Array[String] = []
-	if production.tier(town) == Production.DEFEND and kinds.has("walls"):
+	if kinds.has("walls") and (production.tier(town) == Production.DEFEND
+			or threat_of(town) >= float(rules.get("raids", {}).get("walls_from", 1.0))):
 		wants.append("walls")
 	for who in residents(town):
 		var worker := production.worker(who)
@@ -270,6 +314,7 @@ func unlock(town: String, kind: String) -> bool:
 	entry["state"] = BUILDING if int(entry["level"]) >= 1 else PLANNED
 	record["buildings"][kind] = entry
 	_note(town, "%d experience spent on a %s, level %d" % [price, kind, level])
+	building_changed.emit(town, kind)
 	var by := str(spec.get("built_by", ""))
 	if by.is_empty():
 		_built(town, kind)
@@ -282,6 +327,16 @@ func unlock(town: String, kind: String) -> bool:
 ## standing; its trade's workshop opens and waiting residents are seated.
 func _built(town: String, kind: String) -> void:
 	var record := _town(town)
+	if kind.begins_with(REPAIR):
+		var repaired: Dictionary = record["buildings"].get(kind.trim_prefix(REPAIR), {})
+		if not repaired.is_empty():
+			repaired["state"] = STANDING
+			repaired["since"] = now()
+			repaired["job"] = 0
+			_note(town, "the %s is repaired, level %d" % [repaired["kind"], repaired["level"]])
+			building_changed.emit(town, str(repaired["kind"]))
+			_seat(town)
+		return
 	var entry: Dictionary = record["buildings"].get(kind, {"kind": kind, "level": 0, "job": 0})
 	entry["level"] = int(entry["level"]) + 1
 	entry["state"] = STANDING
@@ -289,6 +344,7 @@ func _built(town: String, kind: String) -> void:
 	entry["job"] = 0
 	record["buildings"][kind] = entry
 	_note(town, "the %s stands, level %d" % [kind, entry["level"]])
+	building_changed.emit(town, kind)
 	_seat(town)
 
 
@@ -315,6 +371,165 @@ func _seat(town: String) -> void:
 			_note(town, "%s the %s works at %s" % [worker["name"], trade, shop_id])
 
 
+## Orders a repair of [param town]'s first damaged building with none
+## ordered (rules' raids repair share of its cost and time at its level, no
+## experience): true if it did.
+func _repair(town: String) -> bool:
+	var kinds: Dictionary = rules.get("buildings", {})
+	var share := float(rules.get("raids", {}).get("repair", {}).get("share", 0.5))
+	var record := _town(town)
+	var names: Array = record["buildings"].keys()
+	names.sort()
+	for kind: String in names:
+		var entry: Dictionary = record["buildings"][kind]
+		if entry["state"] != DAMAGED or int(entry["job"]) != 0 or not kinds.has(kind):
+			continue
+		var spec: Dictionary = kinds[kind]
+		var level := maxi(int(entry["level"]), 1)
+		var cost := {}
+		for what: String in spec.get("cost", {}):
+			var amount := ceili(int(spec["cost"][what]) * level * share)
+			if amount > 0:
+				cost[what] = amount
+		var by := str(spec.get("built_by", ""))
+		if by.is_empty():
+			_built(town, REPAIR + kind)
+			return true
+		entry["job"] = production.order_build(town, REPAIR + kind, by, cost, maxi(ceili(int(spec.get("steps", 1)) * level * share), 1))
+		_note(town, "the %s is to be repaired" % kind)
+		return true
+	return false
+
+
+# --- Raids ---------------------------------------------------------------------------
+
+## How threatened [param town] is, 0..1: threat's, else from its safety
+## (rules' raids threat_default, by Production's safety).
+func threat_of(town: String) -> float:
+	if threat.is_valid():
+		return clampf(float(threat.call(town)), 0.0, 1.0)
+	var safety := str(production.signals_of(town, production.catalog.call())["safety"])
+	return clampf(float(rules.get("raids", {}).get("threat_default", {}).get(safety, 0.0)), 0.0, 1.0)
+
+
+## [param town]'s defence against a raid now: its walls (standing, by
+## level) and its residents in town, at rules' raids defence.
+func defence(town: String) -> float:
+	var per: Dictionary = rules.get("raids", {}).get("defence", {})
+	var walls := building(town, "walls")
+	var levels := int(walls.get("level", 0)) if walls.get("state") in [STANDING, BUILDING] else 0
+	var present := residents(town).filter(func(who: String) -> bool:
+		return not production.worker(who).is_empty() and not production.worker(who)["away"]).size()
+	return levels * float(per.get("per_wall_level", 0)) + present * float(per.get("per_resident", 0))
+
+
+## The people taken from [param town] and not yet rescued, oldest first:
+## [{id, name, trade, origin, purse, taken_at, by, held_by}].
+func captives(town: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.assign(_towns.get(town, {}).get("captives", []).duplicate(true))
+	return out
+
+
+## Captive [param who_id] is held by [param holder] now (a camp's place
+## id once the group is home, another group...): maps says so. False for
+## no such captive.
+func captive_held(who_id: String, holder: String) -> bool:
+	for town: String in _towns:
+		for each: Dictionary in _towns[town]["captives"]:
+			if each["id"] == who_id:
+				each["held_by"] = holder
+				return true
+	return false
+
+
+## A raiding [param group] ({id, faction, strength, from}: its strength
+## after anything done to it on the way) has reached [param town]'s ground,
+## travelled there or walked there in play, alike. Its strength less the
+## town's defence is what gets past (margin); none, and it is fought off.
+## Else it takes rules' raids takes in order, each scaled by margin /
+## strength (only food: never gold, materials, experience or buildings),
+## damages one building past damage.margin and carries off up to
+## captives.count residents (the newest first, never a companion) past
+## captives.margin. The report, also emitted on raided: {town, group,
+## faction, repelled, margin, took: {resource: count, items: [uids]},
+## damaged (a kind or ""), captives: [{id, name, trade}]}: what the group
+## carries off is maps' to move home with it.
+func raid_arrives(town: String, group: Dictionary) -> Dictionary:
+	var raids: Dictionary = rules.get("raids", {})
+	var faction := str(group.get("faction", raids.get("raiders", "")))
+	var group_id := str(group.get("id", ""))
+	var strength := maxf(float(group.get("strength", 0.0)), 0.0)
+	var margin := strength - defence(town)
+	var report := {"town": town, "group": group_id, "faction": faction, "repelled": margin <= 0.0,
+		"margin": margin, "took": {"items": []}, "damaged": "", "captives": []}
+	var by := "raid:%s" % faction
+	if margin <= 0.0:
+		_note(town, "a raid by %s (%.1f) is fought off (defence %.1f)" % [faction, strength, defence(town)])
+		raided.emit(town, report)
+		return report
+	var scale := clampf(margin / strength, 0.0, 1.0)
+	var stock := production.stockpile
+	var book := production.book()
+	for take: Variant in raids.get("takes", []):
+		if not take is Dictionary:
+			continue
+		var what := str(take.get("what", ""))
+		if what in Stockpile.RESOURCES:
+			var amount := floori(stock.count(town, what) * float(take.get("share", 0.0)) * scale)
+			if amount > 0 and stock.take(town, what, amount, by):
+				report["took"][what] = int(report["took"].get(what, 0)) + amount
+		elif take.has("tag"):
+			var count := roundi(int(take.get("count", 0)) * scale)
+			var tag := str(take["tag"])
+			var uids := stock.shop(town)
+			uids.append_array(stock.items(town))
+			for uid in uids:
+				if count <= 0:
+					break
+				if tag not in production.tags_of(book.id_of(uid)):
+					continue
+				var taken := stock.take_from_shop(town, uid, by) if uid in stock.shop(town) else stock.take_item(town, uid, by)
+				if taken:
+					book.place(uid, "raid:%s" % group_id)
+					book.note(uid, "taken", "by %s (%s) from %s" % [faction, group_id, town])
+					report["took"]["items"].append(uid)
+					count -= 1
+	var damage: Dictionary = raids.get("damage", {})
+	if margin >= float(damage.get("margin", INF)):
+		var record := _town(town)
+		for kind: Variant in damage.get("prefer", []):
+			var entry: Dictionary = record["buildings"].get(str(kind), {})
+			if entry.get("state") == STANDING:
+				entry["state"] = DAMAGED
+				entry["since"] = now()
+				report["damaged"] = str(kind)
+				building_changed.emit(town, str(kind))
+				break
+	var taking: Dictionary = raids.get("captives", {})
+	if margin >= float(taking.get("margin", INF)):
+		var record := _town(town)
+		var people: Array = record["residents"].duplicate()
+		people.reverse()
+		for who: String in people:
+			if report["captives"].size() >= int(taking.get("count", 0)):
+				break
+			var worker := production.worker(who)
+			if worker.is_empty() or worker["away"] or str(worker["origin"]).begins_with("companion:"):
+				continue
+			record["residents"].erase(who)
+			production.set_away(who, true)
+			record["captives"].append({"id": who, "name": worker["name"], "trade": worker["trades"][0],
+				"origin": worker["origin"], "purse": worker["purse"], "taken_at": now(), "by": faction, "held_by": group_id})
+			report["captives"].append({"id": who, "name": worker["name"], "trade": worker["trades"][0]})
+	_note(town, "a raid by %s (%.1f against %.1f) took %s%s%s" % [faction, strength, strength - margin,
+		report["took"], ", damaged the %s" % report["damaged"] if report["damaged"] != "" else "",
+		", carried off %s" % ", ".join(report["captives"].map(func(each: Dictionary) -> String: return each["name"]))
+			if not report["captives"].is_empty() else ""])
+	raided.emit(town, report)
+	return report
+
+
 func _seated(who: String) -> bool:
 	return production.workshop_of(who) != ""
 
@@ -329,7 +544,7 @@ func _note(town: String, what: String) -> void:
 
 func _town(town: String) -> Dictionary:
 	if not _towns.has(town):
-		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "log": []}
+		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "log": []}
 	return _towns[town]
 
 
@@ -363,6 +578,12 @@ func from_dict(saved: Dictionary) -> void:
 						"state": str(house["state"]), "since": int(house.get("since", 0)), "job": int(house.get("job", 0))}
 		for done: Variant in entry.get("objectives", []):
 			record["objectives"].append(str(done))
+		for each: Variant in entry.get("captives", []):
+			if each is Dictionary and not production.worker(str(each.get("id", ""))).is_empty():
+				record["captives"].append({"id": str(each["id"]), "name": str(each.get("name", "")),
+					"trade": str(each.get("trade", "")), "origin": str(each.get("origin", "")),
+					"purse": int(each.get("purse", 0)), "taken_at": int(each.get("taken_at", 0)),
+					"by": str(each.get("by", "")), "held_by": str(each.get("held_by", ""))})
 		for line: Variant in entry.get("log", []):
 			if line is Dictionary:
 				record["log"].append({"step": int(line.get("step", 0)), "what": str(line.get("what", ""))})

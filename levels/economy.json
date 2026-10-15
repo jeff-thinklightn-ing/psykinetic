@@ -25,6 +25,16 @@
 	"level_speed": 0.25,
 	"xp": {"rescue": 10, "objective": 50},
 	"residents": {"base": 3, "per_inn": 3},
+	"raids": {
+		"raiders": "goblins",
+		"defence": {"per_wall_level": 4, "per_resident": 1},
+		"takes": [{"what": "food", "share": 0.5}, {"tag": "food", "count": 2}],
+		"damage": {"margin": 3, "prefer": ["walls", "kitchen", "forge", "inn"]},
+		"captives": {"margin": 6, "count": 1},
+		"repair": {"share": 0.5},
+		"threat_default": {"threatened": 0.6, "uneasy": 0.3, "safe": 0.0},
+		"walls_from": 0.5
+	},
 	"buildings": {
 		"forge": {"trade": "smith", "built_by": "carpenter", "xp": 20, "cost": {"wood": 10, "ore": 5}, "steps": 6000, "max_level": 3},
 		"kitchen": {"trade": "cook", "built_by": "carpenter", "xp": 10, "cost": {"wood": 6}, "steps": 3000, "max_level": 3},
