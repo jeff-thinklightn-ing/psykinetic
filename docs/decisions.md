@@ -6455,3 +6455,24 @@ carrier's: has_hands stays players' and companions' (nothing hands it
 things or bandages it). Its things drop with the rest when it dies. Server
 side only: a monster's slots are not replicated (the views do not show
 what it holds yet), so the protocol is unchanged.
+
+## 342. A companion speaks only for herself
+
+What: her voice's rules say she speaks only for herself: never words in her
+player's mouth, never quoting them, never what kind of person they are or
+what they feel. A line that does anyway (Companion.SPEAKS_FOR: a quoted
+sentence, since her words are said aloud and quotes in them are a script;
+"you say" and the like; "you're the kind to..."; "you don't trust...") is
+asked again once, that line unsaid and logged ("asked again"); the second
+answer is never asked again, and any such sentence in it, or in any line,
+is dropped (spoken), the rest said.
+
+Measured with qwen3:14b, 24 asks (8 hours and weathers outdoors x 3
+neutral triggers): without the rule 3 first answers spoke for him, 1 still
+after asking again, none said once cleaned; with it, 0.
+
+Known, left: she now and then tells her player their state without quotes
+("You have a stone in your hand."), about 1 in 24; not caught.
+
+Rejected: dropping the whole line without asking again (a question to her
+then goes unanswered); asking again more than once (calls against the box).
