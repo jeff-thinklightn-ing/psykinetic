@@ -207,10 +207,10 @@ Monsters idle until someone comes: guard (stands, glances about), wander (stroll
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % [", ".join(legend), ", ".join(Items.ids()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % [", ".join(legend), ", ".join(Items.ids()), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
@@ -286,6 +286,10 @@ static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2
 			var at: Variant = Level._tile(link.get("at"))
 			if at != null and shown.has_point(at):
 				notes.append("link " + JSON.stringify(link))
+	for building: Variant in config.get("buildings", []):
+		var rect: Variant = Level.building_rect(building)
+		if rect != null and shown.intersects(rect):
+			notes.append("building " + JSON.stringify(building))
 	if not notes.is_empty():
 		lines.append("Settings of things here: " + "; ".join(notes))
 	return "\n".join(lines)
@@ -361,6 +365,12 @@ const TOOLS := [
 			"holder": {"type": "string", "enum": ["goblins", "town", "nobody"]},
 			"name": {"type": "string", "description": "optional, how it is called, e.g. \"the old farmstead\""}},
 			"required": ["key", "kind", "at", "holder"]}},
+	{"name": "set_building", "description": "Gives a building in the area its use and the town it serves, or makes it scenery again (no use, no town).",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL,
+			"use": {"type": "string", "description": "what the town does there (the uses are in the system prompt); empty for none"},
+			"town": {"type": "string", "description": "the key of a stockpile place in this level; empty for none"}},
+			"required": ["at"]}},
 	{"name": "look", "description": "The area as it is now, with your changes so far, as a grid.",
 		"input_schema": {"type": "object", "properties": {}}},
 	{"name": "new_area", "description": "Makes a new level beyond the map's edge on a side the area touches (one with nothing beyond it yet), joined both ways, and carves a way from the middle of the area out to that edge. The new level is a first draft, its size given in cells (16 to 256).",
@@ -463,6 +473,8 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			return _lay(Prefab.stamp_changes(prefab, working.map, at, working.config), "stamped %s" % prefab_name)
 		"mark_place":
 			return _mark_place(given)
+		"set_building":
+			return _set_building(given)
 		"look":
 			return {"ok": true, "text": grid(working.map, working.config, area, area)}
 		"new_area":
@@ -544,6 +556,58 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	places[key] = place
 	working.apply_changes({"config": {"places": places}})
 	return {"ok": true, "text": "%s the place %s: a %s at %s, radius %d, held by %s" % ["changed" if again else "marked", key, kind, at, place["radius"], holder]}
+
+
+## The uses a map building may have: the economy rules' buildings (the
+## town wall is a record of its own, not a building's use).
+static func building_uses() -> Array[String]:
+	var out: Array[String] = []
+	for use: Variant in Production.read_rules().get("buildings", {}):
+		if str(use) != "walls":
+			out.append(str(use))
+	out.sort()
+	return out
+
+
+func _set_building(given: Dictionary) -> Dictionary:
+	var at: Variant = Level._tile(given.get("at"))
+	if at == null:
+		return _no("set_building needs at: [x, y], a cell of the building")
+	if not area.has_point(at):
+		return _no("%s is outside the area" % [at])
+	var buildings: Array = (working.config["buildings"] as Array).duplicate(true) if working.config.get("buildings") is Array else []
+	var index := buildings.find_custom(func(entry: Variant) -> bool:
+		var rect: Variant = Level.building_rect(entry)
+		return rect != null and rect.has_point(at))
+	if index < 0:
+		return _no("no building stands on %s: stamp a building prefab first" % [at])
+	var use := str(given.get("use", "")).strip_edges()
+	var town := str(given.get("town", "")).strip_edges()
+	if not use.is_empty() and use not in building_uses():
+		return _no("use is one of %s, or empty" % ", ".join(building_uses()))
+	if not town.is_empty():
+		var places: Dictionary = Level.places_from(working.config, [] as Array[String])
+		if not places.has(town) or places[town]["kind"] != "stockpile":
+			var stockpiles := places.keys().filter(func(key: String) -> bool: return places[key]["kind"] == "stockpile")
+			return _no("town is the key of a stockpile place here (%s)" % (", ".join(stockpiles) if not stockpiles.is_empty() else "there is none: mark_place one, kind stockpile"))
+	if not use.is_empty() and not town.is_empty():
+		for other: Variant in buildings:
+			if other != buildings[index] and other is Dictionary and str(other.get("use", "")) == use and str(other.get("town", "")) == town:
+				return _no("%s has its %s already, at %s" % [town, use, other.get("at")])
+	var entry: Dictionary = buildings[index]
+	for key: String in {"use": use, "town": town}:
+		var value := use if key == "use" else town
+		if value.is_empty():
+			entry.erase(key)
+		else:
+			entry[key] = value
+	working.apply_changes({"config": {"buildings": buildings}})
+	var what := "%s at %s" % [entry["slot"], entry.get("at")]
+	if use.is_empty() and town.is_empty():
+		return {"ok": true, "text": "the %s is scenery now" % what}
+	if town.is_empty():
+		return {"ok": true, "text": "the %s is a %s, but in no town: it does nothing until it has one" % [what, use]}
+	return {"ok": true, "text": "the %s %s, in %s" % [what, "is a %s" % use if not use.is_empty() else "has no use", town]}
 
 
 func _place(given: Dictionary) -> Dictionary:

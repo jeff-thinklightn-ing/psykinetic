@@ -18,6 +18,7 @@ func _ready() -> void:
 	await _test_new_area()
 	await _test_mark_place()
 	await _test_stamp_building()
+	await _test_set_building()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -83,6 +84,36 @@ func _test_stamp_building() -> void:
 			"Claude is told which prefabs are buildings")
 
 
+func _test_set_building() -> void:
+	print("
+== set_building: a building's use and its town ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "stamp", "input": {"prefab": "building_hut", "at": [6, 6]}},
+			{"name": "mark_place", "input": {"key": "square", "kind": "stockpile", "at": [14, 12], "holder": "town"}},
+			{"name": "set_building", "input": {"at": [12, 12], "use": "forge", "town": "square"}},
+			{"name": "set_building", "input": {"at": [8, 8], "use": "walls", "town": "square"}},
+			{"name": "set_building", "input": {"at": [8, 8], "use": "forge", "town": "nowhere"}},
+			{"name": "set_building", "input": {"at": [8, 8], "use": "forge", "town": "square"}}],
+		"A forge for the square.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a forge")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(results[2]["is_error"] and "no building stands" in str(results[2]["content"]), "a cell with no building: an error (%s)" % results[2]["content"])
+	_check(results[3]["is_error"] and "walls" not in str(results[3]["content"]).get_slice("one of", 1), "walls is not a building's use (%s)" % results[3]["content"])
+	_check(results[4]["is_error"] and "square" in str(results[4]["content"]), "a town that is no stockpile place here: an error naming those there are (%s)" % results[4]["content"])
+	_check(not results[5]["is_error"], "a hut made the square's forge (%s)" % results[5]["content"])
+	session.accept()
+	var buildings: Array = doc.config.get("buildings", [])
+	_check(buildings.size() == 1 and buildings[0].get("use") == "forge" and buildings[0].get("town") == "square", "accepted: the record has its use and town (%s)" % [buildings])
+	var level := Level.parse(doc.map.to_image(), null, doc.config)
+	var about := (level["warnings"] as Array).filter(func(warning: String) -> bool: return "building" in warning)
+	_check(level["buildings"].size() == 1 and about.is_empty(), "the level reads it with nothing to say (%s)" % [about])
+	_check("set_building gives one in the area a use (forge, inn, kitchen)" in BuilderSession.system_prompt(), "Claude is told the uses, from the economy rules")
+	_check("building {" in session.grid(doc.map, doc.config, Rect2i(5, 5, 12, 10), Rect2i(5, 5, 12, 10)), "and sees the buildings in the area, with theirs")
+
+
 func _test_prompt() -> void:
 	print("\n== what Claude is told ==")
 	var system := BuilderSession.system_prompt()
@@ -99,7 +130,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "mark_place", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "mark_place", "set_building", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
