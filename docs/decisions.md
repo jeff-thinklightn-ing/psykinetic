@@ -4687,8 +4687,9 @@ band) shown (art-kit, 287); until a slot has a roof_damaged its roof sags
 at its eaves (ROOF_SAG), caved in at a glance. The roof shown is the one
 that goes while the player is inside (266) and fades from outside.
 Planned, being built and standing draw standing for now. The walls of a
-damaged building take terrain's "broken" wall state when its
-Client3D._wall_states lands (#285); until then they stand whole. Later:
+damaged building take terrain's "broken" wall state (Client3D.
+_wall_states, 285): a third of its outline's walls by a hash of where
+each is, the same on every peer, redrawn by rebuild_walls. Later:
 whether a damaged roof lets daylight in (environment's 291 has every
 footprint roofed); for now it stays roofed.
 
@@ -4811,6 +4812,17 @@ Rejected: walls that appear in the sim as the town builds them (live edge
 changes, paths and fields reworked, for what reads as well as a rubble
 bank that blocks); the ring written into the level as economy builds it
 (game state in content); and a ring round the place's radius.
+
+Drawn (with terrain's sets and states, 285, and art-kit's towers, 287):
+Client3D._show_town_wall reads the town's "walls" record from the "town"
+message. No record, or one only planned: level 0, every wall of the ring
+in the "rubble" state. Level 1: wall set wood; 2: stone; 3: stone and
+wall.stone.tower at the rect's four corners and at both ends of each
+gate's edge (made once, shown only at level 3). Damaged: a third of the
+ring "broken", by the same hash as a building's. Each change goes through
+rebuild_walls with the ring's edges only; the entries are this view's own
+(_state_walls, _town_wall_sets), taken out when the room is built again.
+
 ## 304. Each kind of place has its own light; the floor shows where you are seen
 
 Jeff's environment step 3: how dark interiors, caves and night really are,

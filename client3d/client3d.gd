@@ -374,9 +374,6 @@ const FADE_HOLD := 0.4
 ## (_index_occluders), so the lines to the player are tested against those
 ## near them only, not every tree of a big map (310).
 const FADE_CHUNK := 8.0
-## A building (_add_buildings) stands this far above its ground, so its
-## inside floor clears it.
-const BUILDING_LIFT := 0.01
 ## A damaged building's roof until its slot has a roof_damaged part: tipped
 ## and dropped at its eaves, caved in at a glance (_show_state).
 const ROOF_SAG := Transform3D(Basis(Vector3.RIGHT, 0.18), Vector3(0.0, -0.45, 0.0))
@@ -764,6 +761,13 @@ var _floor_mask: ImageTexture
 ## The edges in _wall_sets and cells in _floor_sets that are there for a
 ## building, and the cells in _dry_water that are there for a well.
 var _building_walls: Array[Vector3i] = []
+## The edges in _wall_states and _wall_sets that are there for a damaged
+## building or a town wall (_show_state, _show_town_wall), and each town
+## wall drawn: {town_id, walls, gates, rect, towers (vertex -> Node3D),
+## shown: the look it has}.
+var _state_walls: Array[Vector3i] = []
+var _town_wall_sets: Array[Vector3i] = []
+var _town_walls: Array[Dictionary] = []
 var _building_floors: Array[Vector2i] = []
 var _building_dry: Array[Vector2i] = []
 ## Water cells drawn as plain ground (a well's, whose rim stands round it):
@@ -2043,6 +2047,14 @@ func _build_room() -> void:
 	for key in _building_walls:
 		_wall_sets.erase(key)
 	_building_walls.clear()
+	# A damaged building's and a town wall's looks: the last map's out.
+	for key in _state_walls:
+		_wall_states.erase(key)
+	_state_walls.clear()
+	for key in _town_wall_sets:
+		_wall_sets.erase(key)
+	_town_wall_sets.clear()
+	_town_walls.clear()
 	for cell in _building_floors:
 		_floor_sets.erase(cell)
 	_building_floors.clear()
@@ -2117,6 +2129,7 @@ func _build_room() -> void:
 	if _outdoor:
 		_add_forest()
 	_add_buildings()
+	_add_town_walls()
 	# Every door's leaf set once; from then on those that change.
 	if not World.door_shown.is_connected(_on_door_shown):
 		World.door_shown.connect(_on_door_shown)
@@ -2142,7 +2155,7 @@ func _add_buildings() -> void:
 		for part: Node3D in damaged:
 			part.visible = false
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
-		node.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + BUILDING_LIFT, middle.y)
+		node.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE, middle.y)
 		node.rotation.y = atan2(float(facing.x), float(facing.y))
 		_room.add_child(node)
 		var index := _buildings.size()
@@ -2164,6 +2177,9 @@ func set_town(town: String, buildings: Dictionary) -> void:
 	for building in _buildings:
 		if building["town_id"] == town:
 			_show_state(building)
+	for ring in _town_walls:
+		if ring["town_id"] == town:
+			_show_town_wall(ring)
 
 
 ## [param building] drawn as its town has it: damaged, the slot's
@@ -2199,10 +2215,96 @@ func _show_state(building: Dictionary) -> void:
 	var heaps := node.find_child("state_damaged", true, false) as Node3D
 	if heaps != null:
 		heaps.visible = damaged
+	# Its walls broken here and there (terrain's "broken": a ragged stub,
+	# never a way through; the sim keeps the wall).
+	var changed: Array[Vector3i] = []
+	for key in Level.outline(building["rect"]):
+		if _terrain["edges"].get(key) == Terrain.Edge.WALL and _broken_pick(key):
+			_set_wall_state(key, "broken" if damaged else "")
+			changed.append(key)
+	if not changed.is_empty():
+		rebuild_walls(changed)
 	# What hides the player is indexed again, with the roof now shown.
 	_occluders_built = false
 	if _camera != null and building["off"]:
 		_update_fade(true)
+
+
+## Whether a damaged building's or town wall's edge [param key] is one
+## drawn broken: a third of them, by a hash of where it is, the same on
+## every peer.
+static func _broken_pick(key: Vector3i) -> bool:
+	var hash := (key.x * 374761393 + key.y * 668265263 + key.z * 2246822519) & 0x7fffffff
+	hash = ((hash ^ (hash >> 13)) * 1274126177) & 0x7fffffff
+	return (hash ^ (hash >> 16)) % 3 == 0
+
+
+## Sets wall edge [param key]'s state in _wall_states ("" takes it out),
+## kept as this view's own (_state_walls).
+func _set_wall_state(key: Vector3i, state: String) -> void:
+	if state.is_empty():
+		_wall_states.erase(key)
+		_state_walls.erase(key)
+		return
+	_wall_states[key] = state
+	if not _state_walls.has(key):
+		_state_walls.append(key)
+
+
+## The terrain's town walls (Level.town_walls_from), each drawn as its
+## town's walls level has it (_show_town_wall).
+func _add_town_walls() -> void:
+	for given: Dictionary in _terrain.get("town_walls", []):
+		var ring := {"town_id": str(given.get("town_id", "")), "walls": given["walls"], "gates": given["gates"],
+			"rect": given["rect"], "towers": {}, "shown": ""}
+		_town_walls.append(ring)
+		_show_town_wall(ring)
+
+
+## [param ring] drawn as its town has its walls (decision 298): no record
+## (level 0, or only planned) a bank of rubble along it that still blocks;
+## level 1 a palisade (wall set wood), 2 stone, 3 stone with towers at its
+## corners and beside its gates; damaged, a third of it broken.
+func _show_town_wall(ring: Dictionary) -> void:
+	var record: Dictionary = town_states.get(ring["town_id"], {}).get("walls", {})
+	var state := str(record.get("state", Towns.PLANNED))
+	var level := 0 if state == Towns.PLANNED else int(record.get("level", 0))
+	var damaged := state == Towns.DAMAGED and level > 0
+	var look := "%d%s" % [level, " damaged" if damaged else ""]
+	if look == ring["shown"]:
+		return
+	ring["shown"] = look
+	var wall_set := "stone" if level >= 2 else "wood" if level == 1 else ""
+	for key: Vector3i in ring["walls"]:
+		if wall_set.is_empty():
+			_wall_sets.erase(key)
+			_town_wall_sets.erase(key)
+		else:
+			_wall_sets[key] = _known_set(wall_set)
+			if not _town_wall_sets.has(key):
+				_town_wall_sets.append(key)
+		_set_wall_state(key, "rubble" if level == 0 else "broken" if damaged and _broken_pick(key) else "")
+	var towers: Dictionary = ring["towers"]
+	if level >= 3 and towers.is_empty():
+		var rect: Rect2i = ring["rect"]
+		var at: Dictionary[Vector2i, bool] = {}
+		for corner in [rect.position, Vector2i(rect.end.x, rect.position.y), Vector2i(rect.position.x, rect.end.y), rect.end]:
+			at[corner] = true
+		for gate: Vector3i in ring["gates"]:
+			at[WallEdge.vertex_at(gate, 0)] = true
+			at[WallEdge.vertex_at(gate, 1)] = true
+		var slot := "wall.%s.tower" % _known_set(wall_set)
+		for vertex: Vector2i in at:
+			if not ArtKit.has(slot):
+				break
+			var tower := ArtKit.instance(slot)
+			tower.name = "Tower_%d_%d" % [vertex.x, vertex.y]
+			tower.position = Vector3(vertex.x - 0.5, _height(vertex) * LEVEL_RISE, vertex.y - 0.5)
+			_room.add_child(tower)
+			towers[vertex] = tower
+	for tower: Node3D in towers.values():
+		tower.visible = level >= 3
+	rebuild_walls(ring["walls"])
 
 
 ## Every art slot the room may be built from (WARM_CATEGORIES), made once

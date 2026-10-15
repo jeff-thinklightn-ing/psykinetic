@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_scatter()
 	_test_buildings()
 	_test_building_states()
+	_test_town_walls()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -648,7 +649,7 @@ func _test_buildings() -> void:
 	var lawn_place := (lawn.y - _rig._mask_origin.y) * _rig._mask_size.x + lawn.x - _rig._mask_origin.x
 	_check(planks == footprint.size() and _rig._floor_bytes[lawn_place] == 0,
 			"and its inside floored in its floor set, wood, cell by cell to its walls (%d of %d), the grass outside as it was" % [planks, footprint.size()])
-	_check(node.position.is_equal_approx(Vector3(4.5, Client3D.BUILDING_LIFT, 5.5)) and is_equal_approx(node.rotation.y, 0.0),
+	_check(node.position.is_equal_approx(Vector3(4.5, 0.0, 5.5)) and is_equal_approx(node.rotation.y, 0.0),
 			"the house stands over the middle of its footprint, its front south (%s, %s)" % [node.position, node.rotation.y])
 	_check(is_equal_approx((hut["node"] as Node3D).rotation.y, -PI / 2.0), "the hut turned with its front west")
 	_check(is_equal_approx((house["roof"] as Node3D).global_position.y - node.global_position.y, Client3D.WALL_HEIGHT), "its roof on the walls' tops")
@@ -728,6 +729,8 @@ func _test_building_states() -> void:
 	_check(_main.town_states.has("fixture/square") and house["damaged"], "told the forge is damaged: it is drawn so")
 	var caved: bool = house["roof"] != roof or not roof.transform.is_equal_approx(house["roof_at"])
 	var heaps := (house["node"] as Node3D).find_child("state_damaged", true, false) as Node3D
+	var broken := Level.outline(house["rect"]).filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "broken")
+	_check(broken.size() > 0 and broken.size() < Level.outline(house["rect"]).size() / 2, "a third or so of its walls broken (%d of %d)" % [broken.size(), Level.outline(house["rect"]).size()])
 	_check(caved and house["roof"] != roof and (house["roof"] as Node3D).name == "roof_damaged" and (house["roof"] as Node3D).visible
 			and not roof.visible and heaps != null and heaps.visible, "its roof_damaged in its roof's place, its rubble shown (art-kit's slot)")
 	# Inside, the damaged roof goes as the whole one did.
@@ -744,6 +747,7 @@ func _test_building_states() -> void:
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.STANDING, "level": 1}}})
 	_check(not house["damaged"] and house["roof"] == roof and roof.visible and roof.transform.is_equal_approx(house["roof_at"]) and not heaps.visible,
 			"repaired: standing again, its roof whole, its rubble gone")
+	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return not _rig._wall_states.has(key)), "and its walls whole")
 	_rig.rebuild(terrain, Vector2i(7, 7))
 	_check(_rig._buildings.any(func(b: Dictionary) -> bool: return b["use"] == "forge" and not b["damaged"]), "kept across a rebuild (as the town has it)")
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.DAMAGED, "level": 1}}})
@@ -755,6 +759,49 @@ func _test_building_states() -> void:
 	_main.town_states.clear()
 	_rig.town_states.clear()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+func _test_town_walls() -> void:
+	print("
+== a town wall drawn as its town's walls level: rubble, palisade, stone, towers; damaged, broken in places ==")
+	var map := LevelMap.new(Vector2i(20, 16))
+	for y in 16:
+		for x in 20:
+			map.set_cell(Vector2i(x, y), "grass")
+	var rect := Rect2i(4, 3, 10, 8)
+	var gate := Vector3i(8, 10, Terrain.SOUTH)
+	for key in Level.outline(rect):
+		map.set_edge(key, "door" if key == gate else "wall")
+	var config := {"outdoor": true, "places": {"square": {"at": [8, 6], "kind": "stockpile"}}, "town_walls": [{"town": "square", "rect": [4, 3, 10, 8]}]}
+	var terrain: Dictionary = Level.parse(map.to_image(), null, config)["terrain"]
+	(terrain["town_walls"] as Array)[0]["town_id"] = "fixture/square"
+	_rig.rebuild(terrain, Vector2i(8, 6))
+	var ring: Dictionary = _rig._town_walls[0] if not _rig._town_walls.is_empty() else {}
+	_check(not ring.is_empty() and ring["walls"].size() == Level.outline(rect).size() - 1 and ring["gates"] == [gate], "the ring drawn, its gate a door")
+	if ring.is_empty():
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var walls: Array = ring["walls"]
+	var all_are := func(state: String) -> bool: return walls.all(func(key: Vector3i) -> bool: return _rig._wall_states.get(key, "") == state)
+	var all_set := func(set_name: String) -> bool: return walls.all(func(key: Vector3i) -> bool: return _rig._wall_sets.get(key, "") == set_name)
+	_check(all_are.call("rubble") and _rig._walls.has(walls[0]), "no walls record (level 0): a bank of rubble all round, the walls still standing in the sim and drawn")
+	_rig.set_town("fixture/square", {"walls": {"state": Towns.STANDING, "level": 1}})
+	_check(all_are.call("") and all_set.call("wood"), "level 1: a palisade")
+	_rig.set_town("fixture/square", {"walls": {"state": Towns.STANDING, "level": 2}})
+	_check(all_are.call("") and all_set.call("stone") and ring["towers"].is_empty(), "level 2: stone, no towers")
+	_rig.set_town("fixture/square", {"walls": {"state": Towns.STANDING, "level": 3}})
+	var towers: Dictionary = ring["towers"]
+	_check(towers.size() == 6 and towers.has(rect.position) and towers.has(rect.end) and towers.has(WallEdge.vertex_at(gate, 0))
+			and towers.values().all(func(t: Node3D) -> bool: return t.visible), "level 3: towers at its four corners and either side of its gate (%d)" % towers.size())
+	_rig.set_town("fixture/square", {"walls": {"state": Towns.DAMAGED, "level": 3}})
+	var broken := walls.filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key, "") == "broken")
+	_check(broken.size() > 0 and broken.size() < walls.size() / 2 and all_set.call("stone"), "damaged: a third or so of it broken, still stone (%d of %d)" % [broken.size(), walls.size()])
+	_rig.set_town("fixture/square", {"walls": {"state": Towns.PLANNED, "level": 0}})
+	_check(all_are.call("rubble") and all_set.call("") and towers.values().all(func(t: Node3D) -> bool: return not t.visible), "planned only: rubble again, no towers")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_check(_rig._town_walls.is_empty() and walls.all(func(key: Vector3i) -> bool: return not _rig._wall_states.has(key) and not _rig._wall_sets.has(key)),
+			"another map: its ring's looks taken out")
+	_rig.town_states.clear()
 
 
 func _test_water() -> void:

@@ -9,6 +9,11 @@ notes (decision 324).
 
 - Cave walls are ready for maps that ask for them: rough rock, thick at
   the foot, with ragged tops, and a rock floor.
+- A damaged building's walls are broken in places too, not only its roof.
+- A town's wall shows how far the town has built it: a tumbled bank of
+  rubble at first (it still stops you), then a wooden palisade, then stone,
+  then stone with towers at its corners and gates; broken in places after a
+  raid.
 - Homes are built of wood: timber walls a little thinner and not quite
   straight, and plank floors inside. Maps can say which set their walls and
   floors are drawn in (castle, wood, stone or cave); every map today keeps
