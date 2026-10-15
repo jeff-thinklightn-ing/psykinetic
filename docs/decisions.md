@@ -6219,6 +6219,18 @@ player and companion it thinks every FAR_EVERY (20) ticks and is walked
 there at once (World.walk); near, a path search per new goal and a look
 every LOOK_EVERY (5) ticks.
 
+Amended: a companion resting or working in a town away from her player
+(her record's "resident", the legacy companions too, trade or none; not
+held; her player's Companion not out) is a body there as well, after the
+town's own residents and within the same cap: a Resident whose worker_id
+is "companion:<player id>" and player_id her player's, named as herself,
+on her trade's day (the default day for none, her work the square). Main
+takes companions from the player records, not Towns, since one resting
+without a trade is no Towns resident. Beaten down by raiders, she is held
+as her player's (Main.companion_taken), a fact in her record and her
+player told if online; her player coming for her, her body goes and she
+comes as herself.
+
 Rejected: a Resident as a Companion (Main's and World's companion paths
 would all have to tell them apart); saving bodies (two truths about where
 a resident is); homes marked in the wilds' level.json (content in a real

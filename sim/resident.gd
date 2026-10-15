@@ -33,8 +33,12 @@ const STUCK_TRIES := 3
 const NO_CELL := Vector2i(-99999, -99999)
 const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home"}
 
-## Production's worker id, the town (a stockpile place id) and its trade.
+## Production's worker id ("companion:<player id>" for a companion resting
+## in town: decision 333 amended), the town (a stockpile place id) and its
+## trade ("" for none: the default day, its work the square).
 var worker_id := ""
+## A companion's player's id, "" for a town's own resident.
+var player_id := ""
 var town := ""
 var trade := ""
 ## Where it goes: "work", "home", "square" -> Rect2i of cells (Main's).

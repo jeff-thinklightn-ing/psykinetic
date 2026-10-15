@@ -263,6 +263,29 @@ func _test_bodies_in_town() -> void:
 	_check(not Snapshot._entries(saved).any(func(entry: Dictionary) -> bool: return entry["script"] == Main.RESIDENT), "never saved")
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
+	print("\n== a companion resting in town away from her player is a body there too; raiders taking her hold her as her player's (decision 333 amended) ==")
+	var other := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(_main._records[Net.player_id].to_dict())))
+	other.player_id = "rs-other"
+	other.name = "Other"
+	other.companion = {"name": "Wren", "alive": true, "facts": [], "resident": {"place": STORE, "zone": TOWN, "trade": ""}}
+	_main._records["rs-other"] = other
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	_sync()
+	var wren := _body("companion:rs-other")
+	_check(wren != null and wren.label == "Wren" and wren.player_id == "rs-other", "Wren, resting (no trade), stands in the town (%s)" % [wren.label if wren != null else "none"])
+	_check(_body("companion:" + Net.player_id) == null, "a companion out with her player has no body here")
+	World.entity_taken.emit(wren, "raid-10")
+	_check(not wren.spawned and other.companion.get("taken", {}).get("by", "") == "raid-10" and not other.companion.has("resident"),
+		"beaten down by raiders: held as her player's companion (%s)" % [other.companion.get("taken", {})])
+	_check(other.companion["facts"].any(func(fact: Dictionary) -> bool: return "carried off by raiders" in str(fact["text"])), "a fact about her")
+	_sync()
+	_check(_body("companion:rs-other") == null, "held: no body")
+	_main._records.erase("rs-other")
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, false)
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
 	DayNight.phase = phase
 	DayNight.anchor = anchor
 	DayNight.update()

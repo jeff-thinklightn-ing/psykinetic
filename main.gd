@@ -2218,6 +2218,12 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion["name"]))
 		record.companion.erase("resident")
 		party_log.add("%s leaves her work in the town and goes with %s." % [record.companion["name"], record.name])
+		# Her body in town goes; she comes as herself (decision 333 amended).
+		for body: GridEntity in World.townsfolk().duplicate():
+			if (body as Resident).player_id == record.player_id:
+				_travelling = true
+				World.despawn(body)
+				_travelling = false
 	var existing: Companion = _companions.get(record.player_id)
 	if is_instance_valid(existing) and existing.spawned:
 		existing.works_as = ""
@@ -2319,7 +2325,9 @@ func _on_entity_taken(entity: GridEntity, by: String) -> void:
 ## town's records hold it captive (Towns.resident_taken, economy's) and its
 ## body goes, as one carried off, not one who died.
 func _resident_taken(body: Resident, by: String) -> void:
-	if World.towns != null:
+	if not body.player_id.is_empty():
+		_companion_taken_in_town(body, by)
+	elif World.towns != null:
 		World.towns.resident_taken(body.town, body.worker_id, by)
 	party_log.add("Raiders beat %s down and carried them off." % _display_name(body))
 	_travelling = true  # Taken, not dead.
@@ -2327,11 +2335,32 @@ func _resident_taken(body: Resident, by: String) -> void:
 	_travelling = false
 
 
+## A companion resting in town, her body (a Resident) beaten down by raid
+## group [param by] (decision 333 amended): held as one taken beside her
+## player (companion_taken), a fact about her in her record, her player told.
+func _companion_taken_in_town(body: Resident, by: String) -> void:
+	var record: PlayerRecord = _records.get(body.player_id)
+	if record == null or not companion_taken(body.player_id, by):
+		return
+	var pet_name := str(record.companion.get("name", body.name))
+	var town := str(Level.load_level(World.zone.name).get("display_name", World.zone.name)) if Level.exists(World.zone.name) else World.zone.name
+	var grown := CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
+	grown.add_fact("%s was beaten down and carried off by raiders in %s." % [pet_name, town], "event", body.player_id)
+	record.companion["facts"] = grown.facts
+	record.companion["beliefs"] = grown.beliefs
+	for peer: int in _players:
+		if _peer_ids.get(peer, "") == body.player_id:
+			Net.broadcast_to([peer], "party", {"from": "Server", "text": "Raiders carried %s off from %s." % [pet_name, town]})
+
+
 ## Server: the zone World is in has a body for each resident of its towns
-## (Towns.residents, but for companions, who have their own, and those
-## away), at most RESIDENTS_MAX, and none for anyone else (decision 333).
-## A body comes where its day puts it now, and goes when the record says it
-## is gone (taken, away, moved); bodies are never saved.
+## (Towns.residents, not away), then for each companion resting or working
+## in one away from her player (her record's "resident", not held, her
+## player's Companion not out: decision 333 amended), at most RESIDENTS_MAX,
+## and none for anyone else (decision 333). A body comes where its day puts
+## it now, and goes when the record says it is gone (taken, away, moved, her
+## player come for her); bodies are never saved. A body's key is its worker
+## id, or "companion:<player id>" for a companion.
 func _sync_residents() -> void:
 	if World.towns == null or World.production == null or World.holdings == null or _world_map == null:
 		return
@@ -2346,10 +2375,19 @@ func _sync_residents() -> void:
 				return not who.begins_with("companion:") and not World.production.worker(who).is_empty() \
 					and not bool(World.production.worker(who).get("away", false)))
 			ids.sort()
+			var folk: Array[Dictionary] = []
+			for who in ids:
+				var trades: Array = World.production.worker(who).get("trades", [])
+				folk.append({"key": who, "name": str(World.production.worker(who).get("name", who)),
+					"trade": str(trades[0]) if not trades.is_empty() else "", "player": ""})
+			folk.append_array(_companions_resting(place_id))
 			var homes := _homes(area, place)
-			for i in ids.size():
+			for i in folk.size():
 				if wanted.size() < RESIDENTS_MAX:
-					wanted[ids[i]] = {"town": place_id, "places": _resident_places(area, place, ids[i], homes, i)}
+					var each: Dictionary = folk[i]
+					each["town"] = place_id
+					each["places"] = _resident_places(area, place, each["trade"], homes, i)
+					wanted[each["key"]] = each
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
@@ -2362,24 +2400,45 @@ func _sync_residents() -> void:
 			_travelling = false
 	for who: String in wanted:
 		if not have.has(who):
-			_spawn_resident(who, wanted[who]["town"], wanted[who]["places"])
+			_spawn_resident(wanted[who])
 
 
-## A body for resident [param who] of [param town], with [param places]
-## (_resident_places), where its day puts it now.
-func _spawn_resident(who: String, town: String, places: Dictionary) -> Resident:
-	var worker := World.production.worker(who)
-	var trades: Array = worker.get("trades", [])
-	var trade := str(trades[0]) if not trades.is_empty() else ""
+## The companions resting or working in the town at [param place_id], away
+## from their players, by player id: [{key ("companion:<player id>"),
+## name, trade, player}].
+func _companions_resting(place_id: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ids: Array = _records.keys()
+	ids.sort()
+	for player_id: String in ids:
+		var record: PlayerRecord = _records[player_id]
+		var resident: Dictionary = record.companion.get("resident", {})
+		var out_with: Companion = _companions.get(player_id)
+		if resident.get("place", "") != place_id or record.companion.has("taken") or not record.companion.get("alive", true) \
+				or is_instance_valid(out_with) and out_with.spawned:
+			continue
+		out.append({"key": "companion:" + player_id, "name": str(record.companion.get("name", "")),
+			"trade": str(resident.get("trade", "")), "player": player_id})
+	return out
+
+
+## A body for [param each] (_sync_residents' entry: key, name, trade,
+## player, town, places), where its day puts it now.
+func _spawn_resident(each: Dictionary) -> Resident:
+	var who: String = each["key"]
+	var town: String = each["town"]
+	var places: Dictionary = each["places"]
+	var trade: String = each["trade"]
 	var doing := Resident.doing_at(trade, DayNight.hour(DayNight.now()))
 	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
-	var label := str(worker.get("name", who)) + (", " + trade if not trade.is_empty() else "")
+	var label := str(each["name"]) + (", " + trade if not trade.is_empty() else "")
 	var body := _spawn({"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(),
 		"label": label, "tile": at}) as Resident
 	if body == null:
 		return null
 	body.worker_id = who
+	body.player_id = each["player"]
 	body.town = town
 	body.trade = trade
 	body.places = places
@@ -2407,18 +2466,17 @@ func _homes(area: Dictionary, place: Dictionary) -> Array[Rect2i]:
 	return out
 
 
-## Where resident [param who] (the [param index]th of its town, in id
-## order) goes, in [param area] for the town at [param place]: "work", the
+## Where a resident of [param trade] (the [param index]th of its town:
+## residents in id order, then companions) goes, in [param area] for the town at [param place]: "work", the
 ## inside of the standing building its trade works in (none: the square);
 ## "home", its share of [param homes], else the inn if it stands, else its
 ## work; "square", the store's ground.
-func _resident_places(area: Dictionary, place: Dictionary, who: String, homes: Array[Rect2i], index: int) -> Dictionary:
+func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes: Array[Rect2i], index: int) -> Dictionary:
 	var key := str(place.get("key", ""))
 	var radius := int(place.get("radius", 4))
 	var store: Vector2i = place.get("cell", Vector2i.ZERO)
 	var square := Rect2i(store - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
-	var trades: Array = World.production.worker(who).get("trades", [])
-	var kind := World.towns.kind_for(str(trades[0])) if not trades.is_empty() else ""
+	var kind := World.towns.kind_for(trade) if not trade.is_empty() else ""
 	var work := Rect2i()
 	var inn := Rect2i()
 	for building: Dictionary in area.get("buildings", []):
