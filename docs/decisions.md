@@ -5805,6 +5805,13 @@ translations today: arrival() ignores the levels' "north", and so does this,
 so a quarter turn waits until a crossing turns too. world_map_test checks
 an edge against arrival(), a link's placement, a one-way link, and the
 wilds' castle lying north with its arrival across from the link.
+
+Amended: a link's target goes gap cells past where our land ends going out
+from the marker, not past the map's edge (what terrain's design asked; the
+wilds' rows 0 to 15 above the castle link are void, now terrain's canopy,
+which put the castle some 20 cells out of view from the road). The land's
+end is the last floor cell walking out from the marker. Edges are as they
+were: a crossing lands at the map's edge, so the glimpse does too.
 ## 315. Animals are monsters of side "wild"
 
 A wild animal is a row of levels/monsters.json with "side": "wild" (rabbit,

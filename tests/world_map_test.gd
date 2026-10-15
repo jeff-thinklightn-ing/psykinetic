@@ -163,8 +163,15 @@ func _test_ways_out() -> void:
 	_check(to_castle.size() == 1 and to_castle[0]["out"] == Vector2i(0, -1), "the wilds' way to the castle points north")
 	if to_castle.size() == 1:
 		var spawn := Vector2i((to_castle[0]["to_ours"] as Transform2D) * Vector2(to_castle[0]["to_cell"]))
-		_check(spawn.x == (to_castle[0]["from_cell"] as Vector2i).x and spawn.y < 0,
-			"the castle lies beyond the wilds' north edge, its arrival across from the link (%s)" % spawn)
+		var marker: Vector2i = to_castle[0]["from_cell"]
+		var land := marker
+		var floor_cells: Dictionary = real.areas["wilds"]["floor"]
+		while floor_cells.has(land + Vector2i(0, -1)):
+			land += Vector2i(0, -1)
+		var castle_size: Vector2i = real.areas["castle"]["size"]
+		var bottom := Vector2i((to_castle[0]["to_ours"] as Transform2D) * Vector2(0, castle_size.y - 1)).y
+		_check(spawn.x == marker.x and bottom == land.y - 4,
+			"the castle lies 3 cells past where the wilds' land ends going north from the link, its arrival across from it (land ends at row %d, its south row at %d, arrival %s)" % [land.y, bottom, spawn])
 
 
 func _test_crossing() -> void:

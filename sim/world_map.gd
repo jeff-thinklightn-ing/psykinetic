@@ -135,8 +135,9 @@ func crossing(area_name: String, cell: Vector2i, direction: Vector2i) -> Diction
 ## (nothing leads back)}. A neighbour abuts as arrival() has it: the same row
 ## or column, the target's opposite edge next to ours. A link's target is
 ## turned to face us by the edge its arrival is nearest: that edge put
-## [param gap] cells beyond our land along out, the arrival across from our
-## marker. Cells, not levels' "north": arrival ignores it too, so the two
+## [param gap] cells beyond our land along out (where the floor ends going
+## out from the marker, not the map's edge: void past the land is not
+## crossed), the arrival across from our marker. Cells, not levels' "north": arrival ignores it too, so the two
 ## always agree.
 func ways_out(area_name: String, gap := 3) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -172,16 +173,21 @@ func ways_out(area_name: String, gap := 3) -> Array[Dictionary]:
 			entry["out"] = away
 			entry["from_cell"] = marker
 			entry["to_cell"] = arrive
-			# That edge's row or column lands gap cells past ours, the arrival across from the marker.
+			# Our land's last cell going out from the marker.
+			var floor_cells: Dictionary = areas[area_name]["floor"]
+			var land := marker
+			while floor_cells.has(land + away):
+				land += away
+			# That edge's row or column lands gap cells past it, the arrival across from the marker.
 			match facing:
 				"south":
-					shift = Vector2i(marker.x - arrive.x, -1 - gap - (to_size.y - 1))
+					shift = Vector2i(marker.x - arrive.x, land.y - 1 - gap - (to_size.y - 1))
 				"north":
-					shift = Vector2i(marker.x - arrive.x, size.y + gap)
+					shift = Vector2i(marker.x - arrive.x, land.y + 1 + gap)
 				"east":
-					shift = Vector2i(-1 - gap - (to_size.x - 1), marker.y - arrive.y)
+					shift = Vector2i(land.x - 1 - gap - (to_size.x - 1), marker.y - arrive.y)
 				"west":
-					shift = Vector2i(size.x + gap, marker.y - arrive.y)
+					shift = Vector2i(land.x + 1 + gap, marker.y - arrive.y)
 		entry["to_ours"] = Transform2D(0.0, Vector2(shift))
 		out.append(entry)
 	return out

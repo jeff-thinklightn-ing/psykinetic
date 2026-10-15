@@ -289,7 +289,8 @@ an edge's `side`, `out` (the direction away from our land), `to_ours` (a
 `Transform2D` taking the target's cells into ours) and `one_way`. A
 neighbour abuts exactly as `arrival()` puts a crossing (the same row or
 column); a link's target faces us by the edge its arrival is nearest, that
-edge `gap` cells past our land, the arrival across from our marker. It reads
+edge `gap` cells past where our land ends going out from the marker (not
+the map's edge), the arrival across from our marker. It reads
 cells, not the levels' `"north"`, as `arrival()` does, so what is shown and
 where a crossing lands cannot disagree.
 
