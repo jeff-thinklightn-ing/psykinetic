@@ -34,6 +34,10 @@ notes (decision 324).
 
 ## v0.1.143
 
+- You can see the weather outdoors: rain falls (and stops at roofs), fog
+  rolls in along the ground, clouds cast drifting shadows and grey the
+  sky, and the wind leans fires, torch flames and grass.
+- Server: `--weather=<kind>` starts the world in that weather.
 - Companions know the weather when outdoors: rain, fog, wind, a storm or a clear
   sky.
 - A deer or stag that hears you lifts its head with a quiet snort: freeze
@@ -82,10 +86,6 @@ notes (decision 324).
   all fades from one to the next as you move, as the day turns and as the
   weather changes; under a roof the outside is quieter and muffled.
 - Rain and wind now cover sounds for you as they do for monsters.
-- You can see the weather outdoors: rain falls (and stops at roofs), fog
-  rolls in along the ground, clouds cast drifting shadows and grey the
-  sky, and the wind leans fires, torch flames and grass.
-- Server: `--weather=<kind>` starts the world in that weather.
 - A goblin that spots you and calls its pack is heard calling (a brute
   lower, an imp higher), and a smashed crate or cart sounds like one.
 - The town's smith makes knives, axe heads and nails from ore, and its
