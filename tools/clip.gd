@@ -59,7 +59,7 @@ var _end_tick := -1
 var _lured := false
 ## Sounds already logged (the sounds scenario).
 var _sounds_logged := 0
-## The tick a "fight" step gives up by.
+## The tick a "sound_fight" step gives up by.
 var _fight_until := -1
 
 
@@ -288,10 +288,10 @@ func _sounds() -> void:
 		["wait", 30, ""],
 		["open", false, ""],
 		["walk", Vector2i(5, 3), "To the door."],
-		["door", true, "A door: sfx.door_wood_open, heard 6 cells."],
+		["sound_door", true, "A door: sfx.door_wood_open, heard 6 cells."],
 		["wait", 25, ""],
 		["walk", "beside the monster", "Into the next room."],
-		["fight", 400, "A fight: sfx.swing, sfx.hit_flesh, heard 5 cells."],
+		["sound_fight", 400, "A fight: sfx.swing, sfx.hit_flesh, heard 5 cells."],
 		["say", 60, "Its death: sfx.goblin_death."],
 	]
 func _door(which: String) -> void:
@@ -358,11 +358,11 @@ func _on_tick(tick: int) -> void:
 			if cell != null:
 				args["cell"] = [cell.x, cell.y]
 			World.command(_player, str(step[1][0]), args)
-		"door":
+		"sound_door":
 			var door: Door = World.get_doors()[0]
 			if door.open != bool(step[1]):
 				World.try_toggle_door(_player, door.key)
-		"fight":
+		"sound_fight":
 			if is_instance_valid(_monster) and _monster.hp > 0:
 				if _fight_until < 0:
 					_fight_until = tick + int(step[1])
