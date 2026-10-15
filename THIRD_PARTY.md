@@ -43,6 +43,7 @@ Slots whose own art came from someone else: none.
 | ComfyUI | Comfy-Org | GPL-3.0 (the program; what it makes is the maker's) | running the image models |
 | Blender | Blender Foundation | GPL (the program; what it makes is the maker's) | modelling, painting, rigging; slot exports (`tools/blender/export_slot.py`) |
 | Godot Engine | Godot contributors | MIT | the game |
+| Sonniss #GameAudioGDC bundles 2024 and 2021–23 | Sonniss | Sonniss GameAudioGDC Bundle licence v2.0, effective 2026-08-27 (`docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt`): royalty-free, commercial use in our own projects; no redistributing the sounds as sounds, and no AI or machine-learning use | a source library for the game's sounds; the files stay outside the repo (`N:\assets\sound`), and only what the game uses goes into it, inside the game |
 
 **Not to be used:** Qwen-Image-2.1 (installed in `C:\ComfyUI`). Its licence, the Qwen Research
 License, allows research and evaluation only, with no commercial use.
