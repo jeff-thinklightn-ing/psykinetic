@@ -85,6 +85,7 @@ func _ready() -> void:
 	_test_raid_townsfolk()
 	_test_charging()
 	_test_archer()
+	_test_shield()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1796,4 +1797,42 @@ func _test_archer() -> void:
 	for i in 10:
 		World.step()
 	_check(World.distance(archer.tile, player.tile) >= Monster.KEEP_NEAR, "2 off, it steps back to %d" % World.distance(archer.tile, player.tile))
+	Monster.idling = true
+
+
+func _test_shield() -> void:
+	print("\n== a shield is up, turned to its foe, while it is near; down far off or out of breath; a sneak goes round a raised one ==")
+	Monster.idling = false
+	var e := _build(["############", "#..........#", "#.P......i.#", "#..........#", "############"])
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	_bold(imp)
+	imp.slots = PackedStringArray(["", "", "", "", "", "shield"])  # As Level arms one wielding a shield.
+	World.step()
+	_check(World.off_hand(imp) == "block" and imp.raised.is_empty(), "far off, its shield is down")
+	for i in 40:
+		World.step()
+		if World.distance(imp.tile, player.tile) <= Monster.GUARD_TILES:
+			break
+	World.step()
+	_check(imp.raised == "block" and not World.guarding(imp, player).is_empty(),
+			"near, it is up and turned to the player (%s, facing %s)" % [imp.raised, imp.facing])
+	imp.stamina = 5
+	World.step()
+	_check(imp.raised.is_empty(), "out of breath, it lowers it")
+	# A sneak against a player's raised shield: it strikes round it.
+	e = _build(["############", "#..........#", "#....P.s...#", "#..........#", "############"])
+	player = e["P"][0]
+	var sneak: Monster = e["s"][0]
+	_bold(sneak)
+	player.slots[Items.LEFT_HAND] = "shield"
+	World.face(player, Vector2i(1, 0))
+	World.try_stance(player, "block")
+	var struck := 0
+	for i in 60:
+		World.step()
+		for hit: Dictionary in _damage_log:
+			if hit["source"] == sneak and int(hit["tick"]) == World.tick:
+				struck += 1
+	_check(struck > 0, "the sneak gets blows in (%d) round the shield" % struck)
 	Monster.idling = true

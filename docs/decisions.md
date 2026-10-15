@@ -6604,3 +6604,18 @@ both hands empty when it is not striking), since it costs a turn. Nothing
 judges one weapon better than another: there are no tiers. What it took
 up drops where it falls (decision 330). Server side only (a monster's
 slots are not replicated, so the views do not show it in hand yet).
+## 345. A monster with a shield raises it when its foe is near
+
+A monster with a shield in its left hand (decision 338's wields; World.off_hand
+"block") raises it (World.try_stance "block", decision 340) while it
+fights and its target is within GUARD_TILES (2), turned to face it so
+the blow comes into the shield's arc; farther off it lowers it. A raised
+shield does not stop its own blows, so it fights on behind it. It
+lowers it to get its breath back when its stamina falls under GUARD_REST
+(a quarter) and raises it again only over GUARD_RESTED (a half), so it
+does not flicker. A broken guard is World's: lowered, stunned, no raising
+for a while. With no target it lowers it, as an archer lowers its bow.
+A FLANK monster (a sneak) treats a target guarding against it
+(World.guarding) as a front to go round, as it does a target facing it,
+so it looks for the open side. Which kinds carry shields is content, as
+with bows: none in a real level until Jeff says.

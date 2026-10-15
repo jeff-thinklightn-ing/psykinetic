@@ -150,6 +150,12 @@ const CHASE_RETRY_TICKS := 5
 ## An archer (a bow in its hands, decision 341) shoots from KEEP_NEAR cells
 ## out to its bow's reach; nearer than KEEP_NEAR it steps back.
 const KEEP_NEAR := 3
+## A shield (decision 345) is up while its target is this near, and its
+## stamina above GUARD_REST of its most; below that it lowers it to get
+## its breath back, raising it again only above GUARD_RESTED.
+const GUARD_TILES := 2
+const GUARD_REST := 0.25
+const GUARD_RESTED := 0.5
 
 ## What it does with nobody in sight. NONE: stands where it is (a monster of
 ## no kind, as monsters were).
@@ -439,8 +445,8 @@ func _sim_tick() -> void:
 	target = seen
 	if target == null:
 		_windup = {}
-		if raised == "draw":
-			World.try_stance(self, "")  # Nobody to shoot.
+		if not raised.is_empty():
+			World.try_stance(self, "")  # Nobody to shoot or guard against.
 		_alert_tick()
 		return
 	var took_up := alert != Alert.FIGHTING
@@ -457,8 +463,12 @@ func _sim_tick() -> void:
 		if _should_flee():
 			_flee(target.tile)
 			return
-	if World.off_hand(self) == "draw" and _shoot_tick():
-		return
+	match World.off_hand(self):
+		"draw":
+			if _shoot_tick():
+				return
+		"block":
+			_guard_tick()
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
 			World.try_attack(self, target)
@@ -482,7 +492,8 @@ func _sim_tick() -> void:
 			return
 		if not can_strike:
 			return
-		if tactic == Tactic.FLANK and _in_front() and _front_ticks < FLANK_PATIENCE_TICKS:
+		if tactic == Tactic.FLANK and (_in_front() or not World.guarding(target, self).is_empty()) \
+				and _front_ticks < FLANK_PATIENCE_TICKS:
 			_front_ticks += 1
 			var round_to := _pick_slot()
 			if round_to != NO_TILE and round_to != tile and _go_to(round_to):
@@ -548,6 +559,23 @@ func _shoot_tick() -> bool:
 	elif World.draw_of(self) >= 1.0:
 		World.try_loose(self, target.tile)
 	return true
+
+
+## A shield's fight (decision 345): up, and turned to its target, while it
+## is within GUARD_TILES (it fights on behind it: a raised shield never
+## stops a blow of its own), down farther off, or to get its breath back
+## under GUARD_REST of its stamina. A broken guard World lowers itself.
+func _guard_tick() -> void:
+	var near := World.distance(tile, target.tile) <= GUARD_TILES
+	var breath := GUARD_REST if raised == "block" else GUARD_RESTED
+	if near and (max_stamina <= 0 or stamina_fraction() > breath):
+		var way := Senses.way_toward(tile, target.tile)
+		if way != Vector2i.ZERO and facing != way:
+			World.face(self, way)
+		if raised != "block":
+			World.try_stance(self, "block")
+	elif raised == "block":
+		World.try_stance(self, "")
 
 
 ## Whether its arrow would fly to its target: the first body on the shot's
