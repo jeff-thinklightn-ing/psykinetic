@@ -5179,3 +5179,24 @@ made companions' names a roll from their player's id (Jo and Kim had
 random ids, and the check named Pip and Nix); it reads their names from the
 server's log now. land.sh runs net_test.sh, which has no zones phase, so it
 went unseen.
+
+## 320. Companions bandage, and heal only by being bandaged
+
+Companions step 4's last verb. Items' bandaging (#272: World.try_bandage,
+a kit, out of combat, then mending) left companions healing on their own
+(Companion._heal: a point every 10 ticks after 50 calm). That is gone: a
+companion heals only by being bandaged, by her player or by herself, and
+a reset still brings her back whole. With a bandaging kit, out of combat
+(World.calm for her and the patient), Companion.can_do offers "bandage
+your own wounds" and, with her player in sight, "bandage <player>'s
+wounds", for each who is hurt and neither being bandaged nor mending.
+Chosen ([DO: n], or one promise naming it: "I'll bandage you" is her
+player, "my own wounds" herself; "give you my bandages" stays a give),
+she walks beside her patient, calls World.try_bandage, and waits on the
+patient's mending: 2 is done (her voice tells it), 0 is broken off.
+Bandaging herself, low, with nothing next to her, she keeps at it rather
+than the retreat reflex ending it. Her voice is told the facts, never
+what to say: whose wounds are being bandaged or mending, and for open
+wounds whether she carries a kit (or her player does, or neither) and
+whether it is safe to bandage now. Her world text says wounds do not
+close on their own. No protocol change: mending is already replicated.

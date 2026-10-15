@@ -74,11 +74,6 @@ const RETREAT_CLEAR := 3
 const RETREAT_CLEAR_WEIGHT := 2.0
 const RETREAT_KEEP_MARGIN := 1.0
 const RETREAT_TURN_BACK := 1.5
-## Out of combat (no hostile within CALM_RANGE for CALM_TICKS) she heals
-## 1 hp every HEAL_EVERY ticks.
-const CALM_RANGE := 6
-const CALM_TICKS := 50
-const HEAL_EVERY := 10
 ## This long after a fight without a word from her: a speaking moment.
 const SILENCE_TICKS := 100
 ## Her player's words become a standing instruction only when her voice,
@@ -216,7 +211,7 @@ PULL_BACK: get away from the monsters, to safety. Follow the standing instructio
 const VOICE_WORLD := """You walk the old stone places and the land around them: rooms and corridors lit by lanterns and
 by fires, and the open ground beyond. Monsters prowl there, imps and brutes and worse, and they attack whoever they
 see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
-Wounds close slowly when you rest away from danger.
+Wounds do not close on their own; a bandaging kit, used away from danger, mends them.
 Whoever falls can be brought back, but it hurts, and no one wants to fall.
 Directions are spoken as north, south, east and west."""
 const VOICE_RULES := """Say what you would say out loud right now, as yourself, in one or two short sentences. However few
@@ -399,8 +394,7 @@ var _addressed: Dictionary[String, int] = {}
 ## What the voice sees of the recent exchange: {role: "user" | "assistant",
 ## text}; her player's words and narration as the user's, her lines as hers.
 var _exchange: Array[Dictionary] = []
-## The fight, for healing and the silence after it.
-var _calm_since := 0
+## The fight, for the silence after it.
 var _was_in_fight := false
 var _fight_ended_tick := -100000
 var _silence_due := false
@@ -884,7 +878,6 @@ func _sim_tick() -> void:
 	if World.tick % MEMORY_EVERY == 0:
 		_remember_sights()
 	_calm()
-	_heal()
 	_act()
 	_execute()
 
@@ -1538,6 +1531,9 @@ func voice_situation() -> String:
 		sentences.append("%s has fallen." % who)
 	else:
 		sentences.append("%s is not here." % who)
+	var wounds := _wound_words()
+	if not wounds.is_empty():
+		sentences.append(wounds)
 	if her_danger and their_danger:
 		sentences.append("You are both in danger.")
 	elif her_danger:
@@ -1549,6 +1545,36 @@ func voice_situation() -> String:
 	else:
 		sentences.append("Neither of you is in danger.")
 	return " ".join(sentences)
+
+
+## Wounds, for her voice (decision 320), when she or her player is hurt:
+## a bandaging under way or mending, and for the rest whether she carries
+## a kit (or her player does) and whether it is safe to bandage now
+## (World.calm). "" when neither is hurt.
+func _wound_words() -> String:
+	var who := keeper_name()
+	var told: Array[String] = []
+	var open_wounds: Array[GridEntity] = []
+	for each: GridEntity in [self, keeper]:
+		if not _alive(each) or each.hp >= each.max_hp:
+			continue
+		var whose := "Your" if each == self else "%s's" % who
+		if each.mending == 1:
+			told.append("%s wounds are being bandaged." % whose)
+		elif each.mending == 2:
+			told.append("%s wounds are bandaged and mending." % whose)
+		else:
+			open_wounds.append(each)
+	if not open_wounds.is_empty():
+		var safe := World.calm(self) and open_wounds.all(func(each: GridEntity) -> bool: return World.calm(each))
+		if World.bandage_kit(self) >= 0:
+			told.append("You carry a bandaging kit; it is %s." % ("safe to bandage now" if safe
+				else "not safe to bandage now: danger is near, or a blow came too recently"))
+		elif _alive(keeper) and World.bandage_kit(keeper) >= 0:
+			told.append("You have no bandaging kit; %s carries one." % who)
+		else:
+			told.append("Neither of you carries a bandaging kit.")
+	return " ".join(told)
 
 
 ## What she can see around her, for the voice and the stance (the "around
@@ -2445,7 +2471,9 @@ func _act() -> void:
 	if current_intent == Intent.YIELD and World.tick < _yield_until and not (low and foe != null):
 		return
 	intent_target = null
-	if low:
+	# Bandaging herself, low, with nothing at her: she keeps at it.
+	var mending_self: bool = str(errand.get("verb", "")) == "bandage" and errand.get("patient") == self and foe == null
+	if low and not mending_self:
 		if not errand.is_empty():
 			_end_errand("you are badly hurt", false)
 		current_intent = Intent.RETREAT
@@ -2513,17 +2541,6 @@ func _nearest_hostile(reach: int) -> GridEntity:
 				best = entity
 				best_distance = distance
 	return best
-
-
-## Out of combat (no hostile within CALM_RANGE of her or her player for
-## CALM_TICKS) she heals a point every HEAL_EVERY ticks.
-func _heal() -> void:
-	if _hostile_within(CALM_RANGE):
-		_calm_since = World.tick
-		return
-	var calm := World.tick - _calm_since
-	if calm >= CALM_TICKS and hp < max_hp and (calm - CALM_TICKS) % HEAL_EVERY == 0:
-		World.heal(self, 1)
 
 
 # --- Acting -------------------------------------------------------------------
@@ -2716,12 +2733,15 @@ func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
 # --- Errands: what she does when asked ------------------------------------------
 
 ## What she can do here and now, nearest first, at most ACTIONS_MAX: each
-## {verb ("open", "close", "open_chest", "fetch", "give", "look"), words
+## {verb ("open", "close", "open_chest", "fetch", "give", "bandage", "look"), words
 ## (for her voice: "open the closed door, a few paces to the south"), at,
 ## and its door, chest, item or cell}. Only what she sees: a door not
 ## broken, a chest, and, with her player in sight (the only one she may
 ## hand things to: World.reaches), each thing in a chest to bring them and
-## each thing she carries to give them; and the nearest walkable cells she
+## each thing she carries to give them; with a bandaging kit, out of
+## combat, to bandage herself or her player in sight, if hurt and not
+## being bandaged or mending (World.try_bandage, decision 320); and the
+## nearest walkable cells she
 ## cannot see within her sight's range, one a compass point, LOOKS_OFFERED
 ## of them.
 func can_do() -> Array[Dictionary]:
@@ -2757,6 +2777,11 @@ func can_do() -> Array[Dictionary]:
 				given[id] = true
 				actions.append({"verb": "give", "item": id, "at": keeper.tile,
 					"words": "give %s your %s" % [keeper_name(), Items.name_of(id)]})
+	if World.bandage_kit(self) >= 0 and World.calm(self):
+		for patient: GridEntity in [self, keeper if to_them else null]:
+			if patient != null and patient.hp < patient.max_hp and patient.mending == 0 and World.calm(patient):
+				actions.append({"verb": "bandage", "patient": patient, "at": patient.tile,
+					"words": "bandage your own wounds" if patient == self else "bandage %s's wounds" % keeper_name()})
 	actions.sort_custom(_nearer_found)
 	actions.resize(mini(actions.size(), ACTIONS_MAX - LOOKS_OFFERED))
 	var ways: Dictionary[int, bool] = {}
@@ -2793,8 +2818,11 @@ static func _errand_verbs(text: String) -> Array[String]:
 	# Handing over and fetching: only of a thing named (or the chest), so
 	# "I'll get them" or "I'll take the imps" is no errand.
 	var thing := _item_words("").search(text) != null
-	if thing and not chest and has.call("\\b(give|hand|pass)"):
+	var handing: bool = has.call("\\b(give|hand|pass)")
+	if thing and not chest and handing:
 		verbs.append("give")
+	if not handing and has.call("\\b(bandag|patch\\w* (you|me|myself|yourself|us) up|dress\\w* (your|my|the|those|these) wound|see to (your|my) wound)"):
+		verbs.append("bandage")
 	if (thing or chest) and not door and has.call("\\b(bring|fetch|get|grab|take)"):
 		verbs.append("fetch")
 	return verbs
@@ -2845,6 +2873,11 @@ func _promises(line: String, offered: Array, chosen: int) -> Dictionary:
 			return offered[i].has("item") and _item_words(offered[i]["item"]).search(text) != null)
 		if not named_thing.is_empty():
 			matching.assign(named_thing)
+		# Bandaging: herself when she speaks of herself, else her player.
+		var bandaging := matching.filter(func(i: int) -> bool: return offered[i]["verb"] == "bandage")
+		if bandaging.size() > 1:
+			var own := RegEx.create_from_string("\\b(myself|my own|my wounds?|me up)\\b").search(text) != null
+			matching.assign(bandaging.filter(func(i: int) -> bool: return (offered[i]["patient"] == self) == own))
 		if chosen >= 0 and chosen in matching or chosen == -1 and matching.size() == 1:
 			kept.append(sentence)
 			if chosen == -1 and named == -1:
@@ -2910,6 +2943,9 @@ func _errand_there() -> bool:
 			return World.reaches(self, errand["chest"])
 		"give":
 			return World.reaches(self, keeper)
+		"bandage":
+			var patient: GridEntity = errand["patient"]
+			return patient == self or _alive(patient) and World.can_melee(tile, patient.tile)
 		_:
 			return _sees(errand["cell"])
 
@@ -2927,15 +2963,39 @@ func _errand_walk() -> bool:
 			return _alive(errand["chest"]) and _step_toward(errand["chest"].tile, true)
 		"give":
 			return _alive(keeper) and _step_toward(keeper.tile, true)
+		"bandage":
+			return _alive(errand["patient"]) and _step_toward(errand["patient"].tile, true)
 		_:
 			return _step_toward(errand["cell"], true)
 
 
 ## There: the door opened or closed, the chest looked in, the thing taken
-## from the chest (then taken to her player) or handed over, or the place
+## from the chest (then taken to her player) or handed over, the bandaging
+## begun (then waited on: done, mending, or broken off), or the place
 ## looked at.
 func _errand_do() -> void:
 	match str(errand["verb"]):
+		"bandage":
+			var patient: GridEntity = errand["patient"]
+			var whom := "yourself" if patient == self else keeper_name()
+			if errand.get("started", false):
+				if patient.mending == 2:
+					_report_errand("You bandaged %s; the wounds are mending." % ("your wounds" if patient == self else "%s's wounds" % keeper_name()))
+				elif patient.mending == 0:
+					_end_errand("the bandaging was broken off", true)
+			elif not _alive(patient):
+				_end_errand("%s was gone" % whom, true)
+			elif patient.hp >= patient.max_hp:
+				_end_errand("there was no wound to bandage", true)
+			elif World.bandage_kit(self) < 0:
+				_end_errand("you had no bandaging kit", true)
+			elif not World.calm(self) or not World.calm(patient):
+				_end_errand("it was not safe to bandage", true)
+			elif World.try_bandage(self, patient):
+				errand["started"] = true
+				errand["until"] = World.tick + World.BANDAGE_TICKS + ERRAND_TICKS
+			else:
+				_end_errand("the bandaging could not be begun", true)
 		"fetch":
 			var chest: Chest = errand["chest"]
 			var item: String = errand["item"]

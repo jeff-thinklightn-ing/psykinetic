@@ -2320,22 +2320,63 @@ func _test_names() -> void:
 
 
 func _test_healing() -> void:
-	print("\n== healing: out of combat a point every 10 ticks; a reset heals the living ==")
+	print("\n== healing: she does not heal on her own; with a kit, out of combat, she bandages herself or her player (decision 320); a reset heals the living ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
 	_settle(pet)
 	_put(owner, Vector2i(9, 6))
 	_put(pet, Vector2i(10, 6))
-	var imp := _spawn_imp(Vector2i(10, 11))
+	var kept := pet.slots.duplicate()
+	World.set_slots(pet, [])
 	pet.hp = 10
-	for i in Companion.CALM_TICKS + 30:
+	for i in World.BANDAGE_CALM_TICKS + 80:
 		World.step()
-	_check(pet.hp == 10, "a monster 5 away: no healing (%d)" % pet.hp)
+	_check(pet.hp == 10, "calm a long while, no kit: no healing (%d)" % pet.hp)
+	_check(_offer(pet.can_do(), "bandage") == -1, "and no bandaging offered without a kit")
+	_check("Neither of you carries a bandaging kit." in pet.voice_situation(), "her voice is told: %s" % pet.voice_situation())
+
+	World.set_slots(pet, ["bandaging_kit"])
+	owner.hp = owner.max_hp - 6
+	var imp := _spawn_imp(Vector2i(10, 11))
+	imp.acts = false
+	_check(_offer(pet.can_do(), "bandage") == -1 and "not safe to bandage now" in pet.voice_situation(),
+		"a monster near: not offered, and her voice is told it is not safe (%s)" % pet.voice_situation())
 	World.despawn(imp)
-	for i in Companion.CALM_TICKS + Companion.HEAL_EVERY * 3:
+	var offered := pet.can_do()
+	var words := _words(offered)
+	_check("bandage your own wounds" in words and "bandage %s's wounds" % pet.keeper_name() in words and "safe to bandage now" in pet.voice_situation(),
+		"with a kit, out of combat: herself and her player offered (%s)" % [words])
+
+	var both := ["bandage your own wounds", "bandage %s's wounds" % pet.keeper_name()].map(func(w: String) -> int: return words.find(w))
+	_check(Companion._errand_verbs("let me bandage you.") == ["bandage"] and Companion._errand_verbs("i'll give you my bandages.") == ["give"],
+		"a promise to bandage is one; handing the kit over is not")
+	var to_them: Dictionary = pet._promises("Hold still, I'll bandage you.", offered, -1)
+	var to_her: Dictionary = pet._promises("Let me bandage my own wounds first.", offered, -1)
+	_check(to_them["chosen"] == both[1] and to_her["chosen"] == both[0], "\"bandage you\" is her player, \"my own wounds\" herself (%s, %s)" % [to_them, to_her])
+
+	_put(owner, Vector2i(7, 6))
+	pet._start_errand(offered[both[1]], pet._serial)
+	var started := false
+	for i in 80:
 		World.step()
-	_check(pet.hp >= 12 and pet.hp <= 14, "calm for 50 ticks, then a point every 10 (%d)" % pet.hp)
+		started = started or owner.mending == 1
+		if pet.errand.is_empty():
+			break
+	_check(started and owner.mending == 2 and pet.errand.is_empty() and _narrated(pet, "You bandaged %s's wounds" % pet.keeper_name()),
+		"she goes to them, bandages them, and their wounds mend (mending %d, %s)" % [owner.mending, pet.errand])
+	for i in World.BANDAGE_REGEN_TICKS * 3:
+		World.step()
+	_check(owner.hp > owner.max_hp - 6, "hp coming back (%d)" % owner.hp)
+
+	pet.hp = 3
+	pet._start_errand(pet.can_do()[_offer(pet.can_do(), "bandage")], pet._serial)
+	for i in World.BANDAGE_TICKS + 5:
+		World.step()
+	_check(pet.mending == 2 or pet.hp > 3,
+		"low, with nothing at her, she bandages herself rather than run (mending %d, %s)" % [pet.mending, pet.intent_name()])
+	World.set_slots(pet, kept)
+	owner.hp = owner.max_hp
 	pet.hp = 7
 	_main.admin_command("reset")
 	_check(_companion() != null and _companion().hp == _companion().max_hp, "a reset brings her back at full hp (%d)" % (_companion().hp if _companion() else -1))
@@ -2347,10 +2388,10 @@ func _test_players_heal() -> void:
 	var owner := _player()
 	_put(owner, Vector2i(9, 6))
 	owner.hp = 10
-	for i in Companion.CALM_TICKS + Companion.HEAL_EVERY * 3:
+	for i in 80:
 		World.step()
 	_check(owner.hp == 10, "calm for 80 ticks, no bandage: still 10 (%d)" % owner.hp)
-	_check("Wounds close slowly when you rest away from danger." in Companion.VOICE_WORLD
+	_check("Wounds do not close on their own; a bandaging kit, used away from danger, mends them." in Companion.VOICE_WORLD
 			and "the old stone places and the land around them" in Companion.VOICE_WORLD and not "underground" in Companion.VOICE_WORLD,
 			"her world says so, and is not only underground")
 	owner.hp = owner.max_hp
