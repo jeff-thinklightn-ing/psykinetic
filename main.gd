@@ -2251,8 +2251,9 @@ func companion_taken(player_id: String, by: String) -> bool:
 ## The companion of player [param player_id] is freed from the raiders who
 ## held her (decision 314): with [param place] (a stockpile place, the
 ## town that freed her) she rests there, a resident working her trade, till
-## her player comes (as _rest_in_town); without, she comes back beside her
-## player the next time they are put down. A fact about her either way.
+## her player comes (as _rest_in_town); without (her captors beaten), she
+## comes back beside her player, at once if they are in this zone, else the
+## next time they are put down. A fact about her either way.
 ## False if she was not held.
 func companion_freed(player_id: String, place := "") -> bool:
 	var record: PlayerRecord = _records.get(player_id)
@@ -2276,6 +2277,14 @@ func companion_freed(player_id: String, place := "") -> bool:
 	record.companion["beliefs"] = grown.beliefs
 	print("[raids] %s's companion %s is free%s" % [record.name, pet_name, " in " + town if not town.is_empty() else ""])
 	party_log.add("%s is free%s." % [pet_name, " and waits in " + town if not town.is_empty() else ""])
+	if town.is_empty():
+		# Freed in the field (her captors beaten): back beside her player at
+		# once, if they are here.
+		for peer: int in _players:
+			var player: Player = _players[peer]
+			var id: String = _peer_ids.get(peer, Net.player_id if peer == Net.local_id else Net.player_of(peer))
+			if id == player_id and is_instance_valid(player) and player.spawned and player.zone == World.zone.name:
+				_join_companion(record, player)
 	return true
 
 

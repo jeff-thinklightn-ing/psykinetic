@@ -5697,7 +5697,8 @@ as one who travels, not one who dies. While taken she is not spawned, and
 her player, joining, is told she is held. Main.companion_freed(player_id,
 place) frees her: with a stockpile place she rests in that town as a
 resident (as Wren and Nix do between trips) till her player comes, without
-one she comes back beside her player; a fact either way. Towns calls
+one (her captors beaten in the field) she comes back beside her player,
+at once if they are in that zone; a fact either way. Towns calls
 companion_taken for a resident taken in a raid on a town nobody is in, and
 companion_freed on a rescue.
 ## 321. A minimap from the zone's Level data: a corner map always, the big map on M

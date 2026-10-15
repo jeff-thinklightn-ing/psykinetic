@@ -199,6 +199,13 @@ func _test_taken_by_raiders() -> void:
 	_main.travel(Net.local_id, ROAD)
 	_main.travel(Net.local_id, TOWN)
 	_check(_companion() != null and not record.companion.has("resident"), "her player in the town: she joins them again")
+	pet = _companion()
+	World.spared = func(target: GridEntity, _source: GridEntity, _cause: StringName) -> String:
+		return "raid-8" if target is Companion else ""
+	World.damage(pet, pet.hp + 5)
+	World.spared = was_spared
+	_check(_companion() == null and _main.companion_freed(Net.player_id) and _companion() != null
+		and World.distance(_companion().tile, _player().tile) <= 2, "freed in the field (her captors beaten): beside her player at once")
 
 
 # --- helpers ------------------------------------------------------------------
