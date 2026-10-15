@@ -56,6 +56,14 @@ func _ready() -> void:
 	_test_ambience_runs()
 	_test_options_panel()
 
+	# Every sound stopped and let go before quitting: the audio server lets
+	# a stopped sound's stream go a mix or two later, and one still held at
+	# exit is reported as a leak.
+	for player in _rig.find_children("*", "AudioStreamPlayer", true, false) + _rig.find_children("*", "AudioStreamPlayer3D", true, false):
+		player.stop()
+		player.stream = null
+	for i in 3:
+		await get_tree().process_frame
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)

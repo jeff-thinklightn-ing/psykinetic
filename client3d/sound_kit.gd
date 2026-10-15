@@ -44,7 +44,7 @@ const NOISES := {
 	"door_struck": Senses.NOISE_DOOR_STRUCK, "door_broken": Senses.NOISE_DOOR_BROKEN,
 	"door_rattle": Senses.NOISE_RATTLE, "latch": Senses.NOISE_LATCH, "rummage": Senses.NOISE_RUMMAGE,
 	"break": Senses.NOISE_BREAK, "thud_light": Senses.NOISE_THUD_LIGHT, "thud_heavy": Senses.NOISE_THUD_HEAVY,
-	"call": Senses.NOISE_CALL, "rout": Senses.NOISE_ROUT,
+	"call": Senses.NOISE_CALL, "rout": Senses.NOISE_ROUT, "charge": Animal.NOISE_CHARGE,
 }
 ## A slot's noise that is one radius of a sim kind: the kind World.noise
 ## makes for it.
@@ -234,9 +234,16 @@ const STEP_GROUNDS := ["grass", "dirt", "stone", "sand", "water"]
 const STEP_MASS := [50.0, 100.0]
 
 
+## An animal's feet (enemy-ai's kinds), for its footsteps.
+const FEET := {"deer": "hooves", "stag": "hooves", "boar": "hooves", "rabbit": "paws", "wolf": "claws"}
+
+
 ## The footstep slot for a body of [param mass] on [param ground] (a floor
-## kind, or "water").
-static func footstep(ground: String, mass: float) -> String:
+## kind, or "water"); an animal of [param creature] kind (FEET) steps on its
+## own feet, whatever the ground.
+static func footstep(ground: String, mass: float, creature := "") -> String:
+	if FEET.has(creature):
+		return "sfx.footstep_%s" % FEET[creature]
 	var size := "small" if mass < STEP_MASS[0] else "medium" if mass < STEP_MASS[1] else "large"
 	return "sfx.footstep_%s_%s" % [ground if ground in STEP_GROUNDS else "stone", size]
 
@@ -245,15 +252,33 @@ static func footstep(ground: String, mass: float) -> String:
 ## are the goblin's slots, pitched by size: an imp high, a brute low.
 const GOBLINS := ["", "imp", "brute", "sneak"]
 const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05}
-## A cry (Monster.cried) -> the part of its slot's name after the creature.
+## A cry (Monster.cried) -> the part of its slot's name after the creature;
+## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
+const OWN_CRIES := {"wolf": {"call": "howl"}}
+## A kind that sounds as another (a stag as a deer).
+const SOUNDS_AS := {"stag": "deer"}
+
+
+## The name a [param creature] (a monster's kind) goes by in slot names:
+## "goblin" for the goblins, else its own or SOUNDS_AS's.
+static func creature_slot_name(creature: String) -> String:
+	return "goblin" if creature in GOBLINS else str(SOUNDS_AS.get(creature, creature))
 
 
 ## The slot for a [param creature] (a monster's kind) crying
-## [param cry] (Monster.cried's kind): "" when there is none.
+## [param cry_kind] (Monster.cried's kind): "" when there is none.
 static func cry(creature: String, cry_kind: String) -> String:
-	var slot := "sfx.%s_%s" % ["goblin" if creature in GOBLINS else creature, CRIES.get(cry_kind, cry_kind)]
+	var own: Dictionary = OWN_CRIES.get(creature, {})
+	var slot := "sfx.%s_%s" % [creature_slot_name(creature), own.get(cry_kind, CRIES.get(cry_kind, cry_kind))]
 	return slot if has(slot) else ""
+
+
+## The slot for a [param creature] (a monster's kind) dying: its own, else
+## the goblin's.
+static func death(creature: String) -> String:
+	var slot := "sfx.%s_death" % creature_slot_name(creature)
+	return slot if has(slot) else "sfx.goblin_death"
 
 
 ## The slot for [param entity], a breakable thing, broken: a crate's or

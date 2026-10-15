@@ -749,6 +749,109 @@
 				]
 			}
 		},
+		"sfx.rabbit_rout": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "rout",
+			"volume_db": -2.0,
+			"uses": "a rabbit bolting: a scuffle through the grass (Monster.cried rout)"
+		},
+		"sfx.deer_rout": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "rout",
+			"volume_db": -2.0,
+			"uses": "a deer or stag bolting: a crash through brush (Monster.cried rout)"
+		},
+		"sfx.boar_rout": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "rout",
+			"volume_db": -2.0,
+			"uses": "a boar bolting: a grunt and a crash (Monster.cried rout)"
+		},
+		"sfx.boar_charge": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "charge",
+			"volume_db": -2.0,
+			"uses": "a boar turning to charge: a squeal (Monster.cried charge)"
+		},
+		"sfx.wolf_howl": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "call",
+			"volume_db": -2.0,
+			"uses": "a wolf calling its pack: a howl (Monster.cried call)"
+		},
+		"sfx.rabbit_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a rabbit killed (Client3D._fall)",
+			"fallback": "sfx.knockback_body_soft"
+		},
+		"sfx.deer_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a deer killed (Client3D._fall)",
+			"fallback": "sfx.knockback_body_soft"
+		},
+		"sfx.boar_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a boar killed (Client3D._fall)",
+			"fallback": "sfx.knockback_body_soft"
+		},
+		"sfx.wolf_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a wolf killed (Client3D._fall)",
+			"fallback": "sfx.knockback_body_soft"
+		},
+		"sfx.footstep_hooves": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -14.0,
+			"uses": "a step of a deer, stag or boar (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_paws": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -14.0,
+			"uses": "a step of a rabbit (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_claws": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -14.0,
+			"uses": "a step of a wolf's clawed paws (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep"
+		},
 		"voice.effort_swing_male": {
 			"category": "voices",
 			"type": "oneshot",

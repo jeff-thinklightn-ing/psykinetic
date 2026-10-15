@@ -4819,7 +4819,8 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 	_last_tile[id] = entity.tile
 	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
 		var ground: String = "water" if World.is_water(entity.tile) else _ground_kinds.get(entity.tile, "stone")
-		sfx.play(SoundKit.footstep(ground, entity.mass), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
+		var creature := str(entity.spawn_spec.get("kind", "")) if entity is Monster else ""
+		sfx.play(SoundKit.footstep(ground, entity.mass, creature), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
 
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own
@@ -4926,7 +4927,10 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 			puppet.remove_child(node)
 			node.queue_free()
 	var kind := str(data.get("kind", "monster"))
-	sfx.play(DEATH_SOUNDS.get(kind, "sfx.goblin_death"), puppet.position + Vector3.UP * 0.5)
+	var death_slot: String = DEATH_SOUNDS.get(kind, "sfx.goblin_death")
+	if kind == "monster":
+		death_slot = SoundKit.death(str(puppet.get_meta("creature", "")))
+	sfx.play(death_slot, puppet.position + Vector3.UP * 0.5)
 	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
 	if lantern != null:
 		lantern.reparent(self)
@@ -5356,6 +5360,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		if entity is Monster:
 			(entity as Monster).winding.connect(_on_winding.bind(id))
 			(entity as Monster).cried.connect(_on_cried.bind(id))
+			puppet.set_meta("creature", str(entity.spawn_spec.get("kind", "")))
 		if entity.max_hp > 0:
 			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
 	elif entity.is_breakable():
