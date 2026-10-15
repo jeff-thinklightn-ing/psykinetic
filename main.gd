@@ -7,6 +7,9 @@ extends Node2D
 const FLOOR_SOURCE := 0
 const FIRE_SOURCE := 2
 const DOOR := "res://sim/door.gd"
+## --test-herds: a set of herds, each about a cell of its own (Main._test_herds).
+const TEST_HERDS := [["deer", "deer", "deer", "deer", "stag"], ["rabbit", "rabbit", "rabbit"], ["boar", "boar"],
+	["wolf", "wolf", "wolf"]]
 const PILE := "res://sim/ground_pile.gd"
 ## Keys for things, in both schemes: F picks up (your cell, the one under the
 ## cursor, or one beside), G puts down what is in your hand, T throws it at
@@ -1548,6 +1551,7 @@ func _open_zone(zone_name: String, saved := {}) -> Zone:
 	if saved.is_empty() or not _spawn_saved(saved):
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
+	_test_herds()
 	_restore_ground(saved.get("ground", []))
 	print("[zone] %s loaded%s" % [zone_name, " from the snapshot" if not saved.is_empty() else ""])
 	World.enter(was)
@@ -1828,6 +1832,7 @@ func _start_level(from_snapshot := false, whole := true) -> void:
 	if saved.is_empty() or not _spawn_saved(saved):
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
+	_test_herds()
 	_restore_ground(saved.get("ground", []))
 	for peer in peers:
 		var id: String = ids[peer]
@@ -1843,6 +1848,50 @@ func _start_level(from_snapshot := false, whole := true) -> void:
 				var record: PlayerRecord = _records.get(_peer_ids.get(player.owner_peer, ""))
 				if record != null:
 					record.remember(player)
+
+
+## --test-herds=<n> (perf's benches, before economy's herds place any):
+## n sets of TEST_HERDS (13 animals a set) in the zone World is in when
+## it is outdoors, each herd on free cells under the sky a few apart about a cell drawn
+## at random, the draw seeded by the zone's name so every run puts them in
+## the same places. Not saved: a restart or a rebuild puts them in again.
+func _test_herds() -> void:
+	if Net.test_herds <= 0 or not Net.is_authority() or not World.fields.outdoor:
+		return
+	var open: Array[Vector2i] = []
+	for cell in World.floor_cells():
+		if World.is_free(cell) and World.fields.under_sky(cell):
+			open.append(cell)
+	if open.is_empty():
+		return
+	open.sort()  # floor_cells is in no set order: the draw must be.
+	var draw := RandomNumberGenerator.new()
+	draw.seed = hash(World.zone.name + "/test_herds")
+	var made := 0
+	for set in Net.test_herds:
+		for group in TEST_HERDS.size():
+			var kinds: Array = TEST_HERDS[group]
+			var near := open[draw.randi_range(0, open.size() - 1)]
+			for i in kinds.size():
+				var at := _free_cell_near(near, 4, draw)
+				if at == World.NO_CELL:
+					break
+				var spec := Level._spec_for("monster_" + str(kinds[i]), Level.MONSTER_TYPES)
+				spec["name"] = "Herd%d_%d_%s_%d" % [set + 1, group + 1, kinds[i], i + 1]
+				spec["tile"] = at
+				if _spawn(spec) != null:
+					made += 1
+	print("[main] --test-herds: %d animals in %d sets of herds in %s" % [made, Net.test_herds, World.zone.name])
+
+
+## A free cell under the sky within [param reach] of [param near], drawn by
+## [param draw]; NO_CELL if a few tries find none.
+func _free_cell_near(near: Vector2i, reach: int, draw: RandomNumberGenerator) -> Vector2i:
+	for attempt in 12:
+		var at := near + Vector2i(draw.randi_range(-reach, reach), draw.randi_range(-reach, reach))
+		if World.is_free(at) and World.fields.under_sky(at):
+			return at
+	return World.NO_CELL
 
 
 ## A snapshot's section for the zone World is in ({entities, respawns}): its

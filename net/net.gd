@@ -87,6 +87,7 @@ extends Node
 ##   --test-exit-on=<path>        quit once that file exists (a client in the game sees 20 more ticks first)
 ##   --test-wait-players=<n>      server: the sim waits until n players are in (60 s at most)
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
+##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
@@ -345,6 +346,10 @@ var test_minimap := false
 ## --raids: raid groups on from the start (World.raid_groups; the console can too).
 var raids := false
 var test_wait_players := 0
+## --test-herds=<n>: n mixed herds (deer, rabbits, boar, wolves) put in each
+## outdoor zone the server builds, for benches with wildlife before economy's
+## herds place any (Main._test_herds). 0: none.
+var test_herds := 0
 var test_hold_tick := 0
 var test_hold_orders := 0
 ## Players admitted since start, for --test-wait-players.
@@ -1217,7 +1222,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
-					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-hold", "--test-version", "--test-protocol", \
+					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
 				if not has_value and i + 1 < args.size():
@@ -1341,6 +1346,8 @@ func _set_option(key: String, value: String) -> void:
 			test_exit_on = value
 		"--test-wait-players":
 			test_wait_players = value.to_int()
+		"--test-herds":
+			test_herds = maxi(0, value.to_int())
 		"--test-hold":
 			var hold := value.split(",")
 			if hold.size() == 2:

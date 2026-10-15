@@ -3554,6 +3554,13 @@ func is_walkable(at: Vector2i) -> bool:
 	return _floor.has(at)
 
 
+## Every walkable cell of the zone's terrain, in no set order (a copy).
+func floor_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	out.assign(_floor.keys())
+	return out
+
+
 ## A cell's height in levels (0..6).
 func height_at(at: Vector2i) -> int:
 	return _height.get(at, 0)
