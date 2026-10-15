@@ -20,7 +20,7 @@ var _main: Node
 
 func _ready() -> void:
 	World.set_process(false)
-	Net.port = preload("res://tests/test_ports.gd").of(17795)
+	Net.port = preload("res://tests/test_ports.gd").of(17796)
 	Net.companions = true
 	Net.state_path = preload("res://tests/test_ports.gd").scratch("resident_test_world.json")
 	if FileAccess.file_exists(Net.state_path):
