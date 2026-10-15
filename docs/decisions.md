@@ -6310,8 +6310,9 @@ making (Production: their workshop's job, its materials, how far along, or
 waiting for materials, or no workshop or trade), what the town is short of
 (Production.signals_of's short) and what its shop has (Economy.goods); then
 to answer out loud in a sentence or two, and that what is not written there
-they don't know. Later: being taken before (economy's Towns.taken_before)
-and Lore.known_by once B1 settles.
+they don't know. Amended: and whether raiders have carried them off before
+(economy's Towns.taken_before; a companion's past is in her card). Later:
+Lore.known_by, once B1 settles.
 
 Rejected: a mind per resident (a dozen calls in flight against the box's
 budget); residents talking unasked (idle chatter costs calls and drowns the

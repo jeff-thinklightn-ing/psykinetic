@@ -216,7 +216,8 @@ func card_words() -> String:
 
 
 ## What is true now, a sentence each: the hour and the weather, its work,
-## what the town is short of, what its shop has.
+## whether raiders have carried it off before (Towns.taken_before), what the
+## town is short of, what its shop has.
 func facts_now() -> Array[String]:
 	var out: Array[String] = []
 	var hour := Companion.time_words(DayNight.hour(DayNight.now()))
@@ -225,6 +226,10 @@ func facts_now() -> Array[String]:
 		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
 	out.append("It is %s%s." % [hour, sky])
 	out.append(work_words())
+	# A companion's past is in her own card; a resident's, in the town's records.
+	var taken := World.towns.taken_before(worker_id) if World.towns != null and player_id.is_empty() else 0
+	if taken > 0:
+		out.append("You have been carried off by raiders %s, and brought home." % ("once" if taken == 1 else "twice" if taken == 2 else "more than twice"))
 	if World.production != null:
 		var short: Dictionary = World.production.signals_of(town, Production.items_catalog()).get("short", {})
 		var wants: Array = short.keys()

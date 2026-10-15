@@ -339,6 +339,9 @@ func _test_resident_voices() -> void:
 		World.step()
 	_check(mind.asks.size() == 2 and _main._resident_asks.is_empty(), "waited too long: dropped, nothing said")
 	pet.mind = was
+	World.towns.resident_taken(STORE, "rs-mara", "raid-11")
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	_check("carried off by raiders once" in str(mara.voice_ask("Player", "Hello", 98)["system"]), "taken before and brought home: her prompt says so")
 	mara.doing = Resident.Doing.HIDE
 	_check(_main._resident_addressed(player, "Mara?", null) == null, "hiding from raiders: she answers nothing")
 	mara.card = "Wren is a legacy companion who rests in town between trips."
