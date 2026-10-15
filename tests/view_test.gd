@@ -35,6 +35,7 @@ func _ready() -> void:
 	await _test_fade()
 	_test_outdoor()
 	_test_heights()
+	_test_hills()
 	_test_water()
 	await _test_wall_runs()
 	_test_cave_walls()
@@ -859,6 +860,39 @@ func _test_water() -> void:
 	_rig._dry_water.clear()
 	_rig.rebuild(terrain, castle["centre"])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## levels/hills (decision 358): every ledge between two of its cells is a
+## rock face, at every level from 1 to 4 (the plateau's cliff the tallest).
+func _test_hills() -> void:
+	print("
+== hills: a rock face down every ledge, at every level ==")
+	var hills := Level.load_level("hills")
+	var terrain: Dictionary = hills["terrain"]
+	_rig.rebuild(terrain, hills["centre"])
+	var faces: Dictionary = {}
+	for edge: Array in _rig._cliff_edges:
+		faces[edge] = true
+	var heights: Dictionary = terrain["heights"]
+	var stairs: Dictionary = terrain["stairs"]
+	var floor_cells: Dictionary = {}
+	for cell: Vector2i in terrain["floor"]:
+		floor_cells[cell] = true
+	var missing := []
+	var tops: Dictionary = {}
+	var drops: Dictionary = {}
+	for cell: Vector2i in floor_cells:
+		var level: int = heights.get(cell, 0)
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := cell + direction
+			if not floor_cells.has(next) or heights.get(next, 0) >= level or stairs.get(next) == -direction:
+				continue
+			tops[level] = true
+			drops[level - int(heights.get(next, 0))] = true
+			if not faces.has([cell, direction]):
+				missing.append([cell, direction])
+	_check(missing.is_empty() and tops.size() == 4 and drops.has(4),
+			"a face on each of %d ledges, from tops at levels %s, drops of %s (missing: %s)" % [faces.size(), tops.keys(), drops.keys(), missing.slice(0, 5)])
 
 
 func _test_heights() -> void:

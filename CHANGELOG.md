@@ -11,6 +11,11 @@ notes (decision 324).
   walk, run, graze, lift their heads when they hear you, headbutt, flinch
   when struck and fall when killed. Deer, stags, wolves and rabbits follow
   as their art lands.
+- The Hills, a new outdoor map west of the wilds (a link on the wilds' west
+  edge): a valley with a stream (a ford and a stone crossing), rolling rises
+  and a dry gully, a knoll crowned with trees, and a plateau with a sheer
+  cliff, a flight of stairs standing out from it, and terraces up its south
+  side.
 - Spoken to, a resident also knows what they owe the town's bank, and
   whether they are working that debt off by hauling.
 - Builder mode can shape the ground's height: raise or lower cells, make a

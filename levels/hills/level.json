@@ -1,0 +1,48 @@
+{
+	"name": "The Hills",
+	"outdoor": true,
+	"zone": "outdoors",
+	"region": "town_lands",
+	"border": "forest",
+	"walls": "stone",
+	"floors": "cave",
+	"centre": [
+		86,
+		70
+	],
+	"starts": [
+		[
+			85,
+			69
+		],
+		[
+			85,
+			71
+		],
+		[
+			85,
+			68
+		],
+		[
+			85,
+			72
+		]
+	],
+	"spawn_points": {
+		"from_wilds": [
+			86,
+			70
+		]
+	},
+	"links": [
+		{
+			"at": [
+				88,
+				70
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_hills"
+		}
+	],
+	"entities": []
+}

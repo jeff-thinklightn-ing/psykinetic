@@ -23,7 +23,9 @@ extends Node
 ## either way along its row and back; the turn's own cost (the camera
 ## placed and what it hides worked out again) is timed. --fade=0 leaves
 ## nothing to fade, to compare. --look=X,Y pans the view to that cell
-## (wherever the host is), and --shot=PATH saves the last frame as a PNG.
+## (wherever the host is), and --shot=PATH saves the last frame as a PNG;
+## --zoom=Z sets the view's zoom (past ZOOM_MAX too, for an overview) and
+## --yaw=D turns it to D degrees; a shot leaves out the hints.
 ## --weather=KIND starts every region in that weather (Weather; rain's
 ## drops and fog's layers drawn, outdoors).
 ## --off=shadows,border,glimpse,minimap leaves those pieces of the view out
@@ -53,6 +55,8 @@ var walk := 0
 var fade := true
 var look := Vector2i(-1, -1)
 var shot := ""
+var shot_zoom := 0.0
+var shot_yaw := NAN
 const WALK_STEP := 0.3
 var _main: Node
 
@@ -86,6 +90,8 @@ func _ready() -> void:
 			"fade": fade = pair[1] != "0"
 			"look": look = Vector2i(pair[1].get_slice(",", 0).to_int(), pair[1].get_slice(",", 1).to_int())
 			"shot": shot = pair[1]
+			"zoom": shot_zoom = pair[1].to_float()
+			"yaw": shot_yaw = pair[1].to_float()
 			"weather": Net.start_weather = pair[1].to_lower() if Weather.KINDS.has(pair[1].to_lower()) else ""
 			"bench-state": bench_state = pair[1]
 			"off": off.assign(pair[1].split(","))
@@ -326,6 +332,14 @@ func _frames() -> void:
 		var puppet: Node3D = view._puppets.get(host.get_instance_id())
 		if puppet != null:
 			view.pan = Vector3(look.x, 0.0, look.y) - Vector3(puppet.position.x, 0.0, puppet.position.z)
+	if view != null and shot_zoom > 0.0:
+		view.zoom = shot_zoom
+		view._zoom_to = shot_zoom
+		view._apply_size()
+	if view != null and not is_nan(shot_yaw):
+		view._set_yaw(shot_yaw)
+	if shot != "" and _main.hint_panel != null:
+		_main.hint_panel.visible = false
 	var home := host.tile if host != null else Vector2i.ZERO
 	var stepped := 0
 	var turn_total := 0

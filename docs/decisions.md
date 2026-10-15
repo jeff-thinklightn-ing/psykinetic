@@ -7242,3 +7242,42 @@ puppet, plays it from what the sim replicates, the same on every peer:
 Its pick shape is a cylinder round its middle, which needs no turning.
 `tools/blender/export_slot.py` exports a rigged slot's actions with it. Client
 only; the protocol is unchanged.
+## 358. levels/hills, a showcase of the ground's heights
+
+Jeff asked for a demo map with varied terrain heights: lows, highs, a
+cliff, a stream. `levels/hills` (96 x 96, outdoors, region town_lands, a
+forest border, stone walls, cave floors) is written by
+`tools/make_hills.tscn` (a scene, not a `--script` run: saving parses the
+level, which needs the autoloads), seeded, so the same run writes the same
+`layout.png`, `height.png` and `level.json`. Every height and stair comes
+from `HeightTools` (decision 356): `hill`, `level`, `stair` and `flight`,
+laid on the map, and `ledge_warnings` over all of it says nothing. Edit it
+by changing the script and running it again, not by touching the files.
+
+What it holds: a valley floor at 0 down the middle, with a stream two wide
+winding north to south. A dirt ford crosses it, and so does a run of stone
+cells where a bridge piece will go once `prop.bridge` has art. To the
+west, rolling rises: a hill of 2 with a dry gully at 0 cut into it, a rise
+of 1, and a knoll of 2 crowned with trees (void), each with a flight up.
+To the east, a plateau at 4 with a sheer cliff over the valley. A flight
+of four stairs stands out from the cliff face, open on both sides: the
+ledge to fall from. The safe way up is the terraces of 3, 2 and 1 to the
+plateau's south, with a stair at each front. The terraces and the rim
+band are rock (stone), the plateau's top is grass. A low stone wall on the
+valley floor below the cliff is what the rim sees over. Boulders and
+crates stand by the rim to push off. No monsters, no buildings.
+
+The link: maps-80's cell on the wilds' west edge, (14, 128), with its
+`from_hills` arrival two cells in, written into `levels/wilds` through
+`MapDoc` in the same run. Hills' link is on its east edge at row 70, with
+`from_wilds` two cells in and the starts beside it. Both are outdoors with
+a way back, so each is glimpsed past the other's way out (decision 327).
+
+Checks: level_test's `_test_hills` walks a bot from the start up every
+level to the plateau and back down, pushes a body off the rim (a fall of
+4, 12 impact) and off the flight (a fall of 2), and finds that the wall
+stops sight on the valley floor but not from the rim. view_test's
+`_test_hills` finds a rock face on every ledge, with tops at levels 1 to 4.
+map_bench gains `--zoom=Z` (past ZOOM_MAX, for an overview) and `--yaw=D`,
+and a shot leaves out the hints. Content and tools only; no protocol
+change.
