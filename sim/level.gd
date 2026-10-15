@@ -216,6 +216,9 @@ static func load_level(level_name: String) -> Dictionary:
 ## from the project (the editor's build) the file itself wins, so a map
 ## the level editor has just saved plays without a reimport.
 static func _image(path: String) -> Image:
+	if path.begins_with("user://"):
+		# The overlay: never imported, so the file itself (load would fail, loudly).
+		return Image.load_from_file(ProjectSettings.globalize_path(path)) if FileAccess.file_exists(path) else null
 	if OS.has_feature("editor") and FileAccess.file_exists(path):
 		var fresh := Image.load_from_file(ProjectSettings.globalize_path(path))
 		if fresh != null:

@@ -180,6 +180,9 @@ var _had_player := false
 var _rejected := false
 ## Client: trying to get back to the server (decision 240).
 var _reconnecting := false
+## While reload_zone rebuilds a zone: the players in it were standing there,
+## so they stay, monsters near or not (no spawn safety's start tile).
+var _reloading := false
 ## Each level's files as last read (_level_stamp), for the console's reload.
 var _level_stamps: Dictionary[String, String] = {}
 ## Client: told once that the server runs a newer build of the same protocol.
@@ -1239,7 +1242,9 @@ func reload_zone(zone_name: String) -> void:
 		return
 	var was := World.enter_named(zone_name)
 	_load_level(zone_name)
+	_reloading = true
 	_start_level(false, false)
+	_reloading = false
 	World.enter(was)
 	var message := BuilderHost.terrain_message(zone_name)
 	for peer in World.peers_in(zone_name):
@@ -1914,7 +1919,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	# respawning; a first join is at a start tile anyway and gets the same check.
 	var intended := tile
 	var threat := _nearest_hostile_distance(intended)
-	if threat <= SPAWN_SAFE_DISTANCE:
+	if threat <= SPAWN_SAFE_DISTANCE and not (back and _reloading):
 		tile = _safest_start_tile(intended)
 		print("[spawn] %s: hostile %d tiles from the %s tile %s; using start tile %s, %d from the nearest hostile" % [
 			player_name, threat, "saved" if back else "start", intended, tile, _nearest_hostile_distance(tile)])
@@ -2673,11 +2678,14 @@ func _nearest_free(wanted: Vector2i) -> Vector2i:
 		var tile: Vector2i = queue.pop_front()
 		if World.is_free(tile) and not World.is_burning(tile):
 			return tile
-		if seen.size() > 200:
+		if seen.size() > 2000:
 			break
+		# Out of a cell that is no ground (one builder mode made water, say)
+		# through anything, to the nearest ground; along the ground after.
+		var stuck := not World.is_walkable(tile)
 		for direction in World.DIRECTIONS:
 			var next := tile + direction
-			if not seen.has(next) and World.is_walkable(next):
+			if not seen.has(next) and (stuck or World.is_walkable(next)):
 				seen[next] = true
 				queue.append(next)
 	return _free_start_tile()

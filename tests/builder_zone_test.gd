@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_terrain_message()
 	await _test_refused()
 	await _test_undo()
+	await _test_flooded()
 	await _test_new_area()
 	_test_console()
 
@@ -126,6 +127,37 @@ func _test_undo() -> void:
 	var live := World.get_entities().filter(func(entity: GridEntity) -> bool: return entity is Chest and entity.tile == _chest_cell())
 	World.enter(was)
 	_check(live.is_empty(), "and from the zone")
+
+
+## Jeff's first live run: a pond over where a player stood put him at the
+## level's start, across the map.
+func _test_flooded() -> void:
+	print("
+== water over where the host stands: out to the nearest ground ==")
+	var host := _player(Net.local_id)
+	World._relocate(host, Vector2i(7, 6))
+	_main._builder.test_turns = [[{"name": "paint", "input": {"ground": "water", "rects": [{"x": 5, "y": 4, "w": 5, "h": 5}]}}], "A pond."]
+	_main._on_command(host, "builder", {"op": "ask", "area": [4, 3, 8, 6], "text": "a pond"})
+	await _wait_for("proposal")
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	await _wait_for("accepted")
+	var after := _player(Net.local_id)
+	var tile: Vector2i = after.tile if after else Vector2i(-1, -1)
+	_check(after != null and World.is_walkable(tile) and World.distance(tile, Vector2i(7, 6)) <= 3,
+			"the host is on the shore, %d from where they stood (%s), not at a start" % [World.distance(tile, Vector2i(7, 6)), tile])
+	_main._builder.test_turns = []
+	_main._on_command(_player(Net.local_id), "builder", {"op": "undo"})
+	await _wait_for("undone")
+	var near := Vector2i(-1, -1)
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.is_free(cell) and _main._nearest_hostile_distance(cell) <= _main.SPAWN_SAFE_DISTANCE:
+			near = cell
+			break
+	World._relocate(_player(Net.local_id), near)
+	_main.reload_zone("test_room")
+	var stayed := _player(Net.local_id)
+	_check(near != Vector2i(-1, -1) and stayed != null and stayed.tile == near,
+			"a rebuild leaves a host standing near a monster where they are (%s, %s)" % [near, stayed.tile if stayed else "-"])
 
 
 func _test_new_area() -> void:
