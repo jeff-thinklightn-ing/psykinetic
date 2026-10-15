@@ -375,7 +375,8 @@ func _check_fits(slot: String, box: AABB, what: String) -> void:
 	var size := ArtKit.size(slot)
 	var off := (box.size - size).abs() / size
 	var centre := box.get_center()
-	var stands := absf(box.position.y) < 0.01 and absf(centre.x) < size.x * TOLERANCE + 0.01 and absf(centre.z) < size.z * TOLERANCE + 0.01
+	var floor := str(ArtKit.spec(slot).get("kind", "")) == "floor"
+	var stands := absf(box.end.y if floor else box.position.y) < 0.01 and absf(centre.x) < size.x * TOLERANCE + 0.01 and absf(centre.z) < size.z * TOLERANCE + 0.01
 	_check(off.x <= TOLERANCE and off.y <= TOLERANCE and off.z <= TOLERANCE and stands,
 			"%s: %s is %s, the slot %s, standing on its origin (%s)" % [slot, what, box.size, size, box.position])
 

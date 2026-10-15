@@ -294,28 +294,556 @@
 				]}
 			]
 		},
+		"wall.end": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 3.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end, capping the wall.profile section, a little proud of it"
+		},
+		"wall.corner": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.t": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "a T joint, a run along z met by one along +x"
+		},
+		"wall.cross": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "a + joint, runs along z and x crossing"
+		},
+		"wall.straight_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 1, 1],
+			"budget": 300,
+			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.profile section",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.post_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a free-standing pillar low (1 m) at a cell corner"
+		},
+		"wall.end_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 1.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end low (1 m), capping the wall.profile section, a little proud of it"
+		},
+		"wall.corner_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "an L joint low (1 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.t_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a T joint low (1 m), a run along z met by one along +x"
+		},
+		"wall.cross_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a + joint low (1 m), runs along z and x crossing"
+		},
+		"wall.straight_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 4.5, 1],
+			"budget": 300,
+			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.profile section",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.post_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a free-standing pillar tall (4.5 m) at a cell corner"
+		},
+		"wall.end_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 4.6, 0.6],
+			"budget": 200,
+			"uses": "a run's free end tall (4.5 m), capping the wall.profile section, a little proud of it"
+		},
+		"wall.corner_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.t_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a T joint tall (4.5 m), a run along z met by one along +x"
+		},
+		"wall.cross_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a + joint tall (4.5 m), runs along z and x crossing"
+		},
+		"wall.window": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with an opening to see through; it still blocks movement",
+			"grey": [
+				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
+				{"at": [0, 2.6, 0], "size": [0.5, 0.8, 1]},
+				{"at": [0, 1.7, -0.4], "size": [0.5, 1, 0.2]},
+				{"at": [0, 1.7, 0.4], "size": [0.5, 1, 0.2]}
+			]
+		},
+		"wall.straight_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 2.2, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
+			"grey": [
+				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
+				{"at": [0, 2, -0.25], "size": [0.5, 0.4, 0.5]}
+			]
+		},
+		"wall.end_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 1.8, 0.6],
+			"budget": 300,
+			"uses": "a run's broken free end: rubble and a jagged stub"
+		},
+		"door.double": {
+			"category": "doors",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3, 2],
+			"budget": 900,
+			"uses": "a double door over two cell edges (2 m along z): the frame, two leaves hinged at its ends, swinging apart; open and closed are the leaves' swing",
+			"states": ["locked", "barred", "broken"],
+			"grey": [
+				{"at": [0, 1.5, -0.95], "size": [0.5, 3, 0.1]},
+				{"at": [0, 1.5, 0.95], "size": [0.5, 3, 0.1]},
+				{"at": [0, 2.7, 0], "size": [0.5, 0.6, 1.8]}
+			],
+			"parts": [
+				{"name": "leaf_a", "motion": "hinge", "axis": "y", "pivot": [0, 0, -0.9], "range": [0, 90], "size": [0.15, 2.4, 0.9]},
+				{"name": "leaf_b", "motion": "hinge", "axis": "y", "pivot": [0, 0, 0.9], "range": [0, -90], "size": [0.15, 2.4, 0.9], "grey": [
+					{"at": [0, 1.2, -0.45], "size": [0.15, 2.4, 0.9]}
+				]}
+			]
+		},
+		"door.gate": {
+			"category": "doors",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.6, 4, 2],
+			"budget": 1200,
+			"uses": "a castle gate over two cell edges (2 m along z): two heavy leaves hinged at its ends",
+			"states": ["locked", "barred", "broken"],
+			"grey": [
+				{"at": [0, 2, -0.95], "size": [0.6, 4, 0.1]},
+				{"at": [0, 2, 0.95], "size": [0.6, 4, 0.1]},
+				{"at": [0, 3.7, 0], "size": [0.6, 0.6, 1.8]}
+			],
+			"parts": [
+				{"name": "leaf_a", "motion": "hinge", "axis": "y", "pivot": [0, 0, -0.9], "range": [0, 90], "size": [0.25, 3.4, 0.9]},
+				{"name": "leaf_b", "motion": "hinge", "axis": "y", "pivot": [0, 0, 0.9], "range": [0, -90], "size": [0.25, 3.4, 0.9], "grey": [
+					{"at": [0, 1.7, -0.45], "size": [0.25, 3.4, 0.9]}
+				]}
+			]
+		},
+		"door.portcullis": {
+			"category": "doors",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"budget": 800,
+			"uses": "a portcullis on a cell edge: the frame, and a grate that slides up into it to open",
+			"states": ["locked", "barred", "broken"],
+			"grey": [
+				{"at": [0, 1.5, -0.45], "size": [0.5, 3, 0.1]},
+				{"at": [0, 1.5, 0.45], "size": [0.5, 3, 0.1]},
+				{"at": [0, 2.7, 0], "size": [0.5, 0.6, 0.8]}
+			],
+			"parts": [
+				{"name": "grate", "motion": "slide", "axis": "y", "pivot": [0, 0, 0], "range": [0, 2.3], "grey": [
+					{"at": [0, 1.2, 0], "size": [0.1, 2.4, 0.8]}
+				]}
+			]
+		},
+		"door.trapdoor": {
+			"category": "doors",
+			"type": "mesh",
+			"kind": "floor",
+			"size": [1, 0.1, 1],
+			"budget": 400,
+			"uses": "a trapdoor in the floor of a cell, its top level with the floor, its lid hinged along the -z edge, lifting up",
+			"states": ["locked", "barred", "broken"],
+			"grey": "none",
+			"parts": [
+				{"name": "lid", "motion": "hinge", "axis": "x", "pivot": [0, 0, -0.5], "range": [0, -100], "grey": [
+					{"at": [0, -0.05, 0.5], "size": [1, 0.1, 1]}
+				]}
+			]
+		},
+		"tree.dead": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.6, 3.6, 1.6],
+			"budget": 1000,
+			"variants": 3,
+			"uses": "a dead, bare tree for the forest round an outdoor map and groves; sized 0.85 to 1.2, turned and nudged per cell",
+			"grey": [
+				{"at": [0, 1.4, 0], "size": [0.3, 2.8, 0.3]},
+				{"at": [0, 2.9, 0], "size": [1.6, 1.4, 1.6]}
+			]
+		},
+		"tree.stump": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.7, 0.5, 0.7],
+			"budget": 300,
+			"variants": 3,
+			"uses": "a cut or broken stump, in clearings and at the forest's edge"
+		},
+		"tree.log": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.5, 0.5, 2],
+			"budget": 400,
+			"variants": 3,
+			"uses": "a fallen log lying along z"
+		},
+		"plant.bush": {
+			"category": "plants",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1, 0.9, 1],
+			"budget": 400,
+			"variants": 3,
+			"uses": "a bush, among trees and along paths"
+		},
+		"plant.fern": {
+			"category": "plants",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.8, 0.5, 0.8],
+			"budget": 250,
+			"variants": 3,
+			"uses": "a fern, in the forest's shade"
+		},
+		"scatter.reeds": {
+			"category": "plants",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.4, 0.8, 0.4],
+			"budget": 150,
+			"materials": 1,
+			"uses": "reeds terrain scatters along water's edge (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
+			"scatter": {"scale": [0.7, 1.3], "yaw": "free", "tilt_max": 6, "sink": 0.03, "footprint_r": 0.2, "blocks": false}
+		},
+		"rock.large": {
+			"category": "rocks",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [2, 1.4, 2],
+			"budget": 400,
+			"variants": 3,
+			"uses": "a large rock, about 2 m, in the wilds and at cliff feet"
+		},
+		"prop.barrel": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.7, 0.9, 0.7],
+			"budget": 400,
+			"uses": "a barrel (drawn as the barrel shape today)"
+		},
+		"prop.torch": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.3, 0.6, 0.3],
+			"budget": 300,
+			"materials": 2,
+			"uses": "a wall sconce with its torch; the flame (a shader and a light) burns at its flame socket",
+			"sockets": {"flame": [0, 0.6, 0]}
+		},
+		"prop.lantern": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.25, 0.4, 0.25],
+			"budget": 300,
+			"materials": 2,
+			"uses": "a lantern, carried or hung from its hang socket; its light at the flame socket",
+			"sockets": {"flame": [0, 0.2, 0], "hang": [0, 0.4, 0]}
+		},
+		"prop.campfire": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1, 0.4, 1],
+			"budget": 400,
+			"materials": 2,
+			"uses": "a ring of stones and logs; the fire burns at its flame socket",
+			"sockets": {"flame": [0, 0.2, 0]}
+		},
+		"prop.fence": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.1, 1, 1],
+			"budget": 150,
+			"uses": "a 1 m fence section on a cell edge, tiling along z"
+		},
+		"prop.fence_post": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.15, 1.1, 0.15],
+			"budget": 80,
+			"uses": "a fence post at a cell corner"
+		},
+		"prop.stairs": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1, 0.5, 1],
+			"budget": 300,
+			"uses": "stairs up one height level (0.5 m) over one cell, rising toward +z"
+		},
+		"prop.table": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.6, 0.8, 0.9],
+			"budget": 400,
+			"uses": "a table"
+		},
+		"prop.bench": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.4, 0.45, 0.4],
+			"budget": 250,
+			"uses": "a bench"
+		},
+		"prop.bed": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1, 0.6, 2],
+			"budget": 500,
+			"uses": "a bed, its head toward -z"
+		},
+		"prop.sack": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.5, 0.6, 0.4],
+			"budget": 300,
+			"uses": "a sack of grain or loot"
+		},
+		"prop.grave": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.6, 0.9, 1.4],
+			"budget": 400,
+			"uses": "a grave: a headstone at -z and its mound"
+		},
+		"prop.anvil": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.7, 0.8, 0.4],
+			"budget": 400,
+			"uses": "the smith's anvil on its block"
+		},
+		"prop.forge": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.6, 1.8, 1.2],
+			"budget": 800,
+			"materials": 2,
+			"uses": "the smith's forge; its fire glows at the flame socket",
+			"sockets": {"flame": [0, 0.9, 0.3]}
+		},
+		"prop.bookshelf": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.2, 2, 0.4],
+			"budget": 600,
+			"uses": "a bookshelf against a wall, its back toward -z"
+		},
+		"prop.market_stall": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [2, 2.4, 1.2],
+			"budget": 800,
+			"uses": "a market stall: a counter under an awning",
+			"grey": [
+				{"at": [0, 0.5, 0.3], "size": [2, 1, 0.6]},
+				{"at": [0, 2.3, 0], "size": [2, 0.2, 1.2]},
+				{"at": [-0.95, 1.2, -0.55], "size": [0.1, 2.4, 0.1]},
+				{"at": [0.95, 1.2, -0.55], "size": [0.1, 2.4, 0.1]}
+			]
+		},
+		"prop.signpost": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.8, 2, 0.2],
+			"budget": 300,
+			"uses": "a signpost, its arms pointing along x"
+		},
+		"prop.banner": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.8, 2.6, 0.2],
+			"budget": 400,
+			"uses": "a banner on its pole showing who holds a place; its cloth a part the game colours by faction",
+			"grey": [
+				{"at": [-0.35, 1.3, 0], "size": [0.1, 2.6, 0.2]}
+			],
+			"parts": [
+				{"name": "cloth", "motion": "fixed", "pivot": [-0.35, 2.4, 0], "grey": [
+					{"at": [0.375, -0.6, 0], "size": [0.75, 1.2, 0.04]}
+				]}
+			]
+		},
+		"prop.tent": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [2.4, 2, 3],
+			"budget": 800,
+			"uses": "a goblin tent, its opening toward +z"
+		},
+		"prop.palisade": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.4, 2.6, 1],
+			"budget": 300,
+			"uses": "a 1 m palisade section of sharpened stakes on a cell edge, tiling along z"
+		},
+		"prop.cage": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.2, 1.6, 1.2],
+			"budget": 600,
+			"uses": "a cage for a captive, its door hinged at one side",
+			"states": ["locked", "broken"],
+			"grey": [
+				{"at": [0, 0.05, 0], "size": [1.2, 0.1, 1.2]},
+				{"at": [0, 1.55, 0], "size": [1.2, 0.1, 1.2]},
+				{"at": [-0.55, 0.8, 0], "size": [0.1, 1.6, 1.2]},
+				{"at": [0, 0.8, -0.55], "size": [1.2, 1.6, 0.1]}
+			],
+			"parts": [
+				{"name": "door", "motion": "hinge", "axis": "y", "pivot": [0.6, 0, 0.6], "range": [0, 100], "grey": [
+					{"at": [0, 0.8, -0.6], "size": [0.05, 1.4, 1.1]}
+				]}
+			]
+		},
+		"prop.bridge": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.6, 0.6, 3],
+			"budget": 800,
+			"uses": "a plank bridge over a stream or a drop, 3 m along z, walkable along its length"
+		},
+		"prop.ladder": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.6, 3, 0.15],
+			"budget": 200,
+			"uses": "a ladder up one wall's height, leaning on a wall toward -z"
+		},
 		"ground.grass": {
 			"category": "ground",
 			"type": "texture",
-			"tile_m": 2.0,
+			"tile_m": 4.0,
+			"pixels": 512,
 			"uses": "terrain's ground shader on grass: blended, lit and noised there; procedural colour while empty"
 		},
 		"ground.dirt": {
 			"category": "ground",
 			"type": "texture",
-			"tile_m": 2.0,
+			"tile_m": 4.0,
+			"pixels": 512,
 			"uses": "terrain's ground shader on dirt; procedural colour while empty"
 		},
 		"ground.stone": {
 			"category": "ground",
 			"type": "texture",
-			"tile_m": 2.0,
+			"tile_m": 4.0,
+			"pixels": 512,
 			"uses": "terrain's ground shader on stone floors; procedural colour while empty"
 		},
 		"ground.sand": {
 			"category": "ground",
 			"type": "texture",
-			"tile_m": 2.0,
+			"tile_m": 4.0,
+			"pixels": 512,
 			"uses": "terrain's ground shader on sand; procedural colour while empty"
 		},
 		"material.rock": {
