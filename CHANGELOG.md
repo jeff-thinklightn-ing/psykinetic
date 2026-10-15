@@ -1,10 +1,10 @@
 # Changelog
 
-Newest first. Worktrees add their bullets under `## Unreleased`; the coordinator
+Newest first. Worktrees add their bullets under `## Unreleased`; the release session
 renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
 top section as the release notes.
 
-## Unreleased
+## v0.1.141
 
 - A companion left in a town works there while you are away: tell her to
   stay on the town's stockpile ground before you travel on, or log off
