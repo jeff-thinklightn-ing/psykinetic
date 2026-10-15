@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
 	_test_resident_voices()
+	_test_means_in_voice()
 
 	remove_child(_main)
 	_main.free()
@@ -349,6 +350,45 @@ func _test_resident_voices() -> void:
 	Net.message_received.disconnect(heard)
 	_main._resident_mind = null
 	World.despawn(mara)
+
+
+func _test_means_in_voice() -> void:
+	print("\n== how it last ate and traded, and how many the town feeds, are in its voice's facts (decision 336 amended, 353's facts) ==")
+	var production := World.production
+	production.add_worker("rs-means", "Tamsin", ["cook"], STORE)
+	var body := Resident.new()
+	body.worker_id = "rs-means"
+	body.town = STORE
+	var before := body.means_words()
+	_check(before.filter(func(line: String) -> bool: return "You " in line).is_empty(), "before its first meal or trade: nothing of its own (%s)" % [before])
+	production.note_meal("rs-means", "bought")
+	production.note_trade("rs-means", "bought a stew", 4, "Mags")
+	_check(body.means_words().has("You last bought a stew from Mags for 4 gold."), "a meal bought: from whom and for how much (%s)" % [body.means_words()])
+	production.note_trade("rs-means", "bought bread from the store", 2, Economy.TREASURY)
+	_check(body.means_words().has("You last bought bread from the store for 2 gold."), "from the store: not 'from the town' twice (%s)" % [body.means_words()])
+	production.note_trade("rs-means", "sold a stew", 4, "Bram")
+	_check(body.means_words().has("You last sold a stew to Bram for 4 gold."), "a sale: to whom (%s)" % [body.means_words()])
+	production.note_trade("rs-means", "a bed at the inn", 2, Economy.TREASURY)
+	_check(body.means_words().has("You last paid the town 2 gold for a bed at the inn."), "a fee to the town (%s)" % [body.means_words()])
+	production.note_trade("rs-means", "work on their tools", 4, "Bram")
+	_check(body.means_words().has("You last paid Bram 4 gold for work on your tools."), "a fee to a smith (%s)" % [body.means_words()])
+	production.note_trade("rs-means", "work on their tools for Bram", 4, "Bram")
+	_check(body.means_words().has("You were last paid 4 gold by Bram for work on their tools."), "a fee earned (%s)" % [body.means_words()])
+	production.note_meal("rs-means", "dole")
+	_check(body.means_words().has("At your last meal the town fed you for nothing: you could not pay.")
+		and body.means_words().any(func(line: String) -> bool: return "of the town's folk ate from the town's dole" in line), "on the dole: it says so, and the town's count (%s)" % [body.means_words()])
+	production.note_meal("rs-means", "hungry")
+	_check(body.means_words().has("You went without at your last meal: there was nothing you could eat."), "hungry since a mealtime (%s)" % [body.means_words()])
+	# A day as long as the clock has run, so hunger from step 1 is a day old.
+	var day := DayNight.day_steps
+	production._workers["rs-means"]["hungry_since"] = 1
+	DayNight.day_steps = maxi(production.now() - 1, 1)
+	_check(production.now() > 1 and body.means_words().has("You have had nothing to eat since yesterday or before."), "hungry a day: since yesterday (%s)" % [body.means_words()])
+	DayNight.day_steps = day
+	_check(body.means_words()[0] in body.facts_now(), "and they are among what is true now")
+	production.note_meal("rs-means", "bought")
+	production.set_away("rs-means", true)
+	body.free()
 
 
 class VoiceMind:

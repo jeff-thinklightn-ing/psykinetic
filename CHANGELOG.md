@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Spoken to, a resident now knows how they've been getting by: what they
+  last bought or sold and from or to whom, a fee paid or earned, whether
+  the town fed them free or they went without (and since when), and how
+  many of the town are on its dole.
 - A town starts with 50 gold in its store. Its residents now spend their own
   gold: meals from the shop (or the store's food), a bed at the inn, mending
   from the carpenter and tool work from the smith. The town feeds anyone

@@ -216,8 +216,9 @@ func card_words() -> String:
 
 
 ## What is true now, a sentence each: the hour and the weather, its work,
-## whether raiders have carried it off before (Towns.taken_before), what the
-## town is short of, what its shop has.
+## how it last ate and traded (means_words), whether raiders have carried it
+## off before (Towns.taken_before), what the town is short of, what its shop
+## has.
 func facts_now() -> Array[String]:
 	var out: Array[String] = []
 	var hour := Companion.time_words(DayNight.hour(DayNight.now()))
@@ -226,6 +227,7 @@ func facts_now() -> Array[String]:
 		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
 	out.append("It is %s%s." % [hour, sky])
 	out.append(work_words())
+	out.append_array(means_words())
 	# A companion's past is in her own card; a resident's, in the town's records.
 	var taken := World.towns.taken_before(worker_id) if World.towns != null and player_id.is_empty() else 0
 	if taken > 0:
@@ -275,6 +277,56 @@ func work_words() -> String:
 	var share := float(job.get("worked", 0)) / maxf(float(job.get("needed", 1)), 1.0)
 	var far := "just begun" if share < 0.25 else "under half done" if share < 0.5 else "over half done" if share < 0.9 else "nearly done"
 	return "You are making %s%s: it is %s." % [Companion._a(what), into, far]
+
+
+## How it last ate, its last trade and how many of the town the town feeds
+## (Production's worker facts, Economy's: decision 353), a sentence each;
+## none before its first meal or trade (decision 336 amended).
+func means_words() -> Array[String]:
+	var out: Array[String] = []
+	if World.production == null:
+		return out
+	var me := World.production.worker(worker_id)
+	if me.is_empty():
+		return out
+	var now := World.production.now()
+	match str(me.get("fed", "")):
+		"hungry":
+			var since := int(me.get("hungry_since", 0))
+			if since > 0 and now - since >= DayNight.day_steps:
+				out.append("You have had nothing to eat since yesterday or before.")
+			else:
+				out.append("You went without at your last meal: there was nothing you could eat.")
+		"dole":
+			out.append("At your last meal the town fed you for nothing: you could not pay.")
+	var trade_words := _trade_words(me.get("last_trade", {}), now)
+	if not trade_words.is_empty():
+		out.append(trade_words)
+	var fed_free := World.production.on_dole(town)
+	if fed_free > 0:
+		out.append("%s of the town's folk ate from the town's dole or went hungry at their last meal." % ("One" if fed_free == 1 else str(fed_free)))
+	return out
+
+
+## [param last] (a worker's last_trade: {step, what, gold, with}) in words,
+## "" for none: what was bought or sold, or a fee paid or earned.
+static func _trade_words(last: Dictionary, now: int) -> String:
+	var what := str(last.get("what", ""))
+	if what.is_empty():
+		return ""
+	var with_whom := str(last.get("with", ""))
+	var gold := int(last.get("gold", 0))
+	var ago := ", a day or more ago" if now - int(last.get("step", now)) >= DayNight.day_steps else ""
+	var price := " for %d gold" % gold if gold > 0 else ""
+	if what.begins_with("bought "):
+		var from := " from %s" % with_whom if not with_whom.is_empty() and with_whom != Economy.TREASURY and " from " not in what else ""
+		return "You last %s%s%s%s." % [what, from, price, ago]
+	if what.begins_with("sold "):
+		var to := " to %s" % with_whom if not with_whom.is_empty() else ""
+		return "You last %s%s%s%s." % [what, to, price, ago]
+	if not with_whom.is_empty() and what.ends_with(" for " + with_whom):
+		return "You were last paid %d gold by %s for %s%s." % [gold, with_whom, what.trim_suffix(" for " + with_whom), ago]
+	return "You last paid %s %d gold for %s%s." % [with_whom if not with_whom.is_empty() else "someone", gold, (" " + what).replace(" their ", " your ").strip_edges(), ago]
 
 
 ## [param parts] in words: "a, b and c".

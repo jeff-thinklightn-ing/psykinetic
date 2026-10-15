@@ -6317,6 +6317,17 @@ they don't know. Amended: and whether raiders have carried them off before
 (economy's Towns.taken_before; a companion's past is in her card). Later:
 Lore.known_by, once B1 settles.
 
+Amended (2026-10-15, the coordinator): and how they get by, from economy's
+worker facts (decision 353), read as they are as the gold rules shift:
+Resident.means_words says how they last ate when the town fed them free
+or they went without ("since yesterday or before" once a DayNight.day_steps
+has passed since hungry_since), their last trade (bought from, sold to, a
+fee paid or earned: the last_trade's what, with and gold), and how many of
+the town ate from the dole or went hungry (Production.on_dole). Nothing
+before a first meal or trade; a meal bought or the store's food adds no
+line of its own beyond the trade. A companion resting in town gets hers
+too (companion:<id> trades). Facts only, as ever: never what to say.
+
 Rejected: a mind per resident (a dozen calls in flight against the box's
 budget); residents talking unasked (idle chatter costs calls and drowns the
 companions); answering for a hiding resident.
