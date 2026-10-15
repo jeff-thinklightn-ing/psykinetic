@@ -6,6 +6,10 @@ top section as the release notes.
 
 ## Unreleased
 
+- A town in the wilds, by the pond and the shack: a stone square with a
+  well, the town's store (its depot and shop counter), a forge and a
+  kitchen, three homes, lanes between them, and a dirt road north to the
+  castle. New players start in the square.
 - Builder mode knows the town's store: Claude stamps one (yard, depot, shop counter)
   when asked, and you and Claude are told when a change leaves it wrong (a counter
   outside the store, a store with no depot).

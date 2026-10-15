@@ -7,20 +7,20 @@
 	],
 	"starts": [
 		[
-			127.0,
-			22.0
+			208,
+			205
 		],
 		[
-			129.0,
-			22.0
+			212,
+			205
 		],
 		[
-			126.0,
-			22.0
+			208,
+			211
 		],
 		[
-			130.0,
-			22.0
+			212,
+			211
 		]
 	],
 	"spawn_points": {
@@ -123,8 +123,8 @@
 		},
 		{
 			"at": [
-				221,
-				225
+				221.0,
+				225.0
 			],
 			"props": {
 				"slots": [
@@ -137,15 +137,121 @@
 		},
 		{
 			"at": [
-				222,
-				227
+				222.0,
+				227.0
 			],
 			"name": "Snagfin",
+			"facing": [
+				1.0,
+				0.0
+			],
+			"idle": "guard"
+		},
+		{
+			"at": [
+				209,
+				199
+			],
+			"facing": [
+				0.0,
+				1.0
+			],
+			"props": {
+				"depot": true
+			}
+		},
+		{
+			"at": [
+				211,
+				199
+			],
+			"facing": [
+				0.0,
+				1.0
+			],
+			"props": {
+				"shop": true
+			}
+		}
+	],
+	"buildings": [
+		{
+			"slot": "building.well",
+			"at": [
+				210,
+				208
+			]
+		},
+		{
+			"slot": "building.house",
+			"at": [
+				220,
+				205
+			],
+			"facing": [
+				-1,
+				0
+			],
+			"use": "forge",
+			"town": "store"
+		},
+		{
+			"slot": "building.shed",
+			"at": [
+				198,
+				206
+			],
 			"facing": [
 				1,
 				0
 			],
-			"idle": "guard"
+			"use": "kitchen",
+			"town": "store"
+		},
+		{
+			"slot": "building.hut",
+			"at": [
+				204,
+				217
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"slot": "building.hut",
+			"at": [
+				212,
+				219
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"slot": "building.house",
+			"at": [
+				194,
+				215
+			],
+			"facing": [
+				0,
+				-1
+			]
 		}
-	]
+	],
+	"places": {
+		"store": {
+			"at": [
+				210,
+				200
+			],
+			"kind": "stockpile",
+			"radius": 4.0,
+			"holder": "town",
+			"name": "the town's store"
+		}
+	}
 }
