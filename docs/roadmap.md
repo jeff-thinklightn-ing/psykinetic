@@ -122,7 +122,7 @@ but hasn't committed to; confirm before building them.
 ### Game loop, town and world
 - **Town as the progression** (now the `economy` worktree). Everything found on a run (gold, ores, weapons) goes to the town stockpile. Rescued people join the town as shopkeepers, guards, the smith; the town has its own experience that pays for upgrades. Not every companion is a rescued prisoner — they're met in varied ways.
 - **Companion growth.** Companions gain experience from a run but only keep it if they make it back to town alive (and grow when a run is won); fallen companions can be brought back in town. Players have no XP; their growth is the body shape above.
-- **Winning the run** (the objective) earns the big reward; losing never takes away what's already banked. Not punitive.
+- **No runs** (Jeff, 2026-10-14: runs were a relic of an earlier dungeon-delve loop). The town grows from rescues and accomplishments, such as a story objective met (bringing the smith home); losing a fight never takes away what's already banked. Not punitive. Companions left in town work a trade as residents.
 - **Enemies win by holding things, not taking your loot:** captives, territory, getting stronger in an area.
 - **Persistent consequences while you're offline** *(idea)*: log in to find a companion kidnapped, or the fort smouldering after you raided the enemy's mines for ores one too many times. You respawn, resurrect townspeople, rebuild walls; the captive waits in the dungeon for you to retrieve.
 - **A fort with defences you build up** *(idea)*.
