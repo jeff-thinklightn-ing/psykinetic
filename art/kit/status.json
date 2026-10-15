@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 0,
 		"fill": 6,
-		"placeholder": 140
+		"placeholder": 144
 	},
 	"slots": [
 		{
@@ -1618,6 +1618,50 @@
 			"size": "0.8 x 3.0 x 1.0",
 			"budget": 0,
 			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, not a model"
+		},
+		{
+			"slot": "item.antlers",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 147,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.6 x 0.5 x 0.15",
+			"budget": 500
+		},
+		{
+			"slot": "item.hide",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 148,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.5 x 0.06 x 0.4",
+			"budget": 500
+		},
+		{
+			"slot": "item.meat",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 149,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.2 x 0.08 x 0.14",
+			"budget": 500
+		},
+		{
+			"slot": "item.tusks",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 150,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.18 x 0.06 x 0.06",
+			"budget": 500
 		}
 	]
 }
