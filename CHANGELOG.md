@@ -6,6 +6,8 @@ top section as the release notes.
 
 ## Unreleased
 
+- Companions with no player near enough to hear them stay quiet instead
+  of calling the voice model (a few percent of its calls).
 - Companions can hand you what they carry, and fetch something from a
   chest they can see and bring it to you ("I'll get you the bandages
   from the chest").

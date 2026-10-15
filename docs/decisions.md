@@ -4224,3 +4224,20 @@ as before). Knockdowns, pain and deaths are a blow's "fight" already.
 Goblin chatter, bandaging and the alert bark make no noise: chatter heard
 would rouse a camp by itself; the bark becomes a call for help with the
 groups (step 4).
+
+## 273. A companion's voice is asked only when a player can hear her
+
+Jeff's always-on world: companions in zones with no players nearby make
+no voice calls. A zone with nobody in it already sleeps (World.step
+steps only awake zones), so its companions make none. The gap was a
+companion in an awake zone with nobody near: on the box logs 22 of 880
+voice asks (her player offline 17, more than 10 cells off 5).
+
+Companion.heard_by_anyone: her voice is asked only when a spawned player
+in her zone is within HEARING_RANGE, or her own player has fallen and
+waits to rise (still there, listening); otherwise the ask is logged "not
+asked" with the reason. HEARING_RANGE is Senses.NOISE_SPEECH, so how far
+speech carries for chat (Main.hearers), for the monsters' hearing and for
+this is one constant. Stance asks are not gated: they come only in a
+fight near her or her player. Town NPCs and companions left in town will
+come under the same rule as the always-on world runs them.

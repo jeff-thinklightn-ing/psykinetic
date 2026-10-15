@@ -167,8 +167,10 @@ const COMPASS_WORD := "\\b(north-east|north-west|south-east|south-west|north|sou
 ## She notes where she has seen things every so many ticks (_remember_sights).
 const MEMORY_EVERY := 10
 ## Speech carries this far (cells, in its own zone): what anyone says
-## reaches the players and companions within it (Main.hearers).
-const HEARING_RANGE := 10
+## reaches the players and companions within it (Main.hearers), and her
+## voice is asked only with a player this near (heard_by_anyone): the
+## speech noise's own reach.
+const HEARING_RANGE := Senses.NOISE_SPEECH
 ## Heat she feels and tells of (World.heat_at; a fire cell gives 10), and
 ## light under which it is dark (World.light_at, 0..1).
 const HEAT_FELT := 1.0
@@ -1124,6 +1126,10 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 		return
 	if (heard.is_empty() or not own) and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return  # She could not say it: the rate limit.
+	if not heard_by_anyone():
+		_log({"kind": "voice", "companion": String(name), "trigger": trigger, "outcome": "not asked",
+			"note": "no player within %d cells to hear her" % HEARING_RANGE})
+		return
 	if mind.busy("voice"):
 		# Her player's words come first; otherwise the newest moment.
 		if not heard.is_empty() or always or str(_pending_voice.get("heard", "")).is_empty():
@@ -1147,6 +1153,19 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 	var answer := mind.voice(ask)
 	if not answer.is_empty():
 		_take_result(_sync_result(ask, answer))
+
+
+## Whether a player is near enough to hear her (HEARING_RANGE, in her
+## zone), or her player fallen and waiting to rise (still there, and
+## listening): with nobody to hear, her voice is not asked (the world runs
+## on without players, and so may she).
+func heard_by_anyone() -> bool:
+	if _keeper_down:
+		return true
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and World.distance(tile, entity.tile) <= HEARING_RANGE:
+			return true
+	return false
 
 
 static func _sync_result(ask: Dictionary, answer: Dictionary) -> Dictionary:

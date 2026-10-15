@@ -72,6 +72,7 @@ func _ready() -> void:
 	_test_quiet_after_minor()
 	_test_senses()
 	_test_errands()
+	_test_nobody_hears()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -757,6 +758,34 @@ func _test_errands() -> void:
 	_main._on_command(owner, "say", {"text": Net.DEFAULT_PHRASES[0], "phrase": 1})
 	_check(pet.errand.is_empty() and _narrated(pet, "asked something else of you"), "and her player asking something else")
 	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _test_nobody_hears() -> void:
+	print("\n== with no player near enough to hear her, her voice is not asked ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var far := Vector2i(-1, -1)
+	for y in range(0, 30):
+		for x in range(0, 30):
+			var at := Vector2i(x, y)
+			if far.x < 0 and World.is_free(at) and World.distance(at, owner.tile) > Companion.HEARING_RANGE:
+				far = at
+	_check(far.x >= 0, "(a free cell more than %d from her player: %s)" % [Companion.HEARING_RANGE, far])
+	_put(pet, far)
+	pet._last_speech_tick = -1000
+	pet._ask_voice("Imp2 died.", "", true)
+	_check(mind.voice_asks.is_empty() and MindLog.last[String(pet.name)].get("outcome", "") == "not asked"
+		and "to hear her" in str(MindLog.last[String(pet.name)].get("note", "")), "nobody to hear: not asked, and logged so")
+	_put(owner, _main._nearest_free(far + Vector2i(1, 0)))
+	pet._ask_voice("Imp2 died.", "", true)
+	_check(mind.voice_asks.size() == 1, "her player near again: asked")
+	pet.mind = ScriptedMind.new()
+	_put(pet, _main._nearest_free(owner.tile + Vector2i(0, 1)))
 	_settle(pet)
 
 
