@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.148
+
+- Update the client to see the new Hills map, the boars and the stumps:
+  the server is new too, but an older client still joins (no protocol
+  change).
 - Stumps in the forest: now and then a tree at the forest's edge has been
   felled, and stumps lie among the trees. Fallen logs and dead trees will
   join them when their art is made.
