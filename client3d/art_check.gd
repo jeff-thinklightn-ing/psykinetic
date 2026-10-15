@@ -113,6 +113,11 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	if foreign.size() > allowed - 1 and not foreign.is_empty():
 		out.append("warning: material%s %s, not the shared \"palette\": colour it from the palette (the template's material), so it draws with every other piece" % [
 			"s" if foreign.size() > 1 else "", ", ".join(foreign.map(func(name: String) -> String: return "\"%s\"" % name))])
+	if not node.has_meta(&"grey"):
+		var off := _off_swatch(node)
+		if off.x > 0:
+			out.append("warning: %d of %d UVs on the palette sit off its swatches' middles: colour faces by moving their UVs to a swatch's middle (the palette has %d rows: UVs made for %d come out a row off)" % [
+				off.x, off.y, _palette_rows(), _palette_rows() - 1])
 	if entry.has("scatter") and (counts.meshes != 1 or counts.surfaces != 1 or counts.others > 0):
 		out.append("error: a scattered piece is one mesh with one material and nothing else (it has %d meshes, %d surfaces, %d other objects): join it into one object" % [
 			counts.meshes, counts.surfaces, counts.others])
@@ -123,6 +128,44 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	if kind == "creature" and not node.has_meta(&"grey"):
 		out.append_array(_check_rig(entry, node))
 	return out
+
+
+## How many UVs on [param node]'s palette surfaces sit more than a fifth of
+## a swatch off every swatch's middle, of how many (x of y): a face takes
+## its swatch's colour, so a UV off the middle was placed for another
+## palette's grid.
+static func _off_swatch(node: Node3D) -> Vector2i:
+	var shared := load(ArtKit.PALETTE) as Material
+	var rows := _palette_rows()
+	var out := Vector2i.ZERO
+	for child in ArtKit._descendants(node):
+		var mesh := child as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		for surface in mesh.mesh.get_surface_count():
+			var material := mesh.get_active_material(surface)
+			if material == null or material != shared and material.resource_name != ArtKit.PALETTE_NAME:
+				continue
+			var uvs: Variant = mesh.mesh.surface_get_arrays(surface)[Mesh.ARRAY_TEX_UV]
+			if uvs == null:
+				continue
+			for uv: Vector2 in uvs:
+				var cell := Vector2(uv.x * PALETTE_COLUMNS, uv.y * rows)
+				var from_middle := (cell - cell.floor() - Vector2(0.5, 0.5)).abs()
+				out.y += 1
+				if from_middle.x > 0.2 or from_middle.y > 0.2:
+					out.x += 1
+	return out
+
+
+## The palette atlas's rows of swatches (its height over a swatch's width).
+static func _palette_rows() -> int:
+	var image := load(PALETTE_IMAGE) as Texture2D
+	return maxi(1, roundi(image.get_height() / (image.get_width() / float(PALETTE_COLUMNS)))) if image != null else 9
+
+
+const PALETTE_IMAGE := "res://art/kit/palette.png"
+const PALETTE_COLUMNS := 8
 
 
 ## A creature's rig and clips (decision 319): an armature (a Skeleton3D),

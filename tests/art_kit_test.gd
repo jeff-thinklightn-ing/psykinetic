@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_scene_read()
 	_test_changed_told()
 	_test_creature_rig()
+	_test_swatch_uvs()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -445,6 +446,31 @@ func _test_creature_rig() -> void:
 	var biteless := ArtCheck.check_node("creature.wolf", grey)
 	_check(biteless.any(func(line: String) -> bool: return line.begins_with("error: no \"attack\" clip")), "no attack: an error, it reads wrong without one")
 	grey.free()
+
+
+func _test_swatch_uvs() -> void:
+	print("
+== UVs on the palette sit on its swatches' middles; ones made for another row count are named ==")
+	var rows := ArtCheck._palette_rows()
+	_check(rows == 9, "the palette has 9 rows (water is row 8): %d" % rows)
+	var made := {}
+	for grid in [rows, rows - 1]:
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for corner in [Vector3.ZERO, Vector3.RIGHT, Vector3.UP]:
+			tool.set_uv(Vector2(5.5 / 8.0, 5.5 / grid))
+			tool.add_vertex(corner)
+		var material := StandardMaterial3D.new()
+		material.resource_name = ArtKit.PALETTE_NAME
+		tool.set_material(material)
+		var root := Node3D.new()
+		var mesh := MeshInstance3D.new()
+		mesh.mesh = tool.commit()
+		root.add_child(mesh)
+		made[grid] = ArtCheck._off_swatch(root)
+		root.free()
+	_check(made[rows] == Vector2i(0, 3), "UVs on a swatch's middle pass: %s" % made[rows])
+	_check(made[rows - 1] == Vector2i(3, 3), "UVs placed for an 8-row palette are named: %s" % made[rows - 1])
 
 
 func _test_changed_told() -> void:
