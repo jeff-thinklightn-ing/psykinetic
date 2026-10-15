@@ -416,7 +416,7 @@ static func _scene(path: String) -> PackedScene:
 	if not _scenes.has(path):
 		var own := path.begins_with(ROOT)
 		_scenes[path] = _read_glb(path) if live and own else load(path) as PackedScene
-		if own:
+		if own and _scenes[path] != null:
 			_share_palette(_scenes[path])
 	return _scenes[path]
 
