@@ -86,6 +86,7 @@ extends Node
 ##   --test-wait-players=<n>      server: the sim waits until n players are in (60 s at most)
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
+##   --test-minimap               open the big map at the start (for screenshots)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
 ##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
@@ -331,6 +332,7 @@ var test_reset_tick := 0
 var test_builder := ""
 var test_exit_after := 0.0
 var test_exit_on := ""
+var test_minimap := false
 var test_wait_players := 0
 var test_hold_tick := 0
 var test_hold_orders := 0
@@ -1188,6 +1190,8 @@ func _parse_args() -> void:
 				interest.enabled = false
 			"--print-protocol":
 				print_protocol = true
+			"--test-minimap":
+				test_minimap = true
 			"--world-map":
 				world_map = true
 			"--builder-stub":

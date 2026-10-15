@@ -15,6 +15,9 @@ notes (decision 324).
 - A companion beaten down by raiders is carried off, not killed. They are held
   until freed, and then wait for you in the town that freed them. Companions who
   saw it remember it.
+- A map: a small one in the top right corner follows you, and M opens the
+  whole area, with the town, the start, the roads out and your companion
+  on it. The mouse wheel zooms it.
 ## v0.1.142
 
 - Seven weapons exist as things you can carry: hammer, sword, shield, giant

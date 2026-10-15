@@ -269,6 +269,8 @@ var options_panel: OptionsPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
+## The map of the zone you are in: a corner one always, the big one on M (decision 321).
+var minimap: Minimap
 ## Items' icons for the pack panel (none drawn headless).
 var item_icons: ItemIcons
 ## An open shop's goods, and the player's gold over the pack (ShopPanel).
@@ -452,6 +454,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_TAB:
 		talk.visible = not talk.visible
 		return
+	if key != null and key.pressed and not key.echo and minimap != null \
+			and (key.keycode == KEY_M or key.keycode == KEY_ESCAPE and minimap.big):
+		minimap.toggle()
+		get_viewport().set_input_as_handled()
+		return
 	if key != null and key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
 		_open_chat()
 		return
@@ -493,6 +500,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var click := event as InputEventMouseButton
 	if click == null:
+		return
+	if click.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and minimap != null and minimap.big:
+		# The big map open: the wheel zooms it instead.
+		if click.pressed:
+			minimap.zoom(1 if click.button_index == MOUSE_BUTTON_WHEEL_UP else -1)
 		return
 	if click.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		# 3D, both schemes: the wheel zooms, up nearer.
@@ -1338,6 +1350,8 @@ func _on_terrain(data: Dictionary) -> void:
 ## Draws the terrain afresh in both views (a map loaded live).
 func _repaint() -> void:
 	_paint_level()
+	if minimap != null:
+		minimap.rebuild(level)
 	if _client3d != null:
 		_client3d.rebuild(_terrain, level_centre)
 		_show_towns()
@@ -1345,8 +1359,6 @@ func _repaint() -> void:
 
 # --- Zones (server) -------------------------------------------------------------
 
-## The zone a player with no zone of their own goes to: --map's, or the
-## default map.
 ## Where a player with no record of their own starts: --map (tests, a
 ## host), else the world's start zone (levels/world_map.json, decision 300),
 ## else Level.DEFAULT_MAP.
@@ -2492,6 +2504,13 @@ func _build_talk() -> void:
 	add_child(item_icons)
 	pack_panel.icons = item_icons
 	$HUD.add_child(pack_panel)
+	minimap = Minimap.new()
+	minimap.name = "Minimap"
+	minimap.marks = _minimap_marks
+	$HUD.add_child(minimap)
+	if not level.is_empty():
+		minimap.rebuild(level)
+	minimap.big = Net.test_minimap
 	shop_panel = ShopPanel.new()
 	shop_panel.name = "Shop"
 	shop_panel.pack = pack_panel
@@ -3011,7 +3030,7 @@ func hint_lines() -> Array[String]:
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
 		"RMB hold\tbandage yourself or an ally beside you (a kit, out of combat)",
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
-		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
+		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "M\tmap", "L\tlantern",
 		"R\treset the room", "O\toptions", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:
 		lines.append("B\tbuilder mode")
@@ -3265,6 +3284,34 @@ func toggle_hints() -> void:
 
 ## Which way the level's north points on screen (unit, y down), in
 ## whichever view is showing.
+## The minimap's marks, from what is replicated: you (pointing where the
+## camera looks), your companion, the other players in their tints, and the
+## doors. No monsters.
+func _minimap_marks() -> Array:
+	var out: Array = []
+	var me := _local_player()
+	for entity in World.get_entities():
+		if not is_instance_valid(entity) or not entity.spawned:
+			continue
+		if entity is Player:
+			if entity == me:
+				out.append({"cell": Vector2(entity.tile), "kind": "you", "facing": view_forward()})
+			else:
+				out.append({"cell": Vector2(entity.tile), "kind": "player", "colour": entity.tint})
+		elif entity is Companion and entity.keeper_peer == Net.local_id:
+			out.append({"cell": Vector2(entity.tile), "kind": "companion",
+				"colour": me.tint.lightened(0.35) if me != null else Color(0.8, 0.9, 1.0)})
+	for door: Door in World.get_doors():
+		if is_instance_valid(door):
+			out.append({"cell": Vector2(door.key.x, door.key.y), "kind": "door"})
+	return out
+
+
+## The grid direction the camera looks (screen up), for the map's pointer.
+func view_forward() -> Vector2:
+	return Vector2(World.north).rotated(screen_north().angle_to(Vector2.UP))
+
+
 func screen_north() -> Vector2:
 	var north := Vector2(World.north)
 	if _client3d != null:
@@ -3970,8 +4017,16 @@ func _release_zones() -> void:
 		return
 	_save_state()
 	_released = true
+	# Nothing runs from here (the sim, a host's views): they would reach for
+	# what is about to be freed.
+	get_tree().paused = true
 	World.set_process(false)
 	set_process(false)
+	# A host's 3D view answers each entity's going at once (not on its own
+	# frame), reading the rest: it goes first.
+	if _client3d != null:
+		_client3d.free()
+		_client3d = null
 	for holder in $YSort/Entities.get_children():
 		for entity in holder.get_children():
 			entity.free()

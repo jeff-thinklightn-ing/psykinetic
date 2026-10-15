@@ -5688,3 +5688,34 @@ resident (as Wren and Nix do between trips) till her player comes, without
 one she comes back beside her player; a fact either way. Towns calls
 companion_taken for a resident taken in a raid on a town nobody is in, and
 companion_freed on a rescue.
+## 321. A minimap from the zone's Level data: a corner map always, the big map on M
+
+The 256-cell wilds are too big to find your way by the view alone (Jeff:
+"we'll need a minimap"). render/minimap.gd (Minimap) draws the zone the
+client is in from the Level data Main already holds for it, one pixel a
+cell into a texture made again on a change of zone or a builder's edit
+(27.6 ms for the wilds, once): the ground in its kind's palette swatch,
+height a shade lighter or darker, water blue, a wall darkening the floor
+either side (the walls Level puts round the border are the frame's edge
+instead), nothing where there is no floor. Over it each frame: you, a
+pointer turned where the camera looks; your companion; the other players in
+their tints; doors; the start cells; the ways out (links at their marker,
+neighbours at their side's middle), named for where they go; and the
+level's places. No monsters: finding them is the game. North-up, as the
+grid is. It reads Level and World only, so terrain's border glimpses never
+appear on it, and nothing new goes over the wire.
+
+The corner map is always on, top right below the compass (the pack and the
+gold have the bottom), centred on you at a cell a pixel and never showing
+past the zone's edge; a small zone is scaled up to fill it. M opens the big
+map, the whole zone fitted to 72% of the screen with its name, the wheel
+zooming it in steps (x1, x2, x4) round you and Esc or M closing it. Tab and
+Alt were taken (the talk log, every HP bar), and Jeff chose M. Sizes are for
+a 1080-line screen and scale with a taller one, as the rest of the HUD does.
+The whole zone shows for now; fog of war (what each player has seen, saved
+per player, a wire change) and "known" places come later.
+
+Found on the way: decision 299's _release_zones also runs on a host's exit,
+where its 3D view answered each freed entity at once and read the rest
+(a SCRIPT ERROR in Fields.any_carried_heat); it now pauses the tree and frees
+the 3D view before the entities.
