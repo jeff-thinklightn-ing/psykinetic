@@ -34,6 +34,11 @@ top section as the release notes.
   a heavy hit (or a shove) sends someone sliding. Imps and brutes no longer
   push you about with every hit, and your punches no longer bounce an imp
   away from you.
+- Builder mode can make a town's store: ask for one and you get an open
+  yard with its depot (what you put in is banked) and its shop counter,
+  and the ground they stand on becomes the town's store. You can also
+  turn any chest into a depot or a shop counter, and builder mode warns
+  when one stands outside the town's store or a store has no depot.
 - Every companion is now someone of their own: where they were born, their
   family, their trade, what they like to eat and do, what they fear, how
   they talk, and how the two of you met, rolled when they join you, with

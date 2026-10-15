@@ -319,6 +319,11 @@ own gold; something put into the counter is sold to the town, if the
 town is short of it. Like a depot it keeps nothing, and works only while
 the town holds the place.
 
+In builder mode, stamp the `town_store` prefab for a whole store: an open
+yard with its depot and shop counter, and the stockpile place the town
+holds (decision 301). The place tool's `use` (`depot` or `shop`) makes any
+chest one, and `Stockpile.check` says what is wrong with a level's store.
+
 ### Routes between areas
 
 `world_map.routes()` (`WorldRoutes`, `sim/world_routes.gd`) finds the

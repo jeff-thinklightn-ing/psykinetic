@@ -95,6 +95,30 @@ const PREFABS := {
 		],
 		"config": {"buildings": [{"slot": "building.well", "at": [2, 2]}]},
 	},
+	# The town's store (decision 301): an open yard of dirt, its depot
+	# (what is put in is banked) and its shop counter (players buy and sell)
+	# on its back row, facing the yard, no wall near them; the store itself
+	# a stockpile place the town holds, covering the yard.
+	"town_store": {
+		"rows": [
+			", , , , , , ,",
+			"             ",
+			", , h , h , ,",
+			"             ",
+			", , , , , , ,",
+			"             ",
+			", , , , , , ,",
+			"             ",
+			", , , , , , ,",
+		],
+		"config": {
+			"entities": [
+				{"at": [2, 1], "facing": [0, 1], "props": {"depot": true}},
+				{"at": [4, 1], "facing": [0, 1], "props": {"shop": true}},
+			],
+			"places": {"store": {"at": [3, 2], "kind": "stockpile", "radius": 4, "holder": "town", "name": "the town's store"}},
+		},
+	},
 	# The buildings (Level.BUILDINGS, decision 265): the footprint in stone,
 	# its walls on the outline, a door in its front (south), a ring of dirt
 	# round it so the walls are its own; the record says where it stands.

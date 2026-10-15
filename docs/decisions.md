@@ -4986,3 +4986,29 @@ their 3D art: icons are for the HUD only. Icons are kept by item and
 whether placeholders are on; `forget(id)` (or `forget()`) draws again,
 for when art-kit says an item's art changed (a signal of theirs, asked
 for). Client only: nothing is sent, and the protocol is unchanged.
+## 301. The town's store in builder mode: a prefab, a chest's use, and a check
+
+Economy's pieces get into real levels through builder mode, not by hand
+(Jeff lays out the starter town there).
+- The town_store prefab (tools/seed_prefabs.gd, levels/prefabs) is an open
+  7 x 5 yard of dirt. It has a depot chest and a shop counter on its back
+  row, facing the yard with no wall near them, so neither a building's
+  near-fade nor a wall hides them. Its config brings the store itself:
+  place "store", kind stockpile, held by the town, radius 4, covering the
+  yard. A stamp gives a working store in one call, and a second stamp's
+  place becomes store_2 (Prefab.stamp_changes).
+- The builder's place tool takes "use": "depot" | "shop" for a chest. It
+  writes the prop Chest.depot / Chest.shop reads, faces the chest south
+  unless told otherwise, and refuses use on anything else or alongside
+  items (both chests keep nothing).
+- Stockpile.check(config) -> Array[String] reads only a level's
+  level.json. It warns about:
+  - a depot or counter no town-held store covers;
+  - a store held by someone else;
+  - two stores that overlap;
+  - a town-held store with no depot;
+  - a depot or counter given items.
+  The builder runs it after each tool call and shows Claude and the player
+  what it says (builder-69's side), with the prompt text economy wrote.
+Seeding Towns from the buildings a level places (buildings' "use" and
+"town") follows once that lands.

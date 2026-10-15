@@ -1,0 +1,42 @@
+{
+	"entities": [
+		{
+			"at": [
+				2,
+				1
+			],
+			"facing": [
+				0,
+				1
+			],
+			"props": {
+				"depot": true
+			}
+		},
+		{
+			"at": [
+				4,
+				1
+			],
+			"facing": [
+				0,
+				1
+			],
+			"props": {
+				"shop": true
+			}
+		}
+	],
+	"places": {
+		"store": {
+			"at": [
+				3,
+				2
+			],
+			"kind": "stockpile",
+			"radius": 4,
+			"holder": "town",
+			"name": "the town's store"
+		}
+	}
+}

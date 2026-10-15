@@ -63,6 +63,61 @@ static func place_at(holdings: Holdings, area_name: String, cell: Vector2i) -> S
 	return ""
 
 
+## What is wrong with a level's town store, from its level.json
+## [param config] alone (decision 301): a depot or shop counter (an entity
+## with props {"depot": true} / {"shop": true}) no stockpile place the town
+## holds covers, a stockpile place not held by the town, two stockpile
+## places that overlap, a town-held store with no depot. One line each,
+## sorted, for builder mode to show (a stable order: new ones can be told
+## from old); [] for none.
+static func check(config: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var stores: Array[Dictionary] = []
+	var listed: Variant = config.get("places", {})
+	if listed is Dictionary:
+		var keys: Array = listed.keys()
+		keys.sort()
+		for key: Variant in keys:
+			var place: Variant = listed[key]
+			if not place is Dictionary or str(place.get("kind", "")) != KIND:
+				continue
+			var at: Variant = Level._tile(place.get("at"))
+			if at == null:
+				continue
+			var holder := str(place.get("holder", Factions.NOBODY))
+			if holder != TOWN:
+				out.append("the store %s is held by %s, not the town: nothing is banked or sold there" % [key, holder])
+			stores.append({"key": str(key), "at": at, "radius": int(place.get("radius", Level.PLACE_RADIUS)), "town": holder == TOWN})
+	for i in stores.size():
+		for j in range(i + 1, stores.size()):
+			var reach: int = stores[i]["radius"] + stores[j]["radius"]
+			if (stores[i]["at"] - stores[j]["at"]).length_squared() < reach * reach:
+				out.append("the stores %s and %s overlap: make one store, or move them apart" % [stores[i]["key"], stores[j]["key"]])
+	var depots: Dictionary[String, bool] = {}
+	var entries: Variant = config.get("entities", [])
+	for entry: Variant in entries if entries is Array else []:
+		if not entry is Dictionary or not entry.get("props") is Dictionary:
+			continue
+		var props: Dictionary = entry["props"]
+		var use := "depot" if props.get("depot") == true else "shop counter" if props.get("shop") == true else ""
+		var at: Variant = Level._tile(entry.get("at"))
+		if use.is_empty() or at == null:
+			continue
+		var inside: Array = stores.filter(func(store: Dictionary) -> bool:
+			return store["town"] and (at - store["at"]).length_squared() <= store["radius"] * store["radius"])
+		if inside.is_empty():
+			out.append("the %s at %s does nothing: no store the town holds covers it" % [use, at])
+		elif use == "depot":
+			depots[inside[0]["key"]] = true
+		if props.has("slots") and Array(props["slots"]).any(func(id: Variant) -> bool: return not str(id).is_empty()):
+			out.append("the %s at %s keeps nothing: its items would be lost" % [use, at])
+	for store in stores:
+		if store["town"] and not depots.has(store["key"]):
+			out.append("the store %s has no depot: what is put down there is banked, but nothing can be put in" % store["key"])
+	out.sort()
+	return out
+
+
 # --- Reading -------------------------------------------------------------------------
 
 ## Every store's place id, sorted.

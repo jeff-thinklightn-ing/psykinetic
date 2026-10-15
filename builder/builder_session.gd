@@ -350,7 +350,8 @@ const TOOLS := [
 				"route": {"type": "array", "items": _CELL},
 				"loop": {"type": "boolean"},
 				"point": _CELL}, "required": ["mode"]},
-			"items": {"type": "array", "items": {"type": "string"}, "maxItems": 4, "description": "a chest's items, by id"}},
+			"items": {"type": "array", "items": {"type": "string"}, "maxItems": 4, "description": "a chest's items, by id"},
+			"use": {"type": "string", "enum": ["depot", "shop"], "description": "a chest only: the town's depot (what is put in is banked) or shop counter (players buy and sell); inside the town's store, and given no items"}},
 			"required": ["at", "thing"]}},
 	{"name": "stamp", "description": "Stamps a prefab with its top-left at a cell, turned 0-3 quarter turns clockwise. Its void cells leave the map as it was.",
 		"input_schema": {"type": "object", "properties": {"prefab": {"type": "string"}, "at": _CELL,
@@ -705,6 +706,17 @@ func _place(given: Dictionary) -> Dictionary:
 				if read.has(key):
 					out[key] = [read[key].x, read[key].y] if key == "point" else read[key].map(func(cell: Vector2i) -> Array: return [cell.x, cell.y])
 			entry["idle"] = out if out.size() > 1 else out["mode"]
+	if given.has("use"):
+		var use := str(given["use"])
+		if meaning != "chest" or use not in ["depot", "shop"]:
+			return _no("use is for a chest only: depot or shop")
+		if given.has("items") and not (given["items"] as Array).is_empty():
+			return _no("a %s keeps nothing: give it no items" % ("depot" if use == "depot" else "shop counter"))
+		entry["props"] = {use: true}
+		entry["facing"] = [0, 1]
+		if FACINGS.has(str(given.get("facing", ""))):
+			var faces: Vector2i = FACINGS[str(given["facing"])]
+			entry["facing"] = [faces.x, faces.y]
 	elif meaning == "chest" and given.has("items"):
 		var slots := Items.tidy(given["items"], Chest.SLOTS)
 		var unknown: Array = (given["items"] as Array).filter(func(id: Variant) -> bool: return not Items.exists(str(id)))
