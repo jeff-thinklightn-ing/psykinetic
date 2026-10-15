@@ -1248,7 +1248,7 @@
 				{"name": "run", "names": ["run", "gallop"], "required": true},
 				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow"], "required": true},
 				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
-				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
 				{"name": "death", "names": ["death", "die"], "required": true}
 			],
 			"grey": [
@@ -1272,7 +1272,7 @@
 				{"name": "run", "names": ["run", "gallop"], "required": true},
 				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow"], "required": true},
 				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
-				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
 				{"name": "death", "names": ["death", "die"], "required": true},
 				{"name": "attack", "names": ["attack", "attack_headbutt", "headbutt"], "fallback": "a lunge tween (a stag at bay)"}
 			],
@@ -1299,7 +1299,7 @@
 				{"name": "attack", "names": ["attack", "bite"], "required": true},
 				{"name": "howl", "names": ["howl"], "fallback": "idle and a head-up tween"},
 				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
-				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
 				{"name": "death", "names": ["death", "die"], "required": true},
 				{"name": "feed", "names": ["eating", "idle_eating", "feed"]},
 				{"name": "sit", "names": ["sit"]},
@@ -1327,7 +1327,7 @@
 				{"name": "charge", "names": ["charge"], "fallback": "run, faster, and a lunge tween"},
 				{"name": "attack", "names": ["attack", "gore", "headbutt", "attack_headbutt"], "required": true},
 				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
-				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
 				{"name": "death", "names": ["death", "die"], "required": true}
 			],
 			"grey": [
@@ -1350,7 +1350,7 @@
 				{"name": "run", "names": ["run", "hop_run", "hop_fast"], "required": true},
 				{"name": "graze", "names": ["graze", "nibble", "eating"], "fallback": "idle"},
 				{"name": "alert", "names": ["alert", "sit_up"], "fallback": "idle"},
-				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
 				{"name": "death", "names": ["death", "die"], "required": true}
 			],
 			"grey": [
