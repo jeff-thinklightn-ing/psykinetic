@@ -197,12 +197,18 @@ func _spared(target: GridEntity, source: GridEntity, _cause: StringName) -> Stri
 
 ## A companion or a resident taken by group [param by]: it carries them
 ## off ("companion:<keeper id>", as Towns' captives name her origin;
-## "resident:<worker id>", decision 333, the body Main's to end).
+## "resident:<worker id>", decision 333, the body Main's to end; a companion
+## resting in town is a Resident whose worker id is "companion:<id>"
+## already, and goes as a companion).
 func _on_taken(entity: GridEntity, by: String) -> void:
 	if not _groups.has(by) or not (entity is Companion or entity is Resident):
 		return
-	var who := "companion:%s" % (entity as Companion).keeper_id if entity is Companion \
-			else "resident:%s" % (entity as Resident).worker_id
+	var who := ""
+	if entity is Resident:
+		var worker := (entity as Resident).worker_id
+		who = worker if worker.begins_with("companion:") else "resident:%s" % worker
+	else:
+		who = "companion:%s" % (entity as Companion).keeper_id
 	if who not in _groups[by]["carries"]["captives"]:
 		_groups[by]["carries"]["captives"].append(who)
 	print("[raids] %s takes %s" % [by, entity.name])

@@ -1706,6 +1706,13 @@ func _test_raid_townsfolk() -> void:
 	World.damage(smith, 999, raider)
 	_check(taken.size() == 1 and taken[0][0] == smith and taken[0][1] == "g5", "beaten down, the resident is taken")
 	_check("resident:w1" in raids.carries("g5")["captives"], "the group carries them off (%s)" % [raids.carries("g5")])
+	var resting := EntityFactory.build({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Garrow"}) as Resident
+	resting.worker_id = "companion:p1"  # A companion resting in town.
+	_room.add_child(resting)
+	World.spawn(resting, Vector2i(5, 3))
+	World.damage(resting, 999, raider)
+	_check("companion:p1" in raids.carries("g5")["captives"] and "resident:companion:p1" not in raids.carries("g5")["captives"],
+			"a companion resting in town goes as a companion (%s)" % [raids.carries("g5")])
 	World.entity_taken.disconnect(on_taken)
 	World.spawn_spec = Callable()
 	raids.clear()
