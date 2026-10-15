@@ -43,11 +43,22 @@ while ($done.Count -lt $parts.Count) {
 		Write-Output "$(if ($ok) { 'PASS' } else { 'FAIL' })  $name ${took}s"
 	}
 }
+# A failed run's logs, kept where they survive the run: .godot\test_failures
+# (per checkout, never committed), the last ten. Prints where.
+function Save-Failure($what, $from) {
+	$folder = Join-Path $root '.godot\test_failures'
+	$kept = Join-Path $folder ("{0}-{1}" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $what)
+	New-Item -ItemType Directory -Force $kept | Out-Null
+	Copy-Item $from $kept -Recurse -Force -ErrorAction SilentlyContinue
+	Get-ChildItem $folder -Directory | Sort-Object Name | Select-Object -SkipLast 10 | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+	Write-Output "kept in $kept"
+}
 foreach ($name in $failed) {
 	Write-Output ''
 	Write-Output "### $name (failed)"
 	Get-Content (Join-Path $logs "$name.out"), (Join-Path $logs "$name.err") -ErrorAction SilentlyContinue | Write-Output
 }
+if ($failed.Count -gt 0) { Save-Failure 'land' (Join-Path $logs '*') }
 Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
 $seconds = [int]((Get-Date) - $started).TotalSeconds
 Write-Output ''

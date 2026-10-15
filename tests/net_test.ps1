@@ -421,10 +421,21 @@ Assert (@($clientRLog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 
+# A failed run's logs, kept where they survive the run: .godot\test_failures
+# (per checkout, never committed), the last ten. Prints where.
+function Save-Failure($what, $from) {
+	$folder = Join-Path $root '.godot\test_failures'
+	$kept = Join-Path $folder ("{0}-{1}" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $what)
+	New-Item -ItemType Directory -Force $kept | Out-Null
+	Copy-Item $from $kept -Recurse -Force -ErrorAction SilentlyContinue
+	Get-ChildItem $folder -Directory | Sort-Object Name | Select-Object -SkipLast 10 | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+	Write-Output "kept in $kept"
+}
 Write-Output ''
 if ($script:failures -gt 0) {
 	Write-Output "--- server log ($logs) ---"
 	$serverLog | Write-Output
+	Save-Failure 'net_test' (Join-Path $logs '*')
 	Write-Output "RESULT: FAIL ($($script:failures) failed)"
 	exit 1
 }

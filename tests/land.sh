@@ -42,11 +42,24 @@ for name in suite net_test state_test; do
 		failed="$failed $name"
 	fi
 done
+# A failed run's logs, kept where they survive the run: .godot/test_failures
+# (per checkout, never committed), the last ten. Prints where.
+keep_failure() {
+	kept=".godot/test_failures/$(date +%Y%m%d-%H%M%S)-$1"
+	mkdir -p "$kept"
+	shift
+	cp -r "$@" "$kept"/ 2>/dev/null
+	ls -1d .godot/test_failures/*/ 2>/dev/null | sort | head -n -10 | while read -r old; do rm -rf "$old"; done
+	echo "kept in $kept"
+}
 for name in $failed; do
 	echo
 	echo "### $name (failed)"
 	cat "$LOGS/$name.log"
 done
+if [ -n "$failed" ]; then
+	keep_failure land "$LOGS"/*.log
+fi
 echo
 if [ "$code" -eq 0 ]; then
 	echo "LANDING TESTS: PASS (suite, net_test, state_test; $(( $(date +%s) - started ))s)"
