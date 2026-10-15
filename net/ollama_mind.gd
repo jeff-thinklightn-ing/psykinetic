@@ -16,11 +16,12 @@ extends CompanionMind
 ## A stance must come quickly (aim: under 300 ms) and is short; a line may
 ## take longer, in the background.
 ## Her card (CompanionCard) is written once, in the background: it may take long.
-const TIMEOUT_SECONDS := {"stance": 2.0, "voice": 5.0, "check": 2.0, "card": 60.0}
-const MAX_TOKENS := {"stance": 24, "voice": 90, "check": 12, "card": 320}
+## What has become true of her (CompanionFacts) is read off a stretch of talk, in the background too.
+const TIMEOUT_SECONDS := {"stance": 2.0, "voice": 5.0, "check": 2.0, "card": 60.0, "facts": 30.0}
+const MAX_TOKENS := {"stance": 24, "voice": 90, "check": 12, "card": 320, "facts": 240}
 ## A stance wants the likeliest answer, the check the surest; a line wants
 ## some life.
-const TEMPERATURE := {"stance": 0.2, "voice": 0.8, "check": 0.0, "card": 0.9}
+const TEMPERATURE := {"stance": 0.2, "voice": 0.8, "check": 0.0, "card": 0.9, "facts": 0.2}
 ## More with --mind-why, for the reason after the answer.
 const WHY_TOKENS := 40
 ## Loading a model cold takes the box half a minute; a warm-up may.
@@ -64,12 +65,12 @@ func _init(endpoint: String, model_name: String, host: Node, voice_endpoint := "
 	model = model_name
 	openai_shaped = endpoint.trim_suffix("/").ends_with("/chat/completions")
 	_host = host
-	for what: String in ["stance", "voice", "check", "card"]:
-		var own := what in ["voice", "card"]
+	for what: String in ["stance", "voice", "check", "card", "facts"]:
+		var own := what in ["voice", "card", "facts"]
 		_urls[what] = voice_endpoint if own and not voice_endpoint.is_empty() else endpoint
 		_models[what] = voice_model_name if own and not voice_model_name.is_empty() else model_name
 		_openai[what] = _urls[what].trim_suffix("/").ends_with("/chat/completions")
-	for what: String in ["stance", "voice", "check", "card"]:
+	for what: String in ["stance", "voice", "check", "card", "facts"]:
 		var http := HTTPRequest.new()
 		http.timeout = TIMEOUT_SECONDS[what]
 		http.request_completed.connect(_on_request_completed.bind(what))
@@ -95,6 +96,11 @@ func check(ask: Dictionary) -> Dictionary:
 
 func card(ask: Dictionary) -> Dictionary:
 	_send("card", ask)
+	return {}
+
+
+func facts(ask: Dictionary) -> Dictionary:
+	_send("facts", ask)
 	return {}
 
 
@@ -179,7 +185,7 @@ func request_messages(messages: Array, what := "stance") -> String:
 		"model": channel_model, "think": false, "stream": false, "keep_alive": -1,
 		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5)}, "messages": messages,
 	}
-	if what in ["stance", "check", "card"]:
+	if what in ["stance", "check", "card", "facts"]:
 		body["format"] = "json"
 	return JSON.stringify(body)
 
@@ -264,7 +270,7 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 		var found := RegEx.create_from_string("\"stance\"\\s*:\\s*\"([A-Z_]+)\"").search(content)
 		if found != null:
 			answer = {"stance": found.get_string(1)}
-	var needs: String = {"stance": "stance", "check": "asked", "card": "card"}.get(what, "say")
+	var needs: String = {"stance": "stance", "check": "asked", "card": "card", "facts": "facts"}.get(what, "say")
 	if answer is not Dictionary or not answer.has(needs):
 		_fail(what, "reply is not a JSON object with a %s: %s" % [needs, content.left(80)], content)
 		return

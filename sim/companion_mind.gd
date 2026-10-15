@@ -43,6 +43,12 @@ func card(_ask: Dictionary) -> Dictionary:
 	return {}
 
 
+## What has become true of her (CompanionFacts): an extraction answers
+## {"facts": [...], "beliefs": [...]}, a merge {"facts": [history]}; or {}.
+func facts(_ask: Dictionary) -> Dictionary:
+	return {}
+
+
 ## Whether an ask of [param _what] ("stance", "voice") is still out; a busy
 ## kind is asked again by the companion once it is free.
 func busy(_what: String) -> bool:

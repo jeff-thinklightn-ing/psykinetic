@@ -5050,3 +5050,44 @@ you can't), the camera as the listener (the camera is up and back; a
 monster hears from where it stands), and a server message per noise
 (every step is a noise; the client already sees the events that make
 them).
+
+## 294. Her card grows: what she witnessed, and what became true in talk
+
+Jeff: "Rolled cards with lore that gets added dynamically based on events
+and conversations", and "if something is 'hallucinated' per se, that
+actually becomes a card fact about that character". Her card (293) is not
+frozen: CompanionFacts holds what has become true of her since, saved in
+her record ("facts", "beliefs", and "talk" not yet read), per player's
+companion. Every entry is a plain third-person sentence naming her, with
+her player's id beside it (a rename does not strand it), never
+transcript.
+
+Facts from what she witnessed are written from templates, no model call,
+only through her perception (Main tells her of a death only if she saw
+it): an ally falling, a big monster killed, her own near-fall, the first
+of a monster kind she has seen anywhere, what she found in a chest. The
+same fact twice (Companion.near_repeat) is one.
+
+Facts from talk: the lines between her and her player are kept; once at
+least talk_lines (3) of her player's have been quiet for quiet_seconds
+(60), one call on the voice's model (OllamaMind "facts", JSON, off the
+tick) is shown her card, what is already true of her, what she believes,
+and the stretch, and lists what is now true of her: what she said of
+herself, or what her player said of her and she went along with ("went
+along with" is the test; what she did not take up, jests and anything out
+of the story are left out). The earliest fact stands: the call is told to
+leave out what goes against what is listed, and her voice is told her
+facts as true. Claims about the world (places, peoples, history) are her
+beliefs, "You believe, though it may not be so", never written to
+levels/lore: Lore owns the world. At most 4 of each a call.
+
+Caps are data (companion_traits.json "growth"): facts_max 24, beliefs_max
+8 (the oldest belief goes), prompt_chars 700. Over 24 facts, one merge
+call folds the oldest of what she witnessed (all but the newest 6) into a
+two- or three-sentence history fact; with no model to write it, they are
+dropped oldest first. Talk facts are kept longest. Her voice's system
+message, after her card and how they met: "Also true of you: <talk facts,
+history, newest 6 witnessed>" within the budget, then her beliefs. Each
+new fact goes to her transcript ("[Now true of her: ...]") and the mind
+log (kind "fact", "facts"). The console's "companion facts <player>"
+lists them by id, "companion forget <player> <id>" removes one.

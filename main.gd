@@ -2109,6 +2109,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.how_we_met = str(record.companion.get("how_we_met", ""))
 	pet.card_by = str(record.companion.get("card_by", "plain"))
 	pet.card_written.connect(_on_card_written.bind(pet, record))
+	pet.grown = CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
+	pet.talk.assign(record.companion.get("talk", []))
+	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
 	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
 	pet.party_log = party_log
@@ -2162,6 +2165,14 @@ func _give_traits(record: PlayerRecord) -> void:
 	var met := CompanionCard.met(traits, record.name)
 	record.companion["how_we_met"] = met.left(1).to_upper() + met.substr(1) + "."
 	print("[net] %s's companion %s: traits rolled (%s, %s)" % [record.name, traits["name"], traits["profession"], traits["temperament"]])
+
+
+## What has become true of her changed (decision 294): kept in her record
+## at once, with the talk not yet read for it.
+func _on_facts_changed(pet: Companion, record: PlayerRecord) -> void:
+	record.companion["facts"] = pet.grown.facts.duplicate(true)
+	record.companion["beliefs"] = pet.grown.beliefs.duplicate(true)
+	record.companion["talk"] = Array(pet.talk)
 
 
 ## Her card came back from the voice model: kept in her record.
@@ -3353,6 +3364,38 @@ func _poll_console() -> void:
 			_admin_clients.erase(client)
 
 
+## "companion facts <player>": what has become true of that player's
+## companion (decision 294), by id; "companion forget <player> <id>": one
+## of them gone (her live self too, if she is in the world).
+func _companion_command(words: PackedStringArray) -> String:
+	if words.size() < 3 or words[1] not in ["facts", "forget"]:
+		return "companion facts <player> | companion forget <player> <id>"
+	var record: PlayerRecord = null
+	for each: PlayerRecord in _records.values():
+		if each.name.to_lower() == words[2].to_lower():
+			record = each
+	if record == null or record.companion.is_empty():
+		return "no companion for %s" % words[2]
+	var pet: Companion = _companions.get(record.player_id)
+	var live := is_instance_valid(pet) and pet.spawned
+	var grown := pet.grown if live else CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
+	if words[1] == "forget":
+		if words.size() < 4 or not grown.forget(words[3]):
+			return "%s has no fact %s" % [record.companion.get("name", "?"), words[3] if words.size() > 3 else "?"]
+		if live:
+			pet.facts_changed.emit()
+		else:
+			record.companion["facts"] = grown.facts
+			record.companion["beliefs"] = grown.beliefs
+		return "%s: %s forgotten" % [record.companion.get("name", "?"), words[3]]
+	var lines: Array[String] = []
+	for entry in grown.facts:
+		lines.append("%s (%s) %s" % [entry["id"], entry["from"], entry["text"]])
+	for entry in grown.beliefs:
+		lines.append("%s (believes) %s" % [entry["id"], entry["text"]])
+	return "%s: %d facts, %d beliefs\n%s" % [record.companion.get("name", "?"), grown.facts.size(), grown.beliefs.size(), "\n".join(lines)]
+
+
 ## One console command; the reply is what the operator sees.
 func admin_command(line: String) -> String:
 	if not Net.is_authority():
@@ -3406,6 +3449,8 @@ func admin_command(line: String) -> String:
 				return "no --state file to save to"
 			_save_state()
 			return "saved %s at tick %d" % [Net.state_path, World.tick]
+		"companion":
+			return _companion_command(words)
 		"companions":
 			var lines: Array[String] = []
 			for id: String in _companions:
@@ -3475,7 +3520,7 @@ func admin_command(line: String) -> String:
 		"help":
 			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
-				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>]"
+				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>]"
 	return "unknown command %s (try help)" % words[0]
 
 

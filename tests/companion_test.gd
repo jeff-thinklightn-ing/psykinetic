@@ -74,6 +74,7 @@ func _ready() -> void:
 	_test_errands()
 	_test_nobody_hears()
 	_test_card()
+	_test_growing_card()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -850,6 +851,77 @@ func _test_card() -> void:
 	var body: Variant = JSON.parse_string(ollama.request_body("s", "u", "card"))
 	_check(body["format"] == "json" and int(body["options"]["num_predict"]) >= 300, "the card call asks for JSON, with room for a paragraph")
 	pet.mind = ScriptedMind.new()
+
+
+func _test_growing_card() -> void:
+	print("\n== her card grows: what she witnessed, and what became true of her in talk; beliefs apart ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	pet.grown = CompanionFacts.new()
+	pet.talk.clear()
+	var me := Companion._name_of(pet)
+	pet.note_death("Bo")
+	_check(pet.grown.facts.size() == 1 and pet.grown.facts[0]["text"].begins_with("%s saw Bo fall in " % me) and pet.grown.facts[0]["from"] == "event"
+		and pet.grown.facts[0]["player"] == Net.player_id, "an ally she saw fall is a fact about her, with her player's id: %s" % [pet.grown.facts])
+	pet._deaths.clear()
+	pet.note_death("Bo")
+	pet._deaths.clear()
+	_check(pet.grown.facts.size() == 1, "the same thing twice is one fact")
+	_check(record.companion.get("facts", []).size() == 1, "kept in her record at once")
+
+	var mind := CountingMind.new()
+	pet.mind = mind
+	mind.facts_answer = {"facts": ["%s has a sister in the north who keeps goats." % me, "%s said \"hello\"." % me],
+		"beliefs": ["The star that fell is buried under the old keep."]}
+	for line in ["Tell me about your family.", "A sister? Where?", "And what does she do?"]:
+		for i in 21:
+			World.step()
+		pet.owner_spoke(line)
+	_check(pet.talk.size() >= 3 and pet.talk[0] == "Player: Tell me about your family.", "the talk is kept to be read: %s" % [pet.talk])
+	World.step()
+	_check(mind.facts_asks.is_empty(), "not read while the talk goes on")
+	pet._talk_tick = World.tick - CompanionFacts.setting("quiet_seconds", 60) * World.TICK_RATE
+	World.step()
+	var ask: Dictionary = mind.facts_asks.back() if not mind.facts_asks.is_empty() else {}
+	_check(mind.facts_asks.size() == 1 and "went along with" in str(ask.get("system", "")) and "did not take up" in str(ask.get("system", ""))
+		and "Player: A sister? Where?" in str(ask.get("user", "")) and "saw Bo fall" in str(ask.get("user", "")),
+		"quiet, it is read once: what is true already, and what was said")
+	_check(pet.talk.is_empty() and pet.grown.facts.size() == 2 and pet.grown.facts[1]["from"] == "talk"
+		and "sister in the north" in pet.grown.facts[1]["text"], "what she said of herself is now true of her; speech is no fact (%s)" % [pet.grown.facts])
+	_check(pet.grown.beliefs.size() == 1 and "star that fell" in pet.grown.beliefs[0]["text"], "a claim about the world is her belief, not a fact")
+	var prompt := pet.voice_prompt("test")
+	_check("Also true of you: " in prompt and "sister in the north" in prompt and "You believe, though it may not be so: The star that fell" in prompt,
+		"her voice is told them, as true and as belief")
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("facts", []).size() == 2 and saved.companion.get("beliefs", []).size() == 1, "saved and read back")
+
+	for i in CompanionFacts.setting("facts_max", 24):
+		pet.grown.add_fact("%s crossed bridge number %d." % [me, i + 1], "event", Net.player_id)
+	_check(pet.grown.facts.size() > CompanionFacts.setting("facts_max", 24), "(over the cap: %d)" % pet.grown.facts.size())
+	mind.facts_asks.clear()
+	mind.facts_answer = {"facts": ["%s has crossed more bridges than she can count." % me]}
+	World.step()
+	_check(mind.facts_asks.size() == 1 and mind.facts_asks[0]["trigger"] == "merge" and pet.grown.facts.size() <= CompanionFacts.setting("facts_max", 24)
+		and pet.grown.facts.any(func(entry: Dictionary) -> bool: return entry["from"] == "history"),
+		"over the cap, the oldest of what she witnessed is merged into a history (%d facts)" % pet.grown.facts.size())
+	_check(pet.grown.facts.any(func(entry: Dictionary) -> bool: return "sister" in entry["text"]), "what became true in talk stays")
+	pet.mind = ScriptedMind.new()
+	for i in CompanionFacts.setting("facts_max", 24):
+		pet.grown.add_fact("%s climbed tower number %d." % [me, i + 1], "event", Net.player_id)
+	World.step()
+	_check(pet.grown.facts.size() == CompanionFacts.setting("facts_max", 24), "with no model to merge, the oldest go (%d)" % pet.grown.facts.size())
+
+	var listed: String = _main.admin_command("companion facts Player")
+	var id: String = pet.grown.facts[0]["id"]
+	_check(listed.begins_with("%s: " % record.companion["name"]) and id in listed and "(believes)" in listed, "the console lists them: %s" % listed.get_slice("\n", 0))
+	_check(_main.admin_command("companion forget Player %s" % id).ends_with("forgotten") and not pet.grown.facts.any(func(entry: Dictionary) -> bool: return entry["id"] == id)
+		and not record.companion["facts"].any(func(entry: Dictionary) -> bool: return entry["id"] == id), "and forgets one")
+	pet.grown = CompanionFacts.new()
+	pet.facts_changed.emit()
+	_settle(pet)
 
 
 func _offer(offered: Array[Dictionary], verb: String) -> int:
@@ -2461,6 +2533,8 @@ class CountingMind:
 	var check_asks: Array[Dictionary] = []
 	var card_answer := {}
 	var card_asks: Array[Dictionary] = []
+	var facts_answer := {}
+	var facts_asks: Array[Dictionary] = []
 
 	func _init() -> void:
 		kind = "counting"
@@ -2480,6 +2554,10 @@ class CountingMind:
 	func card(ask: Dictionary) -> Dictionary:
 		card_asks.append(ask)
 		return card_answer.duplicate()
+
+	func facts(ask: Dictionary) -> Dictionary:
+		facts_asks.append(ask)
+		return facts_answer.duplicate(true)
 
 	func clear() -> void:
 		stance_asks.clear()

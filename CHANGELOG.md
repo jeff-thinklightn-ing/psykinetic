@@ -47,6 +47,11 @@ top section as the release notes.
   now).
 - O opens the options: volume sliders for master, effects, voices,
   ambience and interface, remembered in settings.cfg.
+- Companions remember: what they have seen with you (a friend falling, a
+  brute brought down, a close call) and what they have told you about
+  themselves become part of who they are. Play along with a story about
+  their past and it stays true from then on. What they claim about the
+  wider world stays their belief, not fact.
 - Every companion is now someone of their own: where they were born, their
   family, their trade, what they like to eat and do, what they fear, how
   they talk, and how the two of you met, rolled when they join you, with

@@ -19,7 +19,8 @@ var zone := ""
 var last_seen := 0
 ## The player's companion: {name, card, hp, stamina, tile: [x, y], alive,
 ## said: her last lines, newest last, slots: her pack, traits (rolled:
-## CompanionCard), how_we_met, card_by ("plain" or "model"), and resident while
+## CompanionCard), how_we_met, card_by ("plain" or "model"), facts and
+## beliefs (CompanionFacts), talk (not yet read for them), and resident while
 ## she stays in a town working: {place, zone, trade} (decision 284)}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
@@ -104,6 +105,14 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			record.companion["traits"] = kept
 			record.companion["how_we_met"] = str(pet.get("how_we_met", ""))
 			record.companion["card_by"] = str(pet.get("card_by", "plain"))
+		# What has become true of her (decision 294), and talk not yet read for it.
+		var grown := CompanionFacts.from_record(pet.get("facts", []), pet.get("beliefs", []))
+		if not grown.facts.is_empty() or not grown.beliefs.is_empty():
+			record.companion["facts"] = grown.facts
+			record.companion["beliefs"] = grown.beliefs
+		var talk: Variant = pet.get("talk", [])
+		if talk is Array and not talk.is_empty():
+			record.companion["talk"] = Array(talk.map(func(line: Variant) -> String: return str(line)))
 		var resident: Variant = pet.get("resident")
 		if resident is Dictionary and str(resident.get("place", "")) != "" and str(resident.get("zone", "")) != "":
 			record.companion["resident"] = {"place": str(resident["place"]), "zone": str(resident["zone"]),

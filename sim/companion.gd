@@ -294,6 +294,9 @@ const STANCE_WORDS: Array[String] = [
 signal said(text: String)
 ## Her card came back written (write_card): card, how_we_met, card_by set.
 signal card_written
+## What has become true of her changed (grown, decision 294), or the talk
+## waiting to be read for it.
+signal facts_changed
 
 ## The player_id this companion belongs to.
 var keeper_id := ""
@@ -308,6 +311,16 @@ var card := "Loyal and cautious. Guards the one she travels with, and says littl
 var traits := {}
 var how_we_met := ""
 var card_by := "plain"
+## What has become true of her since (CompanionFacts, decision 294); the
+## stretch of talk with her player not yet read for it ("Jeff: ...", hers
+## too), and when it was last added to; the facts a merge asked for is
+## folding.
+var grown := CompanionFacts.new()
+var talk: Array[String] = []
+var _talk_tick := -100000
+var _merging: Array[Dictionary] = []
+## The longest stretch of talk kept.
+const TALK_KEPT := 30
 var mind: CompanionMind
 var party_log: PartyLog
 
@@ -680,6 +693,7 @@ func others_here() -> String:
 ## it, but its stance, if any, is not taken.
 func owner_spoke(text: String, phrase := 0) -> void:
 	_heard.append({"text": text, "tick": World.tick, "speaker": keeper_name()})
+	_talked("%s: %s" % [keeper_name(), text])
 	var meaning := meaning_of(text, keeper_name())
 	var heard := meaning if not meaning.is_empty() else "%s just said to you: \"%s\"" % [keeper_name(), text]
 	if meaning.is_empty():
@@ -719,6 +733,11 @@ func note_death(who: String, her_player := false, entity: GridEntity = null) -> 
 	_fallen.append({"word": kind_of(entity) if monster else who, "monster": monster})
 	if _fallen.size() > 8:
 		_fallen.pop_front()
+	# What she saw (Main tells her only of deaths she witnessed).
+	if not monster:
+		note_fact("%s saw %s fall in %s." % [_name_of(self), who, _place_words()])
+	elif big:
+		note_fact("%s saw %s killed in %s." % [_name_of(self), refer(entity), _place_words()])
 
 
 ## A monster's kind ("imp", "brute"), from its level marker or, for one
@@ -856,6 +875,7 @@ func _sim_tick() -> void:
 		_joined_tick = World.tick
 	_take_noises()
 	_watch()
+	_grow()
 	if World.tick % MEMORY_EVERY == 0:
 		_remember_sights()
 	_calm()
@@ -896,6 +916,8 @@ func _watch() -> void:
 			var event := "%s %s" % ["Your HP" if mine else "%s's HP" % keeper_name(), _hp_change(_seen[whose], now[whose])]
 			var body: GridEntity = self if mine else keeper
 			var told := "%s %s now" % ["You are" if mine else "%s is" % keeper_name(), health_words(body)]
+			if mine and now[whose] == HP_THRESHOLDS.size():
+				note_fact("%s was nearly killed in %s." % [_name_of(self), _place_words()])
 			if now[whose] == HP_THRESHOLDS.size() and not standing_instruction().is_empty():
 				# Either of them badly hurt: what was asked no longer binds her.
 				_narrate("%s, and what %s asked of you no longer binds you." % [told, keeper_name()])
@@ -948,6 +970,10 @@ func _watch() -> void:
 		_ask_voice(" ".join(deaths if not deaths.is_empty() else events))
 	elif not new_kind.is_empty() and not lapsing and _lapsed_from.is_empty():
 		_ask_voice(new_kind)
+	if not new_kind.is_empty():
+		var kind := new_kind.get_slice("the first ", 1).get_slice(" you have", 0)
+		if not grown.facts.any(func(entry: Dictionary) -> bool: return ("first saw %s" % _a(kind)) in str(entry["text"])):
+			note_fact("%s first saw %s in %s." % [_name_of(self), _a(kind), _place_words()])
 	elif had_deaths and deaths.is_empty():
 		_log({"kind": "voice", "companion": String(name), "trigger": " ".join(dead_names),
 			"outcome": "not asked", "note": "nothing new: a monster's death, not big, not the first of its kind, not the last"})
@@ -1200,6 +1226,112 @@ func _take_card(answer: Dictionary, entry: Dictionary) -> void:
 	_log(entry)
 
 
+# --- What becomes true of her (decision 294) ---------------------------------------
+
+## [param text], what she witnessed, as a fact about her; told to her
+## transcript and the mind log when new.
+func note_fact(text: String, from := "event") -> void:
+	var added := grown.add_fact(text, from, keeper_id)
+	if added.is_empty():
+		return
+	Transcript.record(String(name), "", "[Now true of her: %s]" % added["text"])
+	_log({"kind": "fact", "companion": String(name), "trigger": from, "outcome": "added", "note": added["text"], "id": added["id"]})
+	facts_changed.emit()
+
+
+## A line of the talk with her player, to be read for what becomes true of her.
+func _talked(line: String) -> void:
+	talk.append(line)
+	if talk.size() > TALK_KEPT:
+		talk.pop_front()
+	_talk_tick = World.tick
+	facts_changed.emit()
+
+
+## Each tick: a stretch of talk gone quiet is read for what became true
+## of her (one ask); over the cap, the oldest of what she witnessed is
+## merged into a history (one ask), or with no model to write it, trimmed.
+func _grow() -> void:
+	if mind == null:
+		return
+	var theirs := talk.filter(func(line: String) -> bool: return line.begins_with(keeper_name() + ": ")).size()
+	var quiet := World.tick - _talk_tick >= CompanionFacts.setting("quiet_seconds", 60) * World.TICK_RATE
+	if theirs >= CompanionFacts.setting("talk_lines", 3) and quiet and not mind.busy("facts"):
+		var who := keeper_name()
+		var me := _name_of(self)
+		var ask := {"kind": "facts", "serial": _serial, "trigger": "talk",
+			"system": CompanionFacts.EXTRACT_SYSTEM % [me, who, me, who, who], "user": grown.extract_prompt(card, talk)}
+		talk.clear()
+		facts_changed.emit()
+		var answer := mind.facts(ask)
+		if not answer.is_empty():
+			_take_result(_sync_result(ask, answer))
+		return
+	var merging := grown.to_merge()
+	if merging.is_empty() or mind.busy("facts") or not _merging.is_empty():
+		return
+	_merging = merging
+	var listed: Array[String] = []
+	for entry in merging:
+		listed.append("- " + str(entry["text"]))
+	var ask := {"kind": "facts", "serial": _serial, "trigger": "merge",
+		"system": CompanionFacts.MERGE_SYSTEM % _name_of(self), "user": "\n".join(listed)}
+	var answer := mind.facts(ask)
+	if not answer.is_empty():
+		_take_result(_sync_result(ask, answer))
+	elif not mind.busy("facts"):
+		# No model to write a history: the oldest go.
+		_merging = []
+		grown.trim()
+		facts_changed.emit()
+
+
+## An extraction or a merge came back (or did not).
+func _take_facts(trigger: String, answer: Dictionary, entry: Dictionary) -> void:
+	var said: Variant = answer.get("facts", [])
+	var held: Variant = answer.get("beliefs", [])
+	var added: Array[String] = []
+	if trigger == "merge":
+		var history := str(said[0]) if said is Array and not said.is_empty() else ""
+		if history.is_empty() or not grown.merge(_merging, history, keeper_id):
+			grown.trim()
+			entry["outcome"] = "trimmed"
+		else:
+			entry["outcome"] = "merged"
+			added.append(history)
+		_merging = []
+	else:
+		for text: Variant in (said if said is Array else []).slice(0, CompanionFacts.PER_CALL):
+			var fact := grown.add_fact(str(text), "talk", keeper_id)
+			if not fact.is_empty():
+				added.append(fact["text"])
+				Transcript.record(String(name), "", "[Now true of her: %s]" % fact["text"])
+		for text: Variant in (held if held is Array else []).slice(0, CompanionFacts.PER_CALL):
+			var belief := grown.add_belief(str(text), keeper_id)
+			if not belief.is_empty():
+				added.append("(belief) " + belief["text"])
+		entry["outcome"] = "added" if not added.is_empty() else ("nothing new" if not answer.is_empty() else "no answer")
+	entry["note"] = " | ".join(added)
+	_log(entry)
+	facts_changed.emit()
+
+
+## Where she is, for a fact: the level's name ("the castle").
+static var _place_names: Dictionary[String, String] = {}
+
+
+func _place_words() -> String:
+	var zone_name := World.zone.name if World.zone != null else ""
+	if not _place_names.has(zone_name):
+		var shown := str(Level.load_level(zone_name).get("display_name", "")) if Level.exists(zone_name) else ""
+		_place_names[zone_name] = shown if not shown.is_empty() else zone_name.replace("_", " ")
+	return _place_names[zone_name]
+
+
+static func _a(word: String) -> String:
+	return ("an " if not word.is_empty() and word[0] in "aeiou" else "a ") + word
+
+
 ## Whether she was told to stay where she is: HOLD, standing as her
 ## player's instruction (Main.travel leaves her behind then).
 func stays_put() -> bool:
@@ -1261,6 +1393,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var things := perceived()
 	var around := perception(things) if surroundings_keys(things) != _around_said or asks_about_surroundings(heard) else ""
 	var met := " How you and %s met: %s" % [who, how_we_met] if not how_we_met.is_empty() else ""
+	var since := grown.prompt_words()
+	if not since.is_empty():
+		met += " " + since
 	var system := "%s %s%s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, VOICE_WORLD, " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
 	var addressed := addressed_to(heard)
@@ -1913,6 +2048,9 @@ func _take_result(result: Dictionary) -> void:
 	var answer: Dictionary = result.get("answer", {})
 	if answer.has("why"):
 		entry["why"] = str(answer["why"])
+	if kind == "facts":
+		_take_facts(str(result.get("trigger", "")), answer, entry)
+		return
 	if answer.is_empty():
 		entry["outcome"] = "no answer"
 		entry["note"] = "%s; %s stands" % [result.get("error", ""), stance_name()]
@@ -2048,6 +2186,8 @@ func _say(line: String, always: bool) -> bool:
 	_around_said = surroundings_keys()
 	remember_said(line)
 	_add_turn("assistant", line)
+	if not talk.is_empty():
+		_talked("%s: %s" % [_name_of(self), line])
 	said.emit(line)
 	return true
 
@@ -2844,6 +2984,8 @@ func _errand_do() -> void:
 					things.append(("an " if word[0] in "aeiou" else "a ") + word)
 			var held := "nothing" if things.is_empty() else things[0] if things.size() == 1 \
 					else "%s and %s" % [", ".join(things.slice(0, -1)), things.back()]
+			if held != "nothing":
+				note_fact("%s found %s in a chest in %s." % [_name_of(self), held, _place_words()])
 			_report_errand("You looked in the chest %s: it holds %s." % [_paces_toward(Vector2(chest.tile)), held])
 		_:
 			var cell: Vector2i = errand["cell"]
