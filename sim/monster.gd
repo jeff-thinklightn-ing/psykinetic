@@ -805,8 +805,17 @@ func _search() -> void:
 			_lead = _lead_seen  # No way on: where it saw them, then.
 			_lead_guess = false
 			return
-		# A way that failed with doors open has no door to blame.
-		var door := {} if opens_doors_now() else _door_on_way(_lead)
+		# A way that failed with doors open has no door to blame; but one
+		# that failed only for someone standing there may be a way to beside
+		# them (the door search ignores who stands at the goal, and keeps
+		# that way as its idle path).
+		var opens := opens_doors_now()
+		var occupied := World.get_entity_at(_lead) != null
+		var door := {} if opens and not occupied else _door_on_way(_lead)
+		if opens:
+			door = {}
+		if door.is_empty() and _idle_path_to == _lead and not _idle_path.is_empty():
+			return  # On along it to beside them.
 		if not door.is_empty():
 			# A closed door it will not open now: it breaks it (one that
 			# cannot open doors, with a reason), else it goes to the door
@@ -846,7 +855,9 @@ func _has_reason() -> bool:
 
 
 ## The first closed door on its way to [param to] were doors open, and the
-## tile before it ({key, near}); {} for none (the same capped search).
+## tile before it ({key, near}); {} for none (the same capped search). With
+## no door on it, the way up to [param to] (whoever stands there) is kept as
+## its idle path, for _search to go on along: the way failed only for them.
 func _door_on_way(to: Vector2i) -> Dictionary:
 	# The answer kept a while for the same goal from the same tile (perf: a
 	# search of IDLE_SEARCH_TILES each time it was asked).
@@ -872,6 +883,9 @@ func _first_door_on_way(to: Vector2i) -> Dictionary:
 			if door != null and not door.is_open():
 				return {"key": door.key, "near": leg[0]}
 		at = next
+	if path.size() > 1 and path.back() == to:
+		_idle_path = path.slice(0, path.size() - 1)
+		_idle_path_to = to
 	return {}
 
 

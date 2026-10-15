@@ -80,6 +80,7 @@ func _ready() -> void:
 	_test_wild_boar()
 	_test_wild_wolf()
 	_test_wild_remains()
+	_test_lead_occupied()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -248,20 +249,24 @@ func _test_flank() -> void:
 
 
 func _test_hold_back() -> void:
-	print("\n== a timid monster waits until another is at its target ==")
-	var e := _build(["##########", "#........#", "#P...i...#", "#........#", "#.......i#", "##########"])
+	print("
+== a timid monster waits until another is at its target ==")
+	var e := _build(["##########", "#........#", "#P...i...#", "#........#", "#........#", "##########"])
 	var player: GridEntity = e["P"][0]
 	var timid: Monster = e["i"][0]
-	var other: Monster = e["i"][1]
 	_bold(timid)
-	_bold(other)
 	timid.boldness = 0.0
 	timid.temper = Monster.Temper.CAUTIOUS  # Waits for one other at its target.
-	other.sight_range = 0
 	for i in 40:
 		World.step()
 	_check(World.distance(timid.tile, player.tile) >= 2 and World.distance(timid.tile, player.tile) <= Monster.HOLD_BACK_RANGE,
 			"alone, it hangs back (%d tiles off)" % World.distance(timid.tile, player.tile))
+	# Another comes (one there from the start would hear the standoff and
+	# come to it: an occupied lead is walked to its side).
+	var other := EntityFactory.build(SPECS["i"].merged({"name": "Imp2"})) as Monster
+	_room.add_child(other)
+	World.spawn(other, Vector2i(8, 4))
+	_bold(other)
 	other.sight_range = 12
 	var joined := false
 	for i in 60:
@@ -1658,3 +1663,19 @@ func _test_wild_remains() -> void:
 	var before := World.zone.ground.size()
 	World.damage(imp, imp.hp)
 	_check(not imp.spawned and World.zone.ground.size() == before, "an imp's row drops nothing")
+
+
+func _test_lead_occupied() -> void:
+	print("
+== its lead stood on (a crate): round the wall to beside it, on the door search's way ==")
+	Monster.idling = false
+	var e := _build(["##########", "#i.#.....#", "#..#..c..#", "#..#.....#", "#........#", "##########"])
+	var monster: Monster = e["i"][0]
+	var crate: GridEntity = e["c"][0]
+	monster._follow(crate.tile, Monster.Alert.SUSPICIOUS, 400)
+	var closest := World.distance(monster.tile, crate.tile)
+	for i in 150:
+		World.step()
+		closest = mini(closest, World.distance(monster.tile, crate.tile))
+	_check(closest <= 1, "it got beside the crate on its lead (%d off at best)" % closest)
+	Monster.idling = true
