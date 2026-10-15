@@ -488,6 +488,12 @@ func _test_wall_runs() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		_check(not is_instance_valid(before), "and the old run freed, frames later")
+		# The room rebuilt before then: the old runs went with the room.
+		_rig.rebuild_walls([rubble_at])
+		_rig.rebuild(terrain, castle["centre"])
+		await get_tree().process_frame
+		await get_tree().process_frame
+		await get_tree().process_frame
 		_rig._wall_states.clear()
 	_rig.rebuild(terrain, castle["centre"])
 	runs.clear()

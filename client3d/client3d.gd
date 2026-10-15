@@ -3465,9 +3465,11 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 func _free_later(pieces: Array) -> void:
 	for frame in 2:
 		await get_tree().process_frame
-	for piece: Node3D in pieces:
+	# Untyped: a room rebuilt meanwhile has freed them, and a freed one
+	# cannot even be held in a typed variable.
+	for piece in pieces:
 		if is_instance_valid(piece):
-			piece.queue_free()
+			(piece as Node).queue_free()
 
 
 ## The line an edge stands on: east edges run along z at x + 0.5, south
