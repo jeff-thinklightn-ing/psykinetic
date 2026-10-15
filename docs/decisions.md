@@ -4633,3 +4633,33 @@ and crawl. Orthogonal shadow mode, fitted to the orthographic camera
 (SHADOW_DISTANCE 70: the camera stands 40 m off), with a little blur.
 Everything is set only when the step changes, not every frame. Indoors,
 caves and dungeons keep the dark under-stone look with no sun.
+
+## 297. A building is linked to its town's record; the town's records hold its state
+
+A building in a level may say what it is to its town: level.json's
+building entry gains "use" (one of the economy's buildings, levels/
+economy.json "buildings": forge, kitchen, inn) and "town" (the key of a
+stockpile place on that map; the town's id is "<area>/<key>", as
+Holdings and Stockpile have it). Level.buildings_from checks the link
+(Level._link) and leaves a building unlinked, standing as scenery, with a
+warning, when the use is no economy building, the town no stockpile place
+here, or the town already has a building of that use; one whose middle is
+outside its place's radius is linked, with a warning. A link moves and
+turns with its building (it is part of the entry), so a stamped prefab
+keeps it.
+
+The state (planned, building, standing, damaged) and level are economy's
+(Towns, the snapshot), never level files: a level is content, a raid is
+game state. A building with no use, or whose town has no record of its
+use yet, draws as standing, so levels without an economy look as they
+did. How a client learns a linked building's state, and how each state
+is drawn, is this decision's second stage, with economy's raids (#295):
+Towns.building_changed(town, kind) on the server, a "town" message to
+the peers, the slot's damaged state on the client.
+
+Rejected: the state in level.json (game state in content, and the level
+rewritten at every raid); a Building entity replicated per building
+(state that only economy changes, and a second record of what Towns
+already holds); and linking by the building's cell from Towns' side
+(economy's rules need no map, and a map edited in the builder would leave
+its records pointing at nothing).

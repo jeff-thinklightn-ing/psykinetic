@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_falls()
 	_test_sight_over_walls()
 	_test_buildings()
+	_test_building_links()
 	await _test_level_links()
 	await _test_edge_links()
 	_test_console()
@@ -345,6 +346,32 @@ func _test_buildings() -> void:
 	_check(level["buildings"].is_empty() and str(said.call(level["warnings"])).contains("water"), "a well on grass is left out: it stands on water")
 	var hut_at := Rect2i(13, 3, 3, 3)
 	_check(Level.rect_cells(hut_at).size() == 9 and Level.outline(hut_at).size() == 12, "a 3 x 3 footprint: nine cells, twelve outline edges")
+
+
+func _test_building_links() -> void:
+	print("
+== buildings linked to their town's records: use and town checked ==")
+	var map := LevelMap.new(Vector2i(30, 12))
+	for y in 12:
+		for x in 30:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := {"places": {"square": {"at": [8, 5], "kind": "stockpile", "radius": 8}, "field": {"at": [26, 5], "kind": "farm"}}}
+	for at in [Vector2i(1, 1), Vector2i(7, 1), Vector2i(13, 1), Vector2i(19, 1), Vector2i(24, 1)]:
+		config = _stamp(map, config, "building_hut", at)
+	var entries: Array = config["buildings"]
+	entries[0].merge({"use": "forge", "town": "square"})
+	entries[1].merge({"use": "forge", "town": "square"})
+	entries[2].merge({"use": "castle", "town": "square"})
+	entries[3].merge({"use": "inn", "town": "field"})
+	entries[4].merge({"use": "kitchen", "town": "square"})
+	var level := Level.parse(map.to_image(), null, config)
+	var links := (level["buildings"] as Array).map(func(b: Dictionary) -> String: return "%s:%s" % [b["use"], b["town"]])
+	_check(links == ["forge:square", ":", ":", ":", "kitchen:square"], "linked: the first forge and the kitchen; a second forge, a use there is not and a town that is no stockpile stand unlinked (%s)" % [links])
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("linked") or text.contains("radius"))
+	_check(said.size() == 4 and str(said).contains("already has its forge") and str(said).contains("is outside its place"),
+			"each said, and the kitchen is outside the square's radius (%s)" % [said])
+	var turned := Prefab.rotated({"map": map, "config": config}, 1)
+	_check((turned["config"]["buildings"] as Array)[0].get("use") == "forge", "a link moves with its building")
 
 
 func _test_level_links() -> void:

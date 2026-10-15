@@ -206,6 +206,15 @@ All of it is optional.
   out with a warning; one whose outline has open edges stands, with a
   warning. The building prefabs below lay the walls and the record together
   (decision 265).
+  A building may also say what it is to its town: `"use"` (one of the
+  economy's buildings in `levels/economy.json`: forge, kitchen, inn) and
+  `"town"` (the key of a stockpile place on this map), as
+  `{"slot": "building.house", "at": [12, 4], "use": "forge", "town":
+  "square"}`. The town's records (economy's Towns) then give its state:
+  damaged after a raid, standing again once repaired. One a town already
+  has, a use there is not, or a town that is no stockpile place stands
+  unlinked, with a warning; one outside its place's radius is linked, with
+  a warning. A building with no use is scenery and always stands.
 
 ## Level links
 

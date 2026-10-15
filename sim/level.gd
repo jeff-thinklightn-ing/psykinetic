@@ -582,7 +582,8 @@ static func zone_of(config: Dictionary) -> String:
 
 ## level.json's "buildings", [{slot, at: its footprint's top-left cell,
 ## facing: [dx, dy], the side its front is on}], as {slot, cell, facing
-## (Vector2i), rect (the footprint, Rect2i)}. A building stands only on
+## (Vector2i), rect (the footprint, Rect2i), use and town (its link to
+## the town's records, "" if none: _link)}. A building stands only on
 ## floor (water, for ON_WATER's) of one height, clear of the others: one
 ## that does not, or of a slot there is not, is left out and said in
 ## [param warnings]; one whose outline has open edges stands, said (a shed
@@ -600,6 +601,7 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 	for cell: Vector2i in terrain.get("water", []):
 		wet[cell] = true
 	var taken: Dictionary[Vector2i, bool] = {}
+	var linked := {}
 	for entry: Variant in listed:
 		var rect: Variant = building_rect(entry)
 		if rect == null:
@@ -622,8 +624,42 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 				open.append(key)
 		if not open.is_empty():
 			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [entry["slot"], rect.position, open.size(), open[0]])
-		out.append({"slot": str(entry["slot"]), "cell": rect.position, "facing": building_facing(entry), "rect": rect})
+		var building := {"slot": str(entry["slot"]), "cell": rect.position, "facing": building_facing(entry), "rect": rect, "use": "", "town": ""}
+		_link(building, entry, config, linked, warnings)
+		out.append(building)
 	return out
+
+
+## A building entry's link to its town's records ("use": what it is to the
+## town, one of the economy's buildings; "town": the stockpile place on this
+## map whose town it is), set on [param building] if it holds: the town's
+## records (Towns, decision 297) give its state. One that does not is said
+## in [param warnings] and the building stands unlinked, as scenery.
+static func _link(building: Dictionary, entry: Dictionary, config: Dictionary, linked: Dictionary, warnings: Array[String]) -> void:
+	var use := str(entry.get("use", ""))
+	var town := str(entry.get("town", ""))
+	if use.is_empty() and town.is_empty():
+		return
+	var at: Vector2i = building["cell"]
+	var kinds: Dictionary = Production.read_rules().get("buildings", {})
+	if not kinds.has(use):
+		warnings.append("the %s at %s is used as \"%s\": one of %s; not linked" % [building["slot"], at, use, ", ".join(kinds.keys())])
+		return
+	var ignored: Array[String] = []
+	var place: Dictionary = places_from(config, ignored).get(town, {})
+	if place.get("kind") != "stockpile":
+		warnings.append("the %s at %s is in town \"%s\": no stockpile place of that key here; not linked" % [building["slot"], at, town])
+		return
+	if linked.has(town + "/" + use):
+		warnings.append("the %s at %s: %s already has its %s at %s; not linked" % [building["slot"], at, town, use, linked[town + "/" + use]])
+		return
+	linked[town + "/" + use] = at
+	var rect: Rect2i = building["rect"]
+	var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+	if middle.distance_to(Vector2(place["cell"])) > float(place["radius"]):
+		warnings.append("the %s at %s, %s's %s, is outside its place's radius" % [building["slot"], at, town, use])
+	building["use"] = use
+	building["town"] = town
 
 
 ## A level.json building entry's facing: its "facing" if it is one of the
