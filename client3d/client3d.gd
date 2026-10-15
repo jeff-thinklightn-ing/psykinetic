@@ -745,6 +745,9 @@ var _last_tile: Dictionary[int, Vector2i] = {}
 ## Entity name -> the "death" message, for an entity still here when it
 ## came; it falls when it goes.
 var _pending_deaths: Dictionary[String, Dictionary] = {}
+## A breakable thing's name -> the slot it breaks with (SoundKit.breaking),
+## noted when it is drawn: its death says only that it was an object.
+var _break_sounds: Dictionary[String, String] = {}
 ## Entity name -> {"puppet", "at"}: puppets whose entity went, kept a moment.
 var _departed: Dictionary[String, Dictionary] = {}
 ## Door edge key -> open, as last seen, for their sounds.
@@ -4259,7 +4262,8 @@ func on_death(data: Dictionary) -> void:
 	if str(data.get("kind", "")) == "object":
 		var tile: Variant = data.get("tile")
 		var at := Vector3(tile[0], 0.4, tile[1]) if tile is Array and tile.size() == 2 else _camera_target
-		sfx.play("sfx.break_wood", at)
+		sfx.play(_break_sounds.get(entity_name, "sfx.break_wood"), at)
+		_break_sounds.erase(entity_name)
 		return
 	if _departed.has(entity_name):
 		_fall(_departed[entity_name]["puppet"], data)
@@ -4726,10 +4730,12 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		entity.pushed.connect(_on_pushed.bind(id))
 		if entity is Monster:
 			(entity as Monster).winding.connect(_on_winding.bind(id))
+			(entity as Monster).cried.connect(_on_cried.bind(id))
 		if entity.max_hp > 0:
 			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
 	elif entity.is_breakable():
 		entity.impacted.connect(_on_impacted.bind(entity.get_instance_id()))
+		_break_sounds[String(entity.name)] = SoundKit.breaking(entity)
 	if entity is Player or entity is Companion:
 		var light := OmniLight3D.new()
 		light.name = "Lantern"
@@ -4785,6 +4791,19 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 
 ## A blow wound up over [param ticks]: the heavy swing, timed to connect
 ## as it lands.
+## A monster cried out (Monster.cried: a call to its pack, a rout): its
+## kind's slot for it, pitched by its size, from where it is drawn.
+func _on_cried(cry: StringName, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	var monster := instance_from_id(id) as Monster
+	if puppet == null or monster == null:
+		return
+	var creature := str(monster.spawn_spec.get("kind", ""))
+	var slot := SoundKit.cry(creature, String(cry))
+	if slot != "":
+		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+
+
 func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null:

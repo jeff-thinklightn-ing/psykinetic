@@ -241,6 +241,27 @@ static func footstep(ground: String, mass: float) -> String:
 	return "sfx.footstep_%s_%s" % [ground if ground in STEP_GROUNDS else "stone", size]
 
 
+## The monster kinds that are goblins (and one of no kind), whose cries
+## are the goblin's slots, pitched by size: an imp high, a brute low.
+const GOBLINS := ["", "imp", "brute", "sneak"]
+const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05}
+## A cry (Monster.cried) -> the part of its slot's name after the creature.
+const CRIES := {"call": "alert", "rout": "rout"}
+
+
+## The slot for a [param creature] (a monster's kind) crying
+## [param cry] (Monster.cried's kind): "" when there is none.
+static func cry(creature: String, cry_kind: String) -> String:
+	var slot := "sfx.%s_%s" % ["goblin" if creature in GOBLINS else creature, CRIES.get(cry_kind, cry_kind)]
+	return slot if has(slot) else ""
+
+
+## The slot for [param entity], a breakable thing, broken: a crate's or
+## cart's smash, else wood breaking.
+static func breaking(entity: GridEntity) -> String:
+	return "sfx.crate_break" if str(entity.spawn_spec.get("art", "")) in ["prop.crate", "prop.cart"] else "sfx.break_wood"
+
+
 ## The slot for opening [param entity]'s slots: a chest's lid, a crate's or
 ## cart's (Cargo), else a pack's leather.
 static func opening(entity: GridEntity) -> String:

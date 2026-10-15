@@ -6,6 +6,8 @@ top section as the release notes.
 
 ## Unreleased
 
+- A goblin that spots you and calls its pack is heard calling (a brute
+  lower, an imp higher), and a smashed crate or cart sounds like one.
 - A town in the wilds, by the pond and the shack: a stone square with a
   well, the town's store (its depot and shop counter), a forge and a
   kitchen, three homes, lanes between them, and a dirt road north to the
