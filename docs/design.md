@@ -1737,8 +1737,13 @@ release (`World.try_stance`, `try_loose`; the "stance" and "loose"
 commands). The entity's `raised` ("block", "draw") and `raised_tick`
 replicate; the HUD shows "shield raised" or "bow drawn 50%"
 (`World.draw_of`: nothing before the verb's draw_min ticks, full at
-draw_full). A loose emits `World.loosed(by, at, strength)`; what a shot
-and a raised shield do in a fight is the roadmap's weapons as verbs.
+draw_full). A loose emits `World.loosed(by, at, strength)` and shoots
+(`World.shoot`, decision 335): the first body on the line from the
+shooter through the cursor's cell, up to the bow's 8 cells, takes the
+shooter's blow times the bow's damage times the draw (4 at full for a
+player); walls, closed doors and higher ground stop it. A step while
+drawn starts the draw again. What a raised shield does in a fight is
+still to come (weapons as verbs).
 With nothing for it the button shoves and tosses as it always did. E,
 tapped, opens what is under the cursor: a chest, crate or cart, your own
 companion's pack, else a door face beside you; held `BANDAGE_HOLD_MSEC`,

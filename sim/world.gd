@@ -21,11 +21,11 @@ extends Node
 
 signal ticked(tick: int)
 signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
-## [param cause] is &"attack", &"impact" or &"fire".
+## [param cause] is &"attack", &"shot", &"impact" or &"fire".
 signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity, cause: StringName)
 signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, tiles: int, impact: int, stopped_by: String)
 signal entity_despawned(entity: GridEntity)
-## Reduced to 0 hp by [param cause] (&"attack", &"impact", &"fire"), just
+## Reduced to 0 hp by [param cause] (&"attack", &"shot", &"impact", &"fire"), just
 ## before it is removed.
 signal entity_died(entity: GridEntity, cause: StringName)
 ## Beaten down and spared (spared): left at 1 hp, taken by [param by] (a
@@ -224,6 +224,9 @@ const THROW_PER_STRENGTH := 0.5
 ## one from THUD_HEAVY_KG.
 const THUD_HEAVY_KG := 5.0
 const THROW_FORCE_PER_KG := 0.3
+## A bow loosed is heard this far (World.shoot): a soft twang, the shooter's
+## own cell its source.
+const NOISE_BOW := 3
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
@@ -292,6 +295,10 @@ var _carried_heat_now := false
 ## Whether an entity holds the key to a lock (entity, lock id) -> bool: set
 ## by the items; till then nobody does (has_key).
 var key_check: Callable = func(_entity: GridEntity, _lock: String) -> bool: return false
+## Whether an entity has something to shoot (entity) -> bool: always for now,
+## a bow needing no arrows (gear is not used up). The hook for arrows kept
+## and picked up again, if they come (decision 335).
+var quiver_check: Callable = func(_entity: GridEntity) -> bool: return true
 ## Whether a blow that would kill spares its target instead (target,
 ## source, cause) -> who takes it ("" to kill as ever): set by Raids, so a
 ## raider takes a companion captive (decision 314). Unset, nobody is.
@@ -1970,7 +1977,7 @@ func try_stance(by: GridEntity, kind: String) -> bool:
 	if kind.is_empty():
 		by.raised = ""
 		return true
-	if kind != off_hand(by):
+	if kind != off_hand(by) or kind == "draw" and not quiver_check.call(by):
 		return false
 	if by.raised != kind:
 		by.raised = kind
@@ -1993,8 +2000,8 @@ func draw_of(entity: GridEntity) -> float:
 
 
 ## [param by] lets its drawn bow go at [param at] (the right button
-## released): loosed is emitted with the draw (draw_of), for combat to
-## shoot; drawn too little, nothing. The stance ends either way.
+## released): loosed is emitted with the draw (draw_of), and it shoots
+## (shoot); drawn too little, nothing. The stance ends either way.
 func try_loose(by: GridEntity, at: Vector2i) -> bool:
 	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw":
 		return false
@@ -2004,7 +2011,78 @@ func try_loose(by: GridEntity, at: Vector2i) -> bool:
 		return false
 	_log("loose: %s at %s, drawn %.2f" % [by.name, at, strength])
 	loosed.emit(by, at, strength)
+	shoot(by, at, strength)
 	return true
+
+
+## [param by]'s shot toward [param at], its bow drawn [param strength] (0
+## to 1; decision 335). Along the line from its cell through
+## [param at] and on (shot_line), as far as its bow's cells, it hits the
+## first body there; a wall, a closed door, higher ground or the map's end
+## stops it first. A body it may not attack (can_target) stops it unharmed.
+## Damage is its blow (attack_damage) times the bow's damage times the
+## draw, at least 1, cause &"shot"; no push. It faces the shot, is heard
+## NOISE_BOW about it, and the views draw the arrow's flight
+## (GridEntity.shot). The body struck, or null.
+func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
+	if not Net.is_authority() or not is_instance_valid(by) or at == by.tile or strength <= 0.0:
+		return null
+	var verb := Items.verb_of(_drawn_with(by))
+	if verb.is_empty():
+		return null
+	var hit: GridEntity = null
+	var end := by.tile
+	for cell in shot_line(by.tile, at, int(verb["cells"])):
+		end = cell
+		var body: GridEntity = _occupancy.get(cell)
+		if body != null and body != by:
+			hit = body
+			break
+	by._world_set_facing(Vector2i(signi(at.x - by.tile.x), signi(at.y - by.tile.y)))
+	by._world_shot(end)
+	noise(by.tile, NOISE_BOW, &"bow", by)
+	if hit == null or not can_target(by, hit) or not hit.is_breakable():
+		_log("shot: %s at %s, drawn %.2f, %s" % [by.name, end, strength, "nothing hit" if hit == null else "stopped by %s" % hit.name])
+		return null
+	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * strength))
+	_log("shot: %s hits %s at %s for %d, drawn %.2f" % [by.name, hit.name, hit.tile, amount, strength])
+	damage(hit, amount, by, &"shot")
+	return hit
+
+
+## The cells a shot from [param from] toward [param toward] crosses, in
+## order, at most [param cells] away: a Bresenham line through
+## [param toward] and on. It ends before a wall edge or a closed door
+## (crossed as sight is: _sight_crosses_edge), a cell higher than the
+## shooter's, or one with no ground and no water (the map's end).
+func shot_line(from: Vector2i, toward: Vector2i, cells: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var d := toward - from
+	var longest := maxi(absi(d.x), absi(d.y))
+	if longest == 0 or cells <= 0:
+		return out
+	var to := from + d * maxi(1, ceili(float(cells) / longest))
+	var top := height_at(from)
+	var span: Vector2i = (to - from).abs()
+	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
+	var err: int = span.x - span.y
+	var at: Vector2i = from
+	while at != to:
+		var e2: int = 2 * err
+		var step := Vector2i.ZERO
+		if e2 > -span.y:
+			err -= span.y
+			step.x = s.x
+		if e2 < span.x:
+			err += span.x
+			step.y = s.y
+		if _sight_crosses_edge(at, step):
+			break
+		at += step
+		if distance(from, at) > cells or height_at(at) > top or not (is_walkable(at) or is_water(at)):
+			break
+		out.append(at)
+	return out
 
 ## Whether [param entity] carries the key to [param lock] (a thing whose
 ## catalog "opens" is it), in its pack or a hand: World.key_check's own.
@@ -2344,6 +2422,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 			walked_off.emit(entity, direction)
 		return false
 	entity.next_move_tick = start + duration
+	if entity.raised == "draw":
+		entity.raised_tick = tick  # A step spoils the draw: it starts again.
 	entity._world_set_facing(direction)
 	entity.protected = false  # Moving ends spawn grace.
 	if entity is Player or entity is Companion:
@@ -2404,7 +2484,7 @@ func try_shove(attacker: GridEntity, target: GridEntity,
 	return _try_hit(attacker, target, 0, true, direction)
 
 
-## [param cause] is &"attack", &"impact" or &"fire". Only FLESH and WOOD with
+## [param cause] is &"attack", &"shot", &"impact" or &"fire". Only FLESH and WOOD with
 ## max_hp > 0 can be hurt; at 0 hp the entity is removed and its tile is empty.
 func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		cause: StringName = &"attack") -> void:

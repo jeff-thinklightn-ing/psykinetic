@@ -483,6 +483,46 @@ func _test_weapons() -> void:
 			"drawn past draw_full: loosed at the aim, full strength, for combat to shoot (%s)" % [shots])
 	_check(not World.try_stance(host, "block"), "a bow is no shield")
 	World.loosed.disconnect(shot)
+	print("\n== the bow shoots: the first body on the line, harder the longer the draw (decision 335) ==")
+	var imp: GridEntity = null
+	for monster in World.monsters():
+		imp = monster
+		break
+	var mark := _open_line(host, 4)
+	_check(imp != null and mark != World.NO_CELL, "an imp, and an open line 4 cells long")
+	if imp != null and mark != World.NO_CELL:
+		var line := World.shot_line(host.tile, mark, 8)
+		_check(line.size() >= 4 and line[3] == mark and line.all(func(cell: Vector2i) -> bool: return World.distance(host.tile, cell) <= 8),
+				"the line runs through the aim and on, never past 8 cells (%s)" % [line])
+		var near := host.tile + (mark - host.tile) / 2
+		World._relocate(imp, mark)
+		var ends := []
+		var seen := func(to: Vector2i) -> void: ends.append(to)
+		host.shot.connect(seen)
+		var hp := imp.hp
+		_check(World.shoot(host, mark + (mark - host.tile), 1.0) == imp and imp.hp == hp - 4 and ends == [mark],
+				"a full draw aimed past it: the imp, the first body, hit for 4 (a blow of 2, the bow's 2) (%d -> %d); the arrow ends there" % [hp, imp.hp])
+		hp = imp.hp
+		_check(World.shoot(host, mark, 0.5) == imp and imp.hp == hp - 2, "a half draw: 2 (%d -> %d)" % [hp, imp.hp])
+		_check(World.shoot(host, mark, 0.1) == imp and imp.hp == hp - 3, "a short draw: still at least 1")
+		World._relocate(imp, _far_cell(host))
+		hp = imp.hp
+		_check(World.shoot(host, near, 1.0) == null and imp.hp == hp, "nothing on the line: nothing hit")
+		host.shot.disconnect(seen)
+		World.try_stance(host, "draw")
+		host.raised_tick = World.tick - 30
+		var stepped := false
+		for direction: Vector2i in World.DIRECTIONS:
+			if World.is_free(host.tile + direction):
+				host.next_move_tick = 0
+				stepped = World.try_move(host, direction)
+				break
+		_check(stepped and host.raised == "draw" and host.raised_tick == World.tick and World.draw_of(host) == 0.0,
+				"a step while drawn: still drawn, but the draw starts again")
+		World.try_stance(host, "")
+		World.quiver_check = func(_entity: GridEntity) -> bool: return false
+		_check(not World.try_stance(host, "draw"), "with the quiver hook saying no, the bow will not draw")
+		World.quiver_check = func(_entity: GridEntity) -> bool: return true
 	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
 		World.items.end(World.take_item(host, host, slot), "gone")
 

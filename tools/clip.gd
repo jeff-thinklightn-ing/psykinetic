@@ -42,6 +42,9 @@ extends Node
 ##     for its chest and "armoury" for its brutes; the chest opened, stocked
 ##     from its table; the brute, carrying what its table gave, fought and
 ##     beaten, drops it where it falls.
+##   items_bow: the bow shoots (decision 335): at dusk, the lantern
+##     covered, a rabbit shot at a full draw and killed; the deer runs from
+##     the kill, comes back, and is shot (4) as it comes in range: it bolts.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -137,6 +140,8 @@ func _ready() -> void:
 			_items_controls()
 		"items_loot":
 			_items_loot()
+		"items_bow":
+			_items_bow()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -451,6 +456,32 @@ func _items_loot() -> void:
 		["walk", "beside the monster", ""],
 		["brawl", 260, ""],
 		["wait", 40, "Beaten, it drops what it carried where it fell."],
+	]
+
+
+func _items_bow() -> void:
+	var rows: Array[String] = ["##########################"]
+	for y in 9:
+		rows.append("#........................#")
+	rows.append("##########################")
+	var markers := {Vector2i(1, 5): "start", Vector2i(13, 4): "monster_rabbit", Vector2i(15, 6): "monster_deer"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.35,
+		"entities": [{"at": [13, 4], "facing": [1, 0]}, {"at": [15, 6], "facing": [1, 0]}],
+		"legend": {"monster_rabbit": "#b0a080", "monster_deer": "#c08040"}}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["lantern", false, "Dusk, the lantern covered, the game facing away."],
+		["item_give", ["bow", Player.RIGHT_HAND], "A hunting bow, in both hands. The right button draws it."],
+		["walk", Vector2i(7, 5), "Up on them, quietly, from behind."],
+		["item_raise", null, "Drawn: the longer, the stronger (full at 2 s)."],
+		["wait", 22, ""],
+		["item_lower", "rabbit", "Let go at the rabbit: a full draw, 4. It falls."],
+		["wait", 25, ""],
+		["say", 1, "The deer heard the kill and ran. Wait, still."],
+		["item_raise", null, "Draw and hold it, standing still (a step would spoil it)."],
+		["item_wait_near", ["deer", 8], ""],
+		["item_lower", "deer", "At 8 cells, the bow's reach: loosed. Hit for 4; it bolts, wounded."],
+		["wait", 50, ""],
 	]
 
 
@@ -790,11 +821,25 @@ func _on_tick(tick: int) -> void:
 		"item_raise":
 			_main._raise_off_hand(_player)
 		"item_lower":
-			if step[1] is Vector2i and _player.raised == "draw":
-				World.command(_player, "loose", {"at": [step[1].x, step[1].y]})
+			var aim: Variant = step[1]
+			if aim is String:
+				aim = null
+				for entity in World.monsters():
+					if str(entity.spawn_spec.get("kind", "")) == step[1]:
+						aim = entity.tile
+			if aim is Vector2i and _player.raised == "draw":
+				World.command(_player, "loose", {"at": [aim.x, aim.y]})
 				_main._stance = ""
 			else:
 				_main._lower_off_hand(_player)
+		"item_wait_near":
+			# Waits until a monster of kind step[1][0] is within step[1][1] cells.
+			var near := false
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1][0] and World.distance(_player.tile, entity.tile) <= int(step[1][1]):
+					near = true
+			if not near:
+				return
 		"item_clear":
 			World.items.end(World.take_item(_player, _player, int(step[1])), "gone")
 		"item_e":
@@ -1000,6 +1045,12 @@ func _log(tick: int) -> void:
 		for i in _player.slots.size():
 			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
 		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
+		return
+	if scenario == "items_bow":
+		var game := []
+		for entity in World.monsters():
+			game.append("%s at %s hp %d %s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert]])
+		print("[clip] tick %d: player %s %s %.2f; %s" % [tick, _player.tile, _player.raised, World.draw_of(_player), ", ".join(game)])
 		return
 	if scenario == "items_loot":
 		var lying := []

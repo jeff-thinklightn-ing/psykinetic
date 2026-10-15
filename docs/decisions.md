@@ -6312,3 +6312,34 @@ and Lore.known_by once B1 settles.
 Rejected: a mind per resident (a dozen calls in flight against the box's
 budget); residents talking unasked (idle chatter costs calls and drowns the
 companions); answering for a hiding resident.
+## 335. The bow's shot: the first body on the line, by the draw
+
+Weapons as verbs in the fight, part 1 of 5 (the roadmap's combat step, the
+coordinator's design approved 2026-10-15; the hunt waits on it). A loose
+(World.try_loose, decision 329) now shoots: World.shoot(by, at, strength).
+The shot is instant: along shot_line, a Bresenham line from the shooter
+through the aimed cell and on, as far as the bow's cells (8), it hits the
+first body. A wall edge or a closed door (crossed as sight is), a cell
+higher than the shooter's or one with no ground or water ends it first.
+A body the shooter may not attack (can_target) stops it unharmed. Damage
+is the shooter's blow (attack_damage) times the bow's damage (2.0 in the
+catalog) times the draw (World.draw_of, 0 to 1), at least 1, cause
+&"shot": 4 for a player at full draw, enough for a rabbit (3), a deer (14)
+in four. No push: the shot's force would be under knockback_min_force. No
+dice and no accuracy roll: what is on the line is hit; skill is the stalk,
+the aim and the draw. The struck body reacts as to any blow (World.damage:
+a deer bolts with its herd, a wolf or boar turns on the shooter).
+
+A step while drawn starts the draw again (try_move resets raised_tick):
+stop, draw, loose. Bows need no arrows, since gear is never used up;
+World.quiver_check (entity) -> bool, true for now, is the hook if Jeff
+wants arrows that are kept and picked up again (try_stance refuses to draw
+without). The shooter faces the shot and is heard NOISE_BOW (3) about it
+(kind &"bow"). The views draw the arrow's flight: GridEntity.shot(to), the
+last cell it reached, emitted on the server and sent by a new RPC
+(_net_shot); Client3D streaks a shaft there and plays the swing's sound
+pitched up until the bow has its own. The party log says "A shot B for N".
+Monsters shoot through the same calls (try_stance "draw", try_loose).
+Protocol: the new RPC changes the fingerprint; no revision bump (no
+existing RPC or value changes; &"shot" is a new cause old views treat as a
+blow).

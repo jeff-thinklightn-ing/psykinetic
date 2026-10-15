@@ -19,11 +19,14 @@ signal pushed(tiles: int)
 ## Stopped with force left over, or hit by something that was;
 ## [param against] is what it hit: &"stone", &"wood", &"body", or &"".
 signal impacted(amount: int, against: StringName)
-## Lost [param amount] hp to [param cause] (&"attack", &"impact", &"fire").
+## Lost [param amount] hp to [param cause] (&"attack", &"shot", &"impact", &"fire").
 ## On every peer (relayed to clients), for the views' sounds and bars.
 signal struck(amount: int, cause: StringName)
 ## An attack or a swing at air went [param direction]: views lunge.
 signal swung(direction: Vector2i)
+## A shot (World.shoot) flew from here to [param to], the last cell it
+## reached: views draw the arrow. On every peer.
+signal shot(to: Vector2i)
 
 # Not called "Material"/"material": CanvasItem already owns that name.
 ## FLESH is a creature (hazards hurt it). WOOD takes impact and breaks at 0 hp.
@@ -640,6 +643,12 @@ func _world_swung(direction: Vector2i) -> void:
 		_net_swung.rpc_id(peer, direction)
 
 
+func _world_shot(to: Vector2i) -> void:
+	shot.emit(to)
+	for peer in viewers():
+		_net_shot.rpc_id(peer, to)
+
+
 func _world_stunned(until_tick: int, ticks: int) -> void:
 	stunned_until_tick = until_tick
 	_reel_until = until_tick
@@ -957,6 +966,11 @@ func _net_stunned(ticks: int) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_swung(direction: Vector2i) -> void:
 	swung.emit(direction)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_shot(to: Vector2i) -> void:
+	shot.emit(to)
 
 
 ## A caption 8 world px tall. Fonts are rasterised at the viewport's

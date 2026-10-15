@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bows shoot: draw with the right button and let go, and the arrow hits the
+  first creature on the line toward the cursor, up to 8 cells. A longer draw
+  hits harder. Stepping while drawn starts the draw again. Bows need no arrows.
 - Talk to the town's residents: stand beside one (or say their name) and
   they answer, about their work, what the town is short of and what the
   shop has. They keep quiet while raiders are about.

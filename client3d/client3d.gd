@@ -630,6 +630,9 @@ const SWING_PITCH_HEAVY := 0.85
 const DEATH_SOUNDS := {"monster": "sfx.goblin_death", "player": "sfx.death_player", "companion": "sfx.death_companion"}
 ## A swing pushes the body this far out toward the blow, and back.
 const LUNGE := 0.3
+## A shot's arrow: metres a second as drawn, and its sound's pitch.
+const SHOT_SPEED := 40.0
+const SHOT_PITCH := 1.8
 const LUNGE_SECONDS := 0.16
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
@@ -5668,6 +5671,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		puppet.add_child(pivot)
 		var id := entity.get_instance_id()
 		entity.swung.connect(_on_swung.bind(id))
+		entity.shot.connect(_on_shot.bind(id))
 		entity.struck.connect(_on_struck.bind(id))
 		entity.impacted.connect(_on_impacted.bind(id))
 		entity.pushed.connect(_on_pushed.bind(id))
@@ -5731,6 +5735,36 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var tween := create_tween()
 	tween.tween_property(body, "position", out, LUNGE_SECONDS * 0.4).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "position", rest, LUNGE_SECONDS * 0.6).set_ease(Tween.EASE_IN)
+
+
+## A shot (World.shoot) flew to [param to]: an arrow streaks from the
+## shooter's chest to that cell, a soft whip of air as it goes (the swing's
+## sound, pitched up, until the bow has its own).
+func _on_shot(to: Vector2i, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null or puppet.get_parent() == null:
+		return
+	_combat_at[id] = Time.get_ticks_msec()
+	var from := puppet.position + Vector3.UP * 1.1
+	var end := _tile_position(to)
+	end.y = _ground_height(Vector2(end.x, end.z)) + 1.0
+	sfx.play("sfx.swing", from, SHOT_PITCH)
+	if from.distance_to(end) < 0.1:
+		return
+	var arrow := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.03, 0.03, 0.7)
+	arrow.mesh = mesh
+	var paint := StandardMaterial3D.new()
+	paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	paint.albedo_color = Color(0.85, 0.8, 0.65)
+	arrow.material_override = paint
+	puppet.get_parent().add_child(arrow)
+	arrow.position = from
+	arrow.look_at_from_position(from, end, Vector3.UP)
+	var tween := create_tween()
+	tween.tween_property(arrow, "position", end, maxf(0.06, from.distance_to(end) / SHOT_SPEED))
+	tween.tween_callback(arrow.queue_free)
 
 
 ## A blow wound up over [param ticks]: the heavy swing, timed to connect

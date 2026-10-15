@@ -3222,6 +3222,9 @@ func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause:
 			party_log.add("%s burned for %d." % [_display_name(entity), amount])
 		&"impact":
 			party_log.add("%s took %d from the impact." % [_display_name(entity), amount])
+		&"shot":
+			if source != null:
+				party_log.add("%s shot %s for %d." % [_display_name(source), _display_name(entity), amount])
 		_:
 			if source != null:
 				party_log.add("%s hit %s for %d." % [_display_name(source), _display_name(entity), amount])
