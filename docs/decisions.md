@@ -4553,3 +4553,83 @@ files would still be supplied to whoever can read it, and the repo is
 public), downloading from Sonniss at build time (their server refuses
 scripted downloads, and a release shouldn't depend on it), and leaving the
 copies' hashes out (a changed or half-copied file would ship unnoticed).
+## 290. The time of day is the world clock's, told to clients in a "sky" message
+
+Jeff's environment worktree: a sun that rises in the east and sets in the
+west on the world clock, a moon at night, a default day of 90 real
+minutes, configurable, pausing with the server like the rest of the world.
+
+The clock is the one there is: World.steps (10 a second, all zones
+together, saved in the snapshot and resumed after a restart, so it already
+stops while the server is down). DayNight (sim/day_night.gd, static) works
+the hour out of it: the day's fraction is phase + (steps - anchor) /
+day_steps, and the sun, the moon and the sky's light are functions of
+that alone, the same on every peer. No per-frame state anywhere, nothing
+counting on its own. A new world starts at noon. Setting the hour or the
+day's length moves phase and anchor so the clock goes on from there (a
+new day length keeps the hour); both are saved in the snapshot's "sky"
+({day_steps, phase, anchor}). --hour and --day-minutes set them at boot
+over the snapshot's; the console's `hour <h>` and `day_minutes <m>` set
+them live, save, and tell every client.
+
+Clients are not sent World.steps with the ticks (they get only their
+zone's tick), and the light field runs on every peer, so the clock goes
+to them: the "sky" message (Net.MESSAGE_KINDS) carries DayNight.to_dict()
+and the server's World.steps, sent on entering a zone, every world tick
+(30 s) to everyone, and at once when the console sets it. A client counts
+on from the last one at the tick rate (DayNight.now). Its 30-s drift is a
+few ticks at most, invisible on a day of 54 000 steps. Weather will ride in
+the same message. Wire change: a new message kind, so PROTOCOL_REVISION
+goes up.
+
+## 291. Daylight in the light field: outdoors, out from under a roof, and zone kinds
+
+The sim's light is ambient + sources (Fields.light_at). Outdoors, the
+ambient term at a cell not under a roof is now the sky's, DayNight.light:
+1 by day, DayNight.NIGHT (0.2) under the moon, smooth through twilight by
+the sun's height (-6° to 12°). It is one number a tick, set by World.step
+(a client's on each tick it is told), and looked up per cell, so nothing
+is worked out again as the hour turns: Senses, which asks
+light_at(cell, false) for every candidate each think, pays a dictionary
+lookup more (enemy-ai's condition). Roofed means inside a building's
+footprint (Level's buildings, decision 265). Those cells, and every cell of
+a level that is not outdoors, keep the level's ambient light at any hour.
+
+NIGHT 0.2 is agreed with enemy-ai: over Senses.GLIMPSE (0.15) and under
+DARK (0.35). An unlit body outdoors at night is glimpsed, never seen (the
+monster comes to look). A torch, fire or carried lantern lifts a cell over
+DARK. Twilight crosses DARK with the sun just under the horizon, a
+sneaking window.
+
+level.json's "zone" names what kind of place a level is: outdoors,
+indoors, cave or dungeon (Level.zone_of, DayNight.ZONES). The older
+"outdoor": true reads as outdoors; with neither it is indoors; an unknown
+one is warned of and read as indoors. Level's terrain keeps "outdoor"
+(zone == outdoors) for what reads it and adds "zone" and "daylight"
+(outdoors, and level.json sets no "ambient": a level that sets its light
+outright keeps it). Each kind has a base ambient light
+(DayNight.ZONE_AMBIENT; outdoors under a roof is lit as indoors), all 1
+for now, as today; the ambient-lighting step tunes them. The view's floor
+shading leaves the sky's term out (light_at's sky = false): the 3D sun
+draws daylight, so the hour moves no per-cell bytes (terrain's rule).
+
+## 292. One sun-or-moon light, moved a game minute at a time, for stable shadows
+
+Outdoors, Client3D's one DirectionalLight3D is the sun by day and the
+moon (opposite it) by night: never two shadow casters. It changes over at
+1° under the horizon, where SKY_KEYS have its light at nothing, so the
+swap does not show. The sky's top and horizon, the ambient light, the
+sun's or moon's light and a thin haze (exponential fog) are blended
+between SKY_KEYS by the sun's height: warm gold at dawn and dusk, neutral
+by day, a cool blue under the moon. The sky colours are hand-picked for
+now; art-kit's palette has no sky row.
+
+Stable shadows: the light's direction moves only in steps of a game
+minute (SKY_STEPS 1440 a day; 3.75 s apart at a 90-minute day), so
+between steps nothing about the shadow map moves but the camera, which
+Godot's directional shadows already snap to texels. It casts from at least
+SHADOW_LOW (14°) up, so dawn and dusk shadows don't reach tens of metres
+and crawl. Orthogonal shadow mode, fitted to the orthographic camera
+(SHADOW_DISTANCE 70: the camera stands 40 m off), with a little blur.
+Everything is set only when the step changes, not every frame. Indoors,
+caves and dungeons keep the dark under-stone look with no sun.

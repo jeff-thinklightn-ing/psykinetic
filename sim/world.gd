@@ -409,6 +409,8 @@ func step() -> void:
 			enter(each)
 			_step_zone()
 	steps += 1
+	# The sky's light on the new hour (DayNight; the light field reads it).
+	DayNight.update()
 	var every := WORLD_TICK_STEPS / WORLD_TICK_SLICES
 	if steps % every == 0:
 		world_tick(steps / every % WORLD_TICK_SLICES)
@@ -913,9 +915,10 @@ func heat_at(at: Vector2i) -> float:
 	return fields.heat_at(self, at)
 
 
-## Light at [param at], 0 dark to 1; [param carried]: with carried lanterns.
-func light_at(at: Vector2i, carried := true) -> float:
-	return fields.light_at(self, at, carried)
+## Light at [param at], 0 dark to 1; [param carried]: with carried
+## lanterns; [param sky]: with the sky's light outdoors (Fields.light_at).
+func light_at(at: Vector2i, carried := true, sky := true) -> float:
+	return fields.light_at(self, at, carried, sky)
 
 
 ## Whether a creature standing at [param at] burns. Asked of every cell a
@@ -2377,6 +2380,7 @@ func _net_tick(server_tick: int) -> void:
 	else:
 		_clock_drift = error * CLOCK_PULL
 	tick_alpha = _clock - tick
+	DayNight.update()
 	ticked.emit(tick)
 
 

@@ -282,6 +282,34 @@ const DAY_SUN := Color(1.0, 0.95, 0.86)
 const DAY_SUN_ENERGY := 1.1
 const DAY_AMBIENT := Color(1.0, 1.0, 1.0)
 const DAY_AMBIENT_ENERGY := 0.6
+## Outdoors the sky follows the world clock (DayNight, decision 292): these
+## keys, by the sun's height in degrees, each the sky's top and horizon,
+## the ambient light, the sun's (or under the horizon the moon's) light
+## and the haze, are blended between; midday is the DAY_* look above.
+## Warm gold at dawn and dusk, cool blue under the moon.
+const SKY_KEYS := [
+	[-14.0, {"top": Color("0b1322"), "horizon": Color("1d2b45"), "ambient": Color(0.42, 0.5, 0.8), "ambient_energy": 0.24,
+		"light": Color(0.62, 0.72, 1.0), "energy": 0.26, "fog": Color("1d2b45"), "fog_density": 0.003}],
+	[-5.0, {"top": Color("1f2a46"), "horizon": Color("6a4a5a"), "ambient": Color(0.55, 0.52, 0.72), "ambient_energy": 0.26,
+		"light": Color(0.7, 0.72, 1.0), "energy": 0.1, "fog": Color("4a3e55"), "fog_density": 0.003}],
+	[-1.0, {"top": Color("3a4a72"), "horizon": Color("c7794a"), "ambient": Color(0.85, 0.7, 0.62), "ambient_energy": 0.36,
+		"light": Color(1.0, 0.55, 0.3), "energy": 0.0, "fog": Color("b0765a"), "fog_density": 0.0025}],
+	[6.0, {"top": Color("6283b8"), "horizon": Color("e3a96f"), "ambient": Color(1.0, 0.9, 0.78), "ambient_energy": 0.48,
+		"light": Color(1.0, 0.72, 0.42), "energy": 0.8, "fog": Color("d9a77c"), "fog_density": 0.0018}],
+	[22.0, {"top": SKY_TOP, "horizon": SKY_HORIZON, "ambient": DAY_AMBIENT, "ambient_energy": DAY_AMBIENT_ENERGY,
+		"light": DAY_SUN, "energy": DAY_SUN_ENERGY, "fog": SKY_HORIZON, "fog_density": 0.0008}],
+]
+## Under this height (degrees) the light is the moon's, opposite the sun.
+const MOON_BELOW := -1.0
+## Shadows are cast from at least this high (degrees): a low sun's
+## shadows, tens of metres long, would crawl and flicker.
+const SHADOW_LOW := 14.0
+## The sky moves on in steps of a game minute (a day's 1440th): the sun's
+## direction stays put between, so shadow edges do not crawl (decision 292).
+const SKY_STEPS := 1440
+## The sun's shadows reach this far from the camera (it stands
+## CAMERA_DISTANCE from what it looks at).
+const SHADOW_DISTANCE := 70.0
 ## Below the water's bed.
 const FOREST_FLOOR_DEPTH := 0.2
 ## A piece fades when the line from the camera to the local player or
@@ -723,6 +751,10 @@ var _hp_bar_shader: Shader
 var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
 var _outdoor := false
+## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
+## none yet.
+var _sky_material: ProceduralSkyMaterial
+var _sky_step := -1
 ## Floor and water cells: the land the forest stands around.
 var _land: Dictionary[Vector2i, bool] = {}
 ## Corner levels where they are not a cell's height: stairs' ramps and the
@@ -843,6 +875,7 @@ func _process(delta: float) -> void:
 	_fade_clock += delta
 	_update_fade()
 	_update_shadows()
+	_update_sky()
 	_grow_scatter()
 	_drop_departed()
 	_update_mourning(delta)
@@ -870,29 +903,35 @@ func _build_environment() -> void:
 	sun.light_energy = SUN_ENERGY
 	sun.shadow_enabled = true
 	sun.rotation_degrees = Vector3(-55.0, 160.0, 0.0)
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	sun.directional_shadow_max_distance = SHADOW_DISTANCE
+	sun.shadow_blur = 1.5
 	add_child(sun)
 	_sun = sun
 
 
-## The dark under-stone look, or outdoors a day sky: its light, a warm sun.
+## The dark under-stone look, or outdoors the sky on the world clock
+## (_update_sky): its light, the sun or the moon.
 func _apply_sky() -> void:
 	_outdoor = bool(_terrain.get("outdoor", false))
+	_sky_step = -1
+	_environment.fog_enabled = false
 	if _outdoor:
-		var sky_material := ProceduralSkyMaterial.new()
-		sky_material.sky_top_color = SKY_TOP
-		sky_material.sky_horizon_color = SKY_HORIZON
-		sky_material.ground_horizon_color = FOREST_FLOOR.lightened(0.2)
-		sky_material.ground_bottom_color = FOREST_FLOOR
+		_sky_material = ProceduralSkyMaterial.new()
+		_sky_material.ground_horizon_color = FOREST_FLOOR.lightened(0.2)
+		_sky_material.ground_bottom_color = FOREST_FLOOR
 		var sky := Sky.new()
-		sky.sky_material = sky_material
+		sky.sky_material = _sky_material
 		_environment.sky = sky
 		_environment.background_mode = Environment.BG_SKY
 		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-		_environment.ambient_light_color = DAY_AMBIENT
-		_environment.ambient_light_energy = DAY_AMBIENT_ENERGY
-		_sun.light_color = DAY_SUN
-		_sun.light_energy = DAY_SUN_ENERGY
+		_environment.fog_enabled = true
+		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+		_environment.fog_sky_affect = 0.0
+		_update_sky()
 	else:
+		_sky_material = null
+		_sun.rotation_degrees = Vector3(-55.0, 160.0, 0.0)
 		_environment.background_mode = Environment.BG_COLOR
 		_environment.background_color = BACKGROUND
 		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
@@ -900,6 +939,61 @@ func _apply_sky() -> void:
 		_environment.ambient_light_energy = 1.0
 		_sun.light_color = SUN
 		_sun.light_energy = SUN_ENERGY
+
+
+## Outdoors: the sky, its light and the sun or moon as the world clock
+## stands (DayNight), moved on a game minute at a time (SKY_STEPS).
+func _update_sky() -> void:
+	if not _outdoor or _sky_material == null:
+		return
+	var at := DayNight.fraction(DayNight.now())
+	var step := floori(at * SKY_STEPS) % SKY_STEPS
+	if step == _sky_step:
+		return
+	_sky_step = step
+	var fraction := float(step) / SKY_STEPS
+	var elevation := DayNight.elevation_at(fraction)
+	var look := sky_look(elevation)
+	_sky_material.sky_top_color = look["top"]
+	_sky_material.sky_horizon_color = look["horizon"]
+	_environment.ambient_light_color = look["ambient"]
+	_environment.ambient_light_energy = look["ambient_energy"]
+	_environment.fog_light_color = look["fog"]
+	_environment.fog_density = look["fog_density"]
+	_sun.light_color = look["light"]
+	_sun.light_energy = look["energy"]
+	# The moon by night, opposite the sun; either casts from at least
+	# SHADOW_LOW up.
+	var toward := DayNight.sun_at(fraction)
+	if elevation < MOON_BELOW:
+		toward = -toward
+	toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
+	_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
+
+
+## SKY_KEYS blended for the sun [param elevation] degrees high.
+static func sky_look(elevation: float) -> Dictionary:
+	if elevation <= SKY_KEYS[0][0]:
+		return SKY_KEYS[0][1]
+	for i in range(1, SKY_KEYS.size()):
+		if elevation <= SKY_KEYS[i][0]:
+			var weight: float = inverse_lerp(SKY_KEYS[i - 1][0], SKY_KEYS[i][0], elevation)
+			var low: Dictionary = SKY_KEYS[i - 1][1]
+			var high: Dictionary = SKY_KEYS[i][1]
+			var look := {}
+			for key: String in low:
+				look[key] = lerp(low[key], high[key], weight)
+			return look
+	return SKY_KEYS[-1][1]
+
+
+## DayNight's direction [param toward] (x east, y up, z south) in this
+## view's space, turned to the level's north (grid x, y are 3D x, z).
+func _level_direction(toward: Vector3) -> Vector3:
+	var north: Vector2i = _terrain.get("north", Vector2i(0, -1))
+	var east := Vector3(-north.y, 0.0, north.x)
+	var south := Vector3(-north.x, 0.0, -north.y)
+	return east * toward.x + Vector3.UP * toward.y + south * toward.z
 
 
 func _build_camera() -> void:
@@ -3005,7 +3099,8 @@ func _shade_floor() -> void:
 		var index: int = _grounds.get(cell, -1)
 		if index < 0:
 			continue
-		var light := World.light_at(cell, false)
+		# The sky's light outdoors is the sun's to draw, not the floor's.
+		var light := World.light_at(cell, false, false)
 		var heat := World.heat_at(cell) if carried else World.fields.map_heat_at(World, cell)
 		var warmth := clampf((heat - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
 		var shade := Vector2(snappedf(lerpf(FLOOR_DARKEST, 1.0, light), 0.1), snappedf(warmth * WARM_MOST, 0.05))

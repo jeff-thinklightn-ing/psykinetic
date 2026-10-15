@@ -24,6 +24,18 @@ top section as the release notes.
 - Behind the scenes, the game can now use sounds from licensed sound
   libraries that may not be shared publicly: they are kept on our own
   storage and added to the game when a release is built.
+- Day and night outdoors: the sun rises in the east and sets in the west
+  on the world clock, a day every 90 minutes, with warm gold dawns and
+  dusks and blue moonlight at night. The clock stops while the server is
+  down, like the rest of the world.
+- Night is darker for monsters too: out in the open at night, without a
+  light, a goblin facing you only glimpses you and comes to look. A torch,
+  a fire or your lantern shows you as before. Inside buildings, light
+  doesn't change with the hour.
+- Server console: `hour <h>` and `day_minutes <m>` set the time of day and
+  the day's length (also `--hour`, `--day-minutes`).
+- Levels can say what kind of place they are (`"zone"`: outdoors, indoors,
+  cave or dungeon); `"outdoor": true` still works.
 
 ## v0.1.141
 

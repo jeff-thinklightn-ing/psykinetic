@@ -12,7 +12,10 @@ extends RefCounted
 ## than one beside a single flame; World burns a creature standing where it
 ## reaches World.HEAT_BURN. Light falls off linearly to nothing past its
 ## reach, adds to the level's ambient light (level.json "ambient", 0..1,
-## default 1: fully lit) and is capped at 1.
+## by default its zone kind's, DayNight.base_ambient) and is capped at 1.
+## Outdoors, out from under a building's roof, the ambient light is the
+## sky's instead (DayNight.light, on the world clock; decision 291): a
+## lookup, so nothing is worked out again as the hour turns.
 ##
 ## Fixed sources (fire, torches) are worked out once and again only when
 ## the map or a door changes (World.fields_changed); carried ones are added
@@ -36,6 +39,11 @@ const CARRIED_REACH := 4
 const HEAT_FALLOFF := 0.35
 
 var ambient := 1.0
+## Whether the open sky lights this level (Level's terrain "daylight").
+var daylight := false
+## The cells under a roof (inside a building's footprint): out of the sky's
+## light. {cell: true}.
+var _roofed: Dictionary[Vector2i, bool] = {}
 var _fire: Array[Vector2i] = []
 var _torches: Array[Vector2i] = []
 var _lanterns: Array[Vector2i] = []
@@ -73,6 +81,11 @@ func load(terrain: Dictionary) -> void:
 	_torches.assign(terrain.get("torches", []))
 	_lanterns.assign(terrain.get("lanterns", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
+	daylight = bool(terrain.get("daylight", false))
+	_roofed.clear()
+	for building: Dictionary in terrain.get("buildings", []):
+		for cell in Level.rect_cells(building["rect"]):
+			_roofed[cell] = true
 	_source_list = []
 	mark_dirty()
 
@@ -178,15 +191,26 @@ func any_carried_heat(world: Node) -> bool:
 
 
 ## Light at [param cell], 0 (dark) to 1; [param carried]: with the lights
-## creatures carry (the 3D view draws those itself).
-func light_at(world: Node, cell: Vector2i, carried := true) -> float:
+## creatures carry (the 3D view draws those itself); [param sky]: with the
+## sky's light outdoors (the 3D view draws that as its sun), else the
+## level's ambient light there.
+func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> float:
 	_refresh(world)
-	var light: float = ambient + _light.get(cell, 0.0)
+	var light: float = ambient_at(cell) if sky else ambient
+	light += _light.get(cell, 0.0)
 	if carried:
 		for entity: GridEntity in world.get_entities():
 			if entity.emit_light > 0.0 and entity.spawned:
 				light += _reaching(world, entity.tile, cell, CARRIED_REACH, entity.emit_light, false)
 	return minf(light, 1.0)
+
+
+## The light at [param cell] before any source's: the sky's (DayNight.light)
+## outdoors and not under a roof, else the level's ambient light.
+func ambient_at(cell: Vector2i) -> float:
+	if daylight and not _roofed.has(cell):
+		return DayNight.light
+	return ambient
 
 
 ## What a lantern of [param amount] carried at [param source] gives

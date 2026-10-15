@@ -1300,6 +1300,14 @@ func _boot() -> void:
 	# The world's clock goes on from where it stopped: the world waits while
 	# the server is down.
 	World.steps = snapshot.get("steps", 0)
+	# The hour and the day's length go on as saved (DayNight), unless
+	# --hour or --day-minutes say otherwise.
+	DayNight.reset()
+	DayNight.from_dict(snapshot.get("sky", {}))
+	if Net.day_minutes > 0.0:
+		DayNight.set_day_minutes(Net.day_minutes)
+	if Net.start_hour >= 0.0:
+		DayNight.set_hour(Net.start_hour)
 	# Who holds which place: as the levels start them, then as the snapshot
 	# left them, on the world's clock.
 	World.holdings = Holdings.new(WorldMap.build(), Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
@@ -1472,6 +1480,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 		# Edited in the game: the client's own copy (its pck's) is not it.
 		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
 	Net.message_to(peer, "map", {"name": zone_name, "server": Net.version})
+	Net.message_to(peer, "sky", sky_message())
 	World.update_visibility(peer, zone_name)
 
 
@@ -1763,13 +1772,42 @@ func _save_state() -> void:
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
-		"items": World.items.to_dict()})
+		"items": World.items.to_dict(),
+		"sky": DayNight.to_dict()})
 
 
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS.
 func _on_world_stepped() -> void:
 	if Net.is_authority() and World.steps % SNAPSHOT_EVERY_TICKS == 0:
 		_save_state()
+	if Net.is_authority() and World.steps % World.WORLD_TICK_STEPS == 0:
+		# The clients' clocks, kept from drifting off the world's.
+		Net.broadcast("sky", sky_message())
+
+
+## The "sky" message: the world clock (DayNight.to_dict) and the server's
+## World.steps now, which a client counts on from (decision 290).
+func sky_message() -> Dictionary:
+	var data := DayNight.to_dict()
+	data["steps"] = World.steps
+	return data
+
+
+## The console's hour and day_minutes: [param words] after the command.
+func _sky_command(words: PackedStringArray) -> String:
+	if words.size() >= 2:
+		if not words[1].is_valid_float() or (words[0].to_lower() == "day_minutes" and words[1].to_float() <= 0.0):
+			return "usage: hour <0..24> | day_minutes <minutes>"
+		if words[0].to_lower() == "hour":
+			DayNight.set_hour(fposmod(words[1].to_float(), 24.0))
+		else:
+			DayNight.set_day_minutes(words[1].to_float())
+		if Net.state_path != "":
+			_save_state()
+		Net.broadcast("sky", sky_message())
+	var now := DayNight.now()
+	return "hour %.2f, a day takes %.1f minutes, daylight %.2f" % [DayNight.hour(now),
+		DayNight.day_steps / float(World.TICK_RATE) / 60.0, DayNight.daylight(now)]
 
 
 func _exit_tree() -> void:
@@ -2413,6 +2451,10 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "terrain":
 		_on_terrain(data)
+		return
+	if kind == "sky":
+		if not Net.is_authority():
+			DayNight.from_dict(data)
 		return
 	if kind == "builder":
 		if _builder_ui != null:
@@ -3209,6 +3251,8 @@ func admin_command(line: String) -> String:
 			return "map load is now zone reset <name>; zones: %s" % ", ".join(World.zones.keys())
 		"zones":
 			return _zones_text()
+		"hour", "day_minutes":
+			return _sky_command(words)
 		"zone":
 			return _zone_command(words)
 		"builder":
@@ -3317,7 +3361,7 @@ func admin_command(line: String) -> String:
 		"help":
 			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
-				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name>"
+				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>]"
 	return "unknown command %s (try help)" % words[0]
 
 

@@ -156,6 +156,7 @@ static func load(path: String) -> Dictionary:
 	var production: Variant = data.get("production", {})
 	var towns: Variant = data.get("towns", {})
 	var economy: Variant = data.get("economy", {})
+	var sky: Variant = data.get("sky", {})
 	return {"ok": true, "zones": zones, "players": players,
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
 		"holdings": holdings if holdings is Dictionary else {},
@@ -163,7 +164,8 @@ static func load(path: String) -> Dictionary:
 		"items": items if items is Dictionary else {},
 		"production": production if production is Dictionary else {},
 		"towns": towns if towns is Dictionary else {},
-		"economy": economy if economy is Dictionary else {}}
+		"economy": economy if economy is Dictionary else {},
+		"sky": sky if sky is Dictionary else {}}
 
 
 ## One zone's {tick, entities, respawns} as read.

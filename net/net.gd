@@ -18,6 +18,9 @@ extends Node
 ##   --no-companions              server/host: players get no companion
 ##   --no-player-reset            server/host: R from a client does not rebuild the room
 ##   --map=<name>                 server/host: new players start in zone levels/<name> (default test_room)
+##   --day-minutes=<m>            server/host: a day on the world clock takes this many real minutes
+##                                (default 90, or as last saved); see DayNight
+##   --hour=<h>                   server/host: start at this hour of the day, 0..24 (clips, tests)
 ##   --edit=<name>                the level editor on levels/<name>/layout.png (made if there is none;
 ##   --edit-size=<w>x<h>          a new one this many cells, default 32x24); no game, no network
 ##   --world-map                  the world map editor: every level and its links as a node map
@@ -138,11 +141,13 @@ signal join_rejected(reason: String, server_version: String)
 ## that every message kind, RPC script and replicated property is listed
 ## here. 7: a carrier's slots are 6, the pack and two hands (decision 247).
 ## 8: crates and carts are Cargo, their slots replicated (decision 259).
-const PROTOCOL_REVISION := 8
+## 9: the "sky" message, the world clock; the sim's light outdoors follows
+## the hour on every peer (decisions 290, 291).
+const PROTOCOL_REVISION := 9
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "shop", "speech", "terrain"]
+const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "shop", "sky", "speech", "terrain"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["alert", "emit_light", "keeper_peer", "move_ticks", "pose", "slots"]
 const SETTINGS_FILE := "settings.cfg"
@@ -187,6 +192,10 @@ const DEFAULT_MIND_LOG := "/var/lib/psykinetic/mind.log"
 var mind_log_path := ""
 ## --map=<name>: the zone new players start in ("" for the default map).
 var map_name := ""
+## --day-minutes=<m>, --hour=<h>: the world clock's day length and hour,
+## set at boot over the snapshot's (DayNight); 0 and -1 keep it.
+var day_minutes := 0.0
+var start_hour := -1.0
 ## --edit=<name>: run the level editor on that map instead of the game.
 var edit_map := ""
 ## --world-map: the world map editor (editor/world_map_view) instead of the game.
@@ -1155,7 +1164,7 @@ func _parse_args() -> void:
 			"--builder-stub":
 				builder_stub = true
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--edit", "--edit-size", "--transcripts", \
+					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
@@ -1225,6 +1234,12 @@ func _set_option(key: String, value: String) -> void:
 				print("[net] --perception=%s: not one of %s; keeping %s" % [value, "|".join(PERCEPTIONS), perception])
 		"--map":
 			map_name = value
+		"--day-minutes":
+			if value.is_valid_float() and value.to_float() > 0.0:
+				day_minutes = value.to_float()
+		"--hour":
+			if value.is_valid_float():
+				start_hour = fposmod(value.to_float(), 24.0)
 		"--builders":
 			builders = PackedStringArray(Array(value.split(",", false)).map(func(id: String) -> String: return id.strip_edges()))
 		"--builder-model":

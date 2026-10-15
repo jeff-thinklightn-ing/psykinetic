@@ -357,13 +357,20 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 		stairs[cell] = up[0]
 	for key: int in unknown:
 		warnings.append("colour #%06x is not in the legend: void" % key)
+	var zone := zone_of(config)
+	if config.has("zone") and str(config["zone"]) != zone:
+		warnings.append("\"zone\" in level.json is %s: one of %s; it is %s" % [config["zone"], ", ".join(DayNight.ZONES), zone])
 	var level := {
 		"terrain": {
 			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water,
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
-			"ambient": clampf(float(config.get("ambient", 1.0)), 0.0, 1.0),
+			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
-			"outdoor": bool(config.get("outdoor", false)),
+			"zone": zone,
+			"outdoor": zone == "outdoors",
+			# Lit by the sky on the world clock, unless level.json sets its
+			# light outright (decision 291).
+			"daylight": zone == "outdoors" and not config.has("ambient"),
 		},
 		"size": cells,
 		"warnings": warnings,
@@ -561,6 +568,16 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
 	return out
+
+
+## What kind of place level.json [param config] is, one of DayNight.ZONES
+## (decision 291): its "zone"; else "outdoors" for the older
+## "outdoor": true, else "indoors".
+static func zone_of(config: Dictionary) -> String:
+	var zone := str(config.get("zone", ""))
+	if zone in DayNight.ZONES:
+		return zone
+	return "outdoors" if bool(config.get("outdoor", false)) else "indoors"
 
 
 ## level.json's "buildings", [{slot, at: its footprint's top-left cell,
