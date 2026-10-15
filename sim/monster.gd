@@ -156,6 +156,10 @@ const KEEP_NEAR := 3
 const GUARD_TILES := 2
 const GUARD_REST := 0.25
 const GUARD_RESTED := 0.5
+## Not fighting, one of a kind that "picks_up" looks for a weapon beside it
+## (World.weapon_near) this often (ticks); fighting bare-handed, every
+## step it would take.
+const PICK_UP_EVERY := 10
 
 ## What it does with nobody in sight. NONE: stands where it is (a monster of
 ## no kind, as monsters were).
@@ -316,6 +320,9 @@ var _idle_from := 0
 var _idle_path: Array[Vector2i] = []
 ## A HEAVY one closing its last CHARGE_RANGE at CHARGE_PACE (charging).
 var _charging := false
+## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
+var picks_up := false
+var _pick_look_tick := -100000
 var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
 ## not yet). World's.
@@ -367,6 +374,7 @@ func _ready() -> void:
 		var opens: Variant = spawn_spec.get("opens_doors")
 		opens_doors = bool(opens) if opens != null else bool(row.get("opens_doors", true))
 		door_force = int(row.get("door_force", 1))
+		picks_up = bool(row.get("picks_up", false))
 		leash = roundi(int(row.get("leash", LEASH)) * (BOLD_LEASH if temper == Temper.BOLD else 1.0))
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 
@@ -447,6 +455,8 @@ func _sim_tick() -> void:
 		_windup = {}
 		if not raised.is_empty():
 			World.try_stance(self, "")  # Nobody to shoot or guard against.
+		if _pick_up(false):
+			return
 		_alert_tick()
 		return
 	var took_up := alert != Alert.FIGHTING
@@ -506,6 +516,8 @@ func _sim_tick() -> void:
 		return  # Out of reach, cooling down.
 	if World.tick < next_move_tick:
 		return
+	if World.wielded(self).is_empty() and _pick_up(true):
+		return  # Bare-handed: the weapon at its feet first.
 	if boldness < HOLD_BACK_BELOW and World.distance(tile, target.tile) <= HOLD_BACK_RANGE \
 			and not _target_beset(2 if temper == Temper.COWARDLY else 1):
 		return  # Waits for the others.
@@ -576,6 +588,23 @@ func _guard_tick() -> void:
 			World.try_stance(self, "block")
 	elif raised == "block":
 		World.try_stance(self, "")
+
+
+## One of a kind that "picks_up" (decision 349), with a weapon beside it it
+## has a free hand for (World.weapon_near), takes it up
+## (World.try_pick_up_weapon), and that is its turn. Not fighting it looks
+## every PICK_UP_EVERY ticks; [param fighting] (bare-handed), every step.
+func _pick_up(fighting: bool) -> bool:
+	if not picks_up or World.tick < next_move_tick or World.is_stunned(self):
+		return false
+	if not fighting:
+		if World.tick - _pick_look_tick < PICK_UP_EVERY:
+			return false
+		_pick_look_tick = World.tick
+	if World.weapon_near(self) == World.NO_CELL or not World.try_pick_up_weapon(self):
+		return false
+	next_move_tick = World.tick + ceili(move_ticks)
+	return true
 
 
 ## Whether its arrow would fly to its target: the first body on the shot's
@@ -1129,7 +1158,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"role": str(row.get("role", "")), "herd": str(row.get("herd", kind)),
 			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
 			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
-			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {}}
+			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
+			"picks_up": bool(row.get("picks_up", false))}
 	return out
 
 

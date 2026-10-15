@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_archer()
 	_test_shield()
 	_test_boar_turns()
+	_test_pick_up()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1856,4 +1857,36 @@ func _test_boar_turns() -> void:
 	World.step()
 	_check(boar.alert == Monster.Alert.FIGHTING and boar.target == player and boar.charging(),
 			"an arrow in it, it turns on the hunter (%s)" % Monster.Alert.keys()[boar.alert])
+	Monster.idling = true
+
+
+func _test_pick_up() -> void:
+	print("\n== one of a kind that picks up takes up a dagger at its feet, idle or fighting bare-handed; others leave it ==")
+	Monster.idling = true
+	var e := _build(["##########", "#........#", "#...i....#", "#........#", "##########"])
+	var imp: Monster = e["i"][0]
+	World.put_on_ground(World.items.mint("dagger", "built", "test"), imp.tile + Vector2i(1, 0))
+	for i in Monster.PICK_UP_EVERY + 2:
+		World.step()
+	_check(World.wielded(imp).is_empty(), "an imp of a kind that does not pick up leaves it")
+	imp.picks_up = true
+	for i in Monster.PICK_UP_EVERY + 2:
+		World.step()
+	_check(World.wielded(imp) == "dagger", "one that picks up takes it up (%s)" % World.wielded(imp))
+	Monster.idling = false
+	e = _build(["############", "#..........#", "#.P....i...#", "#..........#", "############"])
+	imp = e["i"][0]
+	_bold(imp)
+	imp.picks_up = true
+	World.put_on_ground(World.items.mint("dagger", "built", "test"), imp.tile + Vector2i(-1, 1))
+	var armed_at := -1
+	var first_blow := -1
+	for i in 40:
+		World.step()
+		if armed_at < 0 and World.wielded(imp) == "dagger":
+			armed_at = World.tick
+		if first_blow < 0 and _damage_log.any(func(hit: Dictionary) -> bool: return hit["source"] == imp):
+			first_blow = World.tick
+	_check(armed_at >= 0 and (first_blow < 0 or armed_at < first_blow),
+			"fighting bare-handed, it takes up the dagger beside it before it closes (tick %d, first blow %d)" % [armed_at, first_blow])
 	Monster.idling = true

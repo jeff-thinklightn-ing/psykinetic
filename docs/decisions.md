@@ -6686,3 +6686,17 @@ longer exists. WorldRaids._stow now places each at its camp,
 group ends; a stopped group is taken to make its way home in the end. The
 camp's pile (what a camp holds, retaking it) is economy's to build on
 these. Protocol unchanged.
+
+## 349. Which monsters take up a weapon, and when
+
+A monster kind's row says whether it bothers ("picks_up": true in
+levels/monsters.json; Monster.picks_up); items' World.weapon_near and
+try_pick_up_weapon (decision 347) do the taking. The AI decides when,
+since it costs a turn (its next step waits a step's ticks): not fighting
+(idle, looking, hunting) it looks for a weapon on its cell or beside it
+every PICK_UP_EVERY (10) ticks; fighting bare-handed (World.wielded
+empty), at every step it would take, before it closes, so a weapon at
+its feet is in its hand before its first blow. Fighting armed it does not
+stop for another. weapon_near is nine ground lookups and only a kind that
+picks up asks, so a monster that never would costs nothing. No row picks
+up yet: which kinds do is content (goblins, say), Jeff's to say.
