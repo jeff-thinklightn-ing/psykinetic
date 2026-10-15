@@ -62,9 +62,10 @@ function Start-Instance($name, $modeArgs, $backstop) {
 	$null = $script:instances[$name].Handle  # Without it Windows PowerShell may lose the exit code.
 }
 # The phase's server, which quits last.
+# Its world is test_room, not the world's start zone (levels/world_map.json, decision 300).
 function Start-Server($name, $modeArgs) {
 	$script:server = $name
-	Start-Instance $name $modeArgs 300
+	Start-Instance $name ($modeArgs + @('--map=test_room')) 300
 }
 # A client of this phase.
 function Start-Client($name, $modeArgs) {

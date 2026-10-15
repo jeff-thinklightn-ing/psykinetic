@@ -207,15 +207,23 @@ static func doc_name(doc: MapDoc) -> String:
 
 
 ## The world's own settings: levels/world_map.json, {"start": {"zone":
-## <name>}} (decision 300). Tests point it at a file of their own.
-static var settings_path := "res://levels/world_map.json"
+## <name>}} (decision 300). A test scene (run from tests/) plays on its own
+## fixtures and sees none, unless it points this at a file of its own.
+static var settings_path := "" if _in_test_scene() else "res://levels/world_map.json"
+
+
+## Whether this process runs a scene under tests/ (tests/run.sh's --scene).
+static func _in_test_scene() -> bool:
+	var args := OS.get_cmdline_args()
+	var at := args.find("--scene")
+	return at >= 0 and at + 1 < args.size() and args[at + 1].trim_prefix("res://").begins_with("tests/")
 
 
 ## The zone new players start in: world_map.json's start, or "" when it
 ## names none (Main then falls back to Level.DEFAULT_MAP). A player with a
 ## record goes back to their own zone, wherever that is.
 static func start_zone() -> String:
-	if not FileAccess.file_exists(settings_path):
+	if settings_path.is_empty() or not FileAccess.file_exists(settings_path):
 		return ""
 	var read: Variant = JSON.parse_string(FileAccess.get_file_as_string(settings_path))
 	if not read is Dictionary:

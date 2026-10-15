@@ -42,10 +42,11 @@ start() {
 		</dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 	eval "pid_$name=$!"
 }
-# The phase's server, which quits last.
+# The phase's server, which quits last. Its world is test_room, not the
+# world's start zone (levels/world_map.json, decision 300).
 server() {
 	SERVER="$1"
-	start "$@" --test-exit-after=300
+	start "$@" --map=test_room --test-exit-after=300
 }
 # A client of this phase.
 client() {
