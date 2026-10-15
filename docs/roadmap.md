@@ -111,6 +111,12 @@ fields and the overrun castle, find him held in the keep, bring him home.
 - **You become what you do** — slowly. Habits shift the body (heavier/leaner/sharper mind); it's a trade, not a climb (heavy is slow, light is easy to throw). Two hands = choices (sword or the staff that feeds mind).
 - **Gear is kept; buffs are earned.** Weapons are never consumable. Food, magic items and social time (cards with a local) give temporary buffs, found in town or on the road (larders, libraries, puzzles); companions remind you when they fade. Buffs never drop you below baseline.
 - **Items have history.** Each item records carriers (with time held) and up to five notable events. Later: items take the name of a long-time holder ("Wren's dagger") and slowly absorb that holder's strength (capped, slow, drifts to a new owner). Record history from the start (the `items` worktree makes items instances), even before naming is built.
+- **The town is the starting point** (Jeff, 2026-10-14): new players start in the town
+  (Jeff is laying it out in builder mode); the start zone and cells are data in the levels,
+  not a server flag.
+- **Only heavy blows knock back** (Jeff, 2026-10-14): a blow slides its target only when its
+  force clears a threshold (`World.knockback_min_force`); lighter hits do damage without a
+  slide. Shoves, falls and door impacts are unchanged. The hammer's verb clears it.
 - **The long game is the world**, not the character: town grows with rescued people, enemies hold and retake ground, companions remember.
 - **Companion prompts say what's true and what to do, never what to say.**
 - **Licensing:** no assets with non-commercial or regional restrictions; record every third-party asset/tool/model in `THIRD_PARTY.md` with a `source` per asset.
