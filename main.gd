@@ -265,6 +265,8 @@ var hint_panel: HintPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
+## Items' icons for the pack panel (none drawn headless).
+var item_icons: ItemIcons
 ## An open shop's goods, and the player's gold over the pack (ShopPanel).
 var shop_panel: ShopPanel
 ## The local player's gold, as the server last said ("shop" messages).
@@ -2325,6 +2327,10 @@ func _build_talk() -> void:
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
 	pack_panel.sound = _sound
+	item_icons = ItemIcons.new()
+	item_icons.name = "ItemIcons"
+	add_child(item_icons)
+	pack_panel.icons = item_icons
 	$HUD.add_child(pack_panel)
 	shop_panel = ShopPanel.new()
 	shop_panel.name = "Shop"

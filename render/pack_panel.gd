@@ -2,7 +2,9 @@ class_name PackPanel
 extends PanelContainer
 ## The player's pack ("Jeff's Pack"), and above it whatever they have open:
 ## a chest, or their companion's pack ("Wren's Pack"); at the HUD's bottom
-## right, a box a slot, the item's short name in it. Drag an item onto
+## right, a box a slot, the item's icon in it (ItemIcons) over its short
+## name, or the name alone while there is no icon (headless, not drawn yet,
+## no art). Drag an item onto
 ## another slot to move it there (swapping with what is in it); the move
 ## goes to the server as a command (Main._transfer) and the boxes show what
 ## comes back, so every peer shows the same. I shows and hides it (Main);
@@ -15,6 +17,11 @@ extends PanelContainer
 
 const SLOT_SIZE := Vector2(132, 132)
 const FONT_SIZE := 26
+## The short name under an icon.
+const CAPTION_SIZE := 20
+## Room round an icon in its box, and under it for the caption.
+const ICON_INSET := 8
+const ICON_CAPTION := 26
 const BACKING := Color(0.04, 0.04, 0.06, 0.82)
 const SLOT := Color(0.16, 0.15, 0.14, 0.95)
 const SLOT_EDGE := Color(0.55, 0.5, 0.42, 0.9)
@@ -26,6 +33,8 @@ const TEXT := Color(0.93, 0.92, 0.88, 0.95)
 var transfer: Callable
 ## Called with (sound set name, entity) for an item landing.
 var sound: Callable
+## Where icons come from; null: names only.
+var icons: ItemIcons
 ## Whose pack the bottom row shows; null for none (no player).
 var player: GridEntity:
 	set(value):
@@ -58,6 +67,7 @@ class SlotBox:
 	var mine := true
 	var index := 0
 	var label: Label
+	var icon: TextureRect
 
 	func owner_entity() -> GridEntity:
 		return panel.player if mine else panel.other
@@ -66,10 +76,19 @@ class SlotBox:
 		var entity := owner_entity()
 		if not is_instance_valid(entity) or index >= entity.slots.size() or entity.slots[index].is_empty():
 			return null
-		var preview := Label.new()
-		preview.text = Items.short_of(entity.slots[index])
-		preview.add_theme_font_size_override("font_size", PackPanel.FONT_SIZE)
-		set_drag_preview(preview)
+		if icon.texture != null:
+			var picture := TextureRect.new()
+			picture.texture = icon.texture
+			picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			picture.size = PackPanel.SLOT_SIZE
+			picture.modulate.a = 0.85
+			set_drag_preview(picture)
+		else:
+			var preview := Label.new()
+			preview.text = Items.short_of(entity.slots[index])
+			preview.add_theme_font_size_override("font_size", PackPanel.FONT_SIZE)
+			set_drag_preview(preview)
 		return {"slots_of": entity, "slot": index}
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
@@ -148,6 +167,17 @@ func _row(mine: bool) -> HBoxContainer:
 			mark.add_theme_font_size_override("font_size", FONT_SIZE - 6)
 			mark.add_theme_color_override("font_color", HAND_MARK)
 			box.add_child(mark)
+		var picture := TextureRect.new()
+		picture.set_anchors_preset(Control.PRESET_FULL_RECT)
+		picture.offset_left = ICON_INSET
+		picture.offset_top = ICON_INSET
+		picture.offset_right = -ICON_INSET
+		picture.offset_bottom = -ICON_CAPTION
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.icon = picture
+		box.add_child(picture)
 		var label := Label.new()
 		label.set_anchors_preset(Control.PRESET_FULL_RECT)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -184,6 +214,13 @@ func shown_in(mine: bool, index: int) -> String:
 	return (row.get_child(index) as SlotBox).label.text
 
 
+## The icon box [param index] of the open row or the player's shows, or
+## null (names only).
+func icon_in(mine: bool, index: int) -> Texture2D:
+	var row := _player_row if mine else _other_row
+	return (row.get_child(index) as SlotBox).icon.texture
+
+
 ## The title over the open row ([param mine] false) or the player's.
 func title_shown(mine: bool) -> String:
 	return (_player_title if mine else _other_title).text
@@ -216,5 +253,19 @@ func _refresh() -> void:
 			var item := entity.slots[box.index] if has else ""
 			box.label.text = Items.short_of(item) if not item.is_empty() else ""
 			box.label.add_theme_color_override("font_color", Items.color_of(item))
+			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
+
+
+## [param picture] in [param box], its name a caption under it; null: the
+## name alone, in the middle.
+func _show_icon(box: SlotBox, picture: Texture2D) -> void:
+	if box.icon.texture == picture:
+		return
+	box.icon.texture = picture
+	box.label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER if picture == null else VERTICAL_ALIGNMENT_BOTTOM
+	box.label.add_theme_font_size_override("font_size", FONT_SIZE if picture == null else CAPTION_SIZE)
+	box.label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if picture == null else TextServer.AUTOWRAP_OFF
+	box.label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING if picture == null else TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.label.clip_text = picture != null

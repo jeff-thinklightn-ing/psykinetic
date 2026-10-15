@@ -21,6 +21,8 @@ top section as the release notes.
   fighting, opening doors to get there.
 - Changes what the server sends (a monster can now be running): the server
   must be updated with this release.
+- Your pack and chests show each thing's picture, drawn from its model,
+  with its name under it.
 - A town's buildings show their state: after a raid a damaged forge, inn or
   kitchen has a caved-in roof, and it stands whole again once the carpenter
   has repaired it. Its inside still works. Needs the server updated.

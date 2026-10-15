@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_throw()
 	_test_containers()
 	_test_bandage()
+	_test_icons()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -338,6 +339,41 @@ func _test_containers() -> void:
 			"emptied at once (the stockpile's way): its kit's uid, the crate empty")
 	World.items.end(emptied[0], "gone")
 	World.despawn(box)
+
+
+func _test_icons() -> void:
+	print("\n== icons: framed from the game's angle; headless, names only ==")
+	var view := ItemIcons.view_basis()
+	_check(view.z.y > 0.0, "the icon camera looks down on the thing (back axis %s)" % view.z)
+	for bounds: AABB in [AABB(Vector3(-0.09, 0, -0.04), Vector3(0.18, 0.12, 0.08)),
+			AABB(Vector3(2, -1, 5), Vector3(0.3, 0.9, 0.3)), AABB(Vector3.ZERO, Vector3(3, 0.2, 0.5))]:
+		var fit := ItemIcons.frame(bounds, view)
+		var camera: Transform3D = fit["transform"]
+		var half: float = fit["size"] * 0.5
+		var inside := true
+		var touches := false
+		for i in 8:
+			var at := camera.affine_inverse() * bounds.get_endpoint(i)
+			inside = inside and absf(at.x) <= half and absf(at.y) <= half and -at.z > 0.05 and -at.z < fit["far"]
+			touches = touches or absf(at.x) > half / ItemIcons.MARGIN - 0.001 or absf(at.y) > half / ItemIcons.MARGIN - 0.001
+		_check(inside and touches, "a %s box is all in frame and fills it (size %.2f)" % [bounds.size, fit["size"]])
+	var long := AABB(Vector3(-0.15, 0, -0.15), Vector3(0.3, 0.9, 0.3))
+	var laid := ItemIcons.pose(long.size)
+	var turned := ItemIcons.frame(long, view, Transform3D(laid))
+	_check(laid != Basis.IDENTITY and turned["size"] <= ItemIcons.frame(long, view)["size"] * 1.05,
+			"a long thing (a bundle of wood) lies across the diagonal, framed as tight (%.2f)" % turned["size"])
+	_check(ItemIcons.pose(Vector3(0.35, 0.45, 0.3)) == Basis.IDENTITY, "a sack stands as it is")
+	var icons: ItemIcons = _main.item_icons
+	_check(icons != null and _main.pack_panel.icons == icons, "the pack panel takes its icons from Main's ItemIcons")
+	_check(icons.icon(KIT) == null and not icons.enabled, "headless, no icon is drawn")
+	var host := _player(Net.local_id)
+	var slot := host.slots.find("")
+	_give(host, KIT, slot)
+	_main.pack_panel.player = host
+	_main.pack_panel._refresh()
+	_check(_main.pack_panel.icon_in(true, slot) == null and _main.pack_panel.shown_in(true, slot) == Items.short_of(KIT),
+			"so the pack shows the kit's name: \"%s\"" % _main.pack_panel.shown_in(true, slot))
+	World.items.end(World.take_item(host, host, slot), "gone")
 
 
 func _test_bandage() -> void:

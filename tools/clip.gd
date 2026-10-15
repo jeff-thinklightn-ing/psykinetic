@@ -26,6 +26,9 @@ extends Node
 ##     imp on guard. The player takes the kit into a hand, puts it down (G),
 ##     picks it up (F), throws it across the room (T), then throws the sack
 ##     at the imp, who staggers; the pack (I) is open throughout.
+##   items_icons: the pack's icons (ItemIcons): a chest of four things
+##     opened, two taken into the hands, two into the pack, one dragged;
+##     each box its item's icon over its name.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
 ##     (footsteps), opens a chest, opens a door into the next room and
 ##     fights the imp there to its death; each caption names the slot it
@@ -84,6 +87,8 @@ func _ready() -> void:
 			_leash()
 		"items":
 			_items()
+		"items_icons":
+			_items_icons()
 		"sounds":
 			_sounds()
 		"door_hide", "door_noise", "door_brute":
@@ -111,7 +116,7 @@ func _ready() -> void:
 	add_child(layer)
 	if _main.hint_panel != null:
 		_main.hint_panel.visible = false  # The controls list would cover the caption.
-	if scenario == "items":
+	if scenario.begins_with("items"):
 		_main.pack_panel.shown = true
 	_caption = Label.new()
 	_caption.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
@@ -264,6 +269,36 @@ func _items() -> void:
 		["walk", "beside the monster", "Up to the imp."],
 		["item_key", ["throw", "the monster"], "T: thrown at the imp: it staggers."],
 		["wait", 60, ""],
+	]
+
+
+func _items_icons() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(3, 1): "chest", Vector2i(7, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["bandaging_kit", "ore_sack", "wood_bundle", "coin_purse"]}},
+			{"at": [7, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["walk", Vector2i(3, 2), "To the chest."],
+		["item_open", true, "Opened: each thing's icon, drawn from its art."],
+		["wait", 30, ""],
+		["item_take", [2, Player.RIGHT_HAND], "The wood into the hands: two-handed."],
+		["wait", 20, ""],
+		["item_take", [0, 0], "The bandages into the pack."],
+		["wait", 15, ""],
+		["item_take", [3, 1], "The coin purse."],
+		["wait", 15, ""],
+		["item_take", [1, 2], "The ore."],
+		["wait", 30, "The chest empty, the pack full."],
+		["item_open", false, ""],
+		["wait", 30, ""],
 	]
 
 
@@ -499,6 +534,12 @@ func _log(tick: int) -> void:
 		if tick % 30 == 0:
 			print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp,
 				"%s at %s hp %d %s" % [_monster.name, _monster.tile, _monster.hp, Monster.Alert.keys()[_monster.alert]] if is_instance_valid(_monster) else "monster gone"])
+		return
+	if scenario == "items_icons":
+		var shown: Array[String] = []
+		for i in _player.slots.size():
+			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
+		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
 		return
 	if scenario == "items":
 		print("[clip] tick %d: player %s mass %.1f hands %s; ground %s (%d piles, %d drawn); %s hp %d%s" % [tick, _player.tile, _player.mass,

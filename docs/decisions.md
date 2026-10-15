@@ -4959,3 +4959,30 @@ net_test's restart phase checks both: the server it restarts holds three
 zones (sample and castle opened on the console) and must go without an
 ERROR line, and a fresh server told `stop 0` the moment its console is up
 must exit 0.
+
+## 275. Item icons are rendered from each item's art slot, on demand, on the client
+
+The pack panel showed each item's short name. Icons come from the item's
+own art-kit slot (Items' "art"), so a new item, or new art for one, has an
+icon with nothing drawn by hand. `ItemIcons` (client3d/item_icons.gd, Main's
+`item_icons`) renders one the first time the panel asks for it, in a
+SubViewport of its own world (an orthographic camera from the game's 3/4
+angle, a light, a clear background, 128 px), one a frame, and keeps it;
+`icon_ready(id)` says it is there. Rendering all of them at start-up was
+the other way: it costs every item's model at load for icons most players
+won't see that session.
+
+Framing is a pure function, `ItemIcons.frame(bounds, view, place)`: the
+model's bounds' eight corners, placed and seen along the camera, fitted
+with a margin. A long thing (taller than LONG × its width) is rolled an
+eighth of a turn about the line of sight to lie across the diagonal. The
+framing is tested headless (items_test); the rendering is shown by the
+`items_icons` clip.
+
+Headless (servers, tests) nothing is rendered: `icon` gives null, and a
+box with no icon shows the name in the middle as before; with one, the
+name is a caption under it, and a drag carries the icon. Ground piles keep
+their 3D art: icons are for the HUD only. Icons are kept by item and
+whether placeholders are on; `forget(id)` (or `forget()`) draws again,
+for when art-kit says an item's art changed (a signal of theirs, asked
+for). Client only: nothing is sent, and the protocol is unchanged.
