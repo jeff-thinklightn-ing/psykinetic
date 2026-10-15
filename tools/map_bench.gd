@@ -26,6 +26,9 @@ extends Node
 ## (wherever the host is), and --shot=PATH saves the last frame as a PNG.
 ## --weather=KIND starts every region in that weather (Weather; rain's
 ## drops and fog's layers drawn, outdoors).
+## --bench-state=PATH starts the host from that saved world (a copy: the
+## host writes it back), e.g. tools/town_state's wilds town with its
+## residents; with the game's --test-herds=N after "--", N sets of herds.
 ##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--repeat=1] [--seconds=8]
 
 const NAME := "bench"
@@ -52,6 +55,10 @@ const WALK_STEP := 0.3
 var _main: Node
 
 
+## --bench-state=PATH: the host starts from that world (Net.state_path).
+var bench_state := ""
+
+
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		var pair := arg.trim_prefix("--").split("=")
@@ -74,6 +81,7 @@ func _ready() -> void:
 			"look": look = Vector2i(pair[1].get_slice(",", 0).to_int(), pair[1].get_slice(",", 1).to_int())
 			"shot": shot = pair[1]
 			"weather": Net.start_weather = pair[1].to_lower() if Weather.KINDS.has(pair[1].to_lower()) else ""
+			"bench-state": bench_state = pair[1]
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
@@ -96,7 +104,9 @@ func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17890)
 	Net.companions = false
-	Net.state_path = ""
+	# A world to start from (--bench-state: a copy, as the host writes it
+	# back every 30 ticks): a town with its residents (tools/town_state).
+	Net.state_path = bench_state
 	Net.map_name = NAME if map == "" else map
 	started = Time.get_ticks_usec()
 	_main = preload("res://main.tscn").instantiate()
