@@ -121,6 +121,9 @@ fields and the overrun castle, find him held in the keep, bring him home.
 - **Death and return** (Jeff, 2026-10-14): raiders and monsters can kill; players and
   companions are brought back through a medicine man or a temple in town. (The free
   respawn is a placeholder until they exist.)
+- **A flowing town economy** (Jeff, 2026-10-15): a town starts with 50 gold; townspeople trade
+  items and gold among themselves for services and food, so gold circulates on the world
+  tick rather than pooling. Gold is personal; the town is taxed; rent and upkeep are sinks.
 - **The long game is the world**, not the character: town grows with rescued people, enemies hold and retake ground, companions remember.
 - **Companion prompts say what's true and what to do, never what to say.**
 - **Licensing:** no assets with non-commercial or regional restrictions; record every third-party asset/tool/model in `THIRD_PARTY.md` with a `source` per asset.
