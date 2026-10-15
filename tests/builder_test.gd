@@ -243,7 +243,8 @@ func _test_new_area() -> void:
 	_check(session.accept() and session.created == "ashen_wood" and doc.undo_steps.size() == 1, "accepted: one undo step, the new level made")
 	var made := session.created_doc
 	_check(made.map.size == Vector2i(32, 24) and made.config.get("neighbours") == {"west": "test_field"}
-			and made.config.get("name") == "Ashen Wood" and made.config.get("about") == "a burnt wood", "the new level: 32 x 24, joined back on its west, named")
+			and made.config.get("name") == "Ashen Wood" and made.config.get("about") == "a burnt wood" and made.config.get("zone") == "outdoors",
+			"the new level: 32 x 24, joined back on its west, named, outdoors like the field it leads from")
 	var arrive := WorldMap.arrival("east", exit + Vector2i(1, 0), made.map.size)
 	_check(made.map.walkable(arrive) and made.map.walkable(arrive + Vector2i(3, 0)), "walking off the edge at %s arrives on open ground at %s" % [exit, arrive])
 	_check(made.map.cell(Vector2i(31, 0)) == "void" and made.map.cell(Vector2i(16, 23)) == "void", "with forest round its other sides")

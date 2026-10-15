@@ -215,11 +215,11 @@ Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; 
 
 ## What the first request starts with: the level, the area, what is in it.
 func _situation() -> String:
-	var outdoor := bool(doc.config.get("outdoor", false))
+	var zone := Level.zone_of(doc.config)
 	var shown := area.grow(MARGIN).intersection(Rect2i(Vector2i.ZERO, doc.map.size))
 	var text := "The level: %s (\"%s\"), %d x %d cells, %s. The area: x %d to %d, y %d to %d (%d x %d cells).\n\n%s" % [
 		map_name, str(doc.config.get("name", map_name)), doc.map.size.x, doc.map.size.y,
-		"outdoors (void is forest)" if outdoor else "indoors (void is nothing, walled off)",
+		"outdoors (void is forest)" if zone == "outdoors" else "%s (void is nothing, walled off)" % {"indoors": "indoors", "cave": "a cave", "dungeon": "a dungeon"}.get(zone, zone),
 		area.position.x, area.end.x - 1, area.position.y, area.end.y - 1, area.size.x, area.size.y,
 		grid(doc.map, doc.config, shown, area)]
 	var edges := edges_touched()
@@ -752,7 +752,9 @@ func accept() -> bool:
 	created_doc = null
 	created = ""
 	if not new_area.is_empty():
-		created_doc = draft_level(new_area, map_name, bool(doc.config.get("outdoor", true)))
+		# A level beyond an edge is out of doors unless the one it leads from says otherwise.
+		var zone := Level.zone_of(doc.config) if doc.config.has("zone") or doc.config.has("outdoor") else "outdoors"
+		created_doc = draft_level(new_area, map_name, zone)
 		created = str(new_area["name"])
 	var changed := doc.apply_changes(changes)
 	_fresh_working()
@@ -760,13 +762,14 @@ func accept() -> bool:
 
 
 ## The new level [param plan] (new_area's) as a MapDoc to save in the
-## overlay, joined back to [param beside] on its opposite side.
-static func draft_level(plan: Dictionary, beside: String, outdoor: bool) -> MapDoc:
+## overlay, joined back to [param beside] on its opposite side, its
+## [param zone] (DayNight.ZONES: how it is lit) that of the level it leads from.
+static func draft_level(plan: Dictionary, beside: String, zone: String) -> MapDoc:
 	var joined: String = Level.OPPOSITE[plan["side"]]
 	var made := MapDoc.new()
 	made.folder = Level.overlay_dir + str(plan["name"]) + "/"
 	made.map = AreaDraft.draft(plan["size"], int(plan["seed"]), joined, int(plan["gate"]))
-	made.config = {"name": plan["title"], "outdoor": outdoor}
+	made.config = {"name": plan["title"], "zone": zone}
 	if not str(plan.get("description", "")).is_empty():
 		made.config["about"] = plan["description"]
 	WorldMap.put_neighbours(made, {joined: beside})
