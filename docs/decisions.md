@@ -4296,3 +4296,17 @@ trade, she does not stay. Her voice is told, as a fact in her now,
 "While Jeff is away you stay in this town and work as its carpenter."
 Not told to stay, or off the town's ground, she goes with her player as
 before.
+
+## 289. Lore is read by one class, Lore, and asked one thing: what a knower knows
+
+`Lore` (`sim/lore.gd`) reads levels/lore/ once and keeps it (read on first use,
+like Items), with `reload()` for live-reloaded data and `use()` for tests. Code
+asks it one thing: `known_by(knower, least)`, the facts that knower knows under
+decision 258's rule, each as {id, text, hearsay, memory}. A rumour comes as
+hearsay and a lived fact as memory. Whether a rumour is true never leaves Lore,
+so a prompt can't give it away. By default only agreed facts count (both the
+fact and its entry, and the knower too). "draft" lets a tool preview drafts as
+well, and an asked fact never counts. tools/lore_known.gd prints it for a knower.
+How a companion's prompt uses the facts stays the companions tree's business.
+Rejected: each reader filtering the JSON itself (the status gate and the truth
+flag would be repeated, and one day missed).

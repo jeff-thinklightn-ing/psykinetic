@@ -101,3 +101,10 @@ her name, the smith). What a knower knows:
 A prompt gets the facts a character knows as plain true statements (rumours marked
 as hearsay), never as lines to say. How companions put them into a prompt is the
 companions tree's business.
+
+`Lore` (`sim/lore.gd`) reads the files and applies this: `Lore.known_by("wren")`
+gives `[{id, text, hearsay, memory}]` for the agreed facts she knows. A rumour's
+`true` is never handed out. `Lore.known_by(id, "draft")` previews drafts too, and
+asked facts never count. To see what a knower would know:
+
+    godot --headless --path . --script tools/lore_known.gd -- townsfolk --draft

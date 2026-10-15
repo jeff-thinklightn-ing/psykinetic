@@ -10,6 +10,11 @@ top section as the release notes.
   stay on the town's stockpile ground before you travel on, or log off
   while she stands there, and she works her trade (Pip as a carpenter,
   Wren as a cook, Nix as a smith) until you come back for her.
+- Behind the scenes, the world now has a written record of its facts
+  (the town, the Blood Rot and their mine, the fallen star, the tower),
+  each saying who would know it: common talk, rumour, secret, or
+  something only one person lived through. Nothing here is confirmed
+  yet, so companions don't use it until it is.
 - Companions see when a door is locked, and don't offer to open one
   they have no key for.
 - Companions with no player near enough to hear them stay quiet instead

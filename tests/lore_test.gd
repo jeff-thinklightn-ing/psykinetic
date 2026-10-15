@@ -25,6 +25,8 @@ func _ready() -> void:
 	_test_entries()
 	_test_facts()
 	_test_shared_ids()
+	_test_known_by_files()
+	_test_known_by()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -123,6 +125,72 @@ func _test_shared_ids() -> void:
 				if entry.has("item") and not Items.exists(entry["item"]):
 					bad.append(id)
 	_check(bad.is_empty(), "factions, resources, place kinds, levels and items named exist %s" % [bad])
+
+
+func _test_known_by_files() -> void:
+	print("\n== Lore.known_by on the files: only agreed counts, never an asked one, truth kept back ==")
+	Lore.reload()
+	_check(Lore.entries().size() == _entries.size() and Lore.knowers().size() == _knowers.size(),
+			"Lore reads every entry and knower (%d, %d)" % [Lore.entries().size(), Lore.knowers().size()])
+	var agreed := 0
+	for id in _entries:
+		agreed += 1 if _entries[id]["status"] == "agreed" else 0
+	if agreed == 0:
+		_check(Lore.known_by("townsfolk").is_empty(), "with nothing agreed, townsfolk know nothing yet")
+	var drafts := Lore.known_by("townsfolk", "draft")
+	_check(not drafts.is_empty(), "previewing drafts, townsfolk know %d facts" % drafts.size())
+	var asked := []
+	for fact in drafts:
+		if fact.has("true") or fact.has("known"):
+			asked.append(fact["id"])
+		for id in _entries:
+			for each in _entries[id]["facts"]:
+				if each["id"] == fact["id"] and (each.get("status", _entries[id]["status"]) == "asked" or _entries[id]["status"] == "asked"):
+					asked.append(fact["id"])
+	_check(asked.is_empty(), "no asked fact is known, and no fact says whether it is true %s" % [asked])
+
+
+func _test_known_by() -> void:
+	print("\n== Lore.known_by: where, tags, hearsay, secrets, memory, the status gate ==")
+	var entries := [
+		{"id": "near", "type": "region", "status": "agreed", "facts": []},
+		{"id": "far", "type": "region", "status": "agreed", "facts": []},
+		{"id": "a", "status": "agreed", "facts": [
+			{"id": "a.here", "text": "here", "known": "common", "where": ["near"]},
+			{"id": "a.there", "text": "there", "known": "common", "where": ["far"]},
+			{"id": "a.all", "text": "all", "known": "common", "where": []},
+			{"id": "a.old", "text": "old", "known": "common", "where": ["far"], "tags": ["history"]},
+			{"id": "a.said", "text": "said", "known": "rumour", "where": ["near"], "true": false},
+			{"id": "a.hid", "text": "hid", "known": "secret", "where": [], "knowers": ["sage"]},
+			{"id": "a.mine", "text": "mine", "known": "lived", "where": [], "knowers": ["wren"]},
+			{"id": "a.draft", "text": "draft", "known": "common", "where": [], "status": "draft"},
+			{"id": "a.asked", "text": "asked", "known": "common", "where": [], "status": "asked", "ask": "X"},
+		]},
+		{"id": "b", "status": "draft", "facts": [
+			{"id": "b.over", "text": "over", "known": "common", "where": [], "status": "agreed"},
+		]},
+	]
+	var knowers := [
+		{"id": "folk", "status": "agreed", "where": ["near"], "tags": []},
+		{"id": "sage", "status": "agreed", "where": [], "tags": ["history"]},
+		{"id": "wren", "status": "agreed", "where": ["near"], "tags": []},
+		{"id": "maybe", "status": "draft", "where": ["near"], "tags": []},
+	]
+	Lore.use(entries, knowers)
+	var ids := func(knower: String, least := "agreed") -> Array:
+		return Lore.known_by(knower, least).map(func(fact: Dictionary) -> String: return fact["id"])
+	_check(ids.call("folk") == ["a.here", "a.all", "a.said"], "folk know their own region's facts and rumours and what everyone knows, not another region's %s" % [ids.call("folk")])
+	_check(ids.call("sage") == ["a.all", "a.old", "a.hid"], "a sage knows what shares its tag wherever it is, and the secret it is named in %s" % [ids.call("sage")])
+	_check("a.mine" in ids.call("wren") and not "a.mine" in ids.call("folk"), "a lived fact is known to the one who lived it only")
+	var said: Dictionary = Lore.known_by("folk").filter(func(fact: Dictionary) -> bool: return fact["id"] == "a.said")[0]
+	var mine: Dictionary = Lore.known_by("wren").filter(func(fact: Dictionary) -> bool: return fact["id"] == "a.mine")[0]
+	_check(said["hearsay"] and not said.has("true") and mine["memory"] and not said["memory"], "a rumour comes as hearsay, its truth kept back; a lived fact as memory")
+	_check(not "a.draft" in ids.call("folk") and "a.draft" in ids.call("folk", "draft"), "a draft fact counts only when drafts are previewed")
+	_check(not "a.asked" in ids.call("folk", "draft"), "an asked fact never counts")
+	_check(not "b.over" in ids.call("folk"), "an agreed fact in a draft entry does not count")
+	_check(ids.call("maybe").is_empty() and not ids.call("maybe", "draft").is_empty(), "a draft knower knows nothing until previewed")
+	_check(ids.call("nobody").is_empty(), "an unknown knower knows nothing")
+	Lore.reload()
 
 
 func _is_id(id: Variant) -> bool:
