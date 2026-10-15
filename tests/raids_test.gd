@@ -201,6 +201,7 @@ func _test_rescue() -> void:
 		and _work.worker("bram")["origin"] == "rescued:bram" and _work.workshop_of("bram") == "%s:forge" % TOWN,
 		"home as himself: a resident again, back at his forge")
 	_check(_towns.xp_earned(TOWN) == xp + 10, "and the rescue's experience")
+	_check(_towns.taken_before("bram") == 1 and _towns.taken_before("dag") == 0, "Bram taken once before, Dag never (taken_before)")
 
 
 func _test_restart() -> void:
@@ -216,6 +217,7 @@ func _test_restart() -> void:
 	var towns := Towns.new(saved[3], work, RULES, clock)
 	_check(held.size() == 1 and towns.captives(TOWN) == held, "the same captive after a restart (%s)" % [held])
 	_check(towns.note_rescue(TOWN, held[0]["id"], held[0]["name"], held[0]["trade"]), "and can still be rescued")
+	_check(towns.taken_before(held[0]["id"]) == _towns.taken_before(held[0]["id"]) and towns.taken_before(held[0]["id"]) >= 1, "and how often each was taken")
 
 
 func _test_threat() -> void:
@@ -279,6 +281,7 @@ func _test_companions() -> void:
 	_check(not _towns.resident_taken(TOWN, "dag", "g9") and not _towns.resident_taken(TOWN, "nobody", "g9"),
 		"no such resident (or one taken already): false")
 	_check(_towns.note_rescue(TOWN, "dag", "Dag", "carpenter") and "dag" in _towns.residents(TOWN), "and home again when rescued")
+	_check(_towns.taken_before("dag") == 1 and _towns.taken_before("companion:Wren") == 1, "each taken once (%d, %d)" % [_towns.taken_before("dag"), _towns.taken_before("companion:Wren")])
 
 
 func _check(ok: bool, label: String) -> void:

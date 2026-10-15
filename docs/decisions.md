@@ -6143,6 +6143,10 @@ longer a resident, the work waits, a captive held by that group (its
 faction, else rules' raiders). It returns false for a companion, whose own
 body goes through Main.companion_taken, and for no such resident. Main
 calls it on World.entity_taken for a Resident body (companions' side).
+Towns also counts each time a worker is carried off: the town record's
+"taken" maps worker id to a count, and it is saved. Towns.taken_before(worker
+id) totals that count across towns, for residents' voices (a companion
+by her worker id, "companion:<name>").
 ## 334. find_path cheaper per tile
 
 Coordinator's next step after decision 288 (stay in GDScript): try the

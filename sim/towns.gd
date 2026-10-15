@@ -125,6 +125,15 @@ func buildings_of(town: String) -> Dictionary:
 	return out
 
 
+## How many times worker [param worker_id] has been carried off by
+## raiders, from any town (rescued or not): for residents' voices.
+func taken_before(worker_id: String) -> int:
+	var count := 0
+	for town: String in _towns:
+		count += int(_towns[town].get("taken", {}).get(worker_id, 0))
+	return count
+
+
 ## How many residents [param town] has room for: rules' residents base,
 ## and per_inn more for each level of a standing inn.
 func room(town: String) -> int:
@@ -633,6 +642,7 @@ func _take(town: String, who: String, faction: String, by: String) -> void:
 	production.set_away(who, true)
 	record["captives"].append({"id": who, "name": worker["name"], "trade": worker["trades"][0],
 		"origin": worker["origin"], "purse": worker["purse"], "taken_at": now(), "by": faction, "held_by": by})
+	record["taken"][who] = int(record["taken"].get(who, 0)) + 1
 
 
 ## Companion resident [param who] taken by her player's id, Main told;
@@ -647,6 +657,7 @@ func _take_companion(town: String, who: String, faction: String, by: String) -> 
 	production.set_away(who, true)
 	record["captives"].append({"id": origin, "name": worker["name"], "trade": worker["trades"][0],
 		"origin": origin, "purse": 0, "taken_at": now(), "by": faction, "held_by": by})
+	record["taken"][who] = int(record["taken"].get(who, 0)) + 1
 	if companion_taken.is_valid():
 		companion_taken.call(origin.trim_prefix("companion:"), by)
 	return true
@@ -666,13 +677,14 @@ func _note(town: String, what: String) -> void:
 
 func _town(town: String) -> Dictionary:
 	if not _towns.has(town):
-		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "log": []}
+		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "taken": {}, "log": []}
 	return _towns[town]
 
 
 # --- Saving --------------------------------------------------------------------------
 
-## For the snapshot: town -> {xp, spent, residents, buildings, objectives, log}.
+## For the snapshot: town -> {xp, spent, residents, buildings, objectives,
+## captives, taken (worker id -> times carried off), log}.
 func to_dict() -> Dictionary:
 	return _towns.duplicate(true)
 
@@ -700,6 +712,10 @@ func from_dict(saved: Dictionary) -> void:
 						"state": str(house["state"]), "since": int(house.get("since", 0)), "job": int(house.get("job", 0))}
 		for done: Variant in entry.get("objectives", []):
 			record["objectives"].append(str(done))
+		var taken: Variant = entry.get("taken", {})
+		if taken is Dictionary:
+			for who: Variant in taken:
+				record["taken"][str(who)] = maxi(int(taken[who]), 0)
 		for each: Variant in entry.get("captives", []):
 			# A companion captive is her player's (no worker by that id).
 			if each is Dictionary and (not production.worker(str(each.get("id", ""))).is_empty() or str(each.get("id", "")).begins_with("companion:")):
