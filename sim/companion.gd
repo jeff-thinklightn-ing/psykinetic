@@ -1467,7 +1467,7 @@ func perceived() -> Array[Dictionary]:
 		var sides := Terrain.edge_cells(door.key)
 		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
 		if World.distance(tile, near) <= PERCEPTION_RANGE and (_sees(sides[0]) or _sees(sides[1])):
-			found.append(_thing("open door" if door.is_open() else "closed door", near,
+			found.append(_thing("open door" if door.is_open() else "locked door" if door.state() == "locked" else "closed door", near,
 				Vector2(sides[0] + sides[1]) / 2.0))
 	found.sort_custom(_nearer_found)
 	var asked := asked_about()
@@ -2531,6 +2531,8 @@ func can_do() -> Array[Dictionary]:
 		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
 		if World.distance(tile, near) <= PERCEPTION_RANGE and (_sees(sides[0]) or _sees(sides[1])):
 			var verb := "close" if door.is_open() else "open"
+			if verb == "open" and not World.may_open(self, door):
+				continue  # Locked, and she has no key.
 			actions.append({"verb": verb, "door": door, "at": near, "words": "%s the %s door, %s" % [
 				verb, "open" if door.is_open() else "closed", _paces_toward(Vector2(sides[0] + sides[1]) / 2.0)]})
 	# Things go to her own player only (World.reaches), whom she must see.
@@ -2769,7 +2771,7 @@ func _errand_do() -> void:
 				_end_errand("the door is broken", true)
 			elif door.is_open() == opening:
 				_report_errand("The door %s is %s already." % [where, "open" if opening else "shut"])
-			elif opening and World.has_method(&"can_open") and not World.call(&"can_open", self, door):
+			elif opening and not World.may_open(self, door):
 				_end_errand("the door is locked", true)
 			elif World.tick >= next_move_tick:
 				if World.try_toggle_door(self, door.key):

@@ -6,6 +6,8 @@ top section as the release notes.
 
 ## Unreleased
 
+- Companions see when a door is locked, and don't offer to open one
+  they have no key for.
 - Companions with no player near enough to hear them stay quiet instead
   of calling the voice model (a few percent of its calls).
 - Companions can hand you what they carry, and fetch something from a

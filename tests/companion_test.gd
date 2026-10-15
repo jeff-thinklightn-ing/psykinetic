@@ -634,6 +634,15 @@ func _test_errands() -> void:
 	_check(pet.errand.get("verb", "") == "close", "a promise that names one thing she can do is done (%s)" % pet.errand.get("words", ""))
 	_step_until(func() -> bool: return not door.is_open(), 40)
 	_check(not door.is_open(), "the door is shut")
+	door.lock = "test_key"
+	_check(_offer(pet.can_do(), "open") == -1 and "- a locked door" in pet.perception_list(),
+		"locked, with no key: she sees it is locked, and opening it is not hers to offer (%s)" % [_words(pet.can_do())])
+	mind.clear()
+	pet._start_errand({"verb": "open", "door": door, "at": pet.tile, "words": "open the locked door"}, pet._serial)
+	World.step()
+	_check(pet.errand.is_empty() and door.state() == "locked" and "You did not open the locked door: the door is locked." in mind.triggers("voice"),
+		"sent anyway, she says it is locked (%s)" % [mind.triggers("voice")])
+	door.lock = ""
 
 	_put(owner, Vector2i(11, 6))
 	_put(pet, Vector2i(10, 6))

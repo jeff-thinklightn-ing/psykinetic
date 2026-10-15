@@ -3663,9 +3663,10 @@ anything else ("I'll keep watch") is roleplay and stays.
 The errand (Companion.errand) is one at a time, a new intent ERRAND
 over her stance: going (her own A* steps), doing, and for a look
 returning to within 2 of her player. A door is opened from a cell on
-either side with World.try_toggle_door; once enemy-ai's World.can_open
-is on main a locked door is "the door is locked" (looked up by
-has_method until then). A chest is read, never emptied: taking and
+either side with World.try_toggle_door; a door World.may_open says she
+cannot open (locked, and she has no key: enemy-ai's door step, 255-256)
+is told to her as "a locked door" and is not offered, and sent to it
+anyway she says "the door is locked". A chest is read, never emptied: taking and
 handing over are step 4, through World.try_transfer. A look ends when
 she sees the cell, telling what she sees within 2 of it. Done, the
 outcome is narrated and her voice asked to tell it; that ask is cleaned
