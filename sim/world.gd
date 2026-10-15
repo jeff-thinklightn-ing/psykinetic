@@ -28,6 +28,12 @@ signal entity_despawned(entity: GridEntity)
 ## Reduced to 0 hp by [param cause] (&"attack", &"impact", &"fire"), just
 ## before it is removed.
 signal entity_died(entity: GridEntity, cause: StringName)
+## Beaten down and spared (spared): left at 1 hp, taken by [param by] (a
+## raid group's id), not killed. Whoever keeps it (Main, a companion's
+## record) takes it off the map.
+signal entity_taken(entity: GridEntity, by: String)
+## [param each] fell asleep: nobody is in it now (World.step).
+signal zone_slept(each: Zone)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
 ## A door came, or its open or hp changed, on this peer (the server's
@@ -283,6 +289,14 @@ var _carried_heat_now := false
 ## Whether an entity holds the key to a lock (entity, lock id) -> bool: set
 ## by the items; till then nobody does (has_key).
 var key_check: Callable = func(_entity: GridEntity, _lock: String) -> bool: return false
+## Whether a blow that would kill spares its target instead (target,
+## source, cause) -> who takes it ("" to kill as ever): set by Raids, so a
+## raider takes a companion captive (decision 314). Unset, nobody is.
+var spared: Callable
+## Puts an entity of a spec ({kind, name, tile, props, idle...}) into the
+## zone World is in, as a level's are (Main's _spawn); null if it cannot.
+## Unset (a test that builds its own), nothing is spawned.
+var spawn_spec: Callable
 ## carried_lights' memo: for which (tick, entity count), and the list.
 var _carried_lights_key := Vector2i(-1, -1)
 var _carried_lights: Array[GridEntity] = []
@@ -358,6 +372,9 @@ var towns: Towns = null
 ## Server: prices, players' gold and trade with the town (Economy); made by
 ## Main at boot, from the snapshot. Null on a client.
 var economy: Economy = null
+## Server: raid groups in played zones as real monsters (Raids, decision
+## 313); maps hands them over (enter) and takes them back.
+var raids := Raids.new()
 ## Server: every thing in the world, with its history (ItemBook). Main
 ## replaces it at boot with the snapshot's.
 var items := ItemBook.new(steps_now)
@@ -435,12 +452,16 @@ func step() -> void:
 			each.asleep_since = -1
 		elif not awake and each.awake:
 			each.asleep_since = Time.get_ticks_msec()
+			each.awake = false
+			zone_slept.emit(each)
 		each.awake = awake
 		if awake:
 			enter(each)
 			# This zone's weather on the clock (Weather; Fields keeps it).
 			fields.update_weather(steps)
 			_step_zone()
+	enter(was)
+	raids.step()
 	steps += 1
 	# The sky's light on the new hour (DayNight; the light field reads it).
 	DayNight.update()
@@ -831,6 +852,7 @@ func update_visibility(peer: int, zone_name: String) -> void:
 func reset() -> void:
 	if not Net.is_authority():
 		return
+	raids.hand_back(zone.name)  # Its raiders go with the room: back to maps.
 	for entity in _entities:
 		if is_instance_valid(entity) and entity.owner_peer == 0 and entity.keeper_peer == 0:
 			# A level's chest goes with the room; a snapshot may bring it back.
@@ -2311,6 +2333,12 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		noise(target.tile, Senses.NOISE_FIGHT, &"fight", source)
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
+	if target.hp == 0 and spared.is_valid():
+		var by := str(spared.call(target, source, cause))
+		if by != "":
+			target.hp = 1
+			entity_taken.emit(target, by)
+			return
 	if target.hp == 0:
 		if not target.is_creature():
 			noise(target.tile, Senses.NOISE_BREAK, &"break", source)  # A crate or a barrel smashed.

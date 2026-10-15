@@ -5560,3 +5560,45 @@ Pack (CC0; its own License.txt still to be read before use), the boar is
 an art-gen mesh on the Quaternius Pig's rig and clips (pc-character), and
 the rabbit an art-gen mesh on a small rig of pc-character's. A pack's flat
 materials move onto palette swatches when its art drops in, as any piece's.
+## 313. Raids are real monsters in a played zone, handed back to maps when it sleeps
+
+maps moves raid groups on the world tick (WorldRaids). When a group's
+route crosses into an area whose zone is awake, maps calls
+World.raids.enter(group, area, arrival[, goal]) and leaves the group alone
+(its state "present") till Raids hands it back by one of three signals:
+raid_left(id, strength, area, cell, carries) when the zone sleeps or is
+reset with raiders alive, or they reach their goal when it is not the town
+(an exit on their way), or are home again after the raid; raid_done(id,
+report) when the first raider stands on the town's stockpile ground (Towns
+.raid_arrives with the strength left; what it took the group now carries,
+and the raiders turn back the way they came), followed by one of the other
+two; raid_beaten(id, area, cell) when every raider is dead or running at
+once (a rout), what it carried left on the ground there. One owner at a
+time: maps never moves a present group, Raids never keeps one asleep.
+
+The group's strength is spread over raiders of its faction's kinds
+(Factions "monsters" with a "strength" in levels/monsters.json: imp 1,
+brute 3, sneak 1), drawn by the group's id, each holding a share, so its
+strength is what its living raiders hold and no fraction is lost. They
+march (Idle.MARCH: a route of waypoints, one every 6 steps of a single
+capped search when they enter, else straight at the goal) and fight
+whoever they notice like any monster, going back to the march after; far
+from everyone, the world tick walks them on (World.walk). World.spawn_spec
+puts them in as a level's monsters are (Main's _spawn); zone_slept says a
+zone fell asleep. No cost when there are no groups (Raids.step returns at
+once). tools/clip.gd scenario raid.
+
+## 314. Raiders kill players; companions and residents they beat down are taken
+
+Raiders kill players, like any monster; residents and companions they beat
+down in a raid are taken captive, never killed (the town rule: raids take
+food and people). Companions can still die in ordinary fights, and are
+brought back later by a medicine man or temple (economy, companions).
+World.damage asks World.spared(target, source, cause) before a blow kills:
+unset it kills as ever; Raids sets it, and answers the group's id when the
+source is one of its raiders and the target a Companion (a resident is
+one). Then the target stays at 1 hp, entity_died is not emitted (no death
+lines, no "alive": false) and World.entity_taken(target, by) is: Main takes
+her off the map and keeps her record "taken" (companions' side), and the
+group carries "companion:<keeper id>" among its captives, the origin Towns
+names her by. entity_damaged is emitted first as ever, so the blow is seen.

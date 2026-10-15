@@ -1392,6 +1392,8 @@ func _boot() -> void:
 	World.towns.seed_from(world_map)
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
+	# Raiders come into a played zone as its level's monsters do.
+	World.spawn_spec = _spawn
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record

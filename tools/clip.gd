@@ -74,7 +74,8 @@ var _monster: Monster
 ## only while the monster is within n, till the monster gives up), "wait"
 ## (ticks), "work_door" (a door's edge: the player works it, as a click does),
 ## "speak" (words the player says, as typed), "brawl" (ticks: the player
-## fights the nearest monster that is not running).
+## fights the nearest monster that is not running), "raid" ([group, arrival,
+## town cell]: a raid group comes into the room, Raids.enter).
 var _script: Array = []
 var _at := 0
 var _wait_until := -1
@@ -131,6 +132,8 @@ func _ready() -> void:
 			_door(scenario)
 		"pack":
 			_pack()
+		"raid":
+			_raid()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -144,7 +147,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario == "sound_hearing" or scenario == "sound_reel":
@@ -509,6 +512,28 @@ func _pack() -> void:
 	]
 
 
+func _raid() -> void:
+	var rows: Array[String] = [
+		"################################",
+		"#..............................#",
+		"#..............................#",
+		"#..............................#",
+		"#..............................#",
+		"#..............................#",
+		"################################",
+	]
+	var config := {"name": "Clip", "ambient": 1.0, "entities": []}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), {Vector2i(22, 3): "start"}, config), null, config)
+	_script = [
+		["say", 20, "A raiding party comes in from the west, for the town's store in the east."],
+		["raid", [{"id": "clip_raid", "faction": "goblins", "strength": 6.0, "town": "clip_town"}, Vector2i(2, 3), Vector2i(29, 3)],
+			"Real goblins, as many as the party is strong."],
+		["say", 120, "They march on the town."],
+		["brawl", 400, "Stand in their way: they fight like any goblin; all down or running, the raid is beaten."],
+		["say", 60, ""],
+	]
+
+
 func _door(which: String) -> void:
 	var rows: Array[String] = [
 		"###########################",
@@ -694,6 +719,16 @@ func _on_tick(tick: int) -> void:
 			World.command(_player, "door", {"edge": step[1]})
 		"speak":
 			World.command(_player, "say", {"text": str(step[1])})
+		"raid":
+			var town: Vector2i = step[1][2]
+			World.raids.town_cell = func(_town: String, _area: String) -> Vector2i: return town
+			World.raids.on_town = func(_town: String, cell: Vector2i) -> bool: return World.distance(cell, town) <= 1
+			World.raids.arrive = func(at: String, group: Dictionary) -> Dictionary:
+				print("[clip] tick %d: the raid reaches %s with %.1f" % [World.tick, at, group["strength"]])
+				return {"repelled": false, "took": {"items": []}, "captives": []}
+			World.raids.raid_beaten.connect(func(id: String, _area: String, cell: Vector2i) -> void:
+				print("[clip] tick %d: %s beaten at %s" % [World.tick, id, cell]))
+			World.raids.enter(step[1][0], World.zone.name, step[1][1])
 		"brawl":
 			if _fight_until < 0:
 				_fight_until = tick + int(step[1])
@@ -761,7 +796,7 @@ func _nearest_standing() -> Monster:
 
 
 func _log(tick: int) -> void:
-	if scenario == "pack":
+	if scenario == "pack" or scenario == "raid":
 		var each: Array[String] = []
 		for entity in World.monsters():
 			var monster := entity as Monster

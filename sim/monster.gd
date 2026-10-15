@@ -150,9 +150,11 @@ const CHASE_RETRY_TICKS := 5
 
 ## What it does with nobody in sight. NONE: stands where it is (a monster of
 ## no kind, as monsters were).
-enum Idle { NONE, GUARD, WANDER, PATROL, GATHER }
+## MARCH (a raider, Raids): along its route once, to the last waypoint, and
+## stands there.
+enum Idle { NONE, GUARD, WANDER, PATROL, GATHER, MARCH }
 const IDLE_MODES := {"none": Idle.NONE, "guard": Idle.GUARD, "wander": Idle.WANDER, "patrol": Idle.PATROL,
-	"gather": Idle.GATHER}
+	"gather": Idle.GATHER, "march": Idle.MARCH}
 ## Idling it walks this much slower than it chases (its step time times this).
 const IDLE_PACE := 1.6
 ## GUARD: a glance aside every so often (ticks), up to GLANCE_STEPS_MAX
@@ -172,6 +174,10 @@ const PATROL_LOOP_RADIUS := 3
 ## sit there, by name, the rest stand.
 const GATHER_RADIUS := 2
 const SIT_CHANCE := 0.5
+## MARCH: a waypoint this near counts as reached (raiders crowd each other),
+## and a step it cannot take now is tried again after this long (ticks).
+const MARCH_NEAR := 2
+const MARCH_RETRY_TICKS := 15
 ## How far (tiles looked at) it searches for its way home or about.
 const IDLE_SEARCH_TILES := 400
 ## Choosing a tile to stroll to or a patrol waypoint within so many tiles of
@@ -250,6 +256,10 @@ var _listening_until := -1
 ## leash); whom it has given up on, till when (instance id -> tick); a
 ## glimpse this tick.
 var _wary := false
+## The raid group it marches with (Raids; "" for none), and its share of
+## the group's strength.
+var raid := ""
+var raid_strength := 0.0
 var _alert_until := 0
 var _lead := NO_TILE
 var _looks := 0
@@ -950,7 +960,8 @@ static func read_kinds(path: String) -> Dictionary:
 				props[key] = int(value) if value is float and value == floorf(value) and key not in FLOAT_PROPS else value
 		out[kind] = {"body": props, "tactic": TACTIC_NAMES.get(tactic_name, Tactic.PLAIN),
 			"idle": IDLE_MODES.get(idle_name, Idle.NONE), "opens_doors": bool(row.get("opens_doors", true)),
-			"door_force": int(row.get("door_force", 1)), "leash": int(row.get("leash", LEASH)), "temperament": weights}
+			"door_force": int(row.get("door_force", 1)), "leash": int(row.get("leash", LEASH)), "temperament": weights,
+			"strength": maxf(0.0, float(row.get("strength", 0.0)))}
 	return out
 
 
@@ -1142,6 +1153,8 @@ func _idle_tick() -> void:
 			_patrol()
 		Idle.GATHER:
 			_gather()
+		Idle.MARCH:
+			_march()
 
 
 ## Where it goes back to after a fight: home, or (PATROL) the nearest
@@ -1160,7 +1173,34 @@ func _back_to() -> Vector2i:
 			return route[nearest]
 		Idle.GATHER:
 			return _gather_place()
+		Idle.MARCH:
+			return route[mini(_route_index, route.size() - 1)] if not route.is_empty() else home
 	return home
+
+
+## MARCH: on to its route's next waypoint (near enough is there), to the
+## last; there it stands. A step it cannot take now (a crowd, no way found)
+## is tried again in a moment.
+func _march() -> void:
+	if route.is_empty() or World.tick < _idle_until:
+		return
+	var last := route.size() - 1
+	_route_index = mini(_route_index, last)
+	var to := route[_route_index]
+	var near := 0 if _route_index == last else MARCH_NEAR
+	if World.distance(tile, to) <= near:
+		_route_index = mini(_route_index + 1, last)
+		return
+	if not _idle_step(to):
+		if _route_index < last and World.distance(tile, to) <= MARCH_NEAR * 2:
+			_route_index += 1  # Crowded round it: on to the next.
+		_idle_until = World.tick + MARCH_RETRY_TICKS
+
+
+## Whether it has marched to its route's end (or as near as its fellows let
+## it, [param near] tiles).
+func marched(near := 0) -> bool:
+	return idle == Idle.MARCH and not route.is_empty() and World.distance(tile, route.back()) <= near
 
 
 ## GUARD: at home, facing its way, and every so often a glance aside, held
@@ -1394,6 +1434,14 @@ func _world_tick(seconds: float) -> void:
 	_windup = {}
 	_glancing = false
 	_calm()
+	if idle == Idle.MARCH and not route.is_empty():
+		# Marching far from everyone: on by a real way toward its route's end,
+		# as far as it would have gone.
+		move_ticks = _pace * IDLE_PACE
+		_returning = false
+		if World.walk(self, route.back(), seconds * World.TICK_RATE):
+			_route_index = route.size() - 1
+		return
 	if not _returning:
 		return
 	move_ticks = _pace * IDLE_PACE

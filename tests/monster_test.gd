@@ -63,6 +63,9 @@ func _ready() -> void:
 	_test_temperament()
 	_test_flee()
 	_test_call_and_rout()
+	_test_raid_march()
+	_test_raid_beaten()
+	_test_raid_takes()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1303,6 +1306,128 @@ func _test_call_and_rout() -> void:
 func _move_to(entity: GridEntity, to: Vector2i) -> void:
 	World.despawn(entity)
 	World.spawn(entity, to)
+
+
+## A raid group's raiders: spawned into the room as a level's are, and a
+## town at [param town] (its ground the cells within 1).
+func _raid_room(rows: Array[String], town: Vector2i) -> Raids:
+	var room := _build(rows)
+	World.raids.clear()
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var entity := EntityFactory.build(spec)
+		_room.add_child(entity)
+		if not World.spawn(entity, spec["tile"]):
+			entity.free()
+			return null
+		return entity
+	var raids := World.raids
+	raids.town_cell = func(_town: String, _area: String) -> Vector2i: return town
+	raids.on_town = func(_town: String, cell: Vector2i) -> bool: return World.distance(cell, town) <= 1
+	return raids
+
+
+func _test_raid_march() -> void:
+	print("\n== a raid group comes in as raiders of its faction, marches on the town, raids it and goes home ==")
+	Monster.idling = true
+	var raids := _raid_room(["##############################", "#............................#",
+		"#............................#", "#............................#", "##############################"], Vector2i(26, 2))
+	var arrived: Array[Dictionary] = []
+	raids.arrive = func(town: String, group: Dictionary) -> Dictionary:
+		arrived.append({"town": town, "group": group})
+		return {"repelled": false, "took": {"food": 3, "items": []}, "captives": [{"id": "smith"}]}
+	var done: Array[String] = []
+	var left: Array[Dictionary] = []
+	raids.raid_done.connect(func(id: String, _report: Dictionary) -> void: done.append(id))
+	raids.raid_left.connect(func(id: String, strength: float, area: String, cell: Vector2i, carries: Dictionary) -> void:
+		left.append({"id": id, "strength": strength, "area": area, "cell": cell, "carries": carries}))
+	var count := raids.enter({"id": "g1", "faction": "goblins", "strength": 5.0, "town": "t"}, World.zone.name, Vector2i(2, 2))
+	var kinds := {}
+	for each in raids.raiders("g1"):
+		kinds[each.spawn_spec["kind"]] = true
+	_check(count >= 2 and kinds.keys().all(func(k: String) -> bool: return k in ["imp", "brute", "sneak"]),
+			"its strength in goblins (%d: %s)" % [count, kinds.keys()])
+	_check(is_equal_approx(raids.strength("g1"), 5.0), "their shares are its strength (%.2f)" % raids.strength("g1"))
+	for i in 1500:
+		World.step()
+		if not done.is_empty():
+			break
+	_check(done == ["g1"] and arrived.size() == 1 and is_equal_approx(float(arrived[0]["group"]["strength"]), 5.0),
+			"they reach the town, which is raided with the strength left (%s)" % [arrived])
+	for i in 1500:
+		World.step()
+		if not left.is_empty():
+			break
+	_check(left.size() == 1 and World.distance(left[0]["cell"], Vector2i(2, 2)) <= Raids.ARRIVE_TILES + 1,
+			"and go back the way they came, handed back to maps there (%s)" % [left])
+	_check(not left.is_empty() and left[0]["carries"]["captives"] == ["smith"] and is_equal_approx(left[0]["strength"], 5.0),
+			"with what they took and their strength")
+	_check(raids.ids().is_empty() and World.monsters().is_empty(),
+			"and off the map")
+
+
+func _test_raid_beaten() -> void:
+	print("\n== a raid group beaten drops what it carries; a zone gone to sleep hands it back ==")
+	Monster.idling = true
+	var raids := _raid_room(["##############################", "#............................#",
+		"#............................#", "#............................#", "##############################"], Vector2i(26, 2))
+	var beaten: Array[Dictionary] = []
+	raids.raid_beaten.connect(func(id: String, area: String, cell: Vector2i) -> void:
+		beaten.append({"id": id, "area": area, "cell": cell}))
+	var sack := World.items.mint("sack", "raid test")
+	raids.enter({"id": "g2", "faction": "goblins", "strength": 2.0, "town": "t", "carries": {"items": [sack], "captives": []}},
+		World.zone.name, Vector2i(2, 2))
+	_check(raids.raiders("g2").size() == 2, "two imps' worth, two raiders (%d)" % raids.raiders("g2").size())
+	for i in 20:
+		World.step()
+	var first := raids.raiders("g2")[0]
+	World.damage(first, 999)
+	World.step()
+	_check(beaten.is_empty() and is_equal_approx(raids.strength("g2"), 1.0), "one falls: half its strength (%.1f)" % raids.strength("g2"))
+	var last := raids.raiders("g2")[0]
+	var at := last.tile
+	World.damage(last, 999)
+	World.step()
+	_check(beaten.size() == 1 and beaten[0]["cell"] == at, "the last falls: beaten where it fell (%s)" % [beaten])
+	var dropped := false
+	for cell: Vector2i in World.zone.ground:
+		dropped = dropped or sack in World.zone.ground[cell]
+	_check(dropped, "and what it carried lies there")
+	var left: Array[String] = []
+	raids.raid_left.connect(func(id: String, _s: float, _a: String, _c: Vector2i, _k: Dictionary) -> void: left.append(id))
+	raids.enter({"id": "g3", "faction": "goblins", "strength": 2.0, "town": "t"}, World.zone.name, Vector2i(2, 2))
+	raids.hand_back(World.zone.name)
+	_check(left == ["g3"] and raids.ids().is_empty(), "its zone asleep, a group goes back to maps")
+
+
+func _test_raid_takes() -> void:
+	print("\n== a raider kills a player, but a companion it beats down is taken ==")
+	Monster.idling = false
+	var raids := _raid_room(["##########", "#........#", "#........#", "##########"], Vector2i(8, 1))
+	raids.enter({"id": "g4", "faction": "goblins", "strength": 1.0, "town": "t"}, World.zone.name, Vector2i(2, 1))
+	var raider := raids.raiders("g4")[0]
+	var companion := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow",
+		"props": {"max_hp": 10}}) as Companion
+	companion.keeper_id = "p1"
+	_room.add_child(companion)
+	World.spawn(companion, Vector2i(5, 2))
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Pat", "props": {"max_hp": 10}})) as GridEntity
+	_room.add_child(player)
+	World.spawn(player, Vector2i(7, 2))
+	var taken: Array = []
+	var died: Array = []
+	World.entity_taken.connect(func(e: GridEntity, by: String) -> void: taken.append([e, by]))
+	var on_died := func(e: GridEntity, _cause: StringName) -> void: died.append(e)
+	World.entity_died.connect(on_died)
+	World.damage(companion, 999, raider)
+	_check(taken.size() == 1 and taken[0][0] == companion and taken[0][1] == "g4" and companion.hp == 1
+			and not died.has(companion), "a companion beaten down by a raider is taken, at 1 hp, not killed")
+	_check(raids.carries("g4")["captives"] == ["companion:p1"], "and the group carries her off (%s)" % [raids.carries("g4")])
+	World.damage(player, 999, raider)
+	_check(died.has(player), "a player it beats down dies")
+	World.entity_died.disconnect(on_died)
+	World.spawn_spec = Callable()
+	raids.clear()
+	Monster.idling = true
 
 
 func _check(ok: bool, label: String) -> void:

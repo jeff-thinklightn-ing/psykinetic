@@ -6,6 +6,7 @@
 		"opens_doors": true,
 		"door_force": 1,
 		"leash": 20,
+		"strength": 1,
 		"temperament": {"bold": 1, "cautious": 2, "cowardly": 1}
 	},
 	"brute": {
@@ -15,6 +16,7 @@
 		"opens_doors": false,
 		"door_force": 3,
 		"leash": 20,
+		"strength": 3,
 		"temperament": {"bold": 3, "cautious": 1, "cowardly": 0}
 	},
 	"sneak": {
@@ -24,6 +26,7 @@
 		"opens_doors": true,
 		"door_force": 1,
 		"leash": 20,
+		"strength": 1,
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 2}
 	}
 }
