@@ -2074,10 +2074,6 @@ func _add_buildings() -> void:
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false})
-		for part in ["roof_damaged", "state_damaged"]:
-			var shown := node.find_child(part, true, false) as Node3D
-			if shown != null:
-				shown.visible = false
 		_show_state(_buildings[index])
 		if slot in Level.ON_WATER:
 			continue  # Nobody stands in a well: it has no inside.

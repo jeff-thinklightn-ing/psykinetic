@@ -556,7 +556,9 @@ func _test_building_states() -> void:
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.DAMAGED, "level": 1}}})
 	_check(_main.town_states.has("fixture/square") and house["damaged"], "told the forge is damaged: it is drawn so")
 	var caved: bool = house["roof"] != roof or not roof.transform.is_equal_approx(house["roof_at"])
-	_check(caved and (house["roof"] as Node3D).visible, "its roof caved in (or its roof_damaged shown), at a glance")
+	var heaps := (house["node"] as Node3D).find_child("state_damaged", true, false) as Node3D
+	_check(caved and house["roof"] != roof and (house["roof"] as Node3D).name == "roof_damaged" and (house["roof"] as Node3D).visible
+			and not roof.visible and heaps != null and heaps.visible, "its roof_damaged in its roof's place, its rubble shown (art-kit's slot)")
 	# Inside, the damaged roof goes as the whole one did.
 	_rig.set_process(false)
 	var puppet: Node3D = _rig._puppets[_player().get_instance_id()]
@@ -569,8 +571,8 @@ func _test_building_states() -> void:
 	_rig._update_fade()
 	_rig.set_process(true)
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.STANDING, "level": 1}}})
-	_check(not house["damaged"] and house["roof"] == roof and roof.visible and roof.transform.is_equal_approx(house["roof_at"]),
-			"repaired: standing again, its roof whole")
+	_check(not house["damaged"] and house["roof"] == roof and roof.visible and roof.transform.is_equal_approx(house["roof_at"]) and not heaps.visible,
+			"repaired: standing again, its roof whole, its rubble gone")
 	_rig.rebuild(terrain, Vector2i(7, 7))
 	_check(_rig._buildings.any(func(b: Dictionary) -> bool: return b["use"] == "forge" and not b["damaged"]), "kept across a rebuild (as the town has it)")
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.DAMAGED, "level": 1}}})
