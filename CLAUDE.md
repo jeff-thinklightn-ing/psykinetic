@@ -6,9 +6,24 @@ which worktree owns each step, and the design rules not to break without asking 
 ## Folders
 
 - `C:\dev\psykinetic` (`main`): home base. Pulls, plays the latest, small chores, keeps
-  `docs/roadmap.md` and this file current. Feature work happens in a worktree.
+  `docs/roadmap.md` and this file current. Two sessions work here, coordinator and release
+  (below). Feature work happens in a worktree.
 - `C:\dev\psykinetic-trees\<name>` (branch `<name>`): one worktree per job in the roadmap
   (`perf`, `pc-character`, ...). One Claude Code session per folder.
+
+## Who to ask (two sessions in the main folder; ListAgents shows their names)
+
+- **coordinator**: the roadmap and `docs/roadmap.md`, priorities, what each tree does
+  next, cross-tree design (send it your design before you build a step; it approves and
+  routes between trees), questions for Jeff and his "waiting on you" list, the weekly
+  summary, and this file.
+- **release**: landing and shipping. The landing lock (it may freeze `main`, settle who
+  lands next, and clear a stale lock), decision numbers, `PROTOCOL_REVISION` numbers and
+  release versions, cutting the batched releases, deploying the server, the box's health
+  and rollbacks, `CHANGELOG.md`, and `THIRD_PARTY.md`. Ask it for a number before you
+  commit; tell it when you land (commit, protocol change, new `class_name`).
+- A design question goes to the coordinator first; once approved, get its decision number
+  from release.
 
 ## Landing work
 
@@ -26,19 +41,19 @@ which worktree owns each step, and the design rules not to break without asking 
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
-  coordinator cuts releases: it freezes `main` briefly, runs the suite on `main`, renames
+  release session cuts releases: it freezes `main` briefly, runs the suite on `main`, renames
   `## Unreleased` to the next `## vX.Y.Z`, runs the release script, deploys the server,
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
-  running, ask the coordinator (the session in the main folder) for the number before
+  running, ask the release session for the number before
   committing, so two trees don't take the same one.
 - After a pull or rebase that brings in a new `class_name`, run
   `godot --headless --path . --import` before testing: each worktree has its own `.godot`
   class cache, and without it scripts naming the new class fail to compile. Name any new
   `class_name` when you report a landing.
-- The coordinator deploys the server to the box after releases; worktree sessions don't.
+- The release session deploys the server to the box after releases; worktree sessions don't.
 - Worktrees share one Godot `user://` folder (`%APPDATA%/Godot/app_userdata/Psykinetic`),
   which holds the edited-level overlay every test reads. Tests, benches and tools never
   write levels there: register them in memory (`Level.register`), point `Level.overlay_dir`

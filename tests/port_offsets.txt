@@ -17,3 +17,4 @@ economy 2000
 lore 2200
 buildings 2400
 sound 2600
+environment 2800
