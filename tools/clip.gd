@@ -41,6 +41,10 @@ extends Node
 ##     from it: loud beside it, fainter, gone past its 6 cells. Then, the
 ##     door shut, blows land on an imp beyond it: heard muffled close to
 ##     the wall (half a fight's 5 cells), not at all further off.
+##   sound_reel: a listening reel of the slots given (--slots=a,b,...; else
+##     every slot with third-party takes, SoundKit.takes): each played
+##     beside the player once per take, its name and source as the caption,
+##     for Jeff to keep or veto by ear.
 ##   door_hide: an imp chases the player down a corridor; they go through
 ##     the door at its end, shut it and keep quiet: it comes, finds
 ##     nothing beyond, and goes back.
@@ -80,6 +84,8 @@ var _unheard_logged := 0
 ## The tick a sound_slam or sound_blows step ends (its own: _wait_until
 ## would hold the script still meanwhile).
 var _repeat_until := -1
+## Ticks between two plays of the sound reel.
+const REEL_TICKS := 12
 ## How often sound_slam swings the door and sound_blows strikes.
 const SLAM_TICKS := 20
 ## The tick a "sound_fight" step gives up by.
@@ -110,6 +116,8 @@ func _ready() -> void:
 			_sounds()
 		"sound_hearing":
 			_sound_hearing()
+		"sound_reel":
+			_sound_reel()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
 		"pack":
@@ -127,10 +135,10 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
-	if scenario == "sound_hearing":
+	if scenario == "sound_hearing" or scenario == "sound_reel":
 		# The imp only stands there to be struck: it neither dies nor moves.
 		_monster.max_hp = 1000000
 		_monster.hp = _monster.max_hp
@@ -507,6 +515,26 @@ func _sound_hearing() -> void:
 	]
 
 
+## A plain room and the player; the script plays the reel's slots.
+func _sound_reel() -> void:
+	var cells: Array[String] = ["#######", "#.....#", "#.....#", "#.....#", "#######"]
+	var markers := {Vector2i(3, 2): "start", Vector2i(5, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [{"at": [5, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(cells), markers, config), null, config)
+	var slots: Array = []
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--slots="):
+			slots = Array(arg.trim_prefix("--slots=").split(",", false))
+	if slots.is_empty():
+		slots = SoundKit.all_takes().keys()
+		slots.sort()
+	_script = [["say", 20, "Sound reel: %d slots, each take once." % slots.size()]]
+	for slot: String in slots:
+		var takes := SoundKit.takes(slot)
+		var from: String = str(takes[0].get("original", "")) if not takes.is_empty() else "no takes"
+		_script.append(["sound_reel_play", slot, "%s (%d)\n%s" % [slot, takes.size(), str(from).get_file().left(70)]])
+
+
 func _on_tick(tick: int) -> void:
 	if _end_tick >= 0:
 		if tick >= _end_tick:
@@ -562,6 +590,20 @@ func _on_tick(tick: int) -> void:
 		"sound_shut":
 			var shut: Door = World.get_doors()[0]
 			World._set_door(shut, false, _monster)
+		"sound_reel_play":
+			# Each take of the slot once, REEL_TICKS apart.
+			var count := maxi(SoundKit.takes(step[1]).size(), 1)
+			if _repeat_until < 0:
+				_repeat_until = tick + REEL_TICKS * (count + 1)
+			if tick < _repeat_until:
+				var played := count + 1 - ceili(float(_repeat_until - tick) / REEL_TICKS)
+				if (_repeat_until - tick) % REEL_TICKS == 0 and played < count:
+					var view: Client3D = _main._client3d
+					view.sfx.hear_everything = true
+					view.sfx.next_take[str(step[1])] = played
+					view.play_at(str(step[1]), _player)
+				return
+			_repeat_until = -1
 		"sound_blows":
 			# A blow on the imp every SLAM_TICKS ticks for step[1] ticks, from no one.
 			if _repeat_until < 0:
@@ -662,7 +704,7 @@ func _log(tick: int) -> void:
 				Monster.Alert.keys()[monster.alert]])
 		print("[clip] tick %d: player %s; %s" % [tick, _player.tile, "; ".join(each)])
 		return
-	if scenario == "sounds" or scenario == "sound_hearing":
+	if scenario in ["sounds", "sound_hearing", "sound_reel"]:
 		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
 		if sfx != null:
 			for entry: Array in sfx.played.slice(_sounds_logged):

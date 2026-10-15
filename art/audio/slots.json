@@ -292,8 +292,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a small body's footstep on grass; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a small body's footstep on grass (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_grass_medium"
 		},
 		"sfx.footstep_grass_medium": {
 			"category": "movement",
@@ -301,7 +301,7 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a medium body's footstep on grass; not played yet",
+			"uses": "a medium body's footstep on grass (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
 		"sfx.footstep_grass_large": {
@@ -310,8 +310,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a large body's footstep on grass; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a large body's footstep on grass (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_grass_medium"
 		},
 		"sfx.footstep_dirt_small": {
 			"category": "movement",
@@ -319,8 +319,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a small body's footstep on dirt; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a small body's footstep on dirt (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_dirt_medium"
 		},
 		"sfx.footstep_dirt_medium": {
 			"category": "movement",
@@ -328,7 +328,7 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a medium body's footstep on dirt; not played yet",
+			"uses": "a medium body's footstep on dirt (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
 		"sfx.footstep_dirt_large": {
@@ -337,8 +337,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a large body's footstep on dirt; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a large body's footstep on dirt (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_dirt_medium"
 		},
 		"sfx.footstep_stone_small": {
 			"category": "movement",
@@ -346,8 +346,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a small body's footstep on stone; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a small body's footstep on stone (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_stone_medium"
 		},
 		"sfx.footstep_stone_medium": {
 			"category": "movement",
@@ -355,7 +355,7 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a medium body's footstep on stone; not played yet",
+			"uses": "a medium body's footstep on stone (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
 		"sfx.footstep_stone_large": {
@@ -364,8 +364,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a large body's footstep on stone; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a large body's footstep on stone (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_stone_medium"
 		},
 		"sfx.footstep_sand_small": {
 			"category": "movement",
@@ -373,8 +373,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a small body's footstep on sand; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a small body's footstep on sand (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_sand_medium"
 		},
 		"sfx.footstep_sand_medium": {
 			"category": "movement",
@@ -382,7 +382,7 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a medium body's footstep on sand; not played yet",
+			"uses": "a medium body's footstep on sand (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
 		"sfx.footstep_sand_large": {
@@ -391,8 +391,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a large body's footstep on sand; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a large body's footstep on sand (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_sand_medium"
 		},
 		"sfx.footstep_water_small": {
 			"category": "movement",
@@ -400,8 +400,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a small body's footstep on water; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a small body's footstep on water (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_water_medium"
 		},
 		"sfx.footstep_water_medium": {
 			"category": "movement",
@@ -409,7 +409,7 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a medium body's footstep on water; not played yet",
+			"uses": "a medium body's footstep on water (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
 		"sfx.footstep_water_large": {
@@ -418,8 +418,8 @@
 			"bus": "sfx",
 			"noise": "step",
 			"volume_db": -16.0,
-			"uses": "a large body's footstep on water; not played yet",
-			"fallback": "sfx.footstep"
+			"uses": "a large body's footstep on water (Client3D._step_sound, SoundKit.footstep)",
+			"fallback": "sfx.footstep_water_medium"
 		},
 		"sfx.bodyfall": {
 			"category": "movement",
@@ -679,10 +679,17 @@
 			"category": "creatures",
 			"type": "oneshot",
 			"bus": "voice",
-			"noise": null,
-			"range": 12,
+			"noise": "call",
 			"volume_db": -2.0,
-			"uses": "a goblin's bark on spotting you (later the sim's call for help); not played yet"
+			"uses": "a goblin calling its pack on spotting you (the sim's call); not played yet"
+		},
+		"sfx.goblin_rout": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "rout",
+			"volume_db": -2.0,
+			"uses": "a goblin breaking and running: a yelp and a scramble (the sim's rout); not played yet"
 		},
 		"sfx.goblin_pain": {
 			"category": "creatures",

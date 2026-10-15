@@ -16,6 +16,10 @@ top section as the release notes.
 - Companions can bandage: ask yours to bandage you, or they see to their own
   wounds, with a bandaging kit and no danger near. Companions no longer heal
   on their own; like you, they mend when bandaged.
+- First real recorded sounds in place of stand-ins: swings, doors opening
+  and shutting, footsteps on grass and on dirt, and a goblin's death.
+  More are ready for when the game makes them (bandaging, a sword cut, a
+  blow on wood, a crate smashed, a goblin calling its pack).
 - Builder mode: accepting a change no longer sends players across the map. Someone
   standing where a pond went in steps out to the nearest shore, and players near
   monsters stay where they were.

@@ -1,4 +1,199 @@
 {
 	"about": "Third-party takes of the sound slots: slot -> [{file, from (a source in slots.json), original (where in the source it was cut from), sha256, ...}]. Written by tools/sound_take.ps1; read by SoundKit. A take of a source stored external is kept outside the repo (the sound library takes/<slot>/<file>) and copied into art/audio/external/<slot>/ by tools/sound_sync.ps1.",
-	"takes": {}
+	"takes": {
+		"sfx.bandage": [
+			{
+				"file": "sfx.bandage.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/InMotionAudio - Torn T-Shirt/CLOTHRip_CottonRips13_InMotionAudio_TornTShirt.wav",
+				"sha256": "07a153b103e07ca4e95b9610720a42156e45b6ab94002859b98e89674e3c6d54"
+			},
+			{
+				"file": "sfx.bandage.2.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/InMotionAudio - Torn T-Shirt/CLOTHRip_CottonRips44_InMotionAudio_TornTShirt.wav",
+				"sha256": "9ebf179bb400db84ac2ea769c634f8e6451b239ccc690a596030ef59449d0869"
+			},
+			{
+				"file": "sfx.bandage.3.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/InMotionAudio - Torn T-Shirt/CLOTHRip_CottonRips92_InMotionAudio_TornTShirt.wav (from 1.66 s for 1.82 s)",
+				"sha256": "6b61d5013d2ffb662ae53fb0ebd67ded2fb085e5939086e9ab449f832fcfbdb1"
+			}
+		],
+		"sfx.crate_break": [
+			{
+				"file": "sfx.crate_break.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/DavidDumais - Explosion SFX Pack/WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav (from 0 s for 1.3 s)",
+				"sha256": "a137926de2e10f16e2c348c6e1d9b27c2f7762f2f05be5cf209901c5013a34e2"
+			}
+		],
+		"sfx.door_wood_close": [
+			{
+				"file": "sfx.door_wood_close.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/West Wolf - Quiet School Ambiences/DOORWood_School Classroom-Door-CD03, Old Wooden Door, Squeaky, Opening, Closing, Recorded From The Classroom_WWA_QSRT_Neumann KM184_XY_3.wav (from 13.75 s for 3 s)",
+				"sha256": "dd73bc5076379f45865603934c820b471c98c5ddd35539a8e3a905d5235a3e25"
+			}
+		],
+		"sfx.door_wood_lock": [
+			{
+				"file": "sfx.door_wood_lock.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - Ultimate Chess SFX/Closing Latches 4.wav",
+				"sha256": "5a35a57e6e97ca7c7e5a87a37e0839e6deea5ec7556e73e2b2ce9773be25be2c"
+			}
+		],
+		"sfx.door_wood_open": [
+			{
+				"file": "sfx.door_wood_open.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/West Wolf - Quiet School Ambiences/DOORWood_School Classroom-Door-CD03, Old Wooden Door, Squeaky, Opening, Closing, Recorded From The Classroom_WWA_QSRT_Neumann KM184_XY_3.wav (from 3.3 s for 2.2 s)",
+				"sha256": "da48d99479cd071de8535545ddfb916e362d0069efdc89e20de31cdd5f26658b"
+			}
+		],
+		"sfx.door_wood_rattle": [
+			{
+				"file": "sfx.door_wood_rattle.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Sonic Bat - Videogame Foley Essentials Vol. I/SBvfe1_Door Handle D 002.wav",
+				"sha256": "78243991d18b260a8b02075f14698d0962b8b97521b6dcda5bffd1fb657f5759"
+			}
+		],
+		"sfx.footstep_dirt_medium": [
+			{
+				"file": "sfx.footstep_dirt_medium.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/RYK-Sounds - Footstep/mud 1 loop.wav (from 0 s for 0.7 s)",
+				"sha256": "4039a6b727672303594807203ff7ef8aeeadc5f755dbf885379128b1b1a53a9a"
+			},
+			{
+				"file": "sfx.footstep_dirt_medium.2.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/RYK-Sounds - Footstep/mud 1 loop.wav (from 0.78 s for 0.62 s)",
+				"sha256": "bd37284a7111ad360c36c9124563d1d7c5f776f50110e5385d2ddc2e518d956f"
+			},
+			{
+				"file": "sfx.footstep_dirt_medium.3.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/RYK-Sounds - Footstep/mud 1 loop.wav (from 1.55 s for 0.66 s)",
+				"sha256": "ba1677bfeb4adfd3613b22b6231545be5871f827837468304082ec437701e8b0"
+			},
+			{
+				"file": "sfx.footstep_dirt_medium.4.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/RYK-Sounds - Footstep/mud 1 loop.wav (from 2.28 s for 0.66 s)",
+				"sha256": "58ec1545cf9eaf979b60256f9a25181c40b33c8b78aa6d92204bc3aaa7e2d612"
+			}
+		],
+		"sfx.footstep_grass_medium": [
+			{
+				"file": "sfx.footstep_grass_medium.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/RYK-Sounds - Footstep/grass 3 single step 3.wav",
+				"sha256": "1f3e71d8c893383a1fe9420ee7a620aba956fad9b318f6a23b016639643fac21"
+			}
+		],
+		"sfx.goblin_alert": [
+			{
+				"file": "sfx.goblin_alert.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/David Dumais Audio - Monster Sound FX Pack 2/MonsterPack2_Monster10_Call09.wav",
+				"sha256": "60f1154073de9bdbe4f80de1ce1d0c3b7e284bc9d164b9682493a2a81a8a7ded"
+			}
+		],
+		"sfx.goblin_death": [
+			{
+				"file": "sfx.goblin_death.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/David Dumais Audio - Monster Sound FX Pack 2/MonsterPack2_Monster09_Death02.wav",
+				"sha256": "6ebf540ad020348fc7fbf73ce0002a241d38fbc161a197068c10fc2a654974b1"
+			}
+		],
+		"sfx.hit_blade_flesh": [
+			{
+				"file": "sfx.hit_blade_flesh.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/David Dumais Audio - Melee Weapons Sound Effects Pack 1/SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav",
+				"sha256": "bdcc47902f9f3d7bec48c530c8a805b3c30b4a1b4cfecf1cb7c079fac44275c1"
+			}
+		],
+		"sfx.hit_wood": [
+			{
+				"file": "sfx.hit_wood.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/David Dumais Audio - Melee Weapons Sound Effects Pack 1/WOODImpt_Impact Wood 23_DDUMAIS_NONE.wav (from 0 s for 0.8 s)",
+				"sha256": "18cab85d1674a2c815b6ec71e252fd143ef1c028b97c34f7396fe00ecbd86df4"
+			}
+		],
+		"sfx.swing": [
+			{
+				"file": "sfx.swing.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Transition Whooshes Vol. 1/SWSH_Woodstick Swish 03_JSE_TW1.wav (from 0.05 s for 0.3 s)",
+				"sha256": "dff348768164ab08753a57aa5d8a17d0f16e935553fd156cd38229cf96b7968a"
+			},
+			{
+				"file": "sfx.swing.2.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Transition Whooshes Vol. 1/SWSH_Woodstick Swish 03_JSE_TW1.wav (from 1.98 s for 0.28 s)",
+				"sha256": "c6fb26a3d5ea0eaf2f60b3bc9d4c3c613ae935ee395f0e2c7a29a7d62398258c"
+			},
+			{
+				"file": "sfx.swing.3.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Transition Whooshes Vol. 1/SWSH_Woodstick Swish 03_JSE_TW1.wav (from 3.89 s for 0.29 s)",
+				"sha256": "3c330aaec9323c23e813905763ba2bda72a47be1cb10bd3cf1aeb2dc89fdf091"
+			},
+			{
+				"file": "sfx.swing.4.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Transition Whooshes Vol. 1/SWSH_Woodstick Swish 03_JSE_TW1.wav (from 6.05 s for 0.3 s)",
+				"sha256": "2dabeca769e35a2a8d47da158cf1b5e72f409916c5da817c6bdd966114ffc815"
+			}
+		],
+		"sfx.swing_heavy": [
+			{
+				"file": "sfx.swing_heavy.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/David Dumais Audio - Melee Weapons Sound Effects Pack 1/SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav",
+				"sha256": "8b7f6ce8015bda340516c056323176fcb5e54a6af987e8b4a2f8c3c742a46535"
+			}
+		],
+		"sfx.thrown_land_heavy": [
+			{
+				"file": "sfx.thrown_land_heavy.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/InMotionAudio - Wood/WOODImpt_Drops20_InMotionAudio_Wood.wav",
+				"sha256": "8a8c8b691c6867b0547ba7c09e4f2e21de9b1056cf2e078af1ac179cb2397c75"
+			}
+		],
+		"voice.effort_hurt_female": [
+			{
+				"file": "voice.effort_hurt_female.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Pole Position Production - The Grunts Library/Female 1 - Grunt - Getting Hit - Medium Intensity - Ehrlund M1.wav (from 0.38 s for 0.45 s)",
+				"sha256": "d3076f6ecff6e234cc4f2e338efcd3eb5cb4bddafc69ead0b90375eef798a69c"
+			},
+			{
+				"file": "voice.effort_hurt_female.2.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Pole Position Production - The Grunts Library/Female 1 - Grunt - Getting Hit - Medium Intensity - Ehrlund M1.wav (from 1.94 s for 0.42 s)",
+				"sha256": "3f123050a378714a24ea874e196f28b71109f0ddf154fc482f241435e4576370"
+			},
+			{
+				"file": "voice.effort_hurt_female.3.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Pole Position Production - The Grunts Library/Female 1 - Grunt - Getting Hit - Medium Intensity - Ehrlund M1.wav (from 3.86 s for 0.55 s)",
+				"sha256": "d5dcc245b938af8b286258ba3e8c81682593a0ecf69a90a1a670ffa1668f19a9"
+			},
+			{
+				"file": "voice.effort_hurt_female.4.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Pole Position Production - The Grunts Library/Female 1 - Grunt - Getting Hit - Medium Intensity - Ehrlund M1.wav (from 5.56 s for 0.45 s)",
+				"sha256": "f7d265668aea65dfe40ee69799b2837462318d76e3ec91a53995256bff00270b"
+			}
+		]
+	}
 }

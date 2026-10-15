@@ -57,6 +57,9 @@ var hear_everything := false
 var _loaded: Dictionary[String, Array] = {}
 ## Slot -> the index played last.
 var _last: Dictionary[String, int] = {}
+## Slot -> the take to play next time, once, instead of a random one (a
+## listening reel plays each in turn: tools/clip.gd sound_reel).
+var next_take: Dictionary[String, int] = {}
 ## Plays made, for tests: [slot, file ("" for the placeholder), bus] each.
 var played: Array[Array] = []
 ## Sounds not played because they were out of hearing, for tests: slot each.
@@ -204,6 +207,9 @@ func _pick(slot: String) -> AudioStream:
 	var index := randi() % streams.size()
 	if streams.size() > 1 and index == _last.get(slot, -1):
 		index = (index + 1) % streams.size()
+	if next_take.has(slot):
+		index = next_take[slot] % streams.size()
+		next_take.erase(slot)
 	_last[slot] = index
 	return streams[index]
 

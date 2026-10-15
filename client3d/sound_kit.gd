@@ -44,6 +44,7 @@ const NOISES := {
 	"door_struck": Senses.NOISE_DOOR_STRUCK, "door_broken": Senses.NOISE_DOOR_BROKEN,
 	"door_rattle": Senses.NOISE_RATTLE, "latch": Senses.NOISE_LATCH, "rummage": Senses.NOISE_RUMMAGE,
 	"break": Senses.NOISE_BREAK, "thud_light": Senses.NOISE_THUD_LIGHT, "thud_heavy": Senses.NOISE_THUD_HEAVY,
+	"call": Senses.NOISE_CALL, "rout": Senses.NOISE_ROUT,
 }
 ## A slot's noise that is one radius of a sim kind: the kind World.noise
 ## makes for it.
