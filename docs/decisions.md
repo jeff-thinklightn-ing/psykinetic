@@ -3753,3 +3753,19 @@ grapple, right drag toss) will need to share or move this.
 Not "Container": Godot has a Control of that name. The wire changes
 (crates and carts spawn from a new script and replicate slots):
 PROTOCOL_REVISION 8.
+
+Updated (companions step 4): she hands things over and fetches them,
+through items' World.try_transfer with herself as `by`, under its reach
+rules: her own player only, within World.COMPANION_REACH (2) and in line
+of sight; a chest she can strike. With her player in sight, can_do adds
+"give Jeff your bandaging kit" for each thing she carries and "bring Jeff
+the bandaging kit from the chest ..." for each thing in a chest she sees.
+Fetching walks to the chest, takes it into World.free_slot_for(her), and
+goes on as a give: walks until she reaches her player and puts it in
+their free slot. A promise of either counts only when it names a thing
+(the starts of an item's name or short name, from the catalog) or, for
+fetching, the chest, so "I'll take the imps" and "I'll get them" stay
+fight talk; a thing named narrows the list to it. An answer that gives or
+fetches, and her report, may speak of her things (the bandages), which
+her lines otherwise leave out unless asked. Bandaging an ally waits on
+items' bandaging action (its step 4), which takes a companion as `by`.

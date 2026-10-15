@@ -1918,7 +1918,10 @@ func _take_result(result: Dictionary) -> void:
 	# A whole line said back is dropped as such; then what is left of it
 	# once cleaned (spoken) is what she says.
 	var echo := _echo_of(raw_line)
-	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, asks_about_items(str(result.get("heard", ""))), spoken_to))
+	# Her things may be spoken of when asked about, told of in a report, or
+	# given or fetched.
+	var items_told: bool = asks_about_items(str(result.get("heard", ""))) or report or chosen >= 0 and offered[chosen].has("item")
+	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, items_told, spoken_to))
 	if echo.is_empty() and line != raw_line:
 		entry["say_raw"] = raw_line
 	if raw_line.is_empty():
@@ -2492,11 +2495,14 @@ func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
 # --- Errands: what she does when asked ------------------------------------------
 
 ## What she can do here and now, nearest first, at most ACTIONS_MAX: each
-## {verb ("open", "close", "open_chest", "look"), words (for her voice:
-## "open the closed door, a few paces to the south"), at, and its door,
-## chest or cell}. Only what she sees: a door not broken, a chest; and the
-## nearest walkable cells she cannot see within her sight's range, one a
-## compass point, LOOKS_OFFERED of them.
+## {verb ("open", "close", "open_chest", "fetch", "give", "look"), words
+## (for her voice: "open the closed door, a few paces to the south"), at,
+## and its door, chest, item or cell}. Only what she sees: a door not
+## broken, a chest, and, with her player in sight (the only one she may
+## hand things to: World.reaches), each thing in a chest to bring them and
+## each thing she carries to give them; and the nearest walkable cells she
+## cannot see within her sight's range, one a compass point, LOOKS_OFFERED
+## of them.
 func can_do() -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
 	for door: Door in World.get_doors():
@@ -2508,10 +2514,26 @@ func can_do() -> Array[Dictionary]:
 			var verb := "close" if door.is_open() else "open"
 			actions.append({"verb": verb, "door": door, "at": near, "words": "%s the %s door, %s" % [
 				verb, "open" if door.is_open() else "closed", _paces_toward(Vector2(sides[0] + sides[1]) / 2.0)]})
+	# Things go to her own player only (World.reaches), whom she must see.
+	var to_them := _alive(keeper) and World.distance(tile, keeper.tile) <= PERCEPTION_RANGE and senses.sees(keeper)
 	for entity in World.get_entities():
 		if entity is Chest and entity.spawned and World.distance(tile, entity.tile) <= PERCEPTION_RANGE and _sees(entity.tile):
+			var where := _paces_toward(Vector2(entity.tile))
 			actions.append({"verb": "open_chest", "chest": entity, "at": entity.tile,
-				"words": "open the chest %s and see what is in it" % _paces_toward(Vector2(entity.tile))})
+				"words": "open the chest %s and see what is in it" % where})
+			var fetched: Dictionary[String, bool] = {}
+			for id: String in entity.slots:
+				if to_them and not id.is_empty() and not fetched.has(id):
+					fetched[id] = true
+					actions.append({"verb": "fetch", "item": id, "chest": entity, "at": entity.tile,
+						"words": "bring %s the %s from the chest %s" % [keeper_name(), Items.name_of(id), where]})
+	if to_them:
+		var given: Dictionary[String, bool] = {}
+		for id: String in slots:
+			if not id.is_empty() and not given.has(id):
+				given[id] = true
+				actions.append({"verb": "give", "item": id, "at": keeper.tile,
+					"words": "give %s your %s" % [keeper_name(), Items.name_of(id)]})
 	actions.sort_custom(_nearer_found)
 	actions.resize(mini(actions.size(), ACTIONS_MAX - LOOKS_OFFERED))
 	var ways: Dictionary[int, bool] = {}
@@ -2545,7 +2567,32 @@ static func _errand_verbs(text: String) -> Array[String]:
 	if not chest and not door and has.call("\\b(look|check|scout|see|peek)") \
 			and has.call(COMPASS_WORD + "|\\b(dark|there|ahead|around|corner)\\b"):
 		verbs.append("look")
+	# Handing over and fetching: only of a thing named (or the chest), so
+	# "I'll get them" or "I'll take the imps" is no errand.
+	var thing := _item_words("").search(text) != null
+	if thing and not chest and has.call("\\b(give|hand|pass)"):
+		verbs.append("give")
+	if (thing or chest) and not door and has.call("\\b(bring|fetch|get|grab|take)"):
+		verbs.append("fetch")
 	return verbs
+
+
+## _item_words' patterns, by item id ("" for any), compiled once.
+static var _item_patterns: Dictionary[String, RegEx] = {}
+
+
+## The words that name item [param id] in a sentence (the starts of the
+## words of its name and short name: "bandag", "kit"), or of any item for
+## "".
+static func _item_words(id: String) -> RegEx:
+	if not _item_patterns.has(id):
+		var stems: Array[String] = []
+		for each: String in ([id] if not id.is_empty() else Items.ids()):
+			for word in (Items.name_of(each) + " " + Items.short_of(each)).to_lower().split(" ", false):
+				if word.length() >= 3 and word not in ["of", "the", "and"] and word.left(6) not in stems:
+					stems.append(word.left(6))
+		_item_patterns[id] = RegEx.create_from_string("\\b(%s)" % "|".join(stems) if not stems.is_empty() else "^\\b$")
+	return _item_patterns[id]
 
 
 ## [param line] without the sentences that promise one of her errands but
@@ -2570,6 +2617,11 @@ func _promises(line: String, offered: Array, chosen: int) -> Dictionary:
 			var said_way := compass.search(str(offered[i]["words"]))
 			if offered[i]["verb"] in verbs and (way == null or said_way != null and said_way.get_string() == way.get_string()):
 				matching.append(i)
+		# A thing named narrows it to that thing.
+		var named_thing := matching.filter(func(i: int) -> bool:
+			return offered[i].has("item") and _item_words(offered[i]["item"]).search(text) != null)
+		if not named_thing.is_empty():
+			matching.assign(named_thing)
 		if chosen >= 0 and chosen in matching or chosen == -1 and matching.size() == 1:
 			kept.append(sentence)
 			if chosen == -1 and named == -1:
@@ -2631,6 +2683,10 @@ func _errand_there() -> bool:
 			return tile in Terrain.edge_cells(errand["door"].key)
 		"open_chest":
 			return World.distance(tile, errand["chest"].tile) == 1
+		"fetch":
+			return World.reaches(self, errand["chest"])
+		"give":
+			return World.reaches(self, keeper)
 		_:
 			return _sees(errand["cell"])
 
@@ -2644,15 +2700,47 @@ func _errand_walk() -> bool:
 				if not World.find_path(tile, side).is_empty():
 					return _step_toward(side, false)
 			return false
-		"open_chest":
+		"open_chest", "fetch":
 			return _alive(errand["chest"]) and _step_toward(errand["chest"].tile, true)
+		"give":
+			return _alive(keeper) and _step_toward(keeper.tile, true)
 		_:
 			return _step_toward(errand["cell"], true)
 
 
-## There: the door opened or closed, the chest looked in, or the place looked at.
+## There: the door opened or closed, the chest looked in, the thing taken
+## from the chest (then taken to her player) or handed over, or the place
+## looked at.
 func _errand_do() -> void:
 	match str(errand["verb"]):
+		"fetch":
+			var chest: Chest = errand["chest"]
+			var item: String = errand["item"]
+			var from := chest.slots.find(item)
+			var into := World.free_slot_for(self, item)
+			if from == -1:
+				_end_errand("the %s was no longer in the chest" % Items.name_of(item), true)
+			elif into == -1:
+				_end_errand("you had no room to carry it", true)
+			elif World.try_transfer(self, chest, from, self, into):
+				errand["verb"] = "give"
+				errand["fetched"] = true
+				errand["phase"] = "going"
+			else:
+				_end_errand("you could not take it", true)
+		"give":
+			var item: String = errand["item"]
+			var from := slots.find(item)
+			var into := World.free_slot_for(keeper, item) if _alive(keeper) else -1
+			if from == -1:
+				_end_errand("you no longer had it", true)
+			elif into == -1:
+				_end_errand("%s had no room for it" % keeper_name(), true)
+			elif World.try_transfer(self, self, from, keeper, into):
+				_report_errand("You %s %s the %s%s." % ["brought" if errand.get("fetched", false) else "gave", keeper_name(),
+					Items.name_of(item), " from the chest" if errand.get("fetched", false) else ""])
+			else:
+				_end_errand("it could not be handed over", true)
 		"open", "close":
 			var door: Door = errand["door"]
 			var opening: bool = errand["verb"] == "open"

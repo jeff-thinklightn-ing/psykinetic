@@ -651,6 +651,45 @@ func _test_errands() -> void:
 	_check(World.distance(pet.tile, chest.tile) == 1 and chest.slots[0] == ("" if held == "nothing" else chest.slots[0]),
 		"from beside it, taking nothing")
 
+	# Fetching from the chest and handing over: to her own player.
+	var kit: String = chest.slots[0]
+	_check(kit == "bandaging_kit", "(the chest holds a bandaging kit)")
+	for i in 21:
+		World.step()
+	offered = pet.can_do()
+	var fetch_at := _offer(offered, "fetch")
+	_check(fetch_at >= 0 and str(offered[fetch_at]["words"]).begins_with("bring Player the bandaging kit from the chest"),
+		"what is in a chest she sees, she can bring her player: %s" % [_words(offered)])
+	mind.voice_answer = {"say": "I'll get you the bandages from the chest.", "stance": ""}
+	_main._on_command(owner, "say", {"text": "%s, can you get me something to patch this up?" % pet.name})
+	_check(pet.errand.get("verb", "") == "fetch", "a promise naming the thing, and the chest: she fetches it (%s)" % pet.errand.get("words", ""))
+	_check(_said_last(pet) == "I'll get you the bandages from the chest.", "and says so, bandages and all: %s" % _said_last(pet))
+	mind.clear()
+	mind.voice_answer = {"say": "There you go.", "stance": ""}
+	_step_until(func() -> bool: return pet.errand.is_empty(), 60)
+	told = mind.triggers("voice")
+	_check(chest.slots.find(kit) == -1 and owner.slots.find(kit) != -1 and pet.slots.find(kit) == -1,
+		"it is in her player's slots now, not the chest's or hers (%s)" % [owner.slots])
+	_check(told.size() == 1 and told[0] == "You brought Player the bandaging kit from the chest.", "and she tells it: %s" % [told])
+	_check(World.items.history(owner.slot_items[owner.slots.find(kit)]).size() > 0, "the kit's history follows it")
+	_check(World.try_transfer(owner, owner, owner.slots.find(kit), pet, World.free_slot_for(pet, kit)), "(Player hands it to her)")
+	for i in 21:
+		World.step()
+	offered = pet.can_do()
+	var give_at := _offer(offered, "give")
+	_check(give_at >= 0 and offered[give_at]["words"] == "give Player your bandaging kit", "what she carries, she can give her player: %s" % [_words(offered)])
+	mind.voice_answer = {"say": "Here.", "stance": "", "do": str(give_at + 1)}
+	_main._on_command(owner, "say", {"text": "%s, give me that back." % pet.name})
+	mind.clear()
+	mind.voice_answer = {"say": "", "stance": ""}
+	_step_until(func() -> bool: return pet.errand.is_empty(), 30)
+	_check(owner.slots.find(kit) != -1 and pet.slots.find(kit) == -1 and "You gave Player the bandaging kit." in mind.triggers("voice"),
+		"[DO: n]: she hands it over (%s)" % [mind.triggers("voice")])
+	_check(pet._promises("I'll take the imps.", offered, -1)["line"] == "I'll take the imps.", "\"I'll take the imps.\" names no thing: no errand, and said")
+	_put(owner, chest.tile + Vector2i(1, 0))
+	World.try_transfer(owner, owner, owner.slots.find(kit), chest, 0)
+	_put(owner, Vector2i(11, 6))
+
 	var none := pet._promises("I'll open the door. I'll keep watch.", [], -1)
 	_check(none["line"] == "I'll keep watch." and none["dropped"] == "I'll open the door.",
 		"with nothing to open, \"I'll open the door.\" is not said; \"I'll keep watch.\" is no errand, and stays (%s)" % [none])
@@ -733,6 +772,11 @@ func _words(offered: Array[Dictionary]) -> Array[String]:
 	for action in offered:
 		out.append(str(action["words"]))
 	return out
+
+
+func _said_last(pet: Companion) -> String:
+	var lines := pet.said_lines()
+	return lines.back() if not lines.is_empty() else ""
 
 
 func _narrated(pet: Companion, words: String) -> bool:

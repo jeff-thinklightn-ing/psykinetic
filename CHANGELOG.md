@@ -6,6 +6,9 @@ top section as the release notes.
 
 ## Unreleased
 
+- Companions can hand you what they carry, and fetch something from a
+  chest they can see and bring it to you ("I'll get you the bandages
+  from the chest").
 - Companions can do what you ask, and now say they will only when they
   can: open or shut a door they can see, look in a chest and tell you
   what is in it, or go and look at a dark or hidden spot nearby and come
