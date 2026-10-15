@@ -29,8 +29,10 @@ farmsteads and forest. Its people give directions as north, south, east and west
 Monsters prowl the stone places and the open ground, and they attack whoever they
 see. Fire burns whoever stands in it.
 
-Whoever falls rises again after a while. It hurts, and no one wants to fall. Why
-this happens, and whether any death is one the fallen do not rise from, is open
+Raiders can kill, but the fallen can be brought back through a medicine man or a
+temple (Jeff). Which of the two, or both; whose temple *(asked: B3)*; what it costs
+and whether it marks the one brought back; whether it is known and spoken of; and
+whether anyone besides those who travel for the town can be brought back are open
 *(asked: B1)*.
 
 No one has been knighted in ages. Whether there were ever knights in the land,

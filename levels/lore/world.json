@@ -32,14 +32,22 @@
 					"where": []
 				},
 				{
-					"id": "the_land.rising",
-					"text": "Whoever falls rises again after a while; it hurts, and no one wants to fall.",
+					"id": "the_land.deadly",
+					"text": "Raiders can kill.",
 					"known": "common",
-					"where": []
+					"where": [],
+					"source": "Jeff"
 				},
 				{
-					"id": "the_land.why_rising",
-					"text": "Why the fallen rise again, and whether any death is one they do not rise from.",
+					"id": "the_land.brought_back",
+					"text": "The fallen can be brought back through a medicine man or a temple.",
+					"known": "common",
+					"where": [],
+					"source": "Jeff"
+				},
+				{
+					"id": "the_land.bringing_back",
+					"text": "Which brings the fallen back, a medicine man or a temple or both; whose temple; what it costs and whether it marks them; whether it is known and spoken of; and whether anyone besides those who travel for the town can be brought back.",
 					"known": "common",
 					"where": [],
 					"status": "asked",
