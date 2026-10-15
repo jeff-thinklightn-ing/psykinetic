@@ -254,28 +254,52 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var unknown: Dictionary[int, bool] = {}
 	var size := layout.get_size()
 	var cells := Vector2i((size.x + 1) / 2, (size.y + 1) / 2)
-	var meaning_at := func(pixel: Vector2i) -> String:
-		if pixel.x < 0 or pixel.y < 0 or pixel.x >= size.x or pixel.y >= size.y:
-			return "void"
-		var colour := layout.get_pixelv(pixel)
-		if colour.a < 0.5:
-			return "void"
-		var key := _rgb(colour)
-		if not by_colour.has(key):
-			unknown[key] = true
-			return "void"
-		return by_colour[key]
-	# Cells.
-	var cell_meaning: Dictionary[Vector2i, String] = {}
+	# Read from the raw RGBA bytes, a meaning as a code (its index in
+	# names; VOID for void or a colour not in the legend): a 256² level is
+	# half a million pixels, too many for a call and a Color each (decision 303).
+	var pixels := _rgba8(layout).get_data()
+	var names: Array[String] = []
+	var code_of: Dictionary[String, int] = {}
+	var code_by_colour: Dictionary[int, int] = {}
+	for key: int in by_colour:
+		var meaning := by_colour[key]
+		if meaning == "void":
+			code_by_colour[key] = VOID
+			continue
+		if not code_of.has(meaning):
+			code_of[meaning] = names.size()
+			names.append(meaning)
+		code_by_colour[key] = code_of[meaning]
+	var wall: int = code_of.get("wall", -2)
+	var door: int = code_of.get("door", -2)
+	var water_code: int = code_of.get("water", -2)
+	# The meaning of the pixel at (px, py), by code; the last colour looked
+	# up is kept, as neighbouring pixels are mostly the same colour.
+	var last_colour := -1
+	var last_code := VOID
+	# Cells, by code, row by row (VOID for void, a wall or door on a cell
+	# position, and off the map).
+	var cell_codes := PackedInt32Array()
+	cell_codes.resize(cells.x * cells.y)
 	for y in cells.y:
 		for x in cells.x:
-			var meaning: String = meaning_at.call(Vector2i(x, y) * 2)
-			if meaning in ["wall", "door"]:
-				meaning = "void"
-			if meaning != "void":
-				cell_meaning[Vector2i(x, y)] = meaning
-	var walkable := func(cell: Vector2i) -> bool:
-		return cell_meaning.has(cell) and cell_meaning[cell] != "water"
+			var at := (y * 2 * size.x + x * 2) * 4
+			var code := VOID
+			if pixels[at + 3] >= 128:
+				var colour := (pixels[at] << 16) | (pixels[at + 1] << 8) | pixels[at + 2]
+				if colour == last_colour:
+					code = last_code
+				else:
+					code = code_by_colour.get(colour, UNKNOWN)
+					if code == UNKNOWN:
+						unknown[colour] = true
+						code = VOID
+					else:
+						last_colour = colour
+						last_code = code
+			if code == wall or code == door:
+				code = VOID
+			cell_codes[y * cells.x + x] = code
 	var floor_tiles: Array[Vector2i] = []
 	var fire: Array[Vector2i] = []
 	var water: Array[Vector2i] = []
@@ -284,20 +308,24 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var stair_cells: Array[Vector2i] = []
 	var torches: Array[Vector2i] = []
 	var lanterns: Array[Vector2i] = []
+	var ground: Array[bool] = []
+	for meaning in names:
+		ground.append(meaning in GROUNDS)
 	for y in cells.y:
 		for x in cells.x:
-			var cell := Vector2i(x, y)
-			if not cell_meaning.has(cell):
+			var code := cell_codes[y * cells.x + x]
+			if code == VOID:
 				continue
-			var meaning: String = cell_meaning[cell]
-			if meaning == "water":
+			var cell := Vector2i(x, y)
+			if code == water_code:
 				water.append(cell)
 				continue
 			floor_tiles.append(cell)
-			if meaning in GROUNDS:
+			var meaning := names[code]
+			if ground[code]:
 				kinds[cell] = meaning
 				continue
-			kinds[cell] = _ground_around(cell, cell_meaning)
+			kinds[cell] = _ground_around(cell, cell_codes, cells, names)
 			match meaning:
 				"fire":
 					fire.append(cell)
@@ -309,45 +337,77 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 					lanterns.append(cell)
 				_:
 					markers.append({"tile": cell, "marker": meaning})
+	# Whether each cell is walked on (ground, not water), and water, with a
+	# border of void a cell wide all round, so the edges along the outline
+	# need no bounds check: cell (x, y) is (x + 1, y + 1) here.
+	var across := cells.x + 2
+	var walks := PackedByteArray()
+	walks.resize(across * (cells.y + 2))
+	var wet := PackedByteArray()
+	wet.resize(walks.size())
+	for y in cells.y:
+		for x in cells.x:
+			var code := cell_codes[y * cells.x + x]
+			if code == water_code:
+				wet[(y + 1) * across + x + 1] = 1
+			elif code != VOID:
+				walks[(y + 1) * across + x + 1] = 1
 	# Edges: from -1, as in Terrain, so the outline along the top and left is there.
 	var edges: Dictionary[Vector3i, int] = {}
 	for y in range(-1, cells.y):
 		for x in range(-1, cells.x):
-			var cell := Vector2i(x, y)
-			for side in [Terrain.EAST, Terrain.SOUTH]:
-				var key := Vector3i(x, y, side)
-				var other: Vector2i = Terrain.edge_cells(key)[1]
-				var meaning: String = meaning_at.call(cell * 2 + (Vector2i(1, 0) if side == Terrain.EAST else Vector2i(0, 1)))
-				var a_walks: bool = walkable.call(cell)
-				var b_walks: bool = walkable.call(other)
-				var by_water: bool = cell_meaning.get(cell, "") == "water" or cell_meaning.get(other, "") == "water"
+			var here := (y + 1) * across + x + 1
+			for side in 2:
+				var east := side == 0
+				var there: int = here + 1 if east else here + across
+				# The edge's pixel: east of the cell's, or south of it.
+				var px: int = x * 2 + 1 if east else x * 2
+				var py: int = y * 2 if east else y * 2 + 1
+				var code := VOID
+				if px >= 0 and py >= 0 and px < size.x and py < size.y:
+					var at := (py * size.x + px) * 4
+					if pixels[at + 3] >= 128:
+						var colour := (pixels[at] << 16) | (pixels[at + 1] << 8) | pixels[at + 2]
+						if colour == last_colour:
+							code = last_code
+						else:
+							code = code_by_colour.get(colour, UNKNOWN)
+							if code == UNKNOWN:
+								unknown[colour] = true
+								code = VOID
+							else:
+								last_colour = colour
+								last_code = code
 				var kind := Terrain.Edge.OPEN
-				if meaning == "door":
+				if code == door:
 					kind = Terrain.Edge.DOOR
-				elif meaning == "wall":
+				elif code == wall:
 					kind = Terrain.Edge.WALL
-				elif a_walks != b_walks and not by_water:
+				elif walks[here] != walks[there] and wet[here] == 0 and wet[there] == 0:
 					kind = Terrain.Edge.WALL
 				if kind != Terrain.Edge.OPEN:
-					edges[key] = kind
+					edges[Vector3i(x, y, Terrain.EAST if east else Terrain.SOUTH)] = kind
 	# Heights and stairs.
 	var heights: Dictionary[Vector2i, int] = {}
 	if height != null:
 		if height.get_size() != size:
 			warnings.append("height.png is %s, layout.png %s: heights ignored" % [height.get_size(), size])
 		else:
-			for cell: Vector2i in cell_meaning:
-				var grey := height.get_pixelv(cell * 2)
-				var level := clampi(roundi(grey.r8 / float(GREY_PER_LEVEL)), 0, MAX_HEIGHT)
-				if level > 0:
-					heights[cell] = level
+			var greys := _rgba8(height).get_data()
+			for y in cells.y:
+				for x in cells.x:
+					if cell_codes[y * cells.x + x] == VOID:
+						continue
+					var level := clampi(roundi(greys[(y * 2 * size.x + x * 2) * 4] / float(GREY_PER_LEVEL)), 0, MAX_HEIGHT)
+					if level > 0:
+						heights[Vector2i(x, y)] = level
 	var stairs: Dictionary[Vector2i, Vector2i] = {}
 	for cell in stair_cells:
 		var up: Array[Vector2i] = []
 		for direction: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
 			var next := cell + direction
-			if walkable.call(next) and heights.get(next, 0) == heights.get(cell, 0) + 1 \
-					and not edges.has(Terrain.edge_key(cell, direction)):
+			var next_walks := walks[(next.y + 1) * across + next.x + 1] == 1
+			if next_walks and heights.get(next, 0) == heights.get(cell, 0) + 1 and not edges.has(Terrain.edge_key(cell, direction)):
 				up.append(direction)
 		if up.is_empty():
 			warnings.append("the stair at %s has no cell one level up beside it: it is floor" % cell)
@@ -382,11 +442,34 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	return level
 
 
-## The ground kind most of [param cell]'s four neighbours are (stone if none).
-static func _ground_around(cell: Vector2i, cell_meaning: Dictionary[Vector2i, String]) -> String:
+## A cell's code in parse: no meaning (void, or off the map).
+const VOID := -1
+## A colour not in the legend (void, with a warning).
+const UNKNOWN := -3
+
+
+## [param image] as RGBA8: itself if it is, else a copy (the level's own is
+## left as it was).
+static func _rgba8(image: Image) -> Image:
+	if image.get_format() == Image.FORMAT_RGBA8:
+		return image
+	var copy := image.duplicate() as Image
+	if copy.is_compressed():
+		copy.decompress()
+	copy.convert(Image.FORMAT_RGBA8)
+	return copy
+
+
+## The ground kind most of [param cell]'s four neighbours are (stone if
+## none), from parse's [param codes] ([param cells] across) and [param names].
+static func _ground_around(cell: Vector2i, codes: PackedInt32Array, cells: Vector2i, names: Array[String]) -> String:
 	var counts := {}
 	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-		var meaning: String = cell_meaning.get(cell + direction, "")
+		var next := cell + direction
+		if next.x < 0 or next.y < 0 or next.x >= cells.x or next.y >= cells.y:
+			continue
+		var code := codes[next.y * cells.x + next.x]
+		var meaning := names[code] if code != VOID else ""
 		if meaning in GROUNDS:
 			counts[meaning] = int(counts.get(meaning, 0)) + 1
 	var best := "stone"

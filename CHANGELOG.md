@@ -6,6 +6,10 @@ top section as the release notes.
 
 ## Unreleased
 
+- The server no longer freezes for over half a second when someone enters
+  the wilds for the first time or accepts a builder change there: reading
+  a big level is about five times faster, and an accept no longer re-reads
+  every level in the world (650 ms to about 180 ms).
 - Every companion is now someone of their own: where they were born, their
   family, their trade, what they like to eat and do, what they fear, how
   they talk, and how the two of you met, rolled when they join you, with

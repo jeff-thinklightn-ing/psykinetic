@@ -4694,3 +4694,41 @@ Bandaging replaces passive regen (the roadmap's rule, Jeff's): players no
 longer heal on their own out of combat (Main's _heal_players is gone;
 companion_test says so). Companions drop theirs (Companion._heal) in their
 step 4, with their bandage verb.
+
+## 303. A level is parsed from its raw pixels, and the world map reads again only the levels that changed
+
+The server stalled for 0.6 s each time the 256² wilds was built: a player
+going there for the first time since a restart (611 ms worst tick on the
+box), and every builder accept (652 ms), which snaps every client back.
+Level.parse took about 300 ms for the wilds (a function call and a Color
+for each of its half a million pixels, and an array made for each edge),
+and an accept ran it twice: once reloading the zone and once in
+WorldMap.build, which parsed every level again for Holdings.rebind and the
+world map's checks.
+
+Level.parse now reads the layout's bytes as RGBA8 (a copy when the image is
+another format, so the level's own is left as it was), turns each colour
+into a small integer code once per colour run, and works on packed arrays
+of codes with a one-cell border of void, so the outline needs no bounds
+check. Its output is the same, key for key and in the same order: checked
+against the old parse for every level in the repo and the box's edited
+wilds. The wilds parses in 55 ms instead of 300.
+
+WorldMap keeps each area as it last read it, with an MD5 digest of its
+layout and height bytes and its config; a build reads again only an area
+whose digest changed, and gives each WorldMap its own copy of the area's
+dictionary and of its ways. The digest is of the content, not of the files,
+so an overlay written by an accept, a level moving between the overlay and
+res://, a new area, an undo, a level registered in a test and the editor's
+unsaved sources all count as changes without any stamps to keep. What is
+kept is only read (WorldRoutes and Holdings copy what they take). An accept
+now parses the edited level twice at 55 ms each instead of every level
+twice; the wilds went from about 670 ms to about 180 ms on the desktop
+(Ryzen 7 9700X), and a cold open from about 335 to 85.
+
+Rejected for now: keying on file stamps (Main._level_stamp; it misses
+levels registered in code and the editor's unsaved sources), sharing the
+reload's own parse with WorldMap (Main keeps that level and could change
+it), parsing on a thread (more moving parts than the remaining 180 ms
+needs), and maps' incremental rebuild of only the edited area's cells,
+which stays the next step if an accept must fit inside a tick.

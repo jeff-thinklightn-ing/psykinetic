@@ -33,12 +33,53 @@ static func build(names: Array[String] = Level.names(), sources: Dictionary = {}
 	return out
 
 
+## Each area as last read: name -> {digest (of its layout, height and
+## config), area, ways}. A build reads again only the levels that changed
+## (an accept parses the one edited, not the whole world: decision 303);
+## what is kept is shared by every build, so it is never changed, only
+## read: WorldRoutes copies floor and edges, Holdings.rebind each place.
+static var _read_before: Dictionary[String, Dictionary] = {}
+
+
 func _read(area_name: String, made: Dictionary) -> void:
 	var layout: Image = made["layout"]
 	if layout == null:
 		return
 	var config: Dictionary = made["config"]
-	var level := Level.parse(layout, made["height"], config)
+	var digest := _digest(layout, made["height"], config)
+	var before: Dictionary = _read_before.get(area_name, {})
+	if before.get("digest", "") != digest:
+		before = {"digest": digest, "area": {}, "ways": []}
+		var ways_before := ways
+		ways = []
+		_parse_area(area_name, layout, made["height"], config)
+		before["area"] = areas[area_name]
+		before["ways"] = ways
+		ways = ways_before
+		_read_before[area_name] = before
+	areas[area_name] = before["area"].duplicate()
+	_configs[area_name] = config
+	for way: Dictionary in before["ways"]:
+		ways.append(way.duplicate())
+
+
+## What [param layout], [param height] and [param config] are, as a string:
+## the same for the same level, another for any change to it.
+static func _digest(layout: Image, height: Image, config: Dictionary) -> String:
+	var hashing := HashingContext.new()
+	hashing.start(HashingContext.HASH_MD5)
+	for image: Image in [layout, height]:
+		if image == null:
+			hashing.update("none".to_utf8_buffer())
+			continue
+		hashing.update(("%s %d" % [image.get_size(), image.get_format()]).to_utf8_buffer())
+		hashing.update(image.get_data())
+	hashing.update(var_to_str(config).to_utf8_buffer())
+	return hashing.finish().hex_encode()
+
+
+func _parse_area(area_name: String, layout: Image, height: Image, config: Dictionary) -> void:
+	var level := Level.parse(layout, height, config)
 	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor_cells[cell] = true
