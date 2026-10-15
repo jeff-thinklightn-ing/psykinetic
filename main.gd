@@ -258,6 +258,9 @@ var _bump_sent_at := 0
 var _walk_index := -1
 var _walk_since := 0
 var _walk_samples: Array[Array] = []
+## --test-smooth's meter (net/smooth_meter.gd), made with the first frame.
+var _smooth_meter: RefCounted = null
+var _smooth_camera: RefCounted = preload("res://client3d/camera_ease.gd").new()
 ## Every wall face, far and near, for turning the view.
 var _walls: Array[WallEdge] = []
 ## Left button held after a move click: the cell it last sent the player
@@ -436,6 +439,7 @@ func _go_online() -> void:
 ## _ready): the entities have placed themselves and the 3D view has moved
 ## its camera, so the pick below is made against the frame as drawn.
 func _process(delta: float) -> void:
+	_measure_smoothness(delta)
 	_show_home_zone()
 	_follow_player(delta)
 	if _client3d != null and DisplayServer.get_name() != "headless":
@@ -4343,6 +4347,27 @@ func _test_walk_keys() -> String:
 	return Net.test_walk[_walk_index]["keys"]
 
 
+## --test-smooth: this frame as drawn, to the meter. Main runs after the
+## entities and the 3D view, so it sees the frame as it is shown. The camera
+## is the 3D view's aim, or headless where the 3D camera would aim: the
+## player as drawn, through the same easing (client3d/camera_ease.gd).
+func _measure_smoothness(delta: float) -> void:
+	if not Net.test_smooth or Net.is_authority():
+		return
+	var player := _local_player()
+	if player == null:
+		return
+	if _smooth_meter == null:
+		Engine.max_fps = 60
+		_smooth_meter = preload("res://net/smooth_meter.gd").new()
+	var drawn := Iso.local_to_grid(player.position)
+	var eased: Vector3 = _smooth_camera.follow(Vector3(drawn.x, 0.0, drawn.y), delta)
+	var aim := Vector2(eased.x, eased.z)
+	if _client3d != null:
+		aim = Vector2(_client3d._camera_target.x, _client3d._camera_target.z)
+	_smooth_meter.sample(player, aim, delta)
+
+
 func _record_walk(player: Player) -> void:
 	if not Net.test_walk.is_empty() and _walk_index != -1:
 		_walk_samples.append([Time.get_ticks_msec(), Iso.local_to_grid(player.position)])
@@ -4461,6 +4486,9 @@ func _release_zones() -> void:
 ## What a test reads at the end: the walk, where everything is, who holds what.
 func _report_test() -> void:
 	_report_walk()
+	if _smooth_meter != null:
+		print(_smooth_meter.report())
+		print("[smooth] rtt %.0f ms, %s" % [Net.rtt_ms(), Net.stats.client_text()])
 	if Net.screenshot_path != "":
 		var image := get_viewport().get_texture().get_image()
 		var error := image.save_png(Net.screenshot_path)

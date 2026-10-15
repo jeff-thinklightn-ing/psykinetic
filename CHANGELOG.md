@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- The camera no longer jumps when the game corrects where your character is
+  drawn: it glides over the gap in a few frames, and still follows a
+  knockback exactly.
 - Bows shoot: draw with the right button and let go, and the arrow hits the
   first creature on the line toward the cursor, up to 8 cells. A longer draw
   hits harder. Stepping while drawn starts the draw again. Bows need no arrows.

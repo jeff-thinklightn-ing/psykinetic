@@ -419,6 +419,11 @@ func _process(delta: float) -> void:
 				while not held and not _slides.is_empty() \
 						and (_slides[0].get("present", false) or shown >= _slides[0]["tick"]):
 					var slide: Dictionary = _slides.pop_front()
+					if Net.test_smooth and _move_duration > 0.0 and shown < _move_tick + _move_duration - 0.05 and not _present:
+						# --test-smooth: a slide replaced before it ended (net_smooth.sh).
+						print("[slide] cut %s: %s->%s at %.2f of %.2f+%.2f, next %s->%s at %.2f for %.2f%s, %d more queued" % [
+							name, _from_tile, _to_tile, shown, _move_tick, _move_duration, slide["from"], slide["to"],
+							slide["tick"], slide["duration"], " (present)" if slide.get("present", false) else "", _slides.size()])
 					if _present and not slide.get("present", false) and shown > slide["tick"]:
 						# Back to the display clock after a present push: what
 						# came due meanwhile goes on from here, one after

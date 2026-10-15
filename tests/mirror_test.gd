@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_a_guessed_shove()
 	_test_prediction_does_not_walk_into_a_pinned_crate()
 	_test_prediction_gives_up_when_the_server_has()
+	_test_the_camera_eases_over_a_jump_not_a_slide()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -324,6 +325,36 @@ func _trim(moves: Array[float]) -> Array[float]:
 
 func _tile_pixels(step: Vector2i) -> float:
 	return Iso.tile_to_local(Vector2i.ZERO).distance_to(Iso.tile_to_local(step))
+
+
+## The 3D camera's follow (client3d/camera_ease.gd, decision 337): a slide
+## at a push's speed is followed with no lag, a jump is eased over a few
+## frames at no more than a sixth of a tile a frame, and a teleport is
+## taken at once.
+func _test_the_camera_eases_over_a_jump_not_a_slide() -> void:
+	print("
+== the camera eases over a jump, not a slide ==")
+	var ease: RefCounted = preload("res://client3d/camera_ease.gd").new()
+	var dt := 1.0 / 60.0
+	ease.follow(Vector3.ZERO, dt)
+	var worst_lag := 0.0
+	for frame in 30:  # A 5 tiles a second slide (a push's), half a second.
+		var at := Vector3((frame + 1) * 5.0 * dt, 0.0, 0.0)
+		worst_lag = maxf(worst_lag, (ease.follow(at, dt) - at).length())
+	_check(worst_lag < 0.001, "a slide is followed as it is (lag %.3f tiles)" % worst_lag)
+	var held: Vector3 = ease.follow(Vector3(5.5, 0.0, 0.0), dt)
+	var last := held
+	var worst_frame := 0.0
+	var frames := 0
+	while frames < 60 and (last - Vector3(5.5, 0.0, 0.0)).length() > 0.01:
+		var now: Vector3 = ease.follow(Vector3(5.5, 0.0, 0.0), dt)
+		worst_frame = maxf(worst_frame, (now - last).length())
+		last = now
+		frames += 1
+	_check(held.x < 2.6 + 0.2 and worst_frame <= 10.0 * dt + 0.001 and frames < 36,
+			"a 3-tile jump: the camera holds (%.2f) and closes in %d frames, at most %.3f a frame" % [held.x, frames, worst_frame])
+	var cut: Vector3 = ease.follow(Vector3(20.0, 0.0, 0.0), dt)
+	_check(cut.is_equal_approx(Vector3(20.0, 0.0, 0.0)), "a respawn's teleport is taken at once (%s)" % cut)
 
 
 func _check(ok: bool, label: String) -> void:

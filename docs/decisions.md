@@ -6347,3 +6347,76 @@ Monsters shoot through the same calls (try_stance "draw", try_loose).
 Protocol: the new RPC changes the fingerprint; no revision bump (no
 existing RPC or value changes; &"shot" is a new cause old views treat as a
 blow).
+## 337. Network smoothness, measured; the camera eases over jumps
+
+Roadmap step 2 (Jeff: "no rubber-banding in a castle fight ... report
+corrections/min and worst snap before/after"). Jeff and Dire saw rubber
+banding on the box over a real WAN hop once the server stalls were fixed
+(decision 303), so what is left is the client's drawing. This entry is the
+measuring and the first change (A of five, in the coordinator's order:
+A camera, B a push on a walking player, C corrections blended not snapped,
+D catch-up for others, E the shove guess).
+
+Measuring, without installing anything (Clumsy and its like need a driver):
+- `tools/net_proxy.gd`: a UDP relay in GDScript between clients and a
+  server, holding each packet `--delay` ms each way, `--jitter` more or
+  less (never reordering), and dropping `--loss` percent in bursts of
+  `--burst` packets on average (Gilbert's two states). ENet is UDP, so a
+  client pointed at its port plays through it unaware.
+- `--test-smooth` (`net/smooth_meter.gd`, from Main after every other
+  `_process`): every frame, where the local player is drawn, everything
+  within 12 tiles of them, and where the camera aims. A frame's move of
+  more than 0.4 tiles is a jump (the fastest slide moves a twelfth of a
+  tile a frame at 60 fps), 8 or more a teleport (a respawn: meant); a
+  move back along the way it was going is a back step; frames over 100 ms
+  (the machine's hitch) are not counted. The first 40 jumps are logged,
+  and a mirror's slide replaced before it ended prints `[slide] cut`.
+- `tools/net_smooth.sh [clean|wan|bad] [seconds]`: a castle server, two
+  headless clients through the relay (one steering and striking at
+  monsters every 3 s, one walking with WASD), 60 fps, each reporting the
+  above with its round trip and NetStats' corrections. Profiles: clean
+  (no delay), wan (60 +-20 ms each way, 1% loss), bad (120 +-40 ms, 3% in
+  bursts of 3). Ports 17970/17971 + the tree's offset; under the bench lock.
+
+What the baseline showed (two runs a profile, two clients each; rates per
+client-minute):
+
+| link | corrections/min | snaps/min | worst correction | own jumps/min (worst) | others' jumps/min (worst) |
+|---|---|---|---|---|---|
+| clean (rtt 39 ms) | 3.0 | 0 | 2.00 tiles | 1.3 (2.88) | 29 (4.56) |
+| wan (rtt 180 ms) | 6.8 | 0 | 1.90 | 1.5 (0.72; two of them respawns) | 10 (1.02) |
+| bad (rtt 300-460 ms) | 29 | 2.2 | 4.54 | 6.4 (4.54) | 62 (4.32) |
+
+Runs vary a lot (where the fight goes); the causes are what to go by. Of
+others' jumps nearly all are a slide replaced before it ended: a slide
+starts from its own from-tile, not from where the body is drawn, and a
+monster's slow idle step (6-11 ticks) is overtaken by its next, faster
+one (D). A few are the display clock set outright after a server hitch
+ran it more than 3 ticks ahead (D). Own jumps are mispredictions, some
+snapped (B, C). Every own jump went whole to the screen: the 3D camera
+was set on the player as drawn each frame.
+
+A: the camera follows the player through `client3d/camera_ease.gd`. A
+frame's move of more than 0.2 tiles plus what a push's slide moves in the
+frame (6 tiles a second) is a jump: the camera keeps its place and the
+gap closes with a 60 ms time constant, never faster than 10 tiles a
+second (a sixth of a tile a frame), so a 3-tile snap glides in about half
+a second. Anything smoother passes straight through: a walk or a
+knockback's slide is followed with no lag, and the camera is on the body
+when the slide ends (the coordinator's condition). A move of 8 tiles or
+more (respawn, zone) is taken at once. Headless, the meter puts the
+player through the same easing as the camera would be. mirror_test checks
+a push-speed slide with no lag, a 3-tile jump held and closed at most a
+sixth of a tile a frame, and a teleport taken at once.
+
+Result, the same runs (two a profile, both clients; the player's drawn
+jumps are what the camera showed before):
+
+| link | camera jumps/min before | after | worst camera frame before | after |
+|---|---|---|---|---|
+| clean | 2.5 | 0 | 5.39 tiles | 0 |
+| wan | 2.3 | 0 | 3.06 | 0 |
+| bad | 7.1 | 2.3 | 4.06 | 0.45 |
+
+Client only; no protocol change. The 2D view's camera already followed
+with a lerp (Main.CAMERA_FOLLOW_RATE) and is unchanged.

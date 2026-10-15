@@ -218,6 +218,17 @@ sim state.
   is not shown; into a wall it is not sent at all, into a creature it is
   sent (a bump, at most every `Main.BUMP_SEND_INTERVAL`) but not shown.
 
+- *The 3D camera* follows the local player as drawn, but a jump of the
+  drawn place (a correction) is eased over a few frames instead of moving
+  the whole screen (`client3d/camera_ease.gd`, decision 337); a slide,
+  a knockback's included, is followed with no lag.
+
+**Measuring smoothness.** `tools/net_smooth.sh` runs a castle server and
+two headless clients through `tools/net_proxy.gd` (delay, jitter and loss
+each way) under the clean, wan or bad link, and each client's
+`--test-smooth` counts jumps and back steps in what it draws (decision
+337).
+
 **Contested tiles are decided once.** When two orders want the same tile in
 the same tick the act phase resolves them in entity id order: the first
 gets it and the second's `try_move` fails. The loser is sent

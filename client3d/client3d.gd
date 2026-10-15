@@ -671,6 +671,9 @@ var _shapes := {
 
 var _camera: Camera3D
 var _camera_target := Vector3.ZERO
+## The player as the camera follows them: a jump eased, a slide not
+## (client3d/camera_ease.gd).
+var _camera_ease: RefCounted = preload("res://client3d/camera_ease.gd").new()
 ## The camera's yaw now, and the diamond it rests at (or is settling on).
 var yaw := 0.0
 var _yaw_step := 0.0
@@ -1236,7 +1239,8 @@ func _place_camera() -> void:
 
 ## The camera stays on the player (plus the WASD lean, which eases by
 ## itself): the player is the middle of the screen, and the yaw turns
-## about them.
+## about them. A jump of the player's drawn place (a correction) is eased
+## over a few frames, a slide followed as it is (_camera_ease).
 func _follow(delta: float) -> void:
 	var player := _local_player()
 	if player == null:
@@ -1247,7 +1251,7 @@ func _follow(delta: float) -> void:
 	_local_name = String(player.name)
 	sfx.listener = player.tile  # Sounds are heard from here, as a monster there would.
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
-	_camera_target = puppet.position + Vector3(_lead.x, 0.0, _lead.y) + pan
+	_camera_target = _camera_ease.follow(puppet.position, delta) + Vector3(_lead.x, 0.0, _lead.y) + pan
 	_place_camera()
 
 

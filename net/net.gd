@@ -105,6 +105,8 @@ extends Node
 ##   --test-steer=<seconds>       hold-to-move with a cursor that swings a quarter turn this often
 ##   --test-fight=<seconds>       strike at the nearest monster this often (closing in on it), between steering
 ##   --test-walk=<keys:secs,...>  WASD: hold these keys (e.g. w:1.5,wd:1) in turn, then let go
+##   --test-smooth                count jumps and back steps in what is drawn, frame by frame (60 fps), and report
+##                                them at exit (net/smooth_meter.gd; tools/net_smooth.sh)
 ##
 ## Options are read from both the engine argument list and the user arguments
 ## after "--". Use the --name=value form: a bare value before "--" would be
@@ -367,6 +369,8 @@ var tick_send_hz := 10
 var test_steer := 0.0
 ## --test-fight: seconds between strikes at the nearest monster.
 var test_fight := 0.0
+## --test-smooth: Main measures what it draws (net/smooth_meter.gd).
+var test_smooth := false
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
 var test_walk: Array[Dictionary] = []
 
@@ -1204,6 +1208,8 @@ func _parse_args() -> void:
 				test_minimap = true
 			"--raids":
 				raids = true
+			"--test-smooth":
+				test_smooth = true
 			"--world-map":
 				world_map = true
 			"--builder-stub":
