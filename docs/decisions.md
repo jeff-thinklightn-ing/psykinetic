@@ -6555,3 +6555,30 @@ noise of its own (only the shot is heard, World.NOISE_BOW), and it stands
 still to draw, so a player stalking one can close on it. A CAUTIOUS
 archer does not wait for others at its target: it shoots from where it
 is. Without a target it lowers its bow.
+
+## 344. The spear: two cells' reach; braced, it stops a charge
+
+Weapons as verbs in the fight, part 5 of 5. A reach verb (the spear:
+cells 2, brace) lets a blow land as far as its cells in a straight line,
+diagonals too, when every cell between is empty and every step between is
+open (World.in_reach, which _try_hit and a player's walk-up-and-strike
+read in place of can_melee; shoves stay at arm's length). The blow pushes
+one cell's way, as any.
+
+Braced (World.braced): the spear in hand and BRACE_TICKS (5) without a
+step (GridEntity.last_step_tick, set by try_move), not stunned. A creature
+charging (Monster.charging(), enemy-ai's: a HEAVY monster closing at
+CHARGE_PACE, a boar inside its charge) that steps onto a cell within a
+braced spear's reach along where its holder faces (World._meets_brace, in
+try_move) is stopped there: the step is refused, and the holder's blow is
+queued on it at BRACE_DAMAGE_FACTOR (2) times the blow and with a push of
+BRACE_FORCE_PER_KG (0.03) times the charger's own mass, back the way it
+came: a boar (80 kg) takes 4 and is thrown back two or three cells,
+staggered. Its own weight is turned on it, so the heavier the charge the
+harder it breaks. The blow goes through the same resolution as any (a
+guard, decision 340, would meet it). World.braced_against feeds the party
+log. No new replicated state or RPC: the protocol is unchanged.
+
+Seen in the clip: a boar running from a hunter does not turn to charge
+when struck while it flees (Animal's own rule); the clip stages the
+charge (tools/clip.gd item_provoke) to show the brace.

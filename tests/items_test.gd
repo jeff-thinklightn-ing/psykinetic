@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_blows()
 	_test_block()
 	_test_axe()
+	_test_spear()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -730,6 +731,72 @@ func _test_axe() -> void:
 	for foe in foes:
 		if is_instance_valid(foe) and foe.spawned:
 			World.despawn(foe)
+	World._relocate(host, home)
+
+
+func _test_spear() -> void:
+	print("
+== the spear: a blow two cells off through an empty cell; braced, it stops a charge (decision 344) ==")
+	var host := _player(Net.local_id)
+	var home := host.tile
+	var aim := Vector2i.ZERO
+	for dy in range(-8, 9):
+		for dx in range(-8, 9):
+			var spot := home + Vector2i(dx, dy)
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var lane := [spot, spot + d, spot + d * 2, spot + d * 3, spot + d * 4, spot + Vector2i(d.y, d.x) + d * 2]
+				if aim == Vector2i.ZERO and (spot == host.tile or World.is_free(spot)) 						and lane.slice(1).all(func(cell: Vector2i) -> bool: return World.is_free(cell)) 						and range(4).all(func(i: int) -> bool: return World.can_melee(spot + d * i, spot + d * (i + 1))):
+					World._relocate(host, spot)
+					aim = d
+	_check(aim != Vector2i.ZERO, "an open lane four cells long from the host")
+	if aim == Vector2i.ZERO:
+		return
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "SpearImp%d" % World.tick,
+		"tile": host.tile + aim * 2, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
+	imp.acts = false
+	_check(not World.in_reach(host, imp), "bare-handed, two cells off is out of reach")
+	_give(host, "spear", Player.RIGHT_HAND)
+	_check(World.in_reach(host, imp), "with a spear, in reach")
+	host.next_attack_tick = 0
+	host.next_move_tick = 0
+	var hp := imp.hp
+	_check(World.try_attack(host, imp), "and struck from there")
+	World._resolve_hits()
+	_check(imp.hp == hp - 2, "for the blow's 2 (%d -> %d)" % [hp, imp.hp])
+	var blocker := _main._spawn({"script": "res://sim/pushable.gd", "shape": "cube", "name": "SpearCrate%d" % World.tick, "tile": host.tile + aim}) as GridEntity
+	_check(not World.in_reach(host, imp), "a crate between: not through it")
+	World.despawn(blocker)
+	World._relocate(imp, host.tile + aim * 2 + Vector2i(aim.y, aim.x))
+	_check(not World.in_reach(host, imp), "a knight's move off: not a straight line")
+	World._relocate(imp, host.tile + aim * 3)
+	_check(not World.in_reach(host, imp), "three cells: past its two")
+	World.despawn(imp)
+	var boar := _main._spawn({"script": "res://sim/animal.gd", "shape": "capsule", "name": "SpearBoar%d" % World.tick,
+		"tile": host.tile + aim * 4, "kind": "boar", "props": {"mass": 80.0, "max_hp": 18}}) as Animal
+	boar.acts = false
+	host._world_set_facing(aim)
+	host.last_step_tick = World.tick - World.BRACE_TICKS
+	_check(World.braced(host), "the host stood still %d ticks facing the lane: braced" % World.BRACE_TICKS)
+	boar._foe = host
+	boar._charge_until = World.tick + 50
+	boar._world_set_facing(-aim)
+	_check(boar.charging(), "the boar charges")
+	boar.next_move_tick = 0
+	_check(World.try_move(boar, -aim), "a step at four cells: free")
+	boar.next_move_tick = 0
+	hp = boar.hp
+	var at := boar.tile
+	_check(not World.try_move(boar, -aim), "the next, into the spear's reach: stopped")
+	World._resolve_hits()
+	_check(boar.hp == hp - 4 and World.distance(boar.tile, host.tile) > World.distance(at, host.tile) and World.is_stunned(boar),
+			"struck for 4 (twice the blow), thrown back by its own weight (%s -> %s), staggered" % [at, boar.tile])
+	World._relocate(boar, host.tile + aim * 3)
+	boar.stunned_until_tick = 0
+	boar.next_move_tick = 0
+	host.last_step_tick = World.tick
+	_check(World.try_move(boar, -aim), "a spear not braced (the holder just stepped): the charge goes in")
+	World.despawn(boar)
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	World._relocate(host, home)
 
 func _test_loot() -> void:

@@ -1761,7 +1761,10 @@ guard: that blow lands, the holder staggers and cannot raise the shield
 for 2 s. A sword ready in hand parries half of a blow from straight
 ahead. A giant axe's blow sweeps the cell ahead and the two beside it and
 knocks each creature it hurts down for 1.5 s (decision 343): lying, it
-cannot act and is pushed as if half its mass. Raised or drawn, the body turns to the cursor.
+cannot act and is pushed as if half its mass. A spear strikes two cells off
+through an empty cell; held still half a second it is braced, and a
+creature charging onto it is stopped, struck twice over and thrown back
+(decision 344). Raised or drawn, the body turns to the cursor.
 With nothing for it the button shoves and tosses as it always did. E,
 tapped, opens what is under the cursor: a chest, crate or cart, your own
 companion's pack, else a door face beside you; held `BANDAGE_HOLD_MSEC`,

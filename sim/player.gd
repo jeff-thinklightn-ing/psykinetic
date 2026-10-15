@@ -149,7 +149,7 @@ func _pursue_action() -> void:
 	if not is_instance_valid(action_target) or not action_target.spawned:
 		_clear_action()
 		return
-	if World.can_melee(tile, action_target.tile):
+	if World.in_reach(self, action_target, action_order != Order.ATTACK):
 		# World refuses hits during the cooldown and while still mid-step.
 		if World.tick < maxf(next_attack_tick, next_move_tick):
 			return

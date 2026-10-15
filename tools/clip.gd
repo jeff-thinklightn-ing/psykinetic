@@ -55,6 +55,9 @@ extends Node
 ##   items_axe: the giant axe (decision 343): slow, both hands; one swing
 ##     at three imps in an arc strikes all three and knocks them down;
 ##     they lie a moment, then get up.
+##   items_spear: the spear (decision 344): a boar, made to charge (staged:
+##     item_provoke), meets the hunter standing still with a spear
+##     (braced): the charge is stopped and the boar thrown back.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -158,6 +161,8 @@ func _ready() -> void:
 			_items_block()
 		"items_axe":
 			_items_axe()
+		"items_spear":
+			_items_spear()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -577,6 +582,25 @@ func _items_axe() -> void:
 	]
 
 
+func _items_spear() -> void:
+	var rows: Array[String] = ["################"]
+	for y in 7:
+		rows.append("#..............#")
+	rows.append("################")
+	var markers := {Vector2i(3, 4): "start", Vector2i(7, 4): "monster_boar"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9,
+		"entities": [{"at": [7, 4], "facing": [1, 0]}], "legend": {"monster_boar": "#705040"}}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["spear", Player.RIGHT_HAND], "A spear. A boar runs from you, into a corner."],
+		["walk", Vector2i(8, 4), ""],
+		["item_face", "boar", ""],
+		["say", 15, "Standing still, the spear is braced."],
+		["item_provoke", "boar", "(Staged: the boar made to charge.)"],
+		["say", 100, "The charge breaks on the spear, and the boar is thrown back."],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -944,6 +968,14 @@ func _on_tick(tick: int) -> void:
 			var struck: GridEntity = World.get_entity_at(step[1])
 			if struck != null and not World.try_attack(_player, struck):
 				return
+		"item_provoke":
+			# Staging: the first animal of kind step[1] charges the player, as
+			# if struck while standing (Animal's own trigger).
+			for entity in World.monsters():
+				if entity is Animal and str(entity.spawn_spec.get("kind", "")) == step[1]:
+					(entity as Animal)._foe = _player
+					(entity as Animal)._charge_until = tick + Animal.CHARGE_TICKS
+					entity.alert = Monster.Alert.FIGHTING
 		"item_bold":
 			# The clip's monsters of kind step[1] made bold, so they close in.
 			for entity in World.monsters():
@@ -1155,10 +1187,10 @@ func _log(tick: int) -> void:
 			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
 		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
 		return
-	if scenario == "items_axe":
+	if scenario in ["items_axe", "items_spear"]:
 		var them := []
 		for entity in World.monsters():
-			them.append("%s at %s hp %d%s" % [entity.name, entity.tile, entity.hp, " DOWN" if World.is_down(entity) else ""])
+			them.append("%s at %s hp %d %s%s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert], " DOWN" if World.is_down(entity) else ""])
 		print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp, ", ".join(them)])
 		return
 	if scenario == "items_block":

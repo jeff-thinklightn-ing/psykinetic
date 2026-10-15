@@ -92,6 +92,9 @@ var guard_broken_until := 0
 ## it cannot act and is easily pushed. A creature's replicates, for the
 ## views.
 var down_until := 0
+## Server: the tick it last took a step (World.try_move): a spear is braced
+## standing still (World.braced, decision 344).
+var last_step_tick := -100000
 ## Server: the tick it was last hurt (World.damage); out of combat after a while.
 var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH

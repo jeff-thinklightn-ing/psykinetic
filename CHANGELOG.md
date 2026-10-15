@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Spears reach two cells, through an empty one. Stand still a moment and the
+  spear is braced: a charging boar or brute that runs onto it is stopped,
+  hurt and thrown back by its own weight.
 - The giant axe is slow but sweeps the three cells in front of you, and knocks
   everyone it hits off their feet for a moment: lying, they can't act and are
   easily shoved.

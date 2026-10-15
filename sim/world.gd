@@ -72,6 +72,9 @@ signal pile_gone(pile: GroundPile)
 signal guard_met(target: GridEntity, source: GridEntity, broken: bool)
 ## [param target] was knocked down by [param source]'s blow (decision 343).
 signal knocked_down(target: GridEntity, source: GridEntity)
+## [param holder]'s braced spear stopped [param charger]'s charge (decision
+## 344).
+signal braced_against(holder: GridEntity, charger: GridEntity)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -239,6 +242,13 @@ const GUARD_BROKEN_TICKS := 20
 ## A body knocked down (decision 343) is pushed as if it weighed this much
 ## of its mass: lying, it cannot brace.
 const DOWN_MASS_FACTOR := 0.5
+## A spear is braced (decision 344) once its holder has stood this
+## many ticks without a step; a creature charging into its reach is then
+## stopped, struck for BRACE_DAMAGE_FACTOR times the blow and pushed back
+## with BRACE_FORCE_PER_KG times its own mass: its own charge, turned.
+const BRACE_TICKS := 5
+const BRACE_DAMAGE_FACTOR := 2.0
+const BRACE_FORCE_PER_KG := 0.03
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
@@ -2522,6 +2532,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	if tick < entity.next_move_tick or is_stunned(entity):
 		return false
+	if _meets_brace(entity, entity.tile + direction, direction):
+		return false
 	var duration := step_ticks(entity, direction)
 	# A walk in progress keeps its own clock: a step due at 12.5 and taken
 	# on tick 13 starts at 12.5, so the next is due at 15, not 15.5.
@@ -2537,6 +2549,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 			walked_off.emit(entity, direction)
 		return false
 	entity.next_move_tick = start + duration
+	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
 	if entity.raised == "draw":
 		entity.raised_tick = tick  # A step spoils the draw: it starts again.
 	entity._world_set_facing(direction)
@@ -3064,7 +3077,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 		return false
 	if not can_target(attacker, target) or is_stunned(attacker):
 		return false
-	if tick < attacker.next_attack_tick or not can_melee(attacker.tile, target.tile):
+	if tick < attacker.next_attack_tick or not in_reach(attacker, target, is_shove):
 		return false
 	# No hitting mid-step: the attacker's tile changes when a step starts, but
 	# on screen it is still crossing over, so the blow would land from afar.
@@ -3072,7 +3085,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 		return false
 	var aim: Vector2i = target.tile - attacker.tile
 	if push_direction == Vector2i.ZERO:
-		push_direction = aim
+		push_direction = aim.clamp(Vector2i(-1, -1), Vector2i(1, 1))  # A spear's reach: pushed one cell's way.
 	elif push_direction not in DIRECTIONS:
 		return false
 	elif push_direction == -aim and not _can_land_behind(attacker, push_direction):
@@ -3662,6 +3675,67 @@ func is_stunned(entity: GridEntity) -> bool:
 func pushed_mass(entity: GridEntity) -> float:
 	var mass := entity.mass * EXHAUSTED_MASS_FACTOR if entity.is_exhausted() else entity.mass
 	return mass * DOWN_MASS_FACTOR if is_down(entity) else mass
+
+
+## Whether [param attacker] can strike [param target] where they stand:
+## beside it (can_melee), or, with a spear's reach verb and not a
+## [param shove], as far as its cells in a straight line (also diagonal)
+## with every cell between empty and every step open (decision 344).
+func in_reach(attacker: GridEntity, target: GridEntity, shove := false) -> bool:
+	if can_melee(attacker.tile, target.tile):
+		return true
+	var verb := {} if shove else blow_verb(attacker)
+	if verb.get("kind") != "reach":
+		return false
+	var offset := target.tile - attacker.tile
+	var cells := distance(attacker.tile, target.tile)
+	if cells > int(verb["cells"]) or cells < 2:
+		return false
+	var step := offset / cells
+	if step * cells != offset:
+		return false  # Not on a straight line.
+	var at := attacker.tile
+	for i in cells:
+		if not can_melee(at, at + step) or i < cells - 1 and _occupancy.has(at + step):
+			return false
+		at += step
+	return true
+
+
+## Whether [param entity]'s spear is braced (decision 344): a reach
+## verb with brace in its hand, BRACE_TICKS without a step, not stunned.
+func braced(entity: GridEntity) -> bool:
+	var verb := blow_verb(entity)
+	return verb.get("kind") == "reach" and bool(verb.get("brace", false)) and not is_stunned(entity) \
+			and tick - entity.last_step_tick >= BRACE_TICKS
+
+
+## A charging [param mover] stepping onto [param cell] meets a braced
+## spear whose reach, along where its holder faces, covers the cell
+## (decision 344): the step is refused, and the holder's blow is
+## queued on it: its blow times the spear's damage times
+## BRACE_DAMAGE_FACTOR, pushed back the way it came with BRACE_FORCE_PER_KG
+## times its mass. True when it was stopped.
+func _meets_brace(mover: GridEntity, cell: Vector2i, direction: Vector2i) -> bool:
+	if not mover is Monster or not (mover as Monster).charging():
+		return false
+	for facing: Vector2i in DIRECTIONS:
+		for k in [1, 2]:
+			var holder: GridEntity = _occupancy.get(cell - facing * k)
+			if holder == null or holder == mover or holder.facing != facing or not braced(holder) \
+					or k > int(blow_verb(holder)["cells"]) or not can_target(holder, mover):
+				continue
+			if k == 2 and (_occupancy.has(cell - facing) and _occupancy.get(cell - facing) != mover or not can_melee(holder.tile, cell - facing)):
+				continue
+			var amount := maxi(1, roundi(holder.attack_damage * float(blow_verb(holder)["damage"]) * BRACE_DAMAGE_FACTOR))
+			var force := BRACE_FORCE_PER_KG * mover.mass
+			_log("brace: %s's spear stops %s's charge (%d, force %.2f)" % [holder.name, mover.name, amount, force])
+			_queue_hit(holder, mover, mover.tile - holder.tile, -direction, amount,
+					force if force >= knockback_min_force else 0.0, force, false, 0)
+			holder._world_swung(cell - holder.tile)
+			braced_against.emit(holder, mover)
+			return true
+	return false
 
 
 ## Whether [param entity] lies knocked down (knock_down; decision 343).
