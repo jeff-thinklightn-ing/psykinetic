@@ -24,7 +24,7 @@ these rules are in `docs/art_slots_review.md`.
 
 ## Palette
 
-`art/kit/palette.png` is the atlas: 8 rows of 8 swatches, 16 px each (128 × 128), lighter to
+`art/kit/palette.png` is the atlas: 9 rows of 8 swatches, 16 px each (128 × 144), lighter to
 the left. Every piece uses the one material `palette` (`art/kit/palette.tres`), which shows
 it sampled nearest, so a face keeps exactly its swatch's colour. Colour a face by putting its
 UVs inside one swatch (the template does this for the grey box). Jeff may repaint swatches;
@@ -40,6 +40,7 @@ keep the rows.
 | 5 | cloth, leather | `#c2b8a0` `#9c8f74` `#7a6e58` `#4c4a3b` `#6b4a35` `#55392a` `#3d2a1f` `#29231b` |
 | 6 | metal (iron, then bronze) | `#c7c9cc` `#a3a6ab` `#7d8086` `#55575c` `#3e4044` `#c79a55` `#a37d40` `#8a6a3a` |
 | 7 | accents | flame `#ffd27a`, torchlight `#ffb861`, ember `#e8792e`, banner red `#b8322a`, banner blue `#2f5aa8`, magic violet `#7a4fb0`, magic teal `#3fb8a8`, bone `#f4efe6` |
+| 8 | water (terrain's: foam, then shallow to deep) | foam `#f4efe6`, `#8fb3b0`, shallow `#5f8a8c`, `#46707a`, deep `#2f4f5c`, `#213a45` `#16272f` `#0d181d` |
 
 ## Materials
 

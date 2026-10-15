@@ -134,6 +134,7 @@ const PALETTE_FALLBACK: PackedStringArray = [
 	"#c2b8a0", "#9c8f74", "#7a6e58", "#4c4a3b", "#6b4a35", "#55392a", "#3d2a1f", "#29231b",
 	"#c7c9cc", "#a3a6ab", "#7d8086", "#55575c", "#3e4044", "#c79a55", "#a37d40", "#8a6a3a",
 	"#ffd27a", "#ffb861", "#e8792e", "#b8322a", "#2f5aa8", "#7a4fb0", "#3fb8a8", "#f4efe6",
+	"#f4efe6", "#8fb3b0", "#5f8a8c", "#46707a", "#2f4f5c", "#213a45", "#16272f", "#0d181d",
 ]
 const GROUND_CHANNELS := {"grass": 0, "dirt": 1, "stone": 2, "sand": 3}
 ## Water (_build_water): its colours (sRGB) shallow and deep, its foam; its
@@ -2932,7 +2933,7 @@ static func ground_colour(kind: String) -> Color:
 
 
 ## Swatch [param column] of row [param row] of art-kit's palette (sRGB):
-## read from art/kit/palette.png (8 by 8 swatches), so Jeff's repaints show;
+## read from art/kit/palette.png (8 swatches across, a row each kind), so Jeff's repaints show;
 ## the style guide's colours if it cannot be read.
 static var _palette: Image
 
@@ -2944,8 +2945,8 @@ static func swatch(row: int, column: int) -> Color:
 		if _palette != null and _palette.is_compressed():
 			_palette.decompress()
 		if _palette == null or _palette.get_width() < 8:
-			_palette = Image.create(8, 8, false, Image.FORMAT_RGB8)
-			for y in 8:
+			_palette = Image.create(8, PALETTE_FALLBACK.size() / 8, false, Image.FORMAT_RGB8)
+			for y in PALETTE_FALLBACK.size() / 8:
 				for x in 8:
 					_palette.set_pixel(x, y, Color(PALETTE_FALLBACK[y * 8 + x]))
 	var size := _palette.get_width() / 8

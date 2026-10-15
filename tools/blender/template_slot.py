@@ -35,9 +35,12 @@ image.image = bpy.data.images.load(palette)
 image.interpolation = "Closest"
 material.node_tree.links.new(image.outputs["Color"], shader.inputs["Base Color"])
 
-# The swatch's middle, in Blender's UVs (v up from the image's bottom).
+# The swatch's middle, in Blender's UVs (v up from the image's bottom); swatches are square,
+# so the rows are the image's height over a swatch's width.
+width, height = image.image.size
+rows = max(1, round(height / (width / across)))
 u = (column + 0.5) / across
-v = 1.0 - (row + 0.5) / across
+v = 1.0 - (row + 0.5) / rows
 
 for obj in list(bpy.data.objects):
     if obj.type != "MESH":
