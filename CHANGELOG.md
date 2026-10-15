@@ -7,16 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
-- Controls: the right button now does what your off hand holds. With a shield it
-  blocks while held; with a bow it draws, and letting go shoots at the cursor
-  (what a block or an arrow does in a fight comes with combat). With empty
-  hands it still shoves and tosses. Opening chests, crates, carts, doors and
-  your companion's pack moves to E; hold E to bandage.
-
-- The town's residents are people you can see: each goes about their day
-  by the clock, at their workshop, at home or in the square, with their
-  name and trade over their head, and hides indoors when raiders come.
-## v0.1.143
+## v0.1.144
 
 - New things for hunters: a cut of meat (banks as food), a raw hide, a pair of
   antlers and a pair of tusks, ready for the animals to drop.
@@ -28,6 +19,17 @@ notes (decision 324).
   she waits in the town for her player.
 - Monsters work out their way faster, most where they first move after players
   arrive: the server's tick with 9 players nearby is about a fifth shorter.
+- Controls: the right button now does what your off hand holds. With a shield it
+  blocks while held; with a bow it draws, and letting go shoots at the cursor
+  (what a block or an arrow does in a fight comes with combat). With empty
+  hands it still shoves and tosses. Opening chests, crates, carts, doors and
+  your companion's pack moves to E; hold E to bandage.
+- The town's residents are people you can see: each goes about their day
+  by the clock, at their workshop, at home or in the square, with their
+  name and trade over their head, and hides indoors when raiders come.
+
+## v0.1.143
+
 - Companions know the weather when outdoors: rain, fog, wind, a storm or a clear
   sky.
 - A deer or stag that hears you lifts its head with a quiet snort: freeze
