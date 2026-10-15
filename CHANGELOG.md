@@ -4,6 +4,8 @@ Newest first. Worktrees add their bullets under `## Unreleased`; the release ses
 renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
 top section as the release notes.
 
+## Unreleased
+
 ## v0.1.142
 
 - Seven weapons exist as things you can carry: hammer, sword, shield, giant
