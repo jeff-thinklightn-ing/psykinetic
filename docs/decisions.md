@@ -5332,6 +5332,14 @@ renames `## Unreleased`, checks the file reads right after its rebase (the
 release session checks the changelog's top on every cut). Rejected: each
 tree resolving by hand (the conflicts were never real) and a custom merge
 driver (needs setup in every clone; union is built into git).
+
+Amended (2026-10-15, after v0.1.144): `CHANGELOG.md` no longer merges by union.
+A tree whose bullet was written before a cut and rebased after it had its
+bullet kept beside the old top bullet, which the cut had moved under the new
+`## vX.Y.Z`; and 9fd16d8's rebase across the v0.1.144 cut stitched both sides
+into a duplicate section with no conflict shown. A real conflict there is
+cheap (a bullet placed by hand under `## Unreleased`) and silent garbage is
+not. `docs/decisions.md` keeps union: its entries only append at the bottom.
 ## 287. Walls in sets by setting
 
 Jeff, looking at the first wall candidates: they read as castle walls, and a
