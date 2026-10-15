@@ -3978,3 +3978,35 @@ kind's max_level. Raids take residents captive, never kill them
 Also in this step: a crate or cart unloaded at the stockpile credits who
 pushed it there (World keeps each cargo's last pusher from
 entity_pushed until it is unloaded or gone).
+
+## 242. A new server build is tried on staging ports before it replaces the live one; levels reload live
+
+A deploy used to put a build nobody had run on the box straight in place
+of the live server: an export that would not start, or a snapshot the new
+code could not read, showed only when players were cut off. Now
+`deploy.sh --staged` runs server/stage.sh between the export and the
+countdown: it starts the new build from build/ as the deploying user on
+UDP 7787 with its console on 7788 (never the live 7777/7778, nor the
+box's Ollama on 11600), with a throwaway token and copies of the live
+snapshot and edited levels, everything it writes (snapshot, mind log,
+transcripts, Godot's user data) under a temp folder; a headless client on
+the repo joins, walks and reports; `stop 0` must save and exit 0. A
+failure, or a script error in either log, stops the deploy with the live
+server untouched. It never reads /etc/psykinetic/env: the staged token is
+random, and with no LLM settings the staged companions think scripted.
+
+The same script prints the running server's build and protocol beside the
+new one's first, so whoever deploys sees whether the clients must update
+(decision 239). tools/deploy_box.ps1 is the coordinator's one command
+after a release: that comparison against origin/main (and whether the
+version is released yet, since self-updating clients need it published,
+decision 241), then `deploy.sh --staged` over ssh, then what runs; it asks
+nothing and exits non-zero on any failure.
+
+Live reload: the console's `reload <zone>|all` reads a zone's level from
+disk again and rebuilds it as builder mode already did (reload_zone: the
+players stay, everyone there is sent the new terrain), without a restart.
+`all` reloads each open zone whose level files changed since they were
+read, by folder and md5 (mtimes are a second coarse); a zone whose level
+is gone (a builder undo) is left as it is. Level data in the export
+itself still changes only with a deploy; this is for the overlay.

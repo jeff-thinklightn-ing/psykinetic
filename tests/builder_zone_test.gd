@@ -176,6 +176,17 @@ func _test_console() -> void:
 	_check("$" in _main.admin_command("builder") and "test_room" in _main.admin_command("builder"), "builder: how it is, the edited levels")
 	var exported: String = _main.admin_command("builder export")
 	_check("layout.png -> levels/test_room/layout.png" in exported and "level.json" in exported, "builder export: where each file goes")
+	_check(_main.admin_command("reload all").begins_with("no open zone"), "reload all: nothing changed on disk, nothing reloaded")
+	var json := Level.overlay_dir + "test_room/level.json"
+	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(json))
+	config["name"] = "The Test Room, edited by hand"
+	FileAccess.open(json, FileAccess.WRITE).store_string(JSON.stringify(config, "	"))
+	var reloaded: String = _main.admin_command("reload all")
+	_check(reloaded.begins_with("test_room reloaded from") and _main.level.get("display_name", "") == "The Test Room, edited by hand",
+		"reload all: a level edited on disk is read again, no restart (%s)" % reloaded)
+	_check(_main.admin_command("reload all").begins_with("no open zone"), "and only once")
+	_check(_main.admin_command("reload test_room").begins_with("test_room reloaded"), "reload <zone>: that one, changed or not")
+	_check(_main.admin_command("reload nowhere").contains("not open"), "reload of a zone not open: says so")
 	_check("dropped" in _main.admin_command("builder drop test_room") and not Level.overlaid("test_room"), "builder drop: the repo's level again")
 	_check("usage" in _main.admin_command("builder drop nothing_here"), "builder drop of a level not edited: how to use it")
 

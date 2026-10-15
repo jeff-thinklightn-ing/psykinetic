@@ -190,6 +190,8 @@ var _had_player := false
 var _rejected := false
 ## Client: trying to get back to the server (decision 240).
 var _reconnecting := false
+## Each level's files as last read (_level_stamp), for the console's reload.
+var _level_stamps: Dictionary[String, String] = {}
 ## Client: told once that the server runs a newer build of the same protocol.
 var _told_newer := false
 ## Server: when the console's restart is due (msec), -1 when none is, and
@@ -1183,6 +1185,7 @@ func _load_level(level_name: String) -> bool:
 	level_entities.assign(loaded["entities"])
 	player_starts.assign(loaded["starts"])
 	level_centre = loaded["centre"]
+	_level_stamps[map_name] = _level_stamp(map_name)
 	print("[level] %s: %d cells, %d entities, %d starts, %d links" % [map_name, _terrain["floor"].size(),
 		level_entities.size(), player_starts.size(), loaded["links"].size()])
 	return true
@@ -1205,6 +1208,52 @@ func reload_zone(zone_name: String) -> void:
 		if peer != Net.local_id:
 			Net.message_to(peer, "terrain", message)
 	_view_zone = ""  # A host in that zone draws it again.
+
+
+## What level [param level_name]'s files on disk are: their folder and each
+## one's md5, so the console's reload sees an edited level however soon.
+func _level_stamp(level_name: String) -> String:
+	if not Level.exists(level_name):
+		return "gone"
+	var folder := Level.folder_of(level_name)
+	if not DirAccess.dir_exists_absolute(folder):
+		return "in memory"  # Level.register's: nothing on disk to change.
+	var parts: Array[String] = [folder]
+	for file in DirAccess.get_files_at(folder):
+		if not file.ends_with(".import"):
+			parts.append("%s=%s" % [file, FileAccess.get_md5(folder + file)])
+	return "|".join(parts)
+
+
+## Server: the console's reload (decision 242): zone [param words][1], or
+## with "all" each open zone whose level changed on disk since it was read
+## (an edited level put in the overlay by hand, say), read again and rebuilt
+## as builder mode does (reload_zone): the players stay, everyone in it gets
+## the new terrain, no restart.
+func _reload_command(words: PackedStringArray) -> String:
+	if words.size() < 2:
+		return "usage: reload <zone> | reload all (zones: %s)" % ", ".join(World.zones.keys())
+	var names: Array[String] = []
+	var lines: Array[String] = []
+	if words[1] == "all":
+		for each: String in World.zones.keys():
+			if not Level.exists(each):
+				continue  # Its level was taken away (builder undo): left as it is.
+			if _level_stamps.get(each, "") != _level_stamp(each):
+				names.append(each)
+		if names.is_empty():
+			return "no open zone's level changed on disk (%d open)" % World.zones.size()
+	elif not World.zones.has(words[1]):
+		return "zone %s is not open (zones: %s); it reads its level when it opens" % [words[1], ", ".join(World.zones.keys())]
+	elif not Level.exists(words[1]):
+		return "zone %s has no level on disk any more; left as it is" % words[1]
+	else:
+		names.append(words[1])
+	for each in names:
+		reload_zone(each)
+		lines.append("%s reloaded from %s, %d players there kept" % [each, Level.folder_of(each), World.peers_in(each).size()])
+	return "
+".join(lines)
 
 
 ## Server: the game's edits to level [param level_name] are gone (the
@@ -3095,6 +3144,8 @@ func admin_command(line: String) -> String:
 			return "v%s protocol %s" % [Net.version, Net.protocol()]
 		"restart", "stop":
 			return _restart_command(words)
+		"reload":
+			return _reload_command(words)
 		"net":
 			var peers: Array[String] = []
 			var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
@@ -3104,7 +3155,7 @@ func admin_command(line: String) -> String:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | save | builder | builder export | builder drop <name>"
 	return "unknown command %s (try help)" % words[0]

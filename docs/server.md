@@ -101,6 +101,26 @@ one not running.
 systemd starts again after `RestartSec=5`, as the same build: a restart
 without a deploy.
 
+Staged (decision 242): `deploy.sh --staged` tries the new build before the
+running server is touched. `server/stage.sh` prints the running server's
+build and protocol beside the new one's and whether the clients must
+update; starts the new build from `build/` as the deploying user on UDP
+7787 with its console on 7788 (never 7777/7778, nor the box's Ollama on
+11600), with a throwaway token and copies of the live snapshot and edited
+levels, writing only under a temp folder (its mind log and transcripts
+too); has a headless client (the Godot binary, on the repo) join, walk a
+step and report; and stops it with `stop 0`, which must save and exit 0.
+If any of that fails, or either printed a script error, `deploy.sh` stops
+there with the staged logs' last lines and the live server as it was.
+
+From the dev machine, `tools\deploy_box.ps1` (`-Now` for no countdown) is
+the coordinator's one command after a release, and asks nothing: it prints
+the box's build and protocol beside `origin/main`'s, and whether the
+clients must update (and if so whether that version is released yet,
+since an unpublished one leaves them nothing to update to); runs
+`deploy.sh --staged` over ssh; and prints what the box runs afterwards. It
+exits non-zero if staging or the deploy fails.
+
 From the dev machine, `tools\ship.ps1` runs it over ssh as its last step
 (`$env:PSYKINETIC_BOX`, default `jequig@100.78.120.114`), streams its
 output, then runs `admin.sh players` to show the server is up; `-NoDeploy`
@@ -182,7 +202,11 @@ there), `version` (the build and protocol it runs), `restart [<seconds>]
 [<why>]` (60 by default: count down, telling the players, then save and
 exit 75 for systemd to start it again; the clients reconnect; see Deploy),
 `stop [<seconds>] [<why>]` (the same, exiting 0: down until started, as
-`deploy.sh` does), `restart cancel`, and
+`deploy.sh` does), `restart cancel`, `reload <zone>|all` (read a zone's level
+from disk again and rebuild it as builder mode does, the players staying
+where they are, everyone there sent the new terrain: no restart; `all`
+does each open zone whose level files changed since they were read, such as
+an edited level put into the overlay by hand), and
 `transcript <name> [<YYYY-MM-DD>]` (a companion's transcript, today's by
 default); `help` lists them.
 

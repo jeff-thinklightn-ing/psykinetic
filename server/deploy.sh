@@ -7,6 +7,9 @@
 #                            installed and started, and the clients reconnect
 #                            by themselves (decision 240)
 #   server/deploy.sh --now   installs and restarts at once, without a countdown
+#   server/deploy.sh --staged first tries the new build on staging ports
+#                            (server/stage.sh, decision 242) and stops, the
+#                            running server untouched, if it fails
 # Expects the repo at ~/psykinetic (or $PSYKINETIC_REPO), a Linux Godot
 # editor binary with the Linux export templates installed (GODOT_PATH, or
 # the newest ~/godot/Godot_v*_linux.x86_64 when that is not set, as over a
@@ -16,10 +19,12 @@
 set -eu
 
 NOW=0
+STAGED=0
 for arg in "$@"; do
 	case "$arg" in
 		--now) NOW=1 ;;
-		*) echo "usage: $0 [--now]" >&2; exit 2 ;;
+		--staged) STAGED=1 ;;
+		*) echo "usage: $0 [--staged] [--now]" >&2; exit 2 ;;
 	esac
 done
 COUNTDOWN="${PSYKINETIC_RESTART_SECONDS:-60}"
@@ -46,6 +51,10 @@ mkdir -p build
 "$GODOT" --headless --path . --export-release "$PRESET" build/psykinetic-server.x86_64
 test -s build/psykinetic-server.x86_64
 test -s build/psykinetic-server.pck
+
+if [ "$STAGED" -eq 1 ]; then
+	bash "$REPO/server/stage.sh" || { echo "deploy: the staged build failed; the running server is untouched" >&2; exit 1; }
+fi
 
 # The graceful restart (decision 240): the console's stop counts down,
 # telling the players, saves and exits 0, which the unit's Restart=on-failure
