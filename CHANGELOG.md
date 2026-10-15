@@ -4,6 +4,16 @@ Newest first. Worktrees add their bullets under `## Unreleased`; the release ses
 renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
 top section as the release notes.
 
+## Unreleased
+
+- Every companion is now someone of their own: where they were born, their
+  family, their trade, what they like to eat and do, what they fear, how
+  they talk, and how the two of you met, rolled when they join you, with
+  a name. Their character is written from that once, and they speak from
+  it. Pip, Wren and Nix stay as they were named (Wren and Nix are women;
+  Pip is a young man who wants to become a squire) with the rest of their
+  story rolled, and rest in the town between your trips.
+
 ## v0.1.141
 
 - A companion left in a town works there while you are away: tell her to

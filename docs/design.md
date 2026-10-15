@@ -691,11 +691,12 @@ it appears beside its owner, who has just been put somewhere safe.
 to (`keeper`, `PlayerRecord`), never hers, and so is "companion": nothing
 she reads calls the player either. Every ask begins "You are Pip. You
 travel with Jeff by choice.", with the real names, and names Jeff
-throughout. **Cards** are a paragraph each, written per companion in
-`levels/companions.json` (`{"Pip": {"card": "..."}, ...}`, shipped with
-the server); an authored card wins over the one in her record, and a
-companion not in the file keeps her record's (an old one that spoke of
-"its friend" becomes the default).
+throughout. **Cards** (decision 293): her traits, name included, are
+rolled once from `levels/companion_traits.json` (`CompanionCard.roll`,
+seeded by her player's id) and kept in her record; her card is those
+traits as plain facts until her voice's model writes it, once, as a
+paragraph, with a sentence of how she and her player met. Both are told
+to her voice as what is true of her.
 
 **Hands and voice.** Her mind is split in two, and neither part acts.
 This is a hard rule (`sim/companion_mind.gd`): a mind only answers; it

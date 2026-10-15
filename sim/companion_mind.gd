@@ -37,6 +37,12 @@ func check(_ask: Dictionary) -> Dictionary:
 	return {}
 
 
+## Her card, once (CompanionCard): answers {"card": paragraph, "how_we_met":
+## sentence}, or {} (later, or never: her plain card stands).
+func card(_ask: Dictionary) -> Dictionary:
+	return {}
+
+
 ## Whether an ask of [param _what] ("stance", "voice") is still out; a busy
 ## kind is asked again by the companion once it is free.
 func busy(_what: String) -> bool:

@@ -1,0 +1,38 @@
+{
+	"_note": "What a companion is made of, rolled once when she is first given (Companions.roll, seeded by her player's id, so the same player gets the same roll), and kept in her record. One call to the voice model then writes her card, a paragraph, from these, and one sentence of how she and her player met (decision 293). Each entry is a few plain words, never prose or a line to say. 'trade' in a profession is the trade she works in a town she stays in (decision 284; one of levels/economy.json's, or empty for none). In how_we_met, {player} is her player's name and {pronoun} her own. Lore will supply birthplaces and names per region once facts are agreed.",
+	"name": ["Tamsin", "Bram", "Ozzie", "Juno", "Fenn", "Rook", "Sable", "Hollis", "Mara", "Tobin", "Ivo", "Lark", "Brannoc", "Edda", "Cael", "Rhea", "Odo", "Senna", "Wick", "Ansel", "Fern", "Garrow", "Isolde", "Kip", "Maud", "Corin", "Ysolt"],
+	"legacy": {
+		"_note": "Companions from before the roll, kept (Jeff): a companion with one of these names keeps it, and her 'fixed' facts are seeds the roll keeps, the rest rolled round them; a new roll never gives the name. Keys of 'fixed' replace the rolled trait of that name; others ('who', 'aspiration', 'though': what stands against the aspiration) are added to what the card is written from. They rest in town between trips: when their player leaves the game they go to the town's stockpile and wait (decision 293).",
+		"Pip": {"fixed": {"pronoun": "he", "who": "a young man", "aspiration": "wants to become a squire", "though": "no one has been knighted in ages"}},
+		"Wren": {"fixed": {"pronoun": "she", "who": "a woman"}},
+		"Nix": {"fixed": {"pronoun": "she", "who": "a woman"}}
+	},
+	"pronoun": ["she", "she", "he", "he", "they"],
+	"birthplace": ["a fishing village on a grey coast", "the hill farms", "a mining town in the north", "the lower streets of an old city", "a river barge that never stopped long", "a forest hamlet of charcoal burners", "a crossroads inn", "a walled market town"],
+	"parentage": ["a smith's child", "raised by an aunt who kept bees", "a foundling brought up at a shrine", "the youngest of nine on a farm", "a soldier's child, moved from post to post", "a merchant's child who ran away", "a miner's child", "raised by a grandmother who told stories"],
+	"profession": [
+		{"words": "a carpenter", "trade": "carpenter"},
+		{"words": "a joiner's apprentice who never finished", "trade": "carpenter"},
+		{"words": "a cook", "trade": "cook"},
+		{"words": "a camp cook for caravans", "trade": "cook"},
+		{"words": "a smith", "trade": "smith"},
+		{"words": "a farrier", "trade": "smith"},
+		{"words": "a hunter", "trade": ""},
+		{"words": "a hired guard", "trade": ""}
+	],
+	"hobby": ["carving small animals from wood", "collecting smooth stones", "singing old work songs", "playing dice", "drawing maps of where they have been", "fishing", "mending other people's things", "watching birds"],
+	"food": ["fresh bread", "smoked fish", "honey cakes", "anything spicy", "plain porridge", "apples", "roast chestnuts", "strong cheese"],
+	"temperament": ["steady and watchful", "quick and wary", "warm and talkative", "quiet and patient", "blunt and fearless", "cheerful under pressure", "careful and thoughtful", "restless and curious"],
+	"fear": ["deep water", "the dark", "fire", "being left behind", "closed spaces", "heights", "sickness", "being in debt"],
+	"speech": ["short, whole sentences", "a plain, warm way", "a dry, wry way", "a careful, precise way", "a blunt way, with no softening", "an easy, friendly way"],
+	"how_we_met": [
+		"{player} found {pronoun} hiding in a ruined mill",
+		"{pronoun} pulled {player} out of a flooded cellar",
+		"they shared a fire on a cold road and kept walking together",
+		"{player} paid off a debt {pronoun} owed a tavern keeper",
+		"they were the only two to walk away from a caravan ambush",
+		"{pronoun} was guarding a bridge {player} needed to cross, and they came to terms",
+		"{player} was lost in a forest and {pronoun} knew the way out",
+		"they were hired for the same job and the employer never paid either of them"
+	]
+}

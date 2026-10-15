@@ -73,6 +73,7 @@ func _ready() -> void:
 	_test_senses()
 	_test_errands()
 	_test_nobody_hears()
+	_test_card()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -798,6 +799,59 @@ func _test_nobody_hears() -> void:
 	_settle(pet)
 
 
+func _test_card() -> void:
+	print("
+== who she is: traits rolled once, a plain card from them, one written by her voice's model ==")
+	var pet := _companion()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var traits := CompanionCard.roll(Net.player_id)
+	_check(traits == CompanionCard.roll(Net.player_id) and traits != CompanionCard.roll("someone else"), "the same player rolls the same")
+	_check(traits["name"] == record.companion["name"] and String(pet.label) == traits["name"], "her name is rolled too (%s)" % traits["name"])
+	_check(CompanionCard.roll(Net.player_id, "Ysolt")["name"] == "Ysolt"
+		and CompanionCard.roll(Net.player_id, "Ysolt")["fear"] == traits["fear"], "one who has a name keeps it, the rest rolled alike")
+	_check(CompanionCard.roll(Net.player_id, "", [traits["name"]])["name"] != traits["name"], "a name another has is rolled again")
+	var never: Array[String] = []
+	for i in 200:
+		var rolled: String = CompanionCard.roll("player %d" % i)["name"]
+		if CompanionCard.is_legacy(rolled):
+			never.append(rolled)
+	_check(never.is_empty() and CompanionCard.is_legacy("Wren") and CompanionCard.is_legacy("Nix") and CompanionCard.is_legacy("Pip")
+		and not CompanionCard.is_legacy("Tamsin"), "Wren, Nix and Pip are from before: a new roll never gives their names (%s)" % [never])
+	_check(CompanionCard.roll("a", "Nix")["pronoun"] == "she" and CompanionCard.roll("b", "Wren")["pronoun"] == "she"
+		and CompanionCard.roll("a", "Nix")["name"] == "Nix", "and they keep their names; Wren and Nix are women, the rest rolled")
+	var pip := CompanionCard.roll("c", "Pip")
+	var pip_card := CompanionCard.plain_card(pip)
+	_check(pip["pronoun"] == "he" and pip_card.begins_with("Pip, a young man, was born") and "He wants to become a squire, though no one has been knighted in ages." in pip_card
+		and "Aspiration: wants to become a squire" in CompanionCard.facts(pip, "Jeff"), "Pip is a young man who wants to be a squire: %s" % pip_card)
+	var plain := CompanionCard.plain_card(traits)
+	_check(str(traits["birthplace"]) in plain and str(traits["fear"]) in plain and not "\"" in plain, "her plain card says her traits as facts: %s" % plain)
+	var facts := CompanionCard.facts(traits, "Player")
+	_check(("How they met: %s" % CompanionCard.met(traits, "Player")) in facts and not "{" in facts, "the card call is told her traits: %s" % facts.replace("
+", " | "))
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("traits", {}) == record.companion["traits"] and saved.companion.get("how_we_met") == record.companion["how_we_met"],
+		"her traits and how they met are saved and read back")
+	var mind := CountingMind.new()
+	pet.mind = mind
+	pet.card_by = "plain"
+	mind.card_answer = {"card": "She says \"Hello there\" a lot.", "how_we_met": "They met."}
+	pet.write_card()
+	_check(mind.card_asks.size() == 1 and pet.card_by == "plain" and pet.card == record.companion["card"], "a card with speech in it is not taken")
+	var written := "%s grew up on %s and keeps her own counsel. She is careful with strangers and fierce with friends, and she would rather walk all night than sleep near deep water." % [traits["name"], traits["birthplace"]]
+	mind.card_answer = {"card": written, "how_we_met": "Player found her hiding in a ruined mill, and she has stayed since."}
+	pet.write_card()
+	_check(pet.card == written and pet.card_by == "model" and record.companion["card"] == written and record.companion["card_by"] == "model",
+		"a written card is hers, and kept in her record")
+	_check(record.companion["how_we_met"] == "Player found her hiding in a ruined mill, and she has stayed since." and pet.how_we_met in pet.voice_prompt("test"),
+		"and how they met, as her voice is told it")
+	pet.write_card()
+	_check(mind.card_asks.size() == 2, "written once: not asked again")
+	var ollama := OllamaMind.new(Net.DEFAULT_LLM_URL, "stub", _main)
+	var body: Variant = JSON.parse_string(ollama.request_body("s", "u", "card"))
+	_check(body["format"] == "json" and int(body["options"]["num_predict"]) >= 300, "the card call asks for JSON, with room for a paragraph")
+	pet.mind = ScriptedMind.new()
+
+
 func _offer(offered: Array[Dictionary], verb: String) -> int:
 	for i in offered.size():
 		if offered[i]["verb"] == verb:
@@ -1357,10 +1411,11 @@ func _test_voice_knows() -> void:
 			"what she is set on and doing, in her world's words: %s" % pet.doing())
 	_check(prompt.ends_with("[Brute fell.]"), "and the event, narrated last")
 	World.despawn(imp)
-	_check(Main.companion_card("Pip").length() > 200 and Main.companion_card("Nobody").is_empty(),
-			"cards are paragraphs in levels/companions.json, by name")
-	_check(pet.card == Main.companion_card(String(pet.name)) and pet.card in pet.voice_prompt("test"),
-			"her card is her authored one, and her voice reads it")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_check(not pet.traits.is_empty() and pet.traits == record.companion["traits"] and pet.card == record.companion["card"],
+			"her traits and card are her record's (%s)" % [pet.traits.get("profession", "")])
+	_check(pet.card in pet.voice_prompt("test") and ("How you and Player met: %s" % pet.how_we_met) in pet.voice_prompt("test"),
+			"her voice reads her card, and how she and her player met, as facts")
 	var mind := OllamaMind.new(Net.DEFAULT_LLM_URL, "stub", _main)
 	var voice: Variant = JSON.parse_string(mind.request_body("s", "u", "voice"))
 	var stance: Variant = JSON.parse_string(mind.request_body("s", "u", "stance"))
@@ -1652,11 +1707,13 @@ func _test_surroundings() -> void:
 	_check(rows[1].split(" ").size() == Companion.GRID_SIZE, "13 to a row: %s" % rows[1])
 	var centre := Companion.GRID_SIZE / 2
 	var at := func(dx: int, dy: int) -> String: return rows[1 + centre + dy].split(" ")[centre + dx]
-	# Pip and Player share a letter: he is "&".
-	_check(at.call(0, 0) == "P" and at.call(0, 1) == "&", "her at the centre, her player below: %s" % grid)
+	# Her initial; her player's, or "&" when they share it (Pip and Player).
+	var mine := String(pet.name).left(1).to_upper()
+	var theirs := "&" if mine == "P" else "P"
+	_check(at.call(0, 0) == mine and at.call(0, 1) == theirs, "her at the centre, her player below: %s" % grid)
 	_check(at.call(0, 2) == "D" and at.call(0, 3) == "?", "the closed door in its doorway, nothing seen past it")
 	_check(at.call(0, -1) == "#", "the wall at her back")
-	_check(rows[-1].begins_with("Key: P you, & Player, i imp, b brute"), "and the key: %s" % rows[-1])
+	_check(rows[-1].begins_with("Key: %s you, %s Player, i imp, b brute" % [mine, theirs]), "and the key: %s" % rows[-1])
 	World._set_door(door, true, owner)
 	_check(pet.perception_grid().split("\n")[1 + centre + 2].split(" ")[centre] == "d", "an open door is d")
 	_check("- an open door" in pet.perception_list(), "and open in the list")
@@ -1671,7 +1728,7 @@ func _test_surroundings() -> void:
 		"an imp between them: %s" % around)
 	_check("- a crate, a few paces to the west" in around, "a crate, by the compass: %s" % around)
 	grid = pet.perception_grid()
-	_check(grid.split("\n")[1 + centre].split(" ").slice(centre - 2, centre + 3) == PackedStringArray(["c", ".", "P", "i", "&"]),
+	_check(grid.split("\n")[1 + centre].split(" ").slice(centre - 2, centre + 3) == PackedStringArray(["c", ".", mine, "i", theirs]),
 		"on the map too: %s" % grid.split("\n")[1 + centre])
 	World.damage(imp, 999)
 	World.despawn(crate)
@@ -1927,7 +1984,7 @@ func _test_how_she_speaks() -> void:
 	pet._instruction = "Player just said to you: \"Stay close to the wall\""
 	_check(pet._echo_of("Stay close to the wall.") != "", "and one repeating her instruction")
 	pet._instruction = ""
-	pet.card = Main.companion_card(String(pet.name)) if not Main.companion_card(String(pet.name)).is_empty() else Main.COMPANION_CARD
+	pet.card = str(_main._records[Net.player_id].companion["card"])
 
 
 func _test_surroundings_when_new() -> void:
@@ -2406,6 +2463,8 @@ class CountingMind:
 	var voice_answer := {"say": "", "stance": ""}
 	var check_answer := {"asked": true}
 	var check_asks: Array[Dictionary] = []
+	var card_answer := {}
+	var card_asks: Array[Dictionary] = []
 
 	func _init() -> void:
 		kind = "counting"
@@ -2421,6 +2480,10 @@ class CountingMind:
 	func check(ask: Dictionary) -> Dictionary:
 		check_asks.append(ask)
 		return check_answer.duplicate()
+
+	func card(ask: Dictionary) -> Dictionary:
+		card_asks.append(ask)
+		return card_answer.duplicate()
 
 	func clear() -> void:
 		stance_asks.clear()

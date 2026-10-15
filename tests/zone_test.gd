@@ -339,7 +339,7 @@ func _test_overheard() -> void:
 	_check(nix_mind.voice_asks.is_empty() and "%s: Anyone see a way out?" % Net.player_name in Companion.render(nix.voice_messages()),
 		"Nix hears it, but is not asked: it was not his player's, and did not name him")
 	_main._chat_tick.clear()
-	_main._player_said(host, "Nix, can you see a way out?")
+	_main._player_said(host, "%s, can you see a way out?" % nix.label)
 	_check(not nix_mind.voice_asks.is_empty(), "named, Nix is asked")
 	# The fallen hear, but cannot speak.
 	World.damage(bo, 999)

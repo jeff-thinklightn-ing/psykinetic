@@ -73,19 +73,6 @@ const TOSS_AIM_LENGTH := 26.0
 ## A move click off the floor goes to the nearest walkable cell within this
 ## many tiles of the click point (Euclidean on the ground plane), or nowhere.
 const SNAP_RANGE := 3.0
-const COMPANION_NAMES: Array[String] = ["Pip", "Nix", "Tamsin", "Bram", "Ozzie", "Wren", "Juno", "Fenn"]
-const COMPANION_CARD := "Loyal and cautious. Guards the one she travels with, and says little, in short, plain sentences."
-## Companions' cards, a paragraph each, by name; any companion not in it
-## keeps the card in its record (COMPANION_CARD for a new one).
-const COMPANION_CARDS := "res://levels/companions.json"
-static var _cards: Dictionary[String, String] = {}
-## Each companion's trade, read from the same file.
-static var _trades: Dictionary[String, String] = {}
-## Cards earlier builds gave every companion, which spoke of "its friend":
-## a record that still has one gets COMPANION_CARD.
-const OLD_COMPANION_CARDS: Array[String] = ["Loyal and cautious. Guards the one she travels with, and speaks little.",
-	"A loyal, cautious companion who guards its friend and speaks little.",
-	"A loyal, cautious companion who guards its friend."]
 const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 ## What a companion says as she falls.
 const COMPANION_DEATH_LINES: Array[String] = ["Go on... without me.", "I'm sorry.", "Tell them I tried.", "Keep... going."]
@@ -1921,6 +1908,11 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not resident.is_empty():
 		if str(resident.get("zone", "")) != World.zone.name:
 			print("[net] %s's companion %s works in %s; not here" % [record.name, record.companion.get("name", "?"), resident.get("zone", "?")])
+			# Told where she is, so she does not read as lost.
+			var town := str(resident.get("zone", ""))
+			var town_name := str(Level.load_level(town).get("display_name", town)) if Level.exists(town) else town
+			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s is %s in %s. Go there to travel together again." % [
+				record.companion.get("name", "Your companion"), "working" if not str(resident.get("trade", "")).is_empty() else "resting", town_name]})
 			return
 		if World.towns != null:
 			World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion["name"]))
@@ -1943,11 +1935,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# has none: give it one now.
 	var is_new := record.companion.is_empty() or not record.companion.get("name") is String
 	if is_new:
-		record.companion = {
-			"name": COMPANION_NAMES[posmod(record.index - 1, COMPANION_NAMES.size())],
-			"card": COMPANION_CARD, "hp": 0, "stamina": 0,
-			"tile": [player.tile.x, player.tile.y], "alive": true,
-		}
+		record.companion = {"hp": 0, "stamina": 0, "tile": [player.tile.x, player.tile.y], "alive": true}
+	_give_traits(record)
 	if not record.companion.get("alive", true):
 		print("[net] %s's companion %s died earlier; none spawned" % [record.name, record.companion["name"]])
 		return
@@ -1975,19 +1964,17 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		return
 	pet.keeper_id = record.player_id
 	pet.keeper = player
-	pet.card = str(record.companion.get("card", COMPANION_CARD))
-	if pet.card in OLD_COMPANION_CARDS:
-		pet.card = COMPANION_CARD
-	# An authored card (levels/companions.json) wins over the record's.
-	var authored := companion_card(String(record.companion["name"]))
-	if not authored.is_empty():
-		pet.card = authored
-	record.companion["card"] = pet.card
+	pet.traits = record.companion["traits"]
+	pet.card = str(record.companion["card"])
+	pet.how_we_met = str(record.companion.get("how_we_met", ""))
+	pet.card_by = str(record.companion.get("card_by", "plain"))
+	pet.card_written.connect(_on_card_written.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
 	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
 	pet.party_log = party_log
 	pet.mind = _make_mind()
 	pet.mind.warm()  # The model loads now, not on her first ask.
+	pet.write_card()  # Once: a plain card stands until it is written.
 	pet.said.connect(_on_companion_said.bind(pet))
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
@@ -2014,31 +2001,34 @@ func _revive_companions(zone_name := "") -> Array[String]:
 	return revived
 
 
-## The card written for companion [param pet_name] in COMPANION_CARDS, or "".
-static func companion_card(pet_name: String) -> String:
-	if _cards.is_empty() and FileAccess.file_exists(COMPANION_CARDS):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(COMPANION_CARDS))
-		if parsed is Dictionary:
-			for key: String in parsed:
-				if not key.begins_with("_") and parsed[key] is Dictionary:
-					_cards[key] = str(parsed[key].get("card", ""))
-		if _cards.is_empty():
-			_cards["_none"] = ""  # Read once, even when empty.
-	return str(_cards.get(pet_name, ""))
+## Gives the companion in [param record] her traits (CompanionCard.roll,
+## decision 293) if she has none: a new one's name rolled too, not one
+## another record's companion has; one from before keeps hers. Her card is
+## then her traits as plain facts until the written one comes (card_by
+## "plain"; "model" once written).
+func _give_traits(record: PlayerRecord) -> void:
+	if record.companion.get("traits") is Dictionary and not record.companion["traits"].is_empty():
+		return
+	var taken: Array[String] = []
+	for other: PlayerRecord in _records.values():
+		if other != record and other.companion.get("name") is String:
+			taken.append(str(other.companion["name"]))
+	var kept := str(record.companion.get("name", "")) if record.companion.get("name") is String else ""
+	var traits := CompanionCard.roll(record.player_id, kept, taken)
+	record.companion["name"] = traits["name"]
+	record.companion["traits"] = traits
+	record.companion["card"] = CompanionCard.plain_card(traits)
+	record.companion["card_by"] = "plain"
+	var met := CompanionCard.met(traits, record.name)
+	record.companion["how_we_met"] = met.left(1).to_upper() + met.substr(1) + "."
+	print("[net] %s's companion %s: traits rolled (%s, %s)" % [record.name, traits["name"], traits["profession"], traits["temperament"]])
 
 
-## The trade companion [param pet_name] works in a town she stays in
-## (levels/companions.json "trade", until cards say): "" for none.
-static func companion_trade(pet_name: String) -> String:
-	if _trades.is_empty() and FileAccess.file_exists(COMPANION_CARDS):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(COMPANION_CARDS))
-		if parsed is Dictionary:
-			for key: String in parsed:
-				if not key.begins_with("_") and parsed[key] is Dictionary:
-					_trades[key] = str(parsed[key].get("trade", ""))
-		if _trades.is_empty():
-			_trades["_none"] = ""  # Read once, even when empty.
-	return str(_trades.get(pet_name, ""))
+## Her card came back from the voice model: kept in her record.
+func _on_card_written(pet: Companion, record: PlayerRecord) -> void:
+	record.companion["card"] = pet.card
+	record.companion["how_we_met"] = pet.how_we_met
+	record.companion["card_by"] = pet.card_by
 
 
 ## Her player gone from her without her (left the game, or travelled on
@@ -2052,7 +2042,7 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 		return false
 	var pet_name := String(record.companion.get("name", pet.name))
 	var place := Stockpile.place_at(World.holdings, World.zone.name, pet.tile)
-	var trade := companion_trade(pet_name)
+	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if place.is_empty() or trade.is_empty():
 		return false
 	World.towns.note_companion_in(place, pet_name, trade)
@@ -2060,6 +2050,39 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	pet.works_as = trade
 	print("[town] %s's companion %s stays in %s and works as its %s" % [record.name, pet_name, place, trade])
 	party_log.add("%s stays in the town and works as its %s." % [pet_name, trade])
+	return true
+
+
+## A companion from before the roll (Wren, Nix: CompanionCard.is_legacy)
+## rests in town between trips: her player gone from the game, she goes
+## to the first stockpile the town holds, a resident there, working her
+## trade if she has one, until her player comes to that zone
+## (_join_companion). Nowhere for her (no town holds a stockpile yet), she
+## waits where she is, as any companion.
+func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
+	if World.towns == null or World.holdings == null:
+		return false
+	var place := ""
+	var places := World.holdings.places_of(Stockpile.TOWN)
+	places.sort()
+	for each in places:
+		if World.holdings.place(each).get("kind") == Stockpile.KIND:
+			place = each
+			break
+	if place.is_empty():
+		return false
+	var pet_name := String(record.companion.get("name", pet.name))
+	var trade := str(record.companion.get("traits", {}).get("trade", ""))
+	if not trade.is_empty():
+		World.towns.note_companion_in(place, pet_name, trade)
+	record.companion["resident"] = {"place": place, "zone": str(World.holdings.place(place).get("area", "")), "trade": trade}
+	record.companion["tile"] = null  # Wherever she rests: beside her player when they come.
+	_travelling = true  # She leaves; she does not die.
+	World.despawn(pet)
+	_travelling = false
+	_companions.erase(id)
+	print("[town] %s's companion %s rests in %s between trips" % [record.name, pet_name, place])
+	party_log.add("%s goes back to the town to rest." % pet_name)
 	return true
 
 
@@ -2571,8 +2594,8 @@ func _leave(peer: int, player: Player, id: String) -> void:
 		_remember_companion(id)
 		pet.keeper = null
 		pet.current_intent = Companion.Intent.IDLE
-		if record != null:
-			_stay_in_town(record, pet)
+		if record != null and not _stay_in_town(record, pet) and CompanionCard.is_legacy(str(record.companion.get("name", ""))):
+			_rest_in_town(record, pet, id)
 	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
 	party_log.add("%s left." % (record.name if record != null else "someone"))
 

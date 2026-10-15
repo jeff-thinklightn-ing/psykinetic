@@ -2,7 +2,7 @@ extends Node
 ## A companion left in town works there (decision 284): a test town (made in
 ## code) with a stockpile place the town holds, and a road beside it. Her
 ## player travels on while she is told to stay on the town's ground: she
-## stays, a resident working her trade (levels/companions.json), not
+## stays, a resident working her trade (her rolled profession's), not
 ## spawned on the road; her voice is told so; travelling back, she leaves
 ## her work and follows. Her player leaving the game while she stands there
 ## does the same, and coming back ends it. Off the town's ground, or not
@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_stays_when_told()
 	_test_stays_when_left()
 	_test_goes_when_not_told()
+	_test_legacy_rests_in_town()
 
 	remove_child(_main)
 	_main.free()
@@ -73,15 +74,17 @@ func _boot() -> void:
 func _test_stays_when_told() -> void:
 	print("\n== told to stay on the town's ground, she stays and works while her player travels on ==")
 	var pet := _companion()
-	_check(pet != null and Main.companion_trade(_pet_name()) != "", "(a companion with a trade: %s, %s)" % [
-		pet.name if pet != null else "none", Main.companion_trade(_pet_name()) if pet != null else ""])
+	# Her rolled profession may have no trade (a hunter): this one has.
+	_main._records[Net.player_id].companion["traits"]["trade"] = "carpenter"
+	_check(pet != null and _trade() != "", "(a companion with a trade: %s, %s)" % [
+		pet.name if pet != null else "none", _trade() if pet != null else ""])
 	var ground := _town_cell(Vector2i(-1, -1))
 	_check(ground.x >= 0, "(a walkable cell of the town's ground: %s)" % ground)
 	_put(pet, ground)
 	_told_to_stay(pet)
 	_check(pet.stays_put(), "HOLD, standing as her player's instruction: she stays put")
 	var who := "companion:%s" % _pet_name()
-	var trade := Main.companion_trade(_pet_name())
+	var trade := _trade()
 	_main.travel(Net.local_id, ROAD)
 	_check(World.zone.name == ROAD and _companion() == null, "her player is on the road, and she is not with them")
 	_check(who in World.towns.residents(STORE) and not World.production.worker(who).is_empty()
@@ -106,7 +109,7 @@ func _test_stays_when_left() -> void:
 	var who := "companion:%s" % _pet_name()
 	_main._on_peer_disconnected(Net.local_id)
 	World.step()
-	_check(pet.spawned and pet.works_as == Main.companion_trade(_pet_name()) and not World.production.worker(who).get("away", true),
+	_check(pet.spawned and pet.works_as == _trade() and not World.production.worker(who).get("away", true),
 		"she stays, as before, and works as the town's %s" % pet.works_as)
 	_check("you stay in this town and work as its %s" % pet.works_as in pet.voice_prompt("test"), "her voice is told where she works")
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
@@ -130,6 +133,34 @@ func _test_goes_when_not_told() -> void:
 	var record: PlayerRecord = _main._records[Net.player_id]
 	_check(_companion() != null and not record.companion.has("resident"), "told to stay off the town's ground: she goes with them")
 	_main.travel(Net.local_id, TOWN)
+
+
+func _test_legacy_rests_in_town() -> void:
+	print("
+== Wren and Nix rest in town between trips: their player gone from the game, they go to the town ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var was: String = record.companion["name"]
+	record.companion["name"] = "Nix"
+	_main.travel(Net.local_id, ROAD)
+	var pet := _companion()
+	_check(pet != null and World.zone.name == ROAD, "(her player and she are on the road)")
+	_main._on_peer_disconnected(Net.local_id)
+	_check(not pet.spawned and record.companion.get("resident", {}).get("zone", "") == TOWN and record.companion.get("tile") == null,
+		"her player gone, she goes back to the town to rest (%s)" % [record.companion.get("resident", {})])
+	var told: Array[String] = []
+	var note := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(note)
+	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+	Net.message_received.disconnect(note)
+	_check(World.zone.name == ROAD and _companion() == null, "her player back on the road: she is in the town, not with them")
+	_check(told.any(func(line: String) -> bool: return line.begins_with("Nix is ") and TOWN in line), "and they are told where she is: %s" % [told])
+	_main.travel(Net.local_id, TOWN)
+	pet = _companion()
+	_check(pet != null and World.distance(pet.tile, _player().tile) <= 2 and not record.companion.has("resident"),
+		"in the town she joins them again, beside them")
+	record.companion["name"] = was
 
 
 # --- helpers ------------------------------------------------------------------
@@ -159,6 +190,10 @@ func _town_cell(besides: Vector2i) -> Vector2i:
 			if at != besides and World.is_free(at) and Stockpile.place_at(World.holdings, TOWN, at) == STORE:
 				return at
 	return Vector2i(-1, -1)
+
+
+func _trade() -> String:
+	return str(_main._records[Net.player_id].companion.get("traits", {}).get("trade", ""))
 
 
 func _pet_name() -> String:

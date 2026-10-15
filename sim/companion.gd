@@ -292,6 +292,8 @@ const STANCE_WORDS: Array[String] = [
 
 ## Emitted with a line she says, once the rate limit and the echo check pass.
 signal said(text: String)
+## Her card came back written (write_card): card, how_we_met, card_by set.
+signal card_written
 
 ## The player_id this companion belongs to.
 var keeper_id := ""
@@ -300,6 +302,12 @@ var keeper: GridEntity
 ## Her player's name as last known (keeper_name).
 var keeper_label := ""
 var card := "Loyal and cautious. Guards the one she travels with, and says little, in short, plain sentences."
+## What she is made of (CompanionCard.roll), how she and her player met
+## (a sentence), and who wrote her card: "plain" (her traits as facts) or
+## "model" (written once by her voice's model: write_card).
+var traits := {}
+var how_we_met := ""
+var card_by := "plain"
 var mind: CompanionMind
 var party_log: PartyLog
 
@@ -1158,6 +1166,39 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 		_take_result(_sync_result(ask, answer))
 
 
+## Asks her voice's model, once, to write her card from her traits
+## (CompanionCard.CARD_SYSTEM); until it answers, her plain card stands.
+## Not asked when it was written already, or she has no traits or mind.
+func write_card() -> void:
+	if mind == null or traits.is_empty() or card_by == "model" or mind.busy("card"):
+		return
+	_serial += 1
+	var who := keeper_name()
+	var ask := {"kind": "card", "serial": _serial, "trigger": "her card, from her traits",
+		"system": CompanionCard.CARD_SYSTEM % who, "user": CompanionCard.facts(traits, who)}
+	var answer := mind.card(ask)
+	if not answer.is_empty():
+		_take_result(_sync_result(ask, answer))
+
+
+## The written card: taken if it is a paragraph with no speech in it, else
+## her card stands.
+func _take_card(answer: Dictionary, entry: Dictionary) -> void:
+	var written := str(answer.get("card", "")).strip_edges()
+	var met := str(answer.get("how_we_met", "")).strip_edges()
+	if written.length() < 80 or written.contains("\"") or written.contains("“"):
+		entry["outcome"] = "rejected"
+		entry["note"] = "not a card (too short, or speech in it); her %s card stands" % card_by
+	else:
+		card = written
+		if not met.is_empty():
+			how_we_met = met
+		card_by = "model"
+		entry["outcome"] = "applied"
+		card_written.emit()
+	_log(entry)
+
+
 ## Whether she was told to stay where she is: HOLD, standing as her
 ## player's instruction (Main.travel leaves her behind then).
 func stays_put() -> bool:
@@ -1218,7 +1259,8 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	now.append(run_summary(false))
 	var things := perceived()
 	var around := perception(things) if surroundings_keys(things) != _around_said or asks_about_surroundings(heard) else ""
-	var system := "%s %s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, instructed, VOICE_WORLD, " ".join(now),
+	var met := " How you and %s met: %s" % [who, how_we_met] if not how_we_met.is_empty() else ""
+	var system := "%s %s%s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, VOICE_WORLD, " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
 	var addressed := addressed_to(heard)
 	var speaker := heard.get_slice(" ", 0)
@@ -1874,6 +1916,9 @@ func _take_result(result: Dictionary) -> void:
 		entry["outcome"] = "no answer"
 		entry["note"] = "%s; %s stands" % [result.get("error", ""), stance_name()]
 		_log(entry)
+		return
+	if kind == "card":
+		_take_card(answer, entry)
 		return
 	var serial := int(result.get("serial", 0))
 	var stance_text := str(answer.get("stance", "")).strip_edges().to_upper()

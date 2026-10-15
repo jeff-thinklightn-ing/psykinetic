@@ -4377,3 +4377,52 @@ sapling as well: tree.small at a third to three fifths of a tree's size
 own void cell, leaning as trees do; faded as trees are when it hides the
 player. Visual only. tools/map_bench takes --outdoor=1 to bench a forest
 round its dungeon.
+
+## 293. Who a companion is: traits rolled once, a card written from them
+
+Jeff: trait tables rolled at creation, one model call writes the card, a
+"how we met"; names rolled too ("Roll names"); no hand-written cards,
+Pip, Wren and Nix included ("Rolled cards with lore that gets added
+dynamically based on events and conversations": the growing part is its
+own piece of work, designed separately).
+
+levels/companion_traits.json holds a table per trait: name, pronoun,
+birthplace, parentage, profession (its words and the trade she works in a
+town she stays in, decision 284; empty for none), hobby, food,
+temperament, fear, speech, how_we_met (a seed with {player} and
+{pronoun}). Each entry is a few plain words. CompanionCard.roll rolls one
+of each, seeded by her player's id (the same player rolls the same; a
+name another record's companion has is rolled again), and Main keeps it
+in her record ("traits", saved and read back by PlayerRecord).
+COMPANION_NAMES, the authored cards and levels/companions.json are gone.
+
+The legacy three (Jeff: "wren and nix stay in as legacy chars", "Keep
+Pip too", "Pip is a young male, aspiring to be a squire"): the table's
+"legacy" block names Pip, Wren and Nix, each with "fixed" facts the roll
+keeps (Wren and Nix women; Pip a young man who wants to become a squire,
+though no one has been knighted in ages: a wish the land no longer has),
+the rest rolled round them; keys beyond the table's own ("who",
+"aspiration") go into the plain card and the card call. A new roll never
+gives their names; a record whose companion has one keeps it, and her
+hand-written card goes. They rest in town between trips: when their
+player leaves the game and she is not already on town ground (284), she
+goes to the first stockpile the town holds, a resident there (working her
+trade if she has one), despawned from where she was, until her player
+comes to that zone; joining anywhere else, her player is told (a party
+note: "Nix is resting in <town>. Go there to travel together again."), so
+she does not read as lost. With no town stockpile anywhere, she waits
+where she is as any companion. Any other companion goes on as 284 says.
+
+Her card is first CompanionCard.plain_card: her traits said as plain
+facts, so she is never without one. At her first spawn with a mind,
+Companion.write_card asks her voice's model once, on its own channel
+(OllamaMind "card": JSON, up to 320 tokens, 60 s, temperature 0.9, off
+the tick like every ask), for a paragraph in the third person from her
+traits and one sentence of how she and her player met. A paragraph of
+80 characters or more with no speech in it is taken (card_by "model")
+and written to her record; anything else, or no answer, leaves her plain
+card and the call is made again at her next spawn. Her voice's system
+message carries her card and "How you and Jeff met: ...", as facts;
+nothing in it is a line to say. Her trade for 284 comes from her
+profession. Lore will supply birthplaces and names per region once Jeff
+agrees facts.

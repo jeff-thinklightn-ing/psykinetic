@@ -196,7 +196,7 @@ func _set_up(scene: Dictionary) -> void:
 	jeff.label = "Jeff"
 	pet.name = "Wren"
 	pet.label = ""
-	pet.card = Main.companion_card("Wren")
+	pet.card = CompanionCard.plain_card(CompanionCard.roll("perception-eval", "Wren"))
 	pet.hp = pet.max_hp
 	jeff.hp = jeff.max_hp
 	pet.stance = Companion.Stance.GUARD
