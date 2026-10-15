@@ -1162,7 +1162,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
 			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
-			"picks_up": bool(row.get("picks_up", false))}
+			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", ""))}
 	return out
 
 
@@ -1173,6 +1173,13 @@ static func bodies() -> Dictionary:
 	for kind: String in kinds():
 		out[kind] = (kinds()[kind]["body"] as Dictionary).duplicate()
 	return out
+
+
+## The art slot a view draws a monster of [param kind] from (its row's
+## "art", an ArtKit slot such as "creature.boar"); "" for none, a stand-in.
+## Any peer: the kind comes with the spawn (spawn_spec "kind").
+static func art_of(kind: String) -> String:
+	return str(kinds().get(kind, {}).get("art", ""))
 
 
 ## How a monster of [param kind] idles when its level entry does not say.

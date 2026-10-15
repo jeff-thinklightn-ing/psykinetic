@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_shield()
 	_test_boar_turns()
 	_test_pick_up()
+	_test_art_slots()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1890,3 +1891,15 @@ func _test_pick_up() -> void:
 	_check(armed_at >= 0 and (first_blow < 0 or armed_at < first_blow),
 			"fighting bare-handed, it takes up the dagger beside it before it closes (tick %d, first blow %d)" % [armed_at, first_blow])
 	Monster.idling = true
+
+
+func _test_art_slots() -> void:
+	print("
+== a row's art names an ArtKit slot its view draws from ==")
+	_check(Monster.art_of("boar") == "creature.boar" and Monster.art_of("imp") == "", "the boar's is creature.boar; an imp has none")
+	var unknown: Array[String] = []
+	for kind: String in Monster.kinds():
+		var slot := Monster.art_of(kind)
+		if not slot.is_empty() and not ArtKit.has(slot):
+			unknown.append("%s: %s" % [kind, slot])
+	_check(unknown.is_empty(), "every row's art is a slot ArtKit knows (%s)" % [unknown])

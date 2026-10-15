@@ -51,7 +51,7 @@
 		"drops": [{"item": "meat", "count": [4, 5]}, {"item": "hide", "count": [1, 1]}, {"item": "antlers", "count": [1, 1]}]
 	},
 	"boar": {
-		"side": "wild", "role": "game", "herd": "boar",
+		"side": "wild", "role": "game", "herd": "boar", "art": "creature.boar",
 		"body": {"mass": 80.0, "max_hp": 18, "move_ticks": 3.5, "attack_ticks": 14, "attack_damage": 3, "sight_range": 6},
 		"tactic": "heavy", "idle": "wander", "opens_doors": false, "door_force": 2, "leash": 12,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
