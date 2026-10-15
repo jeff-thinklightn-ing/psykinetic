@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_legacy_rests_in_town()
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
+	_test_resident_voices()
 
 	remove_child(_main)
 	_main.free()
@@ -289,6 +290,78 @@ func _test_bodies_in_town() -> void:
 	DayNight.phase = phase
 	DayNight.anchor = anchor
 	DayNight.update()
+
+
+func _test_resident_voices() -> void:
+	print("\n== spoken to, a resident answers from one mind for them all, with facts only, yielding to companions (decision 336) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	_sync()
+	var mara := _body("rs-mara")
+	var player := _player()
+	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	var mind := VoiceMind.new()
+	_main._resident_mind = mind
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append("%s: %s" % [data.get("speaker", ""), data.get("text", "")])
+	Net.message_received.connect(heard)
+	_main._chat_tick.clear()
+	_main._player_said(player, "What are you making today?")
+	World.step()
+	_check(mind.asks.size() == 1 and spoken.has("Mara: The kitchen's warm, at least."), "beside her, a question: she answers from the resident mind (%s)" % [spoken])
+	var prompt := str(mind.asks.back().get("system", "")) if not mind.asks.is_empty() else ""
+	_check("You are Mara" in prompt and "as a cook" in prompt and "It is " in prompt and "The town is short of" in prompt
+		and "shop" in prompt and "workshop" in prompt, "her prompt says who she is, the hour, her work, the town's wants and its shop: %s" % prompt.get_slice("What is true now:", 1).get_slice("Say what", 0).strip_edges())
+	_check("Mara" in prompt.get_slice("Who you are:", 1).get_slice("What is true", 0), "and a card rolled for her, by her name")
+	var pet := _companion()
+	_check(_main._resident_addressed(player, "%s, what do you think?" % pet.name, pet) == null, "a line naming their own companion is hers, not Mara's")
+	var was: CompanionMind = pet.mind
+	pet.mind = BusyMind.new()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Is the kitchen busy?")
+	World.step()
+	_check(mind.asks.size() == 1 and _main._resident_asks.size() == 1, "a companion's voice out: Mara's ask waits (residents yield)")
+	pet.mind = was
+	World.step()
+	_check(mind.asks.size() == 2, "the companion done: Mara is asked")
+	pet.mind = BusyMind.new()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Mara, anything else?")
+	for i in Main.RESIDENT_ASK_TICKS + 2:
+		World.step()
+	_check(mind.asks.size() == 2 and _main._resident_asks.is_empty(), "waited too long: dropped, nothing said")
+	pet.mind = was
+	mara.doing = Resident.Doing.HIDE
+	_check(_main._resident_addressed(player, "Mara?", null) == null, "hiding from raiders: she answers nothing")
+	mara.card = "Wren is a legacy companion who rests in town between trips."
+	_check(mara.card in str(mara.voice_ask("Player", "Hello", 99)["system"]), "a companion resting in town speaks from her own card")
+	Net.message_received.disconnect(heard)
+	_main._resident_mind = null
+	World.despawn(mara)
+
+
+class VoiceMind:
+	extends CompanionMind
+	var asks: Array[Dictionary] = []
+
+	func voice(ask: Dictionary) -> Dictionary:
+		asks.append(ask)
+		return {"say": "The kitchen's warm, at least."}
+
+
+class BusyMind:
+	extends CompanionMind
+
+	func busy(what: String) -> bool:
+		return what == "voice"
 
 
 func _sync() -> void:

@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Talk to the town's residents: stand beside one (or say their name) and
+  they answer, about their work, what the town is short of and what the
+  shop has. They keep quiet while raiders are about.
 - Loot tables: a level or the builder can name a table for a chest or a monster.
   A chest is stocked from it when the level is built, and a monster carries
   its share and drops it where it falls. No real level uses one yet.

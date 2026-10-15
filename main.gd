@@ -57,6 +57,11 @@ const RESIDENT := "res://sim/resident.gd"
 ## residents looked over every so many ticks (_sync_residents).
 const RESIDENTS_MAX := 12
 const RESIDENT_SYNC_TICKS := 30
+## Residents' voices (decision 336): a line goes to a resident within so
+## many cells of its speaker (or one it names); an ask waits for the
+## resident mind at most so many ticks, then is dropped.
+const RESIDENT_EARSHOT := 2
+const RESIDENT_ASK_TICKS := 150
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
 const HOME_TILES := 24
@@ -129,6 +134,13 @@ var _respawn_at: Dictionary[int, int] = {}
 ## Server only: player_id -> that player's live companion.
 ## The world map the towns' buildings are read from (_sync_residents).
 var _world_map: WorldMap
+## Residents' voices (decision 336): one mind for them all, made on first
+## use; the asks waiting for it ({body: instance id, ask, at: tick}), one per
+## resident; the ask out, by serial.
+var _resident_mind: CompanionMind
+var _resident_asks: Array[Dictionary] = []
+var _resident_out: Dictionary[int, Dictionary] = {}
+var _resident_serial := 0
 var _companions: Dictionary[String, Companion] = {}
 ## Server only: the companions the last room rebuild brought back, by name.
 var _revived: Array[String] = []
@@ -2422,6 +2434,84 @@ func _companions_resting(place_id: String) -> Array[Dictionary]:
 	return out
 
 
+## Server: the resident [param player] speaks to with [param line], or
+## null (decision 336): one it names within earshot, else the nearest within
+## RESIDENT_EARSHOT; none when the line names [param pet] (their own
+## companion, if she hears) or the resident is hiding.
+func _resident_addressed(player: Player, line: String, pet: Companion) -> Resident:
+	if pet != null and Companion._named(line, String(pet.name)):
+		return null
+	var nearest: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		var d := World.distance(body.tile, player.tile)
+		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE:
+			continue
+		if not body.person.is_empty() and Companion._named(line, body.person):
+			return body
+		if d <= RESIDENT_EARSHOT and (nearest == null or d < World.distance(nearest.tile, player.tile)):
+			nearest = body
+	return nearest
+
+
+## Server: [param body] is asked [param line] by [param speaker]: an ask
+## waits for the resident mind, replacing one of theirs still waiting.
+func _ask_resident(body: Resident, speaker: String, line: String) -> void:
+	_resident_serial += 1
+	var id := body.get_instance_id()
+	_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
+	_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick})
+	Transcript.record(body.person, speaker, line)
+
+
+## Server, every tick: the resident mind's answers taken; asks waited too
+## long dropped; the next sent when the resident mind is free and no
+## companion's voice is out (residents yield to companions).
+func _resident_voices() -> void:
+	if _resident_asks.is_empty() and _resident_out.is_empty():
+		return
+	if _resident_mind == null:
+		_resident_mind = _make_mind()
+	for result: Dictionary in _resident_mind.take_results():
+		var out: Dictionary = _resident_out.get(int(result.get("serial", 0)), {})
+		_resident_out.erase(int(result.get("serial", 0)))
+		if not out.is_empty():
+			_resident_answered(out, result.get("answer", {}), str(result.get("error", "")))
+	for each: Dictionary in _resident_asks.duplicate():
+		if World.tick - int(each["at"]) > RESIDENT_ASK_TICKS:
+			_resident_asks.erase(each)
+			MindLog.record({"kind": "voice", "companion": str(each["ask"].get("speaker", "")), "mind": "resident",
+				"trigger": each["ask"].get("trigger", ""), "outcome": "dropped", "note": "waited too long for the mind"})
+	if _resident_asks.is_empty() or _resident_mind.busy("voice"):
+		return
+	for pet: Companion in _companions.values():
+		if is_instance_valid(pet) and pet.mind != null and pet.mind.busy("voice"):
+			return
+	var next: Dictionary = _resident_asks.pop_front()
+	_resident_out[int(next["ask"]["serial"])] = next
+	var answer := _resident_mind.voice(next["ask"])
+	if not answer.is_empty():
+		_resident_out.erase(int(next["ask"]["serial"]))
+		_resident_answered(next, answer, "")
+
+
+## A resident's answer ([param out]: the ask waited for): said from its
+## body, if it is still here and the answer is words; logged either way.
+func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> void:
+	var ask: Dictionary = out["ask"]
+	var body := instance_from_id(int(out["body"])) as Resident
+	var line := Companion.trim_line(str(answer.get("say", "")).strip_edges())
+	var said := body != null and is_instance_valid(body) and body.spawned and not line.is_empty() and line != "..."
+	MindLog.record({"kind": "voice", "companion": str(ask.get("speaker", "")), "mind": "resident", "trigger": ask.get("trigger", ""),
+		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": line, "error": error,
+		"outcome": "said" if said else "not said"})
+	if not said:
+		return
+	Transcript.record(body.person, body.person, line)
+	party_log.add("%s said: \"%s\"" % [body.person, line])
+	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line})
+
+
 ## A body for [param each] (_sync_residents' entry: key, name, trade,
 ## player, town, places), where its day puts it now.
 func _spawn_resident(each: Dictionary) -> Resident:
@@ -2439,6 +2529,10 @@ func _spawn_resident(each: Dictionary) -> Resident:
 		return null
 	body.worker_id = who
 	body.player_id = each["player"]
+	body.person = str(each["name"])
+	body.town_name = str(_world_map.areas.get(World.zone.name, {}).get("display_name", World.zone.name))
+	var record: PlayerRecord = _records.get(each["player"])
+	body.card = str(record.companion.get("card", "")) if record != null else ""
 	body.town = town
 	body.trade = trade
 	body.places = places
@@ -2954,6 +3048,11 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var hears := is_instance_valid(pet) and pet.spawned and pet.zone == player.zone \
 			and World.distance(pet.tile, player.tile) <= earshot
 	var to := String(pet.name) if hears else ""
+	# A resident beside them, or named, takes typed words (decision 336);
+	# their companion hears them as said to someone else.
+	var resident := _resident_addressed(player, line, pet if hears else null) if phrase == 0 else null
+	if resident != null:
+		to = resident.person
 	# Every other companion within earshot hears it too, labelled; her voice
 	# decides whether it was meant for her.
 	for entity in World.get_entities():
@@ -2965,7 +3064,11 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	World.noise(player.tile, WHISPER_RANGE if whisper else Senses.speech_radius(line), &"speech", player)
 	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
-	if to != "":
+	if resident != null:
+		_ask_resident(resident, _display_name(player), line)
+		if hears:
+			pet.overheard(_display_name(player), line, false)
+	elif to != "":
 		pet.owner_spoke(line, phrase)
 
 
@@ -3277,6 +3380,7 @@ func _on_world_ticked(tick: int) -> void:
 		_check_respawns(tick)
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
+		_resident_voices()
 	if World.zone != World.home():
 		return  # Another zone's tick: the HUD and the test hooks are this view's.
 	var player := _local_player()

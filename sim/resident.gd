@@ -39,6 +39,12 @@ const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square
 var worker_id := ""
 ## A companion's player's id, "" for a town's own resident.
 var player_id := ""
+## Its name (the worker's, or the companion's), and for a companion her own
+## card (her record's), "" for a town's resident: theirs is rolled.
+var person := ""
+var card := ""
+## Its town's name, as the world map has it (Main's).
+var town_name := ""
 var town := ""
 var trade := ""
 ## Where it goes: "work", "home", "square" -> Rect2i of cells (Main's).
@@ -52,6 +58,20 @@ var _hide_until := -1
 var _wander_at := -1
 var _listened := -1
 static var _days := {}
+
+
+## Its voice (decision 336): asked only when spoken to, one ask at a time
+## for all residents (Main), with facts only: who it is, its work, the
+## town's wants and shop, the hour and weather.
+const VOICE := """You are %s, who lives in %s and works there%s. You are no adventurer: you live and work in the town. Someone has just spoken to you.
+
+Who you are:
+%s
+
+What is true now:
+%s
+
+Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do. What is written above is what you know; anything else you don't know, so say so rather than guess."""
 
 
 func _init() -> void:
@@ -171,6 +191,92 @@ func _free_cell(area: Rect2i) -> Vector2i:
 		if at != tile and World.is_free(at):
 			return at
 	return tile
+
+
+## The voice ask for [param line], said to it by [param speaker]
+## (CompanionMind.voice's shape, plain text back).
+func voice_ask(speaker: String, line: String, serial: int) -> Dictionary:
+	var system := VOICE % [person, town_name if not town_name.is_empty() else "a town", " as a " + trade if not trade.is_empty() else "", card_words(),
+		" ".join(facts_now()), speaker]
+	var user := "%s says to you: \"%s\"" % [speaker, line]
+	return {"kind": "voice", "serial": serial, "trigger": "%s spoke to %s." % [speaker, person], "speaker": person,
+		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+		"spoken_to": true, "asked": true, "heard": line}
+
+
+## Who it is: a companion's own card; else a card rolled as a companion's
+## is, by its worker id (the same every time), its name and trade its own.
+func card_words() -> String:
+	if not card.is_empty():
+		return card
+	var traits := CompanionCard.roll(worker_id, person)
+	traits.erase("aspiration")
+	traits["profession"] = "a " + trade if not trade.is_empty() else "without a trade of %s own" % {"she": "her", "he": "his"}.get(str(traits.get("pronoun", "")), "their")
+	return CompanionCard.plain_card(traits)
+
+
+## What is true now, a sentence each: the hour and the weather, its work,
+## what the town is short of, what its shop has.
+func facts_now() -> Array[String]:
+	var out: Array[String] = []
+	var hour := Companion.time_words(DayNight.hour(DayNight.now()))
+	var sky := ""
+	if World.fields.outdoor and Companion.WEATHER_WORDS.has(str(World.fields.weather.get("kind", ""))):
+		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
+	out.append("It is %s%s." % [hour, sky])
+	out.append(work_words())
+	if World.production != null:
+		var short: Dictionary = World.production.signals_of(town, Production.items_catalog()).get("short", {})
+		var wants: Array = short.keys()
+		wants.sort()
+		out.append("The town is short of %s." % _listed(wants) if not wants.is_empty() else "The town is short of nothing it needs.")
+	if World.economy != null:
+		var counts := {}
+		for each: Dictionary in World.economy.goods(town):
+			var what := str(each["id"]).replace("_", " ")
+			counts[what] = int(counts.get(what, 0)) + 1
+		var goods: Array = []
+		var kinds: Array = counts.keys()
+		kinds.sort()
+		for what: String in kinds:
+			goods.append(Companion.counted(what, counts[what]))
+		out.append("The town's shop has %s." % _listed(goods) if not goods.is_empty() else "The town's shop has nothing for sale.")
+	return out
+
+
+## What it is making now, from its workshop's job (Production): what, how
+## far along, and what went into it; or that it has no work and why.
+func work_words() -> String:
+	if World.production == null or trade.is_empty():
+		return "You have no trade to work at."
+	var shop_id := World.production.workshop_of(worker_id)
+	if shop_id.is_empty():
+		return "You have no workshop to work in yet: the town has no building for your trade."
+	var job := World.production.job(int(World.production.workshop(shop_id).get("job", 0)))
+	if job.is_empty():
+		return "Your workshop is idle: you are making nothing now."
+	var what := str(job.get("recipe", "")).replace("_", " ")
+	if str(job.get("kind", "")) == "build":
+		what = "the town's " + what.trim_prefix("build:").trim_prefix(Towns.REPAIR)
+	var made: Array = []
+	var resources: Dictionary = job.get("resources", {})
+	for each: String in resources:
+		made.append(Companion.counted(each.replace("_", " "), int(resources[each])))
+	var into := ", from %s" % _listed(made) if not made.is_empty() else ""
+	if str(job.get("state", "")) == "waiting":
+		return "Your next work is %s, waiting for its materials." % Companion._a(what)
+	if str(job.get("state", "")) != "working":
+		return "Your next work is %s%s, not yet begun." % [Companion._a(what), into]
+	var share := float(job.get("worked", 0)) / maxf(float(job.get("needed", 1)), 1.0)
+	var far := "just begun" if share < 0.25 else "under half done" if share < 0.5 else "over half done" if share < 0.9 else "nearly done"
+	return "You are making %s%s: it is %s." % [Companion._a(what), into, far]
+
+
+## [param parts] in words: "a, b and c".
+static func _listed(parts: Array) -> String:
+	if parts.size() <= 1:
+		return "" if parts.is_empty() else str(parts[0])
+	return "%s and %s" % [", ".join(parts.slice(0, -1)), parts.back()]
 
 
 ## A step along its route to its goal, a new route when it has none or is

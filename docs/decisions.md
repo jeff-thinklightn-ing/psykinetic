@@ -6279,3 +6279,36 @@ them on the ground where it fell, with its remains (Monster.remains).
 Not done: a carried thing's weight on the monster, monsters picking things
 up, and a raid's took carried as things (Raids keeps it as uids). The
 entity entry key "loot" is orderless: naming a table does not rename.
+
+## 336. Residents speak when spoken to
+
+What: typed words a player says go to a resident (333) standing within
+RESIDENT_EARSHOT (2) of them, the nearest, or to one the line names within
+earshot; a line naming their own companion stays hers, and quick phrases
+are always hers. Their companion hears it as said to someone else (no
+ask). A resident hiding from a raid answers nothing. Residents never speak
+on their own.
+
+One mind answers for every resident (Main._resident_mind, made by
+_make_mind like a companion's), with a queue: one ask per resident (the
+newest replaces one still waiting), one out at a time, none sent while any
+companion's voice ask is out (residents yield to companions), and one still
+waiting after RESIDENT_ASK_TICKS (15 s) dropped with nothing said. The
+answer is said from the body (the "speech" message, as a companion's: the
+bubble and the talk panel), into the party log, the transcript under the
+resident's name and mind.log (mind "resident"), the question too.
+
+The prompt (Resident.voice_ask) is facts only, never lines: who they are
+(a companion resting in town: her own card; a town's resident: a card
+rolled as a companion's is, CompanionCard.roll by worker id, their name
+and trade their own), the hour and the weather outdoors, what they are
+making (Production: their workshop's job, its materials, how far along, or
+waiting for materials, or no workshop or trade), what the town is short of
+(Production.signals_of's short) and what its shop has (Economy.goods); then
+to answer out loud in a sentence or two, and that what is not written there
+they don't know. Later: being taken before (economy's Towns.taken_before)
+and Lore.known_by once B1 settles.
+
+Rejected: a mind per resident (a dozen calls in flight against the box's
+budget); residents talking unasked (idle chatter costs calls and drowns the
+companions); answering for a hiding resident.
