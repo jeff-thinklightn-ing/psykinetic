@@ -409,11 +409,11 @@ Her pack is in her voice's prompt ("You carry a lantern, and in your pack
 a bandaging kit.").
 
 **The panel** (`render/pack_panel.gd`, bottom right): the player's pack,
-titled with their name, shown and hidden with I; a right click on a
-chest, or on your own companion, opens its row above it ("Chest",
-"Wren's Pack"; from afar you walk to the nearest free cell beside it and
-it opens on arrival); out of reach it closes, as it does on I or a right
-click on it again. A left
+titled with their name, shown and hidden with I; a tap of E with the
+cursor on a chest, a crate or a cart, or your own companion, opens its
+row above it ("Chest", "Wren's Pack"; from afar you walk to the nearest
+free cell beside it and it opens on arrival); out of reach it closes, as
+it does on I or another tap of E on it (decision 329). A left
 click on a chest walks you beside it. Drag an item onto another slot to
 move it there (Godot's own drag and drop; the boxes show what the server
 says, not what was dropped).
@@ -1240,7 +1240,8 @@ hides it, remembered in settings.cfg (`hints=on|off`).
   off cooldown, and clears. Otherwise follows its move order one step at a
   time, re-running A* each step; the goal tile may be occupied, so clicking a
   crate walks up to it and pushes it. Left click: attack a creature (walking
-  to it first), else move. Right click: shove any entity (walking to it
+  to it first), else move. Right click: the off hand (a shield blocks, a
+  bow draws; decision 329), empty-handed shove any entity (walking to it
   first). On a client the walk up to the target is predicted; the hit is not.
 - **Monster** — targets the nearest player it can see (within `sight_range`
   and in line of sight). Attacks if that player is in melee reach, otherwise
@@ -1668,8 +1669,9 @@ that. A sprite under the cursor comes first with either button
 (`_entity_under_mouse`: opaque pixels only, the sprite drawn in front wins,
 the local player is skipped): a left click on a creature attacks it, on
 anything else walks to its cell (and pushes), whatever cell is under those
-pixels. A right click on a sprite shoves it, and a door face under the
-cursor toggles the door when the player stands beside it. `main.gd` checks
+pixels. A right click on a sprite shoves it (with empty off hand), and
+a tap of E with a door face under the cursor toggles the door when the
+player stands beside it. `main.gd` checks
 at startup that `Iso` agrees with the TileMapLayer's own `map_to_local`.
 
 **Move clicks** (`_move_click`). A left click on no sprite walks to the
@@ -1699,12 +1701,13 @@ the quick phrases, R, F3, F11 and H as ever.
 
 **Click** is the input described above: left click moves or attacks,
 hold-to-move retargets (brought onto a monster, the hold attacks it and
-ends), right click (and drag) shoves and tosses, the
+ends), right click (and drag) shoves and tosses when the off hand is
+empty (a shield blocks, a bow draws: see "The off hand and E" below), the
 verbs land on the clicked target. In 3D, A/D turn the camera freely and
 lock it on the next diamond when let go (saved); W/S tilt it while held,
 springing back to 50° when let go; the wheel zooms, a middle drag pans
-the view, springing back onto the player when let go; Q/E do
-nothing (see the 3D view). The camera follows the player alone (at any
+the view, springing back onto the player when let go; Q does nothing,
+E opens and bandages (below; see the 3D view). The camera follows the player alone (at any
 pan's offset).
 
 **WASD.** W is up the screen at the current camera yaw, D to its right;
@@ -1723,8 +1726,24 @@ way: whoever stands next to the player that way, or a swing at air
 (`World.command("swing")` -> `World.order_swing` -> `try_swing`: the
 attack's cooldown, facing and lunge, nothing hit). A right click grabs
 whoever stands next to the player the cursor's way; a drag from it
-tosses, as ever. A sideways middle drag turns the 3D camera, an up or down
-one tilts it for a look (see the 3D view); Q/E do nothing. The camera leans toward the cursor.
+tosses, as ever (with the off hand empty). A sideways middle drag turns the 3D camera, an up or down
+one tilts it for a look (see the 3D view); Q does nothing, E opens and bandages. The camera leans toward the cursor.
+
+**The off hand and E** (both schemes, decision 329). The right button
+does what the off hand holds (`World.off_hand`): a block verb in the left
+hand (a shield) is raised while held, a ranged one in a hand (a bow, held
+in both) is drawn while held and let go at the cell under the cursor on
+release (`World.try_stance`, `try_loose`; the "stance" and "loose"
+commands). The entity's `raised` ("block", "draw") and `raised_tick`
+replicate; the HUD shows "shield raised" or "bow drawn 50%"
+(`World.draw_of`: nothing before the verb's draw_min ticks, full at
+draw_full). A loose emits `World.loosed(by, at, strength)`; what a shot
+and a raised shield do in a fight is the roadmap's weapons as verbs.
+With nothing for it the button shoves and tosses as it always did. E,
+tapped, opens what is under the cursor: a chest, crate or cart, your own
+companion's pack, else a door face beside you; held `BANDAGE_HOLD_MSEC`,
+it bandages the player or companion under the cursor if beside you, else
+yourself. A right click in the pack panel still uses the thing.
 
 **One pick a frame.** Main processes after every other node
 (`process_priority`), so by then the entities are placed and the 3D

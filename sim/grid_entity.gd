@@ -73,6 +73,12 @@ var mending := 0
 ## ever above baseline. Reassigned whole on every change, so a player's
 ## and a companion's replicate, for the HUD.
 var buffs := {}
+## The right button's off hand (World.try_stance, decision 329): "" none,
+## "block" a guard raised, "draw" a bow drawn. A player's replicates, for
+## the views and the HUD.
+var raised := ""
+## The tick it was raised (World.tick): how long a bow has been drawn.
+var raised_tick := 0
 ## Server: the tick it was last hurt (World.damage); out of combat after a while.
 var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH

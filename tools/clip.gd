@@ -35,6 +35,9 @@ extends Node
 ##   items_weapons: the seven weapons (Items.VERBS): sword and shield in
 ##     the hands, hammer, spear and dagger in the pack, the giant axe and
 ##     the bow in a chest; each caption names the verb.
+##   items_controls: the right button as the off hand (decision 329): a
+##     shield raised while held ("shield raised"), E opening a chest, a bow
+##     from it drawn ("bow drawn 50%") and let go at the imp.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -126,6 +129,8 @@ func _ready() -> void:
 			_items_buffs()
 		"items_weapons":
 			_items_weapons()
+		"items_controls":
+			_items_controls()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -383,6 +388,40 @@ func _items_weapons() -> void:
 		["wait", 15, ""],
 		["item_open", true, "Giant axe: slow, both hands, knocks down. Bow: both hands, ranged; the longer the draw, the stronger."],
 		["wait", 40, ""],
+	]
+
+
+func _items_controls() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(3, 1): "chest", Vector2i(7, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["bow", "", "", ""]}},
+			{"at": [7, 3], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["walk", Vector2i(3, 2), "The right button is the off hand."],
+		["item_give", ["shield", Player.LEFT_HAND], "A shield in the left hand."],
+		["wait", 10, ""],
+		["item_raise", null, "Right button held: the shield is raised."],
+		["wait", 25, ""],
+		["item_lower", null, "Let go: lowered."],
+		["wait", 10, ""],
+		["item_clear", Player.LEFT_HAND, "Opening is E now: a tap with the cursor on the chest."],
+		["item_e", null, ""],
+		["wait", 15, ""],
+		["item_take", [0, Player.RIGHT_HAND], "A bow from it, in both hands."],
+		["item_open", false, ""],
+		["wait", 10, ""],
+		["item_raise", null, "Right button held: the bow draws."],
+		["wait", 25, ""],
+		["item_lower", Vector2i(7, 3), "Let go: loosed at the imp (what it does in a fight comes with combat)."],
+		["wait", 25, ""],
 	]
 
 
@@ -719,6 +758,21 @@ func _on_tick(tick: int) -> void:
 			_main.use_slot(int(step[1]))
 		"item_give":
 			World.put_item(_player, _player, int(step[1][1]), World.items.mint(str(step[1][0]), "built", "clip"))
+		"item_raise":
+			_main._raise_off_hand(_player)
+		"item_lower":
+			if step[1] is Vector2i and _player.raised == "draw":
+				World.command(_player, "loose", {"at": [step[1].x, step[1].y]})
+				_main._stance = ""
+			else:
+				_main._lower_off_hand(_player)
+		"item_clear":
+			World.items.end(World.take_item(_player, _player, int(step[1])), "gone")
+		"item_e":
+			_main._e_target = _chest()
+			_main._e_held = true
+			_main._e_since = Time.get_ticks_msec()
+			_main._release_e()
 		"item_open":
 			if bool(step[1]):
 				_main._open_pack(_player, _chest())

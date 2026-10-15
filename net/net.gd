@@ -158,7 +158,7 @@ const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "r
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "shop", "sky", "speech", "terrain", "town"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["alert", "buffs", "emit_light", "keeper_peer", "mending", "move_ticks", "pose", "slots"]
+const SUBCLASS_REPLICATED: Array[String] = ["alert", "buffs", "emit_light", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

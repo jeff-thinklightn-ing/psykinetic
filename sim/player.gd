@@ -45,6 +45,8 @@ func _init() -> void:
 	replicate("slots")
 	replicate("mending")
 	replicate("buffs")
+	replicate("raised")
+	replicate("raised_tick")
 	# Its lantern lit or covered (L): what the views draw and monsters see by.
 	replicate("emit_light")
 

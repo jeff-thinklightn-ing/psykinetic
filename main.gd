@@ -199,11 +199,16 @@ var _restart_told: Array[int] = []
 ## Right button held on this entity: released without a drag it is a shove,
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
-## The right button held on yourself or an ally beside you: bandaged once
-## held BANDAGE_HOLD_MSEC (World.try_bandage); let go sooner, the click is
-## what it always was.
-var _bandage_target: GridEntity
-var _bandage_since := 0
+## E held (decision 329): bandaging once held BANDAGE_HOLD_MSEC (the one
+## under the cursor beside you, else yourself: World.try_bandage); let go
+## sooner, a tap: what was under the cursor opens (_tap_e).
+var _e_held := false
+var _e_since := 0
+var _e_target: GridEntity
+var _e_door: Door
+## The off hand raised with the right button (World.off_hand): "block",
+## "draw", or "" (the button shoves and tosses).
+var _stance := ""
 var _toss_from := Vector2.ZERO
 ## WASD: the camera's lean toward the cursor, in grid units (see
 ## CAMERA_LEAN_*).
@@ -492,6 +497,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if holder != null:
 			World.command(holder, "lantern", {})
 		return
+	if key != null and not key.echo and key.keycode == KEY_E:
+		if key.pressed:
+			_press_e()
+		elif _e_held:
+			_release_e()
+		return
 	if key != null and key.pressed and not key.echo and ITEM_KEYS.has(key.keycode):
 		item_key(ITEM_KEYS[key.keycode])
 		return
@@ -525,7 +536,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_held_target = NONE
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
-		_bandage_target = null
+		_lower_off_hand(player)
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
@@ -542,25 +553,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
-	# Right, held on yourself or an ally beside you: bandaging (_check_bandage_hold).
-	if click.button_index == MOUSE_BUTTON_RIGHT and (target is Player or target is Companion) \
-			and (target == player or World.can_melee(player.tile, target.tile)):
-		_bandage_target = target
-		_bandage_since = Time.get_ticks_msec()
-	# Right: a chest, or your own companion, opens. Left: a chest is walked to.
-	if click.button_index == MOUSE_BUTTON_RIGHT and (target is Chest or _is_own_companion(target)):
-		# (A crate or a cart opens on release, a plain click within reach:
-		# _release_toss. Dragged, or from afar, it is shoved as before.)
-		_open_pack(player, target)
+	# Right: the off hand (decision 329): a shield raised, a bow drawn, while
+	# held; empty-handed it shoves and tosses (below). Opening and
+	# bandaging are E's (_press_e). Left: a chest is walked to.
+	if click.button_index == MOUSE_BUTTON_RIGHT and _raise_off_hand(player):
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
 		_walk_to_chest(player, target)
 		return
-	if click.button_index == MOUSE_BUTTON_RIGHT:
-		var door := _door_under_mouse()
-		if door != null and player.tile in Terrain.edge_cells(door.key):
-			World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
-			return
 	var targetable := target != null and target != player and World.can_target(player, target)
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
@@ -582,25 +582,77 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toss_from = get_global_mouse_position()
 
 
-## The right button held BANDAGE_HOLD_MSEC on yourself or an ally beside
-## you: a bandage command, and the click does nothing else (no shove, its
-## pack closed if it opened one).
-func _check_bandage_hold() -> void:
-	if _bandage_target == null:
-		return
-	if not is_instance_valid(_bandage_target) or not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-		_bandage_target = null
-		return
-	if Time.get_ticks_msec() - _bandage_since < BANDAGE_HOLD_MSEC:
-		return
-	var patient := _bandage_target
-	_bandage_target = null
+## The right button pressed: what the off hand holds is raised (a
+## "stance" command: a shield's block, a bow's draw), true; false with
+## nothing for it, and the press shoves as ever.
+func _raise_off_hand(player: Player) -> bool:
+	_stance = World.off_hand(player)
+	if _stance.is_empty():
+		return false
 	_toss_target = null
+	World.command(player, "stance", {"kind": _stance})
+	return true
+
+
+## The right button released: a drawn bow is loosed at the cell under the
+## cursor ("loose"), a raised shield lowered.
+func _lower_off_hand(player: Player) -> void:
+	if _stance == "draw":
+		var at := _mouse_tile()
+		World.command(player, "loose", {"at": [at.x, at.y]})
+	elif _stance == "block":
+		World.command(player, "stance", {"kind": ""})
+	_stance = ""
+
+
+## E pressed: what is under the cursor (an entity, a door face) is kept
+## for the tap or the hold.
+func _press_e() -> void:
+	_e_held = _local_player() != null
+	_e_since = Time.get_ticks_msec()
+	_e_target = _entity_under_mouse()
+	if _e_target == null:
+		_e_target = World.get_entity_at(_mouse_tile())
+	_e_door = _door_under_mouse()
+
+
+## E released before the hold bandaged: a tap.
+func _release_e() -> void:
+	_e_held = false
 	var player := _local_player()
-	if player != null:
-		bandage(player, patient)
-	if pack_panel != null and pack_panel.other == patient:
-		close_other()
+	if player != null and Time.get_ticks_msec() - _e_since < BANDAGE_HOLD_MSEC:
+		_tap_e(player)
+
+
+## A tap of E: a chest, a crate or a cart, or your own companion's pack
+## opens (from afar you walk to it: _open_pack); else a door face beside
+## you opens or closes.
+func _tap_e(player: Player) -> void:
+	var target := _e_target
+	if is_instance_valid(target) and target.spawned \
+			and (target is Chest or target is Cargo or _is_own_companion(target)):
+		_open_pack(player, target)
+		return
+	var door := _e_door
+	if is_instance_valid(door) and player.tile in Terrain.edge_cells(door.key):
+		World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
+
+
+## E held BANDAGE_HOLD_MSEC: a bandage command, on the player or companion
+## under the cursor if it is beside you, else on yourself.
+func _check_bandage_hold() -> void:
+	if not _e_held or Time.get_ticks_msec() - _e_since < BANDAGE_HOLD_MSEC:
+		return
+	_e_held = false
+	var player := _local_player()
+	if player == null:
+		return
+	var patient: GridEntity = player
+	var target := _e_target
+	if is_instance_valid(target) and (target is Player or target is Companion) \
+			and World.can_melee(player.tile, target.tile):
+		patient = target
+	bandage(player, patient)
 
 
 ## Asks the server to have [param player] bandage [param patient].
@@ -969,9 +1021,6 @@ func _release_toss(player: Player) -> void:
 	var direction := _toss_direction()
 	_toss_target = null
 	if is_instance_valid(target) and target.spawned:
-		if target is Cargo and direction == Vector2i.ZERO and World.reaches(player, target):
-			_open_pack(player, target)  # A plain right click on a crate or cart beside you opens it.
-			return
 		World.command_shove(player, target, direction)
 
 
@@ -2445,6 +2494,12 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			World.try_bandage(entity, patient)
 	elif command_name == "use" and entity is Player:
 		World.try_use(entity, int(args.get("slot", -1)))
+	elif command_name == "stance" and entity is Player:
+		World.try_stance(entity, str(args.get("kind", "")))
+	elif command_name == "loose" and entity is Player:
+		var at: Variant = args.get("at")
+		if at is Array and (at as Array).size() == 2:
+			World.try_loose(entity, Vector2i(int(at[0]), int(at[1])))
 	elif command_name in ["pick_up", "drop", "throw"] and entity is Player:
 		_item_command(entity, command_name, args)
 	elif command_name == "lantern" and entity is Player:
@@ -3026,6 +3081,10 @@ func _on_world_ticked(tick: int) -> void:
 		for kind: String in player.buffs:
 			hp_text += "   %s +%s %ds" % [Items.BUFF_KINDS.get(kind, kind), str(snappedf(float(player.buffs[kind][0]), 0.1)),
 				ceili(maxi(int(player.buffs[kind][1]) - tick, 0) * World.TICK_DT)]
+		if player.raised == "block":
+			hp_text += "   shield raised"
+		elif player.raised == "draw":
+			hp_text += "   bow drawn %d%%" % roundi(World.draw_of(player) * 100.0)
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
@@ -3050,18 +3109,19 @@ func _on_world_ticked(tick: int) -> void:
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk)", "RMB\tgrab (drag to toss)"])
+		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk)", "RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
 	else:
-		lines.append_array(["LMB\tmove / attack (hold to steer)", "RMB\tshove (drag to toss)"])
+		lines.append_array(["LMB\tmove / attack (hold to steer)", "RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
-	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB crate, cart\topen it, beside you", "RMB companion\ther pack", "I\tyour pack",
+	lines.append_array(["RMB, shield\tblock while held", "RMB, bow\tdraw; let go to shoot at the cursor",
+		"E\topen a chest, crate, cart, door; your companion's pack", "I\tyour pack",
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
-		"RMB hold\tbandage yourself or an ally beside you (a kit, out of combat)",
+		"E hold\tbandage an ally beside you, else yourself (a kit, out of combat)",
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "M\tmap", "L\tlantern",
 		"R\treset the room", "O\toptions", "F3\tdebug", "F11\tfullscreen", "H\thide these"])

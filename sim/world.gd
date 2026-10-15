@@ -63,6 +63,9 @@ signal bandage_changed(by: GridEntity, patient: GridEntity, state: StringName)
 ## (&"started"), was topped up (&"renewed") or wore off (&"faded"): for
 ## companions to mention, and the views.
 signal buff_changed(entity: GridEntity, kind: String, state: StringName)
+## [param by] let a drawn bow go at [param at], drawn [param strength] (0
+## to 1, World.draw_of): for combat to shoot (decision 329).
+signal loosed(by: GridEntity, at: Vector2i, strength: float)
 signal pile_gone(pile: GroundPile)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
@@ -1335,9 +1338,12 @@ func has_hands(entity: GridEntity) -> bool:
 
 
 ## [param entity]'s slots changed: its mass follows what it carries (its
-## base_mass and the things' weights), and slots_changed is emitted.
+## base_mass and the things' weights), a stance whose thing left the hand
+## ends, and slots_changed is emitted.
 func _slots_changed(entity: GridEntity) -> void:
 	_weigh(entity)
+	if not entity.raised.is_empty() and off_hand(entity) != entity.raised:
+		entity.raised = ""  # What it needed left the hand.
 	slots_changed.emit(entity)
 
 
@@ -1928,6 +1934,76 @@ func guard(entity: GridEntity) -> Dictionary:
 				best = verb
 	return best
 
+
+## What [param entity]'s right button does with what it holds (decision
+## 329): "block" with a block verb in its left hand (a shield), "draw"
+## with a ranged one in a hand (a bow, held in both), "" for neither: the
+## button shoves and tosses, as with empty hands.
+func off_hand(entity: GridEntity) -> String:
+	if not has_hands(entity):
+		return ""
+	var left := entity.slots[Items.LEFT_HAND]
+	if not left.is_empty() and Items.verb_of(left).get("kind") == "block":
+		return "block"
+	if not _drawn_with(entity).is_empty():
+		return "draw"
+	return ""
+
+
+## The ranged thing in [param entity]'s hands (left first), "" for none.
+func _drawn_with(entity: GridEntity) -> String:
+	for slot in [Items.LEFT_HAND, Items.RIGHT_HAND]:
+		var id := entity.slots[slot]
+		if not id.is_empty() and Items.verb_of(id).get("kind") == "ranged":
+			return id
+	return ""
+
+
+## [param by] raises its off hand (the right button pressed): [param kind]
+## "block" or "draw", as off_hand says it can; "" lowers it (released). A
+## stance is only shown and kept: combat (the roadmap's weapons as verbs)
+## reads it. False if it holds nothing for it.
+func try_stance(by: GridEntity, kind: String) -> bool:
+	if not Net.is_authority() or not is_instance_valid(by):
+		return false
+	if kind.is_empty():
+		by.raised = ""
+		return true
+	if kind != off_hand(by):
+		return false
+	if by.raised != kind:
+		by.raised = kind
+		by.raised_tick = tick
+	return true
+
+
+## How far [param entity]'s bow is drawn, 0 to 1: nothing until its verb's
+## draw_min ticks, full at draw_full; 0 when not drawing.
+func draw_of(entity: GridEntity) -> float:
+	if not is_instance_valid(entity) or entity.raised != "draw":
+		return 0.0
+	var verb := Items.verb_of(_drawn_with(entity))
+	if verb.is_empty():
+		return 0.0
+	var drawn := tick - entity.raised_tick
+	if drawn < int(verb["draw_min"]):
+		return 0.0
+	return clampf(float(drawn) / maxf(1.0, float(verb["draw_full"])), 0.0, 1.0)
+
+
+## [param by] lets its drawn bow go at [param at] (the right button
+## released): loosed is emitted with the draw (draw_of), for combat to
+## shoot; drawn too little, nothing. The stance ends either way.
+func try_loose(by: GridEntity, at: Vector2i) -> bool:
+	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw":
+		return false
+	var strength := draw_of(by)
+	by.raised = ""
+	if strength <= 0.0:
+		return false
+	_log("loose: %s at %s, drawn %.2f" % [by.name, at, strength])
+	loosed.emit(by, at, strength)
+	return true
 
 ## Whether [param entity] carries the key to [param lock] (a thing whose
 ## catalog "opens" is it), in its pack or a hand: World.key_check's own.

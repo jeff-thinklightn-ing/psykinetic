@@ -322,11 +322,12 @@ func _test_containers() -> void:
 		_check(not World.reaches(host, cart) and cart.slot_items[2] == kit, "pushed off two cells, it is out of reach, the kit still in it")
 		World._relocate(cart, spot)
 	_main.pack_panel.player = host
-	_main._toss_target = cart
-	_main._toss_from = _main.get_global_mouse_position()
-	_main._release_toss(host)
+	_main._e_target = cart
+	_main._e_held = true
+	_main._e_since = Time.get_ticks_msec()
+	_main._release_e()
 	_check(_main.pack_panel.other == cart and _main.pack_panel.title_shown(false) == "Cart",
-			"a plain right click on it beside you opens it: \"%s\"" % _main.pack_panel.title_shown(false))
+			"a tap of E on it beside you opens it: \"%s\"" % _main.pack_panel.title_shown(false))
 	_main.close_other()
 	var held := cart.contents_uids()
 	var at := cart.tile
@@ -454,6 +455,33 @@ func _test_weapons() -> void:
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	_give(host, "sword", Player.RIGHT_HAND)
 	_check(World.wielded(host) == "sword" and World.guard(host)["absorb"] == 1.0, "sword and shield: the sword, the shield's guard over the sword's")
+	print("\n== the right button is the off hand: a shield raised, a bow drawn and loosed (decision 329) ==")
+	_check(World.off_hand(host) == "block" and _main._raise_off_hand(host) and host.raised == "block",
+			"with a shield in the left hand, the right button raises it (stance %s)" % host.raised)
+	_main._lower_off_hand(host)
+	_check(host.raised == "", "let go, it is lowered")
+	_main._raise_off_hand(host)
+	World.items.end(World.take_item(host, host, Player.LEFT_HAND), "gone")
+	_check(host.raised == "" and World.off_hand(host) == "", "the shield out of the hand, the guard drops; a sword alone has no off hand")
+	_check(not _main._raise_off_hand(host), "and the right button shoves as ever")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "bow", Player.RIGHT_HAND)
+	var shots := []
+	var shot := func(by: GridEntity, at: Vector2i, strength: float) -> void: shots.append([by, at, strength])
+	World.loosed.connect(shot)
+	_check(World.off_hand(host) == "draw" and World.try_stance(host, "draw") and host.raised == "draw", "a bow in both hands: the right button draws it")
+	host.raised_tick = World.tick - 3
+	_check(World.draw_of(host) == 0.0 and not World.try_loose(host, host.tile + Vector2i(4, 0)) and shots.is_empty() and host.raised == "",
+			"let go before draw_min (5 ticks): no shot, the bow lowered")
+	World.try_stance(host, "draw")
+	host.raised_tick = World.tick - 10
+	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 10 ticks of 20: half (%.2f)" % World.draw_of(host))
+	host.raised_tick = World.tick - 40
+	var aim := host.tile + Vector2i(4, 0)
+	_check(World.try_loose(host, aim) and shots.size() == 1 and shots[0] == [host, aim, 1.0] and host.raised == "",
+			"drawn past draw_full: loosed at the aim, full strength, for combat to shoot (%s)" % [shots])
+	_check(not World.try_stance(host, "block"), "a bow is no shield")
+	World.loosed.disconnect(shot)
 	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
 		World.items.end(World.take_item(host, host, slot), "gone")
 
@@ -511,7 +539,11 @@ func _test_bandage() -> void:
 	var hurt := host.hp
 	_check(not World.try_bandage(host, host), "hurt just now: not yet (out of combat first)")
 	_steps(World.BANDAGE_CALM_TICKS)
-	_check(World.try_bandage(host, host) and host.mending == 1, "a while later the host bandages themselves")
+	_main._e_target = null
+	_main._e_held = true
+	_main._e_since = Time.get_ticks_msec() - Main.BANDAGE_HOLD_MSEC
+	_main._check_bandage_hold()
+	_check(host.mending == 1 and not _main._e_held, "a while later the host holds E, no one under the cursor: bandages themselves")
 	_check(not World.try_bandage(host, host), "not twice at once")
 	_steps(World.BANDAGE_TICKS)
 	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL, "bandaged: mending now (%d hp to come)" % World.BANDAGE_HEAL)

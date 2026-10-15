@@ -6060,3 +6060,32 @@ whose things are what they carried (items' decision 330, which can add to
 remains). A companion or resident taken in a raid (decision 314) is not
 slain and leaves nothing. items_test checks every drop names a catalog
 thing.
+## 329. The right button is the off hand; open and bandage move to E
+
+Jeff's choice (layout B, 2026-10-15, through the coordinator) for where a
+shield's block and a bow's draw go once weapons are things in the hands.
+The right button does what the off hand holds (World.off_hand): a block
+verb in the left hand (a shield) is raised while the button is held, a
+ranged one in a hand (a bow takes both) is drawn while held and let go at
+the cell under the cursor on release. With nothing for it, it shoves and
+tosses as it always did. Opening (a chest, a crate or a cart, your own
+companion's pack, a door face beside you) moves to a tap of E, bandaging
+to holding E BANDAGE_HOLD_MSEC (the player or companion under the cursor
+if beside you, else yourself). A right click in the pack panel still uses
+a thing. Rejected: keeping the right button for opening with Space to
+block (layout A: a third hand on the keyboard in a fight) and Shift+right
+(C: a chord for the commonest defence).
+
+The server keeps the raised hand on the entity, `raised` ("", "block",
+"draw") and `raised_tick`, replicated on players (SUBCLASS_REPLICATED; a
+fingerprint change, no revision bump: the commands are new names old
+servers ignore). The "stance" command raises or lowers it
+(World.try_stance: only what off_hand allows); a slot change that takes
+the thing out of the hand lowers it. "loose" ends a draw (World.try_loose):
+the draw (World.draw_of) is nothing before the verb's draw_min ticks and
+full at draw_full; drawn enough, World.loosed(by, at, strength) is
+emitted. The HUD shows "shield raised" or "bow drawn 50%". Nothing in a
+fight reads these yet: what a raised shield absorbs and what a loosed
+arrow does belong to the roadmap's weapons as verbs, which reads
+raised and listens to loosed. The name is not "stance": a companion's
+stance is her fighting mood.
