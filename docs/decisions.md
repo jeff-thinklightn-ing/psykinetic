@@ -4755,3 +4755,24 @@ reload's own parse with WorldMap (Main keeps that level and could change
 it), parsing on a thread (more moving parts than the remaining 180 ms
 needs), and maps' incremental rebuild of only the edited area's cells,
 which stays the next step if an accept must fit inside a tick.
+
+## 305. Knockback threshold: an attack pushes only from World.knockback_min_force
+
+Every melee blow carried half a shove's force and pushed with it, so the
+lightest hits slid their targets: a player's punch moved an imp a tile, and
+a fight was a string of slides. Now an attack's blow (after
+ATTACK_FORCE_FACTOR) pushes only when that force is at least
+`World.knockback_min_force` (exported, 1.5); a lighter one is set to 0 in
+_try_hit, so it does damage and nothing else: no slide, no impact, no new
+stun. Views flinch on the damage as they did (Client3D._on_struck), and
+nothing is guessed on clients for an attack, so no client change.
+
+With today's numbers: imp on player 0.15, brute on player 0.26, player on
+brute 0.57, companion on imp 0.75, player on imp 1.0 hurt only; player on a
+sneak 1.6 still knocks it back (2 tiles). An exhausted target counts half
+its mass, so a tired one is knocked back sooner.
+
+Not held to it: shoves and tosses (the push verb, paid in stamina), throws,
+falls, door impacts and try_bash_door. No stagger state for blows under it
+for now; Jeff can ask for one after the clip. Weapons as data (items step 5)
+give the knockback verb by raising a blow's force over the line.

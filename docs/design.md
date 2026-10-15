@@ -627,7 +627,10 @@ force = clamp(strength × mover_mass / target_mass × force_scale, 0, max_force)
 That is then multiplied by the attacker's stamina fraction
 (`stamina / max_stamina`), so pushes fade steadily as the attacker tires
 rather than cutting out. A shove uses all of the result; a melee attack
-carries half and costs no stamina. `World.force_scale` (0.1) and
+carries half and costs no stamina, and pushes only when that half is at
+least `World.knockback_min_force` (1.5): a lighter blow only hurts (the
+model flinches), so a fresh player's punch knocks a sneak back but not an
+imp, and an imp's or a brute's never moves a player. `World.force_scale` (0.1) and
 `World.max_force` (4) are exported. A fresh player's shove on a rested imp is
 10 × 80 / 40 × 0.1 = 2.0. Shoving the same imp six times in a row throws it
 3, 2, 2, 1, 1, 0 tiles.

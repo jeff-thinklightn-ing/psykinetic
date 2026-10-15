@@ -201,6 +201,20 @@ func _test_mass_gate() -> void:
 	brute.mass = 100.0
 	brute.strength = 20  # An attack carries half force: 20 * 100 / 80 * 0.1 / 2 = 1.25.
 	World.step()
+	_check(player.hp < 20 and player.tile == Vector2i(2, 1),
+			"a blow under knockback_min_force (1.25 < %.1f) hurts but does not move the player (at %s)" % [World.knockback_min_force, player.tile])
+
+	e = _build([
+		"#####",
+		"#.Pm#",
+		"#####",
+	])
+	player = e["P"][0]
+	brute = e["m"][0]
+	brute.sight_range = 7
+	brute.mass = 100.0
+	brute.strength = 30  # 30 * 100 / 80 * 0.1 / 2 = 1.875, over the threshold.
+	World.step()
 	_check(player.tile == Vector2i(1, 1), "a heavy, strong monster knocks the player back one tile (at %s)" % player.tile)
 
 

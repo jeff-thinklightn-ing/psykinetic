@@ -13,6 +13,10 @@ top section as the release notes.
   the wilds for the first time or accepts a builder change there: reading
   a big level is about five times faster, and an accept no longer re-reads
   every level in the world (650 ms to about 180 ms).
+- A light blow no longer knocks its target back: a punch hurts, and only
+  a heavy hit (or a shove) sends someone sliding. Imps and brutes no longer
+  push you about with every hit, and your punches no longer bounce an imp
+  away from you.
 - Every companion is now someone of their own: where they were born, their
   family, their trade, what they like to eat and do, what they fear, how
   they talk, and how the two of you met, rolled when they join you, with

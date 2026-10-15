@@ -232,6 +232,10 @@ const EXHAUSTED_MASS_FACTOR := 0.5
 ## past the end of its slide, wall or no wall: a beat to double over before
 ## it can act again.
 @export var knockback_stun_ticks := 7
+## An attack's blow (after ATTACK_FORCE_FACTOR) pushes only from this force
+## up; a lighter one only hurts. Shoves, tosses, throws and falls are not
+## held to it (decision 305).
+@export var knockback_min_force := 1.5
 ## Ticks after attacking, shoving or being thrown before regen resumes.
 ## 0 means only the tick of the exertion itself is lost.
 @export var stamina_regen_delay := 10
@@ -2603,6 +2607,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 				attacker.stamina -= cost
 	else:
 		force *= ATTACK_FORCE_FACTOR
+		if force < knockback_min_force:
+			force = 0.0  # A blow too light to knock back: damage only.
 	var hit := Hit.new()
 	hit.source = attacker
 	hit.target = target
