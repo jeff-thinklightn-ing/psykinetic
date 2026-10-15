@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_buffs()
 	_test_weapons()
 	_test_blows()
+	_test_block()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -594,6 +595,85 @@ func _test_blows() -> void:
 	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield"]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
 	_check(by_tile[Vector2i(2, 1)][Items.RIGHT_HAND] == "giant_axe" and by_tile[Vector2i(2, 1)][Items.LEFT_HAND] == ""
 			and level["warnings"].any(func(w: String) -> bool: return "no left hand" in w), "a giant axe takes both: the shield left out, and said")
+	imp.acts = true
+
+
+func _test_block() -> void:
+	print("
+== block: a raised shield takes blows from ahead, for stamina; a heavy one breaks it; a sword parries straight on (decision 340) ==")
+	var host := _player(Net.local_id)
+	var imp: GridEntity = null
+	for monster in World.monsters():
+		imp = monster
+		break
+	var beside := World.NO_CELL
+	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_free(host.tile + direction) and World.can_melee(host.tile, host.tile + direction) 				and World.is_free(host.tile - direction):
+			beside = host.tile + direction
+			break
+	_check(imp != null and beside != World.NO_CELL, "an imp beside the host, room behind")
+	if imp == null or beside == World.NO_CELL:
+		return
+	World._relocate(imp, beside)
+	imp.acts = false
+	var ahead := imp.tile - host.tile
+	host._world_set_facing(ahead)
+	host.stamina = host.max_stamina
+	_give(host, "shield", Player.LEFT_HAND)
+	_check(World.guarding(host, imp).is_empty(), "a shield not raised: no guard")
+	World.try_stance(host, "block")
+	_check(World.guarding(host, imp).get("absorb") == 1.0, "raised, facing the imp: its guard")
+	host._world_set_facing(-ahead)
+	_check(World.guarding(host, imp).is_empty(), "turned away: the blow comes from behind, unguarded")
+	host._world_set_facing(Vector2i(ahead.x + ahead.y, ahead.y - ahead.x).clamp(Vector2i(-1, -1), Vector2i(1, 1)))
+	_check(not World.guarding(host, imp).is_empty(), "faced one step aside: still within the shield's arc")
+	host._world_set_facing(ahead)
+	var met: Variant = World._meet_guard(host, imp, 1, 0.8)
+	_check(met == [0, 0.0] and host.stamina == host.max_stamina - 15, "an imp's blow (1, force 0.8, weighing 1.8): nothing gets through; 15 stamina (%s, %d)" % [met, host.stamina])
+	var hp := host.hp
+	imp._world_set_facing(-ahead)
+	imp.next_attack_tick = 0
+	imp.next_move_tick = 0
+	World.try_attack(imp, host)
+	World._resolve_hits()
+	_check(host.hp == hp and host.raised == "block", "a real blow, resolved: the host unhurt, the shield still up")
+	met = World._meet_guard(host, imp, 2, 3.0)
+	_check(met == [2, 3.0] and host.raised == "" and World.is_stunned(host), "a hammer's blow (2, force 3; over the shield's 2): the guard breaks, the blow lands whole, the host staggered")
+	host.stunned_until_tick = 0
+	host.guard_broken_until = World.tick
+	World.try_stance(host, "block")
+	met = World._meet_guard(host, imp, 2, 0.2)
+	_check(met == [2, 0.2] and host.raised == "", "a brute's (2, force 0.2): heavy enough to break it too")
+	host.stunned_until_tick = 0
+	_check(not World.try_stance(host, "block"), "and the shield will not come up again at once")
+	host.guard_broken_until = World.tick
+	_check(World.try_stance(host, "block"), "a while later it will")
+	host.stamina = 3
+	met = World._meet_guard(host, imp, 1, 0.8)
+	_check(met == [1, 0.8] and host.raised == "" and host.stamina == 0, "out of stamina: the guard gives way")
+	host.stunned_until_tick = 0
+	host.guard_broken_until = 0
+	host.stamina = host.max_stamina
+	World.items.end(World.take_item(host, host, Player.LEFT_HAND), "gone")
+	_give(host, "sword", Player.RIGHT_HAND)
+	host.next_attack_tick = 0
+	_check(World.guarding(host, imp).get("absorb") == 0.5 and World._meet_guard(host, imp, 1, 0.8) == [0, 0.4],
+			"a sword, ready, parries an imp's blow straight on: half, the damage rounded away")
+	host._world_set_facing(Vector2i(ahead.x + ahead.y, ahead.y - ahead.x).clamp(Vector2i(-1, -1), Vector2i(1, 1)))
+	_check(World.guarding(host, imp).is_empty(), "but not from a step aside")
+	host._world_set_facing(ahead)
+	host.next_attack_tick = World.tick + 3
+	_check(World.guarding(host, imp).is_empty(), "nor mid-swing")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	imp.slots = Items.tidy(["", "", "", "", "", "shield"], Items.CARRIED)
+	imp.raised = "block"
+	imp._world_set_facing(-ahead)
+	_give(host, "bow", Player.RIGHT_HAND)
+	hp = imp.hp
+	_check(World.shoot(host, imp.tile, 1.0) == imp and imp.hp == hp, "a shot into a raised shield: taken on it (%d -> %d)" % [hp, imp.hp])
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	imp.raised = ""
+	imp.slots = PackedStringArray()
 	imp.acts = true
 
 func _test_loot() -> void:

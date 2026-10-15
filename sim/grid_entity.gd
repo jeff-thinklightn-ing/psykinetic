@@ -27,6 +27,9 @@ signal swung(direction: Vector2i)
 ## A shot (World.shoot) flew from here to [param to], the last cell it
 ## reached: views draw the arrow. On every peer.
 signal shot(to: Vector2i)
+## A blow or a shot was taken on its guard, or [param broken] it
+## (World._meet_guard): views knock and stagger. On every peer.
+signal guarded(broken: bool)
 
 # Not called "Material"/"material": CanvasItem already owns that name.
 ## FLESH is a creature (hazards hurt it). WOOD takes impact and breaks at 0 hp.
@@ -82,6 +85,9 @@ var buffs := {}
 var raised := ""
 ## The tick it was raised (World.tick): how long a bow has been drawn.
 var raised_tick := 0
+## Server: until this tick a broken guard cannot be raised again
+## (World._meet_guard, decision 340).
+var guard_broken_until := 0
 ## Server: the tick it was last hurt (World.damage); out of combat after a while.
 var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH
@@ -654,6 +660,12 @@ func _world_shot(to: Vector2i) -> void:
 		_net_shot.rpc_id(peer, to)
 
 
+func _world_guarded(broken: bool) -> void:
+	guarded.emit(broken)
+	for peer in viewers():
+		_net_guarded.rpc_id(peer, broken)
+
+
 func _world_stunned(until_tick: int, ticks: int) -> void:
 	stunned_until_tick = until_tick
 	_reel_until = until_tick
@@ -976,6 +988,11 @@ func _net_swung(direction: Vector2i) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_shot(to: Vector2i) -> void:
 	shot.emit(to)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_guarded(broken: bool) -> void:
+	guarded.emit(broken)
 
 
 ## A caption 8 world px tall. Fonts are rasterised at the viewport's

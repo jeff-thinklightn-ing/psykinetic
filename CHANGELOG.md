@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Shields block: raised with the right button, a shield takes blows and arrows
+  from the front for stamina. A brute's heavy blow, or running out of
+  stamina, breaks your guard and staggers you. A sword parries half a blow
+  from straight ahead.
 - Companions speak only for themselves: no more putting words in your mouth
   or telling you what kind of person you are.
 

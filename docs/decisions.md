@@ -6476,3 +6476,40 @@ Known, left: she now and then tells her player their state without quotes
 
 Rejected: dropping the whole line without asking again (a question to her
 then goes unanswered); asking again more than once (calls against the box).
+## 340. Block: a raised shield's arc, paid in stamina; heavy blows break it
+
+Weapons as verbs in the fight, part 3 of 5. A blow (not a shove) or a shot
+meets the target's guard (World.guarding) before it lands:
+- a raised shield (raised "block", decision 329: the block verb in its
+  left hand) when the blow comes from within its arc of where the target
+  faces: arc 1, the facing cell and one either side (45 degree steps);
+- else, raising nothing and its next blow ready (not mid-swing), a sword
+  in its right hand, arc 0, straight ahead only;
+- nothing while stunned, or from outside the arc (a flanker, a second foe
+  behind).
+A blow weighs its damage plus its push force (before the knockback
+threshold; a shot's force is 0). The guard pays the verb's stamina times
+that weight (at least 1) and takes absorb of the damage (rounded up) and
+of the force: a shield (absorb 1, stamina 8) all of it, a sword (0.5, 10)
+half. A blow weighing breaks_at (2.0 for both) or more breaks the guard: a
+brute's (2 and a little push), a hammer's; an imp's (1 and 0.8) does not.
+So does a guard short of stamina. A broken guard lets that blow land
+whole, lowers the shield, staggers its holder GUARD_BREAK_STUN (8) ticks
+and keeps it from raising one again for GUARD_BROKEN_TICKS (20). A shot
+never breaks a guard, only costs stamina. Weighing damage with force
+because force alone is mass against mass: a brute's push on an 80 kg
+player is a fifth of a newton's worth here, and by force alone a shield
+would hold it for free.
+
+The roadmap's "pushes at stamina cost" is read as: the guard keeps its
+feet and pays stamina for the push it would have taken. A shield bash
+(shoving the attacker back) would be another verb if Jeff wants one.
+
+Raising a shield or drawing a bow turns the body to the cursor in the
+click scheme too (Main._aim_at_cursor while raised; WASD already faces
+it), so the arc points where the player looks. The views hear and see it:
+GridEntity.guarded(broken), sent by a new RPC (_net_guarded): a knock on
+wood, or wood splitting and a stagger; World.guard_met for the party log
+("X takes Y's blow on the guard", "Y breaks X's guard"). Monsters guard
+through the same code (holds_in_hands, decision 338) when their AI raises
+(try_stance "block"). Protocol: the new RPC changes the fingerprint.

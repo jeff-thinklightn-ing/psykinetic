@@ -396,6 +396,7 @@ func _go_online() -> void:
 			World.entity_despawned.connect(Net.interest.remove)
 		World.entity_pushed.connect(_narrate_push)
 		World.entity_damaged.connect(_narrate_damage)
+		World.guard_met.connect(_narrate_guard)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
@@ -450,6 +451,8 @@ func _process(delta: float) -> void:
 	_update_pick()
 	_test_hover()
 	_drive_wasd()
+	if not _stance.is_empty() and Net.controls != "wasd" and _local_player() != null:
+		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
 	_check_bandage_hold()
 	_run_test_steer()
 	# Hover is the floor cell under the cursor, on the ground plane alone:
@@ -3216,6 +3219,14 @@ func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, til
 	if impact > 0:
 		line += " for %d" % impact
 	party_log.add(line + ".")
+
+
+## A blow taken on a guard, or one that broke it (World.guard_met).
+func _narrate_guard(entity: GridEntity, source: GridEntity, broken: bool) -> void:
+	if broken:
+		party_log.add("%s breaks %s's guard." % [_display_name(source), _display_name(entity)])
+	else:
+		party_log.add("%s takes %s's blow on the guard." % [_display_name(entity), _display_name(source)])
 
 
 func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:

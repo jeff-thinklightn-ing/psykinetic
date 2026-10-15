@@ -5676,6 +5676,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		var id := entity.get_instance_id()
 		entity.swung.connect(_on_swung.bind(id))
 		entity.shot.connect(_on_shot.bind(id))
+		entity.guarded.connect(_on_guarded.bind(id))
 		entity.struck.connect(_on_struck.bind(id))
 		entity.impacted.connect(_on_impacted.bind(id))
 		entity.pushed.connect(_on_pushed.bind(id))
@@ -5739,6 +5740,18 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var tween := create_tween()
 	tween.tween_property(body, "position", out, LUNGE_SECONDS * 0.4).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "position", rest, LUNGE_SECONDS * 0.6).set_ease(Tween.EASE_IN)
+
+
+## A blow taken on a guard (World._meet_guard): a knock on wood; one
+## that [param broken] it, wood splitting and a stagger.
+func _on_guarded(broken: bool, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null:
+		return
+	_combat_at[id] = Time.get_ticks_msec()
+	sfx.play("sfx.break_wood" if broken else "sfx.knockback_wood", puppet.position + Vector3.UP * 0.9)
+	if broken:
+		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 
 
 ## A shot (World.shoot) flew to [param to]: an arrow streaks from the

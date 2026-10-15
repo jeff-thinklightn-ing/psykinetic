@@ -67,6 +67,9 @@ signal buff_changed(entity: GridEntity, kind: String, state: StringName)
 ## to 1, World.draw_of): for combat to shoot (decision 329).
 signal loosed(by: GridEntity, at: Vector2i, strength: float)
 signal pile_gone(pile: GroundPile)
+## [param target]'s guard met a blow or a shot from [param source]
+## (decision 340): taken on it, or [param broken] by it.
+signal guard_met(target: GridEntity, source: GridEntity, broken: bool)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -227,6 +230,10 @@ const THROW_FORCE_PER_KG := 0.3
 ## A bow loosed is heard this far (World.shoot): a soft twang, the shooter's
 ## own cell its source.
 const NOISE_BOW := 3
+## A guard broken (decision 340): its holder stunned this long, and no
+## raising a guard again until GUARD_BROKEN_TICKS have passed.
+const GUARD_BREAK_STUN := 8
+const GUARD_BROKEN_TICKS := 20
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
@@ -410,6 +417,11 @@ var _mending: Dictionary[GridEntity, Dictionary] = {}
 ## An attack or shove accepted this tick, waiting for the resolve phase.
 class Hit:
 	var source: GridEntity
+	## A shove's hit (no guard meets it), else a blow.
+	var shove := false
+	## The blow's push before knockback_min_force: what a guard pays for
+	## and what breaks it (decision 340).
+	var raw_force := 0.0
 	var target: GridEntity
 	var source_id := 0
 	var source_name := ""
@@ -2009,6 +2021,8 @@ func try_stance(by: GridEntity, kind: String) -> bool:
 		return true
 	if kind != off_hand(by) or kind == "draw" and not quiver_check.call(by):
 		return false
+	if kind == "block" and tick < by.guard_broken_until:
+		return false  # A broken guard comes back up only after a while.
 	if by.raised != kind:
 		by.raised = kind
 		by.raised_tick = tick
@@ -2075,9 +2089,72 @@ func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
 		_log("shot: %s at %s, drawn %.2f, %s" % [by.name, end, strength, "nothing hit" if hit == null else "stopped by %s" % hit.name])
 		return null
 	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * strength))
+	var met: Variant = _meet_guard(hit, by, amount, 0.0, true)
+	if met != null:
+		amount = met[0]
 	_log("shot: %s hits %s at %s for %d, drawn %.2f" % [by.name, hit.name, hit.tile, amount, strength])
-	damage(hit, amount, by, &"shot")
+	if amount > 0:
+		damage(hit, amount, by, &"shot")
 	return hit
+
+
+## The guard [param target] meets a blow from [param source]'s side with
+## (decision 340): a raised shield's (raised "block": the block verb in
+## its left hand) when the blow comes within its arc of where the target
+## faces (arc: 45 degree steps either side; a shield's 1, the facing cell
+## and the two beside it); else, raising nothing and its next blow ready
+## (not mid-swing), a sword's in its right hand (arc 0, straight ahead).
+## {} for none, and when stunned.
+func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
+	if not holds_in_hands(target) or is_stunned(target) or not is_instance_valid(source) or source.tile == target.tile:
+		return {}
+	var held := ""
+	if target.raised == "block":
+		held = target.slots[Items.LEFT_HAND]
+	elif target.raised.is_empty() and tick >= target.next_attack_tick:
+		held = target.slots[Items.RIGHT_HAND]
+	var verb := Items.verb_of(held) if not held.is_empty() else {}
+	if verb.get("kind") != "block" or target.facing == Vector2i.ZERO:
+		return {}
+	var off := absf(Vector2(source.tile - target.tile).angle_to(Vector2(target.facing)))
+	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 else {}
+
+
+## A blow of [param amount] damage and [param force] (its push before
+## knockback_min_force; 0 for a shot) from [param source] on
+## [param target], met by its guard (guarding; decision 340): null when
+## there is none, else [damage, force] what is left. A blow weighs its
+## damage plus its force: the guard pays the verb's stamina times that (at
+## least 1) and takes absorb of both (a shield all, a sword half, the
+## damage taken off rounded up). A blow weighing breaks_at or more (a
+## brute's, a hammer's; never a [param shot]), or too little stamina,
+## breaks it: the blow lands whole, the shield is lowered, its holder
+## stunned GUARD_BREAK_STUN and unable to raise one again for
+## GUARD_BROKEN_TICKS.
+func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false) -> Variant:
+	var verb := guarding(target, source)
+	if verb.is_empty():
+		return null
+	var weight := amount + force
+	var cost := maxi(1, ceili(float(verb["stamina"]) * weight))
+	target._world_note_exertion(tick)
+	if weight >= float(verb["breaks_at"]) and not shot or target.max_stamina > 0 and target.stamina < cost:
+		if target.max_stamina > 0:
+			target.stamina = maxi(0, target.stamina - cost)
+		target.raised = ""
+		target.guard_broken_until = tick + GUARD_BROKEN_TICKS
+		_stun_for(target, GUARD_BREAK_STUN)
+		_log("guard: %s's guard broken by %s (a blow of %d, force %.2f)" % [target.name, source.name, amount, force])
+		target._world_guarded(true)
+		guard_met.emit(target, source, true)
+		return [amount, force]
+	if target.max_stamina > 0:
+		target.stamina -= cost
+	var absorb := clampf(float(verb["absorb"]), 0.0, 1.0)
+	_log("guard: %s takes %s's blow (%d, force %.2f) for %d stamina" % [target.name, source.name, amount, force, cost])
+	target._world_guarded(false)
+	guard_met.emit(target, source, false)
+	return [maxi(0, amount - ceili(amount * absorb - 0.001)), force * (1.0 - absorb)]
 
 
 ## The cells a shot from [param from] toward [param toward] crosses, in
@@ -3014,8 +3091,10 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 				attacker.stamina = 0
 			else:
 				attacker.stamina -= cost
-	else:
+	var raw_force := force
+	if not is_shove:
 		force *= ATTACK_FORCE_FACTOR * float(verb.get("force", 1.0))
+		raw_force = force
 		if force < knockback_min_force:
 			force = 0.0  # A blow too light to knock back: damage only.
 		if hit_damage > 0 and not verb.is_empty():
@@ -3033,6 +3112,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	hit.push_direction = push_direction
 	hit.damage = hit_damage
 	hit.force = force
+	hit.shove = is_shove
+	hit.raw_force = raw_force
 	_hits.append(hit)
 	return true
 
@@ -3051,6 +3132,11 @@ func _resolve_hits() -> void:
 			if is_instance_valid(hit.source) and _logs_for(hit.source):
 				_log("hit dropped: %s -> %s (no longer lined up)" % [hit.source_name, hit.target_name])
 			continue
+		if not hit.shove:
+			var met: Variant = _meet_guard(hit.target, hit.source, hit.damage, hit.raw_force)
+			if met != null:
+				hit.damage = met[0]
+				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
 		if hit.damage > 0:
 			damage(hit.target, hit.damage, hit.source, &"attack")
 		if hit.force > 0.0 and _alive(hit.target):

@@ -1753,8 +1753,13 @@ draw_full). A loose emits `World.loosed(by, at, strength)` and shoots
 shooter through the cursor's cell, up to the bow's 8 cells, takes the
 shooter's blow times the bow's damage times the draw (4 at full for a
 player); walls, closed doors and higher ground stop it. A step while
-drawn starts the draw again. What a raised shield does in a fight is
-still to come (weapons as verbs).
+drawn starts the draw again. A raised shield takes blows and shots
+from its facing cell and the two beside it (decision 340), paying stamina
+for each (damage plus push, times the shield's 8); a blow weighing 2 or
+more (a brute's, a hammer's), or running short of stamina, breaks the
+guard: that blow lands, the holder staggers and cannot raise the shield
+for 2 s. A sword ready in hand parries half of a blow from straight
+ahead. Raised or drawn, the body turns to the cursor.
 With nothing for it the button shoves and tosses as it always did. E,
 tapped, opens what is under the cursor: a chest, crate or cart, your own
 companion's pack, else a door face beside you; held `BANDAGE_HOLD_MSEC`,

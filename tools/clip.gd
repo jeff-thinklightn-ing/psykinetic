@@ -48,6 +48,10 @@ extends Node
 ##   items_blows: the weapon in the blow (decision 338): a war hammer
 ##     knocks a brute back a cell a blow, where a fist would not move it;
 ##     then a dagger, quick, in the back of an imp that faces away.
+##   items_block: block (decision 340): between an imp and a brute, the
+##     shield raised toward the imp takes its blows for stamina while the
+##     brute behind, outside the arc, lands its own; out of stamina, the
+##     guard gives way and the player staggers.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -147,6 +151,8 @@ func _ready() -> void:
 			_items_bow()
 		"items_blows":
 			_items_blows()
+		"items_block":
+			_items_block()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -516,6 +522,30 @@ func _items_blows() -> void:
 	]
 
 
+func _items_block() -> void:
+	var rows: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var markers := {Vector2i(3, 2): "start", Vector2i(6, 2): "monster_imp", Vector2i(11, 2): "monster_brute"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [6, 2], "facing": [-1, 0]}, {"at": [11, 2], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_bold", "imp", "A round shield in the left hand."],
+		["item_give", ["shield", Player.LEFT_HAND], ""],
+		["walk", "beside the monster", "Up between an imp and a brute."],
+		["item_face", "imp", ""],
+		["item_raise", null, "Shield up, toward the imp: its blows are taken on it, for stamina."],
+		["wait", 70, ""],
+		["say", 80, "The brute is behind, outside the shield's arc: its blows land."],
+		["say", 40, "Out of stamina, the guard gives way: a stagger."],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -850,7 +880,9 @@ func _on_tick(tick: int) -> void:
 		"item_give":
 			World.put_item(_player, _player, int(step[1][1]), World.items.mint(str(step[1][0]), "built", "clip"))
 		"item_raise":
-			_main._raise_off_hand(_player)
+			# Raised by command, not through Main, which would turn the body to
+			# wherever the clip's cursor happens to be.
+			World.command(_player, "stance", {"kind": World.off_hand(_player)})
 		"item_lower":
 			var aim: Variant = step[1]
 			if aim is String:
@@ -860,9 +892,8 @@ func _on_tick(tick: int) -> void:
 						aim = entity.tile
 			if aim is Vector2i and _player.raised == "draw":
 				World.command(_player, "loose", {"at": [aim.x, aim.y]})
-				_main._stance = ""
 			else:
-				_main._lower_off_hand(_player)
+				World.command(_player, "stance", {"kind": ""})
 		"item_wait_near":
 			# Waits until a monster of kind step[1][0] is within step[1][1] cells.
 			var near := false
@@ -871,6 +902,17 @@ func _on_tick(tick: int) -> void:
 					near = true
 			if not near:
 				return
+		"item_face":
+			# The player turns to the first monster of kind step[1].
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					World.face(_player, Vector2i(signi(entity.tile.x - _player.tile.x), signi(entity.tile.y - _player.tile.y)))
+					break
+		"item_bold":
+			# The clip's monsters of kind step[1] made bold, so they close in.
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					(entity as Monster).temper = Monster.Temper.BOLD
 		"item_clear":
 			World.items.end(World.take_item(_player, _player, int(step[1])), "gone")
 		"item_e":
@@ -1076,6 +1118,13 @@ func _log(tick: int) -> void:
 		for i in _player.slots.size():
 			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
 		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
+		return
+	if scenario == "items_block":
+		var them := []
+		for entity in World.monsters():
+			them.append("%s at %s" % [entity.name, entity.tile])
+		print("[clip] tick %d: player %s hp %d stamina %d raised %s%s; %s" % [tick, _player.tile, _player.hp, _player.stamina,
+			_player.raised, " stunned" if World.is_stunned(_player) else "", ", ".join(them)])
 		return
 	if scenario in ["items_bow", "items_blows"]:
 		var game := []
