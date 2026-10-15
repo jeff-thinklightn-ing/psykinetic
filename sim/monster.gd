@@ -147,6 +147,9 @@ const DOOR_WAY_TICKS := 20
 ## With no way to its target at all (a crowd round it), it looks for one
 ## again only after this many ticks: a crowd does not open in a tick.
 const CHASE_RETRY_TICKS := 5
+## An archer (a bow in its hands, decision 341) shoots from KEEP_NEAR cells
+## out to its bow's reach; nearer than KEEP_NEAR it steps back.
+const KEEP_NEAR := 3
 
 ## What it does with nobody in sight. NONE: stands where it is (a monster of
 ## no kind, as monsters were).
@@ -436,6 +439,8 @@ func _sim_tick() -> void:
 	target = seen
 	if target == null:
 		_windup = {}
+		if raised == "draw":
+			World.try_stance(self, "")  # Nobody to shoot.
 		_alert_tick()
 		return
 	var took_up := alert != Alert.FIGHTING
@@ -452,6 +457,8 @@ func _sim_tick() -> void:
 		if _should_flee():
 			_flee(target.tile)
 			return
+	if World.off_hand(self) == "draw" and _shoot_tick():
+		return
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
 			World.try_attack(self, target)
@@ -514,6 +521,65 @@ func _unnoticing() -> void:
 	_windup = {}
 	alert = Alert.IDLE
 	_idle_tick()
+
+
+## An archer's fight (decision 341): in its band (KEEP_NEAR to its bow's
+## cells) with a clear shot it stands, draws (World.try_stance "draw") and
+## looses at full draw (try_loose); struck, its draw is spoilt. Too near,
+## it steps back; true for all of that. False when its fight is its kind's
+## as ever: no clear shot from here, or out of reach (it closes as any
+## monster does, till it has one), or too near and nowhere to step back
+## (it fights with its blow).
+func _shoot_tick() -> bool:
+	if raised == "draw" and hurt_tick >= raised_tick:
+		World.try_stance(self, "")  # Struck while drawing: it starts again.
+	var d := World.distance(tile, target.tile)
+	if d < KEEP_NEAR:
+		World.try_stance(self, "")
+		return World.tick >= next_move_tick and _step_back()
+	if not _clear_shot():
+		World.try_stance(self, "")
+		return false
+	if World.tick - _noticed_tick < reaction_ticks:
+		return true  # Sizing it up.
+	World.face(self, Senses.way_toward(tile, target.tile))
+	if raised != "draw":
+		World.try_stance(self, "draw")
+	elif World.draw_of(self) >= 1.0:
+		World.try_loose(self, target.tile)
+	return true
+
+
+## Whether its arrow would fly to its target: the first body on the shot's
+## line (World.shot_line, as far as its bow's cells) is the target, so no
+## wall, door or friend is in the way.
+func _clear_shot() -> bool:
+	var cells := 0
+	for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		var verb := Items.verb_of(slots[hand]) if hand < slots.size() and not slots[hand].is_empty() else {}
+		if verb.get("kind") == "ranged":
+			cells = int(verb["cells"])
+	if World.distance(tile, target.tile) > cells:
+		return false
+	for cell in World.shot_line(tile, target.tile, cells):
+		var body := World.get_entity_at(cell)
+		if body != null:
+			return body == target
+	return false
+
+
+## A step away from its target, to the free neighbouring cell farthest from
+## it (no search); false if none is farther.
+func _step_back() -> bool:
+	var best := Vector2i.ZERO
+	var best_d := World.distance(tile, target.tile)
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+			Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]:
+		var d := World.distance(tile + way, target.tile)
+		if d > best_d and World.is_free(tile + way):
+			best = way
+			best_d = d
+	return best != Vector2i.ZERO and World.try_move(self, best)
 
 
 ## A blow at its target, as its kind strikes.

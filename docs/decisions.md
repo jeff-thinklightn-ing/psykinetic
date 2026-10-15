@@ -6534,3 +6534,24 @@ body over and stands it up when it wears off; the combat animation step
 can give it a proper fall). World.knocked_down feeds the party log ("X
 knocks Y down."). Protocol: a new replicated property changes the
 fingerprint.
+## 341. A monster with a bow in its hands stands off and shoots
+
+A monster wielding a bow (decision 338's "wields", World.off_hand "draw")
+fights as an archer, whatever its tactic; which kinds do is content, and
+no real level has one until Jeff says. Fighting, in its band (KEEP_NEAR, 3
+cells, out to its bow's cells) with a clear shot, it stands, faces its
+target, draws (World.try_stance "draw") and looses at full draw
+(try_loose: the bow's draw_full, 20 ticks), then draws again. A clear shot
+is one whose line (World.shot_line) meets its target before any other
+body, so it never shoots through a friend, a crate or anyone else; nor
+past a wall or a closed door. Struck while drawing, its draw is spoilt
+(lowered, and begun again). Nearer than KEEP_NEAR it steps back to the
+free neighbouring cell farthest from its target (no search); with nowhere
+to step it fights with its blow, which with a bow is bare-handed. With no
+clear shot from where it stands, or out of reach, it fights as its kind
+does: it closes, by the same capped chase every monster uses, until it has
+one, so it needs no search of its own for a firing cell. Drawing makes no
+noise of its own (only the shot is heard, World.NOISE_BOW), and it stands
+still to draw, so a player stalking one can close on it. A CAUTIOUS
+archer does not wait for others at its target: it shoots from where it
+is. Without a target it lowers its bow.

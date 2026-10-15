@@ -15,9 +15,10 @@ const SPECS := {
 	"D": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "stag"},
 	"o": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "boar"},
 	"w": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "wolf"},
+	"a": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "imp"},
 }
 const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
-	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf"}
+	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer"}
 
 var _failures := 0
 var _room: Node2D
@@ -83,6 +84,7 @@ func _ready() -> void:
 	_test_lead_occupied()
 	_test_raid_townsfolk()
 	_test_charging()
+	_test_archer()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1738,4 +1740,60 @@ func _test_charging() -> void:
 	World.damage(boar, 2, e["P"][0])
 	World.step()
 	_check(boar.charging(), "struck, the boar charges")
+	Monster.idling = true
+
+
+func _test_archer() -> void:
+	print("\n== an archer stands off, draws and shoots; holds while someone is in the way; steps back from one close ==")
+	Monster.idling = false
+	var e := _build(["##############", "#............#", "#.P......a...#", "#............#", "##############"])
+	var archer: Monster = e["a"][0]
+	var player: GridEntity = e["P"][0]
+	_bold(archer)
+	archer.slots = PackedStringArray(["", "", "", "", "bow", ""])  # As Level arms one wielding a bow.
+	_check(World.off_hand(archer) == "draw", "a bow in its hands: it draws")
+	var from := archer.tile
+	var shot: Dictionary = {}
+	var drawn := false
+	for i in 40:
+		World.step()
+		drawn = drawn or archer.raised == "draw"
+		for hit: Dictionary in _damage_log:
+			if hit["cause"] == &"shot" and hit["source"] == archer:
+				shot = hit
+		if not shot.is_empty():
+			break
+	_check(drawn and not shot.is_empty() and shot["entity"] == player and archer.tile == from,
+			"it draws where it stands and shoots the player 7 off (%s)" % [shot])
+	_check(not shot.is_empty() and int(shot["tick"]) >= 20, "at full draw (tick %s)" % shot.get("tick"))
+	# Struck as it draws: the draw starts again.
+	for i in 12:
+		World.step()
+	var was := World.draw_of(archer)
+	World.damage(archer, 1, player)
+	World.step()
+	_check(was > 0.0 and World.draw_of(archer) < was, "struck while drawing, its draw is spoilt (%.2f to %.2f)" % [was, World.draw_of(archer)])
+	# Someone in the way (a friend would be; a crate stays put): it does
+	# not shoot from there, but moves till it has a clear line.
+	e = _build(["##############", "#............#", "#.P...c..a...#", "#............#", "##############"])
+	archer = e["a"][0]
+	_bold(archer)
+	archer.slots = PackedStringArray(["", "", "", "", "bow", ""])  # As Level arms one wielding a bow.
+	from = archer.tile
+	var shot_from := Vector2i(-1, -1)
+	for i in 60:
+		World.step()
+		if shot_from == Vector2i(-1, -1) and _damage_log.any(func(hit: Dictionary) -> bool: return hit["cause"] == &"shot"):
+			shot_from = archer.tile
+	_check(shot_from != Vector2i(-1, -1) and shot_from != from and shot_from.y != from.y,
+			"a crate on its line: it moves off it (to %s), then shoots" % [shot_from])
+	# One too close.
+	e = _build(["##############", "#............#", "#....P.a.....#", "#............#", "##############"])
+	archer = e["a"][0]
+	player = e["P"][0]
+	_bold(archer)
+	archer.slots = PackedStringArray(["", "", "", "", "bow", ""])  # As Level arms one wielding a bow.
+	for i in 10:
+		World.step()
+	_check(World.distance(archer.tile, player.tile) >= Monster.KEEP_NEAR, "2 off, it steps back to %d" % World.distance(archer.tile, player.tile))
 	Monster.idling = true
