@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_bodies_in_town()
 	_test_resident_voices()
 	_test_means_in_voice()
+	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
 	remove_child(_main)
 	_main.free()
@@ -405,6 +406,40 @@ class BusyMind:
 
 	func busy(what: String) -> bool:
 		return what == "voice"
+
+
+## A town far from everyone has no bodies, and is not in play: a raid on
+## it takes its people off the record (decision 355). The room is small,
+## so the distances are made small (Main.recall_tiles, retire_tiles).
+func _test_bodies_only_near() -> void:
+	print("
+== a town's residents have bodies only while someone is near; out of play while none (decision 355) ==")
+	var recall: int = _main.recall_tiles
+	var retire: int = _main.retire_tiles
+	_main.recall_tiles = 4
+	_main.retire_tiles = 6
+	World.towns.note_rescue(STORE, "rs-near", "Nell", "cook")
+	var player := _player()
+	var pet := _companion()
+	_put(player, Vector2i(26, 17))
+	_put(pet, Vector2i(27, 17))
+	_sync()
+	_check(World.townsfolk().is_empty(), "everyone 20 and more cells off the store: no bodies (%d)" % World.townsfolk().size())
+	_check(not World.towns.in_play.call(STORE), "and the town is not in play: a raid takes its people off the record")
+	_put(player, Vector2i(8, 3))
+	_sync()
+	_check(not World.townsfolk().is_empty() and World.towns.in_play.call(STORE), "the player 3 cells off: bodies, and in play (%d)" % World.townsfolk().size())
+	_put(player, Vector2i(10, 3))
+	_sync()
+	_check(not World.townsfolk().is_empty() and World.towns.in_play.call(STORE), "5 off, between the two: kept")
+	_put(player, Vector2i(26, 17))
+	_sync()
+	_check(World.townsfolk().is_empty() and not World.towns.in_play.call(STORE), "far again: gone, and out of play")
+	_check(World.towns.residents(STORE).has("rs-near"), "still the town's: only the body went, not her")
+	_main.recall_tiles = recall
+	_main.retire_tiles = retire
+	_put(player, Vector2i(2, 2))
+	_sync()
 
 
 func _sync() -> void:

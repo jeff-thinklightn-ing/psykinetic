@@ -159,6 +159,15 @@ func step() -> void:
 			_left(id)
 
 
+## Whether a group is in play in zone [param area] (Main keeps a town's
+## residents there while one is, decision 355).
+func any_in(area: String) -> bool:
+	for id in ids():
+		if _groups[id]["area"] == area:
+			return true
+	return false
+
+
 ## Zone [param area] went to sleep or was reset: its groups go back to maps
 ## where they stand, with what they carry.
 func hand_back(area: String) -> void:

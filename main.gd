@@ -183,6 +183,8 @@ const WHISPER_RANGE := Senses.NOISE_WHISPER
 var mind_kind := "scripted"
 ## Server only: level_entities index -> the entity holding that slot now.
 var _alive_slots: Dictionary[int, GridEntity] = {}
+## The towns whose residents have bodies now, by place id (_town_near).
+var _towns_near := {}
 ## Server only: level_entities index -> tick its entity died or broke.
 var _dead_since: Dictionary[int, int] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
@@ -378,6 +380,12 @@ func _ready() -> void:
 
 	World.ticked.connect(_on_world_ticked)
 	World.stepped.connect(_on_world_stepped)
+	# A zone asleep is not synced: its towns are near no more, till its first
+	# sync awake says (decision 355).
+	World.zone_slept.connect(func(each: Zone) -> void:
+		for place_id: String in _towns_near.keys():
+			if str(World.holdings.place(place_id).get("area", "")) == each.name:
+				_towns_near.erase(place_id))
 	if Net.test_exit_after > 0.0:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
 	if Net.test_exit_on != "":
@@ -1518,9 +1526,12 @@ func _boot() -> void:
 	if Net.raids:
 		World.raid_groups.set_on(true)
 	# Companions taken and freed in raids (decision 314).
+	# In play: its residents have bodies, which raiders take themselves; not
+	# (its zone asleep, or nobody near it: _town_near, decision 355), Towns
+	# takes them off the record.
 	World.towns.in_play = func(town: String) -> bool:
 		var zone: Zone = World.zones.get(str(World.holdings.place(town).get("area", "")))
-		return zone != null and zone.awake
+		return zone != null and zone.awake and _towns_near.has(town)
 	World.towns.companion_taken = companion_taken
 	World.towns.companion_freed = companion_freed
 	World.towns.companion_of = func(player_id: String) -> Dictionary:
@@ -2641,6 +2652,10 @@ func _sync_residents() -> void:
 			var place := World.holdings.place(place_id)
 			if place.get("kind") != "stockpile":
 				continue
+			# Bodies only while someone is near (decision 355); a far town
+			# takes none of the RESIDENTS_MAX either.
+			if not _town_near(place_id, place):
+				continue
 			var ids: Array[String] = World.towns.residents(place_id).filter(func(who: String) -> bool:
 				return not who.begins_with("companion:") and not World.production.worker(who).is_empty() \
 					and not bool(World.production.worker(who).get("away", false)))
@@ -2671,6 +2686,39 @@ func _sync_residents() -> void:
 	for who: String in wanted:
 		if not have.has(who):
 			_spawn_resident(wanted[who])
+
+
+## Whether the town at [param place_id] has its residents' bodies: once a
+## player or companion of the zone is within recall_tiles of its stockpile,
+## till all are beyond retire_tiles (as far monsters are kept as records,
+## decision 352; the residents are Towns' and Production's already, a body
+## is only where it is now), and while raiders are in the zone or one of
+## its folk hides from them, so a raid under way meets the bodies it came
+## for. A zone nobody has been in (a test room) keeps them. Kept in
+## _towns_near, which Towns.in_play reads.
+func _town_near(place_id: String, place: Dictionary) -> bool:
+	var near := World._tier_origins()
+	var cell: Variant = place.get("cell")
+	var now := near.is_empty() or not cell is Vector2i
+	if not now:
+		now = _nearest_of(cell, near) <= (retire_tiles if _towns_near.has(place_id) else recall_tiles)
+	if not now and _towns_near.has(place_id) and (World.raids.any_in(World.zone.name) or _hiding_in(place_id)):
+		now = true
+	if now:
+		_towns_near[place_id] = true
+	else:
+		_towns_near.erase(place_id)
+	return now
+
+
+## Whether one of the bodies of the town at [param place_id] is hiding (from
+## raiders).
+func _hiding_in(place_id: String) -> bool:
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body != null and body.town == place_id and body.doing == Resident.Doing.HIDE:
+			return true
+	return false
 
 
 ## The companions resting or working in the town at [param place_id], away

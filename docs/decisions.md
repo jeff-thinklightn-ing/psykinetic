@@ -7039,3 +7039,45 @@ Players depositing and borrowing at the counter is a later step.
 Snapshot: workers gain `loan` and `working_off`; older saves owe nothing.
 Server only.
 
+## 355. A town's residents have bodies only while someone is near
+
+Far-tier step (b) (decision 352 is (a)). A resident is Towns' and
+Production's already (who, what trade, where they live and work); a body
+(Resident, decision 333) is only where they are now, made where the hour
+puts them (Resident.doing_at). So a town far from everyone keeps no
+bodies: Main's resident sync (`_sync_residents`, every 30 ticks) leaves a
+town out unless `_town_near` says it is near: once a player or companion
+of the zone is within `recall_tiles` (70) of its stockpile, till all of
+them are beyond `retire_tiles` (80), the same distances and hysteresis as
+far monsters' records. A far town is left out before the RESIDENTS_MAX
+(12) cap, so it no longer takes a near town's bodies; its bodies go by the
+sync's own despawn (`_travelling`: not taken, not dead; never
+resident_taken or World.entity_taken). A zone nobody has been in keeps
+them, as before.
+
+Raids (economy and companions): a town's bodies are kept while a raid
+group is in the zone (`Raids.any_in`, new) or one of its folk hides from
+raiders, so a raid under way meets the bodies it came for. And
+`Towns.in_play`, which decides whether a raid takes the town's people as
+bodies (raiders carry them off) or off the record (decision 331 amended),
+now means "this town's bodies are spawned" (its zone awake and
+`_towns_near` has it), not "its zone is awake": a raid on a town nobody is
+near takes people off the record, as it does a sleeping zone's, where
+before such a town had no bodies to take and was out of reach.
+
+Lost with a body, and fine to lose (companions): where it was walking,
+what it heard, its stroll timer, pending asks (logged "not said"; nobody
+is within hearing at 70 cells), hp and hiding. A companion resting in town
+comes back from her PlayerRecord.
+
+`_towns_near` lets a zone's towns go when it falls asleep (World.zone_slept),
+so a stale entry never says in play. Towns reads `in_play` once, as a raid
+arrives (companions): one that comes on a far town takes people off the
+record; should a player then walk near during the raid, bodies come for
+the rest (the taken are no longer residents, so no ghosts) and raiders may
+take a few more in play. An edge, accepted.
+
+resident_test (distances made 4 and 6 for its small room): everyone far,
+no bodies and not in play; the player 3 cells off, bodies and in play; 5
+off, kept; far again, gone and out of play, the resident still the
+town's. Server only; no protocol change.
