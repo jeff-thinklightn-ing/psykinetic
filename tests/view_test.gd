@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_wall_runs()
 	_test_scatter()
 	_test_buildings()
+	_test_building_states()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -455,6 +456,50 @@ func _test_buildings() -> void:
 		other.global_position = other_was
 	puppet.global_position = was
 	_rig.set_process(true)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+func _test_building_states() -> void:
+	print("
+== a building drawn as its town has it: damaged, its roof caved in; standing again, as built ==")
+	var terrain := _building_terrain()
+	var record: Dictionary = (terrain["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == "building.house")[0]
+	record["use"] = "forge"
+	record["town_id"] = "fixture/square"
+	_rig.rebuild(terrain, Vector2i(7, 7))
+	_main._client3d = _rig
+	var house: Dictionary = _rig._buildings.filter(func(b: Dictionary) -> bool: return b["use"] == "forge")[0]
+	var roof: Node3D = house["roof"]
+	_check(not house["damaged"] and roof.transform.is_equal_approx(house["roof_at"]), "no word from the town: standing, as built")
+	# A client told by the server ("town"), through Main as the message comes.
+	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.DAMAGED, "level": 1}}})
+	_check(_main.town_states.has("fixture/square") and house["damaged"], "told the forge is damaged: it is drawn so")
+	var caved: bool = house["roof"] != roof or not roof.transform.is_equal_approx(house["roof_at"])
+	_check(caved and (house["roof"] as Node3D).visible, "its roof caved in (or its roof_damaged shown), at a glance")
+	# Inside, the damaged roof goes as the whole one did.
+	_rig.set_process(false)
+	var puppet: Node3D = _rig._puppets[_player().get_instance_id()]
+	var was := puppet.global_position
+	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(4, 6)))
+	_rig._update_fade()
+	_check(house["off"] and _roof_shadow_only(house), "inside a damaged building: its roof draws only its shadow")
+	puppet.global_position = was
+	_rig._fade_clock += Client3D.FADE_HOLD + 0.1
+	_rig._update_fade()
+	_rig.set_process(true)
+	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.STANDING, "level": 1}}})
+	_check(not house["damaged"] and house["roof"] == roof and roof.visible and roof.transform.is_equal_approx(house["roof_at"]),
+			"repaired: standing again, its roof whole")
+	_rig.rebuild(terrain, Vector2i(7, 7))
+	_check(_rig._buildings.any(func(b: Dictionary) -> bool: return b["use"] == "forge" and not b["damaged"]), "kept across a rebuild (as the town has it)")
+	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.DAMAGED, "level": 1}}})
+	_rig.rebuild(terrain, Vector2i(7, 7))
+	_check(_rig._buildings.any(func(b: Dictionary) -> bool: return b["use"] == "forge" and b["damaged"]), "a damaged building is still damaged after a rebuild")
+	# On the server, a change in the town's records reaches its own view too.
+	World.towns.building_changed.emit("fixture/other", "inn")
+	_check(_main.town_states.has("fixture/other") and _rig.town_states.has("fixture/other"), "the server's Towns.building_changed is told to every peer and its own view")
+	_main.town_states.clear()
+	_rig.town_states.clear()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

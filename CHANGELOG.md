@@ -6,6 +6,9 @@ top section as the release notes.
 
 ## Unreleased
 
+- A town's buildings show their state: after a raid a damaged forge, inn or
+  kitchen has a caved-in roof, and it stands whole again once the carpenter
+  has repaired it. Its inside still works. Needs the server updated.
 - The server no longer freezes for over half a second when someone enters
   the wilds for the first time or accepts a builder change there: reading
   a big level is about five times faster, and an accept no longer re-reads

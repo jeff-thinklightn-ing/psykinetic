@@ -232,6 +232,9 @@ var _held_target := NONE
 
 ## The 3D view (the default; see Net.renderer); the 2D nodes are hidden.
 var _client3d: Client3D
+## Town id -> {kind: {state, level}}: the towns' buildings as the server
+## last told ("town", decision 297), for the view's buildings.
+var town_states := {}
 @onready var ground: TileMapLayer = $Ground
 ## The node the zone World is in keeps its entities under (one per zone,
 ## under $YSort/Entities, named for it), and its spawner: both per zone.
@@ -591,6 +594,7 @@ func _show_3d() -> void:
 	add_child(_client3d)
 	_client3d.setup(_terrain, level_centre)
 	_client3d.bubbles = bubbles
+	_show_towns()
 
 
 # --- WASD ---------------------------------------------------------------------------
@@ -1319,6 +1323,7 @@ func _repaint() -> void:
 	_paint_level()
 	if _client3d != null:
 		_client3d.rebuild(_terrain, level_centre)
+		_show_towns()
 
 
 # --- Zones (server) -------------------------------------------------------------
@@ -1356,6 +1361,7 @@ func _boot() -> void:
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
+	World.towns.building_changed.connect(_on_town_building_changed)
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	_records.clear()
@@ -1518,6 +1524,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
 	Net.message_to(peer, "map", {"name": zone_name, "server": Net.version})
 	Net.message_to(peer, "sky", sky_message())
+	_send_towns(peer, zone_name)
 	World.update_visibility(peer, zone_name)
 
 
@@ -1926,6 +1933,38 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	party_log.add("%s joined." % player_name)
 	_join_companion(record, player)
 	_on_gold_changed(id, World.gold_of(id))
+
+
+# --- Towns -----------------------------------------------------------------------
+
+## Server: a town's building was unlocked, built, raised, damaged or
+## repaired (Towns.building_changed): every peer, and this one, is told the
+## town's buildings ("town" {town, buildings}).
+func _on_town_building_changed(town: String, _kind: String) -> void:
+	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town)})
+
+
+## Server: [param peer], come to [param zone_name], is told the buildings of
+## each town there.
+func _send_towns(peer: int, zone_name: String) -> void:
+	if World.towns == null:
+		return
+	for town: String in World.towns.to_dict():
+		if town.begins_with(zone_name + "/"):
+			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town)})
+
+
+## The view's buildings drawn as their towns have them: the server's own
+## records on the server (its player never gets a zone's greeting), else
+## what it was told.
+func _show_towns() -> void:
+	if _client3d == null:
+		return
+	if Net.is_authority() and World.towns != null:
+		for town: String in World.towns.to_dict():
+			town_states[town] = World.towns.buildings_of(town)
+	for town: String in town_states:
+		_client3d.set_town(town, town_states[town])
 
 
 # --- Trade -----------------------------------------------------------------------
@@ -2492,6 +2531,14 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "terrain":
 		_on_terrain(data)
+		return
+	if kind == "town":
+		var town := str(data.get("town", ""))
+		var buildings: Variant = data.get("buildings", {})
+		if not town.is_empty() and buildings is Dictionary:
+			town_states[town] = buildings
+			if _client3d != null:
+				_client3d.set_town(town, buildings)
 		return
 	if kind == "sky":
 		if not Net.is_authority():

@@ -4664,6 +4664,29 @@ already holds); and linking by the building's cell from Towns' side
 (economy's rules need no map, and a map edited in the builder would leave
 its records pointing at nothing).
 
+The second stage, the state on every peer: the server connects
+Towns.building_changed(town, kind) (economy's step 6, 295) when it makes
+its Towns (Main._boot) and broadcasts a "town" message, {town: its id,
+buildings: Towns.buildings_of(town)}, the whole town (a few kinds, so no
+deltas); a peer coming into a zone is told each town there (Main.
+_send_towns, beside "map" and "sky"); the server's own view takes Towns'
+records as they are (_show_towns), as its player gets no greeting. Main
+keeps what it was told (town_states) and hands it to the view
+(Client3D.set_town), which keeps it across rebuilds: a town's state is
+not the map's. Level.load_level gives a linked building its town id
+("<level>/<town>"). A new message kind: the protocol changes with it.
+
+How a state draws, on the client only: damaged, the slot's roof_damaged
+in its roof's place and its state_damaged (rubble heaps in the outline's
+band) shown (art-kit, 287); until a slot has a roof_damaged its roof sags
+at its eaves (ROOF_SAG), caved in at a glance. The roof shown is the one
+that goes while the player is inside (266) and fades from outside.
+Planned, being built and standing draw standing for now. The walls of a
+damaged building take terrain's "broken" wall state when its
+Client3D._wall_states lands (#285); until then they stand whole. Later:
+whether a damaged roof lets daylight in (environment's 291 has every
+footprint roofed); for now it stays roofed.
+
 ## 272. Bandaging: a kit, out of combat, then mending you can walk away from
 
 Items step 4, first part (the roadmap's rule: right-click-hold on an

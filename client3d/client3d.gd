@@ -325,6 +325,9 @@ const FADE_HOLD := 0.4
 ## A building (_add_buildings) stands this far above its ground, so its
 ## inside floor clears it.
 const BUILDING_LIFT := 0.01
+## A damaged building's roof until its slot has a roof_damaged part: tipped
+## and dropped at its eaves, caved in at a glance (_show_state).
+const ROOF_SAG := Transform3D(Basis(Vector3.RIGHT, 0.18), Vector3(0.0, -0.45, 0.0))
 ## A building's side is near the camera, and fades while the player is
 ## inside (_inside_walls), when its outward way and the camera's, flat,
 ## agree more than this (the cosine): both sides toward the camera in a
@@ -794,6 +797,8 @@ var _saplings: Dictionary[Vector2i, Node3D] = {}
 var _buildings: Array[Dictionary] = []
 var _building_at: Dictionary[Vector2i, int] = {}
 var _roofs_off: Dictionary[int, float] = {}
+## Town id -> {kind: {state, level}}, as Main was told (set_town).
+var town_states := {}
 ## For each wall and doorway edge, the pieces of its run (_wall_runs), as
 ## the occluders were indexed.
 var _runs: Dictionary[Vector3i, Array] = {}
@@ -2014,11 +2019,67 @@ func _add_buildings() -> void:
 		node.rotation.y = atan2(float(facing.x), float(facing.y))
 		_room.add_child(node)
 		var index := _buildings.size()
-		_buildings.append({"rect": rect, "node": node, "roof": node.get_node_or_null("roof"), "off": false})
+		var roof: Node3D = node.get_node_or_null("roof")
+		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
+			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false})
+		for part in ["roof_damaged", "state_damaged"]:
+			var shown := node.find_child(part, true, false) as Node3D
+			if shown != null:
+				shown.visible = false
+		_show_state(_buildings[index])
 		if slot in Level.ON_WATER:
 			continue  # Nobody stands in a well: it has no inside.
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
+
+
+## Sets the buildings of [param town] (its id) to [param buildings] ({kind:
+## {state, level}}, the "town" message, decision 297), and draws each of
+## its buildings so. Kept across rebuilds: a town's state is not the map's.
+func set_town(town: String, buildings: Dictionary) -> void:
+	town_states[town] = buildings
+	for building in _buildings:
+		if building["town_id"] == town:
+			_show_state(building)
+
+
+## [param building] drawn as its town has it: damaged, the slot's
+## roof_damaged in its roof's place and its state_damaged (rubble) shown;
+## until a slot has a roof_damaged, its roof sags (ROOF_SAG); else as
+## built. Planned, being built and standing all draw standing for now, as
+## does a building no town has a record of.
+func _show_state(building: Dictionary) -> void:
+	var state := Towns.STANDING
+	if not str(building["use"]).is_empty():
+		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+	var damaged := state == Towns.DAMAGED
+	if damaged == building["damaged"]:
+		return
+	building["damaged"] = damaged
+	var node: Node3D = building["node"]
+	var whole: Node3D = node.get_node_or_null("roof")
+	var broken: Node3D = node.get_node_or_null("roof_damaged")
+	var was: Node3D = building["roof"]
+	if was != null:
+		# The roof that goes keeps nothing of the fade or of being off.
+		_set_near(was, false)
+		_faded.erase(was)
+		_hid_at.erase(was)
+		_hiding.erase(was)
+	if broken != null:
+		if whole != null:
+			whole.visible = not damaged
+		broken.visible = damaged
+		building["roof"] = broken if damaged else whole
+	elif whole != null:
+		whole.transform = building["roof_at"] * ROOF_SAG if damaged else building["roof_at"]
+	var heaps := node.find_child("state_damaged", true, false) as Node3D
+	if heaps != null:
+		heaps.visible = damaged
+	# What hides the player is indexed again, with the roof now shown.
+	_occluders_built = false
+	if _camera != null and building["off"]:
+		_update_fade(true)
 
 
 ## Every art slot the room may be built from (WARM_CATEGORIES), made once
