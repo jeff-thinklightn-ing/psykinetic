@@ -1,8 +1,9 @@
 # Changelog
 
-Newest first. Worktrees add their bullets under `## Unreleased`; the release session
-renames it to the version when it cuts a release, and `tools/release_client.ps1` uses the
-top section as the release notes.
+Newest first. Worktrees add their bullets under `## Unreleased`. To cut a release the
+release session leaves that heading where it is, empty, and puts `## vX.Y.Z` under it
+above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as the release
+notes (decision 324).
 
 ## Unreleased
 

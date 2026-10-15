@@ -13,7 +13,8 @@
 #      (a failure here puts version.txt back)
 #   3. commit "Release v<version>" and tag it
 #   4. with gh: push the commit to main and the tag, create the GitHub
-#      release with the top CHANGELOG.md section as notes; without gh: print
+#      release with CHANGELOG.md's '## v<version>' section (else the top one)
+#      as notes; without gh: print
 #      the manual steps
 # A release always lands on main, from main or from any branch or worktree
 # (the perf worktree's branch, say): its commit goes to origin's main as a
@@ -128,11 +129,18 @@ git tag $tag
 Write-Output "committed and tagged $tag"
 
 # --- 4. release ---------------------------------------------------------------
-# The top CHANGELOG.md section, without its heading.
+# The CHANGELOG.md section headed '## <tag>', without its heading; with none,
+# the top section. A cut keeps '## Unreleased' (empty) above '## <tag>', so a
+# tree rebasing after it still adds its bullets under Unreleased (decision 324).
 $notes = New-TemporaryFile
 $lines = Get-Content (Join-Path $root 'CHANGELOG.md')
-$start = ($lines | Select-String -Pattern '^## ' | Select-Object -First 1).LineNumber
-$end = ($lines | Select-String -Pattern '^## ' | Select-Object -Skip 1 -First 1).LineNumber
+$headings = @($lines | Select-String -Pattern '^## ')
+$at = 0
+for ($i = 0; $i -lt $headings.Count; $i++) {
+	if ($headings[$i].Line -match "^## $([regex]::Escape($tag))\b") { $at = $i; break }
+}
+$start = if ($headings.Count -gt $at) { $headings[$at].LineNumber } else { $null }
+$end = if ($headings.Count -gt $at + 1) { $headings[$at + 1].LineNumber } else { $null }
 if (-not $start) { Set-Content $notes "Release $tag" }
 elseif ($end) { $lines[$start..($end - 2)] | Set-Content $notes }
 else { $lines[$start..($lines.Count - 1)] | Set-Content $notes }

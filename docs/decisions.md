@@ -5654,3 +5654,19 @@ Rejected: a set a building or region paints per cell in the editor (later,
 if Jeff asks); a mesh per floor set over the ground, which would double the
 ground's draws and light it twice; and keeping plain walls as a flag beside
 the sets, which the wood set's own variation now says.
+
+## 324. A release cut keeps `## Unreleased` and puts the version under it
+
+Cutting v0.1.141 and v0.1.142 renamed `## Unreleased` to `## vX.Y.Z` and then
+added an empty `## Unreleased` above it in a second commit. A tree that
+rebased after the cut had its bullet, written right under the old
+`## Unreleased` line, carried by git to the renamed line: it landed under the
+released version (terrain caught it twice by hand; decision 322's union merge
+does not help, since there is no conflict). Now a cut leaves the
+`## Unreleased` line untouched and inserts `## vX.Y.Z` (and a blank line)
+below it, above the bullets, in the one CHANGELOG commit: the line every
+tree's bullets hang from never moves, so a rebase keeps them under it.
+`tools/release_client.ps1` takes the release notes from the `## v<version>`
+section when there is one (the top section only when there is none), so the
+empty Unreleased section above it is not the notes. Rejected: asking every
+tree to check after a rebase (they did; it still slipped twice).
