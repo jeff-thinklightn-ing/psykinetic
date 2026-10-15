@@ -185,6 +185,8 @@ func _ready() -> void:
 			_raid()
 		"wild":
 			_wild()
+		"boar":
+			_boar()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -198,7 +200,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "wild"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "wild", "boar"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -791,6 +793,30 @@ func _wild() -> void:
 	]
 
 
+## A boar in its art (creature.boar, decision 359): grazing, shot from
+## afar, it turns and charges the hunter, then runs.
+func _boar() -> void:
+	var rows: Array[String] = ["##############################"]
+	for y in 11:
+		rows.append("#............................#")
+	rows.append("##############################")
+	var markers := {Vector2i(3, 6): "start", Vector2i(16, 6): "monster_boar"}
+	# Animals are placed by herds, not markers: the clip's own legend has it.
+	var config := {"name": "Clip", "zone": "outdoors", "entities": [{"at": [16, 6], "facing": [1, 0]}],
+		"legend": {"monster_boar": "#6a5040"}}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["say", 90, "A boar roots about, head down between strolls."],
+		["item_give", ["bow", Player.RIGHT_HAND], "A hunting bow."],
+		["walk", Vector2i(9, 6), "Up on it from behind, quietly."],
+		["item_face", "boar", ""],
+		["item_raise", null, "Drawn..."],
+		["wait", 22, ""],
+		["item_lower", "boar", "...and loosed. A boar struck does not run: it charges."],
+		["wait", 160, ""],
+	]
+
+
 func _raid() -> void:
 	var rows: Array[String] = [
 		"################################",
@@ -1167,7 +1193,7 @@ func _nearest_standing() -> Monster:
 
 
 func _log(tick: int) -> void:
-	if scenario in ["pack", "raid", "wild"]:
+	if scenario in ["pack", "raid", "wild", "boar"]:
 		var each: Array[String] = []
 		for entity in World.monsters():
 			var monster := entity as Monster
