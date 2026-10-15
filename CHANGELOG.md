@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.146
+
 - Spears reach two cells, through an empty one. Stand still a moment and the
   spear is braced: a charging boar or brute that runs onto it is stopped,
   hurt and thrown back by its own weight.
