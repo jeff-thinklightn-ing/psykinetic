@@ -65,7 +65,9 @@ extends Node
 ## and kept as written when the file is rewritten. controls=wasd is WASD
 ## with the mouse aiming; anything else, or no line, is click-to-move;
 ## read and kept the same way. hp_bars=0 turns the 3D view's HP bars off;
-## master_volume= and sfx_volume= (0..1, default 1) set the sound.
+## master_volume=, sfx_volume=, voice_volume=, ambience_volume=, ui_volume=
+## and music_volume= (0..1, default 1) set the sound (the options panel, O,
+## writes them back).
 ## phrase1= ... phrase4= are the quick phrases keys 1-4 say (written back,
 ## the defaults where there is none). Any line
 ## the game does not write itself (these, and keys it does not know) is
@@ -273,10 +275,19 @@ var camera_yaw := 0.0
 var camera_zoom := 1.0
 ## The HUD's list of controls shown (H toggles it); settings.cfg hints=on|off.
 var hints := true
-## settings.cfg hp_bars= (0 turns them off), master_volume=, sfx_volume=.
+## settings.cfg hp_bars= (0 turns them off), and the volumes, 0..1, each a
+## bus's (Sfx.VOLUME_SETTINGS) but master's: master_volume=, sfx_volume=,
+## voice_volume=, ambience_volume=, ui_volume=, music_volume=.
 var hp_bars := true
 var master_volume := 1.0
 var sfx_volume := 1.0
+var voice_volume := 1.0
+var ambience_volume := 1.0
+var ui_volume := 1.0
+var music_volume := 1.0
+## A volume changed (set_volume): Sfx sets the buses again.
+signal volumes_changed
+const VOLUME_SETTINGS: Array[String] = ["master_volume", "sfx_volume", "voice_volume", "ambience_volume", "ui_volume", "music_volume"]
 ## The quick phrases, keys 1-4; settings.cfg phrase1= ... phrase4=.
 const DEFAULT_PHRASES: Array[String] = ["With me!", "Stay back!", "Get them!", "Fall back!"]
 var phrases: Array[String] = DEFAULT_PHRASES.duplicate()
@@ -482,14 +493,15 @@ func _apply_renderer_setting() -> void:
 		apply_view_options(settings)
 
 
-## hp_bars=, master_volume=, sfx_volume=, art_placeholders= and art_labels=
-## (ArtKit) from [param settings], and the lines to keep. A volume is held to 0..1; a bad one keeps the default.
+## hp_bars=, the volumes (VOLUME_SETTINGS), art_placeholders= and
+## art_labels= (ArtKit) from [param settings], and the lines to keep. A
+## volume is held to 0..1; a bad one keeps the default.
 func apply_view_options(settings: Dictionary) -> void:
 	hp_bars = str(settings.get("hp_bars", "1")).strip_edges().to_lower() not in ["0", "false", "off", "no"]
 	ArtKit.show_placeholders = _setting_on(settings, "art_placeholders")
 	ArtKit.show_labels = _setting_on(settings, "art_labels")
-	master_volume = _volume(settings.get("master_volume", ""), master_volume)
-	sfx_volume = _volume(settings.get("sfx_volume", ""), sfx_volume)
+	for key in VOLUME_SETTINGS:
+		set(key, _volume(settings.get(key, ""), float(get(key))))
 	phrases = phrases_from(settings)
 	_settings_kept.clear()
 	for key: String in settings:
@@ -623,6 +635,20 @@ func _read_settings(path: String) -> Dictionary:
 		if equals > 0:
 			settings[line.substr(0, equals).strip_edges()] = line.substr(equals + 1).strip_edges()
 	return settings
+
+
+## The volume [param key] (one of VOLUME_SETTINGS) at [param value], held
+## to 0..1 and applied to the buses; with [param save], written to the
+## settings file (kept as any line the game does not write itself), else
+## only when the next save comes (a slider writes when let go).
+func set_volume(key: String, value: float, save := true) -> void:
+	if key not in VOLUME_SETTINGS:
+		return
+	set(key, clampf(value, 0.0, 1.0))
+	_settings_kept[key] = "%.2f" % float(get(key))
+	volumes_changed.emit()
+	if save:
+		save_view_settings()
 
 
 ## Writes the settings file, keeping (or minting) this client's player id.

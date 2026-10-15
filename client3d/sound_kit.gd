@@ -226,6 +226,20 @@ static func _playing(slot: String) -> Array[String]:
 	return found
 
 
+## Grounds a footstep has its own slots for (others sound as stone).
+const STEP_GROUNDS := ["grass", "dirt", "stone", "sand", "water"]
+## A body's size for its footsteps, by mass (kg): small under the first,
+## large from the second (a sneak is small, a player or a brute medium).
+const STEP_MASS := [50.0, 100.0]
+
+
+## The footstep slot for a body of [param mass] on [param ground] (a floor
+## kind, or "water").
+static func footstep(ground: String, mass: float) -> String:
+	var size := "small" if mass < STEP_MASS[0] else "medium" if mass < STEP_MASS[1] else "large"
+	return "sfx.footstep_%s_%s" % [ground if ground in STEP_GROUNDS else "stone", size]
+
+
 ## The slot for opening [param entity]'s slots: a chest's lid, a crate's or
 ## cart's (Cargo), else a pack's leather.
 static func opening(entity: GridEntity) -> String:

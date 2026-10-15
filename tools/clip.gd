@@ -33,6 +33,11 @@ extends Node
 ##     (footsteps), opens a chest, opens a door into the next room and
 ##     fights the imp there to its death; each caption names the slot it
 ##     plays, and the log every sound played.
+##   sound_hearing: what you hear is what monsters hear (decision 269). A
+##     door opens and shuts again and again while the player backs away
+##     from it: loud beside it, fainter, gone past its 6 cells. Then, the
+##     door shut, blows land on an imp beyond it: heard muffled close to
+##     the wall (half a fight's 5 cells), not at all further off.
 ##   door_hide: an imp chases the player down a corridor; they go through
 ##     the door at its end, shut it and keep quiet: it comes, finds
 ##     nothing beyond, and goes back.
@@ -67,6 +72,13 @@ var _end_tick := -1
 var _lured := false
 ## Sounds already logged (the sounds scenario).
 var _sounds_logged := 0
+## Unheard sounds already logged (the sound_hearing scenario).
+var _unheard_logged := 0
+## The tick a sound_slam or sound_blows step ends (its own: _wait_until
+## would hold the script still meanwhile).
+var _repeat_until := -1
+## How often sound_slam swings the door and sound_blows strikes.
+const SLAM_TICKS := 20
 ## The tick a "sound_fight" step gives up by.
 var _fight_until := -1
 
@@ -91,6 +103,8 @@ func _ready() -> void:
 			_items_icons()
 		"sounds":
 			_sounds()
+		"sound_hearing":
+			_sound_hearing()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
 		"pack":
@@ -108,9 +122,14 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
+	if scenario == "sound_hearing":
+		# The imp only stands there to be struck: it neither dies nor moves.
+		_monster.max_hp = 1000000
+		_monster.hp = _monster.max_hp
+		_monster.stunned_until_tick = 1 << 30
 	var layer := CanvasLayer.new()
 	layer.layer = 100
 	add_child(layer)
@@ -395,6 +414,46 @@ func _door(which: String) -> void:
 		])
 
 
+## A long room, a door at its east end into a small one with an imp in it
+## (held there and made too tough to die of the blows: _ready).
+func _sound_hearing() -> void:
+	var cells: Array[String] = [
+		"###################",
+		"#.................#",
+		"#.................#",
+		"#.................#",
+		"#.................#",
+		"#.................#",
+		"###################",
+	]
+	var rows := Terrain.expand(cells)
+	# The wall between cells x 13 and 14 (pixel 27), its door on row 3.
+	for y in range(1, rows.size() - 1):
+		rows[y] = rows[y].substr(0, 27) + ("+" if y == 6 else "#") + rows[y].substr(28)
+	var markers := {Vector2i(13, 3): "start", Vector2i(15, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [15, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(rows, markers, config), null, config)
+	_script = [
+		["say", 20, "What you hear is what monsters hear: a door carries 6 cells."],
+		["sound_slam", 60, "Beside the door: loud."],
+		["walk", Vector2i(10, 3), ""],
+		["sound_slam", 60, "3 cells off: fainter."],
+		["walk", Vector2i(8, 3), ""],
+		["sound_slam", 60, "5 cells: nearly gone."],
+		["walk", Vector2i(5, 3), ""],
+		["sound_slam", 60, "8 cells: past its 6. Not heard, by you or a monster here."],
+		["sound_shut", true, "The door shut, blows on the imp beyond it (a fight carries 5)."],
+		["walk", Vector2i(13, 3), ""],
+		["sound_blows", 80, "2 cells, through the wall: muffled (half as far: 2.5 cells)."],
+		["walk", Vector2i(10, 3), ""],
+		["sound_blows", 80, "5 cells, through the wall: not heard."],
+		["walk", Vector2i(13, 3), ""],
+		["sound_slam", 20, "The door open again, 2 cells: clear."],
+		["sound_blows", 80, ""],
+	]
+
+
 func _on_tick(tick: int) -> void:
 	if _end_tick >= 0:
 		if tick >= _end_tick:
@@ -434,6 +493,29 @@ func _on_tick(tick: int) -> void:
 			var door: Door = World.get_doors()[0]
 			if door.open != bool(step[1]):
 				World.try_toggle_door(_player, door.key)
+		"sound_slam":
+			# The door swings every SLAM_TICKS ticks for step[1] ticks, as if by the
+			# imp (World makes its noise where the mover stands).
+			if _repeat_until < 0:
+				_repeat_until = tick + int(step[1])
+			if tick < _repeat_until:
+				if tick % SLAM_TICKS == 0:
+					var slammed: Door = World.get_doors()[0]
+					World._set_door(slammed, not slammed.open, _monster)
+				return
+			_repeat_until = -1
+		"sound_shut":
+			var shut: Door = World.get_doors()[0]
+			World._set_door(shut, false, _monster)
+		"sound_blows":
+			# A blow on the imp every SLAM_TICKS ticks for step[1] ticks, from no one.
+			if _repeat_until < 0:
+				_repeat_until = tick + int(step[1])
+			if tick < _repeat_until:
+				if tick % SLAM_TICKS == 0 and is_instance_valid(_monster):
+					World.damage(_monster, 1, null, &"attack")
+				return
+			_repeat_until = -1
 		"sound_fight":
 			if is_instance_valid(_monster) and _monster.hp > 0:
 				if _fight_until < 0:
@@ -525,12 +607,15 @@ func _log(tick: int) -> void:
 				Monster.Alert.keys()[monster.alert]])
 		print("[clip] tick %d: player %s; %s" % [tick, _player.tile, "; ".join(each)])
 		return
-	if scenario == "sounds":
+	if scenario == "sounds" or scenario == "sound_hearing":
 		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
 		if sfx != null:
 			for entry: Array in sfx.played.slice(_sounds_logged):
-				print("[clip] tick %d: played %s (%s)" % [tick, entry[0], str(entry[1]).get_file() if entry[1] != "" else "placeholder"])
+				print("[clip] tick %d: played %s (%s) on %s, heard from %s" % [tick, entry[0], str(entry[1]).get_file() if entry[1] != "" else "placeholder", entry[2], sfx.listener])
 			_sounds_logged = sfx.played.size()
+			for slot: String in sfx.unheard.slice(_unheard_logged):
+				print("[clip] tick %d: not heard %s (from %s)" % [tick, slot, sfx.listener])
+			_unheard_logged = sfx.unheard.size()
 		if tick % 30 == 0:
 			print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp,
 				"%s at %s hp %d %s" % [_monster.name, _monster.tile, _monster.hp, Monster.Alert.keys()[_monster.alert]] if is_instance_valid(_monster) else "monster gone"])

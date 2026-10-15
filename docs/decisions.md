@@ -5012,3 +5012,41 @@ Economy's pieces get into real levels through builder mode, not by hand
   what it says (builder-69's side), with the prompt text economy wrote.
 Seeding Towns from the buildings a level places (buildings' "use" and
 "town") follows once that lands.
+
+## 269. A sound is heard where a monster there would hear its noise
+
+Jeff's rule for sound: what you hear is what monsters hear. Sfx plays a
+positional sound by the rule World._hear tells a monster a noise by, from
+the listener's cell (the local player's; Client3D sets it as it follows
+them): within the radius of the slot's sim noise (SoundKit.reach, Senses'
+own radii; a footstep's is the body's, Senses.step_radius), counted in
+cells, Chebyshev, and only half as far with no clear line
+(World.has_clear_line, on the client's own copy of the map and doors).
+Past that it isn't played at all. Within it, it is full loudness out to a
+cell and falls in a straight line (in dB) to -24 dB at the edge, 4 dB less
+and through a low-pass when muffled; Godot's own distance falloff is off,
+its 3D player only pans. A sound on a cell edge (a door, a blow on a wall)
+is heard from whichever cell beside it is heard best, since it faces both.
+A test (view_test) makes every noise kind at every cell round a listener
+by a door, through the sim and through Sfx.hearing, and they agree on
+heard and muffled for all of them (1076 cases). Interest (36 cells) is
+wider than the loudest noise (a shout, 20), so a sound you should hear is
+never cut by it. Footsteps pick their slot by the ground (grass, dirt,
+stone, sand, water) and the body (small under 50 kg, large from 100).
+
+Buses: SFX, Voice, Ambience, UI and Music under Master, each with a
+muffled twin (a low-pass at 900 Hz) sending to it, made by Sfx if the
+project has none. Volumes are settings.cfg's master_volume=, sfx_volume=,
+voice_volume=, ambience_volume=, ui_volume= and music_volume=, each 0..1;
+Net.set_volume applies one (the volumes_changed signal) and writes it.
+The game's first options screen is OptionsPanel (O, the coordinator's
+ruling): a section per kind of option, Sound first with a slider each for
+master, effects, voices, ambience and interface (music when there is
+some); other trees add sections rather than keys. A slider applies as it
+moves and writes the file when let go or when the panel is hidden.
+Rejected: Godot's distance attenuation tuned per radius (Euclidean, and
+never quite silent at the edge, so you would hear what a monster beside
+you can't), the camera as the listener (the camera is up and back; a
+monster hears from where it stands), and a server message per noise
+(every step is a noise; the client already sees the events that make
+them).

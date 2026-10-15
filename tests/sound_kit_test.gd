@@ -94,6 +94,11 @@ func _test_noises_are_the_sims() -> void:
 	_check(SoundKit.noise("sfx.goblin_chatter") == "" and SoundKit.reach("sfx.goblin_chatter") > 0,
 			"chatter: not heard by monsters, heard by players %d cells" % SoundKit.reach("sfx.goblin_chatter"))
 	_check(SoundKit.reach("ui.click") == 0 and SoundKit.reach("amb.forest_day") == 0, "ui and beds: flat, no reach")
+	_check(SoundKit.footstep("grass", 80.0) == "sfx.footstep_grass_medium" and SoundKit.footstep("water", 25.0) == "sfx.footstep_water_small"
+			and SoundKit.footstep("mud", 120.0) == "sfx.footstep_stone_large", "a footstep by ground and body: grass medium, water small, unknown ground as stone")
+	for ground: String in SoundKit.STEP_GROUNDS:
+		for mass: float in [20.0, 80.0, 150.0]:
+			_check(SoundKit.has(SoundKit.footstep(ground, mass)), "%s is a slot" % SoundKit.footstep(ground, mass))
 
 
 func _test_fallbacks() -> void:
@@ -166,7 +171,7 @@ func _test_sfx_plays_slots() -> void:
 			repeats += 1
 	_check(sfx.played.size() == 12 and repeats == 0, "twelve hits, no take twice running (%d repeats)" % repeats)
 	sfx.play("sfx.block_shield", Vector3.ZERO)
-	_check(sfx.played.back() == ["sfx.block_shield", ""], "a slot with no takes plays the blip (%s)" % [sfx.played.back()])
+	_check(sfx.played.back().slice(0, 2) == ["sfx.block_shield", ""], "a slot with no takes plays the blip (%s)" % [sfx.played.back()])
 	var before := sfx.played.size()
 	sfx.play("amb.forest_day", Vector3.ZERO)
 	_check(sfx.played.size() == before, "a bed with no takes: silence")

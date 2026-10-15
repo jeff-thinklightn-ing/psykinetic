@@ -22,6 +22,7 @@ func _ready() -> void:
 	_main._client3d = _rig
 	_rig.bubbles = _main.bubbles
 	_rig._process(0.0)
+	_rig.sfx.hear_everything = true  # Which sounds events make; who hears them is _test_heard_as_monsters_hear.
 
 	_test_every_sound_has_its_files()
 	await _test_hp_bars()
@@ -48,10 +49,84 @@ func _ready() -> void:
 	await _test_doors_swing()
 	_test_art_puppets()
 	_test_piles()
+	_test_heard_as_monsters_hear()
+	_test_options_panel()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
+
+
+func _test_heard_as_monsters_hear() -> void:
+	print("\n== what you hear is what monsters hear: a sound is played where a monster there hears its noise, muffled as it is ==")
+	# A listener beside a door, so some noises come round walls and through it.
+	var door: Door = World.get_doors()[0]
+	var near := Vector2i(door.key.x, door.key.y)
+	var listener := near
+	for d in range(0, 4):
+		for dy in range(-d, d + 1):
+			for dx in range(-d, d + 1):
+				if listener == near and World.is_walkable(near + Vector2i(dx, dy)) and World.get_entity_at(near + Vector2i(dx, dy)) == null:
+					listener = near + Vector2i(dx, dy)
+	var imp := _spawn_imp(listener)
+	var counts := {"same": 0, "differ": 0, "heard": 0, "muffled": 0, "unheard": 0}
+	var differ: Array[String] = []
+	for noise: Array in [["sfx.hit_flesh", &"fight"], ["sfx.door_wood_open", &"door"], ["sfx.footstep", &"step"], ["sfx.break_wood", &"break"]]:
+		var radius := SoundKit.reach(noise[0])
+		for dy in range(-radius - 2, radius + 3):
+			for dx in range(-radius - 2, radius + 3):
+				var at := listener + Vector2i(dx, dy)
+				imp.senses.heard.clear()
+				World.noise(at, radius, noise[1])
+				var monster := not imp.senses.heard.is_empty()
+				var heard := Sfx.hearing(noise[0], at, listener)
+				if monster == bool(heard.heard) and (not monster or bool(imp.senses.heard[0]["muffled"]) == bool(heard.muffled)):
+					counts.same += 1
+				else:
+					counts.differ += 1
+					if differ.size() < 5:
+						differ.append("%s at %s: monster %s, sound %s" % [noise[1], at, imp.senses.heard, heard])
+				counts.heard += 1 if heard.heard else 0
+				counts.muffled += 1 if heard.heard and heard.muffled else 0
+				counts.unheard += 0 if heard.heard else 1
+	_check(counts.differ == 0, "every noise: heard and muffled alike (%s) %s" % [counts, differ])
+	_check(counts.heard > 0 and counts.muffled > 0 and counts.unheard > 0, "some heard, some through a wall or door, some out of reach")
+	var close := Sfx.hearing("sfx.hit_flesh", listener + Vector2i(1, 0), listener)
+	_check(not close.heard or is_equal_approx(float(close.db), 0.0) or close.muffled, "a cell off: full loudness (%s)" % [close])
+	World.despawn(imp)
+	print("\n== the view plays from the local player: a blow far off is not played ==")
+	var player := _rig._local_player()
+	_rig._process(0.0)
+	if player != null:
+		_check(_rig.sfx.listener == player.tile, "the listener is the local player's cell (%s, player %s)" % [_rig.sfx.listener, player.tile])
+	_rig.sfx.hear_everything = false
+	_rig.sfx.listener = listener
+	var before := _rig.sfx.unheard.size()
+	var played := _rig.sfx.played.size()
+	_rig.sfx.play("sfx.hit_flesh", Vector3(listener.x + 9, 0.0, listener.y))
+	_check(_rig.sfx.unheard.size() == before + 1 and _rig.sfx.played.size() == played, "nine cells off, past a fight's 5: not played")
+	_rig.sfx.play("sfx.hit_flesh", Vector3(listener.x, 0.0, listener.y))
+	_check(_rig.sfx.played.size() == played + 1, "at the listener: played")
+	_rig.sfx.hear_everything = true
+
+
+func _test_options_panel() -> void:
+	print("\n== O: the options panel, a slider per volume, moved: the bus follows, written when let go ==")
+	var panel: OptionsPanel = _main.options_panel
+	_check(panel != null and not panel.visible, "there, hidden")
+	_main.toggle_options()
+	_check(panel.visible and panel.sliders.size() == OptionsPanel.VOLUMES.size(), "O shows it: %d sliders" % panel.sliders.size())
+	var was := Net.ambience_volume
+	panel.sliders["ambience_volume"].value = 0.25
+	_check(is_equal_approx(Net.ambience_volume, 0.25)
+			and is_equal_approx(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Ambience")), linear_to_db(0.25)),
+			"the ambience slider at 25%%: Net and the Ambience bus follow (%.2f)" % Net.ambience_volume)
+	panel.sliders["ambience_volume"].value = 0.0
+	_check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Ambience")), "at 0: muted")
+	_main.toggle_options()
+	_check(not panel.visible, "O again hides it")
+	Net.set_volume("ambience_volume", was, false)
+	_check(not AudioServer.is_bus_mute(AudioServer.get_bus_index("Ambience")), "back as it was")
 
 
 func _test_piles() -> void:
@@ -150,7 +225,7 @@ func _test_sounds_follow_events() -> void:
 	_rig._process(0.0)
 	_check(_heard(func() -> void: World._set_door(door, not door.open, player); _rig._process(0.0)) == [
 			"sfx.door_wood_open" if door.open else "sfx.door_wood_close"], "a door: open or close, as it went")
-	_check(_heard(func() -> void: World._relocate(imp, imp.tile + Vector2i(0, 1)); _rig._process(0.0)) == ["sfx.footstep"],
+	_check(_heard(func() -> void: World._relocate(imp, imp.tile + Vector2i(0, 1)); _rig._process(0.0)).any(func(slot: String) -> bool: return slot.begins_with("sfx.footstep_stone_")),
 			"a creature's tile moves on: a footstep")
 	var pitch_light := _swing_pitch(imp)
 	var pitch_heavy := _swing_pitch(player)

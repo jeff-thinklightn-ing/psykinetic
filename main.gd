@@ -262,6 +262,8 @@ var _fell_at: Dictionary[int, Vector2i] = {}
 var compass: HudCompass
 ## The controls, down the left (H shows and hides them).
 var hint_panel: HintPanel
+## The options (O): sound volumes; other trees add their sections.
+var options_panel: OptionsPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
@@ -458,6 +460,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_H:
 		toggle_hints()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_O:
+		toggle_options()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_I:
 		toggle_pack()
@@ -2323,6 +2328,10 @@ func _build_talk() -> void:
 	hint_panel.name = "Hints"
 	hint_panel.visible = Net.hints
 	$HUD.add_child(hint_panel)
+	options_panel = OptionsPanel.new()
+	options_panel.name = "Options"
+	options_panel.visible = false
+	$HUD.add_child(options_panel)
 	pack_panel = PackPanel.new()
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
@@ -2845,10 +2854,16 @@ func hint_lines() -> Array[String]:
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
 		"RMB hold\tbandage yourself or an ally beside you (a kit, out of combat)",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
-		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
+		"R\treset the room", "O\toptions", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:
 		lines.append("B\tbuilder mode")
 	return lines
+
+
+## O: the options shown or hidden; hiding writes what changed.
+func toggle_options() -> void:
+	if options_panel != null:
+		options_panel.toggle()
 
 
 ## I: the player's pack shown or hidden (with its sack sound); with a

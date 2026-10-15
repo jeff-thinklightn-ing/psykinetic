@@ -1087,6 +1087,7 @@ func _follow(delta: float) -> void:
 	if puppet == null:
 		return
 	_local_name = String(player.name)
+	sfx.listener = player.tile  # Sounds are heard from here, as a monster there would.
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
 	_camera_target = puppet.position + Vector3(_lead.x, 0.0, _lead.y) + pan
 	_place_camera()
@@ -4153,7 +4154,8 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 	var last: Vector2i = _last_tile.get(id, entity.tile)
 	_last_tile[id] = entity.tile
 	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
-		sfx.play("sfx.footstep", puppet.position)
+		var ground: String = "water" if World.is_water(entity.tile) else _ground_kinds.get(entity.tile, "stone")
+		sfx.play(SoundKit.footstep(ground, entity.mass), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
 
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own

@@ -39,6 +39,14 @@ top section as the release notes.
   and the ground they stand on becomes the town's store. You can also
   turn any chest into a depot or a shop counter, and builder mode warns
   when one stands outside the town's store or a store has no depot.
+- You hear what monsters hear: a sound carries exactly as far as a monster
+  standing where you are would hear it (a footstep 2 to 4 cells by the
+  body, a fight 5, a door 6, a shout 20), fading as it goes and silent
+  beyond. Through a wall or a shut door it carries half as far, muffled.
+  Footsteps sound of the ground and the size of who walks (stand-ins for
+  now).
+- O opens the options: volume sliders for master, effects, voices,
+  ambience and interface, remembered in settings.cfg.
 - Every companion is now someone of their own: where they were born, their
   family, their trade, what they like to eat and do, what they fear, how
   they talk, and how the two of you met, rolled when they join you, with
