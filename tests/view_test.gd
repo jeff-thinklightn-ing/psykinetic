@@ -453,7 +453,7 @@ func _roof_shadow_only(building: Dictionary) -> bool:
 
 func _test_buildings() -> void:
 	print("
-== buildings: the slot's roof and floor over the footprint; the roof off, its shadow kept, while the player is inside ==")
+== buildings: the slot's roof over the footprint; the roof off, its shadow kept, while the player is inside ==")
 	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
 	var by_rect := {}
 	for building: Dictionary in _rig._buildings:
@@ -466,7 +466,9 @@ func _test_buildings() -> void:
 		_rig.rebuild(_main._terrain, Vector2i.ZERO)
 		return
 	var node: Node3D = house["node"]
-	_check(house["roof"] != null and node.get_node_or_null("floor") != null, "each has its roof and its inside floor")
+	_check(house["roof"] != null and node.get_node_or_null("floor") == null, "each has its roof, and no floor of its own: its inside is terrain's ground in its floor set")
+	_check(not (node.get_node("roof_damaged") as Node3D).visible and not (node.get_node("state_damaged") as Node3D).visible,
+			"whole: its damaged roof and its rubble hidden")
 	_check(Level.BUILDINGS.keys().all(func(slot: String) -> bool:
 		var footprint: Array = ArtKit.spec(slot).get("footprint", [])
 		return footprint.size() == 2 and Vector2i(int(footprint[0]), int(footprint[1])) == Level.BUILDINGS[slot]),

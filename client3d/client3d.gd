@@ -10,8 +10,8 @@ extends Node3D
 ##
 ## The room is built once from the parsed map (Terrain): the ground
 ## (_build_ground), and on it the art slots (ArtKit, art/kit/slots.json),
-## each at its real size: a wall.straight per wall edge, centred on the
-## boundary line; a wall.post at every vertex where walls meet at an angle
+## each at its real size: a wall.castle.straight per wall edge, centred on the
+## boundary line; a wall.castle.post at every vertex where walls meet at an angle
 ## or end; a door.single for a door, its leaf hinged at the edge's start
 ## end, turning with the Door node. Fire is an emissive quad with a small
 ## light. Flat-colour boxes in the kit's stone (_box, _stone) stay
@@ -104,7 +104,7 @@ const WALL_RUBBLE_LOW := 0.9
 const WALL_RUBBLE_HIGH := 1.15
 const WALL_RUBBLE_HALF := 0.35
 const WALL_TILE := 2.0
-## The walls' stone until material.wall has a texture: a palette swatch.
+## The walls' stone until material.wall.castle has a texture: a palette swatch.
 const WALL_SWATCH := Vector2i(0, 1)
 ## What an edge of a run is drawn as.
 enum { WALL_WHOLE, WALL_TOPLESS, WALL_RUBBLE }
@@ -2060,6 +2060,12 @@ func _add_buildings() -> void:
 		var slot := str(building["slot"])
 		var facing: Vector2i = building["facing"]
 		var node := ArtKit.instance(slot)
+		# Whole (decision 287): its damaged roof and its rubble shown only damaged.
+		var damaged := node.find_children("state_*", "Node3D", true, false)
+		if node.get_node_or_null("roof_damaged") != null:
+			damaged.append(node.get_node("roof_damaged"))
+		for part: Node3D in damaged:
+			part.visible = false
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
 		node.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + BUILDING_LIFT, middle.y)
 		node.rotation.y = atan2(float(facing.x), float(facing.y))
@@ -3305,7 +3311,7 @@ func _add_wall(key: Vector3i) -> void:
 	if BOX_WALLS:
 		wall = _box(Vector3(WALL_THICKNESS, WALL_HEIGHT, 1.0), _stone_opaque)
 	else:
-		wall = ArtKit.instance("wall.straight")
+		wall = ArtKit.instance("wall.castle.straight")
 	wall.name = "Wall_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 	wall.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
 	wall.rotation.y = _edge_yaw(key)
@@ -3315,7 +3321,7 @@ func _add_wall(key: Vector3i) -> void:
 
 ## The walls: each straight run of wall edges (to where it turns, meets
 ## another wall, a door, a change of height, or WALL_RUN_MOST edges) is one
-## mesh, wall.profile swept along it: the body under the profile's cap_y
+## mesh, wall.castle.profile swept along it: the body under the profile's cap_y
 ## rises and falls along the run (a height every WALL_SWAY edges, straight
 ## between), the cap band on top kept whole; now and then an edge's top is
 ## broken off (WALL_BROKEN), and in a long run, rarely, an edge is a breach
@@ -3578,14 +3584,14 @@ func _wall_quad(mesh: Array, a: Vector3, b: Vector3, c: Vector3, d: Vector3, out
 	mesh[3] = indices
 
 
-## wall.profile from the art slots: its points (x across, y up), its cap_y,
+## wall.castle.profile from the art slots: its points (x across, y up), its cap_y,
 ## and its face as triangles (indices into the points), made once.
 static var _profile: Array = []
 
 
 static func _wall_profile() -> Array:
 	if _profile.is_empty():
-		var spec := ArtKit.spec("wall.profile")
+		var spec := ArtKit.spec("wall.castle.profile")
 		var points := PackedVector2Array()
 		for each: Array in spec.get("points", [[-0.25, 0.0], [0.25, 0.0], [0.25, 3.0], [-0.25, 3.0]]):
 			points.append(Vector2(each[0], each[1]))
@@ -3593,7 +3599,7 @@ static func _wall_profile() -> Array:
 	return _profile
 
 
-## The walls' material: material.wall's texture if it has one, else a
+## The walls' material: material.wall.castle's texture if it has one, else a
 ## stone-course texture made here, in the castle's stone; a plain
 ## StandardMaterial3D, so a near run's see-through copy is made as any
 ## other's (_see_through_of).
@@ -3603,7 +3609,7 @@ static var _wall_stone: StandardMaterial3D
 static func _wall_material() -> StandardMaterial3D:
 	if _wall_stone == null:
 		_wall_stone = StandardMaterial3D.new()
-		var own := ArtKit.texture("material.wall")
+		var own := ArtKit.texture("material.wall.castle")
 		_wall_stone.albedo_texture = own if own != null else _stone_courses()
 		_wall_stone.albedo_color = Color.WHITE if own != null else swatch(WALL_SWATCH.x, WALL_SWATCH.y)
 		_wall_stone.roughness = 0.9
@@ -3694,7 +3700,7 @@ func _add_post(vertex: Vector2i) -> void:
 	if BOX_WALLS:
 		post = _box(Vector3(POST_SIZE, WALL_HEIGHT, POST_SIZE), _stone_opaque)
 	else:
-		post = ArtKit.instance("wall.post")
+		post = ArtKit.instance("wall.castle.post")
 	post.name = "Post_%d_%d" % [vertex.x, vertex.y]
 	var base := 0
 	for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:

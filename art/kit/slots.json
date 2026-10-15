@@ -12,42 +12,594 @@
 		}
 	},
 	"slots": {
-		"wall.straight": {
+		"wall.castle.profile": {
+			"category": "walls",
+			"type": "profile",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"uses": "the castle set: outdoor fortifications. A wall set's runs (decision 287); its variation is what terrain's sweep varies per run, tuned here without code: sway (a fraction of the height), broken (a share of the cap broken), gap (a share of breaches), lean (degrees per run at most), jitter (metres), sag (metres, post to post). the cross-section terrain sweeps along each wall run (terrain part 4); the body below cap_y may be raised, lowered, notched or broken per segment, the band above it is kept whole",
+			"points": [[-0.25, 0], [0.25, 0], [0.25, 2.7], [0.22, 2.75], [0.22, 3], [-0.22, 3], [-0.22, 2.75], [-0.25, 2.7]],
+			"cap_y": 2.7,
+			"material": "material.wall.castle",
+			"variation": {"sway": 0.1, "broken": 0.1, "gap": 0.05, "lean": 0, "jitter": 0, "sag": 0}
+		},
+		"material.wall.castle": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"uses": "the stone of swept wall.castle runs (wall.castle.profile): u is metres along the run, v metres up"
+		},
+		"floor.castle": {
+			"category": "floors",
+			"type": "texture",
+			"tile_m": 4.0,
+			"pixels": 512,
+			"uses": "terrain's ground shader on the floor of a castle place (floor set \"castle\"): cobbles"
+		},
+		"wall.castle.straight": {
 			"category": "walls",
 			"type": "mesh",
 			"kind": "edge",
-			"size": [0.5, 3.0, 1.0],
+			"size": [0.5, 3, 1],
 			"budget": 300,
-			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.profile along runs",
+			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.castle.profile along runs",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]},
 			"fill": {"from": "kenney-castle", "piece": "wall-narrow", "offset": [0.25, 0, 0], "scale": [1, 2.290076, 1]}
 		},
-		"wall.post": {
+		"wall.castle.straight_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 1, 1],
+			"budget": 300,
+			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.castle.profile section",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.castle.straight_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 4.5, 1],
+			"budget": 300,
+			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.castle.profile section",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.castle.end": {
 			"category": "walls",
 			"type": "mesh",
 			"kind": "vertex",
-			"size": [0.5, 3.0, 0.5],
+			"size": [0.6, 3.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end, capping the wall.castle.profile section, a little proud of it"
+		},
+		"wall.castle.end_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 1.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end low (1 m), capping the wall.castle.profile section, a little proud of it"
+		},
+		"wall.castle.end_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 4.6, 0.6],
+			"budget": 200,
+			"uses": "a run's free end tall (4.5 m), capping the wall.castle.profile section, a little proud of it"
+		},
+		"wall.castle.corner": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.castle.corner_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "an L joint low (1 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.castle.corner_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.castle.t": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "a T joint, a run along z met by one along +x"
+		},
+		"wall.castle.t_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a T joint low (1 m), a run along z met by one along +x"
+		},
+		"wall.castle.t_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a T joint tall (4.5 m), a run along z met by one along +x"
+		},
+		"wall.castle.cross": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "a + joint, runs along z and x crossing"
+		},
+		"wall.castle.cross_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a + joint low (1 m), runs along z and x crossing"
+		},
+		"wall.castle.cross_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a + joint tall (4.5 m), runs along z and x crossing"
+		},
+		"wall.castle.post": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
 			"budget": 200,
 			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post)",
 			"fill": {"from": "kenney-castle", "piece": "wall-narrow-corner", "scale": [1, 2.290076, 1]}
 		},
-		"wall.profile": {
+		"wall.castle.post_low": {
 			"category": "walls",
-			"type": "profile",
-			"kind": "edge",
-			"size": [0.5, 3.0, 1.0],
-			"uses": "the cross-section terrain sweeps along each wall run (terrain part 4); the body below cap_y may be raised, lowered, notched or broken per segment, the band above it is kept whole",
-			"points": [[-0.25, 0.0], [0.25, 0.0], [0.25, 2.7], [0.22, 2.75], [0.22, 3.0], [-0.22, 3.0], [-0.22, 2.75], [-0.25, 2.7]],
-			"cap_y": 2.7,
-			"material": "material.wall"
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a free-standing pillar low (1 m) at a cell corner"
 		},
-		"wall.rubble": {
+		"wall.castle.post_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a free-standing pillar tall (4.5 m) at a cell corner"
+		},
+		"wall.castle.window": {
 			"category": "walls",
 			"type": "mesh",
 			"kind": "edge",
-			"size": [0.8, 0.7, 1.0],
+			"size": [0.5, 3, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; an arrow slit",
+			"grey": [
+				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
+				{"at": [0, 2.6, 0], "size": [0.5, 0.8, 1]},
+				{"at": [0, 1.7, -0.4], "size": [0.5, 1, 0.2]},
+				{"at": [0, 1.7, 0.4], "size": [0.5, 1, 0.2]}
+			]
+		},
+		"wall.castle.straight_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 2.2, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
+			"grey": [
+				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
+				{"at": [0, 2, -0.25], "size": [0.5, 0.4, 0.5]}
+			]
+		},
+		"wall.castle.end_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 1.8, 0.6],
+			"budget": 300,
+			"uses": "a run's broken free end: rubble and a jagged stub"
+		},
+		"wall.castle.rubble": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.8, 0.7, 1],
 			"budget": 400,
 			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through"
+		},
+		"wall.wood.profile": {
+			"category": "walls",
+			"type": "profile",
+			"kind": "edge",
+			"size": [0.3, 3, 1],
+			"uses": "the wood set: homes, planks between timber posts, a top beam above cap_y. A wall set's runs (decision 287); its variation is what terrain's sweep varies per run, tuned here without code: sway (a fraction of the height), broken (a share of the cap broken), gap (a share of breaches), lean (degrees per run at most), jitter (metres), sag (metres, post to post)",
+			"points": [[-0.15, 0], [0.15, 0], [0.15, 3], [-0.15, 3]],
+			"cap_y": 2.8,
+			"material": "material.wall.wood",
+			"variation": {"sway": 0, "broken": 0, "gap": 0, "lean": 2, "jitter": 0, "sag": 0.03}
+		},
+		"material.wall.wood": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"uses": "the planks of swept wall.wood runs (wall.wood.profile): u is metres along the run, v metres up"
+		},
+		"floor.wood": {
+			"category": "floors",
+			"type": "texture",
+			"tile_m": 4.0,
+			"pixels": 512,
+			"uses": "terrain's ground shader on the floor of a home place (floor set \"wood\"): planks"
+		},
+		"wall.wood.straight": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.3, 3, 1],
+			"budget": 300,
+			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.wood.profile along runs",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.wood.end": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.36, 3.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end, capping the wall.wood.profile section, a little proud of it"
+		},
+		"wall.wood.corner": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.3, 3, 0.3],
+			"budget": 200,
+			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.wood.t": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.3, 3, 0.3],
+			"budget": 200,
+			"uses": "a T joint, a run along z met by one along +x"
+		},
+		"wall.wood.cross": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.3, 3, 0.3],
+			"budget": 200,
+			"uses": "a + joint, runs along z and x crossing"
+		},
+		"wall.wood.post": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.3, 3, 0.3],
+			"budget": 200,
+			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post); a timber upright"
+		},
+		"wall.wood.window": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.3, 3, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; shuttered",
+			"grey": [
+				{"at": [0, 0.6, 0], "size": [0.3, 1.2, 1]},
+				{"at": [0, 2.6, 0], "size": [0.3, 0.8, 1]},
+				{"at": [0, 1.7, -0.4], "size": [0.3, 1, 0.2]},
+				{"at": [0, 1.7, 0.4], "size": [0.3, 1, 0.2]}
+			]
+		},
+		"wall.wood.straight_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.3, 2.2, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with a broken top, for ruins and broken runs; broken planks",
+			"grey": [
+				{"at": [0, 0.9, 0], "size": [0.3, 1.8, 1]},
+				{"at": [0, 2, -0.25], "size": [0.3, 0.4, 0.5]}
+			]
+		},
+		"wall.wood.rubble": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.8, 0.7, 1],
+			"budget": 400,
+			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through; fallen planks and beams"
+		},
+		"wall.stone.profile": {
+			"category": "walls",
+			"type": "profile",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"uses": "the stone set: dungeons and crypts, dressed blocks in clean courses, a level cap above cap_y. A wall set's runs (decision 287); its variation is what terrain's sweep varies per run, tuned here without code: sway (a fraction of the height), broken (a share of the cap broken), gap (a share of breaches), lean (degrees per run at most), jitter (metres), sag (metres, post to post)",
+			"points": [[-0.25, 0], [0.25, 0], [0.25, 3], [-0.25, 3]],
+			"cap_y": 2.8,
+			"material": "material.wall.stone",
+			"variation": {"sway": 0, "broken": 0, "gap": 0, "lean": 0, "jitter": 0, "sag": 0}
+		},
+		"material.wall.stone": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"uses": "the dressed stone of swept wall.stone runs (wall.stone.profile): u is metres along the run, v metres up"
+		},
+		"floor.stone": {
+			"category": "floors",
+			"type": "texture",
+			"tile_m": 4.0,
+			"pixels": 512,
+			"uses": "terrain's ground shader on the floor of a dungeon or crypt place (floor set \"stone\"): flagstones"
+		},
+		"wall.stone.straight": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"budget": 300,
+			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.stone.profile along runs",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.stone.end": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 3.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end, capping the wall.stone.profile section, a little proud of it"
+		},
+		"wall.stone.corner": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
+		},
+		"wall.stone.t": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "a T joint, a run along z met by one along +x"
+		},
+		"wall.stone.cross": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "a + joint, runs along z and x crossing"
+		},
+		"wall.stone.post": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 200,
+			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post); a pillar"
+		},
+		"wall.stone.straight_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 4.5, 1],
+			"budget": 300,
+			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.stone.profile section; crypt halls",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.stone.end_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 4.6, 0.6],
+			"budget": 200,
+			"uses": "a run's free end tall (4.5 m), capping the wall.stone.profile section, a little proud of it; crypt halls"
+		},
+		"wall.stone.corner_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x; crypt halls"
+		},
+		"wall.stone.t_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a T joint tall (4.5 m), a run along z met by one along +x; crypt halls"
+		},
+		"wall.stone.cross_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a + joint tall (4.5 m), runs along z and x crossing; crypt halls"
+		},
+		"wall.stone.post_tall": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 4.5, 0.5],
+			"budget": 200,
+			"uses": "a free-standing pillar tall (4.5 m) at a cell corner; crypt halls"
+		},
+		"wall.stone.straight_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 1, 1],
+			"budget": 300,
+			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.stone.profile section; ledges and rails",
+			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
+		},
+		"wall.stone.end_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 1.1, 0.6],
+			"budget": 200,
+			"uses": "a run's free end low (1 m), capping the wall.stone.profile section, a little proud of it; ledges and rails"
+		},
+		"wall.stone.post_low": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 1, 0.5],
+			"budget": 200,
+			"uses": "a free-standing pillar low (1 m) at a cell corner; ledges and rails"
+		},
+		"wall.stone.window": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; a barred grate",
+			"grey": [
+				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
+				{"at": [0, 2.6, 0], "size": [0.5, 0.8, 1]},
+				{"at": [0, 1.7, -0.4], "size": [0.5, 1, 0.2]},
+				{"at": [0, 1.7, 0.4], "size": [0.5, 1, 0.2]}
+			]
+		},
+		"wall.stone.straight_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 2.2, 1],
+			"budget": 400,
+			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
+			"grey": [
+				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
+				{"at": [0, 2, -0.25], "size": [0.5, 0.4, 0.5]}
+			]
+		},
+		"wall.stone.end_ruined": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 1.8, 0.6],
+			"budget": 300,
+			"uses": "a run's broken free end: rubble and a jagged stub"
+		},
+		"wall.stone.rubble": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.8, 0.7, 1],
+			"budget": 400,
+			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through"
+		},
+		"wall.cave.profile": {
+			"category": "walls",
+			"type": "profile",
+			"kind": "edge",
+			"size": [0.8, 3, 1],
+			"uses": "the cave set: natural rock, no cap; terrain's sweep makes the faces irregular. A wall set's runs (decision 287); its variation is what terrain's sweep varies per run, tuned here without code: sway (a fraction of the height), broken (a share of the cap broken), gap (a share of breaches), lean (degrees per run at most), jitter (metres), sag (metres, post to post)",
+			"points": [[-0.4, 0], [0.4, 0], [0.3, 1.5], [0.25, 3], [-0.25, 3], [-0.3, 1.5]],
+			"material": "material.wall.cave",
+			"variation": {"sway": 0, "broken": 0, "gap": 0, "lean": 0, "jitter": 0, "sag": 0}
+		},
+		"material.wall.cave": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"uses": "the rock of swept wall.cave runs (wall.cave.profile): u is metres along the run, v metres up"
+		},
+		"floor.cave": {
+			"category": "floors",
+			"type": "texture",
+			"tile_m": 4.0,
+			"pixels": 512,
+			"uses": "terrain's ground shader on the floor of a cave place (floor set \"cave\"): rock"
+		},
+		"wall.cave.end": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.9, 3.1, 0.9],
+			"budget": 300,
+			"uses": "the rounded butt of rock where a cave wall stops"
+		},
+		"wall.cave.pillar": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.8, 3.0, 0.8],
+			"budget": 300,
+			"uses": "a free-standing column of rock or a stalagmite at a cell corner"
+		},
+		"wall.cave.rubble": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.0, 1.2, 1.0],
+			"budget": 400,
+			"uses": "a rockfall across a whole 1 m edge, reading as blocked"
+		},
+		"wall.castle.tower": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [1.6, 6, 1.6],
+			"budget": 800,
+			"uses": "a castle tower at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
+			"sockets": {"top": [0, 5, 0]}
+		},
+		"wall.stone.tower": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [1.6, 6, 1.6],
+			"budget": 800,
+			"uses": "a stone tower at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
+			"sockets": {"top": [0, 5, 0]}
+		},
+		"wall.wood.tower": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [1.4, 5.5, 1.4],
+			"budget": 600,
+			"uses": "a timber watchtower on a palisade at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
+			"sockets": {"top": [0, 4.5, 0]}
 		},
 		"door.single": {
 			"category": "doors",
@@ -210,12 +762,12 @@
 			"footprint": [3, 3],
 			"size": [3.6, 4.5, 3.6],
 			"budget": 3000,
-			"uses": "a hut, 3 x 3 cells: its roof, interior floor and trim, never walls: its walls are the map's wall edges, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside). Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
+			"uses": "a hut, 3 x 3 cells: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
+			"wall_set": "wood",
+			"floor_set": "wood",
+			"states": ["damaged"],
 			"parts": [
-				{"name": "floor", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
-					{"at": [0, 0.05, 0], "size": [3, 0.1, 3]}
-				]},
 				{"name": "roof", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
 					{"at": [0, 0.3, 0], "size": [3.6, 0.6, 3.6]},
 					{"at": [0, 0.9, 0], "size": [2.16, 0.6, 3.6]},
@@ -224,6 +776,15 @@
 				{"name": "trim", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
 					{"at": [-1.5, 2.95, 0], "size": [0.15, 0.1, 3.6]},
 					{"at": [1.5, 2.95, 0], "size": [0.15, 0.1, 3.6]}
+				]},
+				{"name": "roof_damaged", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
+					{"at": [0, 0.3, -0.9], "size": [3.6, 0.6, 1.8]},
+					{"at": [0, 0.9, -0.9], "size": [2.16, 0.6, 1.8]},
+					{"at": [0, 0.15, 1.08], "size": [3.6, 0.3, 1.44]}
+				]},
+				{"name": "state_damaged", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-1.25, 0.2, 0], "size": [0.5, 0.4, 1.2]},
+					{"at": [1.25, 0.15, 0.75], "size": [0.5, 0.3, 0.8]}
 				]}
 			]
 		},
@@ -234,12 +795,12 @@
 			"footprint": [4, 6],
 			"size": [4.6, 4.5, 6.6],
 			"budget": 3000,
-			"uses": "a house, 4 x 6 cells, its ridge along z: its roof, interior floor and trim, never walls: its walls are the map's wall edges, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside). Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
+			"uses": "a house, 4 x 6 cells, its ridge along z: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
+			"wall_set": "wood",
+			"floor_set": "wood",
+			"states": ["damaged"],
 			"parts": [
-				{"name": "floor", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
-					{"at": [0, 0.05, 0], "size": [4, 0.1, 6]}
-				]},
 				{"name": "roof", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
 					{"at": [0, 0.3, 0], "size": [4.6, 0.6, 6.6]},
 					{"at": [0, 0.9, 0], "size": [2.76, 0.6, 6.6]},
@@ -248,6 +809,15 @@
 				{"name": "trim", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
 					{"at": [-2, 2.95, 0], "size": [0.15, 0.1, 6.6]},
 					{"at": [2, 2.95, 0], "size": [0.15, 0.1, 6.6]}
+				]},
+				{"name": "roof_damaged", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
+					{"at": [0, 0.3, -1.65], "size": [4.6, 0.6, 3.3]},
+					{"at": [0, 0.9, -1.65], "size": [2.76, 0.6, 3.3]},
+					{"at": [0, 0.15, 1.98], "size": [4.6, 0.3, 2.64]}
+				]},
+				{"name": "state_damaged", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-1.75, 0.2, 0], "size": [0.5, 0.4, 2.4]},
+					{"at": [1.75, 0.15, 1.5], "size": [0.5, 0.3, 0.8]}
 				]}
 			]
 		},
@@ -258,12 +828,12 @@
 			"footprint": [2, 3],
 			"size": [2.6, 4, 3.6],
 			"budget": 3000,
-			"uses": "a shed, 2 x 3 cells: its roof, interior floor and trim, never walls: its walls are the map's wall edges, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside). Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
+			"uses": "a shed, 2 x 3 cells: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
+			"wall_set": "wood",
+			"floor_set": "wood",
+			"states": ["damaged"],
 			"parts": [
-				{"name": "floor", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
-					{"at": [0, 0.05, 0], "size": [2, 0.1, 3]}
-				]},
 				{"name": "roof", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
 					{"at": [0, 0.2, 0], "size": [2.6, 0.4, 3.6]},
 					{"at": [0, 0.6, 0], "size": [1.56, 0.4, 3.6]},
@@ -272,6 +842,15 @@
 				{"name": "trim", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
 					{"at": [-1, 2.95, 0], "size": [0.15, 0.1, 3.6]},
 					{"at": [1, 2.95, 0], "size": [0.15, 0.1, 3.6]}
+				]},
+				{"name": "roof_damaged", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
+					{"at": [0, 0.2, -0.9], "size": [2.6, 0.4, 1.8]},
+					{"at": [0, 0.6, -0.9], "size": [1.56, 0.4, 1.8]},
+					{"at": [0, 0.1, 1.08], "size": [2.6, 0.2, 1.44]}
+				]},
+				{"name": "state_damaged", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-0.75, 0.2, 0], "size": [0.5, 0.4, 1.2]},
+					{"at": [0.75, 0.15, 0.75], "size": [0.5, 0.3, 0.8]}
 				]}
 			]
 		},
@@ -293,170 +872,6 @@
 					{"at": [0, 0.3, 0], "size": [1.4, 0.6, 1.4]}
 				]}
 			]
-		},
-		"wall.end": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.6, 3.1, 0.6],
-			"budget": 200,
-			"uses": "a run's free end, capping the wall.profile section, a little proud of it"
-		},
-		"wall.corner": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 3, 0.5],
-			"budget": 200,
-			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
-		},
-		"wall.t": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 3, 0.5],
-			"budget": 200,
-			"uses": "a T joint, a run along z met by one along +x"
-		},
-		"wall.cross": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 3, 0.5],
-			"budget": 200,
-			"uses": "a + joint, runs along z and x crossing"
-		},
-		"wall.straight_low": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "edge",
-			"size": [0.5, 1, 1],
-			"budget": 300,
-			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.profile section",
-			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
-		},
-		"wall.post_low": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 1, 0.5],
-			"budget": 200,
-			"uses": "a free-standing pillar low (1 m) at a cell corner"
-		},
-		"wall.end_low": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.6, 1.1, 0.6],
-			"budget": 200,
-			"uses": "a run's free end low (1 m), capping the wall.profile section, a little proud of it"
-		},
-		"wall.corner_low": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 1, 0.5],
-			"budget": 200,
-			"uses": "an L joint low (1 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
-		},
-		"wall.t_low": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 1, 0.5],
-			"budget": 200,
-			"uses": "a T joint low (1 m), a run along z met by one along +x"
-		},
-		"wall.cross_low": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 1, 0.5],
-			"budget": 200,
-			"uses": "a + joint low (1 m), runs along z and x crossing"
-		},
-		"wall.straight_tall": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "edge",
-			"size": [0.5, 4.5, 1],
-			"budget": 300,
-			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.profile section",
-			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
-		},
-		"wall.post_tall": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
-			"uses": "a free-standing pillar tall (4.5 m) at a cell corner"
-		},
-		"wall.end_tall": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.6, 4.6, 0.6],
-			"budget": 200,
-			"uses": "a run's free end tall (4.5 m), capping the wall.profile section, a little proud of it"
-		},
-		"wall.corner_tall": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
-			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
-		},
-		"wall.t_tall": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
-			"uses": "a T joint tall (4.5 m), a run along z met by one along +x"
-		},
-		"wall.cross_tall": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
-			"uses": "a + joint tall (4.5 m), runs along z and x crossing"
-		},
-		"wall.window": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "edge",
-			"size": [0.5, 3, 1],
-			"budget": 400,
-			"uses": "a 1 m wall section with an opening to see through; it still blocks movement",
-			"grey": [
-				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
-				{"at": [0, 2.6, 0], "size": [0.5, 0.8, 1]},
-				{"at": [0, 1.7, -0.4], "size": [0.5, 1, 0.2]},
-				{"at": [0, 1.7, 0.4], "size": [0.5, 1, 0.2]}
-			]
-		},
-		"wall.straight_ruined": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "edge",
-			"size": [0.5, 2.2, 1],
-			"budget": 400,
-			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
-			"grey": [
-				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
-				{"at": [0, 2, -0.25], "size": [0.5, 0.4, 0.5]}
-			]
-		},
-		"wall.end_ruined": {
-			"category": "walls",
-			"type": "mesh",
-			"kind": "vertex",
-			"size": [0.6, 1.8, 0.6],
-			"budget": 300,
-			"uses": "a run's broken free end: rubble and a jagged stub"
 		},
 		"door.double": {
 			"category": "doors",
@@ -851,12 +1266,6 @@
 			"type": "texture",
 			"tile_m": 2.0,
 			"uses": "the cliff faces terrain generates at ledges, mapped triplanar: no up or down in it"
-		},
-		"material.wall": {
-			"category": "materials",
-			"type": "texture",
-			"tile_m": 2.0,
-			"uses": "the stone of swept wall runs (wall.profile): u is metres along the run, v metres up"
 		}
 	}
 }

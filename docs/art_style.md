@@ -57,17 +57,32 @@ are texture slots, not materials on a model (see Budgets).
   exporter does this by default).
 - **Edge pieces** (walls, doors, rubble) run along **z** from -0.5 to 0.5, centred on the
   edge's line at **x = 0**, base at y = 0. A 0.5 m thick wall spans x -0.25 to 0.25.
+- **Walls come in sets by setting** (decision 287), each slot named `wall.<set>.<module>`:
+  - `castle`: outdoor fortifications. Every module in 1 m (`_low`), 3 m and 4.5 m (`_tall`), with
+    an arrow-slit window.
+  - `wood`: homes, planks between timber posts, 0.3 m thick, 3 m only.
+  - `stone`: dungeons and crypts, dressed blocks in clean courses, 3 m and 4.5 m, a few 1 m ledges.
+  - `cave`: natural rock. A profile, plus an end, a pillar and a rockfall.
+
+  Each set has its own `wall.<set>.profile` (the cross-section terrain sweeps along runs; its
+  `variation` block is what the sweep varies per run, Jeff's to tune), `material.wall.<set>` (the
+  runs' texture) and `floor.<set>` (the ground inside such a place). A set's modules share its
+  profile, so their ends meet a run. `wall.<set>.tower` stands at a vertex, taller than the wall.
 - **Vertex pieces** (posts) and **cell pieces** (props, plants, rocks, trees) stand centred
   on their origin, base at y = 0, front facing **+Z**.
 - **Held pieces** (items, weapons) have their origin at the `grip` socket, where the hand
   holds them, with their length along +Y. A two-handed one has a second socket `grip_2` (an
   empty named `grip_2`) for the other hand, so it fits the character's hand attach points.
-- **Buildings** are a roof, an interior floor and trim, **never walls**. The walls are the map's
-  wall edges, drawn by terrain's wall runs and faded edge by edge. The slot's `footprint` is in
-  cells, its origin is the footprint's middle, and its size includes the roof's 0.3 m overhang.
-  The named objects `roof` (origin at the eaves, 3 m up, the wall height), `floor` (origin on
-  the ground) and `trim` (eaves, ridge, chimney, porch) are separate, so the game can hide the
-  roof while you're inside.
+- **Buildings** are a roof and trim, **never walls or a floor**.
+  - The walls are the map's wall edges in the slot's `wall_set`, drawn by terrain's wall runs and
+    faded edge by edge. The inside is terrain's ground in its `floor_set` (wood for homes).
+  - The slot's `footprint` is in cells, its origin is the footprint's middle, and its size
+    includes the roof's 0.3 m overhang.
+  - The named objects `roof` (origin at the eaves, 3 m up, the wall height) and `trim` (eaves,
+    ridge, chimney, porch) are separate, so the game can hide the roof while you're inside.
+  - **Damaged**, `roof_damaged` (a broken roof, the same origin) shows in place of `roof`, and
+    `state_damaged` (rubble at the walls' feet, within the footprint's outer 0.5 m) appears.
+  - A `floor` object only for a raised floor.
 - A **moving part** is its own object, named as the manifest names it (`leaf` for a door),
   with its origin at the pivot: a hinge's on the hinge line, a slide's at its closed position.
 - **States** are optional objects named `state_<name>`, shown only in that state, as the slot's
@@ -82,8 +97,9 @@ drawn a thousand times (a wall, a tuft) should be well under.
 
 | Kind | Triangles | Notes |
 |------|-----------|-------|
-| Wall module (1 m) | 300 | tiles along z; ends match wall.profile |
+| Wall module (1 m) | 300 | tiles along z; ends match its set's wall.<set>.profile |
 | Post | 200 | |
+| Tower | 600 to 800 | wood 600, stone and castle 800 |
 | Door, frame and leaf | 600 | the leaf about a third |
 | Tree | 1500 | |
 | Rock (small), plant | 200 | |

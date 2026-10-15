@@ -95,7 +95,7 @@ func _test_fills_fit() -> void:
 	# As the 3D view drew the Kenney pieces before slots (decision 220): a
 	# wall straddles its edge's line, 3 m tall, the leaf hinged at the
 	# doorway's opening.
-	var wall := ArtKit.instance("wall.straight")
+	var wall := ArtKit.instance("wall.castle.straight")
 	var box := ArtKit.bounds_of(wall)
 	_check(box.position.is_equal_approx(Vector3(-0.25, 0.0, -0.5)) and box.size.is_equal_approx(Vector3(0.5, 3.0, 1.0)),
 			"wall.straight's fill straddles the edge, 3 m tall (%s)" % box)
@@ -118,8 +118,8 @@ func _test_grey_boxes() -> void:
 	ArtKit.show_placeholders = false
 	ArtKit.show_labels = false
 	ArtKit.forget()
-	var node := ArtKit.instance("wall.rubble")
-	_check(ArtKit.filled_by("wall.rubble") == "placeholder" and node.get_node_or_null("Label") == null,
+	var node := ArtKit.instance("wall.castle.rubble")
+	_check(ArtKit.filled_by("wall.castle.rubble") == "placeholder" and node.get_node_or_null("Label") == null,
 			"a slot with no art and no fill is its grey box in the game too, without a label unless asked")
 	node.free()
 
@@ -147,8 +147,8 @@ func _test_parts() -> void:
 
 func _test_kept() -> void:
 	print("\n== a slot's scene is made once: its instances share their meshes ==")
-	var one := ArtKit.instance("wall.straight")
-	var two := ArtKit.instance("wall.straight")
+	var one := ArtKit.instance("wall.castle.straight")
+	var two := ArtKit.instance("wall.castle.straight")
 	var meshes: Array[Mesh] = []
 	for node: Node3D in [one, two]:
 		for child in node.find_children("*", "MeshInstance3D", true, false):
@@ -171,18 +171,36 @@ func _test_own_art_says_where_from() -> void:
 
 
 func _test_profile() -> void:
-	print("\n== wall.profile: a closed section within the wall's thickness, its cap line inside it ==")
-	var entry := ArtKit.spec("wall.profile")
-	var points: Array = entry.get("points", [])
-	var half := ArtKit.size("wall.profile").x * 0.5
-	var top := 0.0
-	var inside := points.size() >= 3
-	for point: Array in points:
-		inside = inside and absf(float(point[0])) <= half + 0.001 and float(point[1]) >= 0.0
-		top = maxf(top, float(point[1]))
-	var cap := float(entry.get("cap_y", -1.0))
-	_check(inside and cap > 0.0 and cap < top and ArtKit.has(str(entry.get("material", ""))),
-			"%d points in x [-%.2f, %.2f], cap at %.2f below the top %.2f, material %s" % [points.size(), half, half, cap, top, entry.get("material")])
+	print("\n== each wall set's profile: a closed section within its thickness, its cap line (if any) inside it; its material, floor and variation ==")
+	var sets: Array[String] = []
+	for slot: String in ArtKit.slots():
+		var entry := ArtKit.spec(slot)
+		if str(entry.get("type", "")) != "profile":
+			continue
+		var set_name := slot.trim_prefix("wall.").trim_suffix(".profile")
+		sets.append(set_name)
+		var points: Array = entry.get("points", [])
+		var half := ArtKit.size(slot).x * 0.5
+		var top := 0.0
+		var inside := points.size() >= 3
+		for point: Array in points:
+			inside = inside and absf(float(point[0])) <= half + 0.001 and float(point[1]) >= 0.0
+			top = maxf(top, float(point[1]))
+		var cap := float(entry.get("cap_y", top * 0.5))  # The cave's has none.
+		var variation: Dictionary = entry.get("variation", {})
+		var tunable := true
+		for key: String in ["sway", "broken", "gap", "lean", "jitter", "sag"]:
+			tunable = tunable and (variation.get(key) is float or variation.get(key) is int)
+		_check(inside and cap > 0.0 and cap < top and str(entry.get("material", "")) == "material.wall." + set_name
+				and ArtKit.has("material.wall." + set_name) and ArtKit.has("floor." + set_name) and tunable,
+				"%s: %d points in x [-%.2f, %.2f], cap %s, top %.2f, %s and floor.%s, variation %s" % [
+				slot, points.size(), half, half, entry.get("cap_y", "none"), top, entry.get("material"), set_name, variation])
+	_check(sets.size() >= 4 and "castle" in sets, "the wall sets: %s" % [sets])
+	for slot: String in ArtKit.slots():
+		var entry := ArtKit.spec(slot)
+		if entry.has("wall_set") or entry.has("floor_set"):
+			_check(str(entry.get("wall_set", "")) in sets and str(entry.get("floor_set", "")) in sets,
+					"%s's wall_set %s and floor_set %s are sets" % [slot, entry.get("wall_set"), entry.get("floor_set")])
 
 
 func _test_check_passes_grey_boxes() -> void:

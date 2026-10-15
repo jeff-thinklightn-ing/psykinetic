@@ -5316,3 +5316,35 @@ renames `## Unreleased`, checks the file reads right after its rebase (the
 release session checks the changelog's top on every cut). Rejected: each
 tree resolving by hand (the conflicts were never real) and a custom merge
 driver (needs setup in every clone; union is built into git).
+## 287. Walls in sets by setting
+
+Jeff, looking at the first wall candidates: they read as castle walls, and a
+home, a crypt and a cave should not all be one castle. The wall slots are
+now sets by setting, each a full module list where it makes sense:
+wall.castle.* (outdoor fortifications: today's flat wall.* renamed, the
+Kenney fills with them, every module in 1 m, 3 m and 4.5 m), wall.wood.*
+(homes: planks between timber posts, 0.3 m thick, one storey), wall.stone.*
+(dungeons and crypts: dressed blocks, 3 m and 4.5 m with a few 1 m ledges)
+and wall.cave (natural rock: a profile and an end, a pillar, a rockfall).
+Each set has its own wall.<set>.profile for terrain's sweep (no cap_y for
+the cave), material.wall.<set> for the runs' texture (material.wall became
+material.wall.castle), and floor.<set> for the ground inside such a place
+(cobbles, planks, flagstones, rock; textures as ground.*, which stays for
+the outdoors). A profile carries a "variation" block terrain's sweep reads,
+so Jeff can tune it without code: sway, broken, gap, lean, jitter, sag;
+castle sways 10 %, is broken 0.1 and breached 0.05; wood leans up to 2° a
+run and sags 3 cm post to post; stone and cave are all zero (terrain's
+sweep makes the cave's faces). Towers (wall.<set>.tower for castle, stone,
+wood) stand at a vertex, taller than the wall, for a town's walls. Doors
+stay set-free for now.
+
+Buildings (decision 263) lose their floor part, since terrain draws the
+inside as ground in the building's floor_set (one lit surface, no double
+floor at the door), and say their wall_set and floor_set (wood for the
+hut, house and shed), read through ArtKit.spec. A building's damaged state
+is a roof_damaged part, shown in place of roof with the same pivot, and a
+state_damaged part of rubble at the walls' feet: a state node can only add,
+and a caved-in roof needs the whole one gone.
+
+Until terrain passes a set in (decisions 285, 286), client3d draws every
+wall in the castle set, so nothing changes on screen.
