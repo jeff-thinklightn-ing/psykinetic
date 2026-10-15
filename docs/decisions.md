@@ -5348,3 +5348,100 @@ and a caved-in roof needs the whole one gone.
 
 Until terrain passes a set in (decisions 285, 286), client3d draws every
 wall in the castle set, so nothing changes on screen.
+
+## 288. Monster AI stays in GDScript: C# measured, not adopted
+
+Jeff asked for real numbers on moving monster AI, starting with
+pathfinding, from GDScript to C#. World.find_path (the grid A*, its step
+memo, doors, occupancy, heat and held ground) and line of sight were ported
+to C# in a throwaway worktree on main at 9cbeb51 (enemy-ai step 4), using
+Godot 4.7.2 .NET and the .NET 8 SDK. The C# side read a mirror of the
+zone's terrain, doors and occupancy, kept current by hooks in world.gd. It
+matched GDScript exactly: 1,468 paths compared in play and 20,000 lines of
+sight, no difference. Every timing was taken on the 256² castle-density
+map_bench under the bench lock on the desktop (Ryzen 7 9700X), with
+--settle=300 and 600-tick blocks. The GDScript baseline is the standard
+Godot build of the same commit. The throwaway code is deleted; nothing
+landed in the game.
+
+| | GDScript (standard Godot) | GDScript (.NET Godot) | C# find_path (.NET Godot) |
+|---|---|---|---|
+| tick median, 1 / 4 / 9 players | 3.2 / 7.1 / 13.8 ms | 2.9 / 7.1 / 13.7 ms | 2.6 / 6.8 / 12.4 ms |
+| worst tick, 1 / 4 / 9 players | 21 / 26 / 58 ms | 10 / 36 / 61 ms | 8 / 24 / 62 ms |
+| time in find_path, 4 / 9 players | 1.07 / 1.97 ms a tick | | 0.08 / 0.15 ms a tick |
+| one path in play (glue included) | 360-410 µs | | 28-32 µs |
+| a monster's path (capped at 400 tiles) | 527 µs | | 24 µs |
+| a path corner to corner across 256² | 100-220 ms | | 2.3-4.0 ms |
+| a line of sight | 15.7 µs | | 1.1 µs (0.4 batched) |
+| a call (no args / two Vector2i) | 110 / 141 ns | | 455 / 775 ns into C# |
+| peak working set, 4 players | 696 MB | 719 MB | 719 MB (C# heap 5 MB) |
+| server export | 78.8 MB, 2 files | | 158.8 MB, 189 files |
+| client export | 115.2 MB, 2 files | | 195.4 MB, 189 files |
+| server start (Windows, to listening) | 625-660 ms | | 709-737 ms |
+
+The tick medians move by 1-3 ms between runs, so the direct measure is
+the one to trust. C# makes pathfinding 13-20 times faster, but that saves
+only 1-1.8 ms of the 9-player tick, about 13%. Worst ticks did not move.
+The other ~10 ms of the tick is spread over hundreds of short monster
+calls (idle steps, patrols, looks, refreshes). Most are a few µs, and that
+is about what one call into C# costs.
+
+Costs:
+- **Dev (Windows):** a second Godot binary (the .NET editor), the .NET 8
+  SDK, and the .NET templates (1.2 GB download, 1.9 GB unpacked). Every
+  tool, worktree and GODOT_PATH would move to the .NET editor. The repo
+  needs a .csproj and .sln at its root.
+- **Builds before runs:** a headless run uses whatever assembly was built
+  last. tests/run.sh, net_test, state_test, map_bench and every tool would
+  need `dotnet build` first, or they test stale C#.
+- **Export time and hangs:** an export takes about a minute. But MSBuild's
+  reused nodes held the pipe for another ~9 minutes, so scripts would need
+  MSBUILDDISABLENODEREUSE=1.
+- **The box:** server/deploy.sh builds the server on the box with the Linux
+  Godot, and the box has no .NET. Either the .NET Linux editor, the .NET 8
+  SDK and the .NET templates go on the box, or the server is exported on
+  the desktop and shipped. The server carries its own runtime (a 77 MB
+  data_Psykinetic_linuxbsd_x86_64 folder), so nothing runs system-wide, but
+  deploy.sh's install step must copy that folder too.
+- **Support dates:** .NET 8's support ends in November 2026, so an upgrade
+  would follow soon after adopting it.
+- **Moving only the pathfinder:** about 240 lines of GDScript become about
+  330 of C#, plus about 135 lines of GDScript glue. The glue keeps a second
+  copy of terrain, doors and occupancy in step through hooks in spawn,
+  despawn, relocate, doors, zone switches and terrain resets. That is a new
+  class of bug: the mirror disagreeing with the sim.
+- **Moving the monster loop:** GDScript and C# cannot extend each other's
+  classes. Monster in C# drags GridEntity and its five subclasses, Senses
+  and World's queries with it: in effect all of sim/ (34 files, about
+  16,000 lines). The 33 test files are written against GDScript members,
+  six of them against a monster's own state.
+- **Tooling:** C# changes need a rebuild. There is no reload into a running
+  game, and the GDScript debugger does not step into C# (Visual Studio or
+  Rider attach for that). The GDScript editor and builder tools are
+  unaffected.
+- **Parallel worktrees:** each worktree builds its own assembly on the
+  shared CPU.
+
+Alternatives:
+- **Further GDScript work on the same code:** the cost is the searches
+  themselves. A search that cannot reach its goal looks at all 400 tiles,
+  and the door check and retries repeat searches. Reachability regions
+  (cells joined with the doors as they are, so an unreachable goal fails at
+  once), path reuse within a chase or pack, and fewer retries cost no
+  toolchain. They should take most of the 1-2 ms, but this has not been
+  measured.
+- **The hot function alone in C#:** measured above, 1-1.8 ms at 9 players
+  for all the costs listed.
+- **A GDExtension (C++):** at least C#'s speed, with cheaper calls and no
+  runtime (a 1-3 MB library per platform). But it needs a C++ toolchain and
+  godot-cpp for Windows and Linux (the box builds on the box), a crash
+  takes the server down, and it needs the same mirror glue. Not measured.
+
+Decision: stay in GDScript, and move no monster AI. Pathfinding is the one
+piece that ports cleanly, and it is only a seventh of the tick. The rest
+cannot move without all of sim/, and the toolchain, deploy and test costs
+fall on every tree. The measurements are kept here for later. If long
+walks (100-220 ms corner to corner today, on world-tick walks or
+click-to-move across a big map) or pathfinding grow into the stall, first
+do the GDScript work above. Only then move find_path alone, as a
+GDExtension or C#, with these numbers as the bar.
