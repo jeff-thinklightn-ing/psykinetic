@@ -68,6 +68,11 @@ func _test_entries() -> void:
 			bad.append(id)
 	_check(bad.is_empty(), "every entry is well formed, its relations to known entries %s" % [bad])
 	bad = []
+	for id in _entries:
+		if _personal(str(_entries[id].get("summary", ""))):
+			bad.append(id)
+	_check(bad.is_empty(), "every summary is in the third person %s" % [bad])
+	bad = []
 	for id in _knowers:
 		var knower: Dictionary = _knowers[id]
 		if not (_is_id(id) and _status_ok(knower) and _regions_ok(knower.get("where")) and knower.get("tags") is Array):
@@ -94,8 +99,9 @@ func _test_facts() -> void:
 				ok = ok and fact.get("knowers") is Array and not fact["knowers"].is_empty()
 			for knower in fact.get("knowers", []):
 				ok = ok and _knowers.has(knower)
-			# A line to say would be quoted speech.
-			ok = ok and not String(fact.get("text", "")).contains("\"")
+			# A line to say would be quoted speech, or spoken in the first or second person.
+			ok = ok and not String(fact.get("text", "")).contains("\"") and not _personal(String(fact.get("text", ""))) \
+					and (not fact.has("weight") or (fact["weight"] is float and fact["weight"] > 0.0))
 			if not ok:
 				bad.append(fid)
 	_check(bad.is_empty(), "every fact is well formed %s" % [bad])
@@ -137,7 +143,7 @@ func _test_known_by_files() -> void:
 		agreed += 1 if _entries[id]["status"] == "agreed" else 0
 	if agreed == 0:
 		_check(Lore.known_by("townsfolk").is_empty(), "with nothing agreed, townsfolk know nothing yet")
-	var drafts := Lore.known_by("townsfolk", "draft")
+	var drafts := Lore.known_by("townsfolk", PackedStringArray(), "draft")
 	_check(not drafts.is_empty(), "previewing drafts, townsfolk know %d facts" % drafts.size())
 	var asked := []
 	for fact in drafts:
@@ -178,7 +184,7 @@ func _test_known_by() -> void:
 	]
 	Lore.use(entries, knowers)
 	var ids := func(knower: String, least := "agreed") -> Array:
-		return Lore.known_by(knower, least).map(func(fact: Dictionary) -> String: return fact["id"])
+		return Lore.known_by(knower, PackedStringArray(), least).map(func(fact: Dictionary) -> String: return fact["id"])
 	_check(ids.call("folk") == ["a.here", "a.all", "a.said"], "folk know their own region's facts and rumours and what everyone knows, not another region's %s" % [ids.call("folk")])
 	_check(ids.call("sage") == ["a.all", "a.old", "a.hid"], "a sage knows what shares its tag wherever it is, and the secret it is named in %s" % [ids.call("sage")])
 	_check("a.mine" in ids.call("wren") and not "a.mine" in ids.call("folk"), "a lived fact is known to the one who lived it only")
@@ -190,7 +196,28 @@ func _test_known_by() -> void:
 	_check(not "b.over" in ids.call("folk"), "an agreed fact in a draft entry does not count")
 	_check(ids.call("maybe").is_empty() and not ids.call("maybe", "draft").is_empty(), "a draft knower knows nothing until previewed")
 	_check(ids.call("nobody").is_empty(), "an unknown knower knows nothing")
+	_check(said["where"] == ["near"] and said["weight"] == Lore.DEFAULT_WEIGHT, "a fact comes with its where and, giving none, the default weight")
+	var about := func(topics: Array) -> Array:
+		return Lore.known_by("sage", PackedStringArray(topics)).map(func(fact: Dictionary) -> String: return fact["id"])
+	_check(about.call(["history"]) == ["a.old"], "about a tag: the facts with that tag %s" % [about.call(["history"])])
+	_check(about.call(["HID"]) == ["a.hid"] and about.call(["alls"]) == [] and about.call(["al"]) == [], "about a word: whole words of the text, any case %s" % [about.call(["HID"])])
+	_check(about.call(["a"]).size() == 3, "about an entry's id: all its facts known")
+	_check(about.call(["history", "hid"]) == ["a.old", "a.hid"], "about several topics: a fact on any of them")
+	_check(about.call([]).size() == 3, "about nothing: everything known")
 	Lore.reload()
+	var ore := Lore.known_by("learned", PackedStringArray(["ore"]), "draft").map(func(fact: Dictionary) -> String: return fact["id"])
+	_check("blighted_ore.carries" in ore and not "the_land.fire" in ore, "on the files, about the ore: the ore's facts, not the fire's %s" % [ore])
+	var weighted: Array = Lore.known_by("learned", PackedStringArray(), "draft").filter(func(fact: Dictionary) -> bool: return fact["weight"] != Lore.DEFAULT_WEIGHT)
+	_check(weighted.is_empty(), "no fact is weighted until Jeff and Dire have agreed facts to weigh")
+
+
+## Whether [param text] speaks as I or we, or to you: lore is stated in the
+## third person ("mine" is the place, so it is not counted).
+func _personal(text: String) -> bool:
+	for word in text.to_lower().replace(",", " ").replace(".", " ").replace(":", " ").replace(";", " ").split(" ", false):
+		if word in ["i", "me", "my", "we", "us", "our", "you", "your", "yours"]:
+			return true
+	return false
 
 
 func _is_id(id: Variant) -> bool:

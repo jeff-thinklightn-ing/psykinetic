@@ -127,7 +127,7 @@
 				},
 				{
 					"id": "goblins.sneak",
-					"text": "The sneak patrols and comes at you from the side.",
+					"text": "The sneak patrols and comes at its prey from the side.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
@@ -329,7 +329,7 @@
 				},
 				{
 					"id": "blood_rot.catching",
-					"text": "The rot is catching: touching one of the Blood Rot rots you.",
+					"text": "The rot is catching: whoever touches one of the Blood Rot will rot.",
 					"known": "rumour",
 					"where": [
 						"town_lands"

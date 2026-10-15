@@ -99,7 +99,7 @@ hammer has one, are open *(asked: E3)*.
 
 Three goblin kinds are in the game today. The imp is small and darts in and out.
 The brute is big and heavy, and it stands guard. The sneak patrols and comes at
-you from the side. Goblins win by holding things (captives and ground), not by
+its prey from the side. Goblins win by holding things (captives and ground), not by
 taking loot from the people they fight. How these goblins stand to the Blood Rot
 (the same clan, kin in a feud, or unrelated) is open *(asked: H4)*, as is whether
 the three kinds are ranks of one people *(asked: C2)* and whether goblins can be

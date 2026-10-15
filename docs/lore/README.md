@@ -102,9 +102,17 @@ A prompt gets the facts a character knows as plain true statements (rumours mark
 as hearsay), never as lines to say. How companions put them into a prompt is the
 companions tree's business.
 
-`Lore` (`sim/lore.gd`) reads the files and applies this: `Lore.known_by("wren")`
-gives `[{id, text, hearsay, memory}]` for the agreed facts she knows. A rumour's
-`true` is never handed out. `Lore.known_by(id, "draft")` previews drafts too, and
-asked facts never count. To see what a knower would know:
+`Lore` (`sim/lore.gd`) reads the files and applies this (decision 289):
+`Lore.known_by("wren")` gives `[{id, text, hearsay, memory, where, weight}]` for the
+agreed facts she knows. A rumour's `true` is never handed out.
+`Lore.known_by("wren", ["ore", "rot"])` keeps the facts on those topics: a
+fact's or its entry's tag, the entry's id, or a whole word or phrase of the text
+or the entry's name (any case, a plural "s" allowed).
+`Lore.known_by(id, [], "draft")` previews drafts too, and asked facts never
+count. A fact may give a `weight` (a number above 0, how much it matters beside
+others when a prompt has room for only some). Without one it is
+`Lore.DEFAULT_WEIGHT`. None is set until Jeff and Dire have agreed facts to weigh.
+Fact text is a third-person statement: lore_test refuses I, we or you in a fact or
+a summary. To see what a knower would know:
 
-    godot --headless --path . --script tools/lore_known.gd -- townsfolk --draft
+    godot --headless --path . --script tools/lore_known.gd -- townsfolk --draft --about=ore
