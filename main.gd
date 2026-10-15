@@ -2624,6 +2624,12 @@ func _send_chat(text: String, phrase := 0) -> void:
 	World.command(me, "say", {"text": line, "phrase": phrase})
 
 
+## The latest blow (_narrate_damage): who was struck and by whom, so a
+## death right after it knows its killer (decision 332).
+var _blow_target: GridEntity = null
+var _blow_source: GridEntity = null
+
+
 ## Server: a creature or a breakable thing was killed. Every view hears of
 ## it ("death"), with what it was and where, since its node goes at once;
 ## a companion says a last line.
@@ -2638,7 +2644,8 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and pet != entity and entity.is_creature() \
 				and (entity == pet.keeper or pet.witnessed(entity)):
-			pet.note_death(_display_name(entity), entity == pet.keeper, entity)
+			pet.note_death(_display_name(entity), entity == pet.keeper, entity,
+				_blow_source if _blow_target == entity and is_instance_valid(_blow_source) else null)
 	var line := ""
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.
@@ -2847,6 +2854,8 @@ func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, til
 
 
 func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
+	_blow_target = entity
+	_blow_source = source
 	match cause:
 		&"fire":
 			party_log.add("%s burned for %d." % [_display_name(entity), amount])

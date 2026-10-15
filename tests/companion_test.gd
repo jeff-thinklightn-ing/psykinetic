@@ -75,6 +75,7 @@ func _ready() -> void:
 	_test_nobody_hears()
 	_test_card()
 	_test_growing_card()
+	_test_wild()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
 
@@ -2486,6 +2487,94 @@ func _test_run_summary() -> void:
 
 ## Lets a yield window and a bump's repeat guard run out, then has her
 ## follow, so the next bump is a fresh one.
+func _test_wild() -> void:
+	print("
+== the wild (decision 332): prey no foe till she is set on it, quiet while her player stalks, wolves warned of at night, a kill she saw a fact ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(7, 1))
+	_put(pet, Vector2i(6, 1))
+	for i in 3:
+		World.step()
+	var mind := CountingMind.new()
+	pet.mind = mind
+	Monster.noticing = false
+	var doe := _spawn_wild("deer", _free_tile_between(pet, 3, 4))
+	for i in 40:
+		World.step()
+	_check(doe.hp == doe.max_hp and not pet.in_fight() and pet.current_intent != Companion.Intent.ATTACK,
+		"a deer 3-4 off is no foe: she leaves it be (%s)" % pet.intent_name())
+	_check(pet.stalking() == doe, "her player sees it, and it is not running: they are stalking it")
+	_check("is stalking the deer" in pet.voice_situation(), "her voice is told (%s)" % pet.voice_situation())
+	var far := Vector2i(-1, -1)
+	for dy in range(-4, 5):
+		for dx in range(-4, 5):
+			var cell := pet.tile + Vector2i(dx, dy)
+			if far == Vector2i(-1, -1) and World.distance(pet.tile, cell) == 4 and World.is_free(cell) 					and World.distance(cell, doe.tile) <= Companion.SIGHT_RANGE and World.has_line_of_sight(cell, doe.tile):
+				far = cell
+	_put(owner, far)
+	pet._catching_up = false
+	var stood := pet.tile
+	for i in 10:
+		World.step()
+	_check(far != Vector2i(-1, -1) and pet.tile == stood, "her player 4 off, stalking: she keeps still (she would set off at %d)" % Companion.FOLLOW_START)
+	pet._last_speech_tick = -1000
+	pet.owner_spoke("Get them!", 3)
+	_check(pet._quarry == doe, "\"Get them!\" with nothing hostile in sight: the deer is her quarry")
+	_step_until(func() -> bool: return doe.hp < doe.max_hp, 80)
+	_check(doe.hp < doe.max_hp and pet.in_fight(), "and she goes for it (deer hp %d/%d)" % [doe.hp, doe.max_hp])
+	World.damage(doe, 999, owner)
+	World.step()
+	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "brought down a deer" in str(fact["text"])),
+		"her player brought it down where she saw: a fact about her (%s)" % [pet.grown.facts.map(func(f: Dictionary) -> String: return f["text"])])
+	_check(pet._quarry == null, "the quarry is gone with it")
+	var phase := DayNight.phase
+	var anchor := DayNight.anchor
+	World.fields.outdoor = true
+	DayNight.set_hour(12.0)
+	mind.clear()
+	var wolf := _spawn_wild("wolf", _free_tile_between(pet, 3, 4))
+	for i in 3:
+		World.step()
+	_check(not mind.triggers("voice").any(func(t: String) -> bool: return "Warn" in t), "a wolf by day: no warning (%s)" % [mind.triggers("voice")])
+	World.despawn(wolf)
+	DayNight.set_hour(0.0)
+	pet._last_speech_tick = -1000
+	mind.clear()
+	wolf = _spawn_wild("wolf", _free_tile_between(pet, 3, 4))
+	for i in 3:
+		World.step()
+	_check(mind.triggers("voice").any(func(t: String) -> bool: return "Warn" in t and "night" in t), "a wolf seen at night: she is asked to warn her player (%s)" % [mind.triggers("voice")])
+	pet._wolf_warned_tick = -100000
+	mind.clear()
+	World.noise(wolf.tile, Senses.NOISE_CALL, &"call", wolf)
+	World.step()
+	_check(mind.triggers("voice").any(func(t: String) -> bool: return "howl" in t and "Warn" in t), "a howl heard at night: warned of too (%s)" % [mind.triggers("voice")])
+	mind.clear()
+	World.noise(wolf.tile, Senses.NOISE_CALL, &"call", wolf)
+	World.step()
+	_check(not mind.triggers("voice").any(func(t: String) -> bool: return "Warn" in t), "not again so soon")
+	World.fields.outdoor = false
+	DayNight.phase = phase
+	DayNight.anchor = anchor
+	DayNight.update()
+	Monster.noticing = true
+	_kill_monsters()
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+## A wild animal of [param kind] at [param tile] (a test's prop: with
+## Monster.noticing off it stands, noticing nothing).
+func _spawn_wild(kind: String, tile: Vector2i) -> Animal:
+	var animal := _main._spawn({"script": "res://sim/animal.gd", "shape": "capsule", "name": "Wild%d_%d" % [World.tick, _imps],
+		"tile": tile, "kind": kind, "props": Level.MONSTER_TYPES[kind]}) as Animal
+	_imps += 1
+	return animal
+
+
 func _settle(pet: Companion) -> void:
 	for i in Companion.BUMP_REPEAT_TICKS + Companion.DECISION_INTERVAL_TICKS + 1:
 		World.step()

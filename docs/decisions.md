@@ -6002,3 +6002,44 @@ wholly in it, roofed, by `_add_buildings` as ours are, moved into our
 cells; with no use or town (drawn only, no town state, standing), and with
 no inside (no rain box, no cells for the roof fade). A building cut by the
 glimpse's edge is left out, so no half a house stands at its edge.
+## 332. Companions and the wild
+
+What: wild animals (315) are Monsters, so until now a deer within reach was
+a fight to her and she went for it. Now `Companion._hostile` says what is her
+foe: a monster not of the wild; a wolf (predator) always; a boar only while
+it goes for a player or a companion (its target); prey (rabbit, deer, stag)
+never, unless it is her quarry. `Companion.harmless(entity)` is the same test
+without the quarry, for the static danger words. Every place she looked for
+"a monster" (in a fight, guard and press targets, a foe beside her, a
+retreat's hostiles, an errand broken off, danger) goes through them.
+
+"Get them!" (the quick phrase whose stance is PRESS, or those words typed)
+with nothing hostile in her sight marks a quarry: the nearest wild animal she
+or her player sees in front of her player (Senses' cone along their facing),
+else the nearest she sees. PRESS hunts it like any foe. It goes when it dies,
+is out of her sight and her player's, or the call lapses (INSTRUCTION_TICKS),
+and with any other phrase.
+
+At night out under the sky (the sky's light under Animal.NIGHT_LIGHT, as the
+wolves' boldness), a wolf she sees or a wolf's howl she hears (its "call", by
+her Senses, so weather covers it) asks her voice: what she saw or heard, that
+it is night, when wolves are bold and hunt people, and to warn her player.
+At most once in WOLF_WARN_TICKS (60 s).
+
+Stalking: the sim has no crouch or slow walk, so `Companion.stalking()` is:
+not in a fight, and prey or game not running, not her quarry, within her
+sight range of her player with a clear line from them. Then she asks her
+voice nothing of her own (a new kind, a noise), though she answers when
+spoken to; her voice is told her player stalks it and to keep still and
+quiet; and she follows from STALK_START (5) to STALK_CLOSE (3), not 3 to 1,
+so fewer of her steps (Senses' step noise) reach it. Her steps are not
+quieter: `Senses.step_radius` has no careful flag.
+
+A wild animal she sees killed by her player or herself is a fact about her
+("Jeff brought down a stag in the wilds."): Main keeps the latest blow's
+target and source (`_narrate_damage`), so `note_death` is told the killer.
+Facts drop exact repeats, so a kind is noted once a place.
+
+Rejected: a companion who hunts on her own (she follows her
+player's lead); warning of wolves by day, when they leave people be unless
+in a pack (her sighting is still told as any sighting).

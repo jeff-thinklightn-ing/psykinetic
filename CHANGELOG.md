@@ -11,6 +11,9 @@ notes (decision 324).
 
 - New things for hunters: a cut of meat (banks as food), a raw hide, a pair of
   antlers and a pair of tusks, ready for the animals to drop.
+- Companions leave deer, stags, rabbits and boar alone unless you say "Get
+  them!" with one in front of you. They keep still and quiet while you
+  stalk, warn you of wolves at night, and remember the game you bring down.
 - Companions know the weather when outdoors: rain, fog, wind, a storm or a clear
   sky.
 - A deer or stag that hears you lifts its head with a quiet snort: freeze

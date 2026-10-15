@@ -418,6 +418,19 @@ var senses: Senses
 var _noises: Array[Dictionary] = []
 var _heard_upto := -1
 var _noise_asked_tick := -100000
+## The wild (decision 332): a wolf she sees or hears at night asks her
+## voice to warn her player, at most once in WOLF_WARN_TICKS. While her
+## player stalks (stalking()), she sets off after them at STALK_START, not
+## FOLLOW_START, and closes to STALK_CLOSE.
+const WOLF_WARN_TICKS := 600
+const STALK_START := 5
+const STALK_CLOSE := 3
+var _wolf_warned_tick := -100000
+## The wild animal "Get them!" marked (decision 332), or null: hostile to
+## her as a monster is, till it dies, is out of sight or the call lapses.
+var _quarry: GridEntity = null
+var _stalk_tick := -1
+var _stalked: GridEntity = null
 ## Her errand, or empty: what can_do offered ({verb, words, at, and its
 ## door, chest or cell}) with phase ("going", "doing", "returning"), the
 ## serial of the ask it answered, and when it gives up. What she was
@@ -700,6 +713,8 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_add_turn("user", text)
 	else:
 		_narrate("%s calls out to you. %s" % [keeper_name(), meaning])
+	if PHRASE_STANCES.has(phrase) or not meaning.is_empty():
+		_quarry = _quarry_called() if PHRASE_STANCES.get(phrase, -1) == Stance.PRESS or text.strip_edges() == "Get them!" else null
 	if PHRASE_STANCES.has(phrase):
 		_serial += 1
 		var wanted: int = PHRASE_STANCES[phrase]
@@ -718,8 +733,9 @@ func owner_spoke(text: String, phrase := 0) -> void:
 ## travels with, who is down until they respawn (its own event). Her voice
 ## speaks to an ally's death; to a monster's only if it was a big one
 ## (BIG_MONSTER_MASS), the first of its kind she has seen fall this run, or
-## the last of a fight (_watch).
-func note_death(who: String, her_player := false, entity: GridEntity = null) -> void:
+## the last of a fight (_watch). [param by]: who struck the last blow, if
+## anyone.
+func note_death(who: String, her_player := false, entity: GridEntity = null, by: GridEntity = null) -> void:
 	if her_player:
 		_keeper_down = true
 	var monster := entity is Monster
@@ -738,6 +754,12 @@ func note_death(who: String, her_player := false, entity: GridEntity = null) -> 
 		note_fact("%s saw %s fall in %s." % [_name_of(self), who, _place_words()])
 	elif big:
 		note_fact("%s saw %s killed in %s." % [_name_of(self), refer(entity), _place_words()])
+	if entity is Animal and by != null and (by == self or by == keeper):
+		# A wild animal brought down by her player, or by her (decision 332).
+		note_fact("%s brought down %s in %s." % [_name_of(self) if by == self else keeper_name(), _a(kind_of(entity)),
+			_place_words()])
+	if entity == _quarry:
+		_quarry = null
 
 
 ## [param who] (another companion) beaten down and carried off by raiders
@@ -954,6 +976,8 @@ func _watch() -> void:
 	for entity in World.get_entities():
 		if entity is Monster and entity.spawned and not _known_hostiles.has(entity.get_instance_id()) and senses.sees(entity):
 			_known_hostiles[entity.get_instance_id()] = true
+			if _is_wolf(entity):
+				_warn_wolves("%s came into sight, %s" % [refer(entity, true), _paces_toward(Vector2(entity.tile))])
 			if not _kinds_seen.has(kind_of(entity)):
 				# The first of a kind this run: new to her, worth a word.
 				_kinds_seen[kind_of(entity)] = true
@@ -981,7 +1005,7 @@ func _watch() -> void:
 	# A lapse is spoken to once her new stance is known (_take_result).
 	if (threshold or not deaths.is_empty()) and not lapsing and _lapsed_from.is_empty():
 		_ask_voice(" ".join(deaths if not deaths.is_empty() else events))
-	elif not new_kind.is_empty() and not lapsing and _lapsed_from.is_empty():
+	elif not new_kind.is_empty() and not lapsing and _lapsed_from.is_empty() and stalking() == null:
 		_ask_voice(new_kind)
 	if not new_kind.is_empty():
 		var kind := new_kind.get_slice("the first ", 1).get_slice(" you have", 0)
@@ -1039,6 +1063,9 @@ func _take_noises() -> void:
 	var loud := ""
 	for noise: Dictionary in senses.heard_since(_heard_upto):
 		var at: Vector2i = noise["at"]
+		if noise["kind"] == &"call" and _is_wolf(noise["source"]):
+			_warn_wolves("You hear a wolf howl, %s" % _paces_toward(Vector2(at)))
+			continue
 		if not NOISE_WORDS.has(noise["kind"]) or noise["source"] != null or senses.sees_cell(at):
 			continue  # Not hers to tell, or she sees who made it, or where.
 		var newest: Dictionary = _noises.back() if not _noises.is_empty() else {}
@@ -1053,9 +1080,29 @@ func _take_noises() -> void:
 		if NOISE_WORDS[noise["kind"]][1]:
 			loud = told
 	_heard_upto = int(senses.heard.back()["tick"])
-	if not loud.is_empty() and not in_fight() and World.tick - _noise_asked_tick >= NOISE_ASK_TICKS:
+	if not loud.is_empty() and not in_fight() and stalking() == null and World.tick - _noise_asked_tick >= NOISE_ASK_TICKS:
 		_noise_asked_tick = World.tick
 		_ask_voice(loud)
+
+
+## Whether [param entity] is a wolf (a wild predator).
+static func _is_wolf(entity: Variant) -> bool:
+	return is_instance_valid(entity) and entity is Animal and (entity as Animal).role == Animal.Role.PREDATOR
+
+
+## Night out under the sky: the sky's light under Animal.NIGHT_LIGHT, when
+## wolves are bold (decision 315).
+static func is_night() -> bool:
+	return World.fields.outdoor and DayNight.daylight(DayNight.now()) < Animal.NIGHT_LIGHT
+
+
+## A wolf seen or heard ([param seen], how): at night her voice is asked
+## to warn her player, at most once in WOLF_WARN_TICKS (decision 332).
+func _warn_wolves(seen: String) -> void:
+	if not is_night() or World.tick - _wolf_warned_tick < WOLF_WARN_TICKS:
+		return
+	_wolf_warned_tick = World.tick
+	_ask_voice("%s, and it is night, when wolves are bold and hunt people. Warn %s." % [seen, keeper_name()], "", true)
 
 
 ## What she heard lately and did not see, for her voice: "You heard, out
@@ -1097,6 +1144,92 @@ func _explain_lapse() -> void:
 			_lapse_why[0].to_upper() + _lapse_why.substr(1), keeper_name(), was, stance_name()], "", true)
 
 
+## Whether [param entity] is her foe (decision 332): a monster, but of the
+## wild only a wolf, a boar going for someone, or the quarry she was set on.
+func _hostile(entity: GridEntity) -> bool:
+	if not entity is Monster or not entity.spawned:
+		return false
+	return entity == _quarry or not harmless(entity)
+
+
+## Wild prey, or game going for no one (decision 332): no foe to her, nor
+## danger, unless she is set on it.
+static func harmless(entity: GridEntity) -> bool:
+	var animal := entity as Animal
+	if animal == null:
+		return false
+	match animal.role:
+		Animal.Role.PREDATOR:
+			return false
+		Animal.Role.GAME:
+			return not (animal.target is Player or animal.target is Companion)
+	return true
+
+
+## The wild animal "Get them!" means, with nothing hostile in sight: the
+## nearest she sees, or her player does, in front of her player (Senses'
+## cone along their facing), else the nearest she sees; null for none.
+func _quarry_called() -> GridEntity:
+	var ahead: GridEntity = null
+	var nearest: GridEntity = null
+	for entity in World.get_entities():
+		if not entity is Monster or not entity.spawned or World.distance(tile, entity.tile) > SIGHT_RANGE:
+			continue
+		var seen := senses.sees(entity)
+		if not harmless(entity):
+			if seen:
+				return null  # A fight to be had: "Get them!" means that.
+			continue
+		var theirs := _alive(keeper) and World.distance(keeper.tile, entity.tile) <= SIGHT_RANGE \
+				and World.has_line_of_sight(keeper.tile, entity.tile)
+		if not seen and not theirs:
+			continue
+		var from: Vector2i = keeper.tile if _alive(keeper) else tile
+		var d := World.distance(from, entity.tile)
+		var facing := Vector2(keeper.facing) if _alive(keeper) else Vector2.ZERO
+		var way := Vector2(entity.tile - from)
+		if facing != Vector2.ZERO and way != Vector2.ZERO and way.normalized().dot(facing.normalized()) >= Senses.CONE_COS:
+			if ahead == null or d < World.distance(from, ahead.tile):
+				ahead = entity
+		if seen and (nearest == null or d < World.distance(from, nearest.tile)):
+			nearest = entity
+	return ahead if ahead != null else nearest
+
+
+## The quarry dropped when gone, out of her sight and her player's, or the
+## call lapsed (INSTRUCTION_TICKS).
+func _keep_quarry() -> void:
+	if _quarry == null:
+		return
+	if not is_instance_valid(_quarry) or not _quarry.spawned or standing_instruction().is_empty() \
+			or not senses.sees(_quarry) and not (_alive(keeper) and World.has_line_of_sight(keeper.tile, _quarry.tile)
+				and World.distance(keeper.tile, _quarry.tile) <= SIGHT_RANGE):
+		_quarry = null
+
+
+## The wild animal her player is stalking, or null (decision 332): not in
+## a fight, prey or game not running and not her quarry, within sight of her
+## player, who has a clear line to it. Worked out once a tick.
+func stalking() -> GridEntity:
+	if _stalk_tick == World.tick:
+		return _stalked if is_instance_valid(_stalked) else null
+	_stalk_tick = World.tick
+	_stalked = null
+	if not _alive(keeper) or in_fight():
+		return null
+	var best := SIGHT_RANGE + 1
+	for entity in World.get_entities():
+		var animal := entity as Animal
+		if animal == null or not animal.spawned or animal == _quarry or not harmless(animal) \
+				or animal.alert == Monster.Alert.FLEEING:
+			continue
+		var d := World.distance(keeper.tile, animal.tile)
+		if d < best and World.has_line_of_sight(keeper.tile, animal.tile):
+			_stalked = animal
+			best = d
+	return _stalked
+
+
 ## A hostile within COMBAT_RANGE of her or her player.
 func in_fight() -> bool:
 	return _hostile_within(COMBAT_RANGE)
@@ -1105,7 +1238,7 @@ func in_fight() -> bool:
 func _hostile_within(reach: int) -> bool:
 	var player_here := _alive(keeper)
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and (World.distance(tile, entity.tile) <= reach
+		if _hostile(entity) and (World.distance(tile, entity.tile) <= reach
 				or player_here and World.distance(keeper.tile, entity.tile) <= reach):
 			return true
 	return false
@@ -1117,7 +1250,7 @@ func _situation_now() -> Dictionary:
 	var player_here := _alive(keeper)
 	var adjacent: Array[int] = []
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and (World.distance(tile, entity.tile) == 1
+		if _hostile(entity) and (World.distance(tile, entity.tile) == 1
 				or player_here and World.distance(keeper.tile, entity.tile) == 1):
 			adjacent.append(entity.get_instance_id())
 	return {"adjacent": adjacent, "hp_band": _hp_band(self),
@@ -1597,6 +1730,10 @@ func voice_situation() -> String:
 	var wounds := _wound_words()
 	if not wounds.is_empty():
 		sentences.append(wounds)
+	var stalked := stalking()
+	if stalked != null:
+		sentences.append("%s is stalking %s, %s, which has not run; keep still and quiet so as not to startle it." % [
+			who, refer(stalked), _paces_toward(Vector2(stalked.tile))])
 	if her_danger and their_danger:
 		sentences.append("You are both in danger.")
 	elif her_danger:
@@ -2529,6 +2666,7 @@ static func event_report(kinds: Array) -> RegEx:
 func _act() -> void:
 	var before := current_intent
 	var before_target := intent_target
+	_keep_quarry()
 	var foe := _adjacent_hostile()
 	var low := max_hp > 0 and float(hp) / max_hp < REFLEX_BELOW
 	if current_intent == Intent.YIELD and World.tick < _yield_until and not (low and foe != null):
@@ -2571,7 +2709,7 @@ func _reflex_active() -> bool:
 
 func _adjacent_hostile() -> GridEntity:
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) == 1:
+		if _hostile(entity) and World.distance(tile, entity.tile) == 1:
 			return entity
 	return null
 
@@ -2583,7 +2721,7 @@ func _guard_target() -> GridEntity:
 	var best_distance := 999
 	for entity in World.get_entities():
 		var monster := entity as Monster
-		if monster == null or not monster.spawned:
+		if monster == null or not _hostile(monster):
 			continue
 		var distance := World.distance(tile, monster.tile)
 		var after_us := monster.target != null and (monster.target == self or monster.target == keeper)
@@ -2598,7 +2736,7 @@ func _nearest_hostile(reach: int) -> GridEntity:
 	var best: GridEntity = null
 	var best_distance := reach + 1
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned:
+		if _hostile(entity):
 			var distance := World.distance(tile, entity.tile)
 			if distance < best_distance and World.has_line_of_sight(tile, entity.tile):
 				best = entity
@@ -2685,7 +2823,7 @@ func _safe_cells(heading := Vector2i.ZERO) -> Dictionary[Vector2i, float]:
 	var scores: Dictionary[Vector2i, float] = {}
 	var hostiles: Array[Vector2i] = []
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) <= RETREAT_REACH + 1:
+		if _hostile(entity) and World.distance(tile, entity.tile) <= RETREAT_REACH + 1:
 			hostiles.append(entity.tile)
 	var steps: Dictionary[Vector2i, int] = {tile: 0}
 	var first: Dictionary[Vector2i, Vector2i] = {tile: Vector2i.ZERO}
@@ -2770,16 +2908,19 @@ func _follow() -> void:
 		_catching_up = false
 		return
 	var distance := World.distance(tile, keeper.tile)
-	if distance >= FOLLOW_START and not _catching_up:
+	# Her player stalking: she keeps still till they are farther off, and
+	# closes less (decision 332), so fewer of her steps reach the animal.
+	var quiet := stalking() != null
+	if distance >= (STALK_START if quiet else FOLLOW_START) and not _catching_up:
 		_catching_up = true
 		_log({"kind": "follow", "companion": String(name), "mind": "hands", "trigger": "%s %d away" % [keeper_name(), distance],
 			"outcome": "set off"})
-	if _catching_up and distance <= FOLLOW_CLOSE:
+	if _catching_up and distance <= (STALK_CLOSE if quiet else FOLLOW_CLOSE):
 		_catching_up = false
 		_log({"kind": "follow", "companion": String(name), "mind": "hands", "trigger": "%s %d away" % [keeper_name(), distance],
 			"outcome": "closed in"})
 	if _catching_up:
-		_approach(keeper, FOLLOW_CLOSE)
+		_approach(keeper, STALK_CLOSE if quiet else FOLLOW_CLOSE)
 
 
 ## One A* step toward [param goal]. False if there is no way there.
@@ -2974,7 +3115,7 @@ func _on_errand() -> bool:
 		_end_errand("it was taking too long", false)
 		return false
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and World.distance(tile, entity.tile) <= ERRAND_BREAK and senses.sees(entity):
+		if _hostile(entity) and World.distance(tile, entity.tile) <= ERRAND_BREAK and senses.sees(entity):
 			_end_errand("a monster came near", false)
 			return false
 	return true
@@ -3232,7 +3373,7 @@ func situation_text() -> String:
 static func _monsters_next_to(at: Vector2i) -> int:
 	var count := 0
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and World.distance(at, entity.tile) == 1:
+		if entity is Monster and entity.spawned and not harmless(entity) and World.distance(at, entity.tile) == 1:
 			count += 1
 	return count
 
@@ -3250,7 +3391,7 @@ static func _badly_hurt(entity: GridEntity) -> bool:
 
 static func _hostile_near(at: Vector2i, reach: int) -> bool:
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned and World.distance(at, entity.tile) <= reach:
+		if entity is Monster and entity.spawned and not harmless(entity) and World.distance(at, entity.tile) <= reach:
 			return true
 	return false
 
