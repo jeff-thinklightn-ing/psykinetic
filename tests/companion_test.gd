@@ -2053,7 +2053,14 @@ func _test_how_she_speaks() -> void:
 	World.outdoor = true
 	_check("You are outdoors, under the sky, with forest all around the edge of this place." in pet.voice_situation()
 			and "# wall or forest" in pet.perception_grid(), "outdoors she is told so, and her map's # is wall or forest")
+	DayNight.set_hour(18.7)
+	_check("It is dusk. You are outdoors" in pet.voice_situation(), "and the hour, in words: %s" % pet.where_words())
 	World.outdoor = false
+	DayNight.set_hour(2.0)
+	_check("You are indoors; outside it is the middle of the night." in pet.voice_situation(), "indoors, the hour outside: %s" % pet.where_words())
+	_check(Companion.time_words(6.0) == "dawn" and Companion.time_words(12.0) == "midday" and Companion.time_words(23.5) == "the middle of the night"
+			and not RegEx.create_from_string("\\d").search(pet.where_words()), "never a number")
+	DayNight.reset()
 	_check("Speak to Player as \"you\"" in prompt and "\"I\" and \"me\" are the one speaking" in prompt
 			and "never describe yourself or recite who you are" in prompt, "speak to her player as you; I and me are the speaker; no reciting")
 	pet.card = "She thinks before she moves and before she speaks. She is gentle."

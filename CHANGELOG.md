@@ -10,6 +10,8 @@ top section as the release notes.
   well, the town's store (its depot and shop counter), a forge and a
   kitchen, three homes, lanes between them, and a dirt road north to the
   castle. New players start in the square.
+- Companions know the hour (dawn, dusk, the middle of the night) and whether
+  they are outdoors, indoors, in a cave or deep in a dungeon.
 - Builder mode knows the town's store: Claude stamps one (yard, depot, shop counter)
   when asked, and you and Claude are told when a change leaves it wrong (a counter
   outside the store, a store with no depot).

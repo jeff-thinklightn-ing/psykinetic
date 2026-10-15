@@ -1494,6 +1494,46 @@ func doing() -> String:
 	return "You are %s; right now you are %s." % [words, action]
 
 
+## The hour, in words (DayNight.hour: 0 midnight, 12 noon): "dusk", "the
+## middle of the night"; never a number.
+const HOURS := [[4.0, "the middle of the night"], [5.5, "the small hours before dawn"], [7.0, "dawn"],
+	[11.0, "morning"], [13.0, "midday"], [17.0, "afternoon"], [18.0, "evening"], [19.5, "dusk"],
+	[22.0, "night"], [24.0, "the middle of the night"]]
+
+
+static func time_words(hour: float) -> String:
+	for each: Array in HOURS:
+		if hour < float(each[0]):
+			return each[1]
+	return HOURS.back()[1]
+
+
+## The kind of place this zone is (level.json's "zone", DayNight.ZONES),
+## by zone name, read once.
+static var _zone_kinds: Dictionary[String, String] = {}
+
+
+## Where she is and the hour, for her voice, in one sentence: outdoors
+## under the sky (or under a roof there), indoors, in a cave or a dungeon.
+func where_words() -> String:
+	var hour := time_words(DayNight.hour(DayNight.now()))
+	if World.outdoor:
+		if World.fields.daylight and not World.fields.open_sky(tile):
+			return "You are under a roof; outside it is %s." % hour
+		return "It is %s. You are outdoors, under the sky, with forest all around the edge of this place." % hour
+	var zone_name := World.zone.name if World.zone != null else ""
+	if not _zone_kinds.has(zone_name):
+		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
+		_zone_kinds[zone_name] = str(level.get("terrain", {}).get("zone", "indoors"))
+	match _zone_kinds[zone_name]:
+		"cave":
+			return "You are in a cave; outside it is %s." % hour
+		"dungeon":
+			return "You are in a dungeon, under the ground; above it is %s." % hour
+		_:
+			return "You are indoors; outside it is %s." % hour
+
+
 ## How hurt [param entity] is, in words.
 static func health_words(entity: GridEntity) -> String:
 	var share := float(entity.hp) / entity.max_hp if entity.max_hp > 0 else 1.0
@@ -1515,8 +1555,7 @@ func voice_situation() -> String:
 	sentences.append("%s monster%s next to you." % [NUMBERS[mini(next_to_her, NUMBERS.size() - 1)],
 		" is" if next_to_her == 1 else "s are"])
 	sentences.append("You are %s." % health_words(self))
-	if World.outdoor:
-		sentences.append("You are outdoors, under the sky, with forest all around the edge of this place.")
+	sentences.append(where_words())
 	var who := keeper_name()
 	var her_danger := _in_danger(self)
 	var their_danger := false
