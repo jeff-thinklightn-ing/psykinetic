@@ -115,8 +115,10 @@ ruling on E2, cards are rolled for every companion, and a card grows from what
 she witnesses and what is said to her. Lore doesn't write companions' pasts. It
 gives the world they are rolled into.
 
-Wren, Nix and Pip stay as named companions (Jeff). Wren and Nix are women. All
-three rest in town between trips. Beyond that, who each one is comes from their own card.
+Wren, Nix and Pip stay as named companions (Jeff). Wren and Nix are women. Pip is
+a young man who wants to become a squire. Whom he would squire for is open, since
+the draft has no lord or knight *(asked: H10)*. All three rest in town between
+trips. Beyond that, who each one is comes from their own card.
 
 ## Who knows what
 

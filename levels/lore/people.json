@@ -94,7 +94,7 @@
 			"name": "Pip",
 			"status": "draft",
 			"source": "Jeff",
-			"summary": "Pip is a companion who rests in town between trips; the rest of who Pip is comes from the card, which the companions tree rolls and grows.",
+			"summary": "Pip is a young man, a companion who rests in town between trips and wants to become a squire; the rest of who he is comes from his card, which the companions tree rolls and grows.",
 			"relations": [
 				{
 					"to": "town",
@@ -112,6 +112,30 @@
 					"where": [
 						"town_lands"
 					]
+				},
+				{
+					"id": "pip.young_man",
+					"text": "Pip is a young man.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "pip.squire",
+					"text": "Pip wants to become a squire.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				},
+				{
+					"id": "pip.squire_to",
+					"text": "Whom Pip would squire for: there is no lord or knight in the draft.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "H10"
 				}
 			]
 		},
