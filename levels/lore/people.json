@@ -65,43 +65,82 @@
 			"id": "wren",
 			"type": "person",
 			"name": "Wren",
-			"status": "asked",
-			"source": "game",
-			"summary": "A companion; who she is comes from her card, which the companions tree makes.",
-			"ask": "E2",
-			"relations": [],
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Wren is a woman, a companion who rests in town between trips; the rest of who she is comes from her card, which the companions tree rolls and grows.",
+			"relations": [
+				{
+					"to": "town",
+					"kind": "member"
+				}
+			],
 			"tags": [
 				"companion"
 			],
-			"facts": []
+			"facts": [
+				{
+					"id": "wren.companion",
+					"text": "Wren is a woman, a companion who travels with the town's people and rests in town between trips.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				}
+			]
 		},
 		{
 			"id": "pip",
 			"type": "person",
 			"name": "Pip",
-			"status": "asked",
-			"source": "game",
-			"summary": "A companion; who she is comes from her card, which the companions tree makes.",
-			"ask": "E2",
-			"relations": [],
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Pip is a companion who rests in town between trips; the rest of who Pip is comes from the card, which the companions tree rolls and grows.",
+			"relations": [
+				{
+					"to": "town",
+					"kind": "member"
+				}
+			],
 			"tags": [
 				"companion"
 			],
-			"facts": []
+			"facts": [
+				{
+					"id": "pip.companion",
+					"text": "Pip is a companion who travels with the town's people and rests in town between trips.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				}
+			]
 		},
 		{
 			"id": "nix",
 			"type": "person",
 			"name": "Nix",
-			"status": "asked",
-			"source": "game",
-			"summary": "A companion; who he is comes from his card, which the companions tree makes.",
-			"ask": "E2",
-			"relations": [],
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "Nix is a woman, a companion who rests in town between trips; the rest of who she is comes from her card, which the companions tree rolls and grows.",
+			"relations": [
+				{
+					"to": "town",
+					"kind": "member"
+				}
+			],
 			"tags": [
 				"companion"
 			],
-			"facts": []
+			"facts": [
+				{
+					"id": "nix.companion",
+					"text": "Nix is a woman, a companion who travels with the town's people and rests in town between trips.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					]
+				}
+			]
 		}
 	]
 }

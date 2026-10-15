@@ -113,8 +113,10 @@ Companions travel with the players by choice. Who each one is (temper, manner,
 where she comes from) is in her card, which the companions tree makes: by Jeff's
 ruling on E2, cards are rolled for every companion, and a card grows from what
 she witnesses and what is said to her. Lore doesn't write companions' pasts. It
-gives the world they are rolled into. Whether Wren, Pip and Nix stay in the lore
-as named people is open *(asked: E2)*.
+gives the world they are rolled into.
+
+Wren, Nix and Pip stay as named companions (Jeff). Wren and Nix are women. All
+three rest in town between trips. Beyond that, who each one is comes from their own card.
 
 ## Who knows what
 
