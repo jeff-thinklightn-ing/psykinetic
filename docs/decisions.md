@@ -4265,3 +4265,34 @@ rim built round it): no surface, no sunk bed, no wet shore, no scatter, its
 ground the neighbouring land's kind. The sim still has it as water
 (unwalkable, sight passes). Whoever places it fills the set before the
 room is built.
+
+## 284. A companion left in town works there as a resident
+
+Jeff: companions left in town work a trade as residents. Economy's Towns
+(note_companion_in / note_companion_out) seats her as a Production
+worker; companions decides when she stays and when she goes.
+
+She stays when her player goes from her without her, on ground of a
+stockpile the town holds (Stockpile.place_at), and she has a trade:
+- her player leaves the game while she stands there (Main._leave, where
+  she already waits, idle); she stays in the world as before;
+- her player travels to another zone while she was told to stay (HOLD,
+  standing as their instruction: Companion.stays_put). Main.travel,
+  shared, leaves her behind then: she is despawned as before but not
+  brought along, and is not spawned beside them in the zone they go to.
+
+Main._stay_in_town calls note_companion_in(place, name, trade) and keeps
+{place, zone, trade} in her record as "resident" (saved, and read back by
+PlayerRecord.from_dict). She goes when her player is back in her zone:
+Main._join_companion, before anything else, calls note_companion_out and
+clears it (her job waits with its materials), then she rejoins or spawns
+where she worked; joined in any other zone while she is resident, no
+companion is spawned. The name is her record's (her entity may be "Pip2"
+after a respawn).
+
+Her trade is levels/companions.json "trade" (Main.companion_trade) until
+step 6's cards: placeholders Pip carpenter, Wren cook, Nix smith; no
+trade, she does not stay. Her voice is told, as a fact in her now,
+"While Jeff is away you stay in this town and work as its carpenter."
+Not told to stay, or off the town's ground, she goes with her player as
+before.

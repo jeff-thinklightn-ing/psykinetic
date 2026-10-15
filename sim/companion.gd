@@ -412,6 +412,9 @@ var errand := {}
 var _offering: Array[Dictionary] = []
 var _offered: Dictionary[int, Array] = {}
 var _report_serials: Dictionary[int, bool] = {}
+## The trade she works in a town she stays in while her player is away
+## (Main._stay_in_town; decision 284), or "".
+var works_as := ""
 
 
 ## Her slots (Items): a pack and two hands, as a player's, empty at first;
@@ -1155,6 +1158,12 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 		_take_result(_sync_result(ask, answer))
 
 
+## Whether she was told to stay where she is: HOLD, standing as her
+## player's instruction (Main.travel leaves her behind then).
+func stays_put() -> bool:
+	return stance == Stance.HOLD and not standing_instruction().is_empty()
+
+
 ## Whether a player is near enough to hear her (HEARING_RANGE, in her
 ## zone), or her player fallen and waiting to rise (still there, and
 ## listening): with nobody to hear, her voice is not asked (the world runs
@@ -1196,6 +1205,8 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	if asks_about_items(heard):
 		now.append(carried())
 	now.append(doing())
+	if not works_as.is_empty():
+		now.append("While %s is away you stay in this town and work as its %s." % [who, works_as])
 	var heard_now := heard_words()
 	if not heard_now.is_empty():
 		now.append(heard_now)

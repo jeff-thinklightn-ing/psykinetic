@@ -79,6 +79,8 @@ const COMPANION_CARD := "Loyal and cautious. Guards the one she travels with, an
 ## keeps the card in its record (COMPANION_CARD for a new one).
 const COMPANION_CARDS := "res://levels/companions.json"
 static var _cards: Dictionary[String, String] = {}
+## Each companion's trade, read from the same file.
+static var _trades: Dictionary[String, String] = {}
 ## Cards earlier builds gave every companion, which spoke of "its friend":
 ## a record that still has one gets COMPANION_CARD.
 const OLD_COMPANION_CARDS: Array[String] = ["Loyal and cautious. Guards the one she travels with, and speaks little.",
@@ -1501,6 +1503,9 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}) -> bool:
 		World.despawn(player)
 	if is_instance_valid(pet) and pet.spawned:
 		_remember_companion(id)
+		# Told to stay, on town ground: she stays and works (decision 284).
+		if pet.stays_put():
+			_stay_in_town(record, pet)
 		World.despawn(pet)
 	_travelling = false
 	_players.erase(peer)
@@ -1512,7 +1517,7 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}) -> bool:
 	if not edge.is_empty():
 		record.tile = WorldMap.arrival(edge["side"], edge["cell"], level["size"])
 	record.zone = to_map
-	if not record.companion.is_empty():
+	if not record.companion.is_empty() and not record.companion.has("resident"):
 		record.companion["tile"] = null  # Beside their player.
 	_show_zone_to(peer, to_map, leaving)
 	_join_player(peer, id, record.name)
@@ -1860,8 +1865,20 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not Net.companions:
 		return
+	# Working in a town (decision 284): elsewhere, she stays at it; here,
+	# she leaves it and goes with them, her job waiting.
+	var resident: Dictionary = record.companion.get("resident", {})
+	if not resident.is_empty():
+		if str(resident.get("zone", "")) != World.zone.name:
+			print("[net] %s's companion %s works in %s; not here" % [record.name, record.companion.get("name", "?"), resident.get("zone", "?")])
+			return
+		if World.towns != null:
+			World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion["name"]))
+		record.companion.erase("resident")
+		party_log.add("%s leaves her work in the town and goes with %s." % [record.companion["name"], record.name])
 	var existing: Companion = _companions.get(record.player_id)
 	if is_instance_valid(existing) and existing.spawned:
+		existing.works_as = ""
 		existing.keeper = player
 		# A rejoin is a new peer: she is theirs again (replicated, so their
 		# client knows her for their own: a right click opens her pack).
@@ -1958,6 +1975,42 @@ static func companion_card(pet_name: String) -> String:
 		if _cards.is_empty():
 			_cards["_none"] = ""  # Read once, even when empty.
 	return str(_cards.get(pet_name, ""))
+
+
+## The trade companion [param pet_name] works in a town she stays in
+## (levels/companions.json "trade", until cards say): "" for none.
+static func companion_trade(pet_name: String) -> String:
+	if _trades.is_empty() and FileAccess.file_exists(COMPANION_CARDS):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(COMPANION_CARDS))
+		if parsed is Dictionary:
+			for key: String in parsed:
+				if not key.begins_with("_") and parsed[key] is Dictionary:
+					_trades[key] = str(parsed[key].get("trade", ""))
+		if _trades.is_empty():
+			_trades["_none"] = ""  # Read once, even when empty.
+	return str(_trades.get(pet_name, ""))
+
+
+## Her player gone from her without her (left the game, or travelled on
+## while she was told to stay): on ground of a stockpile the town holds,
+## with a trade, she stays as one of its residents and works
+## (Towns.note_companion_in), until her player comes back to her zone
+## (_join_companion). The place and zone are kept in her record. False if
+## she does not.
+func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
+	if World.towns == null or World.holdings == null or record.companion.is_empty():
+		return false
+	var pet_name := String(record.companion.get("name", pet.name))
+	var place := Stockpile.place_at(World.holdings, World.zone.name, pet.tile)
+	var trade := companion_trade(pet_name)
+	if place.is_empty() or trade.is_empty():
+		return false
+	World.towns.note_companion_in(place, pet_name, trade)
+	record.companion["resident"] = {"place": place, "zone": World.zone.name, "trade": trade}
+	pet.works_as = trade
+	print("[town] %s's companion %s stays in %s and works as its %s" % [record.name, pet_name, place, trade])
+	party_log.add("%s stays in the town and works as its %s." % [pet_name, trade])
+	return true
 
 
 func _make_mind() -> CompanionMind:
@@ -2452,6 +2505,8 @@ func _leave(peer: int, player: Player, id: String) -> void:
 		_remember_companion(id)
 		pet.keeper = null
 		pet.current_intent = Companion.Intent.IDLE
+		if record != null:
+			_stay_in_town(record, pet)
 	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
 	party_log.add("%s left." % (record.name if record != null else "someone"))
 

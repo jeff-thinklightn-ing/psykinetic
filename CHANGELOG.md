@@ -6,6 +6,10 @@ top section as the release notes.
 
 ## Unreleased
 
+- A companion left in a town works there while you are away: tell her to
+  stay on the town's stockpile ground before you travel on, or log off
+  while she stands there, and she works her trade (Pip as a carpenter,
+  Wren as a cook, Nix as a smith) until you come back for her.
 - Companions see when a door is locked, and don't offer to open one
   they have no key for.
 - Companions with no player near enough to hear them stay quiet instead
