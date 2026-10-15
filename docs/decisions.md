@@ -5538,3 +5538,25 @@ Every weapon is made by the smith (the only item trade with a workshop),
 from ore, wood and, for the bow, cloth, so the town's "weapon" and
 "shield" wants are met. Blocking and drawing need a button: that is Jeff's
 choice between layouts (the coordinator has it), landed separately.
+## 319. Creatures are art slots: a rigged body and a named clip set
+
+Jeff's hunting and wildlife (enemy-ai leads) needs deer, rabbits, boar and
+wolves drawn. Each is an art slot of a new kind, "creature": creature.deer
+(the doe), creature.stag (the antlered male), creature.wolf, creature.boar
+and creature.rabbit, sized as the animal stands, with a budget (a rabbit
+1,200 triangles to a stag 4,000) and a "clips" list: each clip a name the
+game asks for (idle, walk, trot, run, graze, alert, hit, death; attack,
+charge, howl where the animal has them), the names it may have in the art
+(the Quaternius pack's Gallop is a run, its Eating a graze), and either
+"required" (the behaviour reads wrong without it) or a "fallback" (what the
+game shows instead: trot is walk faster, a wolf's howl idle with a head-up
+tween). ArtCheck holds a creature's own art to it: an armature, every
+required clip (an error when missing), the fallbacks named in warnings.
+Names match in any case, after any library or armature prefix. A grey box
+has no rig, so the check asks none of it (ArtKit marks grey instances).
+
+The deer, stag and wolf come from Quaternius's Ultimate Animated Animal
+Pack (CC0; its own License.txt still to be read before use), the boar is
+an art-gen mesh on the Quaternius Pig's rig and clips (pc-character), and
+the rabbit an art-gen mesh on a small rig of pc-character's. A pack's flat
+materials move onto palette swatches when its art drops in, as any piece's.

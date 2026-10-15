@@ -1233,6 +1233,131 @@
 			"budget": 200,
 			"uses": "a ladder up one wall's height, leaning on a wall toward -z"
 		},
+		"creature.deer": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.45, 1.4, 1.5],
+			"tolerance": 0.15,
+			"budget": 2500,
+			"uses": "a doe: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. From the Ultimate Animated Animal Pack's Deer",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "trot", "names": ["trot"], "fallback": "walk, faster"},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow"], "required": true},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.237, -0.15], "size": [0.36, 0.475, 0.9]},
+				{"at": [0, 0.712, -0.15], "size": [0.45, 0.475, 1.2]},
+				{"at": [0, 1.232, 0.6], "size": [0.315, 0.336, 0.3]}
+			]
+		},
+		"creature.stag": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.7, 1.95, 1.7],
+			"tolerance": 0.15,
+			"budget": 4000,
+			"uses": "a stag, the antlered male: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. From the Ultimate Animated Animal Pack's Stag",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "trot", "names": ["trot"], "fallback": "walk, faster"},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow"], "required": true},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "attack", "names": ["attack", "attack_headbutt", "headbutt"], "fallback": "a lunge tween (a stag at bay)"}
+			],
+			"grey": [
+				{"at": [0, 0.275, -0.17], "size": [0.4, 0.55, 1.02]},
+				{"at": [0, 0.825, -0.17], "size": [0.5, 0.55, 1.36]},
+				{"at": [0, 1.408, 0.68], "size": [0.35, 0.384, 0.34]},
+				{"at": [0, 1.75, 0.6], "size": [0.7, 0.4, 0.3]}
+			]
+		},
+		"creature.wolf": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.35, 0.95, 1.4],
+			"tolerance": 0.15,
+			"budget": 2500,
+			"uses": "a wolf: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. From the Ultimate Animated Animal Pack's Wolf; howl's stand-in is idle with a head-up tween until it has one",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "trot", "names": ["trot"], "fallback": "walk, faster"},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "attack", "names": ["attack", "bite"], "required": true},
+				{"name": "howl", "names": ["howl"], "fallback": "idle and a head-up tween"},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "feed", "names": ["eating", "idle_eating", "feed"]},
+				{"name": "sit", "names": ["sit"]},
+				{"name": "lie", "names": ["lie", "lie_down"]}
+			],
+			"grey": [
+				{"at": [0, 0.2, -0.14], "size": [0.28, 0.4, 0.84]},
+				{"at": [0, 0.6, -0.14], "size": [0.35, 0.4, 1.12]},
+				{"at": [0, 0.836, 0.56], "size": [0.245, 0.228, 0.28]}
+			]
+		},
+		"creature.boar": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.5, 0.85, 1.4],
+			"tolerance": 0.15,
+			"budget": 3000,
+			"uses": "a boar: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. An art-gen mesh on the Quaternius Pig's rig, playing its clips",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "root", "idle_eating", "eating"], "fallback": "idle"},
+				{"name": "charge", "names": ["charge"], "fallback": "run, faster, and a lunge tween"},
+				{"name": "attack", "names": ["attack", "gore", "headbutt", "attack_headbutt"], "required": true},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.191, -0.14], "size": [0.4, 0.382, 0.84]},
+				{"at": [0, 0.616, -0.14], "size": [0.5, 0.468, 1.12]},
+				{"at": [0, 0.66, 0.56], "size": [0.35, 0.18, 0.28]}
+			]
+		},
+		"creature.rabbit": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.18, 0.32, 0.42],
+			"tolerance": 0.15,
+			"budget": 1200,
+			"uses": "a rabbit: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. An art-gen mesh on pc-character's small four-legged rig",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk", "hop"], "required": true},
+				{"name": "run", "names": ["run", "hop_run", "hop_fast"], "required": true},
+				{"name": "graze", "names": ["graze", "nibble", "eating"], "fallback": "idle"},
+				{"name": "alert", "names": ["alert", "sit_up"], "fallback": "idle"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.1, -0.05], "size": [0.18, 0.2, 0.32]},
+				{"at": [0, 0.25, 0.14], "size": [0.12, 0.14, 0.14]}
+			]
+		},
 		"ground.grass": {
 			"category": "ground",
 			"type": "texture",

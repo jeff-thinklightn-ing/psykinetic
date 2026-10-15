@@ -238,7 +238,8 @@ static func off_changed(listener: Callable) -> void:
 ## transform, what: a PackedScene to instantiate, [mesh, material] for a
 ## box, a String for a label, null for a plain Node3D]; each lift a part
 ## of the body's scene moved out beside it, [its path in the body, its
-## name, where it stands].
+## name, where it stands]; a grey box's has a fourth, true, and its
+## instances the meta "grey".
 static func _compile(slot: String) -> Array:
 	if show_placeholders:
 		return [_grey_recipe(slot)]
@@ -281,6 +282,8 @@ static func _make(recipe: Array) -> Node3D:
 		nodes.append(node)
 	var root := nodes[0]
 	root.set_meta(&"slot", recipe[2])
+	if recipe.size() > 3:
+		root.set_meta(&"grey", true)
 	for lift: Array in recipe[1]:
 		var part := nodes[1].get_node(lift[0]) as Node3D
 		for node in _descendants(part):
@@ -387,7 +390,7 @@ static func _grey_recipe(slot: String) -> Array:
 				_step(steps, 0, socket, Transform3D(Basis.IDENTITY, _vec(sockets[socket])), null)
 	if show_labels:
 		_step(steps, 0, "Label", Transform3D(Basis.IDENTITY, Vector3(0.0, size(slot).y + 0.2, 0.0)), slot)
-	return [steps, [], slot]
+	return [steps, [], slot, true]  # A grey box: ArtCheck asks no rig of it.
 
 
 static func _grey_step(steps: Array, parent: int, name: String, box: Dictionary, material: Material) -> void:

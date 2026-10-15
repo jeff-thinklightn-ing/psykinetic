@@ -4,7 +4,8 @@ extends RefCounted
 ## art/kit/slots.json), and says what is wrong in words that say what to
 ## change: its size, where its origin is, its moving parts and where they
 ## turn, its triangles and materials, a scatter piece's single mesh, a held
-## piece's second grip, where it came from, and files in a slot's folder
+## piece's second grip, a creature's rig and clips, where it came from, and
+## files in a slot's folder
 ## that are not named for it. A problem is a line beginning "error:" (the
 ## art does not fit its slot) or "warning:" (worth a look). tools/art_check
 ## prints these; tools/art_drop runs it on a dropped file; art_kit_test
@@ -115,6 +116,43 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	for child in node.find_children("state_*", "", true, false):
 		if str(child.name).trim_prefix("state_") not in states:
 			out.append("warning: \"%s\" is not one of the slot's states %s, so it never shows" % [child.name, states])
+	if kind == "creature" and not node.has_meta(&"grey"):
+		out.append_array(_check_rig(entry, node))
+	return out
+
+
+## A creature's rig and clips (decision 319): an armature (a Skeleton3D),
+## and each clip the slot lists found by any of its names; a required one
+## missing is an error, one with a fallback a warning naming what stands in.
+static func _check_rig(entry: Dictionary, node: Node3D) -> Array[String]:
+	var out: Array[String] = []
+	if node.find_children("*", "Skeleton3D", true, false).is_empty():
+		out.append("error: no armature: a creature is a rigged body, its mesh skinned to one Skeleton3D")
+	var have := clip_names(node)
+	for clip: Dictionary in entry.get("clips", []):
+		var names: Array = clip.get("names", [clip["name"]])
+		if names.any(func(name: String) -> bool: return have.has(name.to_lower())):
+			continue
+		var called := "\"%s\" clip (named any of %s)" % [clip["name"], ", ".join(names)]
+		if clip.get("required", false):
+			out.append("error: no %s: the creature reads wrong without it (its clips: %s)" % [called, ", ".join(have.keys()) if not have.is_empty() else "none"])
+		elif clip.has("fallback"):
+			out.append("warning: no %s: %s stands in" % [called, clip["fallback"]])
+		else:
+			out.append("warning: no %s: nice to have" % called)
+	return out
+
+
+## The names of [param node]'s animation clips, lower case, without the
+## library's or an armature's prefix ("AnimalArmature|Gallop" is "gallop").
+static func clip_names(node: Node) -> Dictionary:
+	var out := {}
+	for player: AnimationPlayer in node.find_children("*", "AnimationPlayer", true, false):
+		for name in player.get_animation_list():
+			var bare := str(name)
+			bare = bare.substr(bare.rfind("/") + 1)
+			bare = bare.substr(bare.rfind("|") + 1)
+			out[bare.to_lower()] = true
 	return out
 
 

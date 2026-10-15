@@ -83,6 +83,15 @@ are texture slots, not materials on a model (see Budgets).
   - **Damaged**, `roof_damaged` (a broken roof, the same origin) shows in place of `roof`, and
     `state_damaged` (rubble at the walls' feet, within the footprint's outer 0.5 m) appears.
   - A `floor` object only for a raised floor.
+- **Creatures** (`creature.*`, decision 319: the wilds' deer, stag, wolf, boar and rabbit) are a
+  rigged body standing at rest, front +Z, origin under its middle, its mesh skinned to one
+  armature, with the clips the slot's `clips` lists.
+  - A clip is found by any of its `names`, in any case and after any library or armature
+    prefix: the Quaternius pack's `AnimalArmature|Gallop` is a `run`.
+  - A `required` clip missing is an error. One with a `fallback` missing is a warning naming
+    the stand-in the game uses (a wolf's howl is idle with a head-up tween until it has one).
+  - Every face sits on the palette, like any piece. A pack's flat materials move onto swatches
+    when the art drops in.
 - A **moving part** is its own object, named as the manifest names it (`leaf` for a door),
   with its origin at the pivot: a hinge's on the hinge line, a slide's at its closed position.
 - **States** are optional objects named `state_<name>`, shown only in that state, as the slot's
@@ -107,6 +116,7 @@ drawn a thousand times (a wall, a tuft) should be well under.
 | Prop (crate, barrel, chest ...) | 300 to 800 | by size: a sack 300, a cart 800 |
 | Building | 3000 | |
 | Character (reference) | the goblin is 3,780 | pc-character owns characters |
+| Creature | 1,200 to 4,000 | a rabbit 1,200, a deer or wolf 2,500, a boar 3,000, a stag (antlers) 4,000 |
 
 Materials: the one `palette` (above). Tileable textures (ground, rock, wall stone) are texture
 slots: 512 px square, tiling every 4 m (the manifest's `tile_m` gives the world size).

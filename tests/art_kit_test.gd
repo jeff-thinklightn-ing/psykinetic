@@ -7,7 +7,7 @@ extends Node
 ## assertion failed, 0 otherwise.
 
 const TYPES := ["mesh", "texture", "profile"]
-const KINDS := ["edge", "vertex", "cell", "floor", "held"]
+const KINDS := ["edge", "vertex", "cell", "floor", "held", "creature"]
 ## How far a drawn slot's bounds may be from its size, a share of it.
 const TOLERANCE := 0.05
 
@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_palette_shared()
 	_test_scene_read()
 	_test_changed_told()
+	_test_creature_rig()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -408,6 +409,36 @@ func _test_scene_read() -> void:
 	_check(not found.is_empty() and (found[1] as Transform3D).is_equal_approx(place)
 			and read_bounds.position.is_equal_approx(made_bounds.position) and read_bounds.size.is_equal_approx(made_bounds.size),
 			"its leaf found at Frame/leaf where it stands (%s), and its bounds as made" % [found[1] if not found.is_empty() else "none"])
+
+
+func _test_creature_rig() -> void:
+	print("
+== a creature (decision 319): a rig, and its clips by any of their names; a required one missing is an error ==")
+	ArtKit.show_placeholders = true
+	ArtKit.forget()
+	var grey := ArtKit.instance("creature.wolf")
+	ArtKit.show_placeholders = false
+	ArtKit.forget()
+	_check(ArtCheck.check_node("creature.wolf", grey).is_empty(), "its grey box fits, no rig asked of it")
+	grey.remove_meta(&"grey")
+	var bare := ArtCheck.check_node("creature.wolf", grey)
+	_check(bare.any(func(line: String) -> bool: return line.begins_with("error: no armature")), "unrigged art: no armature named")
+	grey.add_child(Skeleton3D.new())
+	var player := AnimationPlayer.new()
+	var library := AnimationLibrary.new()
+	for clip in ["AnimalArmature|Idle", "Walk", "Gallop", "Attack", "Death", "Idle_HitReact_Left", "Eating"]:
+		library.add_animation(clip, Animation.new())
+	player.add_animation_library("", library)
+	grey.add_child(player)
+	var rigged := ArtCheck.check_node("creature.wolf", grey)
+	var errors := rigged.filter(func(line: String) -> bool: return line.begins_with("error"))
+	_check(errors.is_empty() and rigged.any(func(line: String) -> bool: return "\"howl\"" in line and "head-up tween" in line)
+			and rigged.any(func(line: String) -> bool: return "\"trot\"" in line and "walk, faster" in line),
+			"the pack's wolf: its run is Gallop, its hit Idle_HitReact_Left; howl and trot named with what stands in %s" % [errors])
+	library.remove_animation("Attack")
+	var biteless := ArtCheck.check_node("creature.wolf", grey)
+	_check(biteless.any(func(line: String) -> bool: return line.begins_with("error: no \"attack\" clip")), "no attack: an error, it reads wrong without one")
+	grey.free()
 
 
 func _test_changed_told() -> void:
