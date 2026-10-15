@@ -20,8 +20,21 @@
 	"labour": 1,
 	"trade": {"buy_ratio": 0.5, "min_factor": 0.5, "max_factor": 2.0},
 	"rent": 3,
-	"rent_every": 6000,
+	"rent_every": 54000,
 	"gold_floor": 20,
+	"start_gold": 50,
+	"folk": {
+		"needs": {
+			"meal": {"every": 18000, "tags": ["food"], "store": "food"},
+			"bed": {"every": 54000, "building": "inn", "fee": 2, "what": "a bed at the inn"},
+			"mend": {"every": 108000, "trade": "carpenter", "fee": 3, "what": "mending at home"},
+			"tools": {"every": 108000, "trade": "smith", "fee": 4, "what": "work on their tools"}
+		},
+		"skip": {"carpenter": ["mend"], "smith": ["tools"]},
+		"keep_in_shop": 1,
+		"rich_above": 40,
+		"rich_every": 0.5
+	},
 	"level_speed": 0.25,
 	"xp": {"rescue": 10, "objective": 50},
 	"residents": {"base": 3, "per_inn": 3},

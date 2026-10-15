@@ -6777,3 +6777,67 @@ fails all 40).
 
 Fields' refresh a tick: 1.73 to 1.00 ms at 9 players, 2.26 to 1.21 at 16.
 Server only.
+
+## 353. A town's starting gold, and residents' own trade
+
+Jeff (2026-10-15): "give the town 50 starting gold and a flowing economy,
+townspeople trade items and gold for services and food". Coordinator
+approved the design.
+
+Starting gold: economy.json's `start_gold` (50) goes into each town store
+(a stockpile place the town holds on the world map) once, the first time
+`Towns.seed_from` sees it, at boot or after a builder reload. The town
+record's `founded` (saved) stops it happening twice. A save from before
+this decision gets the 50 once.
+
+Residents' trade (`Economy.tick`, on the world tick after Production's):
+each resident (a Production worker not away) has needs, from economy.json's
+`folk.needs`, each with its own clock (`every`, in steps; a day is 54000).
+A need is first due one `every` after it is first seen.
+- A meal (`tags`) is first bought from the shop: the cheapest item with
+  the tag, at the price a player pays (value x need). This only happens
+  while more than `keep_in_shop` of them are there, so players find one.
+  The sale tax goes to the treasury and the rest to its maker, and the
+  item is eaten (the book ends it).
+- Else the store's food (`store`) is bought at its value x need, paid into
+  the treasury.
+- Else, with no gold, the town feeds them from the store: the dole.
+- Else they go hungry (`hungry_since`).
+- A service with a `trade` is paid to a resident of that trade there (the
+  one with the least gold, so it spreads), with the trade tax going to the
+  treasury.
+- A service with a `building` (the inn's bed) is paid to the treasury
+  while that building stands.
+- Nothing goes into debt: a need that can't be paid for, or has no one to
+  serve it, waits till it is next due.
+- Above `rich_above` gold, needs come due `rich_every` as often, so no
+  purse pools.
+- `skip` names the needs a trade meets for itself.
+
+Rent stays the sink and now falls due once a day (`rent_every` 54000; it
+was 6000, nine times a day, which would empty every purse in a day).
+
+What it reads as:
+- Each trade is a ledger line on the store (`Stockpile.note`, by
+  `folk:<id>`, its text in `from`; `dole:<id>`, `hungry:<id>`).
+- Each worker has `last_trade` {step, what, gold, with}, `fed` and
+  `hungry_since`, for residents' voices.
+- `Production.on_dole(town)` counts those fed by the town or hungry.
+  `signals_of` reports it (`dole`) and makes food the first want
+  (short 1.0) while it is above 0.
+- `Economy.dole_changed` tells Main, which tells the players in that zone
+  in the party log ("3 in town are on the dole...").
+
+Bounds, by construction: no gold is made here, only moved; the treasury
+pays wages only above `gold_floor` and never pays the dole in gold. The
+snapshot gains workers' `needs`, `fed`, `hungry_since`, `last_trade` and
+towns' `founded`; older saves load with them empty.
+
+Tuning: start_gold, wage, the fees, each need's every, rent and
+rent_every, rich_above, rich_every and keep_in_shop. folk_test runs
+8 residents for 3 days on start_gold alone. The treasury never goes under
+its floor, gold is conserved but for rent, and the most any purse holds
+is 18. But most of the 50 sits at the floor (wages need 9 above it), so
+without players folk soon live on the dole. Gold comes in through
+players: their buys, deposits and sales. The dole makes the kitchen work
+for food first.

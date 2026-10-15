@@ -1510,6 +1510,11 @@ func _boot() -> void:
 		return {"name": str(record.companion.get("name", "")), "trade": str(record.companion.get("traits", {}).get("trade", ""))}
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
+	# Residents' trade (decision 353): the inn's bed while it stands, and
+	# players in a town's zone told how many it feeds.
+	World.economy.building_stands = func(town: String, kind: String) -> bool:
+		return World.towns.building(town, kind).get("state") == Towns.STANDING
+	World.economy.dole_changed.connect(_on_dole_changed)
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
 	# A beaten raid's companion captives come back (decision 314).
@@ -2191,6 +2196,18 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 ## town's buildings ("town" {town, buildings}).
 func _on_town_building_changed(town: String, _kind: String) -> void:
 	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town)})
+
+
+## Server: how many residents [param town] feeds (or who go hungry)
+## changed (Economy.dole_changed, decision 353): the players in its zone
+## are told, in the party log.
+func _on_dole_changed(town: String, count: int) -> void:
+	var peers := World.peers_in(town.get_slice("/", 0))
+	if peers.is_empty():
+		return
+	var text := "Nobody in town is on the dole now." if count == 0 \
+			else "%d in town %s on the dole (fed by the town, or hungry): its kitchen works for food first." % [count, "is" if count == 1 else "are"]
+	Net.broadcast_to(peers, "party", {"from": "Town", "text": text})
 
 
 ## Server: [param peer], come to [param zone_name], is told the buildings of

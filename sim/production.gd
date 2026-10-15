@@ -63,7 +63,8 @@ var workshop_level := Callable()
 ## (town, building id) -> void: a "build" job is done (Towns sets it).
 var on_built := Callable()
 
-## Id -> {id, name, trades, town, origin, purse, rent_due, away}.
+## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
+## (need -> step due), fed, hungry_since, last_trade}.
 var _workers: Dictionary[String, Dictionary] = {}
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
@@ -131,9 +132,76 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	var list: Array[String] = []
 	list.assign(trades.map(func(trade: Variant) -> String: return str(trade)))
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
-		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false}
+		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
+		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}}
 	_town(town)
 	return true
+
+
+## Every worker's id ([param town]'s only, if given), sorted.
+func worker_ids(town := "") -> Array[String]:
+	var out: Array[String] = []
+	for id: String in _workers:
+		if town.is_empty() or _workers[id]["town"] == town:
+			out.append(id)
+	out.sort()
+	return out
+
+
+# --- Residents' own trade (decision 353; Economy.tick does the buying) ---------------
+
+## Takes [param amount] gold from worker [param worker_id]'s purse: false
+## (nothing taken) if it hasn't that much.
+func spend(worker_id: String, amount: int, why := "") -> bool:
+	if not _workers.has(worker_id) or amount < 0 or int(_workers[worker_id]["purse"]) < amount:
+		return false
+	_workers[worker_id]["purse"] = int(_workers[worker_id]["purse"]) - amount
+	print("[production] %s spent %d gold (%s), step %d (%d left)" % [_workers[worker_id]["name"], amount, why, now(),
+		_workers[worker_id]["purse"]])
+	return true
+
+
+## When worker [param worker_id]'s [param need] is next due (0: not yet set).
+func need_due(worker_id: String, need: String) -> int:
+	return int(_workers.get(worker_id, {}).get("needs", {}).get(need, 0))
+
+
+func set_need_due(worker_id: String, need: String, at: int) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["needs"][need] = at
+
+
+## How worker [param worker_id] last ate: "bought" (from the shop),
+## "store" (the store's food, paid for), "dole" (fed by the town) or
+## "hungry" (nothing to eat); hungry_since is the step they first went
+## without, 0 once fed.
+func note_meal(worker_id: String, how: String) -> void:
+	if not _workers.has(worker_id):
+		return
+	var worker_record: Dictionary = _workers[worker_id]
+	worker_record["fed"] = how
+	if how == "hungry":
+		if int(worker_record["hungry_since"]) == 0:
+			worker_record["hungry_since"] = maxi(now(), 1)
+	else:
+		worker_record["hungry_since"] = 0
+
+
+## Worker [param worker_id]'s last trade, for their voice:
+## {step, what, gold, with} (with: the other side's name, or "the town").
+func note_trade(worker_id: String, what: String, gold: int, with_whom: String) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["last_trade"] = {"step": now(), "what": what, "gold": gold, "with": with_whom}
+
+
+## How many of [param town]'s workers (not away) the town fed, or who went
+## hungry, at their last meal: the dole, which makes food its first want.
+func on_dole(town: String) -> int:
+	var count := 0
+	for id in worker_ids(town):
+		if not _workers[id]["away"] and str(_workers[id]["fed"]) in ["dole", "hungry"]:
+			count += 1
+	return count
 
 
 ## A workshop [param id] of [param trade] in [param town]. False if the id is taken.
@@ -391,6 +459,10 @@ func signals_of(town: String, cat: Dictionary) -> Dictionary:
 		var target := int(wants[want]) + int(extra.get(want, 0))
 		if target > 0 and int(have.get(want, 0)) < target:
 			short[want] = float(target - int(have.get(want, 0))) / target
+	# Anyone on the dole makes food the town's first want (decision 353).
+	var dole := on_dole(town)
+	if dole > 0 and wants.has("food"):
+		short["food"] = 1.0
 	var full := true
 	var comfort: Dictionary = rules.get("comfort", {})
 	for what: String in comfort:
@@ -407,7 +479,7 @@ func signals_of(town: String, cat: Dictionary) -> Dictionary:
 			sold[sale["what"]] = int(sold.get(sale["what"], 0)) + int(sale["count"])
 	var raw := DEFEND if safety == THREATENED else WORK_UP if not sold.is_empty() \
 			else STOCK if not short.is_empty() else SURPLUS if full else IDLE
-	return {"safety": safety, "short": short, "full": full, "busy": busy, "sold": sold, "raw_tier": raw}
+	return {"safety": safety, "short": short, "full": full, "busy": busy, "sold": sold, "raw_tier": raw, "dole": dole}
 
 
 func _safety(town: String, since: int) -> String:
@@ -754,6 +826,17 @@ func from_dict(saved: Dictionary) -> void:
 			_workers[id]["purse"] = maxi(int(entry.get("purse", 0)), 0)
 			_workers[id]["rent_due"] = int(entry.get("rent_due", _workers[id]["rent_due"]))
 			_workers[id]["away"] = bool(entry.get("away", false))
+			# Saves from before decision 353 have no needs: they come due afresh.
+			var needs: Variant = entry.get("needs", {})
+			if needs is Dictionary:
+				for need: Variant in needs:
+					_workers[id]["needs"][str(need)] = int(needs[need])
+			_workers[id]["fed"] = str(entry.get("fed", ""))
+			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)
+			var last: Variant = entry.get("last_trade", {})
+			if last is Dictionary and not last.is_empty():
+				_workers[id]["last_trade"] = {"step": int(last.get("step", 0)), "what": str(last.get("what", "")),
+					"gold": int(last.get("gold", 0)), "with": str(last.get("with", ""))}
 	var workshops: Variant = saved.get("workshops", {})
 	if workshops is Dictionary:
 		for id: String in workshops:

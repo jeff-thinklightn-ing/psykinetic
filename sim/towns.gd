@@ -364,6 +364,15 @@ func unlock(town: String, kind: String) -> bool:
 func seed_from(world_map: WorldMap) -> Array[String]:
 	var out: Array[String] = []
 	var kinds: Dictionary = rules.get("buildings", {})
+	var names: Array = world_map.areas.keys()
+	names.sort()
+	for area_name: String in names:
+		var places: Dictionary = world_map.areas[area_name].get("places", {})
+		var keys: Array = places.keys()
+		keys.sort()
+		for key: String in keys:
+			if places[key].get("kind") == "stockpile" and places[key].get("holder") == Stockpile.TOWN:
+				_found("%s/%s" % [area_name, key])
 	for area_name: String in world_map.areas:
 		for house: Dictionary in world_map.areas[area_name].get("buildings", []):
 			var kind := str(house.get("use", ""))
@@ -380,6 +389,19 @@ func seed_from(world_map: WorldMap) -> Array[String]:
 			out.append("%s/%s" % [town, kind])
 	out.sort()
 	return out
+
+
+## A town's store gets rules' start_gold once, the first time it is seen
+## (a save from before decision 353 too): "founded" on its record.
+func _found(town: String) -> void:
+	var record := _town(town)
+	if record["founded"]:
+		return
+	record["founded"] = true
+	var gold := int(rules.get("start_gold", 0))
+	if gold > 0:
+		production.stockpile.deposit(town, "gold", gold, "founded", "the town's starting gold")
+		_note(town, "founded, with %d gold" % gold)
 
 
 ## Production.on_built: [param kind] in [param town] is up a level and
@@ -677,14 +699,14 @@ func _note(town: String, what: String) -> void:
 
 func _town(town: String) -> Dictionary:
 	if not _towns.has(town):
-		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "taken": {}, "log": []}
+		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "taken": {}, "log": [], "founded": false}
 	return _towns[town]
 
 
 # --- Saving --------------------------------------------------------------------------
 
 ## For the snapshot: town -> {xp, spent, residents, buildings, objectives,
-## captives, taken (worker id -> times carried off), log}.
+## captives, taken (worker id -> times carried off), log, founded}.
 func to_dict() -> Dictionary:
 	return _towns.duplicate(true)
 
@@ -699,6 +721,7 @@ func from_dict(saved: Dictionary) -> void:
 			continue
 		var record := _town(str(town))
 		record["xp"] = maxi(int(entry.get("xp", 0)), 0)
+		record["founded"] = bool(entry.get("founded", false))
 		record["spent"] = clampi(int(entry.get("spent", 0)), 0, record["xp"])
 		for who: Variant in entry.get("residents", []):
 			if not production.worker(str(who)).is_empty():

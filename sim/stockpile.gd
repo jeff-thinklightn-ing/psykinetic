@@ -287,6 +287,13 @@ func take_from_shop(place: String, uid: int, reason := "") -> bool:
 	return true
 
 
+## A line in [param place]'s ledger that moves nothing in the store: a
+## trade between its residents (decision 353), [param count] the gold.
+func note(place: String, what: String, count: int, by: String, text: String) -> void:
+	if not place.is_empty():
+		_record(_store(place), what, count, by, text)
+
+
 ## The book's holder key for [param place]'s shop.
 static func shop_holder(place: String) -> String:
 	return "shop:" + place

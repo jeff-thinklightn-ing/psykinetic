@@ -20,7 +20,11 @@ extends RefCounted
 ## and only while its treasury stays above gold_floor; the buy tax stays in
 ## the treasury. A player's gold is theirs: nothing takes it but buying.
 
+## A town's count of residents on the dole changed (decision 353).
+signal dole_changed(town: String, count: int)
+
 const PATH := "res://levels/economy.json"
+const TREASURY := "the town"
 const SELL := "sell"
 const BUY := "buy"
 ## A thing made of things is valued that many steps down at most.
@@ -33,6 +37,11 @@ var production: Production
 var clock := Callable()
 ## () -> Dictionary: id -> definition (Items' by default), what prices read.
 var catalog := Callable()
+## (town, building kind) -> bool: whether it stands (Towns', set by Main),
+## for a need met at a building. None stands while unset.
+var building_stands := Callable()
+## Town -> how many it fed or let go hungry, as last told (dole_changed).
+var _dole := {}
 
 ## Player id -> gold.
 var _purses: Dictionary[String, int] = {}
@@ -277,6 +286,177 @@ func sell(player_id: String, town: String, id: String) -> Dictionary:
 		return {"ok": false, "why": "the town can't pay for it now"}
 	add_gold(player_id, pays, "sold %s" % id)
 	return {"ok": true, "paid": pays, "id": id}
+
+
+# --- Residents' trade (decision 353) -------------------------------------------------
+
+## Each resident (a Production worker not away) meets their needs from
+## their purse on the world tick, each need (rules' "folk" "needs") on its
+## own clock: a meal (tags) is bought from the shop at its price (the sale
+## tax to the treasury, the rest to its maker), only past keep_in_shop of
+## them so players find one; else the store's food at its value x need,
+## paid into the treasury; else, broke, the town feeds them from the store
+## (the dole); else they go hungry. A service is paid to a resident of its
+## trade there (the trade tax to the treasury) or, for a building's
+## (the inn's bed), to the treasury while it stands. One they can't pay for
+## or can't get waits till it is next due: nobody goes into debt. Above
+## rich_above gold, needs come due rich_every as often. Gold only moves:
+## nothing here makes any. Each trade is a ledger line (Stockpile.note) and
+## the worker's last_trade; Production.on_dole a signal.
+func tick() -> void:
+	var folk: Dictionary = rules.get("folk", {})
+	var needs: Dictionary = folk.get("needs", {})
+	if needs.is_empty():
+		return
+	var cat: Dictionary = catalog.call()
+	var at := now()
+	var names: Array = needs.keys()
+	names.sort()
+	var skip: Dictionary = folk.get("skip", {})
+	var towns := {}
+	for id in production.worker_ids():
+		var who := production.worker(id)
+		if bool(who["away"]) or str(who["town"]).is_empty():
+			continue
+		towns[who["town"]] = true
+		for need: String in names:
+			var rule: Dictionary = needs[need]
+			var every := int(rule.get("every", 0))
+			if every <= 0 or who["trades"].any(func(trade: String) -> bool: return need in skip.get(trade, [])):
+				continue
+			var due := production.need_due(id, need)
+			if due == 0:
+				production.set_need_due(id, need, at + every)
+				continue
+			if at < due:
+				continue
+			_meet(id, need, rule, cat)
+			var rich := folk.has("rich_above") and int(production.worker(id)["purse"]) > int(folk["rich_above"])
+			production.set_need_due(id, need, at + maxi(int(every * (float(folk.get("rich_every", 1.0)) if rich else 1.0)), 1))
+	for town: String in _dole:
+		towns[town] = true
+	var keys: Array = towns.keys()
+	keys.sort()
+	for town: String in keys:
+		var count := production.on_dole(town)
+		if count != int(_dole.get(town, 0)):
+			_dole[town] = count
+			dole_changed.emit(town, count)
+
+
+## What [param town]'s store asks a resident for one of resource
+## [param what]: its value, scaled by how short of comfort the town is.
+func raw_price(town: String, what: String) -> int:
+	var value := float(rules.get("value", {}).get(what, 1))
+	var short := _short(stockpile.count(town, what), int(rules.get("comfort", {}).get(what, 0)))
+	return maxi(roundi(value * factor(short)), 1)
+
+
+func _meet(id: String, need: String, rule: Dictionary, cat: Dictionary) -> void:
+	if rule.has("tags"):
+		_eat(id, rule, cat)
+	elif rule.has("building"):
+		_stay(id, need, rule)
+	elif rule.has("trade"):
+		_hire(id, need, rule)
+
+
+func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
+	var who := production.worker(id)
+	var town: String = who["town"]
+	var tags: Array = rule["tags"]
+	var food := goods(town).filter(func(each: Dictionary) -> bool:
+		return cat.get(each["id"], {}).get("tags", []).any(func(tag: Variant) -> bool: return tag in tags))
+	if food.size() > int(rules.get("folk", {}).get("keep_in_shop", 0)):
+		food.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return a["price"] < b["price"] or a["price"] == b["price"] and a["uid"] < b["uid"])
+		var pick: Dictionary = food[0]
+		var cost := int(pick["price"])
+		if int(who["purse"]) >= cost:
+			var thing := Items.name_of(pick["id"])
+			var maker := stockpile.maker_of(town, pick["uid"])
+			stockpile.take_from_shop(town, pick["uid"], "folk:%s" % id)
+			stockpile.book.end(pick["uid"], "eaten", "by %s at %s" % [who["name"], town])
+			production.spend(id, cost, "a %s" % thing)
+			var seller := _pay(town, maker, cost, "sale", "sold a %s to %s" % [thing, who["name"]])
+			production.note_meal(id, "bought")
+			production.note_trade(id, "bought a %s" % thing, cost, seller)
+			if seller != TREASURY:
+				production.note_trade(maker, "sold a %s" % thing, cost, who["name"])
+			stockpile.note(town, pick["id"], cost, "folk:%s" % id, "%s bought a %s from %s for %d gold" % [who["name"], thing, seller, cost])
+			return
+	var store := str(rule.get("store", ""))
+	if not store.is_empty() and stockpile.has(town, store):
+		var cost := raw_price(town, store)
+		if int(who["purse"]) >= cost:
+			production.spend(id, cost, "%s from the store" % store)
+			stockpile.take(town, store, 1, "folk:%s" % id)
+			stockpile.deposit(town, "gold", cost, "folk:%s" % id, "%s bought %s from the store for %d gold" % [who["name"], store, cost])
+			production.note_meal(id, "store")
+			production.note_trade(id, "bought %s from the store" % store, cost, TREASURY)
+			return
+		stockpile.take(town, store, 1, "dole:%s" % id)
+		stockpile.note(town, store, 0, "dole:%s" % id, "the town fed %s, who has no gold" % who["name"])
+		production.note_meal(id, "dole")
+		return
+	if str(who["fed"]) != "hungry":
+		stockpile.note(town, store, 0, "hungry:%s" % id, "%s went hungry: nothing to eat" % who["name"])
+	production.note_meal(id, "hungry")
+
+
+func _stay(id: String, need: String, rule: Dictionary) -> void:
+	var who := production.worker(id)
+	var town: String = who["town"]
+	var fee := int(rule.get("fee", 0))
+	var what := str(rule.get("what", need))
+	if fee <= 0 or int(who["purse"]) < fee or not building_stands.is_valid() \
+			or not building_stands.call(town, str(rule["building"])):
+		return
+	production.spend(id, fee, what)
+	stockpile.deposit(town, "gold", fee, "folk:%s" % id, "%s paid %d gold for %s" % [who["name"], fee, what])
+	production.note_trade(id, what, fee, TREASURY)
+
+
+func _hire(id: String, need: String, rule: Dictionary) -> void:
+	var who := production.worker(id)
+	var town: String = who["town"]
+	var fee := int(rule.get("fee", 0))
+	var what := str(rule.get("what", need))
+	var trade := str(rule["trade"])
+	if fee <= 0 or int(who["purse"]) < fee:
+		return
+	# The one of that trade with the least gold, so it spreads.
+	var best := ""
+	var least := 0
+	for other in production.worker_ids(town):
+		var them := production.worker(other)
+		if other == id or bool(them["away"]) or trade not in them["trades"]:
+			continue
+		if best.is_empty() or int(them["purse"]) < least:
+			best = other
+			least = int(them["purse"])
+	if best.is_empty():
+		return
+	production.spend(id, fee, what)
+	var seller := _pay(town, best, fee, "trade", "%s for %s" % [what, who["name"]])
+	production.note_trade(id, what, fee, seller)
+	production.note_trade(best, "%s for %s" % [what, who["name"]], fee, who["name"])
+	stockpile.note(town, need, fee, "folk:%s" % id, "%s paid %s %d gold for %s" % [who["name"], seller, fee, what])
+
+
+## [param amount] paid to worker [param payee] in [param town] for a
+## [param kind] of transaction, the tax to the treasury (all of it, for no
+## such worker): who was paid, their name or TREASURY.
+func _pay(town: String, payee: String, amount: int, kind: String, why: String) -> String:
+	var worker := production.worker(payee) if not payee.is_empty() else {}
+	if worker.is_empty():
+		stockpile.deposit(town, "gold", amount, "folk", why)
+		return TREASURY
+	var split := Economy.taxed(amount, kind, rules)
+	if split[0] > 0:
+		stockpile.deposit(town, "gold", split[0], "tax:folk", why)
+	production.pay(payee, split[1], why)
+	return str(worker["name"])
 
 
 # --- Saving --------------------------------------------------------------------------

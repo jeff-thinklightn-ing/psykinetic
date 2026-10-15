@@ -544,6 +544,9 @@ func world_tick(slice := -1) -> void:
 		if towns != null:
 			towns.tick()
 		production.tick()
+		# Then its residents buy what they need (decision 353).
+		if economy != null:
+			economy.tick()
 		if raid_groups != null:
 			raid_groups.world_tick()
 	var was := zone
