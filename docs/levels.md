@@ -279,6 +279,20 @@ and the ways between them, point links and neighbours alike. Its
 `godot --headless --path . --scene res://tools/check_world.tscn` prints the
 list (exit code 1 if there is anything on it).
 
+### What lies past a border
+
+`WorldMap.ways_out(area, gap)` (decision 325) gives each way out of an area
+with where its target lies against it, for drawing what is beyond a border:
+`kind` (link or edge), `to_map`, a link's `from_cell` (our marker) and
+`to_cell` (where it arrives: its spawn point, else the target's first start),
+an edge's `side`, `out` (the direction away from our land), `to_ours` (a
+`Transform2D` taking the target's cells into ours) and `one_way`. A
+neighbour abuts exactly as `arrival()` puts a crossing (the same row or
+column); a link's target faces us by the edge its arrival is nearest, that
+edge `gap` cells past our land, the arrival across from our marker. It reads
+cells, not the levels' `"north"`, as `arrival()` does, so what is shown and
+where a crossing lands cannot disagree.
+
 ### The start zone
 
 Where a new player begins is data, not a server flag (decision 300):

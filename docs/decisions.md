@@ -5773,3 +5773,23 @@ switching beds outright at thresholds (an audible cut at dusk), the
 server choosing beds (it knows nothing a client doesn't, and a client
 moves between ticks), and one long recording per zone (no crossfade with
 the clock or weather).
+
+## 325. Where a way out's target lies against an area: WorldMap.ways_out
+
+Terrain draws the wilds' edges as borders with a glimpse of the linked level
+beyond (the castle's wall past the trees), and needs to know where each
+target's cells lie in ours. If terrain worked that out itself, the glimpse
+and where a crossing actually lands (WorldMap.arrival, maps') could
+disagree, so the world map gives it: ways_out(area, gap), one entry a way
+whose target is a level, with its kind, target, our marker or side, where a
+link arrives, the direction away from our land, a Transform2D taking the
+target's cells into ours, and whether anything leads back (a glimpse of a
+drop or a trapdoor can be skipped). A neighbour abuts as arrival() has it:
+the same row or column, the target's opposite edge against ours. A link's
+target is turned to face us by the edge its arrival is nearest (the castle's
+from_wilds is on its south row, so it lies north of the wilds), that edge
+gap cells past our land and the arrival across from our marker. Only
+translations today: arrival() ignores the levels' "north", and so does this,
+so a quarter turn waits until a crossing turns too. world_map_test checks
+an edge against arrival(), a link's placement, a one-way link, and the
+wilds' castle lying north with its arrival across from the link.

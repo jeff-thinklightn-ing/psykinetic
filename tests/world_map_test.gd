@@ -16,6 +16,7 @@ func _ready() -> void:
 	_test_graph()
 	_test_problems()
 	_test_start()
+	_test_ways_out()
 	_test_crossing()
 	_test_levels()
 	_test_join()
@@ -136,6 +137,34 @@ func _test_start() -> void:
 	_check(problems.has("world_map.json: the start zone wm_nowhere is not a level"), "a start zone that is no level is flagged")
 	WorldMap.settings_path = "res://levels/world_map.json"
 	DirAccess.remove_absolute(settings)
+
+
+func _test_ways_out() -> void:
+	print("ways out, and where their targets lie (decision 325)")
+	var world := _world()
+	var out := world.ways_out("wm_hub", 3)
+	var edge: Dictionary = out.filter(func(way: Dictionary) -> bool: return way["kind"] == "edge")[0]
+	var to_ours: Transform2D = edge["to_ours"]
+	_check(edge["to_map"] == "wm_east" and edge["side"] == "east" and edge["out"] == Vector2i(1, 0) and not edge["one_way"],
+		"a neighbour: its side, out, and a way back (%s)" % [edge])
+	# Where a step off the east edge arrives, put back in ours, is the cell stepped into.
+	var stepped := Vector2i(6, 0)
+	var arrives := WorldMap.arrival("east", stepped, world.areas["wm_east"]["size"])
+	_check(Vector2i(to_ours * Vector2(arrives)) == stepped, "its cells lie where arrival() puts a crossing (%s -> %s)" % [arrives, to_ours * Vector2(arrives)])
+	var link: Dictionary = out.filter(func(way: Dictionary) -> bool: return way["to_map"] == "wm_a")[0]
+	var placed := Vector2i((link["to_ours"] as Transform2D) * Vector2(link["to_cell"]))
+	_check(link["from_cell"] == Vector2i(0, 0) and link["to_cell"] == Vector2i(2, 0) and link["out"] == Vector2i(0, -1),
+		"a link: our marker, where it arrives, out by the edge that arrival is nearest (%s)" % [link])
+	_check(placed == Vector2i(0, -4), "its arrival lies across from our marker, 3 cells past our land (%s)" % placed)
+	var meant: Dictionary = out.filter(func(way: Dictionary) -> bool: return way["to_map"] == "wm_b")[0]
+	_check(meant["one_way"], "a one-way link says so")
+	var real := WorldMap.build(["wilds", "castle"])
+	var to_castle: Array = real.ways_out("wilds", 3).filter(func(way: Dictionary) -> bool: return way["to_map"] == "castle")
+	_check(to_castle.size() == 1 and to_castle[0]["out"] == Vector2i(0, -1), "the wilds' way to the castle points north")
+	if to_castle.size() == 1:
+		var spawn := Vector2i((to_castle[0]["to_ours"] as Transform2D) * Vector2(to_castle[0]["to_cell"]))
+		_check(spawn.x == (to_castle[0]["from_cell"] as Vector2i).x and spawn.y < 0,
+			"the castle lies beyond the wilds' north edge, its arrival across from the link (%s)" % spawn)
 
 
 func _test_crossing() -> void:

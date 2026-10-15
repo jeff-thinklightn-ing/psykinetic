@@ -125,6 +125,68 @@ func crossing(area_name: String, cell: Vector2i, direction: Vector2i) -> Diction
 ## The edge of a map [param size] cells across that [param cell] is beyond
 ## ("north", "east", "south", "west"), or "" for a cell on the map. A cell
 ## past a corner is east or west of it.
+## Each way out of [param area_name] and where its target lies against it,
+## for drawing what is beyond a border (terrain's glimpse, decision 325): one entry a
+## link or neighbour whose target is a level here, {kind ("link" | "edge"),
+## to_map, from_cell (a link's marker; an edge's: none), side (an edge's
+## side; a link's: ""), to_cell (where a link arrives: its spawn point, else
+## the target's first start; an edge's: none), out (away from our land),
+## to_ours (a Transform2D taking the target's cells into ours), one_way
+## (nothing leads back)}. A neighbour abuts as arrival() has it: the same row
+## or column, the target's opposite edge next to ours. A link's target is
+## turned to face us by the edge its arrival is nearest: that edge put
+## [param gap] cells beyond our land along out, the arrival across from our
+## marker. Cells, not levels' "north": arrival ignores it too, so the two
+## always agree.
+func ways_out(area_name: String, gap := 3) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not areas.has(area_name):
+		return out
+	var size: Vector2i = areas[area_name]["size"]
+	for way in ways_from(area_name):
+		var to: String = way["to"]
+		if not areas.has(to):
+			continue
+		var to_size: Vector2i = areas[to]["size"]
+		var back := ways_from(to).any(func(other: Dictionary) -> bool: return other["to"] == area_name)
+		var entry := {"kind": way["kind"], "to_map": to, "from_cell": null, "side": way["side"], "to_cell": null,
+			"one_way": bool(way["one_way"]) or not back}
+		var shift := Vector2i.ZERO
+		if way["kind"] == "edge":
+			var side: String = way["side"]
+			entry["out"] = Level.SIDES[side]
+			shift = {"east": Vector2i(size.x, 0), "west": Vector2i(-to_size.x, 0),
+				"south": Vector2i(0, size.y), "north": Vector2i(0, -to_size.y)}[side]
+		else:
+			var marker: Vector2i = way["at"]
+			var spawns: Dictionary = areas[to]["spawn_points"]
+			var starts: Array = areas[to]["starts"]
+			var arrive: Vector2i = spawns.get(way["to_spawn"], starts[0] if not starts.is_empty() else Vector2i.ZERO)
+			# The target's edge nearest where one arrives faces our land.
+			var near := {"north": arrive.y, "south": to_size.y - 1 - arrive.y, "west": arrive.x, "east": to_size.x - 1 - arrive.x}
+			var facing := "south"
+			for side: String in near:
+				if near[side] < near[facing]:
+					facing = side
+			var away: Vector2i = -Level.SIDES[facing]
+			entry["out"] = away
+			entry["from_cell"] = marker
+			entry["to_cell"] = arrive
+			# That edge's row or column lands gap cells past ours, the arrival across from the marker.
+			match facing:
+				"south":
+					shift = Vector2i(marker.x - arrive.x, -1 - gap - (to_size.y - 1))
+				"north":
+					shift = Vector2i(marker.x - arrive.x, size.y + gap)
+				"east":
+					shift = Vector2i(-1 - gap - (to_size.x - 1), marker.y - arrive.y)
+				"west":
+					shift = Vector2i(size.x + gap, marker.y - arrive.y)
+		entry["to_ours"] = Transform2D(0.0, Vector2(shift))
+		out.append(entry)
+	return out
+
+
 static func side_off(size: Vector2i, cell: Vector2i) -> String:
 	if cell.x < 0:
 		return "west"
