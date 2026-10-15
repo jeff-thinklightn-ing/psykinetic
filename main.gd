@@ -2319,9 +2319,8 @@ func _on_entity_taken(entity: GridEntity, by: String) -> void:
 ## town's records hold it captive (Towns.resident_taken, economy's) and its
 ## body goes, as one carried off, not one who died.
 func _resident_taken(body: Resident, by: String) -> void:
-	# Economy's hook; until it is on main the body still goes.
-	if World.towns != null and World.towns.has_method("resident_taken"):
-		World.towns.call("resident_taken", body.town, body.worker_id, by)
+	if World.towns != null:
+		World.towns.resident_taken(body.town, body.worker_id, by)
 	party_log.add("Raiders beat %s down and carried them off." % _display_name(body))
 	_travelling = true  # Taken, not dead.
 	World.despawn(body)

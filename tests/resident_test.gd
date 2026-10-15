@@ -243,7 +243,11 @@ func _test_bodies_in_town() -> void:
 	World.despawn(raider)
 	World.entity_taken.emit(bram, "raid-9")
 	_check(not bram.spawned and _body("rs-bram") == null, "beaten down by raiders: his body is carried off")
+	_check("rs-bram" not in World.towns.residents(STORE) and World.towns.captives(STORE).any(func(each: Dictionary) -> bool:
+		return each["id"] == "rs-bram" and each["by"] != ""), "and the town's records hold him captive (%s)" % [World.towns.captives(STORE)])
 	_sync()
+	_check(_body("rs-bram") == null, "held: no body comes back for him")
+	World.towns.note_rescue(STORE, "rs-bram", "Bram", "smith")
 	World.production.set_away("rs-bram", true)
 	_sync()
 	_check(_body("rs-bram") == null, "away: no body")
