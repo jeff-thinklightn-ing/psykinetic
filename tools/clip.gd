@@ -55,9 +55,9 @@ extends Node
 ##   items_axe: the giant axe (decision 343): slow, both hands; one swing
 ##     at three imps in an arc strikes all three and knocks them down;
 ##     they lie a moment, then get up.
-##   items_spear: the spear (decision 344): a boar, made to charge (staged:
-##     item_provoke), meets the hunter standing still with a spear
-##     (braced): the charge is stopped and the boar thrown back.
+##   items_spear: the spear (decision 344): a boar shot from 6 cells turns
+##     and charges (enemy-ai's 345); the hunter, standing still with a
+##     spear (braced), stops the charge and throws it back.
 ##   items_pickup: monsters take up weapons (decision 347): a dagger is
 ##     dropped by an imp; it takes it up (its AI's call, made here by
 ##     item_pick: World.try_pick_up_weapon), heavier by it, and fights
@@ -598,11 +598,14 @@ func _items_spear() -> void:
 		"entities": [{"at": [7, 4], "facing": [1, 0]}], "legend": {"monster_boar": "#705040"}}
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	_script = [
-		["item_give", ["spear", Player.RIGHT_HAND], "A spear. A boar runs from you, into a corner."],
+		["item_give", ["bow", Player.RIGHT_HAND], "A boar runs from you, into a corner."],
 		["walk", Vector2i(8, 4), ""],
+		["item_raise", null, "Draw, standing still..."],
+		["wait", 22, ""],
+		["item_lower", "boar", "...and shoot: struck, it turns and charges."],
+		["item_clear", Player.RIGHT_HAND, ""],
+		["item_give", ["spear", Player.RIGHT_HAND], "The spear, still standing: braced."],
 		["item_face", "boar", ""],
-		["say", 15, "Standing still, the spear is braced."],
-		["item_provoke", "boar", "(Staged: the boar made to charge.)"],
 		["say", 100, "The charge breaks on the spear, and the boar is thrown back."],
 	]
 
@@ -995,14 +998,6 @@ func _on_tick(tick: int) -> void:
 			var struck: GridEntity = World.get_entity_at(step[1])
 			if struck != null and not World.try_attack(_player, struck):
 				return
-		"item_provoke":
-			# Staging: the first animal of kind step[1] charges the player, as
-			# if struck while standing (Animal's own trigger).
-			for entity in World.monsters():
-				if entity is Animal and str(entity.spawn_spec.get("kind", "")) == step[1]:
-					(entity as Animal)._foe = _player
-					(entity as Animal)._charge_until = tick + Animal.CHARGE_TICKS
-					entity.alert = Monster.Alert.FIGHTING
 		"item_pick":
 			# The first monster takes up a weapon beside it, when there is one.
 			if not World.try_pick_up_weapon(_monster):

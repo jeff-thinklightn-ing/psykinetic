@@ -6582,9 +6582,9 @@ harder it breaks. The blow goes through the same resolution as any (a
 guard, decision 340, would meet it). World.braced_against feeds the party
 log. No new replicated state or RPC: the protocol is unchanged.
 
-Seen in the clip: a boar running from a hunter does not turn to charge
-when struck while it flees (Animal's own rule); the clip stages the
-charge (tools/clip.gd item_provoke) to show the brace.
+Seen in the clip: a boar shot from 6 cells turns and charges (since
+enemy-ai's decision 345 a struck boar charges even as it flees), and the
+braced spear stops it each time.
 
 ## 347. Monsters take up weapons lying beside them; what they carry weighs
 
