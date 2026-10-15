@@ -942,6 +942,7 @@ func reset() -> void:
 				items.place(int(uid), "")
 				_unclaimed.append(int(uid))
 	zone.records = {}
+	zone.recalls_due.clear()
 	for entity in _entities:
 		if is_instance_valid(entity):
 			entity._world_remove()
@@ -1010,9 +1011,10 @@ func take_records_near(at: Vector2i, reach: int) -> Array[Dictionary]:
 	return taken
 
 
-## Every record of the zone World is in, in no particular order (saving).
+## Every record of the zone World is in, in no particular order (saving),
+## those waiting to be made again (Zone.recalls_due) too.
 func record_list() -> Array[Dictionary]:
-	var list: Array[Dictionary] = []
+	var list: Array[Dictionary] = zone.recalls_due.duplicate()
 	for chunk: Vector2i in zone.records:
 		for record: Dictionary in zone.records[chunk]:
 			list.append(record)
@@ -1023,6 +1025,7 @@ func record_list() -> Array[Dictionary]:
 ## things they hold are theirs again, so a rebuild does not end them as lost.
 func set_records(list: Array) -> void:
 	zone.records = {}
+	zone.recalls_due.clear()
 	for record: Dictionary in list:
 		add_record(record)
 		var holder := "%s/%s" % [zone.name, record["entry"].get("name", "")]

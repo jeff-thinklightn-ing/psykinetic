@@ -399,8 +399,10 @@ the world tick would have left it: `Monster._world_tick` moves only one
 going back or marching, and those are not retired. It is made again as it
 was (`Main._recall`: the snapshot path, its tile or the nearest free one,
 its place on its route) once someone is within `Main.recall_tiles` (70),
-looked at every `RETIRE_EVERY_TICKS` (10) and when a player comes into the
-zone (before spawn safety looks for hostiles). Both distances are past
+looked at every `RETIRE_EVERY_TICKS` (10); round a player coming into the
+zone, those within 12 at once (before spawn safety looks for hostiles) and
+the rest nearest first over the next ticks, 4 ms a tick (`Zone.recalls_due`),
+while their client loads the map. Both distances are past
 what a client is sent (Interest leaves at about 44), so nobody sees one go
 or come. Its slot is neither alive nor dead meanwhile (no respawn, no
 death in the party log), its things stay held under its name, and records

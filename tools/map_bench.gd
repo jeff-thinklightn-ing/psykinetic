@@ -26,6 +26,8 @@ extends Node
 ## (wherever the host is), and --shot=PATH saves the last frame as a PNG.
 ## --weather=KIND starts every region in that weather (Weather; rain's
 ## drops and fog's layers drawn, outdoors).
+## --off=shadows,border,glimpse,minimap leaves those pieces of the view out
+## of the frames, to see what each costs (with --fade=0, no --weather).
 ## --bench-state=PATH starts the host from that saved world (a copy: the
 ## host writes it back), e.g. tools/town_state's wilds town with its
 ## residents; with the game's --test-herds=N after "--", N sets of herds.
@@ -57,6 +59,10 @@ var _main: Node
 
 ## --bench-state=PATH: the host starts from that world (Net.state_path).
 var bench_state := ""
+## --off=a,b: in the frames, pieces of the view left out, to see what each
+## costs: shadows (the near lights' shadows), border (terrain's band round
+## an outdoor map), glimpse (the level past a way out), minimap.
+var off: Array[String] = []
 
 
 func _ready() -> void:
@@ -82,6 +88,7 @@ func _ready() -> void:
 			"shot": shot = pair[1]
 			"weather": Net.start_weather = pair[1].to_lower() if Weather.KINDS.has(pair[1].to_lower()) else ""
 			"bench-state": bench_state = pair[1]
+			"off": off.assign(pair[1].split(","))
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
@@ -292,6 +299,21 @@ func _frames() -> void:
 	for i in 30:
 		await get_tree().process_frame
 	var view: Node = _main._client3d
+	if view != null and off.has("shadows"):
+		for light: OmniLight3D in view._shadow_lights:
+			light.shadow_enabled = false
+		view._shadow_lights.clear()
+	if view != null and off.has("border") and view._border != null:
+		view._border.visible = false
+		view._border.set_process(false)
+	if view != null and off.has("glimpse"):
+		for glimpse: Node3D in view._glimpses:
+			glimpse.visible = false
+	if off.has("minimap") and _main.minimap != null:
+		_main.minimap.visible = false
+		_main.minimap.set_process(false)
+	if not off.is_empty():
+		print("BENCH left out: %s" % ", ".join(off))
 	if view != null and not fade:
 		view._occluders.clear()
 		view._occluder_chunks.clear()
@@ -318,11 +340,15 @@ func _frames() -> void:
 	var render_gpu := 0.0
 	var started := Time.get_ticks_usec()
 	var last := started
+	# Every frame's length with when it came: the median, the 99th, and the
+	# longest, to find what a spike is.
+	var spikes: Array[Vector2] = []
 	while Time.get_ticks_usec() - started < seconds * 1000000.0:
 		await get_tree().process_frame
 		var now := Time.get_ticks_usec()
 		var delta := (now - last) / 1000000.0
 		worst = maxf(worst, (now - last) / 1000.0)
+		spikes.append(Vector2((now - last) / 1000.0, (now - started) / 1000000.0))
 		last = now
 		frames += 1
 		if view != null and spin != 0.0:
@@ -353,6 +379,16 @@ func _frames() -> void:
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
 		render_cpu / frames, render_gpu / frames])
+	var times: Array[float] = []
+	for spike in spikes:
+		times.append(spike.x)
+	times.sort()
+	spikes.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x > b.x)
+	var listed: Array[String] = []
+	for spike in spikes.slice(0, 8):
+		listed.append("%.1f ms at %.1f s" % [spike.x, spike.y])
+	print("BENCH frame time: median %.2f ms, 99th %.2f ms; longest: %s" % [
+		times[times.size() / 2], times[mini(times.size() - 1, times.size() * 99 / 100)], ", ".join(listed)])
 	if view != null:
 		for plan: Dictionary in view._glimpse_plans:
 			var low := Vector2i(1 << 20, 1 << 20)

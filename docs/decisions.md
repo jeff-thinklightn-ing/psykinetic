@@ -6985,6 +6985,19 @@ within 44 of it at once (castle density: about 180, some 50 ms).
 Server only; no protocol change. map_bench reads nodes and memory a frame
 or two after the run, so what was freed is gone.
 
+
+Amended (frame-budget pass): a join recalled every record within
+`recall_tiles` of where the player came in at once, as one tick's work:
+measured in the 1-player 256x256 dungeon (a player coming back to a saved
+tile mid-map after 400 ticks alone), 420 records and 238 ms, not the 50
+the estimate above said. Now only those within `RECALL_JOIN_NOW_TILES`
+(12, what spawn safety looks at) come back at once; the rest are queued
+nearest first (`Zone.recalls_due`, still records: saved and reset as the
+rest) and made again for `RECALL_BUDGET_USEC` (4 ms) a tick
+(`Main._recall_due`): the join 40 ms, the ticks after it 14 ms at worst,
+those within view back in about 2 s while the client loads the map, the
+last in about 5. far_tier_test: a player coming back 20 and 30 cells
+from two records finds them waiting, still records, and back two ticks on.
 ## 354. The town's bank: loans to residents, rent 1 a day
 
 Jeff (2026-10-15), shown the official-jobs model of decision 353 beside a

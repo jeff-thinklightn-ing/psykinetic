@@ -50,6 +50,10 @@ var tier_origins: Array[Vector2i] = []
 ## record is {entry: Snapshot.entry, route: [[x, y]], route_index,
 ## route_step}; Main makes and recalls them (_retire, _recall).
 var records := {}
+## Records taken to be made again round a player who joined, waiting their
+## turn, nearest first (Main._recall_due); still records till then: saved
+## and reset as the rest (World.record_list).
+var recalls_due: Array[Dictionary] = []
 
 
 func _init(zone_name := "") -> void:

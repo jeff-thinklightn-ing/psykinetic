@@ -38,6 +38,7 @@ func _run() -> void:
 	_test_records_come_back_as_they_were()
 	_test_an_old_snapshot_loads_as_before(old_world)
 	_test_a_keeper_takes_its_own()
+	_test_a_join_recalls_over_ticks()
 
 	DirAccess.remove_absolute(preload("res://tests/test_ports.gd").scratch_path("far_world.json"))
 	Net.state_path = ""
@@ -188,6 +189,30 @@ func _test_a_keeper_takes_its_own() -> void:
 	_check(_main.party_log.size() == lines and _main._dead_since.is_empty(), "and the brute is not dead either")
 	_check(keeper.asked > 0, "the keeper is asked about what it keeps near the player (%d times)" % keeper.asked)
 	World.keepers.erase(keeper)
+
+
+## A player who comes back where records are: those near enough for spawn
+## safety at once, the rest queued and made again over the next ticks, and
+## counted as records (saved) while they wait.
+func _test_a_join_recalls_over_ticks() -> void:
+	print("
+== a join near records: made again over the next ticks, not all on one ==")
+	var record := PlayerRecord.new()
+	record.player_id = "fa000000-0000-4000-8000-00000000000f"
+	record.name = "Late"
+	record.index = 9
+	record.zone = LEVEL
+	record.tile = Vector2i(100, 3)
+	_main._records[record.player_id] = record
+	var before := World.record_list().size()
+	_main._admit(2000, record.player_id, "Late")
+	_check(before == 2 and _monsters() == 0 and World.zone.recalls_due.size() == 2,
+			"the two imps, 20 and 30 cells off, wait their turn (%d waiting, %d monsters)" % [World.zone.recalls_due.size(), _monsters()])
+	_check(World.record_list().size() == 2, "and are still records, so a save meanwhile keeps them")
+	for i in 2:
+		World.step()
+	_check(_monsters() == 2 and World.zone.recalls_due.is_empty() and World.record_list().is_empty(),
+			"a tick or two on, both are back (%d)" % _monsters())
 
 
 # --- helpers ------------------------------------------------------------------

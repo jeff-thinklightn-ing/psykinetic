@@ -136,6 +136,12 @@ const RESPAWN_MIN_DISTANCE := 6
 @export var retire_tiles := 80
 @export var recall_tiles := 70
 const RECALL_NOW_TILES := 44
+## A player joining: the records within RECALL_JOIN_NOW_TILES of where they
+## come in are made again at once (spawn safety looks for hostiles there),
+## the rest within recall_tiles nearest first over the next ticks, for
+## RECALL_BUDGET_USEC a tick (_recall_due), while their client loads the
+## map: one join's hundred or two do not land on one tick.
+const RECALL_JOIN_NOW_TILES := 12
 const RETIRE_AFTER_TICKS := 300
 const RETIRE_EVERY_TICKS := 10
 const RETIRE_BUDGET_USEC := 2000
@@ -2008,6 +2014,19 @@ static func _nearest_of(at: Vector2i, near: Array[Vector2i]) -> int:
 	return nearest
 
 
+## The records waiting round a player who joined (Zone.recalls_due), made
+## again in turn for RECALL_BUDGET_USEC.
+func _recall_due() -> void:
+	var due := World.zone.recalls_due
+	if due.is_empty():
+		return
+	var started := Time.get_ticks_usec()
+	while not due.is_empty() and Time.get_ticks_usec() - started < RECALL_BUDGET_USEC:
+		var record: Dictionary = due.pop_front()
+		if _recall(record) == null:
+			World.add_record(record)  # No room for it now: kept, tried again later.
+
+
 ## Whether [param monster] can be kept as a record: far from everyone in
 ## [param near] for long enough, past retire_tiles, calm, nobody's, not a
 ## raider (Raids holds those as nodes), and with nothing for the world tick
@@ -2341,9 +2360,13 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
 		return
 	# Monsters kept as records near where they come in are back first
-	# (decision 352): they count for spawn safety, and are there when the
-	# player's view arrives.
-	_recall_near(tile)
+	# (decision 352): those near enough to count for spawn safety now, the
+	# rest over the next ticks, before the player's view arrives.
+	_recall_near(tile, RECALL_JOIN_NOW_TILES)
+	var due := World.take_records_near(tile, recall_tiles)
+	due.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return World.distance(World.record_tile(a), tile) < World.distance(World.record_tile(b), tile))
+	World.zone.recalls_due.append_array(due)
 	# Spawn safety: not next to a hostile. Applies to coming back and to
 	# respawning; a first join is at a start tile anyway and gets the same check.
 	var intended := tile
@@ -3707,6 +3730,7 @@ func _on_world_ticked(tick: int) -> void:
 		_check_respawns(tick)
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
+		_recall_due()
 		if tick % RETIRE_EVERY_TICKS == 0:
 			_retire_and_recall()
 		_resident_voices()
