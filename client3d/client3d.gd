@@ -290,6 +290,8 @@ const SHADOW_RECHECK := 0.5
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
 const FIRE := Color(1.0, 0.45, 0.1)
 const FIRE_SHADER := preload("res://client3d/fire.gdshader")
+const FLAME_SHADER := preload("res://client3d/flame.gdshader")
+const SCATTER_SHADER := preload("res://client3d/scatter.gdshader")
 ## How wide a cell's fire patch is drawn, in cells.
 const FIRE_SPREAD := 1.5
 ## The floor where there is no light at all (Fields), as a share of its
@@ -341,6 +343,16 @@ const SKY_KEYS := [
 	[22.0, {"top": SKY_TOP, "horizon": SKY_HORIZON, "ambient": DAY_AMBIENT, "ambient_energy": DAY_AMBIENT_ENERGY,
 		"light": DAY_SUN, "energy": DAY_SUN_ENERGY, "fog": SKY_HORIZON, "fog_density": 0.0008}],
 ]
+## Under the weather (decision 309): how much of the sun's light full cloud
+## takes (the ambient stays, so a storm's noon is grey, not dark); the haze
+## full fog and full rain add (Environment fog density, per unit: the
+## camera is CAMERA_DISTANCE off); full fog's layer along the ground, up
+## to FOG_HEIGHT.
+const CLOUD_SUN := 0.75
+const FOG_DENSITY := 0.012
+const RAIN_FOG_DENSITY := 0.008
+const FOG_HEIGHT := 2.5
+const FOG_HEIGHT_DENSITY := 0.22
 ## Under this height (degrees) the light is the moon's, opposite the sun.
 const MOON_BELOW := -1.0
 ## Shadows are cast from at least this high (degrees): a low sun's
@@ -838,6 +850,11 @@ var _outdoor := false
 ## none yet.
 var _sky_material: ProceduralSkyMaterial
 var _sky_step := -1
+## The sky's look at that step (sky_look), before the weather; the light
+## by day there (0..1); the weather drawn (decision 309).
+var _look := {}
+var _look_daylight := 0.0
+var _weather_view: WeatherView
 ## The ground's material, and the sky's light on its floor (its sky_floor:
 ## 0 indoors).
 var _ground_shader_material: ShaderMaterial
@@ -975,7 +992,7 @@ func _process(delta: float) -> void:
 	_fade_clock += delta
 	_update_fade()
 	_update_shadows()
-	_update_sky()
+	_update_sky(delta)
 	_grow_scatter()
 	_drop_departed()
 	_update_mourning(delta)
@@ -1008,6 +1025,8 @@ func _build_environment() -> void:
 	sun.shadow_blur = 1.5
 	add_child(sun)
 	_sun = sun
+	_weather_view = WeatherView.new()
+	add_child(_weather_view)
 
 
 ## The dark under-stone look, or outdoors the sky on the world clock
@@ -1017,6 +1036,7 @@ func _apply_sky() -> void:
 	_sky_step = -1
 	_environment.fog_enabled = false
 	_set_sky_floor(0.0)
+	_weather_view.set_outdoor(_outdoor)
 	if _outdoor:
 		_sky_material = ProceduralSkyMaterial.new()
 		_sky_material.ground_horizon_color = FOREST_FLOOR.lightened(0.2)
@@ -1029,7 +1049,7 @@ func _apply_sky() -> void:
 		_environment.fog_enabled = true
 		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 		_environment.fog_sky_affect = 0.0
-		_update_sky()
+		_update_sky(0.0)
 	else:
 		_sky_material = null
 		_sun.rotation_degrees = Vector3(-55.0, 160.0, 0.0)
@@ -1057,34 +1077,69 @@ func _set_sky_floor(level: float) -> void:
 
 
 ## Outdoors: the sky, its light and the sun or moon as the world clock
-## stands (DayNight), moved on a game minute at a time (SKY_STEPS).
-func _update_sky() -> void:
+## stands (DayNight), moved on a game minute at a time (SKY_STEPS), under
+## the weather (decision 309: eased every frame, drawn when it changes).
+func _update_sky(delta: float) -> void:
 	if not _outdoor or _sky_material == null:
 		return
 	var at := DayNight.fraction(DayNight.now())
 	var step := floori(at * SKY_STEPS) % SKY_STEPS
-	if step == _sky_step:
+	var weathered := _weather_view.ease_toward(World.fields.weather, delta)
+	_weather_view.place(_camera_target, delta, _look.get("weather_fog", SKY_HORIZON), _look_daylight, _level_direction)
+	if step == _sky_step and not weathered:
 		return
-	_sky_step = step
-	var fraction := float(step) / SKY_STEPS
-	var elevation := DayNight.elevation_at(fraction)
-	var look := sky_look(elevation)
+	if step != _sky_step:
+		_sky_step = step
+		var fraction := float(step) / SKY_STEPS
+		var elevation := DayNight.elevation_at(fraction)
+		_look = sky_look(elevation).duplicate()
+		_look_daylight = smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
+		# The moon by night, opposite the sun; either casts from at least
+		# SHADOW_LOW up.
+		var toward := DayNight.sun_at(fraction)
+		if elevation < MOON_BELOW:
+			toward = -toward
+		toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
+		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
+	var look := weathered_look(_look, _weather_view.weather)
+	_look["weather_fog"] = look["fog"]
 	_sky_material.sky_top_color = look["top"]
 	_sky_material.sky_horizon_color = look["horizon"]
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.fog_light_color = look["fog"]
 	_environment.fog_density = look["fog_density"]
+	_environment.fog_height = look["fog_height"]
+	_environment.fog_height_density = look["fog_height_density"]
 	_sun.light_color = look["light"]
 	_sun.light_energy = look["energy"]
-	_set_sky_floor(floor_brightness(DayNight.daylight_at(fraction)) if bool(_terrain.get("daylight", false)) else 0.0)
-	# The moon by night, opposite the sun; either casts from at least
-	# SHADOW_LOW up.
-	var toward := DayNight.sun_at(fraction)
-	if elevation < MOON_BELOW:
-		toward = -toward
-	toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
-	_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
+	# The floor as the sim lights it: cloud takes Weather.CLOUD_DIM of the
+	# day's light over the night's (Fields.ambient_at).
+	var light := DayNight.NIGHT + (DayNight.daylight_at(float(_sky_step) / SKY_STEPS) - DayNight.NIGHT) 			* (1.0 - Weather.CLOUD_DIM * float(_weather_view.weather["cloud"]))
+	_set_sky_floor(floor_brightness(light) if bool(_terrain.get("daylight", false)) else 0.0)
+
+
+## [param look] (sky_look's) under [param weather] (Weather.at's amounts):
+## cloud greys the sky and takes the sun's light (its shadows fade with
+## it), fog thickens the haze and lies along the ground, rain darkens.
+static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
+	var cloud := float(weather.get("cloud", 0.0))
+	var fog := float(weather.get("fog", 0.0))
+	var rain := float(weather.get("rain", 0.0))
+	var out := look.duplicate()
+	var grey := func(colour: Color, amount: float) -> Color:
+		var value := colour.get_luminance() * (1.0 - 0.25 * rain)
+		return colour.lerp(Color(value, value, value * 1.04), amount)
+	out["top"] = grey.call(look["top"], 0.75 * cloud)
+	out["horizon"] = grey.call(look["horizon"], 0.6 * cloud)
+	out["ambient"] = grey.call(look["ambient"], 0.5 * cloud)
+	out["light"] = grey.call(look["light"], 0.5 * cloud)
+	out["energy"] = float(look["energy"]) * (1.0 - CLOUD_SUN * cloud)
+	out["fog"] = grey.call(look["fog"], maxf(0.6 * cloud, 0.8 * fog))
+	out["fog_density"] = float(look["fog_density"]) + FOG_DENSITY * fog + RAIN_FOG_DENSITY * rain
+	out["fog_height"] = FOG_HEIGHT
+	out["fog_height_density"] = FOG_HEIGHT_DENSITY * fog
+	return out
 
 
 ## SKY_KEYS blended for the sun [param elevation] degrees high.
@@ -2175,6 +2230,12 @@ func _add_buildings() -> void:
 		_show_state(_buildings[index])
 		if slot in Level.ON_WATER:
 			continue  # Nobody stands in a well: it has no inside.
+		# The rain stops on its roof even while the roof is cut away
+		# (decision 309; WeatherView's heightfield sees only what is drawn).
+		var keep_dry := GPUParticlesCollisionBox3D.new()
+		keep_dry.size = Vector3(rect.size.x, WALL_HEIGHT, rect.size.y)
+		keep_dry.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + WALL_HEIGHT * 0.5, middle.y)
+		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
 
@@ -2454,7 +2515,7 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 	var drawn := MultiMeshInstance3D.new()
 	drawn.name = "Scatter_%d_%d_%s" % [chunk.x, chunk.y, kind]
 	drawn.multimesh = multimesh
-	drawn.material_override = _scatter_material()
+	drawn.material_override = _scatter_material(kind)
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_room.add_child(drawn)
 
@@ -2537,12 +2598,20 @@ func _scatter_tint(kind: String, cell: Vector2i, salt: int, forest: bool) -> Col
 	return Color(colour, 1.0)
 
 
-## The scatter's one material: vertex colours times each instance's, rough,
-## both sides of a blade drawn.
+## The scatter's materials: vertex colours times each instance's, rough,
+## both sides of a blade drawn; the soft kinds (SWAYING) bend in the wind
+## (scatter.gdshader, decision 309), stones and roots don't.
+const SWAYING: Array[String] = ["tuft", "flower", "reeds"]
 static var _scatter_look: StandardMaterial3D
+static var _scatter_sway: ShaderMaterial
 
 
-static func _scatter_material() -> StandardMaterial3D:
+static func _scatter_material(kind := "") -> Material:
+	if kind in SWAYING:
+		if _scatter_sway == null:
+			_scatter_sway = ShaderMaterial.new()
+			_scatter_sway.shader = SCATTER_SHADER
+		return _scatter_sway
 	if _scatter_look == null:
 		_scatter_look = StandardMaterial3D.new()
 		_scatter_look.vertex_color_use_as_albedo = true
@@ -3475,16 +3544,7 @@ func _add_torch(cell: Vector2i) -> void:
 	post.position = at
 	_room.add_child(post)
 	var flame := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.09
-	mesh.height = 0.2
-	var material := StandardMaterial3D.new()
-	material.albedo_color = TORCH
-	material.emission_enabled = true
-	material.emission = TORCH
-	material.emission_energy_multiplier = 3.0
-	mesh.material = material
-	flame.mesh = mesh
+	flame.mesh = _torch_flame()
 	flame.position = at + Vector3(0.0, 1.2, 0.0)
 	_room.add_child(flame)
 	var light := OmniLight3D.new()
@@ -4325,6 +4385,23 @@ func _add_post(vertex: Vector2i) -> void:
 	post.position = Vector3(vertex.x - 0.5, base * LEVEL_RISE, vertex.y - 0.5)
 	_room.add_child(post)
 	_posts[vertex] = post
+
+
+## A torch's flame, one mesh for all: a glowing drop that leans with the
+## wind (flame.gdshader, decision 309).
+static var _flame_mesh: SphereMesh
+
+
+static func _torch_flame() -> SphereMesh:
+	if _flame_mesh == null:
+		_flame_mesh = SphereMesh.new()
+		_flame_mesh.radius = 0.09
+		_flame_mesh.height = 0.2
+		var material := ShaderMaterial.new()
+		material.shader = FLAME_SHADER
+		material.set_shader_parameter("flame", TORCH)
+		_flame_mesh.material = material
+	return _flame_mesh
 
 
 ## Fire on the ground: a ragged glowing patch (fire.gdshader) wider than

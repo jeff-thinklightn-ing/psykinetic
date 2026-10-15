@@ -24,6 +24,8 @@ extends Node
 ## placed and what it hides worked out again) is timed. --fade=0 leaves
 ## nothing to fade, to compare. --look=X,Y pans the view to that cell
 ## (wherever the host is), and --shot=PATH saves the last frame as a PNG.
+## --weather=KIND starts every region in that weather (Weather; rain's
+## drops and fog's layers drawn, outdoors).
 ##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--repeat=1] [--seconds=8]
 
 const NAME := "bench"
@@ -71,6 +73,7 @@ func _ready() -> void:
 			"fade": fade = pair[1] != "0"
 			"look": look = Vector2i(pair[1].get_slice(",", 0).to_int(), pair[1].get_slice(",", 1).to_int())
 			"shot": shot = pair[1]
+			"weather": Net.start_weather = pair[1].to_lower() if Weather.KINDS.has(pair[1].to_lower()) else ""
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,

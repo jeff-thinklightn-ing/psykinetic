@@ -4,7 +4,9 @@ extends Node
 ## region's climate; a change is blended; the console's override comes in
 ## and goes out over a change; a level's region is a lore region; outdoors
 ## the weather dims the sky's light and cuts sight and hearing, not under a
-## roof and not indoors; climates.json names only lore regions.
+## roof and not indoors; climates.json names only lore regions. How it
+## looks (decision 309): cloud greys the sky and takes the sun, fog
+## thickens the haze, and the drawn weather eases toward the sim's.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -20,6 +22,7 @@ func _ready() -> void:
 	_test_regions()
 	_test_in_the_field()
 	_test_climates_file()
+	_test_view()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -142,6 +145,31 @@ func _test_climates_file() -> void:
 		fog_town += 1 if Weather.kind_of("town_lands", spell) == "fog" else 0
 		fog_rot += 1 if Weather.kind_of("blood_rot_lands", spell) == "fog" else 0
 	_check(fog_rot > fog_town * 2, "the Blood Rot's land is foggier than the town's (%d to %d of 400)" % [fog_rot, fog_town])
+
+
+func _test_view() -> void:
+	print("
+== how it looks ==")
+	var noon := Client3D.sky_look(60.0)
+	var clear := Client3D.weathered_look(noon, Weather.KINDS["clear"])
+	_check(clear["top"] == noon["top"] and is_equal_approx(clear["energy"], noon["energy"]) and is_equal_approx(clear["fog_density"], noon["fog_density"]),
+			"clear weather leaves the sky as the hour has it")
+	var storm := Client3D.weathered_look(noon, Weather.KINDS["storm"])
+	_check(storm["energy"] < noon["energy"] * 0.5 and storm["ambient_energy"] == noon["ambient_energy"],
+			"a storm takes the sun's light, not the ambient (%.2f of %.2f)" % [storm["energy"], noon["energy"]])
+	_check(storm["top"].s < noon["top"].s * 0.6, "and greys the sky")
+	var fog := Client3D.weathered_look(noon, Weather.KINDS["fog"])
+	_check(fog["fog_density"] > noon["fog_density"] * 5.0 and fog["fog_height_density"] > 0.0, "fog thickens the haze and lies on the ground")
+	var view := WeatherView.new()
+	add_child(view)
+	view.set_outdoor(true)
+	for i in 10:
+		view.ease_toward(Weather.KINDS["storm"], 0.1)
+	_check(view.weather["rain"] > 0.5 and view.weather["rain"] < 1.0, "the drawn rain eases toward the sim's (%.2f after 1 s)" % view.weather["rain"])
+	view.set_outdoor(false)
+	_check(not view.ease_toward(Weather.KINDS["storm"], 1.0) and view.weather["rain"] == 0.0 and not view.visible,
+			"indoors none is drawn")
+	view.free()
 
 
 func _check(ok: bool, label: String) -> void:

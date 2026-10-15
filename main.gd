@@ -1388,6 +1388,8 @@ func _boot() -> void:
 		DayNight.set_day_minutes(Net.day_minutes)
 	if Net.start_hour >= 0.0:
 		DayNight.set_hour(Net.start_hour)
+	if Net.start_weather != "":
+		Weather.set_override("all", Net.start_weather, 600.0, true)
 	# Who holds which place: as the levels start them, then as the snapshot
 	# left them, on the world's clock.
 	var world_map := WorldMap.build()

@@ -21,6 +21,8 @@ extends Node
 ##   --day-minutes=<m>            server/host: a day on the world clock takes this many real minutes
 ##                                (default 90, or as last saved); see DayNight
 ##   --hour=<h>                   server/host: start at this hour of the day, 0..24 (clips, tests)
+##   --weather=<kind>             server/host: start in this weather everywhere, already in (clips;
+##                                as the console's `weather <kind>`, for 10 hours); see Weather
 ##   --edit=<name>                the level editor on levels/<name>/layout.png (made if there is none;
 ##   --edit-size=<w>x<h>          a new one this many cells, default 32x24); no game, no network
 ##   --world-map                  the world map editor: every level and its links as a node map
@@ -202,6 +204,8 @@ var map_name := ""
 ## set at boot over the snapshot's (DayNight); 0 and -1 keep it.
 var day_minutes := 0.0
 var start_hour := -1.0
+## --weather=<kind>: the weather every region starts in ("" for the clock's).
+var start_weather := ""
 ## --edit=<name>: run the level editor on that map instead of the game.
 var edit_map := ""
 ## --world-map: the world map editor (editor/world_map_view) instead of the game.
@@ -1200,7 +1204,7 @@ func _parse_args() -> void:
 			"--builder-stub":
 				builder_stub = true
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--edit", "--edit-size", "--transcripts", \
+					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
@@ -1276,6 +1280,11 @@ func _set_option(key: String, value: String) -> void:
 		"--hour":
 			if value.is_valid_float():
 				start_hour = fposmod(value.to_float(), 24.0)
+		"--weather":
+			if Weather.KINDS.has(value.to_lower()):
+				start_weather = value.to_lower()
+			else:
+				print("[net] --weather=%s: not one of %s" % [value, "|".join(Weather.KINDS.keys())])
 		"--builders":
 			builders = PackedStringArray(Array(value.split(",", false)).map(func(id: String) -> String: return id.strip_edges()))
 		"--builder-model":

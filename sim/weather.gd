@@ -163,14 +163,15 @@ static func hearing_factor(weather: Dictionary) -> float:
 
 
 ## Server: [param region] (or every region, "all") has [param kind] for
-## [param minutes] real minutes from now ("auto": the climate's again).
-static func set_override(region: String, kind: String, minutes: float) -> void:
+## [param minutes] real minutes from now ("auto": the climate's again),
+## coming in over a change, or [param already] in (--weather).
+static func set_override(region: String, kind: String, minutes: float, already := false) -> void:
 	var regions: Array = climates().keys() if region == "all" else [region]
 	for each: String in regions:
 		if kind == "auto":
 			overrides.erase(each)
 		else:
-			overrides[each] = {"kind": kind, "from": World.steps,
+			overrides[each] = {"kind": kind, "from": World.steps - (spell_steps(each) if already else 0),
 				"until": World.steps + roundi(minutes * 60.0 * World.TICK_RATE)}
 
 

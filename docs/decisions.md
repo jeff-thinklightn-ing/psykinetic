@@ -5882,3 +5882,43 @@ with decision 327.
 Rejected: more real trees out to the view's reach (tens of thousands of
 nodes on a 256-cell map), and fog, which would have hidden the land's own
 far side too.
+
+## 309. What weather looks like: drawn round the view, eased to the sim's
+
+The 3D view draws the zone's weather (World.fields.weather, decision 308)
+outdoors only, with one WeatherView node (client3d/weather_view.gd) that
+moves with the camera's target. It eases the drawn amounts toward the
+sim's (the sim's already change over a climate's change; this only
+smooths its ticks). Nothing here is in the sim or on the wire.
+
+- Sky and light (Client3D.weathered_look, over the hour's sky_look): cloud
+  greys the sky, ambient and sun, and takes up to CLOUD_SUN (three
+  quarters) of the sun's or moon's light. The ambient is kept, so a storm's
+  noon is grey, not dark, and its shadows fade with the sun. The floor's
+  sky_floor follows the sim's light, the day's less Weather.CLOUD_DIM of
+  cloud. The sky's look is still set once a game minute, plus whenever the
+  eased weather changes.
+- Fog: the Environment's exponential fog thickens (FOG_DENSITY at full
+  fog, a little for rain), plus height fog up to FOG_HEIGHT. Over it, three
+  unshaded noise layers near the ground drift with the wind, so thin fog
+  shows as wisps and a bank rolls in and fills them. Sized against the
+  sim's sight: full fog halves sight, so the view's own few cells stay
+  readable.
+- Rain: one GPUParticles3D of streaks in a box over the view, its
+  amount_ratio the rain, slanted downwind. The drops hide on a
+  GPUParticlesCollisionHeightField3D that follows the camera and is redrawn
+  only when the view moves, so rain stops on roofs and never falls inside.
+  The drops are on their own visual layer, which the heightfield leaves out.
+- Cloud shadow: one Decal of seamless noise, tiled 2×2, drifting with the
+  wind and jumping a period at a time so the jump never shows. Strongest
+  in broken cloud, none in overcast, storm or fog, by day only.
+- Wind: one global shader uniform, `wind` (project.godot [shader_globals]:
+  xy the way it blows in the view's xz, z its strength), set each frame.
+  Ground fire stretches downwind (fire.gdshader), torch flames lean
+  (flame.gdshader, one mesh for all), and tufts, flowers and reeds bend in
+  rolling gusts (scatter.gdshader, their own material; stones and roots
+  keep the plain one; no shadows, so no shadow-map redraw). Trees and
+  saplings wait: their near-fade swaps in see-through copies of their
+  materials, which would need the same vertex code (agreed with terrain).
+- `--weather=<kind>` (and map_bench's) starts every region already in a
+  weather, for clips, shots and benches.
