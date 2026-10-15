@@ -5139,3 +5139,26 @@ economy's prices.
 noise of kind "thud" (Senses.NOISE_THUD_LIGHT, or _HEAVY from
 THUD_HEAVY_KG 5 kg), so monsters hear a dropped sack. Things laid down by
 the world (restores, spills) make none.
+
+## 279. net_test's phases run at once
+
+After decision 278, net_test was a landing's long pole: its phases ran one
+after another, some 100 s of a 111 s landing. Its phases are independent
+but for 2, which loads 1's snapshot, so each group now runs at once on
+ports of its own (base 17760 for the checkout; 1 and 2 on it, 3 + 1, 4 + 2,
+the restart phase + 3 with its console on + 4, and in net_test.ps1 the zones
+phase + 5 and the chest phase + 6), and the checks read every log once all
+are done, as before. net_test.sh runs each group in a subshell of its own
+(its instances and helpers' state its own); net_test.ps1 runs itself once a
+group (-Phase <group> -Logs <folder>), since a PowerShell process cannot
+run its functions side by side. What a check needs from a group (the
+restart's exit code, the console's reply) goes through a file. The
+condition-based waits of the earlier fix carry over unchanged, so a loaded
+machine still only makes it slower. net_test.sh went from about 100 s to
+70, net_test.ps1 from about 100 to 48.
+
+Found on the way: net_test.ps1's zones phase had failed since decision 293
+made companions' names a roll from their player's id (Jo and Kim had
+random ids, and the check named Pip and Nix); it reads their names from the
+server's log now. land.sh runs net_test.sh, which has no zones phase, so it
+went unseen.
