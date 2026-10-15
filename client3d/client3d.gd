@@ -1824,14 +1824,20 @@ const BUILDER_BEYOND := Color(1.0, 0.7, 0.3, 0.9)
 const BUILDER_GHOST_ALPHA := 0.6
 ## A ghost's void cell: forest outdoors, nothing indoors.
 const BUILDER_VOID := Color(0.08, 0.3, 0.12)
+## A ghost's cell whose height changes: from this at 0 to BUILDER_HIGH at
+## Level.MAX_HEIGHT, drawn at its new height.
+const BUILDER_LOW := Color(0.3, 0.27, 0.22)
+const BUILDER_HIGH := Color(0.97, 0.95, 0.88)
 var _builder_marks: Node3D
 
 
 ## Builder mode's marks: [param area]'s outline (size zero: none) and, over
 ## it, the cells and edges a proposal would change ([[x, y, meaning]...],
-## [[x, y, side, kind]...]), see-through, coloured as the legend; and
-## [param beyond] (a new level's place past the map's edge) outlined.
-func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i()) -> void:
+## [[x, y, side, kind]...]), see-through, coloured as the legend;
+## [param beyond] (a new level's place past the map's edge) outlined; and
+## the cells whose height changes ([[x, y, level]...]) at their new height,
+## lighter the higher.
+func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i(), heights: Array = []) -> void:
 	clear_builder()
 	if area.size == Vector2i.ZERO:
 		return
@@ -1845,22 +1851,22 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 		far.position.y = ON_FLOOR * 3.0
 		_builder_marks.add_child(far)
 	# Cells, one mesh a colour; a thing as a smaller square on its cell.
+	var raised := {}
+	for each: Variant in heights:
+		raised[Vector2i(int(each[0]), int(each[1]))] = clampi(int(each[2]), 0, Level.MAX_HEIGHT)
 	var by_colour := {}
+	var drawn := {}
 	for each: Variant in cells:
 		var at := Vector2i(int(each[0]), int(each[1]))
 		var meaning := str(each[2])
 		var colour := BUILDER_VOID if meaning == "void" else Color(str(Level.LEGEND.get(meaning, "#ff00ff")))
 		var half := 0.5 if meaning in Level.GROUNDS or meaning in ["void", "water", "fire", "stair"] else 0.3
-		# On the cell's ground, corner by corner (a ramp's slope too).
-		var lift := ON_FLOOR * 4.0 if half < 0.5 else ON_FLOOR * 2.0
-		var quad := PackedVector3Array()
-		for offset: Vector2 in [Vector2(-half, -half), Vector2(half, -half), Vector2(half, half), Vector2(-half, half)]:
-			var point := Vector2(at) + offset
-			quad.append(Vector3(point.x, _height_in(at, point) + lift, point.y))
-		var key := colour.to_html()
-		if not by_colour.has(key):
-			by_colour[key] = {"colour": colour, "quads": [] as Array[PackedVector3Array]}
-		by_colour[key]["quads"].append(quad)
+		if half == 0.5:
+			drawn[at] = true
+		_ghost_quad(by_colour, at, colour, half, ON_FLOOR * 4.0 if half < 0.5 else ON_FLOOR * 2.0, raised)
+	for at: Vector2i in raised:
+		if not drawn.has(at):
+			_ghost_quad(by_colour, at, BUILDER_LOW.lerp(BUILDER_HIGH, raised[at] / float(Level.MAX_HEIGHT)), 0.5, ON_FLOOR * 2.0, raised)
 	for key: String in by_colour:
 		var ghost := _make_flat(_quads_mesh(by_colour[key]["quads"]), Color(by_colour[key]["colour"], BUILDER_GHOST_ALPHA))
 		_builder_marks.add_child(ghost)
@@ -1883,6 +1889,22 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 		box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		box.position = _tile_position(cell) + (Vector3(0.5, 0.35, 0.0) if key.z == Terrain.EAST else Vector3(0.0, 0.35, 0.5))
 		_builder_marks.add_child(box)
+
+
+## A ghost's square [param half] across from the middle of cell [param at],
+## [param lift] above its ground (its new height in [param raised] if it
+## has one, flat; else the ground as drawn, a ramp's slope too), added to
+## [param by_colour]'s quads of [param colour].
+func _ghost_quad(by_colour: Dictionary, at: Vector2i, colour: Color, half: float, lift: float, raised: Dictionary) -> void:
+	var quad := PackedVector3Array()
+	for offset: Vector2 in [Vector2(-half, -half), Vector2(half, -half), Vector2(half, half), Vector2(-half, half)]:
+		var point := Vector2(at) + offset
+		var ground := float(raised[at]) * LEVEL_RISE if raised.has(at) else _height_in(at, point)
+		quad.append(Vector3(point.x, ground + lift, point.y))
+	var key := colour.to_html()
+	if not by_colour.has(key):
+		by_colour[key] = {"colour": colour, "quads": [] as Array[PackedVector3Array]}
+	by_colour[key]["quads"].append(quad)
 
 
 ## A flat frame round the cells of [param rect], [param line] wide.

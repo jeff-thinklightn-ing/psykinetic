@@ -9,6 +9,10 @@ notes (decision 324).
 
 - Spoken to, a resident also knows what they owe the town's bank, and
   whether they are working that debt off by hauling.
+- Builder mode can shape the ground's height: raise or lower cells, make a
+  hill with stairs up its sides, or put stairs onto a ledge. The proposal's
+  ghost shows the new heights, lighter the higher, and Claude is told when
+  something is left stranded on a ledge with no way up.
 
 ## v0.1.147
 

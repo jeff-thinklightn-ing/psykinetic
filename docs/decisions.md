@@ -7125,3 +7125,63 @@ far_tier_test: a periodic save, another at once, a tick, then a stop: the
 file parses, is the stop's (its steps the world's), no temp file is left
 and nothing is still being written. Server and host only; the snapshot's
 format is unchanged.
+
+## 356. Heights in builder mode, on shared height ops (HeightTools)
+
+Jeff: "is terrain height in? how do i edit it". The sim has had heights
+(height.png, 0 to 6) for a while, but only by painting height.png by
+hand. Builder mode now edits them, through one set of ops that the level
+editor (maps, decision 357) and terrain's scripted demo level use too:
+`editor/height_tools.gd` (class_name HeightTools). Built like AreaTools,
+its static functions take a LevelMap and return a change set, `{heights,
+cells, edges}`, without making it, with "reason" when they can't (and no
+changes) and "warnings" for what may not be wanted:
+
+- raise(map, cells, by) and level(map, cells, to): each cell once
+  (a brush lists cells more than once), clamped to 0..MAX_HEIGHT; void
+  takes no height (Level.parse ignores it); water and fire do.
+- hill(map, centre, radius, top, stairs): terraced rings a level each
+  up to top above the lowest ground under the disc, no more levels than
+  the radius (so every ring is a cell wide and no step is two), never
+  lowering higher ground; a flight up each side in stairs.
+- stair(map, at, dir): the cell beyond is raised a level above it; beside
+  a ledge more than a level up, a flight onto it ending at `at`.
+- flight(map, from, to): along a row or column, a stair a level, the
+  landing at `to`.
+- Every stair made opens its edge up and walls any other side a level
+  up. Level.parse takes the first of N, E, S, W when a stair has two
+  ways up, and warns (terrain's catch: a flight cut into a cliff face has
+  its sides a level up). A wall there costs nothing a walker could do:
+  the ledge already stopped them.
+- ledge_warnings(map, cells): a cell on ground cut off by ledges from
+  bigger ground beyond, with no stair (walls and forest closing in are not
+  ledges; past 1500 cells ground is open). "Bigger" keeps the ground round
+  a pillar from being called cut off.
+
+Builder mode: tools height (raise, lower or set; rects and cells), hill
+(at, radius, top, stairs: sides) and stairs (at, up, count). After each
+tool call the session's height_checks (a stair in the area climbing
+nowhere or two ways, a thing, start or building cut off, a building on
+more than one height; nothing at all on a level with no heights) are
+compared with before, and what is new is added to the tool's answer as
+"Heights now: ...", as the store's (decision 301); the proposal's are
+said to the player as "Heights: ...". The grid shows a Heights block (a
+digit a cell, # for void) when any shown cell has a height. The prompt
+says what heights do: a ledge is a wall to walkers, a body pushed off one
+falls, higher ground sees over walls, stairs join one level to the next.
+
+Saving needed nothing new: the proposal's diff already carried heights,
+MapDoc.set_height marks height.png to write (on a level that had none,
+too, the wilds), `builder export` lists every file in the overlay, and
+the "terrain" message sends height.png to clients. The saved overlay's
+format is unchanged; older overlays load as before.
+
+The ghost: the "builder" proposal message gains `heights: [[x, y,
+level]...]`; client3d.show_builder draws those cells flat at their new
+height, tinted from dark to light by level, and a changed cell that also
+changes height at its new height. No PROTOCOL_REVISION bump: an older
+client ignores the field and draws today's ghost (net.gd's rule for a
+field whose absence means today's behaviour).
+
+height_tools_test; builder_test _test_heights; view_test (a raised cell
+in the ghost).

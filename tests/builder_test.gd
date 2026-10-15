@@ -21,6 +21,7 @@ func _ready() -> void:
 	await _test_set_building()
 	await _test_town_wall()
 	await _test_store_checks()
+	await _test_heights()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -161,6 +162,40 @@ func _test_store_checks() -> void:
 	_check("Stamp town_store for one" in BuilderSession.system_prompt(), "the prompt says how a town's store is made")
 
 
+func _test_heights() -> void:
+	print("
+== heights: a hill, a chest cut off on it and told, stairs up to it, the ghost and the save ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "place", "input": {"at": [14, 12], "thing": "chest"}},
+			{"name": "hill", "input": {"at": [14, 12], "radius": 4, "top": 2}},
+			{"name": "stairs", "input": {"at": [14, 17], "up": "north"}},
+			{"name": "stairs", "input": {"at": [14, 15], "up": "north"}},
+			{"name": "height", "input": {"change": "raise", "cells": [[30, 20]]}},
+			{"name": "stairs", "input": {"at": [5, 6], "up": "west"}},
+			{"name": "look", "input": {}}],
+		"A hill with a chest on top.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 20, 15), "test_field", stub)
+	var result: Dictionary = await session.ask("a hill")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check("Heights now: (14, 12) is on a patch" in str(results[1]["content"]), "the hill cuts the chest off: Claude is told (%s)" % results[1]["content"])
+	_check("Heights now" not in str(results[2]["content"]) and "Heights now" not in str(results[3]["content"]), "a stair a level: nothing new to say")
+	_check("outside the area" in str(results[4]["content"]), "a cell outside the area: left out (%s)" % results[4]["content"])
+	_check("outside the area" in str(results[5]["content"]) and "Heights now: the stair at (5, 6) has no cell a level up" in str(results[5]["content"]),
+			"a stair whose top is outside the area: its top left out, and Claude is told it climbs nowhere (%s)" % results[5]["content"])
+	_check("Heights (0 to 6" in str(results[6]["content"]) and "  12 " in str(results[6]["content"]), "look shows a Heights block")
+	_check(result["height_warnings"].size() == 1 and "(5, 6)" in result["height_warnings"][0], "the proposal says only that stair: the top is reached (%s)" % [result["height_warnings"]])
+	var message := BuilderHost.proposal_message(session)
+	_check(message["heights"].has([14, 12, 2]) and message["cells"].has([14, 17, "stair"]), "the ghost: the top at 2, the stairs")
+	_check("Ground has a height, 0 to 6" in BuilderSession.system_prompt(), "the prompt says what heights do")
+	session.accept()
+	_check(doc.map.heights.get(Vector2i(14, 12)) == 2 and doc.heights_dirty, "accepted: the doc has the hill, height.png to write")
+	var level := doc.parsed()
+	_check(level["terrain"]["stairs"].get(Vector2i(14, 17)) == Vector2i(0, -1) and level["terrain"]["stairs"].get(Vector2i(14, 15)) == Vector2i(0, -1),
+			"the level reads both stairs climbing north")
+
+
 func _test_prompt() -> void:
 	print("\n== what Claude is told ==")
 	var system := BuilderSession.system_prompt()
@@ -177,7 +212,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "place", "stamp", "mark_place", "set_building", "town_wall", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "town_wall", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:

@@ -937,6 +937,20 @@ func _test_heights() -> void:
 				lowest = minf(lowest, point.y)
 				highest = maxf(highest, point.y)
 	_check(highest - lowest > rise * 0.9, "a builder ghost on the stair runs up its ramp (%.2f to %.2f)" % [lowest, highest])
+	# A height the proposal changes: flat at the new height, lighter the higher (decision 356).
+	var beside := stair
+	_rig.show_builder(Rect2i(stair - Vector2i.ONE, Vector2i(3, 3)), [], [], Rect2i(), [[beside.x, beside.y, 5]])
+	var tops: Array[float] = []
+	var colours: Array[Color] = []
+	for node in _rig._builder_marks.get_children():
+		var mesh := (node as MeshInstance3D).mesh
+		if mesh is ArrayMesh and node.position == Vector3.ZERO:
+			for point: Vector3 in (mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+				tops.append(point.y)
+			colours.append(((node as MeshInstance3D).material_override as StandardMaterial3D).albedo_color)
+	_check(not tops.is_empty() and tops.all(func(y: float) -> bool: return absf(y - 5 * rise - Client3D.ON_FLOOR * 2.0) < 0.01)
+			and colours.size() == 1 and colours[0].v > Client3D.BUILDER_LOW.v,
+			"a cell raised to 5 in the ghost: flat at 5, lighter than the ground's tint (%s)" % [colours])
 	_rig.clear_builder()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 

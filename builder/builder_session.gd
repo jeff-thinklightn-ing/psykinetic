@@ -110,12 +110,18 @@ func ask(text: String) -> Dictionary:
 			for block: Dictionary in content:
 				if block.get("type") == "tool_use":
 					var before := Stockpile.check(working.config)
+					var ground_before := height_checks()
 					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
 					# What the change did to the town's store, said at once (decision 301).
 					var new := Stockpile.check(working.config).filter(func(warning: String) -> bool: return warning not in before)
 					if not new.is_empty():
 						outcome["text"] += "
 The town's store now: " + "; ".join(new)
+					# And to the ways up and down (decision 356).
+					var ground := height_checks().filter(func(warning: String) -> bool: return warning not in ground_before)
+					if not ground.is_empty():
+						outcome["text"] += "
+Heights now: " + "; ".join(ground)
 					results.append({"type": "tool_result", "tool_use_id": block.get("id"),
 						"content": outcome["text"], "is_error": not outcome["ok"]})
 			messages.append({"role": "user", "content": results})
@@ -137,6 +143,7 @@ The town's store now: " + "; ".join(new)
 		result["error"] = "Claude did not finish in %d turns" % MAX_TURNS
 	result["summary"] = summary
 	result["warnings"] = Stockpile.check(working.config)
+	result["height_warnings"] = height_checks()
 	result["cost"] = spent
 	busy = false
 	return result
@@ -217,6 +224,8 @@ Levels join at their edges: walking off one edge arrives on the neighbour's oppo
 
 Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first).
 
+Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right.
+
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
@@ -277,6 +286,19 @@ static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2
 		for x in range(shown.position.x, shown.end.x):
 			row += str(CHARS.get(map.cell(Vector2i(x, y)), "?"))
 		lines.append("%4d %s" % [y, row])
+	# Heights, when any cell shown has one: a digit a cell, the same rows.
+	var raised := false
+	for at: Vector2i in map.heights:
+		if shown.has_point(at):
+			raised = true
+			break
+	if raised:
+		lines.append("Heights (0 to 6, a digit a cell, the same rows):")
+		for y in range(shown.position.y, shown.end.y):
+			var row := ""
+			for x in range(shown.position.x, shown.end.x):
+				row += str(int(map.heights.get(Vector2i(x, y), 0))) if map.cell(Vector2i(x, y)) != "void" else "#"
+			lines.append("%4d %s" % [y, row])
 	var walls := PackedStringArray()
 	for key: Vector3i in map.edges:
 		var ends := Terrain.edge_cells(key)
@@ -348,6 +370,24 @@ const TOOLS := [
 		"input_schema": {"type": "object", "properties": {"rect": _RECT,
 			"gate": {"type": "string", "enum": ["north", "east", "south", "west", "none"]}},
 			"required": ["rect"]}},
+	{"name": "height", "description": "Raises or lowers cells a level (change raise or lower), or sets them to a height (change set, with level 0 to 6). Give rectangles, single cells, or both. Void takes no height.",
+		"input_schema": {"type": "object", "properties": {
+			"change": {"type": "string", "enum": ["raise", "lower", "set"]},
+			"level": {"type": "integer", "minimum": 0, "maximum": 6},
+			"rects": {"type": "array", "items": _RECT},
+			"cells": {"type": "array", "items": _CELL}},
+			"required": ["change"]}},
+	{"name": "hill", "description": "A rounded hill on the disc of a radius round a cell: rings a level each up to top levels above the lowest ground under it (no more levels than the radius), never lowering higher ground, with a flight of stairs from its foot to its top up each side asked.",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL, "radius": {"type": "integer", "minimum": 1, "maximum": 30},
+			"top": {"type": "integer", "minimum": 1, "maximum": 6},
+			"stairs": {"type": "array", "items": {"type": "string", "enum": ["north", "east", "south", "west"]}, "description": "the sides a flight of stairs climbs up from"}},
+			"required": ["at", "radius", "top"]}},
+	{"name": "stairs", "description": "Stairs at a cell climbing toward a side. Beside a ledge that way, a flight up onto it (a stair a level, the cell given the top one, starting as many cells back); otherwise count stairs in a row climbing a level each from the cell's height, the cell after the last one the landing. Other sides a level above a stair are walled, so it climbs only the way asked.",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL, "up": {"type": "string", "enum": ["north", "east", "south", "west"]},
+			"count": {"type": "integer", "minimum": 1, "maximum": 6}},
+			"required": ["at", "up"]}},
 	{"name": "place", "description": "Puts a thing on a cell (its ground stays), with its settings: a monster's facing and idling, a chest's items, a loot table for a chest or a monster, a name.",
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL,
@@ -474,6 +514,51 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 					var gate := str(given.get("gate", "south"))
 					changes = AreaTools.fence(working.map, rect, "" if gate == "none" else gate)
 			return _lay(changes, tool)
+		"height":
+			var cells: Array[Vector2i] = []
+			for rect_value: Variant in given.get("rects", []):
+				var rect: Variant = _rect(rect_value)
+				if rect == null:
+					return _no("a rectangle needs x, y, w and h")
+				for y in range(rect.position.y, rect.end.y):
+					for x in range(rect.position.x, rect.end.x):
+						cells.append(Vector2i(x, y))
+			for cell_value: Variant in given.get("cells", []):
+				var at: Variant = Level._tile(cell_value)
+				if at == null:
+					return _no("a cell is [x, y]")
+				cells.append(at)
+			match str(given.get("change", "")):
+				"raise":
+					return _lay(HeightTools.raise(working.map, cells, 1), "raised %d cells a level" % cells.size())
+				"lower":
+					return _lay(HeightTools.raise(working.map, cells, -1), "lowered %d cells a level" % cells.size())
+				"set":
+					var level := clampi(int(given.get("level", 0)), 0, Level.MAX_HEIGHT)
+					return _lay(HeightTools.level(working.map, cells, level), "set %d cells to height %d" % [cells.size(), level])
+			return _no("change is raise, lower or set")
+		"hill":
+			var at: Variant = Level._tile(given.get("at"))
+			if at == null:
+				return _no("at is [x, y]")
+			var sides: Array[Vector2i] = []
+			for side: Variant in given.get("stairs", []):
+				if SIDES.has(str(side)):
+					sides.append(SIDES[str(side)])
+			var radius := clampi(int(given.get("radius", 4)), 1, 30)
+			return _lay(HeightTools.hill(working.map, at, radius, clampi(int(given.get("top", 2)), 1, Level.MAX_HEIGHT), sides),
+				"a hill round %s, radius %d" % [at, radius])
+		"stairs":
+			var at: Variant = Level._tile(given.get("at"))
+			var up := str(given.get("up", ""))
+			if at == null or not SIDES.has(up):
+				return _no("at is [x, y]; up is north, east, south or west")
+			var dir: Vector2i = SIDES[up]
+			var count := clampi(int(given.get("count", 1)), 1, Level.MAX_HEIGHT)
+			var ledge := HeightTools.height_of(working.map, at + dir) > HeightTools.height_of(working.map, at) + 1
+			var changes := HeightTools.stair(working.map, at, dir) if ledge or count == 1 \
+					else HeightTools.flight(working.map, at, at + dir * count)
+			return _lay(changes, "%d stairs climbing %s" % [(changes["cells"] as Dictionary).size(), up])
 		"place":
 			return _place(given)
 		"stamp":
@@ -749,6 +834,10 @@ func _place(given: Dictionary) -> Dictionary:
 
 ## Lays [param changes] on the working copy, kept to the area; {ok, text}.
 func _lay(changes: Dictionary, done: String) -> Dictionary:
+	if not str(changes.get("reason", "")).is_empty():
+		return _no(changes["reason"])
+	if changes.has("warnings"):
+		done += " (" + "; ".join(changes["warnings"]) + ")"
 	var kept := {}
 	var outside := 0
 	var cells: Dictionary = {}
@@ -770,6 +859,8 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 	for cell: Vector2i in changes.get("heights", {}):
 		if area.has_point(cell):
 			heights[cell] = changes["heights"][cell]
+		else:
+			outside += 1
 	kept["heights"] = heights
 	for list in ["entries", "links"]:
 		kept[list] = (changes.get(list, []) as Array).filter(func(entry: Dictionary) -> bool:
@@ -780,6 +871,45 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 		kept["config"] = changes["config"]
 	working.apply_changes(kept)
 	return {"ok": true, "text": "%s%s" % [done, " (%d cells or edges outside the area left out)" % outside if outside > 0 else ""]}
+
+
+## What is wrong with the area's heights on the working copy: a stair
+## that climbs nowhere or could climb two ways (Level.parse's rule), and a
+## thing, start or building cut off by ledges (HeightTools.ledge_warnings)
+## or a building standing on more than one height.
+func height_checks() -> Array[String]:
+	var out: Array[String] = []
+	var map := working.map
+	if map.heights.is_empty() and doc.map.heights.is_empty():
+		return out
+	var things: Array[Vector2i] = []
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			var at := Vector2i(x, y)
+			var meaning := map.cell(at)
+			if meaning == "stair":
+				var ups := HeightTools.FOUR.filter(func(side: Vector2i) -> bool:
+					return map.walkable(at + side) and int(map.heights.get(at + side, 0)) == int(map.heights.get(at, 0)) + 1 							and map.edge(Terrain.edge_key(at, side)) == "clear")
+				if ups.is_empty():
+					out.append("the stair at %s has no cell a level up beside it: it is floor" % at)
+				elif ups.size() > 1:
+					out.append("the stair at %s could climb two ways: wall one or level it" % at)
+			elif meaning not in GROUNDS and meaning not in ["water", "void"]:
+				things.append(at)
+	for building: Variant in working.config.get("buildings", []):
+		var rect: Variant = Level.building_rect(building)
+		if rect == null or not area.intersects(rect):
+			continue
+		var levels := {}
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				if map.walkable(Vector2i(x, y)):
+					levels[int(map.heights.get(Vector2i(x, y), 0))] = true
+		if levels.size() > 1:
+			out.append("the building at %s stands on more than one height: level it" % rect.position)
+		things.append(rect.position)
+	out.append_array(HeightTools.ledge_warnings(map, things))
+	return out
 
 
 static func _no(text: String) -> Dictionary:

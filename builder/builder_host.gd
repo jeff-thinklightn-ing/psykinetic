@@ -129,7 +129,8 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 		[area.position.x, area.position.y, area.size.x, area.size.y], text, "ok" if result["ok"] else result["error"],
 		result["cost"], session.usage["cost"], session.usage["input"] + session.usage["cache_read"] + session.usage["cache_write"],
 		session.usage["output"], spent])
-	if not result["ok"] and session.proposal()["cells"].is_empty() and session.proposal()["edges"].is_empty():
+	var proposed := session.proposal()
+	if not result["ok"] and proposed["cells"].is_empty() and proposed["edges"].is_empty() and proposed["heights"].is_empty():
 		_reply(peer, {"state": "error", "error": result["error"]})
 		return
 	var reply := proposal_message(session)
@@ -137,6 +138,9 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 	var warnings: Array = result.get("warnings", [])
 	if not warnings.is_empty():
 		reply["summary"] += "\nThe town's store: " + "; ".join(warnings)
+	var ground: Array = result.get("height_warnings", [])
+	if not ground.is_empty():
+		reply["summary"] += "\nHeights: " + "; ".join(ground)
 	reply["cost"] = result["cost"]
 	reply["total"] = session.usage["cost"]
 	_reply(peer, reply)
@@ -154,8 +158,11 @@ static func proposal_message(session: BuilderSession) -> Dictionary:
 	var edges: Array = []
 	for key: Vector3i in proposal["edges"]:
 		edges.append([key.x, key.y, key.z, proposal["edges"][key]])
+	var heights: Array = []
+	for at: Vector2i in proposal["heights"]:
+		heights.append([at.x, at.y, proposal["heights"][at]])
 	var message := {"state": "proposal", "area": [session.area.position.x, session.area.position.y, session.area.size.x, session.area.size.y],
-		"cells": cells, "edges": edges}
+		"cells": cells, "edges": edges, "heights": heights}
 	if proposal.has("new_area"):
 		var plan: Dictionary = proposal["new_area"]
 		var footprint: Rect2i = plan["footprint"]
