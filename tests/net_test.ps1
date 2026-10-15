@@ -205,7 +205,7 @@ Complete-Phase
 # which systemd would start again: here the script starts it again from the
 # same snapshot. Rex's client reconnects by itself and is put back where he
 # stood.
-$adminPort = $port + 11
+$adminPort = $port + 1
 $restartState = Join-Path $logs 'restart.json'
 function Send-Admin($line) {
 	$tcp = New-Object Net.Sockets.TcpClient('127.0.0.1', $adminPort)

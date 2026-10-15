@@ -176,7 +176,7 @@ finish
 # which systemd would start again: here the script starts it again from the
 # same snapshot. Rex's client reconnects by itself and is put back where he
 # stood.
-ADMIN=$((PORT + 11))
+ADMIN=$((PORT + 1))
 admin() {
 	exec 3<>"/dev/tcp/127.0.0.1/$ADMIN"
 	printf '%s\n' "$*" >&3

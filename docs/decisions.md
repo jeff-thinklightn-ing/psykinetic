@@ -4889,3 +4889,41 @@ others again: routs echoing round a camp kept it breaking for ever. The
 rout is read by a monster even mid-fight (its newest noises, each think),
 where other noises are only heard with nobody in sight. Both are events:
 no cost per tick. The call is the sound worktree's alert bark.
+
+## 278. The suite runs its scenes at once, and a landing runs it beside net_test and state_test
+
+A landing ran the suite's scenes one after another, then net_test, then
+state_test: about 290 s on a quiet machine (the median of three, under the
+bench lock: suite 150, net_test 107, state_test 38), much more on a busy
+one, and every tree's landing waited on it. tests/run.sh and run.ps1 now
+run the scenes at once: PSYKINETIC_TEST_JOBS, else half the cores less the
+Godot processes already running (the machine is shared with other trees'
+runs and benches), 2 to 8, and 2 while another tree holds the bench lock so
+its timings stay true. The slowest start first by their last times
+(.godot/test_durations.txt, per checkout), since view_test alone is some
+30 s and sets the floor. Each scene writes its own log; a line prints as
+each finishes, then the whole output of each that failed and a summary.
+The rule is the one before: a non-zero exit, SCRIPT ERROR or ERROR:, or the
+per-scene timeout fails the run; a timed-out scene is killed with the game
+the Windows console build runs under it (found by a marker argument in
+run.sh, by parent process in run.ps1), which the serial runner left
+running. --serial / -Serial keeps the old way for reading a run as it goes.
+
+Scenes running at once must not meet. Each test already had a base port of
+its own, explicit in test_ports.gd's of(), and a per-scene offset would not
+fit a checkout's 200-port window as tests grow, so ports stay explicit and
+tests/suite_test reads every script under tests/ and fails, naming both
+places, on two tests with one base port (the shell tests' "<base> +
+PORT_OFFSET" and the ports counted from it included) or one scratch name,
+or a test setting Net.port without test_ports.gd. Its first run found
+net_test's console (base + 11) on controls_test's port; it is base + 1 now.
+test_ports.gd's scratch() also puts the running scene's name (from
+--scene) in the path, so two scenes cannot share a folder by accident.
+
+tests/land.sh and land.ps1 run the suite (with two fewer jobs), net_test
+and state_test together, with one summary and one exit code: what a
+landing runs, and one of .sh or .ps1 is enough. Measured the same way,
+medians of three under the bench lock: the suite alone 47 s (from 150), and
+33 s once run.sh stopped starting a grep and a basename per scene (some 9 s
+of process starts on Windows); a whole landing 111 s (from 290), net_test
+now its long pole (decision 279 runs its phases at once).

@@ -1813,11 +1813,25 @@ All sim behaviour is verified headless via `tests/run`, never through the editor
 ```
 tests/run.ps1        # Windows
 tests/run.sh         # anything with a POSIX shell
+tests/land.ps1       # what a landing runs: the suite, net_test and state_test
+tests/land.sh        #   at once, one summary (one of .ps1 or .sh is enough)
 ```
 
-Both run `godot --headless --path . --scene tests/push_test.tscn` from the
-project root. Godot is taken from the `GODOT_PATH` environment variable, or
-`godot` on `PATH` if that is not set.
+Both run every `tests/*_test.tscn` (`godot --headless --path . --scene
+<scene>`) from the project root, several at once (decision 278):
+`PSYKINETIC_TEST_JOBS`, else half the cores less the Godot processes
+already running (other worktrees'), 2 to 8, and 2 while another tree holds
+the bench lock (`tests/jobs.sh`, `jobs.ps1`). The slowest start first, by
+their last times in `.godot/test_durations.txt`; a line prints as each
+finishes, then the whole output of each that failed and a summary. A scene
+fails on a non-zero exit, `SCRIPT ERROR` or `ERROR:` in its output, or not
+finishing in `TEST_TIMEOUT` seconds (300), when it is killed with the game
+the console build runs under it. `--serial` / `-Serial` runs them one after
+another with their output as it goes. Scenes running at once must not meet:
+each test's base port (`test_ports.gd`'s `of()`) and scratch name are its
+own, which `tests/suite_test` checks, naming both places; `scratch()` also
+puts the scene's name in the path. Godot is taken from the `GODOT_PATH`
+environment variable, or `godot` on `PATH` if that is not set.
 
 The test scene stops `World`'s own clock, builds small ASCII rooms through the
 normal `World` API, calls `World.step()` by hand, and checks tiles and damage.
