@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cst32fj1d1xbt"
+path="res://.godot/imported/layout.png-758814dcf3b9105a1de73887d1729800.image"
+
+[deps]
+
+source_file="res://levels/prefabs/building_house/layout.png"
+dest_files=["res://.godot/imported/layout.png-758814dcf3b9105a1de73887d1729800.image"]
+
+[params]
+

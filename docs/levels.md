@@ -189,6 +189,20 @@ All of it is optional.
   camp, keep, farm, gate, mine, stockpile (where the town banks what is
   brought home: see The stockpile) or other; `radius` defaults to 8
   cells, `worth` to 1, `holder` (who holds it at the start) to nobody.
+- `buildings`: the buildings standing here, a list of `{"slot":
+  "building.house", "at": [12, 4], "facing": [0, 1]}`. `slot` is one of
+  `Level.BUILDINGS` (building.hut 3 x 3, building.house 4 x 6,
+  building.shed 2 x 3, across by deep facing north or south, the other way
+  round facing east or west); `at` is the footprint's top-left cell;
+  `facing` is the side its front is on (south if not given). The
+  footprint is the inside, ordinary floor; the building's walls and door
+  are the map's own edges round it, drawn in the layout as any wall, so a
+  building changes no rule: it says where the roof, the inside floor and
+  the trim are drawn (art-kit's `building.*` slots), and what counts as
+  inside. One not on floor of one height, or overlapping another, is left
+  out with a warning; one whose outline has open edges stands, with a
+  warning. The building prefabs below lay the walls and the record together
+  (decision 265).
 
 ## Level links
 
@@ -428,8 +442,8 @@ A prefab is a piece of map to stamp elsewhere, kept in
 `level.json`, and `height.png` if it has heights, its top-left cell at
 (0, 0) (`editor/prefab.gd`). Its `level.json` holds only what goes with the
 piece: the entities' entries (names, props such as a chest's `slots`,
-facing, idling with its route or gather point), links, and any `legend` or
-`monsters` it uses; no starts, spawn points or centre. A prefab is not a
+facing, idling with its route or gather point), links, places, buildings,
+and any `legend` or `monsters` it uses; no starts, spawn points or centre. A prefab is not a
 level: the server never loads one, and the level tests skip the folder.
 
 Stamping one with its top-left at a cell, turned 0-3 quarter turns:
@@ -443,6 +457,8 @@ Stamping one with its top-left at a cell, turned 0-3 quarter turns:
 - the map's entries and links on the cells it covers go, and the prefab's
   are put where their cells land, with facings, routes and gather points
   turned with it.
+- the map's buildings whose footprint it lands on go, and its own are
+  added where they land, turned with it.
 
 Seeded by hand (`tools/seed_prefabs.gd` draws them; run it again after
 changing a drawing):
@@ -453,6 +469,9 @@ changing a drawing):
 | `campfire_camp` | 7 x 7 | a round dirt clearing, three imps gathered at the fire, a chest and crates |
 | `fenced_field` | 10 x 6 | dirt behind a fence with a gate south, a ring of grass |
 | `well` | 5 x 5 | water ringed with stone |
+| `building_hut` | 5 x 5 | a building.hut: 3 x 3 of stone in walls, a door south, a ring of dirt |
+| `building_house` | 6 x 8 | a building.house: 4 x 6 of stone in walls, a door south, a ring of dirt |
+| `building_shed` | 4 x 5 | a building.shed: 2 x 3 of stone in walls, a door south, a ring of dirt |
 
 A camp's group is its gather point: every monster gathering at one cell is
 that camp, so a coarse world tick can move the group (or hand the place

@@ -16,7 +16,7 @@ extends RefCounted
 
 const DIR := "res://levels/prefabs/"
 ## level.json keys a prefab keeps.
-const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places"]
+const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places", "buildings"]
 
 
 ## The prefabs there are, by name, sorted.
@@ -66,7 +66,9 @@ static func rotated(prefab: Dictionary, turns: int) -> Dictionary:
 ## moved, links: theirs, moved, covers: the map cells the prefab's cells land on,
 ## and, if the prefab has places, config: {places: [param config]'s (the
 ## map's level.json) with the prefab's added, moved, a key the map has
-## already taking _2, _3...}}. Only what lands on the map.
+## already taking _2, _3...}; if it has buildings or lands on the map's,
+## config buildings: the map's that it does not land on, and its own,
+## moved}. Only what lands on the map.
 static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, config := {}) -> Dictionary:
 	var piece: LevelMap = prefab["map"]
 	var cells: Dictionary[Vector2i, String] = {}
@@ -107,6 +109,20 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, confi
 				n += 1
 			merged[free] = places[key]
 		out["config"] = {"places": merged}
+	# Buildings: the map's, but for those whose footprint the prefab's cells
+	# land on, and the prefab's, moved.
+	var landed: Dictionary[Vector2i, bool] = {}
+	for cell in covers:
+		landed[cell] = true
+	var had: Array = config.get("buildings", []) if config.get("buildings") is Array else []
+	var buildings := had.filter(func(entry: Variant) -> bool:
+		var rect: Variant = Level.building_rect(entry)
+		return rect == null or Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not landed.has(cell)))
+	buildings.append_array(moved_config.get("buildings", []))
+	if buildings.size() != had.size() or not moved_config.get("buildings", []).is_empty():
+		var changed: Dictionary = out.get("config", {})
+		changed["buildings"] = buildings.duplicate(true)
+		out["config"] = changed
 	return out
 
 

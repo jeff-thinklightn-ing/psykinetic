@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://duwrdqbrw5113"
+path="res://.godot/imported/layout.png-2545393a6288bc7c799d30007cd2da5c.image"
+
+[deps]
+
+source_file="res://levels/prefabs/building_shed/layout.png"
+dest_files=["res://.godot/imported/layout.png-2545393a6288bc7c799d30007cd2da5c.image"]
+
+[params]
+

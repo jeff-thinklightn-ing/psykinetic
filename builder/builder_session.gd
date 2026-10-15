@@ -34,7 +34,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 ## Context shown round the area, in cells.
 const MARGIN := 3
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -186,7 +186,12 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 		if prefab.is_empty():
 			continue
 		var piece: LevelMap = prefab["map"]
-		prefabs.append("%s (%d x %d):\n%s" % [prefab_name, piece.size.x, piece.size.y,
+		# The grid shows cells only: a building is said in words.
+		var buildings: Array = prefab["config"].get("buildings", []) if prefab["config"].get("buildings") is Array else []
+		var kinds := PackedStringArray(buildings.map(func(entry: Variant) -> String:
+			return str(entry.get("slot", "")).trim_prefix("building.") if entry is Dictionary else ""))
+		prefabs.append("%s (%d x %d)%s:\n%s" % [prefab_name, piece.size.x, piece.size.y,
+			", a building: %s" % ", ".join(kinds) if not kinds.is_empty() else "",
 			grid(piece, prefab["config"], Rect2i(Vector2i.ZERO, piece.size), Rect2i(Vector2i.ZERO, piece.size))])
 	return """You build places in Psykinetic, a top-down co-op game on a grid of cells, where players fight goblins with physics (pushing, throwing, knocking down) and explore with talking companions. A player in builder mode has picked an area of a level and asked for something there. Change the area with the tools, then say in a sentence or two what you made; the player sees your changes as a ghost and accepts or discards them.
 
@@ -202,7 +207,7 @@ Monsters idle until someone comes: guard (stands, glances about), wander (stroll
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
 %s""" % [", ".join(legend), ", ".join(Items.ids()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
@@ -613,7 +618,7 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 			return area.has_point(Level._tile(entry.get("at"))))
 	kept["covers"] = (changes.get("covers", cells.keys()) as Array).filter(func(cell: Vector2i) -> bool: return area.has_point(cell))
 	if changes.has("config"):
-		# A stamped prefab's places (it fits in the area, so they do).
+		# A stamped prefab's places and buildings (it fits in the area, so they do).
 		kept["config"] = changes["config"]
 	working.apply_changes(kept)
 	return {"ok": true, "text": "%s%s" % [done, " (%d cells or edges outside the area left out)" % outside if outside > 0 else ""]}

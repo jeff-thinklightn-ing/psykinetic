@@ -150,7 +150,7 @@ func resized(left: int, top: int, right: int, bottom: int) -> LevelMap:
 ## [param config] (level.json) with every cell in it carried by [param move]
 ## (Vector2i -> Vector2i, or null for gone) and every facing turned
 ## [param turns] quarter turns clockwise: the centre, starts, spawn points,
-## links, places, and each entity's cell, route and gather point. What [param move]
+## links, places, buildings (their footprints and facings), and each entity's cell, route and gather point. What [param move]
 ## drops is left out (an entity's entry, a link, a start; a waypoint; a gather
 ## point), each said in [param dropped]. The rest of the file is kept.
 static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped: Array[String] = []) -> Dictionary:
@@ -205,6 +205,23 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 			else:
 				places.erase(key)
 				dropped.append("place %s" % key)
+	if out.get("buildings") is Array:
+		# A footprint goes by two opposite corners: wherever a turn puts
+		# them, its top-left is the lesser of each, its size theirs.
+		var buildings: Array = []
+		for entry: Variant in out["buildings"]:
+			var rect: Variant = Level.building_rect(entry)
+			var a: Variant = move.call(rect.position) if rect != null else null
+			var b: Variant = move.call(rect.end - Vector2i.ONE) if rect != null else null
+			if a == null or b == null:
+				dropped.append("building %s" % [entry])
+				continue
+			entry["at"] = [mini(a.x, b.x), mini(a.y, b.y)]
+			if turns != 0:
+				var turned := turn(Level.building_facing(entry), turns)
+				entry["facing"] = [turned.x, turned.y]
+			buildings.append(entry)
+		out["buildings"] = buildings
 	if out.get("entities") is Array:
 		var entities: Array = []
 		for entry: Variant in out["entities"]:

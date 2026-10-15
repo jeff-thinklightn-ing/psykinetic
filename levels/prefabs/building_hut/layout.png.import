@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://lkvgblssg5qf"
+path="res://.godot/imported/layout.png-45190c041b7946c0d67c3427e984e1fa.image"
+
+[deps]
+
+source_file="res://levels/prefabs/building_hut/layout.png"
+dest_files=["res://.godot/imported/layout.png-45190c041b7946c0d67c3427e984e1fa.image"]
+
+[params]
+

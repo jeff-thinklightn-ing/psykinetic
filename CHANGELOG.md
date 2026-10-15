@@ -21,6 +21,10 @@ top section as the release notes.
 - If the server has been updated past your game, the game updates itself
   and starts again, instead of just saying it is out of date. If a newer
   game is out but yours still plays, you're told so once.
+- Builder mode and the level editor can lay buildings: a hut, a house and a
+  shed, each a walled room with a door, stamped whole and turned as you
+  like. They're grey stand-ins for now; roofs that lift away when you walk
+  inside come next.
 - A client and the server no longer need to be the very same build to
   play together: only what they send each other has to match. A release
   that changes only how the game looks no longer needs the server updated,

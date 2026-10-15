@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_heights_and_stairs()
 	_test_falls()
 	_test_sight_over_walls()
+	_test_buildings()
 	await _test_level_links()
 	await _test_edge_links()
 	_test_console()
@@ -279,6 +280,61 @@ func _test_sight_over_walls() -> void:
 	print("\n== higher cells see over lower walls ==")
 	_check(not World.has_line_of_sight(Vector2i(3, 3), Vector2i(1, 3)), "on the ground, the wall between (1,3) and (2,3) stops sight")
 	_check(World.has_line_of_sight(Vector2i(4, 3), Vector2i(1, 3)), "from two levels up, it is seen over")
+
+
+## [param prefab_name] stamped onto [param map] at [param at], turned
+## [param turns]: the map changed in place, the config returned.
+func _stamp(map: LevelMap, config: Dictionary, prefab_name: String, at: Vector2i, turns := 0) -> Dictionary:
+	var changes := Prefab.stamp_changes(Prefab.rotated(Prefab.load_prefab(prefab_name), turns), map, at, config)
+	for cell: Vector2i in changes["cells"]:
+		map.set_cell(cell, changes["cells"][cell])
+	for key: Vector3i in changes["edges"]:
+		map.set_edge(key, changes["edges"][key])
+	var out := config.duplicate(true)
+	out.merge(changes.get("config", {}), true)
+	return out
+
+
+func _test_buildings() -> void:
+	print("\n== buildings: kit prefabs stamped, turned, replaced; the footprint checked ==")
+	var map := LevelMap.new(Vector2i(24, 20))
+	for y in 20:
+		for x in 24:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := _stamp(map, {}, "building_house", Vector2i(2, 2))
+	config = _stamp(map, config, "building_hut", Vector2i(12, 2), 1)
+	config = _stamp(map, config, "building_shed", Vector2i(2, 12), 1)
+	var level := Level.parse(map.to_image(), null, config)
+	var by_slot := {}
+	for building: Dictionary in level["buildings"]:
+		by_slot[building["slot"]] = building
+	var said := func(warnings: Array) -> Array: return warnings.filter(func(text: String) -> bool: return text.contains("building"))
+	_check(by_slot.size() == 3 and said.call(level["warnings"]).is_empty(), "three buildings, nothing said of them (%s)" % [level["warnings"]])
+	_check(by_slot.get("building.house", {}).get("rect") == Rect2i(3, 3, 4, 6) and by_slot["building.house"]["facing"] == Vector2i(0, 1),
+			"the house's footprint is 4 x 6 inside its walls, its front south (%s)" % [by_slot.get("building.house")])
+	_check(by_slot.get("building.shed", {}).get("rect") == Rect2i(3, 13, 3, 2) and by_slot["building.shed"]["facing"] == Vector2i(-1, 0),
+			"the shed turned a quarter is 3 x 2, its front west (%s)" % [by_slot.get("building.shed")])
+	var shed: Rect2i = by_slot["building.shed"]["rect"]
+	var walls := Level.outline(shed).filter(func(key: Vector3i) -> bool: return level["terrain"]["edges"].get(key) == Terrain.Edge.WALL)
+	var doors := Level.outline(shed).filter(func(key: Vector3i) -> bool: return level["terrain"]["edges"].get(key) == Terrain.Edge.DOOR)
+	_check(walls.size() == 9 and doors.size() == 1 and doors[0].z == Terrain.EAST and doors[0].x == shed.position.x - 1,
+			"its outline is walls and a door on its west side (%s)" % [doors])
+
+	config = _stamp(map, config, "building_hut", Vector2i(12, 2))
+	var slots := (config["buildings"] as Array).map(func(entry: Dictionary) -> String: return entry["slot"])
+	_check(slots.count("building.hut") == 1 and slots.size() == 3, "a hut stamped over the hut replaces it, the others kept (%s)" % [slots])
+	config = _stamp(map, config, "campfire_camp", Vector2i(1, 1))
+	_check((config["buildings"] as Array).size() == 2, "another prefab laid over the house takes the house's record with it")
+
+	var bad := config.duplicate(true)
+	bad["buildings"] = [{"slot": "building.castle", "at": [0, 0]}, {"slot": "building.hut", "at": [22, 18]},
+		{"slot": "building.hut", "at": [13, 3]}, {"slot": "building.hut", "at": [15, 15]}]
+	level = Level.parse(map.to_image(), null, bad)
+	_check(level["buildings"].size() == 2 and level["buildings"][1]["rect"] == Rect2i(15, 15, 3, 3), "an unknown slot and one off the floor are left out (%s)" % [level["buildings"]])
+	var warned: Array = said.call(level["warnings"])
+	_check(warned.size() == 3 and str(warned[2]).contains("open edges"), "said, and the hut in the open said to have open edges (%s)" % [warned])
+	var hut_at := Rect2i(13, 3, 3, 3)
+	_check(Level.rect_cells(hut_at).size() == 9 and Level.outline(hut_at).size() == 12, "a 3 x 3 footprint: nine cells, twelve outline edges")
 
 
 func _test_level_links() -> void:

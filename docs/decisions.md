@@ -4010,3 +4010,41 @@ players stay, everyone there is sent the new terrain), without a restart.
 read, by folder and md5 (mtimes are a second coarse); a zone whose level
 is gone (a builder undo) is left as it is. Level data in the export
 itself still changes only with a deploy; this is for the overlay.
+
+## 265. A building is a record over the map's own walls, laid by a prefab
+
+A building (art-kit's building.hut 3x3, house 4x6, shed 2x3) is a footprint
+of ordinary floor whose walls and door are the map's own edges round it,
+drawn in the layout like any wall, and a record in level.json
+"buildings" ({slot, at: the footprint's top-left, facing: the side its
+front is on}) that says where it stands. The record changes no rule:
+walls, doors (with their rules, 255 and 256), paths, light and senses work
+on the edges as they did. It says where the client draws the slot's roof,
+inside floor and trim (art-kit's building.* slots are those parts only, no
+walls: the walls are wall runs, 245, so they fade edge by edge as any
+wall, 188), and what counts as inside (266). Level.BUILDINGS gives each
+slot's footprint, across by deep facing north or south; Level.parse leaves
+out a record whose footprint is not all floor of one height or overlaps
+another, and warns of one whose outline has open edges but keeps it (a
+shed may be open).
+
+It is placed by stamping a prefab that carries both: levels/prefabs/
+building_hut, building_house and building_shed (drawn by
+tools/seed_prefabs.gd: the footprint, its walls, a door south, a ring of
+dirt) each hold one record. Stamping (Prefab.stamp_changes) moves and
+turns the record with the cells (LevelMap.moved_config carries
+"buildings", a footprint by two opposite corners) and merges it into the
+map's list, the map's buildings it lands on taken out, as it merges
+places; so the editor and builder mode (BuilderSession.CONFIG_KEYS, its
+prompt naming which prefabs are buildings) place buildings with no new
+tool. The record reaches clients inside level.json in the "terrain"
+message they already get: nothing replicates, the protocol is unchanged.
+
+Rejected: a Building entity (replicated state that nothing changes, and a
+second thing to keep in step with the walls); generating the walls from
+the record (two sources for one wall, and an editor that could not touch
+them up); and building slots that carry their own walls (they would
+double the wall runs and fade as one block, not by the edge that hides the
+player). A well, 1x1 with no inside, is not yet one of these: how its
+cell stops walkers is its own question; it comes last, with its own
+decision.

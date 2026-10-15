@@ -12,7 +12,8 @@ extends RefCounted
 ##   level.json   name; legend overrides; the entities' names and props by
 ##                tile (a monster's facing and idling too); the start order;
 ##                named spawn points; level links; neighbours (the level
-##                across each map edge); places (held by factions).
+##                across each map edge); places (held by factions);
+##                buildings (footprints walked into, roofed).
 ##
 ## A cell pixel is ground (stone, grass, dirt), fire, water, a stair, void
 ## (also any pixel more than half transparent), or a marker: a player start,
@@ -27,7 +28,7 @@ extends RefCounted
 ## no wall: nothing is built along it, and sight passes over it.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
-## links, neighbours, places, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
+## links, neighbours, places, buildings, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
 ## views take: floor, fire, edges (as Terrain.parse), and kinds (cell ->
 ## "stone" | "grass" | "dirt"), water, heights (cell -> 1..6; 0 is left
 ## out), stairs (cell -> the direction it climbs), torches.
@@ -84,6 +85,14 @@ const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "sto
 ## A place's radius when level.json gives none, in cells.
 const PLACE_RADIUS := 8
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
+## The buildings level.json "buildings" may name (art-kit's building.*
+## slots, drawn over the footprint: roof, floor, trim), each its footprint
+## in cells, across by deep as it faces north or south (the other way round
+## facing east or west). The footprint is the inside; its walls and door
+## are the map's own edges on its outline (decision 265).
+const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3)}
+## A building's facing (the side its front is on) when level.json gives none.
+const BUILDING_FACING := Vector2i(0, 1)
 ## What a marker spawns, before level.json's props for that tile.
 ## Each kind fights its own way too (Monster.TACTICS): the brute plods and
 ## hits hard and seldom, the sneak is quick and frail.
@@ -355,6 +364,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 		"warnings": warnings,
 	}
 	_place(level, markers, config, warnings)
+	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	return level
 
 
@@ -543,6 +553,85 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			warnings.append("the place %s has a radius under 1: it is 1" % [key])
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
+	return out
+
+
+## level.json's "buildings", [{slot, at: its footprint's top-left cell,
+## facing: [dx, dy], the side its front is on}], as {slot, cell, facing
+## (Vector2i), rect (the footprint, Rect2i)}. A building stands only on
+## floor of one height, clear of the others: one that does not, or of a
+## slot there is not, is left out and said in [param warnings]; one whose
+## outline has open edges stands, said (a shed may be open).
+static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("buildings", [])
+	if not listed is Array:
+		warnings.append("\"buildings\" in level.json is not a list")
+		return out
+	var ground: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain["floor"]:
+		ground[cell] = true
+	var taken: Dictionary[Vector2i, bool] = {}
+	for entry: Variant in listed:
+		var rect: Variant = building_rect(entry)
+		if rect == null:
+			warnings.append("the building %s has no \"at\" cell or no slot of %s" % [entry, ", ".join(BUILDINGS.keys())])
+			continue
+		var cells := rect_cells(rect)
+		var height: int = terrain["heights"].get(cells[0], 0)
+		var bad := cells.filter(func(cell: Vector2i) -> bool:
+			return not ground.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
+		if not bad.is_empty():
+			warnings.append("the %s at %s is not all on clear floor of one height (%s): left out" % [entry["slot"], rect.position, bad[0]])
+			continue
+		for cell in cells:
+			taken[cell] = true
+		var open: Array[Vector3i] = []
+		for key in outline(rect):
+			if not terrain["edges"].has(key):
+				open.append(key)
+		if not open.is_empty():
+			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [entry["slot"], rect.position, open.size(), open[0]])
+		out.append({"slot": str(entry["slot"]), "cell": rect.position, "facing": building_facing(entry), "rect": rect})
+	return out
+
+
+## A level.json building entry's facing: its "facing" if it is one of the
+## four sides, else BUILDING_FACING.
+static func building_facing(entry: Dictionary) -> Vector2i:
+	var facing: Variant = facing_from(entry.get("facing"))
+	return facing if facing != null and (facing.x == 0 or facing.y == 0) else BUILDING_FACING
+
+
+## A level.json building entry's footprint (null if it has no "at" or no
+## slot in BUILDINGS).
+static func building_rect(entry: Variant) -> Variant:
+	if not entry is Dictionary or not BUILDINGS.has(str(entry.get("slot", ""))):
+		return null
+	var at: Variant = _tile(entry.get("at"))
+	if at == null:
+		return null
+	var size: Vector2i = BUILDINGS[str(entry["slot"])]
+	return Rect2i(at, size if building_facing(entry).x == 0 else Vector2i(size.y, size.x))
+
+
+static func rect_cells(rect: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			out.append(Vector2i(x, y))
+	return out
+
+
+## The edges round [param rect]'s outline, as Terrain edge keys.
+static func outline(rect: Rect2i) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	for x in range(rect.position.x, rect.end.x):
+		out.append(Vector3i(x, rect.position.y - 1, Terrain.SOUTH))
+		out.append(Vector3i(x, rect.end.y - 1, Terrain.SOUTH))
+	for y in range(rect.position.y, rect.end.y):
+		out.append(Vector3i(rect.position.x - 1, y, Terrain.EAST))
+		out.append(Vector3i(rect.end.x - 1, y, Terrain.EAST))
 	return out
 
 

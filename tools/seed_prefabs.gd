@@ -94,6 +94,58 @@ const PREFABS := {
 		],
 		"config": {},
 	},
+	# The buildings (Level.BUILDINGS, decision 265): the footprint in stone,
+	# its walls on the outline, a door in its front (south), a ring of dirt
+	# round it so the walls are its own; the record says where it stands.
+	# Art-kit's building.<kind> draws its roof, floor and trim over it.
+	"building_hut": {
+		"rows": [
+			", , , , ,",
+			"  # # #  ",
+			",#_ _ _#,",
+			"         ",
+			",#_ _ _#,",
+			"         ",
+			",#_ _ _#,",
+			"  # + #  ",
+			", , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.hut", "at": [1, 1], "facing": [0, 1]}]},
+	},
+	"building_house": {
+		"rows": [
+			", , , , , ,",
+			"  # # # #  ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"  # + # #  ",
+			", , , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.house", "at": [1, 1], "facing": [0, 1]}]},
+	},
+	"building_shed": {
+		"rows": [
+			", , , ,",
+			"  # #  ",
+			",#_ _#,",
+			"       ",
+			",#_ _#,",
+			"       ",
+			",#_ _#,",
+			"  + #  ",
+			", , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.shed", "at": [1, 1], "facing": [0, 1]}]},
+	},
 }
 
 

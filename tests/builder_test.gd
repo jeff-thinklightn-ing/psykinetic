@@ -17,6 +17,7 @@ func _ready() -> void:
 	await _test_spending_limit()
 	await _test_new_area()
 	await _test_mark_place()
+	await _test_stamp_building()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -55,6 +56,30 @@ func _test_mark_place() -> void:
 	_check(results.slice(1).all(func(result: Dictionary) -> bool: return result.get("is_error", false)), "and Claude is told so")
 	session.accept()
 	_check(doc.config.get("places", {}).has("camp") and doc.undo_steps.size() == 1, "accepted: in the level, one undo step")
+
+
+func _test_stamp_building() -> void:
+	print("
+== stamp a building: its record in the level, turned with it, beside the others ==")
+	var doc := _doc()
+	doc.config["buildings"] = [{"slot": "building.shed", "at": [20, 20], "facing": [0, 1]}]
+	var stub := StubClaude.new([
+		[{"name": "stamp", "input": {"prefab": "building_hut", "at": [6, 6], "turns": 1}},
+			{"name": "stamp", "input": {"prefab": "building_shed", "at": [11, 6]}}],
+		"A hut and a shed.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a hut and a shed")
+	session.accept()
+	var buildings: Array = doc.config.get("buildings", [])
+	_check(buildings.size() == 3 and buildings[0]["at"] == [20, 20], "accepted: the map's shed kept, and two more (%s)" % [buildings])
+	_check(buildings.size() == 3 and buildings[1] == {"slot": "building.hut", "at": [7, 7], "facing": [-1, 0]},
+			"the hut turned a quarter: its front west (%s)" % [buildings[1] if buildings.size() > 1 else null])
+	var level := Level.parse(doc.map.to_image(), null, doc.config)
+	_check(level["buildings"].size() == 3 and doc.undo_steps.size() == 1, "all three stand in the level, one undo step (%s)" % [level["warnings"]])
+	var prompt := BuilderSession.system_prompt()
+	_check(prompt.contains("building_hut (5 x 5), a building: hut") and prompt.contains("building_house (6 x 8), a building: house"),
+			"Claude is told which prefabs are buildings")
 
 
 func _test_prompt() -> void:
