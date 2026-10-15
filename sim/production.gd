@@ -27,8 +27,10 @@ extends RefCounted
 ## any banked gear whose recipe is the worker's trade: half its steps and
 ## one of its first resource.
 ##
-## Workers are paid a wage from the town's gold when a job is done, never
-## below rules' gold_floor; they pay rent from their purse every rent_every
+## Workers are paid rules' "wage" from the town's gold when a job is done
+## (none in the game's rules: makers earn from sales; decision 353), and
+## official trades a wage of their own every so often, never below rules'
+## gold_floor; they pay rent from their purse every rent_every
 ## steps, which leaves the economy (the town's upkeep). Rules: levels/economy.json.
 ## World keeps one (World.production), made by Main at boot; saved in the
 ## snapshot ("production": to_dict). Server only.
@@ -64,7 +66,7 @@ var workshop_level := Callable()
 var on_built := Callable()
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
-## (need -> step due), fed, hungry_since, last_trade}.
+## (need -> step due), fed, hungry_since, last_trade, wage_due}.
 var _workers: Dictionary[String, Dictionary] = {}
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
@@ -133,7 +135,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	list.assign(trades.map(func(trade: Variant) -> String: return str(trade)))
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
-		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}}
+		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0}
 	_town(town)
 	return true
 
@@ -359,6 +361,7 @@ func tick() -> void:
 	var cat: Dictionary = catalog.call()
 	_advance(at, cat)
 	_rent(at)
+	_official_wages(at)
 	var towns: Array[String] = []
 	towns.assign(_towns.keys())
 	towns.sort()
@@ -394,6 +397,7 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 	if each["kind"] == "build":
 		if on_built.is_valid():
 			on_built.call(each["town"], each["recipe"])
+		_town_work_fee(each, worker_record)
 	elif each["kind"] == "rework":
 		uid = int(each["uids"][0])
 		book().place(uid, "")
@@ -421,6 +425,25 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 	_jobs.erase(int(each["id"]))
 
 
+## Work the town ordered (a build or repair job, [param each]) is paid
+## from the treasury to [param worker_record] who did it, as a resident
+## pays the carpenter (decision 353 amended): rules' "town_work" fee for
+## each per_steps of the work, at least 1; what the treasury has above
+## gold_floor if less, none at the floor.
+func _town_work_fee(each: Dictionary, worker_record: Dictionary) -> void:
+	var town_work: Dictionary = rules.get("town_work", {})
+	var fee := int(town_work.get("fee", 0))
+	if fee <= 0:
+		return
+	var town: String = each["town"]
+	var owed := maxi(int(int(each["needed"]) / maxf(float(town_work.get("per_steps", 600)), 1.0) * fee), 1)
+	var paid := mini(owed, stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)))
+	if paid > 0 and stockpile.take(town, "gold", paid, "town_work:%s" % worker_record["id"]):
+		worker_record["purse"] = int(worker_record["purse"]) + paid
+	print("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], maxi(paid, 0), owed, town,
+		each["recipe"], now()])
+
+
 func _rent(at: int) -> void:
 	var every := int(rules.get("rent_every", 6000))
 	var rent := int(rules.get("rent", 0))
@@ -440,6 +463,41 @@ func _rent(at: int) -> void:
 		town["upkeep"] = int(town["upkeep"]) + pay
 		print("[production] %s paid %d gold rent to %s's upkeep, step %d (%d left)" % [worker_record["name"], pay,
 			worker_record["town"], at, worker_record["purse"]])
+
+
+## The town pays wages only for its official jobs (rules' "official":
+## trade -> {wage, every}, a guard's; decision 353 amended): every "every"
+## steps from the treasury while it stays at gold_floor or above (else it
+## waits till next due), to each worker of that trade there, not away.
+## Makers earn from what they sell.
+func _official_wages(at: int) -> void:
+	var official: Dictionary = rules.get("official", {})
+	if official.is_empty():
+		return
+	var floor_gold := int(rules.get("gold_floor", 0))
+	for id in worker_ids():
+		var worker_record: Dictionary = _workers[id]
+		var trade := ""
+		for each: String in worker_record["trades"]:
+			if official.has(each):
+				trade = each
+				break
+		if trade.is_empty() or worker_record["away"]:
+			continue
+		var every := maxi(int(official[trade].get("every", 54000)), 1)
+		if int(worker_record["wage_due"]) == 0:
+			worker_record["wage_due"] = at + every
+			continue
+		if at < int(worker_record["wage_due"]):
+			continue
+		worker_record["wage_due"] = at + every
+		var wage := int(official[trade].get("wage", 0))
+		var town: String = worker_record["town"]
+		if wage <= 0 or stockpile.count(town, "gold") - wage < floor_gold 				or not stockpile.take(town, "gold", wage, "wage:%s" % id):
+			print("[production] %s the %s goes unpaid: %s's treasury is at its floor, step %d" % [worker_record["name"], trade, town, at])
+			continue
+		worker_record["purse"] = int(worker_record["purse"]) + wage
+		print("[production] %s the %s is paid %d gold by %s, step %d" % [worker_record["name"], trade, wage, town, at])
 
 
 # --- Signals and tiers ---------------------------------------------------------------
@@ -832,6 +890,7 @@ func from_dict(saved: Dictionary) -> void:
 				for need: Variant in needs:
 					_workers[id]["needs"][str(need)] = int(needs[need])
 			_workers[id]["fed"] = str(entry.get("fed", ""))
+			_workers[id]["wage_due"] = maxi(int(entry.get("wage_due", 0)), 0)
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)
 			var last: Variant = entry.get("last_trade", {})
 			if last is Dictionary and not last.is_empty():

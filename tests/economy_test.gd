@@ -98,8 +98,8 @@ func _test_buying() -> void:
 	_now = 700
 	deal = economy.buy("p1", TOWN, uid)
 	_check(deal["ok"] and deal["price"] == 18 and economy.gold("p1") == 32, "bought at 18: 32 left (%s, %d)" % [deal, economy.gold("p1")])
-	_check(economy.stockpile.count(TOWN, "gold") == 103 and int(economy.production.worker("bram")["purse"]) == 15,
-		"the sale tax (3) to the treasury, 15 to Bram who made it (%d, %s)" % [economy.stockpile.count(TOWN, "gold"), economy.production.worker("bram")])
+	_check(economy.materials("sword") == 7 and economy.stockpile.count(TOWN, "gold") == 109 and int(economy.production.worker("bram")["purse"]) == 9,
+		"its materials (7: 3 ore, a wood) and the sale tax on the rest (2) to the treasury, 9 to Bram who made it (decision 353 amended; %d, %s)" % [economy.stockpile.count(TOWN, "gold"), economy.production.worker("bram")])
 	_check(not economy.stockpile.shop(TOWN).has(uid) and economy.stockpile.book.at_of(uid) == ""
 		and economy.stockpile.book.history(uid)["events"].any(func(event: Dictionary) -> bool: return event["kind"] == "bought"),
 		"out of the shop, held by nothing until put somewhere, its history says bought")
@@ -108,7 +108,7 @@ func _test_buying() -> void:
 	var bought := economy.stockpile.book.mint("crown", "found", "test")
 	economy.stockpile.stock_shop(TOWN, bought, "sold:p2")
 	economy.buy("p1", TOWN, bought)
-	_check(economy.stockpile.count(TOWN, "gold") == 123 and economy.gold("p1") == 12,
+	_check(economy.stockpile.count(TOWN, "gold") == 129 and economy.gold("p1") == 12,
 		"a crown no resident made (the town bought it): all 20 to the treasury")
 	_check(economy.add_gold("p1", -50, "a test") == 0, "gold never goes below none")
 

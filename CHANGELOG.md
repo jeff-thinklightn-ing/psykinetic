@@ -11,9 +11,12 @@ notes (decision 324).
   last bought or sold and from or to whom, a fee paid or earned, whether
   the town fed them free or they went without (and since when), and how
   many of the town are on its dole.
-- A town starts with 50 gold in its store. Its residents now spend their own
-  gold: meals from the shop (or the store's food), a bed at the inn, mending
-  from the carpenter and tool work from the smith. The town feeds anyone
+- A town starts with 150 gold spread evenly over its residents' purses; its
+  treasury starts empty and lives on taxes and on what its materials sell
+  for, and pays only official jobs (guards, haulers) and the building and
+  repairs it orders. Makers earn from what they sell. Residents spend their
+  own gold: meals from the shop (or the store's food), a bed at the inn,
+  mending from the carpenter and tool work from the smith. The town feeds anyone
   with no gold, and its kitchen then works for food first; the party log
   says how many are on the dole. Rent falls due once a day.
 - Monsters and other players no longer hop forward over a laggy connection: a

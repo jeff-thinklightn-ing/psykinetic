@@ -281,6 +281,7 @@ func tick() -> void:
 	towns.assign(_towns.keys())
 	towns.sort()
 	for town in towns:
+		_spread(town)
 		if production.building_in(town):
 			continue
 		if _repair(town):
@@ -391,17 +392,41 @@ func seed_from(world_map: WorldMap) -> Array[String]:
 	return out
 
 
-## A town's store gets rules' start_gold once, the first time it is seen
-## (a save from before decision 353 too): "founded" on its record.
+## A town is founded once, the first time its store is seen (a save from
+## before decision 353 too): "founded" on its record. Its treasury starts
+## empty; rules' start_gold is its people's, spread evenly over its
+## residents' purses (Jeff, 353 amended), the first when there are any
+## ("to_spread" waits till then). Residents who come later get none.
 func _found(town: String) -> void:
 	var record := _town(town)
 	if record["founded"]:
 		return
 	record["founded"] = true
-	var gold := int(rules.get("start_gold", 0))
-	if gold > 0:
-		production.stockpile.deposit(town, "gold", gold, "founded", "the town's starting gold")
-		_note(town, "founded, with %d gold" % gold)
+	record["to_spread"] = maxi(int(rules.get("start_gold", 0)), 0)
+	_note(town, "founded")
+	_spread(town)
+
+
+## [param town]'s founding gold, if it waits and the town has residents of
+## its own (not companions): split evenly, the first by id a coin more
+## for what doesn't divide.
+func _spread(town: String) -> void:
+	var record := _town(town)
+	var gold := int(record["to_spread"])
+	if gold <= 0:
+		return
+	var folk: Array[String] = []
+	for who: String in record["residents"]:
+		if not who.begins_with("companion:") and not str(production.worker(who).get("origin", "")).begins_with("companion:"):
+			folk.append(who)
+	if folk.is_empty():
+		return
+	folk.sort()
+	record["to_spread"] = 0
+	for i in folk.size():
+		var share := gold / folk.size() + (1 if i < gold % folk.size() else 0)
+		production.pay(folk[i], share, "the town's founding gold")
+	_note(town, "its founding gold, %d, spread over %d residents" % [gold, folk.size()])
 
 
 ## Production.on_built: [param kind] in [param town] is up a level and
@@ -699,14 +724,15 @@ func _note(town: String, what: String) -> void:
 
 func _town(town: String) -> Dictionary:
 	if not _towns.has(town):
-		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "taken": {}, "log": [], "founded": false}
+		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "taken": {}, "log": [], "founded": false, "to_spread": 0}
 	return _towns[town]
 
 
 # --- Saving --------------------------------------------------------------------------
 
 ## For the snapshot: town -> {xp, spent, residents, buildings, objectives,
-## captives, taken (worker id -> times carried off), log, founded}.
+## captives, taken (worker id -> times carried off), log, founded,
+## to_spread}.
 func to_dict() -> Dictionary:
 	return _towns.duplicate(true)
 
@@ -722,6 +748,7 @@ func from_dict(saved: Dictionary) -> void:
 		var record := _town(str(town))
 		record["xp"] = maxi(int(entry.get("xp", 0)), 0)
 		record["founded"] = bool(entry.get("founded", false))
+		record["to_spread"] = maxi(int(entry.get("to_spread", 0)), 0)
 		record["spent"] = clampi(int(entry.get("spent", 0)), 0, record["xp"])
 		for who: Variant in entry.get("residents", []):
 			if not production.worker(str(who)).is_empty():

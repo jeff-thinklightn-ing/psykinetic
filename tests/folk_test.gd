@@ -1,15 +1,17 @@
 extends Node
-## Residents' trade and a town's starting gold (decision 353), on a clock of
-## its own with the real rules (levels/economy.json) and a test catalog: a
-## town is founded with start_gold once; residents buy meals from the shop
+## Residents' trade and a town's starting gold (decision 353, amended), on a
+## clock of its own with the real rules (levels/economy.json) and a test
+## catalog: a town is founded once, its start_gold spread evenly over its
+## residents (none to the treasury, none to those who come later); residents buy meals from the shop
 ## (the maker paid, the sale tax to the treasury, keep_in_shop left for
 ## players), else the store's food, else the town feeds them (the dole,
 ## which makes food the town's first want), else they go hungry; they pay
 ## the carpenter and the smith for services and the inn for a bed, never
 ## into debt; a rich one spends sooner; each trade is a ledger line and the
-## worker's last_trade; gold only moves; and three game days of work, rent
-## and trade keep the treasury at its floor or above, every purse bounded
-## and everyone fed. Reads the repo's levels, never the shared overlay.
+## worker's last_trade; gold only moves; a made thing's materials are the
+## treasury's; and over three game days the treasury, filled by sales,
+## pays the official jobs (a guard, haulers) and the walls it orders, every
+## purse bounded and everyone fed. Reads the repo's levels, never the shared overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -59,6 +61,13 @@ func _meal(maker := "c1") -> int:
 	return uid
 
 
+## A maker's share of a meal sold for [param cost]: past its materials,
+## less the sale tax.
+func _labour(cost: int) -> int:
+	var rest := cost - mini(_economy.materials("meal"), cost)
+	return rest - int(floor(rest * float(_rules["tax"]["sale"])))
+
+
 func _gold() -> int:
 	var total := _stock.count(TOWN, "gold")
 	for id in _work.worker_ids():
@@ -76,19 +85,31 @@ func _test_founded() -> void:
 	var work := Production.new({}, stock, null, Callable(), _rules)
 	var towns := Towns.new({}, work, _rules)
 	towns.seed_from(world_map)
-	_check(_rules.get("start_gold") == 50.0 and stock.count("wilds/store", "gold") == 50,
-		"the wilds store has the 50 starting gold (%d)" % stock.count("wilds/store", "gold"))
+	var gold := int(_rules["start_gold"])
+	_check(gold == 150 and stock.count("wilds/store", "gold") == 0 and towns.to_dict()["wilds/store"]["to_spread"] == gold,
+		"founded: the treasury starts empty, its %d gold waits for residents (%s)" % [gold, towns.to_dict()["wilds/store"]["to_spread"]])
+	for each in [["r1", "Odo", "smith"], ["r2", "Mags", "cook"], ["r3", "Ash", "hauler"], ["r4", "Bea", "hauler"]]:
+		towns.note_rescue("wilds/store", each[0], each[1], each[2])
+	towns.tick()
+	var purses: Array = ["r1", "r2", "r3", "r4"].map(func(id: String) -> int: return int(work.worker(id)["purse"]))
+	_check(purses == [gold / 4 + 1, gold / 4 + 1, gold / 4, gold / 4] and stock.count("wilds/store", "gold") == 0,
+		"spread evenly over the residents, the first by id a coin more (%s), none to the treasury" % [purses])
+	towns.note_rescue("wilds/store", "r5", "Cole", "hauler")
+	towns.tick()
 	towns.seed_from(world_map)
-	_check(stock.count("wilds/store", "gold") == 50, "seeded again: still 50")
+	_check(int(work.worker("r5")["purse"]) == 0 and int(work.worker("r1")["purse"]) == gold / 4 + 1,
+		"one who comes later gets none; seeded again, nothing more")
 	var again := Towns.new(towns.to_dict(), work, _rules)
 	again.seed_from(world_map)
-	_check(stock.count("wilds/store", "gold") == 50, "after a restart: still 50 (founded is saved)")
+	again.tick()
+	_check(int(work.worker("r1")["purse"]) == gold / 4 + 1, "after a restart: nothing more (founded is saved)")
 	var old := towns.to_dict()
 	old["wilds/store"].erase("founded")
+	old["wilds/store"].erase("to_spread")
 	var stock_old := Stockpile.new({}, Callable(), ItemBook.new(Callable()))
 	var older := Towns.new(old, Production.new({}, stock_old, null, Callable(), _rules), _rules)
 	older.seed_from(world_map)
-	_check(stock_old.count("wilds/store", "gold") == 50, "a save from before it gets the 50 once")
+	_check(older.to_dict()["wilds/store"]["to_spread"] == gold, "a save from before it is founded once")
 
 
 func _test_meals() -> void:
@@ -114,12 +135,12 @@ func _test_meals() -> void:
 	_economy.tick()
 	_check(_gold() == before, "gold only moved (%d, %d)" % [before, _gold()])
 	_check(_stock.shop(TOWN).size() == 1, "two meals bought; keep_in_shop leaves one for players (%d)" % _stock.shop(TOWN).size())
-	var tax := int(floor(price * float(_rules["tax"]["sale"])))
 	var mags := _work.worker("c1")
 	var ash := _work.worker("h1")
 	var second := int(ash["last_trade"].get("gold", 0))
-	_check(mags["fed"] == "bought" and int(mags["purse"]) == 10 - price + (price - tax) + second - int(floor(second * float(_rules["tax"]["sale"]))),
-		"Mags (cook) bought her own meal and was paid for both, less the tax (%d gold, %d then %d: dearer as the shop runs short)" % [mags["purse"], price, second])
+	_check(_economy.materials("meal") == 2, "a meal's materials are worth 2 (2 food)")
+	_check(mags["fed"] == "bought" and int(mags["purse"]) == 10 - price + _labour(price) + _labour(second),
+		"Mags (cook) bought her own meal and was paid her labour for both: the materials and the tax to the treasury (%d gold, %d then %d: dearer as the shop runs short)" % [mags["purse"], price, second])
 	_check(ash["fed"] == "bought" and ash["last_trade"].get("with") == "Mags" and int(ash["last_trade"].get("gold", 0)) == 100 - int(ash["purse"]),
 		"Ash bought a meal from Mags: his last_trade says so (%s)" % [ash["last_trade"]])
 	_check(_stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "folk:h1" and str(line["from"]).contains("Ash bought a meal from Mags")),
@@ -199,44 +220,72 @@ func _test_services() -> void:
 
 
 func _test_days() -> void:
-	print("\n== three days of work, rent and trade ==")
+	print("
+== three days of work, rent and trade on the founding gold ==")
 	_setup()
-	_stock.deposit(TOWN, "gold", int(_rules["start_gold"]))
 	_stock.deposit(TOWN, "food", 400)
 	var folk := [["c1", "Mags", "cook"], ["c2", "Tilda", "cook"], ["s1", "Odo", "smith"], ["p1", "Pell", "carpenter"],
-		["h1", "Ash", "hauler"], ["h2", "Bea", "hauler"], ["h3", "Cole", "hauler"], ["h4", "Dara", "hauler"]]
-	for each in folk:
-		_work.add_worker(each[0], each[1], [each[2]], TOWN)
+		["g1", "Wat", "guard"], ["h1", "Ash", "hauler"], ["h2", "Bea", "hauler"], ["h3", "Cole", "hauler"]]
+	var gold := int(_rules["start_gold"])
+	for i in folk.size():
+		_work.add_worker(folk[i][0], folk[i][1], [folk[i][2]], TOWN)
+		_work.pay(folk[i][0], gold / folk.size() + (1 if i < gold % folk.size() else 0))
 	_work.add_workshop(TOWN + ":kitchen", "cook", TOWN)
 	_work.assign(TOWN + ":kitchen", "c1")
 	_work.add_workshop(TOWN + ":kitchen2", "cook", TOWN)
 	_work.assign(TOWN + ":kitchen2", "c2")
+	_work.add_workshop(TOWN + ":yard", "carpenter", TOWN)
+	_work.assign(TOWN + ":yard", "p1")
+	_stock.deposit(TOWN, "wood", 10)
 	var start := _gold()
-	var floor_gold := int(_rules["gold_floor"])
-	var lowest := _stock.count(TOWN, "gold")
 	var richest := 0
-	var meals := 0
-	var steps := 0
+	var ordered := false
+	var most_dole := 0
+	var guard_paid := 0
+	var haulers_paid := 0
+	var town_work := 0
+	var day_lines: Array[String] = []
 	while _now < 3 * DAY:
 		_now += World.WORLD_TICK_STEPS
-		steps += 1
+		if not ordered and _now >= DAY:
+			ordered = true
+			_work.order_build(TOWN, "walls", "carpenter", {"wood": 10}, 3000)
 		_work.tick()
 		_economy.tick()
-		lowest = mini(lowest, _stock.count(TOWN, "gold"))
+		most_dole = maxi(most_dole, _work.on_dole(TOWN))
 		for id in _work.worker_ids():
 			richest = maxi(richest, int(_work.worker(id)["purse"]))
+		if _now % DAY == 0:
+			day_lines.append("day %d: treasury %d, purses %s, on the dole %d" % [_now / DAY, _stock.count(TOWN, "gold"),
+				_work.worker_ids().map(func(id: String) -> String: return "%s %d" % [_work.worker(id)["name"], _work.worker(id)["purse"]]),
+				_work.on_dole(TOWN)])
+	var meals := 0
+	var services := 0
 	for line: Dictionary in _stock.ledger(TOWN):
+		if str(line["by"]) == "wage:g1":
+			guard_paid += 1
+		if str(line["by"]).begins_with("wage:h"):
+			haulers_paid += 1
+		if str(line["by"]) == "town_work:p1":
+			town_work = -int(line["count"])
 		if str(line["from"]).contains("bought a meal"):
 			meals += 1
-	_check(lowest >= mini(floor_gold, int(_rules["start_gold"])), "the treasury never went under its floor (lowest %d)" % lowest)
+		elif str(line["by"]).begins_with("folk:") and str(line["from"]).contains(" paid "):
+			services += 1
+	for line in day_lines:
+		print("  " + line)
+	print("  haulers paid %d times; Pell paid %d by the town for the walls" % [haulers_paid, town_work])
+	print("  meals bought %d, services and beds %d, the guard paid %d times, the most on the dole at once %d, rent %d" % [
+		meals, services, guard_paid, most_dole, _work.upkeep(TOWN)])
+	_check(start == gold, "the town starts with its %d gold in its residents' purses" % gold)
 	_check(_gold() + _work.upkeep(TOWN) == start, "gold conserved but for rent, the sink (%d + %d upkeep = %d)" % [_gold(), _work.upkeep(TOWN), start])
-	_check(_work.upkeep(TOWN) > 0, "rent was paid (%d)" % _work.upkeep(TOWN))
-	_check(richest <= 200, "no purse ran away (the most: %d)" % richest)
-	_check(meals > 0, "residents bought meals the cooks made (%d in the ledger)" % meals)
-	_check(_work.worker_ids().all(func(id: String) -> bool: return _work.worker(id)["fed"] != "" and _work.worker(id)["fed"] != "hungry"),
-		"everyone ate, nobody hungry (%s)" % [_work.worker_ids().map(func(id: String) -> String: return "%s %s %d" % [id, _work.worker(id)["fed"], _work.worker(id)["purse"]])])
-	print("  after 3 days: treasury %d, purses %s, upkeep %d" % [_stock.count(TOWN, "gold"),
-		_work.worker_ids().map(func(id: String) -> int: return int(_work.worker(id)["purse"])), _work.upkeep(TOWN)])
+	_check(_stock.count(TOWN, "gold") > 0 and meals > 0, "the treasury filled from what was sold (%d)" % _stock.count(TOWN, "gold"))
+	_check(guard_paid > 0, "the guard, an official job, was paid by the town (%d times)" % guard_paid)
+	_check(haulers_paid > 0, "haulers, the town's own labour, were paid (%d times)" % haulers_paid)
+	_check(town_work > 0, "the town paid Pell for the walls it ordered (%d)" % town_work)
+	_check(richest <= gold, "no purse ran away (the most: %d)" % richest)
+	_check(_work.worker_ids().all(func(id: String) -> bool: return _work.worker(id)["fed"] not in ["", "hungry"]),
+		"everyone ate, nobody hungry")
 
 
 func _check(ok: bool, what: String) -> void:

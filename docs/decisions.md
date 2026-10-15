@@ -6852,3 +6852,50 @@ is 18. But most of the 50 sits at the floor (wages need 9 above it), so
 without players folk soon live on the dole. Gold comes in through
 players: their buys, deposits and sales. The dole makes the kitchen work
 for food first.
+
+Amended (Jeff, 2026-10-15: "treasury can start 0, but raise total economy
+to 150 coins spread about -- attempt to spread it evenly, town collects
+taxes and pays official jobs only such as guards"):
+- Founding gold goes to the people, not the store. A town's treasury
+  starts at 0. `start_gold` (150) is spread evenly over its residents'
+  purses (not companions'), with the first by id getting a coin more for
+  what doesn't divide.
+- When a town has no residents yet, the gold waits (`to_spread` on the
+  record, saved) and is spread at the first `Towns.tick` that finds some.
+- Anyone who comes later gets none.
+
+The town pays only official jobs and work it orders:
+- No wage per job (`wage` 0): makers earn only from what they sell.
+- `official` (trade -> {wage, every}): guard 4 and hauler 2 (the town's
+  own labour), every 18000 steps (12 and 6 a day). These are paid from
+  the treasury while it stays at `gold_floor` or above; if it can't pay,
+  that payday is skipped. A daily lump came the first day, while the
+  treasury was still low, and went unpaid.
+- Work the town orders (a build or a repair) is paid from the treasury to
+  the worker as a fee: `town_work` fee 1 for each 600 steps of the job,
+  or what the treasury has above its floor if that is less.
+
+The treasury is paid for its materials:
+- When a made thing sells, to a player or a resident, the value of its
+  materials (`Economy.materials`: its recipe's `from` at base values) goes
+  to the treasury, the sale tax on the rest goes there too, and the maker
+  keeps the rest, which is their labour.
+- Players pay the same price, and their gold is never touched.
+
+folk_test, over 3 days with 8 residents (2 cooks, smith, carpenter,
+guard, 3 haulers), 400 food, 150 gold spread, and the walls ordered on
+day 1:
+
+| End of | Treasury | Purses | On the dole |
+|---|---|---|---|
+| Day 1 | 23 | 7 to 18 | 0 |
+| Day 2 | 48 | 0 to 16 | 0 |
+| Day 3 | 71 | 0 to 8 | 0 (1 at most, at once) |
+
+Over the 3 days: 22 meals, 17 services and beds, 20 official wages, 5
+for the walls, rent 65. Gold goes round: purses pay the treasury
+(materials, taxes, beds, store food), and the treasury pays guards,
+haulers and town work.
+- Rent is now the largest drain: 3 a day each takes 150 down by 65 in
+  3 days with no players. `rent` 1 or 2 slows that.
+- (b), the treasury hiring more officials as it grows, is a later step.

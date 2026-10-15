@@ -13,9 +13,10 @@ extends RefCounted
 ## it is threatened; "comfort" for raws) dearer up to "trade".max_factor,
 ## plenty cheaper down to min_factor.
 ##
-## A player buys from a shop at its price, from their own gold: the sale tax
-## goes to the treasury (the stockpile's gold) and the rest to the purse of
-## the resident who made it (the treasury's if no one did). The town buys
+## A player buys from a shop at its price, from their own gold: what its
+## materials are worth and the sale tax on the rest go to the treasury (the
+## stockpile's gold), and the rest to the purse of the resident who made it
+## (the treasury's if no one did; decision 353 amended). The town buys
 ## from a player only what it is short of, at buy_ratio of its own price,
 ## and only while its treasury stays above gold_floor; the buy tax stays in
 ## the treasury. A player's gold is theirs: nothing takes it but buying.
@@ -202,6 +203,24 @@ func price(town: String, id: String, side := SELL, cat := {}) -> int:
 	return asked
 
 
+## What [param id]'s materials are worth, before the town's need: its
+## recipe's from (each resource at rules' "value", each thing at its own
+## value); 0 for a thing not made.
+func materials(id: String, cat := {}) -> int:
+	if cat.is_empty():
+		cat = catalog.call()
+	var made: Variant = cat.get(id, {}).get("made", {})
+	if not made is Dictionary or made.is_empty():
+		return 0
+	var values: Dictionary = rules.get("value", {})
+	var total := 0.0
+	var from: Dictionary = made.get("from", {})
+	for what: String in from:
+		var each := float(values.get(what, 1)) if what in Stockpile.RESOURCES or not cat.has(what) 				else float(value_of(what, cat, 1))
+		total += each * int(from[what])
+	return roundi(total)
+
+
 ## Whether [param town] would buy [param id] from a player now, and why
 ## not: "" for yes.
 func refuses(town: String, id: String, cat := {}) -> String:
@@ -260,14 +279,7 @@ func buy(player_id: String, town: String, uid: int) -> Dictionary:
 	if not stockpile.take_from_shop(town, uid, "sold:%s" % player_id):
 		return {"ok": false, "why": "that is no longer for sale"}
 	add_gold(player_id, -cost, "bought %s" % id)
-	var split := Economy.taxed(cost, "sale", rules)
-	var worker := production.worker(maker) if not maker.is_empty() else {}
-	if worker.is_empty():
-		stockpile.deposit(town, "gold", cost, "sale:%s" % player_id, "a sale")
-	else:
-		if split[0] > 0:
-			stockpile.deposit(town, "gold", split[0], "tax:sale", "a sale")
-		production.pay(maker, split[1], "sold %s" % id)
+	_sale(town, maker, id, cost, "sale:%s" % player_id, "sold %s" % id)
 	stockpile.book.note(uid, "bought", "by %s at %s for %d gold" % [player_id, town, cost])
 	production.note_sale(town, id, 1)
 	return {"ok": true, "price": cost, "id": id}
@@ -292,8 +304,8 @@ func sell(player_id: String, town: String, id: String) -> Dictionary:
 
 ## Each resident (a Production worker not away) meets their needs from
 ## their purse on the world tick, each need (rules' "folk" "needs") on its
-## own clock: a meal (tags) is bought from the shop at its price (the sale
-## tax to the treasury, the rest to its maker), only past keep_in_shop of
+## own clock: a meal (tags) is bought from the shop at its price (split as
+## a player's buy: materials and tax to the treasury, the rest its maker's), only past keep_in_shop of
 ## them so players find one; else the store's food at its value x need,
 ## paid into the treasury; else, broke, the town feeds them from the store
 ## (the dole); else they go hungry. A service is paid to a resident of its
@@ -378,7 +390,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 			stockpile.take_from_shop(town, pick["uid"], "folk:%s" % id)
 			stockpile.book.end(pick["uid"], "eaten", "by %s at %s" % [who["name"], town])
 			production.spend(id, cost, "a %s" % thing)
-			var seller := _pay(town, maker, cost, "sale", "sold a %s to %s" % [thing, who["name"]])
+			var seller := _sale(town, maker, pick["id"], cost, "folk:%s" % id, "sold a %s to %s" % [thing, who["name"]])
 			production.note_meal(id, "bought")
 			production.note_trade(id, "bought a %s" % thing, cost, seller)
 			if seller != TREASURY:
@@ -442,6 +454,25 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 	production.note_trade(id, what, fee, seller)
 	production.note_trade(best, "%s for %s" % [what, who["name"]], fee, who["name"])
 	stockpile.note(town, need, fee, "folk:%s" % id, "%s paid %s %d gold for %s" % [who["name"], seller, fee, what])
+
+
+## A made thing [param id] sold from [param town]'s shop for
+## [param cost], made by worker [param maker] (decision 353 amended): what
+## its materials are worth goes to the treasury (the town's food, ore and
+## wood paid for), the sale tax on the rest too, and the maker the rest,
+## their labour. All of it to the treasury for no such worker. Who was
+## paid: the maker's name or TREASURY.
+func _sale(town: String, maker: String, id: String, cost: int, by: String, why: String) -> String:
+	var worker := production.worker(maker) if not maker.is_empty() else {}
+	if worker.is_empty():
+		stockpile.deposit(town, "gold", cost, by, why)
+		return TREASURY
+	var stuff := mini(materials(id), cost)
+	var split := Economy.taxed(cost - stuff, "sale", rules)
+	if stuff + split[0] > 0:
+		stockpile.deposit(town, "gold", stuff + split[0], "tax:sale", "%s: materials %d, tax %d" % [why, stuff, split[0]])
+	production.pay(maker, split[1], why)
+	return str(worker["name"])
 
 
 ## [param amount] paid to worker [param payee] in [param town] for a
