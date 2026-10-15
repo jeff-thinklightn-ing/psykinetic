@@ -28,8 +28,8 @@ which worktree owns each step, and the design rules not to break without asking 
 ## Landing work
 
 - Only `main` is released. In a worktree, rebase onto `origin/main` before each change,
-  run the full suite (plus net_test and state_test for anything the server runs), commit,
-  and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
+  run `tests/land.sh` (or `land.ps1`: the suite's scenes at once, beside net_test and
+  state_test; decision 278), commit, and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
   moved: rebase, retest, push again. A branch never collects unlanded work.
 - Take the landing lock for your final retest and push, so nobody lands between them:
   `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, retest, push, and
@@ -61,6 +61,8 @@ which worktree owns each step, and the design rules not to break without asking 
   `tests/port_offsets.txt` (`tests/test_ports.gd`); temp folders are named per checkout,
   and any `user://` path a test writes comes from `test_ports.gd`'s `scratch(name)`
   (`user://tests_<checkout>/name`), never a fixed `"user://x/"`.
+  Each test scene needs a base port and scratch name of its own: `tests/suite_test` fails
+  the suite when two share one, since the scenes now run at the same time.
 - Worktrees share one machine's CPU: take the bench lock before any run whose timings
   you report (map_bench, frame numbers, network benches with many processes):
   `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's
