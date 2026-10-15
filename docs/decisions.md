@@ -5248,3 +5248,26 @@ not set its level: Towns does, and the views draw it so.
   Holdings.rebind), so a building linked live stands at once.
 - WorldMap's areas carry Level's "buildings" (with use and town) for it.
 Server only; protocol unchanged; tests/towns_seed_test.
+
+## 310. A turn fades only what changes, and the fade looks near the line
+
+Turning the camera ran `_set_yaw` into `_classify_walls`, which forced every
+piece that can fade to be set again (its materials and shadow) on every
+frame of the turn, and the test of which pieces hide the player went
+through all of them. Outdoors that is every tree: the wilds have 6,676
+such pieces, and turning there (A or D held, 180 degrees a second) cost
+40 ms of script a frame plus 24 ms of the renderer catching up, 14 fps
+against 439 with nothing to fade (Jeff: "camera rotation gets laggy in the
+wilds"). A turn now calls `_update_fade()` as a step does, setting only the
+pieces whose fade changes. The pieces are also indexed by 8-unit squares,
+flat (`_occluder_chunks`), and the lines from the camera to the player are
+tested only against those in the squares a line crosses below the highest
+top of any piece: a few dozen, not thousands. The same turn now costs
+0.06 ms, and frames match a run with the fade left out (about 750 fps
+here). view_test checks the index finds exactly what testing every piece
+finds, from every floor cell of the test room at four turns and three
+tilts. Rejected: capping the swaps per frame with hysteresis, which would
+still pay for the test and leave a tree in front of the player late; and
+fading by chunk, which would fade trees nowhere near the line.
+`tools/map_bench` gains `--map=`, `--spin=`, `--walk=` and `--fade=0` to
+measure it on a real level.

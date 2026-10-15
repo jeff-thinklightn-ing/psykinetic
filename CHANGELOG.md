@@ -35,6 +35,9 @@ top section as the release notes.
 - Builder mode can make a building serve a town (a forge, kitchen or inn, tied to
   the town's store) and wall a town in, with gates. A new area beyond an edge is lit
   like the level it leads from (outdoors, a cave, a dungeon).
+- Turning the camera in the wilds is smooth again: it was re-fading every
+  tree on the map each frame (14 fps while turning, now as fast as standing
+  still).
 - Monsters have tempers. Bold ones fight to the end and chase you farther;
   cautious ones hang back until a friend is at you and call for help when
   they spot you; cowards call, hang back longer and run early. A badly hurt

@@ -334,6 +334,10 @@ const FADE_HEIGHTS: Array[float] = [0.3, 0.9, 1.5]
 ## How long a piece stays faded after it stops hiding them, so walking along
 ## a wall does not make it flicker.
 const FADE_HOLD := 0.4
+## The pieces that can fade are indexed by squares this many units across
+## (_index_occluders), so the lines to the player are tested against those
+## near them only, not every tree of a big map (310).
+const FADE_CHUNK := 8.0
 ## A building (_add_buildings) stands this far above its ground, so its
 ## inside floor clears it.
 const BUILDING_LIFT := 0.01
@@ -828,6 +832,10 @@ var _see_through: Dictionary[Material, Material] = {}
 ## each piece last hid them (_fade_clock).
 var _occluders: Array[Array] = []
 var _occluders_built := false
+## Which of _occluders' bounds touch each FADE_CHUNK square (flat, x and z),
+## and the highest top of any.
+var _occluder_chunks: Dictionary[Vector2i, Array] = {}
+var _occluder_top := 0.0
 var _faded: Dictionary[Node3D, bool] = {}
 var _hiding: Dictionary[Node3D, bool] = {}
 var _hid_at: Dictionary[Node3D, float] = {}
@@ -1384,7 +1392,9 @@ func _set_yaw(degrees: float) -> void:
 		return
 	yaw = degrees
 	_place_camera()
-	_classify_walls()
+	# Not every piece set again (_classify_walls): only those whose fade
+	# changes, so a turn costs what a step does (310).
+	_update_fade()
 
 
 # --- Picking --------------------------------------------------------------------
@@ -3881,9 +3891,24 @@ func _update_roofs(points: Array[Vector3]) -> bool:
 ## The pieces the lines from the camera to [param points] pass through,
 ## with what fades with them. The camera is orthographic: its line to a
 ## point runs back from it along [param toward], up to the camera's plane.
+## Only the pieces in the squares a line crosses below the highest top are
+## tried (_occluder_chunks).
 func _hiding_pieces(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D, bool]:
 	var out: Dictionary[Node3D, bool] = {}
-	for entry in _occluders:
+	var tried: Dictionary[int, bool] = {}
+	for point in points:
+		var reach := maxf((_camera.global_position - point).dot(toward), 0.0)
+		if toward.y > 0.01:
+			reach = minf(reach, maxf(_occluder_top - point.y, 0.0) / toward.y)
+		var end := point + toward * reach
+		var low := Vector2i(floori(minf(point.x, end.x) / FADE_CHUNK), floori(minf(point.z, end.z) / FADE_CHUNK))
+		var high := Vector2i(floori(maxf(point.x, end.x) / FADE_CHUNK), floori(maxf(point.z, end.z) / FADE_CHUNK))
+		for x in range(low.x, high.x + 1):
+			for z in range(low.y, high.y + 1):
+				for index: int in _occluder_chunks.get(Vector2i(x, z), []):
+					tried[index] = true
+	for index in tried:
+		var entry := _occluders[index]
 		var bounds: AABB = entry[1]
 		for point in points:
 			var ahead := bounds.get_center() - point
@@ -3932,6 +3957,17 @@ func _index_occluders() -> void:
 	for building in _buildings:
 		if building["roof"] != null:
 			_occluders.append([building["roof"], _bounds(building["roof"]), false, [building["roof"]]])
+	_occluder_chunks.clear()
+	_occluder_top = 0.0
+	for index in _occluders.size():
+		var bounds: AABB = _occluders[index][1]
+		_occluder_top = maxf(_occluder_top, bounds.end.y)
+		for x in range(floori(bounds.position.x / FADE_CHUNK), floori(bounds.end.x / FADE_CHUNK) + 1):
+			for z in range(floori(bounds.position.z / FADE_CHUNK), floori(bounds.end.z / FADE_CHUNK) + 1):
+				var chunk := Vector2i(x, z)
+				if not _occluder_chunks.has(chunk):
+					_occluder_chunks[chunk] = []
+				_occluder_chunks[chunk].append(index)
 	_occluders_built = true
 
 

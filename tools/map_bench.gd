@@ -16,6 +16,13 @@ extends Node
 ## medians (a single run's average moves by several ms on a shared machine).
 ## With --settle=N the map runs N ticks with the host alone before the
 ## other players come and the timing starts.
+## --map=NAME plays a level from levels/ instead of the dungeon (run it with
+## APPDATA set to a temp folder, so no edited overlay is read). In the
+## frames, --spin=D turns the camera D degrees a second, as A or D held does,
+## and --walk=N steps the host one tile every WALK_STEP seconds, N tiles
+## either way along its row and back; the turn's own cost (the camera
+## placed and what it hides worked out again) is timed. --fade=0 leaves
+## nothing to fade, to compare.
 ##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--repeat=1] [--seconds=8]
 
 const NAME := "bench"
@@ -32,6 +39,11 @@ var repeat := 1
 var settle := 0
 var ticks := 200
 var seconds := 8.0
+var map := ""
+var spin := 0.0
+var walk := 0
+var fade := true
+const WALK_STEP := 0.3
 var _main: Node
 
 
@@ -50,6 +62,10 @@ func _ready() -> void:
 			"settle": settle = maxi(0, pair[1].to_int())
 			"ticks": ticks = pair[1].to_int()
 			"seconds": seconds = pair[1].to_float()
+			"map": map = pair[1]
+			"spin": spin = pair[1].to_float()
+			"walk": walk = maxi(0, pair[1].to_int())
+			"fade": fade = pair[1] != "0"
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
@@ -57,11 +73,15 @@ func _ready() -> void:
 	var memory_before := OS.get_static_memory_usage()
 
 	var started := Time.get_ticks_usec()
-	var layout := _layout()
-	_report("make layout.png", started)
-	Level.register(NAME, layout, null, {"name": "Bench", "outdoor": outdoor})
+	if map == "":
+		var layout := _layout()
+		_report("make layout.png", started)
+		Level.register(NAME, layout, null, {"name": "Bench", "outdoor": outdoor})
 	started = Time.get_ticks_usec()
-	var level := Level.load_level(NAME)
+	var level := Level.load_level(NAME if map == "" else map)
+	if map != "":
+		size = level["size"].x
+		print("BENCH map %s, %d x %d" % [map, level["size"].x, level["size"].y])
 	_report("Level.load_level (parse)", started)
 	print("BENCH entities in level: %d" % level["entities"].size())
 
@@ -69,7 +89,7 @@ func _ready() -> void:
 	Net.port = preload("res://tests/test_ports.gd").of(17890)
 	Net.companions = false
 	Net.state_path = ""
-	Net.map_name = NAME
+	Net.map_name = NAME if map == "" else map
 	started = Time.get_ticks_usec()
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
@@ -250,6 +270,20 @@ func _frames() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	for i in 30:
 		await get_tree().process_frame
+	var view: Node = _main._client3d
+	if view != null and not fade:
+		view._occluders.clear()
+		view._occluder_chunks.clear()
+		view._occluders_built = true
+	if view != null:
+		print("BENCH fade: %d pieces that can fade (%d trees and saplings)%s" % [view._occluders.size(),
+			view._trees.size() + view._saplings.size(), "" if fade else ", left out (--fade=0)"])
+	var host: Player = _main._players.get(Net.local_id)
+	var home := host.tile if host != null else Vector2i.ZERO
+	var stepped := 0
+	var turn_total := 0
+	var turn_worst := 0
+	var turns := 0
 	var frames := 0
 	var worst := 0.0
 	var draws := 0.0
@@ -262,9 +296,27 @@ func _frames() -> void:
 	while Time.get_ticks_usec() - started < seconds * 1000000.0:
 		await get_tree().process_frame
 		var now := Time.get_ticks_usec()
+		var delta := (now - last) / 1000000.0
 		worst = maxf(worst, (now - last) / 1000.0)
 		last = now
 		frames += 1
+		if view != null and spin != 0.0:
+			var turn_started := Time.get_ticks_usec()
+			view._set_yaw(view.yaw + spin * delta)
+			var took := Time.get_ticks_usec() - turn_started
+			turn_total += took
+			turn_worst = maxi(turn_worst, took)
+			turns += 1
+		if host != null and walk > 0:
+			var step := int((now - started) / (WALK_STEP * 1000000.0))
+			if step != stepped:
+				stepped = step
+				# Out and back: 0, 1 ... walk, ... 0, -1 ... -walk ... 0.
+				var phase := step % (walk * 4)
+				var along := phase if phase <= walk else (2 * walk - phase if phase <= 3 * walk else phase - 4 * walk)
+				var to := home + Vector2i(along, 0)
+				if World.is_free(to):
+					World._relocate(host, to)
 		draws = maxf(draws, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 		render_cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport) \
 				+ RenderingServer.get_frame_setup_time_cpu()
@@ -276,6 +328,9 @@ func _frames() -> void:
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
 		render_cpu / frames, render_gpu / frames])
+	if turns > 0:
+		print("BENCH turning %.0f degrees a second: the turn itself avg %.2f ms, worst %.2f ms a frame (%d frames)" % [
+			spin, turn_total / 1000.0 / turns, turn_worst / 1000.0, turns])
 
 
 ## players - 1 more players, each at the free tile nearest a point of a grid

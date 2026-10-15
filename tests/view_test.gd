@@ -871,6 +871,36 @@ func _test_fade() -> void:
 				if _rig._hiding_pieces(points, toward).has(_rig._walls[edge[0]]):
 					grazed += 1
 	_check(beside > 0 and grazed == 0, "beside a wall at their back, it never fades (%d of %d spots)" % [grazed, beside])
+	# The chunk index (310) finds what testing every piece finds: from
+	# every floor cell, the camera turned to each diamond and tilted.
+	var differ := 0
+	var asked := 0
+	var found := 0
+	for cell: Vector2i in floor_cells:
+		for turn in 4:
+			for tilt: float in [Client3D.PITCH_MIN, Client3D.CAMERA_PITCH, Client3D.PITCH_MAX]:
+				var flat_way := flat.rotated(turn * PI * 0.5)
+				var way := Vector3(flat_way.x * cos(deg_to_rad(tilt)), sin(deg_to_rad(tilt)), flat_way.y * cos(deg_to_rad(tilt)))
+				var at := _rig.to_global(_rig._tile_position(cell))
+				var points: Array[Vector3] = []
+				for height in Client3D.FADE_HEIGHTS:
+					points.append(at + Vector3(0.0, height, 0.0))
+				var every: Dictionary[Node3D, bool] = {}
+				for entry: Array in _rig._occluders:
+					var bounds: AABB = entry[1]
+					for point in points:
+						var ahead := bounds.get_center() - point
+						var reach := maxf((_rig._camera.global_position - point).dot(way), 0.0)
+						if ahead.x * way.x + ahead.z * way.z > 0.0 and bounds.intersects_segment(point, point + way * reach) != null:
+							for piece: Node3D in entry[3]:
+								every[piece] = true
+							break
+				var indexed := _rig._hiding_pieces(points, way)
+				asked += 1
+				found += every.size()
+				if indexed.size() != every.size() or not every.keys().all(func(piece: Node3D) -> bool: return indexed.has(piece)):
+					differ += 1
+	_check(asked > 0 and found > 0 and differ == 0, "the pieces hiding them, found by the chunk index, are those testing every piece finds (%d of %d views differ, %d pieces in all)" % [differ, asked, found])
 	# Out of the way: still faded for FADE_HOLD, so walking along a wall does
 	# not flicker it, then solid (the rig held still, its clock stepped).
 	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
