@@ -69,6 +69,7 @@ func _ready() -> void:
 	_test_bubbles()
 	_test_spoken()
 	_test_spoken_polish()
+	_test_speaks_only_for_herself()
 	_test_quiet_after_minor()
 	_test_senses()
 	_test_errands()
@@ -445,6 +446,40 @@ func _test_spoken() -> void:
 
 
 ## Lines from the transcripts of 10-09 to 10-13, each as she said it then.
+func _test_speaks_only_for_herself() -> void:
+	print("\n== she never speaks for her player: a line that does is asked again once, and such a sentence is never said ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	pet._said.clear()
+	_check(Companion.speaks_for("You're not the kind to linger. \"Let's move.\"") and Companion.speaks_for("You don\u2019t look back. \u201cA waste,\u201d you say.")
+		and Companion.speaks_for("You're the sort who never rests.") and not Companion.speaks_for("You should rest. Let's move on.")
+		and not Companion.speaks_for("You're hurt; let me look."), "a quote, \"you say\", or what kind of person they are speaks for them; advice does not")
+	_check(pet.spoken("You're not the type to linger. Let's move before something else comes.") == "Let's move before something else comes.",
+		"such a sentence is never said: %s" % pet.spoken("You're not the type to linger. Let's move before something else comes."))
+	_check("You speak only for yourself: never put words in %s's mouth" % pet.keeper_name() in pet.voice_prompt("test"), "and her prompt says so")
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var replies := ["You're not the kind to wait around. \"Let's go.\"", "Ready when you are."]
+	pet._last_speech_tick = -1000
+	mind.voice_answer = {"say": replies[0], "stance": ""}
+	mind.next_voice_answers = [{"say": replies[1], "stance": ""}]
+	pet._ask_voice("%s just spoke to you." % pet.keeper_name(), "%s just said to you: \"Ready to go?\"" % pet.keeper_name())
+	_check(mind.voice_asks.size() == 2 and pet.said_lines().back() == "Ready when you are.",
+		"a line speaking for them: asked once more, and the second answer said (%s)" % [pet.said_lines().slice(-2)])
+	mind.voice_asks.clear()
+	mind.voice_answer = {"say": replies[0], "stance": ""}
+	mind.next_voice_answers = [{"say": "\"Let's go,\" you say. I'll follow.", "stance": ""}]
+	pet._last_speech_tick = -1000
+	pet._ask_voice("%s just spoke to you." % pet.keeper_name(), "%s just said to you: \"Shall we?\"" % pet.keeper_name())
+	_check(mind.voice_asks.size() == 2 and pet.said_lines().back() == "I'll follow.", "asked again only once: then only her own words are said (%s)" % pet.said_lines().back())
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
 func _test_spoken_polish() -> void:
 	print("\n== near repeats, the event log said back, her player spoken of, fragments ==")
 	_kill_monsters()
@@ -2702,8 +2737,14 @@ class CountingMind:
 		stance_asks.append(ask)
 		return stance_answer.duplicate()
 
+	## Answers given in turn before voice_answer again, the first one first
+	## after it (a second try's answer).
+	var next_voice_answers: Array[Dictionary] = []
+
 	func voice(ask: Dictionary) -> Dictionary:
 		voice_asks.append(ask)
+		if voice_asks.size() > 1 and not next_voice_answers.is_empty():
+			return next_voice_answers.pop_front()
 		return voice_answer.duplicate()
 
 	func check(ask: Dictionary) -> Dictionary:

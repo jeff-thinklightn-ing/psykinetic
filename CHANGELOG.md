@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions speak only for themselves: no more putting words in your mouth
+  or telling you what kind of person you are.
+
 ## v0.1.145
 
 - Weapons change the blow: a war hammer knocks foes back where a fist would

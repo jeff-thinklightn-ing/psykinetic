@@ -225,6 +225,7 @@ truly nothing worth saying, answer with just: ...
 Speak to %s as "you", never of them by name, and to no one else unless they have just spoken to you or are in danger you must warn them
 of; say a name only to call out. In what anyone says, "I" and "me" are the one speaking.
 Never repeat back what you were asked to do, and never describe yourself or recite who you are.
+You speak only for yourself: never put words in %s's mouth, never quote them, and never say what kind of person they are or what they feel.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
 If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there, and a plain no would claim you do."""
 ## Who her player's words were for, as the server knows it (addressed):
@@ -265,6 +266,11 @@ const ITEM_WORDS := "\\b(carry\\w*|pack|bag|items?|lanterns?|bandag\\w*|kit|hold
 const OWN_ITEMS := "\\b(lanterns?|bandag\\w*|pack)\\b"
 ## Narration in a line, not speech: her own name and a verb, a gesture,
 ## or herself moving into place ("You move to stand between ...").
+## A line that speaks for her player: a quoted sentence (her words are
+## said aloud; quotes in them are a script), "you say", or telling them
+## what kind of person they are or what they feel. Such a sentence goes
+## (spoken), and a line with one is asked again, once (_take_result).
+const SPEAKS_FOR := "(?i)[\"\u201c\u201d]|\\byou (say|said|mutter\\w*|whisper\\w*|repl\\w*|add|added)\\b|^you(?:'re|\u2019re| are) (not )?(the|a|an) (kind|type|sort)\\b|^you (don'?t|don\u2019t|do not|can'?t|can\u2019t|cannot|never) (trust|shake|look back|seem|like|care)\\b"
 const NARRATION := "(?i)^(%s) [a-z]+s\\b|^a moment passes\\b|^(you |)(nod|nods|smile|smiles|sigh|sighs|shrug|shrugs|grin|grins|frown|frowns)\\b|^you (move|step|walk|go|turn|shift|edge|plant|brace|position) .*\\b(stand|between|beside|in front of|yourself)\\b"
 ## The recent exchange the voice sees: so many turns and narrations.
 const EXCHANGE_KEPT := 16
@@ -440,6 +446,10 @@ var errand := {}
 var _offering: Array[Dictionary] = []
 var _offered: Dictionary[int, Array] = {}
 var _report_serials: Dictionary[int, bool] = {}
+## Voice asks that are a second try after a line that spoke for her player
+## (SPEAKS_FOR); the next ask sent is one when set.
+var _reask_serials: Dictionary[int, bool] = {}
+var _reask_next := false
 ## The trade she works in a town she stays in while her player is away
 ## (Main._stay_in_town; decision 284), or "".
 var works_as := ""
@@ -1321,6 +1331,9 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 		return
 	_serial += 1
 	_phrase_serials[_serial] = phrase
+	if _reask_next:
+		_reask_serials[_serial] = true
+		_reask_next = false
 	if report:
 		_report_serials[_serial] = true
 	var asked := not heard.is_empty() and own
@@ -1544,7 +1557,7 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	if not since.is_empty():
 		met += " " + since
 	var system := "%s %s%s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, VOICE_WORLD, " ".join(now),
-		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
+		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who]]
 	var addressed := addressed_to(heard)
 	var speaker := heard.get_slice(" ", 0)
 	if asked:
@@ -2397,6 +2410,18 @@ func _take_result(result: Dictionary) -> void:
 	if not str(promised["dropped"]).is_empty():
 		entry["promise_dropped"] = promised["dropped"]
 	var raw_line := trim_line(str(promised["line"]))
+	var second_try: bool = _reask_serials.get(serial, false)
+	_reask_serials.erase(serial)
+	if not second_try and speaks_for(raw_line):
+		# Words put in her player's mouth: asked once more, this line unsaid.
+		entry["outcome"] = "asked again"
+		entry["say_dropped"] = raw_line
+		entry["note"] = "spoke for her player"
+		_log(entry)
+		_reask_next = true
+		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, false, true, report)
+		_reask_next = false
+		return
 	# A whole line said back is dropped as such; then what is left of it
 	# once cleaned (spoken) is what she says.
 	var echo := _echo_of(raw_line)
@@ -2480,6 +2505,15 @@ static func asks_about_items(heard: String) -> bool:
 ## ADDRESS_OTHER_TICKS, when they are in danger: otherwise those sentences
 ## go; and no one-word fragment (ONE_WORD_ANSWERS aside). "" if nothing is
 ## left.
+## Whether [param line] speaks for her player (SPEAKS_FOR, any sentence).
+static func speaks_for(line: String) -> bool:
+	var voiced := RegEx.create_from_string(SPEAKS_FOR)
+	for sentence in _sentences(line):
+		if voiced.search(sentence.strip_edges()) != null:
+			return true
+	return false
+
+
 func spoken(line: String, items_asked := false, asked := false) -> String:
 	var text := line.strip_edges().get_slice("\n\n", 0).replace("\n", " ")
 	text = RegEx.create_from_string("\\*[^*]*\\*|\\([^)]*\\)").sub(text, " ", true)
@@ -2507,6 +2541,7 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 	var report := event_report(_kinds_seen.keys() + _kinds_fallen.keys())
 	var keeper_named := RegEx.create_from_string("(?i)\\b%s\\b" % _escaped(keeper_word))
 	var narration := RegEx.create_from_string(NARRATION % RegEx.create_from_string("\\W").sub(_name_of(self), "", true))
+	var voiced := RegEx.create_from_string(SPEAKS_FOR)
 	var items := RegEx.create_from_string("(?i)" + OWN_ITEMS)
 	var kept: Array[String] = []
 	var to := ""
@@ -2537,7 +2572,7 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 				called = who
 				sentence = middle.sub(sentence, ", ")
 		sentence = sentence.strip_edges()
-		if sentence.is_empty() or narration.search(sentence) != null:
+		if sentence.is_empty() or narration.search(sentence) != null or voiced.search(sentence) != null:
 			continue
 		if not items_asked and items.search(sentence) != null:
 			continue
