@@ -72,6 +72,15 @@ func _ready() -> void:
 		Net.volumes_changed.connect(apply_volumes)
 
 
+## Every sound stopped as this goes: a stream still playing at quit is
+## reported as a leak.
+func _exit_tree() -> void:
+	for child in get_children():
+		if child is AudioStreamPlayer or child is AudioStreamPlayer3D:
+			child.stop()
+			child.stream = null
+
+
 ## Every bus (and its muffled twin) made if missing, and each at its volume
 ## from Net.
 static func apply_volumes() -> void:
@@ -107,9 +116,15 @@ static func _set_bus_volume(index: int, linear: float) -> void:
 ## muffled, db}, by the sim's rule (World._hear): heard within
 ## [param radius] cells (Chebyshev), half that with no clear line, falling
 ## from 0 dB at a cell to EDGE_DB at the edge. [param radius] -1 is the
-## slot's own (SoundKit.reach).
+## slot's own (SoundKit.reach). Rain and wind shorten it under the sky
+## as World.noise has them (World.weather_hearing_at).
 static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1) -> Dictionary:
 	var reach := radius if radius >= 0 else SoundKit.reach(slot)
+	if reach > 0 and SoundKit.noise_kind(slot) != "speech":
+		# Rain and wind cover it as World.noise has them cover a noise.
+		var cover := World.weather_hearing_at(at)
+		if cover < 1.0:
+			reach = maxi(1, roundi(reach * cover))
 	var d := maxi(absi(at.x - from.x), absi(at.y - from.y))
 	var muffled := d > 0 and not World.has_clear_line(at, from)
 	var carries := reach / 2.0 if muffled else float(reach)

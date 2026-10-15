@@ -26,6 +26,13 @@ notes (decision 324).
   axe, spear, dagger and bow, each with what it will do in a fight
   (knockback, block, knockdown, reach, backstab, range). The smith makes
   them. They don't fight differently yet.
+- The world has a sound of its own: outdoors a dawn chorus, birds by
+  day, crickets and owls by night, wind, rain and storms as the weather
+  turns, a market's bustle near a town's buildings, a cave's hush
+  underground, and the crackle of a fire or torch as you come near. It
+  all fades from one to the next as you move, as the day turns and as the
+  weather changes; under a roof the outside is quieter and muffled.
+- Rain and wind now cover sounds for you as they do for monsters.
 - A goblin that spots you and calls its pack is heard calling (a brute
   lower, an imp higher), and a smashed crate or cart sounds like one.
 - The town's smith makes knives, axe heads and nails from ore, and its

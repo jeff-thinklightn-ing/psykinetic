@@ -46,6 +46,10 @@ extends Node
 ##     from it: loud beside it, fainter, gone past its 6 cells. Then, the
 ##     door shut, blows land on an imp beyond it: heard muffled close to
 ##     the wall (half a fight's 5 cells), not at all further off.
+##   sound_ambience: the beds under it all (decision 270), outdoors: the
+##     clock run from dawn through noon and dusk to midnight, then rain and
+##     a storm; the player walks up to a fire to hear it crackle. The log
+##     says each bed's level every second.
 ##   sound_reel: a listening reel of the slots given (--slots=a,b,...; else
 ##     every slot with third-party takes, SoundKit.takes): each played
 ##     beside the player once per take, its name and source as the caption,
@@ -128,6 +132,8 @@ func _ready() -> void:
 			_sound_hearing()
 		"sound_reel":
 			_sound_reel()
+		"sound_ambience":
+			_sound_ambience()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
 		"pack":
@@ -147,10 +153,10 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
-	if scenario == "sound_hearing" or scenario == "sound_reel":
+	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
 		# The imp only stands there to be struck: it neither dies nor moves.
 		_monster.max_hp = 1000000
 		_monster.hp = _monster.max_hp
@@ -623,6 +629,40 @@ func _sound_reel() -> void:
 		_script.append(["sound_reel_play", slot, "%s (%d)\n%s" % [slot, takes.size(), str(from).get_file().left(70)]])
 
 
+## An open field, outdoors, a fire at its east end, an imp held at the far
+## side; the script runs the clock and the weather.
+func _sound_ambience() -> void:
+	var cells: Array[String] = [
+		"#################",
+		"#...............#",
+		"#.............~.#",
+		"#...............#",
+		"#################",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(2, 1): "monster_imp"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9,
+		"entities": [{"at": [2, 1], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(cells), markers, config), null, config)
+	_script = [
+		["sound_hour", 6.2, "Dawn, outdoors: the dawn chorus."],
+		["wait", 50, ""],
+		["sound_hour", 12.0, "Noon: the forest by day."],
+		["wait", 50, ""],
+		["sound_hour", 19.5, "Dusk: day giving way to night."],
+		["wait", 40, ""],
+		["sound_hour", 0.0, "Midnight: crickets and owls."],
+		["wait", 50, ""],
+		["sound_hour", 12.0, ""],
+		["sound_weather", "rain", "Rain (hurried for the clip): the birds go quiet."],
+		["wait", 60, ""],
+		["sound_weather", "storm", "A storm."],
+		["wait", 60, ""],
+		["sound_weather", "clear", "Clear again."],
+		["walk", Vector2i(13, 2), "To the fire: it crackles within 4 cells."],
+		["wait", 40, ""],
+	]
+
+
 func _on_tick(tick: int) -> void:
 	if _end_tick >= 0:
 		if tick >= _end_tick:
@@ -694,6 +734,14 @@ func _on_tick(tick: int) -> void:
 					view.play_at(str(step[1]), _player)
 				return
 			_repeat_until = -1
+		"sound_hour":
+			DayNight.set_hour(float(step[1]))
+		"sound_weather":
+			# Hurried for the clip: the override backdated, so it is in full
+			# at once (in play a turn takes minutes).
+			Weather.set_override("all", str(step[1]), 30.0)
+			for region: String in Weather.overrides:
+				Weather.overrides[region]["from"] = World.steps - 1000000
 		"sound_blows":
 			# A blow on the imp every SLAM_TICKS ticks for step[1] ticks, from no one.
 			if _repeat_until < 0:
@@ -804,12 +852,21 @@ func _log(tick: int) -> void:
 				Monster.Alert.keys()[monster.alert]])
 		print("[clip] tick %d: player %s; %s" % [tick, _player.tile, "; ".join(each)])
 		return
-	if scenario in ["sounds", "sound_hearing", "sound_reel"]:
+	if scenario in ["sounds", "sound_hearing", "sound_reel", "sound_ambience"]:
 		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
 		if sfx != null:
 			for entry: Array in sfx.played.slice(_sounds_logged):
 				print("[clip] tick %d: played %s (%s) on %s, heard from %s" % [tick, entry[0], str(entry[1]).get_file() if entry[1] != "" else "placeholder", entry[2], sfx.listener])
 			_sounds_logged = sfx.played.size()
+			if scenario == "sound_ambience" and tick % 10 == 0:
+				var beds: Array[String] = []
+				for bed: String in _main._client3d.ambience.levels:
+					if _main._client3d.ambience.levels[bed] >= 0.05:
+						beds.append("%s %.2f" % [bed, _main._client3d.ambience.levels[bed]])
+				var torch: AudioStreamPlayer3D = _main._client3d.ambience._torch
+				print("[clip] tick %d: hour %.1f, weather %s; beds %s; torch %s" % [tick, DayNight.hour(DayNight.now()),
+					World.fields.weather.get("kind", "?"), ", ".join(beds),
+					"%.1f dB" % torch.volume_db if torch != null and torch.playing else "off"])
 			for slot: String in sfx.unheard.slice(_unheard_logged):
 				print("[clip] tick %d: not heard %s (from %s)" % [tick, slot, sfx.listener])
 			_unheard_logged = sfx.unheard.size()

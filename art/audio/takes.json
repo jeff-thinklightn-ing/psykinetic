@@ -1,6 +1,84 @@
 {
 	"about": "Third-party takes of the sound slots: slot -> [{file, from (a source in slots.json), original (where in the source it was cut from), sha256, ...}]. Written by tools/sound_take.ps1; read by SoundKit. A take of a source stored external is kept outside the repo (the sound library takes/<slot>/<file>) and copied into art/audio/external/<slot>/ by tools/sound_sync.ps1.",
 	"takes": {
+		"amb.dungeon": [
+			{
+				"file": "amb.dungeon.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/InMotionAudio - Cave Design/AMBUndr_CaveDesign01_InMotionAudio_CaveDesign.wav (from 0 s for 22 s)",
+				"sha256": "eb88794d7d2617d2c9505678286bc99e20e54092e050d54b6e3df8299b993d09"
+			}
+		],
+		"amb.field_wind": [
+			{
+				"file": "amb.field_wind.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/Sonik Sound Library - Spatial Countryside/WIND_Wind, Soft Wind Howling, Soft Leaves Rustle on Concrete_KS_Spatial Counstryside-Stereo_KSL_KS011.wav (from 5 s for 60 s)",
+				"sha256": "bae40a2254a18fe8f0c7a867e316165063583fc3f616786a3f085fd1251c8830"
+			}
+		],
+		"amb.forest_dawn": [
+			{
+				"file": "amb.forest_dawn.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/Justsoundeffects - Forests of Norway/AMBForst_Morning Small Birch Forest Willow Warbler Singing Many Insects Humming_JSE_FoN_Quad.wav (from 10 s for 60 s)",
+				"sha256": "6b69acd3abd4e45f36b95c1dd1031431ef30ceaf3f19ca9a8e170558c7a7eac2"
+			}
+		],
+		"amb.forest_day": [
+			{
+				"file": "amb.forest_day.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/Justsoundeffects - Forest Ambiences/AMBForst_Spring Noon Deciduous Forest Gentle Wind Leaves Rustling Blackbird Raven in Background_JSE_FA.wav (from 5 s for 60 s)",
+				"sha256": "9fa99be4ca80db2e7d8af5af6ad0da14fe363ccbf1c6179c70753ba5743a8858"
+			}
+		],
+		"amb.forest_night": [
+			{
+				"file": "amb.forest_night.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Stefano Cremona - Pure Nature Ambiences/Crickets.wav (from 2 s for 60 s)",
+				"sha256": "1a458f7f186a6c8700b6a89a5acb32e4398739050614c788b65bec827ba78808"
+			},
+			{
+				"file": "amb.forest_night.2.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/Justsoundeffects - Forest Ambiences/BIRDPrey_Spring Night Deciduous Forest Many Tawny Owls Wind Leaves Rustling_JSE_FA.wav (from 1 s for 50 s)",
+				"sha256": "bdef45c37f9f5be3659cbce572bb430991006ef1d8f70418de025b816fd88395"
+			}
+		],
+		"amb.rain": [
+			{
+				"file": "amb.rain.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/InspectorJ - Essentials 06 Rain/RAINVege_InsJ_Ambience_Rain_Moderate_02_LOOP.wav (from 0 s for 20 s)",
+				"sha256": "f8f92b477b509a93cd3c175d2007293f448b26f027904be25a776ac56126a834"
+			}
+		],
+		"amb.storm": [
+			{
+				"file": "amb.storm.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/Bolt - Backyard Rain & Thunder - Suburban Rain Recordings/RAIN_Distant Thunder and Rain Long Thunderstorm C_BOLT_BackyardRain_UsiPro.wav (from 10 s for 90 s)",
+				"sha256": "70de2e47ac4dc2ec69489ada3ed53617602d98200f94989e93d8df7102b169dd"
+			}
+		],
+		"amb.torch_fire": [
+			{
+				"file": "amb.torch_fire.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Stefano Cremona - Pure Nature Ambiences/Campfire.wav (from 5 s for 30 s)",
+				"sha256": "8c60cf365839213cd04eedc979bb6761c97d4e7636badf9b6015ade3b22e44b0"
+			}
+		],
+		"amb.town_day": [
+			{
+				"file": "amb.town_day.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 10 s for 60 s)",
+				"sha256": "bf68f1751cb11c261c3040dc7ddd83cbc360f6ff4ebd7aafd83cb73f60b2c904"
+			}
+		],
 		"sfx.bandage": [
 			{
 				"file": "sfx.bandage.ogg",

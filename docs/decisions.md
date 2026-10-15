@@ -5740,3 +5740,36 @@ material.wall.cave and material.rock can replace the swatch later, as
 they can on the cliffs. Rejected: sweeping the profile with jitter (its
 long flat faces read as masonry, not rock), and a separate rock mesh per
 cell edge (seams at every metre).
+
+## 270. Ambience: beds weighed from the zone, the roof, the clock and the weather
+
+Jeff's brief asks for beds per zone, time of day and weather (wind on the
+field, birds at dawn, crickets at night, a fire's crackle, the town's
+noise), crossfading as you move. Ambience (client3d/ambience.gd, under the
+3D view) plays each amb.* slot as a looping, flat bed on the Ambience bus.
+Four times a second it weighs every bed 0..1 (Ambience.weights, a pure
+function the tests read): outdoors (the level's zone, Level.zone_of) the
+forest's dawn, day and night beds by the clock (DayNight's light; dawn a
+bell round 6.2 o'clock), the wind, rain and storm beds by the zone's
+weather (World.fields.weather, environment's), rain hushing the birds and
+crickets; under stone (cave, dungeon) the dungeon's bed; a town's day or
+night bed near a building that serves a town. Under a roof
+(World.fields.under_sky false at the listener) the outdoor beds are
+quieter and muffled (the Ambience bus's low-pass twin). Each bed eases
+toward its weight over about two seconds, so beds cross-fade, and a bed
+below 1% is stopped. A bed starts at a random point along its loop.
+
+Fire is a point, not a bed: the crackle (amb.torch_fire, a mono loop)
+plays from the nearest fire or torch the listener hears, by the same rule
+as every positional sound (Sfx.hearing, its slot's range, 4). Beds are cut
+by tools/sound_take.ps1 as seamless loops: the take's last two seconds
+fade out over its first fading in, and it ends where that overlap began;
+flat takes are folded to stereo (some sources are quad or ambisonic).
+
+Sfx.hearing now also shortens a noise's reach in rain and wind under the
+sky, as World.noise does (World.weather_hearing_at; never speech), so the
+rule that you hear what monsters hear holds in weather too. Rejected:
+switching beds outright at thresholds (an audible cut at dusk), the
+server choosing beds (it knows nothing a client doesn't, and a client
+moves between ticks), and one long recording per zone (no crossfade with
+the clock or weather).

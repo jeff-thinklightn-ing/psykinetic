@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_art_puppets()
 	_test_piles()
 	_test_heard_as_monsters_hear()
+	_test_ambience_runs()
 	_test_options_panel()
 
 	print("")
@@ -110,6 +111,22 @@ func _test_heard_as_monsters_hear() -> void:
 	_rig.sfx.play("sfx.hit_flesh", Vector3(listener.x, 0.0, listener.y))
 	_check(_rig.sfx.played.size() == played + 1, "at the listener: played")
 	_rig.sfx.hear_everything = true
+
+
+func _test_ambience_runs() -> void:
+	print("
+== the view's ambience weighs its beds from the listener ==")
+	_rig.sfx.listener = _rig._local_player().tile if _rig._local_player() != null else Vector2i(1, 1)
+	_rig.ambience._weigh()
+	_check(_rig.ambience.targets.size() == Ambience.BEDS.size(), "a weight for every bed (%s)" % [_rig.ambience.targets])
+	for i in 10:
+		_rig.ambience._process(0.2)
+	var playing: Array[String] = []
+	for bed: String in _rig.ambience.players:
+		if _rig.ambience.players[bed].playing:
+			playing.append(bed)
+	_check(playing.all(func(bed: String) -> bool: return _rig.ambience.targets[bed] >= Ambience.SILENT),
+			"only beds with weight play (%s)" % [playing])
 
 
 func _test_options_panel() -> void:

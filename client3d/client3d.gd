@@ -821,6 +821,11 @@ var _mourn := 0.0
 var _environment: Environment
 var _listener: AudioListener3D
 var sfx: Sfx
+## The beds under it all: forest, wind, rain, dungeon, town (Ambience).
+var ambience: Ambience
+## The cells fire burns on, torches (_add_torch) and fires (_add_fire),
+## for their crackle (Ambience).
+var torch_cells: Array[Vector2i] = []
 var _hp_bar_shader: Shader
 var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
@@ -931,6 +936,10 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	sfx = Sfx.new()
 	sfx.name = "Sfx"
 	add_child(sfx)
+	ambience = Ambience.new()
+	ambience.name = "Ambience"
+	ambience.view = self
+	add_child(ambience)
 	# Sounds are heard from the player's place: the camera is 40 units off.
 	_listener = AudioListener3D.new()
 	_listener.name = "Listener"
@@ -1961,6 +1970,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_doors_due.clear()
 	_grounds.clear()
 	_ground_kinds.clear()
+	torch_cells.clear()
 	_ground_shades.clear()
 	_shade_all = true
 	_trees.clear()
@@ -3346,6 +3356,7 @@ func _add_lantern(cell: Vector2i) -> void:
 
 ## A torch on a post, and its warm light.
 func _add_torch(cell: Vector2i) -> void:
+	torch_cells.append(cell)
 	var at := _tile_position(cell)
 	var post := _box(Vector3(0.1, 1.1, 0.1), _stone_opaque)
 	post.name = "Torch_%d_%d" % [cell.x, cell.y]
@@ -4210,6 +4221,7 @@ static var _fire_mesh: PlaneMesh
 
 
 func _add_fire(cell: Vector2i) -> void:
+	torch_cells.append(cell)
 	if _fire_mesh == null:
 		_fire_mesh = PlaneMesh.new()
 		_fire_mesh.size = Vector2(FIRE_SPREAD, FIRE_SPREAD)

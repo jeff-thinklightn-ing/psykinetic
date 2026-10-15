@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_fallbacks()
 	_test_placeholder()
 	_test_takes()
+	_test_ambience_weights()
 	_test_folders()
 	_test_sfx_plays_slots()
 	_test_status_current()
@@ -145,6 +146,32 @@ func _test_takes() -> void:
 	_check(SoundKit.takes("sfx.block_shield").is_empty() and SoundKit.source("kenney-impact")["path"] == "res://art/audio/sfx/", "reload reads the files again")
 
 
+func _test_ambience_weights() -> void:
+	print("
+== ambience: each bed's weight by zone, roof, the clock and the weather ==")
+	var clear := {"kind": "clear", "rain": 0.0, "wind": 0.0}
+	var noon := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0)
+	_check(is_equal_approx(noon["amb.forest_day"], 1.0) and noon["amb.forest_night"] == 0.0 and noon["amb.dungeon"] == 0.0
+			and noon["amb.forest_dawn"] == 0.0, "outdoors at noon, clear: the forest by day alone (%s)" % [noon])
+	var night := Ambience.weights("outdoors", true, DayNight.NIGHT, 0.0, clear, 0.0)
+	_check(is_equal_approx(night["amb.forest_night"], 1.0) and night["amb.forest_day"] == 0.0, "at midnight: the night bed (crickets, owls)")
+	var dawn := Ambience.weights("outdoors", true, 0.6, Ambience.DAWN_HOUR, clear, 0.0)
+	_check(is_equal_approx(dawn["amb.forest_dawn"], 1.0) and dawn["amb.forest_day"] == 0.0, "at dawn: the dawn chorus")
+	var rain := Ambience.weights("outdoors", true, 1.0, 12.0, {"kind": "rain", "rain": 1.0, "wind": 0.3}, 0.0)
+	_check(is_equal_approx(rain["amb.rain"], 1.0) and is_equal_approx(rain["amb.forest_day"], 1.0 - Ambience.RAIN_HUSH)
+			and is_equal_approx(rain["amb.field_wind"], 0.3), "rain: the rain bed, the birds hushed, the wind as it blows")
+	var storm := Ambience.weights("outdoors", true, 0.5, 15.0, {"kind": "storm", "rain": 1.0, "wind": 1.0}, 0.0)
+	_check(storm["amb.storm"] > 0.5 and storm["amb.rain"] < 0.5, "a storm: the storm bed over the rain (%.2f, %.2f)" % [storm["amb.storm"], storm["amb.rain"]])
+	var roofed := Ambience.weights("outdoors", false, 1.0, 12.0, clear, 0.0)
+	_check(is_equal_approx(roofed["amb.forest_day"], Ambience.ROOFED), "under a roof: outdoor beds quieter")
+	var town := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 1.0)
+	_check(is_equal_approx(town["amb.town_day"], 1.0) and town["amb.town_night"] == 0.0, "by a town's buildings by day: its day bed")
+	var dungeon := Ambience.weights("dungeon", true, 1.0, 12.0, {"kind": "storm", "rain": 1.0, "wind": 1.0}, 0.0)
+	_check(dungeon["amb.dungeon"] == 1.0 and dungeon["amb.rain"] == 0.0 and dungeon["amb.forest_day"] == 0.0, "under stone: the dungeon bed, no weather")
+	for bed: String in Ambience.BEDS:
+		_check(SoundKit.has(bed) and not SoundKit.positional(bed), "%s is a flat slot" % bed)
+
+
 func _test_placeholder() -> void:
 	print("\n== the placeholder: a short blip by bus, silence for a bed ==")
 	var blip := SoundKit.placeholder("sfx")
@@ -174,7 +201,7 @@ func _test_sfx_plays_slots() -> void:
 	sfx.play("sfx.block_shield", Vector3.ZERO)
 	_check(sfx.played.back().slice(0, 2) == ["sfx.block_shield", ""], "a slot with no takes plays the blip (%s)" % [sfx.played.back()])
 	var before := sfx.played.size()
-	sfx.play("amb.forest_day", Vector3.ZERO)
+	sfx.play("amb.town_night", Vector3.ZERO)
 	_check(sfx.played.size() == before, "a bed with no takes: silence")
 	var player := sfx.get_child(sfx.get_child_count() - 1) as AudioStreamPlayer3D
 	_check(player != null and player.bus == Sfx.BUS, "on the SFX bus")

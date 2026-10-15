@@ -3,7 +3,8 @@
 #                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>]
 #
 # Cuts -Source (any format ffmpeg reads; -Start and -Length in seconds), trims silence off
-# both ends of a one-shot, makes a positional slot's take mono, encodes Ogg Vorbis, and
+# both ends of a one-shot, makes a loop or bed seamless (its end cross-faded into its
+# start, -LoopFade s), makes a positional slot's take mono and any other stereo, encodes Ogg Vorbis, and
 # stores it as the slot's next take, <slot>.ogg, <slot>.2.ogg ...:
 #   a source stored "external" (Sonniss): in the sound library, <library>\takes\<slot>\,
 #     then copied into the game by tools\sound_sync.ps1 (the library is $env:PSYK_SOUND_DIR,
@@ -21,6 +22,8 @@ param(
 	[double]$Length = -1,
 	[string]$By = '',
 	[string]$Url = '',
+	# A loop's or bed's seam: this many seconds of its end cross-faded into its start.
+	[double]$LoopFade = 2.0,
 	[string]$Library = $(if ($env:PSYK_SOUND_DIR) { $env:PSYK_SOUND_DIR } else { 'N:\assets\sound' }),
 	[int]$TimeoutSeconds = 10
 )
@@ -70,10 +73,25 @@ if ($Start -ge 0) { $ffmpegArgs += @('-ss', "$Start") }
 $ffmpegArgs += @('-i', $Source)
 if ($Length -gt 0) { $ffmpegArgs += @('-t', "$Length") }
 $positional = -not ($spec.PSObject.Properties['positional'] -and $spec.positional -eq $false)
-if ($positional) { $ffmpegArgs += @('-ac', '1') }
+# Positional: mono (the 3D player places it). Flat: stereo, whatever the source
+# (quad and ambisonic beds folded down).
+$ffmpegArgs += @('-ac', $(if ($positional) { '1' } else { '2' }))
 if ($spec.type -eq 'oneshot') {
 	$trim = 'silenceremove=start_periods=1:start_threshold=-50dB'
 	$ffmpegArgs += @('-af', "$trim,areverse,$trim,areverse")
+} else {
+	# A loop or a bed loops without a seam: its last LoopFade seconds fade out
+	# over its first fading in, and it ends where that overlap began.
+	$whole = if ($Length -gt 0) { $Length } else {
+		[double](& ffprobe -v error -show_entries format=duration -of csv=p=0 $Source) - [math]::Max($Start, 0)
+	}
+	$fade = [math]::Min($LoopFade, $whole / 4)
+	$body = $whole - $fade
+	$ffmpegArgs += @('-filter_complex', ("[0:a]asplit=3[a][b][c];" +
+		"[a]atrim=0:$fade,asetpts=PTS-STARTPTS,afade=t=in:d=$fade[head];" +
+		"[b]atrim=${fade}:$body,asetpts=PTS-STARTPTS[mid];" +
+		"[c]atrim=${body}:$whole,asetpts=PTS-STARTPTS,afade=t=out:d=$fade[tail];" +
+		"[tail][head]amix=inputs=2:normalize=0[seam];[seam][mid]concat=n=2:v=0:a=1"))
 }
 $ffmpegArgs += @('-ar', '44100', '-c:a', 'libvorbis', '-q:a', '5', $out)
 & ffmpeg @ffmpegArgs
