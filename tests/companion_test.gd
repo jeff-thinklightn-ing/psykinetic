@@ -338,7 +338,7 @@ func _test_old_record_gets_a_companion() -> void:
 
 
 func _test_says_so_with_no_room() -> void:
-	print("\n== bumped in the dead end, with nowhere to go: she stays and says so ==")
+	print("\n== bumped in the dead end, with nowhere to step aside: she and her player change places ==")
 	var owner := _player()
 	var pet := _companion()
 	_settle(pet)
@@ -350,9 +350,13 @@ func _test_says_so_with_no_room() -> void:
 	World.order_step(owner, Vector2i(-1, 0), owner.refusals, false)
 	World.step()
 	pet.said.disconnect(listen)
-	_check(pet.current_intent == Companion.Intent.YIELD and pet.tile == Vector2i(1, 8),
-			"YIELD, staying put (%s at %s)" % [pet.intent_name(), pet.tile])
-	_check(heard.size() == 1 and heard[0] == Companion.NO_ROOM_LINE, "and says there is no room (%s)" % [heard])
+	_check(owner.tile == Vector2i(1, 8) and pet.tile == Vector2i(2, 8) and pet.current_intent == Companion.Intent.YIELD,
+			"at once: her player where she stood, she where they were (%s at %s, %s at %s)" % [owner.name, owner.tile, pet.name, pet.tile])
+	_check(heard.is_empty() and World.get_entity_at(Vector2i(1, 8)) == owner and World.get_entity_at(Vector2i(2, 8)) == pet,
+			"no word of it, and the grid knows them where they are (%s)" % [heard])
+	for i in 12:
+		World.step()
+	_check(pet.tile != Vector2i(1, 8) and owner.tile == Vector2i(1, 8), "and she does not walk back into them")
 
 
 func _test_last_words() -> void:

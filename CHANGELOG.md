@@ -47,6 +47,8 @@ top section as the release notes.
   now).
 - O opens the options: volume sliders for master, effects, voices,
   ambience and interface, remembered in settings.cfg.
+- Walking into your companion in a narrow corridor no longer bounces you
+  back: with no room to step aside, they swap places with you.
 - Companions remember: what they have seen with you (a friend falling, a
   brute brought down, a close call) and what they have told you about
   themselves become part of who they are. Play along with a story about

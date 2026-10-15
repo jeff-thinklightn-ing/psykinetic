@@ -492,7 +492,12 @@ func bumped(direction: Vector2i) -> bool:
 	_bump_direction = direction
 	_yield_tile = _find_yield_tile()
 	_bump_direction = Vector2i.ZERO
-	if _yield_tile == NONE:
+	if _yield_tile == NONE and _alive(keeper) and keeper.tile + direction == tile \
+			and World.swap_places(keeper, self, World.step_ticks(keeper, direction)):
+		# Nowhere to step aside (a corridor, a dead end): she and her player
+		# change places, as they walk.
+		_yield_tile = tile
+	elif _yield_tile == NONE:
 		_yield_tile = tile
 		_say(NO_ROOM_LINE, true)
 	current_intent = Intent.YIELD

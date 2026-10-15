@@ -5091,3 +5091,18 @@ history, newest 6 witnessed>" within the budget, then her beliefs. Each
 new fact goes to her transcript ("[Now true of her: ...]") and the mind
 log (kind "fact", "facts"). The console's "companion facts <player>"
 lists them by id, "companion forget <player> <id>" removes one.
+
+## 302. A companion with no room to step aside changes places with her player
+
+The box, tonight: her player walked into her in a one-wide corridor and
+bounced back and forth ten times in five seconds. Bumped by her player
+(Companion.bumped), she stepped aside to a free cell off their way; in a
+corridor or a dead end there is none, and she stayed and said there was
+no room. Now, with nowhere to step aside, she and her player change
+places at once (World.swap_places: both creatures, side by side, nothing
+between, no closed door; each slides as a step over her player's step
+time, the grid updated for both together, entity_moved for each so a link
+under her player still takes them). No voice call; she yields a moment so
+she does not walk straight back into them. "There's no room for me to
+move" is left for when even that cannot be (her player stunned, a wall
+edge between).

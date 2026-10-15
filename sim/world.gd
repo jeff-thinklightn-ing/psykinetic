@@ -2877,6 +2877,33 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	return true
 
 
+## [param a] and [param b], side by side, change places at once, each
+## sliding over [param duration] ticks as a step: a companion making way
+## for her player where there is no room to step aside (Companion.bumped).
+## Both must be creatures, next to each other, with nothing between.
+func swap_places(a: GridEntity, b: GridEntity, duration: float) -> bool:
+	if not Net.is_authority() or not a.is_creature() or not b.is_creature() or not are_adjacent(a.tile, b.tile):
+		return false
+	var direction: Vector2i = b.tile - a.tile
+	if _terrain_blocks_step(a.tile, direction, true) or _terrain_blocks_step(b.tile, -direction, true) \
+			or _closed_door_across(a.tile, direction) != null:
+		return false
+	var at: Vector2i = a.tile
+	var bt: Vector2i = b.tile
+	_occupancy[at] = b
+	_occupancy[bt] = a
+	for each: Array in [[a, at, bt], [b, bt, at]]:
+		var entity: GridEntity = each[0]
+		entity._world_set_tile(each[2])
+		entity._world_note_moved(tick)
+		entity._world_slide_from(each[1], float(tick), duration)
+		entity.next_move_tick = tick + duration
+	_log("swap: %s %s <-> %s %s" % [a.name, at, b.name, bt])
+	entity_moved.emit(a, at, bt)
+	entity_moved.emit(b, bt, at)
+	return true
+
+
 func _relocate(entity: GridEntity, to: Vector2i) -> void:
 	var from: Vector2i = entity.tile
 	_occupancy.erase(from)
