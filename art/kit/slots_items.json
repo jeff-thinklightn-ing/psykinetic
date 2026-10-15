@@ -96,6 +96,25 @@
 			"type": "mesh",
 			"uses": "sack of ore (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.ration": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.15,
+				0.08,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "travel ration (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.wood_bundle": {
 			"budget": 500,
 			"category": "items",

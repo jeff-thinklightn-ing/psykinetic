@@ -15,6 +15,10 @@ top section as the release notes.
 - Builder mode knows the town's store: Claude stamps one (yard, depot, shop counter)
   when asked, and you and Claude are told when a change leaves it wrong (a counter
   outside the store, a store with no depot).
+- Food: a travel ration, eaten from the pack (right-click), makes you
+  heavier and harder to shove for three minutes; the top of the screen
+  shows it and the time left. Buffs never stack and never take you below
+  what you were.
 - Right-click a thing in your pack to use it: a coin purse opens into
   your gold. Keys open their locked doors when you carry them (none in the
   world yet). Things you put down or throw land with a thud that monsters

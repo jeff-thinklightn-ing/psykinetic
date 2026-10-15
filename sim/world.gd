@@ -53,6 +53,10 @@ signal pile_shown(pile: GroundPile)
 ## &"started"), finished (&"done": it mends from now), was broken off
 ## (&"interrupted"), or the mending ended (&"mended", by null). Server only.
 signal bandage_changed(by: GridEntity, patient: GridEntity, state: StringName)
+## A buff ([param kind], Items.BUFF_KINDS) on [param entity] began
+## (&"started"), was topped up (&"renewed") or wore off (&"faded"): for
+## companions to mention, and the views.
+signal buff_changed(entity: GridEntity, kind: String, state: StringName)
 signal pile_gone(pile: GroundPile)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
@@ -363,6 +367,9 @@ var _unclaimed: Array[int] = []
 ## Server: bandaging under way, bandager -> {patient, until, from, tile,
 ## exerted}; and the mending, patient -> {left, next, from} (_tend_wounds).
 var _bandaging: Dictionary[GridEntity, Dictionary] = {}
+## Server: whoever has a buff on (GridEntity.buffs), so only they are
+## looked at for fading.
+var _buffed: Dictionary[GridEntity, bool] = {}
 var _mending: Dictionary[GridEntity, Dictionary] = {}
 
 
@@ -562,8 +569,9 @@ func _step_zone() -> void:
 	_apply_hazards()
 	# 4. Stamina comes back for whoever did not exert themselves this tick.
 	_regen_stamina()
-	# 5. Bandaging and mending.
+	# 5. Bandaging and mending; buffs wearing off.
 	_tend_wounds()
+	_fade_buffs()
 	ticked.emit(tick)
 	# 6. The tick counter goes once per tick to the clients in this zone.
 	for peer in Net.sendable_peers():
@@ -1291,7 +1299,7 @@ func _weigh(entity: GridEntity) -> void:
 		for id in entity.slots:
 			if not id.is_empty():
 				carried += Items.weight_of(id)
-	entity.mass = entity.base_mass + carried
+	entity.mass = entity.base_mass + carried + buff(entity, "mass")
 
 
 ## Takes everything out of [param container] at once (economy banking a
@@ -1853,14 +1861,26 @@ func holds_key(entity: GridEntity, lock: String) -> bool:
 ## [param by] uses what is in its slot [param slot], by the thing's catalog
 ## use: a bandaging kit ("bandage") bandages [param by] (try_bandage); a
 ## coin purse ("purse", a player's) is opened into their gold, its yield's
-## gold (add_gold), and is gone. A key is used by carrying it (holds_key).
-## False, and nothing happens, if it cannot.
+## gold (add_gold), and is gone. A thing with effects (food, a draught, a
+## charm) is consumed, whatever its use is called ("eat", "drink"...): its
+## buffs go on [param by] (add_buff) and it is gone. A key is used by
+## carrying it (holds_key). False, and nothing happens, if it cannot.
 func try_use(by: GridEntity, slot: int) -> bool:
 	if not Net.is_authority() or not _can_handle(by) or is_stunned(by):
 		return false
 	if slot < 0 or slot >= by.slots.size() or by.slots[slot].is_empty():
 		return false
 	var id := by.slots[slot]
+	var effects: Array = Items.def(id).get("effects", [])
+	if not effects.is_empty():
+		var uid := take_item(by, by, slot)
+		if uid == 0:
+			return false
+		items.end(uid, "consumed", "by %s" % _label_of(by), zone.name, by.tile)
+		for effect: Dictionary in effects:
+			add_buff(by, effect["kind"], effect["amount"], effect["ticks"])
+		_log("use: %s consumed %s" % [by.name, id])
+		return true
 	match str(Items.def(id).get("use", "")):
 		"bandage":
 			return try_bandage(by, by)
@@ -1877,6 +1897,59 @@ func try_use(by: GridEntity, slot: int) -> bool:
 			_log("use: %s opened %s: %d gold" % [by.name, id, gold])
 			return true
 	return false
+
+
+## Puts a buff on [param entity]: [param kind] (Items.BUFF_KINDS) raised by
+## [param amount] for [param ticks]. Buffs of a kind do not add up: one on
+## already keeps the larger amount and the later end (a second meal tops
+## the first up, it does not double it). Mass shows at once (_weigh).
+func add_buff(entity: GridEntity, kind: String, amount: float, ticks: int) -> void:
+	if not Net.is_authority() or kind not in Items.BUFF_KINDS or amount <= 0.0 or ticks <= 0:
+		return
+	var now: Dictionary = entity.buffs.duplicate(true)
+	var had: Array = now.get(kind, [])
+	now[kind] = [maxf(amount, float(had[0])) if not had.is_empty() else amount,
+		maxi(tick + ticks, int(had[1])) if not had.is_empty() else tick + ticks]
+	entity.buffs = now
+	_buffed[entity] = true
+	if kind == "mass":
+		_weigh(entity)
+	buff_changed.emit(entity, kind, &"started" if had.is_empty() else &"renewed")
+
+
+## How much [param kind] is raised on [param entity] now (0 for none): for
+## whatever reads aura or wits; mass is already in its mass.
+func buff(entity: GridEntity, kind: String) -> float:
+	var on: Array = entity.buffs.get(kind, [])
+	return float(on[0]) if not on.is_empty() else 0.0
+
+
+## Buffs whose time is up wear off (this zone's buffed only).
+func _fade_buffs() -> void:
+	if _buffed.is_empty():
+		return
+	for entity: GridEntity in _buffed.keys():
+		if not is_instance_valid(entity):
+			_buffed.erase(entity)
+			continue
+		if entity.zone != zone.name:
+			continue
+		var now: Dictionary = entity.buffs.duplicate(true)
+		var faded: Array[String] = []
+		for kind: String in entity.buffs:
+			if int(entity.buffs[kind][1]) <= tick:
+				now.erase(kind)
+				faded.append(kind)
+		if faded.is_empty():
+			continue
+		entity.buffs = now
+		if now.is_empty():
+			_buffed.erase(entity)
+		if "mass" in faded:
+			_weigh(entity)
+		for kind in faded:
+			_log("buff: %s's %s wore off" % [entity.name, kind])
+			buff_changed.emit(entity, kind, &"faded")
 
 
 ## How many cells [param by] can throw [param id]: its strength over the

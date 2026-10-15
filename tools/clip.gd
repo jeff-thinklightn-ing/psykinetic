@@ -32,6 +32,8 @@ extends Node
 ##   items_use: using things: a locked door rattles; from a chest a coin
 ##     purse, opened into gold, and the key, which opens the door; a sack
 ##     of ore put down beyond it, and the imp there hears the thud.
+##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
+##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
 ##     (footsteps), opens a chest, opens a door into the next room and
 ##     fights the imp there to its death; each caption names the slot it
@@ -112,6 +114,8 @@ func _ready() -> void:
 			_items_icons()
 		"items_use":
 			_items_use()
+		"items_buffs":
+			_items_buffs()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -333,6 +337,30 @@ func _items_icons() -> void:
 		["wait", 30, "The chest empty, the pack full."],
 		["item_open", false, ""],
 		["wait", 30, ""],
+	]
+
+
+func _items_buffs() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(3, 1): "chest", Vector2i(7, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["ration", "", "", ""]}},
+			{"at": [7, 3], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["walk", Vector2i(3, 2), "A chest: a travel ration."],
+		["item_open", true, ""],
+		["item_take", [0, 0], "Into the pack."],
+		["item_open", false, ""],
+		["wait", 20, ""],
+		["item_use", 0, "Right click it: eaten. Fed: 10 kg heavier, harder to shove (top left)."],
+		["wait", 60, "It wears off in three minutes; buffs never take you below what you were."],
 	]
 
 
@@ -723,6 +751,9 @@ func _log(tick: int) -> void:
 			World.gold_of(_player.get("player_id")), World.has_key(_player, door.lock), "open" if door.open else "shut",
 			_monster.name, _monster.tile, Monster.Alert.keys()[_monster.alert],
 			_monster.senses.heard.back()["kind"] if not _monster.senses.heard.is_empty() else "-"])
+		return
+	if scenario == "items_buffs":
+		print("[clip] tick %d: player slots %s mass %.1f buffs %s" % [tick, _player.slots, _player.mass, _player.buffs])
 		return
 	if scenario == "items_icons":
 		var shown: Array[String] = []

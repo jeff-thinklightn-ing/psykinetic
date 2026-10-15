@@ -68,6 +68,11 @@ var base_mass := -1.0
 ## Bandaging (World.try_bandage): 0 none, 1 being bandaged, 2 mending.
 ## A player's and a companion's replicate, for the views.
 var mending := 0
+## Buffs (World.try_use, a thing with effects consumed): kind ("mass",
+## "aura", "wits": Items.BUFF_KINDS) -> [amount, the tick it fades]. Only
+## ever above baseline. Reassigned whole on every change, so a player's
+## and a companion's replicate, for the HUD.
+var buffs := {}
 ## Server: the tick it was last hurt (World.damage); out of combat after a while.
 var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH

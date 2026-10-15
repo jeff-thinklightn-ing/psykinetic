@@ -18,6 +18,9 @@
 			"tags": ["resource"], "yield": {"food": 5}},
 		{"id": "coin_purse", "name": "coin purse", "short": "Coins", "color": "e0c050",
 			"art": "item.coin_purse", "kind": "held", "size": [0.1, 0.12, 0.1], "weight": 0.5, "hands": 1,
-			"tags": ["resource"], "yield": {"gold": 10}, "use": "purse"}
+			"tags": ["resource"], "yield": {"gold": 10}, "use": "purse"},
+		{"id": "ration", "name": "travel ration", "short": "Ration", "color": "c89a5a",
+			"art": "item.ration", "kind": "held", "size": [0.15, 0.08, 0.1], "weight": 0.5, "hands": 1,
+			"tags": ["food"], "use": "eat", "effects": [{"kind": "mass", "amount": 10, "ticks": 1800}]}
 	]
 }

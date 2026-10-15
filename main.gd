@@ -2840,6 +2840,9 @@ func _on_world_ticked(tick: int) -> void:
 	var hp_text := "no player" if Net.mode == Net.Mode.SERVER else "dead, respawning"
 	if player != null:
 		hp_text = "HP %d/%d" % [player.hp, player.max_hp]
+		for kind: String in player.buffs:
+			hp_text += "   %s +%s %ds" % [Items.BUFF_KINDS.get(kind, kind), str(snappedf(float(player.buffs[kind][0]), 0.1)),
+				ceili(maxi(int(player.buffs[kind][1]) - tick, 0) * World.TICK_DT)]
 	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
 	if not Net.online:
 		mode_text = "offline"
@@ -2876,7 +2879,7 @@ func hint_lines() -> Array[String]:
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB crate, cart\topen it, beside you", "RMB companion\ther pack", "I\tyour pack",
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
 		"RMB hold\tbandage yourself or an ally beside you (a kit, out of combat)",
-		"RMB in pack\tuse it (open a purse, bandage)",
+		"RMB in pack\tuse it (eat, open a purse, bandage)",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
 		"R\treset the room", "O\toptions", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:

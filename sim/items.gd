@@ -121,7 +121,7 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"weight": maxf(float(entry.get("weight", 1.0)), 0.0),
 		"hands": clampi(int(entry.get("hands", 1)), 0, 2),
 		"tags": tags,
-		"effects": entry.get("effects", []) if entry.get("effects") is Array else [],
+		"effects": effects_of(id, entry["effects"]) if entry.get("effects") is Array else [],
 		"use": str(entry.get("use", "")),
 		"opens": str(entry.get("opens", "")),
 		"value": maxi(int(entry.get("value", 0)), 0) if entry.get("value") is float or entry.get("value") is int else 0,
@@ -198,6 +198,28 @@ static func has_tag(id: String, tag: String) -> bool:
 
 ## What banking a resource gives ({"ore": 5}); {} for anything else.
 ## The lock [param id] opens (a key: Door.lock), "" for none.
+## What a consumed thing's effects may raise, each with its name on the HUD:
+## mass (food: kg, heavier and harder to shove), aura (magic) and wits
+## (social time), the last two read by whatever comes to use them
+## (World.buff).
+const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits"}
+
+
+## [param effects] as the catalog gives them, each {kind, amount, ticks},
+## the ones that make sense: a kind in BUFF_KINDS, an amount and ticks over
+## 0 (a buff never takes anyone below baseline). [param id] for warnings.
+static func effects_of(id: String, effects: Array) -> Array:
+	var out := []
+	for effect: Variant in effects:
+		if effect is Dictionary and str(effect.get("kind", "")) in BUFF_KINDS \
+				and float(effect.get("amount", 0)) > 0.0 and int(effect.get("ticks", 0)) > 0:
+			out.append({"kind": str(effect["kind"]), "amount": float(effect["amount"]), "ticks": int(effect["ticks"])})
+		else:
+			push_warning("Items: %s's effect %s is not a buff (%s, an amount and ticks over 0); left out" % [
+				id, effect, ", ".join(BUFF_KINDS.keys())])
+	return out
+
+
 static func opens_of(id: String) -> String:
 	return str(def(id).get("opens", ""))
 

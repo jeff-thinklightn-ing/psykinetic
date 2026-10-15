@@ -5271,3 +5271,33 @@ still pay for the test and leave a tree in front of the player late; and
 fading by chunk, which would fade trees nowhere near the line.
 `tools/map_bench` gains `--map=`, `--spin=`, `--walk=` and `--fade=0` to
 measure it on a real level.
+
+## 312. Buffs: a thing with effects is consumed into a temporary raise, on the entity
+
+Items step 4c. A thing whose catalog `effects` are non-empty (food, a
+draught, a charm) is consumed when used (World.try_use, whatever its
+`use` is called), and each effect goes on the user as a buff:
+`World.add_buff(entity, kind, amount, ticks)`. Gear (no effects) is never
+consumed; buffs are, as the roadmap's rule has it.
+
+Kinds are the roadmap's upkeep buffs (Items.BUFF_KINDS): **mass** (food,
+in kg: added in World._weigh, so a fed player is heavier and harder to
+shove; the travel ration, +10 kg for three minutes, is the catalog's
+one), **aura** (magic items) and **wits** (social time). Aura and wits
+have no reader yet: `World.buff(entity, kind)` is the hook for whatever
+comes to use them (psionics, talk), so nothing here guesses what they do.
+
+Never below baseline: an effect with an amount or ticks of 0 or less, or
+an unknown kind, is warned about and left out at load, and add_buff
+refuses them. Buffs of a kind don't add up: a second one keeps the larger
+amount and the later end, so eating three rations is not three times as
+heavy (no stacking treadmill).
+
+The buffs live on the entity, `GridEntity.buffs` (kind -> [amount, the
+tick it fades]), reassigned whole on each change; a player's and a
+companion's replicate (SUBCLASS_REPLICATED "buffs"), and the HUD's top
+line shows each with its seconds left ("Fed +10 175s"). World._fade_buffs
+looks only at entities with one on (_buffed), in the zone ticking.
+`World.buff_changed(entity, kind, state)` (&"started", &"renewed",
+&"faded") is for companions to mention a fade, once, and the views. Buffs
+are not saved: a restart drops them, as it drops bandaging under way.

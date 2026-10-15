@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_bandage()
 	_test_icons()
 	_test_use()
+	_test_buffs()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -375,6 +376,47 @@ func _test_use() -> void:
 		World.items.end(World.take_item(host, host, host.slots.find("ore_sack")), "gone")
 		World._relocate(imp, was)
 	Items.reset()
+
+
+func _test_buffs() -> void:
+	print("\n== buffs: a ration eaten makes you heavier for a while; never below baseline ==")
+	var host := _player(Net.local_id)
+	var bad := Items.read('{"items": [{"id": "x", "effects": [{"kind": "mass", "amount": -5, "ticks": 10}, {"kind": "luck", "amount": 1, "ticks": 10}, {"kind": "wits", "amount": 2, "ticks": 10}]}]}')
+	_check(bad["x"]["effects"].size() == 1 and bad["x"]["effects"][0]["kind"] == "wits",
+			"effects that would lower you or raise nothing known are left out (%s)" % [bad["x"]["effects"]])
+	var mass := host.mass
+	var slot := host.slots.find("")
+	_give(host, "ration", slot)
+	var with_ration := host.mass
+	_check(World.try_use(host, slot) and host.slots[slot].is_empty(), "the host eats the ration: gone")
+	_check(is_equal_approx(host.mass, with_ration - 0.5 + 10.0), "fed: 10 kg heavier (%.1f to %.1f)" % [mass, host.mass])
+	var imp_force_before := 0.0
+	var imp: Monster = World.monsters()[0] if not World.monsters().is_empty() else null
+	if imp != null:
+		imp_force_before = World.push_force(imp, host)
+		host.buffs = {}
+		World._weigh(host)
+		_check(World.push_force(imp, host) > imp_force_before, "and harder to shove: an imp's push %.3f fed, %.3f not" % [
+			imp_force_before, World.push_force(imp, host)])
+		World.add_buff(host, "mass", 10.0, 1800)
+	var until: int = host.buffs["mass"][1]
+	World.add_buff(host, "mass", 4.0, 3000)
+	_check(host.buffs["mass"][0] == 10.0 and host.buffs["mass"][1] > until and is_equal_approx(host.mass, mass + 10.0),
+			"a second, smaller meal does not add up: still +10, for longer")
+	World.add_buff(host, "aura", 2.0, 5)
+	_check(World.buff(host, "aura") == 2.0 and World.buff(host, "wits") == 0.0, "an aura buff is there to read (2), wits none")
+	var faded: Array[String] = []
+	var on_faded := func(entity: GridEntity, kind: String, state: StringName) -> void:
+		if entity == host and state == &"faded":
+			faded.append(kind)
+	World.buff_changed.connect(on_faded)
+	_steps(6)
+	_check(faded == ["aura"] and World.buff(host, "aura") == 0.0 and host.buffs.has("mass"), "the aura wears off first (%s)" % [faded])
+	host.buffs = {"mass": [host.buffs["mass"][0], World.tick + 1]}  # Its time up next tick.
+	_steps(2)
+	_check(faded.has("mass") and host.buffs.is_empty() and is_equal_approx(host.mass, mass),
+			"then the meal: back to baseline, not below (%.1f)" % host.mass)
+	World.buff_changed.disconnect(on_faded)
 
 
 func _test_icons() -> void:
