@@ -67,7 +67,7 @@ Slots whose own takes came from someone else: none.
 License, allows research and evaluation only, with no commercial use.
 
 Slot candidates from the art-gen session (`C:\dev\art-gen`) land in
-`D:\assets\candidates\<slot>\` with a `notes.md` naming the model files, LoRA, prompts, seeds and
+`N:\assets\candidates\<slot>\` with a `notes.md` naming the model files, LoRA, prompts, seeds and
 licences. A candidate picked for a slot cites that note in the slot's `source` (its `notes`).
 
 ## Models (vetting)

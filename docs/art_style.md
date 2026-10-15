@@ -109,7 +109,7 @@ slots: 512 px square, tiling every 4 m (the manifest's `tile_m` gives the world 
    `"jeff, blender"`). The manifest's `source` field for the slot says the same, with the
    licence and date: `{"by": "jeff", "tool": "blender", "license": "own", "date":
    "2026-10-20"}`. Art that started as a generated candidate also cites its note:
-   `"notes": "D:/assets/candidates/door.single/notes.md"` (the models and licences used are
+   `"notes": "N:/assets/candidates/door.single/notes.md"` (the models and licences used are
    listed in `THIRD_PARTY.md`).
 4. Save it as `<slot>.blend` (variants `<slot>.2.blend` ...) and drop it in:
    `tools\art_drop.ps1 <path to door.single.blend>`. It copies the file into

@@ -57,6 +57,6 @@ animations/goblin.res    Idle, Walk, Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit
                          saved by tools/extract_clips.gd. Animations by Quaternius, CC0 1.0
                          (animations/LICENSE-quaternius-ual.txt), https://quaternius.com
                          The pack itself (172 MB, not in the repo) is on the NAS at
-                         N:\psykinetic-art\sources\quaternius\UAL Pro\ (Unreal-Godot\UAL1.glb
+                         N:\assets\sources\quaternius\UAL Pro\ (Unreal-Godot\UAL1.glb
                          in place, UAL1_RM.glb with root motion); extract_clips.gd copies
                          UAL1.glb into build/ual_extract/ when clips are rebuilt.
