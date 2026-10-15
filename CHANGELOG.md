@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- The forest goes on past the edge of outdoor maps: dense treetops as far
+  as the view reaches, so panning near an edge no longer shows a void
+  under the map.
 - Cave walls are ready for maps that ask for them: rough rock, thick at
   the foot, with ragged tops, and a rock floor.
 - A damaged building's walls are broken in places too, not only its roof.

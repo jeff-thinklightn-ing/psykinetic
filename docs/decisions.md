@@ -5843,3 +5843,35 @@ in a lighter one, through walls; never in still air or out of the sky.
 One dot product per candidate, after the range check. Animals smell (a
 prey's look is sight, glimpse or scent); monsters do not, for now. So the
 way to a herd is upwind and quiet: downwind, it is gone before you see it.
+## 326. Past the forest, outdoors: a canopy, hills and a far floor
+
+Jeff: "the wilds needs zone borders on the edges". Outdoors, the real trees
+stood only FOREST_REACH (8) cells off the land, and past them the view,
+which reaches about 22 cells and pans 10 more, showed the sky's colour
+under the map: a drop into nothing. `TerrainBorder` (client3d/border.gd),
+under the room, now draws what lies past the forest. A canopy: one sheet
+at crown height from 6 cells off the land, where the real trees thin out,
+rising out of the forest floor among them, to 34 cells, further than the
+view and its pan reach from anywhere on the land. Noise rolls it into
+crowns and points them, each facet a foliage colour, darker in a hollow
+and further off. Its colours are the trees' own: the Kenney fill's greens
+while the trees are that fill, the palette's foliage once they are
+art-kit's. Hills: where the land's edge stands high, the canopy beyond it
+stands as high (the height of the land each cell was reached from). And a
+far floor in the forest floor's colour, 200 m past the map, under the
+canopy, so no tilt or peek finds a void.
+
+Drawing only: the sim, paths, picks and the minimap never see it, and no
+rule changes at the map's edge. Its cost is kept off the room's build: the
+walk out from the land (eight ways, from the land's outline) and the
+meshes' arrays are made on a worker thread, and the meshes are added when
+it is done. The land set it reads is made new each build, never cleared
+under it. One mesh a 16-cell chunk, flat facets, no shadows: 228 chunks for
+a 256-cell map, a few in view. map_bench at 256 outdoors: frames and ready
+time as before, within the spread. level.json `"border": "none"` leaves it
+out. Openings at a map's ways out, and a glimpse of the level beyond, come
+with decision 327.
+
+Rejected: more real trees out to the view's reach (tens of thousands of
+nodes on a 256-cell map), and fog, which would have hidden the land's own
+far side too.

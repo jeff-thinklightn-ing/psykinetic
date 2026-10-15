@@ -444,6 +444,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			# The wall and floor sets it is drawn in (decision 285).
 			"walls": str(config.get("walls", "castle")),
 			"floors": str(config.get("floors", "castle")),
+			# Outdoors, what lies past the forest: "forest", or "none".
+			"border": str(config.get("border", "forest")),
 		},
 		"size": cells,
 		"warnings": warnings,

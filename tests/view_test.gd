@@ -980,6 +980,48 @@ func _test_outdoor() -> void:
 	var tree: Node3D = _rig._trees.values()[0]
 	_check(tree.scale.x * ArtKit.size(str(tree.get_meta("slot"))).y > 2.5,
 			"trees stand taller than a player")
+	# Past the forest (326): a canopy to the view's reach and more, never
+	# over the land or its first trees, over a far floor.
+	var border := _rig._border
+	_check(border != null and border.get_parent() == _rig._room, "a border past the forest")
+	if border != null:
+		border.finish()
+		var forest_floor := _rig._room.get_node("ForestFloor") as Node3D
+		_check(border.far_floor != null and border.far_floor.position.y < forest_floor.position.y
+				and (border.far_floor.mesh as PlaneMesh).size.x > TerrainBorder.FAR * 2.0, "over a far floor, under the forest's, %d m past the map" % TerrainBorder.FAR)
+		var canopy: Dictionary[Vector2i, bool] = {}
+		var near_land := 0
+		var tried := 0
+		for chunk: Vector2i in border.chunks:
+			var positions: PackedVector3Array = border.chunks[chunk][0]
+			for t in range(0, positions.size(), 3):
+				var middle := (positions[t] + positions[t + 1] + positions[t + 2]) / 3.0
+				var cell := Vector2i(roundi(middle.x), roundi(middle.z))
+				canopy[cell] = true
+				if (t / 3) % 7 != 0:
+					continue
+				tried += 1
+				var reach := TerrainBorder.START - 2
+				for dy in range(-reach, reach + 1):
+					for dx in range(-reach, reach + 1):
+						if land.has(cell + Vector2i(dx, dy)):
+							near_land += 1
+		_check(not border.chunks.is_empty() and near_land == 0,
+				"its canopy %d cells and more off the land, never over it (%d facets tried)" % [TerrainBorder.START - 1, tried])
+		var low := Vector2i(1 << 20, 1 << 20)
+		var high := -low
+		for cell: Vector2i in land:
+			low = low.min(cell)
+			high = high.max(cell)
+		var middle := (low + high) / 2
+		var out := TerrainBorder.REACH - 4
+		var ends: Array[Vector2i] = [Vector2i(middle.x, low.y - out), Vector2i(middle.x, high.y + out), Vector2i(low.x - out, middle.y), Vector2i(high.x + out, middle.y)]
+		_check(ends.all(func(cell: Vector2i) -> bool: return canopy.has(cell)),
+				"reaching %d cells out every way, past what the view and its pan see" % out)
+		var bare_terrain := terrain.duplicate()
+		bare_terrain["border"] = "none"
+		_rig.rebuild(bare_terrain, castle["centre"])
+		_check(_rig._border == null, "and none where level.json says \"border\": \"none\"")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
 			"and back in the test room, it is under stone again")

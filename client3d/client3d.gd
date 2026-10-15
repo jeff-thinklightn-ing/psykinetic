@@ -872,6 +872,9 @@ var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
+## Past the forest, outdoors: its canopy and far floor (TerrainBorder),
+## under the room; null indoors or where level.json says "border": "none".
+var _border: TerrainBorder
 ## The saplings at the forest's edge (_add_sapling), faded as trees are.
 var _saplings: Dictionary[Vector2i, Node3D] = {}
 ## Each building drawn (_add_buildings): {rect: its footprint, node: the
@@ -1979,6 +1982,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_shade_all = true
 	_trees.clear()
 	_saplings.clear()
+	_border = null
 	_buildings.clear()
 	_building_at.clear()
 	_roofs_off.clear()
@@ -2083,7 +2087,8 @@ func _build_room() -> void:
 	_warm_art()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
-	_land.clear()
+	# A new set each build, never changed after: the border's worker reads it.
+	_land = {}
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
 	_forest_distance.clear()
@@ -2128,6 +2133,11 @@ func _build_room() -> void:
 			_add_post(vertex)
 	if _outdoor:
 		_add_forest()
+		if str(_terrain.get("border", "forest")) != "none":
+			_border = TerrainBorder.new()
+			_border.name = "Border"
+			_room.add_child(_border)
+			_border.build(_land, _terrain.get("heights", {}), LEVEL_RISE, FOREST_FLOOR, FOREST_FLOOR_DEPTH)
 	_add_buildings()
 	_add_town_walls()
 	# Every door's leaf set once; from then on those that change.

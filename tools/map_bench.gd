@@ -22,7 +22,8 @@ extends Node
 ## and --walk=N steps the host one tile every WALK_STEP seconds, N tiles
 ## either way along its row and back; the turn's own cost (the camera
 ## placed and what it hides worked out again) is timed. --fade=0 leaves
-## nothing to fade, to compare.
+## nothing to fade, to compare. --look=X,Y pans the view to that cell
+## (wherever the host is), and --shot=PATH saves the last frame as a PNG.
 ##   godot --path . --scene res://tools/map_bench.tscn -- --size=128 [--monsters=2] [--cells-per-monster=42] [--players=1] [--ticks=200] [--repeat=1] [--seconds=8]
 
 const NAME := "bench"
@@ -43,6 +44,8 @@ var map := ""
 var spin := 0.0
 var walk := 0
 var fade := true
+var look := Vector2i(-1, -1)
+var shot := ""
 const WALK_STEP := 0.3
 var _main: Node
 
@@ -66,6 +69,8 @@ func _ready() -> void:
 			"spin": spin = pair[1].to_float()
 			"walk": walk = maxi(0, pair[1].to_int())
 			"fade": fade = pair[1] != "0"
+			"look": look = Vector2i(pair[1].get_slice(",", 0).to_int(), pair[1].get_slice(",", 1).to_int())
+			"shot": shot = pair[1]
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
@@ -279,6 +284,10 @@ func _frames() -> void:
 		print("BENCH fade: %d pieces that can fade (%d trees and saplings)%s" % [view._occluders.size(),
 			view._trees.size() + view._saplings.size(), "" if fade else ", left out (--fade=0)"])
 	var host: Player = _main._players.get(Net.local_id)
+	if view != null and host != null and look != Vector2i(-1, -1):
+		var puppet: Node3D = view._puppets.get(host.get_instance_id())
+		if puppet != null:
+			view.pan = Vector3(look.x, 0.0, look.y) - Vector3(puppet.position.x, 0.0, puppet.position.z)
 	var home := host.tile if host != null else Vector2i.ZERO
 	var stepped := 0
 	var turn_total := 0
@@ -328,6 +337,11 @@ func _frames() -> void:
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
 		render_cpu / frames, render_gpu / frames])
+	if view != null and view._border != null:
+		print("BENCH border: %d canopy chunks, %d nodes, task %d" % [view._border.chunks.size(), view._border.get_child_count(), view._border._task])
+	if shot != "":
+		get_viewport().get_texture().get_image().save_png(shot)
+		print("BENCH shot: %s" % shot)
 	if turns > 0:
 		print("BENCH turning %.0f degrees a second: the turn itself avg %.2f ms, worst %.2f ms a frame (%d frames)" % [
 			spin, turn_total / 1000.0 / turns, turn_worst / 1000.0, turns])
