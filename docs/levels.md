@@ -263,13 +263,33 @@ and the ways between them, point links and neighbours alike. Its
 - a cell level.json holds that is off the map (the cells are the ones a
   resize moves, `LevelMap.moved_config`), and a spawn point or start on no
   floor;
-- an area that cannot be reached from the default map, or has no way back
-  to it;
+- an area that cannot be reached from the start zone (else the default
+  map), or has no way back to it;
+- a start zone that is not a level, or has no starts of its own;
 - the level's own load warnings (a link off its marker, a marker with no
   link).
 
 `godot --headless --path . --scene res://tools/check_world.tscn` prints the
 list (exit code 1 if there is anything on it).
+
+### The start zone
+
+Where a new player begins is data, not a server flag (decision 300):
+`levels/world_map.json` names the zone,
+
+```json
+{ "start": { "zone": "wilds" } }
+```
+
+and the players appear on that level's `start` cells (its `"starts"`).
+`Main.default_zone()` takes `--map` first (tests, a host trying a level),
+then this, then `Level.DEFAULT_MAP` (`test_room`) when neither names a
+level. A player with a record goes back to their own zone wherever it is.
+The world map is measured from the start zone (`WorldMap.root()`): what it
+cannot reach, or what has no way back to it, is flagged, and so is a start
+zone with no `start` cells (Level would stand its first floor cell in). The
+world map view (`--world-map`) lays out from it and marks its box
+", start".
 
 ### Places and who holds them
 

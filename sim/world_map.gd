@@ -205,6 +205,30 @@ static func doc_name(doc: MapDoc) -> String:
 	return doc.folder.trim_suffix("/").get_file()
 
 
+## The world's own settings: levels/world_map.json, {"start": {"zone":
+## <name>}} (decision 300). Tests point it at a file of their own.
+static var settings_path := "res://levels/world_map.json"
+
+
+## The zone new players start in: world_map.json's start, or "" when it
+## names none (Main then falls back to Level.DEFAULT_MAP). A player with a
+## record goes back to their own zone, wherever that is.
+static func start_zone() -> String:
+	if not FileAccess.file_exists(settings_path):
+		return ""
+	var read: Variant = JSON.parse_string(FileAccess.get_file_as_string(settings_path))
+	if not read is Dictionary:
+		return ""
+	var start: Variant = (read as Dictionary).get("start", {})
+	return str((start as Dictionary).get("zone", "")) if start is Dictionary else ""
+
+
+## Where the world is measured from: the start zone, else Level.DEFAULT_MAP.
+static func root() -> String:
+	var start := start_zone()
+	return start if not start.is_empty() else Level.DEFAULT_MAP
+
+
 ## Routing between areas over this map (WorldRoutes), made the first time
 ## it is asked for: a WorldMap built again (a level edited) makes its own.
 func routes() -> WorldRoutes:
@@ -246,13 +270,22 @@ func reachable(from: String, backwards := false) -> Array[String]:
 
 
 ## What is wrong with how the areas connect, one line each, "<area>: ...";
-## [] when nothing is. Unreachable means not from [param root] (the default
-## map), or no way back to it. Places are checked against
+## [] when nothing is. Unreachable means not from [param from] (the start
+## zone, else the default map: root()), or no way back to it. A start zone
+## must be a level with starts. Places are checked against
 ## [param factions] (levels/factions.json by default).
-func problems(root := Level.DEFAULT_MAP, factions: Factions = null) -> Array[String]:
+func problems(from := "", factions: Factions = null) -> Array[String]:
 	var out: Array[String] = []
 	if factions == null:
 		factions = Factions.read()
+	var start := start_zone()
+	if not start.is_empty() and from.is_empty():
+		if not areas.has(start):
+			out.append("world_map.json: the start zone %s is not a level" % start)
+		elif (areas[start]["warnings"] as Array).any(func(warning: String) -> bool: return warning.begins_with("no player start")):
+			# Level.parse stands the first floor cell in; not for where everyone begins.
+			out.append("%s: it is the start zone (world_map.json) but has no starts" % start)
+	var root := from if not from.is_empty() else root()
 	for area_name: String in areas:
 		var area: Dictionary = areas[area_name]
 		for warning: String in area["warnings"]:

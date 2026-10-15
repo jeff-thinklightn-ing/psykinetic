@@ -1346,8 +1346,14 @@ func _repaint() -> void:
 
 ## The zone a player with no zone of their own goes to: --map's, or the
 ## default map.
+## Where a player with no record of their own starts: --map (tests, a
+## host), else the world's start zone (levels/world_map.json, decision 300),
+## else Level.DEFAULT_MAP.
 func default_zone() -> String:
-	return Net.map_name if not Net.map_name.is_empty() and Level.exists(Net.map_name) else Level.DEFAULT_MAP
+	if not Net.map_name.is_empty() and Level.exists(Net.map_name):
+		return Net.map_name
+	var start := WorldMap.start_zone()
+	return start if Level.exists(start) else Level.DEFAULT_MAP
 
 
 ## Server start: every zone the snapshot holds, back as it was saved, and

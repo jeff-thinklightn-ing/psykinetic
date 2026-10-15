@@ -5200,3 +5200,23 @@ what to say: whose wounds are being bandaged or mending, and for open
 wounds whether she carries a kit (or her player does, or neither) and
 whether it is safe to bandage now. Her world text says wounds do not
 close on their own. No protocol change: mending is already replicated.
+
+## 300. Where a new player starts is data: levels/world_map.json's start zone
+
+New players went to Level.DEFAULT_MAP (test_room) unless the server ran with
+--map, and the box runs without it; Jeff wants the town to be where
+everyone begins. A server flag would be one more thing to keep right in the
+unit and in every deploy, and the world's shape is the levels' business, so
+the start is data: levels/world_map.json, {"start": {"zone": <level>}}, the
+cells the level's own "starts". Main.default_zone() takes --map first (it
+stays, for tests and a host), then the start zone, then DEFAULT_MAP when
+neither names a level, so a world with no world_map.json plays as before.
+A player with a record still goes back to their own zone.
+
+The world map is measured from the start zone (WorldMap.root()): problems()
+flags what it cannot reach or what has no way back to it, a start zone that
+is not a level, and one with no start cells of its own (Level.parse stands
+its first floor cell in, which is no place for everyone to begin); the world
+map view lays out from it and marks it. A file rather than a key in a level:
+one place, so two levels cannot both claim to be the start. It is set to the
+wilds, where the town is, once the town is in that level.

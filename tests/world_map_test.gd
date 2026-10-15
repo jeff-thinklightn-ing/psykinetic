@@ -15,6 +15,7 @@ func _ready() -> void:
 
 	_test_graph()
 	_test_problems()
+	_test_start()
 	_test_crossing()
 	_test_levels()
 	_test_join()
@@ -110,6 +111,31 @@ func _test_problems() -> void:
 	names = ["wm_ghost_link"]
 	more = WorldMap.build(names).problems("wm_ghost_link")
 	_check(more.any(func(problem: String) -> bool: return "goes to wm_ghost, which is no level" in problem), "a link to no level is flagged")
+
+
+func _test_start() -> void:
+	print("the start zone (decision 300)")
+	var settings: String = preload("res://tests/test_ports.gd").scratch_path("world_map.json")
+	WorldMap.settings_path = settings
+	DirAccess.remove_absolute(settings)
+	_check(WorldMap.start_zone() == "" and WorldMap.root() == Level.DEFAULT_MAP, "no world_map.json: no start zone, measured from the default map")
+	Level.register("wm_town", Level.image_from_rows(["....."], {Vector2i(1, 0): "start"}), null, {})
+	var names: Array[String] = ["wm_town", "wm_lost"]
+	var write := func(zone: String) -> void:
+		FileAccess.open(settings, FileAccess.WRITE).store_string(JSON.stringify({"start": {"zone": zone}}))
+	write.call("wm_town")
+	var problems := WorldMap.build(names).problems()
+	_check(WorldMap.start_zone() == "wm_town" and WorldMap.root() == "wm_town", "world_map.json names the start zone: %s" % WorldMap.start_zone())
+	_check(problems.has("wm_lost: cannot be reached from wm_town") and not problems.any(func(p: String) -> bool: return "start zone" in p),
+		"the world is measured from it, and one with starts is not flagged (%s)" % [problems])
+	write.call("wm_lost")
+	problems = WorldMap.build(names).problems()
+	_check(problems.has("wm_lost: it is the start zone (world_map.json) but has no starts"), "a start zone with no starts is flagged (%s)" % [problems])
+	write.call("wm_nowhere")
+	problems = WorldMap.build(names).problems()
+	_check(problems.has("world_map.json: the start zone wm_nowhere is not a level"), "a start zone that is no level is flagged")
+	WorldMap.settings_path = "res://levels/world_map.json"
+	DirAccess.remove_absolute(settings)
 
 
 func _test_crossing() -> void:

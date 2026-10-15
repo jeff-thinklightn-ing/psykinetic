@@ -135,14 +135,15 @@ func _boxes() -> Array[GraphNode]:
 	return out
 
 
-## Columns by how many ways from the default map, rows in order; areas it
-## does not reach in a last column. Spaced by the boxes' own sizes.
+## Columns by how many ways from the start zone (else the default map:
+## WorldMap.root()), rows in order; areas it does not reach in a last
+## column. Spaced by the boxes' own sizes.
 func _default_places(boxes: Dictionary[String, GraphNode]) -> Dictionary:
 	var out := {}
 	var depth := {}
-	var reached := world_map.reachable(Level.DEFAULT_MAP)
+	var reached := world_map.reachable(WorldMap.root())
 	for area_name in reached:
-		if area_name == Level.DEFAULT_MAP:
+		if area_name == WorldMap.root():
 			depth[area_name] = 0
 			continue
 		for way: Dictionary in world_map.ways_into(area_name):
@@ -176,6 +177,8 @@ func _box(area_name: String) -> GraphNode:
 	node.name = area_name
 	var display: String = area["display_name"]
 	node.title = "%s (%s)" % [display, area_name] if not display.is_empty() and display != area_name else area_name
+	if area_name == WorldMap.start_zone():
+		node.title += ", start"
 	node.tooltip_text = "%d x %d cells; double-click to open it in the level editor" % [area["size"].x, area["size"].y]
 	node.gui_input.connect(_on_box_input.bind(area_name))
 	node.add_theme_stylebox_override("panel", _style(PANEL, false))
