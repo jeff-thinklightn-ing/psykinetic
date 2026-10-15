@@ -96,6 +96,20 @@
 			],
 			"fill": {"from": "kenney-castle", "piece": "tree-small", "fit": "height"}
 		},
+		"tree.pine": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.8, 3.6, 1.8],
+			"budget": 1500,
+			"uses": "a conifer for the forest round an outdoor map and groves (not drawn yet: Client3D._add_tree picks tree.broadleaf or tree.small); sized 0.85 to 1.2, turned and nudged per cell",
+			"grey": [
+				{"at": [0, 0.5, 0], "size": [0.3, 1.0, 0.3]},
+				{"at": [0, 1.6, 0], "size": [1.8, 1.4, 1.8]},
+				{"at": [0, 2.7, 0], "size": [1.2, 1.2, 1.2]},
+				{"at": [0, 3.45, 0], "size": [0.5, 0.3, 0.5]}
+			]
+		},
 		"rock.small": {
 			"category": "rocks",
 			"type": "mesh",
@@ -145,6 +159,28 @@
 			"materials": 1,
 			"uses": "roots breaking the ground near trees (terrain part 5), drawn by MultiMesh, laid lengthwise along x; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.8, 1.3], "yaw": "free", "tilt_max": 5, "sink": 0.05, "footprint_r": 0.3, "blocks": false}
+		},
+		"prop.crate": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.8, 0.8, 0.8],
+			"budget": 300,
+			"uses": "a crate, pushable and stackable to stand on (the crate entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)"
+		},
+		"prop.chest": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.9, 0.6, 0.6],
+			"budget": 500,
+			"uses": "a chest holding loot, its lid hinged at the back and lifted when opened (the chest entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)",
+			"parts": [
+				{"name": "lid", "motion": "hinge", "axis": "x", "pivot": [0, 0.4, -0.3], "range": [0, -100], "size": [0.9, 0.2, 0.6]}
+			],
+			"grey": [
+				{"at": [0, 0.2, 0], "size": [0.9, 0.4, 0.6]}
+			]
 		},
 		"ground.grass": {
 			"category": "ground",

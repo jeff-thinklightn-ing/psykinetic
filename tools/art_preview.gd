@@ -135,7 +135,7 @@ func _grid() -> Node3D:
 	plane.size = Vector2(40, 40)
 	ground.mesh = plane
 	var earth := StandardMaterial3D.new()
-	earth.albedo_color = Client3D.GROUND_COLOURS["stone"]
+	earth.albedo_color = Client3D.GROUND_COLOURS["dirt"]
 	earth.roughness = 1.0
 	ground.material_override = earth
 	ground.position.y = -0.005

@@ -3699,3 +3699,29 @@ triangles, a prop 300 to 800, a tree 1500. Rejected: a material per colour
 Jeff to repaint, and Godot's importer keeps them only on request), and
 replacing every material whatever its name (a slot's second, glowing
 material must survive).
+
+## 262. A slot's Blender template is its grey box, as the game makes it
+
+Jeff asked for a template to model over: a slot opened in Blender at the
+right size and origin, with its moving parts named. tools/art_template.ps1
+<slot> writes art/kit/<category>/<slot>/<slot>.blend (never over one that
+is there, unless -Force). Godot makes the slot's grey box with ArtKit, as
+the game does, and writes it as a .glb (tools/art_template.gd); Blender
+imports it (tools/blender/template_slot.py), puts every mesh in the one
+palette material (261) with its UVs on the grey stone swatch, flat-shaded,
+adds a "guide" collection holding the slot's outline as a wireframe box,
+and saves. So sizes, pivots, part and socket names come from the one place
+the game and ArtCheck read them, and the template, exported untouched,
+passes ArtCheck (all but the source line, which is for whoever makes the
+art). tools/blender/export_slot.py drops the guide collection's objects
+from its run before exporting, never from the saved .blend.
+
+Jeff's first five slots have their templates ready: wall.straight and
+door.single were there; prop.crate (0.8 m, as the crate's puppet is),
+prop.chest (its lid hinged on x along the back, opening to -100°) and
+tree.pine (3.6 m, the forest's height) are new. Templates are made when
+asked, not committed: a .blend in a slot's folder with no .glb beside it
+is unfinished work, which art_kit_test refuses. Rejected: building the
+boxes again in Blender's Python from the manifest (a second copy of the
+grey box rules to keep in step), and committing templates for every slot
+(eighty .blend files nobody asked for).

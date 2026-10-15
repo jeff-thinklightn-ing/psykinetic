@@ -92,7 +92,13 @@ slots: 512 px square, tiling every 4 m (the manifest's `tile_m` gives the world 
 ## Making a slot's art
 
 1. Look up the slot in `art/kit/slots.json`: its size, kind, parts and budget.
-2. Model it in Blender, to the conventions above.
+2. Start from its template: `tools\art_template.ps1 prop.chest` writes
+   `art/kit/props/prop.chest/prop.chest.blend` with the slot's grey box as the game makes it.
+   It has the right size and origin, the moving parts as objects with their origins at the
+   pivots (the chest's `lid`), the sockets, every face in the `palette` material on a grey
+   swatch, and a wireframe `guide` collection with the slot's outline, which exporting leaves
+   out. Model over the boxes or replace them, to the conventions above, keeping the parts'
+   names and origins. Colour faces by moving their UVs onto a swatch.
 3. Record where it came from: a scene custom property `source` (for example
    `"jeff, blender"`). The manifest's `source` field for the slot says the same, with the
    licence and date: `{"by": "jeff", "tool": "blender", "license": "own", "date":
