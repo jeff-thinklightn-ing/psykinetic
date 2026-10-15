@@ -45,6 +45,8 @@ which worktree owns each step, and the design rules not to break without asking 
   `## Unreleased` to the next `## vX.Y.Z`, runs the release script, deploys the server,
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
+  After a rebase, check your bullet still sits under `## Unreleased`, above the first
+  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one.
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
   running, ask the release session for the number before
