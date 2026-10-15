@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_charging()
 	_test_archer()
 	_test_shield()
+	_test_boar_turns()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1835,4 +1836,24 @@ func _test_shield() -> void:
 			if hit["source"] == sneak and int(hit["tick"]) == World.tick:
 				struck += 1
 	_check(struck > 0, "the sneak gets blows in (%d) round the shield" % struck)
+	Monster.idling = true
+
+
+func _test_boar_turns() -> void:
+	print("\n== a boar running from a hunter, struck from afar, turns and charges ==")
+	Monster.idling = false
+	var e := _build(["####################", "#..................#", "#..P.....o.........#", "#..................#",
+		"####################"], {"o": {"facing": Vector2i(-1, 0)}})
+	var boar: Animal = e["o"][0]
+	var player: GridEntity = e["P"][0]
+	boar.sight_range = 8
+	for i in 3:
+		World.step()
+	_check(boar.alert == Monster.Alert.FLEEING, "it sees the hunter and runs")
+	for i in 5:
+		World.step()
+	World.damage(boar, 1, player, &"shot")
+	World.step()
+	_check(boar.alert == Monster.Alert.FIGHTING and boar.target == player and boar.charging(),
+			"an arrow in it, it turns on the hunter (%s)" % Monster.Alert.keys()[boar.alert])
 	Monster.idling = true

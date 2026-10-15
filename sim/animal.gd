@@ -11,7 +11,7 @@ extends Monster
 ## - prey (rabbit, deer, stag): anyone it notices, or a noise not its
 ##   herd's, and it bolts (FLEEING), and its bolting (a rout, a cry) sends
 ##   the herd after it; it never fights.
-## - game (boar): bolts as prey does, but struck, or cornered with the
+## - game (boar): bolts as prey does, but struck (running or not), or cornered with the
 ##   threat near, it charges (its kind's HEAVY blow) for a while, then
 ##   runs again.
 ## - predator (wolf): hunts its "diet" kinds in sight, and players only when
@@ -87,7 +87,9 @@ func _sim_tick() -> void:
 		_settle_bold()
 		super()
 		return
-	if alert == Alert.FLEEING:
+	# Struck, a boar turns and charges though it was running (an arrow from
+	# afar); prey runs on.
+	if alert == Alert.FLEEING and not (role == Role.GAME and _struck_by() != null):
 		pose = Pose.STAND
 		_flee_tick()
 		return
@@ -109,6 +111,7 @@ func _sim_tick() -> void:
 		_charge_until = World.tick + CHARGE_TICKS
 		_cry(&"charge", NOISE_CHARGE)
 		pose = Pose.STAND
+		alert = Alert.IDLE  # Running no more: Monster's fight takes it from here.
 		super()
 		return
 	_flee((from if from != null else threat).tile)

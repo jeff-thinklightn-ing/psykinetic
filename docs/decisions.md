@@ -5860,6 +5860,9 @@ seeing 3 cells less with its head down. Animals keep Monster's tiers, so a
 herd nobody is near costs what a far monster does. The pose and the alert
 it shows are the replicated ones there were; the protocol is unchanged.
 
+Amended: a boar struck while it runs (an arrow from afar) turns and
+charges the one who struck it, as when struck standing; prey runs on.
+
 ## 316. Scent goes with the wind
 
 Senses.smells(entity): an animal smells someone downwind of them, the wind
