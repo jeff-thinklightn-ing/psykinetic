@@ -187,6 +187,9 @@ server server5 --server --still-monsters --no-companions "--token=$TOKEN" "--sta
 wait_for server5 'console on'
 client clientR $GOOD --name=Rex "--player-id=$ID_R" --test-move=-2,0
 wait_for clientR '\[test\] Player[0-9]+ arrived'
+# It holds three zones when it goes, as the box does (decision 299).
+admin zone reset sample >/dev/null 2>&1
+admin zone reset castle >/dev/null 2>&1
 admin restart 3 a test >"$LOGS/admin.txt" 2>&1
 restart_code=0
 eval "wait \$pid_server5" || restart_code=$?
@@ -194,6 +197,13 @@ server server6 --server --still-monsters --no-companions "--token=$TOKEN" "--sta
 wait_for server6 'Rex \(5e5e5e5e\) joined'
 wait_for clientR '\[net\] reconnected'
 finish
+# A server stopped the moment its console is up (its stdin thread still
+# waiting out stdin's end) must exit cleanly too (decision 299).
+server server7 --server --still-monsters --no-companions "--token=$TOKEN" "--admin-port=$ADMIN"
+wait_for server7 'console on'
+admin stop 0 at once >/dev/null 2>&1
+quick_code=0
+eval "wait \$pid_server7" || quick_code=$?
 
 failures=0
 check() {
@@ -275,6 +285,8 @@ check "$(count 'restarting in 3 s \(a test\), 1 connected' "$LOGS/admin.txt")" 1
 check "$(count "\\[party\\] Server: Restarting in 3 s \\(a test\\); you'll be reconnected\\." "$LOGS/clientR.log")$(count '\[party\] Server:' "$LOGS/clientR.log")" 11 "phase 5: Rex is told once (a countdown of 3 s has no later warnings)"
 check "$(count '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75' "$LOGS/server5.log")" 1 "phase 5: the server saves and lets him go"
 check "$restart_code" 75 "phase 5: and exits 75, for systemd to start it again"
+check "$(cat "$LOGS/server5.log" "$LOGS/server5.err" | grep -c '^ERROR' || true)" 0 "phase 5: holding three zones, it went without an ERROR (decision 299)"
+check "$quick_code" 0 "phase 5: a server stopped as soon as its console is up exits 0"
 check "$(count '\[net\] lost the server; reconnecting' "$LOGS/clientR.log")$(count '\[net\] reconnected \(try [0-9]+\)' "$LOGS/clientR.log")" 11 "phase 5: Rex's client reconnects by itself"
 check "$(count '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)' "$LOGS/server6.log")" 1 "phase 5: the restarted server puts him back on (9, 2)"
 check "$(count '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)' "$LOGS/clientR.log")" 1 "phase 5: and his client shows him there"

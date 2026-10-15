@@ -4927,3 +4927,35 @@ medians of three under the bench lock: the suite alone 47 s (from 150), and
 33 s once run.sh stopped starting a grep and a basename per scene (some 9 s
 of process starts on Windows); a whole landing 111 s (from 290), net_test
 now its long pole (decision 279 runs its phases at once).
+
+## 299. A server goes cleanly: zone spawners leave after their entities, and the stdin thread is stopped and joined
+
+The box's first staged deploy (decision 242) refused v0.1.141: its staged
+server printed some 50 "Attempt to disconnect a nonexistent connection
+from '<entity>' ... Signal: 'tree_exiting'" lines as it exited, one an
+entity in its three zones (v0.1.140 the same). A MultiplayerSpawner tracks
+each node it spawned through that signal, connected with the node's id
+bound, and when the spawner itself leaves the tree with nodes still
+tracked it disconnects them without the binding, which matches nothing.
+The tree takes a node's children out last first, and each zone's spawner
+was added to Main after $YSort (where the zone's entities live), so the
+spawners left first, every entity still tracked. Now each spawner is moved
+before $YSort as it is made: the entities leave first, each untracked by
+its own tree_exiting, and a spawner leaves tracking nothing. That fixes
+every way out (stop, restart, the test timer, a window closed), not only
+the console's. The errors did not show on Windows, editor or export, so the
+reasoning is the engine's code; the next staged deploy on the box is the
+proof.
+
+Looking for it found a crash too: a server stopped within 2 s of starting
+crashed on its way out (exit 139), two runs in three. Its stdin thread,
+which runs a method of Main, waits out 2 s of empty reads after stdin's
+end before it returns, and Main's exit joined it only if it had already
+ended, so Main was freed under it. Now _exit_tree sets _stdin_stop, which
+the thread reads every 100 ms, waits half a second for it and joins it;
+one held in a read by a live terminal is still left to die, as before.
+
+net_test's restart phase checks both: the server it restarts holds three
+zones (sample and castle opened on the console) and must go without an
+ERROR line, and a fresh server told `stop 0` the moment its console is up
+must exit 0.

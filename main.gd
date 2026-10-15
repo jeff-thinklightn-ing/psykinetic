@@ -143,6 +143,8 @@ var _dead_since: Dictionary[int, int] = {}
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
 var _stdin_lines: Array[String] = []
+## Set on exit: the stdin thread stops at its next look (decision 299).
+var _stdin_stop := false
 var _admin: TCPServer
 var _admin_clients: Array[StreamPeerTCP] = []
 var _test_target := Vector2i.ZERO
@@ -1417,6 +1419,11 @@ func _zone_nodes(zone_name: String) -> void:
 	var made := MultiplayerSpawner.new()
 	made.name = "Spawner_" + zone_name
 	add_child(made)
+	# Before $YSort: the tree takes a node's children out last first, so the
+	# zone's entities leave before the spawner that tracks them, not after it
+	# (each then found its spawner's connection gone: an ERROR an entity on a
+	# server's exit, or a crash; decision 299).
+	move_child(made, 0)
 	made.spawn_path = made.get_path_to(holder)
 	# Every peer builds entities the same way; only the server decides when.
 	made.spawn_function = _build_entity
@@ -1857,8 +1864,15 @@ func _sky_command(words: PackedStringArray) -> String:
 func _exit_tree() -> void:
 	# Clean shutdown (quit, window closed): keep the last state.
 	_save_state()
-	# The stdin thread ends on its own once stdin is closed; join it then. One
-	# still blocked on a live terminal cannot be joined and is left to die.
+	# The stdin thread runs this node's method: it must have stopped before
+	# the node goes, or the server crashes on its way out (one stopped within
+	# 2 s of starting found it still waiting out stdin's end; decision 299).
+	# It sees _stdin_stop within 100 ms unless a live terminal holds it in a
+	# read, when it cannot be joined and is left to die.
+	_stdin_stop = true
+	var deadline := Time.get_ticks_msec() + 500
+	while _stdin_thread != null and _stdin_thread.is_alive() and Time.get_ticks_msec() < deadline:
+		OS.delay_msec(10)
 	if _stdin_thread != null and _stdin_thread.is_started() and not _stdin_thread.is_alive():
 		_stdin_thread.wait_to_finish()
 
@@ -3269,7 +3283,7 @@ func _start_console() -> void:
 ## the main thread. Ends when stdin is closed or empty (a service's is).
 func _read_stdin() -> void:
 	var empties := 0
-	while true:
+	while not _stdin_stop:
 		# One read may hold several lines (piped input), or nothing (EOF).
 		var chunk: String = OS.read_string_from_stdin()
 		if chunk.strip_edges().is_empty():

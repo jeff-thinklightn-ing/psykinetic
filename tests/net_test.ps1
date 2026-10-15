@@ -221,6 +221,9 @@ Start-Server 'server7' @('--server', '--still-monsters', '--no-companions', "--t
 Wait-Log 'server7' 'console on'
 Start-Client 'clientR' ($good + @('--name=Rex', "--player-id=$idR", '--test-move=-2,0'))
 Wait-Log 'clientR' '\[test\] Player\d+ arrived'
+# It holds three zones when it goes, as the box does (decision 299).
+$null = Send-Admin 'zone reset sample'
+$null = Send-Admin 'zone reset castle'
 $adminReply = Send-Admin 'restart 3 a test'
 $restarting = $script:instances['server7']
 if (-not $restarting.WaitForExit(60000)) { $restarting | Stop-Process -Force }
@@ -229,6 +232,14 @@ Start-Server 'server8' @('--server', '--still-monsters', '--no-companions', "--t
 Wait-Log 'server8' 'Rex \(5e5e5e5e\) joined'
 Wait-Log 'clientR' '\[net\] reconnected'
 Complete-Phase
+# A server stopped the moment its console is up (its stdin thread still
+# waiting out stdin's end) must exit cleanly too (decision 299).
+Start-Server 'server9' @('--server', '--still-monsters', '--no-companions', "--token=$token", "--admin-port=$adminPort")
+Wait-Log 'server9' 'console on'
+$null = Send-Admin 'stop 0 at once'
+$quick = $script:instances['server9']
+if (-not $quick.WaitForExit(60000)) { $quick | Stop-Process -Force }
+$quickCode = $quick.ExitCode
 
 function Read-Log($name) {
 	$path = Join-Path $logs "$name.log"
@@ -346,6 +357,9 @@ Assert ($adminReply -match 'restarting in 3 s \(a test\), 1 connected') "phase 7
 Assert (@($clientRLog | Select-String "\[party\] Server: Restarting in 3 s \(a test\); you'll be reconnected\.").Count -eq 1 -and @($clientRLog | Select-String '\[party\] Server:').Count -eq 1) 'phase 7: Rex is told once (a countdown of 3 s has no later warnings)'
 Assert (@($server7Log | Select-String '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75').Count -eq 1) 'phase 7: the server saves and lets him go'
 Assert ($restartCode -eq 75) "phase 7: and exits 75, for systemd to start it again (exit $restartCode)"
+$restartErrors = @((Read-Log 'server7') + @(Get-Content (Join-Path $logs 'server7.err') -ErrorAction SilentlyContinue) | Select-String '^ERROR')
+Assert ($restartErrors.Count -eq 0) "phase 7: holding three zones, it went without an ERROR (decision 299) ($($restartErrors.Count))"
+Assert ($quickCode -eq 0) "phase 7: a server stopped as soon as its console is up exits 0 (exit $quickCode)"
 Assert (@($clientRLog | Select-String '\[net\] lost the server; reconnecting').Count -eq 1 -and @($clientRLog | Select-String '\[net\] reconnected \(try \d+\)').Count -eq 1) "phase 7: Rex's client reconnects by itself"
 Assert (@($server8Log | Select-String '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)').Count -eq 1) 'phase 7: the restarted server puts him back on (9, 2)'
 Assert (@($clientRLog | Select-String '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)').Count -eq 1) 'phase 7: and his client shows him there'
