@@ -773,6 +773,15 @@
 			"volume_db": -2.0,
 			"uses": "a boar bolting: a grunt and a crash (Monster.cried rout)"
 		},
+		"sfx.deer_snort": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 4,
+			"volume_db": -8.0,
+			"uses": "a deer or stag lifting its head, alert to a sound: a quiet snort, the stalker's cue to freeze (Client3D._sync_alert, idle to suspicious)"
+		},
 		"sfx.boar_charge": {
 			"category": "creatures",
 			"type": "oneshot",

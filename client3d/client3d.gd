@@ -4904,9 +4904,15 @@ func on_death(data: Dictionary) -> void:
 ## A monster's name with how alert it is (Monster.Alert): "?" looking into
 ## something, "!" after someone, "~" running.
 func _sync_alert(monster: Monster, puppet: Node3D) -> void:
-	if int(puppet.get_meta("alert", Monster.Alert.IDLE)) == monster.alert:
+	var was := int(puppet.get_meta("alert", Monster.Alert.IDLE))
+	if was == monster.alert:
 		return
 	puppet.set_meta("alert", monster.alert)
+	if was == Monster.Alert.IDLE and monster.alert == Monster.Alert.SUSPICIOUS:
+		# Its head comes up: a deer snorts (the stalker's cue to freeze).
+		var slot := SoundKit.cry(str(puppet.get_meta("creature", "")), "suspicious")
+		if slot != "":
+			sfx.play(slot, puppet.position + Vector3.UP * 0.8)
 	var label := puppet.get_node_or_null("Name") as Label3D
 	if label == null:
 		return

@@ -255,7 +255,7 @@ const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05}
 ## A cry (Monster.cried) -> the part of its slot's name after the creature;
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
-const OWN_CRIES := {"wolf": {"call": "howl"}}
+const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"}}
 ## A kind that sounds as another (a stag as a deer).
 const SOUNDS_AS := {"stag": "deer"}
 
@@ -269,7 +269,7 @@ static func creature_slot_name(creature: String) -> String:
 ## The slot for a [param creature] (a monster's kind) crying
 ## [param cry_kind] (Monster.cried's kind): "" when there is none.
 static func cry(creature: String, cry_kind: String) -> String:
-	var own: Dictionary = OWN_CRIES.get(creature, {})
+	var own: Dictionary = OWN_CRIES.get(creature_slot_name(creature), {})
 	var slot := "sfx.%s_%s" % [creature_slot_name(creature), own.get(cry_kind, CRIES.get(cry_kind, cry_kind))]
 	return slot if has(slot) else ""
 

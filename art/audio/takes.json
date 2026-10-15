@@ -105,6 +105,20 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/Justsoundeffects - Horror Jumpscares/DSGNStngr_Pig Scream 02_JSE_HJS.wav (from 0.1 s for 2.5 s)",
 				"sha256": "5d8727953843ed94379e29bb722f184da01087f6c75e14b5279da39cbbe9cac6"
+			},
+			{
+				"file": "sfx.boar_charge.2.ogg",
+				"from": "sonniss-gdc-2024",
+				"original": "2024/Mechanical Wave - Farm Animals/ANMLFarm_Pig Squeal and Snort-18_MWSFX_FA.wav",
+				"sha256": "87d722bf5cba90fbaad5e34a2422f83cd35c19ee5502f0518f7699693907f32e"
+			}
+		],
+		"sfx.cart_roll": [
+			{
+				"file": "sfx.cart_roll.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Dramatic Cat - Horse Carriage - Draft Horse/VEHWagn_Wood Cart Roll On Stone Pavement In Courtyard 03_DRCA_HOCA_Kmr81i.wav (from 1 s for 14 s)",
+				"sha256": "386bee5e57c38cd5c29371c68ce37bbb789a10d116a16544c99ff36130407a52"
 			}
 		],
 		"sfx.crate_break": [

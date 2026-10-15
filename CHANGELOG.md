@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A deer or stag that hears you lifts its head with a quiet snort: freeze
+  before it sees you.
 - The forest goes on past the edge of outdoor maps: dense treetops as far
   as the view reaches, so panning near an edge no longer shows a void
   under the map.
