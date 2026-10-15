@@ -48,6 +48,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			continue
 		if entity is Companion:
 			continue  # Kept in its owner's player record instead.
+		if entity is Resident:
+			continue  # Its town's records are its truth (decision 333).
 		var spec := entity.spawn_spec
 		var entry := {
 			"script": str(spec.get("script", "")),

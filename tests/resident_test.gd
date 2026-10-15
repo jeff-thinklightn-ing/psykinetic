@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_goes_when_not_told()
 	_test_legacy_rests_in_town()
 	_test_taken_by_raiders()
+	_test_bodies_in_town()
 
 	remove_child(_main)
 	_main.free()
@@ -48,16 +49,20 @@ func _ready() -> void:
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
-## rs_town: 16 x 10 cells of stone in a wall, the start at (2, 2), the store
-## (a stockpile the town holds) at (5, 3), radius 2. rs_road: a bare room.
+## rs_town: a room of stone (30 x 20 rows of the layout) in a wall, the start
+## at (2, 2), the store (a stockpile the town holds) at (5, 3), radius 2, a
+## hut at (9, 5) (no walls of its own: its inside, (9, 5) to (11, 7), is a
+## home). rs_road: a bare room.
 func _register_levels() -> void:
 	for level_name: String in [TOWN, ROAD]:
 		var rows: Array[String] = []
-		for y in 10:
-			rows.append("#".repeat(16) if y == 0 or y == 9 else "#" + ".".repeat(14) + "#")
+		for y in 20:
+			rows.append("#".repeat(30) if y == 0 or y == 19 else "#" + ".".repeat(28) + "#")
 		var spec := {"name": level_name, "centre": [7, 4], "starts": [[2, 2]], "entities": []}
 		if level_name == TOWN:
 			spec["places"] = {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}}
+			# A home for residents' bodies (decision 333): a hut linked to nothing.
+			spec["buildings"] = [{"slot": "building.hut", "at": [9, 5]}]
 		Level.register(level_name, Level.image_from_rows(rows, {Vector2i(2, 2): "start"}), null, spec)
 
 
@@ -68,6 +73,7 @@ func _boot() -> void:
 	var names := Level.names()
 	names.append_array([TOWN, ROAD])
 	World.holdings.rebind(WorldMap.build(names))
+	_main._world_map = WorldMap.build(names)
 	for i in 3:
 		World.step()
 
@@ -206,6 +212,75 @@ func _test_taken_by_raiders() -> void:
 	World.spared = was_spared
 	_check(_companion() == null and _main.companion_freed(Net.player_id) and _companion() != null
 		and World.distance(_companion().tile, _player().tile) <= 2, "freed in the field (her captors beaten): beside her player at once")
+
+
+func _test_bodies_in_town() -> void:
+	print("\n== residents are bodies in their town: at work, at home or in the square by the hour, hiding from raiders, taken by them (decision 333) ==")
+	var phase := DayNight.phase
+	var anchor := DayNight.anchor
+	DayNight.set_hour(12.0)
+	_check(World.towns.note_rescue(STORE, "rs-bram", "Bram", "smith"), "(Bram the smith rescued: a resident of the town)")
+	_sync()
+	var bram := _body("rs-bram")
+	_check(bram != null and bram.label == "Bram, smith" and bram.town == STORE and bram.trade == "smith",
+		"a body for him, named with his trade over his head (%s)" % [bram.label if bram != null else "none"])
+	_check(World.townsfolk().size() == 1 and not World.sought().has(bram), "one of the townsfolk, not sought (no monster's tier wakes for him)")
+	var hut := Rect2i(9, 5, 3, 3)
+	var square := Rect2i(3, 1, 5, 5)
+	_check(bram.places["home"] == hut and bram.places["work"] == square, "home the hut; no forge, so he works in the square (%s)" % [bram.places])
+	_step_until(func() -> bool: return bram.doing == Resident.Doing.WORK and square.has_point(bram.tile), 120)
+	_check(bram.doing == Resident.Doing.WORK and square.has_point(bram.tile), "noon: at work (%s, at %s)" % [bram.doing, bram.tile])
+	DayNight.set_hour(23.0)
+	_step_until(func() -> bool: return bram.doing == Resident.Doing.HOME and hut.has_point(bram.tile), 150)
+	_check(bram.doing == Resident.Doing.HOME and hut.has_point(bram.tile), "night: home in the hut (at %s)" % bram.tile)
+	DayNight.set_hour(19.5)
+	_step_until(func() -> bool: return bram.doing == Resident.Doing.SQUARE and square.has_point(bram.tile), 150)
+	_check(bram.doing == Resident.Doing.SQUARE and square.has_point(bram.tile), "evening, between work and home: the square (at %s)" % bram.tile)
+	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RsRaider%d" % World.tick,
+		"tile": _main._nearest_free(Vector2i(2, 7)), "props": {"sight_range": 0}}) as Monster
+	_step_until(func() -> bool: return bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), 150)
+	_check(bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), "a raider in sight: he hides at home (at %s)" % bram.tile)
+	World.despawn(raider)
+	World.entity_taken.emit(bram, "raid-9")
+	_check(not bram.spawned and _body("rs-bram") == null, "beaten down by raiders: his body is carried off")
+	_sync()
+	World.production.set_away("rs-bram", true)
+	_sync()
+	_check(_body("rs-bram") == null, "away: no body")
+	World.production.set_away("rs-bram", false)
+	for i in 14:
+		World.towns.note_rescue(STORE, "rs-folk%02d" % i, "Folk%d" % i, "carpenter")
+	_sync()
+	_check(World.townsfolk().size() == Main.RESIDENTS_MAX, "%d residents: at most %d bodies (%d)" % [15, Main.RESIDENTS_MAX, World.townsfolk().size()])
+	_check(not World.townsfolk().any(func(body: GridEntity) -> bool: return (body as Resident).worker_id.begins_with("companion:")),
+		"a companion resident has her own body, not one of these")
+	var saved: Array[GridEntity] = []
+	saved.assign(World.get_entities())
+	_check(not Snapshot._entries(saved).any(func(entry: Dictionary) -> bool: return entry["script"] == Main.RESIDENT), "never saved")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.phase = phase
+	DayNight.anchor = anchor
+	DayNight.update()
+
+
+func _sync() -> void:
+	_main._sync_residents()
+	World.step()
+
+
+func _body(who: String) -> Resident:
+	for body: GridEntity in World.townsfolk():
+		if (body as Resident).worker_id == who:
+			return body
+	return null
+
+
+func _step_until(condition: Callable, limit: int) -> void:
+	for i in limit:
+		if condition.call():
+			return
+		World.step()
 
 
 # --- helpers ------------------------------------------------------------------

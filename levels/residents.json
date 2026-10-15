@@ -1,0 +1,7 @@
+{
+	"_": "Each trade's day, for a resident's body in its town (decision 333): the hours (0-24, on DayNight's clock) it is at its work and at home; any other hour it is in the square. A span may run over midnight ([21, 6]). A trade not listed has the default's. Placeholders until Jeff and economy settle each trade's day.",
+	"default": {"work": [8, 18], "home": [21, 6]},
+	"smith": {"work": [7, 18], "home": [21, 6]},
+	"cook": {"work": [6, 15], "home": [20, 5]},
+	"carpenter": {"work": [7, 17], "home": [21, 6]}
+}

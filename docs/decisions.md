@@ -6170,3 +6170,48 @@ Measured and not done:
   occupied (an early, free failure), so the door search finds a way with
   no door and the monster gives up anyway. Skipping it there changes what a
   monster does, enemy-ai's to decide; told to the coordinator.
+## 333. Residents are bodies in their town
+
+What: a town's residents (Towns.residents, Production.worker: records
+only, economy's) stand in their town while its zone is awake, as
+`Resident` bodies (sim/resident.gd, a GridEntity, not a Companion: no
+keeper, mind, voice or save of its own). Main keeps them (`_sync_residents`,
+every RESIDENT_SYNC_TICKS in each awake zone): a body for each resident of
+each stockpile place in the zone, but for companions (who have their own)
+and those away, at most RESIDENTS_MAX (12) a zone; a body whose record is
+gone (taken, away, moved) goes. Bodies are never saved (Snapshot skips
+them): a body comes where its day puts it at that hour.
+
+Its day is levels/residents.json: per trade (a "default" row), the hours at
+work and at home on DayNight's clock, the square any other hour (a span may
+run over midnight). Its places are cells: work is the inside of the
+standing building its trade works in (Towns.kind_for, the map's building
+with that use and town), else the square; home is the map's huts and
+houses linked to nothing within HOME_TILES (24) of the store, handed out
+nearest first in worker-id order (a hut 2, a house 3), else the inn if it
+stands, else its work; the square is the store's ground. No level gets a
+new mark: a "home" link on a building can come later.
+
+It walks there as a companion does (World.find_path, the route kept till a
+step is blocked STUCK_TRIES times), and strolls in the square. It has
+Senses (sight all round, hearing: World adds Residents to its hearers): a
+monster that is no harmless animal (Companion.harmless) it sees, a raider's
+noise, a fight or a door broken, or a blow, and it hides at home until none
+for HIDE_TICKS (60 s). It never fights and says nothing yet. Beaten down by
+raiders (enemy-ai's Raids._spared, carrying "resident:<worker id>"), Main
+hands it to economy's Towns.resident_taken and takes its body off the map,
+carried off, not dead. World.townsfolk() lists the zone's bodies; they are
+not sought(), so no monster's tier wakes for them, and only raiders look
+over them for a target (enemy-ai's side).
+
+The name and trade over its head ("Bram, smith") is its spawn spec's label,
+so nothing new goes over the wire: an older client draws it as a capsule
+with that name. Perf: at most 12 a zone; beyond FAR_TILES (30) of every
+player and companion it thinks every FAR_EVERY (20) ticks and is walked
+there at once (World.walk); near, a path search per new goal and a look
+every LOOK_EVERY (5) ticks.
+
+Rejected: a Resident as a Companion (Main's and World's companion paths
+would all have to tell them apart); saving bodies (two truths about where
+a resident is); homes marked in the wilds' level.json (content in a real
+level, Jeff's call).

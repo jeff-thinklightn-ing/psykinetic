@@ -345,6 +345,7 @@ var _sought: Array[GridEntity] = []
 ## Those sought that hear by Senses (companions): noise tells them too.
 var _hearers: Array[GridEntity] = []
 var _monsters: Array[GridEntity] = []
+var _townsfolk: Array[GridEntity] = []
 ## The zone's entities that have a turn (GridEntity.acts), in id order.
 var _actors: Array[GridEntity] = []
 var _roster_current := false
@@ -3335,6 +3336,13 @@ func monsters() -> Array[GridEntity]:
 	return _monsters
 
 
+## The zone's residents' bodies (Resident, decision 333), in id order. Not a
+## copy, as sought(). Not sought: they wake no monster's tier.
+func townsfolk() -> Array[GridEntity]:
+	_take_roster()
+	return _townsfolk
+
+
 func _roster_changed() -> void:
 	_roster_current = false
 
@@ -3346,6 +3354,7 @@ func _take_roster() -> void:
 	_sought = []
 	_hearers = []
 	_monsters = []
+	_townsfolk = []
 	_actors = []
 	for entity in _entities:
 		if entity.acts:
@@ -3356,6 +3365,9 @@ func _take_roster() -> void:
 				_hearers.append(entity)
 		elif entity is Monster:
 			_monsters.append(entity)
+		elif entity is Resident:
+			_townsfolk.append(entity)
+			_hearers.append(entity)
 	_roster_current = true
 
 

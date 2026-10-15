@@ -13,6 +13,9 @@ notes (decision 324).
   hands it still shoves and tosses. Opening chests, crates, carts, doors and
   your companion's pack moves to E; hold E to bandage.
 
+- The town's residents are people you can see: each goes about their day
+  by the clock, at their workshop, at home or in the square, with their
+  name and trade over their head, and hides indoors when raiders come.
 ## v0.1.143
 
 - New things for hunters: a cut of meat (banks as food), a raw hide, a pair of

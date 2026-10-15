@@ -52,6 +52,15 @@ const MONSTER := "res://sim/monster.gd"
 const PUSHABLE := "res://sim/pushable.gd"
 const PLAYER := "res://sim/player.gd"
 const COMPANION := "res://sim/companion.gd"
+const RESIDENT := "res://sim/resident.gd"
+## Residents' bodies (decision 333): at most so many in a zone, its towns'
+## residents looked over every so many ticks (_sync_residents).
+const RESIDENTS_MAX := 12
+const RESIDENT_SYNC_TICKS := 30
+## A town's homes: the map's huts and houses linked to nothing within so
+## many cells of its store, each with room for so many.
+const HOME_TILES := 24
+const HOME_ROOM := {"building.hut": 2, "building.house": 3}
 ## The level in play (Level.load_level): its entities, spawned by the
 ## server in this order, which is also entity id order (each spec built by
 ## EntityFactory on every peer); the starts, a joining peer's player taking
@@ -118,6 +127,8 @@ var _records: Dictionary[String, PlayerRecord] = {}
 ## Server only: peer id -> tick at which its dead player comes back.
 var _respawn_at: Dictionary[int, int] = {}
 ## Server only: player_id -> that player's live companion.
+## The world map the towns' buildings are read from (_sync_residents).
+var _world_map: WorldMap
 var _companions: Dictionary[String, Companion] = {}
 ## Server only: the companions the last room rebuild brought back, by name.
 var _revived: Array[String] = []
@@ -1454,6 +1465,7 @@ func _boot() -> void:
 	World.towns.building_changed.connect(_on_town_building_changed)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
+	_world_map = world_map
 	# Raid groups (decision 328): off until switched on (--raids, the console).
 	World.raid_groups = WorldRaids.new(world_map, World.holdings, World.towns, snapshot.get("raid_groups", {}))
 	World.raid_groups.clock = func() -> int: return World.steps
@@ -2280,6 +2292,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 ## (companion_taken), her player is told, and she leaves the map as one who
 ## travels, not one who dies (her pack and facts kept with her record).
 func _on_entity_taken(entity: GridEntity, by: String) -> void:
+	if entity is Resident:
+		_resident_taken(entity as Resident, by)
+		return
 	var pet := entity as Companion
 	if pet == null:
 		return
@@ -2298,6 +2313,126 @@ func _on_entity_taken(entity: GridEntity, by: String) -> void:
 	World.despawn(pet)
 	_travelling = false
 	_companions.erase(id)
+
+
+## A resident beaten down by raid group [param by] (decision 333): its
+## town's records hold it captive (Towns.resident_taken, economy's) and its
+## body goes, as one carried off, not one who died.
+func _resident_taken(body: Resident, by: String) -> void:
+	# Economy's hook; until it is on main the body still goes.
+	if World.towns != null and World.towns.has_method("resident_taken"):
+		World.towns.call("resident_taken", body.town, body.worker_id, by)
+	party_log.add("Raiders beat %s down and carried them off." % _display_name(body))
+	_travelling = true  # Taken, not dead.
+	World.despawn(body)
+	_travelling = false
+
+
+## Server: the zone World is in has a body for each resident of its towns
+## (Towns.residents, but for companions, who have their own, and those
+## away), at most RESIDENTS_MAX, and none for anyone else (decision 333).
+## A body comes where its day puts it now, and goes when the record says it
+## is gone (taken, away, moved); bodies are never saved.
+func _sync_residents() -> void:
+	if World.towns == null or World.production == null or World.holdings == null or _world_map == null:
+		return
+	var area: Dictionary = _world_map.areas.get(World.zone.name, {})
+	var wanted := {}
+	if not area.is_empty():
+		for place_id: String in World.holdings.places_in(World.zone.name):
+			var place := World.holdings.place(place_id)
+			if place.get("kind") != "stockpile":
+				continue
+			var ids: Array[String] = World.towns.residents(place_id).filter(func(who: String) -> bool:
+				return not who.begins_with("companion:") and not World.production.worker(who).is_empty() \
+					and not bool(World.production.worker(who).get("away", false)))
+			ids.sort()
+			var homes := _homes(area, place)
+			for i in ids.size():
+				if wanted.size() < RESIDENTS_MAX:
+					wanted[ids[i]] = {"town": place_id, "places": _resident_places(area, place, ids[i], homes, i)}
+	var have := {}
+	for entity: GridEntity in World.townsfolk().duplicate():
+		var body := entity as Resident
+		if wanted.has(body.worker_id):
+			have[body.worker_id] = true
+			body.places = wanted[body.worker_id]["places"]
+		else:
+			_travelling = true
+			World.despawn(body)
+			_travelling = false
+	for who: String in wanted:
+		if not have.has(who):
+			_spawn_resident(who, wanted[who]["town"], wanted[who]["places"])
+
+
+## A body for resident [param who] of [param town], with [param places]
+## (_resident_places), where its day puts it now.
+func _spawn_resident(who: String, town: String, places: Dictionary) -> Resident:
+	var worker := World.production.worker(who)
+	var trades: Array = worker.get("trades", [])
+	var trade := str(trades[0]) if not trades.is_empty() else ""
+	var doing := Resident.doing_at(trade, DayNight.hour(DayNight.now()))
+	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
+	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
+	var label := str(worker.get("name", who)) + (", " + trade if not trade.is_empty() else "")
+	var body := _spawn({"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(),
+		"label": label, "tile": at}) as Resident
+	if body == null:
+		return null
+	body.worker_id = who
+	body.town = town
+	body.trade = trade
+	body.places = places
+	body.doing = doing
+	return body
+
+
+## [param area]'s homes for the town at [param place]: its huts and houses
+## linked to nothing within HOME_TILES of the store, nearest first, each
+## as many times as it has room (HOME_ROOM): a list of insides (Rect2i).
+func _homes(area: Dictionary, place: Dictionary) -> Array[Rect2i]:
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	var found: Array[Dictionary] = []
+	for building: Dictionary in area.get("buildings", []):
+		var rect: Rect2i = building["rect"]
+		if str(building.get("use", "")).is_empty() and HOME_ROOM.has(building["slot"]) \
+				and World.distance(rect.get_center(), store) <= HOME_TILES:
+			found.append(building)
+	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return World.distance((a["rect"] as Rect2i).get_center(), store) < World.distance((b["rect"] as Rect2i).get_center(), store))
+	var out: Array[Rect2i] = []
+	for building in found:
+		for i in int(HOME_ROOM[building["slot"]]):
+			out.append(building["rect"])
+	return out
+
+
+## Where resident [param who] (the [param index]th of its town, in id
+## order) goes, in [param area] for the town at [param place]: "work", the
+## inside of the standing building its trade works in (none: the square);
+## "home", its share of [param homes], else the inn if it stands, else its
+## work; "square", the store's ground.
+func _resident_places(area: Dictionary, place: Dictionary, who: String, homes: Array[Rect2i], index: int) -> Dictionary:
+	var key := str(place.get("key", ""))
+	var radius := int(place.get("radius", 4))
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	var square := Rect2i(store - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+	var trades: Array = World.production.worker(who).get("trades", [])
+	var kind := World.towns.kind_for(str(trades[0])) if not trades.is_empty() else ""
+	var work := Rect2i()
+	var inn := Rect2i()
+	for building: Dictionary in area.get("buildings", []):
+		if str(building.get("town", "")) != key:
+			continue
+		var standing := str(World.towns.building(str(place.get("id", "")), str(building["use"])).get("state", "")) == Towns.STANDING
+		if standing and building["use"] == kind:
+			work = building["rect"]
+		elif standing and building["use"] == "inn":
+			inn = building["rect"]
+	var home := homes[index] if index < homes.size() else (inn if inn.size != Vector2i.ZERO else work)
+	return {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
+		"square": square}
 
 
 ## The companion of player [param player_id] is held by raid group
@@ -3083,6 +3218,8 @@ func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
 		_respawn_due_players(tick)
 		_check_respawns(tick)
+		if tick % RESIDENT_SYNC_TICKS == 0:
+			_sync_residents()
 	if World.zone != World.home():
 		return  # Another zone's tick: the HUD and the test hooks are this view's.
 	var player := _local_player()
