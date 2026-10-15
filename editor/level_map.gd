@@ -150,7 +150,7 @@ func resized(left: int, top: int, right: int, bottom: int) -> LevelMap:
 ## [param config] (level.json) with every cell in it carried by [param move]
 ## (Vector2i -> Vector2i, or null for gone) and every facing turned
 ## [param turns] quarter turns clockwise: the centre, starts, spawn points,
-## links, places, buildings (their footprints and facings), and each entity's cell, route and gather point. What [param move]
+## links, places, buildings (their footprints and facings), town walls, and each entity's cell, route and gather point. What [param move]
 ## drops is left out (an entity's entry, a link, a start; a waypoint; a gather
 ## point), each said in [param dropped]. The rest of the file is kept.
 static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped: Array[String] = []) -> Dictionary:
@@ -222,6 +222,18 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 				entry["facing"] = [turned.x, turned.y]
 			buildings.append(entry)
 		out["buildings"] = buildings
+	if out.get("town_walls") is Array:
+		var rings: Array = []
+		for entry: Variant in out["town_walls"]:
+			var rect: Variant = Level.town_wall_rect(entry)
+			var a: Variant = move.call(rect.position) if rect != null else null
+			var b: Variant = move.call(rect.end - Vector2i.ONE) if rect != null else null
+			if a == null or b == null:
+				dropped.append("town wall %s" % [entry])
+				continue
+			entry["rect"] = [mini(a.x, b.x), mini(a.y, b.y), absi(a.x - b.x) + 1, absi(a.y - b.y) + 1]
+			rings.append(entry)
+		out["town_walls"] = rings
 	if out.get("entities") is Array:
 		var entities: Array = []
 		for entry: Variant in out["entities"]:

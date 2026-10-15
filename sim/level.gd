@@ -207,6 +207,8 @@ static func load_level(level_name: String) -> Dictionary:
 	# A linked building's town by its id, as Towns and Holdings name it.
 	for building: Dictionary in level["buildings"]:
 		building["town_id"] = "%s/%s" % [level_name, building["town"]] if not building["town"].is_empty() else ""
+	for ring: Dictionary in level["town_walls"]:
+		ring["town_id"] = "%s/%s" % [level_name, ring["town"]]
 	for warning: String in level["warnings"]:
 		push_warning("[level] %s: %s" % [level_name, warning])
 	return level
@@ -442,6 +444,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	# The views draw them (roofs, inside floors) from the terrain they are given.
 	level["terrain"]["buildings"] = level["buildings"]
+	level["town_walls"] = town_walls_from(config, level["terrain"], cells, warnings)
+	level["terrain"]["town_walls"] = level["town_walls"]
 	return level
 
 
@@ -746,6 +750,65 @@ static func _link(building: Dictionary, entry: Dictionary, config: Dictionary, l
 		warnings.append("the %s at %s, %s's %s, is outside its place's radius" % [building["slot"], at, town, use])
 	building["use"] = use
 	building["town"] = town
+
+
+## level.json's "town_walls", [{town: a stockpile place's key, rect: [x,
+## y, w, h], the cells it encloses}], as {town, rect (Rect2i), walls and
+## gates (its outline's wall and door edges, Level.outline)}: which ring of
+## the map's walls is a town's wall, its look and strength the town's walls
+## level (decision 298). The walls are the layout's own. One whose town is
+## no stockpile place here, or has a wall already, or whose rect is not on
+## the map, is left out, said in [param warnings]; one whose ring has open
+## edges, or that does not hold its place's cell, stands, said.
+static func town_walls_from(config: Dictionary, terrain: Dictionary, size: Vector2i, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("town_walls", [])
+	if not listed is Array:
+		warnings.append("\"town_walls\" in level.json is not a list")
+		return out
+	var ignored: Array[String] = []
+	var places := places_from(config, ignored)
+	var walled := {}
+	for entry: Variant in listed:
+		var town := str(entry.get("town", "")) if entry is Dictionary else ""
+		var rect: Variant = town_wall_rect(entry)
+		if rect == null or not Rect2i(Vector2i.ZERO, size).encloses(rect):
+			warnings.append("the town wall %s has no \"rect\" [x, y, w, h] on the map" % [entry])
+			continue
+		var place: Dictionary = places.get(town, {})
+		if place.get("kind") != "stockpile":
+			warnings.append("the town wall at %s is round town \"%s\": no stockpile place of that key here; left out" % [rect.position, town])
+			continue
+		if walled.has(town):
+			warnings.append("the town wall at %s: %s has its wall already; left out" % [rect.position, town])
+			continue
+		walled[town] = true
+		var walls: Array[Vector3i] = []
+		var gates: Array[Vector3i] = []
+		var open: Array[Vector3i] = []
+		for key in outline(rect):
+			match terrain["edges"].get(key, Terrain.Edge.OPEN):
+				Terrain.Edge.WALL:
+					walls.append(key)
+				Terrain.Edge.DOOR:
+					gates.append(key)
+				_:
+					open.append(key)
+		if not open.is_empty():
+			warnings.append("the town wall round %s has %d open edges on its ring (%s)" % [town, open.size(), open[0]])
+		if not rect.has_point(place["cell"]):
+			warnings.append("the town wall round %s does not hold its place's cell %s" % [town, place["cell"]])
+		out.append({"town": town, "rect": rect, "walls": walls, "gates": gates})
+	return out
+
+
+## A level.json town wall entry's rect (null if it has none).
+static func town_wall_rect(entry: Variant) -> Variant:
+	var given: Variant = entry.get("rect") if entry is Dictionary else null
+	if not given is Array or given.size() != 4:
+		return null
+	var rect := Rect2i(int(given[0]), int(given[1]), int(given[2]), int(given[3]))
+	return rect if rect.size.x > 0 and rect.size.y > 0 else null
 
 
 ## A level.json building entry's facing: its "facing" if it is one of the

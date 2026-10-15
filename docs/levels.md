@@ -215,6 +215,15 @@ All of it is optional.
   has, a use there is not, or a town that is no stockpile place stands
   unlinked, with a warning; one outside its place's radius is linked, with
   a warning. A building with no use is scenery and always stands.
+- `town_walls`: which ring of this map's walls is a town's wall, a list of
+  `{"town": "square", "rect": [x, y, w, h]}`. `town` is a stockpile place's
+  key, as for buildings; `rect` is the cells the wall encloses, and the wall
+  is its outline: the edge just outside each border cell, drawn in the
+  layout as walls, with doors for gates. The town's walls level (economy)
+  says how it looks: 0 a rubble bank that still blocks, 1 a palisade, 2
+  stone, 3 stone with towers (decision 298). One whose town is no
+  stockpile place, or has a wall already, or whose rect is off the map, is
+  left out; open edges on its ring, or a place cell outside it, are warned.
 
 ## Level links
 

@@ -4776,3 +4776,33 @@ Not held to it: shoves and tosses (the push verb, paid in stamina), throws,
 falls, door impacts and try_bash_door. No stagger state for blows under it
 for now; Jeff can ask for one after the clip. Weapons as data (items step 5)
 give the knockback verb by raising a blow's force over the line.
+
+## 298. A town's wall is a ring of the map's walls, its look the town's walls level
+
+A town wall is content, in the layout, like any wall: it blocks whatever
+the town has built (Jeff: "rubble bank that still blocks"). level.json
+"town_walls" names which ring of walls is a town's: {town: a stockpile
+place's key, rect: the cells it encloses}; the ring is the rect's outline
+(Level.outline, as a building's), its door edges the gates, ordinary
+Doors under enemy-ai's rules. Level.town_walls_from leaves out a ring
+whose town is no stockpile place here, already has a wall, or whose rect
+is off the map, and warns of open edges on a ring or a place cell outside
+it. A rect, not a disc round the place's radius: on the grid a disc is a
+staircase of short runs, a rect four long sides. The ring moves with the
+map (LevelMap.moved_config, by two corners) and is kept by builder mode
+(CONFIG_KEYS); builder's town_wall tool lays the ring and the record
+together. Linked by its town id ("<level>/<town>"), as buildings are (297).
+
+Economy's walls level is the wall's strength (its defence) and here its
+look, by the "town" message (297): level 0 (no "walls" record at all) a
+low bank of rubble along the whole ring (terrain's "rubble" wall state);
+1 a palisade (wall set wood); 2 stone; 3 stone with towers at its corners
+and beside its gates (art-kit's wall.<set>.tower). Damaged, part of the
+ring takes the "broken" state, never a gap: the sim keeps every wall.
+Drawing waits on terrain's wall sets and states (#285) and art-kit's
+towers (287); this is the record and its checks.
+
+Rejected: walls that appear in the sim as the town builds them (live edge
+changes, paths and fields reworked, for what reads as well as a rubble
+bank that blocks); the ring written into the level as economy builds it
+(game state in content); and a ring round the place's radius.

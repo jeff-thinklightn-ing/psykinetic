@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_sight_over_walls()
 	_test_buildings()
 	_test_building_links()
+	_test_town_walls()
 	await _test_level_links()
 	await _test_edge_links()
 	_test_console()
@@ -372,6 +373,41 @@ func _test_building_links() -> void:
 			"each said, and the kitchen is outside the square's radius (%s)" % [said])
 	var turned := Prefab.rotated({"map": map, "config": config}, 1)
 	_check((turned["config"]["buildings"] as Array)[0].get("use") == "forge", "a link moves with its building")
+
+
+func _test_town_walls() -> void:
+	print("
+== town walls: a ring of the layout's walls named a town's, its gates its doors ==")
+	var map := LevelMap.new(Vector2i(24, 20))
+	for y in 20:
+		for x in 24:
+			map.set_cell(Vector2i(x, y), "grass")
+	var rect := Rect2i(4, 3, 12, 10)
+	var gate := Vector3i(9, 12, Terrain.SOUTH)
+	var gap := Vector3i(3, 6, Terrain.EAST)
+	for key in Level.outline(rect):
+		if key != gap:
+			map.set_edge(key, "door" if key == gate else "wall")
+	var places := {"square": {"at": [9, 7], "kind": "stockpile"}, "yard": {"at": [20, 16], "kind": "stockpile"}, "field": {"at": [2, 2], "kind": "farm"}}
+	var config := {"places": places, "town_walls": [
+		{"town": "square", "rect": [4, 3, 12, 10]},
+		{"town": "square", "rect": [1, 1, 3, 3]},
+		{"town": "field", "rect": [1, 14, 4, 4]},
+		{"town": "yard", "rect": [20, 18, 6, 6]},
+		{"town": "yard", "rect": [17, 14, 2, 2]}]}
+	var level := Level.parse(map.to_image(), null, config)
+	var rings: Array = level["town_walls"]
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("town wall"))
+	_check(rings.size() == 2 and rings[0]["town"] == "square" and rings[0]["rect"] == rect and rings[1]["town"] == "yard",
+			"the square's wall and the yard's small one stand (%s)" % [rings.map(func(r: Dictionary) -> String: return "%s %s" % [r["town"], r["rect"]])])
+	_check(rings[0]["gates"] == [gate] and rings[0]["walls"].size() == Level.outline(rect).size() - 2, "its gate is the door on its ring; the rest walls but the gap")
+	_check(said.size() == 6 and str(said).contains("has its wall already") and str(said).contains("no stockpile place") and str(said).contains("on the map")
+			and str(said).contains("1 open edges") and str(said).contains("does not hold its place"),
+			"a second wall, a town that is no stockpile, a ring off the map left out; the gaps (the yard's ring is not drawn) and the yard's cell outside said (%s)" % [said])
+	_check(level["terrain"]["town_walls"] == rings, "the views have them in the terrain")
+	var turned := Prefab.rotated({"map": map, "config": config}, 1)
+	var moved: Array = turned["config"]["town_walls"]
+	_check(moved.size() == 5 and moved[0]["rect"] == [7, 4, 10, 12], "turned with the map, a ring keeps its cells: 10 x 12 (%s)" % [moved[0]])
 
 
 func _test_level_links() -> void:
