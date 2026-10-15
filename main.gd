@@ -12,6 +12,7 @@ const PILE := "res://sim/ground_pile.gd"
 ## cursor, or one beside), G puts down what is in your hand, T throws it at
 ## the cursor.
 const ITEM_KEYS := {KEY_F: "pick_up", KEY_G: "drop", KEY_T: "throw"}
+const BANDAGE_HOLD_MSEC := 500
 ## The one grey every wall face is drawn in, 0..1: darker than the floor,
 ## a few steps above the void, the same whichever way the face points.
 const WALL_VALUE := 0.18
@@ -156,8 +157,6 @@ var _test_reset_sent := false
 var _test_door_sent := false
 ## Everything said this session (speech, last words, chat), shown with Tab.
 var talk: TalkPanel
-## Server: since when each player (instance id) has had no hostile near.
-var _player_calm_since: Dictionary[int, int] = {}
 ## Speech bubbles over the speakers, in either view.
 var bubbles: SpeechBubbles
 ## 2D: a bubble's tail this many world px over an entity (above its name).
@@ -193,6 +192,11 @@ var _restart_told: Array[int] = []
 ## Right button held on this entity: released without a drag it is a shove,
 ## dragged it is a toss in the dragged direction.
 var _toss_target: GridEntity
+## The right button held on yourself or an ally beside you: bandaged once
+## held BANDAGE_HOLD_MSEC (World.try_bandage); let go sooner, the click is
+## what it always was.
+var _bandage_target: GridEntity
+var _bandage_since := 0
 var _toss_from := Vector2.ZERO
 ## WASD: the camera's lean toward the cursor, in grid units (see
 ## CAMERA_LEAN_*).
@@ -397,6 +401,7 @@ func _process(delta: float) -> void:
 	_update_pick()
 	_test_hover()
 	_drive_wasd()
+	_check_bandage_hold()
 	_run_test_steer()
 	# Hover is the floor cell under the cursor, on the ground plane alone:
 	# nothing standing on the map intercepts it. In 3D a monster a click
@@ -490,6 +495,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_held_target = NONE
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
+		_bandage_target = null
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
@@ -506,6 +512,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
+	# Right, held on yourself or an ally beside you: bandaging (_check_bandage_hold).
+	if click.button_index == MOUSE_BUTTON_RIGHT and (target is Player or target is Companion) \
+			and (target == player or World.can_melee(player.tile, target.tile)):
+		_bandage_target = target
+		_bandage_since = Time.get_ticks_msec()
 	# Right: a chest, or your own companion, opens. Left: a chest is walked to.
 	if click.button_index == MOUSE_BUTTON_RIGHT and (target is Chest or _is_own_companion(target)):
 		# (A crate or a cart opens on release, a plain click within reach:
@@ -539,6 +550,32 @@ func _unhandled_input(event: InputEvent) -> void:
 			if targetable:
 				_toss_target = target
 				_toss_from = get_global_mouse_position()
+
+
+## The right button held BANDAGE_HOLD_MSEC on yourself or an ally beside
+## you: a bandage command, and the click does nothing else (no shove, its
+## pack closed if it opened one).
+func _check_bandage_hold() -> void:
+	if _bandage_target == null:
+		return
+	if not is_instance_valid(_bandage_target) or not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		_bandage_target = null
+		return
+	if Time.get_ticks_msec() - _bandage_since < BANDAGE_HOLD_MSEC:
+		return
+	var patient := _bandage_target
+	_bandage_target = null
+	_toss_target = null
+	var player := _local_player()
+	if player != null:
+		bandage(player, patient)
+	if pack_panel != null and pack_panel.other == patient:
+		close_other()
+
+
+## Asks the server to have [param player] bandage [param patient].
+func bandage(player: Player, patient: GridEntity) -> void:
+	World.command(player, "bandage", {"target": str(patient.get_path())})
 
 
 ## The 3D view (unless renderer is 2d) takes over drawing and picking; the 2D
@@ -2153,6 +2190,10 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "party" and entity is Player:
 		_party_said(entity, str(args.get("text", "")))
+	elif command_name == "bandage" and entity is Player:
+		var patient := get_node_or_null(NodePath(str(args.get("target", "")))) as GridEntity
+		if patient != null:
+			World.try_bandage(entity, patient)
 	elif command_name in ["pick_up", "drop", "throw"] and entity is Player:
 		_item_command(entity, command_name, args)
 	elif command_name == "lantern" and entity is Player:
@@ -2682,27 +2723,9 @@ func _respawn_due_players(tick: int) -> void:
 
 # --- HUD, logging, test hooks -------------------------------------------------
 
-## Server: out of combat (no hostile within Companion.CALM_RANGE for
-## CALM_TICKS) a player heals 1 hp every HEAL_EVERY ticks, as a companion
-## does.
-func _heal_players(tick: int) -> void:
-	for player: Player in _players.values():
-		if not is_instance_valid(player) or not player.spawned or player.zone != World.zone.name:
-			continue
-		var id := player.get_instance_id()
-		if not _player_calm_since.has(id) or Companion._hostile_near(player.tile, Companion.CALM_RANGE):
-			_player_calm_since[id] = tick
-			continue
-		var calm := tick - _player_calm_since[id]
-		if calm >= Companion.CALM_TICKS and player.hp < player.max_hp \
-				and (calm - Companion.CALM_TICKS) % Companion.HEAL_EVERY == 0:
-			World.heal(player, 1)
-
-
 func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
 		_respawn_due_players(tick)
-		_heal_players(tick)
 		_check_respawns(tick)
 	if World.zone != World.home():
 		return  # Another zone's tick: the HUD and the test hooks are this view's.
@@ -2745,6 +2768,7 @@ func hint_lines() -> Array[String]:
 		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
 	lines.append_array(["RMB chest\topen / close it (drag items)", "RMB crate, cart\topen it, beside you", "RMB companion\ther pack", "I\tyour pack",
 		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
+		"RMB hold\tbandage yourself or an ally beside you (a kit, out of combat)",
 		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "L\tlantern",
 		"R\treset the room", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
 	if Net.mode == Net.Mode.HOST:

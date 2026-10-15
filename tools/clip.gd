@@ -242,20 +242,20 @@ func _items() -> void:
 	_script = [
 		["say", 30, "A chest: a bandaging kit and a sack of ore."],
 		["walk", Vector2i(3, 2), "To the chest."],
-		["open", true, "Opened: the chest above, the pack and two hands (R, L) below."],
+		["item_open", true, "Opened: the chest above, the pack and two hands (R, L) below."],
 		["wait", 25, ""],
-		["take", [0, Player.RIGHT_HAND], "The kit into the right hand (drag, in the pack below)."],
+		["item_take", [0, Player.RIGHT_HAND], "The kit into the right hand (drag, in the pack below)."],
 		["wait", 25, ""],
-		["key", ["drop", null], "G: put it down."],
+		["item_key", ["drop", null], "G: put it down."],
 		["wait", 30, ""],
-		["key", ["pick_up", null], "F: picked up again."],
+		["item_key", ["pick_up", null], "F: picked up again."],
 		["wait", 30, ""],
-		["key", ["throw", Vector2i(8, 2)], "T: thrown at the cursor (a kit flies far)."],
+		["item_key", ["throw", Vector2i(8, 2)], "T: thrown at the cursor (a kit flies far)."],
 		["wait", 40, ""],
-		["take", [1, Player.RIGHT_HAND], "The sack of ore: 10 kg. Carried, it weighs on you."],
-		["open", false, ""],
+		["item_take", [1, Player.RIGHT_HAND], "The sack of ore: 10 kg. Carried, it weighs on you."],
+		["item_open", false, ""],
 		["walk", "beside the monster", "Up to the imp."],
-		["key", ["throw", "the monster"], "T: thrown at the imp: it staggers."],
+		["item_key", ["throw", "the monster"], "T: thrown at the imp: it staggers."],
 		["wait", 60, ""],
 	]
 
@@ -345,14 +345,14 @@ func _on_tick(tick: int) -> void:
 		"lantern":
 			if (_player.emit_light > 0.0) != bool(step[1]):
 				_player.toggle_lantern()
-		"take":
+		"item_take":
 			World.try_transfer(_player, _chest(), int(step[1][0]), _player, int(step[1][1]))
-		"open":
+		"item_open":
 			if bool(step[1]):
 				_main._open_pack(_player, _chest())
 			else:
 				_main.close_other()
-		"key":
+		"item_key":
 			var args := {}
 			var cell: Variant = _monster.tile if step[1][1] is String else step[1][1]
 			if cell != null:

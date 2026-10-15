@@ -49,6 +49,10 @@ signal gold_changed(player_id: String, gold: int)
 signal traded(by: GridEntity, shop: GridEntity, why: String)
 ## A GroundPile came, changed or went, for the views (any peer).
 signal pile_shown(pile: GroundPile)
+## Bandaging (try_bandage): [param by] began on [param patient] (state
+## &"started"), finished (&"done": it mends from now), was broken off
+## (&"interrupted"), or the mending ended (&"mended", by null). Server only.
+signal bandage_changed(by: GridEntity, patient: GridEntity, state: StringName)
 signal pile_gone(pile: GroundPile)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
@@ -194,6 +198,14 @@ const NO_CELL := Vector2i(-99999, -99999)
 ## root of the weight, 1 to THROW_MAX cells; a body hit takes force weight x
 ## THROW_FORCE_PER_KG (impact_damage at the thing's mass over its).
 const THROW_MAX := 6
+## Bandaging (try_bandage): BANDAGE_TICKS to bandage, out of combat (no
+## hostile within BANDAGE_SAFE cells, not hurt for BANDAGE_CALM_TICKS);
+## then BANDAGE_HEAL hp come back, one every BANDAGE_REGEN_TICKS.
+const BANDAGE_TICKS := 20
+const BANDAGE_SAFE := 6
+const BANDAGE_CALM_TICKS := 30
+const BANDAGE_HEAL := 10
+const BANDAGE_REGEN_TICKS := 10
 const THROW_PER_STRENGTH := 0.5
 const THROW_FORCE_PER_KG := 0.3
 ## Mass multiplier for being pushed while at 0 stamina.
@@ -341,6 +353,10 @@ var items := ItemBook.new(steps_now)
 ## Uids that level entities held when the room was reset: ended as lost
 ## unless the rebuild puts them back (end_unclaimed_items).
 var _unclaimed: Array[int] = []
+## Server: bandaging under way, bandager -> {patient, until, from, tile,
+## exerted}; and the mending, patient -> {left, next, from} (_tend_wounds).
+var _bandaging: Dictionary[GridEntity, Dictionary] = {}
+var _mending: Dictionary[GridEntity, Dictionary] = {}
 
 
 ## An attack or shove accepted this tick, waiting for the resolve phase.
@@ -539,8 +555,10 @@ func _step_zone() -> void:
 	_apply_hazards()
 	# 4. Stamina comes back for whoever did not exert themselves this tick.
 	_regen_stamina()
+	# 5. Bandaging and mending.
+	_tend_wounds()
 	ticked.emit(tick)
-	# 5. The tick counter goes once per tick to the clients in this zone.
+	# 6. The tick counter goes once per tick to the clients in this zone.
 	for peer in Net.sendable_peers():
 		if peer_sees(peer, zone.name):
 			_net_tick.rpc_id(peer, tick)
@@ -1824,6 +1842,98 @@ func _ground_room(cell: Vector2i) -> Vector2i:
 	return NO_CELL
 
 
+## [param by] (a player or a companion, alive, not stunned, carrying a
+## bandaging kit: a thing whose catalog use is "bandage") starts
+## bandaging [param patient]: itself, or a player or a companion beside it,
+## hurt, not already being bandaged or mending, both out of combat (no
+## hostile within BANDAGE_SAFE, neither hurt for BANDAGE_CALM_TICKS). It
+## takes BANDAGE_TICKS; moving, attacking or shoving, either of them hurt
+## or a hostile coming near breaks it off (_tend_wounds). Done, the patient
+## mends (mending 2): BANDAGE_HEAL hp, one every BANDAGE_REGEN_TICKS, while
+## the bandager may walk away; a hurt stops it. The kit is gear: it is not
+## used up. False, and nothing starts, if it cannot.
+func try_bandage(by: GridEntity, patient: GridEntity) -> bool:
+	if not Net.is_authority() or not _can_handle(by) or is_stunned(by) or not has_hands(by):
+		return false
+	if not is_instance_valid(patient) or not patient.spawned or patient.hp <= 0 or not has_hands(patient):
+		return false
+	if patient != by and (patient.zone != by.zone or not can_melee(by.tile, patient.tile)):
+		return false
+	if patient.hp >= patient.max_hp or patient.mending != 0 or by.mending == 1 or _bandaging.has(by):
+		return false
+	if bandage_kit(by) < 0 or not calm(by) or not calm(patient):
+		return false
+	_bandaging[by] = {"patient": patient, "until": tick + BANDAGE_TICKS, "from": tick, "tile": by.tile,
+		"exerted": by.last_exertion_tick()}
+	patient.mending = 1
+	_log("bandage: %s starts on %s" % [by.name, patient.name])
+	bandage_changed.emit(by, patient, &"started")
+	return true
+
+
+## The slot of [param entity]'s bandaging kit (a thing used to "bandage"), -1 if none.
+func bandage_kit(entity: GridEntity) -> int:
+	for slot in entity.slots.size():
+		if not entity.slots[slot].is_empty() and Items.def(entity.slots[slot]).get("use") == "bandage":
+			return slot
+	return -1
+
+
+## Out of combat: not hurt for BANDAGE_CALM_TICKS and no hostile within
+## BANDAGE_SAFE cells (the cells round it looked at, not every monster).
+func calm(entity: GridEntity) -> bool:
+	if tick - entity.hurt_tick < BANDAGE_CALM_TICKS:
+		return false
+	for dy in range(-BANDAGE_SAFE, BANDAGE_SAFE + 1):
+		for dx in range(-BANDAGE_SAFE, BANDAGE_SAFE + 1):
+			var other: GridEntity = _occupancy.get(entity.tile + Vector2i(dx, dy))
+			if other != null and other is Monster and other.hp > 0:
+				return false
+	return true
+
+
+## Each tick: bandaging under way goes on, ends (the patient mends from
+## now) or is broken off; and the mending mend.
+func _tend_wounds() -> void:
+	for by: GridEntity in _bandaging.keys():
+		var job: Dictionary = _bandaging[by]
+		var patient: GridEntity = job["patient"]
+		if _alive(by) and by.zone != zone.name:
+			continue  # Another zone's: its own step tends it.
+		var broken := not _alive(by) or not _alive(patient)
+		if not broken:
+			broken = by.tile != job["tile"] or by.last_exertion_tick() != job["exerted"] \
+					or by.hurt_tick >= job["from"] or patient.hurt_tick >= job["from"] \
+					or patient != by and not can_melee(by.tile, patient.tile) or not calm(by) or not calm(patient)
+		if broken:
+			_bandaging.erase(by)
+			if _alive(patient):
+				patient.mending = 0
+			_log("bandage: %s's bandaging of %s broken off" % [by.name, patient.name])
+			bandage_changed.emit(by, patient, &"interrupted")
+		elif tick >= int(job["until"]):
+			_bandaging.erase(by)
+			patient.mending = 2
+			_mending[patient] = {"left": BANDAGE_HEAL, "next": tick + BANDAGE_REGEN_TICKS, "from": tick}
+			_log("bandage: %s bandaged %s" % [by.name, patient.name])
+			bandage_changed.emit(by, patient, &"done")
+	for patient: GridEntity in _mending.keys():
+		if is_instance_valid(patient) and patient.zone != zone.name:
+			continue
+		var mend: Dictionary = _mending[patient]
+		var stop := not _alive(patient) or patient.hurt_tick >= int(mend["from"])
+		if not stop and tick >= int(mend["next"]):
+			heal(patient, 1)
+			mend["left"] = int(mend["left"]) - 1
+			mend["next"] = tick + BANDAGE_REGEN_TICKS
+			stop = int(mend["left"]) <= 0 or patient.hp >= patient.max_hp
+		if stop:
+			_mending.erase(patient)
+			if is_instance_valid(patient):
+				patient.mending = 0
+			bandage_changed.emit(null, patient, &"mended")
+
+
 ## Puts saved contents back into [param entity]'s slots (unknown items
 ## dropped, cut or padded to its size), each with its saved instance from
 ## [param uids] where the book still has it, a new one ("migrated": a save
@@ -2013,6 +2123,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
 	target.hp = maxi(target.hp - amount, 0)
+	target.hurt_tick = tick
 	if cause != &"fire":
 		noise(target.tile, Senses.NOISE_FIGHT, &"fight", source)
 	target._world_damaged(amount, cause)

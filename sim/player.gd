@@ -43,6 +43,7 @@ func _init() -> void:
 	attack_ticks = 5
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
+	replicate("mending")
 	# Its lantern lit or covered (L): what the views draw and monsters see by.
 	replicate("emit_light")
 

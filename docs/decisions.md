@@ -4663,3 +4663,34 @@ rewritten at every raid); a Building entity replicated per building
 already holds); and linking by the building's cell from Towns' side
 (economy's rules need no map, and a map edited in the builder would leave
 its records pointing at nothing).
+
+## 272. Bandaging: a kit, out of combat, then mending you can walk away from
+
+Items step 4, first part (the roadmap's rule: right-click-hold on an
+adjacent ally, out of combat, then regen starts and you can step away).
+World.try_bandage(by, patient): by is a player or a companion, alive, not
+stunned, carrying a bandaging kit (a thing whose catalog use is
+"bandage"); the patient is by itself or a player or companion beside it,
+hurt, not already being bandaged or mending; both out of combat (World.calm:
+not hurt for BANDAGE_CALM_TICKS, 3 s, and no monster within BANDAGE_SAFE,
+6 cells, the cells round looked at rather than every monster). It takes
+BANDAGE_TICKS (2 s); the bandager moving, attacking or shoving, either of
+them hurt, the patient out of reach, or a monster coming near breaks it off
+with nothing lost. Done, the patient mends BANDAGE_HEAL (10) hp, one every
+BANDAGE_REGEN_TICKS, wherever it goes, until it is hurt. The kit is gear:
+not used up. World.bandage_changed(by, patient, state) tells companions,
+the sound tree and the views (&"started", &"done", &"interrupted",
+&"mended"); a player's and a companion's mending (0 none, 1 being
+bandaged, 2 mending) replicates, so the protocol changes. GridEntity
+keeps hurt_tick (World.damage) for the calm rule. Only bandaging under
+way and the mending are looked at each tick.
+
+Input: the right button held BANDAGE_HOLD_MSEC (0.5 s) on yourself or an
+ally beside you sends "bandage"; a quicker click is what it always was
+(a shove, a companion's pack). A companion calls try_bandage as a player's
+command does.
+
+Bandaging replaces passive regen (the roadmap's rule, Jeff's): players no
+longer heal on their own out of combat (Main's _heal_players is gone;
+companion_test says so). Companions drop theirs (Companion._heal) in their
+step 4, with their bandage verb.

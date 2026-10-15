@@ -668,6 +668,7 @@ func _test_item_keys() -> void:
 		Net.controls = scheme
 		var lines := "\n".join(_main.hint_lines())
 		_check("F\tpick up" in lines and "G\tput down" in lines and "T\tthrow" in lines, "%s: F, G and T in the controls list" % scheme)
+		_check("RMB hold\tbandage" in lines, "%s: holding the right button to bandage is in the list" % scheme)
 		var uid := World.items.mint("bandaging_kit", "built")
 		World.put_item(player, player, Player.RIGHT_HAND, uid)
 		_press(KEY_G)

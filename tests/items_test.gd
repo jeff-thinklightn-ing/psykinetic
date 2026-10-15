@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_ground()
 	_test_throw()
 	_test_containers()
+	_test_bandage()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -337,6 +338,79 @@ func _test_containers() -> void:
 			"emptied at once (the stockpile's way): its kit's uid, the crate empty")
 	World.items.end(emptied[0], "gone")
 	World.despawn(box)
+
+
+func _test_bandage() -> void:
+	print("\n== bandaging: a kit, out of combat; then mending, a point at a time, while you walk away ==")
+	var host := _player(Net.local_id)
+	var pet: Companion = _main._companions.get(Net.player_id)
+	var kit := _give(host, KIT, 2)
+	# One imp kept, still and far off; the rest gone, so nothing wanders near.
+	var imp: GridEntity = null
+	for monster in World.monsters():
+		if imp == null:
+			imp = monster
+			imp.acts = false
+			World._relocate(imp, _far_cell(host))
+		else:
+			World.despawn(monster)
+	World.damage(host, 8)
+	var hurt := host.hp
+	_check(not World.try_bandage(host, host), "hurt just now: not yet (out of combat first)")
+	_steps(World.BANDAGE_CALM_TICKS)
+	_check(World.try_bandage(host, host) and host.mending == 1, "a while later the host bandages themselves")
+	_check(not World.try_bandage(host, host), "not twice at once")
+	_steps(World.BANDAGE_TICKS)
+	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL, "bandaged: mending now (%d hp to come)" % World.BANDAGE_HEAL)
+	World._relocate(host, _open_line(host, 1))
+	_steps(World.BANDAGE_REGEN_TICKS * 3)
+	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL - 3 and host.hp >= hurt + 3,
+			"walking about, a point every %d ticks: %d to %d" % [World.BANDAGE_REGEN_TICKS, hurt, host.hp])
+	World.damage(host, 1)
+	_steps(1)
+	_check(host.mending == 0, "hurt again: the mending stops")
+	_check(host.slot_items[2] == kit, "the kit is still in the pack: gear is not used up")
+	_steps(World.BANDAGE_CALM_TICKS)
+	World.try_bandage(host, host)
+	World._relocate(host, _open_line(host, 1))
+	_steps(1)
+	_check(host.mending == 0, "moving while bandaging breaks it off")
+	if pet != null and pet.spawned:
+		World.try_transfer(host, host, 2, pet, 0)
+		World._relocate(pet, _open_line(host, 1))
+		World.damage(host, 5)
+		_steps(World.BANDAGE_CALM_TICKS)
+		_check(World.try_bandage(pet, host) and host.mending == 1, "%s, with the kit, bandages the host beside her" % pet.name)
+		if imp != null:
+			var was := imp.tile
+			World._relocate(imp, _free_near(host, 3))
+			_steps(1)
+			_check(host.mending == 0, "an imp comes within %d cells: broken off" % World.BANDAGE_SAFE)
+			_check(not World.try_bandage(pet, host), "and it cannot start with the imp near")
+			World._relocate(imp, was)
+		World.try_transfer(host, pet, 0, host, 2)
+	World.items.end(World.take_item(host, host, 2), "gone")
+
+
+func _steps(count: int) -> void:
+	for i in count:
+		World.step()
+
+
+## A free floor cell beyond BANDAGE_SAFE of [param entity].
+func _far_cell(entity: GridEntity) -> Vector2i:
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.distance(cell, entity.tile) > World.BANDAGE_SAFE + 1 and World.is_free(cell):
+			return cell
+	return entity.tile
+
+
+## A free floor cell [param cells] or so from [param entity].
+func _free_near(entity: GridEntity, cells: int) -> Vector2i:
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.distance(cell, entity.tile) == cells and World.is_free(cell):
+			return cell
+	return entity.tile
 
 
 func _test_restart() -> void:

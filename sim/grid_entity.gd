@@ -65,6 +65,11 @@ const HURT_TINT := Color(1.0, 0.3, 0.3)
 ## Server: its mass with nothing carried; mass is this plus what its slots
 ## weigh (World._carried_changed). -1 until it first carries anything.
 var base_mass := -1.0
+## Bandaging (World.try_bandage): 0 none, 1 being bandaged, 2 mending.
+## A player's and a companion's replicate, for the views.
+var mending := 0
+## Server: the tick it was last hurt (World.damage); out of combat after a while.
+var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH
 ## Can be shoved along by something walking into it. Force pushes ignore this.
 @export var pushable := false

@@ -2265,19 +2265,14 @@ func _test_healing() -> void:
 
 
 func _test_players_heal() -> void:
-	print("\n== players heal out of combat at the companions' rate ==")
+	print("\n== players do not heal on their own: bandaging does it (decision 272) ==")
 	_kill_monsters()
 	var owner := _player()
 	_put(owner, Vector2i(9, 6))
-	var imp := _spawn_imp(Vector2i(9, 11))
 	owner.hp = 10
-	for i in Companion.CALM_TICKS + 30:
-		World.step()
-	_check(owner.hp == 10, "a monster 5 away: no healing (%d)" % owner.hp)
-	World.despawn(imp)
 	for i in Companion.CALM_TICKS + Companion.HEAL_EVERY * 3:
 		World.step()
-	_check(owner.hp >= 12 and owner.hp <= 14, "calm for 50 ticks, then a point every 10 (%d)" % owner.hp)
+	_check(owner.hp == 10, "calm for 80 ticks, no bandage: still 10 (%d)" % owner.hp)
 	_check("Wounds close slowly when you rest away from danger." in Companion.VOICE_WORLD
 			and "the old stone places and the land around them" in Companion.VOICE_WORLD and not "underground" in Companion.VOICE_WORLD,
 			"her world says so, and is not only underground")

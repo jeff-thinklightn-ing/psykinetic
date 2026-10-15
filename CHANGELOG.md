@@ -144,6 +144,11 @@ top section as the release notes.
 - Young trees grow among the old along the forest's edge, so it no longer
   lines up cell by cell.
 
+- You no longer heal on your own: bandage yourself or an ally out of
+  combat (hold right-click). With a bandaging kit, hold the right mouse
+  button on yourself or on an ally beside you for two seconds; once
+  bandaged they mend 10 hp over the next while, even as you walk away.
+  Getting hurt stops it. The kit isn't used up.
 
 ## v0.1.140
 
