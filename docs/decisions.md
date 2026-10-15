@@ -6750,3 +6750,30 @@ frame from others and counts each body. The clock part's gain is not in
 these runs (no server stall happened in them; the baseline's one clean run
 with a stall had 28 of its first 40 logged jumps from it); mirror_test
 covers it. Corrections a minute are unchanged (5 / 16 / 27).
+## 351. A door redoes only the light and heat lines that go through it
+
+From the tick re-baseline on today's main (coordinator, after decision
+350; map_bench 256x256, a monster per 42 cells, settled 300 ticks): 2.3 /
+7.2 / 12.4 / 17.0 ms median at 1 / 4 / 9 / 16 players, inside Jeff's
+budget (about 17 ms at 9, under 25 at 16). Of the 9-player tick, Fields'
+refresh was 1.73 ms: monsters open and shut doors about 1.4 times a
+tick, and each change worked out again every fixed source within reach of
+the door (decision 178): each cell of its reach looked at, its doors asked,
+its share made anew, and every one of those cells added up again, about
+1.2 ms a door.
+
+Now a source whose share is kept (`_parts`) is told which door changed
+(`mark_dirty_near` makes the door's key from its two cells), and
+`_redo_lines` works out again only the cells whose line (`_lines`, World.
+line_doors) goes through that door, and those whose line passes a door on
+a diagonal (asked afresh each time, as `_spread` does); the rest of its
+share stands, and only those cells are added up again and handed to the
+floor's shading (`take_touched`). A source with no kept share, or a change
+that is not one door, is worked out whole as before. Every cell comes out
+as before: edge_test flips one or two doors at random in a maze of 60
+doors and 8 sources 40 times and compares heat, light and the hot cells
+with a whole recompute after each (a mutation that skips the diagonals
+fails all 40).
+
+Fields' refresh a tick: 1.73 to 1.00 ms at 9 players, 2.26 to 1.21 at 16.
+Server only.

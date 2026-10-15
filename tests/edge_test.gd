@@ -364,6 +364,47 @@ func _test_fields_by_door() -> void:
 			changed = World.fields._light != before
 	_check(same, "after each of six, every cell's heat and light are exactly as worked out afresh")
 	_check(changed, "and the door does change them")
+	# A maze of doors and torches: doors opened and shut one or two at a
+	# time, at random; a source done again for a door redoes only the
+	# cells whose line goes through it (decision 351), and every cell must
+	# still come out as a whole recompute has it, the hot cells too.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 23
+	var size := 14
+	var rows: Array[String] = []
+	for y in size * 2 - 1:
+		var row := ""
+		for x in size * 2 - 1:
+			if x % 2 == 0 and y % 2 == 0:
+				row += "."
+			elif x % 2 == 1 and y % 2 == 1:
+				row += " "
+			else:
+				row += [" ", " ", " ", "#", "+"][rng.randi_range(0, 4)]
+		rows.append(row)
+	var maze := Terrain.parse(rows)
+	maze["torches"] = [Vector2i(2, 2), Vector2i(9, 3), Vector2i(5, 6), Vector2i(1, 10), Vector2i(10, 10), Vector2i(12, 5)]
+	maze["fire"] = [Vector2i(7, 8), Vector2i(3, 12)]
+	_build()
+	World.load_terrain(maze)
+	var doors: Array[Door] = []
+	for key: Vector3i in maze["edges"]:
+		if maze["edges"][key] == Terrain.Edge.DOOR:
+			doors.append(_door(key, 20))
+	World.heat_at(Vector2i(0, 0))
+	var wrong := 0
+	for round in 40:
+		for flip in rng.randi_range(1, 2):
+			var door_now: Door = doors[rng.randi_range(0, doors.size() - 1)]
+			door_now.open = not door_now.open
+		World.heat_at(Vector2i(0, 0))
+		World.fields.hot_set(World, World.HEAT_BURN)
+		var afresh := Fields.new()
+		afresh.load(maze)
+		afresh._refresh(World)
+		if World.fields._heat != afresh._heat or World.fields._light != afresh._light 				or World.fields.hot_set(World, World.HEAT_BURN) != afresh.hot_set(World, World.HEAT_BURN):
+			wrong += 1
+	_check(doors.size() > 30 and wrong == 0, "a maze of %d doors, 40 rounds of one or two flipped: %d rounds differ from a whole recompute" % [doors.size(), wrong])
 
 
 func _test_lines_owe_doors() -> void:

@@ -27,7 +27,9 @@ extends RefCounted
 ## took 16 ms a door, and adding up the whole map again made a door's cost
 ## grow with the map). And what a source's line to each cell owes to doors
 ## is worked out once (_lines, World.line_doors), so a source done again
-## for a door only asks which of those doors are open.
+## for a door only asks which of those doors are open; and only of the
+## cells whose line goes through that door (or past one on a diagonal,
+## which is asked each time): the rest of its share stands (decision 351).
 
 ## What each fixed source gives at its own cell, and how far it reaches.
 const FIRE := {"heat": 10.0, "light": 0.8, "reach": 4}
@@ -69,6 +71,10 @@ var _parts: Array = []
 ## The sources whose shares were let go since the last refresh (indices
 ## into _parts).
 var _redo: Dictionary[int, bool] = {}
+## For a source in _redo whose share is kept (_parts[i] not null), the
+## doors that changed since ({door key: true}): only the cells whose line
+## goes through one are worked out again (_redo_lines).
+var _redo_doors: Dictionary[int, Dictionary] = {}
 ## For each cell a source can reach, the sources that can, in order
 ## (indices into _parts): who to add up again when one changes.
 var _covering: Dictionary[Vector2i, PackedInt32Array] = {}
@@ -107,6 +113,7 @@ func load(terrain: Dictionary) -> void:
 func mark_dirty() -> void:
 	_parts.clear()
 	_redo.clear()
+	_redo_doors.clear()
 	_lines.clear()
 	_dirty = true
 
@@ -118,13 +125,24 @@ func mark_dirty_near(cells: Array[Vector2i]) -> void:
 	_dirty = true
 	if _parts.is_empty():
 		return
+	# The door between the two cells, as a line owes it (World.line_doors):
+	# a source's lines that do not go through it keep what they give.
+	var door := Vector3i.MAX
+	if cells.size() == 2 and (cells[1] - cells[0]) in [Vector2i(1, 0), Vector2i(0, 1)]:
+		door = Vector3i(cells[0].x, cells[0].y, Terrain.EAST if cells[1].x > cells[0].x else Terrain.SOUTH)
 	var sources := _sources()
 	for i in sources.size():
 		var source: Vector2i = sources[i][0]
 		var reach: int = sources[i][1]["reach"]
 		for cell in cells:
 			if maxi(absi(cell.x - source.x), absi(cell.y - source.y)) <= reach + 1:
-				_parts[i] = null
+				if door == Vector3i.MAX or _parts[i] == null:
+					_parts[i] = null
+					_redo_doors.erase(i)
+				else:
+					if not _redo_doors.has(i):
+						_redo_doors[i] = {}
+					_redo_doors[i][door] = true
 				_redo[i] = true
 				break
 
@@ -315,10 +333,14 @@ func _refresh(world: Node) -> void:
 func _refresh_redone(world: Node, sources: Array) -> void:
 	var cells: Dictionary[Vector2i, bool] = {}
 	for i: int in _redo:
+		if _parts[i] != null and _redo_doors.has(i):
+			_redo_lines(world, i, sources[i][0], sources[i][1], _redo_doors[i], cells)
+			continue
 		_parts[i] = _spread(world, i, sources[i][0], sources[i][1])
 		for cell in _reachable(sources[i][0], sources[i][1]["reach"]):
 			cells[cell] = true
 	_redo.clear()
+	_redo_doors.clear()
 	if not _touched_all:
 		_touched.merge(cells)
 	for cell: Vector2i in cells:
@@ -389,6 +411,50 @@ func _spread(world: Node, index: int, source: Vector2i, spec: Dictionary) -> Dic
 		if light > 0.0:
 			light_share[cell] = light
 	return {"heat": heat_share, "light": light_share}
+
+
+## Source [param index]'s kept share worked out again only where
+## [param doors] ({door key: true}) can have changed it: each cell whose
+## line goes through one of them, or past a door on a diagonal (asked
+## afresh each time, as _spread does); those cells go in [param cells] to
+## be added up again. Each comes out as _spread would make it.
+func _redo_lines(world: Node, index: int, source: Vector2i, spec: Dictionary, doors: Dictionary,
+		cells: Dictionary[Vector2i, bool]) -> void:
+	var reach: int = spec["reach"]
+	var part: Dictionary = _parts[index]
+	var heat_share: Dictionary = part["heat"]
+	var light_share: Dictionary = part["light"]
+	var lines: Dictionary = _lines_of(world, index, source, reach)
+	var line_cells: Array[Vector2i] = lines["cells"]
+	var owes: Array = lines["doors"]
+	for k in line_cells.size():
+		var owed: Variant = owes[k]
+		if owed is int:
+			pass
+		elif owed.is_empty():
+			continue
+		else:
+			var through := false
+			for key: Vector3i in owed:
+				if doors.has(key):
+					through = true
+					break
+			if not through:
+				continue
+		var cell := line_cells[k]
+		cells[cell] = true
+		var seen: bool = world.has_clear_line(source, cell) if owed is int else _all_open(world, owed)
+		var distance := Vector2(cell - source).length()
+		var heat := _given(distance, reach, spec["heat"], true) if seen else 0.0
+		if heat > 0.0:
+			heat_share[cell] = heat
+		else:
+			heat_share.erase(cell)
+		var light := _given(distance, reach, spec["light"], false) if seen else 0.0
+		if light > 0.0:
+			light_share[cell] = light
+		else:
+			light_share.erase(cell)
 
 
 ## The [param index]th source's lines (_lines), worked out the first time.
