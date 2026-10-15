@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_heights()
 	_test_water()
 	_test_wall_runs()
+	_test_scatter()
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
@@ -234,6 +235,44 @@ func _test_player_death() -> void:
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
 
 
+func _test_scatter() -> void:
+	print("\n== scatter off the grid by the ground, never on water; trees varied; the land runs into the forest floor ==")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	_rig.rebuild(terrain, castle["centre"])
+	_rig._scatter_all()
+	var water: Dictionary = {}
+	for cell: Vector2i in terrain["water"]:
+		water[cell] = true
+	var counts: Dictionary[String, int] = {}
+	var wet := 0
+	var off_grid := 0
+	# (Headless, a MultiMesh keeps no transforms: where the plan put them.)
+	for chunk: Vector2i in _rig._scatter_chunks:
+		var plan := _rig._scatter_plan(chunk)
+		for kind: String in plan:
+			counts[kind] = counts.get(kind, 0) + plan[kind].size()
+			for item: Array in plan[kind]:
+				var at: Vector2 = item[1]
+				var cell := Vector2i(roundi(at.x), roundi(at.y))
+				wet += 1 if water.has(cell) else 0
+				off_grid += 1 if absf(at.x - cell.x) > 0.05 or absf(at.y - cell.y) > 0.05 else 0
+	_check(not _rig._room.find_children("Scatter_*", "MultiMeshInstance3D", false, false).is_empty(), "drawn by MultiMesh, a chunk and kind")
+	var total: int = counts.values().reduce(func(a: int, b: int) -> int: return a + b, 0)
+	_check(counts.get("tuft", 0) > 0 and counts.get("flower", 0) > 0 and counts.get("stone", 0) > 0 and counts.get("root", 0) > 0
+			and counts.get("reeds", 0) > 0, "tufts, flowers, stones, roots, and reeds by the water (%s)" % counts)
+	_check(wet == 0 and off_grid > total * 0.9, "none on water, and off the cells' middles (%d of %d)" % [off_grid, total])
+	var forest_cells := _rig._ground_cells.size() - _rig._ground_water_end
+	_check(forest_cells > 0, "the ground runs into the forest, its floor blended in (%d cells)" % forest_cells)
+	var sizes: Dictionary[float, bool] = {}
+	var leaning := 0
+	for tree: Node3D in _rig._trees.values():
+		sizes[snappedf(tree.scale.y, 0.05)] = true
+		leaning += 1 if absf(tree.rotation.x) + absf(tree.rotation.z) > 0.02 else 0
+	_check(sizes.size() > 5 and leaning > _rig._trees.size() / 2, "trees of many sizes (%d), most leaning a little" % sizes.size())
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 func _test_wall_runs() -> void:
 	print("\n== walls: a run of wall is one mesh, swept, varied; a breach is rubble, never a way through ==")
 	var castle := Level.load_level("castle")
@@ -268,6 +307,24 @@ func _test_wall_runs() -> void:
 				top = maxf(top, point.y - _rig._edge_base(key))
 		_check(terrain["edges"].get(key) == Terrain.Edge.WALL and top >= Client3D.WALL_RUBBLE_LOW,
 				"the breach at %s is rubble %.2f m high where the sim keeps its wall" % [key, top])
+	# Plain walls (a building's): whole and level, the cap at WALL_HEIGHT.
+	for key: Vector3i in terrain["edges"]:
+		if terrain["edges"][key] == Terrain.Edge.WALL:
+			_rig._plain_walls[key] = true
+	_rig.rebuild(terrain, castle["centre"])
+	var level := true
+	for key: Vector3i in _rig._walls:
+		var body := _rig._walls[key].get_node("Body") as MeshInstance3D
+		var top := -INF
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			top = maxf(top, point.y)
+		level = level and is_equal_approx(top, Client3D.WALL_HEIGHT)
+	_check(_rig._wall_breaches.is_empty() and level, "plain walls: no breach, no broken top, every cap at %s m" % Client3D.WALL_HEIGHT)
+	_rig._plain_walls.clear()
+	_rig.rebuild(terrain, castle["centre"])
+	runs.clear()
+	for key: Vector3i in _rig._walls:
+		runs[_rig._walls[key]] = 1
 	# A run fades as one, by its see-through copy (188).
 	var run: Node3D = runs.keys()[0]
 	var body := run.get_node("Body") as MeshInstance3D

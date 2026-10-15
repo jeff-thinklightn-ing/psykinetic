@@ -23,6 +23,9 @@ uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 // Where the water is, a texel a cell like kinds (Client3D._build_ground):
 // the bed and the shore beside it darker, wet.
 uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
+// Outdoors, the forest's floor (the mask's g): the land runs into it along
+// a ragged line.
+uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
 
 varying vec3 world;
 varying vec2 shade;
@@ -130,6 +133,8 @@ void fragment() {
 	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);
 	float wet = smoothstep(0.25, 0.6, texture(water, (at - kinds_origin + 0.5) / kinds_size).r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
+	float forest = smoothstep(0.35, 0.65, texture(water, uv).g + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
+	colour = mix(colour, forest_floor * (0.8 + 0.4 * fbm(at * 0.4 + 50.0)), forest);
 
 	// Light and heat as the old floor had them, worked out in sRGB.
 	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * shade.r;

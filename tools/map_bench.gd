@@ -166,6 +166,35 @@ func _ready() -> void:
 				shade_worst = maxi(shade_worst, took)
 		print("BENCH door flip, the 3D ground shaded again: avg %.2f ms, worst %.2f ms" % [
 			shade_total / 1000.0 / (flips * 2), shade_worst / 1000.0])
+	# The 3D view's scatter, made as the view comes near, a step a frame:
+	# what a chunk costs in all, and its dearest step.
+	if _main._client3d != null and "_scatter_chunks" in _main._client3d:
+		var view: Node = _main._client3d
+		var scatter_total := 0
+		var scatter_worst := 0
+		var scattered := 0
+		for chunk: Vector2i in view._scatter_chunks:
+			if view._scattered.has(chunk):
+				continue
+			# A frame does one step: the chunk's plan, or one kind's build.
+			view._scattered[chunk] = true
+			started = Time.get_ticks_usec()
+			var placed: Dictionary = view._scatter_plan(chunk)
+			var spent := Time.get_ticks_usec() - started
+			scatter_total += spent
+			scatter_worst = maxi(scatter_worst, spent)
+			for kind: String in placed:
+				started = Time.get_ticks_usec()
+				view._scatter_build(chunk, kind, placed[kind])
+				spent = Time.get_ticks_usec() - started
+				scatter_total += spent
+				scatter_worst = maxi(scatter_worst, spent)
+			scattered += 1
+			if scattered >= 40:
+				break
+		if scattered > 0:
+			print("BENCH scatter a chunk (made as the view comes near, a step a frame): avg %.2f ms a chunk, worst step %.2f ms (%d chunks)" % [
+				scatter_total / 1000.0 / scattered, scatter_worst / 1000.0, scattered])
 
 	# The world tick at its worst: every monster on its way back after a
 	# fight at once, each first put up to 8 tiles from its post (into the

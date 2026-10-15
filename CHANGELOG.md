@@ -55,6 +55,12 @@ top section as the release notes.
 - Crates and carts carry things: a crate holds 4, a cart 8. Right-click
   one beside you to open it; drag to toss it as before. A loaded cart is
   heavier to push, and a broken crate spills what it held.
+- The ground has life on it: grass tufts, wildflowers, small stones, roots
+  where the forest begins and reeds along the water, scattered naturally
+  rather than in rows. Forests grow in clumps of trees of different sizes,
+  and the land fades into the forest floor instead of ending in a stepped
+  edge.
+
 
 ## v0.1.140
 

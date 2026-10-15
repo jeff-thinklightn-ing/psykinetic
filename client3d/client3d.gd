@@ -386,6 +386,28 @@ const TREE_HEIGHT := 3.6
 const THROWN_SHOWN_TICKS := 10
 const THROW_FLIGHT_SECONDS := 0.4
 const PILE_RING := Color(0.95, 0.85, 0.55, 0.55)
+## Trees: lean up to this far (radians), sit up to this far off their
+## cell's middle, gather in clumps about FOREST_CLUMP cells across; the
+## ground runs this many cells into the forest (216, 252).
+const TREE_LEAN := 0.1
+const TREE_NUDGE := 0.42
+const FOREST_CLUMP := 6.0
+const FOREST_GROUND := 3
+## Scatter: how many of each, on average, a cell of each ground has (the
+## forest's ring is "forest"), and roots more on the land at the forest's
+## edge; each kind's size range; a flower's colours.
+const SCATTER_DENSITY := {
+	"grass": {"tuft": 3.0, "flower": 0.15, "stone": 0.05},
+	"dirt": {"tuft": 0.25, "stone": 0.35},
+	"sand": {"tuft": 0.12, "stone": 0.15},
+	"stone": {"tuft": 0.06},
+	"forest": {"tuft": 1.4, "root": 0.25, "stone": 0.1, "flower": 0.04},
+}
+const SCATTER_EDGE_ROOTS := 0.3
+const SCATTER_REEDS := 1.6
+const SCATTER_SIZES := {"tuft": Vector2(0.7, 1.3), "flower": Vector2(0.8, 1.1), "stone": Vector2(0.6, 1.6), "root": Vector2(0.8, 1.4),
+		"reeds": Vector2(0.8, 1.3)}
+const FLOWER_COLOURS: Array[Color] = [Color(1.0, 0.92, 0.45), Color(1.0, 1.0, 1.0), Color(0.82, 0.65, 1.0), Color(1.0, 0.6, 0.55)]
 ## Label3D: units per font pixel, with the font size, for a name about a
 ## quarter unit tall.
 const LABEL_SIZE := 0.004
@@ -603,6 +625,10 @@ var _stone_opaque: StandardMaterial3D
 var _walls: Dictionary[Vector3i, Node3D] = {}
 ## The wall edges drawn as a breach of rubble (_add_wall_run).
 var _wall_breaches: Array[Vector3i] = []
+## Wall edges drawn plain: whole, level, the cap at WALL_HEIGHT, never
+## broken nor breached (a building's walls, which a roof sits on); filled
+## by whoever knows them before the room is built.
+var _plain_walls: Dictionary[Vector3i, bool] = {}
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge).
 var _doorways: Dictionary[Vector3i, Node3D] = {}
@@ -663,6 +689,22 @@ var _ramp_levels: Dictionary[Vector2i, PackedInt32Array] = {}
 ## Where the map's water is, a texel a cell (_build_ground), for the ground's
 ## wet shore and the water's own; its first cell and size; the bodies drawn.
 var _water_mask: ImageTexture
+## How far each void cell outdoors is from the land, out to FOREST_REACH
+## (_measure_forest); the ground's cells in index order, and where its
+## forest ones (after floor and water) begin.
+var _forest_distance: Dictionary[Vector2i, int] = {}
+var _ground_cells: Array = []
+var _ground_water_end := 0
+var _ground_floor_end := 0
+## Scatter (_grow_scatter): each chunk's ground cells (indices), the chunks
+## scattered, those due near the view (nearest first), and the chunk the
+## view was over when they were sorted.
+var _scatter_chunks: Dictionary[Vector2i, PackedInt32Array] = {}
+var _scattered: Dictionary[Vector2i, bool] = {}
+var _scatter_due: Array[Vector2i] = []
+var _scatter_aim := Vector2i(1 << 30, 0)
+## Planned scatter still to make, a [chunk, kind, items] a frame.
+var _scatter_jobs: Array[Array] = []
 var _mask_origin := Vector2i.ZERO
 var _mask_size := Vector2i.ONE
 var _water_bodies: Array[MeshInstance3D] = []
@@ -747,6 +789,7 @@ func _process(delta: float) -> void:
 	_fade_clock += delta
 	_update_fade()
 	_update_shadows()
+	_grow_scatter()
 	_drop_departed()
 	_update_mourning(delta)
 
@@ -1658,6 +1701,10 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_pile_nodes.clear()
 	_walls.clear()
 	_wall_breaches.clear()
+	_scattered.clear()
+	_scatter_due.clear()
+	_scatter_jobs.clear()
+	_scatter_aim = Vector2i(1 << 30, 0)
 	_posts.clear()
 	_doorways.clear()
 	_doors_due.clear()
@@ -1726,6 +1773,9 @@ func _build_room() -> void:
 	_land.clear()
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
+	_forest_distance.clear()
+	if _outdoor:
+		_forest_distance = _measure_forest()
 	_shape_ramps()
 	_build_ground(kinds)
 	for cell: Vector2i in fire:
@@ -1783,24 +1833,7 @@ func _is_outline(key: Vector3i) -> bool:
 func _add_forest() -> void:
 	if _land.is_empty():
 		return
-	# How far each void cell is from the land (cells, eight ways), out to
-	# FOREST_REACH: a walk outward from every land cell at once.
-	var distance: Dictionary[Vector2i, int] = {}
-	var frontier: Array[Vector2i] = []
-	for cell: Vector2i in _land:
-		distance[cell] = 0
-		frontier.append(cell)
-	var head := 0
-	while head < frontier.size():
-		var cell := frontier[head]
-		head += 1
-		if distance[cell] >= FOREST_REACH:
-			continue
-		for direction: Vector2i in World.DIRECTIONS:
-			var next := cell + direction
-			if not distance.has(next):
-				distance[next] = distance[cell] + 1
-				frontier.append(next)
+	var distance := _forest_distance
 	var low := Vector2i(1 << 20, 1 << 20)
 	var high := -low
 	for cell: Vector2i in distance:
@@ -1809,9 +1842,12 @@ func _add_forest() -> void:
 		var away := distance[cell]
 		if away == 0:
 			continue
+		# Trees in clumps: thick where the clump field is high, thin
+		# between; the first ring always, so the edge reads closed.
+		var clump := _field(Vector2(cell), FOREST_CLUMP, 40)
 		var roll := _roll(cell, 0)
-		if away == 1 or away <= FOREST_DEPTH and roll < 0.7 or roll < 0.25:
-			_add_tree(cell)
+		if away == 1 or away <= FOREST_DEPTH and roll < 0.35 + 0.6 * clump or roll < 0.08 + 0.45 * clump:
+			_add_tree(cell, clump)
 		elif roll < 0.33:
 			var rock := ArtKit.instance("rock.small")
 			rock.name = "Rock_%d_%d" % [cell.x, cell.y]
@@ -1831,15 +1867,308 @@ func _add_forest() -> void:
 	_room.add_child(forest_floor)
 
 
-## A tree slot on [param cell], sized, turned and nudged by the cell, so
-## every peer grows the same forest.
-func _add_tree(cell: Vector2i) -> void:
+## Scatter: grass tufts, flowers, small stones and roots on the ground,
+## off the grid: per cell, by a hash of it, a number of each by the cell's
+## ground (SCATTER_DENSITY; the forest's ring has its own), each at its own
+## place in the cell, size, turn and lean, on the ground's height there.
+## One MultiMesh a chunk and kind, made when the view first comes near
+## the chunk (_grow_scatter, a chunk a frame), never again; no shadows;
+## nothing on water or fire. Visual only: the sim knows none of it.
+func _grow_scatter() -> void:
+	if _camera == null or _ground_cells.is_empty():
+		return
+	var aim := Vector2(_camera_target.x, _camera_target.z)
+	var reach := _view_reach() + FLOOR_CHUNK
+	var key := Vector2i(floori(aim.x / FLOOR_CHUNK), floori(aim.y / FLOOR_CHUNK))
+	if key != _scatter_aim:
+		_scatter_aim = key
+		_scatter_due.clear()
+		for chunk: Vector2i in _scatter_chunks:
+			if not _scattered.has(chunk) and (Vector2(chunk * FLOOR_CHUNK) + Vector2.ONE * FLOOR_CHUNK * 0.5).distance_to(aim) <= reach:
+				_scatter_due.append(chunk)
+		_scatter_due.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			return Vector2(a * FLOOR_CHUNK).distance_squared_to(aim) < Vector2(b * FLOOR_CHUNK).distance_squared_to(aim))
+	# One step a frame: a kind's MultiMesh of a chunk planned, or the
+	# next chunk's plan.
+	if not _scatter_jobs.is_empty():
+		var job: Array = _scatter_jobs.pop_front()
+		_scatter_build(job[0], job[1], job[2])
+	elif not _scatter_due.is_empty():
+		var chunk: Vector2i = _scatter_due.pop_front()
+		_scattered[chunk] = true
+		var placed := _scatter_plan(chunk)
+		for kind: String in placed:
+			_scatter_jobs.append([chunk, kind, placed[kind]])
+
+
+## Every chunk's scatter now, near or not (tests, benches).
+func _scatter_all() -> void:
+	for chunk: Vector2i in _scatter_chunks:
+		if not _scattered.has(chunk):
+			_scatter_chunk(chunk)
+
+
+## [param chunk]'s scatter: its cells' tufts, flowers, stones and roots.
+func _scatter_chunk(chunk: Vector2i) -> void:
+	_scattered[chunk] = true
+	var placed := _scatter_plan(chunk)
+	for kind: String in placed:
+		_scatter_build(chunk, kind, placed[kind])
+
+
+## One kind's scatter in [param chunk], from its plan: a MultiMesh.
+func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
+	if _room == null:
+		return
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.mesh = _scatter_mesh(kind)
+	multimesh.instance_count = items.size()
+	var fit := _scatter_fit(kind)
+	for i in items.size():
+		var cell: Vector2i = items[i][0]
+		var at: Vector2 = items[i][1]
+		var salt: int = items[i][2]
+		var size := lerpf(fit[0].x, fit[0].y, _roll(cell, 103 + salt))
+		var tilt: float = fit[1]
+		var lean := Vector3((_roll(cell, 104 + salt) - 0.5) * 2.0 * tilt, _roll(cell, 105 + salt) * TAU, (_roll(cell, 106 + salt) - 0.5) * 2.0 * tilt)
+		var basis := Basis.from_euler(lean).scaled(Vector3.ONE * size)
+		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y)))
+		multimesh.set_instance_color(i, _scatter_tint(kind, cell, salt, items[i][3]))
+	var drawn := MultiMeshInstance3D.new()
+	drawn.name = "Scatter_%d_%d_%s" % [chunk.x, chunk.y, kind]
+	drawn.multimesh = multimesh
+	drawn.material_override = _scatter_material()
+	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_room.add_child(drawn)
+
+
+## Where [param chunk]'s scatter goes, by kind: [cell, place, salt, under
+## the forest] each (made from the cells alone, the same on every peer).
+func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
+	var fire: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain["fire"]:
+		fire[cell] = true
+	var placed: Dictionary[String, Array] = {}
+	for index: int in _scatter_chunks[chunk]:
+		var cell: Vector2i = _ground_cells[index]
+		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell):
+			continue
+		var forest := index >= _ground_water_end
+		var ground := "forest" if forest else _ground_kinds[cell]
+		var density: Dictionary = SCATTER_DENSITY.get(ground, {})
+		# Roots where the land meets the forest; reeds by water.
+		if not forest and _forest_distance.has(cell) and _forest_edge(cell):
+			density = density.duplicate()
+			density["root"] = density.get("root", 0.0) + SCATTER_EDGE_ROOTS
+		if not forest and _by_water(cell):
+			density = density.duplicate()
+			density["reeds"] = SCATTER_REEDS
+		var salt := 0
+		for kind: String in density:
+			salt += 10
+			var count := floori(density[kind] + _roll(cell, 100 + salt))
+			for n in count:
+				var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
+				if not placed.has(kind):
+					placed[kind] = []
+				placed[kind].append([cell, at, n + salt, forest])
+	return placed
+
+
+## How a kind of scatter is placed: [scale range, most lean (radians),
+## sink], from art-kit's slot (scatter.<kind>'s "scatter"), else SCATTER_SIZES.
+static var _scatter_fits: Dictionary[String, Array] = {}
+
+
+static func _scatter_fit(kind: String) -> Array:
+	if not _scatter_fits.has(kind):
+		var slot := "scatter." + kind
+		var fields: Dictionary = ArtKit.spec(slot).get("scatter", {}) if ArtKit.has(slot) else {}
+		var scale: Array = fields.get("scale", [SCATTER_SIZES[kind].x, SCATTER_SIZES[kind].y])
+		_scatter_fits[kind] = [Vector2(scale[0], scale[1]), deg_to_rad(float(fields.get("tilt_max", 8.0))), float(fields.get("sink", 0.01))]
+	return _scatter_fits[kind]
+
+
+## Whether a land [param cell] has water beside it (eight ways).
+func _by_water(cell: Vector2i) -> bool:
+	for direction: Vector2i in World.DIRECTIONS:
+		var index: int = _grounds.get(cell + direction, -1)
+		if index >= _ground_floor_end and index < _ground_water_end:
+			return true
+	return false
+
+
+## Whether a land [param cell] is beside the forest (a void cell round it).
+func _forest_edge(cell: Vector2i) -> bool:
+	for direction: Vector2i in World.DIRECTIONS:
+		if _forest_distance.get(cell + direction, 0) >= 1:
+			return true
+	return false
+
+
+## An item's colour: its kind's, varied, darker under the forest; a flower
+## one of FLOWER_COLOURS.
+func _scatter_tint(kind: String, cell: Vector2i, salt: int, forest: bool) -> Color:
+	var shade := lerpf(0.82, 1.12, _roll(cell, 107 + salt))
+	var colour: Color = FLOWER_COLOURS[floori(_roll(cell, 108 + salt) * FLOWER_COLOURS.size()) % FLOWER_COLOURS.size()] \
+			if kind == "flower" else Color.WHITE * shade
+	if forest:
+		colour = colour * Color(0.6, 0.72, 0.6)
+	elif kind == "tuft" and _ground_kinds.get(cell, "grass") != "grass":
+		colour = colour * Color(1.15, 1.05, 0.65)  # Dry, off the grass.
+	return Color(colour, 1.0)
+
+
+## The scatter's one material: vertex colours times each instance's, rough,
+## both sides of a blade drawn.
+static var _scatter_look: StandardMaterial3D
+
+
+static func _scatter_material() -> StandardMaterial3D:
+	if _scatter_look == null:
+		_scatter_look = StandardMaterial3D.new()
+		_scatter_look.vertex_color_use_as_albedo = true
+		_scatter_look.vertex_color_is_srgb = true
+		_scatter_look.roughness = 1.0
+		_scatter_look.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _scatter_look
+
+
+## A kind of scatter's mesh, made once: art-kit's slot (scatter.<kind>)
+## when it has art, else a small low-poly stand-in made here.
+static var _scatter_meshes: Dictionary[String, Mesh] = {}
+
+
+static func _scatter_mesh(kind: String) -> Mesh:
+	if _scatter_meshes.has(kind):
+		return _scatter_meshes[kind]
+	var slot := "scatter." + kind
+	var mesh: Mesh = null
+	if ArtKit.has(slot) and ArtKit.filled_by(slot) != "placeholder":
+		var piece := ArtKit.instance(slot)
+		for node in ArtKit._descendants(piece):
+			if node is MeshInstance3D:
+				mesh = (node as MeshInstance3D).mesh
+				break
+		piece.free()
+	if mesh == null:
+		mesh = _make_scatter(kind)
+	_scatter_meshes[kind] = mesh
+	return mesh
+
+
+static func _make_scatter(kind: String) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(kind)
+	match kind:
+		"tuft", "flower":
+			var blades := 6 if kind == "tuft" else 4
+			for b in blades:
+				var turn := b * TAU / blades + rng.randf_range(-0.4, 0.4)
+				var out := Vector3(cos(turn), 0.0, sin(turn))
+				var side := Vector3(-out.z, 0.0, out.x) * 0.04
+				var root := out * rng.randf_range(0.0, 0.05)
+				var tip := root + out * rng.randf_range(0.05, 0.12) + Vector3.UP * rng.randf_range(0.12, 0.22)
+				var base := Color(0.2, 0.5, 0.18)
+				var top := Color(0.5, 0.82, 0.32)
+				_scatter_triangle(surface, [root - side, root + side, tip], [base, base, top])
+			if kind == "flower":
+				for p in 3:
+					var at := Vector3(rng.randf_range(-0.07, 0.07), rng.randf_range(0.18, 0.26), rng.randf_range(-0.07, 0.07))
+					var r := 0.05
+					var white := Color.WHITE
+					_scatter_triangle(surface, [at + Vector3(-r, 0, 0), at + Vector3(0, 0, -r), at + Vector3(r, 0, 0)], [white, white, white])
+					_scatter_triangle(surface, [at + Vector3(-r, 0, 0), at + Vector3(r, 0, 0), at + Vector3(0, 0, r)], [white, white, white])
+		"reeds":
+			# Tall thin blades, a few with a brown head.
+			var stalk := Color(0.42, 0.52, 0.26)
+			var tip := Color(0.62, 0.66, 0.38)
+			var head := Color(0.4, 0.27, 0.16)
+			for b in 7:
+				var turn := b * TAU / 7.0 + rng.randf_range(-0.4, 0.4)
+				var out := Vector3(cos(turn), 0.0, sin(turn))
+				var side := Vector3(-out.z, 0.0, out.x) * 0.022
+				var root := out * rng.randf_range(0.0, 0.07)
+				var top := root + out * rng.randf_range(0.03, 0.1) + Vector3.UP * rng.randf_range(0.38, 0.6)
+				_scatter_triangle(surface, [root - side, root + side, top], [stalk, stalk, tip])
+				if b % 3 == 0:
+					var at := root.lerp(top, 0.8)
+					var h := Vector3(0.0, 0.07, 0.0)
+					var w := side * 1.6
+					_scatter_triangle(surface, [at - w, at + w, at + w + h], [head, head, head])
+					_scatter_triangle(surface, [at - w, at + w + h, at - w + h], [head, head, head])
+		"stone":
+			# A squashed, jittered octahedron.
+			var points: Array[Vector3] = []
+			for direction: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.FORWARD, Vector3.BACK, Vector3.UP, Vector3.DOWN]:
+				points.append(direction * Vector3(0.12, 0.07, 0.1) * rng.randf_range(0.75, 1.25) + Vector3(0, 0.03, 0))
+			var grey := Color(0.6, 0.58, 0.54)
+			for face: Array in [[0, 4, 2], [2, 4, 1], [1, 4, 3], [3, 4, 0], [0, 2, 5], [2, 1, 5], [1, 3, 5], [3, 0, 5]]:
+				var shade := grey * rng.randf_range(0.85, 1.1)
+				_scatter_triangle(surface, [points[face[0]], points[face[1]], points[face[2]]], [shade, shade, shade])
+		"root":
+			# A low arching strip, bent, thinning to its end.
+			var brown := Color(0.45, 0.32, 0.2)
+			var steps := 5
+			for s in steps:
+				var t0 := s / float(steps)
+				var t1 := (s + 1) / float(steps)
+				var arc := func(t: float) -> Vector3: return Vector3(t * 0.6 - 0.3, sin(t * PI) * 0.06, sin(t * 3.0) * 0.06)
+				var w0 := 0.04 * (1.0 - t0 * 0.7)
+				var w1 := 0.04 * (1.0 - t1 * 0.7)
+				var a: Vector3 = arc.call(t0)
+				var b: Vector3 = arc.call(t1)
+				_scatter_triangle(surface, [a + Vector3(0, 0, -w0), a + Vector3(0, w0, 0), b + Vector3(0, w1, 0)], [brown, brown, brown])
+				_scatter_triangle(surface, [a + Vector3(0, 0, -w0), b + Vector3(0, w1, 0), b + Vector3(0, 0, -w1)], [brown, brown, brown])
+				_scatter_triangle(surface, [a + Vector3(0, w0, 0), a + Vector3(0, 0, w0), b + Vector3(0, 0, w1)], [brown, brown, brown])
+				_scatter_triangle(surface, [a + Vector3(0, w0, 0), b + Vector3(0, 0, w1), b + Vector3(0, w1, 0)], [brown, brown, brown])
+	surface.generate_normals()
+	return surface.commit()
+
+
+static func _scatter_triangle(surface: SurfaceTool, points: Array, colours: Array) -> void:
+	for k in 3:
+		surface.set_color(colours[k])
+		surface.add_vertex(points[k])
+
+
+## How far each void cell is from the land (cells, eight ways), out to
+## FOREST_REACH: a walk outward from every land cell at once.
+func _measure_forest() -> Dictionary[Vector2i, int]:
+	var distance: Dictionary[Vector2i, int] = {}
+	var frontier: Array[Vector2i] = []
+	for cell: Vector2i in _land:
+		distance[cell] = 0
+		frontier.append(cell)
+	var head := 0
+	while head < frontier.size():
+		var cell := frontier[head]
+		head += 1
+		if distance[cell] >= FOREST_REACH:
+			continue
+		for direction: Vector2i in World.DIRECTIONS:
+			var next := cell + direction
+			if not distance.has(next):
+				distance[next] = distance[cell] + 1
+				frontier.append(next)
+	return distance
+
+
+## A tree slot on [param cell], sized by [param clump] (the biggest in a
+## clump's heart) and by the cell, turned, leaning a little and set off its
+## cell's middle, so every peer grows the same forest and no row shows.
+func _add_tree(cell: Vector2i, clump := 0.5) -> void:
 	var slot := "tree.broadleaf" if _roll(cell, 1) < 0.6 else "tree.small"
 	var tree := ArtKit.instance(slot)
 	tree.name = "Tree_%d_%d" % [cell.x, cell.y]
-	tree.scale = Vector3.ONE * TREE_HEIGHT * lerpf(0.85, 1.2, _roll(cell, 2)) / ArtKit.size(slot).y
-	tree.rotation.y = _roll(cell, 3) * TAU
-	tree.position = _tile_position(cell) + Vector3(_roll(cell, 4) - 0.5, 0.0, _roll(cell, 5) - 0.5) * 0.3
+	var size := lerpf(0.7, 1.05, _roll(cell, 2)) * lerpf(0.9, 1.3, clump)
+	tree.scale = Vector3.ONE * TREE_HEIGHT * size / ArtKit.size(slot).y
+	tree.rotation = Vector3((_roll(cell, 6) - 0.5) * 2.0 * TREE_LEAN, _roll(cell, 3) * TAU, (_roll(cell, 7) - 0.5) * 2.0 * TREE_LEAN)
+	tree.position = _tile_position(cell) + Vector3(_roll(cell, 4) - 0.5, 0.0, _roll(cell, 5) - 0.5) * TREE_NUDGE * 2.0
 	_room.add_child(tree)
 	_trees[cell] = tree
 
@@ -1921,6 +2250,18 @@ func _fly(thing: Node3D, from: Vector3, to: Vector3) -> void:
 		0.0, 1.0, THROW_FLIGHT_SECONDS)
 
 
+## Smooth noise 0..1 over the cells, features about [param size] cells
+## across: a hash at a coarse lattice, eased between; the same everywhere.
+static func _field(at: Vector2, size: float, salt: int) -> float:
+	var p := at / size
+	var corner := Vector2i(floori(p.x), floori(p.y))
+	var f := p - Vector2(corner)
+	f = f * f * (Vector2(3.0, 3.0) - 2.0 * f)
+	var top := lerpf(_roll(corner, salt), _roll(corner + Vector2i(1, 0), salt), f.x)
+	var bottom := lerpf(_roll(corner + Vector2i(0, 1), salt), _roll(corner + Vector2i(1, 1), salt), f.x)
+	return lerpf(top, bottom, f.y)
+
+
 ## 0..1, the same for [param cell] and [param salt] on every peer.
 static func _roll(cell: Vector2i, salt: int) -> float:
 	return float(absi(hash(Vector3i(cell.x, cell.y, salt))) % 10007) / 10007.0
@@ -1972,8 +2313,18 @@ func _build_ground(kinds: Dictionary) -> void:
 	# Water's cells are the ground too, its bed: a corner with water all
 	# round it sinks WATER_BED_DEPTH, so a pond deepens toward its middle
 	# and meets its shore with no edge (the surface is _build_water's).
+	# Outdoors, the void's first FOREST_GROUND cells are the ground too,
+	# under the forest: the land runs into the forest floor along a ragged
+	# line (the mask's g), not the cells' outline.
 	var floor_count: int = _terrain["floor"].size()
 	var cells: Array = _terrain["floor"] + _terrain.get("water", [])
+	var water_end := cells.size()
+	for cell: Vector2i in _forest_distance:
+		if _forest_distance[cell] >= 1 and _forest_distance[cell] <= FOREST_GROUND:
+			cells.append(cell)
+	_ground_cells = cells
+	_ground_water_end = water_end
+	_ground_floor_end = floor_count
 	_cell_shades = PackedByteArray()
 	_vertex_chunk = PackedInt32Array()
 	_vertex_byte = PackedInt32Array()
@@ -1982,6 +2333,7 @@ func _build_ground(kinds: Dictionary) -> void:
 	_cell_vertices = PackedInt32Array()
 	_ground_bytes = PackedByteArray()
 	_ground_meshes.clear()
+	_scatter_chunks.clear()
 	_chunk_byte_start = PackedInt32Array()
 	if cells.is_empty():
 		return
@@ -2004,11 +2356,11 @@ func _build_ground(kinds: Dictionary) -> void:
 	var kind_bytes := PackedByteArray()
 	kind_bytes.resize(across * down * 4)
 	var water_bytes := PackedByteArray()
-	water_bytes.resize(across * down)
+	water_bytes.resize(across * down * 2)
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
-		var kind := str(kinds.get(cell, "stone")) if i < floor_count else _bed_kind(cell, kinds, floor_count)
+		var kind := str(kinds.get(cell, "stone")) if i < floor_count else _bed_kind(cell, kinds, floor_count) if i < water_end else "grass"
 		if not GROUND_CHANNELS.has(kind):
 			kind = "stone"
 		_grounds[cell] = i
@@ -2019,12 +2371,15 @@ func _build_ground(kinds: Dictionary) -> void:
 		var place := (cell.y - origin.y) * across + cell.x - origin.x
 		at[place] = i
 		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
-		if i >= floor_count:
-			water_bytes[place] = 255
+		if i >= water_end:
+			water_bytes[place * 2 + 1] = 255
+		elif i >= floor_count:
+			water_bytes[place * 2] = 255
 		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 		if not chunks.has(chunk):
 			chunks[chunk] = PackedInt32Array()
 		chunks[chunk].append(i)
+	_scatter_chunks = chunks
 	_cell_shades.resize(cells.size() * 2)
 	for i in cells.size():
 		_cell_shades[i * 2] = 255
@@ -2032,7 +2387,7 @@ func _build_ground(kinds: Dictionary) -> void:
 			| Mesh.ARRAY_FORMAT_CUSTOM0 | (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
 	_ground_stride = RenderingServer.mesh_surface_get_format_attribute_stride(format, 1)
 	_ground_custom = RenderingServer.mesh_surface_get_format_offset(format, 1, Mesh.ARRAY_CUSTOM0)
-	_water_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_L8, water_bytes))
+	_water_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_RG8, water_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
 	var material := _ground_material(kind_bytes, across, down, origin)
@@ -2071,7 +2426,8 @@ func _build_ground(kinds: Dictionary) -> void:
 					var sunk := true
 					for a in 4:
 						var next := corner + around[a]
-						sunk = sunk and at[(next.y - origin.y) * across + next.x - origin.x] >= floor_count
+						var other := at[(next.y - origin.y) * across + next.x - origin.x]
+						sunk = sunk and other >= floor_count and other < water_end
 					positions.append(Vector3(corner.x - 0.5, level * LEVEL_RISE - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
 					var global := _vertex_chunk.size()
 					_vertex_chunk.append(chunk_index)
@@ -2177,6 +2533,7 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("warm", WARM)
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("water", _water_mask)
+	material.set_shader_parameter("forest_floor", FOREST_FLOOR)
 	return material
 
 
@@ -2590,6 +2947,7 @@ func _add_wall_runs(keys: Array[Vector3i]) -> void:
 			if not run.is_empty():
 				var last := run[-1]
 				var joined := _along(key) == _along(last) + 1 and _edge_base(key) == _edge_base(last) \
+						and _plain_walls.has(key) == _plain_walls.has(last) \
 						and run.size() < WALL_RUN_MOST and not _needs_post(WallEdge.vertex_at(key, 1 if key.z == Terrain.EAST else 0), standing)
 				if not joined:
 					_add_wall_run(run, material)
@@ -2619,13 +2977,14 @@ func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
 	# What each edge is: whole, broken off, or a breach of rubble.
 	var states := PackedInt32Array()
 	states.resize(count)
+	var plain := _plain_walls.has(first)
 	for i in count:
 		var cell := Vector2i(run[i].x, run[i].y)
-		if count >= WALL_GAP_RUN and i >= 2 and i <= count - 3 and _roll(cell, 20 + run[i].z) < WALL_GAP \
+		if not plain and count >= WALL_GAP_RUN and i >= 2 and i <= count - 3 and _roll(cell, 20 + run[i].z) < WALL_GAP \
 				and (i < 3 or states[i - 1] != WALL_RUBBLE and states[i - 2] != WALL_RUBBLE):
 			states[i] = WALL_RUBBLE
 	for i in count:
-		if states[i] == WALL_WHOLE and (_roll(Vector2i(run[i].x, run[i].y), 22 + run[i].z) < WALL_BROKEN
+		if states[i] == WALL_WHOLE and not plain and (_roll(Vector2i(run[i].x, run[i].y), 22 + run[i].z) < WALL_BROKEN
 				or i > 0 and states[i - 1] == WALL_RUBBLE or i < count - 1 and states[i + 1] == WALL_RUBBLE):
 			states[i] = WALL_TOPLESS
 	for k in count:
@@ -2646,8 +3005,8 @@ func _add_wall_run(run: Array[Vector3i], material: Material) -> void:
 		var j := i + 1
 		while j < count and states[j] == WALL_WHOLE and (_along(run[j]) % WALL_SWAY) != 0:
 			j += 1
-		var low := _wall_height(run[i], 0, cap)
-		var high := _wall_height(run[j - 1], 1, cap)
+		var low := cap if plain else _wall_height(run[i], 0, cap)
+		var high := cap if plain else _wall_height(run[j - 1], 1, cap)
 		for k in points.size():
 			var p := points[k]
 			var q := points[(k + 1) % points.size()]

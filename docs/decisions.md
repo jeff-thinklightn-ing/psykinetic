@@ -3885,3 +3885,41 @@ protocol_test; net_test checks that an out-of-date dev client would update
 were it exported, and that a newer one never tries. A client of an older
 build with the same protocol plays on and is told once, in the party chat,
 that a newer game is out (the map message carries the server's build).
+
+## 252. Scatter off the grid, trees in clumps, the land running into the forest
+
+The ground (216) had no small things on it, and outdoors the forest's
+floor was a flat plane under the void whose edge was the land's outline:
+a stair of cells round every map. Three changes, all in the 3D view, none
+in the sim:
+
+- Scatter: grass tufts, flowers, small stones and roots, a number of each
+  a cell by its ground (SCATTER_DENSITY: thick on grass, stones on dirt, a
+  tuft now and then in a paved floor, roots where the land meets the
+  forest), each by a hash of its cell placed off the cell's middle, sized,
+  turned and leant (art-kit's scatter.* slots' scale, tilt_max and sink),
+  on the ground's height there (ramps too), never on water or fire, tinted
+  by its ground (drier off the grass, darker under the forest). One
+  MultiMesh a chunk and kind, one material (vertex colours times each
+  instance's), no shadows. A chunk's scatter is made when the view first
+  comes within its reach (_grow_scatter, the nearest first, at most one a
+  frame) and kept; chunks off screen are culled as any mesh is. The meshes
+  are art-kit's slots' once they have art; until then small low-poly
+  stand-ins made here, not grey boxes.
+- Trees: still one on every void cell beside the land (the edge reads
+  closed) and on others by chance, but the chance follows a clump field
+  (smooth noise, FOREST_CLUMP cells across), thick in a clump, thin
+  between; a tree is bigger in a clump's heart, leans up to TREE_LEAN and
+  stands up to TREE_NUDGE off its cell's middle.
+- The forest's edge: outdoors the ground's mesh runs FOREST_GROUND cells
+  into the void, and the mask's g (beside water's r) marks those cells;
+  the ground shader turns the land into forest floor along a line pushed
+  by noise, as kinds meet, so the land's outline no longer shows.
+
+Plain walls (for buildings-89, amending 245): a wall edge in
+Client3D._plain_walls is drawn whole and level, its cap at WALL_HEIGHT,
+never broken off, breached or swaying, and a run never mixes plain edges
+with others. A house's walls carry a roof at WALL_HEIGHT: a ruined top
+made a house look abandoned, and the sway pushed walls through the roof.
+Whoever knows a building's outline fills the set before the room is
+built; the sim is untouched.
