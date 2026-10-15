@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Stumps in the forest: now and then a tree at the forest's edge has been
+  felled, and stumps lie among the trees. Fallen logs and dead trees will
+  join them when their art is made.
 - Boars in the wilds are drawn as boars now, not stand-in shapes: they
   walk, run, graze, lift their heads when they hear you, headbutt, flinch
   when struck and fall when killed. Deer, stags, wolves and rabbits follow

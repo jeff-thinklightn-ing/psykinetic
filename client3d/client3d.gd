@@ -524,6 +524,14 @@ const WARM_CATEGORIES: Array[String] = ["walls", "doors", "trees", "rocks", "bui
 ## size against a tree's (252, 277).
 const SAPLING_CHANCE := 0.6
 const SAPLING_SIZE := Vector2(0.35, 0.6)
+## Dead wood (277 amended), each only once its slot has art of its own or
+## a fill (_deadwood_drawn): how often an edge cell with no sapling has its
+## tree felled, a stump toward the land in its place; how often a cell in the forest with no tree has a
+## stump or a log (a LOG_SHARE of them logs); how often a tree is dead.
+const STUMP_EDGE_CHANCE := 0.12
+const DEADWOOD_CHANCE := 0.14
+const LOG_SHARE := 0.4
+const DEAD_TREE_CHANCE := 0.04
 ## Scatter: how many of each, on average, a cell of each ground has (the
 ## forest's ring is "forest"), and roots more on the land at the forest's
 ## edge; each kind's size range; a flower's colours.
@@ -2489,7 +2497,12 @@ func _add_forest() -> void:
 		# between; the first ring always, so the edge reads closed.
 		var clump := _field(Vector2(cell), FOREST_CLUMP, 40)
 		var roll := _roll(cell, 0)
-		if away == 1 or away <= FOREST_DEPTH and roll < 0.35 + 0.6 * clump or roll < 0.08 + 0.45 * clump:
+		# Now and then an edge cell's tree was felled: its stump, toward the
+		# land, where its crown would hide it; the trees beside it close the edge.
+		var felled := away == 1 and _roll(cell, 50) >= SAPLING_CHANCE and _roll(cell, 57) < STUMP_EDGE_CHANCE 				and _deadwood_drawn("tree.stump")
+		if felled:
+			_add_deadwood(cell, "tree.stump", distance)
+		elif away == 1 or away <= FOREST_DEPTH and roll < 0.35 + 0.6 * clump or roll < 0.08 + 0.45 * clump:
 			_add_tree(cell, clump)
 			# At the edge, now and then a sapling too, toward the land: the
 			# edge's line, and its shadow, no longer a tree a cell.
@@ -2501,6 +2514,8 @@ func _add_forest() -> void:
 			rock.position = _tile_position(cell)
 			rock.rotation.y = _roll(cell, 3) * TAU
 			_room.add_child(rock)
+		elif roll < 0.33 + DEADWOOD_CHANCE:
+			_add_deadwood(cell, "tree.log" if _roll(cell, 58) < LOG_SHARE else "tree.stump", distance)
 	var floor_mesh := PlaneMesh.new()
 	floor_mesh.size = Vector2(high - low) + Vector2.ONE * 2.0
 	var material := StandardMaterial3D.new()
@@ -3012,7 +3027,9 @@ func _draw_glimpse(terrain: Dictionary) -> void:
 ## cell's middle, so every peer grows the same forest and no row shows.
 func _add_tree(cell: Vector2i, clump := 0.5) -> void:
 	var slot := "tree.broadleaf" if _roll(cell, 1) < 0.6 else "tree.small"
-	var tree := ArtKit.instance(slot)
+	if _roll(cell, 59) < DEAD_TREE_CHANCE and _deadwood_drawn("tree.dead"):
+		slot = "tree.dead"
+	var tree := ArtKit.instance(slot, 1 + int(_roll(cell, 60) * maxi(1, ArtKit.variant_count(slot))))
 	tree.name = "Tree_%d_%d" % [cell.x, cell.y]
 	var size := lerpf(0.7, 1.05, _roll(cell, 2)) * lerpf(0.9, 1.3, clump)
 	tree.scale = Vector3.ONE * TREE_HEIGHT * size / ArtKit.size(slot).y
@@ -3120,6 +3137,34 @@ func _add_sapling(cell: Vector2i, distance: Dictionary[Vector2i, int]) -> void:
 	sapling.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
 	_room.add_child(sapling)
 	_saplings[cell] = sapling
+
+
+## A stump or a log ([param slot]) in forest [param cell]: on the edge,
+## set off toward the land as a sapling is; deeper in, anywhere in its
+## cell; turned and its variant by the cell. Nothing while the slot has no
+## art (_deadwood_drawn). Small: never faded.
+func _add_deadwood(cell: Vector2i, slot: String, distance: Dictionary[Vector2i, int]) -> void:
+	if not _deadwood_drawn(slot):
+		return
+	var toward := Vector2.ZERO
+	for direction: Vector2i in World.DIRECTIONS:
+		if distance.get(cell + direction, -1) == 0:
+			toward += Vector2(direction)
+	var at := Vector2(_roll(cell, 61) - 0.5, _roll(cell, 62) - 0.5) * 0.5
+	if toward != Vector2.ZERO:
+		at = toward.normalized() * lerpf(0.2, 0.38, _roll(cell, 61))
+	var wood := ArtKit.instance(slot, 1 + int(_roll(cell, 63) * maxi(1, ArtKit.variant_count(slot))))
+	wood.name = "Deadwood_%d_%d" % [cell.x, cell.y]
+	wood.scale = Vector3.ONE * lerpf(0.8, 1.2, _roll(cell, 64))
+	wood.rotation.y = _roll(cell, 65) * TAU
+	wood.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
+	_room.add_child(wood)
+
+
+## Whether [param slot] (dead wood: tree.stump, tree.log, tree.dead) is
+## drawn: once it has art of its own or a fill, never as a grey box.
+static func _deadwood_drawn(slot: String) -> bool:
+	return ArtKit.has(slot) and ArtKit.filled_by(slot) != "placeholder"
 
 
 ## Smooth noise 0..1 over the cells, features about [param size] cells

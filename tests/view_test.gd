@@ -391,6 +391,14 @@ func _test_scatter() -> void:
 			inside += 1
 	_check(_rig._saplings.size() > 0 and inside == _rig._saplings.size(),
 			"saplings at the edge, smaller than its trees, off their void cell's middle and in it (%d of %d)" % [inside, _rig._saplings.size()])
+	# Dead wood (277 amended): stumps, never on the land; logs and dead trees
+	# only once their slots have art.
+	var wood := _rig._room.find_children("Deadwood_*", "", false, false)
+	var on_land := wood.filter(func(each: Node3D) -> bool: return _rig._land.has(Vector2i(roundi(each.position.x), roundi(each.position.z))))
+	_check(not wood.is_empty() and on_land.is_empty() and Client3D._deadwood_drawn("tree.stump"),
+			"stumps in the forest and at its edge, none on the land (%d)" % wood.size())
+	for slot in ["tree.log", "tree.dead"]:
+		_check(Client3D._deadwood_drawn(slot) == (ArtKit.filled_by(slot) != "placeholder"), "%s drawn only with art (%s)" % [slot, ArtKit.filled_by(slot)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
@@ -1019,9 +1027,10 @@ func _test_outdoor() -> void:
 	for cell: Vector2i in land:
 		for direction: Vector2i in World.DIRECTIONS:
 			var next := cell + direction
-			if not land.has(next) and not _rig._trees.has(next) and next not in bare and not _rig._wooded.has(next):
+			if not land.has(next) and not _rig._trees.has(next) and next not in bare and not _rig._wooded.has(next) 					and not _rig._room.has_node("Deadwood_%d_%d" % [next.x, next.y]):
 				bare.append(next)
-	_check(not _rig._trees.is_empty() and bare.is_empty(), "a tree on every cell beside the land but a way's lane (%d trees; bare: %s)" % [_rig._trees.size(), bare.slice(0, 5)])
+	_check(not _rig._trees.is_empty() and bare.is_empty(),
+			"a tree (or a felled one's stump) on every cell beside the land but a way's lane (%d trees; bare: %s)" % [_rig._trees.size(), bare.slice(0, 5)])
 	var outline_walls := 0
 	var inner_walls := 0
 	var edges: Dictionary = terrain["edges"]

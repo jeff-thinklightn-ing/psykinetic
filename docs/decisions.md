@@ -4382,6 +4382,20 @@ own void cell, leaning as trees do; faded as trees are when it hides the
 player. Visual only. tools/map_bench takes --outdoor=1 to bench a forest
 round its dungeon.
 
+Amended (dead wood, the coordinator's ask once tree.stump had art): now
+and then an edge cell with no sapling has its tree felled, its stump
+there instead, set toward the land as a sapling is (STUMP_EDGE_CHANCE, a
+tenth of them). A stump under an edge tree's crown is hidden, and a few
+missing trees leave the edge still closed by the ones beside them. A
+forest cell with neither tree nor rock now and then has a stump or a log
+(DEADWOOD_CHANCE, LOG_SHARE); a tree is now and then dead
+(DEAD_TREE_CHANCE). Each is placed only once its slot (tree.stump,
+tree.log, tree.dead) has art of its own or a fill
+(`Client3D._deadwood_drawn`), never as a grey box, so logs and dead trees
+show up when their art lands, with nothing else to change. Trees pick
+among their slot's variants by the cell. Stumps and logs never fade. The
+sim's walls are unchanged. Visual only.
+
 ## 293. Who a companion is: traits rolled once, a card written from them
 
 Jeff: trait tables rolled at creation, one model call writes the card, a
