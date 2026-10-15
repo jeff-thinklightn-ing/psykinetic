@@ -83,7 +83,8 @@ func _fresh_working() -> void:
 
 ## Asks for [param text] (the first request, or a follow-up), running
 ## Claude's tool calls until it is done. Returns {ok, summary, cost (this
-## request's), error}; the proposal is then [method proposal].
+## request's), error, warnings (Stockpile.check's on the proposal)}; the
+## proposal is then [method proposal].
 func ask(text: String) -> Dictionary:
 	if busy:
 		return {"ok": false, "error": "still working on the last request"}
@@ -108,7 +109,13 @@ func ask(text: String) -> Dictionary:
 			var results: Array = []
 			for block: Dictionary in content:
 				if block.get("type") == "tool_use":
+					var before := Stockpile.check(working.config)
 					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
+					# What the change did to the town's store, said at once (decision 301).
+					var new := Stockpile.check(working.config).filter(func(warning: String) -> bool: return warning not in before)
+					if not new.is_empty():
+						outcome["text"] += "
+The town's store now: " + "; ".join(new)
 					results.append({"type": "tool_result", "tool_use_id": block.get("id"),
 						"content": outcome["text"], "is_error": not outcome["ok"]})
 			messages.append({"role": "user", "content": results})
@@ -129,6 +136,7 @@ func ask(text: String) -> Dictionary:
 	if not result["ok"] and result["error"].is_empty():
 		result["error"] = "Claude did not finish in %d turns" % MAX_TURNS
 	result["summary"] = summary
+	result["warnings"] = Stockpile.check(working.config)
 	result["cost"] = spent
 	busy = false
 	return result
@@ -208,6 +216,8 @@ Monsters idle until someone comes: guard (stands, glances about), wander (stroll
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
 Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first).
+
+A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
 %s""" % [", ".join(legend), ", ".join(Items.ids()), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]

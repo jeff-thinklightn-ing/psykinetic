@@ -20,6 +20,7 @@ func _ready() -> void:
 	await _test_stamp_building()
 	await _test_set_building()
 	await _test_town_wall()
+	await _test_store_checks()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -140,6 +141,24 @@ func _test_town_wall() -> void:
 	var level := Level.parse(doc.map.to_image(), null, doc.config)
 	var about := (level["warnings"] as Array).filter(func(warning: String) -> bool: return "town wall" in warning)
 	_check(level["town_walls"].size() == 1 and about.is_empty(), "the level reads the square's wall, with nothing to say (%s)" % [about])
+
+
+func _test_store_checks() -> void:
+	print("
+== the town's store: what a change does to it, said at once and with the proposal ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "stamp", "input": {"prefab": "town_store", "at": [6, 6]}},
+			{"name": "place", "input": {"at": [20, 12], "thing": "chest", "use": "shop"}}],
+		"A store, and a counter out in the field.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 20, 12), "test_field", stub)
+	var result: Dictionary = await session.ask("a store")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check("The town's store now" not in str(results[0]["content"]), "the store stamped whole: nothing to say (%s)" % results[0]["content"])
+	_check("The town's store now: the shop counter at (20, 12) does nothing" in str(results[1]["content"]), "a counter outside it: Claude is told (%s)" % results[1]["content"])
+	_check(result.get("warnings", []).size() == 1, "and the proposal carries it, for the player (%s)" % [result.get("warnings")])
+	_check("Stamp town_store for one" in BuilderSession.system_prompt(), "the prompt says how a town's store is made")
 
 
 func _test_prompt() -> void:

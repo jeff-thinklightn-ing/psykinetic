@@ -134,6 +134,9 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 		return
 	var reply := proposal_message(session)
 	reply["summary"] = str(result["summary"]) + ("" if result["ok"] else "\n(" + str(result["error"]) + ")")
+	var warnings: Array = result.get("warnings", [])
+	if not warnings.is_empty():
+		reply["summary"] += "\nThe town's store: " + "; ".join(warnings)
 	reply["cost"] = result["cost"]
 	reply["total"] = session.usage["cost"]
 	_reply(peer, reply)

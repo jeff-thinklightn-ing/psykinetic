@@ -6,6 +6,9 @@ top section as the release notes.
 
 ## Unreleased
 
+- Builder mode knows the town's store: Claude stamps one (yard, depot, shop counter)
+  when asked, and you and Claude are told when a change leaves it wrong (a counter
+  outside the store, a store with no depot).
 - Right-click a thing in your pack to use it: a coin purse opens into
   your gold. Keys open their locked doors when you carry them (none in the
   world yet). Things you put down or throw land with a thud that monsters
