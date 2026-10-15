@@ -17,6 +17,8 @@ extends RefCounted
 ## Levels, prefabs and the builder name ids; an unknown id is dropped.
 
 const CATALOG := "res://levels/items.json"
+## Loot tables (loot_tables, decision 330).
+const LOOT := "res://levels/loot.json"
 ## The ArtKit manifest of items' slots, generated from the catalog.
 const ART_SLOTS := "res://art/kit/slots_items.json"
 const ART_BUDGET := 500
@@ -34,6 +36,7 @@ const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight"
 const TRADES: Array[String] = ["smith", "cook", "carpenter"]
 
 static var _catalog: Dictionary = {}
+static var _loot: Dictionary = {}
 
 
 ## Every definition by id, read on first use.
@@ -154,10 +157,11 @@ static func add_for_test(entry: Dictionary) -> Dictionary:
 	return _catalog[id]
 
 
-## For tests: the catalog read again from the file on next use, anything
-## added_for_test gone.
+## For tests: the catalog and the loot tables read again from their files
+## on next use, anything added for a test gone.
 static func reset() -> void:
 	_catalog = {}
+	_loot = {}
 
 
 static func exists(id: String) -> bool:
@@ -285,6 +289,72 @@ static func opens_of(id: String) -> String:
 ## What [param id] is worth in gold (the catalog's value; 0 if it gives none).
 static func value_of(id: String) -> int:
 	return int(def(id).get("value", 0))
+
+
+## Loot tables (decision 330), read on first use: name -> its rows, each
+## {item, count: [least, most], chance: 0 to 1}, as levels/loot.json has
+## them. A level or the builder names one for a chest or a monster
+## ("loot"), and Level rolls it as the level is built (roll_loot).
+static func loot_tables() -> Dictionary:
+	if _loot.is_empty():
+		_loot = read_loot(FileAccess.get_file_as_string(LOOT))
+	return _loot
+
+
+## [param text] (loot.json) as tables. A row naming no thing in the catalog
+## is warned about and left out; a count not [least, most] is [1, 1]; a
+## chance is kept to 0 to 1 (1 if not given).
+static func read_loot(text: String) -> Dictionary:
+	var out := {}
+	var parsed: Variant = JSON.parse_string(text)
+	var tables: Variant = parsed.get("tables") if parsed is Dictionary else null
+	if not tables is Dictionary:
+		push_warning("Items: no loot tables in %s" % LOOT)
+		return out
+	for table: String in tables:
+		var rows: Array[Dictionary] = []
+		var given: Variant = tables[table]
+		for row: Variant in (given if given is Array else []):
+			var id := str(row.get("item", "")) if row is Dictionary else ""
+			if not exists(id):
+				push_warning("Items: loot table %s names \"%s\", no thing in the catalog; left out" % [table, id])
+				continue
+			var count: Variant = row.get("count", [1, 1])
+			var pair: bool = count is Array and count.size() == 2
+			var least := maxi(0, int(count[0])) if pair else 1
+			var most := maxi(least, int(count[1])) if pair else 1
+			rows.append({"item": id, "count": [least, most], "chance": clampf(float(row.get("chance", 1.0)), 0.0, 1.0)})
+		out[table] = rows
+	return out
+
+
+## Whether [param table] is a loot table.
+static func has_loot(table: String) -> bool:
+	return loot_tables().has(table)
+
+
+## [param table] rolled: the ids it gives, row by row (each with its
+## chance, then a count from least to most), at most [param room]. Drawn by
+## [param seed_text]: one seed gives the same every time, so a level built
+## twice is stocked the same. An unknown table gives nothing.
+static func roll_loot(table: String, seed_text: String, room: int) -> PackedStringArray:
+	var out := PackedStringArray()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(seed_text.sha256_text())  # Mixed: near names, near seeds, alike rolls.
+	for row: Dictionary in loot_tables().get(table, []):
+		if rng.randf() >= float(row["chance"]):
+			continue
+		for i in rng.randi_range(int(row["count"][0]), int(row["count"][1])):
+			if out.size() >= room:
+				return out
+			out.append(str(row["item"]))
+	return out
+
+
+## For tests: [param rows] as table [param table], as if in the file,
+## until reset.
+static func add_loot_for_test(table: String, rows: Array) -> void:
+	loot_tables()[table] = read_loot(JSON.stringify({"tables": {table: rows}}))[table]
 
 
 static func yield_of(id: String) -> Dictionary:

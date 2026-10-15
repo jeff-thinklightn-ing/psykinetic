@@ -120,7 +120,9 @@ const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 
 ## The idle modes level.json may give a monster (Monster.IDLE_MODES).
 const IDLE_MODES: Array[String] = ["guard", "wander", "patrol", "gather", "none"]
 ## An entity entry of only these keys leaves the spawn order as it was.
-const ORDERLESS_KEYS: Array[String] = ["at", "facing", "idle"]
+const ORDERLESS_KEYS: Array[String] = ["at", "facing", "idle", "loot"]
+## What a monster can carry from a loot table (_stock), dropped where it falls.
+const MONSTER_CARRIES := 4
 
 ## Levels made in code (tests): name -> {layout: Image, height: Image or
 ## null, config: Dictionary}; load() takes these before the folder.
@@ -558,6 +560,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 		if more is Dictionary:
 			for key: String in more:
 				props[key] = _prop(key, more[key])
+		_stock(props, spec, entry, config, warnings, at)
 		if not props.is_empty():
 			spec["props"] = props
 		if spec.get("script") == MONSTER:
@@ -899,6 +902,44 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 		for key: String in type_props:
 			props[key] = _prop(key, type_props[key])
 	return {"script": ANIMAL if Animal.is_wild(type) else MONSTER, "shape": "capsule", "props": props, "kind": type}
+
+
+## A loot table rolled into [param props]' slots (decision 330): the
+## entry's "loot", else level.json's "loot" for the kind ("chest"; a
+## monster's own kind, else "monster", which leaves wild animals out). A
+## chest's empty slots are filled (a depot or a shop counter keeps none); a
+## monster carries up to MONSTER_CARRIES. Seeded by the level's name and
+## [param at]: the same each time the level is built.
+static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
+	var script := str(spec.get("script", ""))
+	var chest: bool = script == CHEST and not props.get("depot", false) and not props.get("shop", false)
+	var monster := script == MONSTER or script == ANIMAL
+	var kind := str(spec.get("kind", ""))
+	var defaults: Variant = config.get("loot", {})
+	var table := ""
+	if entry.has("loot"):
+		table = str(entry["loot"])
+		if not (chest or monster):
+			warnings.append("loot at %s: only a chest or a monster takes a loot table" % at)
+			return
+	elif defaults is Dictionary and chest:
+		table = str(defaults.get("chest", ""))
+	elif defaults is Dictionary and monster:
+		table = str(defaults.get(kind, "" if Animal.is_wild(kind) else defaults.get("monster", "")))
+	if table.is_empty():
+		return
+	if not Items.has_loot(table):
+		warnings.append("loot at %s: no loot table \"%s\" (levels/loot.json has %s)" % [at, table, ", ".join(Items.loot_tables().keys())])
+		return
+	var slots := Items.tidy(props.get("slots", []), Chest.SLOTS if chest else MONSTER_CARRIES)
+	var empty: Array[int] = []
+	for slot in slots.size():
+		if slots[slot].is_empty():
+			empty.append(slot)
+	var rolled := Items.roll_loot(table, "%s:%d,%d" % [str(config.get("name", "")), at.x, at.y], empty.size())
+	for i in rolled.size():
+		slots[empty[i]] = rolled[i]
+	props["slots"] = slots
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except

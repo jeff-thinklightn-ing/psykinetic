@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_use()
 	_test_buffs()
 	_test_weapons()
+	_test_loot()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -485,6 +486,80 @@ func _test_weapons() -> void:
 	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
 		World.items.end(World.take_item(host, host, slot), "gone")
 
+
+
+func _test_loot() -> void:
+	print("
+== loot: tables as data, named by a level for a chest or a monster; a monster drops what it carried (decision 330) ==")
+	_check(Items.has_loot("supplies") and Items.has_loot("armoury") and Items.has_loot("pockets"), "levels/loot.json: %s" % [Items.loot_tables().keys()])
+	var read := Items.read_loot('{"tables": {"t": [{"item": "no_such"}, {"item": "dagger", "count": [3], "chance": 4}, {"item": "ration", "count": [2, 1]}]}}')
+	_check(read["t"] == [{"item": "dagger", "count": [1, 1], "chance": 1.0}, {"item": "ration", "count": [2, 2], "chance": 1.0}],
+			"an unknown thing left out; a bad count [1, 1], most never under least; a chance kept to 0 to 1 (%s)" % [read["t"]])
+	Items.add_loot_for_test("test_sure", [{"item": "ration", "count": [2, 2]}, {"item": "dagger"}, {"item": "sword", "chance": 0.0}])
+	_check(Items.roll_loot("test_sure", "x", 9) == PackedStringArray(["ration", "ration", "dagger"]), "every row with chance 1, none with 0: two rations and a dagger")
+	_check(Items.roll_loot("test_sure", "x", 2).size() == 2 and Items.roll_loot("no_such_table", "x", 4).is_empty(), "kept to the room there is; an unknown table gives nothing")
+	var same := true
+	for i in 20:
+		same = same and Items.roll_loot("supplies", "seed%d" % i, 4) == Items.roll_loot("supplies", "seed%d" % i, 4)
+	_check(same, "one seed, the same roll every time")
+	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
+	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "chest", Vector2i(2, 2): "monster_imp",
+		Vector2i(4, 2): "monster_brute", Vector2i(5, 2): "start"}
+	var config := {"name": "loot_test", "loot": {"chest": "test_sure", "brute": "test_sure"},
+		"entities": [{"at": [1, 1], "props": {"slots": ["bandaging_kit", "", "", ""]}}, {"at": [3, 1], "loot": "no_such_table"},
+			{"at": [2, 2], "loot": "test_sure"}]}
+	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var by_tile := {}
+	for spec: Dictionary in level["entities"]:
+		by_tile[spec["tile"]] = spec
+	var slots_at := func(cell: Vector2i) -> PackedStringArray: return by_tile[cell].get("props", {}).get("slots", PackedStringArray())
+	_check(slots_at.call(Vector2i(1, 1)) == PackedStringArray(["bandaging_kit", "ration", "ration", "dagger"]),
+			"a chest with the level's chest table: its own kit kept, the empty slots filled (%s)" % slots_at.call(Vector2i(1, 1)))
+	_check(slots_at.call(Vector2i(3, 1)).is_empty() and level["warnings"].any(func(w: String) -> bool: return "no_such_table" in w),
+			"a table that is not there: nothing, and a warning")
+	_check(slots_at.call(Vector2i(2, 2)) == PackedStringArray(["ration", "ration", "dagger", ""]) and slots_at.call(Vector2i(4, 2))[2] == "dagger",
+			"the imp its entry's table, the brute its kind's (%s, %s)" % [slots_at.call(Vector2i(2, 2)), slots_at.call(Vector2i(4, 2))])
+	_check(Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)["entities"] == level["entities"],
+			"built again, stocked the same")
+	var host := _player(Net.local_id)
+	var foe: GridEntity = null
+	for monster in World.monsters():
+		foe = monster
+		break
+	_check(foe != null, "a monster to drop things")
+	if foe == null:
+		return
+	foe.slots = PackedStringArray(["dagger", "", "coin_purse", ""])
+	var at := foe.tile
+	World.damage(foe, 1000, host)
+	var dropped := []
+	for cell: Vector2i in World.zone.ground.keys():
+		if World.distance(cell, at) <= 1:
+			while not World.ground_uids(cell).is_empty():
+				var uid := World.take_from_ground(cell, 0)
+				dropped.append(World.items.id_of(uid))
+				World.items.end(uid, "gone")
+	dropped.sort()
+	_check(not is_instance_valid(foe) or not foe.spawned, "the monster is dead")
+	_check(dropped == ["coin_purse", "dagger"], "what it carried lies where it fell (%s; taken up again)" % [dropped])
+	var doc := MapDoc.new()
+	doc.folder = preload("res://tests/test_ports.gd").scratch("items_test_builder/")
+	doc.map = LevelMap.new(Vector2i(12, 12))
+	for y in 12:
+		for x in 12:
+			doc.map.set_cell(Vector2i(x, y), "grass")
+	doc.config = {"name": "Loot Test", "outdoor": true}
+	var session := BuilderSession.new(doc, Rect2i(1, 1, 10, 10), "loot_test", StubClaude.new())
+	_check(session.run_tool("place", {"at": [3, 3], "thing": "chest", "loot": "supplies"})["ok"]
+			and session.run_tool("place", {"at": [5, 5], "thing": "imp", "loot": "pockets"})["ok"], "the builder places a chest and an imp, each with a table")
+	var entries: Array = session.working.config.get("entities", [])
+	_check(entries.any(func(entry: Dictionary) -> bool: return entry["at"] == [3, 3] and entry["loot"] == "supplies")
+			and entries.any(func(entry: Dictionary) -> bool: return entry["at"] == [5, 5] and entry["loot"] == "pockets"), "named in their entries (%s)" % [entries])
+	var refused := session.run_tool("place", {"at": [7, 7], "thing": "crate", "loot": "supplies"})
+	var unknown := session.run_tool("place", {"at": [7, 7], "thing": "chest", "loot": "dragon_hoard"})
+	_check(not refused["ok"] and not unknown["ok"] and "supplies" in unknown["text"],
+			"a crate with a table, or a table that is not there: refused (%s / %s)" % [refused["text"], unknown["text"]])
+	Items.reset()
 
 func _test_icons() -> void:
 	print("\n== icons: framed from the game's angle; headless, names only ==")

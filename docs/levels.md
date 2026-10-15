@@ -147,12 +147,22 @@ All of it is optional.
 - `starts`: the order the start markers are taken in; start markers not
   listed come after, in reading order (rows top to bottom, then left to
   right).
+- `loot`: a loot table for every chest or monster without its own
+  (below): `{"chest": "supplies", "monster": "pockets", "brute":
+  "armoury"}`, a monster kind's own key first; `"monster"` leaves wild
+  animals out.
 - `entities`: names, props (`mass`, `sight_range`, `body_material` as
   `"stone"` / `"wood"` / `"flesh"`, a chest's `slots` as item ids:
   `["bandaging_kit", "", "", ""]`) and tints for the markers at those
   cells, which are spawned first, in this order (the order is the entity
   id order, and a server's snapshot finds its entities by their slots).
   Other markers follow in reading order, named by kind: `Crate1`, `Imp2`.
+  A chest's or a monster's entry may name a loot table, `"loot":
+  "supplies"` (levels/loot.json; decision 330): rolled as the level is
+  built, by the level's name and the cell, so the same each time, a
+  chest's empty slots filled, a monster carrying up to 4 things, which it
+  drops where it falls. It leaves the spawn order as it was; the
+  builder's `place` tool takes `loot` the same way.
   A monster's entry may also say which way it faces, `"facing": [dx, dy]`
   (each -1, 0 or 1; without one it faces a way of its own, from its name),
   and how it idles with nobody in sight, `"idle"`: a mode, or the mode

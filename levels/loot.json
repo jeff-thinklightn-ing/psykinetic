@@ -1,0 +1,23 @@
+{
+	"_about": "Loot tables (Items.loot_tables, decision 330): name -> rows, each {item: a catalog id, count: [least, most], chance: 0 to 1, 1 if left out}. A level's entity entry names one with \"loot\" (a chest fills its empty slots, a monster carries what it gives and drops it where it falls); level.json \"loot\": {\"chest\": table, \"monster\": table, \"<monster kind>\": table} names one for every chest or monster without its own. Rolled once as the level is built, by the level's name and the cell, so the same every time. No damage tiers, no rarity: a table says what is likely to be there, not how good it is.",
+	"tables": {
+		"supplies": [
+			{"item": "ration", "count": [1, 2], "chance": 0.6},
+			{"item": "bandaging_kit", "chance": 0.3},
+			{"item": "coin_purse", "chance": 0.5},
+			{"item": "food_sack", "chance": 0.2}
+		],
+		"armoury": [
+			{"item": "sword", "chance": 0.3},
+			{"item": "shield", "chance": 0.3},
+			{"item": "spear", "chance": 0.2},
+			{"item": "dagger", "chance": 0.3},
+			{"item": "bow", "chance": 0.2}
+		],
+		"pockets": [
+			{"item": "coin_purse", "chance": 0.3},
+			{"item": "ration", "chance": 0.2},
+			{"item": "dagger", "chance": 0.1}
+		]
+	}
+}

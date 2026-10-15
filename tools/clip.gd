@@ -38,6 +38,10 @@ extends Node
 ##   items_controls: the right button as the off hand (decision 329): a
 ##     shield raised while held ("shield raised"), E opening a chest, a bow
 ##     from it drawn ("bow drawn 50%") and let go at the imp.
+##   items_loot: loot tables (decision 330): the level names "supplies"
+##     for its chest and "armoury" for its brutes; the chest opened, stocked
+##     from its table; the brute, carrying what its table gave, fought and
+##     beaten, drops it where it falls.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -131,6 +135,8 @@ func _ready() -> void:
 			_items_weapons()
 		"items_controls":
 			_items_controls()
+		"items_loot":
+			_items_loot()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -422,6 +428,29 @@ func _items_controls() -> void:
 		["wait", 25, ""],
 		["item_lower", Vector2i(7, 3), "Let go: loosed at the imp (what it does in a fight comes with combat)."],
 		["wait", 25, ""],
+	]
+
+
+func _items_loot() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(3, 1): "chest", Vector2i(6, 2): "monster_brute"}
+	var config := {"name": "Clip", "ambient": 0.9, "loot": {"chest": "supplies", "brute": "armoury"},
+		"entities": [{"at": [6, 2], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["walk", Vector2i(3, 2), "Loot tables: this level names \"supplies\" for chests, \"armoury\" for brutes."],
+		["item_open", true, "The chest, stocked from its table as the level was built."],
+		["wait", 30, ""],
+		["item_open", false, "The brute carries what its table gave it."],
+		["walk", "beside the monster", ""],
+		["brawl", 260, ""],
+		["wait", 40, "Beaten, it drops what it carried where it fell."],
 	]
 
 
@@ -971,6 +1000,13 @@ func _log(tick: int) -> void:
 		for i in _player.slots.size():
 			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
 		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
+		return
+	if scenario == "items_loot":
+		var lying := []
+		for cell: Vector2i in World.zone.ground:
+			lying.append([cell, World.ground_at(cell)])
+		print("[clip] tick %d: player %s; %s; ground %s" % [tick, _player.tile,
+			"%s at %s carries %s" % [_monster.name, _monster.tile, _monster.slots] if is_instance_valid(_monster) else "the brute fallen", lying])
 		return
 	if scenario == "items":
 		print("[clip] tick %d: player %s mass %.1f hands %s; ground %s (%d piles, %d drawn); %s hp %d%s" % [tick, _player.tile, _player.mass,

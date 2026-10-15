@@ -6215,3 +6215,37 @@ Rejected: a Resident as a Companion (Main's and World's companion paths
 would all have to tell them apart); saving bodies (two truths about where
 a resident is); homes marked in the wilds' level.json (content in a real
 level, Jeff's call).
+
+## 330. Loot: tables as data, named by a level or the builder; monsters drop what they carried
+
+Jeff's items step 6, as mechanism only (2026-10-15, through the
+coordinator): no table is placed in a real level until he says. A loot
+table is data, levels/loot.json: a name and rows, each a catalog id, a
+count [least, most] and a chance (Items.loot_tables, read_loot, which
+leaves out a row naming no known thing and keeps counts and chances
+sane). The row format is the one levels/monsters.json's animal "drops"
+already use (decision 318), with a chance added. Three plain tables ship
+(supplies, armoury, pockets) for builders to name. No tiers, no rarity:
+a table says what is likely to be in a place, not how good it is.
+
+A level names one per entity, an entry's "loot", or for every chest or
+monster without its own, level.json's "loot" {"chest", "monster",
+"<monster kind>"} ("monster" leaves wild animals out: an animal's remains
+are decision 318's). The builder's place tool takes "loot" for a chest or
+a monster and refuses an unknown table. Level._stock rolls it as the level
+is built (Items.roll_loot), seeded by the level's name and the cell
+(through sha256: the plain string hashes of neighbouring cells are near
+each other, and Godot's generator rolled them alike), so a
+level built twice (a reset, a restart, another peer) is stocked the same:
+a chest's empty slots are filled, its own items kept (a depot or a shop
+counter takes none); a monster carries up to Level.MONSTER_CARRIES (4) in
+its slots, server side, minted lazily like a chest's (World.slot_uid).
+Rolling at build rather than at first open keeps the roll in the level's
+data path, where the editor, snapshots and the builder already look, and
+needs no new state.
+
+At death World.damage empties a monster's slots (empty_container) and puts
+them on the ground where it fell, with its remains (Monster.remains).
+Not done: a carried thing's weight on the monster, monsters picking things
+up, and a raid's took carried as things (Raids keeps it as uids). The
+entity entry key "loot" is orderless: naming a table does not rename.

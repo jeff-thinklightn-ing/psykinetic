@@ -348,7 +348,7 @@ const TOOLS := [
 		"input_schema": {"type": "object", "properties": {"rect": _RECT,
 			"gate": {"type": "string", "enum": ["north", "east", "south", "west", "none"]}},
 			"required": ["rect"]}},
-	{"name": "place", "description": "Puts a thing on a cell (its ground stays), with its settings: a monster's facing and idling, a chest's items, a name.",
+	{"name": "place", "description": "Puts a thing on a cell (its ground stays), with its settings: a monster's facing and idling, a chest's items, a loot table for a chest or a monster, a name.",
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL,
 			"thing": {"type": "string", "enum": ["imp", "brute", "sneak", "crate", "boulder", "cart", "chest", "torch", "lantern"]},
@@ -361,6 +361,7 @@ const TOOLS := [
 				"loop": {"type": "boolean"},
 				"point": _CELL}, "required": ["mode"]},
 			"items": {"type": "array", "items": {"type": "string"}, "maxItems": 4, "description": "a chest's items, by id"},
+			"loot": {"type": "string", "description": "a chest or a monster: a loot table by name (levels/loot.json), rolled as the level is built: a chest's empty slots filled, a monster carrying it and dropping it where it falls"},
 			"use": {"type": "string", "enum": ["depot", "shop"], "description": "a chest only: the town's depot (what is put in is banked) or shop counter (players buy and sell); inside the town's store, and given no items"}},
 			"required": ["at", "thing"]}},
 	{"name": "stamp", "description": "Stamps a prefab with its top-left at a cell, turned 0-3 quarter turns clockwise. Its void cells leave the map as it was.",
@@ -733,6 +734,13 @@ func _place(given: Dictionary) -> Dictionary:
 		if not unknown.is_empty():
 			return _no("no items %s (there are: %s)" % [unknown, ", ".join(Items.ids())])
 		entry["props"] = {"slots": Array(slots)}
+	if given.has("loot"):
+		var table := str(given["loot"])
+		if not (meaning == "chest" or meaning.begins_with("monster_")) or given.has("use"):
+			return _no("loot is for a monster or a chest (not a depot or a shop counter)")
+		if not Items.has_loot(table):
+			return _no("no loot table %s (there are: %s)" % [table, ", ".join(Items.loot_tables().keys())])
+		entry["loot"] = table
 	var changes := {"cells": {at: meaning}, "covers": [at]}
 	if entry.size() > 1:
 		changes["entries"] = [entry]
