@@ -23,6 +23,10 @@ extends Node
 ##     imp on guard. The player takes the kit into a hand, puts it down (G),
 ##     picks it up (F), throws it across the room (T), then throws the sack
 ##     at the imp, who staggers; the pack (I) is open throughout.
+##   sounds: the sound slots heard in play (SoundKit): the player walks
+##     (footsteps), opens a chest, opens a door into the next room and
+##     fights the imp there to its death; each caption names the slot it
+##     plays, and the log every sound played.
 
 const NAME := "clip"
 
@@ -41,6 +45,10 @@ var _caption: Label
 var _end_tick := -1
 ## The lure has the monster after the player.
 var _lured := false
+## Sounds already logged (the sounds scenario).
+var _sounds_logged := 0
+## The tick a "fight" step gives up by.
+var _fight_until := -1
 
 
 func _ready() -> void:
@@ -57,6 +65,8 @@ func _ready() -> void:
 			_leash()
 		"items":
 			_items()
+		"sounds":
+			_sounds()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -70,7 +80,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario == "sneak":
+	if scenario == "sneak" or scenario == "sounds":
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	var layer := CanvasLayer.new()
@@ -98,7 +108,7 @@ func _ready() -> void:
 ## The camera on the middle of the player and the monster, so both are seen.
 func _process(delta: float) -> void:
 	var view: Node = _main._client3d if _main != null else null
-	if view == null or _player == null or _monster == null:
+	if view == null or _player == null or not is_instance_valid(_monster):
 		return
 	var at: Node3D = view._puppets.get(_player.get_instance_id())
 	var monster: Node3D = view._puppets.get(_monster.get_instance_id())
@@ -184,6 +194,9 @@ func _leash() -> void:
 		["say", 15, "An imp sees you."],
 		["lure", [Vector2i(30, 2), 3], "You keep just ahead of it..."],
 		["say", 80, "...too far from its post: it gives up, you in plain sight."],
+	]
+
+
 func _items() -> void:
 	var rows: Array[String] = [
 		"#############",
@@ -217,6 +230,42 @@ func _items() -> void:
 		["walk", "beside the monster", "Up to the imp."],
 		["key", ["throw", "the monster"], "T: thrown at the imp: it staggers."],
 		["wait", 60, ""],
+	]
+
+
+## Two rooms with a door between, a chest in the first, an imp on guard in
+## the second.
+func _sounds() -> void:
+	var cells: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var rows := Terrain.expand(cells)
+	# The wall between cells x 5 and 6 (pixel 11), a door in it on row 3.
+	for y in range(1, rows.size() - 1):
+		rows[y] = rows[y].substr(0, 11) + ("+" if y == 6 else "#") + rows[y].substr(12)
+	var markers := {Vector2i(1, 3): "start", Vector2i(3, 1): "chest", Vector2i(10, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [3, 1], "props": {"slots": ["bandaging_kit", "", "", ""]}},
+			{"at": [10, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(rows, markers, config), null, config)
+	_script = [
+		["say", 30, "Every sound is a named slot: today's take, or a placeholder."],
+		["walk", Vector2i(3, 2), "Footsteps: sfx.footstep, heard 3 cells (a monster's hearing)."],
+		["open", true, "A chest: sfx.chest_open."],
+		["wait", 30, ""],
+		["open", false, ""],
+		["walk", Vector2i(5, 3), "To the door."],
+		["door", true, "A door: sfx.door_wood_open, heard 6 cells."],
+		["wait", 25, ""],
+		["walk", "beside the monster", "Into the next room."],
+		["fight", 400, "A fight: sfx.swing, sfx.hit_flesh, heard 5 cells."],
+		["say", 60, "Its death: sfx.goblin_death."],
 	]
 
 
@@ -255,6 +304,20 @@ func _on_tick(tick: int) -> void:
 			if cell != null:
 				args["cell"] = [cell.x, cell.y]
 			World.command(_player, str(step[1][0]), args)
+		"door":
+			var door: Door = World.get_doors()[0]
+			if door.open != bool(step[1]):
+				World.try_toggle_door(_player, door.key)
+		"fight":
+			if is_instance_valid(_monster) and _monster.hp > 0:
+				if _fight_until < 0:
+					_fight_until = tick + int(step[1])
+				if tick < _fight_until:
+					if World.distance(_player.tile, _monster.tile) > 1:
+						_walk(_beside_monster())
+					else:
+						World.order_attack(_player, _monster)
+					return
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -299,6 +362,16 @@ func _chest() -> Chest:
 
 
 func _log(tick: int) -> void:
+	if scenario == "sounds":
+		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
+		if sfx != null:
+			for entry: Array in sfx.played.slice(_sounds_logged):
+				print("[clip] tick %d: played %s (%s)" % [tick, entry[0], str(entry[1]).get_file() if entry[1] != "" else "placeholder"])
+			_sounds_logged = sfx.played.size()
+		if tick % 30 == 0:
+			print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp,
+				"%s at %s hp %d %s" % [_monster.name, _monster.tile, _monster.hp, Monster.Alert.keys()[_monster.alert]] if is_instance_valid(_monster) else "monster gone"])
+		return
 	if scenario == "items":
 		print("[clip] tick %d: player %s mass %.1f hands %s; ground %s (%d piles, %d drawn); %s hp %d%s" % [tick, _player.tile, _player.mass,
 			[_player.slots[Player.RIGHT_HAND], _player.slots[Player.LEFT_HAND]], World.zone.ground.keys(), World.zone.piles.size(),

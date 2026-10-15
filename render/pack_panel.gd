@@ -8,7 +8,7 @@ extends PanelContainer
 ## comes back, so every peer shows the same. I shows and hides it (Main);
 ## opening a chest or a companion's pack shows it with that row. When an
 ## item lands in a row on show, sound plays there what that container
-## sounds like opening ("chest_open", a thud; "pack_open", leather), once a
+## sounds like opening (SoundKit.opening: a chest's thud, a crate's, a pack's leather), once a
 ## frame. A player's or a companion's last two boxes are their hands
 ## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L.
 ## Sizes in the HUD's 3840 x 2160 units.
@@ -217,4 +217,4 @@ func _refresh() -> void:
 			box.label.text = Items.short_of(item) if not item.is_empty() else ""
 			box.label.add_theme_color_override("font_color", Items.color_of(item))
 	if landed != null and sound.is_valid():
-		sound.call("chest_open" if landed is Chest else "pack_open", landed)
+		sound.call(SoundKit.opening(landed), landed)

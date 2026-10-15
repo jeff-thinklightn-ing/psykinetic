@@ -4091,3 +4091,34 @@ code). A fact without a status takes its entry's. Code uses a fact only when
 it and its entry are both agreed, so drafts and open questions can sit in the
 files without reaching a prompt. How a companion's prompt takes the facts is
 the companions tree's business.
+
+## 267. Every sound is a named slot, played from its takes, a fill, a fallback or a blip
+
+Jeff's sound brief asks for sound slots like art's: everything the game
+plays, or soon will, named by what it is for (sfx.door_wood_open,
+sfx.footstep_grass_medium, amb.forest_night, ui.click), with where each
+take came from, and a list of slots still on placeholder. The slots are
+art/audio/slots.json, read by SoundKit (client3d/sound_kit.gd) the way
+ArtKit reads art/kit/slots.json; Sfx now plays slots, not its own table of
+file sets. A slot plays its own takes (art/audio/<category>/<slot>/,
+<slot>.ogg, <slot>.2.ogg ...), else its fill (Kenney's two CC0 packs, the
+files already in art/audio/sfx/, left where they are), else its fallback,
+another slot (a footstep on grass sounds as the generic footstep until it
+has takes), else a short generated blip, its pitch by bus, so a gap is
+heard and not mistaken for a sound; a bed with nothing plays silence.
+tools/sound_status.gd writes docs/sound_status.md and THIRD_PARTY.md's
+sound block, and sound_kit_test fails while either is stale.
+
+Each positional slot names the sim's noise kind it goes with (World.noise:
+step, fight, door, ...), and how far it carries comes from that kind's
+radius (SoundKit.NOISES, Senses' own constants, plus thud, rummage, break,
+latch and door_rattle as enemy-ai agreed them, until Senses has them): the
+one number sets how far monsters and players hear it, so they can't drift.
+A slot monsters don't hear (goblin chatter, picking an item up) says
+"noise": null and gives a range; the status lists them. UI and ambience
+beds are flat (positional false). Playback still uses Sfx's fixed
+distance; matching the falloff to the radius is the next step (269).
+Rejected: renaming Kenney's files into slot folders (churn, and their
+SOURCES.txt already names each original), slots as a GDScript table
+(the tools, the status and the art side all read JSON), and silence for
+an empty slot (a missing sound goes unnoticed).

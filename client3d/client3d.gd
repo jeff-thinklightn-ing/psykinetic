@@ -493,6 +493,8 @@ const MOURN_RETURN_SECONDS := 0.5
 ## A swing's pitch: lighter bodies swing higher.
 const SWING_PITCH_LIGHT := 1.2
 const SWING_PITCH_HEAVY := 0.85
+## A death's sound slot by the kind of body that fell (a monster's otherwise).
+const DEATH_SOUNDS := {"monster": "sfx.goblin_death", "player": "sfx.death_player", "companion": "sfx.death_companion"}
 ## A swing pushes the body this far out toward the blow, and back.
 const LUNGE := 0.3
 const LUNGE_SECONDS := 0.16
@@ -1623,10 +1625,10 @@ func _marking_copy(material: Material) -> Material:
 
 ## The toss aim during a right drag: an arrow on the floor from
 ## [param target] the way it will go; hidden for ZERO or no target.
-## Sound [param set_name] from where [param entity] is drawn (Sfx).
-func play_at(set_name: String, entity: GridEntity) -> void:
+## Sound slot [param slot] from where [param entity] is drawn (Sfx).
+func play_at(slot: String, entity: GridEntity) -> void:
 	var puppet: Node3D = _puppets.get(entity.get_instance_id())
-	sfx.play(set_name, (puppet.position if puppet != null else _tile_position(entity.tile)) + Vector3.UP * 0.5)
+	sfx.play(slot,(puppet.position if puppet != null else _tile_position(entity.tile)) + Vector3.UP * 0.5)
 
 
 func toss_aim(target: GridEntity, direction: Vector2i) -> void:
@@ -3701,7 +3703,7 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 	var last: Vector2i = _last_tile.get(id, entity.tile)
 	_last_tile[id] = entity.tile
 	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
-		sfx.play("footstep", puppet.position)
+		sfx.play("sfx.footstep", puppet.position)
 
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own
@@ -3712,7 +3714,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	if puppet != null and cause != &"impact":
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))  # An impact is shown by _on_impacted.
 	if puppet != null and cause == &"attack":
-		sfx.play("hit", puppet.position + Vector3.UP * 0.8)
+		sfx.play("sfx.hit_flesh", puppet.position + Vector3.UP * 0.8)
 
 
 ## Pushed [param tiles]: a model is knocked back (_animate), a backpedal or,
@@ -3754,12 +3756,12 @@ func _on_impacted(_amount: int, against: StringName, id: int) -> void:
 	var at := puppet.position + Vector3.UP * 0.6
 	match against:
 		&"stone":
-			sfx.play("impact_stone", at)
+			sfx.play("sfx.knockback_stone", at)
 		&"wood":
-			sfx.play("impact_wood", at)
+			sfx.play("sfx.knockback_wood", at)
 		&"body":
-			sfx.play("impact_body", at)
-			sfx.play("impact_body_soft", at)
+			sfx.play("sfx.knockback_body", at)
+			sfx.play("sfx.knockback_body_soft", at)
 
 
 ## The server's "death" message: the puppet falls now if its entity has
@@ -3769,7 +3771,7 @@ func on_death(data: Dictionary) -> void:
 	if str(data.get("kind", "")) == "object":
 		var tile: Variant = data.get("tile")
 		var at := Vector3(tile[0], 0.4, tile[1]) if tile is Array and tile.size() == 2 else _camera_target
-		sfx.play("break", at)
+		sfx.play("sfx.break_wood", at)
 		return
 	if _departed.has(entity_name):
 		_fall(_departed[entity_name]["puppet"], data)
@@ -3806,7 +3808,7 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 			puppet.remove_child(node)
 			node.queue_free()
 	var kind := str(data.get("kind", "monster"))
-	sfx.play("death_" + kind, puppet.position + Vector3.UP * 0.5)
+	sfx.play(DEATH_SOUNDS.get(kind, "sfx.goblin_death"), puppet.position + Vector3.UP * 0.5)
 	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
 	if lantern != null:
 		lantern.reparent(self)
@@ -4281,7 +4283,7 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var swinger := instance_from_id(id) as GridEntity
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
-	sfx.play("swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
+	sfx.play("sfx.swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
 		_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
 	var body := puppet.get_node("Body") as Node3D
@@ -4363,7 +4365,7 @@ func _sync_doors() -> void:
 		var hinge := doorway.get_node(DOOR_LEAF) as Node3D
 		var same_door: bool = _door_node.get(door.key, 0) == door.get_instance_id()
 		if same_door and _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
-			sfx.play("door_open" if door.is_open() else "door_close", doorway.position + Vector3.UP)
+			sfx.play("sfx.door_wood_open" if door.is_open() else "sfx.door_wood_close", doorway.position + Vector3.UP)
 		_door_open[door.key] = door.is_open()
 		_door_node[door.key] = door.get_instance_id()
 		hinge.visible = not door.is_broken()

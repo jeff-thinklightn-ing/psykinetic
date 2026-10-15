@@ -71,12 +71,12 @@ func _test_there_and_back() -> void:
 	_main.sounds.clear()
 	_main.toggle_pack()
 	await get_tree().process_frame
-	_check(panel.visible and _main.sounds == ["pack_open %s" % host.name], "and shows it again, with a rustle (%s)" % [_main.sounds])
+	_check(panel.visible and _main.sounds == ["sfx.pack_open %s" % host.name], "and shows it again, with a rustle (%s)" % [_main.sounds])
 	_check(World.can_melee(host.tile, chest.tile), "the host, at %s, is beside it" % host.tile)
 	_main.sounds.clear()
 	_main._open_pack(host, chest)
 	await get_tree().process_frame
-	_check(_main.sounds == ["chest_open Chest1"], "with the chest's creak (%s)" % [_main.sounds])
+	_check(_main.sounds == ["sfx.chest_open Chest1"], "with the chest's creak (%s)" % [_main.sounds])
 	_main._open_pack(host, chest)
 	_check(panel.other == null, "a second right click closes it")
 	_main._open_pack(host, chest)
@@ -90,7 +90,7 @@ func _test_there_and_back() -> void:
 			"dragged to the player's first slot: theirs now, the chest empty (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	await get_tree().process_frame
 	_check(panel.shown_in(true, 0) == "Bandages" and panel.shown_in(false, 0) == "", "the panel shows it moved")
-	_check(_main.sounds == ["pack_open %s" % host.name], "and it lands with the pack's leather, once (%s)" % [_main.sounds])
+	_check(_main.sounds == ["sfx.pack_open %s" % host.name], "and it lands with the pack's leather, once (%s)" % [_main.sounds])
 	await get_tree().process_frame
 	_check(_main.sounds.size() == 1, "once only (%s)" % [_main.sounds])
 	panel.drop(host, 0, host, 3)
@@ -98,7 +98,7 @@ func _test_there_and_back() -> void:
 	_main.sounds.clear()
 	panel.drop(host, 3, chest, 2)
 	await get_tree().process_frame
-	_check(_main.sounds == ["chest_open Chest1"], "into the chest, with the chest's thud (%s)" % [_main.sounds])
+	_check(_main.sounds == ["sfx.chest_open Chest1"], "into the chest, with the chest's thud (%s)" % [_main.sounds])
 	_check(Array(host.slots) == ["", "", "", "", "", ""] and Array(chest.slots) == ["", "", KIT, ""],
 			"and back into the chest, its third slot (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	World.try_transfer(host, chest, 2, chest, 0)
@@ -265,7 +265,7 @@ func _test_companion_pack() -> void:
 	_main._open_pack(host, pet)
 	var panel: PackPanel = _main.pack_panel
 	await get_tree().process_frame
-	_check("pack_open %s" % pet.name in _main.sounds, "with a sack's rustle (%s)" % [_main.sounds])
+	_check("sfx.pack_open %s" % pet.name in _main.sounds, "with a sack's rustle (%s)" % [_main.sounds])
 	_check(panel.other == pet and panel.title_shown(false) == "%s's Pack" % pet.name, "a right click on her opens %s's Pack" % pet.name)
 	var held := Array(host.slots).find(KIT)
 	panel.drop(host, held, pet, 0)

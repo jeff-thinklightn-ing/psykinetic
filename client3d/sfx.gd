@@ -1,29 +1,18 @@
 class_name Sfx
 extends Node3D
-## Spatial sound effects for the 3D view. Every sound is a named set of
-## files in art/audio/sfx/, named by purpose (swing_1.ogg, hit_3.ogg, ...;
-## SOURCES.txt there says which file of Kenney's CC0 packs each one is);
-## play() picks one of the set (never the same one twice running), varies
-## its pitch and volume a little so repeats do not machine-gun, and plays it
-## once from a point in the world on the SFX bus. Nothing here decides when
-## a sound plays: the view calls play() on events the server sent (see
+## Spatial sound effects for the 3D view. Every sound is a slot of
+## SoundKit (art/audio/slots.json: sfx.door_wood_open, sfx.hit_flesh, ...);
+## play() picks one of the slot's takes (never the same one twice running),
+## varies its pitch and volume a little so repeats do not machine-gun, and
+## plays it once from a point in the world on the SFX bus. A slot with no
+## takes plays its fallback's or a placeholder blip. Nothing here decides
+## when a sound plays: the view calls play() on events the server sent (see
 ## Client3D).
 ##
 ## Volumes come from settings.cfg: master_volume= (the Master bus) and
 ## sfx_volume= (the SFX bus), each 0..1.
 
-const PACK := "res://art/audio/sfx/"
 const BUS := "SFX"
-## Set name -> [volume in dB, how many files: <name>_1.ogg ... in PACK].
-const SET_SIZES := {
-	"swing": [-8.0, 4], "hit": [-2.0, 5], "impact_stone": [-2.0, 5], "impact_wood": [-2.0, 5],
-	"impact_body": [-2.0, 5], "impact_body_soft": [-6.0, 5], "break": [0.0, 5],
-	"death_monster": [0.0, 5], "death_player": [0.0, 5], "death_companion": [-2.0, 1],
-	"door_open": [-4.0, 2], "door_close": [-4.0, 4], "footstep": [-16.0, 5],
-	"chest_open": [-4.0, 3], "pack_open": [2.0, 2],
-}
-## Set name -> [volume in dB, its files under PACK].
-var sets := _sets()
 ## Each play: pitch times 1 ± this, volume from -VOLUME_JITTER_DB to half
 ## that above.
 const PITCH_JITTER := 0.07
@@ -32,23 +21,12 @@ const VOLUME_JITTER_DB := 2.0
 const UNIT_SIZE := 5.0
 const MAX_DISTANCE := 30.0
 
-## Set name -> its streams, loaded on first use; files that are missing
-## are left out (warned once).
+## Slot -> its streams, loaded on first use.
 var _loaded: Dictionary[String, Array] = {}
-## Set name -> the index played last.
+## Slot -> the index played last.
 var _last: Dictionary[String, int] = {}
-## Plays made, for tests: [set name, file] each.
+## Plays made, for tests: [slot, file ("" for the placeholder)] each.
 var played: Array[Array] = []
-
-
-static func _sets() -> Dictionary:
-	var out := {}
-	for set_name: String in SET_SIZES:
-		var files: Array[String] = []
-		for i in range(1, int(SET_SIZES[set_name][1]) + 1):
-			files.append("%s_%d.ogg" % [set_name, i])
-		out[set_name] = [SET_SIZES[set_name][0], files]
-	return out
 
 
 func _ready() -> void:
@@ -72,40 +50,41 @@ static func _set_bus_volume(index: int, linear: float) -> void:
 	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(linear, 0.0001)))
 
 
-## One sound from [param set_name] at [param at], [param pitch] times the
-## set's own (before the jitter), [param volume_db] on top of its volume.
-func play(set_name: String, at: Vector3, pitch := 1.0, volume_db := 0.0) -> void:
-	var streams := _streams(set_name)
+## One sound of [param slot] at [param at], [param pitch] times its own
+## (before the jitter), [param volume_db] on top of the slot's volume.
+func play(slot: String, at: Vector3, pitch := 1.0, volume_db := 0.0) -> void:
+	if not SoundKit.has(slot):
+		push_warning("[sfx] no sound slot %s" % slot)
+		return
+	var streams := _streams(slot)
 	if streams.is_empty():
 		return
 	var index := randi() % streams.size()
-	if streams.size() > 1 and index == _last.get(set_name, -1):
+	if streams.size() > 1 and index == _last.get(slot, -1):
 		index = (index + 1) % streams.size()
-	_last[set_name] = index
+	_last[slot] = index
 	var player := AudioStreamPlayer3D.new()
 	player.stream = streams[index]
 	player.bus = BUS
 	player.unit_size = UNIT_SIZE
 	player.max_distance = MAX_DISTANCE
 	player.pitch_scale = pitch * randf_range(1.0 - PITCH_JITTER, 1.0 + PITCH_JITTER)
-	player.volume_db = sets[set_name][0] + volume_db + randf_range(-VOLUME_JITTER_DB, VOLUME_JITTER_DB * 0.5)
+	player.volume_db = SoundKit.volume_db(slot) + volume_db + randf_range(-VOLUME_JITTER_DB, VOLUME_JITTER_DB * 0.5)
 	player.position = at
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
-	played.append([set_name, (streams[index] as AudioStream).resource_path])
+	played.append([slot, (streams[index] as AudioStream).resource_path])
 
 
-func _streams(set_name: String) -> Array:
-	if _loaded.has(set_name):
-		return _loaded[set_name]
+## [param slot]'s takes, or its placeholder alone (none for a bed's).
+func _streams(slot: String) -> Array:
+	if _loaded.has(slot):
+		return _loaded[slot]
 	var streams: Array = []
-	if sets.has(set_name):
-		for file: String in sets[set_name][1]:
-			var path := PACK + file
-			if ResourceLoader.exists(path):
-				streams.append(load(path))
-			else:
-				push_warning("[sfx] %s: %s is missing" % [set_name, path])
-	_loaded[set_name] = streams
+	for path: String in SoundKit.files(slot):
+		streams.append(load(path))
+	if streams.is_empty() and SoundKit.placeholder(SoundKit.bus(slot)) != null:
+		streams.append(SoundKit.placeholder(SoundKit.bus(slot)))
+	_loaded[slot] = streams
 	return streams

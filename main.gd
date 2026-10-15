@@ -2576,7 +2576,7 @@ func toggle_pack() -> void:
 		return
 	pack_panel.shown = not pack_panel.shown
 	if pack_panel.shown and _local_player() != null:
-		_sound("pack_open", _local_player())
+		_sound("sfx.pack_open", _local_player())
 
 
 ## A right click on a chest, or on the player's own companion: open it
@@ -2624,7 +2624,7 @@ func open_other(target: GridEntity) -> void:
 	_pack_wanted = null
 	if pack_panel != null:
 		if pack_panel.other != target:
-			_sound("chest_open" if target is Chest else "pack_open", target)
+			_sound(SoundKit.opening(target), target)
 		pack_panel.open(target)
 
 
@@ -2651,11 +2651,12 @@ func _update_pack() -> void:
 		close_other()
 
 
-## A sound from [param entity], in the 3D view (the 2D one has none).
-func _sound(set_name: String, entity: GridEntity) -> void:
-	sounds.append("%s %s" % [set_name, entity.name])
+## Sound slot [param slot] from [param entity], in the 3D view (the 2D one
+## has none).
+func _sound(slot: String, entity: GridEntity) -> void:
+	sounds.append("%s %s" % [slot, entity.name])
 	if _client3d != null and is_instance_valid(entity) and DisplayServer.get_name() != "headless":
-		_client3d.play_at(set_name, entity)
+		_client3d.play_at(slot, entity)
 
 
 ## F, G or T ([param what]: pick_up, drop, throw): a command for the local

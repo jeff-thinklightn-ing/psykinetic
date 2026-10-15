@@ -74,12 +74,14 @@ func _test_piles() -> void:
 
 
 func _test_every_sound_has_its_files() -> void:
-	print("\n== every sound set has its files in art/audio ==")
-	for set_name: String in _rig.sfx.sets:
-		var files: Array = _rig.sfx.sets[set_name][1]
-		var streams := _rig.sfx._streams(set_name)
-		_check(streams.size() == files.size() and not streams.is_empty(),
-				"%s: %d of %d (%s)" % [set_name, streams.size(), files.size(), (files[0] as String).get_file()])
+	print("
+== every sound slot the view plays has takes of its own or a fill (not the placeholder) ==")
+	for slot: String in ["sfx.swing", "sfx.hit_flesh", "sfx.knockback_stone", "sfx.knockback_wood", "sfx.knockback_body",
+			"sfx.knockback_body_soft", "sfx.break_wood", "sfx.goblin_death", "sfx.death_player", "sfx.death_companion",
+			"sfx.door_wood_open", "sfx.door_wood_close", "sfx.footstep", "sfx.chest_open", "sfx.pack_open"]:
+		var streams := _rig.sfx._streams(slot)
+		_check(not streams.is_empty() and (streams[0] as AudioStream).resource_path != "",
+				"%s: %d takes (%s)" % [slot, streams.size(), (streams[0] as AudioStream).resource_path.get_file() if not streams.is_empty() else "none"])
 
 
 func _test_hp_bars() -> void:
@@ -135,18 +137,18 @@ func _test_sounds_follow_events() -> void:
 	var player := _player()
 	var imp := _spawn_imp(Vector2i(9, 4))
 	_rig._process(0.0)
-	_check(_heard(func() -> void: player._world_swung(Vector2i(1, 0))) == ["swing"], "a swing: a whoosh")
-	_check(_heard(func() -> void: World.damage(imp, 1, player, &"attack")) == ["hit"], "a blow: a thud on flesh")
-	_check(_heard(func() -> void: World._impact(imp, 1, player, &"stone")) == ["impact_stone"], "into a wall: stone")
-	_check(_heard(func() -> void: World._impact(imp, 1, player, &"wood")) == ["impact_wood"], "into a door or crate: wood")
-	_check(_heard(func() -> void: World._impact(imp, 1, player, &"body")) == ["impact_body", "impact_body_soft"],
+	_check(_heard(func() -> void: player._world_swung(Vector2i(1, 0))) == ["sfx.swing"], "a swing: a whoosh")
+	_check(_heard(func() -> void: World.damage(imp, 1, player, &"attack")) == ["sfx.hit_flesh"], "a blow: a thud on flesh")
+	_check(_heard(func() -> void: World._impact(imp, 1, player, &"stone")) == ["sfx.knockback_stone"], "into a wall: stone")
+	_check(_heard(func() -> void: World._impact(imp, 1, player, &"wood")) == ["sfx.knockback_wood"], "into a door or crate: wood")
+	_check(_heard(func() -> void: World._impact(imp, 1, player, &"body")) == ["sfx.knockback_body", "sfx.knockback_body_soft"],
 			"into another body: a thud, and a softer one")
 	_check(_heard(func() -> void: World.damage(imp, 1, null, &"fire")).is_empty(), "fire: nothing yet (no fire sounds in the packs)")
 	var door: Door = World.get_doors()[0]
 	_rig._process(0.0)
 	_check(_heard(func() -> void: World._set_door(door, not door.open, player); _rig._process(0.0)) == [
-			"door_open" if door.open else "door_close"], "a door: open or close, as it went")
-	_check(_heard(func() -> void: World._relocate(imp, imp.tile + Vector2i(0, 1)); _rig._process(0.0)) == ["footstep"],
+			"sfx.door_wood_open" if door.open else "sfx.door_wood_close"], "a door: open or close, as it went")
+	_check(_heard(func() -> void: World._relocate(imp, imp.tile + Vector2i(0, 1)); _rig._process(0.0)) == ["sfx.footstep"],
 			"a creature's tile moves on: a footstep")
 	var pitch_light := _swing_pitch(imp)
 	var pitch_heavy := _swing_pitch(player)
@@ -162,7 +164,7 @@ func _test_monster_death() -> void:
 	_rig._process(0.0)
 	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
 	var heard := _heard(func() -> void: World.damage(imp, 999, player, &"attack"); _rig._process(0.0))
-	_check("death_monster" in heard, "a death sound (%s)" % [heard])
+	_check("sfx.goblin_death" in heard, "a death sound (%s)" % [heard])
 	_check(World.is_free(Vector2i(9, 4)), "its tile is free at once: a corpse never blocks")
 	_check(is_instance_valid(puppet) and puppet.has_meta("corpse") and puppet.get_node_or_null("Pick") == null,
 			"its puppet is a corpse, with nothing to pick")
@@ -206,7 +208,7 @@ func _test_companion_death() -> void:
 	var puppet: Node3D = _rig._puppets[pet.get_instance_id()]
 	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
 	var heard := _heard(func() -> void: World.damage(pet, 999, null, &"attack"); _rig._process(0.0))
-	_check("death_companion" in heard, "her death sound (%s)" % [heard])
+	_check("sfx.death_companion" in heard, "her death sound (%s)" % [heard])
 	var words: String = _main.bubbles.text_of(puppet.get_instance_id())
 	_check(words in Main.COMPANION_DEATH_LINES, "a last line, in a bubble over her body: %s" % words)
 	_check(lantern != null and lantern.get_parent() == _rig, "her lantern is dropped, off the body")

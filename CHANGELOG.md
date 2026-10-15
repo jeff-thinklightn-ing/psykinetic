@@ -9,6 +9,11 @@ top section as the release notes.
 - Companions can hand you what they carry, and fetch something from a
   chest they can see and bring it to you ("I'll get you the bandages
   from the chest").
+- Behind the scenes, every sound now has a name and a place: a list of
+  91 sounds the game plays or soon will (footsteps by ground and body,
+  hits by weapon, doors, chests, items, goblins, voices, menus, ambience),
+  each playing today's sound where there is one. A sound not made yet
+  plays a short blip instead, so gaps are easy to hear.
 - Companions can do what you ask, and now say they will only when they
   can: open or shut a door they can see, look in a chest and tell you
   what is in it, or go and look at a dark or hidden spot nearby and come

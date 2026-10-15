@@ -20,12 +20,28 @@ Slots whose own art came from someone else: none.
 
 <!-- end of art slots -->
 
+## Sound slots
+
+The sounds are sound slots (`art/audio/slots.json`, decision 267): each records where its
+takes came from. The block below is written from it by `tools/sound_status.gd`, which also
+writes `docs/sound_status.md`; `sound_kit_test` fails while either is out of date. Kenney's
+files are copied unchanged and renamed; `art/audio/sfx/SOURCES.txt` names each original.
+
+<!-- sound slots: written by tools/sound_status.gd from art/audio/slots.json; edit there -->
+
+| Source | Licence | Where | Slots played from it |
+|--------|---------|-------|----------------------|
+| [Impact Sounds 1.0, Kenney](https://kenney.nl/assets/impact-sounds) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-impact-sounds.txt`) | `art/audio/sfx/` | sfx.break_wood, sfx.death_player, sfx.footstep, sfx.goblin_death, sfx.hit_flesh, sfx.knockback_body, sfx.knockback_body_soft, sfx.knockback_stone, sfx.knockback_wood |
+| [RPG Audio, Kenney](https://kenney.nl/assets/rpg-audio) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-rpg-audio.txt`) | `art/audio/sfx/` | sfx.chest_open, sfx.death_companion, sfx.door_wood_close, sfx.door_wood_open, sfx.pack_open, sfx.swing |
+
+Slots whose own takes came from someone else: none.
+
+<!-- end of sound slots -->
+
 ## Other assets
 
 | Asset | By | Licence | Where | Notes |
 |-------|----|---------|-------|-------|
-| Impact Sounds 1.0 | Kenney | CC0 1.0 | `art/audio/sfx/LICENSE-kenney-impact-sounds.txt` | sound effects, copied unchanged; which file is which in `art/audio/sfx/SOURCES.txt` |
-| RPG Audio | Kenney | CC0 1.0 | `art/audio/sfx/LICENSE-kenney-rpg-audio.txt` | as above |
 | Universal Animation Library (Pro) | Quaternius | CC0 1.0 | `art/models/animations/LICENSE-quaternius-ual.txt` | the goblin's clips, retargeted (`art/models/SOURCES.txt`) |
 | Retro Textures Fantasy 1.0 | Kenney | CC0 1.0 | `art/kenney_retro-textures-fantasy/License.txt` | in the repo, not drawn by the game now |
 | Sonniss #GameAudioGDC bundles 2024 and 2021–23 | Sonniss | Sonniss GameAudioGDC Bundle licence v2.0, effective 2026-08-27: royalty-free, commercial use in our own projects; no redistributing the sounds as sounds, and no AI or machine-learning use | `docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt` | a source library for the game's sounds; the files stay outside the repo (`N:\assets\sound`), and only what the game uses goes into it, inside the game |

@@ -1,0 +1,931 @@
+{
+	"about": "The game's sound slots: everything the game plays, by name. Read by SoundKit (client3d/sound_kit.gd), which Sfx plays them through; tools/sound_status.gd writes docs/sound_status.md and THIRD_PARTY.md's sound block from it. A slot is played from, in order: its own takes in art/audio/<category>/<slot>/ (<slot>.ogg, <slot>.2.ogg ...; .wav too), named in 'source'; its fill, files of a third-party source (its 'path' + each of 'files'); its fallback, another slot; else a placeholder blip (a bed: silence). 'noise' is the sim's noise kind the sound goes with (World.noise; its radius is how far both monsters and players hear it); null means monsters do not hear it, and 'range' (cells) is how far players do. 'positional': false plays it flat (UI, beds). 'type' is oneshot, loop or bed; 'bus' is sfx, ambience, voice, ui or music.",
+	"version": 1,
+	"sources": {
+		"kenney-impact": {
+			"name": "Impact Sounds 1.0, Kenney",
+			"path": "res://art/audio/sfx/",
+			"license": "CC0 1.0",
+			"license_file": "art/audio/sfx/LICENSE-kenney-impact-sounds.txt",
+			"url": "https://kenney.nl/assets/impact-sounds",
+			"notes": "copied unchanged and renamed; art/audio/sfx/SOURCES.txt names each original"
+		},
+		"kenney-rpg": {
+			"name": "RPG Audio, Kenney",
+			"path": "res://art/audio/sfx/",
+			"license": "CC0 1.0",
+			"license_file": "art/audio/sfx/LICENSE-kenney-rpg-audio.txt",
+			"url": "https://kenney.nl/assets/rpg-audio",
+			"notes": "copied unchanged and renamed; art/audio/sfx/SOURCES.txt names each original"
+		}
+	},
+	"slots": {
+		"sfx.swing": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -8.0,
+			"uses": "any swing, pitched by the weapon's heft (Client3D._world_swung)",
+			"fill": {
+				"from": "kenney-rpg",
+				"files": [
+					"swing_1.ogg",
+					"swing_2.ogg",
+					"swing_3.ogg",
+					"swing_4.ogg"
+				]
+			}
+		},
+		"sfx.swing_heavy": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "a two-handed or heavy weapon's swing; not played yet",
+			"fallback": "sfx.swing"
+		},
+		"sfx.hit_flesh": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blow landing on a body, any weapon (Client3D._on_struck)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"hit_1.ogg",
+					"hit_2.ogg",
+					"hit_3.ogg",
+					"hit_4.ogg",
+					"hit_5.ogg"
+				]
+			}
+		},
+		"sfx.hit_blade_flesh": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blade blow on flesh; not played yet",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.hit_blade_armor": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blade blow on armor; not played yet",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.hit_blunt_flesh": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blunt blow on flesh; not played yet",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.hit_blunt_armor": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blunt blow on armor; not played yet",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.hit_fist_flesh": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a fist blow on flesh; not played yet",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.hit_wood": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blow on a door, crate or wooden prop; not played yet",
+			"fallback": "sfx.knockback_wood"
+		},
+		"sfx.hit_stone": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blow on stone; not played yet",
+			"fallback": "sfx.knockback_stone"
+		},
+		"sfx.block_shield": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blow taken on a shield; not played yet"
+		},
+		"sfx.block_weapon": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a blow parried with a weapon; not played yet"
+		},
+		"sfx.knockback_stone": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a body knocked into a wall (Client3D._on_impacted)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"impact_stone_1.ogg",
+					"impact_stone_2.ogg",
+					"impact_stone_3.ogg",
+					"impact_stone_4.ogg",
+					"impact_stone_5.ogg"
+				]
+			}
+		},
+		"sfx.knockback_wood": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a body knocked into a door or crate (Client3D._on_impacted)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"impact_wood_1.ogg",
+					"impact_wood_2.ogg",
+					"impact_wood_3.ogg",
+					"impact_wood_4.ogg",
+					"impact_wood_5.ogg"
+				]
+			}
+		},
+		"sfx.knockback_body": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "two bodies knocked together, the thump (Client3D._on_impacted)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"impact_body_1.ogg",
+					"impact_body_2.ogg",
+					"impact_body_3.ogg",
+					"impact_body_4.ogg",
+					"impact_body_5.ogg"
+				]
+			}
+		},
+		"sfx.knockback_body_soft": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "two bodies knocked together, the soft layer under the thump (Client3D._on_impacted)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"impact_body_soft_1.ogg",
+					"impact_body_soft_2.ogg",
+					"impact_body_soft_3.ogg",
+					"impact_body_soft_4.ogg",
+					"impact_body_soft_5.ogg"
+				]
+			}
+		},
+		"sfx.knockdown": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a body knocked off its feet; not played yet",
+			"fallback": "sfx.bodyfall"
+		},
+		"sfx.break_wood": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "break",
+			"volume_db": 0.0,
+			"uses": "a wooden object broken: crate, barrel, door leaf (Client3D.on_death of an object)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"break_1.ogg",
+					"break_2.ogg",
+					"break_3.ogg",
+					"break_4.ogg",
+					"break_5.ogg"
+				]
+			}
+		},
+		"sfx.break_stone": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "break",
+			"volume_db": 0.0,
+			"uses": "a stone object broken; not played yet"
+		},
+		"sfx.footstep": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a footstep on any ground, until the per-surface slots are filled (Client3D._step_sound)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"footstep_1.ogg",
+					"footstep_2.ogg",
+					"footstep_3.ogg",
+					"footstep_4.ogg",
+					"footstep_5.ogg"
+				]
+			}
+		},
+		"sfx.footstep_grass_small": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a small body's footstep on grass; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_grass_medium": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a medium body's footstep on grass; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_grass_large": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a large body's footstep on grass; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_dirt_small": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a small body's footstep on dirt; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_dirt_medium": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a medium body's footstep on dirt; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_dirt_large": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a large body's footstep on dirt; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_stone_small": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a small body's footstep on stone; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_stone_medium": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a medium body's footstep on stone; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_stone_large": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a large body's footstep on stone; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_sand_small": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a small body's footstep on sand; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_sand_medium": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a medium body's footstep on sand; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_sand_large": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a large body's footstep on sand; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_water_small": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a small body's footstep on water; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_water_medium": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a medium body's footstep on water; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.footstep_water_large": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -16.0,
+			"uses": "a large body's footstep on water; not played yet",
+			"fallback": "sfx.footstep"
+		},
+		"sfx.bodyfall": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -4.0,
+			"uses": "a body hitting the ground; not played yet",
+			"fallback": "sfx.knockback_body_soft"
+		},
+		"sfx.splash": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 4,
+			"volume_db": 0.0,
+			"uses": "a body or thing falling into water; not played yet"
+		},
+		"sfx.door_wood_open": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door",
+			"volume_db": -4.0,
+			"uses": "a door opening (Client3D, the door's state)",
+			"fill": {
+				"from": "kenney-rpg",
+				"files": [
+					"door_open_1.ogg",
+					"door_open_2.ogg"
+				]
+			}
+		},
+		"sfx.door_wood_close": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door",
+			"volume_db": -4.0,
+			"uses": "a door shutting (Client3D, the door's state)",
+			"fill": {
+				"from": "kenney-rpg",
+				"files": [
+					"door_close_1.ogg",
+					"door_close_2.ogg",
+					"door_close_3.ogg",
+					"door_close_4.ogg"
+				]
+			}
+		},
+		"sfx.door_wood_lock": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "latch",
+			"volume_db": -6.0,
+			"uses": "a door locked; not played yet"
+		},
+		"sfx.door_wood_unlock": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "latch",
+			"volume_db": -6.0,
+			"uses": "a door unlocked; not played yet"
+		},
+		"sfx.door_wood_bar": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "latch",
+			"volume_db": -6.0,
+			"uses": "a door barred; not played yet"
+		},
+		"sfx.door_wood_unbar": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "latch",
+			"volume_db": -6.0,
+			"uses": "a door unbarred; not played yet"
+		},
+		"sfx.door_wood_rattle": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door_rattle",
+			"volume_db": -4.0,
+			"uses": "someone trying a locked or barred door; not played yet"
+		},
+		"sfx.door_wood_struck": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door_struck",
+			"volume_db": 0.0,
+			"uses": "a door struck by a blow; not played yet",
+			"fallback": "sfx.hit_wood"
+		},
+		"sfx.door_wood_break": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door_broken",
+			"volume_db": 0.0,
+			"uses": "a door broken down; not played yet",
+			"fallback": "sfx.break_wood"
+		},
+		"sfx.chest_open": {
+			"category": "props",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "rummage",
+			"volume_db": -4.0,
+			"uses": "a chest opened (Main._sound when a chest's panel opens)",
+			"fill": {
+				"from": "kenney-rpg",
+				"files": [
+					"chest_open_1.ogg",
+					"chest_open_2.ogg",
+					"chest_open_3.ogg"
+				]
+			}
+		},
+		"sfx.chest_close": {
+			"category": "props",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "rummage",
+			"volume_db": -4.0,
+			"uses": "a chest shut; not played yet",
+			"fallback": "sfx.chest_open"
+		},
+		"sfx.crate_open": {
+			"category": "props",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "rummage",
+			"volume_db": -4.0,
+			"uses": "a crate or cart opened (Main._sound, SoundKit.opening)",
+			"fallback": "sfx.chest_open"
+		},
+		"sfx.crate_break": {
+			"category": "props",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "break",
+			"volume_db": 0.0,
+			"uses": "a crate smashed; not played yet",
+			"fallback": "sfx.break_wood"
+		},
+		"sfx.cart_roll": {
+			"category": "props",
+			"type": "loop",
+			"bus": "sfx",
+			"noise": null,
+			"range": 6,
+			"volume_db": -8.0,
+			"uses": "a cart's wheels while it moves; not played yet"
+		},
+		"sfx.pack_open": {
+			"category": "props",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": 2.0,
+			"uses": "a pack opened, yours or another's (Main._sound)",
+			"fill": {
+				"from": "kenney-rpg",
+				"files": [
+					"pack_open_1.ogg",
+					"pack_open_2.ogg"
+				]
+			}
+		},
+		"sfx.item_pickup_light": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -6.0,
+			"uses": "a light item picked up; not played yet"
+		},
+		"sfx.item_drop_light": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "thud",
+			"volume_db": -4.0,
+			"uses": "a light item dropped; not played yet"
+		},
+		"sfx.item_pickup_heavy": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -6.0,
+			"uses": "a heavy item picked up; not played yet"
+		},
+		"sfx.item_drop_heavy": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "thud",
+			"volume_db": -4.0,
+			"uses": "a heavy item dropped; not played yet"
+		},
+		"sfx.throw": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 3,
+			"volume_db": -8.0,
+			"uses": "an item thrown, the release; not played yet",
+			"fallback": "sfx.swing"
+		},
+		"sfx.thrown_land_soft": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "thud",
+			"volume_db": -4.0,
+			"uses": "a thrown item landing on earth or a body; not played yet"
+		},
+		"sfx.thrown_land_hard": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "thud",
+			"volume_db": -4.0,
+			"uses": "a thrown item landing on stone or wood; not played yet"
+		},
+		"sfx.bandage": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 1,
+			"volume_db": -8.0,
+			"uses": "binding a wound (the bandaging action, when it exists); not played yet"
+		},
+		"sfx.goblin_chatter": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 6,
+			"volume_db": -8.0,
+			"uses": "a goblin muttering while idle; pitched by kind (imp, brute, sneak); not played yet"
+		},
+		"sfx.goblin_alert": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 12,
+			"volume_db": -2.0,
+			"uses": "a goblin's bark on spotting you (later the sim's call for help); not played yet"
+		},
+		"sfx.goblin_pain": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -4.0,
+			"uses": "a goblin hurt; not played yet"
+		},
+		"sfx.goblin_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a monster killed (Client3D._fall)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"death_monster_1.ogg",
+					"death_monster_2.ogg",
+					"death_monster_3.ogg",
+					"death_monster_4.ogg",
+					"death_monster_5.ogg"
+				]
+			}
+		},
+		"sfx.death_player": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a player killed (Client3D._fall)",
+			"fill": {
+				"from": "kenney-impact",
+				"files": [
+					"death_player_1.ogg",
+					"death_player_2.ogg",
+					"death_player_3.ogg",
+					"death_player_4.ogg",
+					"death_player_5.ogg"
+				]
+			}
+		},
+		"sfx.death_companion": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a companion killed (Client3D._fall)",
+			"fill": {
+				"from": "kenney-rpg",
+				"files": [
+					"death_companion_1.ogg"
+				]
+			}
+		},
+		"voice.effort_swing_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "a male grunt with a heavy swing; not played yet"
+		},
+		"voice.effort_hurt_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -4.0,
+			"uses": "a male cry when hurt; not played yet"
+		},
+		"voice.effort_lift_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 3,
+			"volume_db": -8.0,
+			"uses": "a male strain lifting or throwing something heavy; not played yet"
+		},
+		"voice.death_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a male death cry; not played yet"
+		},
+		"voice.effort_swing_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "a female grunt with a heavy swing; not played yet"
+		},
+		"voice.effort_hurt_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -4.0,
+			"uses": "a female cry when hurt; not played yet"
+		},
+		"voice.effort_lift_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 3,
+			"volume_db": -8.0,
+			"uses": "a female strain lifting or throwing something heavy; not played yet"
+		},
+		"voice.death_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a female death cry; not played yet"
+		},
+		"ui.click": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "a button pressed; not played yet"
+		},
+		"ui.hover": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "the pointer over a button; not played yet"
+		},
+		"ui.panel_open": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "a panel opened (pack, chest, settings); not played yet"
+		},
+		"ui.panel_close": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "a panel closed; not played yet"
+		},
+		"ui.error": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "something you can't do; not played yet"
+		},
+		"ui.chat_ping": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "a chat line for you; not played yet"
+		},
+		"ui.notify": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "a notice: a quest, a companion's word; not played yet"
+		},
+		"amb.field_wind": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "wind over open ground; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.forest_dawn": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a forest at dawn: birds; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.forest_day": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a forest by day; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.forest_night": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a forest at night: crickets, an owl; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.dungeon": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "under stone: air, drips; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.town_day": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "the town's daily noise; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.town_night": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "the town at night; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.rain": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "rain; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.storm": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "wind and rain hard; a bed under a zone, time or weather; not played yet"
+		},
+		"amb.torch_fire": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 4,
+			"volume_db": -10.0,
+			"uses": "the crackle of a torch or brazier, from where it burns; not played yet"
+		}
+	}
+}
