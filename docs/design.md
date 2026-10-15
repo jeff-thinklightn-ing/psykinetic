@@ -1759,7 +1759,9 @@ for each (damage plus push, times the shield's 8); a blow weighing 2 or
 more (a brute's, a hammer's), or running short of stamina, breaks the
 guard: that blow lands, the holder staggers and cannot raise the shield
 for 2 s. A sword ready in hand parries half of a blow from straight
-ahead. Raised or drawn, the body turns to the cursor.
+ahead. A giant axe's blow sweeps the cell ahead and the two beside it and
+knocks each creature it hurts down for 1.5 s (decision 343): lying, it
+cannot act and is pushed as if half its mass. Raised or drawn, the body turns to the cursor.
 With nothing for it the button shoves and tosses as it always did. E,
 tapped, opens what is under the cursor: a chest, crate or cart, your own
 companion's pack, else a door face beside you; held `BANDAGE_HOLD_MSEC`,

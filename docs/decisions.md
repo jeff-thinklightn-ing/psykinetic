@@ -6513,3 +6513,24 @@ wood, or wood splitting and a stagger; World.guard_met for the party log
 ("X takes Y's blow on the guard", "Y breaks X's guard"). Monsters guard
 through the same code (holds_in_hands, decision 338) when their AI raises
 (try_stance "block"). Protocol: the new RPC changes the fingerprint.
+
+## 343. The giant axe: a 3-cell arc that knocks down; prone
+
+Weapons as verbs in the fight, part 4 of 5. A blow with a knockdown verb
+(the giant axe: arc 1, down_ticks 15, speed 2.0, damage 1.5) is queued on
+the cell struck and, for each step of its arc, on the cells a 45 degree
+turn either side of it (World._try_hit, _queue_hit): whoever stands there,
+within reach and attackable, takes the same blow. Each Hit carries
+down_ticks; a blow that lands any damage on a creature after its guard
+(decision 340; an axe's blow weighs 3 and more, so it breaks a guard)
+knocks it down (World.knock_down): down_until, a stun as long (it cannot
+act), what it raised lowered and not raised again while down, and
+World.pushed_mass at DOWN_MASS_FACTOR (0.5) of its mass while it lies, so
+the same blow's push, and any other, sends it further ("prone: can't act
+or resist pushes"). The knockdown is applied before the blow's push.
+GridEntity.down_until replicates on players, companions and monsters
+(SUBCLASS_REPLICATED), so every view lays the body down (Client3D tips the
+body over and stands it up when it wears off; the combat animation step
+can give it a proper fall). World.knocked_down feeds the party log ("X
+knocks Y down."). Protocol: a new replicated property changes the
+fingerprint.

@@ -630,6 +630,9 @@ const SWING_PITCH_HEAVY := 0.85
 const DEATH_SOUNDS := {"monster": "sfx.goblin_death", "player": "sfx.death_player", "companion": "sfx.death_companion"}
 ## A swing pushes the body this far out toward the blow, and back.
 const LUNGE := 0.3
+## Knocked down: how far the body tips (radians), and how fast.
+const DOWN_TILT := 1.4
+const DOWN_TILT_SPEED := 9.0
 ## A shot's arrow: metres a second as drawn, and its sound's pitch.
 const SHOT_SPEED := 40.0
 const SHOT_PITCH := 1.8
@@ -5057,6 +5060,7 @@ func _sync_puppets() -> void:
 				lantern.visible = entity.emit_light > 0.0  # Covered (L).
 		elif entity is Monster:
 			_sync_alert(entity as Monster, puppet)
+		_sync_down(entity, puppet)
 		if puppet.has_meta("animator"):
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
@@ -5218,6 +5222,18 @@ func on_death(data: Dictionary) -> void:
 
 ## A monster's name with how alert it is (Monster.Alert): "?" looking into
 ## something, "!" after someone, "~" running.
+## Knocked down (GridEntity.down_until; decision 343): the body tips over
+## to lie on the ground, and rises again when it wears off.
+func _sync_down(entity: GridEntity, puppet: Node3D) -> void:
+	var body := puppet.get_node_or_null("Body") as Node3D
+	if body == null:
+		return
+	var lying := World.tick + World.tick_alpha < entity.down_until
+	var want := DOWN_TILT if lying else 0.0
+	if not is_equal_approx(body.rotation.x, want):
+		body.rotation.x = move_toward(body.rotation.x, want, get_process_delta_time() * DOWN_TILT_SPEED)
+
+
 func _sync_alert(monster: Monster, puppet: Node3D) -> void:
 	var was := int(puppet.get_meta("alert", Monster.Alert.IDLE))
 	if was == monster.alert:

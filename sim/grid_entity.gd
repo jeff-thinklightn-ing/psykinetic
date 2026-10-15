@@ -88,6 +88,10 @@ var raised_tick := 0
 ## Server: until this tick a broken guard cannot be raised again
 ## (World._meet_guard, decision 340).
 var guard_broken_until := 0
+## Knocked down until this tick (World.knock_down, decision 343): lying,
+## it cannot act and is easily pushed. A creature's replicates, for the
+## views.
+var down_until := 0
 ## Server: the tick it was last hurt (World.damage); out of combat after a while.
 var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH

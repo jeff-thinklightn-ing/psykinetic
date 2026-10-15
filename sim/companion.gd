@@ -466,6 +466,7 @@ func _init() -> void:
 	replicate("slots")
 	replicate("mending")
 	replicate("buffs")
+	replicate("down_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")
 	mass = 75.0

@@ -70,6 +70,8 @@ signal pile_gone(pile: GroundPile)
 ## [param target]'s guard met a blow or a shot from [param source]
 ## (decision 340): taken on it, or [param broken] by it.
 signal guard_met(target: GridEntity, source: GridEntity, broken: bool)
+## [param target] was knocked down by [param source]'s blow (decision 343).
+signal knocked_down(target: GridEntity, source: GridEntity)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -234,6 +236,9 @@ const NOISE_BOW := 3
 ## raising a guard again until GUARD_BROKEN_TICKS have passed.
 const GUARD_BREAK_STUN := 8
 const GUARD_BROKEN_TICKS := 20
+## A body knocked down (decision 343) is pushed as if it weighed this much
+## of its mass: lying, it cannot brace.
+const DOWN_MASS_FACTOR := 0.5
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
@@ -422,6 +427,9 @@ class Hit:
 	## The blow's push before knockback_min_force: what a guard pays for
 	## and what breaks it (decision 340).
 	var raw_force := 0.0
+	## Landed, it knocks the target down this long (a giant axe's;
+	## decision 343). 0 for none.
+	var down_ticks := 0
 	var target: GridEntity
 	var source_id := 0
 	var source_name := ""
@@ -2021,8 +2029,8 @@ func try_stance(by: GridEntity, kind: String) -> bool:
 		return true
 	if kind != off_hand(by) or kind == "draw" and not quiver_check.call(by):
 		return false
-	if kind == "block" and tick < by.guard_broken_until:
-		return false  # A broken guard comes back up only after a while.
+	if kind == "block" and tick < by.guard_broken_until or is_stunned(by):
+		return false  # A broken guard comes back up only after a while; nothing is raised reeling or lying.
 	if by.raised != kind:
 		by.raised = kind
 		by.raised_tick = tick
@@ -3102,6 +3110,25 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 			if verb.get("kind") == "backstab" and is_behind(attacker, target):
 				scale *= float(verb["behind"])
 			hit_damage = maxi(1, roundi(hit_damage * scale))
+	var down := int(verb["down_ticks"]) if verb.get("kind") == "knockdown" else 0
+	_queue_hit(attacker, target, aim, push_direction, hit_damage, force, raw_force, is_shove, down)
+	if down > 0 and aim in DIRECTIONS:
+		# A giant axe's arc (decision 343): the cells either side of the
+		# one struck, a step of 45 degrees each, take the same blow.
+		for turn in range(1, int(verb["arc"]) + 1):
+			for side in [-1, 1]:
+				var way := Vector2(aim).rotated(side * turn * PI / 4.0)
+				var cell := attacker.tile + Vector2i(clampi(roundi(way.x), -1, 1), clampi(roundi(way.y), -1, 1))
+				var other: GridEntity = _occupancy.get(cell)
+				if other != null and other != target and other != attacker and other.spawned \
+						and can_target(attacker, other) and can_melee(attacker.tile, cell):
+					_queue_hit(attacker, other, cell - attacker.tile, cell - attacker.tile, hit_damage, force, raw_force, false, down)
+	return true
+
+
+## A Hit of [param attacker] on [param target] queued for _resolve_hits.
+func _queue_hit(attacker: GridEntity, target: GridEntity, aim: Vector2i, push_direction: Vector2i, hit_damage: int,
+		force: float, raw_force: float, is_shove: bool, down_ticks: int) -> void:
 	var hit := Hit.new()
 	hit.source = attacker
 	hit.target = target
@@ -3114,8 +3141,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	hit.force = force
 	hit.shove = is_shove
 	hit.raw_force = raw_force
+	hit.down_ticks = down_ticks
 	_hits.append(hit)
-	return true
 
 
 ## Ascending source id. A hit whose target is no longer where it was aimed
@@ -3139,6 +3166,8 @@ func _resolve_hits() -> void:
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
 		if hit.damage > 0:
 			damage(hit.target, hit.damage, hit.source, &"attack")
+			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
+				knock_down(hit.target, hit.source, hit.down_ticks)
 		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, hit.push_direction, hit.force, hit.push_direction != hit.direction)
 
@@ -3631,7 +3660,27 @@ func is_stunned(entity: GridEntity) -> bool:
 ## Mass used when [param entity] is on the receiving end of a push: halved
 ## while it is exhausted.
 func pushed_mass(entity: GridEntity) -> float:
-	return entity.mass * EXHAUSTED_MASS_FACTOR if entity.is_exhausted() else entity.mass
+	var mass := entity.mass * EXHAUSTED_MASS_FACTOR if entity.is_exhausted() else entity.mass
+	return mass * DOWN_MASS_FACTOR if is_down(entity) else mass
+
+
+## Whether [param entity] lies knocked down (knock_down; decision 343).
+func is_down(entity: GridEntity) -> bool:
+	return tick < entity.down_until
+
+
+## Knocks [param target] down for [param ticks] (a giant axe's blow;
+## decision 343): it lies (down_until, replicated, for the views), cannot
+## act (a stun as long), lowers what it raised, and is pushed as if
+## DOWN_MASS_FACTOR of its mass.
+func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
+	if not Net.is_authority() or ticks <= 0:
+		return
+	target.down_until = maxi(target.down_until, tick + ticks)
+	target.raised = ""
+	_stun_for(target, ticks)
+	_log("down: %s knocked down by %s for %d ticks" % [target.name, source.name if is_instance_valid(source) else "?", ticks])
+	knocked_down.emit(target, source)
 
 
 ## Force of a shove by [param attacker] on [param target]:

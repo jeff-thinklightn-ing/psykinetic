@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- The giant axe is slow but sweeps the three cells in front of you, and knocks
+  everyone it hits off their feet for a moment: lying, they can't act and are
+  easily shoved.
 - Shields block: raised with the right button, a shield takes blows and arrows
   from the front for stamina. A brute's heavy blow, or running out of
   stamina, breaks your guard and staggers you. A sword parries half a blow

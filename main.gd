@@ -397,6 +397,7 @@ func _go_online() -> void:
 		World.entity_pushed.connect(_narrate_push)
 		World.entity_damaged.connect(_narrate_damage)
 		World.guard_met.connect(_narrate_guard)
+		World.knocked_down.connect(_narrate_down)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
@@ -3219,6 +3220,11 @@ func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, til
 	if impact > 0:
 		line += " for %d" % impact
 	party_log.add(line + ".")
+
+
+## A blow that knocked someone down (World.knocked_down).
+func _narrate_down(entity: GridEntity, source: GridEntity) -> void:
+	party_log.add("%s knocks %s down." % [_display_name(source), _display_name(entity)])
 
 
 ## A blow taken on a guard, or one that broke it (World.guard_met).

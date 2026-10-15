@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_weapons()
 	_test_blows()
 	_test_block()
+	_test_axe()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -675,6 +676,61 @@ func _test_block() -> void:
 	imp.raised = ""
 	imp.slots = PackedStringArray()
 	imp.acts = true
+
+
+func _test_axe() -> void:
+	print("
+== the giant axe: slow, a 3-cell arc, each struck knocked down; lying, they cannot act and push easily (decision 343) ==")
+	var host := _player(Net.local_id)
+	var home := host.tile
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var spot := home + Vector2i(dx, dy)
+			if World.is_free(spot) and World.DIRECTIONS.all(func(d: Vector2i) -> bool: return World.is_free(spot + d) and World.can_melee(spot, spot + d)):
+				World._relocate(host, spot)
+				break
+		if host.tile != home:
+			break
+	var cells: Array[Vector2i] = []
+	for aim: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var left := Vector2(aim).rotated(-PI / 4.0)
+		var right := Vector2(aim).rotated(PI / 4.0)
+		var trio: Array[Vector2i] = [host.tile + aim, host.tile + Vector2i(roundi(left.x), roundi(left.y)), host.tile + Vector2i(roundi(right.x), roundi(right.y))]
+		if trio.all(func(cell: Vector2i) -> bool: return World.is_free(cell) and World.can_melee(host.tile, cell)):
+			cells = trio
+			break
+	_check(cells.size() == 3, "three free cells in an arc before the host (%s)" % [cells])
+	if cells.size() != 3:
+		return
+	var foes: Array[GridEntity] = []
+	for i in 3:
+		var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "AxeImp%d_%d" % [i, World.tick],
+			"tile": cells[i], "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
+		foe.acts = false
+		foes.append(foe)
+	_give(host, "giant_axe", Player.RIGHT_HAND)
+	host._world_set_facing(cells[0] - host.tile)
+	host.next_attack_tick = 0
+	host.next_move_tick = 0
+	var before: Array = foes.map(func(foe: GridEntity) -> int: return foe.hp)
+	_check(World.try_attack(host, foes[0]) and host.next_attack_tick - World.tick == 10, "a swing at the middle one; slow: 10 ticks to the next")
+	World._resolve_hits()
+	var hurt := range(3).all(func(i: int) -> bool: return foes[i].hp == before[i] - 3)
+	_check(hurt, "all three in the arc struck for 3 (2 times 1.5) (%s -> %s)" % [before, foes.map(func(foe: GridEntity) -> int: return foe.hp)])
+	_check(foes.all(func(foe: GridEntity) -> bool: return World.is_down(foe) and World.is_stunned(foe) and foe.down_until == World.tick + 15),
+			"and all three knocked down for 15 ticks, unable to act")
+	var lying := foes[1]
+	_check(is_equal_approx(World.pushed_mass(lying), lying.mass * World.DOWN_MASS_FACTOR), "lying, pushed as if half its mass (%.1f of %.1f)" % [World.pushed_mass(lying), lying.mass])
+	lying.slots = Items.tidy(["", "", "", "", "", "shield"], Items.CARRIED)
+	_check(not World.try_stance(lying, "block"), "a shield cannot come up lying down")
+	World.tick += 16
+	_check(not World.is_down(lying) and World.try_stance(lying, "block"), "15 ticks on it is up, and can")
+	World.tick -= 16
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	for foe in foes:
+		if is_instance_valid(foe) and foe.spawned:
+			World.despawn(foe)
+	World._relocate(host, home)
 
 func _test_loot() -> void:
 	print("

@@ -52,6 +52,9 @@ extends Node
 ##     shield raised toward the imp takes its blows for stamina while the
 ##     brute behind, outside the arc, lands its own; out of stamina, the
 ##     guard gives way and the player staggers.
+##   items_axe: the giant axe (decision 343): slow, both hands; one swing
+##     at three imps in an arc strikes all three and knocks them down;
+##     they lie a moment, then get up.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -153,6 +156,8 @@ func _ready() -> void:
 			_items_blows()
 		"items_block":
 			_items_block()
+		"items_axe":
+			_items_axe()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -546,6 +551,32 @@ func _items_block() -> void:
 	]
 
 
+func _items_axe() -> void:
+	var rows: Array[String] = [
+		"###########",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"###########",
+	]
+	var markers := {Vector2i(2, 3): "start", Vector2i(5, 2): "monster_imp", Vector2i(5, 3): "monster_imp", Vector2i(5, 4): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [5, 2], "facing": [-1, 0], "idle": {"mode": "guard"}}, {"at": [5, 3], "facing": [-1, 0], "idle": {"mode": "guard"}},
+			{"at": [5, 4], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["giant_axe", Player.RIGHT_HAND], "A giant axe: both hands, slow."],
+		["walk", Vector2i(4, 3), "Three imps in a row."],
+		["item_strike", Vector2i(5, 3), "One swing takes the cell ahead and the two beside it."],
+		["wait", 12, "All three knocked down: lying, they cannot act."],
+		["wait", 25, "1.5 s later they are up."],
+		["item_strike", Vector2i(5, 3), "And again."],
+		["wait", 30, ""],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -908,6 +939,11 @@ func _on_tick(tick: int) -> void:
 				if str(entity.spawn_spec.get("kind", "")) == step[1]:
 					World.face(_player, Vector2i(signi(entity.tile.x - _player.tile.x), signi(entity.tile.y - _player.tile.y)))
 					break
+		"item_strike":
+			# A blow at whoever stands on cell step[1], once the player can strike.
+			var struck: GridEntity = World.get_entity_at(step[1])
+			if struck != null and not World.try_attack(_player, struck):
+				return
 		"item_bold":
 			# The clip's monsters of kind step[1] made bold, so they close in.
 			for entity in World.monsters():
@@ -1118,6 +1154,12 @@ func _log(tick: int) -> void:
 		for i in _player.slots.size():
 			shown.append("%s%s" % [_main.pack_panel.shown_in(true, i), "*" if _main.pack_panel.icon_in(true, i) != null else ""])
 		print("[clip] tick %d: pack %s (* an icon)" % [tick, shown])
+		return
+	if scenario == "items_axe":
+		var them := []
+		for entity in World.monsters():
+			them.append("%s at %s hp %d%s" % [entity.name, entity.tile, entity.hp, " DOWN" if World.is_down(entity) else ""])
+		print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp, ", ".join(them)])
 		return
 	if scenario == "items_block":
 		var them := []

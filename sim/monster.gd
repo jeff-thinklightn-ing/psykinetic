@@ -340,6 +340,7 @@ func _init() -> void:
 	replicate("move_ticks")
 	replicate("pose")
 	replicate("alert")
+	replicate("down_until")
 
 
 func _ready() -> void:
