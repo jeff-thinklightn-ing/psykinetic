@@ -201,6 +201,10 @@ signal cried(kind: StringName)
 ## Off: no monster idles (they stand where they are, as before idling). For
 ## tests staged in a real level whose monsters must stay put.
 static var idling := true
+## Off: no monster notices anyone (none sees, hears, hunts or fights; each
+## stays IDLE, idling as idling says). For tests staging a real level
+## (--still-monsters), whose players must not be hunted.
+static var noticing := true
 
 @export var sight_range := 7:
 	set(value):
@@ -396,6 +400,9 @@ func _temper() -> void:
 
 
 func _sim_tick() -> void:
+	if not noticing:
+		_unnoticing()
+		return
 	if alert == Alert.FLEEING:
 		_flee_tick()
 		return
@@ -496,6 +503,14 @@ func _sim_tick() -> void:
 			World.try_move(self, path[0] - tile)
 		else:
 			next_move_tick = World.tick + CHASE_RETRY_TICKS  # No way in: look again in a moment.
+
+
+## noticing off: nobody seen or heard; it idles, IDLE.
+func _unnoticing() -> void:
+	target = null
+	_windup = {}
+	alert = Alert.IDLE
+	_idle_tick()
 
 
 ## A blow at its target, as its kind strikes.
@@ -961,7 +976,10 @@ static func read_kinds(path: String) -> Dictionary:
 		out[kind] = {"body": props, "tactic": TACTIC_NAMES.get(tactic_name, Tactic.PLAIN),
 			"idle": IDLE_MODES.get(idle_name, Idle.NONE), "opens_doors": bool(row.get("opens_doors", true)),
 			"door_force": int(row.get("door_force", 1)), "leash": int(row.get("leash", LEASH)), "temperament": weights,
-			"strength": maxf(0.0, float(row.get("strength", 0.0)))}
+			"strength": maxf(0.0, float(row.get("strength", 0.0))), "side": str(row.get("side", "")),
+			"role": str(row.get("role", "")), "herd": str(row.get("herd", kind)),
+			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
+			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else []}
 	return out
 
 
@@ -1096,8 +1114,8 @@ func _call_for_help() -> void:
 ## Whether [param other] is of its side (Factions.of_kind; with no factions,
 ## every monster of a kind is).
 func _same_side(other: GridEntity) -> bool:
-	if not other is Monster or not (other as Monster)._wary:
-		return false
+	if not other is Monster or not (other as Monster)._wary or other is Animal:
+		return false  # An animal is of no side but its herd's (Animal).
 	var mine := str(spawn_spec.get("kind", ""))
 	var theirs := str(other.spawn_spec.get("kind", ""))
 	var factions: Factions = World.holdings.factions if World.holdings != null else null

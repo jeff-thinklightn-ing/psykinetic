@@ -5793,3 +5793,41 @@ translations today: arrival() ignores the levels' "north", and so does this,
 so a quarter turn waits until a crossing turns too. world_map_test checks
 an edge against arrival(), a link's placement, a one-way link, and the
 wilds' castle lying north with its arrival across from the link.
+## 315. Animals are monsters of side "wild"
+
+A wild animal is a row of levels/monsters.json with "side": "wild" (rabbit,
+deer, stag, boar, wolf so far), spawned as Animal (sim/animal.gd, a
+Monster; Level gives a wild kind's spec that script). It is of no faction:
+monsters never hunt it (they look for players and companions, as ever) and
+never count it of their side (Monster._same_side), and its own side is its
+herd (a row's "herd": a stag runs with the deer). Its row's "role" is what
+it does with what it notices:
+- prey (rabbit, deer, stag) never fights: anyone it sees, glimpses or
+  smells, a predator's step, or anything loud (a fight, a call, a door)
+  and it bolts (FLEEING, its rout cry), and the herd hears the rout and
+  bolts with it (step 4's rout: prey are cowards). Another's step only
+  brings its head up, turned to it, a moment (SUSPICIOUS, " ?"): you can
+  creep up on a herd that does not see you, not walk up on one;
+- game (boar) bolts the same, but struck, or cornered with the threat
+  near, it charges (its row's HEAVY blow) for CHARGE_TICKS, crying
+  "charge", then runs;
+- predator (wolf) hunts its row's "diet" in sight (looked over every 10
+  ticks, not every think), and players only when bold: by night (the sky's
+  light under 0.35, and 2 cells more sight), with 3 of its pack about, or
+  just struck. Its call for help is the pack's howl (the "call" cry; sound
+  picks the slot by kind).
+Idling it wanders about its home and grazes between strolls (Pose.SIT,
+which a view of an animal plays as its graze: no new pose on the wire),
+seeing 3 cells less with its head down. Animals keep Monster's tiers, so a
+herd nobody is near costs what a far monster does. The pose and the alert
+it shows are the replicated ones there were; the protocol is unchanged.
+
+## 316. Scent goes with the wind
+
+Senses.smells(entity): an animal smells someone downwind of them, the wind
+(Weather's, the zone's fields: wind 0..1 and wind_dir) blowing from them
+toward it within a cosine of 0.6, up to 12 cells in a full wind and less
+in a lighter one, through walls; never in still air or out of the sky.
+One dot product per candidate, after the range check. Animals smell (a
+prey's look is sight, glimpse or scent); monsters do not, for now. So the
+way to a herd is upwind and quiet: downwind, it is gone before you see it.

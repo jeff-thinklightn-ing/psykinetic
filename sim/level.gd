@@ -46,6 +46,8 @@ const GREY_PER_LEVEL := 40
 const MAX_HEIGHT := 6
 
 const MONSTER := "res://sim/monster.gd"
+## A wild kind's (Animal, decision 315).
+const ANIMAL := "res://sim/animal.gd"
 const PUSHABLE := "res://sim/pushable.gd"
 const CHEST := "res://sim/chest.gd"
 const CARGO := "res://sim/cargo.gd"
@@ -893,7 +895,7 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 	if type_props is Dictionary:
 		for key: String in type_props:
 			props[key] = _prop(key, type_props[key])
-	return {"script": MONSTER, "shape": "capsule", "props": props, "kind": type}
+	return {"script": ANIMAL if Animal.is_wild(type) else MONSTER, "shape": "capsule", "props": props, "kind": type}
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except
@@ -966,7 +968,7 @@ static func image_from_rows(rows: Array[String], markers: Dictionary = {}, confi
 		width = maxi(width, row.length())
 	var image := Image.create_empty(width, maxi(rows.size(), 1), false, Image.FORMAT_RGBA8)
 	var colour_of := func(meaning: String) -> Color:
-		var hex: Variant = config.get("legend", {}).get(meaning, LEGEND[meaning])
+		var hex: Variant = config.get("legend", {}).get(meaning, LEGEND.get(meaning, "#000000"))
 		return Color(str(hex))
 	image.fill(colour_of.call("void"))
 	for y in rows.size():

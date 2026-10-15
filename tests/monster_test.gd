@@ -10,8 +10,14 @@ const SPECS := {
 	"b": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "brute"},
 	"s": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "sneak"},
 	"c": {"script": "res://sim/pushable.gd", "shape": "cube"},
+	"r": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "rabbit"},
+	"d": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "deer"},
+	"D": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "stag"},
+	"o": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "boar"},
+	"w": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "wolf"},
 }
-const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate"}
+const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
+	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf"}
 
 var _failures := 0
 var _room: Node2D
@@ -66,6 +72,13 @@ func _ready() -> void:
 	_test_raid_march()
 	_test_raid_beaten()
 	_test_raid_takes()
+	_test_noticing()
+	_test_wild_kinds()
+	_test_wild_prey()
+	_test_wild_ears()
+	_test_wild_scent()
+	_test_wild_boar()
+	_test_wild_wolf()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1424,9 +1437,194 @@ func _test_raid_takes() -> void:
 	_check(raids.carries("g4")["captives"] == ["companion:p1"], "and the group carries her off (%s)" % [raids.carries("g4")])
 	World.damage(player, 999, raider)
 	_check(died.has(player), "a player it beats down dies")
+	var freed: Array[String] = []
+	World.companion_freed = func(who: String, place: String) -> void: freed.append(who + "@" + place)
+	World.damage(raider, 999)
+	World.step()
+	_check(freed == ["p1@"], "the group beaten, the companion it took is free, back beside her player (%s)" % [freed])
+	World.companion_freed = Callable()
 	World.entity_died.disconnect(on_died)
 	World.spawn_spec = Callable()
 	raids.clear()
+	Monster.idling = true
+
+
+## Wild: out of doors, under one kind of weather always (Weather.KINDS);
+## the way the wind blows then.
+func _outdoors(kind: String) -> Vector2:
+	Weather.use({"default": {"weights": {kind: 1}}})
+	World.fields.outdoor = true
+	World.fields.update_weather(DayNight.now())
+	return World.fields.weather.get("wind_dir", Vector2.ZERO)
+
+
+func _indoors() -> void:
+	World.fields.outdoor = false
+	World.fields.update_weather(DayNight.now())
+	Weather.reload()
+
+
+func _test_wild_kinds() -> void:
+	print("\n== animals are rows of monsters.json of side wild: Animals, of no side but their herd's ==")
+	_check(Animal.is_wild("deer") and Animal.is_wild("wolf") and not Animal.is_wild("imp"), "deer and wolves are wild, imps not")
+	_check(Level._spec_for("monster_deer", Level.MONSTER_TYPES)["script"] == Level.ANIMAL
+			and Level._spec_for("monster_imp", Level.MONSTER_TYPES)["script"] == Level.MONSTER, "a level's deer is an Animal")
+	var e := _build(["##########", "#d.D.o.i.#", "##########"])
+	var doe: Animal = e["d"][0]
+	_check(doe._same_side(e["D"][0]) and not doe._same_side(e["o"][0]) and not doe._same_side(e["i"][0]),
+			"a doe's side: the stag (her herd), not a boar or an imp")
+	_check(not (e["i"][0] as Monster)._same_side(e["o"][0]) and not (e["i"][0] as Monster)._same_side(doe),
+			"an imp's side has no animals in it")
+
+
+func _test_wild_prey() -> void:
+	print("\n== prey grazes; it bolts from whoever it sees, and the herd with it ==")
+	Monster.idling = true
+	var e := _build(["####################", "#..................#", "#.........d.D......#", "#..................#",
+		"#..................#", "####################"], {"d": {"facing": Vector2i(-1, 0)}})
+	var doe: Animal = e["d"][0]
+	var stag: Animal = e["D"][0]
+	doe.sight_range = 9
+	stag.sight_range = 9
+	for i in 80:
+		World.step()
+	_check(doe.alert == Monster.Alert.IDLE and (doe.pose == Monster.Pose.SIT or stag.pose == Monster.Pose.SIT),
+			"nobody about: they graze (head down between strolls)")
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Hunter"})) as GridEntity
+	_room.add_child(player)
+	World.spawn(player, doe.tile + Vector2i(-4, 0))
+	World.face(doe, Vector2i(-1, 0))
+	doe.pose = Monster.Pose.STAND
+	var cries: Array[StringName] = []
+	doe.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	World.step()
+	World.step()
+	_check(doe.alert == Monster.Alert.FLEEING and cries == [&"rout"], "the doe sees a hunter and bolts, crying (%s %s)" % [Monster.Alert.keys()[doe.alert], cries])
+	World.step()
+	_check(stag.alert == Monster.Alert.FLEEING, "the stag of her herd bolts with her")
+	var before := World.distance(doe.tile, player.tile)
+	for i in 25:
+		World.step()
+	_check(World.distance(doe.tile, player.tile) > before, "away from the hunter (%d off)" % World.distance(doe.tile, player.tile))
+
+
+func _test_wild_ears() -> void:
+	print("\n== a step heard: head up, turned to it; a fight heard: off ==")
+	Monster.idling = true
+	var e := _build(["##############", "#............#", "#....r.......#", "#............#", "##############"],
+		{"r": {"facing": Vector2i(1, 0)}})
+	var rabbit: Animal = e["r"][0]
+	rabbit.sight_range = 0  # Sees nothing: ears only.
+	World.noise(rabbit.tile + Vector2i(-3, 0), 3, &"step", null)
+	World.step()
+	_check(rabbit.alert == Monster.Alert.SUSPICIOUS and rabbit.facing == Vector2i(-1, 0) and rabbit.pose == Monster.Pose.STAND,
+			"a step behind it: it turns to it, head up, and stays (%s, %s)" % [Monster.Alert.keys()[rabbit.alert], rabbit.facing])
+	World.noise(rabbit.tile + Vector2i(-3, 0), Senses.NOISE_FIGHT, &"fight", null)
+	World.step()
+	_check(rabbit.alert == Monster.Alert.FLEEING, "a fight: it bolts")
+
+
+func _test_wild_scent() -> void:
+	print("
+== downwind of you it smells you before it sees you; upwind it does not ==")
+	Monster.idling = false
+	var rows: Array[String] = ["#########################"]
+	for y in 23:
+		rows.append("#.......................#")
+	rows.append("#########################")
+	for downwind in [true, false]:
+		var e := _build(rows)
+		var doe := EntityFactory.build(SPECS["d"].merged({"name": "Doe", "props": Level.MONSTER_TYPES["deer"]})) as Animal
+		_room.add_child(doe)
+		World.spawn(doe, Vector2i(12, 12))
+		doe.sight_range = 9
+		var blows := _outdoors("wind")
+		var way := Vector2i(roundi(blows.x * 7.0), roundi(blows.y * 7.0))
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "Hunter"})) as GridEntity
+		_room.add_child(player)
+		World.spawn(player, doe.tile - way if downwind else doe.tile + way)
+		# Looking away from the hunter.
+		World.face(doe, Senses.way_toward(player.tile, doe.tile))
+		World.step()
+		World.step()
+		if downwind:
+			_check(doe.alert == Monster.Alert.FLEEING, "the wind from the hunter to the doe: she smells them, 7 off, and bolts")
+		else:
+			_check(doe.alert != Monster.Alert.FLEEING, "the wind the other way: she grazes on, none the wiser")
+	_indoors()
+	Monster.idling = true
+
+
+func _test_wild_boar() -> void:
+	print("\n== a boar struck charges whoever struck it, crying; then runs ==")
+	Monster.idling = false
+	var e := _build(["############", "#..........#", "#....Po....#", "#..........#", "############"],
+		{"o": {"facing": Vector2i(1, 0)}})
+	var boar: Animal = e["o"][0]
+	var player: GridEntity = e["P"][0]
+	boar.sight_range = 6
+	var cries: Array[StringName] = []
+	boar.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	World.damage(boar, 2, player)
+	World.step()
+	_check(boar.alert == Monster.Alert.FIGHTING and boar.target == player and cries == [&"charge"],
+			"struck, it turns on the striker (%s, %s)" % [Monster.Alert.keys()[boar.alert], cries])
+	for i in Animal.CHARGE_TICKS + 5:
+		World.step()
+	_check(boar.alert == Monster.Alert.FLEEING or World.distance(boar.tile, player.tile) > 1,
+			"its charge spent, it runs (%s)" % Monster.Alert.keys()[boar.alert])
+	Monster.idling = true
+
+
+func _test_wild_wolf() -> void:
+	print("\n== a wolf hunts deer; by day it lets a lone hunter be, by night it does not ==")
+	Monster.idling = false
+	var e := _build(["####################", "#..................#", "#..P.w.....d.......#", "#..................#",
+		"####################"], {"w": {"facing": Vector2i(1, 0)}, "d": {"facing": Vector2i(1, 0)}})
+	var wolf: Animal = e["w"][0]
+	var doe: Animal = e["d"][0]
+	wolf.sight_range = 8
+	doe.sight_range = 6
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	for i in 3:
+		World.step()
+	_check(wolf.target == doe, "by day it goes for the doe, not the hunter behind it (%s)" % [wolf.target])
+	for i in 30:
+		World.step()
+	_check(doe.alert == Monster.Alert.FLEEING, "she hears it coming and runs")
+	e = _build(["####################", "#..................#", "#..P.w.............#", "#..................#",
+		"####################"], {"w": {"facing": Vector2i(-1, 0)}})
+	wolf = e["w"][0]
+	wolf.sight_range = 8
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	for i in 3:
+		World.step()
+	_check(wolf.target == null, "by day, facing a lone hunter, it lets them be")
+	DayNight.set_hour(0.0)
+	for i in Animal.PREY_LOOK_TICKS + 2:
+		World.step()
+	_check(wolf.target == e["P"][0] and wolf.temper == Monster.Temper.BOLD, "at night it is bold, and goes for them")
+	DayNight.reset()
+	_indoors()
+	Monster.idling = true
+
+func _test_noticing() -> void:
+	print("
+== Monster.noticing off (a test staging a level): nobody is noticed ==")
+	Monster.idling = false
+	var e := _build(["#########", "#.P..i..#", "#########"], {"i": {"facing": Vector2i(-1, 0)}})
+	var imp: Monster = e["i"][0]
+	imp.sight_range = 7
+	imp.reaction_ticks = 0
+	Monster.noticing = false
+	for i in 5:
+		World.step()
+	_check(imp.target == null and imp.alert == Monster.Alert.IDLE, "an imp facing a player lets them be")
+	Monster.noticing = true
+	World.step()
+	_check(imp.alert == Monster.Alert.FIGHTING, "on again, it goes for them")
 	Monster.idling = true
 
 

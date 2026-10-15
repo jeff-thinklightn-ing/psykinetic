@@ -56,6 +56,10 @@ const STEP_MASS := 27.0
 const STEP_RADIUS_MIN := 2
 const STEP_RADIUS_MAX := 4
 const MEMORY_TICKS := 600
+## Scent (smells): carried so many cells in a full wind, down a way within
+## this cosine of the wind's.
+const SCENT_TILES := 12
+const SCENT_ALIGN := 0.6
 
 var agent: GridEntity
 var sight_range := 7
@@ -108,6 +112,23 @@ func glimpses(entity: GridEntity, d := -1) -> bool:
 		return false
 	var light := _light(at, DARK)
 	return light >= GLIMPSE and light < DARK and World.has_line_of_sight(agent.tile, at)
+
+
+## Whether it smells [param entity] [param d] cells off (Chebyshev; as
+## sees): the wind blowing from it toward here (within SCENT_ALIGN of the
+## way from it to here), SCENT_TILES at full wind, less in a lighter one,
+## none in still air or out of the sky (Weather; the zone's fields). Walls
+## do not stop a scent. Animals only (decision 316).
+func smells(entity: GridEntity, d := -1) -> bool:
+	var from := entity.tile
+	if d < 0:
+		d = maxi(absi(from.x - agent.tile.x), absi(from.y - agent.tile.y))
+	var weather: Dictionary = World.fields.weather
+	var wind := float(weather.get("wind", 0.0))
+	if d == 0 or d > SCENT_TILES * wind or not World.fields.under_sky(agent.tile):
+		return false
+	var way := Vector2(agent.tile - from).normalized()
+	return way.dot(weather.get("wind_dir", Vector2.ZERO)) >= SCENT_ALIGN
 
 
 ## Whether it can see [param cell] (a spot, not someone): in range, in its

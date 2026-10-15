@@ -345,7 +345,8 @@ func _left(id: String) -> void:
 
 
 ## Group [param id] is beaten: those still running scatter (off the map),
-## what it carried lies where it fell, raid_beaten.
+## what it carried lies where it fell, the companions it took are free
+## (World.companion_freed), raid_beaten.
 func _beaten(id: String) -> void:
 	var record: Dictionary = _groups[id]
 	var at: Vector2i = record["cell"]
@@ -354,6 +355,10 @@ func _beaten(id: String) -> void:
 	_despawn(record)
 	for uid: Variant in record["carries"]["items"]:
 		World.put_on_ground(int(uid), at)
+	# The companions it carried are free, back beside their players.
+	for who: Variant in record["carries"]["captives"]:
+		if str(who).begins_with("companion:") and World.companion_freed.is_valid():
+			World.companion_freed.call(str(who).trim_prefix("companion:"), "")
 	World.enter(was)
 	_groups.erase(id)
 	print("[raids] %s is beaten in %s at %s" % [id, record["area"], at])

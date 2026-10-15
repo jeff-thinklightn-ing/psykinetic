@@ -1407,6 +1407,8 @@ func _boot() -> void:
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
+	# A beaten raid's companion captives come back (decision 314).
+	World.companion_freed = companion_freed
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record

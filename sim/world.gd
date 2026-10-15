@@ -297,6 +297,10 @@ var spared: Callable
 ## zone World is in, as a level's are (Main's _spawn); null if it cannot.
 ## Unset (a test that builds its own), nothing is spawned.
 var spawn_spec: Callable
+## A taken companion freed where she is (player id, town place or "" for
+## beside her player): Main's companion_freed. Raids calls it for those a
+## beaten group carried (decision 314).
+var companion_freed: Callable
 ## carried_lights' memo: for which (tick, entity count), and the list.
 var _carried_lights_key := Vector2i(-1, -1)
 var _carried_lights: Array[GridEntity] = []

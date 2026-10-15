@@ -140,6 +140,8 @@ func _ready() -> void:
 			_pack()
 		"raid":
 			_raid()
+		"wild":
+			_wild()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -153,7 +155,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "wild"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -518,6 +520,32 @@ func _pack() -> void:
 	]
 
 
+func _wild() -> void:
+	var rows: Array[String] = ["########################################"]
+	for y in 12:
+		rows.append("#......................................#")
+	rows.append("########################################")
+	var markers := {Vector2i(3, 6): "start"}
+	var entities: Array = []
+	for at: Vector2i in [Vector2i(16, 5), Vector2i(17, 7), Vector2i(15, 7)]:
+		markers[at] = "monster_deer"
+		entities.append({"at": [at.x, at.y], "facing": [1, 0]})
+	markers[Vector2i(18, 6)] = "monster_stag"
+	entities.append({"at": [18, 6], "facing": [1, 0]})
+	markers[Vector2i(36, 6)] = "monster_wolf"
+	entities.append({"at": [36, 6], "facing": [-1, 0]})
+	# Animals are placed by herds, not markers: the clip's own legend has them.
+	var config := {"name": "Clip", "zone": "outdoors", "entities": entities,
+		"legend": {"monster_deer": "#c08040", "monster_stag": "#a06030", "monster_wolf": "#808890"}}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["say", 60, "A herd grazes, heads down between strolls. Far off, a wolf."],
+		["walk", Vector2i(10, 6), "Walk up on them: a step heard, a head comes up (?)..."],
+		["walk", Vector2i(12, 6), "...seen, one bolts (~), and the herd with it."],
+		["say", 200, "Running from you, toward the wolf: it goes for a doe."],
+	]
+
+
 func _raid() -> void:
 	var rows: Array[String] = [
 		"################################",
@@ -844,7 +872,7 @@ func _nearest_standing() -> Monster:
 
 
 func _log(tick: int) -> void:
-	if scenario == "pack" or scenario == "raid":
+	if scenario in ["pack", "raid", "wild"]:
 		var each: Array[String] = []
 		for entity in World.monsters():
 			var monster := entity as Monster
