@@ -8,6 +8,8 @@ top section as the release notes.
 
 - A goblin that spots you and calls its pack is heard calling (a brute
   lower, an imp higher), and a smashed crate or cart sounds like one.
+- The town's smith makes knives, axe heads and nails from ore, and its
+  cook makes travel rations from food, for the shop.
 - A town in the wilds, by the pond and the shack: a stone square with a
   well, the town's store (its depot and shop counter), a forge and a
   kitchen, three homes, lanes between them, and a dirt road north to the

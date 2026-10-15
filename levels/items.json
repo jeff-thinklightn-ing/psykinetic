@@ -21,6 +21,16 @@
 			"tags": ["resource"], "yield": {"gold": 10}, "use": "purse"},
 		{"id": "ration", "name": "travel ration", "short": "Ration", "color": "c89a5a",
 			"art": "item.ration", "kind": "held", "size": [0.15, 0.08, 0.1], "weight": 0.5, "hands": 1,
-			"tags": ["food"], "use": "eat", "effects": [{"kind": "mass", "amount": 10, "ticks": 1800}]}
+			"tags": ["food"], "use": "eat", "effects": [{"kind": "mass", "amount": 10, "ticks": 1800}],
+			"made": {"by": "cook", "from": {"food": 1}, "steps": 600}},
+		{"id": "knife", "name": "knife", "short": "Knife", "color": "b8bcc4",
+			"art": "item.knife", "kind": "held", "size": [0.04, 0.25, 0.02], "weight": 0.3, "hands": 1,
+			"tags": ["weapon", "tool"], "made": {"by": "smith", "from": {"ore": 1}, "steps": 1200}},
+		{"id": "axe_head", "name": "axe head", "short": "Axe head", "color": "8c9098",
+			"art": "item.axe_head", "kind": "held", "size": [0.16, 0.12, 0.03], "weight": 1.2, "hands": 1,
+			"tags": ["tool", "part"], "made": {"by": "smith", "from": {"ore": 2}, "steps": 1800}},
+		{"id": "nails", "name": "bag of nails", "short": "Nails", "color": "7a7d82",
+			"art": "item.nails", "kind": "held", "size": [0.1, 0.1, 0.08], "weight": 1.0, "hands": 1,
+			"tags": ["part"], "made": {"by": "smith", "from": {"ore": 1}, "steps": 600}}
 	]
 }

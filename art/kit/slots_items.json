@@ -1,6 +1,25 @@
 {
 	"about": "Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand.",
 	"slots": {
+		"item.axe_head": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.16,
+				0.12,
+				0.03
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "axe head (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bandaging_kit": {
 			"budget": 500,
 			"category": "items",
@@ -76,6 +95,44 @@
 			},
 			"type": "mesh",
 			"uses": "sack of food (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.knife": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.04,
+				0.25,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "knife (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.nails": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.1,
+				0.1,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bag of nails (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.ore_sack": {
 			"budget": 500,
