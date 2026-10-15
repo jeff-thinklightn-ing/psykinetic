@@ -386,6 +386,14 @@ func _test_means_in_voice() -> void:
 	DayNight.day_steps = maxi(production.now() - 1, 1)
 	_check(production.now() > 1 and body.means_words().has("You have had nothing to eat since yesterday or before."), "hungry a day: since yesterday (%s)" % [body.means_words()])
 	DayNight.day_steps = day
+	_check(not body.means_words().any(func(line: String) -> bool: return "owe" in line), "owing nothing: no debt said")
+	production.set_loan("rs-means", 11.2)
+	_check(body.means_words().has("You owe the town 12 gold.") and not body.means_words().any(func(line: String) -> bool: return "working off" in line),
+		"a loan: what it owes, rounded up (%s)" % [body.means_words()])
+	production.set_loan("rs-means", 29.5, true)
+	_check(body.means_words().has("You owe the town 30 gold.") and body.means_words().has("You are working off your debt to the town, hauling for it, and cannot borrow more."),
+		"working it off: it says so (%s)" % [body.means_words()])
+	production.set_loan("rs-means", 0.0)
 	_check(body.means_words()[0] in body.facts_now(), "and they are among what is true now")
 	production.note_meal("rs-means", "bought")
 	production.set_away("rs-means", true)

@@ -6327,6 +6327,9 @@ the town ate from the dole or went hungry (Production.on_dole). Nothing
 before a first meal or trade; a meal bought or the store's food adds no
 line of its own beyond the trade. A companion resting in town gets hers
 too (companion:<id> trades). Facts only, as ever: never what to say.
+And what they owe the town's bank (decision 354): "You owe the town N
+gold." (the loan rounded up, none at 0), and while they work it off as
+town labour, that they do and cannot borrow more.
 
 Rejected: a mind per resident (a dozen calls in flight against the box's
 budget); residents talking unasked (idle chatter costs calls and drowns the

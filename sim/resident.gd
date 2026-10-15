@@ -279,8 +279,9 @@ func work_words() -> String:
 	return "You are making %s%s: it is %s." % [Companion._a(what), into, far]
 
 
-## How it last ate, its last trade and how many of the town the town feeds
-## (Production's worker facts, Economy's: decision 353), a sentence each;
+## How it last ate, what it owes the town's bank and whether it works that
+## off (decision 354), its last trade and how many of the town the town
+## feeds (Production's worker facts, Economy's: decision 353), a sentence each;
 ## none before its first meal or trade (decision 336 amended).
 func means_words() -> Array[String]:
 	var out: Array[String] = []
@@ -299,6 +300,11 @@ func means_words() -> Array[String]:
 				out.append("You went without at your last meal: there was nothing you could eat.")
 		"dole":
 			out.append("At your last meal the town fed you for nothing: you could not pay.")
+	var owed := ceili(float(me.get("loan", 0.0)))
+	if owed > 0:
+		out.append("You owe the town %d gold." % owed)
+	if bool(me.get("working_off", false)):
+		out.append("You are working off your debt to the town, hauling for it, and cannot borrow more.")
 	var trade_words := _trade_words(me.get("last_trade", {}), now)
 	if not trade_words.is_empty():
 		out.append(trade_words)

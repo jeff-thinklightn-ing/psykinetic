@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Spoken to, a resident also knows what they owe the town's bank, and
+  whether they are working that debt off by hauling.
+
 ## v0.1.147
 
 - The town's gold is now a bank: a resident short of gold borrows from it
