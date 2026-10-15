@@ -51,6 +51,7 @@ func _ready() -> void:
 	await _test_doors_swing()
 	await _test_door_states()
 	_test_art_puppets()
+	await _test_creature_puppets()
 	_test_piles()
 	_test_heard_as_monsters_hear()
 	_test_ambience_runs()
@@ -1833,6 +1834,40 @@ func _test_art_puppets() -> void:
 		crate.impacted.connect(callable)
 	ArtKit.forget("prop.crate")
 	_check(Client3D.art_slot_for(crate) == "", "and back to its cube when the art is gone")
+
+
+func _test_creature_puppets() -> void:
+	print("
+== a boar is drawn from creature.boar's art, played by its CreatureView (decision 359) ==")
+	var boar := _spawn_imp(Vector2i(9, 4), "boar")
+	await _frames(2)
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets.get(boar.get_instance_id())
+	_check(puppet != null and Client3D.creature_slot_for(boar) == "creature.boar", "a boar's puppet, its slot creature.boar (it has art)")
+	if puppet == null:
+		return
+	var view := puppet.get_meta("creature_view", null) as CreatureView
+	var art := puppet.get_node_or_null("Body/Pose").get_child(0) as Node3D if puppet.has_node("Body/Pose") else null
+	_check(view != null and art != null and str(art.get_meta("slot", "")) == "creature.boar"
+			and (puppet.get_node("Facing") as Node3D).get_child_count() == 0,
+			"drawn as creature.boar's art under Body/Pose, no nose")
+	if view == null:
+		World.despawn(boar)
+		return
+	_check(["idle", "walk", "run", "graze", "attack", "death"].all(func(clip: String) -> bool: return view.clips.has(clip)),
+			"the Pig's clips found by the slot's names: %s" % [view.clips])
+	_check(view.resolve("charge") == view.clips["run"] and view.resolve("alert") == view.clips["idle"] and not view.clips.has("hit"),
+			"no charge, alert or hit of its own: run and idle stand in (a flinch for a hit)")
+	var player := art.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
+	_check(player.get_animation(view.clips["walk"]).loop_mode == Animation.LOOP_LINEAR
+			and player.get_animation(view.clips["death"]).loop_mode == Animation.LOOP_NONE, "its walk loops, its death plays once")
+	view.frame(puppet, boar)
+	_check(player.current_animation == view.clips["idle"], "standing still: idle")
+	view.wind(0.6)
+	_check(player.current_animation == view.clips["attack"] and player.speed_scale > 0.0, "a wound-up blow plays its headbutt")
+	_check(view.die() > 0.0 and player.current_animation == view.clips["death"], "dying plays its death")
+	World.despawn(boar)
+	await _frames(2)
 
 
 # --- helpers ------------------------------------------------------------------

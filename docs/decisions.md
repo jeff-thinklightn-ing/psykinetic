@@ -7213,3 +7213,32 @@ cell's level. editor_test paints, lowers, sets, picks, undoes, lays a
 flight, raises and levels an area, and reads the saved `height.png` back
 through `Level.parse`. Editor only; no protocol change.
 
+## 359. Creatures drawn from their art slots, played by CreatureView
+
+A monster whose kind's row names an "art" slot (`Monster.art_of`: creature.boar
+for a boar) is drawn from that slot's own art once it has some (decision 319's
+rigged bodies); until then it is its shape, as before.
+`Client3D.creature_slot_for` decides; the puppet's Body turns to its facing,
+a "Pose" node under it turns the art's front (+Z) to +X and is what the
+stand-in tweens tip and push.
+
+New class_name `CreatureView` (client3d/creature_view.gd), a node under the
+puppet, plays it from what the sim replicates, the same on every peer:
+
+- the slot's clips found by its names for them (any of a clip's "names",
+  after any "library/" or "Armature|", as ArtCheck finds them); the looping
+  ones set to loop (a glTF's clips import playing once);
+- each frame: moving faster than 0.4 tiles a second walks, faster than 2.2
+  (or fleeing, charging, routed) runs, each at its pace; still and sitting
+  (Monster.Pose.SIT) grazes; still and SUSPICIOUS is alert; else idle;
+- one-shots: a blow (swung) its attack, a wound-up blow (winding, HEAVY) its
+  attack timed so the middle lands with the sim's, a blow taken its hit,
+  death its death held on its last frame, then it lies and sinks as a model
+  does; cried "charge" a faster run, "rout" a run;
+- where the art has no clip of its own, the slot's fallback: graze and alert
+  an idle (the head tipped up for an alert or a howl), charge a run with a
+  lunge, a hit a flinch (tipped and pushed back).
+
+Its pick shape is a cylinder round its middle, which needs no turning.
+`tools/blender/export_slot.py` exports a rigged slot's actions with it. Client
+only; the protocol is unchanged.

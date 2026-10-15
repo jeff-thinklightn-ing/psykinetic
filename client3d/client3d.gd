@@ -5088,6 +5088,11 @@ func _sync_puppets() -> void:
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
 			_animate(puppet)
+		elif puppet.has_meta("creature_view"):
+			var body := puppet.get_node("Body") as Node3D
+			if not is_equal_approx(body.rotation.y, yaw):
+				body.rotation.y = yaw
+			(puppet.get_meta("creature_view") as CreatureView).frame(puppet, entity as Monster)
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
 	for id in _puppets.keys():
@@ -5171,6 +5176,8 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet != null and cause != &"impact":
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))  # An impact is shown by _on_impacted.
+		if puppet.has_meta("creature_view"):
+			(puppet.get_meta("creature_view") as CreatureView).hit()
 	if puppet != null and cause == &"attack":
 		sfx.play("sfx.hit_flesh", puppet.position + Vector3.UP * 0.8)
 
@@ -5311,6 +5318,14 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	# their side, a touch too far, back, and still.
 	if puppet.has_meta("knock"):
 		puppet.remove_meta("knock")
+	var dying := (puppet.get_meta("creature_view") as CreatureView).die() if puppet.has_meta("creature_view") else 0.0
+	if dying > 0.0:
+		# A creature plays its death and lies where it fell, as a model does.
+		var lies := create_tween()
+		lies.tween_interval(CORPSE_SECONDS + dying)
+		lies.tween_property(puppet, "position:y", -SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
+		lies.tween_callback(puppet.queue_free)
+		return
 	var death := _pick_clip(puppet, DEATH_CLIPS)
 	if _play_once(puppet, death):
 		puppet.set_meta("busy_until", 1 << 62)
@@ -5356,6 +5371,19 @@ func _update_mourning(delta: float) -> void:
 static func art_slot_for(entity: GridEntity) -> String:
 	var slot := str(entity.spawn_spec.get("art", ""))
 	if slot == "" or not ArtKit.has(slot) or ArtKit.filled_by(slot) != "own":
+		return ""
+	return slot
+
+
+## The creature slot [param entity] is drawn from (decision 359): its kind's
+## "art" (Monster.art_of: creature.boar for a boar, the wilds' animals of
+## decision 319) once that slot has art of its own, played by a
+## CreatureView; "" while it has none, and it is its shape, as before.
+static func creature_slot_for(entity: GridEntity) -> String:
+	if not entity is Monster:
+		return ""
+	var slot := Monster.art_of(str(entity.spawn_spec.get("kind", "")))
+	if slot == "" or not ArtKit.has(slot) or str(ArtKit.spec(slot).get("kind", "")) != "creature" or ArtKit.filled_by(slot) != "own":
 		return ""
 	return slot
 
@@ -5653,7 +5681,10 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	if not model.is_empty():
 		_vary(entity, puppet)
 	var art := art_slot_for(entity)
-	var height: float = float(model["height"]) * float(puppet.get_meta("model_scale", 1.0)) if not model.is_empty() 			else ArtKit.size(art).y if art != "" else Iso.HEIGHTS[shape]
+	var creature := creature_slot_for(entity) if model.is_empty() else ""
+	if creature != "":
+		art = ""
+	var height: float = float(model["height"]) * float(puppet.get_meta("model_scale", 1.0)) if not model.is_empty() 			else ArtKit.size(creature).y if creature != "" else ArtKit.size(art).y if art != "" else Iso.HEIGHTS[shape]
 	var material := StandardMaterial3D.new()
 	var sprite := entity.get_node_or_null("Sprite") as Sprite2D
 	material.albedo_color = sprite.modulate if sprite != null else Color.WHITE
@@ -5668,7 +5699,30 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var collision := CollisionShape3D.new()
 	collision.position.y = height * 0.5
 	area.add_child(collision)
-	if art != "":
+	if creature != "":
+		# Its creature slot's rigged art (decision 359): Body turns to its
+		# facing (+X ahead, as the nose), Pose turns the art's front (+Z)
+		# there and is what the view's stand-in tweens tip and push.
+		var drawn := Node3D.new()
+		drawn.name = "Body"
+		var pose := Node3D.new()
+		pose.name = "Pose"
+		pose.rotation.y = PI * 0.5
+		var instance := ArtKit.instance(creature)
+		pose.add_child(instance)
+		drawn.add_child(pose)
+		puppet.add_child(drawn)
+		var view := CreatureView.new(creature, instance, pose)
+		puppet.add_child(view)
+		puppet.set_meta("creature_view", view)
+		# The pick shape turns with nothing: a cylinder round its middle,
+		# whichever way it faces.
+		var cylinder := CylinderShape3D.new()
+		var size := ArtKit.size(creature)
+		cylinder.radius = maxf(size.x, size.z) * 0.4
+		cylinder.height = size.y
+		collision.shape = cylinder
+	elif art != "":
 		# Its slot's own art, standing on the tile; the pick shape its size.
 		var drawn := Node3D.new()
 		drawn.name = "Body"
@@ -5702,7 +5756,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# A model turns itself instead.
 		var pivot := Node3D.new()
 		pivot.name = "Facing"
-		if model.is_empty():
+		if model.is_empty() and creature == "":
 			var nose := MeshInstance3D.new()
 			var nose_mesh := BoxMesh.new()
 			nose_mesh.size = Vector3(0.18, 0.1, 0.14)
@@ -5772,6 +5826,8 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	sfx.play("sfx.swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
 		_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
+		if puppet.has_meta("creature_view"):
+			(puppet.get_meta("creature_view") as CreatureView).swing()
 	var body := puppet.get_node("Body") as Node3D
 	var rest := Vector3(0.0, body.position.y, 0.0)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE
@@ -5832,6 +5888,12 @@ func _on_cried(cry: StringName, id: int) -> void:
 	if puppet == null or monster == null:
 		return
 	var creature := str(monster.spawn_spec.get("kind", ""))
+	if puppet.has_meta("creature_view"):
+		var view := puppet.get_meta("creature_view") as CreatureView
+		if cry == &"charge":
+			view.charge()
+		elif cry == &"rout":
+			view.bolt()
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
@@ -5842,6 +5904,11 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	if puppet == null:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
+	if puppet.has_meta("creature_view"):
+		# A creature's wound-up blow: its attack, timed to land with the sim's.
+		(puppet.get_meta("creature_view") as CreatureView).wind(ticks * World.TICK_DT)
+		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) + 400)
+		return
 	if not _play_once(puppet, CLIP_HEAVY):
 		return
 	var animator := puppet.get_meta("animator") as AnimationPlayer

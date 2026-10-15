@@ -1,5 +1,6 @@
 # Exports an art slot's .blend to its .glb, as the game reads it: glTF binary, +Y up,
-# modifiers applied, custom properties kept (as glTF extras), no images. Run by tools/art_drop.ps1 and
+# modifiers applied, custom properties kept (as glTF extras), no images, a rigged slot's
+# clips (its actions) with it. Run by tools/art_drop.ps1 and
 # tools/art_preview:
 #   blender -b <slot>.blend --python tools/blender/export_slot.py -- <slot>.glb
 # The template's "guide" collection (the slot's outline, tools/blender/template_slot.py) is
@@ -20,7 +21,7 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
     export_apply=True,
     export_extras=True,
-    export_animations=False,
+    export_animations=True,
     export_cameras=False,
     export_lights=False,
     # No images: the game swaps the "palette" material for the shared one (decision 261), and

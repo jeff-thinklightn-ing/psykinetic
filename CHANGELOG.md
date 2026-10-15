@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Boars in the wilds are drawn as boars now, not stand-in shapes: they
+  walk, run, graze, lift their heads when they hear you, headbutt, flinch
+  when struck and fall when killed. Deer, stags, wolves and rabbits follow
+  as their art lands.
 - Spoken to, a resident also knows what they owe the town's bank, and
   whether they are working that debt off by hauling.
 - Builder mode can shape the ground's height: raise or lower cells, make a
