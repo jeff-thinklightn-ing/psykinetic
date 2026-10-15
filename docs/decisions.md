@@ -4482,3 +4482,38 @@ or level changes (unlocked, built, raised, damaged, repaired), and
 Towns.buildings_of(town) gives {kind: {state, level}}. They are what the
 buildings worktree's views draw from (agreed with buildings): the state
 lives only in Towns, never in level files.
+
+## 296. Art slots are made once before a room is built; the forest is measured from its edge
+
+A 256x256 outdoor map (the wilds) took 6 to 7 s to be ready, against
+under 3 indoors. Timed phase by phase (tools/map_bench --outdoor=1), the
+forest took 3.9 to 4.8 s of it, and of that the first tree 3.8 to 4.2 s,
+the other 3,992 together 56 ms; and a rebuild spent 2.5 s freeing the old
+room. A tree is not dear: made in a bare script it takes under 5 ms,
+windowed or not. Split further, the 3.6 s was ArtKit freeing the sample
+it measures a slot's height from ("fit"). Perf found why (Godot 4.7.2):
+freeing any VisualInstance3D while the RenderingServer holds many newly
+added instances that no drawn frame has taken in yet is pathologically
+slow (100,000 added, one free: 36 s; the same free after two drawn
+frames: 0.1 ms; headless, 1.8 ms). A room's build adds tens of thousands
+in one frame, so a free during it pays; a free before it, or once a frame
+has been drawn, does not.
+
+Client3D._warm_art makes and lets go every mesh slot in WARM_CATEGORIES
+(walls, doors, trees, rocks, buildings) once a process, before any room
+is built: every slot's load and fit happen, and any free with them, while
+there is nothing pending. Nothing in a build may free a 3D node until a
+frame has been drawn (ArtKit's fit sample is the one there was; caching
+its height from the scene's bounds would take the trap out of ArtKit
+itself). The 2.5 s freeing the old room in map_bench's rebuild is the
+same trap in the bench, which rebuilds with no frame drawn since the
+first build; in play a frame has always been drawn by then. And _measure_forest walks from the land's outline only (a land
+cell with void beside it), not from every land cell (65,536 at 256x256):
+the land within is 0 by being land, and only the outline's 0 is read.
+
+tools/map_bench, windowed, under the bench lock, alternately with main:
+256x256 outdoors, ready 6.38 / 6.72 s to 3.02 / 2.89, 3D rebuild 3.96 /
+4.06 s to 1.85 / 1.75; indoors, ready 2.97 to 2.77, rebuild 1.75 to 1.64;
+frames and nodes unchanged. Rejected for now: trees by MultiMesh (the
+forest builds in 140 ms now; it would save about 14,000 nodes, but the
+near-fade swaps materials by node and would need per-instance alpha).

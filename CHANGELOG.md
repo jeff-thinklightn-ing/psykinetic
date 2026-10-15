@@ -19,6 +19,8 @@ top section as the release notes.
   carpenter then repairs. Raiders never take gold, materials or the
   town's progress, and anyone carried off waits to be rescued. No
   raiders set out yet.
+- Big outdoor maps like the wilds load in about half the time (about 3 s
+  instead of 6 to 7 on a fast machine).
 
 ## v0.1.141
 

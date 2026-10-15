@@ -417,6 +417,8 @@ const TREE_LEAN := 0.1
 const TREE_NUDGE := 0.42
 const FOREST_CLUMP := 6.0
 const FOREST_GROUND := 3
+## The art slots made once before a room is built (_warm_art).
+const WARM_CATEGORIES: Array[String] = ["walls", "doors", "trees", "rocks", "buildings"]
 ## Saplings: how often an edge cell has one besides its tree, and their
 ## size against a tree's (252, 277).
 const SAPLING_CHANCE := 0.6
@@ -1846,6 +1848,7 @@ func _build_room() -> void:
 			if not _plain_walls.has(key):
 				_building_walls.append(key)
 				_plain_walls[key] = true
+	_warm_art()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
 	_land.clear()
@@ -1922,6 +1925,23 @@ func _add_buildings() -> void:
 			continue  # Nobody stands in a well: it has no inside.
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
+
+
+## Every art slot the room may be built from (WARM_CATEGORIES), made once
+## and let go, before the room is: the first of a slot loaded into an
+## already big room cost seconds (a 256x256 outdoor map's first tree 4 s,
+## its room's freeing 2.5 s; made first, 9 ms and 0.2 s). Once a process.
+static var _warmed := false
+
+
+static func _warm_art() -> void:
+	if _warmed:
+		return
+	_warmed = true
+	for slot: String in ArtKit.slots():
+		var spec: Dictionary = ArtKit.spec(slot)
+		if str(spec.get("type", "mesh")) == "mesh" and str(spec.get("category", "")) in WARM_CATEGORIES:
+			ArtKit.instance(slot).free()
 
 
 ## An edge between the land and the void: the map's outline.
@@ -2245,11 +2265,17 @@ static func _scatter_triangle(surface: SurfaceTool, points: Array, colours: Arra
 ## How far each void cell is from the land (cells, eight ways), out to
 ## FOREST_REACH: a walk outward from every land cell at once.
 func _measure_forest() -> Dictionary[Vector2i, int]:
+	# The walk starts from the land's outline only (a land cell with void
+	# beside it): the land within is 0 by being land, and walking it cost
+	# a 256x256 map 65,536 cells to reach a few thousand.
 	var distance: Dictionary[Vector2i, int] = {}
 	var frontier: Array[Vector2i] = []
 	for cell: Vector2i in _land:
-		distance[cell] = 0
-		frontier.append(cell)
+		for direction: Vector2i in World.DIRECTIONS:
+			if not _land.has(cell + direction):
+				distance[cell] = 0
+				frontier.append(cell)
+				break
 	var head := 0
 	while head < frontier.size():
 		var cell := frontier[head]
@@ -2258,7 +2284,7 @@ func _measure_forest() -> Dictionary[Vector2i, int]:
 			continue
 		for direction: Vector2i in World.DIRECTIONS:
 			var next := cell + direction
-			if not distance.has(next):
+			if not distance.has(next) and not _land.has(next):
 				distance[next] = distance[cell] + 1
 				frontier.append(next)
 	return distance
