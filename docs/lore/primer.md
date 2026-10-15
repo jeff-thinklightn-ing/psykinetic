@@ -109,9 +109,12 @@ Whether there are other factions (outlaws, a rival steading) is open *(asked: E1
 
 ## The companions
 
-Wren, Pip and Nix travel with the players by choice. Who each one is (temper and
-manner) is in their cards (`levels/companions.json`, owned by the companions
-tree). Where they come from, and how they came to the town, are open *(asked: E2)*.
+Companions travel with the players by choice. Who each one is (temper, manner,
+where she comes from) is in her card, which the companions tree makes: by Jeff's
+ruling on E2, cards are rolled for every companion, and a card grows from what
+she witnesses and what is said to her. Lore doesn't write companions' pasts. It
+gives the world they are rolled into. Whether Wren, Pip and Nix stay in the lore
+as named people is open *(asked: E2)*.
 
 ## Who knows what
 

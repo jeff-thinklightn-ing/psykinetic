@@ -67,7 +67,7 @@
 			"name": "Wren",
 			"status": "asked",
 			"source": "game",
-			"summary": "A companion; her temper and manner are in her card (levels/companions.json).",
+			"summary": "A companion; who she is comes from her card, which the companions tree makes.",
 			"ask": "E2",
 			"relations": [],
 			"tags": [
@@ -81,7 +81,7 @@
 			"name": "Pip",
 			"status": "asked",
 			"source": "game",
-			"summary": "A companion; her temper and manner are in her card (levels/companions.json).",
+			"summary": "A companion; who she is comes from her card, which the companions tree makes.",
 			"ask": "E2",
 			"relations": [],
 			"tags": [
@@ -95,7 +95,7 @@
 			"name": "Nix",
 			"status": "asked",
 			"source": "game",
-			"summary": "A companion; his temper and manner are in his card (levels/companions.json).",
+			"summary": "A companion; who he is comes from his card, which the companions tree makes.",
 			"ask": "E2",
 			"relations": [],
 			"tags": [
