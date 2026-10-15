@@ -74,6 +74,13 @@ func _test_catalog() -> void:
 			"the bandaging kit is as it was, used to bandage")
 	_check(Items.yield_of("ore_sack") == {"ore": 5} and Items.yield_of(KIT).is_empty(), "a sack of ore banks as 5 ore; a kit as nothing")
 	_check(Items.tidy([KIT, "no_such_thing"], 3) == PackedStringArray([KIT, "", ""]), "an unknown id is dropped from slots")
+	var unknown_drops := []
+	for kind: String in Monster.kinds():
+		for drop: Variant in Monster.kinds()[kind]["drops"]:
+			if not Items.exists(str(drop.get("item", ""))):
+				unknown_drops.append("%s: %s" % [kind, drop])
+	_check(unknown_drops.is_empty(), "every monster's drops name a thing in the catalog (%s)" % [unknown_drops])
+	_check(Items.yield_of("meat") == {"food": 1} and Items.value_of("antlers") == 5, "meat banks as food; antlers are worth 5")
 	var generated: Variant = JSON.parse_string(FileAccess.get_file_as_string(Items.ART_SLOTS)) if FileAccess.file_exists(Items.ART_SLOTS) else null
 	_check(generated is Dictionary and generated == JSON.parse_string(JSON.stringify(Items.art_slots())),
 			"%s is current with the catalog (else: tools/items_art_slots.gd)" % Items.ART_SLOTS)

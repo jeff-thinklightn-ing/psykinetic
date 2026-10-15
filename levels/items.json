@@ -59,6 +59,18 @@
 		{"id": "bow", "name": "hunting bow", "short": "Bow", "color": "8a6038",
 			"art": "item.bow", "kind": "held", "size": [0.06, 1.3, 0.25], "weight": 1.0, "hands": 2,
 			"tags": ["weapon", "ranged"], "verb": {"kind": "ranged", "cells": 8, "draw_min": 5, "draw_full": 20},
-			"made": {"by": "smith", "from": {"wood": 2, "cloth": 1}, "steps": 2400}}
+			"made": {"by": "smith", "from": {"wood": 2, "cloth": 1}, "steps": 2400}},
+		{"id": "meat", "name": "cut of meat", "short": "Meat", "color": "a8483c",
+			"art": "item.meat", "kind": "held", "size": [0.2, 0.08, 0.14], "weight": 2.0, "hands": 1,
+			"tags": ["resource", "meat", "raw"], "yield": {"food": 1}, "value": 1},
+		{"id": "hide", "name": "raw hide", "short": "Hide", "color": "8a6a4a",
+			"art": "item.hide", "kind": "held", "size": [0.5, 0.06, 0.4], "weight": 3.0, "hands": 1,
+			"tags": ["hide", "raw"], "value": 3},
+		{"id": "antlers", "name": "pair of antlers", "short": "Antlers", "color": "d8c8a8",
+			"art": "item.antlers", "kind": "held", "size": [0.6, 0.5, 0.15], "weight": 3.0, "hands": 1,
+			"tags": ["bone", "trophy"], "value": 5},
+		{"id": "tusks", "name": "pair of tusks", "short": "Tusks", "color": "e8e0c8",
+			"art": "item.tusks", "kind": "held", "size": [0.18, 0.06, 0.06], "weight": 0.6, "hands": 1,
+			"tags": ["bone", "trophy"], "value": 4}
 	]
 }
