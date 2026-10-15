@@ -6981,3 +6981,61 @@ back 20 or so a pass well before they could be seen; a join recalls those
 within 44 of it at once (castle density: about 180, some 50 ms).
 Server only; no protocol change. map_bench reads nodes and memory a frame
 or two after the run, so what was freed is gone.
+
+## 354. The town's bank: loans to residents, rent 1 a day
+
+Jeff (2026-10-15), shown the official-jobs model of decision 353 beside a
+bank model: "Bank, rent 1 a day". The question was: "whats if its not a
+treasury, just a bank, and they collect the "tax" but its just there as
+loans to keep the economy going".
+
+The town's gold (its store's "gold", the treasury of 353) is a bank.
+What it takes in is capital: taxes, the value of materials sold, fees,
+bed money, store food, and loans paid back. It lends that capital back
+out, and the official wages and town work of 353 are paid from it too.
+
+How a loan works (`Economy._afford`, `Economy._bank_turn`):
+- A resident short of gold for a need borrows the rest from the bank,
+  with `interest` (0.1) added to what they owe. This is Production's
+  worker `loan`, a float, saved.
+- What they owe never goes past `cap` (30), and the bank never lends more
+  than it holds, so it never goes below nothing.
+- Each world tick, a borrower pays back `repay_share` (0.5) of their purse.
+- One who owes within a coin of the cap works it off as town labour,
+  `work_off` (6, a hauler's day) a day, until they owe `work_off_until`
+  (0.5) of the cap. No gold moves for this. They are `working_off`
+  (saved), and borrow nothing meanwhile.
+- A debt is never written off.
+- The dole (353) comes only when the bank is empty, the borrower is at the
+  cap, or they are working off a debt.
+- Ledger lines: "Odo borrowed 4 from the town (owes 5)" (`loan:<id>`),
+  "Odo paid back 3 to the town (owes 2)" (`repay:<id>`), and once when it
+  starts, "Odo works off the debt to the town hauling (owes 29)"
+  (`work_off:<id>`).
+- Interest only moves gold back into the bank. Nothing is made, so gold
+  is conserved but for rent.
+
+Rent is 1 a day per resident (it was 3), and it is still the sink.
+
+folk_test, over 7 days with 8 residents (2 cooks, smith, carpenter,
+guard, 3 haulers), 150 gold spread, the bank starting at 0, 400 food, and
+the walls ordered on day 1:
+
+| End of | Bank | Owed |
+|---|---|---|
+| Day 1 | 23 | 0 |
+| Day 3 | 45 | 28 |
+| Day 5 | 57 | 61 |
+| Day 7 | 66 | 102 |
+
+- Over the 7 days: 82 meals bought, 85 services and beds, 199 lent, 104
+  paid back, 172 in official wages, 5 for the walls, 2 dole meals, rent 35.
+- The bank never goes below nothing, nobody owes past the cap, no purse
+  passes 150, and everyone eats.
+- The official-jobs model without the bank, at rent 3, had 106 dole meals
+  in the same week.
+
+Players depositing and borrowing at the counter is a later step.
+Snapshot: workers gain `loan` and `working_off`; older saves owe nothing.
+Server only.
+

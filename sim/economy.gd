@@ -305,16 +305,18 @@ func sell(player_id: String, town: String, id: String) -> Dictionary:
 ## Each resident (a Production worker not away) meets their needs from
 ## their purse on the world tick, each need (rules' "folk" "needs") on its
 ## own clock: a meal (tags) is bought from the shop at its price (split as
-## a player's buy: materials and tax to the treasury, the rest its maker's), only past keep_in_shop of
-## them so players find one; else the store's food at its value x need,
-## paid into the treasury; else, broke, the town feeds them from the store
-## (the dole); else they go hungry. A service is paid to a resident of its
-## trade there (the trade tax to the treasury) or, for a building's
-## (the inn's bed), to the treasury while it stands. One they can't pay for
-## or can't get waits till it is next due: nobody goes into debt. Above
-## rich_above gold, needs come due rich_every as often. Gold only moves:
-## nothing here makes any. Each trade is a ledger line (Stockpile.note) and
-## the worker's last_trade; Production.on_dole a signal.
+## a player's buy: materials and tax to the treasury, the rest its
+## maker's), only past keep_in_shop of them so players find one; else the
+## store's food at its value x need, paid into the treasury. One short of
+## gold borrows the rest from the town's bank (decision 354: _afford);
+## only when the bank is empty, or they owe its cap, does the town feed
+## them from the store (the dole), or they go hungry. A service is paid to
+## a resident of its trade there (the trade tax to the treasury) or, for a
+## building's (the inn's bed), to the treasury while it stands; one that
+## can't be paid for or got waits till it is next due. Above rich_above
+## gold, needs come due rich_every as often. Gold only moves: nothing here
+## makes any. Each trade is a ledger line (Stockpile.note) and the
+## worker's last_trade; Production.on_dole a signal.
 func tick() -> void:
 	var folk: Dictionary = rules.get("folk", {})
 	var needs: Dictionary = folk.get("needs", {})
@@ -331,6 +333,7 @@ func tick() -> void:
 		if bool(who["away"]) or str(who["town"]).is_empty():
 			continue
 		towns[who["town"]] = true
+		_bank_turn(id, str(who["town"]))
 		for need: String in names:
 			var rule: Dictionary = needs[need]
 			var every := int(rule.get("every", 0))
@@ -384,7 +387,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 			return a["price"] < b["price"] or a["price"] == b["price"] and a["uid"] < b["uid"])
 		var pick: Dictionary = food[0]
 		var cost := int(pick["price"])
-		if int(who["purse"]) >= cost:
+		if _afford(id, town, cost):
 			var thing := Items.name_of(pick["id"])
 			var maker := stockpile.maker_of(town, pick["uid"])
 			stockpile.take_from_shop(town, pick["uid"], "folk:%s" % id)
@@ -400,7 +403,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 	var store := str(rule.get("store", ""))
 	if not store.is_empty() and stockpile.has(town, store):
 		var cost := raw_price(town, store)
-		if int(who["purse"]) >= cost:
+		if _afford(id, town, cost):
 			production.spend(id, cost, "%s from the store" % store)
 			stockpile.take(town, store, 1, "folk:%s" % id)
 			stockpile.deposit(town, "gold", cost, "folk:%s" % id, "%s bought %s from the store for %d gold" % [who["name"], store, cost])
@@ -421,8 +424,8 @@ func _stay(id: String, need: String, rule: Dictionary) -> void:
 	var town: String = who["town"]
 	var fee := int(rule.get("fee", 0))
 	var what := str(rule.get("what", need))
-	if fee <= 0 or int(who["purse"]) < fee or not building_stands.is_valid() \
-			or not building_stands.call(town, str(rule["building"])):
+	if fee <= 0 or not building_stands.is_valid() \
+			or not building_stands.call(town, str(rule["building"])) or not _afford(id, town, fee):
 		return
 	production.spend(id, fee, what)
 	stockpile.deposit(town, "gold", fee, "folk:%s" % id, "%s paid %d gold for %s" % [who["name"], fee, what])
@@ -435,7 +438,7 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 	var fee := int(rule.get("fee", 0))
 	var what := str(rule.get("what", need))
 	var trade := str(rule["trade"])
-	if fee <= 0 or int(who["purse"]) < fee:
+	if fee <= 0:
 		return
 	# The one of that trade with the least gold, so it spreads.
 	var best := ""
@@ -447,7 +450,7 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 		if best.is_empty() or int(them["purse"]) < least:
 			best = other
 			least = int(them["purse"])
-	if best.is_empty():
+	if best.is_empty() or not _afford(id, town, fee):
 		return
 	production.spend(id, fee, what)
 	var seller := _pay(town, best, fee, "trade", "%s for %s" % [what, who["name"]])
@@ -473,6 +476,57 @@ func _sale(town: String, maker: String, id: String, cost: int, by: String, why: 
 		stockpile.deposit(town, "gold", stuff + split[0], "tax:sale", "%s: materials %d, tax %d" % [why, stuff, split[0]])
 	production.pay(maker, split[1], why)
 	return str(worker["name"])
+
+
+# --- The town's bank (decision 354) ------------------------------------------------
+
+## Whether worker [param id] can pay [param cost] now: from their purse,
+## or with rules' "bank", a loan from [param town]'s treasury (the town's
+## bank) for the rest: interest added to what they owe (Production's
+## "loan"), never past cap owed, never more than the bank holds, never to
+## one working off a debt. False (nothing lent) if not: then the dole, or
+## the need waits.
+func _afford(id: String, town: String, cost: int) -> bool:
+	var who := production.worker(id)
+	var purse := int(who["purse"])
+	if purse >= cost:
+		return true
+	var bank: Dictionary = rules.get("bank", {})
+	if bank.is_empty() or bool(who["working_off"]):
+		return false
+	var short := cost - purse
+	var owed := float(who["loan"])
+	var due := short * (1.0 + float(bank.get("interest", 0.0)))
+	if owed + due > float(bank.get("cap", 0)) or not stockpile.take(town, "gold", short, "loan:%s" % id):
+		return false
+	production.pay(id, short, "a loan from the town")
+	production.set_loan(id, owed + due)
+	stockpile.note(town, "gold", short, "loan:%s" % id, "%s borrowed %d from the town (owes %d)" % [who["name"], short, ceili(owed + due)])
+	return true
+
+
+## A borrower's turn each tick: repay_share of their purse goes back to
+## the bank; one who owes within a coin of the cap works it off as town
+## labour, work_off a day (no gold moves: the bank is paid in work), till
+## they owe work_off_until of the cap, said once in the ledger when it
+## starts. A debt is never written off.
+func _bank_turn(id: String, town: String) -> void:
+	var bank: Dictionary = rules.get("bank", {})
+	var who := production.worker(id)
+	var owed := float(who["loan"])
+	if bank.is_empty() or owed <= 0.0:
+		return
+	var back := mini(ceili(owed), ceili(int(who["purse"]) * float(bank.get("repay_share", 0.5))))
+	if back > 0 and production.spend(id, back, "paying back the town"):
+		owed = maxf(owed - back, 0.0)
+		stockpile.deposit(town, "gold", back, "repay:%s" % id, "%s paid back %d to the town (owes %d)" % [who["name"], back, ceili(owed)])
+	var cap := float(bank.get("cap", 0))
+	var working := owed >= cap - 1.0 or bool(who["working_off"]) and owed > cap * float(bank.get("work_off_until", 0.5))
+	if working:
+		if not bool(who["working_off"]):
+			stockpile.note(town, "labour", 0, "work_off:%s" % id, "%s works off the debt to the town hauling (owes %d)" % [who["name"], ceili(owed)])
+		owed = maxf(owed - float(bank.get("work_off", 0)) * World.WORLD_TICK_STEPS / 54000.0, 0.0)
+	production.set_loan(id, owed, working and owed > 0.0)
 
 
 ## [param amount] paid to worker [param payee] in [param town] for a

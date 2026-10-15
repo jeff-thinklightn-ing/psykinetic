@@ -66,7 +66,8 @@ var workshop_level := Callable()
 var on_built := Callable()
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
-## (need -> step due), fed, hungry_since, last_trade, wage_due}.
+## (need -> step due), fed, hungry_since, last_trade, wage_due, loan
+## (owed to the town's bank, decision 354), working_off}.
 var _workers: Dictionary[String, Dictionary] = {}
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
@@ -135,7 +136,8 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	list.assign(trades.map(func(trade: Variant) -> String: return str(trade)))
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
-		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0}
+		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0,
+		"loan": 0.0, "working_off": false}
 	_town(town)
 	return true
 
@@ -194,6 +196,14 @@ func note_meal(worker_id: String, how: String) -> void:
 func note_trade(worker_id: String, what: String, gold: int, with_whom: String) -> void:
 	if _workers.has(worker_id):
 		_workers[worker_id]["last_trade"] = {"step": now(), "what": what, "gold": gold, "with": with_whom}
+
+
+## What worker [param worker_id] owes the town's bank now
+## ([param working_off]: working it off as town labour; decision 354).
+func set_loan(worker_id: String, owed: float, working_off := false) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["loan"] = maxf(owed, 0.0)
+		_workers[worker_id]["working_off"] = working_off and owed > 0.0
 
 
 ## How many of [param town]'s workers (not away) the town fed, or who went
@@ -891,6 +901,8 @@ func from_dict(saved: Dictionary) -> void:
 					_workers[id]["needs"][str(need)] = int(needs[need])
 			_workers[id]["fed"] = str(entry.get("fed", ""))
 			_workers[id]["wage_due"] = maxi(int(entry.get("wage_due", 0)), 0)
+			_workers[id]["loan"] = maxf(float(entry.get("loan", 0.0)), 0.0)
+			_workers[id]["working_off"] = bool(entry.get("working_off", false)) and float(_workers[id]["loan"]) > 0.0
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)
 			var last: Variant = entry.get("last_trade", {})
 			if last is Dictionary and not last.is_empty():

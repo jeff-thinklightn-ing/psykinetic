@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town's gold is now a bank: a resident short of gold borrows from it
+  (10% interest, up to 30 owed), pays it back from what they earn, and one
+  who owes too much works it off as town labour. The town feeds people for
+  free only when the bank can't lend. Rent is 1 gold a day.
 - Spoken to, a resident now knows how they've been getting by: what they
   last bought or sold and from or to whom, a fee paid or earned, whether
   the town fed them free or they went without (and since when), and how

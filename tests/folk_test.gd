@@ -9,9 +9,12 @@ extends Node
 ## the carpenter and the smith for services and the inn for a bed, never
 ## into debt; a rich one spends sooner; each trade is a ledger line and the
 ## worker's last_trade; gold only moves; a made thing's materials are the
-## treasury's; and over three game days the treasury, filled by sales,
-## pays the official jobs (a guard, haulers) and the walls it orders, every
-## purse bounded and everyone fed. Reads the repo's levels, never the shared overlay.
+## treasury's; the town's bank (decision 354) lends to one short, is paid
+## back from half their purse, and is worked off at the cap, the dole only
+## then or when it is empty; and over seven game days the bank, filled by
+## sales, pays the official jobs (a guard, haulers) and the walls it
+## orders, never below nothing, gold conserved but for rent, every purse
+## and debt bounded and everyone fed. Reads the repo's levels, never the shared overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -37,20 +40,21 @@ func _ready() -> void:
 	_test_founded()
 	_test_meals()
 	_test_services()
+	_test_bank()
 	_test_days()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
-func _setup() -> void:
+func _setup(rules := _rules) -> void:
 	_now = 0
 	_told.clear()
 	var clock := func() -> int: return _now
 	var cat := func() -> Dictionary: return CATALOG
 	_stock = Stockpile.new({}, clock, ItemBook.new(clock))
-	_work = Production.new({}, _stock, null, clock, _rules, cat)
-	_economy = Economy.new({}, _stock, _work, clock, _rules, cat)
+	_work = Production.new({}, _stock, null, clock, rules, cat)
+	_economy = Economy.new({}, _stock, _work, clock, rules, cat)
 	_economy.building_stands = func(_town: String, kind: String) -> bool: return kind == "inn" and _inn
 	_economy.dole_changed.connect(func(town: String, count: int) -> void: _told.append([town, count]))
 
@@ -113,8 +117,8 @@ func _test_founded() -> void:
 
 
 func _test_meals() -> void:
-	print("\n== meals: the shop, the store, the dole, hunger ==")
-	_setup()
+	print("\n== meals: the shop, the store, the dole, hunger (no bank) ==")
+	_setup(_no_bank())
 	_stock.deposit(TOWN, "food", 3)
 	_stock.deposit(TOWN, "gold", 30)
 	_work.add_worker("c1", "Mags", ["cook"], TOWN)
@@ -181,8 +185,8 @@ func _test_meals() -> void:
 
 
 func _test_services() -> void:
-	print("\n== services: the carpenter, the smith, the inn ==")
-	_setup()
+	print("\n== services: the carpenter, the smith, the inn (no bank) ==")
+	_setup(_no_bank())
 	_work.add_worker("h1", "Ash", ["hauler"], TOWN)
 	_work.add_worker("p1", "Pell", ["carpenter"], TOWN)
 	_work.add_worker("s1", "Odo", ["smith"], TOWN)
@@ -219,9 +223,76 @@ func _test_services() -> void:
 		"with the inn standing, a bed is paid to the treasury (%d to %d)" % [had, _stock.count(TOWN, "gold")])
 
 
+## The game's rules without the bank: the dole when broke.
+func _no_bank() -> Dictionary:
+	var rules := _rules.duplicate(true)
+	rules.erase("bank")
+	return rules
+
+
+func _test_bank() -> void:
+	print("\n== the town's bank: borrowing, paying back, working it off ==")
+	_setup()
+	var bank: Dictionary = _rules["bank"]
+	_check(int(_rules["rent"]) == 1 and int(bank["cap"]) == 30 and is_equal_approx(float(bank["interest"]), 0.1),
+		"the rules: rent 1 a day, a cap of 30, 10%% interest (%s)" % [bank])
+	_stock.deposit(TOWN, "food", 10)
+	_stock.deposit(TOWN, "gold", 40)
+	_work.add_worker("h1", "Odo", ["hauler"], TOWN)
+	var every := int(_rules["folk"]["needs"]["meal"]["every"])
+	_economy.tick()
+	_now = every
+	var price := _economy.raw_price(TOWN, "food")
+	var before := _gold()
+	_economy.tick()
+	var odo := _work.worker("h1")
+	_check(odo["fed"] == "store" and int(odo["purse"]) == 0 and is_equal_approx(float(odo["loan"]), price * 1.1),
+		"Odo, with no gold, borrowed %d for the store's food: owes it and 10%% (%s)" % [price, odo["loan"]])
+	_check(_gold() == before and _stock.count(TOWN, "gold") == 40, "the bank lent and was paid for the food: gold only moved (%d)" % _stock.count(TOWN, "gold"))
+	_check(_stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "loan:h1" and str(line["from"]).begins_with("Odo borrowed %d from the town" % price)),
+		"the ledger: Odo borrowed %d from the town" % price)
+	_work.pay("h1", 10)
+	_now += World.WORLD_TICK_STEPS
+	_economy.tick()
+	odo = _work.worker("h1")
+	_check(int(odo["purse"]) == 7 and float(odo["loan"]) == 0.0, "paid 10, he pays it back from half his purse; clear (%d left, owes %s)" % [odo["purse"], odo["loan"]])
+	_check(_stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "repay:h1"), "the ledger has it paid back")
+	# Up to the cap: then the town's labour, and the dole.
+	_work.spend("h1", 7)
+	_work.set_loan("h1", float(bank["cap"]) - 0.5)
+	_now += every
+	_economy.tick()
+	odo = _work.worker("h1")
+	_check(odo["fed"] == "dole" and bool(odo["working_off"]) and float(odo["loan"]) < float(bank["cap"]) - 0.5,
+		"owing the cap, he can borrow no more: the dole, and he works it off (owes %.2f)" % odo["loan"])
+	_check(_stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "work_off:h1" and str(line["from"]).contains("works off the debt to the town")),
+		"the ledger: Odo works off the debt to the town")
+	var owed := float(odo["loan"])
+	for i in 180:
+		_now += World.WORLD_TICK_STEPS
+		_economy.tick()
+	_check(absf(owed - float(_work.worker("h1")["loan"]) - float(bank["work_off"])) < 0.01 and bool(_work.worker("h1")["working_off"]),
+		"a day's town labour takes %d off (%.2f to %.2f)" % [bank["work_off"], owed, _work.worker("h1")["loan"]])
+	var saved := Production.new(_work.to_dict(), _stock, null, Callable(), _rules)
+	_check(is_equal_approx(float(saved.worker("h1")["loan"]), float(_work.worker("h1")["loan"])) and saved.worker("h1")["working_off"] == _work.worker("h1")["working_off"],
+		"what he owes, and that he works it off, are saved")
+	var plain := _work.to_dict()
+	plain["workers"]["h1"].erase("loan")
+	plain["workers"]["h1"].erase("working_off")
+	_check(float(Production.new(plain, _stock, null, Callable(), _rules).worker("h1")["loan"]) == 0.0, "a save from before owes nothing")
+	# An empty bank lends nothing.
+	_setup()
+	_stock.deposit(TOWN, "food", 5)
+	_work.add_worker("h2", "Bea", ["hauler"], TOWN)
+	_economy.tick()
+	_now = every
+	_economy.tick()
+	_check(_work.worker("h2")["fed"] == "dole" and float(_work.worker("h2")["loan"]) == 0.0 and _stock.count(TOWN, "gold") == 0,
+		"an empty bank lends nothing: the dole")
+
+
 func _test_days() -> void:
-	print("
-== three days of work, rent and trade on the founding gold ==")
+	print("\n== seven days of work, rent, trade and the bank on the founding gold ==")
 	_setup()
 	_stock.deposit(TOWN, "food", 400)
 	var folk := [["c1", "Mags", "cook"], ["c2", "Tilda", "cook"], ["s1", "Odo", "smith"], ["p1", "Pell", "carpenter"],
@@ -230,60 +301,66 @@ func _test_days() -> void:
 	for i in folk.size():
 		_work.add_worker(folk[i][0], folk[i][1], [folk[i][2]], TOWN)
 		_work.pay(folk[i][0], gold / folk.size() + (1 if i < gold % folk.size() else 0))
-	_work.add_workshop(TOWN + ":kitchen", "cook", TOWN)
-	_work.assign(TOWN + ":kitchen", "c1")
-	_work.add_workshop(TOWN + ":kitchen2", "cook", TOWN)
-	_work.assign(TOWN + ":kitchen2", "c2")
-	_work.add_workshop(TOWN + ":yard", "carpenter", TOWN)
-	_work.assign(TOWN + ":yard", "p1")
+	for each in [["kitchen", "cook", "c1"], ["kitchen2", "cook", "c2"], ["yard", "carpenter", "p1"]]:
+		_work.add_workshop(TOWN + ":" + each[0], each[1], TOWN)
+		_work.assign(TOWN + ":" + each[0], each[2])
 	_stock.deposit(TOWN, "wood", 10)
 	var start := _gold()
+	var cap := float(_rules["bank"]["cap"])
 	var richest := 0
+	var most_owed := 0.0
+	var lowest := 0
 	var ordered := false
-	var most_dole := 0
-	var guard_paid := 0
-	var haulers_paid := 0
-	var town_work := 0
-	var day_lines: Array[String] = []
-	while _now < 3 * DAY:
+	var counts := {"meal": 0, "dole": 0, "service": 0, "lent": 0, "repaid": 0, "official": 0, "town_work": 0, "work_off": 0}
+	var seen := 0
+	while _now < 7 * DAY:
 		_now += World.WORLD_TICK_STEPS
 		if not ordered and _now >= DAY:
 			ordered = true
 			_work.order_build(TOWN, "walls", "carpenter", {"wood": 10}, 3000)
 		_work.tick()
 		_economy.tick()
-		most_dole = maxi(most_dole, _work.on_dole(TOWN))
+		lowest = mini(lowest, _stock.count(TOWN, "gold"))
 		for id in _work.worker_ids():
 			richest = maxi(richest, int(_work.worker(id)["purse"]))
+			most_owed = maxf(most_owed, float(_work.worker(id)["loan"]))
+		for line: Dictionary in _stock.ledger(TOWN):
+			if int(line["step"]) <= seen:
+				continue
+			var by := str(line["by"])
+			if str(line["from"]).contains("bought a meal"):
+				counts["meal"] += 1
+			elif by.begins_with("dole:"):
+				counts["dole"] += 1
+			elif by.begins_with("folk:") and str(line["from"]).contains(" paid "):
+				counts["service"] += 1
+			elif by.begins_with("loan:") and int(line["count"]) < 0:
+				counts["lent"] += -int(line["count"])
+			elif by.begins_with("repay:"):
+				counts["repaid"] += int(line["count"])
+			elif by.begins_with("wage:"):
+				counts["official"] += -int(line["count"])
+			elif by.begins_with("town_work:"):
+				counts["town_work"] += -int(line["count"])
+			elif by.begins_with("work_off:"):
+				counts["work_off"] += 1
+		seen = _now
 		if _now % DAY == 0:
-			day_lines.append("day %d: treasury %d, purses %s, on the dole %d" % [_now / DAY, _stock.count(TOWN, "gold"),
+			var owed := 0.0
+			for id in _work.worker_ids():
+				owed += float(_work.worker(id)["loan"])
+			print("  day %d: bank %d; purses %s; on the dole %d; owed %.0f" % [_now / DAY, _stock.count(TOWN, "gold"),
 				_work.worker_ids().map(func(id: String) -> String: return "%s %d" % [_work.worker(id)["name"], _work.worker(id)["purse"]]),
-				_work.on_dole(TOWN)])
-	var meals := 0
-	var services := 0
-	for line: Dictionary in _stock.ledger(TOWN):
-		if str(line["by"]) == "wage:g1":
-			guard_paid += 1
-		if str(line["by"]).begins_with("wage:h"):
-			haulers_paid += 1
-		if str(line["by"]) == "town_work:p1":
-			town_work = -int(line["count"])
-		if str(line["from"]).contains("bought a meal"):
-			meals += 1
-		elif str(line["by"]).begins_with("folk:") and str(line["from"]).contains(" paid "):
-			services += 1
-	for line in day_lines:
-		print("  " + line)
-	print("  haulers paid %d times; Pell paid %d by the town for the walls" % [haulers_paid, town_work])
-	print("  meals bought %d, services and beds %d, the guard paid %d times, the most on the dole at once %d, rent %d" % [
-		meals, services, guard_paid, most_dole, _work.upkeep(TOWN)])
+				_work.on_dole(TOWN), owed])
+	print("  7 days: %s; rent %d" % [counts, _work.upkeep(TOWN)])
 	_check(start == gold, "the town starts with its %d gold in its residents' purses" % gold)
 	_check(_gold() + _work.upkeep(TOWN) == start, "gold conserved but for rent, the sink (%d + %d upkeep = %d)" % [_gold(), _work.upkeep(TOWN), start])
-	_check(_stock.count(TOWN, "gold") > 0 and meals > 0, "the treasury filled from what was sold (%d)" % _stock.count(TOWN, "gold"))
-	_check(guard_paid > 0, "the guard, an official job, was paid by the town (%d times)" % guard_paid)
-	_check(haulers_paid > 0, "haulers, the town's own labour, were paid (%d times)" % haulers_paid)
-	_check(town_work > 0, "the town paid Pell for the walls it ordered (%d)" % town_work)
+	_check(lowest >= 0, "the bank never went below nothing (lowest %d)" % lowest)
 	_check(richest <= gold, "no purse ran away (the most: %d)" % richest)
+	_check(most_owed <= cap + 0.001, "nobody owed past the cap (the most: %.2f)" % most_owed)
+	_check(counts["lent"] > 0 and counts["repaid"] > 0, "the bank lent (%d) and was paid back (%d)" % [counts["lent"], counts["repaid"]])
+	_check(counts["meal"] > 0 and counts["service"] > 0, "meals and services were bought (%d, %d)" % [counts["meal"], counts["service"]])
+	_check(counts["official"] > 0 and counts["town_work"] > 0, "the bank paid official jobs (%d) and the walls (%d)" % [counts["official"], counts["town_work"]])
 	_check(_work.worker_ids().all(func(id: String) -> bool: return _work.worker(id)["fed"] not in ["", "hungry"]),
 		"everyone ate, nobody hungry")
 
