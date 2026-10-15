@@ -2055,6 +2055,11 @@ func _test_how_she_speaks() -> void:
 			and "# wall or forest" in pet.perception_grid(), "outdoors she is told so, and her map's # is wall or forest")
 	DayNight.set_hour(18.7)
 	_check("It is dusk. You are outdoors" in pet.voice_situation(), "and the hour, in words: %s" % pet.where_words())
+	World.fields.weather = Weather.at("test", 0.0).merged({"kind": "rain"}, true)
+	World.fields.outdoor = true
+	_check("It is dusk, and it is raining. You are outdoors" in pet.voice_situation(), "and the weather: %s" % pet.where_words())
+	World.fields.weather = {}
+	World.fields.outdoor = false
 	World.outdoor = false
 	DayNight.set_hour(2.0)
 	_check("You are indoors; outside it is the middle of the night." in pet.voice_situation(), "indoors, the hour outside: %s" % pet.where_words())

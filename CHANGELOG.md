@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions know the weather when outdoors: rain, fog, wind, a storm or a clear
+  sky.
 - A deer or stag that hears you lifts its head with a quiet snort: freeze
   before it sees you.
 - You can see where a road leads: from the end of the wilds' castle road

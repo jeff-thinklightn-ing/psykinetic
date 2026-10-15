@@ -1523,19 +1523,28 @@ static func time_words(hour: float) -> String:
 	return HOURS.back()[1]
 
 
+## The weather outdoors (Weather.KINDS), in words, after the hour.
+const WEATHER_WORDS := {"clear": "the sky is clear", "overcast": "the sky is grey with cloud", "rain": "it is raining",
+	"fog": "fog lies thick", "wind": "a strong wind is blowing", "storm": "a storm is raging"}
+
+
 ## The kind of place this zone is (level.json's "zone", DayNight.ZONES),
 ## by zone name, read once.
 static var _zone_kinds: Dictionary[String, String] = {}
 
 
 ## Where she is and the hour, for her voice, in one sentence: outdoors
-## under the sky (or under a roof there), indoors, in a cave or a dungeon.
+## under the sky (or under a roof there) with the weather (Fields.weather),
+## indoors, in a cave or a dungeon.
 func where_words() -> String:
 	var hour := time_words(DayNight.hour(DayNight.now()))
 	if World.outdoor:
-		if World.fields.daylight and not World.fields.open_sky(tile):
-			return "You are under a roof; outside it is %s." % hour
-		return "It is %s. You are outdoors, under the sky, with forest all around the edge of this place." % hour
+		var sky := ""
+		if WEATHER_WORDS.has(str(World.fields.weather.get("kind", ""))):
+			sky = ", and " + WEATHER_WORDS[World.fields.weather["kind"]]
+		if World.fields.outdoor and not World.fields.under_sky(tile):
+			return "You are under a roof; outside it is %s%s." % [hour, sky]
+		return "It is %s%s. You are outdoors, under the sky, with forest all around the edge of this place." % [hour, sky]
 	var zone_name := World.zone.name if World.zone != null else ""
 	if not _zone_kinds.has(zone_name):
 		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
