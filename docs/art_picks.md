@@ -7,6 +7,8 @@ art-gen runs the slot again with the note.
 
 | Date | Slot | Pick | Note |
 |---|---|---|---|
+| 2026-10-15 | wall.castle post, end, corner, t, cross | (awaits pick) | post c2 as the one mesh for the 3 m castle set (not the tall pillar squashed), slimmed to 0.5×3×0.5; budget 200 → 800 (one per joint) |
+| 2026-10-15 | tree.small | (awaits pick) | c2 or c4; scaled x/z 0.67 to 2.0 wide, 3.6 tall, budget 1500 |
 | 2026-10-15 | wall.castle.straight_low | (awaits pick) | budget 300 → 600 (tiles a metre at a time); c4's 1200 mesh worked down by hand, cut to 1 m; faded block lines get alternate palette colours |
 | 2026-10-15 | wall.castle *_tall set | (awaits pick) | corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5×4.5×0.5, crenellated top kept; budget 200 → 800 (one per joint) |
 | 2026-10-15 | wall.castle.straight_tall | (awaits pick) | c1 slab trimmed to 1 m, budget 300 |
