@@ -19,7 +19,6 @@ art-gen runs the slot again with the note.
 | 2026-10-15 | wall.castle.straight_ruined | (awaits pick) | c8 trimmed to 1 m |
 | 2026-10-15 | wall.stone.window | (awaits pick) | c2 cut to 1 m round the opening; bars rebuilt by hand if faint |
 | 2026-10-15 | door.trapdoor | (awaits pick) | fit to the 1×1 footprint, then flatten to 0.1; lid hinged along -z |
-| 2026-10-15 | prop.palisade | (awaits pick) | c5 squeezed along z to 1.0 (three stakes per metre) |
 | 2026-10-15 | prop.market_stall | (awaits pick) | c7 scaled x 0.8, z 0.86 |
 | 2026-10-15 | wall.cave.pillar | (awaits pick) | c3 slimmed to 0.8 wide at 3 m, budget 300 |
 | 2026-10-15 | door.gate | (awaits pick) | one leaf cut from c1/c4, fitted 0.9×3.4 and mirrored for leaf_b; body (posts, lintel) from the frame or grey; 1200 covers all |
@@ -29,7 +28,7 @@ art-gen runs the slot again with the note.
 | 2026-10-15 | building.shed roof | (awaits pick) | c11 stretched z 1.57, x 1.13 to 2.6×1.0×3.6, pivot at the eaves |
 | 2026-10-15 | scatter.flower, scatter.reeds | (awaits pick) | art-gen's meshes fail at 300; art-kit rebuilds by hand to the picked look |
 | 2026-10-15 | wall.wood.tower | (awaits pick) | budget 600 → 2000 (a few per town) |
-| 2026-10-15 | prop.palisade | (awaits pick) | budget stays 300, 500 at most: tiles a metre at a time round a town; art-gen meshes a 1 m three-stake section, else cleanup rebuilds stakes as prisms |
+| 2026-10-15 | prop.palisade | (awaits pick) | budget stays 300, 500 at most: tiles a metre at a time round a town; art-gen's 1 m three-stake c5 at 500 holds; cleanup squeezes it along z to 1.0, else rebuilds the stakes as prisms |
 | 2026-10-15 | prop.forge | (awaits pick) | budget 800 → 3200 (one per town, centrepiece) |
 | 2026-10-15 | scatter.flower, scatter.reeds | (awaits pick) | budget 150 → 300 at most (drawn in thousands via MultiMesh); below that cleanup rebuilds by hand |
 | 2026-10-15 | wall.wood.corner, t, cross | (awaits pick) | one post mesh for all three: footing trimmed, 0.3 wide, 3 m, 200 tris; post may share it |
