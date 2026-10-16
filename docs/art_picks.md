@@ -13,7 +13,7 @@ art-gen runs the slot again with the note.
 | 2026-10-15 | prop.bookshelf | (awaits pick) | budget 600 → 2400 (c3) |
 | 2026-10-15 | prop.stairs | (awaits pick) | budget 300 → 600, not 1200 (flights repeat); hand fit if c4 won't hold |
 | 2026-10-15 | wall.stone.end_ruined | (awaits pick) | budget 300 → 1200 (only at broken run ends) |
-| 2026-10-15 | wall.stone.straight_tall, straight_low | (awaits pick) | budget 300 → 600, not 1200 (tile a metre at a time); art-gen meshes at 600 |
+| 2026-10-15 | wall.stone.straight_tall, straight_low | (awaits pick) | budget 300 → 600, not 1200 (tile a metre at a time); low c3/c2 hold at 600 (block lines from the palette); tall c3 fails at 600, art-kit works its 1200 mesh down by hand in 1 m sections |
 | 2026-10-15 | wall.castle.tower | (awaits pick) | budget 800 → 3200 (c7); wall.stone.tower c8 stays 800 |
 | 2026-10-15 | wall.stone *_tall set | (awaits pick) | one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5×4.5×0.5 |
 | 2026-10-15 | wall.castle.straight_ruined | (awaits pick) | c8 trimmed to 1 m |
