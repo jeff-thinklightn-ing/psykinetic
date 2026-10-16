@@ -7,6 +7,12 @@ art-gen runs the slot again with the note.
 
 | Date | Slot | Pick | Note |
 |---|---|---|---|
+| 2026-10-15 | door.gate | (awaits pick) | one leaf cut from c1/c4, fitted 0.9×3.4 and mirrored for leaf_b; body (posts, lintel) from the frame or grey; 1200 covers all |
+| 2026-10-15 | wall.stone post, end, corner, t, cross | (awaits pick) | one pillar mesh reused, scaled to 0.5 wide, 3 m (end 0.6×3.1×0.6) |
+| 2026-10-15 | wall.stone.straight_ruined | (awaits pick) | c2 cut to a 1 m piece, not scaled |
+| 2026-10-15 | castle.window | (awaits pick) | c3 depth squeezed to the 1.0 wall |
+| 2026-10-15 | building.shed roof | (awaits pick) | c11 stretched z 1.57, x 1.13 to 2.6×1.0×3.6, pivot at the eaves |
+| 2026-10-15 | scatter.flower, scatter.reeds | (awaits pick) | art-gen's meshes fail at 300; art-kit rebuilds by hand to the picked look |
 | 2026-10-15 | wall.wood.tower | (awaits pick) | budget 600 → 2000 (a few per town) |
 | 2026-10-15 | prop.palisade | (awaits pick) | budget stays 300, 500 at most: tiles a metre at a time round a town; art-gen meshes a 1 m three-stake section, else cleanup rebuilds stakes as prisms |
 | 2026-10-15 | prop.forge | (awaits pick) | budget 800 → 3200 (one per town, centrepiece) |
