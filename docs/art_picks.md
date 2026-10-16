@@ -7,6 +7,12 @@ art-gen runs the slot again with the note.
 
 | Date | Slot | Pick | Note |
 |---|---|---|---|
+| 2026-10-15 | wall.castle.straight_low | (awaits pick) | budget 300 → 600 (tiles a metre at a time); c4's 1200 mesh worked down by hand, cut to 1 m; faded block lines get alternate palette colours |
+| 2026-10-15 | wall.castle *_tall set | (awaits pick) | corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5×4.5×0.5, crenellated top kept; budget 200 → 800 (one per joint) |
+| 2026-10-15 | wall.castle.straight_tall | (awaits pick) | c1 slab trimmed to 1 m, budget 300 |
+| 2026-10-15 | building.hut roof | by hand | no clean mesh (straw shreds the mesher); art-kit models a simple thatch roof to the 3.6×1.5×3.6 box, pivot at the eaves, c14 for shape and size only; roof_damaged same pivot |
+| 2026-10-15 | item.meat, item.tusks, item.antlers | (awaits pick) | meat c3/c1 scaled up to 0.2; tusks c1 laid flat and scaled to 0.18×0.06×0.06; antlers c3 fits as is |
+| 2026-10-15 | item.hide | redo | rolled bundle was the wrong shape; art-gen redoing as a flat pelt (0.5×0.06×0.4); fine fur crashes the mesher's 1024 decoder |
 | 2026-10-15 | door.portcullis | (awaits pick) | budget 800 → 3200 (c3); the grate is a separate part sliding into the frame, rebuilt as bars if it won't cut cleanly |
 | 2026-10-15 | door.double | (awaits pick) | budget 900 → 3600 (c1/c4); two leaves cut as hinged parts like the gate |
 | 2026-10-15 | prop.cage | (awaits pick) | budget 600 → 2400 (c2); door cut as a hinged part |
