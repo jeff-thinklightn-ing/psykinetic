@@ -93,6 +93,9 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
 		"places": level["places"], "buildings": level["buildings"],
+		# Its roofs (decision 383: damage_roof's index is into this) and
+		# its lore region (its weather), for what works on every level.
+		"roofs": level["roofs"], "region": level["terrain"]["region"],
 	}
 	_configs[area_name] = config
 	for link: Dictionary in level["links"]:

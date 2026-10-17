@@ -916,20 +916,16 @@ static func _roof_key(level: String, rect: Rect2i) -> String:
 
 
 ## Level [param level]'s roofs' rects, in order: its zone's if loaded, else
-## read.
-var _roofs_read: Dictionary[String, Array] = {}
-
-
+## WorldMap's (the level alone read, its parse kept by its digest).
 func _roof_rects(level: String) -> Array:
 	var fields_of := _fields_of(level)
 	if fields_of != null and fields_of.level == level:
 		return fields_of.roofs
-	if not _roofs_read.has(level):
-		var read: Array[Rect2i] = []
-		for roof: Dictionary in Level.load_level(level).get("roofs", []):
-			read.append(roof["rect"])
-		_roofs_read[level] = read
-	return _roofs_read[level]
+	var read: Array[Rect2i] = []
+	var names: Array[String] = [level]
+	for roof: Dictionary in WorldMap.build(names).areas.get(level, {}).get("roofs", []):
+		read.append(roof["rect"])
+	return read
 
 
 func _fields_of(level: String) -> Fields:

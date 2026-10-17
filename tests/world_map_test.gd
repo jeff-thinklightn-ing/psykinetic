@@ -17,6 +17,7 @@ func _ready() -> void:
 	_test_problems()
 	_test_start()
 	_test_ways_out()
+	_test_roofs_and_region()
 	_test_crossing()
 	_test_levels()
 	_test_join()
@@ -137,6 +138,20 @@ func _test_start() -> void:
 	_check(problems.has("world_map.json: the start zone wm_nowhere is not a level"), "a start zone that is no level is flagged")
 	WorldMap.settings_path = "res://levels/world_map.json"
 	DirAccess.remove_absolute(settings)
+
+
+
+func _test_roofs_and_region() -> void:
+	print("each area's roofs and region (decisions 383, 309)")
+	Level.register("wm_roofed", Level.image_from_rows([".........", ".........", ".........", ".........", "........."], {}), null, {"roofs": [{"rect": [0, 0, 2, 2]}, {"rect": [3, 0, 2, 1]}]})
+	var names: Array[String] = ["wm_roofed"]
+	var area: Dictionary = WorldMap.build(names).areas["wm_roofed"]
+	_check((area["roofs"] as Array).map(func(roof: Dictionary) -> Rect2i: return roof["rect"]) == [Rect2i(0, 0, 2, 2), Rect2i(3, 0, 2, 1)]
+			and area["region"] == Level.DEFAULT_REGION,
+			"an area keeps its roofs in order and its region, the default with none given (%s, %s)" % [area["roofs"].size(), area["region"]])
+	_check(World.damage_roof("wm_roofed", 1) and World.damaged_roofs("wm_roofed") == [1] and World.repair_roof("wm_roofed", 1),
+			"a roof of a level nobody has open is damaged and mended by its index there")
+	World.roofs_damaged.clear()
 
 
 func _test_ways_out() -> void:

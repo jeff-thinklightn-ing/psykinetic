@@ -7877,6 +7877,13 @@ Its fade and its being off carry over. A building slot keeps its own
 roof_damaged look. Rejected: indices as the saved key (an edit would
 move the damage); keeping the open cells per client from the view (the
 sim's light must agree on every peer).
+
+Amended: every level's roofs are in WorldMap's areas (`areas[name]["roofs"]`,
+as `Level.roofs_from` gives them, in order: the index `damage_roof` takes),
+beside its lore region (`"region"`, for environment's storms, which roll
+on every level with roofs, open or not). World reads a level that is not
+open from there (`WorldMap.build([level])`, its parse kept by its digest),
+so the two never disagree.
 ## 362. Seasons are a function of the world clock, like the hour and the weather
 
 Season (sim/season.gd) works the year out from World.steps alone. The
