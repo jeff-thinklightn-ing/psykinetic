@@ -696,8 +696,10 @@
 			"kind": "cell",
 			"size": [1.8, 3.6, 1.8],
 			"budget": 1500,
-			"variants": 5,
-			"uses": "a conifer for the forest round an outdoor map and groves, and the trees tree.pine_stand's clusters are made of (Jeff, 2026-10-17: c25's look, 5 variants; terrain fills the cells between border stands with it, a variant by the cell) (not drawn yet: Client3D._add_tree picks tree.broadleaf or tree.small); sized 0.85 to 1.2, turned and nudged per cell",
+			"variants": 4,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-17",
+				"notes": "N:/assets/candidates/tree.pine/notes.md (Jeff: \"go with the pine look, if it needs clean up we'll do later\"): c25, c43, c44, c45 from their 12000 meshes, fitted only: the trunk kept, the crown remeshed by 0.04 m voxels and decimated, scaled to the box, swatches by facing. Clean later: the crowns are TRELLIS's loose clumps with no branches joining them to the trunk, some crumbs; c45 was squeezed most (3.2 m wide)"},
+			"uses": "a conifer for the forest round an outdoor map and groves, and the trees tree.pine_stand's clusters are made of (Jeff, 2026-10-17: c25's look, 4 variants; terrain fills the cells between border stands with it, a variant by the cell) (not drawn yet: Client3D._add_tree picks tree.broadleaf or tree.small); sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 0.5, 0], "size": [0.3, 1.0, 0.3]},
 				{"at": [0, 1.6, 0], "size": [1.8, 1.4, 1.8]},
@@ -713,7 +715,9 @@
 			"size": [3.2, 4.0, 3.2],
 			"budget": 3000,
 			"variants": 4,
-			"uses": "the map's border band (Jeff, 2026-10-17; terrain's PineStands in TerrainBorder, decision 326, places it, about 2000 on the wilds, one MultiMesh a variant a chunk, each turned and scaled 0.9 to 1.12 in height, never mirrored): a cluster of 4 to 5 of tree.pine's variants (c25's look; Jeff: close enough to look impenetrable, the canopies overlapping like a cloud) composed in cleanup, their trunks spread over the 2 x 2 cells and leaning a little, every trunk's base within 0.8 m of the middle, nothing at their feet; their crowns overlapping each other and 0.6 m past the footprint every side, so neighbours 2 m apart merge into one cloud, from about 2.4 m to 4 m (near the border canopy's 3.2 m); the canopy's hidden faces inside the cloud deleted; one mesh, on the palette (foliage on its green swatches: seasons find foliage by its green), no ground plane; origin the footprint's middle on the ground; its variants differ in trunk places and canopy outline so a run of them never visibly repeats",
+			"source": {"by": "art-kit, from tree.pine's art-gen variants", "tool": "blender", "license": "own", "date": "2026-10-17",
+				"notes": "composed from tree.pine (c25, c43, c44, c45): 4 or 5 trees a stand, leaning a little, their crowns swollen 0.18 m and remeshed by 0.12 m voxels into one mass, decimated, swatches by facing; trunks as tree.pine's. Clean later: the cloud is blobby, needles would read better"},
+			"uses": "the map's border band (Jeff, 2026-10-17; terrain's PineStands in TerrainBorder, decision 326, places it, about 2000 on the wilds, one MultiMesh a variant a chunk, each turned and scaled 0.9 to 1.12 in height, never mirrored): a cluster of 4 to 5 of tree.pine's variants (c25's look; Jeff: close enough to look impenetrable, the canopies overlapping like a cloud) composed in cleanup (the crowns fused into one mass), their trunks spread over the 2 x 2 cells and leaning a little, every trunk's base within 0.8 m of the middle, nothing at their feet; their crowns overlapping each other and 0.6 m past the footprint every side, so neighbours 2 m apart merge into one cloud, from about 2.4 m to 4 m (near the border canopy's 3.2 m); the canopy's hidden faces inside the cloud deleted; one mesh, on the palette (foliage on its green swatches: seasons find foliage by its green), no ground plane; origin the footprint's middle on the ground; its variants differ in trunk places and canopy outline so a run of them never visibly repeats",
 			"grey": [
 				{"at": [-0.5, 1.4, -0.5], "size": [0.2, 2.8, 0.2]},
 				{"at": [0.55, 1.5, -0.4], "size": [0.2, 3.0, 0.2]},
