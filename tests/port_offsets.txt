@@ -18,3 +18,4 @@ lore 2200
 buildings 2400
 sound 2600
 environment 2800
+npc 3000
