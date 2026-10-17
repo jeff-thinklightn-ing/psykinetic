@@ -2993,7 +2993,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var doing := Resident.doing_at(trade, DayNight.hour(DayNight.now()))
 	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
-	var label := str(each["name"]) + (", " + trade if not trade.is_empty() else "")
+	var label := Resident.label_of(str(each["name"]), trade)
 	var body := _spawn({"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(),
 		"label": label, "tile": at}) as Resident
 	if body == null:
@@ -3717,13 +3717,15 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
 
 
-## A name for the party log: players by record name, everything else by its
-## node name.
+## A name for the party log: players by record name, residents by the label
+## over their head ("Bram [smith]"), everything else by its node name.
 func _display_name(entity: GridEntity) -> String:
 	if entity is Player:
 		var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
 		if record != null:
 			return record.name
+	if entity is Resident and not entity.label.is_empty():
+		return entity.label
 	return String(entity.name)
 
 

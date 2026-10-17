@@ -225,8 +225,10 @@ func _test_bodies_in_town() -> void:
 	_check(World.towns.note_rescue(STORE, "rs-bram", "Bram", "smith"), "(Bram the smith rescued: a resident of the town)")
 	_sync()
 	var bram := _body("rs-bram")
-	_check(bram != null and bram.label == "Bram, smith" and bram.town == STORE and bram.trade == "smith",
-		"a body for him, named with his trade over his head (%s)" % [bram.label if bram != null else "none"])
+	_check(bram != null and bram.label == "Bram [smith]" and bram.town == STORE and bram.trade == "smith",
+		"a body for him, named \"Name [profession]\" over his head (%s)" % [bram.label if bram != null else "none"])
+	_check(Resident.label_of("Odo", "medicine_man") == "Odo [medicine man]" and Resident.label_of("Wren", "") == "Wren",
+		"a trade id's underscores spaced in the label, a bare name for no trade")
 	_check(World.townsfolk().size() == 1 and not World.sought().has(bram), "one of the townsfolk, not sought (no monster's tier wakes for him)")
 	var hut := Rect2i(9, 5, 3, 3)
 	var square := Rect2i(3, 1, 5, 5)

@@ -94,6 +94,15 @@ static func days() -> Dictionary:
 	return _days
 
 
+## The name over a resident's head: "Bram [smith]", the profession in
+## brackets after the name (Jeff, 2026-10-17: never "Bram, smith"), a trade
+## id's underscores spaced ("medicine man"); the bare name for no trade.
+static func label_of(person_name: String, of_trade: String) -> String:
+	if of_trade.is_empty():
+		return person_name
+	return "%s [%s]" % [person_name, of_trade.replace("_", " ")]
+
+
 ## What one of [param of_trade] is doing at [param hour] (0..24): WORK, HOME
 ## or SQUARE.
 static func doing_at(of_trade: String, hour: float) -> Doing:

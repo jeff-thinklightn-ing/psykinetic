@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk are named with their profession in brackets over their head, "Bram
+  [smith]", and the party log names them the same way when raiders carry one off.
 - Players and companions are people now, not capsules: a man or a woman in a tunic
   in your colour, trousers and boots, walking, running, fighting and falling with
   the same moves as the goblins.

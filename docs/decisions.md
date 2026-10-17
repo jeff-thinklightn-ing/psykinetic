@@ -6267,6 +6267,17 @@ would all have to tell them apart); saving bodies (two truths about where
 a resident is); homes marked in the wilds' level.json (content in a real
 level, Jeff's call).
 
+Amended (the npc tree, 2026-10-17; Jeff: "for NPC's the name title should be
+name [profession] instead of comma"): the label over a resident's head is
+"Bram [smith]", never "Bram, smith" (`Resident.label_of`: the profession in
+brackets after the name, a trade id's underscores spaced, the bare name for
+no trade, so a companion resting without one is still "Wren"). Main's
+`_display_name` names a Resident by that label in the party log (it named
+the node, "Resident_bram"); companions' perception reads the same label.
+Still the spawn spec's caption, drawn as is: protocol unchanged. Ledger and
+log prose ("Bram the smith, taken by...") and worker record names stay as
+they are: they are sentences, not labels.
+
 ## 330. Loot: tables as data, named by a level or the builder; monsters drop what they carried
 
 Jeff's items step 6, as mechanism only (2026-10-15, through the
