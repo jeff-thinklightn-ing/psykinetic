@@ -103,7 +103,7 @@
 				},
 				{
 					"id": "the_land.taken_named",
-					"text": "Whether a named thing taken from the remains of the one it is named for, not given, is cursed, and who knows it.",
+					"text": "Whether a named thing kept from the one it is named for, rather than given by them, is cursed, and who knows it.",
 					"known": "common",
 					"where": [],
 					"status": "asked",

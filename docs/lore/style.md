@@ -31,5 +31,6 @@ rules once it is answered. Until then:
 - A named weapon or heirloom takes the name of its maker, its holder or a deed
   (as items will later name things after long-time holders: "Wren's dagger").
   The forms names take are in `levels/lore/names.json` (README, decision 366).
-  Whether a named thing taken from its namer's remains is cursed is open
+  Whether a named thing kept from the one it is named for, rather than given
+  by them, is cursed is open
   *(asked: H12)*.
