@@ -22,6 +22,9 @@ notes (decision 324).
 - Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.
 - The minimap and the big map (M) show when you host a game, not only when
   you join one.
+- Companions know the land's beasts and monsters: what deer, stags, rabbits,
+  boar and wolves are and do, what a hunter takes from each, and the imp, brute
+  and sneak as goblins, instead of saying they don't know what a stag is.
 
 ## v0.1.149
 

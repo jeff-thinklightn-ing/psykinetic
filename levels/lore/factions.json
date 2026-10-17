@@ -83,7 +83,7 @@
 			"id": "goblins",
 			"type": "faction",
 			"name": "the goblins",
-			"status": "draft",
+			"status": "agreed",
 			"source": "game",
 			"summary": "Imps, brutes and sneaks, the goblin kinds met in the land today.",
 			"relations": [
@@ -97,49 +97,61 @@
 			],
 			"facts": [
 				{
+					"id": "goblins.kinds_known",
+					"text": "Imps, brutes and sneaks are goblins.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"monsters"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
 					"id": "goblins.holding",
 					"text": "The goblins win by holding things, captives and ground, not by taking loot.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
 					],
-					"source": "roadmap"
+					"source": "roadmap",
+					"status": "draft"
 				},
 				{
 					"id": "goblins.imp",
 					"text": "The imp is small and darts in and out of a fight.",
 					"known": "common",
-					"where": [
-						"blood_rot_lands"
-					],
+					"where": [],
 					"tags": [
-						"fighting"
+						"fighting",
+						"monsters"
 					],
-					"source": "lore"
+					"source": "game",
+					"status": "agreed"
 				},
 				{
 					"id": "goblins.brute",
 					"text": "The brute is big and heavy, and it stands guard.",
 					"known": "common",
-					"where": [
-						"blood_rot_lands"
-					],
+					"where": [],
 					"tags": [
-						"fighting"
+						"fighting",
+						"monsters"
 					],
-					"source": "lore"
+					"source": "game",
+					"status": "agreed"
 				},
 				{
 					"id": "goblins.sneak",
 					"text": "The sneak patrols and comes at its prey from the side.",
 					"known": "common",
-					"where": [
-						"blood_rot_lands"
-					],
+					"where": [],
 					"tags": [
-						"fighting"
+						"fighting",
+						"monsters"
 					],
-					"source": "lore"
+					"source": "game",
+					"status": "agreed"
 				},
 				{
 					"id": "goblins.blood_rot",

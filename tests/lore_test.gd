@@ -9,8 +9,8 @@ extends Node
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
 const DIR := "res://levels/lore/"
-const FILES := ["world", "factions", "regions", "materials", "people", "history"]
-const TYPES := ["world", "faction", "people", "region", "place", "material", "person", "weapon", "event"]
+const FILES := ["world", "factions", "regions", "materials", "creatures", "people", "history"]
+const TYPES := ["world", "faction", "people", "region", "place", "material", "creature", "person", "weapon", "event"]
 const STATUSES := ["agreed", "draft", "asked"]
 const KNOWN := ["common", "rumour", "secret", "lived"]
 const RELATIONS := ["in", "holds", "enemy", "feud", "ally", "from", "member", "carries", "took", "held_at"]

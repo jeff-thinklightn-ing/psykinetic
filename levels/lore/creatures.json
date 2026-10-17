@@ -1,0 +1,225 @@
+{
+	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
+	"entries": [
+		{
+			"id": "deer",
+			"type": "creature",
+			"name": "deer",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "Deer graze in the wilds and flee together from what they see or hear.",
+			"relations": [],
+			"tags": [
+				"wildlife"
+			],
+			"facts": [
+				{
+					"id": "deer.graze",
+					"text": "Deer graze in the wilds.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "deer.flee",
+					"text": "Deer flee together from what they see or hear.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "deer.taken",
+					"text": "A hunter takes meat and a hide from a deer.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife",
+						"hunting"
+					],
+					"source": "game"
+				}
+			]
+		},
+		{
+			"id": "stag",
+			"type": "creature",
+			"name": "stag",
+			"status": "agreed",
+			"source": "game",
+			"summary": "A stag is a deer with antlers, and keeps with the deer.",
+			"relations": [
+				{
+					"to": "deer",
+					"kind": "member"
+				}
+			],
+			"tags": [
+				"wildlife"
+			],
+			"facts": [
+				{
+					"id": "stag.antlers",
+					"text": "A stag is a deer with antlers.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "stag.herd",
+					"text": "A stag grazes and flees with the deer.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					],
+					"source": "Jeff"
+				},
+				{
+					"id": "stag.taken",
+					"text": "A hunter takes meat, a hide and antlers from a stag.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife",
+						"hunting"
+					]
+				}
+			]
+		},
+		{
+			"id": "rabbit",
+			"type": "creature",
+			"name": "rabbit",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "Rabbits graze in the wilds and flee together from what they see or hear.",
+			"relations": [],
+			"tags": [
+				"wildlife"
+			],
+			"facts": [
+				{
+					"id": "rabbit.graze",
+					"text": "Rabbits graze in the wilds.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "rabbit.flee",
+					"text": "Rabbits flee together from what they see or hear.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "rabbit.taken",
+					"text": "A hunter takes meat and a hide from a rabbit.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife",
+						"hunting"
+					],
+					"source": "game"
+				}
+			]
+		},
+		{
+			"id": "boar",
+			"type": "creature",
+			"name": "boar",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "A boar of the wilds flees, but charges when it is cornered.",
+			"relations": [],
+			"tags": [
+				"wildlife"
+			],
+			"facts": [
+				{
+					"id": "boar.wilds",
+					"text": "Boar live in the wilds.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "boar.cornered",
+					"text": "A boar flees, but charges when it is cornered.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "boar.taken",
+					"text": "A hunter takes meat, a hide and tusks from a boar.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife",
+						"hunting"
+					],
+					"source": "game"
+				}
+			]
+		},
+		{
+			"id": "wolf",
+			"type": "creature",
+			"name": "wolf",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "Wolves hunt game in the wilds and are more dangerous at night.",
+			"relations": [],
+			"tags": [
+				"wildlife"
+			],
+			"facts": [
+				{
+					"id": "wolf.hunt",
+					"text": "Wolves hunt game in the wilds.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "wolf.night",
+					"text": "Wolves are more dangerous at night.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "wolf.taken",
+					"text": "A hunter takes a hide from a wolf.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife",
+						"hunting"
+					],
+					"source": "game"
+				}
+			]
+		}
+	]
+}

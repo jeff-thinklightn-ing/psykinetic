@@ -104,7 +104,7 @@ hammer has one, are open *(asked: E3)*.
 
 ## The goblins in play
 
-Three goblin kinds are in the game today. The imp is small and darts in and out.
+Three goblin kinds are in the game today, and everyone in the land knows them. The imp is small and darts in and out.
 The brute is big and heavy, and it stands guard. The sneak patrols and comes at
 its prey from the side. Goblins win by holding things (captives and ground), not by
 taking loot from the people they fight. How these goblins stand to the Blood Rot
@@ -113,6 +113,14 @@ the three kinds are ranks of one people *(asked: C2)* and whether goblins can be
 bargained with *(asked: C1)*.
 
 Whether there are other factions (outlaws, a rival steading) is open *(asked: E1)*.
+
+## Beasts of the wilds
+
+Deer and rabbits graze in the wilds and flee together from what they see or
+hear. A stag is a deer with antlers. A boar flees, but charges when it is
+cornered. Wolves hunt game, and they are more dangerous at night (Jeff). A
+hunter takes meat and hides from them, antlers from a stag and tusks from a boar;
+from a wolf, only its hide.
 
 ## The companions
 

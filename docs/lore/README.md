@@ -15,6 +15,7 @@ levels and the status gate). `tests/lore_test.gd` checks every rule below.
 | `levels/lore/factions.json` | factions and peoples (`faction`, `people`) |
 | `levels/lore/regions.json` | regions and the places in them (`region`, `place`) |
 | `levels/lore/materials.json` | materials (`material`) |
+| `levels/lore/creatures.json` | the land's beasts, wild and hunted (`creature`) |
 | `levels/lore/people.json` | named people and named weapons (`person`, `weapon`) |
 | `levels/lore/history.json` | things that happened (`event`) |
 | `levels/lore/knowers.json` | who knows what: groups and characters (not entries; see below) |
@@ -45,7 +46,7 @@ Each file is `{"_about": "...", "entries": [...]}`.
   out of `agreed` until maps has added its key. A `region` id is what a level's
   `region` names, and a key of `levels/climates.json` (environment owns it and its
   weather numbers; a region that isn't `asked` needs a key there).
-- `type`: world, faction, people, region, place, material, person, weapon, event.
+- `type`: world, faction, people, region, place, material, creature, person, weapon, event.
 - `status`: `agreed` (Jeff said it, word for word, or it is already in the game;
   Dire plays and tests, and his ideas go to Jeff, who decides: Jeff, 2026-10-17),
   `draft` (written from what is decided but not yet confirmed), `asked` (an open

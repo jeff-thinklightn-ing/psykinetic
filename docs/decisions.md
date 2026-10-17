@@ -4083,6 +4083,11 @@ tests/lore_test.gd checks it all. level_test and editor_test now skip
 folders under levels/ with no layout.png, the rule Level.names() already
 used. Rejected: lore fields inside levels/factions.json and items.json (two
 trees writing one file), and data under docs/ (it doesn't ship).
+Amended (2026-10-17, after a playtest where Wren said "I do not know what the
+stag is"): a type `creature` and a file `levels/lore/creatures.json` for the
+land's beasts (deer, stag, rabbit, boar, wolf), agreed on Jeff's hunting spec
+and the game's drops, tagged wildlife and hunting; the goblin kinds (imp, brute,
+sneak) are agreed common knowledge everywhere, as they are in the game.
 
 ## 258. Who knows what: common, rumour, secret, lived; only agreed lore is used
 
