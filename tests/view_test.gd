@@ -913,6 +913,35 @@ func _test_wall_heights() -> void:
 	_check(temple.all(func(key: Vector3i) -> bool: return is_equal_approx(_rig._wall_heights.get(key, Client3D.WALL_HEIGHT), tall))
 			and Level.outline(Rect2i(10, 2, 3, 3)).all(func(key: Vector3i) -> bool: return not _rig._wall_heights.has(key)),
 			"the temple's outline %s m tall, as its slot says; the hut's the sets' own" % tall)
+	# Its runs reach its roof's eaves; the hut's stand at the sets' 3 m.
+	var tops := func(outline: Array[Vector3i]) -> Array[float]:
+		var out: Array[float] = []
+		var seen: Dictionary[Node3D, bool] = {}
+		for key in outline:
+			var run: Node3D = _rig._walls.get(key)
+			if run == null or seen.has(run) or run.get_node_or_null("Body") == null:
+				continue
+			seen[run] = true
+			var top := -INF
+			for point: Vector3 in ((run.get_node("Body") as MeshInstance3D).mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+				top = maxf(top, point.y)
+			out.append(top)
+		return out
+	var temple_tops: Array[float] = tops.call(temple)
+	var hut_tops: Array[float] = tops.call(Level.outline(Rect2i(10, 2, 3, 3)))
+	var eaves := -1.0
+	for building: Dictionary in _rig._buildings:
+		if building["rect"] == Rect2i(2, 2, 4, 6) and building["roof"] != null:
+			eaves = (building["roof"] as Node3D).global_position.y - (building["node"] as Node3D).global_position.y
+	_check(not temple_tops.is_empty() and temple_tops.all(func(top: float) -> bool: return absf(top - eaves) < 0.6)
+			and not hut_tops.is_empty() and hut_tops.all(func(top: float) -> bool: return absf(top - Client3D.WALL_HEIGHT) < 0.6),
+			"the temple's wall tops meet its eaves at %.1f m (%s), the hut's stand at %.1f m (%s)" % [eaves, temple_tops, Client3D.WALL_HEIGHT, hut_tops])
+	var doors := temple.filter(func(key: Vector3i) -> bool: return _rig._doorways.has(key))
+	_check(not doors.is_empty() and doors.all(func(key: Vector3i) -> bool: return _rig._doorways[key].find_child("Lintel", true, false) != null)
+			and not Level.outline(Rect2i(10, 2, 3, 3)).any(func(key: Vector3i) -> bool: return _rig._doorways.has(key) and _rig._doorways[key].find_child("Lintel", true, false) != null),
+			"over the temple's doors the wall goes on (a lintel), over the hut's none")
+	var corner: Node3D = _rig._posts.get(Vector2i(2, 2))
+	_check(corner != null and _rig._bounds(corner).end.y > tall - 0.2, "its corner posts as tall")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(_rig._wall_heights.is_empty(), "and none left on another map")
 

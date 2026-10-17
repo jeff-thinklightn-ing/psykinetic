@@ -2377,8 +2377,9 @@ func _add_buildings() -> void:
 		# The rain stops on its roof even while the roof is cut away
 		# (decision 309; WeatherView's heightfield sees only what is drawn).
 		var keep_dry := GPUParticlesCollisionBox3D.new()
-		keep_dry.size = Vector3(rect.size.x, WALL_HEIGHT, rect.size.y)
-		keep_dry.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + WALL_HEIGHT * 0.5, middle.y)
+		var eaves := float(ArtKit.spec(slot).get("wall_height", WALL_HEIGHT))
+		keep_dry.size = Vector3(rect.size.x, eaves, rect.size.y)
+		keep_dry.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + eaves * 0.5, middle.y)
 		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
@@ -4251,8 +4252,9 @@ func _add_wall(key: Vector3i) -> void:
 	_walls[key] = wall
 
 
-## The walls: each straight run of wall edges of one set (to where it
-## turns, meets another wall or set, a door, a change of height, or
+## The walls: each straight run of wall edges of one set and wall height
+## (to where it turns, meets another wall, set or wall height, a door, a
+## change of ground height, or
 ## WALL_RUN_MOST edges) is one mesh, its set's wall.<set>.profile swept
 ## along it, varied as the set's variation says: the body under the
 ## profile's cap_y rises and falls along the run (sway: a height every
@@ -4281,7 +4283,7 @@ func _add_wall_runs(keys: Array[Vector3i]) -> void:
 			if not run.is_empty():
 				var last := run[-1]
 				var joined := _along(key) == _along(last) + 1 and _edge_base(key) == _edge_base(last) \
-						and _set_of(key) == _set_of(last) \
+						and _set_of(key) == _set_of(last) and _height_of(key) == _height_of(last) \
 						and run.size() < WALL_RUN_MOST and not _needs_post(WallEdge.vertex_at(key, 1 if key.z == Terrain.EAST else 0), standing)
 				if not joined:
 					_add_wall_run(run)
@@ -4361,6 +4363,25 @@ func _set_of(key: Vector3i) -> String:
 	return _wall_sets.get(key, _walls_set)
 
 
+## How tall a wall edge stands (_wall_heights, a building's; else
+## WALL_HEIGHT).
+func _height_of(key: Vector3i) -> float:
+	return _wall_heights.get(key, WALL_HEIGHT)
+
+
+## A set's profile [param points] and [param cap] (its body's top) for a
+## wall [param tall] metres high: the body stretched up by the difference
+## from the set's [param top], the cap band above it kept as it is.
+static func _profile_for(points: PackedVector2Array, cap: float, top: float, tall: float) -> Array:
+	var rise := tall - top
+	if is_zero_approx(rise):
+		return [points, cap]
+	var out := PackedVector2Array()
+	for p in points:
+		out.append(Vector2(p.x, p.y * (cap + rise) / cap if p.y <= cap else p.y + rise))
+	return [out, cap + rise]
+
+
 ## The set a floor cell is drawn in: its own (_floor_sets), else the map's
 ## on its stone ground, else the ground's own look.
 func _floor_set(cell: Vector2i, kind: String) -> String:
@@ -4436,8 +4457,11 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 			pieces[k] = piece
 	for k: int in pieces:
 		states[k] = WALL_PIECE
-	var points: PackedVector2Array = wall_set["points"]
-	var cap: float = wall_set["cap"]
+	# A building's taller walls (its wall_height): the profile's body
+	# stretched to it.
+	var shaped := _profile_for(wall_set["points"], wall_set["cap"], wall_set["top"], _height_of(first))
+	var points: PackedVector2Array = shaped[0]
+	var cap: float = shaped[1]
 	var faces: PackedInt32Array = wall_set["faces"]
 	var half: float = wall_set["half"]
 	# The top's sag between the run's ends, at a vertex s along it.
@@ -4981,6 +5005,20 @@ func _add_doorway(key: Vector3i) -> void:
 	var piece := ArtKit.instance("door.single")
 	piece.name = "Door"
 	doorway.add_child(piece)
+	# In a wall taller than the frame (a building's wall_height), the wall
+	# goes on over it: a lintel of the wall's set, in the frame's Body so it
+	# fades with it.
+	var tall := _doorway_height(key)
+	if tall > WALL_HEIGHT and piece.has_node("Body"):
+		var wall_set := _wall_set(_set_of(key))
+		var lintel := MeshInstance3D.new()
+		lintel.name = "Lintel"
+		var block := BoxMesh.new()
+		block.size = Vector3(float(wall_set["half"]) * 2.0, tall - WALL_HEIGHT, 1.0)
+		lintel.mesh = block
+		lintel.material_override = _wall_material(_set_of(key))
+		lintel.position.y = (tall + WALL_HEIGHT) * 0.5
+		piece.get_node("Body").add_child(lintel)
 	if _glimpse:
 		_room.add_child(doorway)
 		_doorways[key] = doorway
@@ -4999,6 +5037,21 @@ func _add_doorway(key: Vector3i) -> void:
 	_doorways[key] = doorway
 
 
+## How tall the wall a doorway stands in is: the tallest of the walls on
+## its line either side of it (a building's outline: _wall_heights), else
+## WALL_HEIGHT.
+func _doorway_height(key: Vector3i) -> float:
+	var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+	var tall := _height_of(key)
+	for side: Vector3i in [step, -step]:
+		var next := key + side
+		while _terrain["edges"].get(next, Terrain.Edge.OPEN) == Terrain.Edge.DOOR:
+			next += side
+		if _terrain["edges"].get(next, Terrain.Edge.OPEN) == Terrain.Edge.WALL:
+			tall = maxf(tall, _height_of(next))
+	return tall
+
+
 ## A post where walls meet at an angle, or a wall ends; none along a
 ## straight run.
 static func _needs_post(vertex: Vector2i, kind_at: Callable) -> bool:
@@ -5013,17 +5066,18 @@ static func _needs_post(vertex: Vector2i, kind_at: Callable) -> bool:
 	return directions[0].dot(directions[1]) > -0.9
 
 
-## Whether walls of two sets meet at [param vertex]: a post between them,
-## so the step from one thickness to the other is not seen.
+## Whether walls of two sets, or two heights, meet at [param vertex]: a
+## post between them, so the step from one to the other is not seen.
 func _sets_meet(vertex: Vector2i) -> bool:
 	var seen := ""
 	for entry: Array in WallEdge.edges_at_vertex(vertex):
 		var key: Vector3i = entry[0]
 		if _terrain["edges"].get(key, Terrain.Edge.OPEN) != Terrain.Edge.WALL or _outdoor and _is_outline(key):
 			continue
-		if seen != "" and _set_of(key) != seen:
+		var look := "%s %s" % [_set_of(key), _height_of(key)]
+		if seen != "" and look != seen:
 			return true
-		seen = _set_of(key)
+		seen = look
 	return false
 
 
@@ -5049,16 +5103,30 @@ func _add_post(vertex: Vector2i) -> void:
 	var post: Node3D
 	var set_name := _post_set(vertex)
 	var slot := "wall.%s.post" % set_name if ArtKit.has("wall.%s.post" % set_name) else "wall.%s.end" % set_name
+	# As tall as the tallest wall at it: the set's _tall piece where it has
+	# art, else the post stretched.
+	var tall := WALL_HEIGHT
+	for entry: Array in WallEdge.edges_at_vertex(vertex):
+		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN:
+			tall = maxf(tall, _height_of(entry[0]))
+	var stretch := 1.0
+	if tall > WALL_HEIGHT:
+		var tall_slot := slot + "_tall"
+		if ArtKit.has(tall_slot) and ArtKit.filled_by(tall_slot) != "placeholder":
+			slot = tall_slot
+		else:
+			stretch = tall / WALL_HEIGHT
 	if BOX_WALLS:
-		post = _box(Vector3(POST_SIZE, WALL_HEIGHT, POST_SIZE), _stone_opaque)
+		post = _box(Vector3(POST_SIZE, tall, POST_SIZE), _stone_opaque)
 	elif set_name == CAVE_SET and (not ArtKit.has(slot) or ArtKit.filled_by(slot) == "placeholder"):
 		post = _cave_lump(vertex)
 	elif not ArtKit.has(slot) or ArtKit.filled_by(slot) == "placeholder" and set_name != DEFAULT_SET:
 		var wall_set := _wall_set(set_name)
 		var side: float = wall_set["half"] * 2.0
-		post = _box(Vector3(side, wall_set["top"], side), _wall_material(set_name))
+		post = _box(Vector3(side, wall_set["top"] + tall - WALL_HEIGHT, side), _wall_material(set_name))
 	else:
 		post = ArtKit.instance(slot)
+		post.scale.y = stretch
 	post.name = "Post_%d_%d" % [vertex.x, vertex.y]
 	var base := 0
 	for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:
@@ -5398,12 +5466,12 @@ func _wall_runs() -> Dictionary[Vector3i, Array]:
 
 
 ## A wall edge's own share of its run: its set's thickness across, the
-## edge along, WALL_HEIGHT up from its base.
+## edge along, its height (_height_of) up from its base.
 func _edge_bounds(key: Vector3i) -> AABB:
 	var middle := _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
 	var across: float = _wall_set(_set_of(key))["half"]
 	var half := Vector3(across, 0.0, 0.5) if key.z == Terrain.EAST else Vector3(0.5, 0.0, across)
-	return AABB(middle - half, half * 2.0 + Vector3(0.0, WALL_HEIGHT, 0.0))
+	return AABB(middle - half, half * 2.0 + Vector3(0.0, _height_of(key), 0.0))
 
 
 ## [param piece]'s meshes' bounds, in the world.

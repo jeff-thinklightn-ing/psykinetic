@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A building with taller walls than a house's, as the temple's, has them drawn up to its roof, its door with wall over it.
 - A damaged building's roof is broken in places: rain and daylight come in through the holes. The client must be updated with the server.
 
 - The wilds town has a temple beside its square. Out by the south edge of the forest stands a healer's hut, with a path from the town.

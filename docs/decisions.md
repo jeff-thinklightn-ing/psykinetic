@@ -7733,6 +7733,21 @@ knows it: a wall blocks at any height, so it is on no level record.
 Rejected: a height on the level.json entry (it is the slot's, as its wall
 set is).
 
+Terrain's half (its own commit under this number): a wall run breaks
+where the height changes, as where the set does; its profile's body,
+under cap_y, is stretched up by the difference from the set's top, the
+cap band above kept as it is (`Client3D._profile_for`), so sway, sag and
+broken tops follow the taller cap. A post takes the tallest wall at it:
+the set's `<post>_tall` where it has art, else its post stretched in y
+(stone's and castle's `*_tall` are placeholders today, so stretched); two
+heights meeting on a line get a post between them, as two sets do. A
+doorway in a tall wall (the tallest wall on its line beside it) has a
+lintel of the wall's set from the frame's 3 m up to it, inside the
+frame's Body so it fades with it. The wall's fade bounds and the
+building's rain box reach the taller top. view_test checks the temple's
+run tops meet its roof's pivot (4.5 m) and the hut's stand at 3 m, the
+lintels over the temple's doors, and its corner posts' height.
+
 Placed in levels/wilds (the second commit under this number): the temple
 facing the town's square, footprint 216-219 x 195-200, lanes from its
 door to the square; the healer's hut by the south forest edge, footprint
