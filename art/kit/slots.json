@@ -667,16 +667,16 @@
 			"type": "mesh",
 			"kind": "cell",
 			"footprint": [2, 2],
-			"size": [3.0, 4.8, 3.0],
-			"budget": 2500,
+			"size": [2.8, 4.0, 2.8],
+			"budget": 1500,
 			"variants": 4,
-			"uses": "the map's border band (Jeff, 2026-10-17; terrain's TerrainBorder, decision 326, places it): a stand of pines on 2 x 2 cells, 4 to 6 bare straight trunks of varied height and lean (bare for the lower two thirds, no undergrowth) under one canopy mass of tufted crowns in the top third that overhangs the footprint by half a cell every side, so neighbours' canopies bleed together; in tree.pine's style (Jeff's reference, N:/assets/reference/sppine.jpg); origin the footprint's middle on the ground, every trunk's base at y 0; its variants differ in trunk places and canopy outline so a run of them, each turned a quarter at random, never visibly repeats",
+			"uses": "the map's border band (Jeff, 2026-10-17; terrain's TerrainBorder, decision 326, places it, about 2000 on the wilds, one MultiMesh a variant a chunk, each turned and scaled 0.9 to 1.12 in height, never mirrored): a stand of pines on 2 x 2 cells, 4 to 6 bare straight trunks of varied height and lean, their bases within 0.8 m of the middle, nothing at their feet, under one canopy mass of tufted crowns from 2.4 m to 4 m (near the border canopy's 3.2 m and a single tree's 3.6) reaching 0.4 m past the footprint every side, so neighbours' canopies bleed together without poking through; trunk and canopy on the palette (the canopy on its foliage rows), no ground plane; in tree.pine's style (Jeff's reference, N:/assets/reference/sppine.jpg); origin the footprint's middle on the ground; its variants differ in trunk places and canopy outline so a run of them never visibly repeats",
 			"grey": [
-				{"at": [-0.5, 1.5, -0.5], "size": [0.2, 3.0, 0.2]},
-				{"at": [0.55, 1.6, -0.4], "size": [0.2, 3.2, 0.2]},
-				{"at": [-0.4, 1.4, 0.5], "size": [0.2, 2.8, 0.2]},
-				{"at": [0.45, 1.5, 0.55], "size": [0.2, 3.0, 0.2]},
-				{"at": [0, 3.9, 0], "size": [3.0, 1.8, 3.0]}
+				{"at": [-0.5, 1.4, -0.5], "size": [0.2, 2.8, 0.2]},
+				{"at": [0.55, 1.5, -0.4], "size": [0.2, 3.0, 0.2]},
+				{"at": [-0.4, 1.3, 0.5], "size": [0.2, 2.6, 0.2]},
+				{"at": [0.45, 1.4, 0.55], "size": [0.2, 2.8, 0.2]},
+				{"at": [0, 3.2, 0], "size": [2.8, 1.6, 2.8]}
 			]
 		},
 		"rock.small": {

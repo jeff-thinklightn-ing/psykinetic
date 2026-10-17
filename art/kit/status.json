@@ -80,8 +80,8 @@
 			"type": "mesh",
 			"kind": "cell",
 			"category": "trees",
-			"size": "3.0 x 4.8 x 3.0",
-			"budget": 2500
+			"size": "2.8 x 4.0 x 2.8",
+			"budget": 1500
 		},
 		{
 			"slot": "tree.stump",
