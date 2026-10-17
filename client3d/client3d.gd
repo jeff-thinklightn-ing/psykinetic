@@ -812,6 +812,10 @@ var _floor_mask: ImageTexture
 ## The edges in _wall_sets and cells in _floor_sets that are there for a
 ## building, and the cells in _dry_water that are there for a well.
 var _building_walls: Array[Vector3i] = []
+## How tall a building's walls stand where its slot says ("wall_height",
+## the temple's 4.5 m), by edge; an edge not here is WALL_HEIGHT. Terrain's
+## runs draw them so.
+var _wall_heights: Dictionary[Vector3i, float] = {}
 ## The edges in _wall_states and _wall_sets that are there for a damaged
 ## building or a town wall (_show_state, _show_town_wall), and each town
 ## wall drawn: {town_id, walls, gates, rect, towers (vertex -> Node3D),
@@ -2187,6 +2191,7 @@ func _build_room() -> void:
 	_floors_set = _known_set(str(_terrain.get("floors", DEFAULT_SET)))
 	for key in _building_walls:
 		_wall_sets.erase(key)
+		_wall_heights.erase(key)
 	_building_walls.clear()
 	# A damaged building's and a town wall's looks: the last map's out.
 	for key in _state_walls:
@@ -2211,10 +2216,13 @@ func _build_room() -> void:
 			continue
 		var spec := ArtKit.spec(str(building["slot"]))
 		var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
+		var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
 		for key in Level.outline(building["rect"]):
 			if not _wall_sets.has(key):
 				_building_walls.append(key)
 				_wall_sets[key] = wall_set
+				if not is_equal_approx(wall_height, WALL_HEIGHT):
+					_wall_heights[key] = wall_height
 		if spec.has("floor_set"):
 			var floor_set := _known_set(str(spec["floor_set"]))
 			for cell in Level.rect_cells(building["rect"]):

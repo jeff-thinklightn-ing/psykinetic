@@ -94,7 +94,7 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## facing east or west). The footprint is the inside; its walls and door
 ## are the map's own edges on its outline (decision 265).
 const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
-	"building.well": Vector2i(1, 1)}
+	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]

@@ -171,6 +171,43 @@ const PREFABS := {
 		],
 		"config": {"buildings": [{"slot": "building.shed", "at": [1, 1], "facing": [0, 1]}]},
 	},
+	# The town's temple (its walls stone, 4.5 m, the slot's) and the
+	# healer's hut out in the wilds (Jeff, 2026-10-17): the house's and
+	# the hut's footprints, the temple's door in the middle of its front.
+	"building_temple": {
+		"rows": [
+			", , , , , ,",
+			"  # # # #  ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"           ",
+			",#_ _ _ _#,",
+			"  # + + #  ",
+			", , , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.temple", "at": [1, 1], "facing": [0, 1]}]},
+	},
+	"building_healers_hut": {
+		"rows": [
+			", , , , ,",
+			"  # # #  ",
+			",#_ _ _#,",
+			"         ",
+			",#_ _ _#,",
+			"         ",
+			",#_ _ _#,",
+			"  # + #  ",
+			", , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.healers_hut", "at": [1, 1], "facing": [0, 1]}]},
+	},
 }
 
 

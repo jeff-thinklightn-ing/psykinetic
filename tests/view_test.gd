@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_scatter()
 	_test_buildings()
 	_test_roofs()
+	_test_wall_heights()
 	_test_building_states()
 	_test_town_walls()
 	await _test_near_miss_picks()
@@ -796,6 +797,37 @@ func _test_roofs() -> void:
 	_check([Vector2i(10, 8), Vector2i(13, 8), Vector2i(10, 10), Vector2i(13, 10)].all(func(vertex: Vector2i) -> bool: return _rig._posts.has(vertex)),
 			"an open shelter stands on a post at each corner")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+
+func _test_wall_heights() -> void:
+	print("
+== the temple and the healer's hut: kit prefabs; a building's walls as tall as its slot says ==")
+	var map := LevelMap.new(Vector2i(16, 12))
+	for y in 12:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := {"outdoor": true}
+	for stamp: Array in [["building_temple", Vector2i(1, 1)], ["building_healers_hut", Vector2i(9, 1)]]:
+		var changes := Prefab.stamp_changes(Prefab.load_prefab(stamp[0]), map, stamp[1], config)
+		for cell: Vector2i in changes["cells"]:
+			map.set_cell(cell, changes["cells"][cell])
+		for key: Vector3i in changes["edges"]:
+			map.set_edge(key, changes["edges"][key])
+		config.merge(changes.get("config", {}), true)
+	var level := Level.parse(map.to_image(), null, config)
+	var rects := (level["buildings"] as Array).map(func(b: Dictionary) -> Array: return [b["slot"], b["rect"]])
+	_check(rects == [["building.temple", Rect2i(2, 2, 4, 6)], ["building.healers_hut", Rect2i(10, 2, 3, 3)]]
+			and (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building")).is_empty(),
+			"each prefab stamps its building on its footprint, walled, nothing said (%s)" % [rects])
+	_rig.rebuild(level["terrain"], Vector2i(7, 6))
+	var tall := float(ArtKit.spec("building.temple").get("wall_height", Client3D.WALL_HEIGHT))
+	var temple := Level.outline(Rect2i(2, 2, 4, 6))
+	_check(temple.all(func(key: Vector3i) -> bool: return is_equal_approx(_rig._wall_heights.get(key, Client3D.WALL_HEIGHT), tall))
+			and Level.outline(Rect2i(10, 2, 3, 3)).all(func(key: Vector3i) -> bool: return not _rig._wall_heights.has(key)),
+			"the temple's outline %s m tall, as its slot says; the hut's the sets' own" % tall)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_check(_rig._wall_heights.is_empty(), "and none left on another map")
 
 
 func _test_building_states() -> void:

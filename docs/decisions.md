@@ -7701,3 +7701,31 @@ hold one); the armoury loot table may give a bundle. Art slots item.arrows,
 item.arrows_flame, item.arrows_barbed. Rejected: arrows as counted ammunition
 (Jeff: not wasted); bare fists as blunt (every imp's punch would wear it); a
 bleeding that only stops mending (barbed would do nothing in a fight).
+
+## 373. The temple and the healer's hut; a building's wall height
+
+Jeff (2026-10-17): a temple in the town, where its priest serves, and a
+healer's hut in the wilds, where the medicine man does; whoever falls is
+brought back at either (economy's jobs; maps' places, 372, are derived
+from these buildings). Two building kinds in `Level.BUILDINGS`, art-kit's
+slots (59e9c50): `building.temple`, 4 x 6 as the house, stone, and
+`building.healers_hut`, 3 x 3 as the hut, wood; kit prefabs
+`building_temple` (a double door in the middle of its front) and
+`building_healers_hut` (`tools/seed_prefabs.gd`). Neither carries a use:
+the economy's buildings are trades a town builds; these are found where
+they stand.
+
+The temple's eaves are at 4.5 m, its walls must be as tall. A building
+slot may say `"wall_height"` (3 m if not); Client3D fills
+`_wall_heights[key]` for its outline beside `_wall_sets`, cleared with
+them on a rebuild, and terrain's runs draw an edge that tall (the profile
+scaled in y, the set's `*_tall` joints; terrain's half). Only the view
+knows it: a wall blocks at any height, so it is on no level record.
+Rejected: a height on the level.json entry (it is the slot's, as its wall
+set is).
+
+Placed in levels/wilds (the second commit under this number): the temple
+facing the town's square, footprint 216-219 x 195-200, lanes from its
+door to the square; the healer's hut by the south forest edge, footprint
+151-153 x 233-235 facing north, the far side from the castle link, a path
+from its door to the town's west lane at (196, 213).
