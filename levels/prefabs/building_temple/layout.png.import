@@ -2,10 +2,13 @@
 
 importer="image"
 type="Image"
+uid="uid://cttpi4nt0kwxg"
+path="res://.godot/imported/layout.png-b7d038641770a43a914e2c396382734a.image"
 
 [deps]
 
 source_file="res://levels/prefabs/building_temple/layout.png"
+dest_files=["res://.godot/imported/layout.png-b7d038641770a43a914e2c396382734a.image"]
 
 [params]
 

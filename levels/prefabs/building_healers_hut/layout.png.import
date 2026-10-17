@@ -2,10 +2,13 @@
 
 importer="image"
 type="Image"
+uid="uid://bl27m3k2721qi"
+path="res://.godot/imported/layout.png-9bb8be477ddeabbec74f5f2627ef15fc.image"
 
 [deps]
 
 source_file="res://levels/prefabs/building_healers_hut/layout.png"
+dest_files=["res://.godot/imported/layout.png-9bb8be477ddeabbec74f5f2627ef15fc.image"]
 
 [params]
 
