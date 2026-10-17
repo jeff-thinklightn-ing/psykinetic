@@ -1602,9 +1602,18 @@ func _boot() -> void:
 	World.herds.here = func() -> String: return World.zone.name
 	World.herds.spawn = _spawn
 	World.herds.free_near = func(cell: Vector2i, reach: int) -> Vector2i:
+		# Out of every player's way where it can be (Animal.unseen_cell).
+		var players: Array[Vector2i] = []
+		for player: Player in _players.values():
+			if is_instance_valid(player) and player.spawned:
+				players.append(player.tile)
+		var draw := RandomNumberGenerator.new()
+		draw.seed = hash(cell)
+		var unseen := Animal.unseen_cell(cell, reach, players, draw)
+		if unseen != World.NO_CELL:
+			return unseen
 		if World.is_free(cell) and World.fields.under_sky(cell):
 			return cell
-		var draw := RandomNumberGenerator.new()
 		draw.seed = hash(cell)
 		return _free_cell_near(cell, reach, draw)
 	World.keepers.erase(_herds_kept)
@@ -1851,6 +1860,11 @@ func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void
 ## neighbour goes there, arriving at the matching cell of its opposite edge
 ## (level.json "neighbours"), with their companion, as a link takes them.
 func _on_walked_off(entity: GridEntity, direction: Vector2i) -> void:
+	if entity is Animal:
+		var cross := Animal.crossing_off(entity as Animal, direction, _world_map, World.zone.name)
+		if not cross.is_empty():
+			_animal_crossed.call_deferred(entity, cross)  # After the tick: not mid-step.
+		return
 	if not entity is Player:
 		return
 	var beyond := entity.tile + direction
@@ -1861,6 +1875,17 @@ func _on_walked_off(entity: GridEntity, direction: Vector2i) -> void:
 	print("[level] %s walked off the %s edge at %s to %s" % [_display_name(entity), side, entity.tile, neighbours[side]])
 	# After the tick: not mid-step.
 	travel.call_deferred(entity.owner_peer, str(neighbours[side]), "", {"side": side, "cell": beyond})
+
+
+## Server: a herd's animal fled off the map's edge into the next area
+## ([param cross]: Animal.crossing_off): gone from here, its unit moved to
+## its species' group there (Herds.moved, decision 367); kept, not dead.
+func _animal_crossed(animal: Animal, cross: Dictionary) -> void:
+	if not is_instance_valid(animal) or not animal.spawned or World.herds == null:
+		return
+	var group := World.herds.moved(str(animal.spawn_spec.get("group", "")), str(cross["to"]), cross["at"])
+	print("[herds] %s fled off the %s edge at %s into %s (group %s)" % [animal.name, cross["side"], animal.tile, cross["to"], group])
+	_despawn_kept(animal)
 
 
 ## Server: one Door node per door edge, through the spawner so every client

@@ -83,6 +83,8 @@ func _ready() -> void:
 	_test_wild_boar()
 	_test_wild_wolf()
 	_test_wild_remains()
+	_test_herd_hunt()
+	_test_wolf_den()
 	_test_lead_occupied()
 	_test_raid_townsfolk()
 	_test_charging()
@@ -1699,6 +1701,105 @@ func _test_wild_wolf() -> void:
 	DayNight.reset()
 	_indoors()
 	Monster.idling = true
+
+func _test_herd_hunt() -> void:
+	print("\n== a hunt (W4): a herd's bodies come out of the hunter's sight; a kill leaves the herd for good; a deer run off the east edge goes to the next area's herd ==")
+	Monster.idling = true
+	const W := 34
+	var rows: Array[String] = ["#".repeat(W)]
+	for y in 5:
+		rows.append("#" + ".".repeat(W - 1))  # Open to the east: the map's edge.
+	rows.append("#".repeat(W))
+	var e := _build(rows)
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	var hunter := EntityFactory.build(SPECS["P"].merged({"name": "Hunter"})) as GridEntity
+	_room.add_child(hunter)
+	World.spawn(hunter, Vector2i(14, 3))
+	var floor := {}
+	for cell in World.floor_cells():
+		floor[cell] = true
+	var areas := {"meadow": {"floor": floor, "outdoor": true}, "fields": {"floor": floor, "outdoor": true}}
+	var herds := Herds.new({}, areas, Production.read_rules().get("herds", {}), func() -> int: return 0)
+	World.herds = herds
+	herds.here = func() -> String: return "meadow"
+	herds.spawn = func(spec: Dictionary) -> GridEntity:
+		var body := EntityFactory.build(spec) as GridEntity
+		_room.add_child(body)
+		if not World.spawn(body, spec["tile"]):
+			body.free()
+			return null
+		return body
+	herds.free_near = func(cell: Vector2i, reach: int) -> Vector2i:
+		var draw := RandomNumberGenerator.new()
+		draw.seed = hash(cell)
+		var near: Array[Vector2i] = [hunter.tile]
+		var unseen := Animal.unseen_cell(cell, reach, near, draw)
+		return unseen if unseen != World.NO_CELL else cell
+	var deer := herds._add_group("meadow", "deer", Vector2i(26, 3), 5.0)
+	herds.recall_near(hunter.tile, W)
+	var bodies: Array[Animal] = []
+	for monster in World.monsters():
+		if monster is Animal and str((monster as Animal).spawn_spec.get("group", "")) == deer["id"]:
+			bodies.append(monster)
+	_check(bodies.size() == 5 and int(deer["out"]) == 5, "the herd near the hunter made bodies (%d, out %d)" % [bodies.size(), deer["out"]])
+	_check(bodies.all(func(body: Animal) -> bool: return World.distance(body.tile, hunter.tile) > Animal.UNSEEN_TILES),
+			"each out of the hunter's sight (more than %d off)" % Animal.UNSEEN_TILES)
+	World.damage(bodies[0], 999, hunter)
+	_check(int(deer["out"]) == 4 and is_equal_approx(herds.total("meadow", "deer"), 4.0), "one killed: gone from the herd for good (out %d)" % deer["out"])
+	# Hunted to the edge: the rest bolt east, and off it.
+	var map := WorldMap.new()
+	map.areas = {"meadow": {"size": Vector2i(W, rows.size()), "neighbours": {"east": "fields"}},
+		"fields": {"size": Vector2i(W, rows.size()), "neighbours": {}}}
+	var crossed: Array[Dictionary] = []
+	var off := func(entity: GridEntity, direction: Vector2i) -> void:
+		if entity is Animal:
+			var cross := Animal.crossing_off(entity as Animal, direction, map, "meadow")
+			if not cross.is_empty():
+				crossed.append(cross)
+				herds.moved(str((entity as Animal).spawn_spec["group"]), cross["to"], cross["at"])
+				World.despawn(entity)  # As Main's _animal_crossed: kept, not dead.
+	World.walked_off.connect(off)
+	World.despawn(hunter)
+	World.spawn(hunter, Vector2i(22, 3))
+	for i in 120:
+		World.step()
+		if crossed.size() >= 2:
+			break
+	World.walked_off.disconnect(off)
+	_check(not crossed.is_empty() and crossed[0]["to"] == "fields" and crossed[0]["side"] == "east" and (crossed[0]["at"] as Vector2i).x == 0,
+			"a deer runs off the east edge into fields, at its west edge (%s)" % [crossed.slice(0, 1)])
+	var there := herds.groups_in("fields", "deer")
+	_check(not there.is_empty() and int(there[0]["out"]) == crossed.size() and int(deer["out"]) == 4 - crossed.size(),
+			"its unit is out of the fields' deer now (%d moved)" % crossed.size())
+	# One of no group (a level's own) at the edge stays.
+	var plain := EntityFactory.build(Level._spec_for("monster_deer", Level.MONSTER_TYPES).merged({"name": "LevelDoe", "kind": "deer"})) as Animal
+	_room.add_child(plain)
+	World.spawn(plain, Vector2i(W - 1, 1))
+	plain.alert = Monster.Alert.FLEEING
+	_check(Animal.crossing_off(plain, Vector2i(1, 0), map, "meadow").is_empty(), "a level's own deer (no group) never leaves")
+	World.herds = null
+	DayNight.reset()
+	_indoors()
+
+
+func _test_wolf_den() -> void:
+	print("\n== a wolf keeps to its den by day and ranges by night ==")
+	Monster.idling = true
+	var e := _build(["##########", "#...w....#", "##########"])
+	var wolf: Animal = e["w"][0]
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	for i in Animal.PREY_LOOK_TICKS + 2:
+		World.step()
+	_check(wolf.wander_radius == Animal.DEN_RADIUS, "by day it wanders %d from home" % wolf.wander_radius)
+	DayNight.set_hour(0.0)
+	for i in Animal.PREY_LOOK_TICKS + 2:
+		World.step()
+	_check(wolf.wander_radius == Monster.WANDER_RADIUS * 2, "by night %d" % wolf.wander_radius)
+	DayNight.reset()
+	_indoors()
+
 
 func _test_noticing() -> void:
 	print("

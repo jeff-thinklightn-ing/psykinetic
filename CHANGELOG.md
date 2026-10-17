@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.
+
 ## v0.1.149
 
 - This release changes what the server and client send each other, so update the

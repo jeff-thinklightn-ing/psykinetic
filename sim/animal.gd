@@ -43,6 +43,12 @@ const PACK_TILES := 8
 const PREY_LOOK_TICKS := 10
 ## A boar's charge is heard so far (a "charge" cry).
 const NOISE_CHARGE := 6
+## A predator by day keeps to its den: it wanders this far from home; by
+## night twice its own wander radius (decision 317, W4).
+const DEN_RADIUS := 1
+## A herd's body is made (Herds' free_near, Main) more than this far from
+## every player where it can be: it walks into view, not appears in it.
+const UNSEEN_TILES := 8
 ## A step heard (not its herd's, nor a predator's): it stops, head up,
 ## turned to it, for so long (ticks), and sees as far as it can.
 const ALERT_TICKS := 40
@@ -62,6 +68,9 @@ var _bold_tick := -1
 var _night_bonus := 0
 ## Head up after a step heard, till then (ticks).
 var _heads_up_until := -1
+## Its wander radius as its spawn spec or kind gave it (a predator's by
+## night is twice it; by day DEN_RADIUS).
+var _roam := WANDER_RADIUS
 
 
 func _ready() -> void:
@@ -72,6 +81,7 @@ func _ready() -> void:
 	role = ROLES.get(str(row.get("role", "prey")), Role.PREY)
 	diet.assign(row.get("diet", []))
 	herd = str(row.get("herd", spawn_spec.get("kind", "")))
+	_roam = wander_radius
 
 
 ## Whether [param kind] is a wild animal's (its row's "side").
@@ -251,10 +261,59 @@ func _settle_bold() -> void:
 					and World.distance(tile, entity.tile) <= PACK_TILES:
 				pack += 1
 	_bold = night or pack >= PACK_BOLD
+	wander_radius = _roam * 2 if night else DEN_RADIUS  # Out by night, at its den by day.
 	temper = Temper.BOLD if _bold else Temper.CAUTIOUS
 	var bonus := NIGHT_SIGHT if night else 0
 	sight_range += bonus - _night_bonus
 	_night_bonus = bonus
+
+
+## Its drops; and one of a herd's group (spec "group", decision 367) is
+## gone from it for good (Herds.killed): hunting thins a herd.
+func remains() -> Array[int]:
+	var group := str(spawn_spec.get("group", ""))
+	if not group.is_empty() and World.herds != null:
+		World.herds.killed(group, str(spawn_spec.get("kind", "")))
+	return super()
+
+
+## Fleeing: one of a herd's group first tries the steps away from its
+## threat that leave the floor (World.walked_off): at a map edge with a
+## neighbour, Main sends it there (crossing_off); else nothing comes of it
+## and it runs on as any monster.
+func _flee_tick() -> void:
+	if not str(spawn_spec.get("group", "")).is_empty() and World.herds != null \
+			and not World.is_stunned(self) and World.tick >= next_move_tick:
+		var away := Vector2i(signi(tile.x - _flee_from.x), signi(tile.y - _flee_from.y))
+		# Straight steps only: off the map a cell across, at its row or column.
+		for way: Vector2i in [Vector2i(away.x, 0), Vector2i(0, away.y)]:
+			if way != Vector2i.ZERO and not World.is_walkable(tile + way):
+				World.try_move(self, way)
+	super()
+
+
+## Where [param animal], stepping by [param direction] off the floor of
+## [param area] on [param world_map], goes (WorldMap.crossing: {to, side,
+## at}): {} unless it is one of a herd's group, fleeing, and that edge has
+## a neighbour. A level's own animals and ungrouped ones never leave.
+static func crossing_off(animal: Animal, direction: Vector2i, world_map: WorldMap, area: String) -> Dictionary:
+	if world_map == null or World.herds == null or animal.alert != Alert.FLEEING \
+			or str(animal.spawn_spec.get("group", "")).is_empty():
+		return {}
+	return world_map.crossing(area, animal.tile, direction)
+
+
+## A free cell under the sky within [param reach] of [param near] (itself
+## first) more than UNSEEN_TILES from every one of [param away_from], drawn
+## by [param draw]; World.NO_CELL if a few draws find none.
+static func unseen_cell(near: Vector2i, reach: int, away_from: Array[Vector2i], draw: RandomNumberGenerator) -> Vector2i:
+	for attempt in 16:
+		var at := near if attempt == 0 else near + Vector2i(draw.randi_range(-reach, reach), draw.randi_range(-reach, reach))
+		if not World.is_free(at) or not World.fields.under_sky(at):
+			continue
+		if away_from.all(func(other: Vector2i) -> bool: return World.distance(at, other) > UNSEEN_TILES):
+			return at
+	return World.NO_CELL
 
 
 ## A boar in its charge, or charging as Monster's HEAVY do.

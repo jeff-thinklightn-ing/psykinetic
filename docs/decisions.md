@@ -8378,3 +8378,32 @@ MSAA 4x multiplies the 3D buffers on a weak card. MSAA 4x stays for thin
 geometry, FXAA for the weakest cards; MSAA 2x and TAA (ghosting in motion)
 are not offered. A render scale would go in the same Video section if a
 laptop needs one.
+
+## 397. Wildlife in play on the herds (W4)
+
+Economy's Herds (decision 367) keeps the wilds' animals as counts and makes
+bodies near someone; what the bodies do about it is the Animal's
+(`sim/animal.gd`):
+- A kill: `Animal.remains` tells `World.herds.killed(group, kind)` before its
+  drops, so a group's "out" stays true and hunting thins it for good.
+- A flight off the map: a fleeing animal of a group (spec "group") first
+  tries the straight steps away from its threat that leave the floor; World's
+  `walked_off` reaches Main, which asks `Animal.crossing_off` (WorldMap.crossing:
+  an edge with a neighbour, the arrival cell on its opposite edge), and after
+  the tick (`Main._animal_crossed`) moves its unit with `Herds.moved` and
+  despawns it as kept, not dead. A level's own animals and ungrouped ones never
+  leave; a step into a wall or an edge with no neighbour comes to nothing.
+  Straight steps only, so it arrives on the row or column it left by.
+- Placement: Main's `free_near` takes `Animal.unseen_cell` first, a free cell
+  under the sky more than UNSEEN_TILES (8) from every player, and falls back to
+  the nearest free cell; bodies walk into view instead of appearing in it.
+- Wolves: a predator's wander radius is DEN_RADIUS (1) by day and twice its own
+  by night, set where W1 already settles its boldness and night sight
+  (`_settle_bold`, every PREY_LOOK_TICKS).
+Camps hunting herds is economy's, in Herds' counts by camp size (their step
+3), as is a pack's decline when it goes hungry. monster_test's hunt case (a
+real Herds wired as Main wires it, a stub WorldMap) and wolf den case.
+Rejected: animals stepping off diagonally (they arrived a row off); a wolf's
+day kept as a sitting idle mode (the wander radius already holds it at home,
+and keeps W1's grazing poses); placement by line of sight (a distance check
+is enough at a recall's reach, and cheap).
