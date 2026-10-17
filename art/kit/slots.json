@@ -887,10 +887,11 @@
 			"footprint": [4, 6],
 			"size": [4.6, 7.0, 6.6],
 			"budget": 4000,
-			"uses": "the town's temple, where its priest serves (Jeff, 2026-10-17), 4 x 6 cells, its ridge along z, the door at -z: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Taller than the house: its eaves at 4.5 m, so its walls want a run 4.5 m tall (stone's _tall pieces' height). Its roof steeper than the house's, 2 m from eaves to ridge, with a small belfry over the -z gable, so it reads as no house from above. Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 4.5 m",
+			"uses": "the town's temple, where its priest serves (Jeff, 2026-10-17), 4 x 6 cells, its ridge along z, the door at -z: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Taller than the house: its eaves at 4.5 m, so its outline's walls are drawn 4.5 m tall (its wall_height: terrain's runs from the wall set's *_tall pieces; a building slot without one has 3 m walls). Its roof steeper than the house's, 2 m from eaves to ridge, with a small belfry over the -z gable, so it reads as no house from above. Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 4.5 m",
 			"grey": "none",
 			"wall_set": "stone",
 			"floor_set": "stone",
+			"wall_height": 4.5,
 			"states": ["damaged"],
 			"parts": [
 				{"name": "roof", "motion": "fixed", "pivot": [0, 4.5, 0], "grey": [

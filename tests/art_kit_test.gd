@@ -212,6 +212,11 @@ func _test_profile() -> void:
 		if entry.has("wall_set") or entry.has("floor_set"):
 			_check(str(entry.get("wall_set", "")) in sets and str(entry.get("floor_set", "")) in sets,
 					"%s's wall_set %s and floor_set %s are sets" % [slot, entry.get("wall_set"), entry.get("floor_set")])
+		if entry.has("wall_height"):
+			# Its walls' height (3 m without one): a number from 3 to 6.
+			var height = entry["wall_height"]
+			_check((height is float or height is int) and float(height) >= 3.0 and float(height) <= 6.0,
+					"%s's wall_height %s is 3 to 6 m" % [slot, height])
 
 
 func _test_check_passes_grey_boxes() -> void:
