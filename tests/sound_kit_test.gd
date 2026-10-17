@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_placeholder()
 	_test_takes()
 	_test_ambience_weights()
+	_test_music()
 	_test_folders()
 	_test_sfx_plays_slots()
 	_test_status_current()
@@ -203,6 +204,80 @@ func _test_placeholder() -> void:
 	_check(SoundKit.placeholder("sfx") == blip, "made once")
 	_check(SoundKit.placeholder("voice") != null and SoundKit.placeholder("ui") != null, "voice and ui have one")
 	_check(SoundKit.placeholder("ambience") == null and SoundKit.placeholder("music") == null, "ambience and music: silence")
+
+
+func _test_music() -> void:
+	print("
+== music: layers by zone, time and tension, phrases, stingers (decision 377) ==")
+	for slot: String in SoundKit.slots():
+		if slot.begins_with("music."):
+			_check(not SoundKit.positional(slot) and str(SoundKit.spec(slot).get("bus")) == "music", "%s: flat, on Music" % slot)
+	for zone: String in Music.ZONES:
+		_check(SoundKit.has("music.%s_base" % zone) and SoundKit.has("music.melody_" + zone), "%s has a base and a melody" % zone)
+	for kind: String in Music.STINGS:
+		_check(SoundKit.has("music.sting_" + kind), "a %s stinger" % kind)
+	_check(Music.zone_of("dungeon", 0.0) == "dungeon" and Music.zone_of("cave", 1.0) == "dungeon" and Music.zone_of("indoors", 0.0) == "town"
+			and Music.zone_of("outdoors", 0.7) == "town" and Music.zone_of("outdoors", 0.2) == "wilds", "zones: under stone, a town or house, the wilds")
+	var calm_day := Music.weights("wilds", 1.0, 0.0, true)
+	_check(calm_day["music.wilds_base"] == 1.0 and calm_day["music.wilds_night"] == 0.0 and calm_day["music.melody_wilds"] > 0.0
+			and calm_day["music.tension_low"] == 0.0 and calm_day["music.town_base"] == 0.0, "a calm day in the wilds: its base and melody")
+	var night := Music.weights("town", 0.0, 0.0, true)
+	_check(night["music.town_night"] == 1.0 and night["music.town_base"] == 0.0, "a town by night: its night layer")
+	var rest := Music.weights("wilds", 1.0, 0.0, false)
+	_check(rest.values().all(func(w: float) -> bool: return w == 0.0), "between phrases: silence")
+	var wary := Music.weights("dungeon", 1.0, 0.4, false)
+	_check(wary["music.tension_low"] == 1.0 and wary["music.tension_high"] == 0.0 and wary["music.dungeon_base"] > 0.0
+			and wary["music.melody_dungeon"] == 0.0, "something wary near: the low tension layer and the ground, even between phrases")
+	var fight := Music.weights("wilds", 1.0, 1.0, true)
+	_check(fight["music.tension_high"] == 1.0 and fight["music.tension_low"] == 0.0 and fight["music.melody_wilds"] == 0.0
+			and fight["music.wilds_base"] == 0.5, "a fight: the high layer, the ground down, the melody out")
+	_check(Music.weights("wilds", 1.0, 0.5, true)["music.melody_wilds"] == 0.0 and Music.weights("wilds", 1.0, 0.3, true)["music.melody_wilds"] > 0.0,
+			"the melody leaves by half tension")
+	_check(Music.tension_from([]) == 0.0 and Music.tension_from([[Monster.Alert.SUSPICIOUS, true]]) == Music.TENSION_SUSPICIOUS
+			and Music.tension_from([[Monster.Alert.SUSPICIOUS, true], [Monster.Alert.FIGHTING, true]]) == 1.0
+			and Music.tension_from([[Monster.Alert.HUNTING, false], [Monster.Alert.FLEEING, true]]) == 0.0,
+			"tension: the most alarming hostile near; a harmless one or a fleeing one none")
+	var deer := Animal.new()
+	deer.spawn_spec = {"kind": "deer"}
+	deer.alert = Monster.Alert.FIGHTING
+	var wolf := Animal.new()
+	wolf.spawn_spec = {"kind": "wolf"}
+	wolf.alert = Monster.Alert.SUSPICIOUS
+	var goblin := Monster.new()
+	_check(not Music.hostile(deer) and not Music.hostile(wolf) and Music.hostile(goblin), "a deer is never a threat, a wolf only hunting, a goblin always")
+	wolf.alert = Monster.Alert.HUNTING
+	_check(Music.hostile(wolf), "a hunting wolf is")
+	for one: Node in [deer, wolf, goblin]:
+		one.free()
+	var at := [0.0, 0.0]
+	for i in 4:
+		at = Music.step_tension(at[0], at[1], 1.0, 0.25)
+	_check(is_equal_approx(at[0], 1.0 / Music.TENSION_RISE) or at[0] > 0.6, "tension rises quickly (%.2f after 1 s)" % at[0])
+	for i in 8:
+		at = Music.step_tension(at[0], at[1], 1.0, 0.25)
+	_check(at[0] == 1.0, "and reaches full")
+	at = Music.step_tension(at[0], at[1], 0.0, Music.TENSION_HOLD - 0.5)
+	_check(at[0] == 1.0, "held a while once the threat is gone")
+	at = Music.step_tension(at[0], at[1], 0.0, 1.0)
+	at = Music.step_tension(at[0], at[1], 0.0, 1.0)
+	_check(at[0] < 1.0 and at[0] > 0.8, "then falls slowly (%.2f)" % at[0])
+	at = Music.step_tension(at[0], at[1], 0.0, Music.TENSION_FALL)
+	_check(at[0] == 0.0, "to nothing")
+	_check(Music.may_sting("danger", 100.0, -INF, {}) and not Music.may_sting("death", 110.0, 100.0, {"danger": 100.0})
+			and Music.may_sting("death", 121.0, 100.0, {"danger": 100.0}) and not Music.may_sting("danger", 150.0, 100.0, {"danger": 100.0}),
+			"stingers: none within 20 s of another, the same not within 2 min")
+	_without_takes(["music.wilds_night"])
+	var folded := Music.by_take({"music.wilds_night": 0.6, "music.wilds_base": 0.3})
+	_check(SoundKit.files("music.wilds_base").is_empty() or (folded.size() == 1 and is_equal_approx(float(folded["music.wilds_base"]), 0.9)),
+			"a night layer with no take of its own folds into its base's recording (%s)" % folded)
+	SoundKit.reload()
+	var was := Net.music_volume
+	Net.music_volume = 0.0
+	var music := Music.new()
+	add_child(music)
+	_check(Music.muted() and not music.sting("death"), "the Music slider at 0: nothing plays")
+	Net.music_volume = was
+	music.free()
 
 
 func _test_folders() -> void:

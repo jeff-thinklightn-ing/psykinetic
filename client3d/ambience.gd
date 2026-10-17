@@ -50,6 +50,8 @@ var players: Dictionary[String, AudioStreamPlayer] = {}
 ## Bed -> the weight it eases toward, and the weight it is at.
 var targets: Dictionary[String, float] = {}
 var levels: Dictionary[String, float] = {}
+## Every bed this much quieter (dB): Music's duck under a fight.
+var duck_db := 0.0
 var _torch: AudioStreamPlayer3D
 var _since_weigh := INF
 
@@ -180,7 +182,7 @@ func _set_level(bed: String, level: float) -> void:
 	var roofed := bed in OUTDOOR_BEDS and view != null and view.sfx.listener != null and World.fields != null \
 			and not World.fields.under_sky(view.sfx.listener)
 	player.bus = "Ambience" + (Sfx.MUFFLED_SUFFIX if roofed else "")
-	player.volume_db = SoundKit.volume_db(bed) + linear_to_db(level)
+	player.volume_db = SoundKit.volume_db(bed) + linear_to_db(level) + duck_db
 	if not player.playing:
 		# Start somewhere along it, so two visits don't begin alike.
 		player.play(randf() * maxf(player.stream.get_length() - 1.0, 0.0))

@@ -7778,3 +7778,47 @@ Rejected: rolling at spawn (a saved archer's slots are put back after its
 spawn, so a bundle made then would be left orphaned in the book); wearing them
 in Level's arming (items' code, and a level's spec is the same each time: the
 draw is the monster's).
+## 377. Music layers per zone
+
+Jeff's brief, step 5, approved by the coordinator. The game's music is layers of `music.*`
+slots, each a looping flat bed on the Music bus, plus stingers. The new class `Music`
+(`client3d/music.gd`) sits beside `Ambience` and eases each layer toward a weight the same
+way.
+
+Sources: the Sonniss bundles have no finished tracks, but their drones, pads, tension beds
+and short orchestral cues work as music. The bundle licence (v2.0) covers them in the game
+(synchronised use, public performance, no attribution). None of the named packs ships terms
+of its own; that was checked by listing each pack's files. Takes are cut and stored external
+like the effects, and are never fed to anything AI. Freesound CC0 or CC BY melodic loops can
+fill or add takes later under 361. There is no generated music.
+
+Slots: per zone (town, wilds, dungeon) a `_base` (the ground: drones and pads), a `_night`
+for town and wilds (falling back to the base), and a `melody_`; then `tension_low`,
+`tension_high`, and four stingers: `sting_discovery` (a level's first visit this session,
+by `World.zone.name`), `sting_danger` (the first hostile hunting near you from calm),
+`sting_death` (the local player dies) and `sting_victory` (a goblin routing near you).
+
+`Music.weights(zone, day, tension, in_phrase)` is pure. `zone_of` maps the terrain zone
+and Ambience's town nearness to town (a town or any indoors), wilds, or dungeon (cave or
+dungeon). The base and melody play in phrases, 60 to 120 s on and 45 to 120 s off, so the
+music comes and goes. Tension starts a phrase at once. The melody leaves by half tension,
+and the ground drops by half at full tension. `by_take` folds layers that play the same
+recording (a night layer with no take of its own and its base) into one player.
+
+Tension is worked out on the client, from what it already knows: the most alarming
+hostile monster within 12 cells (`tension_from`): suspicious 0.4, hunting or fighting 1.0.
+`hostile()`: any goblin, but an animal only if it is a wolf or boar and hunting or
+fighting; a deer, rabbit or fleeing thing never counts. Blows struck within 12 cells
+(`Client3D._on_struck`, `fight_near`) also count as 1.0. `step_tension` rises to full in
+1.5 s, holds 6 s once the threat is gone, then falls over 10 s.
+
+Mix: layers fade over 4 s. At full tension the ambience beds duck 3 dB (`Ambience.duck_db`).
+A stinger ducks the layers 6 dB while it plays, and stingers are rate-limited (`may_sting`:
+none within 20 s of another, the same kind not within 2 min). The Music slider (269) at 0
+plays nothing at all: no players and no stingers. There is no separate toggle.
+
+Tests: sound_kit_test's `_test_music` covers the weights table (zones, day and night,
+phrase and rest, tension's layers, the melody's exit), zone_of, tension_from and hostile,
+step_tension's rise, hold and fall, the stinger limits, by_take, and the slider at 0. It
+also checks that every music slot is flat on Music. The clip scenario is `sound_music`.
+Client only; no protocol change.

@@ -882,6 +882,8 @@ var _listener: AudioListener3D
 var sfx: Sfx
 ## The beds under it all: forest, wind, rain, dungeon, town (Ambience).
 var ambience: Ambience
+## The music over it: layers by zone, time and tension, and stingers (Music).
+var music: Music
 ## The cells fire burns on, torches (_add_torch) and fires (_add_fire),
 ## for their crackle (Ambience).
 var torch_cells: Array[Vector2i] = []
@@ -1017,6 +1019,10 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	ambience.name = "Ambience"
 	ambience.view = self
 	add_child(ambience)
+	music = Music.new()
+	music.name = "Music"
+	music.view = self
+	add_child(music)
 	# Sounds are heard from the player's place: the camera is 40 units off.
 	_listener = AudioListener3D.new()
 	_listener.name = "Listener"
@@ -5479,6 +5485,9 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 			(puppet.get_meta("creature_view") as CreatureView).hit()
 	if puppet != null and cause == &"attack":
 		sfx.play("sfx.hit_flesh", puppet.position + Vector3.UP * 0.8)
+		var struck := instance_from_id(id) as GridEntity
+		if music != null and struck != null and sfx.listener != null and _cells_apart(struck.tile, sfx.listener) <= Music.TENSION_NEAR:
+			music.fight_near()
 
 
 ## Pushed [param tiles]: a model is knocked back (_animate), a backpedal or,
@@ -5644,7 +5653,7 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 		lie.tween_property(puppet, "position:y", -SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
 		lie.tween_callback(puppet.queue_free)
 		if kind == "player" and str(data.get("entity", "")) == _local_name:
-			_mourning = true
+			_mourn_local()
 		return
 	var side := PI * 0.5
 	var fall := create_tween()
@@ -5657,7 +5666,20 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	fall.chain().tween_property(puppet, "position:y", FALL_LIFT - SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
 	fall.chain().tween_callback(puppet.queue_free)
 	if kind == "player" and str(data.get("entity", "")) == _local_name:
-		_mourning = true
+		_mourn_local()
+
+
+## The local player has died: mourning (_update_mourning) and its stinger.
+func _mourn_local() -> void:
+	_mourning = true
+	if music != null:
+		music.sting("death")
+
+
+## Cells between [param a] and [param b], Chebyshev (as hearing counts).
+static func _cells_apart(a: Vector2i, b: Variant) -> int:
+	var to: Vector2i = b
+	return maxi(absi(a.x - to.x), absi(a.y - to.y))
 
 
 ## The local player dead: pull back and drain the colour, slowly; back as
@@ -6207,6 +6229,8 @@ func _on_cried(cry: StringName, id: int) -> void:
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+	if cry == &"rout" and not monster is Animal and music != null and sfx.listener != null 			and _cells_apart(monster.tile, sfx.listener) <= Music.TENSION_NEAR:
+		music.sting("victory")
 
 
 func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:

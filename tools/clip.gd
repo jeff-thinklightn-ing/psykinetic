@@ -88,6 +88,11 @@ extends Node
 ##     clock run from dawn through noon and dusk to midnight, then rain and
 ##     a storm; the player walks up to a fire to hear it crackle. The log
 ##     says each bed's level every second.
+##   sound_music: the music (decision 377), outdoors: a phrase by day, the
+##     night layer, then an imp: tension rises as it hunts and fights you (the
+##     danger stinger), and falls once it is stunned; then the dungeon's
+##     layer, and each stinger. The log says each layer's level, the tension
+##     and the phrase every second.
 ##   sound_reel: a listening reel of the slots given (--slots=a,b,...; else
 ##     every slot with third-party takes, SoundKit.takes): each played
 ##     beside the player once per take, its name and source as the caption,
@@ -194,6 +199,8 @@ func _ready() -> void:
 			_sound_reel()
 		"sound_ambience":
 			_sound_ambience()
+		"sound_music":
+			_sound_music()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
 		"pack":
@@ -217,7 +224,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "wild", "boar"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "wild", "boar"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -1024,6 +1031,40 @@ func _sound_reel() -> void:
 
 ## An open field, outdoors, a fire at its east end, an imp held at the far
 ## side; the script runs the clock and the weather.
+func _sound_music() -> void:
+	var cells: Array[String] = [
+		"################################",
+		"#..............................#",
+		"#..............................#",
+		"#..............................#",
+		"################################",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(22, 2): "monster_imp"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9,
+		"entities": [{"at": [22, 2], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(cells), markers, config), null, config)
+	_script = [
+		["sound_hour", 12.0, ""],
+		["sound_music", "phrase", "A calm day in the wilds: the music comes in phrases, its ground and a melody."],
+		["wait", 100, ""],
+		["sound_hour", 0.0, "Night: the night layer."],
+		["wait", 80, ""],
+		["sound_hour", 12.0, ""],
+		["walk", "monster", "An imp ahead: it hunts, then fights. Tension rises; a stinger marks the danger."],
+		["wait", 120, ""],
+		["sound_music", "calm", "The imp stunned: tension holds a moment, then falls slowly."],
+		["wait", 170, ""],
+		["sound_music", "dungeon", "Under stone: the dungeon's layer."],
+		["wait", 100, ""],
+		["sound_music", "discovery", "Stingers: a level's first visit..."],
+		["wait", 50, ""],
+		["sound_music", "victory", "...a hostile routing near you..."],
+		["wait", 50, ""],
+		["sound_music", "death", "...and your death."],
+		["wait", 40, ""],
+	]
+
+
 func _sound_ambience() -> void:
 	var cells: Array[String] = [
 		"#################",
@@ -1186,6 +1227,20 @@ func _on_tick(tick: int) -> void:
 			_repeat_until = -1
 		"sound_hour":
 			DayNight.set_hour(float(step[1]))
+		"sound_music":
+			var music: Music = _main._client3d.music
+			match str(step[1]):
+				"phrase":
+					music.phrase_on = true
+					music._phrase_left = 60.0
+				"calm":
+					_monster.stunned_until_tick = 1 << 30
+					_monster.alert = Monster.Alert.IDLE
+				"dungeon":
+					_main._client3d._terrain["zone"] = "dungeon"
+				_:
+					music._last_sting = -INF  # The clip shows each, whatever played last.
+					music.sting(str(step[1]))
 		"sound_weather":
 			# Hurried for the clip: the override backdated, so it is in full
 			# at once (in play a turn takes minutes).
@@ -1302,6 +1357,15 @@ func _log(tick: int) -> void:
 				Monster.Alert.keys()[monster.alert]])
 		print("[clip] tick %d: player %s; %s" % [tick, _player.tile, "; ".join(each)])
 		return
+	if scenario == "sound_music" and tick % 10 == 0 and _main._client3d != null:
+		var music: Music = _main._client3d.music
+		var layers: Array[String] = []
+		for layer: String in music.levels:
+			if music.levels[layer] >= 0.05:
+				layers.append("%s %.2f" % [layer, music.levels[layer]])
+		print("[clip] tick %d: hour %.1f, tension %.2f, phrase %s; layers %s; ambience duck %.1f dB; imp %s" % [tick,
+			DayNight.hour(DayNight.now()), music.tension, music.phrase_on, ", ".join(layers), _main._client3d.ambience.duck_db,
+			Monster.Alert.keys()[_monster.alert] if is_instance_valid(_monster) else "gone"])
 	if scenario in ["sounds", "sound_hearing", "sound_reel", "sound_ambience"]:
 		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
 		if sfx != null:

@@ -90,6 +90,118 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"music.dungeon_base": [
+			{
+				"file": "music.dungeon_base.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/CB Sound Design - Exoplanets - Drones & Atmosphere Sound Effects/Dark_Drone_13.wav (from 0 s for 90 s)",
+				"sha256": "ae8af7c35ab7a6d4276354b3f5700e6710ad4ac34abaff6ffb5ff4ee333bbcb8"
+			}
+		],
+		"music.melody_dungeon": [
+			{
+				"file": "music.melody_dungeon.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/BluezoneCorp - Afterlife - Ethereal Ambient Samples/Bluezone_BC0285_afterlife_ambient_synth_melodic_texture_008.wav",
+				"sha256": "31217cbafcd41a55e01b2f12327445c6cb5ea5010c7e545a1051a617fde4e2b3"
+			}
+		],
+		"music.melody_town": [
+			{
+				"file": "music.melody_town.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/CB Sound Design - Dreamcatcher - The Sound of Dreams & Magic/Enchanting_Bells_4.wav",
+				"sha256": "331b1ac84920d1f035ed2eac54a40000e3304cf38fe7a409f0037ae22804cd74"
+			}
+		],
+		"music.melody_wilds": [
+			{
+				"file": "music.melody_wilds.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/BluezoneCorp - Better World - Ethereal Ambient Samples/Bluezone_BC0276_better_world_synth_texture_melodic_phrase_soft_01_01.wav",
+				"sha256": "2d7fa289fc192b95a2e2fe121f7aa53033a7698e9bae4bc186ae8243103a1191"
+			}
+		],
+		"music.sting_danger": [
+			{
+				"file": "music.sting_danger.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/InspectorJ - RPG Orchestral Essentials (Music FX)/Mystery_01-11_Ensemble-Large_WET.wav",
+				"sha256": "75ddee41cc2cbc9de5f17ecf62579d39e147e69bd648fb811f8800d191869995"
+			}
+		],
+		"music.sting_death": [
+			{
+				"file": "music.sting_death.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/InspectorJ - RPG Orchestral Essentials (Music FX)/Failure_05-01_Piano-A_DRY.wav",
+				"sha256": "8a46c4de2991dd4afb817d2404605fb464f9768da8e6d31e001cb652e18d6285"
+			}
+		],
+		"music.sting_discovery": [
+			{
+				"file": "music.sting_discovery.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/InspectorJ - RPG Orchestral Essentials (Music FX)/Discovery_01-03_Organ-A_WET.wav",
+				"sha256": "17ea8a5402e6d967ca5a581f5b93ea384caeca554bd3c6e2336f9eda1ae6b21c"
+			}
+		],
+		"music.sting_victory": [
+			{
+				"file": "music.sting_victory.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/CB Sound Design - Dreamcatcher - The Sound of Dreams & Magic/Harp_Glissando_10b.wav",
+				"sha256": "47bc6c89e08a374715584f6a96ad4f731b1edfe328e44c6126a25a27db2a4aef"
+			}
+		],
+		"music.tension_high": [
+			{
+				"file": "music.tension_high.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Federico Soler Fernandez - Complex Cinematic Tension Sounds/CCTS - H - Full Mix.wav",
+				"sha256": "aa0bbc4dc669fdd64ad3467aa2bedd13a07f36e634a14b25c52c3588def8de1e"
+			}
+		],
+		"music.tension_low": [
+			{
+				"file": "music.tension_low.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Cinematic Drones/DSGNDron_Slow Pulse Drone_JSE_CD.wav (from 0 s for 90 s)",
+				"sha256": "d8182a7d574ba38b8b84a772b216dc33b3d09857ed61d9f6b59e74d840c60b14"
+			}
+		],
+		"music.town_base": [
+			{
+				"file": "music.town_base.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Cinematic Drones/DSGNDron_Evolving Guitar Swell_JSE_CD.wav (from 0 s for 90 s)",
+				"sha256": "f716e85e14a216efac51f40ff85bcbd5505639d28f4ce14be41e6148f0b093a8"
+			}
+		],
+		"music.town_night": [
+			{
+				"file": "music.town_night.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/Justsoundeffects - Cinematic Drones/DSGNDron_Mystery Bells_JSE_CD.wav (from 0 s for 90 s)",
+				"sha256": "2c74a757e19e9ebf96e410765278f6079a9d8813eef6f3fda083d00ed7f08055"
+			}
+		],
+		"music.wilds_base": [
+			{
+				"file": "music.wilds_base.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - Mind States/Pad 3.wav (from 0 s for 90 s)",
+				"sha256": "377be768aa8fd4c5b0dd125003a836b2ed788b50c94d528a5989ca25b02ac9fd"
+			}
+		],
+		"music.wilds_night": [
+			{
+				"file": "music.wilds_night.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/CB Sound Design - Dreamcatcher - The Sound of Dreams & Magic/Dream_Drone_09.wav (from 0 s for 90 s)",
+				"sha256": "a738a92f4e4ee454e0707d23720e1f1a6737f6e51ce3acf6b7ef36bc9e908f09"
+			}
+		],
 		"sfx.bandage": [
 			{
 				"file": "sfx.bandage.ogg",

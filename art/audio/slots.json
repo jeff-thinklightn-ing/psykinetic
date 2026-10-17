@@ -1064,6 +1064,121 @@
 			"volume_db": -12.0,
 			"uses": "wind and rain hard; a bed under a zone, time or weather; not played yet"
 		},
+		"music.town_base": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "a town or a house: the ground layer, drones and pads, played in phrases with silences between (Music)"
+		},
+		"music.town_night": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "a town or a house by night: the ground layer (Music)",
+			"fallback": "music.town_base"
+		},
+		"music.melody_town": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a town or a house: a sparse melodic layer over the ground, out when tension is high (Music)"
+		},
+		"music.wilds_base": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "the open country: the ground layer, drones and pads, played in phrases with silences between (Music)"
+		},
+		"music.wilds_night": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "the open country by night: the ground layer (Music)",
+			"fallback": "music.wilds_base"
+		},
+		"music.melody_wilds": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "the open country: a sparse melodic layer over the ground, out when tension is high (Music)"
+		},
+		"music.dungeon_base": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "a dungeon or cave: the ground layer, drones and pads, played in phrases with silences between (Music)"
+		},
+		"music.melody_dungeon": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a dungeon or cave: a sparse melodic layer over the ground, out when tension is high (Music)"
+		},
+		"music.tension_low": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "a threat near: something hostile is suspicious or hunting (Music's tension)"
+		},
+		"music.tension_high": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -8.0,
+			"uses": "a fight near: something hostile is fighting, or blows were heard (Music's tension)",
+			"fallback": "music.tension_low"
+		},
+		"music.sting_discovery": {
+			"category": "music",
+			"type": "oneshot",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -6.0,
+			"uses": "a stinger: a level entered for the first time this session (Music)"
+		},
+		"music.sting_danger": {
+			"category": "music",
+			"type": "oneshot",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -6.0,
+			"uses": "a stinger: the first hostile to hunt near you, from calm (Music)"
+		},
+		"music.sting_death": {
+			"category": "music",
+			"type": "oneshot",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -6.0,
+			"uses": "a stinger: you die (Music)"
+		},
+		"music.sting_victory": {
+			"category": "music",
+			"type": "oneshot",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -6.0,
+			"uses": "a stinger: a hostile near you routs (Music)"
+		},
 		"amb.torch_fire": {
 			"category": "ambience",
 			"type": "loop",
