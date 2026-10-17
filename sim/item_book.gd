@@ -24,11 +24,20 @@ extends RefCounted
 ## (name_due, World._consider_names), takes a name for life (set_name:
 ## {form, holder, made_step, text}, and a strength): it is never renamed,
 ## and its "named" event, like a "reforged" one, is never the one that goes.
+##
+## Curses (decision 370): a named thing taken by anyone but its namer
+## other than from its namer's hand is kept from its namer (keep:
+## kept_from, kept_by, a "kept" event). While it is kept, a carrier row
+## that counts (Items.curse()'s follows: "thing", anyone but the namer;
+## "taker", only who took it) gathers ill (0..1) as it holds it, reaching 1
+## after full_days of the world clock, and loses it at fade of that rate
+## while it does not; counted from the clock as it changes (_settle), never
+## per tick. Back in its namer's hands it is lifted (lift, a "back" event).
 
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -101,6 +110,7 @@ func place(uid: int, at: String, who := "", carrier_name := "") -> void:
 	entry["at"] = at
 	if entry["holder"] == who:
 		return
+	_settle(entry)
 	_let_go(entry)
 	if who.is_empty():
 		return
@@ -111,7 +121,7 @@ func place(uid: int, at: String, who := "", carrier_name := "") -> void:
 			row["since"] = _now()
 			row["name"] = carrier_name
 			return
-	carriers.append({"who": who, "name": carrier_name, "since": _now(), "held": 0, "deeds": {}})
+	carriers.append({"who": who, "name": carrier_name, "since": _now(), "held": 0, "deeds": {}, "ill": 0.0, "ill_at": _now()})
 	if carriers.size() > MAX_CARRIERS:
 		# The one who held it least goes (never who holds it now).
 		var least := 0
@@ -146,7 +156,8 @@ func deed(uid: int, who: String, kind: String) -> void:
 			return
 
 
-## [param uid]'s name ({form, holder, made_step, text}); {} for none.
+## [param uid]'s name ({form, holder, who (its namer's carrier key),
+## made_step, text}); {} for none.
 func name_of(uid: int) -> Dictionary:
 	return _book[uid].get("name", {}) if _book.has(uid) else {}
 
@@ -171,6 +182,47 @@ func name_due(uid: int, held: int, deeds: int) -> Dictionary:
 			done += int(row["deeds"][kind])
 		return row if int(row["held"]) >= held and done >= deeds else {}
 	return {}
+
+
+## Who [param uid] is kept from (its namer's carrier key; decision
+## 370); "" when it is not kept.
+func kept_from(uid: int) -> String:
+	return str(_book[uid].get("kept_from", "")) if _book.has(uid) else ""
+
+
+## [param uid], named, is kept from its namer by [param who] (named
+## [param who_name]): noted "kept". Nothing if it is kept already or
+## has no namer.
+func keep(uid: int, who: String, who_name: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or not kept_from(uid).is_empty() or str(name_of(uid).get("who", "")).is_empty():
+		return
+	_settle(_book[uid])
+	_book[uid]["kept_from"] = name_of(uid)["who"]
+	_book[uid]["kept_by"] = who
+	note(uid, "kept", "from %s by %s" % [name_of(uid).get("holder", ""), who_name], zone, tile)
+
+
+## [param uid] is back in its namer's hands: no longer kept, noted
+## "back"; the ill on it fades from now. Nothing if it is not kept.
+func lift(uid: int, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if kept_from(uid).is_empty():
+		return
+	_settle(_book[uid])
+	_book[uid].erase("kept_from")
+	_book[uid].erase("kept_by")
+	note(uid, "back", "with %s" % name_of(uid).get("holder", ""), zone, tile)
+
+
+## The ill (0..1) [param who] has from carrying [param uid], counted up
+## to now; 0 for none.
+func ill_of(uid: int, who: String) -> float:
+	if not _book.has(uid):
+		return 0.0
+	var entry: Dictionary = _book[uid]
+	for row: Dictionary in entry["carriers"]:
+		if row["who"] == who:
+			return _ill_now(entry, row)
+	return 0.0
 
 
 ## [param uid] takes its name for life (decision 365): [param name]
@@ -235,7 +287,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 						for kind: Variant in row["deeds"]:
 							deeds[str(kind)] = int(row["deeds"][kind])
 					carriers.append({"who": row["who"], "name": str(row.get("name", "")),
-						"since": int(row.get("since", -1)), "held": int(row.get("held", 0)), "deeds": deeds})
+						"since": int(row.get("since", -1)), "held": int(row.get("held", 0)), "deeds": deeds,
+						"ill": clampf(float(row.get("ill", 0.0)), 0.0, 1.0), "ill_at": int(row.get("ill_at", 0))})
 			var events: Array = []
 			for event: Variant in entry.get("events", []):
 				if event is Dictionary and event.get("kind") is String:
@@ -248,11 +301,40 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 			if name is Dictionary and name.get("form") is String and name.get("holder") is String:
 				items._book[int(key)]["name"] = {"form": name["form"], "holder": name["holder"],
 					"made_step": int(name.get("made_step", 0)), "text": str(name.get("text", ""))}
+				if name.get("who") is String and not name["who"].is_empty():
+					items._book[int(key)]["name"]["who"] = name["who"]
 				items._book[int(key)]["strength"] = str(entry.get("strength", ""))
+				if entry.get("kept_from") is String and not entry["kept_from"].is_empty():
+					items._book[int(key)]["kept_from"] = entry["kept_from"]
+					items._book[int(key)]["kept_by"] = str(entry.get("kept_by", ""))
 	items._next = maxi(int(data.get("next", 1)), 1)
 	for uid: int in items._book:
 		items._next = maxi(items._next, uid + 1)
 	return items
+
+
+## Every carrier row's ill counted up to now and kept from now.
+func _settle(entry: Dictionary) -> void:
+	for row: Dictionary in entry["carriers"]:
+		row["ill"] = _ill_now(entry, row)
+		row["ill_at"] = _now()
+
+
+## [param row]'s ill now: what it had at ill_at, grown while it held a
+## kept thing it counts for (Items.curse()'s follows), else faded.
+func _ill_now(entry: Dictionary, row: Dictionary) -> float:
+	var ill := float(row.get("ill", 0.0))
+	var since := _now() - int(row.get("ill_at", _now()))
+	if since <= 0:
+		return ill
+	var curse := Items.curse()
+	var full := maxf(1.0, float(curse["full_days"]) * DayNight.day_steps)
+	var kept := str(entry.get("kept_from", ""))
+	var counts: bool = not kept.is_empty() and row["who"] != kept \
+			and (curse["follows"] == "thing" or row["who"] == entry.get("kept_by", ""))
+	if counts and int(row["since"]) >= 0:
+		return minf(1.0, ill + since / full)
+	return maxf(0.0, ill - since * float(curse["fade"]) / full)
 
 
 ## A saved [x, y] as ints; null for none.

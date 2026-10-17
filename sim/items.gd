@@ -43,6 +43,7 @@ const GEAR_TAGS: Array[String] = ["armour", "tool"]
 static var _catalog: Dictionary = {}
 static var _loot: Dictionary = {}
 static var _naming: Dictionary = {}
+static var _curse: Dictionary = {}
 
 
 ## Every definition by id, read on first use.
@@ -169,6 +170,36 @@ static func reset() -> void:
 	_catalog = {}
 	_loot = {}
 	_naming = {}
+	_curse = {}
+
+
+## The catalog's "curse" (decision 370), read on first use: {follows
+## ("thing": every holder but the namer gathers ill while it is kept;
+## "taker": only who took it), below_baseline (null until Jeff answers;
+## what ill does waits on it), full_days (ill 0 to 1 while held), fade
+## (the rate it falls at while not held, of full's)}.
+static func curse() -> Dictionary:
+	if _curse.is_empty():
+		_curse = read_curse(FileAccess.get_file_as_string(CATALOG))
+	return _curse
+
+
+## The "curse" of [param text] (the catalog file), with defaults.
+static func read_curse(text: String) -> Dictionary:
+	var data: Variant = JSON.parse_string(text)
+	var given: Variant = data.get("curse", {}) if data is Dictionary else {}
+	if given is not Dictionary:
+		given = {}
+	var below: Variant = given.get("below_baseline")
+	return {"follows": "taker" if given.get("follows") == "taker" else "thing",
+		"below_baseline": below if below is bool else null,
+		"full_days": maxf(float(given.get("full_days", 1.0)), 0.01),
+		"fade": clampf(float(given.get("fade", 0.5)), 0.0, 10.0)}
+
+
+## For tests: curse's values replaced by [param values] until reset.
+static func set_curse_for_test(values: Dictionary) -> void:
+	curse().merge(values, true)
 
 
 ## The catalog's "naming" (decision 365), read on first use: {held_days,

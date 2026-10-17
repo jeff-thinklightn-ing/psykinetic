@@ -441,6 +441,7 @@ func _go_online() -> void:
 		World.knocked_down.connect(_narrate_down)
 		World.braced_against.connect(_narrate_brace)
 		World.item_named.connect(_narrate_named)
+		World.item_kept.connect(_narrate_kept)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
@@ -3633,6 +3634,17 @@ func _narrate_brace(holder: GridEntity, charger: GridEntity) -> void:
 ## A thing carried long took its name (World.item_named; decision 365).
 func _narrate_named(entity: GridEntity, uid: int, text: String) -> void:
 	party_log.add("%s's %s is %s now." % [_display_name(entity), Items.name_of(World.items.id_of(uid)), text])
+
+
+## A named thing kept from its namer, or back with them (World.item_kept;
+## decision 370).
+func _narrate_kept(entity: GridEntity, uid: int, kept: bool) -> void:
+	var name := World.items.name_of(uid)
+	var title := World.item_title(uid).get_slice(" (", 0)
+	if kept:
+		party_log.add("%s keeps %s from %s." % [_display_name(entity), title, name.get("holder", "")])
+	else:
+		party_log.add("%s is back with %s." % [title, _display_name(entity)])
 
 
 ## A blow that knocked someone down (World.knocked_down).

@@ -78,6 +78,9 @@ signal braced_against(holder: GridEntity, charger: GridEntity)
 ## A thing in [param entity]'s slot took its name for life (decision 365):
 ## [param text] as it reads ("Wren's dagger").
 signal item_named(entity: GridEntity, uid: int, text: String)
+## A named thing is kept from its namer (decision 370) by [param entity],
+## or is back with its namer ([param kept] false).
+signal item_kept(entity: GridEntity, uid: int, kept: bool)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -264,6 +267,9 @@ const BRACE_TICKS := 5
 ## The least status of lore's name forms that names things (decision 365;
 ## Lore.name_forms): "agreed" in play; tests and clips use "draft".
 var name_least := "agreed"
+## How a thing kept from its namer is marked where it is shown (decision
+## 370; the pack panel tints a slot that says it).
+const KEPT_MARK := "ill-starred"
 const BRACE_DAMAGE_FACTOR := 2.0
 const BRACE_FORCE_PER_KG := 0.03
 ## Mass multiplier for being pushed while at 0 stamina.
@@ -1473,6 +1479,7 @@ func put_item(by: GridEntity, to: GridEntity, slot: int, uid: int) -> bool:
 	to.slot_items = given_uids
 	var carrier := _carrier_of(to)
 	items.place(uid, holder_key(to), carrier[0], carrier[1])
+	_taken(uid, to, "")
 	_log("slots: %s put %s into %s %d" % [by.name, id, to.name, slot])
 	_slots_changed(to)
 	return true
@@ -1571,6 +1578,7 @@ func try_pick_up_weapon(monster: GridEntity) -> bool:
 	monster.slot_items = given_uids
 	items.place(uid, holder_key(monster), holder_key(monster), _label_of(monster))
 	items.note(uid, "taken up", "by %s" % _label_of(monster), zone.name, monster.tile)
+	_taken(uid, monster, "")
 	_log("pick up: %s takes up %s from %s" % [monster.name, id, cell])
 	_slots_changed(monster)
 	return true
@@ -1737,7 +1745,7 @@ func _consider_name(entity: GridEntity, slot: int) -> void:
 	var forms := Lore.name_forms("holder", name_least)
 	if forms.is_empty():
 		return
-	var name := {"form": str(forms[0]["id"]), "holder": str(due["name"]), "made_step": steps}
+	var name := {"form": str(forms[0]["id"]), "holder": str(due["name"]), "who": str(due["who"]), "made_step": steps}
 	var text := Lore.render_name(name, id, PackedStringArray(Items.def(id)["tags"]), Items.name_of(id), name_least)
 	if text.is_empty():
 		return
@@ -1760,8 +1768,48 @@ func item_title(uid: int) -> String:
 	var text := Lore.render_name(name, id, PackedStringArray(Items.def(id)["tags"]), Items.name_of(id), name_least)
 	if text.is_empty():
 		text = str(name.get("text", ""))
-	var strength := items.strength_of(uid)
-	return text + (" (%s)" % strength if not strength.is_empty() else "")
+	var marks: Array[String] = []
+	if not items.strength_of(uid).is_empty():
+		marks.append(items.strength_of(uid))
+	if not items.kept_from(uid).is_empty():
+		marks.append(KEPT_MARK)  # Kept from its namer (decision 370).
+	return text + (" (%s)" % ", ".join(marks) if not marks.is_empty() else "")
+
+
+## [param uid] came into [param to]'s slots, from [param from_key]'s hand
+## ("" for none: the ground, a chest, the stockpile; decision 370): a
+## named thing taken by anyone but its namer, not from its namer's hand,
+## is kept from its namer; one that reaches its namer's hands is back.
+func _taken(uid: int, to: GridEntity, from_key: String) -> void:
+	var namer := str(items.name_of(uid).get("who", ""))
+	var taker := _carrier_of(to)[0]
+	if namer.is_empty() or taker.is_empty() or taker == from_key:
+		return
+	if taker == namer:
+		if not items.kept_from(uid).is_empty():
+			items.lift(uid, to.zone, to.tile)
+			_log("kept: %s is back with %s" % [items.id_of(uid), to.name])
+			item_kept.emit(to, uid, false)
+		return
+	if not items.kept_from(uid).is_empty() or from_key == namer:
+		return  # Kept already; or a gift.
+	items.keep(uid, taker, _label_of(to), to.zone, to.tile)
+	_log("kept: %s keeps %s from its namer" % [to.name, items.id_of(uid)])
+	item_kept.emit(to, uid, true)
+
+
+## The most ill (decision 370; ItemBook.ill_of) [param entity] has from
+## the things it carries now, 0..1. What it does waits on Jeff (Items.curse()'s
+## below_baseline); nothing reads it yet.
+func ill_of(entity: GridEntity) -> float:
+	var who := _carrier_of(entity)[0]
+	var most := 0.0
+	if who.is_empty():
+		return most
+	for uid in entity.slot_items:
+		if uid != 0:
+			most = maxf(most, items.ill_of(uid, who))
+	return most
 
 
 ## [param entity]'s slot_names (replicated) follow its things' names.
@@ -1857,6 +1905,7 @@ func _moved_item(uid: int, from: GridEntity, to: GridEntity) -> void:
 	var taker := _carrier_of(to)
 	var carried_before: bool = not items.history(uid).get("carriers", []).is_empty()
 	items.place(uid, holder_key(to), taker[0], taker[1])
+	_taken(uid, to, giver[0])
 	if taker[0].is_empty() or giver[0] == taker[0]:
 		return
 	if not giver[0].is_empty():

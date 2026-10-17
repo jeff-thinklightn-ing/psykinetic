@@ -66,6 +66,10 @@ extends Node
 ##     thresholds dropped to none held and 4 deeds, and lore's draft holder
 ##     form let count; a dagger stabs an imp in the back until it takes its
 ##     holder's name and the quiet strength (the party log says so).
+##   items_curse: cursed heirlooms (decision 370): a dagger named for
+##     Wren (item_name) is put down; taken up by the player, not given by
+##     Wren, it is kept from her: the slot rust, ill-starred, its ill
+##     growing as it is held (ill full over 20 seconds here).
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -175,6 +179,8 @@ func _ready() -> void:
 			_items_pickup()
 		"items_names":
 			_items_names()
+		"items_curse":
+			_items_curse()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -664,6 +670,32 @@ func _items_names() -> void:
 	]
 
 
+func _items_curse() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start"}
+	var config := {"name": "Clip", "ambient": 0.9}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	Items.set_curse_for_test({"full_days": 200.0 / DayNight.day_steps})
+	_script = [
+		["item_give", ["dagger", Player.RIGHT_HAND], ""],
+		["item_name", ["Wren", "companion:clip:Wren", "quiet"], "Wren's dagger: hers, named by long use."],
+		["item_open", true, "Named: gilded."],
+		["wait", 20, ""],
+		["item_key", ["drop", null], "Put down, as if she had lost it."],
+		["walk", Vector2i(5, 2), ""],
+		["walk", Vector2i(2, 2), ""],
+		["item_key", ["pick_up", null], "Taken up by another, not given: kept from Wren."],
+		["wait", 30, "Ill-starred: the slot rusts, and ill gathers while it is held."],
+		["wait", 30, ""],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -1059,6 +1091,13 @@ func _on_tick(tick: int) -> void:
 			# The first monster takes up a weapon beside it, when there is one.
 			if not World.try_pick_up_weapon(_monster):
 				return
+		"item_name":
+			# The thing in the player's right hand named for someone else.
+			var named: Array = step[1]
+			var uid := _player.slot_items[Player.RIGHT_HAND]
+			World.items.set_name(uid, {"form": "holder_possessive", "holder": named[0], "who": named[1], "made_step": World.steps,
+				"text": "%s's %s" % [named[0], Items.name_of(World.items.id_of(uid))]}, named[2])
+			World._slots_changed(_player)
 		"item_bold":
 			# The clip's monsters of kind step[1] made bold, so they close in.
 			for entity in World.monsters():
@@ -1275,6 +1314,11 @@ func _log(tick: int) -> void:
 		for entity in World.monsters():
 			them.append("%s at %s hp %d %s%s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert], " DOWN" if World.is_down(entity) else ""])
 		print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp, ", ".join(them)])
+		return
+	if scenario == "items_curse":
+		var uid := _player.slot_items[Player.RIGHT_HAND] if _player.slot_items.size() > Player.RIGHT_HAND else 0
+		print("[clip] tick %d: player %s; names %s; kept from %s; ill %.2f" % [tick, _player.tile, _player.slot_names,
+			World.items.kept_from(uid), World.ill_of(_player)])
 		return
 	if scenario == "items_names":
 		var uid := _player.slot_items[Player.RIGHT_HAND] if _player.slot_items.size() > Player.RIGHT_HAND else 0

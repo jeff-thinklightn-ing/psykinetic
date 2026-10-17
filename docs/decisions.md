@@ -7548,3 +7548,44 @@ nodes 87,656 to 79,979, fps 50.4 to 51.0, draw calls up to 537 to 625,
 99th percentile frame 35 to 44 ms (a noisy run: its sim ticks, which this
 does not touch, also halved). The plan is 10 ms on hills and 37 ms on the
 wilds, on the build's thread. Client only; no protocol change.
+
+## 370. Cursed heirlooms: a named thing kept from its namer, not given
+
+Packs survive death (a player's or companion's record keeps them), so the
+roadmap's "taken from the remains" never happens in play; the curse follows the
+Gísla reading instead (Grásíða borrowed and not returned): a named thing (365)
+taken into anyone's slots but its namer's, other than from its namer's own hand,
+is kept from its namer. The paths: off the ground (a drop, a throw), out of a
+chest or the stockpile, taken up by a monster (347), from a monster's spill.
+Handed from the namer's hand it is a gift and stays clean, so lending to a
+friend is fine. A thing won back from a monster's spill by someone other than
+its namer is kept until it is back with them, so a rescuer carries a little
+ill on the way home; that is the saga reading. A name now records its namer's
+carrier key (name's "who"); the book keeps kept_from and kept_by and notes
+"kept" and "back", both kept in the history past MAX_EVENTS. World._taken
+decides at put_item, _moved_item and try_pick_up_weapon.
+
+While it is kept, each carrier row it counts for gathers ill, 0 to 1 over
+`full_days` of the world clock held (items.json "curse": 1 day, about 1.5 real
+hours), and loses it at `fade` (0.5) of that rate while not holding it, so
+putting it down and taking it up again clears nothing. Ill is counted from the
+clock as holders change (ItemBook._settle), never per tick. Whom it counts for
+is Jeff's question, a switch: `follows` "thing" (every holder but the namer;
+the default and the saga's) or "taker" (only who took it). It lifts only back in
+the namer's hands, by any path; the town's stockpile holds it without lifting
+it, and ill does not grow there. A namer who never comes back cannot lift it.
+
+What ill does waits on Jeff's other answer, `below_baseline` (null until then):
+true, the holder is noticed farther off and mends slower, scaled by ill; false,
+it only shortens their buffs, to half their time at full ill. Until he answers
+ill is counted and shown and does nothing; World.ill_of(entity) is the reading
+the effects will use. The thing's own strength keeps working either way.
+
+Marked where it is shown: slot_names reads "Wren's dagger (quiet, ill-starred)"
+(World.KEPT_MARK; no protocol change, slot_names already carries text), the
+pack tints that slot rust instead of gold, and the party log says when it is
+kept and when it is back (World.item_kept). Whether the curse is known in the
+world is lore's (H12, worded "kept from its namer rather than given"). Cursed
+ore waits on Jeff's D3. Rejected: cursing on any pick-up (a namer's own drop
+would curse a friend helping); lifting by laying it in the stockpile (the town
+would launder it); resetting ill on a drop (a drop and pick-up would clear it).

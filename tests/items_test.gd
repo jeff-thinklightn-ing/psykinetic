@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_spear()
 	_test_pickup()
 	_test_names()
+	_test_curse()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -952,6 +953,89 @@ func _test_names() -> void:
 	World.despawn(imp)
 	World.name_least = "agreed"
 	Items._naming = {}
+
+
+func _test_curse() -> void:
+	print("\n== a named thing kept from its namer, not given, is ill-starred until it is back (decision 370) ==")
+	var host := _player(Net.local_id)
+	var pet: GridEntity = null
+	for entity in World.get_entities():
+		if entity is Companion and entity.spawned and entity.keeper_peer == host.owner_peer:
+			pet = entity
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not host.slots[slot].is_empty():
+			World.items.end(World.take_item(host, host, slot), "gone")
+	var day := float(DayNight.day_steps)
+	Items.set_curse_for_test({"full_days": 100.0 / day})  # Ill full after 100 steps held.
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	var namer := World._carrier_of(host)[0]
+	World.items.set_name(dagger, {"form": "holder_possessive", "holder": World._label_of(host), "who": namer, "made_step": 0,
+		"text": "%s's dagger" % World._label_of(host)}, "quiet")
+	World._slots_changed(host)
+	# Down on the ground and taken up again by its namer: nothing.
+	var cell := host.tile
+	var dropped := World.put_on_ground(World.take_item(host, host, Player.RIGHT_HAND), cell)
+	_check(World.try_pick_up(host, dropped) and World.items.kept_from(dagger).is_empty(), "its namer takes it up again: not kept")
+	_check(pet != null, "a companion to take it")
+	if pet == null:
+		return
+	for direction: Vector2i in World.DIRECTIONS:
+		if pet.tile != host.tile + direction and World.is_free(host.tile + direction) and World.can_melee(host.tile, host.tile + direction) 				and World.distance(pet.tile, host.tile) > 1:
+			World._relocate(pet, host.tile + direction)
+	pet.acts = false
+	# Handed over: a gift.
+	var free := World.free_slot_for(pet, "dagger")
+	var from_slot := host.slot_items.find(dagger)
+	_check(World.try_transfer(host, host, from_slot, pet, free) and World.items.kept_from(dagger).is_empty(), "handed from its namer's hand: a gift, not kept (slot %d, %s, near %s)" % [free, pet.slots, World.reaches(host, pet)])
+	World.try_transfer(host, pet, pet.slot_items.find(dagger), host, Player.RIGHT_HAND)
+	_check(host.slot_items[Player.RIGHT_HAND] == dagger, "handed back")
+	# Down, and taken up by another: kept.
+	var landed := World.put_on_ground(World.take_item(host, host, Player.RIGHT_HAND), cell)
+	var lying := World.take_from_ground(landed, Array(World.ground_uids(landed)).find(dagger))
+	_check(lying == dagger, "lying where it was dropped")
+	World.put_item(pet, pet, World.free_slot_for(pet, "dagger"), dagger)
+	var slot := pet.slot_items.find(dagger)
+	_check(World.items.kept_from(dagger) == namer, "taken up by another, not given: kept from its namer")
+	_check(slot >= 0 and pet.slot_names.size() > slot and pet.slot_names[slot].ends_with("(quiet, ill-starred)"), "and marked (%s)" % [pet.slot_names])
+	_check(World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "kept"), "its history says so")
+	var who := World._carrier_of(pet)[0]
+	_steps(50)
+	var half := World.items.ill_of(dagger, who)
+	_check(absf(half - 0.5) < 0.05 and is_equal_approx(World.ill_of(pet), half), "ill grows as it is held: half way after half the time (%.2f)" % half)
+	_steps(60)
+	_check(is_equal_approx(World.items.ill_of(dagger, who), 1.0), "full at most (%.2f)" % World.items.ill_of(dagger, who))
+	# Put down and taken up again: nothing cleared; the ill fades at half the rate meanwhile.
+	var down := World.put_on_ground(World.take_item(pet, pet, slot), pet.tile)
+	_steps(40)
+	var faded := World.items.ill_of(dagger, who)
+	_check(absf(faded - 0.8) < 0.05, "put down, it fades at half the rate (%.2f)" % faded)
+	World.put_item(pet, pet, World.free_slot_for(pet, "dagger"), World.take_from_ground(down, Array(World.ground_uids(down)).find(dagger)))
+	_check(World.items.kept_from(dagger) == namer, "taken up again: still kept")
+	# Another taker: follows the thing.
+	var held := World.items.ill_of(dagger, namer)
+	World.try_transfer(pet, pet, pet.slot_items.find(dagger), host, Player.RIGHT_HAND)
+	_check(World.items.kept_from(dagger).is_empty() and host.slot_names[Player.RIGHT_HAND].ends_with("(quiet)"),
+			"back in its namer's hands: lifted (%s)" % host.slot_names[Player.RIGHT_HAND])
+	_check(World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "back") and is_equal_approx(held, 0.0), "noted; the namer never gathered ill")
+	_steps(20)
+	_check(World.items.ill_of(dagger, who) < faded, "its keeper's ill fades away")
+	# Taker only: a third holder gathers none.
+	var book := ItemBook.new(func() -> int: return World.steps)
+	var uid := book.mint("sword", "built")
+	book.place(uid, "player:a", "player:a", "Ash")
+	book.set_name(uid, {"form": "holder_possessive", "holder": "Ash", "who": "player:a", "made_step": 0, "text": "Ash's sword"}, "")
+	book.place(uid, "", "")
+	book.place(uid, "player:b", "player:b", "Bo")
+	book.keep(uid, "player:b", "Bo")
+	book.place(uid, "player:c", "player:c", "Cy")
+	_steps(20)
+	var thing := book.ill_of(uid, "player:c")
+	Items.set_curse_for_test({"follows": "taker"})
+	_check(thing > 0.1 and is_equal_approx(book.ill_of(uid, "player:c"), 0.0), "follows the thing: a third holder gathers ill (%.2f); the taker only: none" % thing)
+	_check(Items.curse()["below_baseline"] == null, "what ill does waits on Jeff: below_baseline unset")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	pet.acts = true
+	Items._curse = {}
 
 
 func _test_loot() -> void:

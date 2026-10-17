@@ -85,5 +85,12 @@
 			"heavy": {"from": "downed", "down_ticks": 5},
 			"dread": {"from": "felled", "dread": true}
 		}
+	},
+	"curse": {
+		"_about": "Cursed heirlooms (Items.curse, decision 370). A named thing taken by anyone but its namer, other than from the namer's own hand (off the ground, out of a chest or the stockpile, from a monster's spill), is kept from its namer until it is back in the namer's hands. While kept, a holder it counts for gathers ill, 0 to 1 over full_days of the world clock held, and loses it at fade of that rate while not holding it. follows: thing (every holder but the namer) or taker (only who took it); Jeff's question, thing until he answers. below_baseline: whether ill may take the holder below baseline (true: noticed farther off, slower mending) or only shortens their buffs (false); null until Jeff answers, and until then ill does nothing.",
+		"follows": "thing",
+		"below_baseline": null,
+		"full_days": 1.0,
+		"fade": 0.5
 	}
 }
