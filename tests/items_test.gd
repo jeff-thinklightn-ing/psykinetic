@@ -898,6 +898,9 @@ func _test_names() -> void:
 		"tile": beside, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
 	imp.acts = false
 	Items.set_naming_for_test({"held_days": 0.0, "deeds": 3})
+	# Its own lore forms (decision 366's Lore.use): a draft holder form, so
+	# the agreed gate is tested whatever names.json says.
+	Lore.use([], [], [{"id": "holder_possessive", "how": "holder", "form": "{holder}'s {thing}", "status": "draft", "source": "lore"}])
 	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
 	var stab := func() -> void:
 		imp.hp = imp.max_hp
@@ -957,6 +960,7 @@ func _test_names() -> void:
 	World.despawn(imp)
 	World.name_least = "agreed"
 	Items._naming = {}
+	Lore.reload()
 
 
 func _test_curse() -> void:
@@ -1132,6 +1136,9 @@ func _test_arrows() -> void:
 	World.despawn(imp)
 	World.afflict(host, "bleed", 150, 30, 1)
 	host.hp = host.max_hp - 3
+	_steps(31)
+	_check(host.ailments.has("bleed") and host.hp == host.max_hp - 4 and World.calm(host),
+			"a bleed is no blow: 31 ticks on, bleeding, still calm enough to bandage")
 	var kit := _give(host, "bandaging_kit", 0) if host.slots[0].is_empty() else 0
 	var started := World.try_bandage(host, host)
 	_check(started and not host.ailments.has("bleed"), "a bandage stops bleeding at once (started %s)" % started)
