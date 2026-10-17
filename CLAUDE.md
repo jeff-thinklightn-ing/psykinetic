@@ -31,9 +31,16 @@ which worktree owns each step, and the design rules not to break without asking 
   run `tests/land.sh` (or `land.ps1`: the suite's scenes at once, beside net_test and
   state_test; decision 278), commit, and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
   moved: rebase, retest, push again. A branch never collects unlanded work.
-- Take the landing lock for your final retest and push, so nobody lands between them:
-  `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, retest, push, and
-  `sh tools/land_lock.sh release <tree>`. If it's held, keep working and try again in a
+- Take the landing lock for your final retest and push, so nobody lands between them, with
+  the resource gate taken first (decision 394): `sh tools/heavy_job.sh take <tree> suite`
+  (waits if the machine is short, holding no lock yet), then
+  `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, import, `bash
+  tests/land.sh` (it sees your take and doesn't queue again), push,
+  `sh tools/land_lock.sh release <tree>`, and `sh tools/heavy_job.sh release <tree> suite`.
+  Never wait on the gate while holding the land lock. The suite take covers that landing's
+  import; elsewhere run an import as `sh tools/heavy_job.sh run <tree> godot_import --
+  "$GODOT_PATH" --headless --path . --import`, and a plain test run just calls land.sh,
+  which gates itself. If the lock is held, keep working and try again in a
   few minutes; never push while another tree holds it. Don't hold it for anything else
   (record clips and run benches before taking it): a landing takes under 10 minutes, and
   a land lock older than 15 is stale and may be taken over. If taking it fails, stop: a
@@ -80,7 +87,9 @@ which worktree owns each step, and the design rules not to break without asking 
   free RAM (and GPU memory for GPU jobs) against the kind's recorded estimate plus an 8 GB
   margin and how many heavy jobs already run; if there is no room the job waits in a
   first-come queue rather than starting. Estimates update from what jobs actually used.
-  Take the gate before the land lock, never while holding it. If free memory falls under
+  Take the gate before the land lock, never while holding it (the landing flow above);
+  `heavy_job holds <tree> <kind>` says whether your tree already holds a kind. If free
+  memory falls under
   the margin while jobs run, the newest job's own wrapper stops it first and retries;
   nobody stops another session's job. The daily summary lists jobs that waited or were
   stopped.
