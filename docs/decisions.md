@@ -7052,7 +7052,10 @@ hidden personality types (Jeff, 2026-10-17): the record keeps "type"
 (add_worker's type, else Production.type_of's roll by the id, npc's
 Townsfolk.roll_type; "" unset; none on a companion's), saved and loaded as
 it is, and the four roll about profile_of(trade, type), the type's over the
-trade's.
+trade's. For npc's resident cards: the record keeps "card" ({} at first,
+Production.set_card, saved as it is; a companion's stays {}), and npc hears
+of what happens to a resident by Towns.rescued(town, who, by) and
+Production.loan_changed(worker, owed, working_off), beside Towns.raided.
 ## 354. The town's bank: loans to residents, rent 1 a day
 
 Jeff (2026-10-15), shown the official-jobs model of decision 353 beside a

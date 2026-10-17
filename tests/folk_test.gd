@@ -329,6 +329,14 @@ func _test_hearsay() -> void:
 	_check(spread.size() == 5, "within two of the middle each way (%s)" % [spread.keys()])
 	_check(Production.MIND.all(func(q: String) -> bool: return not _work.worker("companion:p1").has(q)), "a companion has none of the town's (hers is her card's)")
 	_check(odo["heard"] == [], "nothing heard yet")
+	_check(odo["card"] == {}, "no card yet (npc's)")
+	_work.set_card("h1", {"traits": {"type": "steady"}, "came": "rescued", "facts": [{"step": 1, "text": "came home"}]})
+	var told: Array = []
+	_work.loan_changed.connect(func(id: String, owed: float, working: bool) -> void: told.append([id, owed, working]))
+	_work.set_loan("h1", 3.0)
+	_work.set_loan("h1", 3.0)
+	_check(told == [["h1", 3.0, false]], "loan_changed says a change once (%s)" % [told])
+	_work.set_loan("h1", 0.0)
 	_work.set_heard("h1", [{"id": "y", "text": "wolves at night", "from": "Ash", "step": 1, "believed": false}])
 	_work.set_heard("nobody", [{"id": "z"}])
 	_check(_work.worker("h1")["heard"].size() == 1 and _work.worker("h1")["heard"][0]["text"] == "wolves at night",
@@ -336,6 +344,7 @@ func _test_hearsay() -> void:
 	var saved: Dictionary = JSON.parse_string(JSON.stringify(_work.to_dict()))
 	saved["workers"]["h1"]["intellect"] = 9
 	var loaded := Production.new(saved, _stock, null, Callable(), _rules)
+	_check(loaded.worker("h1")["card"].get("came") == "rescued", "the card is saved as it is")
 	_check(int(loaded.worker("h1")["intellect"]) == 9 and loaded.worker("h1")["heard"].size() == 1
 		and loaded.worker("h1")["heard"][0]["text"] == "wolves at night", "the mind and what was heard are saved")
 	saved["workers"]["b1"]["intellect"] = 4

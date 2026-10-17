@@ -69,10 +69,15 @@ var on_built := Callable()
 ## "fallback" true, given up on (nobody there for rules' return.give_up).
 var returned := Callable()
 
+## What worker [param worker_id] owes the town's bank changed (set_loan):
+## for npc's cards.
+signal loan_changed(worker_id: String, owed: float, working_off: bool)
+
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
 ## (need -> step due), fed, hungry_since, last_trade, wage_due, loan
 ## (owed to the town's bank, decision 354), working_off, type (hidden, npc's)
-## and the MIND (each 1..10; neither a companion's) and heard (companions' Hearsay's, kept as it is)}.
+## and the MIND (each 1..10; neither a companion's), card (npc's, kept as
+## it is) and heard (companions' Hearsay's, kept as it is)}.
 var _workers: Dictionary[String, Dictionary] = {}
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
@@ -144,7 +149,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0,
-		"loan": 0.0, "working_off": false, "heard": []}
+		"loan": 0.0, "working_off": false, "heard": [], "card": {}}
 	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
 	# roll), and the four rolled about their trade's and type's profile by
 	# the id, so the same every load; a companion's comes from her card.
@@ -157,6 +162,13 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 			_workers[id][each] = mind_of(id, trade, each, type)
 	_town(town)
 	return true
+
+
+## Worker [param worker_id]'s card, as npc writes it whole ({traits, came,
+## facts, card, card_by}; stored as given; nothing for an unknown id).
+func set_card(worker_id: String, card: Dictionary) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["card"] = card.duplicate(true)
 
 
 ## What worker [param worker_id] has heard, as companions' Hearsay keeps
@@ -259,8 +271,12 @@ func note_trade(worker_id: String, what: String, gold: int, with_whom: String) -
 ## ([param working_off]: working it off as town labour; decision 354).
 func set_loan(worker_id: String, owed: float, working_off := false) -> void:
 	if _workers.has(worker_id):
+		var was: float = _workers[worker_id]["loan"]
+		var was_working: bool = _workers[worker_id]["working_off"]
 		_workers[worker_id]["loan"] = maxf(owed, 0.0)
 		_workers[worker_id]["working_off"] = working_off and owed > 0.0
+		if not is_equal_approx(was, _workers[worker_id]["loan"]) or was_working != _workers[worker_id]["working_off"]:
+			loan_changed.emit(worker_id, _workers[worker_id]["loan"], _workers[worker_id]["working_off"])
 
 
 ## How many of [param town]'s workers (not away) the town fed, or who went
@@ -1018,6 +1034,9 @@ func from_dict(saved: Dictionary) -> void:
 			# What they have heard, as companions' Hearsay keeps it.
 			if entry.get("heard") is Array:
 				_workers[id]["heard"] = entry["heard"].duplicate(true)
+			# npc's card of them, kept as it is.
+			if entry.get("card") is Dictionary:
+				_workers[id]["card"] = entry["card"].duplicate(true)
 			var last: Variant = entry.get("last_trade", {})
 			if last is Dictionary and not last.is_empty():
 				_workers[id]["last_trade"] = {"step": int(last.get("step", 0)), "what": str(last.get("what", "")),

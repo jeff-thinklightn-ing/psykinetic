@@ -49,6 +49,9 @@ const REPAIR := "repair:"
 
 ## A raid reached [param town]: raid_arrives' report.
 signal raided(town: String, report: Dictionary)
+## [param who_id] came home to [param town] rescued ([param by]: the
+## faction that had taken them, "" if none did): for npc's cards.
+signal rescued(town: String, who_id: String, by: String)
 ## A building of [param town]'s changed state or level (unlocked, built,
 ## raised, damaged, repaired): the views redraw it (buildings_of).
 signal building_changed(town: String, kind: String)
@@ -208,6 +211,7 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
 		if companion_freed.is_valid():
 			companion_freed.call(who_id.trim_prefix("companion:"), town)
+		rescued.emit(town, who_id, str(held[0]["by"]))
 		return true
 	if not held.is_empty() and not production.worker(who_id).is_empty():
 		# Taken in a raid: back as themselves, their work where it was.
@@ -217,6 +221,7 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		_note(town, "%s the %s, taken by %s, is rescued and home" % [held[0]["name"], str(held[0]["trade"]).replace("_", " "), held[0]["by"]])
 		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
 		_seat(town)
+		rescued.emit(town, who_id, str(held[0]["by"]))
 		return true
 	if not production.add_worker(who_id, name, [trade], town, "rescued:%s" % (origin if not origin.is_empty() else who_id)):
 		return false
@@ -226,6 +231,7 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		_note(town, "%d residents, room for %d: the town is crowded" % [record["residents"].size(), room(town)])
 	add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % name)
 	_seat(town)
+	rescued.emit(town, who_id, "")
 	return true
 
 
