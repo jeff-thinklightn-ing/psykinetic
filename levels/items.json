@@ -73,13 +73,13 @@
 			"art": "item.tusks", "kind": "held", "size": [0.18, 0.06, 0.06], "weight": 0.6, "hands": 1,
 			"tags": ["bone", "trophy"], "value": 4},
 		{"id": "arrows", "name": "bundle of arrows", "short": "Arrows", "color": "b89a6a",
-			"art": "item.arrows", "kind": "held", "size": [0.08, 0.75, 0.08], "weight": 0.6, "hands": 1,
+			"art": "item.arrows", "kind": "held", "size": [0.12, 0.75, 0.12], "weight": 0.6, "hands": 1,
 			"tags": ["ammo"], "ammo": {"effect": ""}, "condition": 10},
 		{"id": "flame_arrows", "name": "bundle of flame arrows", "short": "Fire arr.", "color": "d8783a",
-			"art": "item.arrows_flame", "kind": "held", "size": [0.08, 0.75, 0.08], "weight": 0.7, "hands": 1,
+			"art": "item.arrows_flame", "kind": "held", "size": [0.12, 0.75, 0.12], "weight": 0.7, "hands": 1,
 			"tags": ["ammo"], "ammo": {"effect": "burn", "ticks": 30, "every": 10, "amount": 2}, "condition": 10},
 		{"id": "barbed_arrows", "name": "bundle of barbed arrows", "short": "Barbed", "color": "8a5a5a",
-			"art": "item.arrows_barbed", "kind": "held", "size": [0.08, 0.75, 0.08], "weight": 0.6, "hands": 1,
+			"art": "item.arrows_barbed", "kind": "held", "size": [0.12, 0.75, 0.12], "weight": 0.6, "hands": 1,
 			"tags": ["ammo"], "ammo": {"effect": "bleed", "ticks": 150, "every": 30, "amount": 1}, "condition": 10}
 	],
 	"naming": {

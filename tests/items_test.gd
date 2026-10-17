@@ -1098,6 +1098,19 @@ func _test_arrows() -> void:
 	World.items.set_condition(bundle, 4)
 	_check(back.condition_of(bundle) == 10 and ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict()))).condition_of(bundle) == 4,
 			"its condition is saved")
+	World.items.set_condition(bundle, 3)
+	# Another bundle on the ground: taken up, it swaps for the held one.
+	var fresh := World.items.mint("arrows", "built")
+	var lay := World.put_on_ground(fresh, host.tile)
+	var swaps := []
+	var swapped := func(by: GridEntity, taken: int, left: int) -> void: swaps.append([taken, left])
+	World.bundle_swapped.connect(swapped)
+	_check(World.try_pick_up(host, lay) and host.slot_items[Player.RIGHT_HAND] == fresh and Array(World.ground_uids(lay)) == [bundle]
+			and swaps == [[fresh, bundle]] and World.item_note(bundle) == "bundle of arrows, 3 of 10",
+			"a fresh bundle taken up: the worn one is put down in its place (%s)" % World.item_note(bundle))
+	_check(World.try_pick_up(host, lay) and host.slot_items[Player.RIGHT_HAND] == bundle, "and back again: keeping the one you would rather mend")
+	World.bundle_swapped.disconnect(swapped)
+	World.items.end(World.take_from_ground(lay, 0), "gone")
 	World.items.set_condition(bundle, 10)
 	# Flame and barbed.
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")

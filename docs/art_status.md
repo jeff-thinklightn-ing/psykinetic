@@ -34,9 +34,9 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `ground.sand` | texture | tile 4.0 |  | terrain's ground shader on sand; procedural colour while empty |
 | `ground.stone` | texture | tile 4.0 |  | terrain's ground shader on stone floors; procedural colour while empty |
 | `item.antlers` | held | 0.6 x 0.5 x 0.15 | 500 | pair of antlers (Items: levels/items.json): in a pack or chest as its icon, in a hand, ... |
-| `item.arrows` | held | 0.08 x 0.75 x 0.08 | 500 | bundle of arrows (Items: levels/items.json): in a pack or chest as its icon, in a hand,... |
-| `item.arrows_barbed` | held | 0.08 x 0.75 x 0.08 | 500 | bundle of barbed arrows (Items: levels/items.json): in a pack or chest as its icon, in ... |
-| `item.arrows_flame` | held | 0.08 x 0.75 x 0.08 | 500 | bundle of flame arrows (Items: levels/items.json): in a pack or chest as its icon, in a... |
+| `item.arrows` | held | 0.12 x 0.75 x 0.12 | 500 | bundle of arrows (Items: levels/items.json): in a pack or chest as its icon, in a hand,... |
+| `item.arrows_barbed` | held | 0.12 x 0.75 x 0.12 | 500 | bundle of barbed arrows (Items: levels/items.json): in a pack or chest as its icon, in ... |
+| `item.arrows_flame` | held | 0.12 x 0.75 x 0.12 | 500 | bundle of flame arrows (Items: levels/items.json): in a pack or chest as its icon, in a... |
 | `item.axe_head` | held | 0.16 x 0.12 x 0.03 | 500 | axe head (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ... |
 | `item.bandaging_kit` | held | 0.18 x 0.12 x 0.08 | 500 | bandaging kit (Items: levels/items.json): in a pack or chest as its icon, in a hand, on... |
 | `item.bow` | held | 0.06 x 1.3 x 0.25 | 500 | hunting bow (Items: levels/items.json): in a pack or chest as its icon, in a hand, on t... |

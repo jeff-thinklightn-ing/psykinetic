@@ -8760,3 +8760,11 @@ kinds (373).
   set it false rather than wait a return out.
 
 tests/return_test.
+Amended: Jeff (2026-10-17), "enemies could drop arrow bundles, player can swap
+it out for a fresh one, or decide to keep their better one if and repair it
+later". Archers' bundles spill when they fall (330, 347); enemy-ai rolls some
+worn. Taking up a bundle while holding a bow and a bundle swaps them
+(World._swap_bundle): the held one is put down where the new one lay, and the
+party log names both with their condition (World.bundle_swapped, item_note),
+so the choice reads in play; nothing shows a ground pile's things yet. Bundles
+are 0.12 by 0.75 m (art-kit).

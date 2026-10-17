@@ -81,6 +81,9 @@ signal item_named(entity: GridEntity, uid: int, text: String)
 ## A named thing is kept from its namer (decision 370) by [param entity],
 ## or is back with its namer ([param kept] false).
 signal item_kept(entity: GridEntity, uid: int, kept: bool)
+## [param by] took up the bundle [param taken] and put down the one it held,
+## [param left], in its place (decision 375).
+signal bundle_swapped(by: GridEntity, taken: int, left: int)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -1944,17 +1947,24 @@ func _show_notes(entity: GridEntity) -> void:
 	names.resize(entity.slots.size())
 	var any := false
 	for slot in mini(entity.slots.size(), entity.slot_items.size()):
-		var uid := entity.slot_items[slot]
-		if uid != 0:
-			names[slot] = item_title(uid)
-			if items.condition_of(uid) >= 0:
-				names[slot] = "%s, %d of %d" % [names[slot] if not names[slot].is_empty() else Items.name_of(items.id_of(uid)),
-					items.condition_of(uid), Items.condition_max(items.id_of(uid))]
+		if entity.slot_items[slot] != 0:
+			names[slot] = item_note(entity.slot_items[slot])
 			any = any or not names[slot].is_empty()
 	if not any:
 		names = PackedStringArray()
 	if names != entity.slot_notes:
 		entity.slot_notes = names
+
+
+## How [param uid] reads in a slot's note: its title (item_title) and its
+## condition ("bundle of arrows, 6 of 10"; decision 375); "" for a plain
+## thing.
+func item_note(uid: int) -> String:
+	var note := item_title(uid)
+	if items.condition_of(uid) >= 0:
+		note = "%s, %d of %d" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)),
+			items.condition_of(uid), Items.condition_max(items.id_of(uid))]
+	return note
 
 
 ## The strength (decision 365) of the thing in [param entity]'s slot
@@ -2353,6 +2363,8 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 	if index >= there.size():
 		return false
 	var uid := there[index]
+	if _swap_bundle(by, cell, index):
+		return true
 	var slot := free_slot_for(by, items.id_of(uid))
 	if slot < 0:
 		return false
@@ -2362,6 +2374,27 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 	if not carried_before:
 		items.note(uid, "found", "on the ground by %s" % _label_of(by), zone.name, cell)
 	_log("ground: %s picked up %s at %s" % [by.name, items.id_of(uid), cell])
+	return true
+
+
+## A bundle of arrows taken up by [param by] holding a bow and a bundle
+## (decision 375; Jeff: "player can swap it out for a fresh one, or decide
+## to keep their better one"): the held bundle is put down where the new
+## one lay, and the new one goes into its hand. False, nothing done, for
+## anything else.
+func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
+	var uid := ground_uids(cell)[index]
+	if Items.ammo_of(items.id_of(uid)).is_empty() or _drawn_slot(by) < 0:
+		return false
+	var hand := Items.LEFT_HAND if _drawn_slot(by) == Items.RIGHT_HAND else Items.RIGHT_HAND
+	if Items.ammo_of(by.slots[hand]).is_empty():
+		return false
+	take_from_ground(cell, index)
+	var left := take_item(by, by, hand)
+	put_item(by, by, hand, uid)
+	put_on_ground(left, cell)
+	_log("ground: %s swaps %s for %s at %s" % [by.name, items.id_of(left), items.id_of(uid), cell])
+	bundle_swapped.emit(by, uid, left)
 	return true
 
 

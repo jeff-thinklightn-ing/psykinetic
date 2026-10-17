@@ -1290,7 +1290,7 @@
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
-			"size": "0.08 x 0.75 x 0.08",
+			"size": "0.12 x 0.75 x 0.12",
 			"budget": 500
 		},
 		{
@@ -1301,7 +1301,7 @@
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
-			"size": "0.08 x 0.75 x 0.08",
+			"size": "0.12 x 0.75 x 0.12",
 			"budget": 500
 		},
 		{
@@ -1312,7 +1312,7 @@
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
-			"size": "0.08 x 0.75 x 0.08",
+			"size": "0.12 x 0.75 x 0.12",
 			"budget": 500
 		},
 		{

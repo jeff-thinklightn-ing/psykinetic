@@ -475,6 +475,7 @@ func _go_online() -> void:
 		World.braced_against.connect(_narrate_brace)
 		World.item_named.connect(_narrate_named)
 		World.item_kept.connect(_narrate_kept)
+		World.bundle_swapped.connect(_narrate_swap)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
@@ -3932,6 +3933,12 @@ func _narrate_kept(entity: GridEntity, uid: int, kept: bool) -> void:
 		party_log.add("%s keeps %s from %s." % [_display_name(entity), title, name.get("holder", "")])
 	else:
 		party_log.add("%s is back with %s." % [title, _display_name(entity)])
+
+
+## A bundle of arrows swapped for one on the ground (World.bundle_swapped;
+## decision 375): what was taken and what was left, with their condition.
+func _narrate_swap(by: GridEntity, taken: int, left: int) -> void:
+	party_log.add("%s takes up %s and puts down %s." % [_display_name(by), World.item_note(taken), World.item_note(left)])
 
 
 ## A blow that knocked someone down (World.knocked_down).
