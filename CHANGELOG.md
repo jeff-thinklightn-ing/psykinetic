@@ -8,6 +8,8 @@ notes (decision 324).
 ## Unreleased
 
 - Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.
+- The minimap and the big map (M) show when you host a game, not only when
+  you join one.
 
 ## v0.1.149
 

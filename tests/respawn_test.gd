@@ -16,6 +16,7 @@ func _ready() -> void:
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 
+	_check(_main.minimap.texture != null, "a host's minimap is drawn at boot (ui's report: it was left blank)")
 	_test_respawn_waits_for_time_and_distance()
 	_test_crate_respawns_at_its_spawn_tile()
 	_test_respawns_staggered()

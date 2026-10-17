@@ -401,6 +401,9 @@ func _ready() -> void:
 		_show_3d()
 	GridEntity.draws_2d = _draws_2d()
 	_paint_level()
+	# The minimap was made (_build_talk) before there was a level, and a
+	# host's boot draws this map no more (_view_zone): drawn here.
+	minimap.rebuild(level)
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
 	camera.position = Iso.tile_to_local(level_centre)
