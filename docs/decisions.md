@@ -7437,3 +7437,48 @@ walled outline (a market stall is a roof on posts). Later: hip roofs; roof
 damage of its own (a third of its cells broken and open to the sky,
 `World.damage_roof` and `repair_roof`, a "roofs" message: step b); the
 builder tool (builder) and the editor's rect drag (step c).
+## 363. A companion's voice on the Claude API, an experiment
+
+Jeff's go-ahead (2026-10-17), the coordinator's design approved: to compare
+a companion's voice on Anthropic's models (claude-haiku-5-5,
+claude-sonnet-5-5) with the box's 14B, by transcripts, latency and cost per
+100 lines. ClaudeMind (net/claude_mind.gd, a CompanionMind) wraps her own
+mind and sends only her voice asks to the Messages API: the same system
+prompt and turn, the same length (OllamaMind.max_tokens) and warmth, the
+same parse (OllamaMind.parse_voice), so her rules, the speaks-for filter and
+spoken() hold as ever. Her stance, checks, card and facts stay with her own
+mind, so a comparison is of the voice alone.
+
+Off by default and per companion: only the server console's `mind claude
+<name>|all haiku|sonnet|off` wraps one (`mind claude` alone lists who is on
+what and the session's spend). It lasts the session (Main._claude_voices: a
+companion who comes back is wrapped again), is never saved and never
+replicated: protocol unchanged.
+
+The key: ANTHROPIC_API_KEY in the environment of the process that runs the
+companions (the authority), read when she is wrapped and held in that
+ClaudeMind alone; it goes out only as the request's x-api-key header. Never
+an argument, never in project.godot, settings, user://, tests or logs: mind
+log entries and the transcript carry prompts and answers, never headers,
+and an error is said by its HTTP code and the API's error type, never the
+body. With none set the console will not switch anyone on. The box stays
+off Claude unless Jeff says: other players' chat would leave the box.
+
+Every failure falls back to her own mind with the same ask, logged with
+"fallback" and why: no key, a timeout (the voice's 5 s), HTTP 401/403 (and
+she is switched off for the session, so a refused key is not tried again),
+429, 5xx or overloaded, a reply with no text, or the session's budget spent
+(ClaudeMind.CALL_BUDGET 200 calls or COST_BUDGET $1, across every
+companion). Each voice entry in the mind log gains model, tokens_in,
+tokens_out and est_cost (from the reply's usage and ClaudeMind.PRICES,
+Anthropic's list prices: Haiku $0.10 and $0.50 a million tokens in and out,
+Sonnet $2 and $10), and latency_ms as ever. companion_test covers it with
+stubbed replies, no network and no real key. The real comparison
+(tools/voice_compare) waits for Jeff's own key with a low spend limit on his
+machine and the coordinator's go-ahead.
+
+Rejected: Claude for her stance and checks too (a stance asked every few
+seconds, and the voice is what players hear); a key in a file of the game's
+or an argument (process lists and run logs show arguments); turning it on
+by a startup flag (on by mistake on the box would send players' chat out);
+retrying on Claude after a failure (her own mind answers in time instead).

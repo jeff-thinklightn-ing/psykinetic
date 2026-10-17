@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- An experiment, off unless switched on at the server console: a companion's
+  voice can be given by Claude (Haiku or Sonnet) instead of the box's model,
+  falling back to it on any failure, with what each line cost logged.
 - A weapon, shield or tool you carry for a long time, and fight with, takes your name for life ("Wren's dagger") and one strength from how you used it: steady, quick, set, quiet, heavy or dread. Never more damage. Names show on the pack slot's hover and in the party log. Lore's name form still waits on Jeff's yes, so nothing is named in play yet.
 
 ## v0.1.148

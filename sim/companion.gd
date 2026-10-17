@@ -2328,6 +2328,10 @@ func _take_result(result: Dictionary) -> void:
 	var entry := {"kind": kind, "companion": String(name), "mind": mind.kind if mind != null else "none",
 		"trigger": result.get("trigger", ""), "prompt": result.get("prompt", ""),
 		"reply": result.get("raw", ""), "latency_ms": result.get("latency_ms", 0)}
+	# A voice on the Claude API (decision 363): which model answered, what it cost, and why her own did.
+	for measure: String in ["model", "tokens_in", "tokens_out", "est_cost", "fallback"]:
+		if result.has(measure):
+			entry[measure] = result[measure]
 	var answer: Dictionary = result.get("answer", {})
 	if answer.has("why"):
 		entry["why"] = str(answer["why"])

@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_spoken()
 	_test_spoken_polish()
 	_test_speaks_only_for_herself()
+	_test_claude_voice()
 	_test_quiet_after_minor()
 	_test_senses()
 	_test_errands()
@@ -446,6 +447,80 @@ func _test_spoken() -> void:
 
 
 ## Lines from the transcripts of 10-09 to 10-13, each as she said it then.
+func _test_claude_voice() -> void:
+	print("\n== her voice on the Claude API: off by default, her own mind for all else, every failure falls back to it, the key never logged (decision 363) ==")
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	_check(not pet.mind is ClaudeMind and _main._claude_voices.is_empty(), "off by default: her own mind (%s)" % pet.mind.kind)
+	if not ClaudeMind.has_key():
+		_check(_main._mind_claude(["all", "haiku"]).begins_with("no ANTHROPIC_API_KEY") and not pet.mind is ClaudeMind,
+			"without a key in the environment the console cannot switch her on")
+	var key := "sk-ant-test-NOT-A-REAL-KEY-0000"
+	var own := CountingMind.new()
+	own.voice_answer = {"say": "From my own mind.", "stance": ""}
+	var claude := ClaudeMind.new(own, ClaudeMind.MODELS["haiku"], self, key)
+	pet.mind = claude
+	var was_calls := ClaudeMind.calls
+	var was_cost := ClaudeMind.cost
+	var lines := ["The hall's gone quiet now.", "I can smell rain on the stones.", "My boots are soaked through.", "That hinge will squeal, mind it.",
+		"There's lamplight off to the north.", "A moment's rest would not go amiss."]
+	var ask := func(reply: Dictionary) -> String:
+		if not reply.is_empty():
+			claude.stubbed.append(reply)
+		pet._last_speech_tick = -1000
+		pet._ask_voice("%s just spoke to you." % pet.keeper_name(), "%s just said to you: \"Shall we?\"" % pet.keeper_name())
+		# Taken here, not by stepping the world: later tests keep the monsters' clock.
+		for result: Dictionary in pet.mind.take_results():
+			pet._take_result(result)
+		return str(MindLog.last.get(String(pet.name), {}).get("say", ""))
+	var ok := {"code": 200, "body": JSON.stringify({"content": [{"type": "text", "text": lines[0]}], "usage": {"input_tokens": 1000, "output_tokens": 10}})}
+	var said: String = ask.call(ok)
+	var entry: Dictionary = MindLog.last.get(String(pet.name), {})
+	_check(said == lines[0] and own.voice_asks.is_empty() and entry.get("model") == "claude-haiku-5-5" and int(entry.get("tokens_in", 0)) == 1000
+		and absf(float(entry.get("est_cost", 0.0)) - 0.000105) < 0.0000001 and not entry.has("fallback"),
+		"a Messages API reply: her line, its model, tokens and cost logged (%s)" % [entry])
+	var body: Dictionary = JSON.parse_string(claude.request_body({"system": "Who you are.", "user": "What is said."}))
+	_check(body["system"] == "Who you are." and body["messages"] == [{"role": "user", "content": "What is said."}] and body["model"] == "claude-haiku-5-5"
+		and int(body["max_tokens"]) == OllamaMind.max_tokens("voice"), "the request: her prompt as system and turn, her voice's length")
+	own.voice_answer = {"say": lines[1], "stance": ""}
+	said = ask.call({"code": 429, "body": JSON.stringify({"type": "error", "error": {"type": "rate_limit_error", "message": "slow down"}})})
+	_check(said == lines[1] and own.voice_asks.size() == 1 and str(MindLog.last[String(pet.name)].get("fallback", "")) == "HTTP 429: rate_limit_error",
+		"429: her own mind answers, logged as a fallback (%s)" % [MindLog.last[String(pet.name)].get("fallback", "")])
+	own.voice_answer = {"say": lines[2], "stance": ""}
+	said = ask.call({"result": HTTPRequest.RESULT_TIMEOUT, "code": 0, "body": ""})
+	_check(said == lines[2] and str(MindLog.last[String(pet.name)].get("fallback", "")) == "timed out", "a timeout: her own mind")
+	own.voice_answer = {"say": lines[3], "stance": ""}
+	said = ask.call({"code": 200, "body": JSON.stringify({"content": [], "usage": {"input_tokens": 900, "output_tokens": 0}})})
+	_check(said == lines[3] and str(MindLog.last[String(pet.name)].get("fallback", "")) == "no text in the reply", "an empty reply: her own mind")
+	own.voice_answer = {"say": lines[4], "stance": ""}
+	said = ask.call({"code": 401, "body": JSON.stringify({"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}})})
+	_check(said == lines[4] and claude.off, "401: her own mind, and Claude switched off for her")
+	own.voice_answer = {"say": lines[5], "stance": ""}
+	claude.stubbed.append(ok)
+	said = ask.call({})
+	_check(said == lines[5] and claude.stubbed.size() == 1, "switched off: not asked again")
+	claude.stubbed.clear()
+	var budget := ClaudeMind.new(own, ClaudeMind.MODELS["sonnet"], self, key)
+	ClaudeMind.calls = ClaudeMind.CALL_BUDGET
+	budget.stubbed.append(ok)
+	var before := own.voice_asks.size()
+	_check(budget.voice({"serial": 1}).get("say", "") == lines[5] and own.voice_asks.size() == before + 1 and budget.stubbed.size() == 1,
+		"the session's budget spent: her own mind, Claude not asked")
+	ClaudeMind.calls = was_calls
+	ClaudeMind.cost = was_cost
+	var keyless := ClaudeMind.new(own, ClaudeMind.MODELS["haiku"], self, "")
+	keyless.stubbed.append(ok)
+	_check(keyless.voice({"serial": 2}).get("say", "") == lines[5] and keyless.stubbed.size() == 1, "no key: her own mind, nothing sent")
+	claude.stance({"serial": 3})
+	claude.check({"serial": 4})
+	_check(own.stance_asks.size() == 1 and own.check_asks.size() == 1, "her stance and checks go to her own mind")
+	_check(key not in JSON.stringify(MindLog.last) and key not in claude.request_body({"system": "a", "user": "b"}) and key not in claude.kind
+		and key not in claude.last_error, "the key is in no log, body or error")
+	pet.mind = ScriptedMind.new()
+
+
 func _test_speaks_only_for_herself() -> void:
 	print("\n== she never speaks for her player: a line that does is asked again once, and such a sentence is never said ==")
 	_kill_monsters()

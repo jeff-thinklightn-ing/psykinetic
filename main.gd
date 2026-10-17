@@ -171,6 +171,10 @@ var _resident_asks: Array[Dictionary] = []
 var _resident_out: Dictionary[int, Dictionary] = {}
 var _resident_serial := 0
 var _companions: Dictionary[String, Companion] = {}
+## Server only: the companions whose voice is on the Claude API (decision
+## 363, the console's `mind claude`), by player id -> model id; for this
+## session only, so a companion who comes back is wrapped again.
+var _claude_voices: Dictionary[String, String] = {}
 ## Server only: the companions the last room rebuild brought back, by name.
 var _revived: Array[String] = []
 ## Server only: what happened, in words, for companion minds and the log.
@@ -2621,6 +2625,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
 	pet.party_log = party_log
 	pet.mind = _make_mind()
+	if _claude_voices.has(record.player_id):
+		pet.mind = ClaudeMind.new(pet.mind, _claude_voices[record.player_id], self)
 	pet.mind.warm()  # The model loads now, not on her first ask.
 	pet.write_card()  # Once: a plain card stands until it is written.
 	pet.said.connect(_on_companion_said.bind(pet))
@@ -3118,6 +3124,47 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
 	print("[town] %s's companion %s rests in %s between trips" % [record.name, pet_name, place])
 	party_log.add("%s goes back to the town to rest." % pet_name)
 	return true
+
+
+## The console's `mind claude` ([param args] after it, decision 363): with
+## none, who is on Claude and the session's spend; with a companion's name
+## (or "all") and haiku, sonnet or off, her voice wrapped in a ClaudeMind or
+## unwrapped. Never without ANTHROPIC_API_KEY set.
+func _mind_claude(args: Array) -> String:
+	if args.is_empty():
+		var lines: Array[String] = []
+		for id: String in _companions:
+			var pet: Companion = _companions[id]
+			if is_instance_valid(pet):
+				var claude := pet.mind as ClaudeMind
+				lines.append("%s: %s" % [pet.name, ("%s%s" % [claude.model, " (off: the key was refused)" if claude.off else ""]) if claude != null else "off"])
+		lines.append("spent this session: " + ClaudeMind.spend_words())
+		return "\n".join(lines)
+	if args.size() < 2 or str(args.back()) not in ["haiku", "sonnet", "off"]:
+		return "usage: mind claude [<name>|all haiku|sonnet|off]"
+	var choice := str(args.back())
+	if choice != "off" and not ClaudeMind.has_key():
+		return "no ANTHROPIC_API_KEY in this process's environment: set it where the server runs, never in a file of the game's"
+	var who := " ".join(args.slice(0, -1)).to_lower()
+	var changed: Array[String] = []
+	for id: String in _companions:
+		var pet: Companion = _companions[id]
+		if not is_instance_valid(pet) or who != "all" and String(pet.name).to_lower() != who:
+			continue
+		var own: CompanionMind = pet.mind
+		if pet.mind is ClaudeMind:
+			own = (pet.mind as ClaudeMind).inner
+			(pet.mind as ClaudeMind).close()
+		if choice == "off":
+			_claude_voices.erase(id)
+			pet.mind = own
+		else:
+			_claude_voices[id] = ClaudeMind.MODELS[choice]
+			pet.mind = ClaudeMind.new(own, ClaudeMind.MODELS[choice], self)
+		changed.append(String(pet.name))
+	if changed.is_empty():
+		return "no companion named %s" % who
+	return "%s: voice %s" % [", ".join(changed), "on her own mind" if choice == "off" else "on " + ClaudeMind.MODELS[choice]]
 
 
 func _make_mind() -> CompanionMind:
@@ -4493,14 +4540,19 @@ func admin_command(line: String) -> String:
 				if not MindLog.last.has(who):
 					return "no decision of %s's logged yet (companions: %s)" % [who, ", ".join(MindLog.last.keys())]
 				return JSON.stringify(MindLog.last[who], "  ")
+			if words.size() >= 2 and words[1] == "claude":
+				return _mind_claude(words.slice(2))
 			if words.size() < 2 or words[1] not in ["scripted", "ollama"]:
-				return "usage: mind scripted|ollama | mind log on|off | mind last <name> (now %s)" % mind_kind
+				return "usage: mind scripted|ollama | mind claude [<name>|all haiku|sonnet|off] | mind log on|off | mind last <name> (now %s)" % mind_kind
 			if words[1] == "ollama" and (Net.llm_url == "" or Net.llm_model == ""):
 				return "no --llm-model configured"
 			mind_kind = words[1]
-			for pet: Companion in _companions.values():
+			for id: String in _companions:
+				var pet: Companion = _companions[id]
 				if is_instance_valid(pet):
 					pet.mind = _make_mind()
+					if _claude_voices.has(id):
+						pet.mind = ClaudeMind.new(pet.mind, _claude_voices[id], self)
 					pet.mind.warm()
 			return "companion minds: %s" % mind_kind
 		"perception":
