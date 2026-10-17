@@ -815,7 +815,14 @@ func _roof(given: Dictionary) -> Dictionary:
 	roofs.append(entry)
 	var before: Array = working.parsed()["warnings"]
 	working.apply_changes({"config": {"roofs": roofs}})
-	var new := (working.parsed()["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
+	var parsed := working.parsed()
+	var new := (parsed["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
+	# Asked of Level whether it kept the roof, not read from the new warnings:
+	# a roof it replaced, over the same rect and already left out, had the same words.
+	if not (parsed["roofs"] as Array).any(func(roof: Dictionary) -> bool: return roof["rect"] == rect):
+		working.apply_changes({"config": {"roofs": old}})
+		var why := (parsed["warnings"] as Array).filter(func(warning: String) -> bool: return warning.begins_with("the roof at %s" % rect.position))
+		return _no("; ".join(why) if not why.is_empty() else "the level left the roof out")
 	if new.any(func(warning: String) -> bool: return "left out" in warning):
 		working.apply_changes({"config": {"roofs": old}})
 		return _no("; ".join(new))

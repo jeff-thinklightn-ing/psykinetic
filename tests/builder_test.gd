@@ -209,7 +209,11 @@ func _test_roof() -> void:
 			{"name": "roof", "input": {"rect": {"x": 2, "y": 2, "w": 3, "h": 3}}},
 			{"name": "roof", "input": {"rect": {"x": 6, "y": 14, "w": 3, "h": 3}}},
 			{"name": "roof", "input": {"rect": {"x": 6, "y": 14, "w": 1, "h": 1}, "remove": true}},
-			{"name": "roof", "input": {"rect": {"x": 6, "y": 14, "w": 3, "h": 3}}}],
+			{"name": "roof", "input": {"rect": {"x": 6, "y": 14, "w": 3, "h": 3}}},
+			{"name": "roof", "input": {"rect": {"x": 20, "y": 6, "w": 3, "h": 3}}},
+			{"name": "paint", "input": {"ground": "water", "cells": [[21, 7]]}},
+			{"name": "roof", "input": {"rect": {"x": 20, "y": 6, "w": 3, "h": 3}}},
+			{"name": "roof", "input": {"rect": {"x": 20, "y": 6, "w": 3, "h": 3}, "remove": true}}],
 		"A shelter.",
 	])
 	var session := BuilderSession.new(doc, Rect2i(5, 5, 20, 15), "test_field", stub)
@@ -220,6 +224,8 @@ func _test_roof() -> void:
 	_check(results[3]["is_error"] and "one height" in str(results[3]["content"]), "over a raised cell: refused with the level's words (%s)" % results[3]["content"])
 	_check(results[4]["is_error"] and "in the area" in str(results[4]["content"]), "outside the area: refused")
 	_check("took away 1 roofs" in str(results[6]["content"]), "remove: %s" % results[6]["content"])
+	_check(results[10]["is_error"] and "the roof at (20, 6)" in str(results[10]["content"]),
+			"the same rect again over water painted under a roof already left out: refused (%s)" % results[10]["content"])
 	var message := BuilderHost.proposal_message(session)
 	_check(message.get("roofs", []) == [[8, 7, 5, 3], [6, 14, 3, 3]], "the ghost outlines the roofs it adds (%s)" % [message.get("roofs")])
 	_check("roof {" in BuilderSession.grid(session.working.map, session.working.config, session.area, session.area), "the grid lists them")
