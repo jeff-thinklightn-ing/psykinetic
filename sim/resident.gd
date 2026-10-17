@@ -74,7 +74,25 @@ Who you are:
 What is true now:
 %s
 
-Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do. What is written above is what you know; anything else you don't know, so say so rather than guess."""
+Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do. %s"""
+## What its voice may say of the world (decision 378): an official's what
+## it knows alone; others' what they know and have heard, as heard; then by
+## its role's creativity and integrity (Lore.profile, 1..10: HIGH or more,
+## LOW or less, as lore derives its binding) whether it may embellish and whether it may lie. A
+## companion resting in town speaks as she does with her player.
+const BOUND := {
+	"official": "Of the world, say only what is written above as what you know; what is only said, say as said, never as certain; of anything else, say you cannot speak to it.",
+	"heard": "Of the world, say only what is written above: what you have heard, say as heard, naming who told you.",
+	"embellish": "You may embellish what you know, in your own way.",
+	"plain": "Never make up more than you know; anything else you don't know, so say so rather than guess.",
+	"lie": "You may lie, as yourself would.",
+	"honest": "Never say what you believe is false.",
+	"companion": "What is written above is what you know; anything else you don't know, so say so rather than guess.",
+}
+const HIGH := 7
+const LOW := 3
+## The most of lore's facts a voice is told, in characters.
+const LORE_CHARS := 600
 
 
 func _init() -> void:
@@ -90,7 +108,7 @@ static func days() -> Dictionary:
 		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE))
 		if data is Dictionary:
 			for key: String in data:
-				if not key.begins_with("_") and data[key] is Dictionary:
+				if not key.begins_with("_") and key != "hearsay" and data[key] is Dictionary:
 					_days[key] = data[key]
 		if not _days.has("default"):
 			_days["default"] = {"work": [8, 18], "home": [21, 6]}
@@ -209,7 +227,7 @@ func _free_cell(area: Rect2i) -> Vector2i:
 ## (CompanionMind.voice's shape, plain text back).
 func voice_ask(speaker: String, line: String, serial: int) -> Dictionary:
 	var system := VOICE % [person, town_name if not town_name.is_empty() else "a town", " as a " + trade if not trade.is_empty() else "", card_words(),
-		" ".join(facts_now()), speaker]
+		" ".join(facts_now()), speaker, bound_words()]
 	var user := "%s says to you: \"%s\"" % [speaker, line]
 	return {"kind": "voice", "serial": serial, "trigger": "%s spoke to %s." % [speaker, person], "speaker": person,
 		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -246,11 +264,19 @@ func facts_now() -> Array[String]:
 	out.append("It is %s%s." % [hour, sky])
 	out.append(work_words())
 	out.append_array(means_words())
-	# A companion resting here knows what she knows with her player (decision 381).
+	# What it knows of the world, and has heard (decision 378); a companion
+	# resting here knows what she knows with her player (decision 381).
 	if not player_id.is_empty():
-		var known := Companion.lore_words(person)
-		if not known.is_empty():
-			out.append(known)
+		var hers := Companion.lore_words(person)
+		if not hers.is_empty():
+			out.append(hers)
+	var known := world_facts()
+	if not known.is_empty():
+		out.append("What you know of the world: %s" % " ".join(known))
+	if binding() in ["townsfolk", "free"] and World.production != null:
+		var heard := Hearsay.prompt_words(World.production.worker(worker_id).get("heard", []))
+		if not heard.is_empty():
+			out.append(heard)
 	# A companion's past is in her own card; a resident's, in the town's records.
 	var taken := World.towns.taken_before(worker_id) if World.towns != null and player_id.is_empty() else 0
 	if taken > 0:
@@ -356,6 +382,69 @@ static func _trade_words(last: Dictionary, now: int) -> String:
 	if not with_whom.is_empty() and what.ends_with(" for " + with_whom):
 		return "You were last paid %d gold by %s for %s%s." % [gold, with_whom, what.trim_suffix(" for " + with_whom), ago]
 	return "You last paid %s %d gold for %s%s." % [with_whom if not with_whom.is_empty() else "someone", gold, (" " + what).replace(" their ", " your ").strip_edges(), ago]
+
+
+## How its voice is bound to the world's facts (decision 378): a companion
+## resting in town as a companion, else Lore.binding of its trade and its
+## hidden type ("official", "free", "townsfolk"; a thieving priest is free).
+func binding() -> String:
+	if not player_id.is_empty():
+		return "companion"
+	return Lore.binding(trade, hidden_type())
+
+
+## Its hidden type (npc's, on its worker record: "steady", "thief"...), ""
+## for none.
+func hidden_type() -> String:
+	return str(World.production.worker(worker_id).get("type", "")) if World.production != null else ""
+
+
+## One of its leanings, 1..10 ("intellect", "superstition", "creativity",
+## "integrity"): its own, as its worker record has it (economy rolls each
+## round its role's), else its trade's and type's (Lore.profile), else 5.
+func leaning(key: String) -> int:
+	var own: Variant = World.production.worker(worker_id).get(key) if World.production != null else null
+	if own is int or own is float:
+		return int(own)
+	return int(Lore.profile(trade, hidden_type()).get(key, 5))
+
+
+## Its voice's rule of the world (BOUND), from its binding and its role's
+## profile.
+func bound_words() -> String:
+	var bound := binding()
+	if bound == "companion":
+		return BOUND["companion"]
+	var parts: Array[String] = [BOUND["official"] if bound == "official" else BOUND["heard"]]
+	parts.append(BOUND["embellish"] if leaning("creativity") >= HIGH else BOUND["plain"])
+	parts.append(BOUND["lie"] if leaning("integrity") <= LOW else BOUND["honest"])
+	return " ".join(parts)
+
+
+## Lore's agreed facts it knows (Lore.knower_for its trade, by its domain),
+## a sentence each, weightiest first (a superstitious role's rumours before
+## the rest: it repeats what is said), within LORE_CHARS; a rumour as what
+## is said. A companion's are in her card and her own voice.
+func world_facts() -> Array[String]:
+	var out: Array[String] = []
+	if not player_id.is_empty():
+		return out
+	var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", hidden_type())
+	var superstitious := leaning("superstition") >= HIGH
+	facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if superstitious and bool(a.get("hearsay", false)) != bool(b.get("hearsay", false)):
+			return bool(a.get("hearsay", false))
+		return float(a["weight"]) > float(b["weight"]))
+	var length := 0
+	for fact in facts:
+		var text := str(fact["text"]).strip_edges()
+		if bool(fact.get("hearsay", false)):
+			text = "It is said that %s" % Hearsay._lower_first(text)
+		if length + text.length() > LORE_CHARS:
+			break
+		length += text.length() + 1
+		out.append(text)
+	return out
 
 
 ## [param parts] in words: "a, b and c".

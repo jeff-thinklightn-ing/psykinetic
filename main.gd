@@ -177,6 +177,12 @@ var _world_map: WorldMap
 var _resident_mind: CompanionMind
 var _resident_asks: Array[Dictionary] = []
 var _resident_out: Dictionary[int, Dictionary] = {}
+## Server only: claims asks waiting (decision 378), each {body, worker,
+## person, from, line, at}, one per resident; those out, by serial; when
+## each resident was last asked.
+var _claims_asks: Array[Dictionary] = []
+var _claims_out: Dictionary[int, Dictionary] = {}
+var _claims_at: Dictionary[String, int] = {}
 var _resident_serial := 0
 var _companions: Dictionary[String, Companion] = {}
 ## Server only: the companions whose voice is on the Claude API (decision
@@ -2997,11 +3003,17 @@ func _ask_resident(body: Resident, speaker: String, line: String) -> void:
 ## long dropped; the next sent when the resident mind is free and no
 ## companion's voice is out (residents yield to companions).
 func _resident_voices() -> void:
-	if _resident_asks.is_empty() and _resident_out.is_empty():
+	if _resident_asks.is_empty() and _resident_out.is_empty() and _claims_asks.is_empty() and _claims_out.is_empty():
 		return
 	if _resident_mind == null:
 		_resident_mind = _make_mind()
 	for result: Dictionary in _resident_mind.take_results():
+		if str(result.get("kind", "")) == "facts":
+			var asked: Dictionary = _claims_out.get(int(result.get("serial", 0)), {})
+			_claims_out.erase(int(result.get("serial", 0)))
+			if not asked.is_empty():
+				_claims_answered(asked, result.get("answer", {}), str(result.get("error", "")))
+			continue
 		var out: Dictionary = _resident_out.get(int(result.get("serial", 0)), {})
 		_resident_out.erase(int(result.get("serial", 0)))
 		if not out.is_empty():
@@ -3011,17 +3023,93 @@ func _resident_voices() -> void:
 			_resident_asks.erase(each)
 			MindLog.record({"kind": "voice", "companion": str(each["ask"].get("speaker", "")), "mind": "resident",
 				"trigger": each["ask"].get("trigger", ""), "outcome": "dropped", "note": "waited too long for the mind"})
-	if _resident_asks.is_empty() or _resident_mind.busy("voice"):
+	_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return World.tick - int(each["at"]) <= RESIDENT_ASK_TICKS)
+	if _resident_mind.busy("voice"):
 		return
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.mind != null and pet.mind.busy("voice"):
 			return
+	if _resident_asks.is_empty():
+		# Nothing to answer: what was heard is weighed (decision 378).
+		if not _claims_asks.is_empty() and not _resident_mind.busy("facts"):
+			_send_claims(_claims_asks.pop_front())
+		return
 	var next: Dictionary = _resident_asks.pop_front()
 	_resident_out[int(next["ask"]["serial"])] = next
 	var answer := _resident_mind.voice(next["ask"])
 	if not answer.is_empty():
 		_resident_out.erase(int(next["ask"]["serial"]))
 		_resident_answered(next, answer, "")
+
+
+## Server: [param line], said by [param from] ([param speaker] its body),
+## heard by each resident within RESIDENT_EARSHOT and by [param to] (the
+## one it was said to): a claims ask waits for each (decision 378), at
+## most one per resident per Hearsay "claims_ticks", a newer replacing one
+## still waiting. A companion resting in town keeps hers in her card
+## (later), and one hiding hears nothing.
+func _heard_near(speaker: GridEntity, from: String, line: String, to: Resident = null) -> void:
+	if World.production == null or not Hearsay.worth_asking(line):
+		return
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or body == speaker or not body.player_id.is_empty() or body.doing == Resident.Doing.HIDE:
+			continue
+		if body != to and (speaker == null or World.distance(body.tile, speaker.tile) > RESIDENT_EARSHOT):
+			continue
+		if World.tick - _claims_at.get(body.worker_id, -100000) < int(Hearsay.setting("claims_ticks")):
+			continue
+		_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != body.worker_id)
+		_claims_asks.append({"body": body.get_instance_id(), "worker": body.worker_id, "person": body.person,
+			"from": from, "line": line, "at": World.tick})
+
+
+## Server: [param each] (_claims_asks') sent to the resident mind, with
+## what it knows and holds now.
+func _send_claims(each: Dictionary) -> void:
+	var body := instance_from_id(int(each["body"])) as Resident
+	if body == null or not is_instance_valid(body):
+		return
+	_claims_at[each["worker"]] = World.tick
+	_resident_serial += 1
+	each["ask"] = Hearsay.claims_ask(body.person, body.world_facts(), World.production.worker(body.worker_id).get("heard", []),
+		str(each["from"]), str(each["line"]), _resident_serial)
+	_claims_out[_resident_serial] = each
+	var answer := _resident_mind.facts(each["ask"])
+	if not answer.is_empty():
+		_claims_out.erase(_resident_serial)
+		_claims_answered(each, answer, "")
+
+
+## Server: the claims [param answer] for [param each]: each claim weighed
+## by the resident's intellect (Hearsay.hear), the held ones it shows false
+## no longer believed; kept on its worker record; logged.
+func _claims_answered(each: Dictionary, answer: Dictionary, error: String) -> void:
+	var worker := World.production.worker(str(each["worker"]))
+	if worker.is_empty():
+		return
+	var heard: Array = worker.get("heard", []).duplicate(true)
+	var body := instance_from_id(int(each["body"])) as Resident
+	var trades: Array = worker.get("trades", [])
+	var profile := Lore.profile(str(trades[0]) if not trades.is_empty() else "", str(worker.get("type", "")))
+	var intellect := body.leaning("intellect") if is_instance_valid(body) else int(worker.get("intellect", profile.get("intellect", 5)))
+	var superstition := body.leaning("superstition") if is_instance_valid(body) else int(worker.get("superstition", profile.get("superstition", 5)))
+	var kept: Array[Dictionary] = []
+	var claims: Variant = answer.get("facts", [])
+	for claim: Variant in claims if claims is Array else []:
+		if claim is Dictionary:
+			var text := str(claim.get("text", ""))
+			var entry := Hearsay.hear(heard, str(each["worker"]), intellect, text, str(claim.get("fits", "")),
+				str(each["from"]), World.production.now(), Hearsay.is_omen(text, claim.get("omen")), superstition)
+			if not entry.is_empty():
+				kept.append(entry)
+	var gone: Variant = answer.get("overturns", [])
+	var overturned := Hearsay.overturn(heard, gone if gone is Array else [])
+	if not kept.is_empty() or not overturned.is_empty():
+		World.production.set_heard(str(each["worker"]), heard)
+	MindLog.record({"kind": "claims", "companion": str(each["person"]), "mind": "resident", "trigger": each.get("ask", {}).get("trigger", ""),
+		"heard": each["line"], "from": each["from"], "claims": claims, "kept": kept, "overturned": overturned, "intellect": intellect, "superstition": superstition,
+		"error": error, "outcome": "weighed" if error.is_empty() else "not weighed"})
 
 
 ## A resident's answer ([param out]: the ask waited for): said from its
@@ -3038,6 +3126,7 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 		return
 	Transcript.record(body.person, body.person, line)
 	party_log.add("%s said: \"%s\"" % [body.person, line])
+	_heard_near(body, body.person, line)
 	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line})
 
 
@@ -3644,6 +3733,7 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 			other.overheard(_display_name(player), line)
 	party_log.add("%s %s%s: \"%s\"" % [_display_name(player), "whispered" if whisper else "said",
 		" to " + to if to != "" else "", line])
+	_heard_near(player, _display_name(player), line, resident)
 	World.noise(player.tile, WHISPER_RANGE if whisper else Senses.speech_radius(line), &"speech", player)
 	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
@@ -3701,6 +3791,7 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 		if other != null and other != pet and other.spawned and World.distance(other.tile, pet.tile) <= HEARING_RANGE:
 			other.overheard(String(pet.name), text, false)
 	party_log.add("%s said: \"%s\"" % [pet.name, text])
+	_heard_near(pet, String(pet.name), text)
 	var record: PlayerRecord = _records.get(pet.keeper_id)
 	if record != null:
 		record.companion["said"] = pet.said_lines()

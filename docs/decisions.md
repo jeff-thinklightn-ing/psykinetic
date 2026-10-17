@@ -8600,3 +8600,58 @@ resident cards, step 3); rolling from every type in the file (Jeff has not
 agreed scholar or merchant); showing the type to a player who talks long
 enough (it is hidden by Jeff's word; what a thief lets slip is the voice's
 to decide from the standing fact).
+## 378. Who may say what: speech bound to lore, and townsfolk's hearsay
+
+Jeff (2026-10-17): "official characters only speak lore facts, priests,
+guards, officials -- bards, scoundrels, and thieves aren't bound to lore
+facts -- they can embellish and lie but only in character, and towns
+people don't fabricate they can store what they hear and decide, they may
+have a intillect stat that influences how vulnerable they are to
+falsehoods"; then the role profiles (domain, superstition, creativity,
+intellect, integrity) and the split into professions and hidden types.
+The coordinator's design, with lore (376: roles.json, Lore.binding,
+Lore.profile, Lore.knower_for) and economy (each worker's own leanings,
+"type" and "heard", Production.set_heard).
+
+A resident's voice is bound by Lore.binding(trade, type): an official's
+prompt has only what lore says it knows of the world (Lore.known_by its
+knower, by its domain and its type's, agreed only; a rumour as "it is
+said that"), and its rule says of anything else it cannot speak; others
+are told what they know and what they have heard, as heard, naming who
+told them. Then its leanings (Resident.leaning: its own on its worker
+record, else its profile's, else 5; HIGH 7, LOW 3, as lore derives the
+binding): creativity high, it may embellish, else it never makes up more
+than it knows; integrity low, it may lie as itself would, else it never
+says what it believes false. A superstitious one has lore's rumours told
+first. The hidden type never shows in a label.
+
+What it hears (Hearsay, sim/hearsay.gd; the store is its worker record's
+"heard", saved with it): a line said to it or within RESIDENT_EARSHOT of
+it, by a player, a companion or another resident (Main._heard_near), at
+most one per resident per claims_ticks (150), waits for one cheap claims
+ask on the resident mind (the facts channel), after any voice. The ask is
+shown what it knows and holds, and answers each claim as agreeing with
+what it knows (not kept: it is lore already), against it, or beyond it,
+whether it is an omen, and which held ones the line shows false. A claim
+against is believed with chance max(0, (7 - intellect) / 6), one beyond
+with max(0, (11 - intellect) / 10), an omen beyond with the higher of that
+and max(0, (superstition - 3) / 6) (residents.json "hearsay"), by a roll
+seeded by the worker and the claim, so the same every time; one not
+believed is kept too, so the same lie is not rolled again. At most 8 are
+kept, the oldest not believed going first. Its three newest believed
+reach a townsfolk's or a free role's voice: "You have heard, and believe
+it though you are not sure: Talos told you that the mine is cursed." An
+official's never. A later claims answer may overturn one. Everything goes
+to the mind log. A believed falsehood is the resident's, never lore.
+
+Companions keep their card rule (what they make up is of themselves);
+their own beliefs taking the same shape is phase 2. The resident voices
+and Hearsay go to the npc tree at its step 5. resident_test covers it
+(intellect 1 believes and repeats a lie, intellect 10 does not, a priest
+never, a thief at heart may embellish and lie, overturning, overhearing,
+the cap). Protocol unchanged.
+
+Rejected: a speech field of residents.json's own (lore's roles are the
+one source); believing by a model's judgement (a seeded roll on the
+intellect is the stat Jeff asked for); a claims ask on every line said
+near anyone (only residents within earshot, and a word test first).

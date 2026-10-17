@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk remember what they hear. Tell one something and, depending on how
+  sharp or superstitious they are, they may believe it and pass it on as
+  hearsay ("Talos told me..."); priests and guards speak only of what is
+  known, and a few townsfolk are not as honest as they look.
 - Townsfolk have hidden natures now, most of them steady, a few of them
   thieves, bards or scoundrels, rolled once when they join the town and never
   shown. A thief lifts a thing from the town's store now and then, one piece
@@ -25,7 +29,6 @@ notes (decision 324).
 - Companions know the land's beasts and monsters: what deer, stags, rabbits,
   boar and wolves are and do, what a hunter takes from each, and the imp, brute
   and sneak as goblins, instead of saying they don't know what a stag is.
-
 ## v0.1.149
 
 - This release changes what the server and client send each other, so update the

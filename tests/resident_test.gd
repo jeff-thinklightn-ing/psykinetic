@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_bodies_in_town()
 	_test_resident_voices()
 	_test_means_in_voice()
+	_test_hearsay()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
 	remove_child(_main)
@@ -408,6 +409,121 @@ func _test_means_in_voice() -> void:
 	production.note_meal("rs-means", "bought")
 	production.set_away("rs-means", true)
 	body.free()
+
+
+func _test_hearsay() -> void:
+	print("\n== what townsfolk hear, they weigh by their intellect and repeat as hearsay; an official never does (decision 378) ==")
+	var heard: Array = []
+	var dull := Hearsay.hear(heard, "rs-x", 1, "The mine is cursed.", "beyond", "Talos", 1)
+	_check(bool(dull.get("believed")) and dull["text"] == "The mine is cursed", "intellect 1: a claim beyond what they know is believed")
+	_check(Hearsay.hear(heard, "rs-x", 1, "the mine is cursed", "beyond", "Talos", 2).is_empty(), "the same claim from the same one is not kept twice")
+	_check(Hearsay.hear(heard, "rs-x", 1, "The king is alive.", "agrees", "Talos", 3).is_empty(), "one that agrees with what they know is lore already: not kept")
+	_check(Hearsay.prompt_words(heard) == "You have heard, and believe it though you are not sure: Talos told you that the mine is cursed.",
+		"believed, it is told as hearsay, naming who said it: %s" % Hearsay.prompt_words(heard))
+	var sharp: Array = []
+	_check(not bool(Hearsay.hear(sharp, "rs-y", 10, "The mine is cursed.", "beyond", "Talos", 1).get("believed")) and Hearsay.prompt_words(sharp).is_empty(),
+		"intellect 10: not believed, and nothing told")
+	_check(not bool(Hearsay.hear(sharp, "rs-y", 7, "The river runs uphill.", "against", "Talos", 2).get("believed")), "intellect 7 never believes what goes against what they know")
+	_check(Hearsay.roll("rs-x", "The mine is cursed.") == Hearsay.roll("rs-x", "the mine is cursed"), "the roll is the same every time")
+	Hearsay.overturn(heard, [dull["id"]])
+	_check(Hearsay.prompt_words(heard).is_empty(), "shown false later: no longer believed, and not told")
+	var full: Array = []
+	for i in 9:
+		Hearsay.hear(full, "rs-z", 1 if i > 0 else 10, "Claim number %d is so." % i, "beyond", "Talos", i)
+	_check(full.size() == Hearsay.setting("max") and full.all(func(entry: Dictionary) -> bool: return entry["text"] != "Claim number 0 is so"),
+		"over the cap: the oldest not believed goes")
+	_check(bool(Hearsay.hear(sharp, "rs-y", 10, "The well is cursed.", "beyond", "Talos", 3, true, 10).get("believed", false))
+		and Hearsay.p_believe("beyond", 10, true, 8) > 0.8 and Hearsay.p_believe("beyond", 10, true, 2) == Hearsay.p_believe("beyond", 10),
+		"an omen: a superstitious role believes it though sharp, one who is not does not")
+	_check(Hearsay.is_omen("The old well is haunted") and not Hearsay.is_omen("The mill is closed") and not Hearsay.is_omen("The well is haunted", false),
+		"an omen by the claims ask's word, else by its words")
+	_check(not Hearsay.worth_asking("Hello there.") and not Hearsay.worth_asking("What are you making today?") and Hearsay.worth_asking("The mine is cursed, Mara."),
+		"only a line that may hold a claim is weighed")
+
+	# In play: a player tells Mara (dull) and then Bram (sharp) the same.
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(12.0)
+	_sync()
+	var mara := _body("rs-mara")
+	var player := _player()
+	_check(mara != null, "(Mara stands in the town)")
+	if mara == null:
+		return
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	World.production._workers["rs-mara"]["intellect"] = 1
+	World.production.set_heard("rs-mara", [])
+	var mind := ClaimsMind.new()
+	mind.claims = {"facts": [{"text": "The mine is cursed", "fits": "beyond"}], "overturns": []}
+	_main._resident_mind = mind
+	_main._claims_at.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "The mine is cursed, Mara.")
+	for i in 3:
+		World.step()
+	var said_to := str(mara.voice_ask("Player", "What news?", 1)["system"])
+	_check(mind.claims_asks.size() == 1 and "Player told you that the mine is cursed" in said_to,
+		"intellect 1, told it: she repeats it as hearsay (%s)" % said_to.get_slice("What is true now:", 1).get_slice("Say what", 0).strip_edges())
+	_check("say what you have heard, as heard" in said_to.to_lower() or "what you have heard, say as heard" in said_to, "and her rule: never make up more")
+	World.production._workers["rs-mara"]["intellect"] = 10
+	World.production._workers["rs-mara"]["superstition"] = 2  # A curse is an omen: not one to take omens either.
+	World.production.set_heard("rs-mara", [])
+	_main._claims_at.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "The mine is cursed, Mara.")
+	for i in 3:
+		World.step()
+	_check(mind.claims_asks.size() == 2 and "the mine is cursed" not in str(mara.voice_ask("Player", "What news?", 2)["system"]).to_lower(),
+		"intellect 10, told the same: she does not")
+	# A priest, told it and somehow holding it believed, never says it.
+	var was_trade := mara.trade
+	mara.trade = "priest"
+	var record: Dictionary = World.production._workers["rs-mara"]
+	var leanings := {}
+	for key in ["creativity", "integrity", "type"]:
+		leanings[key] = record.get(key)
+	record["creativity"] = 2
+	record["integrity"] = 8
+	record["type"] = "steady"
+	World.production.set_heard("rs-mara", [{"id": "h1", "text": "The mine is cursed", "from": "Player", "step": 1, "fits": "beyond", "believed": true}])
+	var priest := str(mara.voice_ask("Player", "What news?", 3)["system"])
+	_check(mara.binding() == "official" and "the mine is cursed" not in priest.to_lower() and Resident.BOUND["official"] in priest
+		and Resident.BOUND["plain"] in priest and Resident.BOUND["honest"] in priest, "a priest (official) never repeats a non-fact, and is bound to lore's")
+	# A cook who is a thief at heart (npc's hidden type): free, and as his own leanings say.
+	mara.trade = was_trade
+	record["type"] = "thief"
+	record["creativity"] = 8
+	record["integrity"] = 2
+	var thief := str(mara.voice_ask("Player", "What news?", 4)["system"])
+	_check(mara.binding() == "free" and Resident.BOUND["embellish"] in thief and Resident.BOUND["lie"] in thief and "the mine is cursed" in thief.to_lower()
+		and "thief" not in mara.label.to_lower(), "a thief at heart (hidden) may embellish and lie, and repeats what he heard")
+	for key: String in leanings:
+		if leanings[key] == null:
+			record.erase(key)
+		else:
+			record[key] = leanings[key]
+	mara.trade = was_trade
+	# Overheard: her companion's line beside Mara is weighed too.
+	World.production.set_heard("rs-mara", [])
+	_main._claims_at.clear()
+	var pet := _companion()
+	_put(pet, _main._nearest_free(mara.tile + Vector2i(0, 1)))
+	_main._on_companion_said("They say the old well is haunted.", pet)
+	_check(_main._claims_asks.any(func(each: Dictionary) -> bool: return each["worker"] == "rs-mara" and each["from"] == String(pet.name)),
+		"a companion's line beside her: she weighs it too")
+	_main._claims_asks.clear()
+	World.production.set_heard("rs-mara", [])
+	_main._resident_mind = null
+
+
+class ClaimsMind:
+	extends CompanionMind
+	var claims := {}
+	var claims_asks: Array[Dictionary] = []
+
+	func facts(ask: Dictionary) -> Dictionary:
+		claims_asks.append(ask)
+		return claims.duplicate(true)
 
 
 class VoiceMind:
