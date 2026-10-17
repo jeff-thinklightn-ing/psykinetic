@@ -214,14 +214,14 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		record["captives"].erase(held[0])
 		record["residents"].append(who_id)
 		production.set_away(who_id, false)
-		_note(town, "%s the %s, taken by %s, is rescued and home" % [held[0]["name"], held[0]["trade"], held[0]["by"]])
+		_note(town, "%s the %s, taken by %s, is rescued and home" % [held[0]["name"], str(held[0]["trade"]).replace("_", " "), held[0]["by"]])
 		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
 		_seat(town)
 		return true
 	if not production.add_worker(who_id, name, [trade], town, "rescued:%s" % (origin if not origin.is_empty() else who_id)):
 		return false
 	record["residents"].append(who_id)
-	_note(town, "%s the %s, rescued, is a resident" % [name, trade])
+	_note(town, "%s the %s, rescued, is a resident" % [name, trade.replace("_", " ")])
 	if record["residents"].size() > room(town):
 		_note(town, "%d residents, room for %d: the town is crowded" % [record["residents"].size(), room(town)])
 	add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % name)
@@ -466,7 +466,7 @@ func _seat(town: String) -> void:
 		var trade: String = worker["trades"][0]
 		var kind := kind_for(trade)
 		if not kind.is_empty() and not allows({"trade": trade, "town": town}):
-			var waiting := "%s the %s waits for a %s" % [worker["name"], trade, kind]
+			var waiting := "%s the %s waits for a %s" % [worker["name"], trade.replace("_", " "), kind]
 			if not log_of(town).any(func(line: Dictionary) -> bool: return line["what"] == waiting):
 				_note(town, waiting)
 			continue
@@ -474,7 +474,7 @@ func _seat(town: String) -> void:
 		if production.workshop(shop_id).is_empty():
 			production.add_workshop(shop_id, trade, town)
 		if production.workshop(shop_id)["worker"] == "" and production.assign(shop_id, who):
-			_note(town, "%s the %s works at %s" % [worker["name"], trade, shop_id])
+			_note(town, "%s the %s works at %s" % [worker["name"], trade.replace("_", " "), shop_id])
 
 
 ## Orders a repair of [param town]'s first damaged building with none
