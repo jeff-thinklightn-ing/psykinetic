@@ -3,7 +3,7 @@ extends RefCounted
 ## The town's store: what players have brought home. Each store belongs to a
 ## place of kind "stockpile" (Holdings, by place id "<area>/<key>"), and
 ## holds counts of the raw resources (RESOURCES: gold, ore, wood, cloth,
-## food) and the gear banked there, by its uid in the item book (book,
+## food, and the hunt's meat, hide and the tanner's leather, decision 405) and the gear banked there, by its uid in the item book (book,
 ## World.items), its history kept there and never copied here: in the
 ## book it is at "stockpile:<place>", carried by nobody. A ledger keeps
 ## the last LEDGER_SIZE changes, stamped with the World's steps.
@@ -18,7 +18,7 @@ extends RefCounted
 ## World keeps one (World.stockpile), made by Main at boot from the
 ## snapshot ("stockpile": to_dict). Null on a client.
 
-const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food"]
+const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food", "meat", "hide", "leather"]
 const KIND := "stockpile"
 ## The faction whose stockpiles take deposits.
 const TOWN := "town"

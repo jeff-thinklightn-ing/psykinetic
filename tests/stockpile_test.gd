@@ -165,7 +165,7 @@ func _test_resources() -> void:
 	print("\n== resources count up, and only the town's work takes them ==")
 	var stock := World.stockpile
 	_check(stock.deposit(STORE, "gold", 10, "Bo", "castle") and stock.deposit(STORE, "ore", 5, "Bo", "mine"), "10 gold and 5 ore banked")
-	_check(stock.resources(STORE) == {"gold": 10, "ore": 5, "wood": 0, "cloth": 0, "food": 0}, "counted (%s)" % [stock.resources(STORE)])
+	_check(stock.resources(STORE) == {"gold": 10, "ore": 5, "wood": 0, "cloth": 0, "food": 0, "meat": 0, "hide": 0, "leather": 0}, "counted (%s)" % [stock.resources(STORE)])
 	_check(not stock.deposit(STORE, "dragon", 1) and not stock.deposit(STORE, KIT, 1) and not stock.deposit(STORE, "ore", 0)
 		and not stock.deposit("", "ore", 1), "no depositing of what is not a resource (gear is banked by uid), of nothing, or nowhere")
 	_check(stock.take(STORE, "ore", 3, "smith: a blade") and stock.count(STORE, "ore") == 2, "the smith takes 3 ore: 2 left")
@@ -316,7 +316,7 @@ func _test_restart() -> void:
 	await _boot()
 	var kits: Array[int] = []
 	kits.assign(before[STORE]["items"])
-	_check(World.stockpile.resources(STORE) == {"gold": 10, "ore": 7, "wood": 0, "cloth": 0, "food": 0}
+	_check(World.stockpile.resources(STORE) == {"gold": 10, "ore": 7, "wood": 0, "cloth": 0, "food": 0, "meat": 0, "hide": 0, "leather": 0}
 		and World.stockpile.items(STORE) == kits and World.stockpile.item_ids(STORE) == _strings([KIT, KIT]),
 		"after the restart: the same resources and the same two kits (%s)" % [World.stockpile.to_dict()])
 	_check(kits.all(func(uid: int) -> bool: return World.items.at_of(uid) == Stockpile.holder(STORE)),
@@ -339,7 +339,7 @@ func _test_old_and_odd_snapshots() -> void:
 	var odd := Stockpile.new({"gone/place": {"resources": {"gold": 3, "ore": -4, "wood": "lots"}, "items": [KIT, "dragon", 4242]},
 		"junk": 5}, Callable(), book)
 	_check(odd.places() == _strings(["gone/place"]), "a store whose place is gone is kept; junk is left out (%s)" % [odd.places()])
-	_check(odd.resources("gone/place") == {"gold": 3, "ore": 0, "wood": 0, "cloth": 0, "food": 0}
+	_check(odd.resources("gone/place") == {"gold": 3, "ore": 0, "wood": 0, "cloth": 0, "food": 0, "meat": 0, "hide": 0, "leather": 0}
 		and odd.item_ids("gone/place") == _strings([KIT]),
 		"counts under 0, counts that aren't numbers, unknown items and uids the book hasn't are left out (%s)" % [odd.to_dict()])
 	var migrated := odd.items("gone/place")[0]

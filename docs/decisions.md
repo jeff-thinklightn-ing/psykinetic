@@ -9078,3 +9078,36 @@ naming birthplaces or a river (lore: nothing stated that Jeff has not);
 kin rolled against residents without cards yet (it would make every card in
 the town at once); the type in the written paragraph (it stays a separate
 standing fact, so the model never dresses it up).
+## 405. The hunt into the town: meat, hides, the roast and the tanner
+
+Herds step 2 (367's herds, 397's wildlife in play), the coordinator's
+approval of 2026-10-17: what a player hunts and carries home builds the
+town.
+
+- Stockpile.RESOURCES gains meat, hide and leather. The meat item yields
+  {"meat": 1} (it was food), hide {"hide": 1} (now tagged resource, a
+  yield needs it), leather {"leather": 1}. A save from before reads 0 of
+  each. Their values (economy.json "value"): 1, 3, 4. None has a comfort
+  line, so a town is never short of them.
+- The cook's roast (items.json, items' confirmed): from meat 1 and food 1,
+  900 steps, mass 15 for 2400 ticks against the ration's 10 for 1800. A
+  made field's "first" (Items._made keeps it) puts a recipe before its
+  trade's others, so what the hunt brings home is cooked before rations.
+- Townsfolk eat the store's meat when it has no food: folk.needs.meal's
+  "store" may be a list, the first there is taken (Economy._eat).
+- The tanner (Items.TRADES) and the tannery (economy.json buildings: built
+  by the carpenter, wood 8, 4000 steps, max level 2), on the forge's and
+  kitchen's rails: a rescued tanner waits for one, the town chooses it,
+  and his workshop opens once it stands. Leather from two hides, 1200
+  steps, into the shop to sell until items gives it a use. A town's wants
+  end with rules' always_want (["resource"]) in every tier, so the tanner
+  works whatever the tier: no other trade makes a resource. A tannery has
+  no map slot yet: it stands in the town's record, as any building a town
+  unlocks; a building.tannery slot is buildings' and art-kit's to add.
+- Raids take meat as they take food (raids.takes: meat share 0.5); hides,
+  leather and gold never.
+- Not in this step: a hunter trade, which goes in step 3 beside the camps'
+  hunting, designed so it never empties what players hunt.
+
+Protocol unchanged: stock ids ride the fields they did. tests/larder_test;
+builder_test's uses take the tannery.

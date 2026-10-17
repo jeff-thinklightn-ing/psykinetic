@@ -291,6 +291,25 @@
 			"type": "mesh",
 			"uses": "knife (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.leather": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.4,
+				0.04,
+				0.3
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "piece of leather (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.meat": {
 			"budget": 500,
 			"category": "items",
@@ -366,6 +385,25 @@
 			},
 			"type": "mesh",
 			"uses": "travel ration (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.roast": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.2,
+				0.1,
+				0.15
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "roast meat (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.shield": {
 			"budget": 500,

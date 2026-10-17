@@ -13,7 +13,8 @@ extends RefCounted
 ## (the verb it is used with), yield (a resource's counts when banked),
 ## made (how the town makes it, read by economy's production: {by: a trade
 ## (TRADES), from: {resource or item id: count}, steps} to make it, or
-## {by, rework: the id it is reworked from, steps}; {} for none).
+## {by, rework: the id it is reworked from, steps}; first: true tried
+## before its trade's other recipes, decision 405; {} for none).
 ## Levels, prefabs and the builder name ids; an unknown id is dropped.
 
 const CATALOG := "res://levels/items.json"
@@ -33,7 +34,7 @@ const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
 	"opens", "value", "blunt", "ammo", "condition"]
 ## Who makes things (made's "by"), as economy's production has them.
-const TRADES: Array[String] = ["smith", "cook", "carpenter"]
+const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner"]
 
 ## Deeds done with a thing (ItemBook.deed; decision 365).
 const DEEDS: Array[String] = ["felled", "guarded", "shot", "braced", "behind", "downed", "struck"]
@@ -169,6 +170,8 @@ static func _made(value: Variant) -> Dictionary:
 	if value is not Dictionary:
 		return {}
 	var made := {"by": str(value.get("by", "")), "steps": int(value.get("steps", 0))}
+	if bool(value.get("first", false)):
+		made["first"] = true  # Its trade tries it before the rest (decision 405).
 	if value.has("rework"):
 		made["rework"] = str(value["rework"])
 	elif value.get("from") is Dictionary:

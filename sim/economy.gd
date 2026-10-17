@@ -307,7 +307,8 @@ func sell(player_id: String, town: String, id: String) -> Dictionary:
 ## own clock: a meal (tags) is bought from the shop at its price (split as
 ## a player's buy: materials and tax to the treasury, the rest its
 ## maker's), only past keep_in_shop of them so players find one; else the
-## store's food at its value x need, paid into the treasury. One short of
+## store's food (its meat when it has none, decision 405) at its value x
+## need, paid into the treasury. One short of
 ## gold borrows the rest from the town's bank (decision 354: _afford);
 ## only when the bank is empty, or they owe its cap, does the town feed
 ## them from the store (the dole), or they go hungry. A service is paid to
@@ -400,7 +401,14 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 				production.note_trade(maker, "sold a %s" % thing, cost, who["name"])
 			stockpile.note(town, pick["id"], cost, "folk:%s" % id, "%s bought a %s from %s for %d gold" % [who["name"], thing, seller, cost])
 			return
-	var store := str(rule.get("store", ""))
+	# The store's food, or what stands in for it when there is none (the
+	# hunt's meat, decision 405): the first of rule's "store" there is.
+	var stores: Array = rule["store"] if rule.get("store") is Array else [rule.get("store", "")]
+	var store := str(stores[0]) if not stores.is_empty() else ""
+	for each: Variant in stores:
+		if not str(each).is_empty() and stockpile.has(town, str(each)):
+			store = str(each)
+			break
 	if not store.is_empty() and stockpile.has(town, store):
 		var cost := raw_price(town, store)
 		if _afford(id, town, cost):

@@ -93,7 +93,7 @@ func _test_catalog() -> void:
 			if not Items.exists(str(drop.get("item", ""))):
 				unknown_drops.append("%s: %s" % [kind, drop])
 	_check(unknown_drops.is_empty(), "every monster's drops name a thing in the catalog (%s)" % [unknown_drops])
-	_check(Items.yield_of("meat") == {"food": 1} and Items.value_of("antlers") == 5, "meat banks as food; antlers are worth 5")
+	_check(Items.yield_of("meat") == {"meat": 1} and Items.value_of("antlers") == 5, "meat banks as meat (decision 405); antlers are worth 5")
 	var generated: Variant = JSON.parse_string(FileAccess.get_file_as_string(Items.ART_SLOTS)) if FileAccess.file_exists(Items.ART_SLOTS) else null
 	_check(generated is Dictionary and generated == JSON.parse_string(JSON.stringify(Items.art_slots())),
 			"%s is current with the catalog (else: tools/items_art_slots.gd)" % Items.ART_SLOTS)

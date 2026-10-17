@@ -114,7 +114,7 @@ func _test_set_building() -> void:
 	var level := Level.parse(doc.map.to_image(), null, doc.config)
 	var about := (level["warnings"] as Array).filter(func(warning: String) -> bool: return "building" in warning)
 	_check(level["buildings"].size() == 1 and about.is_empty(), "the level reads it with nothing to say (%s)" % [about])
-	_check("set_building gives one in the area a use (forge, inn, kitchen, temple)" in BuilderSession.system_prompt(), "Claude is told the uses, from the economy rules")
+	_check("set_building gives one in the area a use (forge, inn, kitchen, tannery, temple)" in BuilderSession.system_prompt(), "Claude is told the uses, from the economy rules")
 	_check("building {" in session.grid(doc.map, doc.config, Rect2i(5, 5, 12, 10), Rect2i(5, 5, 12, 10)), "and sees the buildings in the area, with theirs")
 
 

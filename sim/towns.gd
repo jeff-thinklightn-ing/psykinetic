@@ -610,7 +610,8 @@ func carried_home(town: String, group_id: String, faction: String, captives: Arr
 ## travelled there or walked there in play, alike. Its strength less the
 ## town's defence is what gets past (margin); none, and it is fought off.
 ## Else it takes rules' raids takes in order, each scaled by margin /
-## strength (only food: never gold, materials, experience or buildings),
+## strength (only food, the hunt's meat with it, decision 405: never gold,
+## materials, experience or buildings),
 ## damages one building past damage.margin and carries off up to
 ## captives.count residents (the newest first; a companion by her player's
 ## id, "companion:<player id>", Main told: companion_taken) past

@@ -767,6 +767,11 @@ func _wants(town: String, signals: Dictionary) -> Array[String]:
 			out.assign(tiers.get(SURPLUS, []))
 	if signals["busy"] == QUIET and "rework" not in out:
 		out.append("rework")
+	# Raws worked up into a raw (the tanner's leather, decision 405) whatever
+	# the tier, last: no other trade makes a thing of those tags.
+	for want: Variant in rules.get("always_want", []):
+		if str(want) not in out:
+			out.append(str(want))
 	return out
 
 
@@ -810,6 +815,10 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 	var recipes: Array = cat.values().filter(func(entry: Dictionary) -> bool:
 		return _recipe_ok(entry) and entry["made"]["by"] == shop["trade"])
 	recipes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		# A recipe marked "first" (the cook's roast, decision 405) is tried
+		# before the others: what the hunt brings home is cooked, not left.
+		if bool(a["made"].get("first", false)) != bool(b["made"].get("first", false)):
+			return bool(a["made"].get("first", false))
 		if signals["busy"] == BUSY and int(a["made"]["steps"]) != int(b["made"]["steps"]):
 			return int(a["made"]["steps"]) < int(b["made"]["steps"])
 		return str(a["id"]) < str(b["id"]))

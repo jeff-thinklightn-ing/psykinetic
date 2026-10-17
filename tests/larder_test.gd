@@ -1,0 +1,138 @@
+extends Node
+## The hunt brought into the town (decision 405), on a clock of its own with
+## the real rules and items: meat, hide and leather are stock resources
+## (each item's yield; a save from before them reads 0); the cook roasts
+## meat and food before she bakes rations, and rations again once the meat
+## is gone; the tanner makes leather from two hides whatever the tier, in
+## his tannery; townsfolk eat the store's meat when it has no food; a raid
+## takes meat as it takes food. Reads the repo's levels, never the shared
+## overlay.
+## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
+## and quits with exit code 1 if any assertion failed, 0 otherwise.
+
+const TOWN := "lt/store"
+
+var _failures := 0
+var _now := 0
+var _rules := {}
+
+
+func _ready() -> void:
+	World.set_process(false)
+	_rules = Production.read_rules()
+	_test_stock()
+	_test_cook()
+	_test_tanner()
+	_test_eating()
+	_test_raid()
+	print("")
+	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
+	get_tree().quit(1 if _failures > 0 else 0)
+
+
+func _work() -> Production:
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	return Production.new({}, stock, null, clock, _rules)
+
+
+## Ticks [param work] until a job of [param recipe] starts there, at most
+## [param steps]; the recipes started, in order.
+func _started(work: Production, steps: int) -> Array[String]:
+	var out: Array[String] = []
+	var seen := {}
+	var until := _now + steps
+	while _now < until:
+		_now += World.WORLD_TICK_STEPS
+		work.tick()
+		for id in work.jobs():
+			if not seen.has(id):
+				seen[id] = true
+				out.append(str(work.job(id)["recipe"]))
+	return out
+
+
+func _test_stock() -> void:
+	print("\n== meat, hide and leather are stock ==")
+	for what in ["meat", "hide", "leather"]:
+		_check(what in Stockpile.RESOURCES and Items.yield_of(what) == {what: 1}, "%s: a stock resource, its item's yield (%s)" % [what, Items.yield_of(what)])
+	var stock := Stockpile.new({}, func() -> int: return _now)
+	stock.from_dict({TOWN: {"resources": {"gold": 5, "food": 2}, "items": [], "ledger": []}})
+	_check(stock.count(TOWN, "meat") == 0 and stock.count(TOWN, "leather") == 0 and stock.count(TOWN, "food") == 2,
+		"a save from before them: none of each (%s)" % [stock.resources(TOWN)])
+
+
+func _test_cook() -> void:
+	print("\n== the cook roasts the meat first ==")
+	var work := _work()
+	work.stockpile.deposit(TOWN, "food", 6)
+	work.stockpile.deposit(TOWN, "meat", 1)
+	work.add_worker("c1", "Mags", ["cook"], TOWN)
+	work.add_workshop(TOWN + ":kitchen", "cook", TOWN)
+	work.assign(TOWN + ":kitchen", "c1")
+	var made := _started(work, 4000)
+	_check(not made.is_empty() and made[0] == "roast", "with meat in the store, a roast first (%s)" % [made])
+	_check(made.size() >= 2 and made[1] == "ration", "the meat gone, rations again (%s)" % [made])
+	_check(work.stockpile.count(TOWN, "meat") == 0, "the meat was used")
+
+
+func _test_tanner() -> void:
+	print("\n== the tanner and his tannery ==")
+	var tannery: Dictionary = _rules["buildings"]["tannery"]
+	_check(tannery["trade"] == "tanner" and tannery["built_by"] == "carpenter", "the tannery is the tanner's, built by the carpenter")
+	var work := _work()
+	var towns := Towns.new({}, work, _rules, func() -> int: return _now)
+	_check(towns.kind_for("tanner") == "tannery", "a tanner waits for a tannery")
+	work.stockpile.deposit(TOWN, "hide", 3)
+	work.add_worker("t1", "Hew", ["tanner"], TOWN)
+	work.add_workshop(TOWN + ":tannery", "tanner", TOWN)
+	work.assign(TOWN + ":tannery", "t1")
+	_check(_started(work, 2000).is_empty(), "no tannery standing: he waits")
+	towns._town(TOWN)["buildings"]["tannery"] = {"kind": "tannery", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	var made := _started(work, 4000)
+	_check(made == ["leather"], "two hides make leather, whatever the town's tier (%s, %s)" % [made, work.tier(TOWN)])
+	_check(work.stockpile.count(TOWN, "hide") == 1, "one hide left, too few for another")
+	var shop := work.stockpile.shop(TOWN).map(func(uid: int) -> String: return work.book().id_of(uid))
+	_check(shop == ["leather"], "the leather is in the shop to sell (%s)" % [shop])
+
+
+func _test_eating() -> void:
+	print("\n== no food: the store's meat ==")
+	var rules := _rules.duplicate(true)
+	rules.erase("bank")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, rules)
+	var economy := Economy.new({}, stock, work, clock, rules)
+	stock.deposit(TOWN, "meat", 2)
+	work.add_worker("h1", "Ash", ["hauler"], TOWN)
+	work.pay("h1", 20)
+	economy.tick()
+	_now = int(rules["folk"]["needs"]["meal"]["every"])
+	economy.tick()
+	_check(work.worker("h1")["fed"] == "store" and stock.count(TOWN, "meat") == 1, "Ash ate the store's meat (%s, %d left)" % [work.worker("h1")["fed"], stock.count(TOWN, "meat")])
+	stock.deposit(TOWN, "food", 1)
+	_now += int(rules["folk"]["needs"]["meal"]["every"])
+	economy.tick()
+	_check(stock.count(TOWN, "food") == 0 and stock.count(TOWN, "meat") == 1, "with food there, the food first")
+
+
+func _test_raid() -> void:
+	print("\n== a raid takes meat as food ==")
+	var work := _work()
+	var towns := Towns.new({}, work, _rules, func() -> int: return _now)
+	work.stockpile.deposit(TOWN, "food", 10)
+	work.stockpile.deposit(TOWN, "meat", 10)
+	work.stockpile.deposit(TOWN, "hide", 10)
+	work.stockpile.deposit(TOWN, "gold", 10)
+	var report := towns.raid_arrives(TOWN, {"id": "g1", "faction": "goblins", "strength": 100.0, "from": "x"})
+	_check(int(report["took"].get("meat", 0)) > 0 and int(report["took"].get("food", 0)) > 0, "meat and food taken (%s)" % [report["took"]])
+	_check(work.stockpile.count(TOWN, "hide") == 10 and work.stockpile.count(TOWN, "gold") == 10, "hides and gold left alone")
+
+
+func _check(ok: bool, what: String) -> void:
+	print("%s  %s" % ["PASS" if ok else "FAIL", what])
+	if not ok:
+		_failures += 1
