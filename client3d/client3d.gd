@@ -352,6 +352,13 @@ const SKY_KEYS := [
 ## camera is CAMERA_DISTANCE off); full fog's layer along the ground, up
 ## to FOG_HEIGHT.
 const CLOUD_SUN := 0.75
+## The seasons' light (decision 362): winter's cool, pale tint, the sun
+## weaker by WINTER_SUN; summer's warmer; snow cover's lift to the ambient.
+const WINTER_LIGHT := Color(0.86, 0.92, 1.0)
+const WINTER_SKY := Color("9fb3c8")
+const SUMMER_LIGHT := Color(1.0, 0.93, 0.8)
+const WINTER_SUN := 0.2
+const SNOW_AMBIENT := 0.35
 const FOG_DENSITY := 0.012
 const RAIN_FOG_DENSITY := 0.008
 const FOG_HEIGHT := 2.5
@@ -1149,6 +1156,8 @@ func _update_sky(delta: float) -> void:
 	var at := DayNight.fraction(DayNight.now())
 	var step := floori(at * SKY_STEPS) % SKY_STEPS
 	var weathered := _weather_view.ease_toward(World.fields.weather, delta)
+	var season := Season.at(World.fields.region, DayNight.now())
+	_weather_view.set_season(season)
 	_weather_view.place(_camera_target, delta, _look.get("weather_fog", SKY_HORIZON), _look_daylight, _level_direction)
 	if step == _sky_step and not weathered:
 		return
@@ -1165,7 +1174,7 @@ func _update_sky(delta: float) -> void:
 			toward = -toward
 		toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
 		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
-	var look := weathered_look(_look, _weather_view.weather)
+	var look := weathered_look(seasoned_look(_look, season), _weather_view.weather)
 	_look["weather_fog"] = look["fog"]
 	_sky_material.sky_top_color = look["top"]
 	_sky_material.sky_horizon_color = look["horizon"]
@@ -1179,8 +1188,26 @@ func _update_sky(delta: float) -> void:
 	_sun.light_energy = look["energy"]
 	# The floor as the sim lights it: cloud takes Weather.CLOUD_DIM of the
 	# day's light over the night's (Fields.ambient_at).
-	var light := DayNight.NIGHT + (DayNight.daylight_at(float(_sky_step) / SKY_STEPS) - DayNight.NIGHT) 			* (1.0 - Weather.CLOUD_DIM * float(_weather_view.weather["cloud"]))
+	var day := DayNight.daylight_at(float(_sky_step) / SKY_STEPS)
+	var light := DayNight.NIGHT + (day - DayNight.NIGHT) * (1.0 - Weather.CLOUD_DIM * float(_weather_view.weather["cloud"]))
 	_set_sky_floor(floor_brightness(light) if bool(_terrain.get("daylight", false)) else 0.0)
+
+
+## [param look] (sky_look's) in [param season] (Season.at's): winter's
+## light cooler and paler, its sun weaker, summer's a little warmer;
+## snow on the ground throws light back up (decision 362).
+static func seasoned_look(look: Dictionary, season: Dictionary) -> Dictionary:
+	var winter := float(season.get("winter", 0.0))
+	var summer := float(season.get("summer", 0.0))
+	var snow := float(season.get("snow", 0.0))
+	var out := look.duplicate()
+	out["light"] = (look["light"] as Color).lerp(WINTER_LIGHT, 0.35 * winter).lerp(SUMMER_LIGHT, 0.25 * summer)
+	out["energy"] = float(look["energy"]) * (1.0 - WINTER_SUN * winter)
+	out["top"] = (look["top"] as Color).lerp(WINTER_SKY, 0.3 * winter)
+	out["horizon"] = (look["horizon"] as Color).lerp(WINTER_SKY.lightened(0.3), 0.3 * winter)
+	out["ambient"] = (look["ambient"] as Color).lerp(WINTER_LIGHT, 0.3 * winter)
+	out["ambient_energy"] = float(look["ambient_energy"]) * (1.0 + SNOW_AMBIENT * snow)
+	return out
 
 
 ## [param look] (sky_look's) under [param weather] (Weather.at's amounts):

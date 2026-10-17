@@ -1,9 +1,11 @@
 class_name WeatherView
 extends Node3D
-## What the weather looks like outdoors (decision 309): rain, fog drifting
+## What the weather looks like outdoors (decision 309): rain (and in the
+## cold snow, decision 362), fog drifting
 ## over the ground, the shadows of clouds, and the wind, which the fire,
 ## torch flames and scatter lean in (the `wind` global shader uniform,
-## project.godot's shader_globals). Visual only: what the weather does in
+## project.godot's shader_globals; and the season's `season` uniform:
+## x green, y turn, z snow cover, for terrain and scatter). Visual only: what the weather does in
 ## play is the sim's (Weather, Fields, decision 308). Client3D keeps one,
 ## eases it toward the zone's weather (World.fields.weather) every frame and
 ## moves it with the view; it is hidden indoors, and the rain stops on
@@ -20,6 +22,11 @@ const RAIN_HEIGHT := 16.0
 const RAIN_SPEED := 22.0
 const RAIN_SLANT := 0.45
 const RAIN_COLOUR := Color(0.75, 0.8, 0.88, 0.35)
+## Snow: flakes at most, their fall (m/s), how far the wind carries them.
+const SNOW_FLAKES := 1800
+const SNOW_SPEED := 2.2
+const SNOW_DRIFT := 1.6
+const SNOW_COLOUR := Color(0.95, 0.97, 1.0, 0.85)
 ## The visual layer the rain is on, so the roof heightfield leaves it out.
 const RAIN_LAYER := 1 << 19
 ## The fog's layers over the ground: their heights, and how much fog their
@@ -94,13 +101,28 @@ void fragment() {
 }
 """
 
+const FLAKE_SHADER := """
+shader_type spatial;
+render_mode blend_mix, depth_draw_never, cull_disabled, unshaded, shadows_disabled;
+
+uniform vec4 colour : source_color = vec4(0.95, 0.97, 1.0, 0.85);
+
+void fragment() {
+	float round_ = 1.0 - smoothstep(0.25, 0.5, length(UV - 0.5));
+	ALBEDO = colour.rgb;
+	ALPHA = colour.a * round_;
+}
+"""
+
 ## The weather drawn now, eased (Weather.at's keys), and whether it is drawn.
-var weather := {"cloud": 0.0, "rain": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
+var weather := {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 var outdoor := false
 ## How far fog and clouds have drifted (m, world xz).
 var _drift := Vector2.ZERO
 var _rain: GPUParticles3D
 var _rain_process: ParticleProcessMaterial
+var _snow: GPUParticles3D
+var _snow_process: ParticleProcessMaterial
 var _roofs: GPUParticlesCollisionHeightField3D
 var _fog: Array[MeshInstance3D] = []
 var _fog_material: Array[ShaderMaterial] = []
@@ -110,6 +132,7 @@ var _clouds: Decal
 func _ready() -> void:
 	name = "Weather"
 	_build_rain()
+	_build_snow()
 	_build_fog()
 	_build_clouds()
 	set_outdoor(false)
@@ -121,9 +144,19 @@ func set_outdoor(value: bool) -> void:
 	visible = value
 	if _rain != null:
 		_rain.emitting = false
+		_snow.emitting = false
 	if not value:
-		weather = {"cloud": 0.0, "rain": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
+		weather = {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 		RenderingServer.global_shader_parameter_set("wind", Vector4.ZERO)
+		RenderingServer.global_shader_parameter_set("season", Vector4(1.0, 0.0, 0.0, 0.0))
+
+
+## The season's land for terrain and scatter (Season.at's green, turn and
+## snow), outdoors only.
+func set_season(season: Dictionary) -> void:
+	if outdoor:
+		RenderingServer.global_shader_parameter_set("season",
+				Vector4(season.get("green", 1.0), season.get("turn", 0.0), season.get("snow", 0.0), 0.0))
 
 
 ## Eases toward [param target] (Weather.at's, or {} for none) over
@@ -133,7 +166,7 @@ func ease_toward(target: Dictionary, delta: float) -> bool:
 		return false
 	var changed := false
 	var weight := 1.0 - exp(-EASE * delta)
-	for key: String in ["cloud", "rain", "fog", "wind"]:
+	for key: String in ["cloud", "rain", "snow", "fog", "wind"]:
 		var to := float(target.get(key, 0.0))
 		var now: float = weather[key]
 		var next := to if absf(to - now) < 0.001 else lerpf(now, to, weight)
@@ -163,6 +196,12 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	_rain.amount_ratio = clampf(rain, 0.0, 1.0)
 	_rain.global_position = target + Vector3(0.0, RAIN_HEIGHT, 0.0)
 	_rain_process.direction = Vector3(way.x * RAIN_SLANT * wind, -1.0, way.y * RAIN_SLANT * wind).normalized()
+	# Snow: slow flakes, carried by the wind.
+	var snow: float = weather["snow"]
+	_snow.emitting = snow > 0.02
+	_snow.amount_ratio = clampf(snow, 0.0, 1.0)
+	_snow.global_position = target + Vector3(0.0, RAIN_HEIGHT * 0.6, 0.0)
+	_snow_process.gravity = Vector3(way.x * SNOW_DRIFT * wind, -0.3, way.y * SNOW_DRIFT * wind)
 	# Fog: layers centred on the view, their noise drifting.
 	var fog: float = weather["fog"]
 	for i in _fog.size():
@@ -225,6 +264,45 @@ func _build_rain() -> void:
 	_roofs.follow_camera_enabled = true
 	_roofs.heightfield_mask = 0xFFFFF & ~RAIN_LAYER
 	add_child(_roofs)
+
+
+func _build_snow() -> void:
+	_snow = GPUParticles3D.new()
+	_snow.name = "Snow"
+	_snow.amount = SNOW_FLAKES
+	_snow.lifetime = (RAIN_HEIGHT * 0.6 + 3.0) / SNOW_SPEED
+	_snow.preprocess = _snow.lifetime
+	_snow.visibility_aabb = AABB(Vector3(-RAIN_BOX.x, -RAIN_HEIGHT, -RAIN_BOX.z), Vector3(RAIN_BOX.x * 2.0, RAIN_HEIGHT + 4.0, RAIN_BOX.z * 2.0))
+	_snow.local_coords = false
+	_snow.layers = RAIN_LAYER
+	_snow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_snow.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD
+	_snow_process = ParticleProcessMaterial.new()
+	_snow_process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	_snow_process.emission_box_extents = RAIN_BOX * 0.5
+	_snow_process.direction = Vector3.DOWN
+	_snow_process.spread = 10.0
+	_snow_process.initial_velocity_min = SNOW_SPEED * 0.8
+	_snow_process.initial_velocity_max = SNOW_SPEED * 1.2
+	_snow_process.gravity = Vector3(0.0, -0.3, 0.0)
+	_snow_process.turbulence_enabled = true
+	_snow_process.turbulence_noise_strength = 0.6
+	_snow_process.turbulence_noise_scale = 4.0
+	_snow_process.scale_min = 0.6
+	_snow_process.scale_max = 1.3
+	_snow_process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	_snow.process_material = _snow_process
+	var flake := QuadMesh.new()
+	flake.size = Vector2(0.07, 0.07)
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = FLAKE_SHADER
+	material.shader = shader
+	material.set_shader_parameter("colour", SNOW_COLOUR)
+	flake.material = material
+	_snow.draw_pass_1 = flake
+	_snow.emitting = false
+	add_child(_snow)
 
 
 func _build_fog() -> void:

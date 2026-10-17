@@ -8,9 +8,11 @@ extends RefCounted
 ## a zone, every world tick, and whenever the clock is set), and it counts
 ## on from there at the tick rate.
 ##
-## The day: the sun rises in the east at 6, stands highest (MAX_ELEVATION,
-## to the level's south) at 12 and sets in the west at 18; the moon is
-## opposite it. Outdoors, out from under a roof, the sim's light is
+## The day: the sun rises in the east, stands highest (to the level's
+## south) at 12 and sets in the west; the moon is opposite it. Its path
+## follows the season (Season.declination, decision 362): at the
+## equinoxes it rises at 6, sets at 18 and stands 45° high at noon; in
+## midsummer about 5 to 19 and 60°, in midwinter about 7 to 17 and 30°. Outdoors, out from under a roof, the sim's light is
 ## daylight(): 1 by day, NIGHT under the moon, between in the twilight
 ## (decision 291).
 
@@ -19,8 +21,8 @@ const DEFAULT_DAY_MINUTES := 90.0
 ## Senses.DARK, so an unlit body outdoors at night is glimpsed, never seen,
 ## and a torch or lantern is what shows it (agreed with enemy-ai).
 const NIGHT := 0.2
-## The sun's height at noon, degrees.
-const MAX_ELEVATION := 60.0
+## The world's latitude, degrees: the equinoxes' noon is 90° less it.
+const LATITUDE := 45.0
 ## Daylight is NIGHT with the sun this far below the horizon and full this
 ## far above it, degrees; smooth between.
 const TWILIGHT_LOW := -6.0
@@ -71,37 +73,45 @@ static func hour(steps: float) -> float:
 ## The sun's height over the horizon at [param steps], degrees (under it
 ## at night).
 static func elevation(steps: float) -> float:
-	return elevation_at(fraction(steps))
+	return elevation_at(fraction(steps), Season.declination(steps))
 
 
-## The sun's height at the day's [param at] (fraction), degrees.
-static func elevation_at(at: float) -> float:
-	var turn := (at - 0.25) * TAU
-	return rad_to_deg(asin(sin(turn) * sin(deg_to_rad(MAX_ELEVATION))))
+## The sun's height at the day's [param at] (fraction), degrees, on a day
+## of [param tilt] (Season.declination; NAN: today's).
+static func elevation_at(at: float, tilt := NAN) -> float:
+	return rad_to_deg(asin(clampf(sun_at(at, tilt).y, -1.0, 1.0)))
 
 
 ## The sun's direction at [param steps] (unit, toward it), in the level's
 ## own cells and up: x east, y up, z south, so the caller turns it to the
 ## level's north. It rises in the east, crosses the south, sets in the west.
 static func sun_direction(steps: float) -> Vector3:
-	return sun_at(fraction(steps))
+	return sun_at(fraction(steps), Season.declination(steps))
 
 
-## The sun's direction at the day's [param at] (fraction), as sun_direction.
-static func sun_at(at: float) -> Vector3:
-	var turn := (at - 0.25) * TAU
-	var tilt := deg_to_rad(MAX_ELEVATION)
-	return Vector3(cos(turn), sin(turn) * sin(tilt), sin(turn) * cos(tilt)).normalized()
+## The sun's direction at the day's [param at] (fraction), as sun_direction,
+## on a day of [param tilt] (Season.declination; NAN: today's).
+static func sun_at(at: float, tilt := NAN) -> Vector3:
+	if is_nan(tilt):
+		tilt = Season.declination(now())
+	var hour_angle := (at - 0.5) * TAU
+	var latitude := deg_to_rad(LATITUDE)
+	var declination := deg_to_rad(tilt)
+	var up := sin(latitude) * sin(declination) + cos(latitude) * cos(declination) * cos(hour_angle)
+	var east := -cos(declination) * sin(hour_angle)
+	var south := sin(latitude) * cos(declination) * cos(hour_angle) - cos(latitude) * sin(declination)
+	return Vector3(east, up, south).normalized()
 
 
 ## The light under the open sky at [param steps]: NIGHT to 1.
 static func daylight(steps: float) -> float:
-	return daylight_at(fraction(steps))
+	return daylight_at(fraction(steps), Season.declination(steps))
 
 
-## The light under the open sky at the day's [param at] (fraction).
-static func daylight_at(at: float) -> float:
-	return NIGHT + (1.0 - NIGHT) * smoothstep(TWILIGHT_LOW, TWILIGHT_HIGH, elevation_at(at))
+## The light under the open sky at the day's [param at] (fraction), on a
+## day of [param tilt] (NAN: today's).
+static func daylight_at(at: float, tilt := NAN) -> float:
+	return NIGHT + (1.0 - NIGHT) * smoothstep(TWILIGHT_LOW, TWILIGHT_HIGH, elevation_at(at, tilt))
 
 
 ## Keeps [member light] up with the clock (World, once a tick).
@@ -111,7 +121,9 @@ static func update() -> void:
 
 ## The clock as the server tells it to clients ("sky"), and as it is saved.
 static func to_dict() -> Dictionary:
-	return {"day_steps": day_steps, "phase": phase, "anchor": anchor}
+	var data := {"day_steps": day_steps, "phase": phase, "anchor": anchor}
+	data.merge(Season.to_dict())
+	return data
 
 
 ## The clock from [param data] (a snapshot's "sky", or a "sky" message
@@ -121,6 +133,7 @@ static func from_dict(data: Dictionary) -> void:
 	day_steps = maxi(int(data.get("day_steps", day_steps)), 600)
 	phase = fposmod(float(data.get("phase", phase)), 1.0)
 	anchor = int(data.get("anchor", anchor))
+	Season.from_dict(data)
 	if data.has("steps"):
 		_told_steps = int(data["steps"])
 		_told_at = Time.get_ticks_msec()
@@ -134,6 +147,7 @@ static func reset() -> void:
 	anchor = 0
 	_told_steps = -1
 	light = 1.0
+	Season.reset()
 
 
 ## Server: the hour is [param at] (0..24) from now on.
@@ -146,6 +160,7 @@ static func set_hour(at: float) -> void:
 ## Server: a day takes [param minutes] from now on, the hour kept.
 static func set_day_minutes(minutes: float) -> void:
 	var steps_now := World.steps
+	Season.rebase()
 	phase = fraction(steps_now)
 	anchor = steps_now
 	day_steps = maxi(roundi(minutes * 60.0 * World.TICK_RATE), 600)

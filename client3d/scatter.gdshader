@@ -6,6 +6,9 @@ shader_type spatial;
 render_mode cull_disabled, shadows_disabled;
 
 global uniform vec4 wind;
+// The season (decision 362): x green, y turn (autumn), z snow cover.
+global uniform vec4 season;
+varying float up;
 // How far full wind bends a tip one unit up (in the mesh's own units).
 uniform float bend = 0.35;
 
@@ -19,13 +22,21 @@ void vertex() {
 	float phase = dot(at, wind.xy) * 0.6 - TIME * (1.2 + 2.0 * wind.z);
 	float gust = 0.65 + 0.35 * sin(phase) + 0.12 * sin(TIME * 3.1 + at.x * 1.7 + at.y * 2.3);
 	float height = max(VERTEX.y, 0.0);
+	up = clamp(height * 3.0, 0.0, 1.0);
 	vec3 way = inverse(mat3(MODEL_MATRIX)) * vec3(wind.x, 0.0, wind.y);
 	VERTEX += way * (bend * wind.z * gust * height * height);
 	VERTEX.y -= 0.3 * bend * wind.z * gust * height * height * height;
 }
 
 void fragment() {
-	ALBEDO = COLOR.rgb;
+	// Out of season the green dries toward straw, in autumn it turns, and
+	// snow lies on the tops.
+	vec3 colour = COLOR.rgb;
+	float grey = dot(colour, vec3(0.3, 0.55, 0.15));
+	colour = mix(colour, vec3(0.62, 0.55, 0.34) * (0.6 + grey), (1.0 - season.x) * 0.6);
+	colour = mix(colour, vec3(0.78, 0.4, 0.12) * (0.6 + grey), season.y * 0.55);
+	colour = mix(colour, vec3(0.9, 0.93, 0.97), season.z * smoothstep(0.0, 0.5, up) * 0.8);
+	ALBEDO = colour;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.5;
 }

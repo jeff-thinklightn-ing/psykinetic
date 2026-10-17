@@ -1515,6 +1515,10 @@ func _boot() -> void:
 		DayNight.set_day_minutes(Net.day_minutes)
 	if Net.start_hour >= 0.0:
 		DayNight.set_hour(Net.start_hour)
+	if Net.season_days > 0:
+		Season.set_season_days(Net.season_days)
+	if Net.start_season != "":
+		Season.set_season(Net.start_season)
 	if Net.start_weather != "":
 		Weather.set_override("all", Net.start_weather, 600.0, true)
 	# Who holds which place: as the levels start them, then as the snapshot
@@ -2349,6 +2353,28 @@ func _sky_command(words: PackedStringArray) -> String:
 	var now := DayNight.now()
 	return "hour %.2f, a day takes %.1f minutes, daylight %.2f" % [DayNight.hour(now),
 		DayNight.day_steps / float(World.TICK_RATE) / 60.0, DayNight.daylight(now)]
+
+
+## The console's season and season_days: [param words] after the command.
+func _season_command(words: PackedStringArray) -> String:
+	if words.size() >= 2:
+		var word := words[1].to_lower()
+		if words[0].to_lower() == "season":
+			if not word in Season.NAMES:
+				return "usage: season <%s> | season_days <n>" % "|".join(Season.NAMES)
+			Season.set_season(word)
+		else:
+			if not word.is_valid_int() or word.to_int() < 1:
+				return "usage: season <%s> | season_days <n>" % "|".join(Season.NAMES)
+			Season.set_season_days(word.to_int())
+		DayNight.update()
+		if Net.state_path != "":
+			_save_state()
+		Net.broadcast("sky", sky_message())
+	var now := DayNight.now()
+	var here := Season.at(World.fields.region, now)
+	return "%s (year %.3f), a season takes %d days, cold %.2f, snow cover %.2f" % [here["name"],
+		Season.year_fraction(now), Season.season_days, here["cold"], here["snow"]]
 
 
 func _exit_tree() -> void:
@@ -4525,6 +4551,8 @@ func admin_command(line: String) -> String:
 			return _zones_text()
 		"hour", "day_minutes":
 			return _sky_command(words)
+		"season", "season_days":
+			return _season_command(words)
 		"weather":
 			return _weather_command(words)
 		"zone":
@@ -4644,7 +4672,7 @@ func admin_command(line: String) -> String:
 		"help":
 			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | companions | zones | zone reset <name> | zone move <player> <zone> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
-				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
+				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | season [<name>] | season_days [<n>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
 	return "unknown command %s (try help)" % words[0]
 
 

@@ -49,6 +49,10 @@ rendering_device/driver.windows="d3d12"
 
 [shader_globals]
 
+season={
+"type": "vec4",
+"value": Vector4(1, 0, 0, 0)
+}
 wind={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)

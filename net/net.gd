@@ -21,6 +21,9 @@ extends Node
 ##   --day-minutes=<m>            server/host: a day on the world clock takes this many real minutes
 ##                                (default 90, or as last saved); see DayNight
 ##   --hour=<h>                   server/host: start at this hour of the day, 0..24 (clips, tests)
+##   --season=<name>              server/host: start in the middle of this season (spring, summer,
+##                                autumn, winter); see Season
+##   --season-days=<n>            server/host: a season lasts this many days (default 7, or as saved)
 ##   --weather=<kind>             server/host: start in this weather everywhere, already in (clips;
 ##                                as the console's `weather <kind>`, for 10 hours); see Weather
 ##   --edit=<name>                the level editor on levels/<name>/layout.png (made if there is none;
@@ -155,7 +158,10 @@ signal join_rejected(reason: String, server_version: String)
 ## 10: a monster's alert can be FLEEING (decision 282).
 ## 11: the "sky" message carries the weather's overrides and climates, and
 ## the sim's sight, hearing and light follow the weather (decisions 307, 308).
-const PROTOCOL_REVISION := 11
+## 12: the "sky" message carries the year (season_days, year_phase,
+## year_anchor), and the sun's path, the sim's daylight and the weather's
+## snow follow the season (decision 362).
+const PROTOCOL_REVISION := 12
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
@@ -210,6 +216,10 @@ var day_minutes := 0.0
 var start_hour := -1.0
 ## --weather=<kind>: the weather every region starts in ("" for the clock's).
 var start_weather := ""
+## --season=<name>, --season-days=<n>: the season to start in ("" for the
+## clock's) and a season's length (0 keeps it).
+var start_season := ""
+var season_days := 0
 ## --edit=<name>: run the level editor on that map instead of the game.
 var edit_map := ""
 ## --world-map: the world map editor (editor/world_map_view) instead of the game.
@@ -1220,7 +1230,7 @@ func _parse_args() -> void:
 			"--builder-stub":
 				builder_stub = true
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--edit", "--edit-size", "--transcripts", \
+					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
@@ -1296,6 +1306,14 @@ func _set_option(key: String, value: String) -> void:
 		"--hour":
 			if value.is_valid_float():
 				start_hour = fposmod(value.to_float(), 24.0)
+		"--season":
+			if value.to_lower() in Season.NAMES:
+				start_season = value.to_lower()
+			else:
+				print("[net] --season=%s: not one of %s" % [value, "|".join(Season.NAMES)])
+		"--season-days":
+			if value.is_valid_int() and value.to_int() > 0:
+				season_days = value.to_int()
 		"--weather":
 			if Weather.KINDS.has(value.to_lower()):
 				start_weather = value.to_lower()

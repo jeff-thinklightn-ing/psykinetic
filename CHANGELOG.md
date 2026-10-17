@@ -36,6 +36,14 @@ notes (decision 324).
   heard in play yet, until the actions that make them are hooked up.
 - The game's folder now holds THIRD_PARTY.md, the credits: who made the
   sounds, art and tools the game uses, and their licences.
+- Seasons: spring, summer, autumn and winter turn on the world clock, a
+  week of days each. Winter days are shorter and the sun hangs lower, so
+  nights are longer for everyone; grass dries and turns in autumn, and in
+  the cold rain falls as snow and lies on the grass. Falling snow hides
+  you a little, like light rain.
+- Server console: `season <name>` and `season_days <n>` (also `--season`,
+  `--season-days`).
+
 
 ## v0.1.148
 

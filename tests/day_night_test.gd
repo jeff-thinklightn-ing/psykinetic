@@ -53,10 +53,10 @@ func _test_sun() -> void:
 	var dusk := DayNight.sun_at(0.75 - 0.01)
 	var midnight := DayNight.sun_at(0.0)
 	_check(dawn.x > 0.9 and dawn.y > 0.0, "just after 6:00, low in the east (%s)" % dawn)
-	_check(is_equal_approx(DayNight.elevation_at(0.5), DayNight.MAX_ELEVATION) and noon.z > 0.0 and absf(noon.x) < 0.001,
-			"at noon, highest, to the south (%s)" % noon)
+	_check(is_equal_approx(DayNight.elevation_at(0.5, 0.0), 90.0 - DayNight.LATITUDE) and noon.z > 0.0 and absf(noon.x) < 0.001,
+			"at an equinox's noon, highest, to the south (%s)" % noon)
 	_check(dusk.x < -0.9 and dusk.y > 0.0, "just before 18:00, low in the west (%s)" % dusk)
-	_check(midnight.y < -0.8, "at midnight, under the world (%s)" % midnight)
+	_check(midnight.y < -0.6, "at midnight, under the world (%s)" % midnight)
 	_check(is_equal_approx(DayNight.daylight(0), 1.0), "daylight at noon is 1")
 	DayNight.set_hour(0.0)
 	_check(is_equal_approx(DayNight.daylight(World.steps), DayNight.NIGHT), "at midnight, NIGHT (%.2f)" % DayNight.daylight(World.steps))
@@ -170,7 +170,7 @@ func _test_saved() -> void:
 
 func _test_sky_look() -> void:
 	print("\n== the view's sky by the sun's height ==")
-	var noon := Client3D.sky_look(DayNight.MAX_ELEVATION)
+	var noon := Client3D.sky_look(90.0 - DayNight.LATITUDE)
 	var night := Client3D.sky_look(-60.0)
 	var dawn := Client3D.sky_look(3.0)
 	_check(noon["light"] == Client3D.DAY_SUN and noon["ambient"] == Client3D.DAY_AMBIENT, "midday is the day look")

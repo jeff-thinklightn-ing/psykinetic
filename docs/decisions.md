@@ -7853,3 +7853,56 @@ Its fade and its being off carry over. A building slot keeps its own
 roof_damaged look. Rejected: indices as the saved key (an edit would
 move the damage); keeping the open cells per client from the view (the
 sim's light must agree on every peer).
+## 362. Seasons are a function of the world clock, like the hour and the weather
+
+Season (sim/season.gd) works the year out from World.steps alone. The
+year runs spring (0), summer (0.25), autumn (0.5), winter (0.75), each
+season season_days days long (default 7: about 10.5 real hours a season
+at 90-minute days, 42 hours a year). Its state (year_phase at
+year_anchor, season_days) rides DayNight's: it is saved in the
+snapshot's "sky" and sent in the "sky" message (PROTOCOL_REVISION 12). It
+is re-anchored before a day's or a season's length changes, so neither
+moves the year. A new world, or an old save without it, starts in
+mid-spring. Console: `season <name>` (the middle of it), `season_days
+<n>`; flags --season, --season-days.
+
+Season.at(region, steps) gives:
+- the season's name, and the four weights, each season alone except half
+  a day either side of a boundary, where they blend;
+- green and turn (the land's colour);
+- cold, 0 in midsummer and 1 in midwinter, plus the region's climate
+  "cold" (levels/climates.json; placeholder numbers that lore settles
+  with Jeff, H11 regional weather);
+- snow, how much of the ground snow covers: cold past SNOW_LIES.
+
+Snow cover is a function of the cold, not of the weather's history:
+nothing is stepped or saved.
+
+- Light: the sun's path follows the season. DayNight models a latitude
+  of 45° and a declination of ±15° (Season.declination). At the equinoxes
+  the sun rises at 6:00 with a 45° noon; midsummer about 5:00 and 60°,
+  midwinter about 7:00 and 30°. elevation_at, sun_at and daylight_at take
+  the day's declination (NAN: today's), so the sim's daylight, and so
+  sight by light, follows it on every peer: winter nights are longer. The
+  view's sky (Client3D.seasoned_look) is cooler and paler in winter, with
+  a weaker sun, and warmer in summer; snow cover lifts the ambient.
+- Snow: in the cold, precipitation falls as snow. Weather.at's "snow" is
+  rain × Season.snowfall(cold), taken out of "rain". Falling snow cuts
+  sight at SNOW_SIGHT (0.15, rain's 0.25 × 0.6) and covers no noise. Lying
+  snow changes nothing in play in this first cut: not speed, sight or
+  sound. A climate's optional "seasons" gives a season weights of its own
+  (the default's winter: more overcast, fewer storms).
+- The land: a global shader uniform `season` (project.godot
+  [shader_globals]: x green, y turn, z snow cover), set each frame
+  outdoors by WeatherView, and (1, 0, 0) indoors. Tufts, flowers and
+  reeds (scatter.gdshader) dry, turn and take snow on their tops from it.
+  Ground, trees and saplings are terrain's, read from the same uniform or
+  Season.at; terrain applies green and turn per species: broadleaf turns,
+  while tree.pine and the tree.pine_stand border stay green; snow lies on
+  all. WeatherView draws falling snow as slow, drifting flakes that hide
+  on roofs as the rain does.
+- Sound and companions read Season.at(World.fields.region, DayNight.now())
+  (name, weights, cold, snow) and the weather's "snow".
+
+Not in this step: frozen water, crops and the economy by season,
+creatures by season, wind moving snow, and lying snow in play.

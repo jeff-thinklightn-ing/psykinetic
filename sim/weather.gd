@@ -19,6 +19,12 @@ extends RefCounted
 ## What the weather does in play (decision 308), outdoors only,
 ## out from under a roof: cloud dims the sky's light, fog and rain shorten
 ## sight (sight_factor), rain and wind cover noise (hearing_factor).
+##
+## In the cold (Season, decision 362) what falls is snow: at's "snow" is the
+## share of the rain the cold turns to snow, taken out of "rain"; falling
+## snow cuts sight at SNOW_SIGHT, and covers no noise. A climate's "seasons"
+## may give a season weights of its own, and its "cold" makes the region
+## colder (or, below 0, warmer) than the year.
 
 const FILE := "res://levels/climates.json"
 ## Each kind as how much cloud, rain, fog and wind it brings, 0..1.
@@ -41,6 +47,7 @@ const CLOUD_DIM := 0.25
 ## takes away.
 const FOG_SIGHT := 0.55
 const RAIN_SIGHT := 0.25
+const SNOW_SIGHT := 0.15
 const RAIN_HEARING := 0.3
 const WIND_HEARING := 0.25
 
@@ -84,6 +91,11 @@ static func _climate(region: String) -> Dictionary:
 	return all.get(region, all["default"])
 
 
+## [param region]'s climate (its own, else the default's).
+static func climate_of(region: String) -> Dictionary:
+	return _climate(region)
+
+
 ## The world steps a spell of [param region]'s weather lasts.
 static func spell_steps(region: String) -> int:
 	return maxi(roundi(float(_climate(region).get("spell", DEFAULT_SPELL)) * DayNight.day_steps), 60)
@@ -92,7 +104,14 @@ static func spell_steps(region: String) -> int:
 ## The kind of [param region]'s spell number [param spell], by its climate's
 ## weights and a hash of the two: the same on every peer.
 static func kind_of(region: String, spell: int) -> String:
-	var weights: Dictionary = _climate(region).get("weights", {})
+	var climate := _climate(region)
+	var weights: Dictionary = climate.get("weights", {})
+	# The season the spell begins in may have weights of its own.
+	var by_season: Variant = climate.get("seasons", {})
+	if by_season is Dictionary and not by_season.is_empty():
+		var season: Variant = by_season.get(Season.name_at(spell * spell_steps(region)), {})
+		if season is Dictionary and season.get("weights") is Dictionary:
+			weights = season["weights"]
 	var total := 0.0
 	for kind: String in weights:
 		if KINDS.has(kind):
@@ -142,6 +161,10 @@ static func at(region: String, steps: float) -> Dictionary:
 			kind = override["kind"]
 	amounts["kind"] = kind
 	amounts["wind_dir"] = Vector2.from_angle(turn)
+	# In the cold what falls is snow.
+	var snow: float = amounts["rain"] * Season.snowfall(Season.cold_at(region, Season.year_fraction(steps)))
+	amounts["snow"] = snow
+	amounts["rain"] -= snow
 	return amounts
 
 
@@ -154,7 +177,7 @@ static func _mix(a: Dictionary, b: Dictionary, weight: float) -> Dictionary:
 
 ## How far one sees in [param weather] (at's), a share of one's range.
 static func sight_factor(weather: Dictionary) -> float:
-	return clampf(1.0 - FOG_SIGHT * weather["fog"] - RAIN_SIGHT * weather["rain"], 0.2, 1.0)
+	return clampf(1.0 - FOG_SIGHT * weather["fog"] - RAIN_SIGHT * weather["rain"] - SNOW_SIGHT * weather.get("snow", 0.0), 0.2, 1.0)
 
 
 ## How far a noise carries in [param weather], a share of its radius.
