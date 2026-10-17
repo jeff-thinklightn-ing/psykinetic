@@ -105,8 +105,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `scatter.tuft` | cell | 0.3 x 0.25 x 0.3 | 100 | grass tufts terrain scatters over grass and dirt (terrain part 5), drawn by MultiMesh; ... |
 | `tree.dead` | cell | 1.6 x 3.6 x 1.6 | 1000 | a dead, bare tree for the forest round an outdoor map and groves; sized 0.85 to 1.2, tu... |
 | `tree.log` | cell | 0.5 x 0.5 x 2.0 | 400 | a fallen log lying along z |
-| `tree.pine` | cell | 1.8 x 3.6 x 1.8 | 1500 | a conifer for the forest round an outdoor map and groves (not drawn yet: Client3D._add_... |
-| `tree.pine_stand` | cell | 2.8 x 4.0 x 2.8 | 1500 | the map's border band (Jeff, 2026-10-17; terrain's TerrainBorder, decision 326, places ... |
+| `tree.pine` | cell | 1.8 x 3.6 x 1.8 | 1500 | a conifer for the forest round an outdoor map and groves, and the trees tree.pine_stand... |
+| `tree.pine_stand` | cell | 3.2 x 4.0 x 3.2 | 3000 | the map's border band (Jeff, 2026-10-17; terrain's PineStands in TerrainBorder, decisio... |
 | `wall.castle.corner` | vertex | 0.5 x 3.0 x 0.5 | 200 | an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x |
 | `wall.castle.corner_low` | vertex | 0.5 x 1.0 x 0.5 | 200 | an L joint low (1 m) where two runs meet at a corner, the runs' ends meeting in it alon... |
 | `wall.castle.corner_tall` | vertex | 0.5 x 4.5 x 0.5 | 200 | an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it a... |
