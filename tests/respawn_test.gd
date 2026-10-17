@@ -18,6 +18,7 @@ func _ready() -> void:
 
 	_test_respawn_waits_for_time_and_distance()
 	_test_crate_respawns_at_its_spawn_tile()
+	_test_respawns_staggered()
 	_test_console()
 	_test_player_reset()
 	_test_old_snapshot_gets_current_looks()
@@ -53,8 +54,11 @@ func _test_respawn_waits_for_time_and_distance() -> void:
 	# door would walk through the tile under test, so kill them again.
 	for i in 3:
 		World.step()
-	_kill_monsters()
+	_kill_monsters(4)
 	_check(_slot_entity(4) == null, "the slot under test is still dead")
+	# One of them came back just now: the stagger (decision 382) would hold
+	# the imp RESPAWN_STAGGER_TICKS more. This checks the distance alone.
+	_main._respawned_at.clear()
 	World.order_move(player, Vector2i(9, 6))
 	World.step()
 	World.step()  # move_ticks: the step lands on the second tick.
@@ -79,7 +83,8 @@ func _test_crate_respawns_at_its_spawn_tile() -> void:
 	_walk_to(player, Vector2i(12, 12))
 	_kill_monsters()
 	var died_at := World.tick
-	while World.tick < died_at + _main.RESPAWN_DELAY_TICKS + 1:
+	# The monsters fall due with it, one a RESPAWN_STAGGER_TICKS (382).
+	while World.tick < died_at + _main.RESPAWN_DELAY_TICKS + 7 * _main.RESPAWN_STAGGER_TICKS and _slot_entity(5) == null:
 		World.step()
 	var back := _slot_entity(5)
 	_check(back is Pushable and back.tile == spawn_tile, "a new crate is on the original spawn tile %s" % spawn_tile)
@@ -95,6 +100,45 @@ func _test_crate_respawns_at_its_spawn_tile() -> void:
 		World.step()
 	_check(other.spawned and _slot_entity(6) == other and World.get_entity_at(other_spawn) == null,
 			"it stays where it was pushed; nothing appears at its spawn tile")
+
+
+func _test_respawns_staggered() -> void:
+	print("
+== due respawns come back one at a time, the farthest first; not near a player just come (382) ==")
+	Monster.noticing = false  # The ones back stand still: nothing hunts the player meanwhile.
+	var player := _player()
+	_walk_to(player, Vector2i(12, 12))
+	_kill_monsters()
+	var slots: Array = _main._dead_since.keys()
+	var away := func(slot: int) -> int: return World.distance(player.tile, _main._slot_spec(slot)["tile"])
+	var farthest: int = slots.map(away).max()
+	for slot: int in slots:
+		_main._dead_since[slot] = World.tick - _main.RESPAWN_DELAY_TICKS
+	_main._respawned_at.clear()
+	World.step()
+	var first: Array = slots.filter(func(slot: int) -> bool: return _slot_entity(slot) != null)
+	_check(_monsters() == 1 and first.size() == 1 and away.call(first[0]) == farthest,
+			"%d due at once: one comes back, %d tiles off, the farthest (%d)" % [slots.size(), away.call(first[0]) if first.size() == 1 else -1, farthest])
+	for i in _main.RESPAWN_STAGGER_TICKS - 1:
+		World.step()
+	_check(_monsters() == 1, "no second within %d ticks" % _main.RESPAWN_STAGGER_TICKS)
+	World.step()
+	_check(_monsters() == 2, "a second at %d" % _main.RESPAWN_STAGGER_TICKS)
+
+	_kill_monsters()
+	for slot: int in slots:
+		_main._dead_since[slot] = World.tick - _main.RESPAWN_DELAY_TICKS
+	_main._respawned_at.clear()
+	_main._arrived_at[_main._players.find_key(player)] = World.tick
+	_check(slots.all(func(slot: int) -> bool: return away.call(slot) <= _main.RESPAWN_JOIN_DISTANCE), "every spawn within %d tiles of the player" % _main.RESPAWN_JOIN_DISTANCE)
+	for i in _main.SPAWN_GRACE_TICKS - 1:
+		World.step()
+	_check(_monsters() == 0, "a player just come: nothing back within %d tiles for %d ticks" % [_main.RESPAWN_JOIN_DISTANCE, _main.SPAWN_GRACE_TICKS])
+	World.step()
+	World.step()
+	_check(_monsters() == 1, "then the first, as before")
+	_kill_monsters()
+	Monster.noticing = true
 
 
 func _test_console() -> void:
@@ -207,10 +251,16 @@ func _monsters() -> int:
 	return count
 
 
-func _kill_monsters() -> void:
+## Kills every monster, and starts every dead slot's delay again from now
+## (but [param keep]'s), so the ones still due under the stagger (382) do
+## not come back into the next check one by one.
+func _kill_monsters(keep := -1) -> void:
 	for entity in World.get_entities():
 		if entity is Monster:
 			World.damage(entity, 999)
+	for slot: int in _main._dead_since:
+		if slot != keep:
+			_main._dead_since[slot] = World.tick
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:

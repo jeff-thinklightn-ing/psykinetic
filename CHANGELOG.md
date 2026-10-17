@@ -10,6 +10,10 @@ notes (decision 324).
 - A damaged building's roof is broken in places: rain and daylight come in through the holes. The client must be updated with the server.
 
 - The wilds town has a temple beside its square. Out by the south edge of the forest stands a healer's hut, with a path from the town.
+- Coming back to a zone after a long time away no longer brings every dead
+  monster back at once round you: they return one at a time, about every 6
+  seconds, the farthest from you first, and none within 12 tiles of you for
+  the first moments after you arrive.
 
 - Arrows come in a bundle held in the hand your bow isn't in. The bow is one-handed now, and it draws only with a bundle in the other hand. Shooting never uses the bundle up, but blunt hits on you (a hammer, being knocked into something, a knockdown) wear it down, 1 of 10 each, and at 0 you can't shoot until the fletcher mends it. Flame arrows set what they hit burning, and barbed arrows make it bleed until bandaged. Burning and bleeding bodies show it in their name's colour.
 - Builder mode can roof a room you walled yourself or an open shelter on

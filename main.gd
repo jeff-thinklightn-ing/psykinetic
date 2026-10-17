@@ -120,6 +120,13 @@ const SNAPSHOT_EVERY_TICKS := 30
 const RESPAWN_DELAY_TICKS := 600
 ## ...and no player is within this many tiles of that spawn tile.
 const RESPAWN_MIN_DISTANCE := 6
+## At most one comes back in a zone this often, the one farthest from every
+## player first, so a zone opened after a long sleep (or cleared and left)
+## does not bring every due one back at once (decision 382).
+const RESPAWN_STAGGER_TICKS := 60
+## For SPAWN_GRACE_TICKS after a player joins or comes into the zone,
+## nothing comes back within this many tiles of them.
+const RESPAWN_JOIN_DISTANCE := 12
 ## The far tier hands over to records (decision 352): a monster FAR from
 ## every player and companion for RETIRE_AFTER_TICKS, more than
 ## retire_tiles from all of them, calm and with nowhere the world tick
@@ -197,6 +204,11 @@ var _alive_slots: Dictionary[int, GridEntity] = {}
 var _towns_near := {}
 ## Server only: level_entities index -> tick its entity died or broke.
 var _dead_since: Dictionary[int, int] = {}
+## Zone name -> the tick its last respawn came back (RESPAWN_STAGGER_TICKS).
+var _respawned_at: Dictionary[String, int] = {}
+## Peer -> the tick its player was last put down (a join, a zone entered, a
+## respawn): the wider no-respawn radius while SPAWN_GRACE_TICKS last.
+var _arrived_at: Dictionary[int, int] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
@@ -2189,10 +2201,17 @@ func _slot_spec(slot: int) -> Dictionary:
 
 
 ## Brings dead level entities back: after RESPAWN_DELAY_TICKS, with no player
-## within RESPAWN_MIN_DISTANCE of the spawn tile, onto a free tile. With
-## [param force], at once regardless of time and distance. Returns how many.
+## within RESPAWN_MIN_DISTANCE of the spawn tile (RESPAWN_JOIN_DISTANCE of
+## one just put down), onto a free tile; one a zone every
+## RESPAWN_STAGGER_TICKS, the farthest from every player first (decision
+## 382). A record (decision 352) is no dead slot, so never one of them. With
+## [param force], all at once regardless of time and distance. Returns how
+## many.
 func _check_respawns(tick: int, force := false) -> int:
-	var count := 0
+	var zone_name: String = World.zone.name if World.zone != null else ""
+	if not force and _respawned_at.has(zone_name) and tick - _respawned_at[zone_name] < RESPAWN_STAGGER_TICKS:
+		return 0
+	var due: Array[Array] = []  # [steps from the nearest player, slot, spec]
 	for slot: int in _dead_since.keys():
 		if not force and tick - _dead_since[slot] < RESPAWN_DELAY_TICKS:
 			continue
@@ -2200,21 +2219,40 @@ func _check_respawns(tick: int, force := false) -> int:
 		var tile: Vector2i = spec["tile"]
 		if not World.is_free(tile):
 			continue
-		if not force and _player_within(tile, RESPAWN_MIN_DISTANCE):
+		var away := _nearest_player(tile, tick)
+		if not force and away < 0:
 			continue
-		if _spawn(spec) == null:
+		due.append([away, slot, spec])
+	if not force:
+		due.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+	var count := 0
+	for each: Array in due:
+		if _spawn(each[2]) == null:
 			continue
 		count += 1
-		print("[world] respawned %s at %s" % [EntityFactory.type_name(spec), tile])
+		print("[world] respawned %s at %s" % [EntityFactory.type_name(each[2]), each[2]["tile"]])
+		if not force:
+			_respawned_at[zone_name] = tick
+			break
 	return count
 
 
-func _player_within(tile: Vector2i, distance: int) -> bool:
-	for player: Player in _players.values():
-		if is_instance_valid(player) and player.spawned and player.zone == World.zone.name \
-				and World.distance(player.tile, tile) <= distance:
-			return true
-	return false
+## How far [param tile] is from the nearest player in this zone (a big
+## number with none); -1 if one is too near for a respawn there:
+## within RESPAWN_MIN_DISTANCE, or RESPAWN_JOIN_DISTANCE of one put down
+## less than SPAWN_GRACE_TICKS ago.
+func _nearest_player(tile: Vector2i, tick: int) -> int:
+	var nearest := 1 << 30
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned or player.zone != World.zone.name:
+			continue
+		var away := World.distance(player.tile, tile)
+		var arrived := tick - int(_arrived_at.get(peer, -SPAWN_GRACE_TICKS)) < SPAWN_GRACE_TICKS
+		if away <= RESPAWN_MIN_DISTANCE or arrived and away <= RESPAWN_JOIN_DISTANCE:
+			return -1
+		nearest = mini(nearest, away)
+	return nearest
 
 
 ## The snapshot's writer (decision 360): the world is gathered here, on the
@@ -2465,6 +2503,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	if known and not respawn:
 		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
 	World.protect(player, SPAWN_GRACE_TICKS)
+	_arrived_at[peer] = World.tick
 	player.player_id = id
 	World.set_slots(player, record.slots, record.slot_items)
 	record.remember(player)

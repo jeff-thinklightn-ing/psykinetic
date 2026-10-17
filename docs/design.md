@@ -260,7 +260,11 @@ level entity carries its slot (`spawn` in its spec, saved in the snapshot).
 When a slot's entity is killed or broken the slot is dead from that tick,
 and comes back — a fresh entity on the slot's own tile, at full stats — once
 `RESPAWN_DELAY_TICKS` (600) have passed, no player is within
-`RESPAWN_MIN_DISTANCE` (6) tiles of that tile, and the tile is free. A crate
+`RESPAWN_MIN_DISTANCE` (6) tiles of that tile (12, `RESPAWN_JOIN_DISTANCE`,
+of a player put down in the last `SPAWN_GRACE_TICKS`), and the tile is
+free; one at a time in a zone, every `RESPAWN_STAGGER_TICKS` (60), the one
+farthest from every player first (decision 382), so a zone woken after
+days does not bring them all back at once. A crate
 that was only pushed is alive and stays where it is; one pushed and then
 broken comes back at its spawn tile. The log line is
 `[world] respawned <type> at (x, y)`. The snapshot records each dead slot's

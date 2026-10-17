@@ -2763,10 +2763,15 @@ func _free_tile_between(pet: Companion, low: int, high: int) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
+## Kills every monster, and starts every dead slot's delay again from now,
+## so ones still due under the respawn stagger (decision 382) do not come
+## back one by one into the next check.
 func _kill_monsters() -> void:
 	for entity in World.get_entities():
 		if entity is Monster:
 			World.damage(entity, 999)
+	for slot: int in _main._dead_since:
+		_main._dead_since[slot] = World.tick
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:

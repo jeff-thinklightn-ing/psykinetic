@@ -7940,3 +7940,31 @@ place moved, the temple on the town's ground and the hut on nobody's, the
 nearest in town, in the wilds, across an edge, and without routes. Server
 only; no protocol change.
 
+## 382. Due respawns come back one at a time, the farthest first
+
+Jeff's playtest on the box: back in the castle after days away, every
+respawn timer there had run out, so `_check_respawns` put a monster back
+on the first tick each spawn tile was clear of him: 10 in 80 s round the
+start tile, 12 imps and a sneak at him, and he left for the wilds close to
+falling. By the rules (600 ticks, nobody within 6 tiles), but a zone
+opening after a long sleep, or a dungeon cleared and left, should not
+bring every due respawn back in one burst.
+
+Now `Main._check_respawns` brings back at most one a zone every
+`RESPAWN_STAGGER_TICKS` (60, a tenth of `RESPAWN_DELAY_TICKS`;
+`_respawned_at` by zone name), the due one farthest from every player in
+the zone first, always (not only on waking). Ten due come back over about
+a minute, from the far side in. And for `SPAWN_GRACE_TICKS` after a
+player is put down (a join, a zone entered, a respawn: `_arrived_at` by
+peer, stamped beside `World.protect`), nothing comes back within
+`RESPAWN_JOIN_DISTANCE` (12) of them, not 6. The saved timers are as they
+were; a record (352) is no dead slot, so never counted; the console's
+`respawn` (force) still brings them all at once.
+
+respawn_test: five due at once, one comes back, the farthest; none more
+within 60 ticks, a second at 60; a player just put down holds every spawn
+within 12 tiles back for SPAWN_GRACE_TICKS, then the first comes. Its older
+checks wait out the stagger (the crate) or clear it (the distance check).
+far_tier_test still fits (one slot, RESPAWN_DELAY_TICKS + 20). Server
+only; no protocol change.
+
