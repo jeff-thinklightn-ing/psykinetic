@@ -28,6 +28,7 @@ extends Node
 ## --yaw=D turns it to D degrees; a shot leaves out the hints.
 ## --stand-in=1 draws the border's pine stands with PineStands' stand-in
 ## while their slot has no art (shots, to tune the packing).
+## --season=NAME starts the year in that season (Season.NAMES).
 ## --weather=KIND starts every region in that weather (Weather; rain's
 ## drops and fog's layers drawn, outdoors).
 ## --off=shadows,border,glimpse,minimap leaves those pieces of the view out
@@ -98,6 +99,7 @@ func _ready() -> void:
 			"bench-state": bench_state = pair[1]
 			"off": off.assign(pair[1].split(","))
 			"stand-in": PineStands.stand_in = pair[1] != "0"
+			"season": Net.start_season = pair[1].to_lower() if Season.NAMES.has(pair[1].to_lower()) else ""
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,

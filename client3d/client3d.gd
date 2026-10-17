@@ -214,6 +214,16 @@ const NEAR_ALPHA := 0.3
 ## A near piece's mesh keeps its own material override under this meta
 ## while it is see-through.
 const OPAQUE_META := &"opaque_material"
+## A mesh's own surface overrides (its season's materials), kept while it
+## is faded: one per surface, null where none.
+const OPAQUE_SURFACES_META := &"opaque_surfaces"
+## The season (decision 362; terrain's side, decision 387):
+## trees, their forest's floors and the canopy past them drawn in
+## season.gdshader (season_material), a see-through copy beside each (this
+## meta) for the near fade.
+const SEASON_SHADER := preload("res://client3d/season.gdshader")
+const SEASON_NEAR_SHADER := preload("res://client3d/season_near.gdshader")
+const SEASON_NEAR_META := &"season_near"
 ## A doorway's door.single (ArtKit): its frame, and its hinged leaf.
 const DOOR_FRAME := ^"Door/Body"
 const DOOR_LEAF := ^"Door/leaf"
@@ -2196,15 +2206,84 @@ func _stone(alpha: float) -> StandardMaterial3D:
 ## [param material] as a near piece is drawn: see-through, its nearest
 ## surface only (NEAR_DEPTH_SHADER first, as its next pass).
 static func _make_near(material: BaseMaterial3D) -> void:
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.render_priority = NEAR_PRIORITY
+	material.next_pass = _near_depth_pass()
+
+
+## The depth pass a see-through copy draws after itself, made once.
+static func _near_depth_pass() -> ShaderMaterial:
 	if _near_depth == null:
 		var shader := Shader.new()
 		shader.code = NEAR_DEPTH_SHADER
 		_near_depth = ShaderMaterial.new()
 		_near_depth.shader = shader
 		_near_depth.render_priority = NEAR_DEPTH_PRIORITY
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.render_priority = NEAR_PRIORITY
-	material.next_pass = _near_depth
+	return _near_depth
+
+
+## Each material as the season draws it, by [its id, leaf]: [the season's,
+## the material] (held, so its id is never another's).
+static var _season_materials: Dictionary = {}
+
+
+## [param material] (a BaseMaterial3D: the palette, a fill's, a flat colour,
+## vertex colours) drawn in season (season.gdshader): its own look, then
+## snow on what faces up, and with [param leaf] its foliage dried out of
+## season and turned in autumn. Kept and shared by material and leaf
+## unless not [param shared] (a material made for one build). Its
+## see-through copy beside it (SEASON_NEAR_META), for the near fade.
+static func season_material(material: Material, leaf: bool, shared := true) -> Material:
+	var base := material as BaseMaterial3D
+	if base == null:
+		return material
+	var key := [base.get_instance_id(), leaf]
+	if shared and _season_materials.has(key):
+		return _season_materials[key][0]
+	var made := _season_copy(SEASON_SHADER, base, leaf)
+	var near := _season_copy(SEASON_NEAR_SHADER, base, leaf)
+	near.set_shader_parameter("alpha", NEAR_ALPHA)
+	near.render_priority = NEAR_PRIORITY
+	near.next_pass = _near_depth_pass()
+	made.set_meta(SEASON_NEAR_META, near)
+	if shared:
+		_season_materials[key] = [made, base]
+	return made
+
+
+static func _season_copy(shader: Shader, base: BaseMaterial3D, leaf: bool) -> ShaderMaterial:
+	var made := ShaderMaterial.new()
+	made.shader = shader
+	made.set_shader_parameter("albedo_color", base.albedo_color)
+	made.set_shader_parameter("use_texture", base.albedo_texture != null)
+	if base.albedo_texture != null:
+		made.set_shader_parameter("albedo_texture", base.albedo_texture)
+	made.set_shader_parameter("use_vertex_color", base.vertex_color_use_as_albedo)
+	made.set_shader_parameter("vertex_srgb", base.vertex_color_is_srgb)
+	made.set_shader_parameter("roughness", base.roughness)
+	made.set_shader_parameter("leaf", leaf)
+	return made
+
+
+## [param node]'s meshes drawn in season (season_material): their
+## overrides, else their surfaces' materials, as overrides.
+static func season_dress(node: Node, leaf: bool) -> void:
+	var walk: Array[Node] = [node]
+	while not walk.is_empty():
+		var next := walk.pop_back() as Node
+		walk.append_array(next.get_children())
+		var mesh := next as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		if mesh.material_override != null:
+			mesh.material_override = season_material(mesh.material_override, leaf)
+			continue
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.get_surface_override_material(surface)
+			if own == null:
+				own = mesh.mesh.surface_get_material(surface)
+			if own != null:
+				mesh.set_surface_override_material(surface, season_material(own, leaf))
 
 
 func _descendants(node: Node) -> Array[Node]:
@@ -2842,7 +2921,7 @@ func _add_forest() -> void:
 	var forest_floor := MeshInstance3D.new()
 	forest_floor.name = "ForestFloor"
 	forest_floor.mesh = floor_mesh
-	forest_floor.material_override = material
+	forest_floor.material_override = season_material(material, false, false)
 	forest_floor.position = Vector3((low.x + high.x) * 0.5, -FOREST_FLOOR_DEPTH, (low.y + high.y) * 0.5)
 	_room.add_child(forest_floor)
 
@@ -3359,6 +3438,7 @@ func _add_tree(cell: Vector2i, clump := 0.5) -> void:
 	tree.scale = Vector3.ONE * TREE_HEIGHT * size / ArtKit.size(slot).y
 	tree.rotation = Vector3((_roll(cell, 6) - 0.5) * 2.0 * TREE_LEAN, _roll(cell, 3) * TAU, (_roll(cell, 7) - 0.5) * 2.0 * TREE_LEAN)
 	tree.position = _tile_position(cell) + Vector3(_roll(cell, 4) - 0.5, 0.0, _roll(cell, 5) - 0.5) * TREE_NUDGE * 2.0
+	season_dress(tree, slot != "tree.dead" and slot != "tree.pine")
 	_room.add_child(tree)
 	_trees[cell] = tree
 
@@ -3505,6 +3585,7 @@ func _add_sapling(cell: Vector2i, distance: Dictionary[Vector2i, int]) -> void:
 	sapling.scale = Vector3.ONE * TREE_HEIGHT * lerpf(SAPLING_SIZE.x, SAPLING_SIZE.y, _roll(cell, 53)) / ArtKit.size(slot).y
 	sapling.rotation = Vector3((_roll(cell, 54) - 0.5) * 2.0 * TREE_LEAN, _roll(cell, 55) * TAU, (_roll(cell, 56) - 0.5) * 2.0 * TREE_LEAN)
 	sapling.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
+	season_dress(sapling, true)
 	_room.add_child(sapling)
 	_saplings[cell] = sapling
 
@@ -3528,6 +3609,7 @@ func _add_deadwood(cell: Vector2i, slot: String, distance: Dictionary[Vector2i, 
 	wood.scale = Vector3.ONE * lerpf(0.8, 1.2, _roll(cell, 64))
 	wood.rotation.y = _roll(cell, 65) * TAU
 	wood.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
+	season_dress(wood, false)
 	_room.add_child(wood)
 
 
@@ -3555,6 +3637,8 @@ static func _roll(cell: Vector2i, salt: int) -> float:
 
 
 func _see_through_of(material: Material) -> Material:
+	if material.has_meta(SEASON_NEAR_META):
+		return material.get_meta(SEASON_NEAR_META)
 	if not _see_through.has(material):
 		var copy := material.duplicate() as BaseMaterial3D
 		if copy == null:
@@ -5505,9 +5589,16 @@ func _set_near(piece: Node3D, near: bool) -> void:
 			var own: Material = mesh.get_meta(OPAQUE_META)
 			mesh.material_override = _see_through_of(own) if near else own
 		else:
+			# Its own overrides (its season's) kept, and put back after.
+			if not mesh.has_meta(OPAQUE_SURFACES_META):
+				var kept: Array[Material] = []
+				for surface in mesh.mesh.get_surface_count():
+					kept.append(mesh.get_surface_override_material(surface))
+				mesh.set_meta(OPAQUE_SURFACES_META, kept)
+			var opaque: Array[Material] = mesh.get_meta(OPAQUE_SURFACES_META)
 			for surface in mesh.mesh.get_surface_count():
-				var own := mesh.mesh.surface_get_material(surface)
-				mesh.set_surface_override_material(surface, _see_through_of(own) if near and own != null else null)
+				var own: Material = opaque[surface] if opaque[surface] != null else mesh.mesh.surface_get_material(surface)
+				mesh.set_surface_override_material(surface, _see_through_of(own) if near and own != null else opaque[surface])
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if near \
 				else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 

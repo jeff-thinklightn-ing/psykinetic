@@ -7996,3 +7996,42 @@ Amended (coordinator): the arrival quiet has its own constant,
 `RESPAWN_ARRIVAL_TICKS` = 100 (10 s), not `SPAWN_GRACE_TICKS` (30, 3 s, the
 monsters' grace for a new player), which was too short to look round.
 
+## 387. The seasons on the ground, the trees and the border
+
+Environment's season (362) on terrain's side, as the coordinator
+approved: its `season` shader global (x green, y turn, z snow cover; (1,
+0, 0, 0) indoors) read by what terrain draws outdoors, each frame, with no
+rebuild when the season moves.
+
+- The ground (ground.gdshader): grass dries toward straw by (1 − green)
+  and browns in patches by turn; dirt, stone and sand keep their colour.
+  Snow covers by cover times a drift noise, only where the ground faces up
+  (smoothstep on the world normal's y, so steps and ramps stay bare), not
+  on water's bed and never on a building's floor (a floor set's cell).
+- Trees, saplings, dead wood, the stands, the forest floor, the far floor
+  and the canopy sheet: `season.gdshader` (its body
+  `season.gdshaderinc`), made from each one's own material by
+  `Client3D.season_material` (the palette's texture, a fill's texture or
+  colour, vertex colours, roughness), shared by material and kind, set as
+  surface overrides by `season_dress` (the palette material is every
+  slot's, so it is never changed itself). Snow on what faces up. With
+  `leaf` (tree.broadleaf, tree.small, saplings, and the canopy sheet past
+  them), foliage, told by its colour (green over red and blue: the
+  palette's foliage row and the Kenney fill's leaves alike), dries toward
+  straw and turns in autumn, each tree to gold, orange or rust by where it
+  stands. Without (tree.pine, tree.pine_stand, stumps, logs, tree.dead,
+  the floors, the canopy behind stands) only snow. A broadleaf has no bare
+  winter crown: it fades to a dry sage under snow until a winter variant
+  of its art exists.
+- The near fade: each season material carries its see-through copy
+  (`season_near.gdshader`, the same with ALPHA, the near depth pass after
+  it), which `_see_through_of` hands back; `_set_near` keeps a mesh's own
+  surface overrides and puts them back after.
+- The scatter's colours from the season are environment's (362).
+  The scatter's straw (a light linear colour) read as cream on whole trees
+  and fields, so terrain's are darker.
+
+map_bench windowed on the wilds, summer then winter twice, under the bench
+lock: frame median 1.65 / 1.30 ms in summer, 1.39 / 1.24 ms in winter, 99th
+percentile 3.56 / 3.37 and 3.61 / 3.16 ms, the 3D rebuild 1,174 / 874 and
+940 / 837 ms: no cost found. Client only; no protocol change.

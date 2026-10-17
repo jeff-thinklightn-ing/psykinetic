@@ -192,7 +192,8 @@ static func _bake(root: Node3D) -> Mesh:
 				if material == null:
 					material = drawn.mesh.surface_get_material(surface)
 				out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-				out.surface_set_material(out.get_surface_count() - 1, material)
+				# Evergreen: snow on it in winter, never dried or turned.
+				out.surface_set_material(out.get_surface_count() - 1, Client3D.season_material(material, false) if material != null else null)
 		for child in node.get_children():
 			if child is Node3D:
 				walk.append([child, at * (child as Node3D).transform])
@@ -234,7 +235,7 @@ static func _stand_in(variant: int) -> Mesh:
 	material.vertex_color_use_as_albedo = true
 	material.vertex_color_is_srgb = true
 	material.roughness = 1.0
-	tool.set_material(material)
+	tool.set_material(Client3D.season_material(material, false))
 	return tool.commit()
 
 

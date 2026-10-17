@@ -47,7 +47,10 @@ var chunks: Dictionary[Vector2i, Array] = {}
 ## The far floor.
 var far_floor: MeshInstance3D
 var _task := -1
-var _material: StandardMaterial3D
+var _material: Material
+## Whether the canopy is broadleaf's (dried and turned with the season) or
+## the stands' (evergreen: snow only).
+var _leaf := true
 
 
 ## Lays the far floor now and starts the canopy past [param land] (its
@@ -72,7 +75,7 @@ func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, f
 	far_floor = MeshInstance3D.new()
 	far_floor.name = "FarFloor"
 	far_floor.mesh = plane
-	far_floor.material_override = floor_material
+	far_floor.material_override = Client3D.season_material(floor_material, false, false)
 	far_floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	far_floor.position = Vector3((low.x + high.x) * 0.5, -floor_depth - FAR_SINK, (low.y + high.y) * 0.5)
 	add_child(far_floor)
@@ -82,6 +85,7 @@ func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, f
 	else:
 		for at in FOLIAGE:
 			colours.append(Client3D.swatch(at.x, at.y))
+	_leaf = not stands
 	var work := _work.bind(land, heights.duplicate(), rise, colours, -floor_depth - FAR_SINK * 2.0)
 	if threaded:
 		_task = WorkerThreadPool.add_task(work, false, "terrain border")
@@ -206,10 +210,11 @@ static func _cell_canopy(into: Array, cell: Vector2i, distance: Dictionary[Vecto
 ## The canopy's meshes, a chunk each, from what the worker built.
 func _place() -> void:
 	if _material == null:
-		_material = StandardMaterial3D.new()
-		_material.vertex_color_use_as_albedo = true
-		_material.vertex_color_is_srgb = true
-		_material.roughness = 1.0
+		var base := StandardMaterial3D.new()
+		base.vertex_color_use_as_albedo = true
+		base.vertex_color_is_srgb = true
+		base.roughness = 1.0
+		_material = Client3D.season_material(base, _leaf, false)
 	for chunk: Vector2i in chunks:
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)

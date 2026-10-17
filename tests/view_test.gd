@@ -35,6 +35,7 @@ func _ready() -> void:
 	await _test_fade()
 	_test_outdoor()
 	_test_pine_stands()
+	_test_seasons()
 	_test_heights()
 	_test_hills()
 	_test_water()
@@ -1415,18 +1416,70 @@ func _test_pine_stands() -> void:
 	if not near.is_empty():
 		_rig._set_near(near[0], true)
 		var drawn := near[0].get_child(0) as MeshInstance3D
-		var faded := drawn.get_surface_override_material(0) as BaseMaterial3D
-		_check(faded != null and faded.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED, "a near stand fades as a tree does")
+		var faded := drawn.get_surface_override_material(0) as ShaderMaterial
+		_check(faded != null and faded.shader == Client3D.SEASON_NEAR_SHADER and faded.render_priority == Client3D.NEAR_PRIORITY,
+				"a near stand fades as a tree does (its season's see-through copy)")
 		_rig._set_near(near[0], false)
+		var again := drawn.get_active_material(0) as ShaderMaterial
+		_check(again != null and again.shader == Client3D.SEASON_SHADER and not again.get_shader_parameter("leaf"),
+				"and solid again after, evergreen: snow on it, never dried or turned")
 	var ringed := 0
 	for index in range(_rig._ground_water_end, _rig._ground_cells.size()):
 		if distance.get(_rig._ground_cells[index], 0) >= PineStands.FROM:
 			ringed += 1
 	var forest_floor := _rig._room.get_node("ForestFloor") as MeshInstance3D
-	_check(ringed == 0 and (forest_floor.material_override as StandardMaterial3D).albedo_color == PineStands.NEEDLES,
+	_check(ringed == 0 and (forest_floor.material_override as ShaderMaterial).get_shader_parameter("albedo_color") == PineStands.NEEDLES,
 			"under them the needles' floor; the land's ground runs only into the first ring")
 	PineStands.stand_in = false
 	PineStands.forget()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The season on terrain's side (environment's 362): the ground, trees and
+## the forest's floors drawn in the season's shaders, by kind.
+func _test_seasons() -> void:
+	print("
+== in season: broadleaf dries and turns, pines and dead wood only take snow ==")
+	_check((Client3D.GROUND_SHADER as Shader).code.contains("global uniform vec4 season")
+			and (Client3D.SEASON_SHADER as Shader).code.contains("season.gdshaderinc"),
+			"the ground's shader and the trees' read the season")
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var season_of := func(node: Node) -> Array:
+		var out := []
+		for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false) + ([node] if node is MeshInstance3D else []):
+			for surface in mesh.mesh.get_surface_count():
+				var drawn := mesh.get_active_material(surface) as ShaderMaterial
+				out.append(null if drawn == null or drawn.shader != Client3D.SEASON_SHADER else drawn.get_shader_parameter("leaf"))
+		return out
+	var leaves: Array = []
+	var dead: Array = []
+	for tree: Node3D in _rig._trees.values():
+		var kind := str(tree.get_meta("slot", ""))
+		(dead if kind == "tree.dead" else leaves).append_array(season_of.call(tree))
+	_check(not leaves.is_empty() and leaves.all(func(leaf: Variant) -> bool: return leaf == true),
+			"every broadleaf's surfaces in the season's shader, its foliage turning (%d)" % leaves.size())
+	var wood: Array = []
+	for node in _rig._room.find_children("Deadwood_*", "", false, false):
+		wood.append_array(season_of.call(node))
+	_check(wood.all(func(leaf: Variant) -> bool: return leaf == false) and dead.all(func(leaf: Variant) -> bool: return leaf == false),
+			"stumps, logs and dead trees: snow only (%d surfaces)" % (wood.size() + dead.size()))
+	var forest_floor := _rig._room.get_node("ForestFloor") as MeshInstance3D
+	var canopy_leaf: Variant = null
+	if _rig._border != null:
+		_rig._border.finish()
+		var sheet := _rig._border.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Canopy_"))
+		if not sheet.is_empty():
+			canopy_leaf = season_of.call(sheet[0])[0]
+	_check(season_of.call(forest_floor) == [false] and canopy_leaf == true,
+			"the forest floor snow only; the canopy past broadleaf turns with it")
+	var tree: Node3D = _rig._trees.values()[0]
+	var before: Array = season_of.call(tree)
+	_rig._set_near(tree, true)
+	var faded := tree.find_children("*", "MeshInstance3D", true, false)[0].get_active_material(0) as ShaderMaterial
+	_rig._set_near(tree, false)
+	_check(faded != null and faded.shader == Client3D.SEASON_NEAR_SHADER and season_of.call(tree) == before,
+			"a near tree fades in its season's see-through copy, and is in season again after")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
