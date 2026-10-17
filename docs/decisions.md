@@ -8161,11 +8161,17 @@ picks c4 of art-gen's concepts, meshed by TRELLIS.2, made the goblin's way
 Animation Library's own skeleton, so every UAL clip plays at the
 proportions it was made for (imported through `bonemaps/ual.tres`, as the
 goblin), and built by `tools/body_build.py`: faceted, lean and heavy shape
-keys for the body range to come, coloured from the concept. Skin, Hair,
-Tunic and Trousers are materials of those names, which the game tints
-(art-kit's agreement: characters are not art-kit slots, ArtCheck does not
-check them); belt and boots are on art-kit's `palette` swatches, swapped for
-the shared palette as a slot's are.
+keys for the body range to come, coloured from the concept. Amended
+(perf's party bench, 904 draw calls with capsules to about 2,030 with five
+surfaces a body, each through the shadow passes too): a body is one surface
+in one material, `human`, which the game draws with one shared
+`art/models/characters/human_body.tres` (`human_body.gdshader`). Each face's
+part is one-hot in its vertex colour (skin, hair, tunic, trousers); those
+take their colours per body as instance uniforms (`Client3D._dress`: the
+concept's, from the mesh's glTF extras, the tunic the player's), and the
+rest (belt, boots) is on art-kit's palette by its UVs. No per-body material
+copies, so bodies batch. Characters are not art-kit slots (art-kit's
+agreement); ArtCheck does not check them.
 
 The view: `Client3D.HUMAN` and `HUMAN_F` beside `MODELS`, chosen by
 `model_for` from `body_of(entity)`; a puppet made before its body arrived

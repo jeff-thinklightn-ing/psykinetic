@@ -517,18 +517,23 @@ const GAIT_HYSTERESIS := 1.15
 ## woman's (the entity's "body", decision 388), rigged to the animation
 ## library's own skeleton, so its clips play at the proportions they were
 ## made for. Their gaits are their own (tools/gait_pace.gd: the two step
-## alike), as is their backpedal; the "Tunic" material takes the player's
-## colour (the capsule's); standing, they only look about now and then. Their
+## alike), as is their backpedal; one surface each, drawn in HUMAN_MATERIAL
+## ("parts"), the tunic in the player's colour (the capsule's); standing,
+## they only look about now and then. Their
 ## size is not their mass: what they carry counts in their mass, and picking
 ## up a hammer should not make them grow.
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": [[CLIP_WALK, 0.93], [CLIP_JOG, 5.6], [CLIP_SPRINT, 8.47]], "backpedal": 4.66,
-	"tint": "Tunic", "fidgets": {"Idle_LookAround": 1}}
+	"parts": true, "fidgets": {"Idle_LookAround": 1}}
+## The human bodies' one material, shared: each body's parts' colours are its
+## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
+const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
+const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": [[CLIP_WALK, 0.93], [CLIP_JOG, 5.6], [CLIP_SPRINT, 8.47]], "backpedal": 4.66,
-	"tint": "Tunic", "fidgets": {"Idle_LookAround": 1}}
+	"parts": true, "fidgets": {"Idle_LookAround": 1}}
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
@@ -6182,6 +6187,8 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 			var own := mesh.mesh.surface_get_material(surface)
 			if own != null and own.resource_name == ArtKit.PALETTE_NAME:
 				mesh.set_surface_override_material(surface, load(ArtKit.PALETTE))
+	if model.get("parts", false):
+		_dress(scene, puppet.get_meta("tint", Color.WHITE))
 	if model.has("tint"):
 		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
@@ -6196,6 +6203,20 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	puppet.set_meta("animator", animator)
 	_start_anywhere(puppet, animator)
 	return body
+
+
+## A human body's meshes in HUMAN_MATERIAL, each part in its own colour (its
+## mesh's extras, as tools/body_build.py wrote them), the tunic in
+## [param tunic] unless that is white (no colour of its own).
+static func _dress(scene: Node3D, tunic: Color) -> void:
+	for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+		mesh.material_override = HUMAN_MATERIAL
+		var own: Dictionary = mesh.get_meta("extras", {})
+		for part: String in HUMAN_PARTS:
+			if own.has(part):
+				mesh.set_instance_shader_parameter(part, Color(str(own[part])))
+		if tunic != Color.WHITE:
+			mesh.set_instance_shader_parameter("tunic", tunic)
 
 
 ## Each surface of [param scene]'s meshes whose material is named

@@ -1891,16 +1891,16 @@ func _test_humans() -> void:
 				"its feet on the ground (%.3f), %.2f m tall" % [low - puppet.global_position.y, high - low])
 		var wanted := Vector2(player.facing).normalized()
 		_check(_toes_ahead(puppet).dot(wanted) > 0.9, "its toes point where it faces (%s)" % _toes_ahead(puppet))
-		var looks := {}
-		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
-			for surface in mesh.mesh.get_surface_count():
-				var own := mesh.mesh.surface_get_material(surface)
-				var drawn := mesh.get_active_material(surface)
-				if own != null:
-					looks[own.resource_name] = drawn
-		_check(looks.has("palette") and looks["palette"] == load(ArtKit.PALETTE), "belt and boots on art-kit's palette")
-		_check(looks.has("Tunic") and (looks["Tunic"] as BaseMaterial3D).albedo_color == puppet.get_meta("tint"),
-				"the tunic in the player's colour")
+		var meshes := model.find_children("*", "MeshInstance3D", true, false)
+		var mesh := meshes[0] as MeshInstance3D
+		_check(meshes.size() == 1 and mesh.mesh.get_surface_count() == 1 and mesh.get_active_material(0) == Client3D.HUMAN_MATERIAL,
+				"one surface in the bodies' one shared material")
+		var own: Dictionary = mesh.get_meta("extras", {})
+		_check(Client3D.HUMAN_PARTS.all(func(part: String) -> bool: return own.has(part))
+				and mesh.get_instance_shader_parameter("skin") == Color(str(own.get("skin", ""))),
+				"its own skin and hair from its mesh (%s)" % own.get("skin", ""))
+		var tint: Color = puppet.get_meta("tint")
+		_check(tint == Color.WHITE or mesh.get_instance_shader_parameter("tunic") == tint, "the tunic in the player's colour")
 	player.body = &"male"
 	_rig._process(0.0)
 	var pet := _companion()

@@ -100,13 +100,20 @@ func _process(_delta: float) -> bool:
 
 
 ## A surface whose material is named "palette" drawn with art-kit's palette, as the
-## game's drop-in does; one named "VertexColour" by its vertex colours.
+## game's drop-in does; one named "human" with the bodies' material, as the game
+## draws them; one named "VertexColour" by its vertex colours.
 func _palette(model: Node3D) -> void:
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		for i in mesh.mesh.get_surface_count():
 			var material := mesh.mesh.surface_get_material(i)
 			if material != null and material.resource_name == "palette":
 				mesh.set_surface_override_material(i, load("res://art/kit/palette.tres"))
+			elif material != null and material.resource_name == "human":
+				# A built body (tools/body_build.py): the game's one material, its own colours.
+				mesh.material_override = load("res://art/models/characters/human_body.tres")
+				var own: Dictionary = mesh.get_meta("extras", {})
+				for part: String in own:
+					mesh.set_instance_shader_parameter(part, Color(str(own[part])))
 			elif material != null and material.resource_name == "VertexColour":
 				# The mesh's own colours (tools/body_build.py --vertex-colours), matte.
 				var own := StandardMaterial3D.new()

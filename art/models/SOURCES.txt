@@ -25,9 +25,12 @@ characters/human_m.blend, characters/human_f.blend
                          Animation Library's own skeleton (CC0; stood 1.75 m and 1.66 m, bone heat
                          weights, each leg's weights its own below the crotch), then
                          tools/body_build.py: welded, decimated to 4,261 and 4,053 triangles,
-                         flat-shaded, lean and heavy shape keys, coloured from the concept (Skin,
-                         Hair, Tunic, Trousers their own materials; belt and boots on the palette's
-                         leather and iron swatches). Each .blend's scene property `source` says so.
+                         flat-shaded, lean and heavy shape keys, coloured from the concept: one
+                         surface, one material ("human"), skin, hair, tunic and trousers marked in
+                         the vertex colour with the concept's colours as the mesh's extras, belt
+                         and boots on the palette's leather and iron swatches; the game draws it
+                         with characters/human_body.tres. Each .blend's scene property `source`
+                         says so.
 characters/goblin.blend  generated:trellis2, blender (goblin-4000f.glb: loose parts removed, holes
                          closed, watertight, 1.2 m tall, flat colours; 22-bone humanoid rig with
                          Godot SkeletonProfileHumanoid bone names, T-pose rest, no animations)

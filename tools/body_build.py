@@ -13,10 +13,12 @@
 #       --source is where the mesh came from, kept in the .blend's scene["source"].
 #       --colours colours a shape-only mesh from its front concept (a figure on white):
 #       flat regions Skin, Hair, Tunic (the one the game tints), Trousers, Belt, Boots.
-#       Skin, Hair, Tunic and Trousers are materials of those names (the game tints each
-#       per character); Belt and Boots go on art-kit's "palette" material, each on the
-#       swatch of PALETTE_ROWS nearest the concept's colour (u = (col + 0.5) / 8,
-#       v = 1 - (row + 0.5) / rows, as art/kit's pieces are).
+#       One surface, one material ("human"): Skin, Hair, Tunic and Trousers are marked
+#       one-hot in the vertex colour (red, green, blue, alpha) and take their colours
+#       per body in the game (art/models/characters/human_body.gdshader; the concept's
+#       are the mesh's extras: skin, hair, tunic, trousers); Belt and Boots are on the
+#       palette, each on the swatch of PALETTE_ROWS nearest the concept's colour (u =
+#       (col + 0.5) / 8, v = 1 - (row + 0.5) / rows, as art/kit's pieces are).
 #       --smooth keeps the surface smooth-shaded (the mesh's own normals) instead of faceted.
 #       --vertex-colours keeps the mesh's own vertex colours (art-gen's projected concept)
 #       on one material, "VertexColour", instead of colouring by region.
@@ -57,6 +59,10 @@ ALLOWED = [
 	(("calf_",), ("Trousers", "Boots")),
 	(("foot_", "ball_"), ("Boots",)),
 ]
+## The one material of a built body, and its tinted parts in the order of the
+## vertex colour's channels (red, green, blue, alpha).
+MATERIAL = "human"
+TINTED = ["Skin", "Hair", "Tunic", "Trousers"]
 ## The regions that go on the palette, and the palette rows each picks its swatch from
 ## (5 cloth and leather, 6 metal).
 PALETTE_ROWS = {"Belt": (5,), "Boots": (5, 6)}
@@ -274,10 +280,6 @@ def cut(obj, heights: list, head_below: float) -> None:
 	bpy.ops.object.vertex_group_normalize_all(group_select_mode="ALL", lock_active=False)
 
 
-def srgb_to_linear(c: float) -> float:
-	return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-
-
 ## Splits the mesh into the flat colour regions, each face by the concept's colour
 ## where it is (among the regions its bone allows), the back of the head hair, then
 ## lone faces given their neighbours' region.
@@ -404,28 +406,26 @@ def colour(obj, arm, concept_path: str, forward_world: Vector, right_world: Vect
 	if not mesh.uv_layers:
 		mesh.uv_layers.new(name="UVMap")
 	uv = mesh.uv_layers.active.data
-	for name in [r for r in REGIONS if r not in PALETTE_ROWS] + ["palette"]:
-		material = bpy.data.materials.get(name) or bpy.data.materials.new(name)
-		if name == "palette":
-			mesh.materials.append(material)  # The game draws it with art/kit/palette.tres.
-			continue
-		c = refs[name]
-		linear = (srgb_to_linear(c.x), srgb_to_linear(c.y), srgb_to_linear(c.z), 1.0)
-		material.diffuse_color = linear
-		material.roughness = 1.0
-		material.metallic = 0.0
-		bsdf = material.node_tree.nodes.get("Principled BSDF") if material.node_tree else None
-		if bsdf:
-			bsdf.inputs["Base Color"].default_value = linear
-			bsdf.inputs["Roughness"].default_value = 1.0
-			bsdf.inputs["Metallic"].default_value = 0.0
-		mesh.materials.append(material)
-	slots = [m.name for m in mesh.materials]
+	# One material for the whole body (art/models/characters/human_body.tres
+	# in the game): the part each face is, one-hot in its vertex colour, and
+	# the palette's swatch in its UVs for the parts that are not tinted.
+	mesh.materials.append(bpy.data.materials.get(MATERIAL) or bpy.data.materials.new(MATERIAL))
+	while mesh.color_attributes:
+		mesh.color_attributes.remove(mesh.color_attributes[0])
+	parts = mesh.color_attributes.new(name="parts", type="FLOAT_COLOR", domain="CORNER")
+	mesh.color_attributes.active_color = parts
 	for poly, name in zip(mesh.polygons, region):
-		at = swatches[name][1] if name in swatches else (0.5, 0.5)
-		poly.material_index = slots.index("palette" if name in swatches else name)
+		at = swatches[name][1] if name in swatches else swatches[next(iter(swatches))][1]
+		mask = [1.0 if TINTED.index(name) == i else 0.0 for i in range(4)] if name in TINTED else [0.0] * 4
+		poly.material_index = 0
 		for li in poly.loop_indices:
 			uv[li].uv = at
+			parts.data[li].color = mask
+	# The body's own colours, as the concept has them: the game's defaults
+	# for each tinted part (the node's extras, its metadata in Godot).
+	for name in TINTED:
+		c = refs[name]
+		obj[name.lower()] = "#%02x%02x%02x" % tuple(round(max(0.0, min(1.0, v)) * 255) for v in (c.x, c.y, c.z))
 	print("  faces: %s" % {n: region.count(n) for n in REGIONS})
 	print("  palette: %s" % {n: swatches[n][0] for n in swatches})
 
@@ -570,7 +570,7 @@ def build(path: str, stem: str, target: int, keep: list, source: str, concept: s
 		obj.select_set(True)
 	bpy.ops.export_scene.gltf(filepath=stem + ".glb", export_format="GLB", use_selection=True,
 		export_yup=True, export_skins=True, export_morph=True, export_morph_normal=True,
-		export_animations=False, export_extras=True, export_vertex_color="ACTIVE" if vertex_colours else "MATERIAL")
+		export_animations=False, export_extras=True, export_vertex_color="ACTIVE")
 
 
 def main() -> None:
