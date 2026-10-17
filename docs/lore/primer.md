@@ -118,7 +118,7 @@ Whether there are other factions (outlaws, a rival steading) is open *(asked: E1
 
 Deer and rabbits graze in the wilds and flee together from what they see or
 hear. A stag is a deer with antlers. A boar flees, but charges when it is
-cornered. Wolves hunt game, and they are more dangerous at night (Jeff). A
+cornered. Wolves hunt deer and rabbits, and they are more dangerous at night (Jeff). A
 hunter takes meat and hides from them, antlers from a stag and tusks from a boar;
 from a wolf, only its hide.
 

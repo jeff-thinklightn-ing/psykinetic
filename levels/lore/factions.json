@@ -290,7 +290,7 @@
 				},
 				{
 					"id": "blood_rot.hunger",
-					"text": "The land around the mine is dead, so the Blood Rot cannot feed themselves from it, and they raid outside it for food and game.",
+					"text": "The land around the mine is dead, so the Blood Rot cannot feed themselves from it, and they raid outside it for food and beasts to eat.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
@@ -310,7 +310,7 @@
 				},
 				{
 					"id": "blood_rot.take_people",
-					"text": "Blood Rot raiders take food, game and people.",
+					"text": "Blood Rot raiders take food, beasts and people.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"

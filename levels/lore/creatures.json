@@ -192,7 +192,7 @@
 			"facts": [
 				{
 					"id": "wolf.hunt",
-					"text": "Wolves hunt game in the wilds.",
+					"text": "Wolves hunt deer and rabbits in the wilds.",
 					"known": "common",
 					"where": [],
 					"tags": [

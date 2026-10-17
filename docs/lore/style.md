@@ -9,7 +9,7 @@ rules once it is answered. Until then:
   companion to say is not.
 - Plain words, short sentences, concrete things: iron, smoke, a broken door. No
   modern words (no "okay", "team", "stress"), no game words (levels, spawns, XP,
-  players) inside the world's facts. Nor "companion" or "owner": those who travel
+  players, nor "game" even for hunted beasts) inside the world's facts. Nor "companion" or "owner": those who travel
   with the town's people go out with them by choice, and a fact says so.
 - Tone after *Gísla saga*: understated, fated, loyal. Say what happened and leave
   the feeling to the reader.

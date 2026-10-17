@@ -15,7 +15,7 @@
 			"facts": [
 				{
 					"id": "blood_rot_lands.dead",
-					"text": "The land around the mine is dead: no crops, no game, nothing living.",
+					"text": "The land around the mine is dead: no crops, no beasts, nothing living.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
