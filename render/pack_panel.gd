@@ -269,9 +269,12 @@ func _refresh() -> void:
 			var item := entity.slots[box.index] if has else ""
 			box.label.text = Items.short_of(item) if not item.is_empty() else ""
 			# A named thing (decision 365) is gilded, and says its name and strength on hover.
-			var named := has and box.index < entity.slot_names.size() and not entity.slot_names[box.index].is_empty()
-			box.tooltip_text = entity.slot_names[box.index] if named else ""
-			var kept := named and World.KEPT_MARK in entity.slot_names[box.index]
+			var noted := has and box.index < entity.slot_notes.size() and not entity.slot_notes[box.index].is_empty()
+			box.tooltip_text = entity.slot_notes[box.index] if noted else ""
+			# A plain thing's note (a bundle's condition) starts with its catalog
+			# name; a named one's with its name (decision 375).
+			var named := noted and not entity.slot_notes[box.index].begins_with(Items.name_of(item))
+			var kept := named and World.KEPT_MARK in entity.slot_notes[box.index]
 			box.label.add_theme_color_override("font_color", KEPT_COLOR if kept else NAMED_COLOR if named else Items.color_of(item))
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 	if landed != null and sound.is_valid():

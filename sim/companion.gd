@@ -464,9 +464,10 @@ func _init() -> void:
 	super()
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
-	replicate("slot_names")
+	replicate("slot_notes")
 	replicate("mending")
 	replicate("buffs")
+	replicate("ailments")
 	replicate("down_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")

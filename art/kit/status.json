@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 2,
 		"fill": 6,
-		"placeholder": 150
+		"placeholder": 153
 	},
 	"slots": [
 		{
@@ -1751,6 +1751,39 @@
 			"size": "1.0 x 0.75 x 1.0",
 			"budget": 0,
 			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+		},
+		{
+			"slot": "item.arrows",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 159,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.08 x 0.75 x 0.08",
+			"budget": 500
+		},
+		{
+			"slot": "item.arrows_barbed",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 160,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.08 x 0.75 x 0.08",
+			"budget": 500
+		},
+		{
+			"slot": "item.arrows_flame",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 161,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.08 x 0.75 x 0.08",
+			"budget": 500
 		}
 	]
 }

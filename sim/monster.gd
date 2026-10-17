@@ -364,6 +364,7 @@ func _init() -> void:
 	replicate("pose")
 	replicate("alert")
 	replicate("down_until")
+	replicate("ailments")
 
 
 func _ready() -> void:

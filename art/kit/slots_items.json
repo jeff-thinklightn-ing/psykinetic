@@ -20,6 +20,63 @@
 			"type": "mesh",
 			"uses": "pair of antlers (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.arrows": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.08,
+				0.75,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bundle of arrows (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.arrows_barbed": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.08,
+				0.75,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bundle of barbed arrows (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.arrows_flame": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.08,
+				0.75,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bundle of flame arrows (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.axe_head": {
 			"budget": 500,
 			"category": "items",
@@ -71,11 +128,6 @@
 				"grip": [
 					0,
 					0,
-					0
-				],
-				"grip_2": [
-					0,
-					0.78,
 					0
 				]
 			},

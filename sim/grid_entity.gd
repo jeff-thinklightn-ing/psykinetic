@@ -177,10 +177,16 @@ var slots := PackedStringArray()
 ## none yet (a level's chest: made on first need, World.slot_uid). Kept
 ## beside slots by the same World calls.
 var slot_items := PackedInt32Array()
-## Each slot's thing's name as it reads ("Wren's dagger (quiet)"), "" for
-## an unnamed one; empty when nothing in the slots has a name. Replicated
-## beside slots (decision 365); written only by World (_show_names).
-var slot_names := PackedStringArray()
+## Each slot's thing's note as it reads: its name ("Wren's dagger
+## (quiet)"; decision 365) and its condition ("bundle of arrows, 6 of 10";
+## decision 375), "" for a plain thing; empty when no slot has one.
+## Replicated beside slots; written only by World (_show_notes).
+var slot_notes := PackedStringArray()
+## What ails it (decision 375): kind ("burn", "bleed") -> [the tick it
+## ends, every so many ticks, the hp each time]. Reassigned whole on every
+## change, so a player's, a companion's and a monster's replicate, for the
+## views. Written only by World (afflict).
+var ailments := {}
 var spawned := false
 ## The tick (maybe fractional) the next step may start; see World.try_move.
 var next_move_tick := 0.0

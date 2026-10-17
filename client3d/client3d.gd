@@ -84,6 +84,9 @@ extends Node3D
 ## ripple a ring, the toss aim an arrow, all flat on the floor. All input
 ## is Main's; this view only answers its picks and draws what it is told.
 
+## A burning and a bleeding body's name (decision 375).
+const AIL_BURN := Color(1.0, 0.6, 0.25)
+const AIL_BLEED := Color(0.95, 0.3, 0.3)
 const WALL_HEIGHT := 3.0
 ## Wall runs (_add_wall_runs), each in its set's profile and variation
 ## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
@@ -5370,6 +5373,7 @@ func _sync_puppets() -> void:
 		elif entity is Monster:
 			_sync_alert(entity as Monster, puppet)
 		_sync_down(entity, puppet)
+		_sync_ailments(entity, puppet)
 		if puppet.has_meta("animator"):
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
@@ -5548,6 +5552,17 @@ func _sync_down(entity: GridEntity, puppet: Node3D) -> void:
 	var want := DOWN_TILT if lying else 0.0
 	if not is_equal_approx(body.rotation.x, want):
 		body.rotation.x = move_toward(body.rotation.x, want, get_process_delta_time() * DOWN_TILT_SPEED)
+
+
+## Burning or bleeding (GridEntity.ailments; decision 375): its name
+## tinted, orange for fire, red for blood, white again when it ends.
+func _sync_ailments(entity: GridEntity, puppet: Node3D) -> void:
+	var label := puppet.get_node_or_null("Name") as Label3D
+	if label == null:
+		return
+	var tint := AIL_BURN if entity.ailments.has("burn") else AIL_BLEED if entity.ailments.has("bleed") else Color.WHITE
+	if label.modulate != tint:
+		label.modulate = tint
 
 
 func _sync_alert(monster: Monster, puppet: Node3D) -> void:

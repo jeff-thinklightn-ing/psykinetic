@@ -343,7 +343,7 @@ var key_check: Callable = func(_entity: GridEntity, _lock: String) -> bool: retu
 ## Whether an entity has something to shoot (entity) -> bool: always for now,
 ## a bow needing no arrows (gear is not used up). The hook for arrows kept
 ## and picked up again, if they come (decision 335).
-var quiver_check: Callable = func(_entity: GridEntity) -> bool: return true
+var quiver_check: Callable = func(entity: GridEntity) -> bool: return World.bundle_slot(entity) >= 0
 ## Whether a blow that would kill spares its target instead (target,
 ## source, cause) -> who takes it ("" to kill as ever): set by Raids, so a
 ## raider takes a companion captive (decision 314). Unset, nobody is.
@@ -676,8 +676,9 @@ func _step_zone() -> void:
 			entity._sim_tick()
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_resolve_hits()
-	# 3. Hazard tiles.
+	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
 	_apply_hazards()
+	_tend_ailments()
 	# 4. Stamina comes back for whoever did not exert themselves this tick.
 	_regen_stamina()
 	# 5. Bandaging and mending; buffs wearing off.
@@ -1624,7 +1625,7 @@ func _slots_changed(entity: GridEntity) -> void:
 	_weigh(entity)
 	if not entity.raised.is_empty() and off_hand(entity) != entity.raised:
 		entity.raised = ""  # What it needed left the hand.
-	_show_names(entity)
+	_show_notes(entity)
 	slots_changed.emit(entity)
 
 
@@ -1753,7 +1754,7 @@ func _consider_name(entity: GridEntity, slot: int) -> void:
 	var strength := Items.strength_from(due["deeds"])
 	items.set_name(uid, name, strength, entity.zone, entity.tile)
 	_log("named: %s's %s is %s%s" % [entity.name, id, text, " (%s)" % strength if not strength.is_empty() else ""])
-	_show_names(entity)
+	_show_notes(entity)
 	item_named.emit(entity, uid, text)
 
 
@@ -1812,19 +1813,25 @@ func ill_of(entity: GridEntity) -> float:
 	return most
 
 
-## [param entity]'s slot_names (replicated) follow its things' names.
-func _show_names(entity: GridEntity) -> void:
+## [param entity]'s slot_notes (replicated) follow its things' names
+## (decision 365) and conditions (decision 375): "bundle of arrows, 6 of
+## 10", "Wren's bow (quick)".
+func _show_notes(entity: GridEntity) -> void:
 	var names := PackedStringArray()
 	names.resize(entity.slots.size())
 	var any := false
 	for slot in mini(entity.slots.size(), entity.slot_items.size()):
-		if entity.slot_items[slot] != 0:
-			names[slot] = item_title(entity.slot_items[slot])
+		var uid := entity.slot_items[slot]
+		if uid != 0:
+			names[slot] = item_title(uid)
+			if items.condition_of(uid) >= 0:
+				names[slot] = "%s, %d of %d" % [names[slot] if not names[slot].is_empty() else Items.name_of(items.id_of(uid)),
+					items.condition_of(uid), Items.condition_max(items.id_of(uid))]
 			any = any or not names[slot].is_empty()
 	if not any:
 		names = PackedStringArray()
-	if names != entity.slot_names:
-		entity.slot_names = names
+	if names != entity.slot_notes:
+		entity.slot_notes = names
 
 
 ## The strength (decision 365) of the thing in [param entity]'s slot
@@ -2383,9 +2390,81 @@ func off_hand(entity: GridEntity) -> String:
 	var left := entity.slots[Items.LEFT_HAND]
 	if not left.is_empty() and Items.verb_of(left).get("kind") == "block":
 		return "block"
-	if not _drawn_with(entity).is_empty():
-		return "draw"
+	if not _drawn_with(entity).is_empty() and quiver_check.call(entity):
+		return "draw"  # A bow with arrows to shoot (decision 375).
 	return ""
+
+
+## The hand [param entity]'s bundle of arrows is in, the one its bow is not
+## (decision 375), while it has condition left; -1 for none.
+func bundle_slot(entity: GridEntity) -> int:
+	var bow := _drawn_slot(entity)
+	if bow < 0:
+		return -1
+	var other := Items.LEFT_HAND if bow == Items.RIGHT_HAND else Items.RIGHT_HAND
+	if Items.ammo_of(entity.slots[other]).is_empty():
+		return -1
+	if other < entity.slot_items.size() and entity.slot_items[other] != 0 and items.condition_of(entity.slot_items[other]) == 0:
+		return -1  # Spent: the fletcher mends it.
+	return other
+
+
+## A blunt hit on [param entity] (decision 375: a blunt weapon's blow, an
+## impact, a knockdown) wears the bundle of arrows in its hands by one.
+func _wear_bundle(entity: GridEntity) -> void:
+	if not Net.is_authority() or not _alive(entity) or not holds_in_hands(entity):
+		return
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if slot < entity.slot_items.size() and not Items.ammo_of(entity.slots[slot]).is_empty():
+			var uid := slot_uid(entity, slot)
+			if items.condition_of(uid) > 0:
+				items.set_condition(uid, items.condition_of(uid) - 1)
+				_log("wear: %s's %s %d of %d" % [entity.name, entity.slots[slot], items.condition_of(uid), Items.condition_max(entity.slots[slot])])
+				if entity.raised == "draw" and off_hand(entity) != "draw":
+					entity.raised = ""  # Spent.
+				_show_notes(entity)
+			return
+
+
+## [param entity] is ailed by [param kind] ("burn", "bleed"; decision
+## 375) for [param ticks], losing [param amount] hp every [param every];
+## a new one replaces a shorter. Burning is for what fire hurts (FLESH,
+## WOOD), bleeding for creatures.
+func afflict(entity: GridEntity, kind: String, ticks: int, every: int, amount: int) -> void:
+	if not Net.is_authority() or not _alive(entity) or ticks <= 0 or amount <= 0:
+		return
+	if kind == "bleed" and not entity.is_creature() or kind == "burn" and not entity.is_breakable():
+		return
+	var until := tick + ticks
+	if int(entity.ailments.get(kind, [0])[0]) >= until:
+		return
+	var ailing := entity.ailments.duplicate()
+	ailing[kind] = [until, maxi(every, 1), amount]
+	entity.ailments = ailing
+	_log("ail: %s %s for %d ticks" % [entity.name, kind, ticks])
+
+
+## [param entity]'s [param kind] ailment ends now (a bandage stops bleeding).
+func cure(entity: GridEntity, kind: String) -> void:
+	if entity.ailments.has(kind):
+		var ailing := entity.ailments.duplicate()
+		ailing.erase(kind)
+		entity.ailments = ailing
+
+
+## What ails the zone's entities hurts them, every so often, until it ends.
+func _tend_ailments() -> void:
+	for entity in _entities.duplicate():
+		if entity.ailments.is_empty() or not _alive(entity):
+			continue
+		for kind: String in entity.ailments.keys():
+			var ail: Array = entity.ailments[kind]
+			if tick >= int(ail[0]):
+				cure(entity, kind)
+			elif (int(ail[0]) - tick) % int(ail[1]) == 0:
+				damage(entity, int(ail[2]), null, &"fire" if kind == "burn" else &"bleed")
+				if not _alive(entity):
+					break
 
 
 ## The ranged thing in [param entity]'s hands (left first), "" for none.
@@ -2493,9 +2572,12 @@ func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
 	_log("shot: %s hits %s at %s for %d, drawn %.2f" % [by.name, hit.name, hit.tile, amount, strength])
 	if amount > 0:
 		var creature := hit.is_creature()
+		var ammo := Items.ammo_of(by.slots[bundle_slot(by)]) if bundle_slot(by) >= 0 else {}
 		damage(hit, amount, by, &"shot")
 		if creature:
 			_credit(by, _drawn_slot(by), "felled" if not _alive(hit) else "shot")
+		if not str(ammo.get("effect", "")).is_empty() and _alive(hit):
+			afflict(hit, ammo["effect"], int(ammo["ticks"]), int(ammo["every"]), int(ammo["amount"]))  # Flame, barbed.
 	return hit
 
 
@@ -2745,6 +2827,7 @@ func try_bandage(by: GridEntity, patient: GridEntity) -> bool:
 	_bandaging[by] = {"patient": patient, "until": tick + BANDAGE_TICKS, "from": tick, "tile": by.tile,
 		"exerted": by.last_exertion_tick()}
 	patient.mending = 1
+	cure(patient, "bleed")  # A bandage stops bleeding at once (decision 375).
 	_log("bandage: %s starts on %s" % [by.name, patient.name])
 	bandage_changed.emit(by, patient, &"started")
 	return true
@@ -3579,6 +3662,8 @@ func _resolve_hits() -> void:
 			damage(hit.target, hit.damage, hit.source, &"attack")
 			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
 				knock_down(hit.target, hit.source, hit.down_ticks)
+			if bool(Items.def(wielded(hit.source)).get("blunt", false)):
+				_wear_bundle(hit.target)
 			if creature and not hit.deed.is_empty():
 				_credit(hit.source, Items.RIGHT_HAND, "felled" if not _alive(hit.target) else hit.deed)
 		if hit.force > 0.0 and _alive(hit.target):
@@ -3758,6 +3843,7 @@ func _stun_for(entity: GridEntity, ticks: int) -> void:
 func _impact(entity: GridEntity, amount: int, source: GridEntity, against: StringName) -> void:
 	entity._world_impacted(amount, against)
 	damage(entity, amount, source, &"impact")
+	_wear_bundle(entity)
 
 
 ## Resting and walking regain stamina. Attacking, shoving, or being moved more
@@ -4160,6 +4246,7 @@ func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
 		return
 	target.down_until = maxi(target.down_until, tick + ticks)
 	target.raised = ""
+	_wear_bundle(target)
 	_stun_for(target, ticks)
 	_log("down: %s knocked down by %s for %d ticks" % [target.name, source.name if is_instance_valid(source) else "?", ticks])
 	knocked_down.emit(target, source)

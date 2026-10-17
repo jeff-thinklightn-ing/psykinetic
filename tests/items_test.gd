@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_pickup()
 	_test_names()
 	_test_curse()
+	_test_arrows()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -444,7 +445,7 @@ func _test_weapons() -> void:
 		var verb := Items.verb_of(id)
 		_check(verb.get("kind") == kinds[id] and verb.has("speed") and Items.def(id)["made"].get("by") == "smith",
 				"%s: %s, %d-handed, %.1f kg, made by the smith (%s)" % [id, kinds[id], Items.def(id)["hands"], Items.weight_of(id), verb])
-	_check(Items.def("giant_axe")["hands"] == 2 and Items.def("bow")["hands"] == 2, "the giant axe and the bow take both hands")
+	_check(Items.def("giant_axe")["hands"] == 2 and Items.def("bow")["hands"] == 1, "the giant axe takes both hands; the bow one, its arrows the other (decision 375)")
 	_check(Items.verb_of("dagger")["speed"] < 1.0 and Items.verb_of("giant_axe")["speed"] > 1.0 and Items.verb_of("spear")["cells"] == 2,
 			"a dagger is quick, a giant axe slow, a spear hits two cells away")
 	_check(Items.verb_of(KIT).is_empty() and Items.verb_of("knife").is_empty(), "a kit or a knife is no weapon verb")
@@ -474,10 +475,12 @@ func _test_weapons() -> void:
 	_check(not _main._raise_off_hand(host), "and the right button shoves as ever")
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	_give(host, "bow", Player.RIGHT_HAND)
+	_check(World.off_hand(host) == "" and not World.try_stance(host, "draw"), "a bow without arrows: nothing to draw (decision 375)")
+	_give(host, "arrows", Player.LEFT_HAND)
 	var shots := []
 	var shot := func(by: GridEntity, at: Vector2i, strength: float) -> void: shots.append([by, at, strength])
 	World.loosed.connect(shot)
-	_check(World.off_hand(host) == "draw" and World.try_stance(host, "draw") and host.raised == "draw", "a bow in both hands: the right button draws it")
+	_check(World.off_hand(host) == "draw" and World.try_stance(host, "draw") and host.raised == "draw", "a bow, and a bundle of arrows in the other hand: the right button draws it")
 	host.raised_tick = World.tick - 3
 	_check(World.draw_of(host) == 0.0 and not World.try_loose(host, host.tile + Vector2i(4, 0)) and shots.is_empty() and host.raised == "",
 			"let go before draw_min (5 ticks): no shot, the bow lowered")
@@ -527,9 +530,10 @@ func _test_weapons() -> void:
 		_check(stepped and host.raised == "draw" and host.raised_tick == World.tick and World.draw_of(host) == 0.0,
 				"a step while drawn: still drawn, but the draw starts again")
 		World.try_stance(host, "")
+		var quiver := World.quiver_check
 		World.quiver_check = func(_entity: GridEntity) -> bool: return false
 		_check(not World.try_stance(host, "draw"), "with the quiver hook saying no, the bow will not draw")
-		World.quiver_check = func(_entity: GridEntity) -> bool: return true
+		World.quiver_check = quiver
 	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
 		World.items.end(World.take_item(host, host, slot), "gone")
 
@@ -913,8 +917,8 @@ func _test_names() -> void:
 	_check(World.items.name_of(dagger).get("text") == named and World.items.strength_of(dagger) == "quiet"
 			and World.items.name_of(dagger).get("form") == "holder_possessive",
 			"the form counting, the next deed names it: %s, quiet from its stabs in the back" % World.items.name_of(dagger).get("text"))
-	_check(host.slot_names.size() == Items.CARRIED and host.slot_names[Player.RIGHT_HAND] == named + " (quiet)",
-			"the hand shows it (%s)" % [host.slot_names])
+	_check(host.slot_notes.size() == Items.CARRIED and host.slot_notes[Player.RIGHT_HAND] == named + " (quiet)",
+			"the hand shows it (%s)" % [host.slot_notes])
 	_check(World.items.history(dagger)["events"][-1]["kind"] == "named", "its history says when")
 	_check(is_equal_approx(float(Items.strength_value(World.slot_strength(host, Player.RIGHT_HAND), "noise", 1.0)), 0.5),
 			"its blows make half the noise")
@@ -928,7 +932,7 @@ func _test_names() -> void:
 	_steps(5)
 	_check(World.items.held_by(dagger, who) == held + 5, "back, the time counts again (%d)" % World.items.held_by(dagger, who))
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
-	_check(host.slot_names.is_empty(), "nothing named in hand: no names sent")
+	_check(host.slot_notes.is_empty(), "nothing named in hand: no names sent")
 	# A quick bow; a set spear; dread.
 	var bow := _give(host, "bow", Player.RIGHT_HAND)
 	var verb := Items.verb_of("bow")
@@ -996,7 +1000,7 @@ func _test_curse() -> void:
 	World.put_item(pet, pet, World.free_slot_for(pet, "dagger"), dagger)
 	var slot := pet.slot_items.find(dagger)
 	_check(World.items.kept_from(dagger) == namer, "taken up by another, not given: kept from its namer")
-	_check(slot >= 0 and pet.slot_names.size() > slot and pet.slot_names[slot].ends_with("(quiet, ill-starred)"), "and marked (%s)" % [pet.slot_names])
+	_check(slot >= 0 and pet.slot_notes.size() > slot and pet.slot_notes[slot].ends_with("(quiet, ill-starred)"), "and marked (%s)" % [pet.slot_notes])
 	_check(World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "kept"), "its history says so")
 	var who := World._carrier_of(pet)[0]
 	_steps(50)
@@ -1014,8 +1018,8 @@ func _test_curse() -> void:
 	# Another taker: follows the thing.
 	var held := World.items.ill_of(dagger, namer)
 	World.try_transfer(pet, pet, pet.slot_items.find(dagger), host, Player.RIGHT_HAND)
-	_check(World.items.kept_from(dagger).is_empty() and host.slot_names[Player.RIGHT_HAND].ends_with("(quiet)"),
-			"back in its namer's hands: lifted (%s)" % host.slot_names[Player.RIGHT_HAND])
+	_check(World.items.kept_from(dagger).is_empty() and host.slot_notes[Player.RIGHT_HAND].ends_with("(quiet)"),
+			"back in its namer's hands: lifted (%s)" % host.slot_notes[Player.RIGHT_HAND])
 	_check(World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "back") and is_equal_approx(held, 0.0), "noted; the namer never gathered ill")
 	_steps(20)
 	_check(World.items.ill_of(dagger, who) < faded, "its keeper's ill fades away")
@@ -1036,6 +1040,97 @@ func _test_curse() -> void:
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	pet.acts = true
 	Items._curse = {}
+
+
+func _test_arrows() -> void:
+	print("\n== arrows in a bundle: held in the bow's other hand, never used up, worn by blunt hits; flame burns, barbed bleeds (decision 375) ==")
+	var host := _player(Net.local_id)
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not host.slots[slot].is_empty():
+			World.items.end(World.take_item(host, host, slot), "gone")
+	_give(host, "bow", Player.LEFT_HAND)
+	var bundle := _give(host, "arrows", Player.RIGHT_HAND)
+	_check(World.off_hand(host) == "draw" and World.bundle_slot(host) == Player.RIGHT_HAND, "the bow in either hand, the bundle in the other")
+	_check(World.items.condition_of(bundle) == 10 and host.slot_notes[Player.RIGHT_HAND] == "bundle of arrows, 10 of 10",
+			"a bundle is whole when made, and says so (%s)" % [host.slot_notes])
+	var beside := World.NO_CELL
+	for direction: Vector2i in World.DIRECTIONS:
+		if beside == World.NO_CELL and World.is_free(host.tile + direction) and World.can_melee(host.tile, host.tile + direction):
+			beside = host.tile + direction
+	_check(beside != World.NO_CELL, "room beside the host")
+	if beside == World.NO_CELL:
+		return
+	var pets: Array = World.get_entities().filter(func(e: GridEntity) -> bool: return e is Companion and e.acts)
+	for pet: GridEntity in pets:
+		pet.acts = false  # Nobody else fights the imp while it burns and bleeds.
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "ArrowImp%d" % World.tick,
+		"tile": beside, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
+	imp.acts = false
+	imp.hp = imp.max_hp
+	World.shoot(host, imp.tile, 1.0)
+	_check(host.slot_items[Player.RIGHT_HAND] == bundle and World.items.condition_of(bundle) == 10 and imp.ailments.is_empty(),
+			"a shot uses nothing up; a plain arrow does nothing more")
+	# Blunt hits wear it.
+	imp.slots = Items.tidy(["", "", "", "", "hammer", ""], Items.CARRIED)
+	imp.next_attack_tick = 0
+	host.hp = host.max_hp
+	World.try_attack(imp, host)
+	World.step()
+	_check(World.items.condition_of(bundle) == 9 and host.slot_notes[Player.RIGHT_HAND] == "bundle of arrows, 9 of 10",
+			"a hammer's blow wears it (%s)" % host.slot_notes[Player.RIGHT_HAND])
+	imp.slots = Items.tidy(["", "", "", "", "dagger", ""], Items.CARRIED)
+	imp.next_attack_tick = 0
+	World.try_attack(imp, host)
+	World.step()
+	_check(World.items.condition_of(bundle) == 9, "a dagger's does not")
+	imp.slots = PackedStringArray()
+	World.knock_down(host, imp, 1)
+	_check(World.items.condition_of(bundle) == 8, "a knockdown wears it")
+	_steps(3)
+	World.items.set_condition(bundle, 1)
+	World.try_stance(host, "draw")
+	World._wear_bundle(host)
+	_check(World.items.condition_of(bundle) == 0 and World.off_hand(host) == "" and host.raised == "" and not World.try_stance(host, "draw"),
+			"spent: the draw drops, and there is nothing to draw")
+	World.items.set_condition(bundle, 10)
+	_check(World.off_hand(host) == "draw", "mended (the fletcher's job), it shoots again")
+	var back := ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict())))
+	World.items.set_condition(bundle, 4)
+	_check(back.condition_of(bundle) == 10 and ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict()))).condition_of(bundle) == 4,
+			"its condition is saved")
+	World.items.set_condition(bundle, 10)
+	# Flame and barbed.
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "flame_arrows", Player.RIGHT_HAND)
+	imp.hp = imp.max_hp
+	World.shoot(host, imp.tile, 1.0)
+	var shot_hp := imp.hp
+	_check(imp.ailments.has("burn"), "a flame arrow sets it burning (%s)" % [imp.ailments])
+	_steps(30)
+	_check(imp.hp < shot_hp and not imp.ailments.has("burn"), "it burns a while, then goes out (%d -> %d)" % [shot_hp, imp.hp])
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "barbed_arrows", Player.RIGHT_HAND)
+	imp.hp = imp.max_hp
+	World.shoot(host, imp.tile, 1.0)
+	shot_hp = imp.hp
+	_check(imp.ailments.has("bleed"), "a barbed one bleeds it")
+	_steps(60)
+	_check(imp.hp == shot_hp - 2 and imp.ailments.has("bleed"), "1 hp every 30 ticks (%d -> %d)" % [shot_hp, imp.hp])
+	World.despawn(imp)
+	World.afflict(host, "bleed", 150, 30, 1)
+	host.hp = host.max_hp - 3
+	var kit := _give(host, "bandaging_kit", 0) if host.slots[0].is_empty() else 0
+	var started := World.try_bandage(host, host)
+	_check(started and not host.ailments.has("bleed"), "a bandage stops bleeding at once (started %s)" % started)
+	if kit != 0:
+		World.items.end(World.take_item(host, host, 0), "gone")
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not host.slots[slot].is_empty():
+			World.items.end(World.take_item(host, host, slot), "gone")
+	World.cure(host, "bleed")
+	host.hp = host.max_hp
+	for pet: GridEntity in pets:
+		pet.acts = true
 
 
 func _test_loot() -> void:

@@ -70,6 +70,9 @@ extends Node
 ##     Wren (item_name) is put down; taken up by the player, not given by
 ##     Wren, it is kept from her: the slot rust, ill-starred, its ill
 ##     growing as it is held (ill full over 20 seconds here).
+##   items_arrows: arrows in a bundle (decision 375): bow in one hand,
+##     flame arrows in the other; drawn and loosed at an imp, it burns
+##     (its name orange) and goes out; the bundle is never used up.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -181,6 +184,8 @@ func _ready() -> void:
 			_items_names()
 		"items_curse":
 			_items_curse()
+		"items_arrows":
+			_items_arrows()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -512,7 +517,8 @@ func _items_bow() -> void:
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	_script = [
 		["lantern", false, "Dusk, the lantern covered, the game facing away."],
-		["item_give", ["bow", Player.RIGHT_HAND], "A hunting bow, in both hands. The right button draws it."],
+		["item_give", ["bow", Player.RIGHT_HAND], "A hunting bow, and its arrows in the other hand. The right button draws it."],
+		["item_give", ["arrows", Player.LEFT_HAND], ""],
 		["walk", Vector2i(7, 5), "Up on them, quietly, from behind."],
 		["item_raise", null, "Drawn: the longer, the stronger (full at 2 s)."],
 		["wait", 22, ""],
@@ -613,6 +619,7 @@ func _items_spear() -> void:
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	_script = [
 		["item_give", ["bow", Player.RIGHT_HAND], "A boar runs from you, into a corner."],
+		["item_give", ["arrows", Player.LEFT_HAND], ""],
 		["walk", Vector2i(8, 4), ""],
 		["item_raise", null, "Draw, standing still..."],
 		["wait", 22, ""],
@@ -693,6 +700,29 @@ func _items_curse() -> void:
 		["item_key", ["pick_up", null], "Taken up by another, not given: kept from Wren."],
 		["wait", 30, "Ill-starred: the slot rusts, and ill gathers while it is held."],
 		["wait", 30, ""],
+	]
+
+
+func _items_arrows() -> void:
+	var rows: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(9, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.6, "entities": [{"at": [9, 2], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["bow", Player.RIGHT_HAND], "A bow in one hand, a bundle of flame arrows in the other."],
+		["item_give", ["flame_arrows", Player.LEFT_HAND], ""],
+		["item_open", true, ""],
+		["item_raise", null, "Drawn: only with arrows in the other hand."],
+		["wait", 22, ""],
+		["item_lower", "imp", "Loosed: the imp burns (its name orange), 2 every second for 3 seconds."],
+		["wait", 40, "Out again. The bundle is never used up: 10 of 10."],
+		["wait", 20, ""],
 	]
 
 
@@ -871,6 +901,7 @@ func _boar() -> void:
 	_script = [
 		["say", 90, "A boar roots about, head down between strolls."],
 		["item_give", ["bow", Player.RIGHT_HAND], "A hunting bow."],
+		["item_give", ["arrows", Player.LEFT_HAND], ""],
 		["walk", Vector2i(9, 6), "Up on it from behind, quietly."],
 		["item_face", "boar", ""],
 		["item_raise", null, "Drawn..."],
@@ -1315,16 +1346,20 @@ func _log(tick: int) -> void:
 			them.append("%s at %s hp %d %s%s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert], " DOWN" if World.is_down(entity) else ""])
 		print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp, ", ".join(them)])
 		return
+	if scenario == "items_arrows":
+		print("[clip] tick %d: player %s raised %s; notes %s; imp %s" % [tick, _player.tile, _player.raised, _player.slot_notes,
+			"%s hp %d %s" % [_monster.tile, _monster.hp, _monster.ailments] if is_instance_valid(_monster) else "gone"])
+		return
 	if scenario == "items_curse":
 		var uid := _player.slot_items[Player.RIGHT_HAND] if _player.slot_items.size() > Player.RIGHT_HAND else 0
-		print("[clip] tick %d: player %s; names %s; kept from %s; ill %.2f" % [tick, _player.tile, _player.slot_names,
+		print("[clip] tick %d: player %s; names %s; kept from %s; ill %.2f" % [tick, _player.tile, _player.slot_notes,
 			World.items.kept_from(uid), World.ill_of(_player)])
 		return
 	if scenario == "items_names":
 		var uid := _player.slot_items[Player.RIGHT_HAND] if _player.slot_items.size() > Player.RIGHT_HAND else 0
 		var rows: Array = World.items.history(uid).get("carriers", [])
 		print("[clip] tick %d: player %s; deeds %s; names %s; imp %s" % [tick, _player.tile, rows[0]["deeds"] if not rows.is_empty() else {},
-			_player.slot_names, "%s hp %d" % [_monster.tile, _monster.hp] if is_instance_valid(_monster) else "gone"])
+			_player.slot_notes, "%s hp %d" % [_monster.tile, _monster.hp] if is_instance_valid(_monster) else "gone"])
 		return
 	if scenario == "items_pickup":
 		var hands := "gone"

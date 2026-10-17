@@ -1,5 +1,5 @@
 {
-	"_about": "The item catalog (Items): one definition per id. Slots, levels, prefabs and the builder name these ids; each thing in the world is an instance of one (ItemBook). art: the ArtKit slot (item.<id>); kind: held (in a hand, origin at the grip) or cell (only lies on the ground); size: metres, the grey box until art; weight: kg; hands: 0 pack only, 1 or 2; tags: what it is; effects: [{kind, amount, ticks}] (buffs, consumed); use: the verb it is used with (bandage, purse: opened into gold; World.try_use); opens: the lock a key opens (Door.lock); verb: a weapon's {kind, ...numbers} (Items.VERBS: knockback, block, knockdown, reach, backstab, ranged; speed, damage, force for all); value: what it is worth in gold; yield: a resource's counts when banked (tag resource).",
+	"_about": "The item catalog (Items): one definition per id. Slots, levels, prefabs and the builder name these ids; each thing in the world is an instance of one (ItemBook). art: the ArtKit slot (item.<id>); kind: held (in a hand, origin at the grip) or cell (only lies on the ground); size: metres, the grey box until art; weight: kg; hands: 0 pack only, 1 or 2; tags: what it is; effects: [{kind, amount, ticks}] (buffs, consumed); use: the verb it is used with (bandage, purse: opened into gold; World.try_use); opens: the lock a key opens (Door.lock); verb: a weapon's {kind, ...numbers} (Items.VERBS: knockback, block, knockdown, reach, backstab, ranged; speed, damage, force for all); blunt: a weapon whose blows wear a bundle of arrows on whoever takes them; ammo: a bundle of arrows, held in the hand a bow is not in ({effect: \"\", burn or bleed, ticks, every, amount}: what a shot does to what it hits); condition: the most a thing's condition can be (each instance's own, ItemBook; a bundle loses 1 to every blunt hit on its holder and cannot be shot at 0, and the fletcher mends it); value: what it is worth in gold; yield: a resource's counts when banked (tag resource).",
 	"items": [
 		{"id": "bandaging_kit", "name": "bandaging kit", "short": "Bandages", "color": "ebe6d6",
 			"art": "item.bandaging_kit", "kind": "held", "size": [0.18, 0.12, 0.08], "weight": 0.5, "hands": 1,
@@ -34,7 +34,7 @@
 			"tags": ["part"], "made": {"by": "smith", "from": {"ore": 1}, "steps": 600}},
 		{"id": "hammer", "name": "war hammer", "short": "Hammer", "color": "9a8f80",
 			"art": "item.hammer", "kind": "held", "size": [0.14, 0.7, 0.07], "weight": 3.0, "hands": 1,
-			"tags": ["weapon"], "verb": {"kind": "knockback", "force": 3.0, "speed": 1.3},
+			"tags": ["weapon"], "verb": {"kind": "knockback", "force": 3.0, "speed": 1.3}, "blunt": true,
 			"made": {"by": "smith", "from": {"ore": 2, "wood": 1}, "steps": 2400}},
 		{"id": "sword", "name": "sword", "short": "Sword", "color": "c8ccd4",
 			"art": "item.sword", "kind": "held", "size": [0.08, 0.9, 0.03], "weight": 1.5, "hands": 1,
@@ -57,7 +57,7 @@
 			"tags": ["weapon"], "verb": {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5},
 			"made": {"by": "smith", "from": {"ore": 1}, "steps": 1200}},
 		{"id": "bow", "name": "hunting bow", "short": "Bow", "color": "8a6038",
-			"art": "item.bow", "kind": "held", "size": [0.06, 1.3, 0.25], "weight": 1.0, "hands": 2,
+			"art": "item.bow", "kind": "held", "size": [0.06, 1.3, 0.25], "weight": 1.0, "hands": 1,
 			"tags": ["weapon", "ranged"], "verb": {"kind": "ranged", "cells": 8, "draw_min": 5, "draw_full": 20, "damage": 2.0},
 			"made": {"by": "smith", "from": {"wood": 2, "cloth": 1}, "steps": 2400}},
 		{"id": "meat", "name": "cut of meat", "short": "Meat", "color": "a8483c",
@@ -71,7 +71,16 @@
 			"tags": ["bone", "trophy"], "value": 5},
 		{"id": "tusks", "name": "pair of tusks", "short": "Tusks", "color": "e8e0c8",
 			"art": "item.tusks", "kind": "held", "size": [0.18, 0.06, 0.06], "weight": 0.6, "hands": 1,
-			"tags": ["bone", "trophy"], "value": 4}
+			"tags": ["bone", "trophy"], "value": 4},
+		{"id": "arrows", "name": "bundle of arrows", "short": "Arrows", "color": "b89a6a",
+			"art": "item.arrows", "kind": "held", "size": [0.08, 0.75, 0.08], "weight": 0.6, "hands": 1,
+			"tags": ["ammo"], "ammo": {"effect": ""}, "condition": 10},
+		{"id": "flame_arrows", "name": "bundle of flame arrows", "short": "Fire arr.", "color": "d8783a",
+			"art": "item.arrows_flame", "kind": "held", "size": [0.08, 0.75, 0.08], "weight": 0.7, "hands": 1,
+			"tags": ["ammo"], "ammo": {"effect": "burn", "ticks": 30, "every": 10, "amount": 2}, "condition": 10},
+		{"id": "barbed_arrows", "name": "bundle of barbed arrows", "short": "Barbed", "color": "8a5a5a",
+			"art": "item.arrows_barbed", "kind": "held", "size": [0.08, 0.75, 0.08], "weight": 0.6, "hands": 1,
+			"tags": ["ammo"], "ammo": {"effect": "bleed", "ticks": 150, "every": 30, "amount": 1}, "condition": 10}
 	],
 	"naming": {
 		"_about": "Names from long-time holders (Items.naming, decision 365). A thing with a verb, or tagged armour or tool, carried by one named holder (a player, a companion) held_days of the world clock (DayNight.day_steps; while they are in the world) with deeds or more done with it, takes a name for life from lore's forms, and one strength: the one whose from is the deed its namer did most with it. Each strength changes how its verb works, never its damage: guard_stamina (times what guarding costs), draw (times a bow's draw times), brace_ticks (the steps still before a spear is braced), noise (times the fight noise of its blows), down_ticks (added to a knockdown), dread (World.holder_dread: enemy-ai reads it). A deed with no strength (struck) gives none.",

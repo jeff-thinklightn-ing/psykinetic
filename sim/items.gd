@@ -31,7 +31,7 @@ const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value"]
+	"opens", "value", "blunt", "ammo", "condition"]
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter"]
 
@@ -138,7 +138,29 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"verb": verb_from(id, entry["verb"]) if entry.get("verb") is Dictionary else {},
 		"yield": yields,
 		"made": _made(entry.get("made")),
+		"blunt": entry.get("blunt") == true,
+		"ammo": _ammo(entry["ammo"]) if entry.get("ammo") is Dictionary else {},
+		"condition": maxi(int(entry.get("condition", 0)), 0) if entry.get("condition") is float or entry.get("condition") is int else 0,
 	}
+
+
+## An ammo field as read (decision 375): {effect ("", burn, bleed), ticks,
+## every, amount}.
+static func _ammo(value: Dictionary) -> Dictionary:
+	var effect := str(value.get("effect", ""))
+	return {"effect": effect if effect in ["burn", "bleed"] else "", "ticks": maxi(int(value.get("ticks", 0)), 0),
+		"every": maxi(int(value.get("every", 1)), 1), "amount": maxi(int(value.get("amount", 1)), 0)}
+
+
+## A bundle of arrows' ammo (decision 375); {} for anything else.
+static func ammo_of(id: String) -> Dictionary:
+	return def(id).get("ammo", {})
+
+
+## The most [param id]'s condition can be (decision 375); 0 for a thing
+## with none.
+static func condition_max(id: String) -> int:
+	return int(def(id).get("condition", 0))
 
 
 ## A made field as read: counts as ints, steps an int; {} for none.

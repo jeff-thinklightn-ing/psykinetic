@@ -7659,3 +7659,45 @@ at about eaves height; the roof itself is drawn once accepted (Client3D's
 _add_roofs). No PROTOCOL_REVISION bump: an older client ignores the field
 and draws today's ghost (net.gd's rule, as decision 356's heights).
 builder_test _test_roof.
+## 375. Arrows in a bundle: the bow's other hand, worn by blunt hits, flame and barbed
+
+Jeff (2026-10-17): arrows are not spent; an archer holds the bow in one hand and
+a bundle of arrows in the other, the bundle decays when its holder is struck
+with blunt damage, and the town's fletcher mends it. The bow is now one-handed
+(either hand), and a bundle (`arrows`, `flame_arrows`, `barbed_arrows`; tag
+ammo, hands 1) goes in the other. World.quiver_check (335's hook) is now "a
+bundle with condition left in the bow's other hand" (World.bundle_slot), and
+World.off_hand gives "draw" only when it passes, so 329's right-button draw and
+341's archers need no change: an archer whose bundle is spent falls back to its
+melee. A shot never uses the bundle up (gear is never consumed).
+
+Condition: an item with "condition" in the catalog (the most it can be, 10 for a
+bundle) has its own in ItemBook (whole when minted, saved; condition_of,
+set_condition). A bundle in its holder's hands loses 1 to every blunt hit: a
+blow by a weapon marked "blunt" (the hammer), an impact (thrown or charged into
+something, a boar's charge among them), a knockdown. Edged blows, shots and
+bare fists do not wear it. At 0 it cannot be shot and the draw drops; it stays
+a thing, and economy's fletcher mends it (a job on the same uid setting it back
+to full: Production reads condition_of and set_condition).
+
+A bundle's "ammo" says what its shot does to what it hits, kept to what the sim
+has: plain nothing more; flame sets it burning (World.afflict "burn": 2 hp every
+10 ticks for 30, as fire does, on anything fire hurts; no spreading, no cells
+lit: a ground fire is Fields' and terrain's design); barbed bleeds it ("bleed":
+1 hp every 30 ticks for 150, creatures only). Bleeding is new: a bandage (272,
+320, the companions' too) stops it at once, as bandaging starts. Ailments are
+GridEntity.ailments ({kind: [until, every, amount]}), tended each tick after
+hazards (World._tend_ailments), replicated on players, companions and monsters
+so the views tint a burning body's name orange and a bleeding one's red; the
+party log says "bled for".
+
+slot_names (365) is widened to slot_notes before any client had it: each slot's
+note, its name and marks and now its condition ("bundle of flame arrows, 9 of
+10"); the pack gilds a slot only when its note does not begin with the thing's
+catalog name, that is when it is named. Protocol changed by the fingerprint
+alone (slot_notes renamed, ailments new; no PROTOCOL_REVISION). Monster archers
+carry a plain bundle unless enemy-ai says otherwise (monster_test's archers
+hold one); the armoury loot table may give a bundle. Art slots item.arrows,
+item.arrows_flame, item.arrows_barbed. Rejected: arrows as counted ammunition
+(Jeff: not wasted); bare fists as blunt (every imp's punch would wear it); a
+bleeding that only stops mending (barbed would do nothing in a fight).

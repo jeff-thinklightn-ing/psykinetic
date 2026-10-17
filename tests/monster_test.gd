@@ -1829,7 +1829,7 @@ func _test_archer() -> void:
 	var archer: Monster = e["a"][0]
 	var player: GridEntity = e["P"][0]
 	_bold(archer)
-	archer.slots = PackedStringArray(["", "", "", "", "bow", ""])  # As Level arms one wielding a bow.
+	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])  # As Level arms one wielding a bow (and its arrows, decision 375).
 	_check(World.off_hand(archer) == "draw", "a bow in its hands: it draws")
 	var from := archer.tile
 	var shot: Dictionary = {}
@@ -1857,7 +1857,7 @@ func _test_archer() -> void:
 	e = _build(["##############", "#............#", "#.P...c..a...#", "#............#", "##############"])
 	archer = e["a"][0]
 	_bold(archer)
-	archer.slots = PackedStringArray(["", "", "", "", "bow", ""])  # As Level arms one wielding a bow.
+	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])  # As Level arms one wielding a bow (and its arrows, decision 375).
 	from = archer.tile
 	var shot_from := Vector2i(-1, -1)
 	for i in 60:
@@ -1871,7 +1871,7 @@ func _test_archer() -> void:
 	archer = e["a"][0]
 	player = e["P"][0]
 	_bold(archer)
-	archer.slots = PackedStringArray(["", "", "", "", "bow", ""])  # As Level arms one wielding a bow.
+	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])  # As Level arms one wielding a bow (and its arrows, decision 375).
 	for i in 10:
 		World.step()
 	_check(World.distance(archer.tile, player.tile) >= Monster.KEEP_NEAR, "2 off, it steps back to %d" % World.distance(archer.tile, player.tile))

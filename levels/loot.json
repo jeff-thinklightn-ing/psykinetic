@@ -12,7 +12,8 @@
 			{"item": "shield", "chance": 0.3},
 			{"item": "spear", "chance": 0.2},
 			{"item": "dagger", "chance": 0.3},
-			{"item": "bow", "chance": 0.2}
+			{"item": "bow", "chance": 0.2},
+			{"item": "arrows", "chance": 0.2}
 		],
 		"pockets": [
 			{"item": "coin_purse", "chance": 0.3},

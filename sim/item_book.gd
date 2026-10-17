@@ -57,6 +57,8 @@ func mint(id: String, kind: String, what := "", zone := "", tile := Vector2i(-1,
 	var uid := _next
 	_next += 1
 	_book[uid] = {"id": id, "made": _now(), "at": "", "holder": "", "carriers": [], "events": []}
+	if Items.condition_max(id) > 0:
+		_book[uid]["condition"] = Items.condition_max(id)  # Made whole (decision 375).
 	_book[uid]["events"].append(_event(kind, what, zone, tile))
 	return uid
 
@@ -184,6 +186,21 @@ func name_due(uid: int, held: int, deeds: int) -> Dictionary:
 	return {}
 
 
+## [param uid]'s condition (decision 375): what it has of its
+## Items.condition_max; -1 for a thing with none.
+func condition_of(uid: int) -> int:
+	if not _book.has(uid) or Items.condition_max(id_of(uid)) <= 0:
+		return -1
+	return int(_book[uid].get("condition", Items.condition_max(id_of(uid))))
+
+
+## [param uid]'s condition set to [param amount], within 0 and its most
+## (wear, the fletcher's mending). Nothing for a thing with none.
+func set_condition(uid: int, amount: int) -> void:
+	if condition_of(uid) >= 0:
+		_book[uid]["condition"] = clampi(amount, 0, Items.condition_max(id_of(uid)))
+
+
 ## Who [param uid] is kept from (its namer's carrier key; decision
 ## 370); "" when it is not kept.
 func kept_from(uid: int) -> String:
@@ -297,6 +314,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 			items._book[int(key)] = {"id": entry["id"], "made": int(entry.get("made", 0)),
 				"at": str(entry.get("at", "")), "holder": str(entry.get("holder", "")),
 				"carriers": carriers, "events": events}
+			if entry.get("condition") is float or entry.get("condition") is int:
+				items._book[int(key)]["condition"] = int(entry["condition"])
 			var name: Variant = entry.get("name")
 			if name is Dictionary and name.get("form") is String and name.get("holder") is String:
 				items._book[int(key)]["name"] = {"form": name["form"], "holder": name["holder"],
