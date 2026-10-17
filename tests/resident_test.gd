@@ -104,11 +104,19 @@ func _test_stays_when_told() -> void:
 		"her record says where she works, and at what (%s)" % [record.companion.get("resident", {})])
 	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
 	_check(saved.companion.get("resident", {}) == record.companion["resident"], "and keeps it through a save and a load")
+	record.companion.erase("home")  # As a record from before decision 381 would be.
 	_main.travel(Net.local_id, TOWN)
 	pet = _companion()
 	_check(pet != null and pet.tile == ground, "back in the town, she is where she worked (%s)" % [pet.tile if pet != null else "none"])
 	_check(World.production.worker(who).get("away", false) and not record.companion.has("resident") and pet.works_as.is_empty(),
 		"and leaves her work to go with them, her job waiting")
+	_check(pet.home.get("place", "") == STORE and record.companion.get("home", {}).get("trade", "") == trade and "You rest in " in pet.standing_words(),
+		"her home town stays with her as she travels (decision 381): %s" % pet.standing_words())
+	var old := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	old.companion.erase("home")
+	pet.home = old.companion.get("home", {})
+	_check(pet.standing_words().is_empty(), "a record from before with no home: no home-town line, nothing else changed")
+	pet.home = record.companion["home"]
 
 
 func _test_stays_when_left() -> void:

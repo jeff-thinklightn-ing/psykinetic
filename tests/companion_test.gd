@@ -275,10 +275,7 @@ func _test_knows_her_town() -> void:
 		"what lore says the townsfolk know: weightiest first, a rumour as said, no draft (%s)" % known)
 	_check("Pip wants to become a squire." in Companion.lore_words("Pip") and "squire" not in known, "a companion lore names knows her own (Pip)")
 	_check(known in pet.voice_prompt("test"), "and her voice is told it")
-	Lore.use([{"id": "people", "status": "agreed", "facts": [{"id": "w1", "status": "agreed", "known": "common",
-		"text": "Wren is a woman, a companion who travels with the town's people."}]}], [{"id": "townsfolk", "status": "agreed", "where": [], "tags": []}])
-	_check("Wren is a woman, a traveller who travels" in Companion.lore_words("Isolde") and "companion" not in Companion.lore_words("Isolde").to_lower(),
-		"what she reads never calls anyone a companion: %s" % Companion.lore_words("Isolde"))
+
 	Lore.reload()
 
 
@@ -993,6 +990,16 @@ func _test_card() -> void:
 	_check(CompanionCard.roll(Net.player_id, "Ysolt")["name"] == "Ysolt"
 		and CompanionCard.roll(Net.player_id, "Ysolt")["fear"] == traits["fear"], "one who has a name keeps it, the rest rolled alike")
 	_check(CompanionCard.roll(Net.player_id, "", [traits["name"]])["name"] != traits["name"], "a name another has is rolled again")
+	_check(CompanionCard.body_of({"pronoun": "he"}, "x") == &"male" and CompanionCard.body_of({"pronoun": "she"}, "x") == &"female"
+		and CompanionCard.body_of({"pronoun": "she", "body": "male"}, "x") == &"male"
+		and CompanionCard.body_of({"pronoun": "they"}, "seed-a") == CompanionCard.body_of({"pronoun": "they"}, "seed-a")
+		and CompanionCard.body_of(CompanionCard.roll("p1", "Pip"), "p1") == &"male" and CompanionCard.body_of(CompanionCard.roll("p1", "Wren"), "p1") == &"female",
+		"her body: he male, she female, they by her seed, the same every time; Pip male, Wren female (decision 293 amended)")
+	var theys: Dictionary[StringName, bool] = {}
+	for i in 40:
+		theys[CompanionCard.body_of({"pronoun": "they"}, "seed-%d" % i)] = true
+	_check(theys.size() == 2 and str(traits.get("body", "")) in ["male", "female"] and _companion().body == CompanionCard.body_of(_companion().traits, _companion().keeper_id),
+		"one who is \"they\" may be either; the roll keeps it; her body is her card's")
 	var never: Array[String] = []
 	for i in 200:
 		var rolled: String = CompanionCard.roll("player %d" % i)["name"]

@@ -4445,6 +4445,15 @@ nothing in it is a line to say. Her trade for 284 comes from her
 profession. Lore will supply birthplaces and names per region once Jeff
 agrees facts.
 
+Amended (2026-10-17, release: no new number): her traits carry her body,
+"male" or "female", for pc-character's Companion.body (decision 388: the
+body the view draws, the voice of her efforts). CompanionCard.body_of:
+the traits' "body" when given; else "he" is male, "she" female, and
+"they" is chosen by her player's id, the same every time, so a record
+rolled before this has one too and needs nothing saved. Wren and Nix are
+female and Pip male by their fixed pronouns. Her card's facts leave the
+body out (the pronoun says what the card needs).
+
 ## 295. Raids on a town: one entry point, food and people only, damage repaired, captives kept until rescued
 
 Economy step 6 (sim/towns.gd). A raid is a real group of raiders: maps

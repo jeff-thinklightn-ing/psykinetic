@@ -1562,9 +1562,7 @@ static func lore_words(who: String) -> String:
 	var said: Array[String] = []
 	var length := 0
 	for fact in facts:
-		# What she reads never calls anyone a companion (her player's own is a
-		# fellow traveller: she travels with them by choice).
-		var text := RegEx.create_from_string("(?i)\\bcompanion(s?)\\b").sub(str(fact["text"]).strip_edges(), "traveller$1", true)
+		var text := str(fact["text"]).strip_edges()
 		if bool(fact.get("hearsay", false)):
 			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
 		if length + text.length() > LORE_CHARS:

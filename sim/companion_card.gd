@@ -72,7 +72,25 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 		if fixed is Dictionary:
 			for key: String in fixed:
 				traits[key] = str(fixed[key])
+	traits["body"] = String(body_of(traits, player_id))
 	return traits
+
+
+## Her body, &"male" or &"female" (decision 293 amended, for pc-character's
+## Companion.body, decision 388: which body the view draws and whose voice
+## her efforts have): her traits' "body" when they have one; else "he"
+## male and "she" female, and "they" by [param seed] (her player's id),
+## the same every time, so a record from before has one too.
+static func body_of(traits: Dictionary, seed: String) -> StringName:
+	var given := str(traits.get("body", ""))
+	if given in ["male", "female"]:
+		return StringName(given)
+	match str(traits.get("pronoun", "")):
+		"he":
+			return &"male"
+		"she":
+			return &"female"
+	return &"male" if absi(hash("body:" + seed)) % 2 == 0 else &"female"
 
 
 ## The how_we_met seed for her and [param player]: "Jeff found her hiding
@@ -112,7 +130,7 @@ static func facts(traits: Dictionary, player: String) -> String:
 	var lines: Array[String] = ["Name: %s" % traits.get("name", "")]
 	# Fixed facts beyond the table's own (who she is, what she wants).
 	for key: String in traits:
-		if key not in KEYS and key not in ["name", "trade"]:
+		if key not in KEYS and key not in ["name", "trade", "body"]:
 			lines.append("%s: %s" % [key.capitalize(), traits[key]])
 	for key in KEYS:
 		if key == "how_we_met":

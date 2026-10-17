@@ -2739,7 +2739,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.keeper = player
 	pet.traits = record.companion["traits"]
 	# Her body by her card's pronoun (Pip "he"); CompanionCard.body_of to come.
-	pet.body = &"male" if str(pet.traits.get("pronoun", "")) == "he" else &"female"
+	pet.body = CompanionCard.body_of(pet.traits, pet.keeper_id)
 	pet.card = str(record.companion["card"])
 	pet.how_we_met = str(record.companion.get("how_we_met", ""))
 	pet.card_by = str(record.companion.get("card_by", "plain"))
