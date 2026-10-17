@@ -67,6 +67,11 @@ const TEMPER_NAMES := {"bold": Temper.BOLD, "cautious": Temper.CAUTIOUS, "coward
 const BOLDNESS := {Temper.BOLD: Vector2(0.6, 1.0), Temper.CAUTIOUS: Vector2(0.1, 0.29), Temper.COWARDLY: Vector2(0.0, 0.09)}
 const FLEE_BELOW := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 const DREAD_FLEE_BELOW := 0.5
+## An archer's arrows (decision 375's bundle): WORN_BUNDLE_CHANCE of them
+## come worn, their condition drawn within WORN_BUNDLE, so one a player
+## takes is sometimes worth swapping and sometimes not.
+const WORN_BUNDLE_CHANCE := 0.3
+const WORN_BUNDLE := Vector2i(4, 9)
 const BOLD_LEASH := 1.5
 const COWARD_ODDS_TILES := 3
 ## Fleeing (Alert.FLEEING): it runs FLEE_TILES at most at a time, and
@@ -286,6 +291,8 @@ var _lead := NO_TILE
 var _looks := 0
 var _look_until := -1
 var _quarry: GridEntity
+## Its arrows' wear rolled (_wear_bundle).
+var _bundle_rolled := false
 var _quarry_at := NO_TILE
 var _quarry_from := NO_TILE
 var _post := NO_TILE
@@ -428,6 +435,8 @@ func _temper() -> void:
 
 
 func _sim_tick() -> void:
+	if not _bundle_rolled:
+		_wear_bundle()
 	if not noticing:
 		_unnoticing()
 		return
@@ -1227,6 +1236,21 @@ func _others_needed() -> int:
 	if temper == Temper.COWARDLY or temper == Temper.CAUTIOUS and _dreads_target():
 		return 2
 	return 1
+
+
+## Once, its first tick: the arrows in its hands worn or not
+## (WORN_BUNDLE_CHANCE), drawn by its name. Only a bundle with no instance
+## yet, as its level arms it: one from a save keeps its condition.
+func _wear_bundle() -> void:
+	_bundle_rolled = true
+	var hand := World.bundle_slot(self)
+	if hand < 0 or hand < slot_items.size() and slot_items[hand] != 0:
+		return
+	var draw := RandomNumberGenerator.new()
+	draw.seed = hash(String(name) + "/bundle")
+	if draw.randf() >= WORN_BUNDLE_CHANCE:
+		return
+	World.items.set_condition(World.slot_uid(self, hand), draw.randi_range(WORN_BUNDLE.x, WORN_BUNDLE.y))
 
 
 ## Whether its target holds a dread thing and it minds (not bold; an

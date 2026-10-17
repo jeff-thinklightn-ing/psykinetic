@@ -7762,3 +7762,19 @@ lore's drafts until he confirms them.
 Rejected: a binding field on person entries (it would state guards, officials
 and bards into the world before A3, A4 or Jeff say they exist); the binding only
 derived (with the profiles still draft, every official would speak as townsfolk).
+## 380. Archers' arrows come worn or whole
+
+Enemies drop their arrow bundles (Jeff, decision 375), and a player may swap
+theirs for one or keep their own and have it mended; for that to be a choice,
+most archers' bundles are whole and some worn. On its first tick
+(`Monster._wear_bundle`, once) a monster with a usable bundle in its hands
+(`World.bundle_slot`) whose instance is not yet made, as its level arms it,
+draws by its name ("<name>/bundle"): WORN_BUNDLE_CHANCE (0.3) of them make it
+now at a condition within WORN_BUNDLE (4 to 9 of 10). One with an instance
+already (from a save, a record recalled) keeps its condition. monster_test's
+worn-bundles case (60 archers) and its archer case with a spent bundle (no
+draw: it comes on hand to hand, World.off_hand "").
+Rejected: rolling at spawn (a saved archer's slots are put back after its
+spawn, so a bundle made then would be left orphaned in the book); wearing them
+in Level's arming (items' code, and a level's spec is the same each time: the
+draw is the monster's).

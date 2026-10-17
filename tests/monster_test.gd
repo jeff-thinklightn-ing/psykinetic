@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_raid_townsfolk()
 	_test_charging()
 	_test_archer()
+	_test_worn_bundles()
 	_test_shield()
 	_test_boar_turns()
 	_test_pick_up()
@@ -1875,6 +1876,55 @@ func _test_archer() -> void:
 	for i in 10:
 		World.step()
 	_check(World.distance(archer.tile, player.tile) >= Monster.KEEP_NEAR, "2 off, it steps back to %d" % World.distance(archer.tile, player.tile))
+	# Its arrows spent (blunt blows wear them, decision 375): it can't draw,
+	# and comes on as its kind does.
+	e = _build(["##############", "#............#", "#.P......a...#", "#............#", "##############"])
+	archer = e["a"][0]
+	player = e["P"][0]
+	_bold(archer)
+	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
+	World.items.set_condition(World.slot_uid(archer, Items.LEFT_HAND), 0)
+	_check(World.off_hand(archer) == "", "its arrows spent, it can't draw")
+	var closed := false
+	for i in 40:
+		World.step()
+		closed = closed or World.are_adjacent(archer.tile, player.tile)
+	_check(closed and archer.raised != "draw", "it comes on to fight hand to hand")
+	Monster.idling = true
+
+
+func _test_worn_bundles() -> void:
+	print("\n== archers' arrows: some come worn (4 to 9 of 10), most whole; a saved bundle keeps its wear ==")
+	Monster.idling = false
+	var rows: Array[String] = ["######################"]
+	for y in 3:
+		rows.append("#aaaaaaaaaaaaaaaaaaaa#")
+	rows.append("######################")
+	var e := _build(rows)
+	var worn := 0
+	var whole := 0
+	var odd := 0
+	for archer: Monster in e["a"]:
+		archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
+	World.step()
+	for archer: Monster in e["a"]:
+		var condition := World.items.condition_of(World.slot_uid(archer, Items.LEFT_HAND))
+		if condition == Items.condition_max("arrows"):
+			whole += 1
+		elif condition >= Monster.WORN_BUNDLE.x and condition <= Monster.WORN_BUNDLE.y:
+			worn += 1
+		else:
+			odd += 1
+	_check(odd == 0 and worn >= 9 and worn <= 27, "of 60, %d worn, %d whole, %d neither" % [worn, whole, odd])
+	# One from a save: its bundle's instance came with it.
+	e = _build(["#####", "#.a.#", "#####"])
+	var saved: Monster = e["a"][0]
+	saved.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
+	var uid := World.slot_uid(saved, Items.LEFT_HAND)
+	World.items.set_condition(uid, 2)
+	for i in 3:
+		World.step()
+	_check(World.items.condition_of(uid) == 2, "a saved bundle keeps its wear (%d)" % World.items.condition_of(uid))
 	Monster.idling = true
 
 
