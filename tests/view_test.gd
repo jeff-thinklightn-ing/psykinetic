@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_buildings()
 	_test_roofs()
 	_test_wall_heights()
+	_test_roof_damage()
 	_test_building_states()
 	_test_town_walls()
 	await _test_near_miss_picks()
@@ -798,6 +799,92 @@ func _test_roofs() -> void:
 			"an open shelter stands on a post at each corner")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
+
+
+
+func _test_roof_damage() -> void:
+	print("
+== a damaged roof (decision 383): a third of it open to the sky, in the sim and the view; mended, whole ==")
+	var broken := Level.broken_cells(Rect2i(0, 0, 9, 9))
+	_check(broken.size() > 15 and broken.size() < 39 and Level.broken_cells(Rect2i(5, 5, 1, 1)) == [Vector2i(5, 5)],
+			"a third or so of a big roof's cells broken (%d of 81), and a one-cell roof's one" % broken.size())
+	var map := LevelMap.new(Vector2i(16, 14))
+	for y in 14:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	var rect := Rect2i(3, 3, 5, 3)
+	for key in Level.outline(rect):
+		map.set_edge(key, "door" if key == Vector3i(5, 5, Terrain.SOUTH) else "wall")
+	var terrain: Dictionary = Level.parse(map.to_image(), null, {"outdoor": true,
+		"roofs": [{"rect": [3, 3, 5, 3]}, {"rect": [10, 3, 3, 3]}]})["terrain"]
+	terrain["level"] = "roof_fixture"
+	# The sim: a zone of its own, so the test's own zone is left as it is.
+	var zone := Zone.new("roof_fixture")
+	zone.fields.load(terrain)
+	zone.fields.outdoor = true
+	World.zones["roof_fixture"] = zone
+	var told: Array[String] = []
+	var heard := func(level: String) -> void: told.append(level)
+	World.roof_changed.connect(heard)
+	var open := Level.broken_cells(rect)
+	_check(World.damage_roof("roof_fixture", 0) and not World.damage_roof("roof_fixture", 0) and not World.damage_roof("roof_fixture", 7),
+			"damaged once (again, or a roof there is not, is nothing)")
+	_check(World.damaged_roofs("roof_fixture") == [0] and World.roof_damaged("roof_fixture", 0) and told == ["roof_fixture"],
+			"its index is among the level's damaged roofs, and Main is told (%s)" % [told])
+	_check(open.all(func(cell: Vector2i) -> bool: return zone.fields.under_sky(cell))
+			and Level.rect_cells(rect).filter(func(cell: Vector2i) -> bool: return zone.fields.under_sky(cell)).size() == open.size()
+			and not zone.fields.under_sky(Vector2i(11, 4)),
+			"its broken cells are under the sky, the rest of it and the other roof still roofed")
+	_check(World.repair_roof("roof_fixture", 0) and World.damaged_roofs("roof_fixture").is_empty()
+			and Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not zone.fields.under_sky(cell)),
+			"mended: roofed again")
+	# A client, told by the server ("roofs"), opens the same cells.
+	World.roofs_told("roof_fixture", [1.0])
+	_check(Level.broken_cells(Rect2i(10, 3, 3, 3)).all(func(cell: Vector2i) -> bool: return zone.fields.under_sky(cell))
+			and Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not zone.fields.under_sky(cell)),
+			"a client told roof 1 is damaged opens its cells, as the server does")
+	World.roofs_told("roof_fixture", [])
+	# A town's damaged building opens a third of it too (a client's, told the town).
+	var house := {"slot": "building.house", "rect": Rect2i(3, 8, 4, 4), "use": "forge", "town_id": "roof_fixture/square"}
+	var with_house := terrain.duplicate()
+	with_house["buildings"] = [house]
+	zone.fields.load(with_house)
+	zone.fields.outdoor = true
+	var towns := World.towns
+	World.towns = null
+	World.towns_seen["roof_fixture/square"] = {"forge": {"state": Towns.DAMAGED, "level": 1}}
+	World.open_roofs("roof_fixture")
+	var house_open := Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return zone.fields.under_sky(cell))
+	_check(house_open.size() == Level.broken_cells(house["rect"]).size(), "a damaged town building: a third of its cells under the sky (%d)" % house_open.size())
+	World.towns = towns
+	World.towns_seen.erase("roof_fixture/square")
+	World.roof_changed.disconnect(heard)
+	World.zones.erase("roof_fixture")
+	World.roofs_damaged.clear()
+	# The snapshot: an old one has none.
+	var path: String = preload("res://tests/test_ports.gd").scratch("view_test_old.json")
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"version": Snapshot.VERSION, "zones": {}, "players": [], "steps": 7}))
+	file.close()
+	var old := Snapshot.load(path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	_check(old["ok"] and old["roofs"] == [], "a snapshot from before roofs broke loads with none broken (%s)" % [old.get("roofs")])
+	# The view: told, the roof is made again with holes, each dressed.
+	_rig.rebuild(terrain, Vector2i(7, 7))
+	var roofed: Dictionary = _rig._buildings[0]
+	var whole: Node3D = roofed["roof"]
+	var tris := func(roof: Node3D) -> int: return ((roof.get_node("Slopes") as MeshInstance3D).mesh as ArrayMesh).surface_get_array_len(0) / 3
+	var before: int = tris.call(whole)
+	_rig.set_roofs("roof_fixture", [0])
+	var holed: Node3D = roofed["roof"]
+	var pieces := holed.get_children().filter(func(child: Node) -> bool: return child.name.begins_with("Broken_"))
+	_check(roofed["holed"] and holed != whole and tris.call(holed) < before and pieces.size() == open.size()
+			and not (_rig._buildings[1]["holed"] as bool),
+			"told roof 0 is damaged: made again with %d holes, each dressed (%d), %d triangles of %d; the other whole" % [open.size(), pieces.size(), tris.call(holed), before])
+	_rig.set_roofs("roof_fixture", [])
+	_check(not roofed["holed"] and tris.call(roofed["roof"]) == before, "mended: whole again")
+	_rig.roof_states.erase("roof_fixture")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_wall_heights() -> void:

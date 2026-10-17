@@ -130,7 +130,8 @@ static func _write(path: String, text: String) -> bool:
 ## town's stores (Stockpile.to_dict; {} in a file from before it), and
 ## "items" the ItemBook (ItemBook.to_dict; {} before instances), and
 ## "production" the town's work (Production.to_dict; {} before it), and
-## "towns" how each grows (Towns.to_dict; {} before it), and "economy"
+## "towns" how each grows (Towns.to_dict; {} before it), "roofs" the
+## damaged roofs (World.roofs_damaged's keys; [] before them), and "economy"
 ## the players' gold (Economy.to_dict; {} before it). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
@@ -182,6 +183,7 @@ static func load(path: String) -> Dictionary:
 	var items: Variant = data.get("items", {})
 	var production: Variant = data.get("production", {})
 	var towns: Variant = data.get("towns", {})
+	var roofs: Variant = data.get("roofs", [])
 	var economy: Variant = data.get("economy", {})
 	var sky: Variant = data.get("sky", {})
 	return {"ok": true, "zones": zones, "players": players,
@@ -191,6 +193,7 @@ static func load(path: String) -> Dictionary:
 		"items": items if items is Dictionary else {},
 		"production": production if production is Dictionary else {},
 		"towns": towns if towns is Dictionary else {},
+		"roofs": roofs if roofs is Array else [],
 		"economy": economy if economy is Dictionary else {},
 		"sky": sky if sky is Dictionary else {}}
 

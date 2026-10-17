@@ -407,6 +407,16 @@ var _accumulator := 0.0
 
 ## Server: every loaded zone by name, and the one World is working on.
 var zones: Dictionary[String, Zone] = {}
+## The damaged roofs (decision 383): "<level>/<x>,<y>" (the roof's rect's
+## top-left, so an edit to the level's list moves none) -> true. Saved in
+## the snapshot; the server's (environment's storms damage, economy's
+## repairs mend: damage_roof, repair_roof).
+var roofs_damaged: Dictionary[String, bool] = {}
+## A roof of [param level] was damaged or mended (Main tells the peers).
+signal roof_changed(level: String)
+## A client's: each town's buildings as the server told ("town"), for
+## open_roofs, which has no Towns there.
+var towns_seen := {}
 var zone := Zone.new()
 ## Server: which zone each peer's player is in: what that client is sent
 ## (peer_sees) and which zone's tick it gets.
@@ -842,6 +852,115 @@ func add_zone(zone_name: String) -> Zone:
 	return made
 
 
+## Damages roof [param index] of level [param level] (its "roofs" in
+## level.json): a third of it broken open to the sky (Level.broken_cells).
+## Whether it was standing.
+func damage_roof(level: String, index: int) -> bool:
+	return _set_roof(level, index, true)
+
+
+## Mends roof [param index] of [param level]. Whether it was damaged.
+func repair_roof(level: String, index: int) -> bool:
+	return _set_roof(level, index, false)
+
+
+func roof_damaged(level: String, index: int) -> bool:
+	var rects := _roof_rects(level)
+	return index >= 0 and index < rects.size() and roofs_damaged.has(_roof_key(level, rects[index]))
+
+
+## A client's: [param level]'s damaged roofs are [param damaged] (their
+## indices, the "roofs" message); the sky opened over them as the server's.
+func roofs_told(level: String, damaged: Array) -> void:
+	var told: Dictionary[int, bool] = {}
+	for index: Variant in damaged:
+		told[int(index)] = true
+	var rects := _roof_rects(level)
+	for index in rects.size():
+		var key := _roof_key(level, rects[index])
+		if told.has(index):
+			roofs_damaged[key] = true
+		else:
+			roofs_damaged.erase(key)
+	open_roofs(level)
+
+
+## The indices of [param level]'s damaged roofs, for the "roofs" message.
+func damaged_roofs(level: String) -> Array[int]:
+	var out: Array[int] = []
+	var rects := _roof_rects(level)
+	for index in rects.size():
+		if roofs_damaged.has(_roof_key(level, rects[index])):
+			out.append(index)
+	return out
+
+
+func _set_roof(level: String, index: int, damaged: bool) -> bool:
+	var rects := _roof_rects(level)
+	if index < 0 or index >= rects.size():
+		return false
+	var key := _roof_key(level, rects[index])
+	if roofs_damaged.has(key) == damaged:
+		return false
+	if damaged:
+		roofs_damaged[key] = true
+	else:
+		roofs_damaged.erase(key)
+	open_roofs(level)
+	roof_changed.emit(level)
+	return true
+
+
+static func _roof_key(level: String, rect: Rect2i) -> String:
+	return "%s/%d,%d" % [level, rect.position.x, rect.position.y]
+
+
+## Level [param level]'s roofs' rects, in order: its zone's if loaded, else
+## read.
+var _roofs_read: Dictionary[String, Array] = {}
+
+
+func _roof_rects(level: String) -> Array:
+	var fields_of := _fields_of(level)
+	if fields_of != null and fields_of.level == level:
+		return fields_of.roofs
+	if not _roofs_read.has(level):
+		var read: Array[Rect2i] = []
+		for roof: Dictionary in Level.load_level(level).get("roofs", []):
+			read.append(roof["rect"])
+		_roofs_read[level] = read
+	return _roofs_read[level]
+
+
+func _fields_of(level: String) -> Fields:
+	if fields.level == level:
+		return fields
+	return zones[level].fields if zones.has(level) else null
+
+
+## Opens to the sky what is broken over [param level]'s cells: its damaged
+## roofs', and its damaged town buildings' (Towns, decision 297), a third
+## of each (Level.broken_cells). On a damage or mend, a town's change, and
+## its terrain read.
+func open_roofs(level: String) -> void:
+	var fields_of := _fields_of(level)
+	if fields_of == null or fields_of.level != level:
+		return
+	var open: Dictionary[Vector2i, bool] = {}
+	for rect: Rect2i in fields_of.roofs:
+		if roofs_damaged.has(_roof_key(level, rect)):
+			for cell in Level.broken_cells(rect):
+				open[cell] = true
+	for building: Dictionary in fields_of.town_buildings:
+		var told: Dictionary = towns.buildings_of(building["town_id"]) if towns != null else towns_seen.get(building["town_id"], {})
+		if str(told.get(building["use"], {}).get("state", "")) == Towns.DAMAGED:
+			for cell in Level.broken_cells(building["rect"]):
+				open[cell] = true
+	fields_of.set_open(open)
+	if fields_of == fields:
+		fields_changed()
+
+
 ## Works on [param to] from now on: its state swapped into World's fields,
 ## the zone left keeping its own. Returns the zone World was in, to go back
 ## to (enter(was)).
@@ -1093,6 +1212,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	outdoor = bool(terrain.get("outdoor", false))
 	fields.load(terrain)
 	fields.update_weather(DayNight.now())
+	open_roofs(fields.level)
 	fields_changed()
 	var heights: Dictionary = terrain.get("heights", {})
 	for cell: Vector2i in heights:

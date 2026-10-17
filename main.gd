@@ -308,6 +308,9 @@ var _client3d: Client3D
 ## Town id -> {kind: {state, level}}: the towns' buildings as the server
 ## last told ("town", decision 297), for the view's buildings.
 var town_states := {}
+## Each level's damaged roofs (their indices) as this client was last told
+## ("roofs", decision 383), for the view.
+var roof_states := {}
 @onready var ground: TileMapLayer = $Ground
 ## The node the zone World is in keeps its entities under (one per zone,
 ## under $YSort/Entities, named for it), and its spawner: both per zone.
@@ -1527,6 +1530,12 @@ func _boot() -> void:
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
 	World.towns.building_changed.connect(_on_town_building_changed)
+	# The roofs storms broke and nobody has mended yet (decision 383).
+	World.roofs_damaged.clear()
+	for key: Variant in snapshot.get("roofs", []):
+		World.roofs_damaged[str(key)] = true
+	if not World.roof_changed.is_connected(_on_roof_changed):
+		World.roof_changed.connect(_on_roof_changed)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -1728,6 +1737,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	Net.message_to(peer, "map", {"name": zone_name, "server": Net.version})
 	Net.message_to(peer, "sky", sky_message())
 	_send_towns(peer, zone_name)
+	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
 	World.update_visibility(peer, zone_name)
 
 
@@ -2248,6 +2258,7 @@ func _save_state(wait := true) -> void:
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
+		"roofs": World.roofs_damaged.keys(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"items": World.items.to_dict(),
@@ -2453,6 +2464,15 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 ## town's buildings ("town" {town, buildings}).
 func _on_town_building_changed(town: String, _kind: String) -> void:
 	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town)})
+	World.open_roofs(town.get_slice("/", 0))
+
+
+## Server: a roof of [param level] was damaged or mended (World.damage_roof,
+## repair_roof, decision 383): every peer, and this one, is told the level's
+## damaged roofs ("roofs" {level, damaged: their indices}).
+func _on_roof_changed(level: String) -> void:
+	Net.broadcast("roofs", {"level": level, "damaged": World.damaged_roofs(level)})
+	_show_towns()
 
 
 ## Server: how many residents [param town] feeds (or who go hungry)
@@ -2488,6 +2508,11 @@ func _show_towns() -> void:
 			town_states[town] = World.towns.buildings_of(town)
 	for town: String in town_states:
 		_client3d.set_town(town, town_states[town])
+	var level := str(_terrain.get("level", ""))
+	if Net.is_authority() and not level.is_empty():
+		_client3d.set_roofs(level, World.damaged_roofs(level))
+	for told: String in roof_states:
+		_client3d.set_roofs(told, roof_states[told])
 
 
 # --- Trade -----------------------------------------------------------------------
@@ -3545,8 +3570,20 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var buildings: Variant = data.get("buildings", {})
 		if not town.is_empty() and buildings is Dictionary:
 			town_states[town] = buildings
+			World.towns_seen[town] = buildings
+			World.open_roofs(town.get_slice("/", 0))
 			if _client3d != null:
 				_client3d.set_town(town, buildings)
+		return
+	if kind == "roofs":
+		var level := str(data.get("level", ""))
+		var damaged: Variant = data.get("damaged", [])
+		if not level.is_empty() and damaged is Array:
+			roof_states[level] = damaged
+			if not Net.is_authority():
+				World.roofs_told(level, damaged)
+			if _client3d != null:
+				_client3d.set_roofs(level, damaged)
 		return
 	if kind == "sky":
 		if not Net.is_authority():

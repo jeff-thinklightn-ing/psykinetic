@@ -56,8 +56,16 @@ var sky_dim := 0.0
 var weather_sight := 1.0
 var weather_hearing := 1.0
 ## The cells under a roof (inside a building's footprint): out of the sky's
-## light. {cell: true}.
+## light. {cell: true}. Those of the roofs and buildings' footprints
+## (decision 364): what is roofed but for what a damage opened (set_open).
 var _roofed: Dictionary[Vector2i, bool] = {}
+var _roofed_whole: Dictionary[Vector2i, bool] = {}
+## The level these fields are of (its terrain's "level"), its roofs' rects
+## in order, and its buildings a town keeps ({rect, use, town_id}): what a
+## damage opens (World.open_roofs).
+var level := ""
+var roofs: Array[Rect2i] = []
+var town_buildings: Array[Dictionary] = []
 var _fire: Array[Vector2i] = []
 var _torches: Array[Vector2i] = []
 var _lanterns: Array[Vector2i] = []
@@ -102,10 +110,19 @@ func load(terrain: Dictionary) -> void:
 	daylight = bool(terrain.get("daylight", false))
 	outdoor = bool(terrain.get("outdoor", false))
 	region = str(terrain.get("region", Level.DEFAULT_REGION))
-	_roofed.clear()
+	_roofed_whole.clear()
 	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
 		for cell in Level.rect_cells(building["rect"]):
-			_roofed[cell] = true
+			_roofed_whole[cell] = true
+	level = str(terrain.get("level", ""))
+	roofs.clear()
+	town_buildings.clear()
+	for roof: Dictionary in terrain.get("roofs", []):
+		roofs.append(roof["rect"])
+	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
+		if not str(building.get("use", "")).is_empty() and not str(building.get("town_id", "")).is_empty():
+			town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"]})
+	_roofed = _roofed_whole.duplicate()
 	_source_list = []
 	mark_dirty()
 
@@ -247,6 +264,19 @@ func ambient_at(cell: Vector2i) -> float:
 
 
 ## Whether the weather reaches [param cell]: outdoors, not under a roof.
+## The roofed cells open to the sky now: [param cells] (a damaged roof's,
+## Level.broken_cells), the rest roofed again. Light and heat are worked out
+## again if any changed.
+func set_open(cells: Dictionary[Vector2i, bool]) -> void:
+	var roofed := _roofed_whole.duplicate()
+	for cell in cells:
+		roofed.erase(cell)
+	if roofed == _roofed:
+		return
+	_roofed = roofed
+	mark_dirty()
+
+
 func under_sky(cell: Vector2i) -> bool:
 	return outdoor and not _roofed.has(cell)
 

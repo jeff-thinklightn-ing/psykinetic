@@ -958,6 +958,9 @@ var _building_at: Dictionary[Vector2i, int] = {}
 var _roofs_off: Dictionary[int, float] = {}
 ## Town id -> {kind: {state, level}}, as Main was told (set_town).
 var town_states := {}
+## Level -> its damaged roofs' indices, as Main was told (set_roofs,
+## decision 383).
+var roof_states := {}
 ## For each wall and doorway edge, the pieces of its run (_wall_runs), as
 ## the occluders were indexed.
 var _runs: Dictionary[Vector3i, Array] = {}
@@ -2370,7 +2373,8 @@ func _add_roofs() -> void:
 		# Built along z; a ridge along x is the same turned a quarter.
 		holder.rotation.y = PI * 0.5 if along_x else 0.0
 		var span := Vector2(rect.size.y, rect.size.x) if along_x else Vector2(rect.size)
-		var roof := _roof_mesh(str(given.get("set", Level.ROOF_SETS[0])), span.x, span.y)
+		var roof_set := str(given.get("set", Level.ROOF_SETS[0]))
+		var roof := _roof_mesh(roof_set, span.x, span.y)
 		roof.name = "roof"
 		roof.position.y = WALL_HEIGHT
 		holder.add_child(roof)
@@ -2383,10 +2387,12 @@ func _add_roofs() -> void:
 				_add_post(vertex)
 		var index := _buildings.size()
 		_buildings.append({"rect": rect, "node": holder, "roof": roof, "off": false, "roof_at": roof.transform,
-			"use": str(given.get("use", "")), "town_id": str(given.get("town_id", "")), "damaged": false})
+			"use": str(given.get("use", "")), "town_id": str(given.get("town_id", "")), "damaged": false,
+			"roof_index": _terrain.get("roofs", []).find(given), "set": roof_set, "span": span, "along_x": along_x, "holed": false})
 		_show_state(_buildings[index])
 		if _glimpse:
 			continue
+		_show_holes(_buildings[index])
 		var keep_dry := GPUParticlesCollisionBox3D.new()
 		keep_dry.size = Vector3(rect.size.x, WALL_HEIGHT, rect.size.y)
 		keep_dry.position = holder.position + Vector3(0.0, WALL_HEIGHT * 0.5, 0.0)
@@ -2410,7 +2416,7 @@ static func _edge_vertices(key: Vector3i) -> Array[Vector2i]:
 ## gables' edges, the gable ends' triangles in this map's wall set, a roof.<set>.ridge a cell along the ridge and a
 ## roof.<set>.end (a finial) at each end of it, grey stand-ins where the set has no
 ## art yet.
-func _roof_mesh(roof_set: String, across: float, along: float) -> Node3D:
+func _roof_mesh(roof_set: String, across: float, along: float, holes: Array[Vector2] = []) -> Node3D:
 	var profile := ROOF_PROFILE.duplicate()
 	var slot := "roof.%s.profile" % roof_set
 	if ArtKit.has(slot):
@@ -2426,22 +2432,54 @@ func _roof_mesh(roof_set: String, across: float, along: float) -> Node3D:
 	var out := Node3D.new()
 	# The slopes: from the eave, reach past the wall and as far below its
 	# top, to the ridge; a top and an underside, u along the ridge and v
-	# down the slope in metres (material.roof.<set>'s tile_m).
+	# down the slope in metres (material.roof.<set>'s tile_m). Laid a cell
+	# at a time (the overhangs strips of their own), so a hole (a broken
+	# cell's middle in [param holes], the roof's own x and z) is a cell left
+	# out.
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var slope := Vector2(half + reach, apex + reach * pitch).length()
-	for side in [-1.0, 1.0]:
-		var eave := Vector3(side * (half + reach), -reach * pitch, 0.0)
-		var ridge := Vector3(0.0, apex, 0.0)
-		for lift in [thick, 0.0]:
-			var up := Vector3(0.0, lift, 0.0)
-			var corners := [ridge + up + Vector3(0, 0, -length * 0.5), ridge + up + Vector3(0, 0, length * 0.5),
-				eave + up + Vector3(0, 0, length * 0.5), eave + up + Vector3(0, 0, -length * 0.5)]
-			var uvs := [Vector2(0, 0), Vector2(length, 0), Vector2(length, slope), Vector2(0, slope)]
-			for i in [0, 1, 2, 0, 2, 3]:
-				tool.set_uv(uvs[i] / 2.0)
-				tool.add_vertex(corners[i])
+	var down := sqrt(1.0 + pitch * pitch)
+	var cuts: Array[float] = [-half - reach]
+	for k in int(across) + 1:
+		cuts.append(-half + k)
+	cuts.append(half + reach)
+	if not cuts.has(0.0):
+		cuts.append(0.0)
+	cuts.sort()
+	var rows: Array[float] = [-length * 0.5]
+	for k in int(along) + 1:
+		rows.append(-along * 0.5 + k)
+	rows.append(length * 0.5)
+	var height := func(x: float) -> float: return apex - absf(x) * pitch
+	for j in rows.size() - 1:
+		for i in cuts.size() - 1:
+			var x0 := cuts[i]
+			var x1 := cuts[i + 1]
+			var z0 := rows[j]
+			var z1 := rows[j + 1]
+			var middle := Vector2((x0 + x1) * 0.5, (z0 + z1) * 0.5)
+			var cell := Vector2(floorf(middle.x + half) - half + 0.5, floorf(middle.y + along * 0.5) - along * 0.5 + 0.5)
+			if holes.any(func(hole: Vector2) -> bool: return hole.is_equal_approx(cell)):
+				continue
+			for lift in [thick, 0.0]:
+				var corners := [Vector3(x0, height.call(x0) + lift, z0), Vector3(x0, height.call(x0) + lift, z1),
+					Vector3(x1, height.call(x1) + lift, z1), Vector3(x1, height.call(x1) + lift, z0)]
+				for k in [0, 1, 2, 0, 2, 3]:
+					var corner: Vector3 = corners[k]
+					tool.set_uv(Vector2(corner.z + length * 0.5, absf(corner.x) * down) / 2.0)
+					tool.add_vertex(corner)
 	tool.generate_normals()
+	# Each hole dressed: roof.<set>.broken lying on the slope, x down it.
+	if ArtKit.has("roof.%s.broken" % roof_set):
+		for i in holes.size():
+			var hole := holes[i]
+			var piece := ArtKit.instance("roof.%s.broken" % roof_set)
+			piece.name = "Broken_%d" % i
+			var side := 1.0 if hole.x >= 0.0 else -1.0
+			piece.position = Vector3(hole.x, height.call(hole.x) + thick, hole.y)
+			piece.rotation = Vector3(0.0, 0.0 if side > 0.0 else PI, -atan(pitch))
+			out.add_child(piece)
 	var slopes := MeshInstance3D.new()
 	slopes.name = "Slopes"
 	slopes.mesh = tool.commit()
@@ -2512,6 +2550,54 @@ static func _roof_material(roof_set: String) -> StandardMaterial3D:
 		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		_roof_materials[roof_set] = material
 	return _roof_materials[roof_set]
+
+
+## Sets [param level]'s damaged roofs to [param damaged] (their indices,
+## the "roofs" message, decision 383), and draws each of this map's so.
+## Kept across rebuilds: a roof's state is not the map's.
+func set_roofs(level: String, damaged: Array) -> void:
+	roof_states[level] = damaged.map(func(index: Variant) -> int: return int(index))
+	for building in _buildings:
+		if building.has("roof_index"):
+			_show_holes(building)
+
+
+## Roof [param building] drawn as its level has it: damaged, broken open
+## over a third of its cells (Level.broken_cells, the cells the sim opens to
+## the sky), each hole dressed with roof.<set>.broken; else whole. Its mesh
+## is made again either way, its fade and being off kept.
+func _show_holes(building: Dictionary) -> void:
+	var damaged: bool = int(building["roof_index"]) in roof_states.get(str(_terrain.get("level", "")), [])
+	if damaged == building["holed"]:
+		return
+	building["holed"] = damaged
+	var holes: Array[Vector2] = []
+	if damaged:
+		var rect: Rect2i = building["rect"]
+		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+		for cell in Level.broken_cells(rect):
+			var off := Vector2(cell) - middle
+			# Into the roof's own cells: turned a quarter, local x is -z.
+			holes.append(Vector2(-off.y, off.x) if building["along_x"] else off)
+	var was: Node3D = building["roof"]
+	_set_near(was, false)
+	_faded.erase(was)
+	_hid_at.erase(was)
+	_hiding.erase(was)
+	var span: Vector2 = building["span"]
+	var roof := _roof_mesh(str(building["set"]), span.x, span.y, holes)
+	roof.name = "roof"
+	roof.transform = was.transform
+	var holder: Node3D = building["node"]
+	holder.remove_child(was)
+	was.queue_free()
+	holder.add_child(roof)
+	building["roof"] = roof
+	_occluders_built = false
+	if building["off"]:
+		for node in _descendants(roof):
+			if node is GeometryInstance3D:
+				node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 
 ## Sets the buildings of [param town] (its id) to [param buildings] ({kind:

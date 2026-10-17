@@ -7822,3 +7822,34 @@ phrase and rest, tension's layers, the melody's exit), zone_of, tension_from and
 step_tension's rise, hold and fall, the stinger limits, by_take, and the slider at 0. It
 also checks that every music slot is flat on Music. The clip scenario is `sound_music`.
 Client only; no protocol change.
+
+## 383. Roof damage: a third of a roof open to the sky
+
+Roof pieces step (b) (364; the coordinator's design, Jeff's go-ahead
+2026-10-17). A roof is standing or damaged. World keeps the damaged ones
+(`roofs_damaged`, "<level>/<x>,<y>" by the rect's top-left, so an edit
+to a level's list moves no damage onto another roof), saved in the
+snapshot ("roofs", none in a file from before). The hooks are
+`World.damage_roof(level, index)` (environment's storms) and
+`World.repair_roof(level, index)` (economy's repairs), by the roof's
+index in level.json's "roofs"; `damaged_roofs(level)` lists them.
+
+Damaged, a third of its cells are broken (`Level.broken_cells`, a hash of
+each cell, never none) and open to the sky: `Fields.set_open` takes them
+out of the roofed cells, so rain, daylight, weather's sight and hearing
+and the ambience reach in. A town building whose town has it damaged
+(297) opens a third of its footprint the same way, one rule for both
+(`World.open_roofs`, on a damage or mend, a town's change, and a terrain
+read). Clients compute light and the sky too, so they are told: a new
+message kind "roofs" {level, damaged: indices}, on zone entry and on every
+change, applied with `World.roofs_told` (and "town" into
+`World.towns_seen`, a client having no Towns) before the view's light is
+next worked out; the protocol changes by the new kind alone.
+
+The view (`Client3D.set_roofs`, `_show_holes`): a damaged roof's mesh is
+made again with its broken cells left out of the slopes, each hole
+dressed with `roof.<set>.broken` lying on the slope; mended, whole again.
+Its fade and its being off carry over. A building slot keeps its own
+roof_damaged look. Rejected: indices as the saved key (an edit would
+move the damage); keeping the open cells per client from the view (the
+sim's light must agree on every peer).

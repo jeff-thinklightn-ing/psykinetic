@@ -888,6 +888,27 @@ static func roofs_from(config: Dictionary, terrain: Dictionary, buildings: Array
 	return out
 
 
+## The cells of a damaged roof over [param rect] that are broken open to
+## the sky: a third of them by a hash of where each is, the same on every
+## peer and in the sim (Fields) and the view (holes), and never none.
+static func broken_cells(rect: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var least := -1
+	var least_cell := rect.position
+	for cell in rect_cells(rect):
+		var hash := (cell.x * 374761393 + cell.y * 668265263) & 0x7fffffff
+		hash = ((hash ^ (hash >> 13)) * 1274126177) & 0x7fffffff
+		hash = (hash ^ (hash >> 16)) & 0xffff
+		if hash % 3 == 0:
+			out.append(cell)
+		if least < 0 or hash < least:
+			least = hash
+			least_cell = cell
+	if out.is_empty():
+		out.append(least_cell)
+	return out
+
+
 ## A level.json town wall's or roof's rect (null if it has none).
 static func town_wall_rect(entry: Variant) -> Variant:
 	var given: Variant = entry.get("rect") if entry is Dictionary else null
