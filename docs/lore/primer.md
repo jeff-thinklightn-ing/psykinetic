@@ -29,11 +29,11 @@ farmsteads and forest. Its people give directions as north, south, east and west
 Monsters prowl the stone places and the open ground, and they attack whoever they
 see. Fire burns whoever stands in it.
 
-Raiders can kill, but the fallen can be brought back through a medicine man or a
-temple (Jeff). Which of the two, or both; whose temple *(asked: B3)*; what it costs
-and whether it marks the one brought back; whether it is known and spoken of; and
-whether anyone besides those who travel for the town can be brought back are open
-*(asked: B1)*.
+Raiders can kill, but whoever falls, townsfolk too, can be brought back (Jeff).
+The town has a temple, kept by a priest, and out in the wilds stands a healer's
+hut where a medicine man lives; the fallen are brought back at either. Whose
+temple it is *(asked: B3)*, whether being brought back costs anything or marks
+the one brought back, and whether people speak of it are open *(asked: B1)*.
 
 No one has been knighted in ages. Whether there were ever knights in the land,
 and who made them, is open *(asked: A4, H1)*.

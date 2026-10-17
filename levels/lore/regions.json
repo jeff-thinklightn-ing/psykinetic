@@ -103,6 +103,67 @@
 			]
 		},
 		{
+			"id": "temple",
+			"type": "place",
+			"name": "the temple",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "The town's temple, kept by a priest, where the fallen are brought back.",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"return"
+			],
+			"facts": [
+				{
+					"id": "temple.in_town",
+					"text": "The town has a temple, and a priest keeps it.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"return"
+					]
+				},
+				{
+					"id": "temple.whose",
+					"text": "Whose temple it is, and which god it serves.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "B3"
+				}
+			]
+		},
+		{
+			"id": "healers_hut",
+			"type": "place",
+			"name": "the healer's hut",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "A healer's hut out in the wilds, where a medicine man lives and the fallen are brought back.",
+			"place_kind": "other",
+			"relations": [],
+			"tags": [
+				"return"
+			],
+			"facts": [
+				{
+					"id": "healers_hut.in_wilds",
+					"text": "Out in the wilds stands a healer's hut, where a medicine man lives.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"return"
+					]
+				}
+			]
+		},
+		{
 			"id": "castle",
 			"type": "place",
 			"name": "the castle",

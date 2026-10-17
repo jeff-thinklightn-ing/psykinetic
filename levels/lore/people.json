@@ -2,6 +2,62 @@
 	"_about": "Lore data (docs/lore/README.md; decisions 257, 258): entries with facts, each fact saying who knows it. Code uses only status agreed. Facts, never lines to say.",
 	"entries": [
 		{
+			"id": "priest",
+			"type": "person",
+			"name": "the priest",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "The priest who keeps the town's temple and brings the fallen back.",
+			"relations": [
+				{
+					"to": "temple",
+					"kind": "from"
+				}
+			],
+			"tags": [
+				"return"
+			],
+			"facts": [
+				{
+					"id": "priest.brings_back",
+					"text": "The town's priest brings the fallen back.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"return"
+					]
+				}
+			]
+		},
+		{
+			"id": "medicine_man",
+			"type": "person",
+			"name": "the medicine man",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "The medicine man who lives in the healer's hut in the wilds and brings the fallen back.",
+			"relations": [
+				{
+					"to": "healers_hut",
+					"kind": "from"
+				}
+			],
+			"tags": [
+				"return"
+			],
+			"facts": [
+				{
+					"id": "medicine_man.brings_back",
+					"text": "The medicine man in the healer's hut brings the fallen back.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"return"
+					]
+				}
+			]
+		},
+		{
 			"id": "smith",
 			"type": "person",
 			"name": "the smith",

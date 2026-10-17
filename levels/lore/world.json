@@ -40,14 +40,17 @@
 				},
 				{
 					"id": "the_land.brought_back",
-					"text": "The fallen can be brought back through a medicine man or a temple.",
+					"text": "Whoever falls, townsfolk too, can be brought back, at the town's temple or at the healer's hut in the wilds.",
 					"known": "common",
 					"where": [],
-					"source": "Jeff"
+					"source": "Jeff",
+					"tags": [
+						"return"
+					]
 				},
 				{
 					"id": "the_land.bringing_back",
-					"text": "Which brings the fallen back, a medicine man or a temple or both; whose temple; what it costs and whether it marks them; whether it is known and spoken of; and whether anyone besides those who travel for the town can be brought back.",
+					"text": "Whether being brought back costs anything or marks the one brought back, and whether people speak of it.",
 					"known": "common",
 					"where": [],
 					"status": "asked",
