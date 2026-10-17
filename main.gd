@@ -2721,6 +2721,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var resident: Dictionary = record.companion.get("resident", {})
 	if not resident.is_empty() and not record.companion.has("home"):
 		record.companion["home"] = resident.duplicate()  # A record from before decision 381.
+	if not record.companion.has("home"):
+		_fill_home(record)
 	if not resident.is_empty():
 		if str(resident.get("zone", "")) != World.zone.name:
 			print("[net] %s's companion %s works in %s; not here" % [record.name, record.companion.get("name", "?"), resident.get("zone", "?")])
@@ -3340,6 +3342,23 @@ func _on_card_written(pet: Companion, record: PlayerRecord) -> void:
 ## (Towns.note_companion_in), until her player comes back to her zone
 ## (_join_companion). The place and zone are kept in her record. False if
 ## she does not.
+## A home for a record without one (decision 400: Wren worked in the
+## castle's town, but her record was saved without "home" and she could not
+## say so): the town her worker record ("companion:<her name>", Towns')
+## names, as {place, zone, trade}. Nothing when it names none.
+func _fill_home(record: PlayerRecord) -> void:
+	if World.production == null or World.holdings == null:
+		return
+	var worker := World.production.worker("companion:%s" % record.companion.get("name", ""))
+	var place := str(worker.get("town", ""))
+	var zone := str(World.holdings.place(place).get("area", "")) if not place.is_empty() else ""
+	if zone.is_empty():
+		return
+	var trades: Array = worker.get("trades", [])
+	var trade := str(trades[0]) if not trades.is_empty() else str(record.companion.get("traits", {}).get("trade", ""))
+	record.companion["home"] = {"place": place, "zone": zone, "trade": trade}
+
+
 func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	if World.towns == null or World.holdings == null or record.companion.is_empty():
 		return false

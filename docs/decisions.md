@@ -8821,3 +8821,40 @@ to steady; not "struck", the right hand's deed. The party log says "X bashes Y's
 guard open" or "X shoves Y with a shield" (World.shield_bashed). Rejected: a key
 of its own (the hands are the buttons, 329); damage (an interruption, not a
 blow); counting it as the right hand's "struck".
+## 400. What a companion knows of her town and the world, and her not knowing
+
+Jeff's play log (2026-10-17): Wren, working in the castle's town, said "I
+do not know what town you mean"; asked "what is a stag?" she knew nothing,
+though lore has it; and her card took "Wren has not seen Pip before" and a
+belief "she does not know what a stag is", against lore. The coordinator's
+quick fix, with lore's creatures (257 amended) on main first.
+
+Her voice's place line says whether a town is here (a stockpile place of
+this zone's Holdings) and whether she stands on its ground ("There is a
+town here, and you are in it."); the town has no name of its own yet, so
+her home line says "the town here in <zone>" and "You know that town
+well." A record saved without "home" gets one at join from her worker
+record ("companion:<name>", its town's place and area, its first trade).
+
+Her lore words (Companion.lore_words(who, about)) put first what is in
+play: Companion.lore_topics, the kinds of creature she sees, the things
+her player asked about, any lore entry id her player's last line names
+("stag"), and the zone; Lore.known_by with those as about, by weight,
+then the rest by weight, each fact once, within the 600 characters (a
+fact too long for what is left is skipped, not the end of the list).
+
+Her not knowing is never a fact or a belief: CompanionFacts.NOT_KNOWING
+(does not / has not know, seen, met, heard of, recognise; never met or
+heard of; not familiar; wonders who; who that is) drops it when proposed
+and when her record loads, for talk entries only (an event's or a merged
+history's words are kept), so a saved
+record loses only such entries and nothing else of it changes. The
+extraction prompt is shown her lore facts as true of the world, and its
+rules say beliefs are only what someone else told her, never her own
+words, and nothing may go against the world. companion_test and
+resident_test cover it. Protocol unchanged.
+
+Rejected: a town name made up here (lore's to give); dropping not-knowing
+from event facts or histories (an event's are the game's words; a history
+holds more than the not knowing); any "never" ("she will never see home
+again" is a fact).

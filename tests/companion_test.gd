@@ -261,9 +261,9 @@ func _test_knows_her_town() -> void:
 	World.outdoor = outdoors
 	var was: Dictionary = pet.home
 	pet.home = {"place": "elsewhere/store", "zone": "no_such_zone", "trade": "carpenter"}
-	_check(pet.standing_words() == "You rest in no such zone between trips, and work there as a carpenter.", "her home town, kept while she travels: %s" % pet.standing_words())
+	_check(pet.standing_words() == "You rest in the town in no such zone between trips, and work there as a carpenter.", "her home town, kept while she travels: %s" % pet.standing_words())
 	pet.home = {"place": World.zone.name + "/store", "zone": World.zone.name, "trade": ""}
-	_check("you know it well" in pet.standing_words() and pet.standing_words() in pet.voice_prompt("test"), "in it now: she knows it well, and her voice is told (%s)" % pet.standing_words())
+	_check("You know that town well." in pet.standing_words() and pet.standing_words() in pet.voice_prompt("test"), "in it now: she knows it well, and her voice is told (%s)" % pet.standing_words())
 	pet.home = was
 	Lore.use([{"id": "town", "status": "agreed", "facts": [
 			{"id": "t1", "status": "agreed", "known": "common", "text": "The town has a temple.", "weight": 2.0},
@@ -276,6 +276,42 @@ func _test_knows_her_town() -> void:
 		"what lore says the townsfolk know: weightiest first, a rumour as said, no draft (%s)" % known)
 	_check("Pip wants to become a squire." in Companion.lore_words("Pip") and "squire" not in known, "a companion lore names knows her own (Pip)")
 	_check(known in pet.voice_prompt("test"), "and her voice is told it")
+	_check(pet.town_words().is_empty() and "There is a town" not in pet.where_world(), "no town in this zone: no town line")
+	# Topics first (decision 400): what was asked about leads, past the 600 characters.
+	var many: Array[Dictionary] = []
+	for i in 30:
+		many.append({"id": "f%d" % i, "status": "agreed", "known": "common", "text": "Filler fact number %d is weighty." % i, "weight": 5.0})
+	Lore.use([{"id": "filler", "status": "agreed", "facts": many},
+		{"id": "stag", "status": "agreed", "facts": [{"id": "s1", "status": "agreed", "known": "common", "text": "A stag is a male deer, and its antlers fall each winter.", "weight": 0.5}]}],
+		[{"id": "townsfolk", "status": "agreed", "where": [], "tags": []}])
+	_check("stag" not in Companion.lore_words(String(pet.name)), "a light fact falls past the 600 characters")
+	var topical := Companion.lore_words(String(pet.name), PackedStringArray(["stag"]))
+	_check(topical.begins_with("What you know of the world: A stag is a male deer, and its antlers fall each winter. Filler") and topical.count("A stag") == 1,
+		"asked about, it comes first, once: %s" % topical.left(90))
+	pet._exchange.append({"role": "user", "text": "What is a stag?", "speaker": pet.keeper_name()})
+	_check("stag" in pet.lore_topics([]), "her player naming a lore entry makes it a topic: %s" % [pet.lore_topics([])])
+	_check("A stag is a male deer, and its antlers fall each winter." in pet.voice_prompt("test"), "and her voice is told of it")
+	pet._exchange.clear()
+	# Her not knowing is never a fact or belief (decision 400).
+	_check(CompanionFacts.not_knowing("Wren has not seen Pip before.") and CompanionFacts.not_knowing("She does not know what a stag is.")
+		and CompanionFacts.not_knowing("Wren never met Pip.") and not CompanionFacts.not_knowing("Wren will never see her home again.")
+		and not CompanionFacts.not_knowing("Wren likes Pip's carpentry.") and not CompanionFacts.not_knowing("Wren knows the castle well."),
+		"not knowing is caught; liking and knowing are not")
+	var grown := CompanionFacts.new()
+	_check(grown.add_fact("Wren has not seen Pip before.", "talk", "p").is_empty() and not grown.add_fact("Wren likes Pip's carpentry.", "talk", "p").is_empty(),
+		"proposed in talk: the not knowing is dropped, the liking kept")
+	_check(not grown.add_fact("Wren has not seen the sea since the war.", "event", "p").is_empty(), "an event fact is kept whatever its words")
+	var clean := [{"id": "f1", "text": "Wren likes Pip's carpentry.", "from": "talk", "when": 5, "player": "p"},
+		{"id": "f2", "text": "Wren has not seen the sea since the war.", "from": "event", "when": 6, "player": "p"}]
+	var clean_beliefs := [{"id": "b3", "text": "Wolves fear fire.", "from": "talk", "when": 7, "player": "p"}]
+	var loaded := CompanionFacts.from_record(clean.duplicate(true), clean_beliefs.duplicate(true))
+	_check(loaded.facts == clean and loaded.beliefs == clean_beliefs, "a record without such a fact loads unchanged: %s" % [loaded.facts])
+	var bad := clean.duplicate(true)
+	bad.insert(1, {"id": "f4", "text": "Wren has not seen Pip before.", "from": "talk", "player": "p"})
+	var bad_beliefs := clean_beliefs.duplicate(true)
+	bad_beliefs.append({"id": "b5", "text": "She does not know what a stag is.", "from": "talk", "player": "p"})
+	loaded = CompanionFacts.from_record(bad, bad_beliefs)
+	_check(loaded.facts == clean and loaded.beliefs == clean_beliefs, "one with them loads without them, all else as it was: %s / %s" % [loaded.facts, loaded.beliefs])
 
 	Lore.reload()
 

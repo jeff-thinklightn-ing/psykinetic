@@ -19,7 +19,9 @@ List anything new that is now true of %s and her own past, people she knows, wha
 said of herself, or that %s said of her and she went along with. Leave out what %s said that she did not take up,
 and anything said in jest or out of the story. Leave out anything already listed, and anything that goes against
 what is already true. What either of them claims about the world itself (places, peoples, history, the land) is not
-a fact about her: put what she claims or agrees with under beliefs. Write each as one plain sentence in the third
+a fact about her. Under beliefs put only what someone else told her about the world and she took up, never her own words.
+What she says she does not know, has not seen or does not recognise is neither a fact nor a belief: leave it out. Nothing
+may go against what is true of the world. Write each as one plain sentence in the third
 person, naming her. Usually there is nothing new. Reply with one JSON object and nothing else:
 {"facts": ["..."], "beliefs": ["..."]}."""
 ## The merge, when her facts are over the cap: the oldest of what she
@@ -27,6 +29,11 @@ person, naming her. Usually there is nothing new. Reply with one JSON object and
 const MERGE_SYSTEM := """You keep the record of a character in a story. Tell these things that happened to %s as her history,
 in two or three plain sentences in the third person, keeping what matters most. Reply with one JSON object and
 nothing else: {"facts": ["<the history>"]}."""
+## Her not knowing, which is never a fact or a belief (decision 400: "I
+## don't know who Pip is" became "Wren has not seen Pip before", against
+## lore, and "she does not know what a stag is" a belief): dropped when
+## proposed in talk and when her record loads (talk entries only).
+const NOT_KNOWING := "(?i)\\b(does not|doesn't|did not|didn't|has not|hasn't|have not|haven't|had not|cannot|can't) (know|knew|seen|see|saw|met|meet|heard of|recogni[sz]e\\w*|remember\\w*)\\b|\\bnever (met|heard of|knew)\\b|\\bunfamiliar\\b|\\bnot familiar\\b|\\bnew to her\\b|\\bwonders? (who|what)\\b|\\bwho (that|he|she|they) (is|was|are|were)\\b|\\bunknown to her\\b"
 ## Most a call may add, and the longest an entry is.
 const PER_CALL := 4
 const ENTRY_MAX := 200
@@ -62,7 +69,7 @@ static func _entries(saved: Variant) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if saved is Array:
 		for entry: Variant in saved:
-			if entry is Dictionary and str(entry.get("text", "")) != "":
+			if entry is Dictionary and str(entry.get("text", "")) != "" and not (str(entry.get("from", "talk")) == "talk" and not_knowing(str(entry["text"]))):
 				out.append({"id": str(entry.get("id", "")), "text": str(entry["text"]), "from": str(entry.get("from", "talk")),
 					"when": int(entry.get("when", 0)), "player": str(entry.get("player", ""))})
 	return out
@@ -82,9 +89,16 @@ func add_belief(text: String, player_id: String) -> Dictionary:
 	return added
 
 
+## Whether [param text] says only that she does not know (NOT_KNOWING).
+static func not_knowing(text: String) -> bool:
+	return RegEx.create_from_string(NOT_KNOWING).search(text) != null
+
+
 func _add(into: Array[Dictionary], prefix: String, text: String, from: String, player_id: String) -> Dictionary:
 	var said := text.strip_edges()
 	if said.is_empty() or said.length() > ENTRY_MAX or said.contains("\"") or said.contains("“"):
+		return {}
+	if from == "talk" and not_knowing(said):
 		return {}
 	if not said.ends_with(".") and not said.ends_with("!") and not said.ends_with("?"):
 		said += "."
@@ -161,15 +175,16 @@ func prompt_words() -> String:
 
 ## The extraction's user message: her card, what is true and believed,
 ## and what was said.
-func extract_prompt(card: String, lines: Array[String]) -> String:
+func extract_prompt(card: String, lines: Array[String], world := "") -> String:
 	var known: Array[String] = []
 	for entry in facts:
 		known.append("- " + str(entry["text"]))
 	var held: Array[String] = []
 	for entry in beliefs:
 		held.append("- " + str(entry["text"]))
-	return "Her card: %s\n\nAlready true of her:\n%s\n\nShe believes:\n%s\n\nWhat was just said:\n%s" % [
-		card, "\n".join(known) if not known.is_empty() else "- nothing more yet",
+	var true_of_world := "\n\nTrue of the world, as she knows it (nothing may go against it): %s" % world.trim_prefix("What you know of the world: ") if not world.is_empty() else ""
+	return "Her card: %s%s\n\nAlready true of her:\n%s\n\nShe believes:\n%s\n\nWhat was just said:\n%s" % [
+		card, true_of_world, "\n".join(known) if not known.is_empty() else "- nothing more yet",
 		"\n".join(held) if not held.is_empty() else "- nothing yet", "\n".join(lines)]
 
 

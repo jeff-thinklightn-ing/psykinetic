@@ -118,6 +118,28 @@ func _test_stays_when_told() -> void:
 	pet.home = old.companion.get("home", {})
 	_check(pet.standing_words().is_empty(), "a record from before with no home: no home-town line, nothing else changed")
 	pet.home = record.companion["home"]
+	var kept: Dictionary = record.companion["home"].duplicate()
+	record.companion.erase("home")
+	_main._fill_home(record)
+	_check(record.companion.get("home", {}) == kept, "a record saved with no home gets its town from her worker record (decision 400): %s" % [record.companion.get("home", {})])
+	var nobody := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	nobody.companion.erase("home")
+	nobody.companion["name"] = "Nobody_in_town"
+	_main._fill_home(nobody)
+	_check(not nobody.companion.has("home"), "and none when no worker record names a town")
+	_check("You rest in the town here in " in pet.standing_words() and "You know that town well." in pet.standing_words(),
+		"in her town: the town here, known well (%s)" % pet.standing_words())
+	_check(pet.town_words() == " There is a town here, and you are in it." and pet.town_words() in pet.where_world(),
+		"on its ground: a town here, and she is in it (decision 400)")
+	var outside := Vector2i(-1, -1)
+	for x in range(0, 40):
+		for y in range(0, 40):
+			if outside.x < 0 and World.is_free(Vector2i(x, y)) and Stockpile.place_at(World.holdings, TOWN, Vector2i(x, y)).is_empty():
+				outside = Vector2i(x, y)
+	if outside.x >= 0:
+		_put(pet, outside)
+		_check(pet.town_words() == " There is a town here.", "off its ground, in the same zone: a town here (%s)" % outside)
+		_put(pet, ground)
 
 
 func _test_stays_when_left() -> void:

@@ -1475,7 +1475,7 @@ func _grow() -> void:
 		var who := keeper_name()
 		var me := _name_of(self)
 		var ask := {"kind": "facts", "serial": _serial, "trigger": "talk",
-			"system": CompanionFacts.EXTRACT_SYSTEM % [me, who, me, who, who], "user": grown.extract_prompt(card, talk)}
+			"system": CompanionFacts.EXTRACT_SYSTEM % [me, who, me, who, who], "user": grown.extract_prompt(card, talk, Companion.lore_words(me))}
 		talk.clear()
 		facts_changed.emit()
 		var answer := mind.facts(ask)
@@ -1534,7 +1534,23 @@ func _take_facts(trigger: String, answer: Dictionary, entry: Dictionary) -> void
 ## Her voice's world: STONE_WORLD or OPEN_WORLD by the zone, the place's
 ## name, then VOICE_WORLD.
 func where_world() -> String:
-	return "%s This place is %s.\n%s" % [OPEN_WORLD if World.outdoor else STONE_WORLD, _place_words(), VOICE_WORLD]
+	return "%s This place is %s.%s\n%s" % [OPEN_WORLD if World.outdoor else STONE_WORLD, _place_words(), town_words(), VOICE_WORLD]
+
+
+## Whether a town is here (a store place in this zone's Holdings), and
+## whether she stands on its ground (decision 400: "It's safer here in
+## town" got "I do not know what town you mean"); "" for none. The town
+## has no name of its own yet (lore's A1), so it is "the town".
+func town_words() -> String:
+	if World.holdings == null or World.zone == null:
+		return ""
+	var towns := World.holdings.places_in(World.zone.name).filter(func(id: String) -> bool:
+		return World.holdings.place(id).get("kind") == "stockpile")
+	if towns.is_empty():
+		return ""
+	if not Stockpile.place_at(World.holdings, World.zone.name, tile).is_empty():
+		return " There is a town here, and you are in it."
+	return " There is a town here."
 
 
 ## Her home town in words (decision 381), "" for none: where she rests
@@ -1543,11 +1559,13 @@ func standing_words() -> String:
 	var zone := str(home.get("zone", ""))
 	if zone.is_empty():
 		return ""
-	var town := place_name(zone)
+	var here := World.zone != null and World.zone.name == zone
 	var trade := str(home.get("trade", ""))
-	var out := "You rest in %s between trips%s." % [town, ", and work there as %s" % _a(trade) if not trade.is_empty() else ""]
-	if World.zone != null and World.zone.name == zone:
-		out += " You are in %s now; you know it well." % town
+	# "the town" (it has no name yet): its zone's name alone read as no town.
+	var out := "You rest in the town %s %s between trips%s." % ["here in" if here else "in", place_name(zone),
+		", and work there as %s" % _a(trade) if not trade.is_empty() else ""]
+	if here:
+		out += " You know that town well."
 	return out
 
 
@@ -1555,10 +1573,19 @@ func standing_words() -> String:
 ## knower (a companion lore names: Wren, Pip, Nix), else the townsfolk's;
 ## agreed facts only, weightiest first, within LORE_CHARS, a rumour as what
 ## is said. "" for none.
-static func lore_words(who: String) -> String:
+static func lore_words(who: String, about := PackedStringArray()) -> String:
 	var knower := who.to_lower() if Lore.knowers().has(who.to_lower()) else "townsfolk"
-	var facts := Lore.known_by(knower, PackedStringArray(), "agreed")
-	facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["weight"]) > float(b["weight"]))
+	var by_weight := func(a: Dictionary, b: Dictionary) -> bool: return float(a["weight"]) > float(b["weight"])
+	# What is in sight or was asked about first (decision 400: "what is a
+	# stag" fell past the 600 characters), then the rest by weight.
+	var facts: Array[Dictionary] = []
+	if not about.is_empty():
+		facts = Lore.known_by(knower, about, "agreed")
+		facts.sort_custom(by_weight)
+	var rest := Lore.known_by(knower, PackedStringArray(), "agreed")
+	rest.sort_custom(by_weight)
+	var ids := facts.map(func(fact: Dictionary) -> String: return str(fact["id"]))
+	facts.append_array(rest.filter(func(fact: Dictionary) -> bool: return str(fact["id"]) not in ids))
 	var said: Array[String] = []
 	var length := 0
 	for fact in facts:
@@ -1566,13 +1593,33 @@ static func lore_words(who: String) -> String:
 		if bool(fact.get("hearsay", false)):
 			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
 		if length + text.length() > LORE_CHARS:
-			break
+			continue
 		length += text.length() + 1
 		said.append(text)
 	return "What you know of the world: %s" % " ".join(said) if not said.is_empty() else ""
 
 
 ## A zone's shown name ("The Castle"), its own name when it has none.
+## What her lore facts should start with (decision 400): the kinds of
+## creature she sees, the things asked about, and this place.
+func lore_topics(things: Array[Dictionary]) -> PackedStringArray:
+	var out := PackedStringArray()
+	for thing in things:
+		if thing.get("monster", false) and str(thing["kind"]) not in out:
+			out.append(str(thing["kind"]))
+	var said := keeper_said()
+	for kind in _asked_in(said):
+		if kind not in out:
+			out.append(kind)
+	# A lore entry her player named ("what is a stag?").
+	for id: String in Lore.entries():
+		if id not in out and not said.is_empty() and RegEx.create_from_string("\\b%ss?\\b" % id.replace("_", " ")).search(said) != null:
+			out.append(id)
+	if World.zone != null:
+		out.append(World.zone.name)
+	return out
+
+
 static func place_name(zone_name: String) -> String:
 	if not _place_names.has(zone_name):
 		var shown := str(Level.load_level(zone_name).get("display_name", "")) if Level.exists(zone_name) else ""
@@ -1660,7 +1707,7 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing
-	var known := Companion.lore_words(_name_of(self))
+	var known := Companion.lore_words(_name_of(self), lore_topics(things))
 	var system := "%s %s%s%s\n\n%s%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, where_world(),
 		"\n" + known if not known.is_empty() else "", " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who]]
@@ -2057,16 +2104,25 @@ static var _asked_words: Dictionary[String, RegEx] = {}
 ## The kinds of thing (as perceived names them, a door as "door") her
 ## player's last words to her named: "Where's the fire?" -> ["fire"].
 func asked_about() -> Array[String]:
-	const WORDS := {
-		"fire": "fire|flame|burn", "water": "water|pool|lake|river", "stair": "stair|steps",
-		"ledge": "ledge|drop|edge|cliff", "door": "door", "crate": "crate|box", "boulder": "boulder|rock",
-		"cart": "cart", "chest": "chest", "torch": "torch",
-	}
+	return _asked_in(keeper_said())
+
+
+## Her player's last line to her, lower case ("" for none).
+func keeper_said() -> String:
 	var said := ""
 	for turn in _exchange:
 		if turn["role"] == "user" and not str(turn["text"]).begins_with("[") \
 				and str(turn.get("speaker", keeper_name())) == keeper_name():
 			said = str(turn["text"]).to_lower()
+	return said
+
+
+func _asked_in(said: String) -> Array[String]:
+	const WORDS := {
+		"fire": "fire|flame|burn", "water": "water|pool|lake|river", "stair": "stair|steps",
+		"ledge": "ledge|drop|edge|cliff", "door": "door", "crate": "crate|box", "boulder": "boulder|rock",
+		"cart": "cart", "chest": "chest", "torch": "torch",
+	}
 	if _asked_words.is_empty():
 		for kind: String in WORDS:
 			_asked_words[kind] = RegEx.create_from_string("\\b(%s)" % WORDS[kind])
