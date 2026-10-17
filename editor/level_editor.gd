@@ -77,6 +77,8 @@ const ROUTE_FAINT := Color(0.35, 0.85, 1.0, 0.3)
 const POINT := Color(1.0, 0.55, 0.15, 0.9)
 const SELECTED := Color(0.3, 1.0, 0.5, 0.95)
 const AREA := Color(0.45, 0.8, 1.0, 0.9)
+## A roof's outline and ridge (level.json "roofs", decision 364).
+const ROOF := Color(0.85, 0.5, 0.3, 0.9)
 const NOWHERE := Vector2i(-1, -1)
 ## The idle modes the panel offers; "" is the kind's own (Monster.idle_of).
 const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", "none"]
@@ -163,6 +165,9 @@ var grove_clearing := false
 var scatter_density := 0.05
 var scatter_things: Array[String] = ["boulder", "crate"]
 var fence_gate := "south"
+## The ridge a roof laid over the area runs along: "x", "z", or "" (along
+## its long side).
+var roof_ridge := ""
 ## The path tool's points, width and ground.
 var path_points: Array[Vector2i] = []
 var path_width := 2
@@ -563,6 +568,40 @@ func fill_area(fill: String) -> void:
 	_last_fill_depth = _undo.size()
 	report = "%s in %d x %d at %d, %d, seed %d%s" % [fill, area.size.x, area.size.y, area.position.x, area.position.y,
 		tool_seed, "" if changed else ": nothing to change"]
+	_refresh_panel()
+
+
+## Roofs the area (level.json "roofs", decision 364) in the first roof set,
+## its ridge roof_ridge, replacing any roof over its cells; [param remove]
+## takes those away instead. One undo step; none if Level would leave the
+## roof out (its warning in the report).
+func roof_area(remove := false) -> void:
+	if area.size == Vector2i.ZERO:
+		return
+	var old: Array = (doc.config["roofs"] as Array).duplicate(true) if doc.config.get("roofs") is Array else []
+	var roofs := old.filter(func(entry: Variant) -> bool:
+		var at: Variant = Level.town_wall_rect(entry)
+		return at == null or not (at as Rect2i).intersects(area))
+	var gone := old.size() - roofs.size()
+	if remove:
+		if gone > 0:
+			apply_changes({"config": {"roofs": roofs}})
+		report = "took away %d roofs" % gone
+		_refresh_panel()
+		return
+	var entry := {"rect": [area.position.x, area.position.y, area.size.x, area.size.y], "set": Level.ROOF_SETS[0]}
+	if roof_ridge in ["x", "z"]:
+		entry["ridge"] = roof_ridge
+	roofs.append(entry)
+	apply_changes({"config": {"roofs": roofs}})
+	var level := doc.parsed()
+	if not (level["roofs"] as Array).any(func(roof: Dictionary) -> bool: return roof["rect"] == area):
+		undo()
+		var at := "the roof at %s" % [area.position]
+		report = "no roof: " + "; ".join((level["warnings"] as Array).filter(func(warning: String) -> bool: return warning.begins_with(at)))
+	else:
+		report = "a roof over %d x %d at %d, %d%s" % [area.size.x, area.size.y, area.position.x, area.position.y,
+			" (replacing %d)" % gone if gone > 0 else ""]
 	_refresh_panel()
 
 
@@ -986,6 +1025,21 @@ func _refresh_panel() -> void:
 	_panel_label("Esc lets go", 20)
 
 
+## The level's roofs (level.json "roofs"): each outlined, its ridge a line
+## down its middle the way it runs.
+func _draw_roofs() -> void:
+	for entry: Variant in doc.config.get("roofs", []) if doc.config.get("roofs") is Array else []:
+		var at: Variant = Level.town_wall_rect(entry)
+		if at == null:
+			continue
+		var rect := Rect2(Vector2((at as Rect2i).position) * CELL, Vector2((at as Rect2i).size) * CELL)
+		draw_rect(rect.grow(-CELL * 0.1), ROOF, false, 3.0)
+		var ridge := str(entry.get("ridge", "x" if rect.size.x > rect.size.y else "z"))
+		var middle := rect.get_center()
+		var half := Vector2(rect.size.x * 0.5 - CELL * 0.1, 0.0) if ridge == "x" else Vector2(0.0, rect.size.y * 0.5 - CELL * 0.1)
+		draw_line(middle - half, middle + half, ROOF, 3.0)
+
+
 ## The area tool's panel: the area, and a name to save it under as a prefab.
 func _area_panel() -> void:
 	_panel_label("Area", 30)
@@ -1046,6 +1100,15 @@ func _area_panel() -> void:
 		var gate := _panel_button(fence_row, side if not side.is_empty() else "none", _set_tool.bind("fence_gate", side))
 		gate.toggle_mode = true
 		gate.button_pressed = side == fence_gate
+	var roof_row := HBoxContainer.new()
+	_panel.add_child(roof_row)
+	_panel_label_in(roof_row, "roof: ridge")
+	for ridge: String in ["", "x", "z"]:
+		var along := _panel_button(roof_row, ridge if not ridge.is_empty() else "long side", _set_tool.bind("roof_ridge", ridge))
+		along.toggle_mode = true
+		along.button_pressed = ridge == roof_ridge
+	_panel_button(roof_row, "roof it", roof_area)
+	_panel_button(roof_row, "take roofs off", roof_area.bind(true))
 	_panel_label("Heights", 26)
 	var heights_row := HBoxContainer.new()
 	_panel.add_child(heights_row)
@@ -1366,6 +1429,7 @@ func _draw() -> void:
 					_draw_edge(key, AUTO_WALL, 4.0)
 	for key: Vector3i in map.edges:
 		_draw_edge(key, WALL if map.edges[key] == "wall" else DOOR, 8.0, map.edges[key] == "door")
+	_draw_roofs()
 	_draw_monsters()
 	if area.size != Vector2i.ZERO:
 		var rect := Rect2(Vector2(area.position) * CELL, Vector2(area.size) * CELL)

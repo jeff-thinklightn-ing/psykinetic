@@ -497,6 +497,27 @@ func _test_area_tools() -> void:
 	_check(editor.map.edge(Vector3i(8, 11, Terrain.SOUTH)) == "door", "a gate in the middle of its south side")
 	_check(editor.map.edges.size() == 2 * 12 + 2 * 10, "and nothing else (%d edges)" % editor.map.edges.size())
 
+	# A roof over it (decision 364): one undo step; again with a ridge given,
+	# the first replaced; over water, refused with Level's word; taken off.
+	depth = editor._undo.size()
+	editor.roof_area()
+	_check(editor.doc.config.get("roofs") == [{"rect": [2, 2, 12, 10], "set": "shingle"}] and editor._undo.size() == depth + 1,
+			"roof it: a shingle roof over the area, one undo step (%s)" % [editor.doc.config.get("roofs")])
+	editor.roof_ridge = "z"
+	editor.roof_area()
+	_check(editor.doc.config.get("roofs") == [{"rect": [2, 2, 12, 10], "set": "shingle", "ridge": "z"}] and editor.report.contains("replacing 1"),
+			"again with its ridge along z: the old one replaced (%s)" % editor.report)
+	editor.apply_changes({"cells": {Vector2i(5, 5): "water"}})
+	editor.roof_ridge = ""
+	var roofs_before: Variant = editor.doc.config.get("roofs").duplicate(true)
+	depth = editor._undo.size()
+	editor.roof_area()
+	_check(editor.doc.config.get("roofs") == roofs_before and editor._undo.size() == depth and editor.report.contains("not all over clear floor"),
+			"over water: no roof, the old kept, Level's warning said (%s)" % editor.report)
+	editor.undo()
+	editor.roof_area(true)
+	_check(editor.doc.config.get("roofs") == [] and editor.report == "took away 1 roofs", "take roofs off: gone (%s)" % editor.report)
+
 	print("
 == the path tool ==")
 	_key(editor, KEY_T)

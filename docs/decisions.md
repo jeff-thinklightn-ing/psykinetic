@@ -7437,6 +7437,15 @@ walled outline (a market stall is a roof on posts). Later: hip roofs; roof
 damage of its own (a third of its cells broken and open to the sky,
 `World.damage_roof` and `repair_roof`, a "roofs" message: step b); the
 builder tool (builder) and the editor's rect drag (step c).
+
+Amended (step c): the editor's area tool roofs the dragged rect
+(`LevelEditor.roof_area`, "roof it" with its ridge along the long side, x
+or z; "take roofs off"), one undo step, replacing any roof over its cells,
+and refused with Level's own warning when `Level.roofs_from` would leave it
+out (asked of the parsed roofs, not by new warnings: a replaced roof over
+the same rect says the same words). The editor's map outlines each roof
+with its ridge.
+
 ## 363. A companion's voice on the Claude API, an experiment
 
 Jeff's go-ahead (2026-10-17), the coordinator's design approved: to compare
