@@ -2620,7 +2620,7 @@ func _tend_ailments() -> void:
 			elif (int(ail[0]) - tick) % int(ail[1]) == 0:
 				# No blow: the wound breaks no calm, so a bleeding body can be
 				# bandaged (calm, BANDAGE_CALM_TICKS; decision 375).
-				var hurt := entity.hurt_tick
+				var hurt: int = entity.hurt_tick
 				damage(entity, int(ail[2]), null, &"fire" if kind == "burn" else &"bleed")
 				entity.hurt_tick = hurt
 				if not _alive(entity):
