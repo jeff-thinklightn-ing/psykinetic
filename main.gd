@@ -188,6 +188,9 @@ var _claims_asks: Array[Dictionary] = []
 var _claims_out: Dictionary[int, Dictionary] = {}
 var _claims_at: Dictionary[String, int] = {}
 var _resident_serial := 0
+## Serial -> worker id: a resident's card asked of the model (decision 398),
+## once, the first time they are spoken to; the plain card stands until then.
+var _resident_cards_out: Dictionary = {}
 var _companions: Dictionary[String, Companion] = {}
 ## Server only: the companions whose voice is on the Claude API (decision
 ## 363, the console's `mind claude`), by player id -> model id; for this
@@ -1611,6 +1614,8 @@ func _boot() -> void:
 		return {"name": str(record.companion.get("name", "")), "trade": str(record.companion.get("traits", {}).get("trade", ""))}
 	# Prices, and each player's own gold.
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
+	# Residents' cards grow from the town's events (decision 398).
+	Townsfolk.watch(World.production, World.towns)
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
@@ -3012,6 +3017,7 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 ## Server: [param body] is asked [param line] by [param speaker]: an ask
 ## waits for the resident mind, replacing one of theirs still waiting.
 func _ask_resident(body: Resident, speaker: String, line: String) -> void:
+	_write_resident_card(body)
 	_resident_serial += 1
 	var id := body.get_instance_id()
 	_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
@@ -3019,11 +3025,51 @@ func _ask_resident(body: Resident, speaker: String, line: String) -> void:
 	Transcript.record(body.person, speaker, line)
 
 
+## A town's resident spoken to for the first time: its card's paragraph is
+## asked of the resident mind once (decision 398, as a companion's is,
+## 293: the "card" channel, off the tick), kept on the worker record when
+## it comes; the plain card stands until then, or for good without a
+## model. A companion resting in town has her own card.
+func _write_resident_card(body: Resident) -> void:
+	if not body.player_id.is_empty() or World.production == null:
+		return
+	var card := Townsfolk.card_of(World.production, body.worker_id)
+	if card.is_empty() or str(card.get("card_by", "")) == "model" or body.worker_id in _resident_cards_out.values():
+		return
+	if _resident_mind == null:
+		_resident_mind = _make_mind()
+	if _resident_mind.busy("card"):
+		return
+	_resident_serial += 1
+	_resident_cards_out[_resident_serial] = body.worker_id
+	var ask := {"kind": "card", "serial": _resident_serial, "trigger": "%s's card, from the facts" % body.person,
+		"system": ResidentCard.CARD_SYSTEM, "user": ResidentCard.facts(card)}
+	var answer := _resident_mind.card(ask)
+	if not answer.is_empty():
+		_resident_card_written(_resident_serial, answer, "")
+
+
+## The resident mind's answer to a card ask: taken if it is a paragraph
+## with no speech in it (ResidentCard.take_written), else the plain card
+## stands; logged either way.
+func _resident_card_written(serial: int, answer: Dictionary, error: String) -> void:
+	var worker_id := str(_resident_cards_out.get(serial, ""))
+	_resident_cards_out.erase(serial)
+	if worker_id.is_empty() or World.production == null:
+		return
+	var card := Townsfolk.card_of(World.production, worker_id)
+	var taken := not card.is_empty() and ResidentCard.take_written(card, str(answer.get("card", "")))
+	if taken:
+		World.production.set_card(worker_id, card)
+	MindLog.record({"kind": "card", "companion": str(card.get("traits", {}).get("name", worker_id)), "mind": "resident",
+		"say": str(answer.get("card", "")), "error": error, "outcome": "applied" if taken else "rejected"})
+
+
 ## Server, every tick: the resident mind's answers taken; asks waited too
 ## long dropped; the next sent when the resident mind is free and no
 ## companion's voice is out (residents yield to companions).
 func _resident_voices() -> void:
-	if _resident_asks.is_empty() and _resident_out.is_empty() and _claims_asks.is_empty() and _claims_out.is_empty():
+	if _resident_asks.is_empty() and _resident_out.is_empty() and _claims_asks.is_empty() and _claims_out.is_empty() and _resident_cards_out.is_empty():
 		return
 	if _resident_mind == null:
 		_resident_mind = _make_mind()
@@ -3033,6 +3079,9 @@ func _resident_voices() -> void:
 			_claims_out.erase(int(result.get("serial", 0)))
 			if not asked.is_empty():
 				_claims_answered(asked, result.get("answer", {}), str(result.get("error", "")))
+			continue
+		if str(result.get("kind", "")) == "card":
+			_resident_card_written(int(result.get("serial", 0)), result.get("answer", {}), str(result.get("error", "")))
 			continue
 		var out: Dictionary = _resident_out.get(int(result.get("serial", 0)), {})
 		_resident_out.erase(int(result.get("serial", 0)))

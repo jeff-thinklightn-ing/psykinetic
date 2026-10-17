@@ -1,0 +1,19 @@
+{
+	"_note": "What a town resident is made of (npc's resident cards): rolled once by worker id (ResidentCard.roll) when first needed and kept on the worker record ('card'), so the same resident rolls the same. Each entry is a few plain words, never prose or a line to say; no place is named (the land's and the town's names are open: lore's primer). 'came' is how they came to the town when the record's origin says nothing real; a rescued resident's is written from the rescue instead. 'kin' and 'grudge' are rolled at founding against a neighbour already in the town (chance per 1). 'growth' caps the facts a card gathers from events.",
+	"pronoun": ["she", "she", "he", "he"],
+	"birthplace": ["this town", "a farmstead east of the town", "a charcoal burners' hamlet in the forest", "a mill on a stream", "a village beyond the fields", "a steading a long road to the south", "a shepherds' hut in the hills", "the inn, in a room over the yard"],
+	"parentage": ["a farmer's child", "a woodcutter's child", "a miller's child", "raised by a widowed aunt", "a foundling left at the temple door", "the eldest of six", "a tinker's child", "a shepherd's child"],
+	"came": ["born here, and never left", "came as a child when the family farm failed", "came after the raiders burned the village", "came with a caravan and stayed when it moved on", "walked in alone one winter and found work", "married into the town", "came looking for a brother who had gone ahead, and never found him", "came to work the forge for a season and stayed"],
+	"hobby": ["keeping bees", "whittling spoons", "singing at the inn", "dice behind the forge", "growing herbs by the door", "watching the road from the wall", "keeping pigeons", "telling old tales to the children"],
+	"food": ["fresh bread", "pease pottage", "roast roots", "smoked pork", "apples", "honey on anything", "plain porridge", "strong cheese"],
+	"temperament": ["steady and watchful", "quick and wary", "warm and talkative", "quiet and patient", "blunt and fearless", "cheerful when things go hard", "careful and thoughtful", "sour and sharp-eyed"],
+	"fear": ["the raiders coming at night", "the dark", "fire", "sickness", "losing the house", "deep water", "the old mine", "being carried off"],
+	"speech": ["short, whole sentences", "a plain, warm way", "a dry, wry way", "a careful, precise way", "a blunt way, with no softening", "an easy, friendly way"],
+	"kin": {"chance": 0.35, "kinds": ["sister or brother", "cousin", "parent and child"]},
+	"grudge": {"chance": 0.25, "causes": ["over a fence line", "over a bad knife sold", "over a debt never repaid", "over a word said at the inn", "over a dog", "over a share of a harvest", "over a promise broken"]},
+	"look": {"_note": "What a resident looks like, rolled with the card by worker id, words the voice can say and pc-character's generator maps to a body (seed: the id's hash, for the details no word names); agreed with pc-character 2026-10-17.",
+		"build": ["lean", "middling", "middling", "heavy"], "stature": ["short", "middling", "middling", "tall"], "posture": ["straight", "straight", "stooped", "slouching"],
+		"hair": ["cropped", "long", "bound up", "bald"], "hair_colour": ["dark", "brown", "fair", "red", "grey"], "beard": ["none", "short", "full"], "shoulders": ["narrow", "middling", "broad"],
+		"age": ["young", "grown", "grown", "old"]},
+	"growth": {"facts_max": 16, "shown": 6, "prompt_chars": 600}
+}

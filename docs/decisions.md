@@ -9017,3 +9017,64 @@ item_note), and the party log tells each as it comes (World.item_grew). Saved in
 ItemBook; display text only, so the protocol is unchanged. Questions with Jeff:
 whether a bane should cost stealth, whether drawing a kind's fire is too harsh a
 cost for vengeance.
+## 398. Resident cards: who a town's person is, rolled once and grown from events
+
+Every town resident has a card, as a companion has hers (293/294): who they
+are, rolled once and never written by hand, growing from what happens to
+them. The new class `ResidentCard` (`sim/resident_card.gd`) is the card
+itself, pure; `Townsfolk` makes and keeps it; economy's worker record holds
+it whole ("card", `Production.set_card`, saved and loaded as it is, {} for a
+save from before and for a companion resting in town, whose card is her own).
+
+The roll (`ResidentCard.roll`, by worker id, the same every time, when the
+card is first needed): npc's `levels/resident_traits.json`, tables in
+townsfolk words checked by lore (no place or person named: the land's and
+the town's names are open), pronoun, birthplace, parentage, hobby, food,
+temperament, fear, speech; "came", how they came to the town, the table's
+words unless the record's origin is a rescue ("rescued:<x>"), when it is
+the rescue itself, by whoever did it when known; and a "look" the character
+generator reads (agreed with pc-character: seed, the id's hash, for what no
+word names; build, stature, posture, hair, hair_colour, beard, shoulders,
+age as words; grey hair twice as likely for the old; no beard for a woman).
+Kin and a grudge at founding (`Townsfolk.card_of`, chances in the file): the
+newcomer may be sister or brother, cousin or child to one neighbour who has
+a card already (the elder resident the parent), and may bear a grudge
+against one over a table's cause; each is a fact in both cards, so both
+voices know it.
+
+What becomes true of them: facts from events only, written from templates,
+no model call (residents share one yielding mind): a raid that got in
+(`Towns.raided`: the captive "was carried off by the goblins", every
+resident at home "saw <name> carried off", or "lived through a raid" when
+nobody was taken), a homecoming (`Towns.rescued`: "came home from the
+goblins", the others saw; a newcomer rescued elsewhere has it in their
+"came" and the others saw them come), a loan (`Production.loan_changed`:
+borrowed from the town's coffer, works off a debt, paid it back), and
+raiders seen from the walls (`Resident._look`, as it hides). Factions are
+named as lore names them (the entry's "name"). `Townsfolk.learn` is the one
+way in: the same words once, the oldest dropped past facts_max (16), each
+told to the resident's transcript and the mind log (kind "fact"). Economy's
+record field and signals: 8e16e60 (378 amended).
+
+One written paragraph: the first time a town's resident is spoken to,
+Main asks the resident mind once for their card (`_write_resident_card`:
+the "card" channel, off the tick, as 293; the box's own model, never the
+Claude API unless 363's switch is on), taken only when it is a paragraph
+with no speech in it (`ResidentCard.take_written`), kept on the record
+(`card_by` "model"); the plain card stands until then, and for good without
+a model (tests have none). The voice (`Resident.card_words`, within 336's
+rules): the written paragraph or the plain card, the hidden type's standing
+fact (393), then "Also true of <name>:" the newest facts within the
+budget, in the order they happened. Hearsay (378) joins the card at step 5.
+
+resident_card_test covers the tables (no modern words), the roll, the
+coming, the look, the plain card and the written one, the record, kin and
+grudge, every event, the cap and the voice's words. Protocol unchanged.
+
+Rejected: a model call per fact (294's talk-facts call is a companion's;
+a dozen residents a zone would drown the box); the card in a store of its
+own (the worker record is where a resident's state lives and is saved);
+naming birthplaces or a river (lore: nothing stated that Jeff has not);
+kin rolled against residents without cards yet (it would make every card in
+the town at once); the type in the written paragraph (it stays a separate
+standing fact, so the model never dresses it up).

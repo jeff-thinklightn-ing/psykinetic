@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Each of the town's people has a life of their own now: where they were born,
+  how they came to the town, kin among the neighbours, maybe a grudge, and what
+  they remember of what happened here (a raid that took a neighbour, one who came
+  home, a loan, raiders at the walls). Ask them and they tell you from it.
 - Weapons can earn a bane or a vengeance. One that fells 25 of a kind becomes their bane: that kind dreads whoever holds it, but notices them from further off. One held by someone who falls to a creature holds a grudge against that kind: its blows stagger them, but they come for its bearer first, until five of them have fallen to it. The pack and the party log say which.
 - Your companion now knows when she or you are bleeding or burning, and
   while one of you bleeds, bandaging comes first among what she offers.

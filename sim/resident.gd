@@ -180,6 +180,8 @@ func _look() -> void:
 	for entity in World.monsters():
 		if entity.spawned and not Companion.harmless(entity) \
 				and World.distance(tile, entity.tile) <= SIGHT_RANGE and senses.sees(entity):
+			if World.tick >= _hide_until and player_id.is_empty():
+				Townsfolk.saw_raiders(World.production, worker_id)  # A fact on its card (decision 398).
 			_hide_until = World.tick + HIDE_TICKS
 			return
 	for noise: Dictionary in senses.heard:
@@ -234,20 +236,22 @@ func voice_ask(speaker: String, line: String, serial: int) -> Dictionary:
 		"spoken_to": true, "asked": true, "heard": line}
 
 
-## Who it is: a companion's own card; else a card rolled as a companion's
-## is, by its worker id (the same every time), its name and trade its own,
-## and its hidden type when it has one (decision 393): a standing fact,
-## kept hidden, that shapes its lines; the type's profile (companions' 378)
-## does the rest.
+## Who it is: a companion's own card; else its resident card (decision 398:
+## Townsfolk.card_of, rolled by its worker id and kept on the worker
+## record: the written paragraph or the plain facts), its hidden type when
+## it has one (decision 393: a standing fact, kept hidden, that shapes its
+## lines; the type's profile, companions' 378, does the rest), and what has
+## become true of it since (the card's facts, newest first).
 func card_words() -> String:
 	if not card.is_empty():
 		return card
-	var traits := CompanionCard.roll(worker_id, person)
-	traits.erase("aspiration")
-	traits["profession"] = "a " + trade if not trade.is_empty() else "without a trade of %s own" % {"she": "her", "he": "his"}.get(str(traits.get("pronoun", "")), "their")
-	var words := CompanionCard.plain_card(traits)
+	var own := Townsfolk.card_of(World.production, worker_id)
+	var words := ResidentCard.words(own) if not own.is_empty() else "%s lives and works in the town." % person
 	if not type.is_empty() and type != Townsfolk.STEADY:
 		words += "\n%s is a %s, and keeps it hidden." % [person, type.replace("_", " ")]
+	var facts := ResidentCard.facts_words(own) if not own.is_empty() else ""
+	if not facts.is_empty():
+		words += "\n" + facts
 	return words
 
 
