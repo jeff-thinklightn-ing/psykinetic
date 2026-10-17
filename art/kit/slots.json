@@ -1011,7 +1011,9 @@
 			"kind": "edge",
 			"size": [0.5, 3, 2],
 			"budget": 900,
-			"uses": "a double door over two cell edges (2 m along z): the frame, two leaves hinged at its ends, swinging apart; open and closed are the leaves' swing",
+			"uses": "a double door over two cell edges (2 m along z): the frame, two leaves hinged at its ends, swinging apart; open and closed are the leaves' swing; its opening 1.8 x 2.4 m, as door.single's 0.8 x 2.4 (decision 402)",
+			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
+				"notes": "a plank double door by hand (a stand-in until Jeff picks a candidate), as door.single's: timber jambs and lintel, each leaf four planks, two battens, iron straps and a ring pull"},
 			"states": ["locked", "barred", "broken"],
 			"grey": [
 				{"at": [0, 1.5, -0.95], "size": [0.5, 3, 0.1]},

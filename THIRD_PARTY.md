@@ -16,7 +16,7 @@ also writes `docs/art_status.md`; `art_kit_test` fails while either is out of da
 |--------|---------|-------|---------------------|
 | [Castle Kit 2.0, Kenney](https://kenney.nl/assets/castle-kit) | CC0 1.0 (`art/kenney-castle/License.txt`) | `art/kenney-castle/Models/GLB format/` | rock.small, tree.broadleaf, tree.small, wall.castle.post, wall.castle.straight |
 
-Slots whose own art came from someone else: door.single (art-kit, own), tree.pine (art-gen, fitted by art-kit, own), tree.pine_stand (art-kit, from tree.pine's art-gen variants, own), tree.stump (art-gen, cleaned up by art-kit, own), creature.boar (art-gen (mesh), pc-character (rig fit); rig and clips Quaternius, own (mesh); CC0 1.0 (the Quaternius Pig's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt)).
+Slots whose own art came from someone else: door.single (art-kit, own), tree.pine (art-gen, fitted by art-kit, own), tree.pine_stand (art-kit, from tree.pine's art-gen variants, own), door.double (art-kit, own), tree.stump (art-gen, cleaned up by art-kit, own), creature.boar (art-gen (mesh), pc-character (rig fit); rig and clips Quaternius, own (mesh); CC0 1.0 (the Quaternius Pig's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt)).
 
 <!-- end of art slots -->
 
