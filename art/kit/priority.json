@@ -6,7 +6,7 @@
 			"why": "on screen most: the ground and trees cover the wilds, the homes and their walls the town",
 			"slots": [
 				"ground.grass", "ground.dirt", "material.rock", "ground.stone", "ground.sand",
-				"tree.pine", "tree.stump", "tree.log", "tree.dead", "plant.bush", "plant.fern",
+				"tree.pine", "tree.pine_stand", "tree.stump", "tree.log", "tree.dead", "plant.bush", "plant.fern",
 				"rock.large", "rock.boulder",
 				"scatter.tuft", "scatter.stone", "scatter.flower", "scatter.root", "scatter.reeds",
 				"building.hut", "building.house", "building.shed", "building.well",
