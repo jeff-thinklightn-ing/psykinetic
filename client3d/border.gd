@@ -53,8 +53,10 @@ var _material: StandardMaterial3D
 ## Lays the far floor now and starts the canopy past [param land] (its
 ## cells, never changed after this: the view makes a new one each build),
 ## [param heights] (the land's, a level a cell; copied), each level
-## [param rise] metres; the forest floor's colour and depth.
-func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, floor_colour: Color, floor_depth: float, threaded := true) -> void:
+## [param rise] metres; the forest floor's colour and depth; whether the
+## band is [param stands] of pines (PineStands), whose canopy's colours,
+## the palette's foliage, the canopy takes.
+func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, floor_colour: Color, floor_depth: float, threaded := true, stands := false) -> void:
 	var low := Vector2i(1 << 20, 1 << 20)
 	var high := -low
 	for cell: Vector2i in land:
@@ -75,7 +77,7 @@ func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, f
 	far_floor.position = Vector3((low.x + high.x) * 0.5, -floor_depth - FAR_SINK, (low.y + high.y) * 0.5)
 	add_child(far_floor)
 	var colours: Array[Color] = []
-	if ArtKit.filled_by("tree.broadleaf") == "fill":
+	if ArtKit.filled_by("tree.broadleaf") == "fill" and not stands:
 		colours = FILL_FOLIAGE.duplicate()
 	else:
 		for at in FOLIAGE:

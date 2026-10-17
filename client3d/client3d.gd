@@ -2251,7 +2251,7 @@ func _build_room() -> void:
 			_border = TerrainBorder.new()
 			_border.name = "Border"
 			_room.add_child(_border)
-			_border.build(_wooded, _terrain.get("heights", {}), LEVEL_RISE, FOREST_FLOOR, FOREST_FLOOR_DEPTH)
+			_border.build(_wooded, _terrain.get("heights", {}), LEVEL_RISE, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
 		for plan: Dictionary in _glimpse_plans:
 			_add_glimpse(plan)
 	_add_buildings()
@@ -2658,11 +2658,20 @@ func _add_forest() -> void:
 	var distance := _forest_distance
 	var low := Vector2i(1 << 20, 1 << 20)
 	var high := -low
+	# Past the first ring, stands of pines once they are drawn (PineStands),
+	# and a tree of its own on each cell left between them.
+	var stood: Dictionary[Vector2i, bool] = {}
+	var stands := PineStands.drawn()
+	if stands:
+		_add_stands(distance, stood)
 	for cell: Vector2i in distance:
 		low = low.min(cell)
 		high = high.max(cell)
 		var away := distance[cell]
-		if away == 0:
+		if away == 0 or stood.has(cell):
+			continue
+		if stands and away >= PineStands.FROM:
+			_add_tree(cell, 1.0)
 			continue
 		# Trees in clumps: thick where the clump field is high, thin
 		# between; the first ring always, so the edge reads closed.
@@ -2690,7 +2699,7 @@ func _add_forest() -> void:
 	var floor_mesh := PlaneMesh.new()
 	floor_mesh.size = Vector2(high - low) + Vector2.ONE * 2.0
 	var material := StandardMaterial3D.new()
-	material.albedo_color = FOREST_FLOOR
+	material.albedo_color = _forest_floor_colour()
 	material.roughness = 1.0
 	var forest_floor := MeshInstance3D.new()
 	forest_floor.name = "ForestFloor"
@@ -3216,6 +3225,52 @@ func _add_tree(cell: Vector2i, clump := 0.5) -> void:
 	_trees[cell] = tree
 
 
+## The forest floor under the trees past the first ring: the stands'
+## needles once they are drawn.
+static func _forest_floor_colour() -> Color:
+	return PineStands.NEEDLES if PineStands.drawn() else FOREST_FLOOR
+
+
+## The border's pine stands on [param distance]'s band (PineStands.plan),
+## their cells put in [param stood]: those with a cell within
+## PineStands.NEAR of the land a node each, faded as a tree is between the
+## camera and the player; the rest one MultiMesh a chunk and variant, with
+## no shadows.
+func _add_stands(distance: Dictionary[Vector2i, int], stood: Dictionary[Vector2i, bool]) -> void:
+	var far: Dictionary[Vector3i, Array] = {}
+	for stand: Dictionary in PineStands.plan(distance, PineStands.variants()):
+		var corner: Vector2i = stand["cell"]
+		for at in PineStands.FOOTPRINT:
+			stood[corner + at] = true
+		var variant: int = stand["variant"]
+		if int(stand["near"]) <= PineStands.NEAR:
+			var piece := Node3D.new()
+			piece.name = "Stand_%d_%d" % [corner.x, corner.y]
+			piece.transform = PineStands.transform_of(stand)
+			var drawn := MeshInstance3D.new()
+			drawn.mesh = PineStands.mesh(variant)
+			piece.add_child(drawn)
+			_room.add_child(piece)
+			_trees[corner] = piece
+			continue
+		var key := Vector3i(floori(corner.x / float(PineStands.CHUNK)), floori(corner.y / float(PineStands.CHUNK)), variant)
+		if not far.has(key):
+			far[key] = []
+		far[key].append(PineStands.transform_of(stand))
+	for key: Vector3i in far:
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = PineStands.mesh(key.z)
+		multimesh.instance_count = far[key].size()
+		for i in far[key].size():
+			multimesh.set_instance_transform(i, far[key][i])
+		var drawn := MultiMeshInstance3D.new()
+		drawn.name = "Stands_%d_%d_%d" % [key.x, key.y, key.z]
+		drawn.multimesh = multimesh
+		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_room.add_child(drawn)
+
+
 ## What lies on the ground: each GroundPile drawn as its things' art slots
 ## (ArtKit, item.<id>: a grey box till art comes), lying on their side,
 ## the top one last; one just thrown flies there from where it was thrown.
@@ -3420,8 +3475,11 @@ func _build_ground(kinds: Dictionary) -> void:
 	var cells: Array = _terrain["floor"] + dry + wet
 	var floor_count := floor_size + dry.size()
 	var water_end := cells.size()
+	# Under the stands the floor is their needles (the forest floor's), so
+	# the land runs only into the first ring.
+	var ground_ring := PineStands.FROM - 1 if PineStands.drawn() else FOREST_GROUND
 	for cell: Vector2i in _forest_distance:
-		if _forest_distance[cell] >= 1 and _forest_distance[cell] <= FOREST_GROUND:
+		if _forest_distance[cell] >= 1 and _forest_distance[cell] <= ground_ring:
 			cells.append(cell)
 	_ground_cells = cells
 	_ground_water_end = water_end

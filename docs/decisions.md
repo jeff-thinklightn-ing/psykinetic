@@ -7482,3 +7482,69 @@ seconds, and the voice is what players hear); a key in a file of the game's
 or an argument (process lists and run logs show arguments); turning it on
 by a startup flag (on by mistake on the box would send players' chat out);
 retrying on Claude after a failure (her own mind answers in time instead).
+## 369. The border's pine stands
+
+Jeff, 2026-10-17, of his reference photo (N:/assets/reference/sppine.jpg):
+"not all pines are cone shaped and the trees crowd together and leave
+mostly no leaves around the base with a healthy green canopy that bleeds
+together, thats perfect for the outside of the map, it might not be
+individual trees but a 3-4 variations that interlock to make up the
+border". Art-kit's slot `tree.pine_stand` (4 variants, 2 x 2 cells, 2.8 x
+4.0 x 2.8: bare trunks within 0.8 m of the middle, a canopy from 2.4 m to
+4 m overhanging the footprint by 0.4 m) is placed by `PineStands`
+(client3d/pine_stands.gd), from `Client3D._add_forest`. The coordinator
+approved the design.
+
+- Where: rings 2 to FOREST_REACH (8) off the land, eight ways, the
+  forest's own walk. Ring 1 stays the region's edge (trees, saplings,
+  felled stumps, 277), so the brush at the light line stands in front of
+  the stand. Glimpses and their lanes count as land in that walk (327), so
+  no stand stands on or beside one; the lane reads as a cut through the
+  stand. TerrainBorder's canopy (326) still rises from ring 6, now in the
+  palette's foliage, the stands' colours.
+- Packing (`PineStands.plan`): the band's cells swept corner to corner,
+  jittered by up to SWEEP_JITTER (1) cell; at each free cell a stand on the
+  first of its four 2 x 2s (in a hashed order) whose cells are all free.
+  No fixed lattice, so no rows of seams. A cell left between stands gets a
+  tree of its own (`_add_tree`), never a rock, log or bare floor. A jitter
+  of 1 leaves 9 to 11 % of the band to single trees (hills 9.1 %, wilds
+  10.8 %); 3 left 16 to 19 %. (0 left as few, but would line the
+  stands up along the sweep's diagonals.)
+- Not repeating: a stand takes a variant no stand round it has (sides and
+  corners), else none beside it has, by a hash; a quarter turn no stand
+  beside it of its variant has; up to YAW (12 degrees) more; width 0.96 to
+  1.04, height 0.9 to 1.12; nudged up to 0.15 cell. No mirroring (a
+  negative scale in a MultiMesh flips its faces). On hills and the wilds,
+  no two stands sharing a side share a variant (0 of 1,326 and 3,742).
+  The same cells make the same stands on every peer.
+- Drawn: a stand with a cell within NEAR (4) rings of the land is a node
+  of its own in `_trees`, so it fades between the camera and the player
+  as a tree does (at the camera's 50 degrees a 4 m stand hides a player
+  up to about 3.8 m off); the rest one MultiMesh a 16-cell chunk and
+  variant, with no shadows. A variant's art is baked into one mesh with
+  its own materials (`PineStands.mesh`), so the art keeps the palette
+  material; no shader copy of it to maintain. (Rejected: a fade through
+  INSTANCE_CUSTOM, which needed exactly that copy.)
+- The floor: the forest floor and TerrainBorder's far floor take
+  NEEDLES (7a4e2c, from the photo), and the land's ground runs only into
+  ring 1 (FOREST_GROUND's 3 otherwise), so from ring 2 out it is open
+  needles with no scatter. Ring 1 and the land's ground are as they were.
+  A `ground.needles` texture can take its place once Jeff's ground art
+  has one.
+- Only once the slot has art of its own or a fill (`PineStands.drawn`,
+  deadwood's rule): never grey boxes; until then the forest is as it
+  was. `PineStands.stand_in` draws a stand made in code (4 to 6 hexagonal
+  trunks under faceted crowns, at the slot's size) for view_test and
+  `map_bench --stand-in=1` only, so the packing is tested before the art;
+  it never draws in play.
+- The single `tree.pine` slot stays for pines inside a map; stands are the
+  border's only.
+
+Cost, map_bench windowed, before and after with the stand-in (about 400
+triangles a stand against the slot's 1,500), under the bench lock: the
+wilds' 3D rebuild 1,720 to 1,230 ms, nodes 25,439 to 17,430, frame median
+2.83 to 1.63 ms; a 256-cell outdoor bench map's rebuild 2,990 to 2,127 ms,
+nodes 87,656 to 79,979, fps 50.4 to 51.0, draw calls up to 537 to 625,
+99th percentile frame 35 to 44 ms (a noisy run: its sim ticks, which this
+does not touch, also halved). The plan is 10 ms on hills and 37 ms on the
+wilds, on the build's thread. Client only; no protocol change.

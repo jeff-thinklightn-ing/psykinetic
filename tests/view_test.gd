@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_ground_colours()
 	await _test_fade()
 	_test_outdoor()
+	_test_pine_stands()
 	_test_heights()
 	_test_hills()
 	_test_water()
@@ -1198,6 +1199,87 @@ func _test_outdoor() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
 			"and back in the test room, it is under stone again")
+
+
+## The border's pine stands (PineStands): drawn with the stand-in while the
+## slot has no art, on the castle, whose way to the wilds has a lane.
+func _test_pine_stands() -> void:
+	print("
+== the border's pine stands: packed past the first ring, never on a lane ==")
+	_check(ArtKit.filled_by(PineStands.SLOT) != "placeholder" or not PineStands.drawn(),
+			"while their slot has no art, no stands (never grey boxes)")
+	PineStands.stand_in = true
+	PineStands.forget()
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var distance := _rig._forest_distance
+	var stands := PineStands.plan(distance, PineStands.variants())
+	_check(not stands.is_empty() and str(stands) == str(PineStands.plan(distance, PineStands.variants())),
+			"the same cells make the same stands (%d)" % stands.size())
+	var taken: Dictionary[Vector2i, int] = {}
+	for i in stands.size():
+		for at in PineStands.FOOTPRINT:
+			taken[stands[i]["cell"] + at] = i
+	var bare: Array[Vector2i] = []
+	var too_near: Array[Vector2i] = []
+	for cell: Vector2i in distance:
+		if distance[cell] >= PineStands.FROM and not taken.has(cell) and not _rig._trees.has(cell):
+			bare.append(cell)
+		if taken.has(cell) and distance[cell] < PineStands.FROM:
+			too_near.append(cell)
+	_check(bare.is_empty() and too_near.is_empty(),
+			"every cell from ring %d out a stand's or a tree's, none of the first ring a stand's (bare %s, near %s)" % [PineStands.FROM, bare.slice(0, 4), too_near.slice(0, 4)])
+	var holes := 0
+	for cell: Vector2i in distance:
+		if distance[cell] >= PineStands.FROM and not taken.has(cell):
+			holes += 1
+	_check(holes * 5 < taken.size(), "stands fill most of the band (%d cells in stands, %d trees between)" % [taken.size(), holes])
+	var on_lane := 0
+	for cell: Vector2i in taken:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if _rig._wooded.has(cell + Vector2i(dx, dy)):
+					on_lane += 1
+	_check(_rig._glimpses.size() == 1 and on_lane == 0, "none on or beside the land, the glimpse or its lane through the trees")
+	var same := 0
+	for i in stands.size():
+		var corner: Vector2i = stands[i]["cell"]
+		for at: Vector2i in [Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(2, 0), Vector2i(2, 1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(0, 2), Vector2i(1, 2)]:
+			var other: int = taken.get(corner + at, i)
+			if other != i and stands[other]["variant"] == stands[i]["variant"]:
+				same += 1
+	_check(same == 0, "no two stands side by side the same variant")
+	var near: Array[Node3D] = []
+	var far := 0
+	for stand: Dictionary in stands:
+		var corner: Vector2i = stand["cell"]
+		if int(stand["near"]) <= PineStands.NEAR:
+			var node := _rig._room.get_node_or_null("Stand_%d_%d" % [corner.x, corner.y]) as Node3D
+			if node != null and _rig._trees.get(corner) == node:
+				near.append(node)
+		else:
+			far += 1
+	var instances := 0
+	for drawn: MultiMeshInstance3D in _rig._room.find_children("Stands_*", "MultiMeshInstance3D", false, false):
+		instances += drawn.multimesh.instance_count
+	_check(near.size() == stands.filter(func(stand: Dictionary) -> bool: return int(stand["near"]) <= PineStands.NEAR).size() and instances == far and far > 0,
+			"near the land each a node of its own (%d), the rest a MultiMesh a chunk (%d)" % [near.size(), far])
+	if not near.is_empty():
+		_rig._set_near(near[0], true)
+		var drawn := near[0].get_child(0) as MeshInstance3D
+		var faded := drawn.get_surface_override_material(0) as BaseMaterial3D
+		_check(faded != null and faded.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED, "a near stand fades as a tree does")
+		_rig._set_near(near[0], false)
+	var ringed := 0
+	for index in range(_rig._ground_water_end, _rig._ground_cells.size()):
+		if distance.get(_rig._ground_cells[index], 0) >= PineStands.FROM:
+			ringed += 1
+	var forest_floor := _rig._room.get_node("ForestFloor") as MeshInstance3D
+	_check(ringed == 0 and (forest_floor.material_override as StandardMaterial3D).albedo_color == PineStands.NEEDLES,
+			"under them the needles' floor; the land's ground runs only into the first ring")
+	PineStands.stand_in = false
+	PineStands.forget()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_ground_colours() -> void:
