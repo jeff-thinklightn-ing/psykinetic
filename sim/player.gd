@@ -43,6 +43,7 @@ func _init() -> void:
 	attack_ticks = 5
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
+	replicate("slot_names")
 	replicate("mending")
 	replicate("buffs")
 	replicate("raised")

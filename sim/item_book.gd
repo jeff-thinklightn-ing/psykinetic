@@ -17,9 +17,18 @@ extends RefCounted
 ## events: [{kind, step, zone, tile, what}]}. A carrier's held is steps
 ## held before since; since is -1 unless it carries it now. events[0] is
 ## where it came from and stays; past MAX_EVENTS the oldest other goes.
+##
+## Names (decision 365): a carrier row keeps deeds ({kind: count}: felled,
+## guarded, shot...) done with the thing while it carried it (deed). A
+## thing carried long enough by one named holder, with deeds enough
+## (name_due, World._consider_names), takes a name for life (set_name:
+## {form, holder, made_step, text}, and a strength): it is never renamed,
+## and its "named" event, like a "reforged" one, is never the one that goes.
 
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
+## Events that stay past MAX_EVENTS, as events[0] does.
+const KEPT_EVENTS: Array[String] = ["named", "reforged"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -102,7 +111,7 @@ func place(uid: int, at: String, who := "", carrier_name := "") -> void:
 			row["since"] = _now()
 			row["name"] = carrier_name
 			return
-	carriers.append({"who": who, "name": carrier_name, "since": _now(), "held": 0})
+	carriers.append({"who": who, "name": carrier_name, "since": _now(), "held": 0, "deeds": {}})
 	if carriers.size() > MAX_CARRIERS:
 		# The one who held it least goes (never who holds it now).
 		var least := 0
@@ -120,7 +129,59 @@ func note(uid: int, kind: String, what := "", zone := "", tile := Vector2i(-1, -
 	var events: Array = _book[uid]["events"]
 	events.append(_event(kind, what, zone, tile))
 	if events.size() > MAX_EVENTS:
-		events.remove_at(1)
+		for i in range(1, events.size()):
+			if str(events[i]["kind"]) not in KEPT_EVENTS:
+				events.remove_at(i)
+				break
+
+
+## [param who], carrying [param uid] now, did a deed of [param kind] with
+## it (decision 365): its carrier row counts it. Nothing for anyone else.
+func deed(uid: int, who: String, kind: String) -> void:
+	if not _book.has(uid) or who.is_empty() or _book[uid]["holder"] != who:
+		return
+	for row: Dictionary in _book[uid]["carriers"]:
+		if row["who"] == who:
+			row["deeds"][kind] = int(row["deeds"].get(kind, 0)) + 1
+			return
+
+
+## [param uid]'s name ({form, holder, made_step, text}); {} for none.
+func name_of(uid: int) -> Dictionary:
+	return _book[uid].get("name", {}) if _book.has(uid) else {}
+
+
+## [param uid]'s strength (a key of Items.naming()'s strengths); "" for none.
+func strength_of(uid: int) -> String:
+	return str(_book[uid].get("strength", "")) if _book.has(uid) else ""
+
+
+## The carrier row (a copy, held counted up to now) of who carries
+## [param uid] now, when it has carried it [param held] steps or more and
+## done [param deeds] deeds or more with it, and it has no name yet; {}
+## otherwise.
+func name_due(uid: int, held: int, deeds: int) -> Dictionary:
+	if not _book.has(uid) or not name_of(uid).is_empty() or str(_book[uid]["holder"]).is_empty():
+		return {}
+	for row: Dictionary in history(uid)["carriers"]:
+		if row["who"] != _book[uid]["holder"]:
+			continue
+		var done := 0
+		for kind: String in row["deeds"]:
+			done += int(row["deeds"][kind])
+		return row if int(row["held"]) >= held and done >= deeds else {}
+	return {}
+
+
+## [param uid] takes its name for life (decision 365): [param name]
+## ({form, holder, made_step, text}) and [param strength], noted "named".
+## Nothing if it has one already.
+func set_name(uid: int, name: Dictionary, strength: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or not name_of(uid).is_empty():
+		return
+	_book[uid]["name"] = name.duplicate()
+	_book[uid]["strength"] = strength
+	note(uid, "named", str(name.get("text", "")), zone, tile)
 
 
 ## [param uid] leaves the world ("banked", "eaten"): its entry, the last
@@ -169,8 +230,12 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 			var carriers: Array = []
 			for row: Variant in entry.get("carriers", []):
 				if row is Dictionary and row.get("who") is String:
+					var deeds := {}
+					if row.get("deeds") is Dictionary:
+						for kind: Variant in row["deeds"]:
+							deeds[str(kind)] = int(row["deeds"][kind])
 					carriers.append({"who": row["who"], "name": str(row.get("name", "")),
-						"since": int(row.get("since", -1)), "held": int(row.get("held", 0))})
+						"since": int(row.get("since", -1)), "held": int(row.get("held", 0)), "deeds": deeds})
 			var events: Array = []
 			for event: Variant in entry.get("events", []):
 				if event is Dictionary and event.get("kind") is String:
@@ -179,6 +244,11 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 			items._book[int(key)] = {"id": entry["id"], "made": int(entry.get("made", 0)),
 				"at": str(entry.get("at", "")), "holder": str(entry.get("holder", "")),
 				"carriers": carriers, "events": events}
+			var name: Variant = entry.get("name")
+			if name is Dictionary and name.get("form") is String and name.get("holder") is String:
+				items._book[int(key)]["name"] = {"form": name["form"], "holder": name["holder"],
+					"made_step": int(name.get("made_step", 0)), "text": str(name.get("text", ""))}
+				items._book[int(key)]["strength"] = str(entry.get("strength", ""))
 	items._next = maxi(int(data.get("next", 1)), 1)
 	for uid: int in items._book:
 		items._next = maxi(items._next, uid + 1)

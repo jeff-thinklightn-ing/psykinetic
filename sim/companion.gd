@@ -464,6 +464,7 @@ func _init() -> void:
 	super()
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
+	replicate("slot_names")
 	replicate("mending")
 	replicate("buffs")
 	replicate("down_until")

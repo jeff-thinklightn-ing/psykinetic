@@ -26,6 +26,7 @@ func _init() -> void:
 	max_hp = 0
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
+	replicate("slot_names")
 
 
 ## Its slots cut or padded to SLOTS, after a spawn spec's props set them

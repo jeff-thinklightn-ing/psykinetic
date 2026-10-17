@@ -35,8 +35,14 @@ const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight"
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter"]
 
+## Deeds done with a thing (ItemBook.deed; decision 365).
+const DEEDS: Array[String] = ["felled", "guarded", "shot", "braced", "behind", "downed", "struck"]
+## Tags that make a thing without a verb gear, which can be named.
+const GEAR_TAGS: Array[String] = ["armour", "tool"]
+
 static var _catalog: Dictionary = {}
 static var _loot: Dictionary = {}
+static var _naming: Dictionary = {}
 
 
 ## Every definition by id, read on first use.
@@ -162,6 +168,71 @@ static func add_for_test(entry: Dictionary) -> Dictionary:
 static func reset() -> void:
 	_catalog = {}
 	_loot = {}
+	_naming = {}
+
+
+## The catalog's "naming" (decision 365), read on first use: {held_days,
+## deeds, strengths: {id: {from: a DEEDS kind, its numbers}}}. A strength
+## from no known deed is warned about and left out.
+static func naming() -> Dictionary:
+	if _naming.is_empty():
+		_naming = read_naming(FileAccess.get_file_as_string(CATALOG))
+	return _naming
+
+
+## The "naming" of [param text] (the catalog file), with defaults.
+static func read_naming(text: String) -> Dictionary:
+	var data: Variant = JSON.parse_string(text)
+	var given: Variant = data.get("naming", {}) if data is Dictionary else {}
+	if given is not Dictionary:
+		given = {}
+	var strengths := {}
+	var rows: Variant = given.get("strengths", {})
+	if rows is Dictionary:
+		for id: Variant in rows:
+			var row: Variant = rows[id]
+			if row is not Dictionary or str(row.get("from", "")) not in DEEDS:
+				push_warning("Items: strength %s is from no deed (%s); left out" % [id, ", ".join(DEEDS)])
+				continue
+			strengths[str(id)] = row.duplicate()
+	return {"held_days": maxf(float(given.get("held_days", 2.0)), 0.0), "deeds": maxi(int(given.get("deeds", 10)), 0),
+		"strengths": strengths}
+
+
+## For tests: naming's numbers replaced by [param values] until reset.
+static func set_naming_for_test(values: Dictionary) -> void:
+	naming().merge(values, true)
+
+
+## Whether [param id] is gear, which can be named (decision 365): a
+## weapon (a verb) or a thing tagged GEAR_TAGS. Nothing used up.
+static func is_gear(id: String) -> bool:
+	if not verb_of(id).is_empty():
+		return true
+	for tag in GEAR_TAGS:
+		if has_tag(id, tag):
+			return true
+	return false
+
+
+## The strength a namer whose [param deeds] ({kind: count}) these are
+## leaves in a thing: the one from its most-done deed (ties to the earlier
+## in DEEDS); "" when that deed gives none.
+static func strength_from(deeds: Dictionary) -> String:
+	var most := ""
+	for kind in DEEDS:
+		if int(deeds.get(kind, 0)) > int(deeds.get(most, 0)):
+			most = kind
+	for id: String in naming()["strengths"]:
+		if naming()["strengths"][id]["from"] == most:
+			return id
+	return ""
+
+
+## [param strength]'s number [param key] (naming's strengths); [param default]
+## for none.
+static func strength_value(strength: String, key: String, default: Variant) -> Variant:
+	return naming()["strengths"].get(strength, {}).get(key, default) if not strength.is_empty() else default
 
 
 static func exists(id: String) -> bool:

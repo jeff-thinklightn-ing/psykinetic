@@ -62,6 +62,10 @@ extends Node
 ##     dropped by an imp; it takes it up (its AI's call, made here by
 ##     item_pick: World.try_pick_up_weapon), heavier by it, and fights
 ##     with it.
+##   items_names: names from long-time holders (decision 365): the naming
+##     thresholds dropped to none held and 4 deeds, and lore's draft holder
+##     form let count; a dagger stabs an imp in the back until it takes its
+##     holder's name and the quiet strength (the party log says so).
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -169,6 +173,8 @@ func _ready() -> void:
 			_items_spear()
 		"items_pickup":
 			_items_pickup()
+		"items_names":
+			_items_names()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -630,6 +636,31 @@ func _items_pickup() -> void:
 		["walk", Vector2i(2, 2), ""],
 		["item_pick", null, "The imp takes it up: it has a hand for it."],
 		["wait", 60, "Armed, and heavier by it."],
+	]
+
+
+func _items_names() -> void:
+	var rows: Array[String] = [
+		"#########",
+		"#.......#",
+		"#.......#",
+		"#.......#",
+		"#########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(6, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [{"at": [6, 2], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	# A clip has minutes, not days: held no time, four deeds; lore's holder
+	# form is a draft until Jeff agrees it.
+	Items.set_naming_for_test({"held_days": 0.0, "deeds": 4})
+	World.name_least = "draft"
+	_script = [
+		["item_give", ["dagger", Player.RIGHT_HAND], "A plain dagger, and an imp facing away."],
+		["walk", Vector2i(5, 2), "Up behind it."],
+		["brawl", 40, "Stabs in the back: each a deed the dagger remembers."],
+		["wait", 30, "Carried long, used well: it takes its holder's name, and quiet from how it was used."],
+		["item_open", true, "A named thing's slot is gilded; its name and strength show on hover: Player's dagger (quiet)."],
+		["wait", 30, ""],
 	]
 
 
@@ -1244,6 +1275,12 @@ func _log(tick: int) -> void:
 		for entity in World.monsters():
 			them.append("%s at %s hp %d %s%s" % [entity.name, entity.tile, entity.hp, Monster.Alert.keys()[entity.alert], " DOWN" if World.is_down(entity) else ""])
 		print("[clip] tick %d: player %s hp %d; %s" % [tick, _player.tile, _player.hp, ", ".join(them)])
+		return
+	if scenario == "items_names":
+		var uid := _player.slot_items[Player.RIGHT_HAND] if _player.slot_items.size() > Player.RIGHT_HAND else 0
+		var rows: Array = World.items.history(uid).get("carriers", [])
+		print("[clip] tick %d: player %s; deeds %s; names %s; imp %s" % [tick, _player.tile, rows[0]["deeds"] if not rows.is_empty() else {},
+			_player.slot_names, "%s hp %d" % [_monster.tile, _monster.hp] if is_instance_valid(_monster) else "gone"])
 		return
 	if scenario == "items_pickup":
 		var hands := "gone"

@@ -75,6 +75,9 @@ signal knocked_down(target: GridEntity, source: GridEntity)
 ## [param holder]'s braced spear stopped [param charger]'s charge (decision
 ## 344).
 signal braced_against(holder: GridEntity, charger: GridEntity)
+## A thing in [param entity]'s slot took its name for life (decision 365):
+## [param text] as it reads ("Wren's dagger").
+signal item_named(entity: GridEntity, uid: int, text: String)
 ## The fixed heat and light changed (the map, a door): views that draw
 ## them redraw.
 signal fields_changed_signal
@@ -258,6 +261,9 @@ const DOWN_MASS_FACTOR := 0.5
 ## stopped, struck for BRACE_DAMAGE_FACTOR times the blow and pushed back
 ## with BRACE_FORCE_PER_KG times its own mass: its own charge, turned.
 const BRACE_TICKS := 5
+## The least status of lore's name forms that names things (decision 365;
+## Lore.name_forms): "agreed" in play; tests and clips use "draft".
+var name_least := "agreed"
 const BRACE_DAMAGE_FACTOR := 2.0
 const BRACE_FORCE_PER_KG := 0.03
 ## Mass multiplier for being pushed while at 0 stamina.
@@ -454,6 +460,10 @@ class Hit:
 	## Landed, it knocks the target down this long (a giant axe's;
 	## decision 343). 0 for none.
 	var down_ticks := 0
+	## Landed on a creature, the deed it counts as for the thing in the
+	## source's right hand (decision 365: struck, behind, downed, braced;
+	## felled if it kills); "" for none (a shove).
+	var deed := ""
 	var target: GridEntity
 	var source_id := 0
 	var source_name := ""
@@ -559,6 +569,10 @@ func world_tick(slice := -1) -> void:
 		each_zone.append(zone)
 	for each in each_zone:
 		enter(each)
+		if slice <= 0:
+			for entity in _entities.duplicate():
+				if _names_things(entity):
+					_consider_names(entity)  # Time held counts up quietly (decision 365).
 		var near := _tier_origins()
 		for entity in monsters().duplicate():
 			if slice >= 0 and entity.id % WORLD_TICK_SLICES != slice:
@@ -1602,6 +1616,7 @@ func _slots_changed(entity: GridEntity) -> void:
 	_weigh(entity)
 	if not entity.raised.is_empty() and off_hand(entity) != entity.raised:
 		entity.raised = ""  # What it needed left the hand.
+	_show_names(entity)
 	slots_changed.emit(entity)
 
 
@@ -1677,6 +1692,122 @@ func holder_key(entity: GridEntity) -> String:
 	if keeper_id is String and not keeper_id.is_empty():
 		return "companion:%s:%s" % [keeper_id, entity.name]
 	return "%s/%s" % [entity.zone, entity.name]
+
+
+## Whether [param entity] is a named holder, who can name what it carries
+## (decision 365): a player or a companion. A monster is known by its kind.
+func _names_things(entity: GridEntity) -> bool:
+	var who := _carrier_of(entity)[0]
+	return who.begins_with("player:") or who.begins_with("companion:")
+
+
+## [param entity] did a deed of [param kind] (Items.DEEDS) with the thing
+## in its slot [param slot] (decision 365): its carrier row counts it, and
+## the thing may take its name now.
+func _credit(entity: GridEntity, slot: int, kind: String) -> void:
+	if not Net.is_authority() or not is_instance_valid(entity) or not _names_things(entity) \
+			or slot < 0 or slot >= entity.slot_items.size() or entity.slot_items[slot] == 0:
+		return
+	items.deed(entity.slot_items[slot], _carrier_of(entity)[0], kind)
+	_consider_name(entity, slot)
+
+
+## Every slot of [param entity]'s that may take a name (_consider_name).
+func _consider_names(entity: GridEntity) -> void:
+	for slot in mini(entity.slots.size(), entity.slot_items.size()):
+		if entity.slot_items[slot] != 0:
+			_consider_name(entity, slot)
+
+
+## The gear in [param entity]'s slot [param slot] takes its name for life
+## (decision 365) when its carrier has held it Items.naming()'s held_days
+## of the world clock and done its deeds with it (ItemBook.name_due): lore's
+## first holder form at name_least (Lore.name_forms), filled with the
+## carrier's name, and the strength of its most-done deed
+## (Items.strength_from). No form counting yet (none agreed): no name.
+func _consider_name(entity: GridEntity, slot: int) -> void:
+	var uid := entity.slot_items[slot]
+	var id := items.id_of(uid)
+	if not Items.is_gear(id) or not items.name_of(uid).is_empty():
+		return
+	var naming := Items.naming()
+	var due := items.name_due(uid, roundi(float(naming["held_days"]) * DayNight.day_steps), int(naming["deeds"]))
+	if due.is_empty() or str(due["name"]).is_empty():
+		return
+	var forms := Lore.name_forms("holder", name_least)
+	if forms.is_empty():
+		return
+	var name := {"form": str(forms[0]["id"]), "holder": str(due["name"]), "made_step": steps}
+	var text := Lore.render_name(name, id, PackedStringArray(Items.def(id)["tags"]), Items.name_of(id), name_least)
+	if text.is_empty():
+		return
+	name["text"] = text
+	var strength := Items.strength_from(due["deeds"])
+	items.set_name(uid, name, strength, entity.zone, entity.tile)
+	_log("named: %s's %s is %s%s" % [entity.name, id, text, " (%s)" % strength if not strength.is_empty() else ""])
+	_show_names(entity)
+	item_named.emit(entity, uid, text)
+
+
+## How [param uid] reads where it is shown (decision 365): its name,
+## rendered for what it is now (a reforged thing keeps its name), and its
+## strength ("Wren's dagger (quiet)"); "" for a thing with no name.
+func item_title(uid: int) -> String:
+	var name := items.name_of(uid)
+	if name.is_empty():
+		return ""
+	var id := items.id_of(uid)
+	var text := Lore.render_name(name, id, PackedStringArray(Items.def(id)["tags"]), Items.name_of(id), name_least)
+	if text.is_empty():
+		text = str(name.get("text", ""))
+	var strength := items.strength_of(uid)
+	return text + (" (%s)" % strength if not strength.is_empty() else "")
+
+
+## [param entity]'s slot_names (replicated) follow its things' names.
+func _show_names(entity: GridEntity) -> void:
+	var names := PackedStringArray()
+	names.resize(entity.slots.size())
+	var any := false
+	for slot in mini(entity.slots.size(), entity.slot_items.size()):
+		if entity.slot_items[slot] != 0:
+			names[slot] = item_title(entity.slot_items[slot])
+			any = any or not names[slot].is_empty()
+	if not any:
+		names = PackedStringArray()
+	if names != entity.slot_names:
+		entity.slot_names = names
+
+
+## The strength (decision 365) of the thing in [param entity]'s slot
+## [param slot]; "" for none. Whoever holds it, a monster too.
+func slot_strength(entity: GridEntity, slot: int) -> String:
+	if not is_instance_valid(entity) or slot < 0 or slot >= entity.slot_items.size() or entity.slot_items[slot] == 0:
+		return ""
+	return items.strength_of(entity.slot_items[slot])
+
+
+## Whether [param entity] holds a thing with the dread strength (decision
+## 365; a namer's felled most): for enemy-ai, which decides how a cautious
+## or cowardly monster takes it.
+func holder_dread(entity: GridEntity) -> bool:
+	if not holds_in_hands(entity):
+		return false
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if bool(Items.strength_value(slot_strength(entity, slot), "dread", false)):
+			return true
+	return false
+
+
+## [param entity] leaves the world (despawn): a named holder's things stop
+## counting its time held until it is back (set_slots places them again),
+## so time away names nothing (decision 365).
+func _let_go_things(entity: GridEntity) -> void:
+	if not _names_things(entity):
+		return
+	for uid in entity.slot_items:
+		if uid != 0:
+			items.place(uid, items.at_of(uid))
 
 
 ## Ends, as lost, what the room's level entities held when it was reset
@@ -2210,13 +2341,19 @@ func off_hand(entity: GridEntity) -> String:
 
 ## The ranged thing in [param entity]'s hands (left first), "" for none.
 func _drawn_with(entity: GridEntity) -> String:
+	var slot := _drawn_slot(entity)
+	return entity.slots[slot] if slot >= 0 else ""
+
+
+## The hand [param entity]'s bow is in (_drawn_with); -1 for none.
+func _drawn_slot(entity: GridEntity) -> int:
 	if not holds_in_hands(entity):
-		return ""
+		return -1
 	for slot in [Items.LEFT_HAND, Items.RIGHT_HAND]:
 		var id := entity.slots[slot]
 		if not id.is_empty() and Items.verb_of(id).get("kind") == "ranged":
-			return id
-	return ""
+			return slot
+	return -1
 
 
 ## [param by] raises its off hand (the right button pressed): [param kind]
@@ -2248,9 +2385,11 @@ func draw_of(entity: GridEntity) -> float:
 	if verb.is_empty():
 		return 0.0
 	var drawn := tick - entity.raised_tick
-	if drawn < int(verb["draw_min"]):
+	# A quick bow (decision 365) draws in less time.
+	var quick := float(Items.strength_value(slot_strength(entity, _drawn_slot(entity)), "draw", 1.0))
+	if drawn < roundi(int(verb["draw_min"]) * quick):
 		return 0.0
-	return clampf(float(drawn) / maxf(1.0, float(verb["draw_full"])), 0.0, 1.0)
+	return clampf(float(drawn) / maxf(1.0, float(verb["draw_full"]) * quick), 0.0, 1.0)
 
 
 ## [param by] lets its drawn bow go at [param at] (the right button
@@ -2304,7 +2443,10 @@ func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
 		amount = met[0]
 	_log("shot: %s hits %s at %s for %d, drawn %.2f" % [by.name, hit.name, hit.tile, amount, strength])
 	if amount > 0:
+		var creature := hit.is_creature()
 		damage(hit, amount, by, &"shot")
+		if creature:
+			_credit(by, _drawn_slot(by), "felled" if not _alive(hit) else "shot")
 	return hit
 
 
@@ -2346,7 +2488,9 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	if verb.is_empty():
 		return null
 	var weight := amount + force
-	var cost := maxi(1, ceili(float(verb["stamina"]) * weight))
+	var slot := Items.LEFT_HAND if target.raised == "block" else Items.RIGHT_HAND  # As guarding found it.
+	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
+	var cost := maxi(1, ceili(float(verb["stamina"]) * weight * steady))
 	target._world_note_exertion(tick)
 	if weight >= float(verb["breaks_at"]) and not shot or target.max_stamina > 0 and target.stamina < cost:
 		if target.max_stamina > 0:
@@ -2364,6 +2508,7 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	_log("guard: %s takes %s's blow (%d, force %.2f) for %d stamina" % [target.name, source.name, amount, force, cost])
 	target._world_guarded(false)
 	guard_met.emit(target, source, false)
+	_credit(target, slot, "guarded")
 	return [maxi(0, amount - ceili(amount * absorb - 0.001)), force * (1.0 - absorb)]
 
 
@@ -2669,6 +2814,7 @@ func despawn(entity: GridEntity) -> void:
 		return
 	if not entity.spawned:
 		return
+	_let_go_things(entity)
 	_occupancy.erase(entity.tile)
 	_entities.erase(entity)
 	_roster_changed()
@@ -2815,7 +2961,10 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	target.hp = maxi(target.hp - amount, 0)
 	target.hurt_tick = tick
 	if cause != &"fire":
-		noise(target.tile, Senses.NOISE_FIGHT, &"fight", source)
+		var loud := float(Senses.NOISE_FIGHT)
+		if cause == &"attack" and is_instance_valid(source):
+			loud *= float(Items.strength_value(slot_strength(source, Items.RIGHT_HAND), "noise", 1.0))  # A quiet blade's.
+		noise(target.tile, roundi(loud), &"fight", source)
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
 	if target.hp == 0 and spared.is_valid():
@@ -3316,7 +3465,13 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 				scale *= float(verb["behind"])
 			hit_damage = maxi(1, roundi(hit_damage * scale))
 	var down := int(verb["down_ticks"]) if verb.get("kind") == "knockdown" else 0
+	if down > 0:
+		down += int(Items.strength_value(slot_strength(attacker, Items.RIGHT_HAND), "down_ticks", 0))  # A heavy axe's.
+	var deed := ""
+	if not is_shove:
+		deed = "downed" if down > 0 else "behind" if verb.get("kind") == "backstab" and is_behind(attacker, target) else "struck"
 	_queue_hit(attacker, target, aim, push_direction, hit_damage, force, raw_force, is_shove, down)
+	_hits[-1].deed = deed
 	if down > 0 and aim in DIRECTIONS:
 		# A giant axe's arc (decision 343): the cells either side of the
 		# one struck, a step of 45 degrees each, take the same blow.
@@ -3328,6 +3483,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 				if other != null and other != target and other != attacker and other.spawned \
 						and can_target(attacker, other) and can_melee(attacker.tile, cell):
 					_queue_hit(attacker, other, cell - attacker.tile, cell - attacker.tile, hit_damage, force, raw_force, false, down)
+					_hits[-1].deed = deed
 	return true
 
 
@@ -3370,9 +3526,12 @@ func _resolve_hits() -> void:
 				hit.damage = met[0]
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
 		if hit.damage > 0:
+			var creature := hit.target.is_creature()
 			damage(hit.target, hit.damage, hit.source, &"attack")
 			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
 				knock_down(hit.target, hit.source, hit.down_ticks)
+			if creature and not hit.deed.is_empty():
+				_credit(hit.source, Items.RIGHT_HAND, "felled" if not _alive(hit.target) else hit.deed)
 		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, hit.push_direction, hit.force, hit.push_direction != hit.direction)
 
@@ -3906,7 +4065,7 @@ func in_reach(attacker: GridEntity, target: GridEntity, shove := false) -> bool:
 func braced(entity: GridEntity) -> bool:
 	var verb := blow_verb(entity)
 	return verb.get("kind") == "reach" and bool(verb.get("brace", false)) and not is_stunned(entity) \
-			and tick - entity.last_step_tick >= BRACE_TICKS
+			and tick - entity.last_step_tick >= int(Items.strength_value(slot_strength(entity, Items.RIGHT_HAND), "brace_ticks", BRACE_TICKS))
 
 
 ## A charging [param mover] stepping onto [param cell] meets a braced
@@ -3931,6 +4090,7 @@ func _meets_brace(mover: GridEntity, cell: Vector2i, direction: Vector2i) -> boo
 			_log("brace: %s's spear stops %s's charge (%d, force %.2f)" % [holder.name, mover.name, amount, force])
 			_queue_hit(holder, mover, mover.tile - holder.tile, -direction, amount,
 					force if force >= knockback_min_force else 0.0, force, false, 0)
+			_hits[-1].deed = "braced"
 			holder._world_swung(cell - holder.tile)
 			braced_against.emit(holder, mover)
 			return true

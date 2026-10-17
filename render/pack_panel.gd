@@ -27,6 +27,8 @@ const SLOT := Color(0.16, 0.15, 0.14, 0.95)
 const SLOT_EDGE := Color(0.55, 0.5, 0.42, 0.9)
 const HAND_EDGE := Color(0.85, 0.68, 0.3, 0.95)
 const HAND_MARK := Color(0.85, 0.68, 0.3, 0.8)
+## A named thing's caption (decision 365).
+const NAMED_COLOR := Color(0.98, 0.82, 0.38)
 const TEXT := Color(0.93, 0.92, 0.88, 0.95)
 
 ## Called with (from, from_slot, to, to_slot) when an item is dropped.
@@ -264,7 +266,10 @@ func _refresh() -> void:
 			box.visible = has or not is_instance_valid(entity)
 			var item := entity.slots[box.index] if has else ""
 			box.label.text = Items.short_of(item) if not item.is_empty() else ""
-			box.label.add_theme_color_override("font_color", Items.color_of(item))
+			# A named thing (decision 365) is gilded, and says its name and strength on hover.
+			var named := has and box.index < entity.slot_names.size() and not entity.slot_names[box.index].is_empty()
+			box.tooltip_text = entity.slot_names[box.index] if named else ""
+			box.label.add_theme_color_override("font_color", NAMED_COLOR if named else Items.color_of(item))
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)

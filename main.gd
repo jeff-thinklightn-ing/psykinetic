@@ -436,6 +436,7 @@ func _go_online() -> void:
 		World.guard_met.connect(_narrate_guard)
 		World.knocked_down.connect(_narrate_down)
 		World.braced_against.connect(_narrate_brace)
+		World.item_named.connect(_narrate_named)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
@@ -3580,6 +3581,11 @@ func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, til
 ## A charge stopped on a braced spear (World.braced_against).
 func _narrate_brace(holder: GridEntity, charger: GridEntity) -> void:
 	party_log.add("%s's charge breaks on %s's spear." % [_display_name(charger), _display_name(holder)])
+
+
+## A thing carried long took its name (World.item_named; decision 365).
+func _narrate_named(entity: GridEntity, uid: int, text: String) -> void:
+	party_log.add("%s's %s is %s now." % [_display_name(entity), Items.name_of(World.items.id_of(uid)), text])
 
 
 ## A blow that knocked someone down (World.knocked_down).

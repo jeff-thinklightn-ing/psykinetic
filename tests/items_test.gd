@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_axe()
 	_test_spear()
 	_test_pickup()
+	_test_names()
 	_test_loot()
 	await _test_restart()
 	await _test_migration()
@@ -853,6 +854,105 @@ func _test_pickup() -> void:
 				World.items.end(uid, "gone")
 	lying.sort()
 	_check("dagger" in lying and "shield" in lying, "beaten, it drops what it took up (%s)" % [lying])
+
+func _test_names() -> void:
+	print("\n== names from long-time holders and the strength they leave (decision 365) ==")
+	var book := ItemBook.new()
+	var uid := book.mint("dagger", "built")
+	book.place(uid, "player:a", "player:a", "Ash")
+	book.deed(uid, "player:a", "behind")
+	book.deed(uid, "player:b", "behind")
+	_check(book.history(uid)["carriers"][0]["deeds"] == {"behind": 1}, "a deed counts for who carries it, and nobody else")
+	_check(book.name_due(uid, 0, 2).is_empty() and not book.name_due(uid, 0, 1).is_empty(), "named only with deeds enough")
+	book.set_name(uid, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's dagger"}, "quiet")
+	book.set_name(uid, {"form": "holder_possessive", "holder": "Bo", "made_step": 0, "text": "Bo's dagger"}, "")
+	_check(book.name_of(uid)["text"] == "Ash's dagger" and book.strength_of(uid) == "quiet" and book.name_due(uid, 0, 0).is_empty(),
+			"one name for life: a second is refused")
+	for i in ItemBook.MAX_EVENTS + 2:
+		book.note(uid, "seen", str(i))
+	var kinds: Array = book.history(uid)["events"].map(func(e: Dictionary) -> String: return e["kind"])
+	_check(kinds.size() == ItemBook.MAX_EVENTS and kinds[0] == "built" and "named" in kinds, "its naming stays in its history (%s)" % [kinds])
+	var back := ItemBook.from_dict(JSON.parse_string(JSON.stringify(book.to_dict())))
+	_check(back.name_of(uid) == book.name_of(uid) and back.strength_of(uid) == "quiet" and back.history(uid)["carriers"][0]["deeds"] == {"behind": 1},
+			"saved and read back: name, strength and deeds")
+	_check(Items.strength_from({"behind": 6, "struck": 2}) == "quiet" and Items.strength_from({"behind": 2, "struck": 6}) == ""
+			and Items.strength_from({"guarded": 3, "shot": 3}) == "steady", "the strength of the most-done deed; plain blows leave none; ties to the earlier")
+	_check(Items.is_gear("dagger") and Items.is_gear("shield") and not Items.is_gear("meat") and not Items.is_gear("ration"), "weapons and tools are gear; food is not")
+	var host := _player(Net.local_id)
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not host.slots[slot].is_empty():
+			World.items.end(World.take_item(host, host, slot), "gone")
+	var beside := World.NO_CELL
+	for direction: Vector2i in World.DIRECTIONS:
+		if beside == World.NO_CELL and World.is_free(host.tile + direction) and World.can_melee(host.tile, host.tile + direction):
+			beside = host.tile + direction
+	_check(beside != World.NO_CELL, "room beside the host")
+	if beside == World.NO_CELL:
+		return
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "NameImp%d" % World.tick,
+		"tile": beside, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
+	imp.acts = false
+	Items.set_naming_for_test({"held_days": 0.0, "deeds": 3})
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	var stab := func() -> void:
+		imp.hp = imp.max_hp
+		World._relocate(imp, beside)
+		imp._world_set_facing(imp.tile - host.tile)
+		host.next_attack_tick = 0
+		World.try_attack(host, imp)
+		World.step()
+	for i in 3:
+		stab.call()
+	var deeds: Dictionary = World.items.history(dagger)["carriers"][0]["deeds"]
+	_check(deeds == {"behind": 3}, "three stabs in the back counted (%s)" % [deeds])
+	_check(World.items.name_of(dagger).is_empty(), "no name while lore's holder form is only a draft (in play)")
+	World.name_least = "draft"
+	stab.call()
+	var named := "%s's dagger" % World._label_of(host)
+	_check(World.items.name_of(dagger).get("text") == named and World.items.strength_of(dagger) == "quiet"
+			and World.items.name_of(dagger).get("form") == "holder_possessive",
+			"the form counting, the next deed names it: %s, quiet from its stabs in the back" % World.items.name_of(dagger).get("text"))
+	_check(host.slot_names.size() == Items.CARRIED and host.slot_names[Player.RIGHT_HAND] == named + " (quiet)",
+			"the hand shows it (%s)" % [host.slot_names])
+	_check(World.items.history(dagger)["events"][-1]["kind"] == "named", "its history says when")
+	_check(is_equal_approx(float(Items.strength_value(World.slot_strength(host, Player.RIGHT_HAND), "noise", 1.0)), 0.5),
+			"its blows make half the noise")
+	# Time away is not held.
+	var who := World._carrier_of(host)[0]
+	var held := World.items.held_by(dagger, who)
+	World._let_go_things(host)
+	_steps(20)
+	_check(World.items.held_by(dagger, who) == held, "gone from the world, the host holds it no longer (%d)" % World.items.held_by(dagger, who))
+	World.set_slots(host, host.slots, host.slot_items)
+	_steps(5)
+	_check(World.items.held_by(dagger, who) == held + 5, "back, the time counts again (%d)" % World.items.held_by(dagger, who))
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_check(host.slot_names.is_empty(), "nothing named in hand: no names sent")
+	# A quick bow; a set spear; dread.
+	var bow := _give(host, "bow", Player.RIGHT_HAND)
+	var verb := Items.verb_of("bow")
+	host.raised = "draw"
+	host.raised_tick = World.tick - roundi(float(verb["draw_full"]) * 0.8)
+	var plain := World.draw_of(host)
+	World.items.set_name(bow, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's bow"}, "quick")
+	_check(plain < 1.0 and is_equal_approx(World.draw_of(host), 1.0), "a quick bow is fully drawn sooner (%.2f, plain %.2f)" % [World.draw_of(host), plain])
+	host.raised = ""
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	var spear := _give(host, "spear", Player.RIGHT_HAND)
+	host.last_step_tick = World.tick - 3
+	_check(not World.braced(host), "a spear is not braced 3 ticks after a step")
+	World.items.set_name(spear, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's spear"}, "set")
+	_check(World.braced(host), "a set one is")
+	_check(not World.holder_dread(host), "no dread in a set spear")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	var sword := _give(host, "sword", Player.RIGHT_HAND)
+	World.items.set_name(sword, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's sword"}, "dread")
+	_check(World.holder_dread(host), "a dread sword: its holder is dreaded (for enemy-ai)")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	World.despawn(imp)
+	World.name_least = "agreed"
+	Items._naming = {}
+
 
 func _test_loot() -> void:
 	print("

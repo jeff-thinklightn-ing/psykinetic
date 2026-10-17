@@ -177,6 +177,10 @@ var slots := PackedStringArray()
 ## none yet (a level's chest: made on first need, World.slot_uid). Kept
 ## beside slots by the same World calls.
 var slot_items := PackedInt32Array()
+## Each slot's thing's name as it reads ("Wren's dagger (quiet)"), "" for
+## an unnamed one; empty when nothing in the slots has a name. Replicated
+## beside slots (decision 365); written only by World (_show_names).
+var slot_names := PackedStringArray()
 var spawned := false
 ## The tick (maybe fractional) the next step may start; see World.try_move.
 var next_move_tick := 0.0

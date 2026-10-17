@@ -7352,3 +7352,50 @@ roofed and held ground 0, the steps walked, the thinning, the town's
 ground thinned like open ground, the steps going on across an edge, no
 mine no thinning. Server only; no protocol change.
 
+
+## 365. Names from long-time holders, and the strength they leave
+
+Gear (a thing with a verb, or tagged armour or tool) carried long by one named
+holder takes a name for life (Jeff's later list, approved 2026-10-17). Each
+carrier row of an item's history (`ItemBook`) counts the deeds done with the
+thing while it carried it (`Items.DEEDS`: felled, guarded, shot, braced, behind,
+downed, struck), credited at the hooks World already has: a landed blow on a
+creature (to the right hand's thing), a shot, a guard taking a blow (the shield
+or the sword), a charge stopped on a braced spear. When the carrier has held it
+`held_days` of the world clock and done `deeds` with it (`levels/items.json`
+"naming": 2 days, about 3 real hours at the default day, and 10), it takes
+lore's first holder form (decision 366; `Lore.name_forms("holder",
+World.name_least)`), filled with the carrier's name: "Wren's dagger". Checked
+when a deed is done and on the world tick (slice 0, named holders' slots only).
+Only players and companions name things; a monster is known by its kind. Time
+held counts only while the holder is in the world: despawn lets go of its
+things' time, set_slots takes it up again, so a player logged off names nothing.
+
+A name is stored as {form, holder, made_step} and rendered when shown, so a
+reforged thing keeps it with its new word; the text it had when given is kept
+too, for its history line and as a fallback if the form is ever gone. It is
+never renamed, and its "named" event (like a later "reforged") stays past
+`MAX_EVENTS`. Until Jeff agrees lore's holder form, `name_least` "agreed" finds
+none and nothing is named in play; tests and clips set "draft".
+
+The thing also takes one strength, from the deed its namer did most with it
+(ties to the earlier in `DEEDS`; plain blows, struck, give none), from items.json
+"strengths": a sidegrade in how its verb works, never more damage, never more
+than one. steady (guarded): guarding costs 0.75 of the stamina; quick (shot): a
+bow draws in 0.8 of the time; set (braced): a spear braces 3 ticks after a step
+instead of 5; quiet (behind): its blows' fight noise is halved; heavy (downed):
+a knockdown lasts 5 ticks longer; dread (felled): `World.holder_dread(entity)`,
+for enemy-ai to decide how cautious and cowardly monsters take it. A strength is
+the thing's, whoever holds it, a monster too.
+
+Names are shown: `GridEntity.slot_names` (replicated beside slots, listed in
+SUBCLASS_REPLICATED; empty when nothing in the slots is named) carries each
+slot's "Wren's dagger (quiet)", the pack's slot tooltip shows it, and the party
+log says when a thing takes its name (`World.item_named`). A protocol change by
+the fingerprint alone (a new replicated property); no PROTOCOL_REVISION bump.
+Ground piles show no names yet: nothing reads a pile's things on hover.
+Rejected: time alone (a dagger forgotten in a pack would be named) or deeds
+alone (one fight would do it); a strength that adds damage (the roadmap's no
+damage tiers); the namer's own body or mass passing into the thing (put to Jeff
+as the other reading of "absorbing their strength"; the table can change
+without the mechanism); counting time while the holder is away.

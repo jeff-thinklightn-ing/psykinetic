@@ -72,5 +72,18 @@
 		{"id": "tusks", "name": "pair of tusks", "short": "Tusks", "color": "e8e0c8",
 			"art": "item.tusks", "kind": "held", "size": [0.18, 0.06, 0.06], "weight": 0.6, "hands": 1,
 			"tags": ["bone", "trophy"], "value": 4}
-	]
+	],
+	"naming": {
+		"_about": "Names from long-time holders (Items.naming, decision 365). A thing with a verb, or tagged armour or tool, carried by one named holder (a player, a companion) held_days of the world clock (DayNight.day_steps; while they are in the world) with deeds or more done with it, takes a name for life from lore's forms, and one strength: the one whose from is the deed its namer did most with it. Each strength changes how its verb works, never its damage: guard_stamina (times what guarding costs), draw (times a bow's draw times), brace_ticks (the steps still before a spear is braced), noise (times the fight noise of its blows), down_ticks (added to a knockdown), dread (World.holder_dread: enemy-ai reads it). A deed with no strength (struck) gives none.",
+		"held_days": 2.0,
+		"deeds": 10,
+		"strengths": {
+			"steady": {"from": "guarded", "guard_stamina": 0.75},
+			"quick": {"from": "shot", "draw": 0.8},
+			"set": {"from": "braced", "brace_ticks": 3},
+			"quiet": {"from": "behind", "noise": 0.5},
+			"heavy": {"from": "downed", "down_ticks": 5},
+			"dread": {"from": "felled", "dread": true}
+		}
+	}
 }
