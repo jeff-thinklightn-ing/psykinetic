@@ -4183,7 +4183,8 @@ func _add_wall_runs(keys: Array[Vector3i]) -> void:
 ## buildings sets a town's walls broken or rubble and calls this. The rest
 ## of the room stays; what hides the player is indexed again. The old runs
 ## are hidden at once and freed two frames later (a 3D node freed before
-## the room's first frame is drawn costs seconds: 296).
+## the room's first frame is drawn costs seconds: 296; Godot's
+## godotengine/godot#124579).
 func rebuild_walls(edges: Array[Vector3i]) -> void:
 	if _room == null or BOX_WALLS:
 		return

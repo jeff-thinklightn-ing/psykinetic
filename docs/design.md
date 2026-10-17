@@ -407,7 +407,10 @@ what a client is sent (Interest leaves at about 44), so nobody sees one go
 or come. Its slot is neither alive nor dead meanwhile (no respawn, no
 death in the party log), its things stay held under its name, and records
 are saved with their zone (`records`; a snapshot from before them loads
-as it did).
+as it did). A zone asleep keeps its monsters as bodies: measured
+(2026-10-17), the castle (18 monsters) and the hills loaded asleep beside
+the wilds left its tick under 0.1 ms either way and cost about 4 MB, mostly
+their maps; worth retiring there only if a level comes to hold hundreds.
 
 *Keepers* (the hook for wildlife's herds, W4, and any other kind with a
 world-tick store of its own): an object in `World.keepers` with
@@ -1550,6 +1553,13 @@ are the ones the 2D client uses: the 2D entity nodes go on being the
 replicated state, unseen, and the 3D view reads them. One tile is one
 unit; grid (x, y) is 3D (x, 0, y). No physics bodies: the sim is the
 physics; the only collision objects are `Area3D`s for picking.
+
+A 3D node is never freed before the first frame after a build is drawn:
+in Godot 4.7.2, one free while many new mesh instances are still pending
+takes seconds (about 1.5 s at 20,000, 9 s at 50,000), where after a frame
+it is nothing. Upstream: godotengine/godot#124579. What a build replaces
+is hidden at once and freed two frames later (`Client3D.rebuild_walls`,
+decision 296).
 
 **Room**, built once from `Terrain.parse` out of the Kenney Castle Kit at
 its own proportions (1-unit modules, `KIT_WALL_HEIGHT` 1.31 tall), scaled
