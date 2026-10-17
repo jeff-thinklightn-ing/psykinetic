@@ -1,0 +1,11 @@
+{
+	"_about": "Who is bound to lore facts, by trade (docs/lore/README.md; decision 376). An official speaks only lore facts; a free one may embellish and lie, in character; anyone unlisted is townsfolk, who do not make things up but keep what they hear. Ids are economy's trade ids (levels/economy.json, items.json made.by), or a role with no job yet. A listed role says how such a person speaks, not that one exists. Read by Lore.binding.",
+	"roles": [
+		{"id": "priest", "name": "a priest", "binding": "official", "status": "agreed", "source": "Jeff"},
+		{"id": "guard", "name": "a guard", "binding": "official", "status": "agreed", "source": "Jeff"},
+		{"id": "official", "name": "one of the town's officials", "binding": "official", "status": "agreed", "source": "Jeff"},
+		{"id": "bard", "name": "a bard", "binding": "free", "status": "agreed", "source": "Jeff"},
+		{"id": "scoundrel", "name": "a scoundrel", "binding": "free", "status": "agreed", "source": "Jeff"},
+		{"id": "thief", "name": "a thief", "binding": "free", "status": "agreed", "source": "Jeff"}
+	]
+}

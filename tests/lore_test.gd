@@ -29,6 +29,8 @@ func _ready() -> void:
 	_test_known_by()
 	_test_names_file()
 	_test_names()
+	_test_roles_file()
+	_test_roles()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -283,6 +285,71 @@ func _test_names() -> void:
 	_check(Lore.render_name({"form": "gone", "holder": "Wren"}, "sword") == "" and Lore.render_name({"form": "held"}, "sword") == ""
 			and Lore.render_name({"form": "held", "holder": "Wren"}, "axe") == "", "an unknown form, a missing holder or no word for the thing renders nothing")
 	Lore.reload()
+
+
+func _test_roles_file() -> void:
+	print("\n== roles.json: who is bound to lore facts, by economy's trade ids (decision 376) ==")
+	var data: Variant = _read("roles")
+	_check(data is Dictionary and data.get("roles") is Array, "roles.json is {roles: [...]}")
+	if not data is Dictionary:
+		return
+	var trades := _trades()
+	var bad: Array = []
+	var ids := {}
+	var jobless: Array = []
+	for role in data.get("roles", []):
+		var id: Variant = role.get("id")
+		if not (_is_id(id) and not ids.has(id) and role.get("binding") in Lore.BINDINGS and role.get("name") is String
+				and _status_ok(role) and role.get("source") is String):
+			bad.append(id)
+		ids[id] = true
+		if not trades.has(id):
+			jobless.append(id)
+	_check(bad.is_empty(), "every role is well formed, its binding one of %s %s" % [Lore.BINDINGS, bad])
+	print("  (roles with no job yet: %s)" % [jobless])
+	bad = []
+	for id in _entries:
+		var role: Variant = _entries[id].get("role")
+		if role != null and not (ids.has(role) or trades.has(role)):
+			bad.append(id)
+	_check(bad.is_empty(), "an entry's role is a listed role or a trade %s" % [bad])
+	Lore.reload()
+	_check(Lore.binding("priest") == "official" and Lore.binding("bard") == "free" and Lore.binding("hauler") == Lore.TOWNSFOLK,
+			"on the files: a priest is official, a bard free, a hauler (unlisted) townsfolk")
+	_check(Lore.knower_for("priest") == "priest" and Lore.knower_for("hauler") == "townsfolk", "a priest knows as a priest; a hauler as the townsfolk")
+
+
+func _test_roles() -> void:
+	print("\n== Lore.binding: the status gate, townsfolk by default ==")
+	Lore.use_roles([
+		{"id": "reeve", "binding": "official", "status": "agreed"},
+		{"id": "liar", "binding": "free", "status": "draft"},
+		{"id": "maybe", "binding": "official", "status": "asked", "ask": "X"},
+	])
+	_check(Lore.binding("reeve") == "official" and Lore.binding("nobody") == Lore.TOWNSFOLK, "a listed role's binding; townsfolk when unlisted")
+	_check(Lore.binding("liar") == Lore.TOWNSFOLK and Lore.binding("liar", "draft") == "free", "a draft role counts only when previewed")
+	_check(Lore.binding("maybe", "draft") == Lore.TOWNSFOLK, "an asked role never counts")
+	Lore.reload()
+
+
+## Economy's trade ids: levels/economy.json's official jobs and its buildings'
+## trade and built_by, and items.json's made.by.
+func _trades() -> Dictionary:
+	var out := {}
+	var economy: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
+	if economy is Dictionary:
+		for trade in economy.get("official", {}):
+			out[trade] = true
+		for building in economy.get("buildings", {}).values():
+			for key in ["trade", "built_by"]:
+				if building.get(key) is String:
+					out[building[key]] = true
+	var items: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/items.json"))
+	if items is Dictionary:
+		for item in items.get("items", []):
+			if item is Dictionary and item.get("made") is Dictionary and item["made"].get("by") is String:
+				out[item["made"]["by"]] = true
+	return out
 
 
 ## Whether [param text] speaks as I or we, or to you: lore is stated in the

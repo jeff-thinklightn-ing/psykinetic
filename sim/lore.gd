@@ -17,6 +17,10 @@ extends RefCounted
 ## came (holder, deed, maker) and lore's word for a thing, under the same
 ## gate. Items stores a name as {form, holder, ...} and render_name fills it
 ## at display time, so a reforged thing keeps its name with its new word.
+##
+## roles.json (decision 376) says who is bound to lore facts, by trade id:
+## an official speaks only what it knows here, a free one (a bard, a thief)
+## may embellish and lie in character, and anyone unlisted is townsfolk.
 
 const DIR := "res://levels/lore/"
 const FILES := ["world", "factions", "regions", "materials", "people", "history"]
@@ -28,12 +32,18 @@ const DEFAULT_WEIGHT := 1.0
 ## How a name came, and what a form may be filled from.
 const NAME_HOWS := ["holder", "deed", "maker"]
 const NAME_SLOTS := ["holder", "thing", "deed", "maker"]
+## How a role is bound to lore facts; TOWNSFOLK for a trade roles.json does
+## not list.
+const BINDINGS := ["official", "free"]
+const TOWNSFOLK := "townsfolk"
 
 static var _entries: Dictionary = {}
 static var _knowers: Dictionary = {}
 static var _forms: Array = []
 static var _things: Array = []
 static var _names_read := false
+static var _roles: Dictionary = {}
+static var _roles_read := false
 
 
 ## Every entry by id, read on first use.
@@ -56,6 +66,8 @@ static func reload() -> void:
 	_forms = []
 	_things = []
 	_names_read = false
+	_roles = {}
+	_roles_read = false
 
 
 ## Uses [param entry_list] and [param knower_list] (and, given, the name
@@ -157,6 +169,32 @@ static func render_name(name: Dictionary, item_id: String, tags := PackedStringA
 	return text
 
 
+## How [param trade] is bound to lore facts: "official" (speaks only what it
+## knows here), "free" (may embellish and lie, in character) or "townsfolk"
+## (unlisted, or listed but not counting under [param least]).
+static func binding(trade: String, least := "agreed") -> String:
+	_load_roles()
+	var role: Dictionary = _roles.get(trade, {})
+	if role.is_empty() or not _counts(str(role.get("status", "")), least):
+		return TOWNSFOLK
+	return str(role.get("binding", TOWNSFOLK))
+
+
+## The knower to ask known_by for someone of [param trade]: the trade's own
+## knower when there is one, else the townsfolk.
+static func knower_for(trade: String) -> String:
+	return trade if knowers().has(trade) else TOWNSFOLK
+
+
+## Uses [param role_list] in place of roles.json (tests).
+static func use_roles(role_list: Array) -> void:
+	_roles = {}
+	for role: Variant in role_list:
+		if role is Dictionary and role.get("id") is String:
+			_roles[role["id"]] = role
+	_roles_read = true
+
+
 ## Whether [param fact] (in [param entry]) is on one of the topics in
 ## [param about]: a topic that is one of the fact's or the entry's tags or
 ## the entry's id, or a word or phrase of its text or the entry's name
@@ -209,6 +247,17 @@ static func _load() -> void:
 		for knower: Variant in known["knowers"]:
 			if knower is Dictionary and knower.get("id") is String:
 				_knowers[knower["id"]] = knower
+
+
+static func _load_roles() -> void:
+	if _roles_read:
+		return
+	_roles_read = true
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(DIR + "roles.json"))
+	if data is not Dictionary or data.get("roles") is not Array:
+		push_warning("Lore: %sroles.json has no roles list" % DIR)
+		return
+	use_roles(data["roles"])
 
 
 static func _load_names() -> void:

@@ -8,6 +8,7 @@
 			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The priest who keeps the town's temple and brings the fallen back.",
+			"role": "priest",
 			"relations": [
 				{
 					"to": "temple",

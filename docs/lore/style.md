@@ -34,3 +34,15 @@ rules once it is answered. Until then:
   Whether a named thing kept from the one it is named for, rather than given
   by them, is cursed is open
   *(asked: H12)*.
+
+## Who knows what, and who may lie
+
+Jeff (2026-10-17), word for word: "offical characters only speak lore facts,
+priests, guards, officials -- bards, scoundrels, and thieves aren't bound to lore
+facts -- they can embellish and lie but only in character, and towns people don't
+fabricate they can store what they hear and decide, they may have a intillect stat
+that influences how vulnerable they are to falsehoods".
+
+So lore holds what is so (and, as rumours, what is said). Which roles are bound to
+it is in `levels/lore/roles.json` (README, decision 376). A falsehood a resident
+comes to believe is that resident's, never a lore fact.

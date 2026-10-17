@@ -142,3 +142,19 @@ made_step}` and shows it with `Lore.render_name(name, item_id, tags, noun)`: the
 form filled in, `{thing}` being lore's word for the item now or else `noun`, so a
 reforged thing keeps its name with its new word ("Wren's spear"). A stored form
 renders whatever its status now: a name given stays given.
+
+## Roles
+
+`roles.json` is `{"_about": "...", "roles": [...]}` (decision 376): who is bound to
+lore facts, by Jeff's rule (`style.md`). A role is `{"id", "name", "binding",
+"status", "source"}`. `id` is a trade id shared with economy (`levels/economy.json`'s
+official jobs and buildings, `items.json`'s `made.by`), or a role with no job yet.
+`binding` is `official` (speaks only lore facts: priests, guards, the town's
+officials) or `free` (may embellish and lie, in character: bards, scoundrels,
+thieves). A trade not listed is `townsfolk`. A listed role says how such a person
+speaks, not that one exists. A person entry may name its `role`.
+
+`Lore.binding(trade)` gives the binding, `"townsfolk"` when unlisted.
+`Lore.knower_for(trade)` gives the knower to ask `known_by` for: the trade's own
+knower when there is one (`priest`, `guard`), else `townsfolk`. What a resident
+hears and believes is that resident's, kept by companions, never a fact here.

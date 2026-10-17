@@ -7729,3 +7729,22 @@ facing the town's square, footprint 216-219 x 195-200, lanes from its
 door to the square; the healer's hut by the south forest edge, footprint
 151-153 x 233-235 facing north, the far side from the castle link, a path
 from its door to the town's west lane at (196, 213).
+## 376. Who is bound to lore facts is a role list in levels/lore/roles.json, keyed by trade
+
+Jeff's rule (2026-10-17): officials (priests, guards, the town's officials) speak
+only lore facts; bards, scoundrels and thieves may embellish and lie in
+character; townsfolk make nothing up but keep what they hear. `levels/lore/roles.json`
+lists roles by economy's trade ids (or a role with no job yet), each with a
+binding, official or free, and a status under decision 258's gate. A trade not
+listed is townsfolk, so a new job is townsfolk until lore lists it. A listed role
+says how such a person speaks, not that one exists (no guard or bard is stated
+into the world by it). `Lore.binding(trade)` answers; `Lore.knower_for(trade)`
+names the knower to ask known_by for, the trade's own (knowers "priest" and
+"guard") or else "townsfolk", one knower until there is a second town. Every
+voice asks with least "agreed"; an official is given rumours as hearsay, which
+are lore facts about what is said. A falsehood a resident believes is companions'
+(their Hearsay store), never lore. lore_test checks the roles and that an entry's
+role is listed or a trade, and prints the roles with no job yet. Economy's own
+"official" key (town-paid jobs, the hauler among them) is pay, not binding.
+Rejected: a binding field on person entries (it would state guards, officials
+and bards into the world before A3, A4 or Jeff say they exist).

@@ -77,6 +77,26 @@
 			"tags": []
 		},
 		{
+			"id": "priest",
+			"name": "the town's priest",
+			"status": "agreed",
+			"where": [
+				"town_lands",
+				"blood_rot_lands"
+			],
+			"tags": []
+		},
+		{
+			"id": "guard",
+			"name": "a town guard",
+			"status": "agreed",
+			"where": [
+				"town_lands",
+				"blood_rot_lands"
+			],
+			"tags": []
+		},
+		{
 			"id": "smith",
 			"name": "the smith",
 			"status": "draft",
