@@ -1492,7 +1492,8 @@ func _test_seasons() -> void:
 	var dead: Array = []
 	for tree: Node3D in _rig._trees.values():
 		var kind := str(tree.get_meta("slot", ""))
-		(dead if kind == "tree.dead" else leaves).append_array(season_of.call(tree))
+		# Pines and their stands, as dead wood: snow only.
+		(dead if kind in ["tree.dead", "tree.pine", PineStands.SLOT] else leaves).append_array(season_of.call(tree))
 	_check(not leaves.is_empty() and leaves.all(func(leaf: Variant) -> bool: return leaf == true),
 			"every broadleaf's surfaces in the season's shader, its foliage turning (%d)" % leaves.size())
 	var wood: Array = []
@@ -1507,8 +1508,9 @@ func _test_seasons() -> void:
 		var sheet := _rig._border.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Canopy_"))
 		if not sheet.is_empty():
 			canopy_leaf = season_of.call(sheet[0])[0]
-	_check(season_of.call(forest_floor) == [false] and canopy_leaf == true,
-			"the forest floor snow only; the canopy past broadleaf turns with it")
+	# The canopy sheet past pine stands is pines' (snow only), else broadleaf's.
+	_check(season_of.call(forest_floor) == [false] and canopy_leaf == (not PineStands.drawn()),
+			"the forest floor snow only; the canopy past broadleaf turns with it, past pine stands snow only")
 	var tree: Node3D = _rig._trees.values()[0]
 	var before: Array = season_of.call(tree)
 	_rig._set_near(tree, true)

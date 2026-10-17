@@ -3506,6 +3506,7 @@ func _add_stands(distance: Dictionary[Vector2i, int], stood: Dictionary[Vector2i
 		if int(stand["near"]) <= PineStands.NEAR:
 			var piece := Node3D.new()
 			piece.name = "Stand_%d_%d" % [corner.x, corner.y]
+			piece.set_meta(&"slot", PineStands.SLOT)
 			piece.transform = PineStands.transform_of(stand)
 			var drawn := MeshInstance3D.new()
 			drawn.mesh = PineStands.mesh(variant)
