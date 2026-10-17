@@ -26,6 +26,8 @@ notes (decision 324).
   shield and weapon blocks, blows on armour, punches, body falls, door bars and bolts,
   falling stone, a town at night, and the menu's clicks, page turns and chimes. Some aren't
   heard in play yet, until the actions that make them are hooked up.
+- The game's folder now holds THIRD_PARTY.md, the credits: who made the
+  sounds, art and tools the game uses, and their licences.
 
 ## v0.1.148
 
