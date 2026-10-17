@@ -389,6 +389,16 @@ const FADE_CHUNK := 8.0
 ## A damaged building's roof until its slot has a roof_damaged part: tipped
 ## and dropped at its eaves, caved in at a glance (_show_state).
 const ROOF_SAG := Transform3D(Basis(Vector3.RIGHT, 0.18), Vector3(0.0, -0.45, 0.0))
+## A roof set's shape until roof.<set>.profile says (decision 364): metres
+## it rises a cell in from the eave, its thickness, how far it reaches past
+## the walls; and its colour until material.roof.<set> has a texture.
+const ROOF_PROFILE := {"rise": 0.75, "thickness": 0.15, "overhang": 0.3}
+const ROOF_SWATCH := Vector2i(2, 4)
+## A barge board's depth and thickness (m); how far a ridge cap's base sits
+## below the apex (roof.<set>.ridge: its lowest edges 0.25 m out on a 0.75
+## pitch).
+const ROOF_BARGE := Vector2(0.05, 0.2)
+const ROOF_CAP_DROP := 0.1875
 ## A building's side is near the camera, and fades while the player is
 ## inside (_inside_walls), when its outward way and the camera's, flat,
 ## agree more than this (the cosine): both sides toward the camera in a
@@ -2245,6 +2255,7 @@ func _build_room() -> void:
 		for plan: Dictionary in _glimpse_plans:
 			_add_glimpse(plan)
 	_add_buildings()
+	_add_roofs()
 	_add_town_walls()
 	# Every door's leaf set once; from then on those that change.
 	if not World.door_shown.is_connected(_on_door_shown):
@@ -2317,6 +2328,166 @@ func _add_buildings() -> void:
 		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
+
+
+## The terrain's roofs (Level.roofs_from, decision 364): each a gable
+## drawn from its set (_roof_mesh) over its rect, at the walls' top, its
+## ridge along x or z; kept with the buildings (_buildings), so it is off
+## while the local player is under it, fades when it hides them, and
+## draws as its town has it as theirs do.
+func _add_roofs() -> void:
+	for given: Dictionary in _terrain.get("roofs", []):
+		var rect: Rect2i = given["rect"]
+		var holder := Node3D.new()
+		holder.name = "Roof_%d_%d" % [rect.position.x, rect.position.y]
+		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+		holder.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE, middle.y)
+		var along_x := str(given.get("ridge", "z")) == "x"
+		# Built along z; a ridge along x is the same turned a quarter.
+		holder.rotation.y = PI * 0.5 if along_x else 0.0
+		var span := Vector2(rect.size.y, rect.size.x) if along_x else Vector2(rect.size)
+		var roof := _roof_mesh(str(given.get("set", Level.ROOF_SETS[0])), span.x, span.y)
+		roof.name = "roof"
+		roof.position.y = WALL_HEIGHT
+		holder.add_child(roof)
+		_room.add_child(holder)
+		# A corner no wall comes to stands on a post (a shelter's).
+		for vertex: Vector2i in [rect.position, Vector2i(rect.end.x, rect.position.y), Vector2i(rect.position.x, rect.end.y), rect.end]:
+			var walled := Level.outline(rect).any(func(key: Vector3i) -> bool:
+				return _terrain["edges"].has(key) and _edge_vertices(key).has(vertex))
+			if not walled and not _posts.has(vertex):
+				_add_post(vertex)
+		var index := _buildings.size()
+		_buildings.append({"rect": rect, "node": holder, "roof": roof, "off": false, "roof_at": roof.transform,
+			"use": str(given.get("use", "")), "town_id": str(given.get("town_id", "")), "damaged": false})
+		_show_state(_buildings[index])
+		if _glimpse:
+			continue
+		var keep_dry := GPUParticlesCollisionBox3D.new()
+		keep_dry.size = Vector3(rect.size.x, WALL_HEIGHT, rect.size.y)
+		keep_dry.position = holder.position + Vector3(0.0, WALL_HEIGHT * 0.5, 0.0)
+		_room.add_child(keep_dry)
+		for cell in Level.rect_cells(rect):
+			_building_at[cell] = index
+
+
+## The two vertices (cell corners, Vector2i(x, y) the top-left of cell (x,
+## y)) at the ends of edge [param key].
+static func _edge_vertices(key: Vector3i) -> Array[Vector2i]:
+	if key.z == Terrain.EAST:
+		return [Vector2i(key.x + 1, key.y), Vector2i(key.x + 1, key.y + 1)]
+	return [Vector2i(key.x, key.y + 1), Vector2i(key.x + 1, key.y + 1)]
+
+
+## A gable roof of set [param roof_set] over a room [param across] cells
+## wide (x) and [param along] long (z, the ridge), its origin the room's
+## middle at the walls' top: two slopes from roof.<set>.profile (rise a
+## cell, thickness, overhang past the walls) with barge boards down the
+## gables' edges, the gable ends' triangles in this map's wall set, a roof.<set>.ridge a cell along the ridge and a
+## roof.<set>.end (a finial) at each end of it, grey stand-ins where the set has no
+## art yet.
+func _roof_mesh(roof_set: String, across: float, along: float) -> Node3D:
+	var profile := ROOF_PROFILE.duplicate()
+	var slot := "roof.%s.profile" % roof_set
+	if ArtKit.has(slot):
+		var spec := ArtKit.spec(slot)
+		for key: String in profile:
+			profile[key] = float(spec.get(key, profile[key]))
+	var half := across * 0.5
+	var apex := float(profile["rise"]) * half
+	var pitch := apex / half
+	var reach := float(profile["overhang"])
+	var thick := float(profile["thickness"])
+	var length := along + reach * 2.0
+	var out := Node3D.new()
+	# The slopes: from the eave, reach past the wall and as far below its
+	# top, to the ridge; a top and an underside, u along the ridge and v
+	# down the slope in metres (material.roof.<set>'s tile_m).
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var slope := Vector2(half + reach, apex + reach * pitch).length()
+	for side in [-1.0, 1.0]:
+		var eave := Vector3(side * (half + reach), -reach * pitch, 0.0)
+		var ridge := Vector3(0.0, apex, 0.0)
+		for lift in [thick, 0.0]:
+			var up := Vector3(0.0, lift, 0.0)
+			var corners := [ridge + up + Vector3(0, 0, -length * 0.5), ridge + up + Vector3(0, 0, length * 0.5),
+				eave + up + Vector3(0, 0, length * 0.5), eave + up + Vector3(0, 0, -length * 0.5)]
+			var uvs := [Vector2(0, 0), Vector2(length, 0), Vector2(length, slope), Vector2(0, slope)]
+			for i in [0, 1, 2, 0, 2, 3]:
+				tool.set_uv(uvs[i] / 2.0)
+				tool.add_vertex(corners[i])
+	tool.generate_normals()
+	var slopes := MeshInstance3D.new()
+	slopes.name = "Slopes"
+	slopes.mesh = tool.commit()
+	slopes.material_override = _roof_material(roof_set)
+	out.add_child(slopes)
+	# The gable ends: the wall set's triangle under each end, on the wall line.
+	var gables := SurfaceTool.new()
+	gables.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for z in [-along * 0.5, along * 0.5]:
+		for point: Vector3 in [Vector3(-half, 0, z), Vector3(half, 0, z), Vector3(0, apex, z)]:
+			gables.set_uv(Vector2(point.x, -point.y) / WALL_TILE)
+			gables.add_vertex(point)
+	gables.generate_normals()
+	var ends := MeshInstance3D.new()
+	ends.name = "Gables"
+	ends.mesh = gables.commit()
+	var wall := _wall_material(_walls_set).duplicate() as StandardMaterial3D
+	wall.cull_mode = BaseMaterial3D.CULL_DISABLED
+	ends.material_override = wall
+	out.add_child(ends)
+	# The barge boards: down each gable's edge, under the slopes' rim.
+	for z in [-length * 0.5, length * 0.5]:
+		for side in [-1.0, 1.0]:
+			var board := MeshInstance3D.new()
+			var shape := BoxMesh.new()
+			shape.size = Vector3(slope, ROOF_BARGE.y, ROOF_BARGE.x)
+			board.mesh = shape
+			board.material_override = _roof_material(roof_set)
+			board.position = Vector3(side * (half + reach) * 0.5, (apex - reach * pitch) * 0.5, z)
+			board.rotation.z = -side * atan(pitch)
+			out.add_child(board)
+	# The ridge and its ends: art-kit's pieces, or a grey cap along it. A
+	# cap's base is a saddle whose lowest edges are ROOF_CAP_DROP below the
+	# apex of the slopes' top faces.
+	var top := Vector3(0.0, apex + thick, 0.0)
+	if ArtKit.has("roof.%s.ridge" % roof_set):
+		for k in int(along):
+			var cap := ArtKit.instance("roof.%s.ridge" % roof_set)
+			cap.position = top + Vector3(0.0, -ROOF_CAP_DROP, k - (along - 1.0) * 0.5)
+			out.add_child(cap)
+	else:
+		var cap := _box(Vector3(0.3, 0.15, length), _roof_material(roof_set))
+		cap.position = top - Vector3(0.0, 0.08, 0.0)
+		out.add_child(cap)
+	if ArtKit.has("roof.%s.end" % roof_set):
+		for side in [-1.0, 1.0]:
+			var finial := ArtKit.instance("roof.%s.end" % roof_set)
+			finial.position = top + Vector3(0.0, 0.0, side * length * 0.5)
+			finial.rotation.y = 0.0 if side < 0.0 else PI
+			out.add_child(finial)
+	return out
+
+
+## A roof set's slopes: material.roof.<set>'s texture if it has one, else
+## a flat ROOF_SWATCH; both faces drawn (its underside is seen at the
+## eaves). One a set.
+static var _roof_materials: Dictionary[String, StandardMaterial3D] = {}
+
+
+static func _roof_material(roof_set: String) -> StandardMaterial3D:
+	if not _roof_materials.has(roof_set):
+		var material := StandardMaterial3D.new()
+		var own := ArtKit.texture("material.roof." + roof_set) if ArtKit.has("material.roof." + roof_set) else null
+		material.albedo_texture = own
+		material.albedo_color = Color.WHITE if own != null else swatch(ROOF_SWATCH.x, ROOF_SWATCH.y)
+		material.roughness = 0.95
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		_roof_materials[roof_set] = material
+	return _roof_materials[roof_set]
 
 
 ## Sets the buildings of [param town] (its id) to [param buildings] ({kind:
@@ -2969,9 +3140,14 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		var rect := Rect2i((building["rect"] as Rect2i).position + shift, (building["rect"] as Rect2i).size)
 		if Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return cells.has(cell)):
 			buildings.append({"slot": building["slot"], "rect": rect, "facing": building["facing"]})
+	var roofs: Array[Dictionary] = []
+	for roof: Dictionary in terrain.get("roofs", []):
+		var rect := Rect2i((roof["rect"] as Rect2i).position + shift, (roof["rect"] as Rect2i).size)
+		if Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return cells.has(cell)):
+			roofs.append({"rect": rect, "set": roof["set"], "ridge": roof["ridge"]})
 	return {"to": str(way["to_map"]), "cells": cells, "terrain": {
 		"floor": floor_cells, "water": water, "kinds": kinds, "heights": heights, "stairs": stairs, "edges": edges,
-		"fire": [], "torches": [], "lanterns": [], "buildings": buildings, "outdoor": true, "zone": "outdoors",
+		"fire": [], "torches": [], "lanterns": [], "buildings": buildings, "roofs": roofs, "outdoor": true, "zone": "outdoors",
 		"walls": terrain.get("walls", DEFAULT_SET), "floors": terrain.get("floors", DEFAULT_SET), "border": "none"}}
 
 
@@ -3020,6 +3196,7 @@ func _draw_glimpse(terrain: Dictionary) -> void:
 	_add_cliffs()
 	_add_walls()
 	_add_buildings()
+	_add_roofs()
 
 
 ## A tree slot on [param cell], sized by [param clump] (the biggest in a

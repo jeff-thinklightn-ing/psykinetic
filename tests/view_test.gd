@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_cave_walls()
 	_test_scatter()
 	_test_buildings()
+	_test_roofs()
 	_test_building_states()
 	_test_town_walls()
 	await _test_near_miss_picks()
@@ -727,6 +728,72 @@ func _test_buildings() -> void:
 		other.global_position = other_was
 	puppet.global_position = was
 	_rig.set_process(true)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+
+func _test_roofs() -> void:
+	print("
+== roofs (decision 364): a tiling set's gable over a walled room; off while the player is under it ==")
+	var map := LevelMap.new(Vector2i(16, 14))
+	for y in 14:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	var rect := Rect2i(3, 3, 5, 3)
+	for key in Level.outline(rect):
+		map.set_edge(key, "door" if key == Vector3i(5, 5, Terrain.SOUTH) else "wall")
+	var terrain: Dictionary = Level.parse(map.to_image(), null, {"outdoor": true, "walls": "wood",
+		"roofs": [{"rect": [3, 3, 5, 3], "use": "", "town": ""}]})["terrain"]
+	(terrain["roofs"][0] as Dictionary)["use"] = "forge"
+	(terrain["roofs"][0] as Dictionary)["town_id"] = "fixture/roofs"
+	_rig.rebuild(terrain, Vector2i(7, 7))
+	_check(_rig._buildings.size() == 1, "one roof drawn, kept with the buildings (%d)" % _rig._buildings.size())
+	if _rig._buildings.size() != 1:
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var roofed: Dictionary = _rig._buildings[0]
+	var holder: Node3D = roofed["node"]
+	var roof: Node3D = roofed["roof"]
+	_check(holder.name == "Roof_3_3" and holder.position.is_equal_approx(Vector3(5, 0, 4)) and is_equal_approx(holder.rotation.y, PI * 0.5)
+			and is_equal_approx(roof.position.y, Client3D.WALL_HEIGHT), "over the room's middle at the walls' top, its ridge along x, the long side")
+	_check(roof.get_node_or_null("Slopes") != null and roof.get_node_or_null("Gables") != null,
+			"its slopes from roof.shingle.profile, its gables in the wall set")
+	var top := _rig._bounds(roof.get_node("Slopes"))
+	_check(absf(top.end.y - (Client3D.WALL_HEIGHT + 0.75 * 1.5 + 0.15)) < 0.01 and is_equal_approx(top.size.x, 5.6) and is_equal_approx(top.size.z, 3.6),
+			"rising 0.75 a cell to its ridge, past the walls at the eaves and gables (%s)" % [top])
+	_check(_rig._building_at.get(Vector2i(4, 4), -1) == 0 and _rig._building_at.get(Vector2i(7, 5), -1) == 0 and not _rig._building_at.has(Vector2i(8, 4)),
+			"its cells are its inside")
+	_check(_rig._occluders.any(func(entry: Array) -> bool: return entry[0] == roof), "it fades as a wall does when it hides a player outside")
+	_rig.set_process(false)
+	var puppet: Node3D = _rig._puppets[_player().get_instance_id()]
+	var other: Node3D = _rig._puppets.get(_companion().get_instance_id()) if _companion() != null else null
+	var was := puppet.global_position
+	var other_was := other.global_position if other != null else Vector3.ZERO
+	var outside := _rig.to_global(_rig._tile_position(Vector2i(12, 11)))
+	if other != null:
+		other.global_position = outside
+	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(6, 4)))
+	_rig._update_fade()
+	_check(roofed["off"] and _roof_shadow_only(roofed), "the player under it: it draws only its shadow")
+	puppet.global_position = outside
+	_rig._fade_clock += Client3D.FADE_HOLD + 0.1
+	_rig._update_fade()
+	_check(not roofed["off"] and not _roof_shadow_only(roofed), "out from under it: it is back")
+	_rig.set_town("fixture/roofs", {"forge": {"state": Towns.DAMAGED, "level": 1}})
+	_check(roofed["damaged"] and not roof.transform.is_equal_approx(roofed["roof_at"]), "its town's forge damaged: it sags, as a slot's roof with no roof_damaged")
+	_rig.set_town("fixture/roofs", {"forge": {"state": Towns.STANDING, "level": 1}})
+	_check(not roofed["damaged"] and roof.transform.is_equal_approx(roofed["roof_at"]), "and standing again")
+	puppet.global_position = was
+	if other != null:
+		other.global_position = other_was
+	_rig.set_process(true)
+	_rig.town_states.erase("fixture/roofs")
+	# An open shelter: no walls, a post at each corner.
+	var open: Dictionary = Level.parse(map.to_image(), null, {"outdoor": true,
+		"roofs": [{"rect": [10, 8, 3, 2]}]})["terrain"]
+	_rig.rebuild(open, Vector2i(7, 7))
+	_check([Vector2i(10, 8), Vector2i(13, 8), Vector2i(10, 10), Vector2i(13, 10)].all(func(vertex: Vector2i) -> bool: return _rig._posts.has(vertex)),
+			"an open shelter stands on a post at each corner")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

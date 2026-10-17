@@ -103,7 +103,7 @@ func load(terrain: Dictionary) -> void:
 	outdoor = bool(terrain.get("outdoor", false))
 	region = str(terrain.get("region", Level.DEFAULT_REGION))
 	_roofed.clear()
-	for building: Dictionary in terrain.get("buildings", []):
+	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
 		for cell in Level.rect_cells(building["rect"]):
 			_roofed[cell] = true
 	_source_list = []

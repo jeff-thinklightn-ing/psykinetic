@@ -213,6 +213,8 @@ static func load_level(level_name: String) -> Dictionary:
 		building["town_id"] = "%s/%s" % [level_name, building["town"]] if not building["town"].is_empty() else ""
 	for ring: Dictionary in level["town_walls"]:
 		ring["town_id"] = "%s/%s" % [level_name, ring["town"]]
+	for roof: Dictionary in level["roofs"]:
+		roof["town_id"] = "%s/%s" % [level_name, roof["town"]] if not roof["town"].is_empty() else ""
 	for warning: String in level["warnings"]:
 		push_warning("[level] %s: %s" % [level_name, warning])
 	return level
@@ -459,6 +461,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	level["terrain"]["buildings"] = level["buildings"]
 	level["town_walls"] = town_walls_from(config, level["terrain"], cells, warnings)
 	level["terrain"]["town_walls"] = level["town_walls"]
+	level["roofs"] = roofs_from(config, level["terrain"], level["buildings"], warnings)
+	level["terrain"]["roofs"] = level["roofs"]
 	return level
 
 
@@ -826,7 +830,65 @@ static func town_walls_from(config: Dictionary, terrain: Dictionary, size: Vecto
 	return out
 
 
-## A level.json town wall entry's rect (null if it has none).
+## The roof sets a level.json roof may name (art-kit's roof.<set>.*,
+## decision 364).
+const ROOF_SETS: Array[String] = ["shingle"]
+
+
+## level.json's "roofs", [{rect: [x, y, w, h], the cells it covers, set:
+## one of ROOF_SETS, ridge: "x" or "z" (along the map's x or y; along the
+## long side if not given), use and town (as a building's, _link)}], as
+## {rect (Rect2i), set, ridge, height (its cells'), use, town}: a roof
+## drawn by a tiling set over a room that is no building slot (decision
+## 364). A roof covers only floor of one height, clear of the buildings and
+## the other roofs: one that does not, or names no set there is, is left
+## out, said in [param warnings]. Its outline need not be walled (a
+## shelter on posts). A town has one of each use, [param buildings]'
+## links counted.
+static func roofs_from(config: Dictionary, terrain: Dictionary, buildings: Array[Dictionary], warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("roofs", [])
+	if not listed is Array:
+		warnings.append("\"roofs\" in level.json is not a list")
+		return out
+	var ground: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain["floor"]:
+		ground[cell] = true
+	var taken: Dictionary[Vector2i, bool] = {}
+	var linked := {}
+	for building in buildings:
+		for cell in rect_cells(building["rect"]):
+			taken[cell] = true
+		if not str(building["use"]).is_empty():
+			linked[str(building["town"]) + "/" + str(building["use"])] = building["cell"]
+	for entry: Variant in listed:
+		var rect: Variant = town_wall_rect(entry)
+		if rect == null:
+			warnings.append("the roof %s has no \"rect\" [x, y, w, h]" % [entry])
+			continue
+		var roof_set := str(entry.get("set", ROOF_SETS[0]))
+		if not roof_set in ROOF_SETS:
+			warnings.append("the roof at %s is of set \"%s\": one of %s; left out" % [rect.position, roof_set, ", ".join(ROOF_SETS)])
+			continue
+		var cells := rect_cells(rect)
+		var height: int = terrain["heights"].get(cells[0], 0)
+		var bad := cells.filter(func(cell: Vector2i) -> bool:
+			return not ground.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
+		if not bad.is_empty():
+			warnings.append("the roof at %s is not all over clear floor of one height, clear of buildings and roofs (%s): left out" % [rect.position, bad[0]])
+			continue
+		for cell in cells:
+			taken[cell] = true
+		var ridge := str(entry.get("ridge", ""))
+		if not ridge in ["x", "z"]:
+			ridge = "x" if rect.size.x > rect.size.y else "z"
+		var roof := {"slot": "roof", "cell": rect.position, "rect": rect, "set": roof_set, "ridge": ridge, "height": height, "use": "", "town": ""}
+		_link(roof, entry, config, linked, warnings)
+		out.append(roof)
+	return out
+
+
+## A level.json town wall's or roof's rect (null if it has none).
 static func town_wall_rect(entry: Variant) -> Variant:
 	var given: Variant = entry.get("rect") if entry is Dictionary else null
 	if not given is Array or given.size() != 4:

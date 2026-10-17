@@ -234,6 +234,21 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 			entry["rect"] = [mini(a.x, b.x), mini(a.y, b.y), absi(a.x - b.x) + 1, absi(a.y - b.y) + 1]
 			rings.append(entry)
 		out["town_walls"] = rings
+	if out.get("roofs") is Array:
+		# A roof's ridge turns with it: along x, a quarter turn puts it along z.
+		var roofs: Array = []
+		for entry: Variant in out["roofs"]:
+			var rect: Variant = Level.town_wall_rect(entry)
+			var a: Variant = move.call(rect.position) if rect != null else null
+			var b: Variant = move.call(rect.end - Vector2i.ONE) if rect != null else null
+			if a == null or b == null:
+				dropped.append("roof %s" % [entry])
+				continue
+			entry["rect"] = [mini(a.x, b.x), mini(a.y, b.y), absi(a.x - b.x) + 1, absi(a.y - b.y) + 1]
+			if turns % 2 != 0 and entry.get("ridge") in ["x", "z"]:
+				entry["ridge"] = "z" if entry["ridge"] == "x" else "x"
+			roofs.append(entry)
+		out["roofs"] = roofs
 	if out.get("entities") is Array:
 		var entities: Array = []
 		for entry: Variant in out["entities"]:

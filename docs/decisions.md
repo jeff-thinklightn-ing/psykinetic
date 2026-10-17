@@ -7399,3 +7399,41 @@ alone (one fight would do it); a strength that adds damage (the roadmap's no
 damage tiers); the namer's own body or mass passing into the thing (put to Jeff
 as the other reading of "absorbing their strength"; the table can change
 without the mechanism); counting time while the holder is away.
+## 364. Roof pieces: a tiling roof set over any room
+
+Jeff's go-ahead for roof pieces (2026-10-17). The building slots (hut,
+house, shed) keep their own roof parts; any other room, walled in by
+builder mode or the editor, or an open shelter, is roofed by a tiling set,
+as walls are by wall sets. level.json `"roofs": [{rect: [x, y, w, h], set,
+ridge: "x" | "z", use, town}]` is read by `Level.roofs_from`: a roof covers
+floor of one height, clear of buildings and other roofs, of a set in
+`Level.ROOF_SETS` ("shingle" now); one that is not is left out and said.
+The ridge runs along the long side unless given. Its outline need not be
+walled. `use` and `town` link it to its town as a building's do (297),
+one of each use a town, buildings counted first. Its cells are roofed
+(`Fields._roofed`: under no sky, as a building's footprint). It moves and
+turns with the map (`LevelMap.moved_config`, the ridge turning with an odd
+quarter turn), is carried by prefabs (`Prefab.KEEP`, `stamp_changes`) and
+is a builder config key.
+
+Client3D draws each (`_add_roofs`, `_roof_mesh`) at the walls' top from
+art-kit's `roof.<set>.profile` (rise a cell 0.75 m, thickness 0.15,
+overhang 0.3): the two slopes extruded in code, u along the ridge and v
+down the slope in metres for `material.roof.<set>` (a ROOF_SWATCH colour
+until it has a texture); barge boards down the gables' edges in code
+(scaling a piece to the span would thicken it); the gable triangles in the
+map's wall set; `roof.<set>.ridge` a cell along the ridge, its saddle
+ROOF_CAP_DROP below the slopes' apex, and `roof.<set>.end`, a finial, at
+each end. A corner no wall comes to stands on the wall set's post (a
+shelter). A roof is kept with the buildings (`_buildings`), so it is off
+(its shadow only) while the local player or companion is under it, its
+near walls fade, it fades as an occluder from outside, and it draws its
+town's state as a slot roof with no roof_damaged does (sagging) until step
+(b) gives it its own damage. A glimpse draws the roofs wholly in it.
+
+Rejected: per-building roof parts for any room (a part a size); slope and
+eave meshes (a span is any length; a profile has no seams); requiring a
+walled outline (a market stall is a roof on posts). Later: hip roofs; roof
+damage of its own (a third of its cells broken and open to the sky,
+`World.damage_roof` and `repair_roof`, a "roofs" message: step b); the
+builder tool (builder) and the editor's rect drag (step c).

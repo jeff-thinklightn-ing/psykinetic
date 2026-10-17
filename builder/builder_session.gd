@@ -34,7 +34,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 ## Context shown round the area, in cells.
 const MARGIN := 3
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls", "roofs"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).

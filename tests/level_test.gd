@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_buildings()
 	_test_building_links()
 	_test_town_walls()
+	_test_roofs()
 	await _test_level_links()
 	await _test_edge_links()
 	_test_console()
@@ -460,6 +461,50 @@ func _test_town_walls() -> void:
 	var turned := Prefab.rotated({"map": map, "config": config}, 1)
 	var moved: Array = turned["config"]["town_walls"]
 	_check(moved.size() == 5 and moved[0]["rect"] == [7, 4, 10, 12], "turned with the map, a ring keeps its cells: 10 x 12 (%s)" % [moved[0]])
+
+
+
+func _test_roofs() -> void:
+	print("
+== roofs: a tiling set over any room (decision 364), checked as buildings are ==")
+	var map := LevelMap.new(Vector2i(24, 20))
+	for y in 20:
+		for x in 24:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(20, 2), "water")
+	var config := {"buildings": [{"slot": "building.hut", "at": [16, 12]}], "roofs": [
+		{"rect": [2, 2, 4, 6]},
+		{"rect": [10, 2, 5, 3], "ridge": "x", "set": "shingle"},
+		{"rect": [2, 12, 3, 3], "set": "slate"},
+		{"rect": [4, 6, 3, 3]},
+		{"rect": [17, 13, 2, 2]},
+		{"rect": [19, 2, 3, 1]},
+		{"rect": [2, 16]}]}
+	var level := Level.parse(map.to_image(), null, config)
+	var roofs: Array = level["roofs"]
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("roof"))
+	_check(roofs.size() == 2 and roofs[0]["rect"] == Rect2i(2, 2, 4, 6) and roofs[0]["ridge"] == "z" and roofs[0]["set"] == "shingle"
+			and roofs[1]["rect"] == Rect2i(10, 2, 5, 3) and roofs[1]["ridge"] == "x",
+			"two roofs stand, the ridge along the long side if not given (%s)" % [roofs])
+	_check(said.size() == 5 and str(said).contains("one of shingle") and str(said).count("clear floor of one height") == 3 and str(said).contains("has no"),
+			"a set there is not, over another roof, over a building, over water, and no rect, each said and left out (%s)" % [said])
+	_check(level["terrain"]["roofs"] == roofs, "the views have them in the terrain")
+	var fields := Fields.new()
+	fields.load(level["terrain"])
+	fields.outdoor = true
+	_check(not fields.under_sky(Vector2i(3, 4)) and not fields.under_sky(Vector2i(12, 3)) and fields.under_sky(Vector2i(8, 4)),
+			"a roof's cells are under it, as a building's are")
+	var turned := Prefab.rotated({"map": map, "config": config}, 1)
+	var moved: Array = turned["config"]["roofs"]
+	_check(moved.size() == 6 and moved[1]["ridge"] == "z" and (moved[1]["rect"] as Array).slice(2) == [3, 5] and not moved[0].has("ridge"),
+			"turned with the map, a roof keeps its cells and its ridge turns with it; one with no rect dropped (%s)" % [moved[1]])
+	var piece := LevelMap.new(Vector2i(4, 4))
+	for y in 4:
+		for x in 4:
+			piece.set_cell(Vector2i(x, y), "grass")
+	var stamped := Prefab.stamp_changes({"map": piece, "config": {"roofs": [{"rect": [1, 1, 2, 2]}]}}, map, Vector2i(8, 8), config)
+	var after: Array = stamped.get("config", {}).get("roofs", [])
+	_check(after.size() == 8 and after[7]["rect"] == [9, 9, 2, 2], "a prefab's roof is stamped with it, moved (%s)" % [after.back() if not after.is_empty() else null])
 
 
 func _test_level_links() -> void:

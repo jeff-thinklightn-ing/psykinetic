@@ -16,7 +16,7 @@ extends RefCounted
 
 const DIR := "res://levels/prefabs/"
 ## level.json keys a prefab keeps.
-const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places", "buildings"]
+const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places", "buildings", "roofs"]
 
 
 ## The prefabs there are, by name, sorted.
@@ -68,7 +68,7 @@ static func rotated(prefab: Dictionary, turns: int) -> Dictionary:
 ## map's level.json) with the prefab's added, moved, a key the map has
 ## already taking _2, _3...}; if it has buildings or lands on the map's,
 ## config buildings: the map's that it does not land on, and its own,
-## moved}. Only what lands on the map.
+## moved, and roofs so}. Only what lands on the map.
 static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, config := {}) -> Dictionary:
 	var piece: LevelMap = prefab["map"]
 	var cells: Dictionary[Vector2i, String] = {}
@@ -122,6 +122,16 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, confi
 	if buildings.size() != had.size() or not moved_config.get("buildings", []).is_empty():
 		var changed: Dictionary = out.get("config", {})
 		changed["buildings"] = buildings.duplicate(true)
+		out["config"] = changed
+	# Roofs as buildings are.
+	var had_roofs: Array = config.get("roofs", []) if config.get("roofs") is Array else []
+	var roofs := had_roofs.filter(func(entry: Variant) -> bool:
+		var rect: Variant = Level.town_wall_rect(entry)
+		return rect == null or Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not landed.has(cell)))
+	roofs.append_array(moved_config.get("roofs", []))
+	if roofs.size() != had_roofs.size() or not moved_config.get("roofs", []).is_empty():
+		var changed: Dictionary = out.get("config", {})
+		changed["roofs"] = roofs.duplicate(true)
 		out["config"] = changed
 	return out
 
