@@ -7906,3 +7906,37 @@ nothing is stepped or saved.
 
 Not in this step: frozen water, crops and the economy by season,
 creatures by season, wind moving snow, and lying snow in play.
+
+## 372. Where the fallen come back: places made from the temple and the healer's hut
+
+Jeff: the fallen come back at a temple in town or a healer's hut out in
+the wilds. Economy owns the job and needs "the nearest place of kind
+temple or healers_hut from here"; buildings adds the two buildings (373)
+and places them in the wilds.
+
+The places are made from the buildings, not written beside them:
+`Level.parse` (`building_places`, after `buildings_from`) gives each placed
+`building.temple` / `building.healers_hut` (`Level.BUILDING_PLACES`) a
+place of kind `temple` / `healers_hut` (both now in `PLACE_KINDS`, so a
+level.json may name one too) on the cell just outside the middle of its
+front (`front_cell`, from its rect and facing: where its door opens),
+keyed `<kind>@x,y`, held by nobody, worth 0, radius 1. One record, the
+building: moved, turned or taken away in the editor or builder, its place
+follows, and Holdings' rebind takes it up like any place. Rejected: a
+places entry buildings writes (two records to keep in step).
+
+Held by nobody, it holds no ground: the temple's cell is the town's because
+the stockpile's radius covers it (town buildings sit inside it), and the
+hut is neutral, so raid groups and the routes' held ground pass it by. A
+key level.json's places already has is left as it is.
+
+`Holdings.nearest(kinds, area, cell, routes)`: the place of those kinds
+nearest by walking steps over the routes' open layer (each leg's steps
+and a CROSSING per way), "" if none can be walked to; without routes, the
+nearest in the same area as the crow flies. On the server the routes are
+`World.raid_groups.routes`. respawn_places_test: both places where their
+fronts are, a level with neither has none, a moved and turned temple's
+place moved, the temple on the town's ground and the hut on nobody's, the
+nearest in town, in the wilds, across an edge, and without routes. Server
+only; no protocol change.
+

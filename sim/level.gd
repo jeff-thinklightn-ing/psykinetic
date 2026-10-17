@@ -84,7 +84,10 @@ const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "t
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
-const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "other"]
+const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut", "other"]
+## The buildings that make a place of their own where they stand
+## (building_places, decision 372): where the fallen come back.
+const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut"}
 ## A place's radius when level.json gives none, in cells.
 const PLACE_RADIUS := 8
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
@@ -457,6 +460,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	}
 	_place(level, markers, config, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
+	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
 	level["terrain"]["buildings"] = level["buildings"]
 	level["town_walls"] = town_walls_from(config, level["terrain"], cells, warnings)
@@ -677,6 +681,41 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
 	return out
+
+
+## The places [param buildings] make (BUILDING_PLACES; decision 372), put
+## in [param places]: a temple and a healer's hut, where the fallen come
+## back (economy), each a place of its kind on the cell outside the middle
+## of its front, held by nobody, worth nothing, keyed "<kind>@x,y". Made
+## from the building, so moving or taking it away in the editor or builder
+## moves or takes the place; a key level.json's places already has is left
+## as it is.
+static func building_places(buildings: Array, places: Dictionary) -> void:
+	for building: Dictionary in buildings:
+		var kind := str(BUILDING_PLACES.get(building["slot"], ""))
+		if kind.is_empty():
+			continue
+		var cell := front_cell(building["rect"], building["facing"])
+		var key := "%s@%d,%d" % [kind, cell.x, cell.y]
+		if not places.has(key):
+			places[key] = {"key": key, "cell": cell, "name": kind.replace("_", " ").capitalize(), "kind": kind,
+				"radius": 1, "worth": 0, "holder": "nobody"}
+
+
+## The cell just outside the middle of [param rect]'s side facing
+## [param facing] (a building's front: where its door opens onto).
+static func front_cell(rect: Rect2i, facing: Vector2i) -> Vector2i:
+	var middle := rect.position + (rect.size - Vector2i.ONE) / 2
+	match facing:
+		Vector2i(0, 1):
+			return Vector2i(middle.x, rect.end.y)
+		Vector2i(0, -1):
+			return Vector2i(middle.x, rect.position.y - 1)
+		Vector2i(1, 0):
+			return Vector2i(rect.end.x, middle.y)
+		Vector2i(-1, 0):
+			return Vector2i(rect.position.x - 1, middle.y)
+	return middle
 
 
 ## What kind of place level.json [param config] is, one of DayNight.ZONES

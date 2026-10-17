@@ -359,6 +359,16 @@ belongs on its gather point, where its group gathers. Prefabs keep their
 places, and stamping one gives a key the map already has a `_2`; builder
 mode's `mark_place` marks one. Nothing in play shows them yet.
 
+A placed `building.temple` or `building.healers_hut` makes a place of its
+own, kind `temple` or `healers_hut`, on the cell outside the middle of its
+front (`Level.building_places`, decision 372): where the fallen come back.
+It is keyed `<kind>@x,y`, held by nobody and worth nothing, so it holds no
+ground (a temple in town stands on the town's ground by the stockpile's
+radius; a hut out in the wilds is neutral), and it moves or goes with the
+building, so nothing in `places` is written for it.
+`Holdings.nearest(kinds, area, cell, routes)` is the nearest place of
+those kinds by walking steps (on the server, `World.raid_groups.routes`).
+
 ### The stockpile
 
 A place of kind `stockpile` is where the town keeps what players bring

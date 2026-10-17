@@ -163,6 +163,35 @@ func camps(faction := "") -> Array[Dictionary]:
 	return out
 
 
+## The place of one of [param kinds] nearest [param cell] of
+## [param area_name] by walking steps over [param routes] (its open layer:
+## held ground walked), "" if none can be walked to: where the fallen come
+## back (economy; decision 372, kinds "temple" and "healers_hut"). On the
+## server, World.raid_groups.routes. With no routes, the nearest in the same
+## area as the crow flies.
+func nearest(kinds: Array[String], area_name: String, cell: Vector2i, routes: WorldRoutes = null) -> String:
+	var best := ""
+	var best_steps := INF
+	for id in all_places():
+		var place: Dictionary = _places[id]
+		if place["kind"] not in kinds:
+			continue
+		var steps := INF
+		if routes != null:
+			var legs := routes.route(area_name, cell, place["area"], place["cell"])
+			if legs.is_empty():
+				continue
+			steps = WorldRoutes.CROSSING * (legs.size() - 1)
+			for leg: Dictionary in legs:
+				steps += float(leg["steps"])
+		elif place["area"] == area_name:
+			steps = Vector2(place["cell"] - cell).length()
+		if steps < best_steps:
+			best = id
+			best_steps = steps
+	return best
+
+
 ## Whether place [param id]'s ground takes in [param cell] (its area's).
 func covers(id: String, cell: Vector2i) -> bool:
 	var place_cell: Vector2i = _places[id]["cell"]
