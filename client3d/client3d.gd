@@ -513,6 +513,22 @@ const GAITS: Array[Array] = [[CLIP_WALK, 0.5], [CLIP_JOG, 3.5], [CLIP_SPRINT, 5.
 ## Gaits change past the geometric mean of their paces, this much beyond it
 ## either way, so a pace near a change does not flicker between them.
 const GAIT_HYSTERESIS := 1.15
+## Players and companions: humanoid bodies (decision 243), a man's and a
+## woman's (the entity's "body", decision 388), rigged to the animation
+## library's own skeleton, so its clips play at the proportions they were
+## made for. Their gaits are their own (tools/gait_pace.gd: the two step
+## alike), as is their backpedal; the "Tunic" material takes the player's
+## colour (the capsule's); standing, they only look about now and then. Their
+## size is not their mass: what they carry counts in their mass, and picking
+## up a hammer should not make them grow.
+const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
+	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
+	"gaits": [[CLIP_WALK, 0.93], [CLIP_JOG, 5.6], [CLIP_SPRINT, 8.47]], "backpedal": 4.66,
+	"tint": "Tunic", "fidgets": {"Idle_LookAround": 1}}
+const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
+	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
+	"gaits": [[CLIP_WALK, 0.93], [CLIP_JOG, 5.6], [CLIP_SPRINT, 8.47]], "backpedal": 4.66,
+	"tint": "Tunic", "fidgets": {"Idle_LookAround": 1}}
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
@@ -5619,6 +5635,12 @@ func _sync_puppets() -> void:
 		var id := entity.get_instance_id()
 		seen[id] = true
 		var made := not _puppets.has(id)
+		if not made and _puppets[id].get_meta("body", &"") != body_of(entity):
+			# Its body came after it did (a client hears it a moment later).
+			if _puppets[id] == _outlined:
+				target(null)
+			_puppets[id].queue_free()
+			made = true
 		if made:
 			_puppets[id] = _make_puppet(entity)
 		var puppet := _puppets[id]
@@ -5993,8 +6015,11 @@ static func creature_slot_for(entity: GridEntity) -> String:
 	return slot
 
 
-## MODELS' entry for [param entity] (a monster of a kind that has one), or {}.
+## The model for [param entity]: HUMAN or HUMAN_F by its body for a player
+## or a companion, MODELS' entry for a monster of a kind that has one, or {}.
 static func model_for(entity: GridEntity) -> Dictionary:
+	if entity is Player or entity is Companion:
+		return HUMAN_F if body_of(entity) == &"female" else HUMAN
 	if not entity is Monster:
 		return {}
 	return MODELS.get(str(entity.spawn_spec.get("kind", "")), {})
@@ -6011,6 +6036,17 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	scene.rotation.y = float(model.get("faces", 0.0))
 	body.add_child(scene)
 	scene.scale = Vector3.ONE * float(puppet.get_meta("model_scale", 1.0))
+	# A body's fixed parts (belt, boots) on art-kit's palette, as its pieces are.
+	for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.mesh.surface_get_material(surface)
+			if own != null and own.resource_name == ArtKit.PALETTE_NAME:
+				mesh.set_surface_override_material(surface, load(ArtKit.PALETTE))
+	if model.has("tint"):
+		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
+	puppet.set_meta("gaits", model.get("gaits", GAITS))
+	puppet.set_meta("backpedal", float(model.get("backpedal", BACKPEDAL_CLIP_SPEED)))
+	puppet.set_meta("fidgets", model.get("fidgets", FIDGETS))
 	var animator := AnimationPlayer.new()
 	animator.name = "Animator"
 	scene.add_child(animator)
@@ -6022,13 +6058,28 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	return body
 
 
+## Each surface of [param scene]'s meshes whose material is named
+## [param material] drawn in [param colour] instead (a copy of it).
+static func _tint(scene: Node3D, material: String, colour: Color) -> void:
+	for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.mesh.surface_get_material(surface) as BaseMaterial3D
+			if own != null and own.resource_name == material:
+				var tinted := own.duplicate() as BaseMaterial3D
+				tinted.albedo_color = colour
+				mesh.set_surface_override_material(surface, tinted)
+
+
 ## [param entity]'s own look and manner (see MODEL_MASS), on its puppet:
-## "model_scale", "pace" (its gaits' paces over GAITS'), "tempo" and "rng",
-## which picks its blows and flinches.
-static func _vary(entity: GridEntity, puppet: Node3D) -> void:
+## "model_scale", "pace" (its gaits' paces over the model's), "tempo" and
+## "rng", which picks its blows and flinches. A model not sized "by_mass"
+## varies its size a little all the same.
+static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(String(entity.name))
-	var size := clampf(pow(entity.mass / MODEL_MASS, 1.0 / 3.0), MODEL_SCALE_MIN, MODEL_SCALE_MAX)
+	var size := 1.0
+	if model.get("by_mass", true):
+		size = clampf(pow(entity.mass / MODEL_MASS, 1.0 / 3.0), MODEL_SCALE_MIN, MODEL_SCALE_MAX)
 	size *= 1.0 + rng.randf_range(-MODEL_SCALE_SPREAD, MODEL_SCALE_SPREAD)
 	puppet.set_meta("model_scale", size)
 	puppet.set_meta("pace", size * (1.0 + rng.randf_range(-PACE_SPREAD, PACE_SPREAD)))
@@ -6063,17 +6114,18 @@ static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 static func _pick_fidget(puppet: Node3D, animator: AnimationPlayer) -> String:
 	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
 	var last := str(puppet.get_meta("last_fidget", ""))
+	var fidgets: Dictionary = puppet.get_meta("fidgets", FIDGETS)
 	var total := 0
-	for clip: String in FIDGETS:
+	for clip: String in fidgets:
 		if clip != last and animator.has_animation(clip):
-			total += int(FIDGETS[clip])
+			total += int(fidgets[clip])
 	if total == 0:
 		return ""
 	var roll := rng.randi_range(1, total) if rng != null else 1
-	for clip: String in FIDGETS:
+	for clip: String in fidgets:
 		if clip == last or not animator.has_animation(clip):
 			continue
-		roll -= int(FIDGETS[clip])
+		roll -= int(fidgets[clip])
 		if roll <= 0:
 			puppet.set_meta("last_fidget", clip)
 			return clip
@@ -6144,7 +6196,8 @@ func _animate(puppet: Node3D) -> void:
 			puppet.set_meta("seated", false)
 			return
 	if speed > WALKING:
-		var gait: Array = GAITS[gait_for(animator.current_animation, speed / pace)]
+		var gaits: Array = puppet.get_meta("gaits", GAITS)
+		var gait: Array = gaits[gait_for(animator.current_animation, speed / pace, gaits)]
 		if animator.current_animation != gait[0]:
 			animator.play(gait[0], CLIP_BLEND)
 			_start_anywhere(puppet, animator)
@@ -6216,7 +6269,7 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 				return true
 		else:
 			if not toss:
-				animator.speed_scale = clampf(speed / (BACKPEDAL_CLIP_SPEED * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0)
+				animator.speed_scale = clampf(speed / (float(puppet.get_meta("backpedal", BACKPEDAL_CLIP_SPEED)) * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0)
 			var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
 			# It doubles over when it gets there: a push back always, a toss
 			# if a wall or a door stopped it. One knocked where it stands holds.
@@ -6239,17 +6292,17 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 	return false
 
 
-## The GAITS index for moving at [param speed] (tiles a second) from the
-## clip playing, [param current]: a gait already reached holds till a little
-## below its change.
-static func gait_for(current: String, speed: float) -> int:
+## The index in [param gaits] (GAITS, or a model's own) for moving at
+## [param speed] (tiles a second) from the clip playing, [param current]: a
+## gait already reached holds till a little below its change.
+static func gait_for(current: String, speed: float, gaits: Array = GAITS) -> int:
 	var at := 0
-	for i in GAITS.size():
-		if GAITS[i][0] == current:
+	for i in gaits.size():
+		if gaits[i][0] == current:
 			at = i
 	var index := 0
-	for i in range(1, GAITS.size()):
-		var change := sqrt(float(GAITS[i - 1][1]) * float(GAITS[i][1]))
+	for i in range(1, gaits.size()):
+		var change := sqrt(float(gaits[i - 1][1]) * float(gaits[i][1]))
 		if speed > change * (1.0 / GAIT_HYSTERESIS if at >= i else GAIT_HYSTERESIS):
 			index = i
 	return index
@@ -6276,15 +6329,27 @@ func _play_once(puppet: Node3D, clip: String) -> bool:
 	return true
 
 
+static func _hook(sig: Signal, callable: Callable) -> void:
+	if not sig.is_connected(callable):
+		sig.connect(callable)
+
+
+## [param entity]'s body (decision 388), &"" if it wears none.
+static func body_of(entity: GridEntity) -> StringName:
+	var body: Variant = entity.get("body")
+	return StringName(body) if body != null else &""
+
+
 func _make_puppet(entity: GridEntity) -> Node3D:
 	var puppet := Node3D.new()
 	puppet.name = entity.name
+	puppet.set_meta("body", body_of(entity))
 	puppet.set_meta("entity_name", String(entity.name))
 	puppet.set_meta("entity_id", entity.get_instance_id())
 	var shape := EntityFactory.shape_name_for(entity.spawn_spec)
 	var model := model_for(entity)
 	if not model.is_empty():
-		_vary(entity, puppet)
+		_vary(entity, puppet, model)
 	var art := art_slot_for(entity)
 	var creature := creature_slot_for(entity) if model.is_empty() else ""
 	if creature != "":
@@ -6293,6 +6358,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var material := StandardMaterial3D.new()
 	var sprite := entity.get_node_or_null("Sprite") as Sprite2D
 	material.albedo_color = sprite.modulate if sprite != null else Color.WHITE
+	puppet.set_meta("tint", material.albedo_color)  # A model's "tint" material.
 	material.roughness = 0.8
 	# A touch of glow so a body reads in the dark away from any light.
 	material.emission_enabled = true
@@ -6371,15 +6437,16 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 			pivot.add_child(nose)
 		puppet.add_child(pivot)
 		var id := entity.get_instance_id()
-		entity.swung.connect(_on_swung.bind(id))
-		entity.shot.connect(_on_shot.bind(id))
-		entity.guarded.connect(_on_guarded.bind(id))
-		entity.struck.connect(_on_struck.bind(id))
-		entity.impacted.connect(_on_impacted.bind(id))
-		entity.pushed.connect(_on_pushed.bind(id))
+		# Hooked once: a puppet made again (a body that came late) finds them hooked.
+		_hook(entity.swung, _on_swung.bind(id))
+		_hook(entity.shot, _on_shot.bind(id))
+		_hook(entity.guarded, _on_guarded.bind(id))
+		_hook(entity.struck, _on_struck.bind(id))
+		_hook(entity.impacted, _on_impacted.bind(id))
+		_hook(entity.pushed, _on_pushed.bind(id))
 		if entity is Monster:
-			(entity as Monster).winding.connect(_on_winding.bind(id))
-			(entity as Monster).cried.connect(_on_cried.bind(id))
+			_hook((entity as Monster).winding, _on_winding.bind(id))
+			_hook((entity as Monster).cried, _on_cried.bind(id))
 			puppet.set_meta("creature", str(entity.spawn_spec.get("kind", "")))
 		if entity.max_hp > 0:
 			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))

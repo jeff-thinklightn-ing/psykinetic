@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_old_snapshot_gets_current_looks()
 	_test_click_snaps_to_floor()
 	_test_renderer_setting()
+	_test_player_body()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -325,6 +326,33 @@ renderer=2d
 	Net._renderer_given = saved[2]
 	Net._settings_renderer = saved[3]
 	Net.player_id = saved[4]
+
+
+func _test_player_body() -> void:
+	print("
+== a player's body (decision 388): asked for at the join, kept on the record ==")
+	_check(_player().body == Net.player_body, "the host's own player wears its setting (%s)" % _player().body)
+	const SAM := 5
+	const SAM_ID := "5a5a5a5a-0000-4000-8000-0000000000c2"
+	Net._bodies[SAM_ID] = Net.tidy_body("female")
+	_main._admit(SAM, SAM_ID, "Sam")
+	var sam: Player = _main._players.get(SAM)
+	var record: PlayerRecord = _main._records.get(SAM_ID)
+	_check(sam != null and sam.body == &"female" and record.body == &"female",
+			"a player who asks for the female body wears it, and the record keeps it")
+	_main._leave(SAM, sam, SAM_ID)
+	Net._bodies.erase(SAM_ID)  # As after a restart: not asked for this run.
+	_main._admit(SAM, SAM_ID, "Sam")
+	sam = _main._players.get(SAM)
+	_check(sam != null and sam.body == &"female", "back without asking: the record's body")
+	_main._leave(SAM, sam, SAM_ID)
+	var back := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(back.body == &"female", "saved and loaded, the record keeps it")
+	var old := record.to_dict()
+	old.erase("body")
+	_check(PlayerRecord.from_dict(old).body == &"male", "an older snapshot's record (no body) wears male")
+	_check(Net.tidy_body("") == &"male" and Net.tidy_body("Female ") == &"female" and Net.tidy_body("x") == &"male",
+			"tidy_body: female, else male")
 
 
 func _check(ok: bool, label: String) -> void:

@@ -167,7 +167,7 @@ const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "r
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "roofs", "shop", "sky", "speech", "terrain", "town"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["ailments", "alert", "buffs", "down_until", "emit_light", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
+const SUBCLASS_REPLICATED: Array[String] = ["ailments", "alert", "body", "buffs", "down_until", "emit_light", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -177,6 +177,8 @@ const UNKNOWN_VERSION := "0.0.0"
 const DEV_PLAYER_ID := "dev-host"
 const DEFAULT_NAME := "Player"
 const MAX_NAME_LENGTH := 24
+## The bodies a player or companion may wear (decision 388), the first the default.
+const BODIES: Array[StringName] = [&"male", &"female"]
 
 ## From version.txt at the project root. Sent on join; must match the server.
 var version := UNKNOWN_VERSION
@@ -264,6 +266,12 @@ var token := ""
 ## for a project host the dev id.
 var player_id := ""
 var player_name := DEFAULT_NAME
+## The body this client's player wears (BODIES; decision 388): settings.cfg
+## "body", chosen in the options panel, sent with the join, so a change shows
+## from the next join.
+var player_body: StringName = &"male"
+## Server only: the body each player id asked for when it joined.
+var _bodies: Dictionary[String, StringName] = {}
 ## Server only: peers told to go that have not yet gone.
 var _leaving: Dictionary[int, bool] = {}
 ## Server only: peers dropped early (see _drop) whose ENet disconnect event
@@ -322,7 +330,7 @@ var _settings_kept: Dictionary = {}
 ## that a rewrite drops it.
 const WRITTEN_SETTINGS: Array[String] = ["address", "port", "token", "player_id", "name", "display_delay",
 	"window_width", "window_height", "window_mode", "camera_yaw", "camera_pitch", "camera_zoom",
-	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4", "hints"]
+	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4", "hints", "body"]
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -456,6 +464,21 @@ static func tidy_name(raw: String) -> String:
 	return tidy if not tidy.is_empty() else DEFAULT_NAME
 
 
+## A body as BODIES has it: anything but "female" is male (an older client
+## sends none).
+static func tidy_body(raw: Variant) -> StringName:
+	return &"female" if str(raw).strip_edges().to_lower() == "female" else &"male"
+
+
+## Server side: the body [param id] asked for when it joined this run (this
+## host's own player: its setting); &"" if it has not joined since the server
+## started, so its record keeps the one it had.
+func asked_body(id: String) -> StringName:
+	if _bodies.has(id):
+		return _bodies[id]
+	return player_body if id == player_id else &""
+
+
 ## Server side: the player_id an authenticated peer presented, or "".
 func player_of(peer: int) -> String:
 	return _authenticated.get(peer, "")
@@ -493,6 +516,7 @@ func _apply_settings() -> void:
 	configure_client(settings.get("address", address), int(settings.get("port", str(port))),
 			settings.get("token", ""))
 	player_name = tidy_name(settings.get("name", DEFAULT_NAME))
+	player_body = tidy_body(settings.get("body", ""))
 	# display_delay (ticks) was written by older builds, always, so a new
 	# default could never reach anyone: it is dropped, and only a hand-written
 	# display_delay_ms (kept as it is, never written) counts.
@@ -708,6 +732,7 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 	for i in phrases.size():
 		file.store_string("phrase%d=%s\n" % [i + 1, phrases[i]])
 	file.store_string("hints=%s\n" % ("on" if hints else "off"))
+	file.store_string("body=%s\n" % player_body)
 	for key: String in _settings_kept:
 		file.store_string("%s=%s\n" % [key, _settings_kept[key]])
 	file.close()
@@ -880,6 +905,7 @@ func authenticate(hello: Dictionary) -> void:
 		if client_version != version:
 			print("[net] peer %d is v%s, the server v%s: the same protocol %s, so it plays" % [
 				peer, client_version, version, protocol()])
+		_bodies[id] = tidy_body(hello.get("body", ""))
 		_admit(peer, id, player_name_given)
 
 
@@ -1173,7 +1199,7 @@ func _on_connected_to_server() -> void:
 	print("[net] connected as peer %d" % multiplayer.get_unique_id())
 	authenticate.rpc_id(1, {
 		"token": token, "version": claimed_version(), "player_id": player_id, "name": player_name,
-		"protocol": _test_protocol if _test_protocol != "" else protocol()})
+		"body": String(player_body), "protocol": _test_protocol if _test_protocol != "" else protocol()})
 
 
 func _on_server_disconnected() -> void:

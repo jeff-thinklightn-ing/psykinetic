@@ -8096,3 +8096,69 @@ Wells (economy's part, pulled). Towns asks rain_between for its town's
 region on its own town tick and keeps water on the town record, with its
 well rules. The carpenter's repair of a broken roof calls
 World.repair_roof, found through World.damaged_roofs and roof_changed.
+
+## 388. A player chooses their body; a companion's comes from her card
+
+The human bodies (243) are a man's and a woman's, and sound picks effort
+voices by body, so who wears which must be known to every peer. Until a
+character creation flow comes (it replaces this), a player picks it in the
+O panel's first section, Character: a Body dropdown (Male, Female), written
+at once to settings.cfg as `body=` (`Net.player_body`, default male; in
+`client/settings.example.cfg` too). The join hello carries it (`"body"`);
+the server keeps what each id asked for this run (`Net._bodies`,
+`Net.asked_body`) and `Main._join_player` puts it on the `PlayerRecord`
+(`body`, saved; an older snapshot's records load as male) and from there on
+the `Player`, so travel, respawn and a restart keep it; a change in the
+panel shows from the next join. `Player.body` (and `Companion.body`) are
+replicated (`SUBCLASS_REPLICATED`). `Net.tidy_body`: "female", else male, so
+an older client that sends none is male, as all players were.
+
+A companion's body is her card's: `CompanionCard.body_of` (companions'),
+from her pronoun, Wren and Nix female, Pip male, and a rolled "they"
+either by her seed.
+
+Protocol: "body" in SUBCLASS_REPLICATED changes the fingerprint by itself;
+the hello's new field, absent, means male (today's behaviour), so no
+PROTOCOL_REVISION. respawn_test: the host wears its setting; a player who
+asks for the female body wears it and the record keeps it, back without
+asking, saved and loaded; an older record is male. view_test: the setting
+written and read back; the panel's choice sets Net and the file.
+
+## 243. Players and companions share one humanoid body, a man's or a woman's
+
+Players and companions were capsules. Now they are drawn as one humanoid
+body, a man's (`art/models/characters/human_m`, 1.75 m, 4,261 triangles) or
+a woman's (`human_f`, 1.66 m, 4,053), by the entity's body (388). Jeff's
+picks c4 of art-gen's concepts, meshed by TRELLIS.2, made the goblin's way
+(art/models/SOURCES.txt): rigged by `tools/body_rig.py` to the Universal
+Animation Library's own skeleton, so every UAL clip plays at the
+proportions it was made for (imported through `bonemaps/ual.tres`, as the
+goblin), and built by `tools/body_build.py`: faceted, lean and heavy shape
+keys for the body range to come, coloured from the concept. Skin, Hair,
+Tunic and Trousers are materials of those names, which the game tints
+(art-kit's agreement: characters are not art-kit slots, ArtCheck does not
+check them); belt and boots are on art-kit's `palette` swatches, swapped for
+the shared palette as a slot's are.
+
+The view: `Client3D.HUMAN` and `HUMAN_F` beside `MODELS`, chosen by
+`model_for` from `body_of(entity)`; a puppet made before its body arrived
+(a client hears it a moment after the entity) is made again
+(`_sync_puppets`, signals hooked once: `_hook`). Their gaits are their own,
+measured by `tools/gait_pace.gd` (the two step alike: walk 0.93, jog 5.6,
+sprint 8.47, backpedal 4.66 m/s), as are their fidgets (only looking
+about); their size is not their mass (`by_mass` false: what they carry
+counts in their mass, and taking up a hammer should not make them grow),
+varied a little all the same. The Tunic takes the player's colour (the
+capsule's). Names and HP bars stand where they stood, at the model's
+height. The lantern stays a light above the head until the attach points
+(244) hang it at the belt.
+
+Jeff saw the faceted bodies in game (2026-10-17: "bodies look pretty good")
+and asked for a later pass on these same rigs: smooth shading on organic
+parts, higher budgets (8-10k), colour from a texture model.
+`tools/body_build.py --smooth` and `--vertex-colours` are ready for it.
+
+view_test: each body, its scene, animated, standing in Idle, upright (head
+over hips over feet), its feet on the ground, its toes where it faces, belt
+and boots on the palette, the tunic in the player's colour; a puppet made
+again when its body changes. Client only; no protocol change of its own.

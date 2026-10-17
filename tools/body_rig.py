@@ -365,7 +365,8 @@ def main() -> None:
 	arm.select_set(True)
 	body.select_set(True)
 	bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=True, export_yup=True,
-		export_skins=True, export_animations=False, export_extras=True)
+		export_skins=True, export_animations=False, export_extras=True,
+		export_vertex_color="ACTIVE")  # A mesh's own colours (art-gen's projection) kept for body_build.
 	print("wrote %s" % out)
 
 

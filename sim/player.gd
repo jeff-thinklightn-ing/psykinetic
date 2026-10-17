@@ -28,6 +28,9 @@ var refusals := 0
 ## Server only: whose player this is (PlayerRecord.player_id), so the
 ## things it carries know (World.holder_key).
 var player_id := ""
+## The body this player wears (Net.BODIES; decision 388): their setting, from
+## their record. What the views draw and sound voices them by.
+var body: StringName = &"male"
 
 
 func _init() -> void:
@@ -52,6 +55,7 @@ func _init() -> void:
 	replicate("down_until")
 	# Its lantern lit or covered (L): what the views draw and monsters see by.
 	replicate("emit_light")
+	replicate("body")
 
 
 

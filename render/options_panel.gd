@@ -5,7 +5,9 @@ extends PanelContainer
 ## controls in the box it returns, rather than giving each its own key.
 ## Sound is the first: a slider (0 to 100%) per volume, applied as it moves
 ## (Net.set_volume) and written to settings.cfg when let go or when the
-## panel is hidden. Sizes in the HUD's 3840 x 2160 units, styled as the pack
+## panel is hidden. Character: the body the player wears (decision 388),
+## written at once and sent with the next join (a character creation flow
+## will replace it). Sizes in the HUD's 3840 x 2160 units, styled as the pack
 ## panel.
 
 const FONT_SIZE := PackPanel.FONT_SIZE
@@ -19,10 +21,14 @@ const VOLUMES := [["master_volume", "Master"], ["sfx_volume", "Effects"], ["voic
 	["ambience_volume", "Ambience"], ["ui_volume", "Interface"]]
 
 var _column: VBoxContainer
+## Character's body: Net.BODIES' labels, in their order.
+const BODY_LABELS := ["Male", "Female"]
 ## Net's setting -> its slider.
 var sliders: Dictionary[String, HSlider] = {}
 ## A slider moved since the settings were last written.
 var _unsaved := false
+## Which body the player wears (Net.player_body).
+var body_choice: OptionButton
 
 
 func _ready() -> void:
@@ -39,6 +45,9 @@ func _ready() -> void:
 	_column.add_theme_constant_override("separation", 12)
 	add_child(_column)
 	_column.add_child(_label("Options", FONT_SIZE + 6))
+	# Who you are first: what a new player sets before anything else.
+	var character := add_section("Character")
+	character.add_child(_body_row())
 	var sound := add_section("Sound")
 	for volume: Array in VOLUMES:
 		sound.add_child(_slider_row(volume[0], volume[1]))
@@ -61,6 +70,7 @@ func toggle() -> void:
 	if visible:
 		for key: String in sliders:
 			sliders[key].set_value_no_signal(float(Net.get(key)))
+		body_choice.select(Net.BODIES.find(Net.player_body))
 	elif _unsaved:
 		_unsaved = false
 		Net.save_view_settings()
@@ -92,6 +102,28 @@ func _slider_row(key: String, text: String) -> HBoxContainer:
 			_unsaved = false
 			Net.save_view_settings())
 	sliders[key] = slider
+	return row
+
+
+## Body: a choice of Net.BODIES, saved when picked; it shows from the next join.
+func _body_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	var name := _label("Body", FONT_SIZE)
+	name.custom_minimum_size = Vector2(200, 0)
+	row.add_child(name)
+	body_choice = OptionButton.new()
+	for text: String in BODY_LABELS:
+		body_choice.add_item(text)
+	body_choice.add_theme_font_size_override("font_size", FONT_SIZE)
+	body_choice.get_popup().add_theme_font_size_override("font_size", FONT_SIZE)
+	body_choice.select(Net.BODIES.find(Net.player_body))
+	body_choice.focus_mode = Control.FOCUS_NONE
+	row.add_child(body_choice)
+	row.add_child(_label("from your next join", FONT_SIZE - 6))
+	body_choice.item_selected.connect(func(index: int) -> void:
+		Net.player_body = Net.BODIES[index]
+		Net.save_view_settings())
 	return row
 
 

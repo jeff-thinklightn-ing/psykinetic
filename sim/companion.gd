@@ -310,6 +310,9 @@ var card := "Loyal and cautious. Guards the one she travels with, and says littl
 ## (a sentence), and who wrote her card: "plain" (her traits as facts) or
 ## "model" (written once by her voice's model: write_card).
 var traits := {}
+## The body she wears (Net.BODIES; decision 388), from her card: what the
+## views draw and sound voices her by.
+var body: StringName = &"female"
 var how_we_met := ""
 var card_by := "plain"
 ## What has become true of her since (CompanionFacts, decision 294); the
@@ -471,6 +474,7 @@ func _init() -> void:
 	replicate("down_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")
+	replicate("body")
 	mass = 75.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 	emit_light = 0.9  # Her lantern.

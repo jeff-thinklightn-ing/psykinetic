@@ -8,7 +8,9 @@ extends Node
 ## runs a series). With --players=N, N - 1 more players join (as peers of
 ## their own) and stand spread over the map on a grid, so more monsters are
 ## near someone and fighting; every player is then too tough to die, so
-## nobody is away respawning for part of the run.
+## nobody is away respawning for part of the run. With --party=1 they stand
+## round the host instead, in view: a party's bodies (decision 243) drawn
+## together.
 ## With --cells-per-monster=N, each room's monster spots are kept at the
 ## rate that gives about N floor cells a monster (the castle has 42; the
 ## default, every spot, 32). With --repeat=N, the ticks are timed in N
@@ -44,6 +46,8 @@ const ROOM := 8
 var size := 64
 var monsters := 2
 var players := 1
+## --party=1: the other players round the host, not spread over the map.
+var party := false
 var cells_per_monster := 0.0
 ## --outdoor=1: the dungeon outdoors, a forest round its outline (its trees,
 ## saplings and forest floor in the 3D build and the frames).
@@ -81,6 +85,7 @@ func _ready() -> void:
 			"size": size = pair[1].to_int()
 			"monsters": monsters = pair[1].to_int()
 			"players": players = maxi(1, pair[1].to_int())
+			"party": party = pair[1] == "1"
 			"cells-per-monster": cells_per_monster = pair[1].to_float()
 			"outdoor": outdoor = pair[1] != "0"
 			"repeat": repeat = maxi(1, pair[1].to_int())
@@ -441,7 +446,8 @@ func _spread_players() -> void:
 		var peer := 1000 + joined
 		_main._admit(peer, "be0c0000-0000-4000-8000-%012d" % peer, "Bench%d" % joined)
 		var player: Player = _main._players.get(peer)
-		var spot := _free_near(point)
+		var host: Player = _main._players.get(Net.local_id)
+		var spot := _free_near(host.tile + Vector2i(joined % 4 - 1, joined / 4 + 1) if party and host != null else point)
 		if player != null and spot != Vector2i(-1, -1):
 			World._relocate(player, spot)
 		joined += 1

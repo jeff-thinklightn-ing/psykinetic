@@ -2473,6 +2473,9 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		record.color = PLAYER_TINTS[(record.index - 1) % PLAYER_TINTS.size()]
 		_records[id] = record
 	record.name = player_name
+	var asked := Net.asked_body(id)
+	if asked != &"":
+		record.body = asked
 	var back := known and not respawn
 	var tile := _nearest_free(record.tile) if back else _free_start_tile()
 	if not World.is_free(tile):
@@ -2509,6 +2512,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 	World.protect(player, SPAWN_GRACE_TICKS)
 	_arrived_at[peer] = World.tick
 	player.player_id = id
+	player.body = record.body
 	World.set_slots(player, record.slots, record.slot_items)
 	record.remember(player)
 	record.zone = World.zone.name
@@ -2709,6 +2713,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.keeper_id = record.player_id
 	pet.keeper = player
 	pet.traits = record.companion["traits"]
+	# Her body by her card's pronoun (Pip "he"); CompanionCard.body_of to come.
+	pet.body = &"male" if str(pet.traits.get("pronoun", "")) == "he" else &"female"
 	pet.card = str(record.companion["card"])
 	pet.how_we_met = str(record.companion.get("how_we_met", ""))
 	pet.card_by = str(record.companion.get("card_by", "plain"))

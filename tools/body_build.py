@@ -7,7 +7,7 @@
 #   blender -b -P tools/body_build.py -- --list <in.glb>
 #       prints the objects, their triangles, materials and the armature's bones.
 #   blender -b -P tools/body_build.py -- <in.glb> <out stem> [--tris 4000] [--mesh NAME ...]
-#           [--source TEXT] [--colours FRONT.png]
+#           [--source TEXT] [--colours FRONT.png] [--smooth] [--vertex-colours]
 #       builds <out stem>.blend and <out stem>.glb (e.g. art/models/characters/human_m).
 #       --mesh keeps only the named meshes; default every mesh skinned to the armature.
 #       --source is where the mesh came from, kept in the .blend's scene["source"].
@@ -17,6 +17,9 @@
 #       per character); Belt and Boots go on art-kit's "palette" material, each on the
 #       swatch of PALETTE_ROWS nearest the concept's colour (u = (col + 0.5) / 8,
 #       v = 1 - (row + 0.5) / rows, as art/kit's pieces are).
+#       --smooth keeps the surface smooth-shaded (the mesh's own normals) instead of faceted.
+#       --vertex-colours keeps the mesh's own vertex colours (art-gen's projected concept)
+#       on one material, "VertexColour", instead of colouring by region.
 #
 # The shape keys move each vertex along its normal by its bones' weights times the
 # amounts below (metres), so a body fills out where people do (belly, hips, thighs,
@@ -479,9 +482,25 @@ def weld(obj) -> None:
 	print("  welded %s: %d vertices to %d" % (obj.name, before, len(obj.data.vertices)))
 
 
-def facet(obj) -> None:
-	for poly in obj.data.polygons:
-		poly.use_smooth = False
+## One material, "VertexColour", drawn by the mesh's own colours (the game and
+## body_sheet.gd give it a material that takes them as albedo).
+def keep_vertex_colours(obj) -> None:
+	mesh = obj.data
+	if not mesh.color_attributes:
+		raise SystemExit("--vertex-colours: %s has no vertex colours" % obj.name)
+	mesh.color_attributes.active_color = mesh.color_attributes[0]
+	mesh.materials.clear()
+	material = bpy.data.materials.get("VertexColour") or bpy.data.materials.new("VertexColour")
+	material.use_nodes = True
+	nodes = material.node_tree.nodes
+	bsdf = nodes.get("Principled BSDF")
+	attribute = nodes.new("ShaderNodeVertexColor")
+	attribute.layer_name = mesh.color_attributes[0].name
+	material.node_tree.links.new(attribute.outputs["Color"], bsdf.inputs["Base Color"])
+	bsdf.inputs["Roughness"].default_value = 1.0
+	bsdf.inputs["Metallic"].default_value = 0.0
+	mesh.materials.append(material)
+	print("  vertex colours: %s" % mesh.color_attributes[0].name)
 
 
 def shape_keys(obj, forward_world: Vector) -> None:
@@ -506,7 +525,8 @@ def shape_keys(obj, forward_world: Vector) -> None:
 			key.data[v.index].co = basis.data[v.index].co + normal * push
 
 
-def build(path: str, stem: str, target: int, keep: list, source: str, concept: str) -> None:
+def build(path: str, stem: str, target: int, keep: list, source: str, concept: str, smooth: bool = False,
+		vertex_colours: bool = False) -> None:
 	load(path)
 	arm = armature()
 	meshes = skinned(arm)
@@ -530,8 +550,11 @@ def build(path: str, stem: str, target: int, keep: list, source: str, concept: s
 		weld(obj)
 		# Each mesh keeps its share of the budget.
 		decimate(obj, max(8, round(target * tris(obj) / total)), right)
-		facet(obj)
-		if concept:
+		for poly in obj.data.polygons:
+			poly.use_smooth = smooth
+		if vertex_colours:
+			keep_vertex_colours(obj)
+		elif concept:
 			colour(obj, arm, concept, forward, right)
 		shape_keys(obj, forward)
 		obj.data.update()
@@ -547,7 +570,7 @@ def build(path: str, stem: str, target: int, keep: list, source: str, concept: s
 		obj.select_set(True)
 	bpy.ops.export_scene.gltf(filepath=stem + ".glb", export_format="GLB", use_selection=True,
 		export_yup=True, export_skins=True, export_morph=True, export_morph_normal=True,
-		export_animations=False, export_extras=True)
+		export_animations=False, export_extras=True, export_vertex_color="ACTIVE" if vertex_colours else "MATERIAL")
 
 
 def main() -> None:
@@ -562,6 +585,7 @@ def main() -> None:
 	keep = []
 	source = SOURCE
 	concept = ""
+	smooth, vertex_colours = False, False
 	rest = a[2:]
 	i = 0
 	while i < len(rest):
@@ -571,6 +595,10 @@ def main() -> None:
 		elif rest[i] == "--colours":
 			concept = os.path.abspath(rest[i + 1])
 			i += 2
+		elif rest[i] in ("--smooth", "--vertex-colours"):
+			smooth = smooth or rest[i] == "--smooth"
+			vertex_colours = vertex_colours or rest[i] == "--vertex-colours"
+			i += 1
 		elif rest[i] == "--source":
 			source = rest[i + 1]
 			i += 2
@@ -581,7 +609,7 @@ def main() -> None:
 				i += 1
 		else:
 			raise SystemExit("unknown argument %s" % rest[i])
-	build(a[0], a[1], target, keep, source, concept)
+	build(a[0], a[1], target, keep, source, concept, smooth, vertex_colours)
 
 
 main()

@@ -8,6 +8,9 @@ var player_id := ""
 ## ("Player3") and its colour, and never changes.
 var index := 0
 var name := "Player"
+## The body the player wears (Net.BODIES; decision 388): what they asked for
+## at their last join.
+var body: StringName = &"male"
 var tile := Vector2i.ZERO
 var hp := 0
 var stamina := 0
@@ -51,6 +54,7 @@ func to_dict() -> Dictionary:
 		"player_id": player_id,
 		"index": index,
 		"name": name,
+		"body": String(body),
 		"tile": [tile.x, tile.y],
 		"hp": hp,
 		"stamina": stamina,
@@ -75,6 +79,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.player_id = entry["player_id"]
 	record.index = int(entry.get("index", 0))
 	record.name = str(entry.get("name", "Player"))
+	record.body = Net.tidy_body(entry.get("body", ""))  # Older snapshots have none: male.
 	record.tile = tile_value
 	record.hp = int(entry.get("hp", 0))
 	record.stamina = int(entry.get("stamina", 0))

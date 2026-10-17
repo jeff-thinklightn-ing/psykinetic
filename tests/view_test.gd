@@ -51,6 +51,7 @@ func _ready() -> void:
 	await _test_near_miss_picks()
 	await _test_target_marked()
 	await _test_goblin()
+	_test_humans()
 	_test_goblins_differ()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
@@ -158,6 +159,19 @@ func _test_options_panel() -> void:
 			"the ambience slider at 25%%: Net and the Ambience bus follow (%.2f)" % Net.ambience_volume)
 	panel.sliders["ambience_volume"].value = 0.0
 	_check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Ambience")), "at 0: muted")
+	var settings: Array = [Net._settings_override, Net.player_id, Net.player_name]
+	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("view_test_body.cfg")
+	Net.save_settings("127.0.0.1", 17789, "", Net.player_name)  # A file to rewrite, as a client has.
+	_check(panel.body_choice.selected == Net.BODIES.find(Net.player_body), "Character: the body shown as set")
+	panel.body_choice.item_selected.emit(1)
+	_check(Net.player_body == &"female"
+			and "body=female" in FileAccess.get_file_as_string(Net._settings_override),
+			"Female picked: Net's body and settings.cfg follow (decision 388)")
+	panel.body_choice.item_selected.emit(0)
+	DirAccess.remove_absolute(Net._settings_override)
+	Net._settings_override = settings[0]
+	Net.player_id = settings[1]
+	Net.player_name = settings[2]
 	_main.toggle_options()
 	_check(not panel.visible, "O again hides it")
 	Net.set_volume("ambience_volume", was, false)
@@ -1841,6 +1855,59 @@ func _place(entity: GridEntity, tile: Vector2i) -> void:
 		entity.has_move_order = false
 
 
+func _test_humans() -> void:
+	print("
+== players and companions are the human bodies (decisions 243, 388): upright, toes forward, on the ground ==")
+	var player := _player()
+	_rig._process(0.0)
+	for body: StringName in [&"male", &"female"]:
+		player.body = body
+		_rig._process(0.0)
+		var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+		var model := puppet.get_node_or_null("Body/Model")
+		var scene := str(Client3D.HUMAN_F["scene"] if body == &"female" else Client3D.HUMAN["scene"])
+		_check(model != null and model.scene_file_path == scene and puppet.has_meta("animator"),
+				"%s: its puppet is %s, animated" % [body, scene.get_file()])
+		if model == null or not puppet.has_meta("animator"):
+			continue
+		var animator := puppet.get_meta("animator") as AnimationPlayer
+		_check(animator.current_animation == Client3D.CLIP_IDLE, "standing: Idle")
+		var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var y := func(bone: String) -> float:
+			return (skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(bone)).origin).y
+		_check(y.call("Head") > y.call("Hips") and y.call("Hips") > y.call("LeftFoot"), "upright: head over hips over feet")
+		var low := INF
+		var high := -INF
+		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			var box := mesh.global_transform * mesh.get_aabb()
+			low = minf(low, box.position.y)
+			high = maxf(high, box.end.y)
+		var tall := float(Client3D.HUMAN_F["height"] if body == &"female" else Client3D.HUMAN["height"]) * float(puppet.get_meta("model_scale"))
+		_check(absf(low - puppet.global_position.y) < 0.05 and absf(high - low - tall) < 0.12,
+				"its feet on the ground (%.3f), %.2f m tall" % [low - puppet.global_position.y, high - low])
+		var wanted := Vector2(player.facing).normalized()
+		_check(_toes_ahead(puppet).dot(wanted) > 0.9, "its toes point where it faces (%s)" % _toes_ahead(puppet))
+		var looks := {}
+		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			for surface in mesh.mesh.get_surface_count():
+				var own := mesh.mesh.surface_get_material(surface)
+				var drawn := mesh.get_active_material(surface)
+				if own != null:
+					looks[own.resource_name] = drawn
+		_check(looks.has("palette") and looks["palette"] == load(ArtKit.PALETTE), "belt and boots on art-kit's palette")
+		_check(looks.has("Tunic") and (looks["Tunic"] as BaseMaterial3D).albedo_color == puppet.get_meta("tint"),
+				"the tunic in the player's colour")
+	player.body = &"male"
+	_rig._process(0.0)
+	var pet := _companion()
+	if pet != null:
+		var wanted := &"male" if str(pet.traits.get("pronoun", "")) == "he" else &"female"
+		var model: Node = _rig._puppets[pet.get_instance_id()].get_node_or_null("Body/Model")
+		_check(pet.body == wanted and model != null
+				and model.scene_file_path == str((Client3D.HUMAN if wanted == &"male" else Client3D.HUMAN_F)["scene"]),
+				"%s, \"%s\" on her card, wears the %s body" % [pet.name, pet.traits.get("pronoun", ""), wanted])
+
+
 func _test_goblin() -> void:
 	print("\n== an imp is the goblin: a model that faces, walks, punches, flinches, is knocked about and dies ==")
 	var player := _player()
@@ -2041,10 +2108,14 @@ func _test_settings() -> void:
 	var path: String = preload("res://tests/test_ports.gd").scratch_path("view_test.cfg")
 	var saved := [Net._settings_override, Net.player_id]
 	Net._settings_override = path
+	Net.player_body = &"female"
 	Net.save_settings("127.0.0.1", 17789, "", "Tester")
 	var text := FileAccess.get_file_as_string(path)
 	_check("hp_bars=0" in text and "master_volume=0.5" in text and "colour_blind=yes" in text,
 			"a rewrite keeps the lines the game does not write itself")
+	_check("body=female" in text and Net.tidy_body(Net._read_settings(path).get("body", "")) == &"female",
+			"the body is written and read back (decision 388)")
+	Net.player_body = &"male"
 	DirAccess.remove_absolute(path)
 	Net._settings_override = saved[0]
 	Net.player_id = saved[1]
