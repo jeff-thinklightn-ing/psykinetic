@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Builder mode can roof a room you walled yourself or an open shelter on
+  posts, such as a market stall or a woodshed, and the proposal outlines
+  the new roof.
 - A named thing taken by someone other than its namer, and not handed over by them, is kept from its namer: "ill-starred", its slot rust-coloured, and ill luck gathers while it is held, until it is back in its namer's hands. What ill luck does waits on Jeff; for now it is only counted and shown.
 - The forest round outdoor maps gets ready for crowded stands of bare-trunked pines over a floor of needles past its first row of trees, as in Jeff's reference photo; they show once their art is in, and until then the forest looks as before.
 - An experiment, off unless switched on at the server console: a companion's

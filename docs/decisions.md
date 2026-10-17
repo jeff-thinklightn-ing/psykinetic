@@ -7637,3 +7637,25 @@ commercial use of the API are negotiated case by case with UPF.
 the same day. UPF's answer
 is pending. A no stops API downloads, and we download by hand from the website, under each
 sound's own licence. Tools and data only; client side; no protocol change.
+
+## 374. Roofs in builder mode
+
+The builder side of buildings' roof records (decision 364): a "roof" tool,
+{rect, set (Level.ROOF_SETS), ridge?, use?, town?, remove?}, writes
+level.json "roofs" on the working copy, as town_wall writes its record. A
+roof must be in the area; one already over any of its cells is replaced
+(roofs may not overlap), and remove takes away those over the rectangle.
+The tool parses the working level before and after: if Level.roofs_from
+would leave the new roof out (floor of more than one height, water, void,
+a building or another roof under it, an unknown set), the roof is not laid
+and Claude gets the level's own words; other new warnings (a use or town
+that does not link) are added to the answer. No "must be walled" rule: a
+shelter on posts is a roof. The grid lists roofs as `roof {json}`; the
+prompt says what one is for.
+
+The ghost: the "builder" proposal message gains `roofs: [[x, y, w, h]...]`,
+the roofs the proposal adds or changes, outlined by client3d.show_builder
+at about eaves height; the roof itself is drawn once accepted (Client3D's
+_add_roofs). No PROTOCOL_REVISION bump: an older client ignores the field
+and draws today's ghost (net.gd's rule, as decision 356's heights).
+builder_test _test_roof.

@@ -1846,6 +1846,8 @@ const BUILDER_VOID := Color(0.08, 0.3, 0.12)
 ## Level.MAX_HEIGHT, drawn at its new height.
 const BUILDER_LOW := Color(0.3, 0.27, 0.22)
 const BUILDER_HIGH := Color(0.97, 0.95, 0.88)
+## A roof the proposal adds: its rect outlined, raised to about the eaves.
+const BUILDER_ROOF := Color(0.85, 0.35, 0.25, 0.9)
 var _builder_marks: Node3D
 
 
@@ -1854,8 +1856,8 @@ var _builder_marks: Node3D
 ## [[x, y, side, kind]...]), see-through, coloured as the legend;
 ## [param beyond] (a new level's place past the map's edge) outlined; and
 ## the cells whose height changes ([[x, y, level]...]) at their new height,
-## lighter the higher.
-func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i(), heights: Array = []) -> void:
+## lighter the higher; and the roofs it adds ([[x, y, w, h]...]) outlined.
+func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i(), heights: Array = [], roofs: Array = []) -> void:
 	clear_builder()
 	if area.size == Vector2i.ZERO:
 		return
@@ -1868,6 +1870,11 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 		var far := _make_flat(_frame_mesh(beyond, 0.25), BUILDER_BEYOND)
 		far.position.y = ON_FLOOR * 3.0
 		_builder_marks.add_child(far)
+	for each: Variant in roofs:
+		var rect := Rect2i(int(each[0]), int(each[1]), int(each[2]), int(each[3]))
+		var outline := _make_flat(_frame_mesh(rect, 0.12), BUILDER_ROOF)
+		outline.position.y = _height(rect.position) * LEVEL_RISE + 0.75
+		_builder_marks.add_child(outline)
 	# Cells, one mesh a colour; a thing as a smaller square on its cell.
 	var raised := {}
 	for each: Variant in heights:

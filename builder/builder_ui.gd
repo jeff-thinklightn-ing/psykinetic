@@ -157,7 +157,7 @@ func _show_area() -> void:
 	var footprint: Array = _proposal.get("new_area", {}).get("footprint", [])
 	if footprint.size() == 4:
 		beyond = Rect2i(int(footprint[0]), int(footprint[1]), int(footprint[2]), int(footprint[3]))
-	main._client3d.show_builder(area, _proposal.get("cells", []), _proposal.get("edges", []), beyond, _proposal.get("heights", []))
+	main._client3d.show_builder(area, _proposal.get("cells", []), _proposal.get("edges", []), beyond, _proposal.get("heights", []), _proposal.get("roofs", []))
 
 
 func _open_box() -> void:

@@ -222,7 +222,7 @@ Monsters idle until someone comes: guard (stands, glances about), wander (stroll
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first).
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right.
 
@@ -322,6 +322,10 @@ static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2
 		var rect: Variant = Level.building_rect(building)
 		if rect != null and shown.intersects(rect):
 			notes.append("building " + JSON.stringify(building))
+	for roof: Variant in config.get("roofs", []) if config.get("roofs") is Array else []:
+		var rect: Variant = Level.town_wall_rect(roof)
+		if rect != null and shown.intersects(rect):
+			notes.append("roof " + JSON.stringify(roof))
 	if not notes.is_empty():
 		lines.append("Settings of things here: " + "; ".join(notes))
 	return "\n".join(lines)
@@ -429,6 +433,15 @@ const TOOLS := [
 			"rect": _RECT,
 			"gates": {"type": "array", "items": _CELL, "description": "cells just inside the wall where a gate goes (on the rectangle's border); none given: one in the middle of each side"}},
 			"required": ["town", "rect"]}},
+	{"name": "roof", "description": "Roofs a rectangle of cells (a room you walled, or an open shelter on posts: no walls needed), drawn in a set of roof pieces, its ridge along x or z (along the long side if not given), with a use and town as a building's if it serves one. The cells must be floor of one height, clear of buildings and other roofs. A roof already over any of the cells is replaced; remove takes the roofs over the rectangle away.",
+		"input_schema": {"type": "object", "properties": {
+			"rect": _RECT,
+			"set": {"type": "string", "enum": Level.ROOF_SETS},
+			"remove": {"type": "boolean", "description": "true: take away the roofs over the rectangle instead"},
+			"ridge": {"type": "string", "enum": ["x", "z"]},
+			"use": {"type": "string", "description": "a building use, or empty for none"},
+			"town": {"type": "string", "description": "the key of a stockpile place in this level; empty for none"}},
+			"required": ["rect"]}},
 	{"name": "look", "description": "The area as it is now, with your changes so far, as a grid.",
 		"input_schema": {"type": "object", "properties": {}}},
 	{"name": "new_area", "description": "Makes a new level beyond the map's edge on a side the area touches (one with nothing beyond it yet), joined both ways, and carves a way from the middle of the area out to that edge. The new level is a first draft, its size given in cells (16 to 256).",
@@ -580,6 +593,8 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			return _set_building(given)
 		"town_wall":
 			return _town_wall(given)
+		"roof":
+			return _roof(given)
 		"look":
 			return {"ok": true, "text": grid(working.map, working.config, area, area)}
 		"new_area":
@@ -769,6 +784,43 @@ func _town_wall(given: Dictionary) -> Dictionary:
 	if not rect.has_point(places[town]["cell"]):
 		text += "; the store's place %s is outside it" % [places[town]["cell"]]
 	return {"ok": true, "text": text}
+
+
+## A roof over [param given]'s rect (decision 364's records), replacing
+## any over its cells, or none over them (remove); refused, laying
+## nothing, if Level.parse would leave it out.
+func _roof(given: Dictionary) -> Dictionary:
+	var rect: Variant = _rect(given.get("rect"))
+	if rect == null:
+		return _no("rect needs x, y, w and h")
+	if not area.encloses(rect):
+		return _no("the roof must be in the area (x %d-%d, y %d-%d)" % [area.position.x, area.end.x - 1, area.position.y, area.end.y - 1])
+	var roof_set := str(given.get("set", Level.ROOF_SETS[0]))
+	if roof_set not in Level.ROOF_SETS:
+		return _no("set is one of %s" % ", ".join(Level.ROOF_SETS))
+	var old: Array = (working.config["roofs"] as Array).duplicate(true) if working.config.get("roofs") is Array else []
+	var roofs := old.filter(func(entry: Variant) -> bool:
+		var at: Variant = Level.town_wall_rect(entry)
+		return at == null or not (at as Rect2i).intersects(rect))
+	var gone := old.size() - roofs.size()
+	if bool(given.get("remove", false)):
+		working.apply_changes({"config": {"roofs": roofs}})
+		return {"ok": true, "text": "took away %d roofs" % gone}
+	var entry := {"rect": [rect.position.x, rect.position.y, rect.size.x, rect.size.y], "set": roof_set}
+	if str(given.get("ridge", "")) in ["x", "z"]:
+		entry["ridge"] = str(given["ridge"])
+	for key in ["use", "town"]:
+		if not str(given.get(key, "")).is_empty():
+			entry[key] = str(given[key])
+	roofs.append(entry)
+	var before: Array = working.parsed()["warnings"]
+	working.apply_changes({"config": {"roofs": roofs}})
+	var new := (working.parsed()["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
+	if new.any(func(warning: String) -> bool: return "left out" in warning):
+		working.apply_changes({"config": {"roofs": old}})
+		return _no("; ".join(new))
+	return {"ok": true, "text": "a %s roof over x %d-%d, y %d-%d%s%s" % [roof_set, rect.position.x, rect.end.x - 1, rect.position.y, rect.end.y - 1,
+		" (replacing %d)" % gone if gone > 0 else "", "; " + "; ".join(new) if not new.is_empty() else ""]}
 
 
 func _place(given: Dictionary) -> Dictionary:

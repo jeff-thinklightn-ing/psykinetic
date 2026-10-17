@@ -163,6 +163,14 @@ static func proposal_message(session: BuilderSession) -> Dictionary:
 		heights.append([at.x, at.y, proposal["heights"][at]])
 	var message := {"state": "proposal", "area": [session.area.position.x, session.area.position.y, session.area.size.x, session.area.size.y],
 		"cells": cells, "edges": edges, "heights": heights}
+	# Roofs the proposal adds or changes, outlined (decision 364's records).
+	if proposal.get("config", {}).has("roofs"):
+		var roofs: Array = []
+		for entry: Variant in proposal["config"]["roofs"]:
+			var rect: Variant = Level.town_wall_rect(entry)
+			if rect != null and not session.doc.config.get("roofs", []).has(entry):
+				roofs.append([rect.position.x, rect.position.y, rect.size.x, rect.size.y])
+		message["roofs"] = roofs
 	if proposal.has("new_area"):
 		var plan: Dictionary = proposal["new_area"]
 		var footprint: Rect2i = plan["footprint"]
