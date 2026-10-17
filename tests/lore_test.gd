@@ -306,6 +306,18 @@ func _test_roles_file() -> void:
 		if not trades.has(id):
 			jobless.append(id)
 	_check(bad.is_empty(), "every role is well formed, its binding one of %s %s" % [Lore.BINDINGS, bad])
+	bad = []
+	var profiles: Array = data.get("roles", []).map(func(role: Dictionary) -> Array: return [role.get("id"), role.get("profile"), role.get("binding")])
+	profiles.append(["townsfolk", data.get("townsfolk"), Lore.TOWNSFOLK])
+	for each in profiles:
+		var shown: Variant = each[1]
+		var ok: bool = shown is Dictionary and shown.get("domain") is Array and _status_ok(shown) and shown.get("source") is String
+		for stat in Lore.STATS:
+			ok = ok and shown is Dictionary and shown.get(stat) in Lore.LEVELS
+		# A role's binding is Jeff's word; its profile must make the same one.
+		if not ok or Lore.derived_binding(shown) != each[2]:
+			bad.append(each[0])
+	_check(bad.is_empty(), "every role and the townsfolk have a profile (domain, %s each %s) that makes its binding %s" % [Lore.STATS, Lore.LEVELS.keys(), bad])
 	print("  (roles with no job yet: %s)" % [jobless])
 	bad = []
 	for id in _entries:
@@ -317,6 +329,9 @@ func _test_roles_file() -> void:
 	_check(Lore.binding("priest") == "official" and Lore.binding("bard") == "free" and Lore.binding("hauler") == Lore.TOWNSFOLK,
 			"on the files: a priest is official, a bard free, a hauler (unlisted) townsfolk")
 	_check(Lore.knower_for("priest") == "priest" and Lore.knower_for("hauler") == "townsfolk", "a priest knows as a priest; a hauler as the townsfolk")
+	var healer := Lore.profile("medicine_man")
+	_check(healer.get("intellect") == 8 and healer.get("creativity") == 2 and healer["words"]["superstition"] == "high"
+			and healer["domain"] == ["nature"] and healer["binding"] == "official", "on the files: Jeff's medicine man, as words and numbers %s" % [healer])
 
 
 func _test_roles() -> void:
@@ -329,6 +344,33 @@ func _test_roles() -> void:
 	_check(Lore.binding("reeve") == "official" and Lore.binding("nobody") == Lore.TOWNSFOLK, "a listed role's binding; townsfolk when unlisted")
 	_check(Lore.binding("liar") == Lore.TOWNSFOLK and Lore.binding("liar", "draft") == "free", "a draft role counts only when previewed")
 	_check(Lore.binding("maybe", "draft") == Lore.TOWNSFOLK, "an asked role never counts")
+	var plain := {"domain": [], "superstition": "mid", "creativity": "low", "intellect": "mid", "integrity": "mid", "status": "draft"}
+	Lore.use_roles([
+		{"id": "sage", "binding": "official", "status": "agreed", "profile": {"domain": ["history"], "superstition": "low",
+				"creativity": "low", "intellect": "high", "integrity": "high", "status": "agreed"}},
+		{"id": "liar", "binding": "free", "status": "agreed", "profile": {"domain": ["a"], "creativity": "high", "status": "draft"}},
+	], plain)
+	_check(Lore.profile("sage")["intellect"] == 8 and Lore.profile("sage")["binding"] == "official", "an agreed profile: numbers and the binding")
+	_check(Lore.profile("liar").is_empty() and Lore.profile("liar", "draft")["superstition"] == 5, "a draft profile counts only when previewed, a missing stat mid")
+	_check(Lore.profile("hauler").is_empty() and Lore.profile("hauler", "draft")["binding"] == Lore.TOWNSFOLK, "an unlisted trade has the townsfolk's profile")
+	_check(Lore.derived_binding({"creativity": "low", "integrity": "high"}) == "official" and Lore.derived_binding({"creativity": "high", "integrity": "high"}) == "free"
+			and Lore.derived_binding({"integrity": "low"}) == "free" and Lore.derived_binding({"creativity": "low"}) == Lore.TOWNSFOLK,
+			"low creativity and high integrity speak only lore; high creativity or low integrity may make things up; else townsfolk")
+	Lore.use([
+		{"id": "near", "type": "region", "status": "agreed", "facts": []},
+		{"id": "far", "type": "region", "status": "agreed", "facts": []},
+		{"id": "a", "status": "agreed", "tags": [], "facts": [
+			{"id": "a.old", "text": "old", "known": "common", "where": ["far"], "tags": ["history"]},
+			{"id": "a.far", "text": "far", "known": "common", "where": ["far"]},
+			{"id": "a.hid", "text": "hid", "known": "secret", "where": [], "knowers": ["folk"]},
+		]},
+	], [
+		{"id": "sage", "status": "agreed", "where": ["near"], "tags": []},
+		{"id": "liar", "status": "agreed", "where": ["near"], "tags": []},
+	])
+	var sage := Lore.known_by("sage").map(func(fact: Dictionary) -> String: return fact["id"])
+	_check(sage == ["a.old"], "a role knows what is on its domain wherever it is, not the rest elsewhere, nor others' secrets %s" % [sage])
+	_check(Lore.known_by("liar").is_empty() and Lore.known_by("liar", PackedStringArray(), "draft").size() == 2, "a draft profile's domain counts only when previewed")
 	Lore.reload()
 
 

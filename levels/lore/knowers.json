@@ -97,6 +97,15 @@
 			"tags": []
 		},
 		{
+			"id": "medicine_man",
+			"name": "the medicine man",
+			"status": "agreed",
+			"where": [
+				"town_lands"
+			],
+			"tags": []
+		},
+		{
 			"id": "smith",
 			"name": "the smith",
 			"status": "draft",

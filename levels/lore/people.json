@@ -38,6 +38,7 @@
 			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The medicine man who lives in the healer's hut in the wilds and brings the fallen back.",
+			"role": "medicine_man",
 			"relations": [
 				{
 					"to": "healers_hut",

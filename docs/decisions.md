@@ -7746,5 +7746,19 @@ are lore facts about what is said. A falsehood a resident believes is companions
 (their Hearsay store), never lore. lore_test checks the roles and that an entry's
 role is listed or a trade, and prints the roles with no job yet. Economy's own
 "official" key (town-paid jobs, the hauler among them) is pay, not binding.
+Each role also has a profile (Jeff's refinement, same day): a domain (lore tags or
+entry ids it knows wherever they are) and superstition, creativity, intellect and
+integrity, each "low", "mid" or "high" in the file (Jeff's words) and 2, 5 or 8
+from `Lore.profile(trade)`, which economy's residents read
+(`Production.profile_of`) and companions' voices curve on. A trade not listed has
+the file's townsfolk profile. A profile's stats make a binding (creativity low
+and integrity high: official; creativity high or integrity low: free; else
+townsfolk), and lore_test fails if it differs from the role's binding. The
+binding stays Jeff's stored word with its own status, and the profile has its own,
+so a draft profile can't drop an agreed official to townsfolk. A role's knower
+knows, besides its home's common facts, the agreed common facts and rumours on its
+domain wherever they are. Jeff's medicine man is agreed; the other profiles are
+lore's drafts until he confirms them.
 Rejected: a binding field on person entries (it would state guards, officials
-and bards into the world before A3, A4 or Jeff say they exist).
+and bards into the world before A3, A4 or Jeff say they exist); the binding only
+derived (with the profiles still draft, every official would speak as townsfolk).

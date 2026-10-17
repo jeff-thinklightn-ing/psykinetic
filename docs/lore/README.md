@@ -154,7 +154,17 @@ officials) or `free` (may embellish and lie, in character: bards, scoundrels,
 thieves). A trade not listed is `townsfolk`. A listed role says how such a person
 speaks, not that one exists. A person entry may name its `role`.
 
+A role's `profile` (Jeff) is `{"domain": [tags or entry ids], "superstition",
+"creativity", "intellect", "integrity", "status", "source"}`, each stat `low`,
+`mid` or `high`; the file's top-level `townsfolk` is the profile for a trade not
+listed. A profile's stats make a binding (creativity low and integrity high:
+official; creativity high or integrity low: free; else townsfolk), which must be
+the role's: lore_test checks. A role's knower knows the common facts and rumours
+on its domain wherever they are.
+
 `Lore.binding(trade)` gives the binding, `"townsfolk"` when unlisted.
+`Lore.profile(trade)` gives `{domain, binding, words: {stat: word}}` and each stat
+as a number (low 2, mid 5, high 8), or `{}` when the profile doesn't count yet.
 `Lore.knower_for(trade)` gives the knower to ask `known_by` for: the trade's own
 knower when there is one (`priest`, `guard`), else `townsfolk`. What a resident
 hears and believes is that resident's, kept by companions, never a fact here.

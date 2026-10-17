@@ -36,6 +36,11 @@ const NAME_SLOTS := ["holder", "thing", "deed", "maker"]
 ## not list.
 const BINDINGS := ["official", "free"]
 const TOWNSFOLK := "townsfolk"
+## A role's profile (Jeff, 2026-10-17): each stat a word in roles.json,
+## given back as a number on 1..10 too.
+const STATS := ["superstition", "creativity", "intellect", "integrity"]
+const LEVELS := {"low": 2, "mid": 5, "high": 8}
+static var _townsfolk: Dictionary = {}
 
 static var _entries: Dictionary = {}
 static var _knowers: Dictionary = {}
@@ -67,6 +72,7 @@ static func reload() -> void:
 	_things = []
 	_names_read = false
 	_roles = {}
+	_townsfolk = {}
 	_roles_read = false
 
 
@@ -98,6 +104,7 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 		return out
 	var where: Array = who.get("where", [])
 	var tags: Array = who.get("tags", [])
+	var domain := PackedStringArray(profile(knower, least).get("domain", []) if _roles_has(knower) else [])
 	for id: String in entries():
 		var entry: Dictionary = _entries[id]
 		var entry_status := str(entry.get("status", ""))
@@ -111,7 +118,8 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 			match known:
 				"common", "rumour":
 					var at: Array = fact.get("where", [])
-					knows = at.is_empty() or _meets(at, where) or _meets(fact.get("tags", []), tags)
+					knows = at.is_empty() or _meets(at, where) or _meets(fact.get("tags", []), tags) \
+							or (not domain.is_empty() and _about(fact, entry, domain))
 				"secret", "lived":
 					knows = knower in fact.get("knowers", [])
 			if knows and (about.is_empty() or _about(fact, entry, about)):
@@ -180,15 +188,50 @@ static func binding(trade: String, least := "agreed") -> String:
 	return str(role.get("binding", TOWNSFOLK))
 
 
+## [param trade]'s profile: {domain, binding, words: {stat: "low" | "mid" |
+## "high"}} and each of STATS as its number (LEVELS), the townsfolk's for a
+## trade not listed, or {} when the profile does not count under
+## [param least] (economy then rolls a plain resident). A listed role's
+## binding is Jeff's word; lore_test holds its profile to it.
+static func profile(trade: String, least := "agreed") -> Dictionary:
+	_load_roles()
+	var role: Dictionary = _roles.get(trade, {})
+	var shown: Dictionary = role.get("profile", {}) if not role.is_empty() else _townsfolk
+	if shown.is_empty() or not _counts(str(shown.get("status", "")), least):
+		return {}
+	var out := {"domain": shown.get("domain", []).duplicate(),
+			"binding": binding(trade, least) if not role.is_empty() else TOWNSFOLK, "words": {}}
+	for stat: String in STATS:
+		var word := str(shown.get(stat, "mid"))
+		out["words"][stat] = word
+		out[stat] = LEVELS.get(word, LEVELS["mid"])
+	return out
+
+
+## The binding a profile's stats make: creativity low and integrity high
+## speak only lore (official), creativity high or integrity low may make
+## things up (free), and anything else is townsfolk.
+static func derived_binding(words: Dictionary) -> String:
+	var creativity := str(words.get("creativity", "mid"))
+	var integrity := str(words.get("integrity", "mid"))
+	if creativity == "low" and integrity == "high":
+		return "official"
+	if creativity == "high" or integrity == "low":
+		return "free"
+	return TOWNSFOLK
+
+
 ## The knower to ask known_by for someone of [param trade]: the trade's own
 ## knower when there is one, else the townsfolk.
 static func knower_for(trade: String) -> String:
 	return trade if knowers().has(trade) else TOWNSFOLK
 
 
-## Uses [param role_list] in place of roles.json (tests).
-static func use_roles(role_list: Array) -> void:
+## Uses [param role_list] (and [param townsfolk], the profile for a trade
+## not listed) in place of roles.json (tests).
+static func use_roles(role_list: Array, townsfolk := {}) -> void:
 	_roles = {}
+	_townsfolk = townsfolk
 	for role: Variant in role_list:
 		if role is Dictionary and role.get("id") is String:
 			_roles[role["id"]] = role
@@ -257,7 +300,12 @@ static func _load_roles() -> void:
 	if data is not Dictionary or data.get("roles") is not Array:
 		push_warning("Lore: %sroles.json has no roles list" % DIR)
 		return
-	use_roles(data["roles"])
+	use_roles(data["roles"], data.get("townsfolk", {}) if data.get("townsfolk") is Dictionary else {})
+
+
+static func _roles_has(trade: String) -> bool:
+	_load_roles()
+	return _roles.has(trade)
 
 
 static func _load_names() -> void:
