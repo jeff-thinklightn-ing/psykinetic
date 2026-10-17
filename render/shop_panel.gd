@@ -97,6 +97,11 @@ func open(counter: GridEntity) -> void:
 	_rebuild()
 
 
+## The server refused what was asked (a purchase): [param why] (Main's
+## UiSounds: an error sound).
+signal refused(why: String)
+
+
 ## The server's "shop" message for the open shop: its goods, offers and
 ## any refusal.
 func show_shop(data: Dictionary) -> void:
@@ -105,6 +110,8 @@ func show_shop(data: Dictionary) -> void:
 	_goods = data.get("goods", []) if data.get("goods") is Array else []
 	_offers = data.get("offers", {}) if data.get("offers") is Dictionary else {}
 	_why = str(data.get("why", ""))
+	if not _why.is_empty():
+		refused.emit(_why)
 	_rebuild()
 
 

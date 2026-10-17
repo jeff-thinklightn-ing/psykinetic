@@ -8440,3 +8440,24 @@ bench lock stays, for timing. Measured: the landing suite 6.3 GB at its
 peak, an import 0.8 GB, frame_budget 1.6 GB. tests/heavy_job_test.py
 checks the decision with made-up numbers, and land.sh runs it.
 
+
+## 395. UI sounds
+
+The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
+beside its panels. It plays the ui.* slots flat on the UI bus through the view's Sfx.
+
+- Buttons are hooked as they enter the tree (`SceneTree.node_added`), so a panel's own
+  code adds no sounds, and ui's restyled screens sound without change. A press clicks
+  (ui.click). The pointer coming onto a button ticks (ui.hover), at most once every 80 ms,
+  so a sweep across a row is a patter. A slider clicks when let go, so a volume is heard as
+  it is set.
+- Panels sound only when watched (`UiSounds.watch`): the options panel (O) and the pack,
+  as they show and hide (ui.panel_open, ui.panel_close).
+- From Main: someone else's chat line pings (`TalkPanel.line_added`, ui.chat_ping), a party
+  line chimes (ui.notify), and a shop's refusal sounds an error (`ShopPanel.refused`,
+  ui.error).
+- Nothing sounds for 1.5 s after the menus are built, while panels are being laid out.
+
+sound_kit_test's `_test_ui_sounds` checks a button made after the hook, the hover limit, a
+slider, a watched panel, the UI bus, and the quiet start. The clip scenario is `sound_ui`.
+Client only; no protocol change.

@@ -359,6 +359,8 @@ var minimap: Minimap
 var item_icons: ItemIcons
 ## An open shop's goods, and the player's gold over the pack (ShopPanel).
 var shop_panel: ShopPanel
+## The menus' sounds (UiSounds).
+var ui_sounds: UiSounds
 ## The local player's gold, as the server last said ("shop" messages).
 var gold := 0
 ## A chest or companion right-clicked from afar: opened once in reach.
@@ -3462,7 +3464,15 @@ func _build_talk() -> void:
 	shop_panel.pack = pack_panel
 	shop_panel.buy = _buy
 	$HUD.add_child(shop_panel)
+	ui_sounds = UiSounds.new()
+	ui_sounds.name = "UiSounds"
+	ui_sounds.sfx_of = func() -> Sfx: return _client3d.sfx if _client3d != null else null
+	add_child(ui_sounds)
+	ui_sounds.watch(options_panel)
+	ui_sounds.watch(pack_panel)
+	shop_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
 	talk = TalkPanel.new()
+	talk.line_added.connect(_line_sound)
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
 	talk.anchor_bottom = 1.0
@@ -4148,6 +4158,18 @@ func close_other() -> void:
 		pack_panel.open(null)
 	if shop_panel != null:
 		shop_panel.open(null)
+
+
+## A line in the talk panel: someone else's chat pings, a party line
+## chimes; what is said around you (speech) has its own voice.
+func _line_sound(speaker: String, is_chat: bool, party: bool) -> void:
+	var me := _local_player()
+	if me != null and speaker == String(me.name):
+		return
+	if party:
+		ui_sounds.play("ui.notify")
+	elif is_chat:
+		ui_sounds.play("ui.chat_ping")
 
 
 ## The shop panel's Buy on [param uid] at [param shop]: asked of the server,

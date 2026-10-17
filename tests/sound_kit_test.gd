@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_music()
 	_test_folders()
 	_test_sfx_plays_slots()
+	await _test_ui_sounds()
 	_test_status_current()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -347,6 +348,42 @@ func _without_takes(slots: Array) -> void:
 	for slot: String in slots:
 		SoundKit.all_takes().erase(slot)
 	SoundKit._files.clear()
+
+
+func _test_ui_sounds() -> void:
+	print("
+== UI sounds: buttons click and tick as they come, sliders click when let go, watched panels open and shut ==")
+	var sfx := Sfx.new()
+	add_child(sfx)
+	var ui := UiSounds.new()
+	ui.sfx_of = func() -> Sfx: return sfx
+	add_child(ui)
+	ui._quiet_until = 0
+	var button := Button.new()
+	add_child(button)
+	button.pressed.emit()
+	button.mouse_entered.emit()
+	button.mouse_entered.emit()
+	_check(ui.played == ["ui.click", "ui.hover"], "a button made after it: pressed clicks, hovered ticks, not twice at once (%s)" % [ui.played])
+	var slider := HSlider.new()
+	add_child(slider)
+	slider.drag_ended.emit(true)
+	_check(ui.played.back() == "ui.click", "a slider let go clicks")
+	var panel := PanelContainer.new()
+	add_child(panel)
+	ui.watch(panel)
+	panel.visible = false
+	panel.visible = true
+	_check(ui.played.slice(-2) == ["ui.panel_close", "ui.panel_open"], "a watched panel shuts and opens (%s)" % [ui.played.slice(-2)])
+	_check(sfx.played.size() == ui.played.size() and sfx.played.all(func(entry: Array) -> bool: return entry[2] == "UI"),
+			"each played on the UI bus")
+	ui._quiet_until = Time.get_ticks_msec() + 10000
+	var before := ui.played.size()
+	button.pressed.emit()
+	_check(ui.played.size() == before, "nothing while the menus are being built")
+	for node: Node in [button, slider, panel, ui, sfx]:
+		node.queue_free()
+	await get_tree().process_frame
 
 
 func _test_status_current() -> void:

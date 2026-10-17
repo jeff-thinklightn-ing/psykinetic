@@ -942,7 +942,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "a button pressed; not played yet"
+			"uses": "a button pressed; any button pressed, a slider let go (UiSounds)"
 		},
 		"ui.hover": {
 			"category": "ui",
@@ -950,7 +950,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "the pointer over a button; not played yet"
+			"uses": "the pointer over a button; the pointer onto a button, at most every 80 ms (UiSounds)"
 		},
 		"ui.panel_open": {
 			"category": "ui",
@@ -958,7 +958,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "a panel opened (pack, chest, settings); not played yet"
+			"uses": "a panel opened (pack, chest, settings); the options or pack panel shown (UiSounds.watch)"
 		},
 		"ui.panel_close": {
 			"category": "ui",
@@ -966,7 +966,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "a panel closed; not played yet"
+			"uses": "a panel closed; the options or pack panel hidden (UiSounds.watch)"
 		},
 		"ui.error": {
 			"category": "ui",
@@ -974,7 +974,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "something you can't do; not played yet"
+			"uses": "something you can't do; a shop refusing (ShopPanel.refused)"
 		},
 		"ui.chat_ping": {
 			"category": "ui",
@@ -982,7 +982,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "a chat line for you; not played yet"
+			"uses": "a chat line for you; someone else's chat line (Main._line_sound)"
 		},
 		"ui.notify": {
 			"category": "ui",
@@ -990,7 +990,7 @@
 			"bus": "ui",
 			"positional": false,
 			"volume_db": -8.0,
-			"uses": "a notice: a quest, a companion's word; not played yet"
+			"uses": "a notice: a quest, a companion's word; a party line (Main._line_sound)"
 		},
 		"amb.field_wind": {
 			"category": "ambience",

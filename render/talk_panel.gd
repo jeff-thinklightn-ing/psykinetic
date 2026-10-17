@@ -29,9 +29,14 @@ func _init() -> void:
 	add_child(_list)
 
 
+## A line was added (Main's UiSounds: a chat ping, a party chime).
+signal line_added(speaker: String, is_chat: bool, party: bool)
+
+
 ## [param party]: a party chat line (Main), shown apart from what is said
 ## around the player.
 func add_line(speaker: String, text: String, is_chat := false, party := false) -> void:
+	line_added.emit(speaker, is_chat, party)
 	var at := Time.get_time_string_from_system().substr(0, 8)
 	lines.append([at, speaker, text, is_chat])
 	if lines.size() > MAX_LINES:

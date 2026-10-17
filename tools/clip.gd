@@ -100,6 +100,9 @@ extends Node
 ##   sound_world: things handled and the doors' sounds: a dagger and a sack
 ##     of ore put down and picked up (light, heavy), a dagger thrown (the
 ##     throw, the landing), a chest opened and shut, a door struck and broken.
+##   sound_ui: the menus' sounds (UiSounds): the options panel opened, its
+##     buttons hovered and pressed, a slider let go, the panel shut; the pack
+##     hidden and shown; a chat line, a party line, a shop's refusal.
 ##   sound_reel: a listening reel of the slots given (--slots=a,b,...; else
 ##     every slot with third-party takes, SoundKit.takes): each played
 ##     beside the player once per take, its name and source as the caption,
@@ -212,6 +215,8 @@ func _ready() -> void:
 			_sound_combat()
 		"sound_world":
 			_sound_world()
+		"sound_ui":
+			_sound_ui()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
 		"pack":
@@ -1042,6 +1047,38 @@ func _sound_reel() -> void:
 
 ## An open field, outdoors, a fire at its east end, an imp held at the far
 ## side; the script runs the clock and the weather.
+func _sound_ui() -> void:
+	var cells: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
+	var markers := {Vector2i(2, 1): "start", Vector2i(4, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [{"at": [4, 2], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(cells), markers, config), null, config)
+	_script = [
+		["wait", 25, ""],
+		["sound_ui", "options", "O: the options panel opens."],
+		["wait", 10, ""],
+		["sound_ui", "hover", "The pointer over its buttons..."],
+		["wait", 10, ""],
+		["sound_ui", "hover", ""],
+		["wait", 10, ""],
+		["sound_ui", "press", "...one pressed."],
+		["wait", 15, ""],
+		["sound_ui", "slider", "A volume slider let go."],
+		["wait", 15, ""],
+		["sound_ui", "options", "O again: shut."],
+		["wait", 15, ""],
+		["sound_ui", "pack", "The pack hidden..."],
+		["wait", 15, ""],
+		["sound_ui", "pack", "...and shown."],
+		["wait", 15, ""],
+		["sound_ui", "chat", "Someone else's chat: a ping."],
+		["wait", 15, ""],
+		["sound_ui", "party", "A party line: a chime."],
+		["wait", 15, ""],
+		["sound_ui", "refused", "A shop refusing: an error."],
+		["wait", 20, ""],
+	]
+
+
 func _sound_world() -> void:
 	var cells: Array[String] = [
 		"#############",
@@ -1314,6 +1351,29 @@ func _on_tick(tick: int) -> void:
 			_repeat_until = -1
 		"sound_hour":
 			DayNight.set_hour(float(step[1]))
+		"sound_ui":
+			var buttons: Array = _main.options_panel.find_children("*", "BaseButton", true, false)
+			match str(step[1]):
+				"options":
+					_main.options_panel.toggle()
+				"hover":
+					if not buttons.is_empty():
+						(buttons[_at % buttons.size()] as BaseButton).mouse_entered.emit()
+				"press":
+					if not buttons.is_empty():
+						(buttons[0] as BaseButton).pressed.emit()
+				"slider":
+					var sliders: Array = _main.options_panel.find_children("*", "Slider", true, false)
+					if not sliders.is_empty():
+						(sliders[0] as Slider).drag_ended.emit(false)
+				"pack":
+					_main.pack_panel.visible = not _main.pack_panel.visible
+				"chat":
+					_main.talk.add_line("Wren's player", "over here!", true)
+				"party":
+					_main.talk.add_line("Wren's player", "meet at the gate", true, true)
+				"refused":
+					_main.shop_panel.refused.emit("not enough gold")
 		"sound_world":
 			var what: Array = step[1]
 			match str(what[0]):
