@@ -7,7 +7,9 @@ extends PanelContainer
 ## (Net.set_volume) and written to settings.cfg when let go or when the
 ## panel is hidden. Character: the body the player wears (decision 388),
 ## written at once and sent with the next join (a character creation flow
-## will replace it). Sizes in the HUD's 3840 x 2160 units, styled as the pack
+## will replace it). Video: the 3D view's anti-aliasing, a button per kind
+## (Net.ANTIALIAS), applied and written at a click (Net.set_antialias,
+## decision 385). Sizes in the HUD's 3840 x 2160 units, styled as the pack
 ## panel.
 
 const FONT_SIZE := PackPanel.FONT_SIZE
@@ -25,6 +27,9 @@ var _column: VBoxContainer
 const BODY_LABELS := ["Male", "Female"]
 ## Net's setting -> its slider.
 var sliders: Dictionary[String, HSlider] = {}
+## The Video section's buttons: Net.ANTIALIAS's value -> its button.
+const ANTIALIAS_NAMES := {"off": "Off", "fxaa": "FXAA", "smaa": "SMAA", "msaa4": "MSAA 4x"}
+var antialias_buttons: Dictionary[String, Button] = {}
 ## A slider moved since the settings were last written.
 var _unsaved := false
 ## Which body the player wears (Net.player_body).
@@ -51,6 +56,7 @@ func _ready() -> void:
 	var sound := add_section("Sound")
 	for volume: Array in VOLUMES:
 		sound.add_child(_slider_row(volume[0], volume[1]))
+	add_section("Video").add_child(_antialias_row())
 
 
 ## A titled section, its controls to be added to the box returned.
@@ -71,6 +77,8 @@ func toggle() -> void:
 		for key: String in sliders:
 			sliders[key].set_value_no_signal(float(Net.get(key)))
 		body_choice.select(Net.BODIES.find(Net.player_body))
+		for value: String in antialias_buttons:
+			antialias_buttons[value].set_pressed_no_signal(value == Net.antialias)
 	elif _unsaved:
 		_unsaved = false
 		Net.save_view_settings()
@@ -124,6 +132,28 @@ func _body_row() -> HBoxContainer:
 	body_choice.item_selected.connect(func(index: int) -> void:
 		Net.player_body = Net.BODIES[index]
 		Net.save_view_settings())
+	return row
+
+
+## Anti-aliasing: a button per Net.ANTIALIAS, applied and saved at a click.
+func _antialias_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	var name := _label("Anti-aliasing", FONT_SIZE)
+	name.custom_minimum_size = Vector2(200, 0)
+	row.add_child(name)
+	var group := ButtonGroup.new()
+	for value: String in Net.ANTIALIAS:
+		var button := Button.new()
+		button.text = ANTIALIAS_NAMES.get(value, value)
+		button.toggle_mode = true
+		button.button_group = group
+		button.button_pressed = value == Net.antialias
+		button.focus_mode = Control.FOCUS_NONE
+		button.add_theme_font_size_override("font_size", FONT_SIZE)
+		button.pressed.connect(func() -> void: Net.set_antialias(value))
+		row.add_child(button)
+		antialias_buttons[value] = button
 	return row
 
 

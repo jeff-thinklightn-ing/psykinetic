@@ -72,7 +72,8 @@ extends Node
 ## read and kept the same way. hp_bars=0 turns the 3D view's HP bars off;
 ## master_volume=, sfx_volume=, voice_volume=, ambience_volume=, ui_volume=
 ## and music_volume= (0..1, default 1) set the sound (the options panel, O,
-## writes them back).
+## writes them back). antialias=off|fxaa|smaa|msaa4 (default smaa) smooths
+## the 3D view's edges (the options panel's Video section writes it back).
 ## phrase1= ... phrase4= are the quick phrases keys 1-4 say (written back,
 ## the defaults where there is none). Any line
 ## the game does not write itself (these, and keys it does not know) is
@@ -318,6 +319,13 @@ var ui_volume := 1.0
 var music_volume := 1.0
 ## A volume changed (set_volume): Sfx sets the buses again.
 signal volumes_changed
+## The 3D view's anti-aliasing (decision 385): settings.cfg antialias=,
+## one of ANTIALIAS, on the root viewport (set_antialias). SMAA by default:
+## at 1080p it takes the steps off every edge, textures' too, where MSAA 2x
+## leaves them, for nothing measured on the desktop; MSAA 4x is there for
+## thin limbs, FXAA for a weak card.
+const ANTIALIAS: Array[String] = ["off", "fxaa", "smaa", "msaa4"]
+var antialias := "smaa"
 const VOLUME_SETTINGS: Array[String] = ["master_volume", "sfx_volume", "voice_volume", "ambience_volume", "ui_volume", "music_volume"]
 ## The quick phrases, keys 1-4; settings.cfg phrase1= ... phrase4=.
 const DEFAULT_PHRASES: Array[String] = ["With me!", "Stay back!", "Get them!", "Fall back!"]
@@ -434,6 +442,7 @@ func _enter_tree() -> void:
 	if not _mode_given:
 		_apply_settings()
 	_apply_renderer_setting()
+	set_antialias(antialias, false)  # The default, with no settings file.
 	_apply_window_settings()
 	if mode == Mode.SERVER and not _mind_log_given and DirAccess.dir_exists_absolute(DEFAULT_MIND_LOG.get_base_dir()):
 		mind_log_path = DEFAULT_MIND_LOG
@@ -558,6 +567,7 @@ func apply_view_options(settings: Dictionary) -> void:
 	ArtKit.show_labels = _setting_on(settings, "art_labels")
 	for key in VOLUME_SETTINGS:
 		set(key, _volume(settings.get(key, ""), float(get(key))))
+	set_antialias(str(settings.get("antialias", antialias)).strip_edges().to_lower(), false)
 	phrases = phrases_from(settings)
 	_settings_kept.clear()
 	for key: String in settings:
@@ -704,6 +714,24 @@ func set_volume(key: String, value: float, save := true) -> void:
 	_settings_kept[key] = "%.2f" % float(get(key))
 	volumes_changed.emit()
 	if save:
+		save_view_settings()
+
+
+## The 3D view's anti-aliasing at [param value] (one of ANTIALIAS; another
+## keeps what it is), on the root viewport: off, FXAA or SMAA (screen space,
+## a pass over the frame) or MSAA 4x. With [param save], written to the
+## settings file (kept as any line the game does not write itself).
+func set_antialias(value: String, save := true) -> void:
+	if value not in ANTIALIAS:
+		return
+	antialias = value
+	var viewport := get_viewport()
+	if viewport != null:
+		viewport.msaa_3d = Viewport.MSAA_4X if value == "msaa4" else Viewport.MSAA_DISABLED
+		viewport.screen_space_aa = {"fxaa": Viewport.SCREEN_SPACE_AA_FXAA,
+			"smaa": Viewport.SCREEN_SPACE_AA_SMAA}.get(value, Viewport.SCREEN_SPACE_AA_DISABLED)
+	if save:
+		_settings_kept["antialias"] = value
 		save_view_settings()
 
 

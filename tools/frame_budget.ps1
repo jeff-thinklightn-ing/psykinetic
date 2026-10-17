@@ -4,11 +4,12 @@
 # for -Seconds; then the frame time's median, 99th percentile and worst, the
 # renderer's share, and the machine. Every piece can be left out to see what
 # it costs: -Off shadows,border,glimpse,minimap and -NoFade, -Clear (a clear
-# day, no storm). Runs with APPDATA set to a temp folder of its own (the
+# day, no storm). -AA off|fxaa|smaa|msaa4 picks the anti-aliasing (the
+# game's antialias=, decision 385; smaa as the game's default). Runs with APPDATA set to a temp folder of its own (the
 # town is made there by tools/town_state), so it reads the levels as
 # committed and writes nothing to the game's own user data.
 #   tools/frame_budget.ps1 [-Godot <exe>] [-Players 9] [-Herds 4] [-Seconds 20]
-#     [-Width 1920] [-Height 1080] [-Zoom 1.1] [-Off shadows,border,glimpse,minimap] [-NoFade] [-Clear]
+#     [-Width 1920] [-Height 1080] [-Zoom 1.1] [-AA smaa] [-Off shadows,border,glimpse,minimap] [-NoFade] [-Clear]
 # The window is the game's: leave it in front and the machine otherwise idle.
 param(
 	[string]$Godot = $env:GODOT_PATH,
@@ -18,6 +19,7 @@ param(
 	[int]$Width = 1920,
 	[int]$Height = 1080,
 	[double]$Zoom = 1.1,
+	[ValidateSet("off", "fxaa", "smaa", "msaa4")][string]$AA = "smaa",
 	[string[]]$Off = @(),
 	[switch]$NoFade,
 	[switch]$Clear
@@ -34,7 +36,7 @@ $appdata = Join-Path $work "appdata"
 New-Item -ItemType Directory -Force $appdata | Out-Null
 $settings = Join-Path $work "settings.cfg"
 $culture = [Globalization.CultureInfo]::InvariantCulture
-Set-Content -Encoding utf8 $settings ("window_width={0}`nwindow_height={1}`nwindow_mode=windowed`nhints=off`ncamera_zoom={2}" -f $Width, $Height, $Zoom.ToString($culture))
+Set-Content -Encoding utf8 $settings ("window_width={0}`nwindow_height={1}`nwindow_mode=windowed`nhints=off`ncamera_zoom={2}`nantialias={3}" -f $Width, $Height, $Zoom.ToString($culture), $AA)
 $env:APPDATA = $appdata
 $town = Join-Path $work "town.json"
 & $Godot --headless --path $root res://tools/town_state.tscn -- "--out=$town" | Out-Null
@@ -69,5 +71,5 @@ $left = @()
 if ($Off.Count -gt 0) { $left += $Off }
 if ($NoFade) { $left += "fade" }
 $without = if ($left.Count -gt 0) { "; without $($left -join ', ')" } else { "" }
-Write-Output ("frame_budget: median {0} ms, 99th {1} ms, worst {2} ms ({3} fps; rendering {4} ms CPU, {5} ms GPU) | wilds town, {6} players, {7} herds, {8}, {9}x{10} zoom {11}{12} | {13}; {14}" -f `
-	$median, $p99, $worst, $fps, $cpu, $gpu, $Players, $Herds, $scene, $Width, $Height, $Zoom.ToString($culture), $without, $cpuName, $gpuName)
+Write-Output ("frame_budget: median {0} ms, 99th {1} ms, worst {2} ms ({3} fps; rendering {4} ms CPU, {5} ms GPU) | wilds town, {6} players, {7} herds, {8}, {9}x{10} zoom {11}, AA {15}{12} | {13}; {14}" -f `
+	$median, $p99, $worst, $fps, $cpu, $gpu, $Players, $Herds, $scene, $Width, $Height, $Zoom.ToString($culture), $without, $cpuName, $gpuName, $AA)

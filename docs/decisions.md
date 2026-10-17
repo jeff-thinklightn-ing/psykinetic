@@ -8351,3 +8351,30 @@ roam; the wolf's prey and eats, agreed with enemy-ai). The wilds seeds
 34 groups (deer 37, rabbits 75, boar 15, wolves 6), 24 bodies about a host
 at its start, the same after a restart. tests/herds_test. Protocol
 unchanged: animals spawn as monsters do.
+## 385. Anti-aliasing: SMAA by default, chosen in the Options panel
+
+Jeff found the new human bodies in game looking like a hundred polygons.
+The 3D view was drawn at the window's full resolution (scale 1.0, nothing
+in project.godot or the code scales it) but with no anti-aliasing at all,
+so every silhouette was a staircase of whole pixels, worst on a body some
+125 pixels tall with thin limbs.
+
+`Net.antialias`, settings.cfg `antialias=off|fxaa|smaa|msaa4`, default
+`smaa` (a file without the line, or with an unknown value, keeps it), is
+set on the root viewport by `Net.set_antialias`: SMAA or FXAA as its
+screen-space pass, or MSAA 4x. The Options panel (O, decision 267's panel)
+has a Video section with a button for each, applied and written at a
+click. project.godot is unchanged.
+
+Measured with tools/frame_budget.ps1 (the wilds town, 9 players, 4 herds,
+storm at night, 1920x1080, RTX 5090 / Ryzen 7 9700X), two passes each:
+none, FXAA, SMAA, MSAA 2x, MSAA 4x and TAA all within the run-to-run noise
+(medians 1.4 to 2.1 ms in the quieter pass, the GPU 0.2 to 0.3 ms in
+every one). In the same frame of tools/clip.gd's items scene, MSAA 2x
+still left steps on the crate's and walls' edges; MSAA 4x and SMAA took
+them off; FXAA softened them and left some. SMAA is the default: clean,
+and a fixed pass per pixel (it smooths edges inside textures too), where
+MSAA 4x multiplies the 3D buffers on a weak card. MSAA 4x stays for thin
+geometry, FXAA for the weakest cards; MSAA 2x and TAA (ghosting in motion)
+are not offered. A render scale would go in the same Video section if a
+laptop needs one.

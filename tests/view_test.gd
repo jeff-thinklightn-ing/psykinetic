@@ -172,6 +172,24 @@ func _test_options_panel() -> void:
 	Net._settings_override = settings[0]
 	Net.player_id = settings[1]
 	Net.player_name = settings[2]
+	var aa_was := Net.antialias
+	var saved_override: String = Net._settings_override
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("view_test_aa.cfg")
+	FileAccess.open(path, FileAccess.WRITE).store_string("name=Tester\n")
+	Net._settings_override = path
+	_check(panel.antialias_buttons.size() == Net.ANTIALIAS.size() and panel.antialias_buttons[Net.antialias].button_pressed,
+			"Video: a button per anti-aliasing, %s's down" % Net.antialias)
+	panel.antialias_buttons["msaa4"].pressed.emit()
+	_check(Net.antialias == "msaa4" and get_viewport().msaa_3d == Viewport.MSAA_4X
+			and get_viewport().screen_space_aa == Viewport.SCREEN_SPACE_AA_DISABLED
+			and "antialias=msaa4" in FileAccess.get_file_as_string(path),
+			"MSAA 4x clicked: on the viewport, written to the file")
+	panel.antialias_buttons["smaa"].pressed.emit()
+	_check(get_viewport().msaa_3d == Viewport.MSAA_DISABLED and get_viewport().screen_space_aa == Viewport.SCREEN_SPACE_AA_SMAA,
+			"SMAA clicked: MSAA off, SMAA on")
+	Net._settings_override = saved_override
+	DirAccess.remove_absolute(path)
+	Net.set_antialias(aa_was, false)
 	_main.toggle_options()
 	_check(not panel.visible, "O again hides it")
 	Net.set_volume("ambience_volume", was, false)
@@ -2106,6 +2124,13 @@ func _test_settings() -> void:
 	Net.apply_view_options({"hp_bars": "0", "master_volume": "0.5", "sfx_volume": "3", "colour_blind": "yes"})
 	_check(not Net.hp_bars and is_equal_approx(Net.master_volume, 0.5) and is_equal_approx(Net.sfx_volume, 1.0),
 			"read, volumes held to 0..1")
+	var aa_was := Net.antialias
+	Net.apply_view_options({"antialias": "FXAA"})
+	_check(Net.antialias == "fxaa" and get_viewport().screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA, "antialias=FXAA read and applied")
+	Net.apply_view_options({"antialias": "8x"})
+	_check(Net.antialias == "fxaa", "an unknown antialias= keeps what it was")
+	Net.set_antialias(aa_was, false)
+	Net.apply_view_options({"hp_bars": "0", "master_volume": "0.5", "sfx_volume": "3", "colour_blind": "yes"})
 	Sfx.apply_volumes()
 	_check(is_equal_approx(AudioServer.get_bus_volume_db(0), linear_to_db(0.5)) and AudioServer.get_bus_index(Sfx.BUS) != -1,
 			"the Master bus at half, an SFX bus made")
