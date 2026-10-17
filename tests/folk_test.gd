@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_meals()
 	_test_services()
 	_test_bank()
+	_test_hearsay()
 	_test_days()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -289,6 +290,50 @@ func _test_bank() -> void:
 	_economy.tick()
 	_check(_work.worker("h2")["fed"] == "dole" and float(_work.worker("h2")["loan"]) == 0.0 and _stock.count(TOWN, "gold") == 0,
 		"an empty bank lends nothing: the dole")
+
+
+## Companions' Hearsay's fields on a resident (decision 378): a mind
+## (intellect, superstition, creativity, integrity: 1..10) rolled about the
+## trade's profile by the id, the same every load, none for a companion;
+## heard kept as is.
+func _test_hearsay() -> void:
+	print("
+== a resident's mind and what they have heard ==")
+	_setup()
+	Production.profile_of = func(trade: String) -> Dictionary:
+		return {"medicine_man": {"intellect": "high", "superstition": "high", "creativity": "low", "integrity": 8},
+			"townsfolk": {"intellect": 5, "superstition": 5, "creativity": 5, "integrity": 5}}.get(trade, {})
+	_work.add_worker("h1", "Odo", ["hauler"], TOWN)
+	_work.add_worker("m1", "Hob", ["medicine_man"], TOWN)
+	_work.add_worker("companion:p1", "Garrow", ["smith"], TOWN)
+	var odo := _work.worker("h1")
+	var hob := _work.worker("m1")
+	_check(Production.MIND.all(func(q: String) -> bool: return int(odo[q]) >= 3 and int(odo[q]) <= 7),
+		"Odo, a hauler with no profile, about townsfolk's middle: %s" % [Production.MIND.map(func(q: String) -> int: return odo[q])])
+	_check(int(hob["intellect"]) >= 6 and int(hob["superstition"]) >= 6 and int(hob["creativity"]) <= 5 and int(hob["integrity"]) >= 6,
+		"Hob, a medicine man, about his profile: %s" % [Production.MIND.map(func(q: String) -> int: return hob[q])])
+	var spread := {}
+	for i in 200:
+		spread[Production.mind_of("r%d" % i, "hauler", "intellect")] = true
+	_check(spread.size() == 5, "within two of the middle each way (%s)" % [spread.keys()])
+	_check(Production.MIND.all(func(q: String) -> bool: return not _work.worker("companion:p1").has(q)), "a companion has none of the town's (hers is her card's)")
+	_check(odo["heard"] == [], "nothing heard yet")
+	_work.set_heard("h1", [{"id": "y", "text": "wolves at night", "from": "Ash", "step": 1, "believed": false}])
+	_work.set_heard("nobody", [{"id": "z"}])
+	_check(_work.worker("h1")["heard"].size() == 1 and _work.worker("h1")["heard"][0]["text"] == "wolves at night",
+		"set_heard stores what was heard as given")
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(_work.to_dict()))
+	saved["workers"]["h1"]["intellect"] = 9
+	var loaded := Production.new(saved, _stock, null, Callable(), _rules)
+	_check(int(loaded.worker("h1")["intellect"]) == 9 and loaded.worker("h1")["heard"].size() == 1
+		and loaded.worker("h1")["heard"][0]["text"] == "wolves at night", "the mind and what was heard are saved")
+	for q: String in Production.MIND:
+		saved["workers"]["m1"].erase(q)
+	saved["workers"]["m1"].erase("heard")
+	var old := Production.new(saved, _stock, null, Callable(), _rules)
+	_check(Production.MIND.all(func(q: String) -> bool: return old.worker("m1")[q] == hob[q]) and old.worker("m1")["heard"] == [],
+		"a save from before rolls the same mind and has heard nothing")
+	Production.profile_of = Callable()
 
 
 func _test_days() -> void:

@@ -67,7 +67,8 @@ var on_built := Callable()
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
 ## (need -> step due), fed, hungry_since, last_trade, wage_due, loan
-## (owed to the town's bank, decision 354), working_off}.
+## (owed to the town's bank, decision 354), working_off, the MIND (each
+## 1..10, not a companion's) and heard (companions' Hearsay's, kept as it is)}.
 var _workers: Dictionary[String, Dictionary] = {}
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
@@ -137,9 +138,52 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0,
-		"loan": 0.0, "working_off": false}
+		"loan": 0.0, "working_off": false, "heard": []}
+	# Their mind (companions' Hearsay, decision 378): rolled about their
+	# trade's profile by the id, so the same every load; a companion's comes
+	# from her card.
+	if not id.begins_with("companion:"):
+		var trade: String = list[0] if not list.is_empty() else ""
+		for each: String in MIND:
+			_workers[id][each] = mind_of(id, trade, each)
 	_town(town)
 	return true
+
+
+## What worker [param worker_id] has heard, as companions' Hearsay keeps
+## it (stored as given; nothing for an unknown id).
+func set_heard(worker_id: String, heard: Array) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["heard"] = heard.duplicate(true)
+
+
+## A resident's mind (decision 378): each 1..10, rolled within MIND_SPREAD
+## of their trade's profile (profile_of), else MIND_MIDDLE.
+const MIND: Array[String] = ["intellect", "superstition", "creativity", "integrity"]
+const MIND_SPREAD := 2
+const MIND_MIDDLE := 5
+## A profile's words as numbers.
+const MIND_WORDS := {"low": 2, "mid": 5, "middle": 5, "high": 8}
+## (trade) -> {intellect, superstition, creativity, integrity: 1..10 or a
+## word}, lore's role profiles (Lore.profile; Main sets it before the
+## snapshot loads). Unset, or {} for a trade with none: townsfolk's.
+static var profile_of := Callable()
+
+
+## [param id]'s [param quality] (one of MIND), a resident of [param trade]:
+## about the trade's profile, by the id.
+static func mind_of(id: String, trade: String, quality: String) -> int:
+	var middle := MIND_MIDDLE
+	var profile: Variant = profile_of.call(trade) if profile_of.is_valid() else {}
+	if not profile is Dictionary or profile.is_empty():
+		profile = profile_of.call("townsfolk") if profile_of.is_valid() else {}
+	var value: Variant = profile.get(quality) if profile is Dictionary else null
+	if value is float or value is int:
+		middle = int(value)
+	elif value is String and MIND_WORDS.has(value):
+		middle = MIND_WORDS[value]
+	var roll := int(("%s:%s" % [id, quality]).md5_buffer().decode_u32(0) % (MIND_SPREAD * 2 + 1)) - MIND_SPREAD
+	return clampi(middle + roll, 1, 10)
 
 
 ## Every worker's id ([param town]'s only, if given), sorted.
@@ -904,6 +948,12 @@ func from_dict(saved: Dictionary) -> void:
 			_workers[id]["loan"] = maxf(float(entry.get("loan", 0.0)), 0.0)
 			_workers[id]["working_off"] = bool(entry.get("working_off", false)) and float(_workers[id]["loan"]) > 0.0
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)
+			for each: String in MIND:
+				if _workers[id].has(each) and (entry.get(each) is float or entry.get(each) is int):
+					_workers[id][each] = clampi(int(entry[each]), 1, 10)
+			# What they have heard, as companions' Hearsay keeps it.
+			if entry.get("heard") is Array:
+				_workers[id]["heard"] = entry["heard"].duplicate(true)
 			var last: Variant = entry.get("last_trade", {})
 			if last is Dictionary and not last.is_empty():
 				_workers[id]["last_trade"] = {"step": int(last.get("step", 0)), "what": str(last.get("what", "")),

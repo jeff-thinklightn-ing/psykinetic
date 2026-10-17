@@ -1546,6 +1546,8 @@ func _boot() -> void:
 	# The town's stores, as the snapshot left them, their gear in the book.
 	World.stockpile = Stockpile.new(snapshot.get("stockpile", {}), World.steps_now, World.items)
 	# The town's workers, workshops and jobs, as the snapshot left them.
+	# A resident's mind about their trade's role profile (decision 378).
+	Production.profile_of = Lore.profile
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)

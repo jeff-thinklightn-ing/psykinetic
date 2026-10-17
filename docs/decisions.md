@@ -7023,6 +7023,17 @@ rest) and made again for `RECALL_BUDGET_USEC` (4 ms) a tick
 those within view back in about 2 s while the client loads the map, the
 last in about 5. far_tier_test: a player coming back 20 and 30 cells
 from two records finds them waiting, still records, and back two ticks on.
+
+Amended (companions' hearsay design, decision 378, approved by the
+coordinator after Jeff's speech ruling and role profiles, 2026-10-17): a
+resident's worker record has a mind, "intellect", "superstition",
+"creativity" and "integrity", each 1..10 rolled within 2 of their trade's
+profile (Production.mind_of, by the id: the same every load, an old save
+rolling it on load; lore's role profile through Production.profile_of,
+numbers or low/mid/high as 2/5/8, townsfolk's for a trade with none, 5 until
+lore's profiles are set), none on a companion's (hers coming from her
+card); and "heard", [] at first, saved and loaded as it is (companions'
+Hearsay keeps its cap and meaning, setting it with Production.set_heard).
 ## 354. The town's bank: loans to residents, rent 1 a day
 
 Jeff (2026-10-15), shown the official-jobs model of decision 353 beside a
