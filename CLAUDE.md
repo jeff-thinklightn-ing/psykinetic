@@ -72,14 +72,18 @@ which worktree owns each step, and the design rules not to break without asking 
   maker writes gigabytes of frames and starves everything else) counts as a heavy run:
   take the bench lock for it too, and clear its frames from `%TEMP%` after.
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
-  generation, a full test suite, a bench, a Godot import or export, ask `tools/heavy_job`
-  (perf lands it; until then, one such job per session at a time and the bench lock). The
-  gate checks free RAM (and GPU memory for GPU jobs) against the job kind's recorded
-  estimate plus an 8 GB margin and how many heavy jobs already run; if there is no room the
-  job waits in its queue rather than starting. Estimates update from what jobs actually
-  used. If free memory falls under the margin while jobs run, the newest job's own wrapper
-  stops it first; nobody stops another session's job. The daily summary lists jobs that
-  waited or were stopped.
+  generation, a full test suite, a bench, a Godot import or export, run it through the gate:
+  `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
+  trellis_mesh, comfy_batch, suite, bench, godot_import, godot_export; `status`, `kinds` and
+  `summary` show the rest; `take`/`release` only for a script that can't wrap). Perf lands
+  it; until then, one such job per session at a time and the bench lock. The gate checks
+  free RAM (and GPU memory for GPU jobs) against the kind's recorded estimate plus an 8 GB
+  margin and how many heavy jobs already run; if there is no room the job waits in a
+  first-come queue rather than starting. Estimates update from what jobs actually used.
+  Take the gate before the land lock, never while holding it. If free memory falls under
+  the margin while jobs run, the newest job's own wrapper stops it first and retries;
+  nobody stops another session's job. The daily summary lists jobs that waited or were
+  stopped.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
   Stopping a background task can leave its shell script and Godot children running: after
