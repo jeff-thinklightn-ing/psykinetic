@@ -7,8 +7,14 @@ art-gen, which lets it start only when there is room:
   * free RAM, less what running jobs have yet to take of their estimates,
     at least the job's estimate plus MARGIN_GB (8: the machine keeps 8 GB
     free);
+  * free commit (what Windows can still promise, RAM and pagefile, before
+    allocations fail), less the same, at least the estimate plus
+    COMMIT_MARGIN_GB;
   * for a GPU kind, free GPU memory (nvidia-smi) at least its GPU estimate;
-  * fewer than MAX_RUNNING heavy jobs running, and never two GPU jobs.
+  * fewer than MAX_RUNNING heavy jobs running, never two GPU jobs, and no
+    more of a kind than its max_running (suite 1: a suite runs its scenes
+    in parallel and fills the CPU, and two together took ten times as long
+    each; bench 1, as the bench lock).
 
 Otherwise it waits in a queue, first come first served: only the job at
 its head may start, so a big job is not starved by small ones. A job run
@@ -17,14 +23,20 @@ and it is the newest job running, its own wrapper stops its own child (no
 one else's process: never kill by name, never another session's) and puts
 it back in the queue, MAX_RESTARTS times at most. Each kind's estimate is
 updated from the peak `run` measures (the whole process tree's working
-set), rising at once and falling slowly.
+set), rising at once and falling slowly. A `run` by a tree that already
+holds a take of the kind (land.sh under its landing's take) adopts the
+take instead of queueing: it measures the take's entry, so what it is owed
+shrinks as it really uses memory, and it is never stopped (its landing
+holds the land lock, which must never wait on the gate).
 
 State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
 them elsewhere, as the test does): running/ and queue/ hold a file a job,
-kinds.json the estimates, heavy_jobs.log a line an event (`summary`).
+kinds.json the estimates and caps (edit a kind's max_running there to
+tune it), heavy_jobs.log a line an event (`summary`).
 
   heavy_job.py run <tree> <kind> -- <command...>   wait, run, release; the command's exit code
-  heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap)
+  heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap);
+                                                   N a Windows process id (Git Bash: $(cat /proc/$$/winpid))
   heavy_job.py release <tree> <kind>               give back what take held
   heavy_job.py holds <tree> <kind>                 exit 0 if <tree> holds a <kind> (run or take)
   heavy_job.py status                              running, queued, free memory
@@ -43,6 +55,9 @@ import time
 
 STATE_DIR = os.environ.get("HEAVY_JOBS_DIR", r"C:\dev\psykinetic-trees\heavy_jobs")
 MARGIN_GB = 8.0
+## Commit (RAM and pagefile, 100 GB here) kept free: past it allocations
+## fail and programs crash.
+COMMIT_MARGIN_GB = 8.0
 MAX_RUNNING = 3
 MAX_GPU_RUNNING = 1
 POLL_SECONDS = 5.0
@@ -50,16 +65,20 @@ WATCH_SECONDS = 2.0
 ## Free RAM under the margin this many watches running stops the newest job.
 LOW_WATCHES = 2
 MAX_RESTARTS = 2
-## A take with no process to watch is forgotten after this long.
-TAKE_STALE_SECONDS = 2 * 3600
+## A take running this long is forgotten, even while the shell that took it
+## lives on (a session's shell, a loop that never released): a landing takes
+## under 10 minutes, and a land lock is stale at 15.
+TAKE_STALE_SECONDS = 30 * 60
+## A wait this long goes in the log (and so in `summary`) with its reason.
+LONG_WAIT_SECONDS = 5 * 60
 ## The state's own lock, if its holder died holding it.
 LOCK_STALE_SECONDS = 30
 ## The kinds and their first estimates (GB), before any is measured.
 KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
-    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False},  # tests/land.sh: 6.3 GB measured
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False},
+    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1},  # tests/land.sh: 6.3 GB measured
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False},
 }
@@ -74,20 +93,27 @@ def reserved_gb(running):
     return sum(max(0.0, job["ram_gb"] - job.get("using_gb", 0.0)) for job in running)
 
 
-def decide(job, running, head, free_ram_gb, free_gpu_gb):
-    """Whether [job] may start now: (True, "") or (False, why). [running]:
-    the jobs running ({ram_gb, using_gb, gpu}); [head]: whether it is first
-    in the queue; free memory in GB (free_gpu_gb None: no GPU known)."""
+def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
+    """Whether [job] may start now: (True, "") or (False, why). [job]: its
+    kind's row, with "kind"; [running]: the jobs running ({kind, ram_gb,
+    using_gb, gpu}); [head]: whether it is first in the queue; free memory
+    in GB (free_gpu_gb or free_commit_gb None: not known)."""
     if not head:
         return False, "behind others in the queue"
     if len(running) >= MAX_RUNNING:
         return False, "%d heavy jobs running" % len(running)
+    cap = job.get("max_running")
+    if cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")) >= cap:
+        return False, "%d %s running, at most %d at once" % (cap, job.get("kind"), cap)
     if job["gpu"] and sum(1 for each in running if each["gpu"]) >= MAX_GPU_RUNNING:
         return False, "a GPU job is running"
     room = free_ram_gb - reserved_gb(running)
     if room < job["ram_gb"] + MARGIN_GB:
         return False, "%.1f GB free (%.1f GB owed to running jobs), %.1f + %.0f GB wanted" % (
             free_ram_gb, reserved_gb(running), job["ram_gb"], MARGIN_GB)
+    if free_commit_gb is not None and free_commit_gb - reserved_gb(running) < job["ram_gb"] + COMMIT_MARGIN_GB:
+        return False, "commit: %.1f GB free (%.1f GB owed to running jobs), %.1f + %.0f GB wanted; a bigger pagefile raises it" % (
+            free_commit_gb, reserved_gb(running), job["ram_gb"], COMMIT_MARGIN_GB)
     if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
         return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
     return True, ""
@@ -110,6 +136,12 @@ def updated_estimate(old_gb, peak_gb):
 # --- The machine -------------------------------------------------------------
 
 def free_ram_gb():
+    return _memory()[0]
+
+
+def _memory():
+    """(free RAM, free commit) in GB; free commit, what Windows can still
+    promise (RAM and pagefile) before allocations fail, None elsewhere."""
     if os.name == "nt":
         class Status(ctypes.Structure):
             _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
@@ -120,12 +152,12 @@ def free_ram_gb():
         status = Status()
         status.length = ctypes.sizeof(Status)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))
-        return status.avail_phys / GB
+        return status.avail_phys / GB, status.avail_page / GB
     with open("/proc/meminfo") as meminfo:
         for line in meminfo:
             if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) * 1024 / GB
-    return 0.0
+                return int(line.split()[1]) * 1024 / GB, None
+    return 0.0, None
 
 
 def gpu_gb():
@@ -174,14 +206,28 @@ class Job:
             if handle and kernel.AssignProcessToJobObject(ctypes.c_void_p(handle), ctypes.c_void_p(int(child._handle))):
                 self.handle = handle
 
+    class _Ids(ctypes.Structure):
+        _fields_ = [("assigned", ctypes.c_ulong), ("listed", ctypes.c_ulong), ("ids", ctypes.c_size_t * 1024)]
+
+    def _ids(self):
+        """The job's live processes' ids (JobObjectBasicProcessIdList)."""
+        if self.handle is None:
+            return []
+        ids = self._Ids()
+        if not ctypes.windll.kernel32.QueryInformationJobObject(ctypes.c_void_p(self.handle), 3, ctypes.byref(ids),
+                ctypes.sizeof(ids), None):
+            return []
+        return [int(ids.ids[i]) for i in range(ids.listed)]
+
+    def processes(self):
+        """How many of the job's processes still run."""
+        return len(self._ids())
+
     def using_gb(self):
         """The working set of the job's processes now."""
         if self.handle is None:
             return 0.0
         kernel = ctypes.windll.kernel32
-
-        class Ids(ctypes.Structure):
-            _fields_ = [("assigned", ctypes.c_ulong), ("listed", ctypes.c_ulong), ("ids", ctypes.c_size_t * 1024)]
 
         class Counters(ctypes.Structure):
             _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong),
@@ -189,13 +235,10 @@ class Job:
                 ("quota_peak_paged", ctypes.c_size_t), ("quota_paged", ctypes.c_size_t),
                 ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
                 ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
-        ids = Ids()
-        if not kernel.QueryInformationJobObject(ctypes.c_void_p(self.handle), 3, ctypes.byref(ids), ctypes.sizeof(ids), None):
-            return 0.0  # 3: JobObjectBasicProcessIdList
         kernel.OpenProcess.restype = ctypes.c_void_p
         total = 0
-        for i in range(ids.listed):
-            process = kernel.OpenProcess(0x1000 | 0x0010, False, int(ids.ids[i]))  # QUERY_LIMITED | VM_READ
+        for pid in self._ids():
+            process = kernel.OpenProcess(0x1000 | 0x0010, False, pid)  # QUERY_LIMITED | VM_READ
             if not process:
                 continue
             counters = Counters()
@@ -303,7 +346,8 @@ def kinds():
 
 def _entries(folder):
     """The live entries of running/ or queue/, oldest first; stale ones
-    (their process gone, or a take past TAKE_STALE_SECONDS) removed."""
+    (their process gone, or a running take past TAKE_STALE_SECONDS)
+    removed."""
     out = []
     for name in sorted(os.listdir(_path(folder))):
         if not name.endswith(".json"):
@@ -312,7 +356,11 @@ def _entries(folder):
         if entry is None:
             continue
         pid = entry.get("pid")
-        stale = not alive(pid) if pid else time.time() - entry.get("started", entry["queued"]) > TAKE_STALE_SECONDS
+        stale = bool(pid) and not alive(pid)
+        if folder == "queue" and entry.get("waiter"):
+            stale = stale or not alive(entry["waiter"])
+        if folder == "running" and not entry.get("watched") and not alive(entry.get("adopted_by")):
+            stale = stale or time.time() - entry.get("started", entry["queued"]) > TAKE_STALE_SECONDS
         if stale:
             os.remove(_path(folder, name))
             log("stale", entry["tree"], entry["kind"], "%s dropped" % folder)
@@ -333,19 +381,36 @@ def log(event, tree, kind, detail=""):
 def wait_turn(tree, kind, pid, watched):
     """Queues, waits to be at the head with room, then moves to running.
     Returns the running entry's file name."""
-    row = kinds()[kind]
+    row = dict(kinds()[kind], kind=kind)
     queued = time.time()
     ticket = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
     with StateLock():
-        _write(_path("queue", ticket), {"tree": tree, "kind": kind, "pid": pid, "queued": queued})
+        # "waiter": this wrapper, which waits for the turn; a take's pid (its
+        # holder) may be none, and a queue file whose waiter died is dropped.
+        _write(_path("queue", ticket), {"tree": tree, "kind": kind, "pid": pid, "waiter": os.getpid(), "queued": queued})
     said = 0.0
+    long_logged = False
     while True:
         with StateLock():
             queue = _entries("queue")
             running = _entries("running")
             free_gpu, _ = gpu_gb() if row["gpu"] else (None, None)
-            head = bool(queue) and queue[0]["file"] == ticket
-            ok, why = decide(row, running, head, free_ram_gb(), free_gpu)
+            if not any(each["file"] == ticket for each in queue):
+                # Dropped as stale: its pid is no live Windows process (Git
+                # Bash's $$ is not one), so it would wait forever.
+                print("heavy_job: %s %s: its place in the queue was dropped (pid %s is no live process); not waiting" % (
+                    tree, kind, pid), file=sys.stderr)
+                raise SystemExit(3)
+            head = queue[0]["file"] == ticket
+            free_ram, free_commit = _memory()
+            ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
+            place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
+            if not head and queue:
+                first = queue[0]
+                first_row = dict(kinds().get(first["kind"], row), kind=first["kind"])
+                first_gpu = gpu_gb()[0] if first_row["gpu"] else None
+                _, first_why = decide(first_row, running, True, free_ram, first_gpu, free_commit)
+                why = "the head, %s %s, waits on: %s" % (first["tree"], first["kind"], first_why or "its next look")
             if ok:
                 os.remove(_path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
@@ -356,16 +421,43 @@ def wait_turn(tree, kind, pid, watched):
                 if waited >= POLL_SECONDS:
                     print("heavy_job: %s %s starts after waiting %.0f s" % (tree, kind, waited), file=sys.stderr)
                 return name
+        waited = time.time() - queued
         if time.time() - said >= 60.0:
             said = time.time()
-            print("heavy_job: %s %s waiting: %s" % (tree, kind, why), file=sys.stderr)
+            print("heavy_job: %s %s waiting %.0f min, %s of %d in the queue: %s (the machine, not this script; heavy_job status shows the rest)" % (
+                tree, kind, waited / 60, _ordinal(place), len(queue), why), file=sys.stderr)
+        if waited >= LONG_WAIT_SECONDS and not long_logged:
+            long_logged = True
+            log("waiting", tree, kind, "%.0f s, %s of %d: %s" % (waited, _ordinal(place), len(queue), why))
         time.sleep(POLL_SECONDS)
+
+
+def _ordinal(n):
+    return "%d%s" % (n, "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th"))
+
+
+def _adopt_take(tree, kind):
+    """The file name of [tree]'s take of [kind] in running/, marked adopted
+    by this wrapper (it does not age out while this lives), or None."""
+    with StateLock():
+        for entry in _entries("running"):
+            if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
+                name = entry.pop("file")
+                entry["adopted_by"] = os.getpid()
+                _write(_path("running", name), entry)
+                return name
+    return None
 
 
 def run(tree, kind, command):
     restarts = 0
     while True:
-        name = wait_turn(tree, kind, os.getpid(), True)
+        adopted = _adopt_take(tree, kind)
+        if adopted is not None:
+            name = adopted
+            print("heavy_job: %s %s inside this tree's take, measured as a run" % (tree, kind), file=sys.stderr)
+        else:
+            name = wait_turn(tree, kind, os.getpid(), True)
         started = time.time()
         child = subprocess.Popen(command)
         job = Job(child)
@@ -387,20 +479,36 @@ def run(tree, kind, command):
                 running = _entries("running")
             free = free_ram_gb()
             low = low + 1 if free < MARGIN_GB else 0
-            if low >= LOW_WATCHES and entry is not None and should_stop(entry, running, free) and child.poll() is None:
+            if (adopted is None and low >= LOW_WATCHES and entry is not None and should_stop(entry, running, free)
+                    and child.poll() is None):
                 job.stop()
                 child.wait()
                 stopped = True
                 break
         peak = max(peak, job.peak_gb())
+        # What the command left running (a test's server or client whose
+        # script was killed) would go on using the machine outside the gate.
+        left = job.processes()
+        if left:
+            job.stop()
+            log("left", tree, kind, "%d processes still running when it ended: stopped" % left)
         job.close()
         code = child.returncode
         duration = time.time() - started
         with StateLock():
-            try:
-                os.remove(_path("running", name))
-            except OSError:
-                pass
+            if adopted is None:
+                try:
+                    os.remove(_path("running", name))
+                except OSError:
+                    pass
+            else:
+                # The take is its holder's to release; with nothing in it
+                # measured, it owes its whole estimate again.
+                entry = _read(_path("running", name))
+                if entry is not None:
+                    entry["using_gb"] = 0.0
+                    entry.pop("adopted_by", None)
+                    _write(_path("running", name), entry)
             if not stopped and peak > 0.0:
                 table = _read(_path("kinds.json")) or {}
                 saved = dict(kinds()[kind])
@@ -452,13 +560,15 @@ def status():
         running = _entries("running")
         queue = _entries("queue")
     free_gpu, used_gpu = gpu_gb()
-    print("free RAM %.1f GB (margin %.0f GB), GPU %s" % (free_ram_gb(), MARGIN_GB,
+    free_ram, free_commit = _memory()
+    print("free RAM %.1f GB (margin %.0f GB), commit %s, GPU %s" % (free_ram, MARGIN_GB,
+        "%.1f GB free (margin %.0f GB)" % (free_commit, COMMIT_MARGIN_GB) if free_commit is not None else "unknown",
         "%.1f GB free" % free_gpu if free_gpu is not None else "unknown"))
     for entry in running:
         print("running %s %s, %.0f s, using %.1f of %.1f GB%s" % (entry["tree"], entry["kind"], time.time() - entry["started"],
             entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)"))
-    for entry in queue:
-        print("queued %s %s, %.0f s" % (entry["tree"], entry["kind"], time.time() - entry["queued"]))
+    for place, entry in enumerate(queue, 1):
+        print("queued %s %s, %.0f s (%s)" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place)))
     if not running and not queue:
         print("no heavy jobs")
     return 0
@@ -466,7 +576,8 @@ def status():
 
 def show_kinds():
     for name, row in sorted(kinds().items()):
-        print("%-14s %5.1f GB RAM%s%s" % (name, row["ram_gb"], ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
+        print("%-14s %5.1f GB RAM%s%s%s" % (name, row["ram_gb"], ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
+            ", at most %d at once" % row["max_running"] if row.get("max_running") is not None else "",
             ", last peak %.1f GB" % row["last_peak_gb"] if "last_peak_gb" in row else ""))
     return 0
 
@@ -477,14 +588,14 @@ def summary(day):
         with open(_path("heavy_jobs.log")) as handle:
             for line in handle:
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] == "stopped" or "waited" in parts[4]):
+                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in ("stopped", "waiting") or "waited" in parts[4]):
                     lines.append(parts)
     except OSError:
         pass
     if not lines:
         print("%s: no heavy job waited or was stopped" % day)
     for when, event, tree, kind, detail in lines:
-        print("%s %s %s %s: %s" % (when[11:16], tree, kind, "stopped" if event == "stopped" else "waited", detail))
+        print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in ("stopped", "waiting") else "waited", detail))
     return 0
 
 

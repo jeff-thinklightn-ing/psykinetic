@@ -8,14 +8,15 @@
 # most of the time; each part's whole output is shown if it fails, else only
 # its last line. tests/land.ps1 is the same; one of them is enough.
 # A heavy job (decision 394): it runs through the gate as <checkout> suite
-# (tools/heavy_job.py), waiting there if the machine has no room, unless
-# this checkout already holds suite (a landing takes it before the land
-# lock, so it never waits on the gate holding the lock). tests/heavy_job_test
-# runs first, alone.
+# (tools/heavy_job.py), waiting there if the machine has no room. If this
+# checkout already holds suite (a landing takes it before the land lock, so
+# it never waits on the gate holding the lock), the run adopts that take
+# and is measured in it instead of queueing. tests/heavy_job_test runs
+# first, alone.
 set -u
 cd "$(dirname "$0")/.."
 tree="$(basename "$(pwd)")"
-if [ -z "${HEAVY_JOB_INSIDE:-}" ] && ! python tools/heavy_job.py holds "$tree" suite; then
+if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	HEAVY_JOB_INSIDE=1 exec python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
 fi

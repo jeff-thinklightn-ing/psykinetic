@@ -6,22 +6,20 @@
 # The suite takes the job count (tests\jobs.ps1) less the two the others use
 # most of the time; each part's whole output is shown if it fails, else only
 # its result line. tests/land.sh is the same; one of them is enough.
-# A heavy job (decision 394): through the gate as <checkout> suite unless
-# this checkout already holds suite (see tests/land.sh); heavy_job_test first.
+# A heavy job (decision 394): through the gate as <checkout> suite, adopting
+# this checkout's take of suite if it holds one (see tests/land.sh);
+# heavy_job_test first.
 $root = Split-Path $PSScriptRoot -Parent
 $tree = Split-Path $root -Leaf
 $gate = Join-Path $root 'tools\heavy_job.py'
 if (-not $env:HEAVY_JOB_INSIDE) {
-	& python $gate holds $tree suite
-	if ($LASTEXITCODE -ne 0) {
-		Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
-		$env:HEAVY_JOB_INSIDE = '1'
-		try {
-			& python $gate run $tree suite -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
-			exit $LASTEXITCODE
-		} finally {
-			Remove-Item Env:HEAVY_JOB_INSIDE -ErrorAction SilentlyContinue
-		}
+	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
+	$env:HEAVY_JOB_INSIDE = '1'
+	try {
+		& python $gate run $tree suite -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+		exit $LASTEXITCODE
+	} finally {
+		Remove-Item Env:HEAVY_JOB_INSIDE -ErrorAction SilentlyContinue
 	}
 }
 . (Join-Path $PSScriptRoot 'jobs.ps1')

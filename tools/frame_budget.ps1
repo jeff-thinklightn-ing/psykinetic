@@ -51,7 +51,12 @@ if ($Off.Count -gt 0) { $bench += "--off=$($Off -join ',')" }
 if ($NoFade) { $bench += "--fade=0" }
 # A heavy job (decision 394): through the gate as <checkout> bench.
 $gate = Join-Path $PSScriptRoot "heavy_job.py"
+# Its stderr (the gate's waiting lines, Godot's warnings) is merged into the
+# log: under "Stop", Windows PowerShell would throw at the first such line and
+# leave the bench running without its gate.
+$ErrorActionPreference = "Continue"
 $log = & python $gate run (Split-Path $root -Leaf) bench -- $Godot @bench 2>&1 | ForEach-Object { "$_" }
+$ErrorActionPreference = "Stop"
 $time = $log | Where-Object { $_ -like "BENCH frame time:*" } | Select-Object -First 1
 $frames = $log | Where-Object { $_ -like "BENCH frames:*" } | Select-Object -First 1
 $render = $log | Where-Object { $_ -like "BENCH a frame:*" } | Select-Object -First 1

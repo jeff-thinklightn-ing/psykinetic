@@ -8457,6 +8457,30 @@ lock. tools/clip.sh, net_bench.sh and frame_budget.ps1 run as bench. The
 bench lock stays, for timing. Measured: the landing suite 6.3 GB at its
 peak, an import 0.8 GB, frame_budget 1.6 GB. tests/heavy_job_test.py
 checks the decision with made-up numbers, and land.sh runs it.
+Amended (2026-10-17): a take is forgotten 30 minutes after it started,
+even while the shell that took it lives on. A take held for 52 minutes
+by a live shell, with the land lock free, kept its 6 GB from the queue
+and stopped every tree behind it; a landing takes under 10 minutes.
+Amended again the same day (the coordinator, release): at most one suite
+and one bench run at once (a kind's max_running, in kinds.json to tune):
+the RAM rule let two suites in, and the box is CPU-bound for them, each
+taking 30 minutes where one alone takes 3, long enough for land locks to
+go stale while still in use. The gate also checks free commit (RAM and
+pagefile, before allocations fail) against the estimate plus 8 GB (2 GB
+for an afternoon, until the pagefile grew to make 100 GB of commit) and
+says "commit" when that is what it waits on. A queued take records its
+waiter, and the queue drops it when the waiter is gone (a stopped landing
+left one with no pid that never would have gone); a take whose --pid
+is no live Windows process (Git Bash's $$) is dropped at once, so it
+stops waiting (exit 3) rather than waiting forever. A `run` by a tree holding a
+take of its kind adopts the take instead of queueing (land.sh no longer
+asks `holds`): it is measured, so the take owes only what the suite has
+yet to use, it is never stopped (its landing holds the land lock), and
+the take does not age out while it lives. When a run's command ends,
+whatever it left running in its job object is stopped and logged ("left"):
+a killed landing's net_test and state_test ran on for an hour outside the
+gate. A wait prints its reason, its place in the queue and what the head
+waits on each minute, and goes in the log (and `summary`) at 5 minutes.
 
 
 ## 395. UI sounds
