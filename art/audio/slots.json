@@ -35,6 +35,15 @@
 			"license_file": "docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt",
 			"url": "https://sonniss.com/gameaudiogdc",
 			"notes": "never in the repo: its licence forbids supplying the sounds as sounds, edited or not; takes are cut into the sound library's takes/ (tools/sound_take.ps1) and copied into the game by tools/sound_sync.ps1; never used to train or feed AI"
+		},
+		"freesound": {
+			"name": "Freesound",
+			"path": "res://art/audio/external/",
+			"store": "external",
+			"license": "CC0 1.0 or CC BY (each take's own, in art/audio/takes.json)",
+			"license_file": "docs/licenses/freesound.md",
+			"url": "https://freesound.org",
+			"notes": "CC0 and CC BY sounds only (nothing non-commercial, no Sampling+), fetched by tools/freesound.ps1 into the sound library's freesound/<slot>/<id>/ and cut into its takes/ like Sonniss's; each take names its maker, page and licence, and THIRD_PARTY.md credits it"
 		}
 	},
 	"slots": {

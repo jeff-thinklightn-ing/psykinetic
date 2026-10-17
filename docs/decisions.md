@@ -7607,3 +7607,33 @@ the player a sword named with the dread strength.
 Rejected: fear of every dread holder seen (a scan of everyone's hands each look);
 the bold fearing it too (bold is the one temper that ignores odds); a morale
 penalty spread to the side (a rout already spreads).
+## 361. Freesound as a sound source
+
+Freesound fills the sound slots that the Sonniss bundles left on placeholders. Its sounds come
+under licences their makers chose, so a Freesound take carries its own licence. The source
+`freesound` in `art/audio/slots.json` is stored external, like Sonniss: originals and takes
+live in the sound library (`N:\assets\sound\freesound\<slot>\<id>\` and `takes\<slot>\`), and
+`tools/sound_sync.ps1` copies the takes into the game. That keeps the repo light; nothing in
+the CC0 or CC BY licences forbids it.
+
+`tools/freesound.ps1` has five commands: `search` (filtered to CC0 and CC BY), `authorize`
+and `token` (OAuth2, once; downloading originals needs it), `fetch` (re-reads the sound's
+licence and refuses any other, so nothing non-commercial and no Sampling+, then keeps the
+original in a folder of its own, under a name of ours, beside a `freesound.json`), and `take`
+(cuts it with `tools/sound_take.ps1`). The app's credentials come from a file named by
+`PSYK_FREESOUND_CREDENTIALS`. They are never printed. The token is kept in
+`%LOCALAPPDATA%\Psykinetic`. The tool refuses either path inside the checkout. Fetches are
+paced under Freesound's limit of 30 calls a minute.
+
+A take records `by`, `url` and `license` in `art/audio/takes.json` (`sound_take.ps1
+-License`), and THIRD_PARTY's sound block credits every take with a maker: its slot, the
+sound it was cut from, the page, the maker and the licence (CC BY needs it; CC0 gets it too).
+`sound_take.ps1 -PeakDb` raises a quiet source to a set peak. Takes are still picked by name,
+rating and measurement, and Jeff vetoes by ear.
+
+The API's own terms are separate from the sounds' licences. Their section 3 says terms for
+commercial use of the API are negotiated case by case with UPF.
+`docs/licenses/freesound.md` quotes them (read 2026-10-17) and records Jeff's decision: "proceed with API downloads until UPF says otherwise". He asked UPF
+the same day. UPF's answer
+is pending. A no stops API downloads, and we download by hand from the website, under each
+sound's own licence. Tools and data only; client side; no protocol change.

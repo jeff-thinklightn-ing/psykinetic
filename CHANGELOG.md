@@ -13,6 +13,13 @@ notes (decision 324).
   voice can be given by Claude (Haiku or Sonnet) instead of the box's model,
   falling back to it on any failure, with what each line cost logged.
 - A weapon, shield or tool you carry for a long time, and fight with, takes your name for life ("Wren's dagger") and one strength from how you used it: steady, quick, set, quiet, heavy or dread. Never more damage. Names show on the pack slot's hover and in the party log. Lore's name form still waits on Jeff's yes, so nothing is named in play yet.
+- Sounds for 44 more slots from Freesound, 77 takes (free licences, each credited in THIRD_PARTY.md):
+  deer snorts, wolf howls and yelps, boar grunts and squeals, rabbits and deer crashing
+  through brush, goblin chatter, screams and pain, men's grunts and death cries, footsteps
+  on stone, sand and shallow water, wooden chests, dropped and picked-up items, a splash,
+  shield and weapon blocks, blows on armour, punches, body falls, door bars and bolts,
+  falling stone, a town at night, and the menu's clicks, page turns and chimes. Some aren't
+  heard in play yet, until the actions that make them are hooked up.
 
 ## v0.1.148
 

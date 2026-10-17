@@ -125,37 +125,49 @@ func _test_fallbacks() -> void:
 			if at != "" and not SoundKit.has(at):
 				break
 		_check(at == "", "%s: its fallbacks are slots and end (%s)" % [slot, " -> ".join(seen)])
+	# As if these had no takes yet, whatever the library holds now.
+	_without_takes(["sfx.footstep_sand_medium", "sfx.knockdown", "sfx.bodyfall", "sfx.block_shield"])
 	_check(SoundKit.played_from("sfx.footstep_sand_medium", false) == "sfx.footstep", "sand underfoot sounds as the footstep meanwhile")
 	_check(SoundKit.played_from("sfx.footstep_grass_small", false) == "sfx.footstep_grass_medium", "a small body on grass, as a medium one meanwhile")
 	_check(SoundKit.played_from("sfx.door_wood_break") == "sfx.break_wood", "a door broken sounds as wood breaking meanwhile")
 	_check(SoundKit.played_from("sfx.knockdown") == "sfx.knockback_body_soft", "a knockdown, through the bodyfall, as the soft thud")
 	_check(SoundKit.filled_by("sfx.hit_flesh") == "fill" and SoundKit.files("sfx.hit_flesh").size() == 5, "hit_flesh: Kenney's five")
 	_check(SoundKit.played_from("sfx.block_shield") == "" and SoundKit.files("sfx.block_shield").is_empty(), "a block: nothing yet, the placeholder")
+	SoundKit.reload()
 
 
 func _test_takes() -> void:
 	print("
 == a third-party take: listed is filled (the status says so everywhere), played once it is there ==")
-	_check(SoundKit.takes("sfx.block_shield").is_empty(), "takes.json lists no take of a block yet")
+	var listed := SoundKit.takes("sfx.block_shield").duplicate(true)
+	_without_takes(["sfx.block_shield"])
 	var sonniss := SoundKit.source("sonniss-gdc-2024")
 	_check(sonniss.get("store") == "external" and str(sonniss.get("path")) == "res://art/audio/external/",
 			"a Sonniss source is stored external, synced into art/audio/external/")
 	# A take listed but not synced (as on a machine without the sound library).
-	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "sfx.block_shield.ogg", "from": "sonniss-gdc-2024", "sha256": "0"}]
+	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "sfx.block_shield.9.ogg", "from": "sonniss-gdc-2024", "sha256": "0"}]
 	SoundKit._files.clear()
-	_check(SoundKit.take_files("sfx.block_shield") == ["res://art/audio/external/sfx.block_shield/sfx.block_shield.ogg"], "it is looked for in art/audio/external/<slot>/")
+	_check(SoundKit.take_files("sfx.block_shield") == ["res://art/audio/external/sfx.block_shield/sfx.block_shield.9.ogg"], "it is looked for in art/audio/external/<slot>/")
 	_check(SoundKit.filled_by("sfx.block_shield") == "fill" and SoundKit.played_from("sfx.block_shield", false) == "sfx.block_shield",
 			"listed: filled, by the lists alone")
 	_check(SoundKit.played_from("sfx.block_shield") == "" and SoundKit.files("sfx.block_shield").is_empty(), "not synced: the placeholder meanwhile")
 	_check("sonniss-gdc-2024" in SoundKit._sources_of("sfx.block_shield") and "sfx.block_shield" in SoundKit.third_party_block(),
 			"THIRD_PARTY's block names it under its source")
+	# A Freesound take: its own licence, maker and page, credited.
+	var freesound := SoundKit.source("freesound")
+	_check(freesound.get("store") == "external" and FileAccess.file_exists("res://" + str(freesound.get("license_file"))),
+			"Freesound is a source stored external, its licences written down")
+	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "sfx.block_shield.ogg", "from": "freesound", "sha256": "0",
+			"original": "freesound 1: Shield [hit]", "by": "someone", "url": "https://freesound.org/s/1/", "license": "CC BY 4.0"}]
+	_check("- `sfx.block_shield` (sfx.block_shield.ogg): cut from [freesound 1: Shield (hit)](https://freesound.org/s/1/) by someone, CC BY 4.0" \
+			in SoundKit.third_party_block(), "THIRD_PARTY credits a take with a maker: its page, maker and licence")
 	# Synced: a take that is there (a Kenney file, through its path from the slot's folder).
 	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "../sfx/hit_1.ogg", "from": "kenney-impact", "sha256": "0"}]
 	SoundKit.source("kenney-impact")["path"] = "res://art/audio/"
 	SoundKit._files.clear()
 	_check(SoundKit.files("sfx.block_shield").size() == 1, "there: played (%s)" % [SoundKit.files("sfx.block_shield")])
 	SoundKit.reload()
-	_check(SoundKit.takes("sfx.block_shield").is_empty() and SoundKit.source("kenney-impact")["path"] == "res://art/audio/sfx/", "reload reads the files again")
+	_check(SoundKit.takes("sfx.block_shield") == listed and SoundKit.source("kenney-impact")["path"] == "res://art/audio/sfx/", "reload reads the files again")
 
 
 func _test_ambience_weights() -> void:
@@ -210,6 +222,7 @@ func _test_sfx_plays_slots() -> void:
 		if sfx.played[i][1] == sfx.played[i - 1][1]:
 			repeats += 1
 	_check(sfx.played.size() == 12 and repeats == 0, "twelve hits, no take twice running (%d repeats)" % repeats)
+	_without_takes(["sfx.block_shield", "amb.town_night"])
 	sfx.play("sfx.block_shield", Vector3.ZERO)
 	_check(sfx.played.back().slice(0, 2) == ["sfx.block_shield", ""], "a slot with no takes plays the blip (%s)" % [sfx.played.back()])
 	var before := sfx.played.size()
@@ -218,6 +231,14 @@ func _test_sfx_plays_slots() -> void:
 	var player := sfx.get_child(sfx.get_child_count() - 1) as AudioStreamPlayer3D
 	_check(player != null and player.bus == Sfx.BUS, "on the SFX bus")
 	sfx.free()
+	SoundKit.reload()
+
+
+## Forgets [param slots]' takes until SoundKit.reload(), as on a slot not filled yet.
+func _without_takes(slots: Array) -> void:
+	for slot: String in slots:
+		SoundKit.all_takes().erase(slot)
+	SoundKit._files.clear()
 
 
 func _test_status_current() -> void:

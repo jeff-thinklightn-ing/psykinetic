@@ -3,7 +3,7 @@ extends Node
 ## THIRD_PARTY.md's sound block as tools/sound_status.gd does. Run by
 ## tools/sound_take.ps1, which makes the file first:
 ##   godot --headless --path . --scene res://tools/sound_take.tscn -- --slot=<slot> --file=<file>
-##       --from=<source> --original=<text> --sha256=<hex> [--by=<author>] [--url=<page>]
+##       --from=<source> --original=<text> --sha256=<hex> [--by=<author>] [--url=<page>] [--license=<name>]
 
 const STATUS := "res://docs/sound_status.md"
 const THIRD_PARTY := "res://THIRD_PARTY.md"
@@ -34,7 +34,7 @@ func _ready() -> void:
 			_fail("%s already lists %s" % [args.slot, args.file])
 			return
 	var take := {"file": args.file, "from": args.from, "original": args.get("original", ""), "sha256": args.sha256}
-	for extra: String in ["by", "url"]:
+	for extra: String in ["by", "url", "license"]:
 		if str(args.get(extra, "")) != "":
 			take[extra] = args[extra]
 	list.append(take)

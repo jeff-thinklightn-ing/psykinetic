@@ -79,6 +79,17 @@
 				"sha256": "bf68f1751cb11c261c3040dc7ddd83cbc360f6ff4ebd7aafd83cb73f60b2c904"
 			}
 		],
+		"amb.town_night": [
+			{
+				"file": "amb.town_night.ogg",
+				"from": "freesound",
+				"original": "freesound 450994: crickets night field diverse +distant village voices Putti, Uganda1 MS.wav (from 10 s for 60 s)",
+				"sha256": "696b85769ff51506b2907952ba5dea5ea22ead8f75d0019abfaa8b70f32f6583",
+				"by": "kyles",
+				"url": "https://freesound.org/people/kyles/sounds/450994/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.bandage": [
 			{
 				"file": "sfx.bandage.ogg",
@@ -99,6 +110,28 @@
 				"sha256": "6b61d5013d2ffb662ae53fb0ebd67ded2fb085e5939086e9ab449f832fcfbdb1"
 			}
 		],
+		"sfx.block_shield": [
+			{
+				"file": "sfx.block_shield.ogg",
+				"from": "freesound",
+				"original": "freesound 370203: shield guard",
+				"sha256": "b2db48a61e28f730c0fa3d143356888c50b72462e27605ee23faca5582f41585",
+				"by": "nekoninja",
+				"url": "https://freesound.org/people/nekoninja/sounds/370203/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.block_weapon": [
+			{
+				"file": "sfx.block_weapon.ogg",
+				"from": "freesound",
+				"original": "freesound 733887: Sword Impact",
+				"sha256": "ab27cb96ee4866ba85aafc7b452828fc35e6c9fe451fe7fbd91d382fccf19c53",
+				"by": "velcronator",
+				"url": "https://freesound.org/people/velcronator/sounds/733887/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.boar_charge": [
 			{
 				"file": "sfx.boar_charge.ogg",
@@ -113,6 +146,68 @@
 				"sha256": "87d722bf5cba90fbaad5e34a2422f83cd35c19ee5502f0518f7699693907f32e"
 			}
 		],
+		"sfx.boar_death": [
+			{
+				"file": "sfx.boar_death.ogg",
+				"from": "freesound",
+				"original": "freesound 233177: Pig - Grunt and Squeal 4 - 96kHz.wav",
+				"sha256": "b4f1b211ad534a6206bc016a1be27912cc08cd3cab6dbcfeeb8d7bfa85a08ada",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233177/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.boar_rout": [
+			{
+				"file": "sfx.boar_rout.ogg",
+				"from": "freesound",
+				"original": "freesound 233184: Pig - Multiple Snorts 1 - 96kHz.wav",
+				"sha256": "673baf413c7cfe5ab25dc7189985de2d67862bffc89f56f8bde5102ee974a618",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233184/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_rout.2.ogg",
+				"from": "freesound",
+				"original": "freesound 620080: LONG_Pig_Grunt_01.flac",
+				"sha256": "10b67bb86175e83580b8f1945baa657e21699179ea45649ebad1e3aecf9140f7",
+				"by": "wwstudioswastaken",
+				"url": "https://freesound.org/people/wwstudioswastaken/sounds/620080/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.bodyfall": [
+			{
+				"file": "sfx.bodyfall.ogg",
+				"from": "freesound",
+				"original": "freesound 346694: Body fall_02.wav",
+				"sha256": "b7feb5f153430597a337f791ead0e39e5d366b3d0632706da145336c02e734da",
+				"by": "deleted_user_2104797",
+				"url": "https://freesound.org/people/deleted_user_2104797/sounds/346694/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.break_stone": [
+			{
+				"file": "sfx.break_stone.ogg",
+				"from": "freesound",
+				"original": "freesound 389618: Rock Tumble 2.wav",
+				"sha256": "694b6dde1cce87ecbe5fbc58a653873596946453f7743b3d937c8f1262ab4a59",
+				"by": "_stubb",
+				"url": "https://freesound.org/people/_stubb/sounds/389618/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.break_stone.2.ogg",
+				"from": "freesound",
+				"original": "freesound 426318: Rocks Falling.wav",
+				"sha256": "68795fde2fb43177947602825f14d3d149f9b9905ba13eaa826fa4fa524d4391",
+				"by": "MTJohnson",
+				"url": "https://freesound.org/people/MTJohnson/sounds/426318/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.cart_roll": [
 			{
 				"file": "sfx.cart_roll.ogg",
@@ -121,12 +216,121 @@
 				"sha256": "386bee5e57c38cd5c29371c68ce37bbb789a10d116a16544c99ff36130407a52"
 			}
 		],
+		"sfx.chest_close": [
+			{
+				"file": "sfx.chest_close.ogg",
+				"from": "freesound",
+				"original": "freesound 573648: Wooden Chest Lid Close.wav",
+				"sha256": "2adc597b960250e367ab56bce1b6ec85a197f71025fd94a23755076510dfa3ca",
+				"by": "The_Frisbee_of_Peace",
+				"url": "https://freesound.org/people/The_Frisbee_of_Peace/sounds/573648/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.chest_close.2.ogg",
+				"from": "freesound",
+				"original": "freesound 573649: Wooden Chest Lid Latches Close_02.wav",
+				"sha256": "e5d60fd03255c4daa8aacf53e8f385078bbfc1eb3a4b3547cfb94e96d78baae3",
+				"by": "The_Frisbee_of_Peace",
+				"url": "https://freesound.org/people/The_Frisbee_of_Peace/sounds/573649/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.chest_open": [
+			{
+				"file": "sfx.chest_open.ogg",
+				"from": "freesound",
+				"original": "freesound 573654: Wooden Chest Open.wav",
+				"sha256": "2c39a30561f41ee3b8a9854a2cdb71a777653d6cdb6932c05ab1be7b4e6f257f",
+				"by": "The_Frisbee_of_Peace",
+				"url": "https://freesound.org/people/The_Frisbee_of_Peace/sounds/573654/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.chest_open.2.ogg",
+				"from": "freesound",
+				"original": "freesound 573653: Wooden Chest Lid Latches Open.wav",
+				"sha256": "1202b5e734475772bbe36027a37f2e8520b5fec93d394864adc577cce27bf81c",
+				"by": "The_Frisbee_of_Peace",
+				"url": "https://freesound.org/people/The_Frisbee_of_Peace/sounds/573653/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.crate_break": [
 			{
 				"file": "sfx.crate_break.ogg",
 				"from": "sonniss-gdc-2024",
 				"original": "2024/DavidDumais - Explosion SFX Pack/WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav (from 0 s for 1.3 s)",
 				"sha256": "a137926de2e10f16e2c348c6e1d9b27c2f7762f2f05be5cf209901c5013a34e2"
+			}
+		],
+		"sfx.deer_rout": [
+			{
+				"file": "sfx.deer_rout.ogg",
+				"from": "freesound",
+				"original": "freesound 106113: bushhit.wav",
+				"sha256": "f21e3b8a770f6c8db8e2d316e95019d1a803e7855076d1a4e188696184bf4efe",
+				"by": "j1987",
+				"url": "https://freesound.org/people/j1987/sounds/106113/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_rout.2.ogg",
+				"from": "freesound",
+				"original": "freesound 540278: tree shake.wav",
+				"sha256": "811ac5f445cd6b54aa7f7c4629629c07bb635b1d377ff6e93d9bb1c9b7f1fed1",
+				"by": "zepurple",
+				"url": "https://freesound.org/people/zepurple/sounds/540278/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_rout.3.ogg",
+				"from": "freesound",
+				"original": "freesound 190641: Rustling foilage 1.wav",
+				"sha256": "c12ac6e4174a5084c939eb207e1be91666e8fcb78d06c91550f40fac279150af",
+				"by": "GUS_MAN",
+				"url": "https://freesound.org/people/GUS_MAN/sounds/190641/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.deer_snort": [
+			{
+				"file": "sfx.deer_snort.ogg",
+				"from": "freesound",
+				"original": "freesound 475480: Horse(snort)_1.wav",
+				"sha256": "24c67f761765bc6777aab29a3202efc73029d67950f13a78a79b6f7d15bf8e43",
+				"by": "o_ciz",
+				"url": "https://freesound.org/people/o_ciz/sounds/475480/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_snort.2.ogg",
+				"from": "freesound",
+				"original": "freesound 475479: Horse(snort)_2.wav",
+				"sha256": "206f59ecfaaf38765bdc042b1bb60ab7b7bd64004a7a4265d184414e70f47ba0",
+				"by": "o_ciz",
+				"url": "https://freesound.org/people/o_ciz/sounds/475479/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_snort.3.ogg",
+				"from": "freesound",
+				"original": "freesound 397236: Horse Snort.wav (from 0.4 s for 0.55 s)",
+				"sha256": "574c99bfa72923539fd2d5dadcba1cae5e454f9cbe793a277da1e1b94672e9ce",
+				"by": "black_trillium",
+				"url": "https://freesound.org/people/black_trillium/sounds/397236/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.door_wood_bar": [
+			{
+				"file": "sfx.door_wood_bar.ogg",
+				"from": "freesound",
+				"original": "freesound 459641: slide_big_4.wav",
+				"sha256": "f3834c56687db112f24b4c75501ec4855f6d4eae753736eea113846a322a0956",
+				"by": "blaukreuz",
+				"url": "https://freesound.org/people/blaukreuz/sounds/459641/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.door_wood_close": [
@@ -159,6 +363,28 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/Sonic Bat - Videogame Foley Essentials Vol. I/SBvfe1_Door Handle D 002.wav",
 				"sha256": "78243991d18b260a8b02075f14698d0962b8b97521b6dcda5bffd1fb657f5759"
+			}
+		],
+		"sfx.door_wood_unbar": [
+			{
+				"file": "sfx.door_wood_unbar.ogg",
+				"from": "freesound",
+				"original": "freesound 459643: slide_big_2.wav",
+				"sha256": "615164d1c39011ccbad67ca18d3f794c44dad74b78f7e41a8053619a146e5bd8",
+				"by": "blaukreuz",
+				"url": "https://freesound.org/people/blaukreuz/sounds/459643/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.door_wood_unlock": [
+			{
+				"file": "sfx.door_wood_unlock.ogg",
+				"from": "freesound",
+				"original": "freesound 448395: Metallic Bolt Lock 2",
+				"sha256": "b606561365f38dafa068b7ee1b415bcc633b8458fa535eb0eac7aeaea9fd7a33",
+				"by": "LordForklift",
+				"url": "https://freesound.org/people/LordForklift/sounds/448395/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.footstep_claws": [
@@ -273,12 +499,182 @@
 				"sha256": "40398c33d36d19e9fbd2373077be3ef74682ef25b428347982b23148a3d8e293"
 			}
 		],
+		"sfx.footstep_sand_medium": [
+			{
+				"file": "sfx.footstep_sand_medium.ogg",
+				"from": "freesound",
+				"original": "freesound 778548: Steps_Fine_Snow_Or_Sand_Strong_10",
+				"sha256": "9d4db7901ae2936156539b36ad6512f0e91dc4392d7d04effa4457629a3751b0",
+				"by": "BlondPanda",
+				"url": "https://freesound.org/people/BlondPanda/sounds/778548/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_sand_medium.2.ogg",
+				"from": "freesound",
+				"original": "freesound 778545: Steps_Fine_Snow_Or_Sand_Strong_07",
+				"sha256": "712baf42d1d22f876fccc299bf7c4ce167c8094f31012496b832c79bc4c94b4c",
+				"by": "BlondPanda",
+				"url": "https://freesound.org/people/BlondPanda/sounds/778545/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_sand_medium.3.ogg",
+				"from": "freesound",
+				"original": "freesound 778547: Steps_Fine_Snow_Or_Sand_Strong_09",
+				"sha256": "59bc6a3f5958592e0e8b73852e2650e14e624dbce5896aca3213c6be4bdf4ee1",
+				"by": "BlondPanda",
+				"url": "https://freesound.org/people/BlondPanda/sounds/778547/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_sand_medium.4.ogg",
+				"from": "freesound",
+				"original": "freesound 778546: Steps_Fine_Snow_Or_Sand_Strong_08",
+				"sha256": "67a5957225626229f321bb35b210393a9490f3e0c3343c7b0b8d4bb6c69a4175",
+				"by": "BlondPanda",
+				"url": "https://freesound.org/people/BlondPanda/sounds/778546/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_sand_medium.5.ogg",
+				"from": "freesound",
+				"original": "freesound 778543: Steps_Fine_Snow_Or_Sand_Strong_05",
+				"sha256": "607ae03c2d1979e55ada73cb2e868895813457c3d2e2e8b3a4d69de6b87b762f",
+				"by": "BlondPanda",
+				"url": "https://freesound.org/people/BlondPanda/sounds/778543/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.footstep_stone_medium": [
+			{
+				"file": "sfx.footstep_stone_medium.ogg",
+				"from": "freesound",
+				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 1.03 s for 0.5 s)",
+				"sha256": "a21c97df1456898841995e01318edcaec116337ce07acf0d8c16841978d97601",
+				"by": "SecureSubset",
+				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_stone_medium.2.ogg",
+				"from": "freesound",
+				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 2.19 s for 0.5 s)",
+				"sha256": "5577584b4fb6f19822a08abb808434d8a2750de0a2598cdea4fb0fe08c4092e9",
+				"by": "SecureSubset",
+				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_stone_medium.3.ogg",
+				"from": "freesound",
+				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 3.44 s for 0.5 s)",
+				"sha256": "f11d052552b257f01f5bf94e43f3612380173e7b366a139d03cc7e130f13fc1a",
+				"by": "SecureSubset",
+				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_stone_medium.4.ogg",
+				"from": "freesound",
+				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 4.78 s for 0.5 s)",
+				"sha256": "9c4e1006b3cce9835c81c97c0e25f7d0fc51bd1ba59df9987077e7ef89245585",
+				"by": "SecureSubset",
+				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_stone_medium.5.ogg",
+				"from": "freesound",
+				"original": "freesound 521590: Hiking Boot Footsteps on Stone (from 0.68 s for 0.45 s)",
+				"sha256": "13ce31df1524ee0516acd4e7eefa93a35fe11b5e4b43db5805e5e627febe1b1f",
+				"by": "Fission9",
+				"url": "https://freesound.org/people/Fission9/sounds/521590/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_stone_medium.6.ogg",
+				"from": "freesound",
+				"original": "freesound 521590: Hiking Boot Footsteps on Stone (from 1.79 s for 0.45 s)",
+				"sha256": "a742da4f5627642fe670174463c518022903a4044f8d24c34574f1f93da1e03e",
+				"by": "Fission9",
+				"url": "https://freesound.org/people/Fission9/sounds/521590/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.footstep_water_medium": [
+			{
+				"file": "sfx.footstep_water_medium.ogg",
+				"from": "freesound",
+				"original": "freesound 861369: Splashing Footsteps Shallow Water (from 0.72 s for 0.45 s)",
+				"sha256": "9d1a28e22ba8cfd26c9dfc34cda63be1eb64b89bc216c612a6311d05bdc6d811",
+				"by": "ChristopherJngs",
+				"url": "https://freesound.org/people/ChristopherJngs/sounds/861369/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_water_medium.2.ogg",
+				"from": "freesound",
+				"original": "freesound 861369: Splashing Footsteps Shallow Water (from 1.24 s for 0.45 s)",
+				"sha256": "902469b2caafdf63f7aff402979dac8542deb4d77e30c0d9265ca5459045a1d9",
+				"by": "ChristopherJngs",
+				"url": "https://freesound.org/people/ChristopherJngs/sounds/861369/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_water_medium.3.ogg",
+				"from": "freesound",
+				"original": "freesound 861369: Splashing Footsteps Shallow Water (from 1.8 s for 0.45 s)",
+				"sha256": "1bac42b638c93e9745e1e9f89732962e9d9ebadcacd55b2cf534d92babea2505",
+				"by": "ChristopherJngs",
+				"url": "https://freesound.org/people/ChristopherJngs/sounds/861369/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_water_medium.4.ogg",
+				"from": "freesound",
+				"original": "freesound 861369: Splashing Footsteps Shallow Water (from 2.84 s for 0.45 s)",
+				"sha256": "c22402c64bf1cd7d98e310d2ce87549046f0466ae5d528b3fac4f0bc0a7823ff",
+				"by": "ChristopherJngs",
+				"url": "https://freesound.org/people/ChristopherJngs/sounds/861369/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.goblin_alert": [
 			{
 				"file": "sfx.goblin_alert.ogg",
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/David Dumais Audio - Monster Sound FX Pack 2/MonsterPack2_Monster10_Call09.wav",
 				"sha256": "60f1154073de9bdbe4f80de1ce1d0c3b7e284bc9d164b9682493a2a81a8a7ded"
+			}
+		],
+		"sfx.goblin_chatter": [
+			{
+				"file": "sfx.goblin_chatter.ogg",
+				"from": "freesound",
+				"original": "freesound 202096: Goblin Cackle.wav",
+				"sha256": "c60cb15f48ebea99f1d1d647487492f39fabd8edd791eb8bba4b936c5dbc82ec",
+				"by": "spookymodem",
+				"url": "https://freesound.org/people/spookymodem/sounds/202096/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_chatter.2.ogg",
+				"from": "freesound",
+				"original": "freesound 442815: Goblin Snarl",
+				"sha256": "2caa03015c9145d3826cd692638fcf545b2020de1f3d3986a26b4dbce98cb861",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/442815/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_chatter.3.ogg",
+				"from": "freesound",
+				"original": "freesound 442817: Goblin Growl",
+				"sha256": "ac1b7842d48da4962c0df19683afac74ca06ccf82ea28b4f10506fd824e52ebd",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/442817/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.goblin_death": [
@@ -289,6 +685,57 @@
 				"sha256": "6ebf540ad020348fc7fbf73ce0002a241d38fbc161a197068c10fc2a654974b1"
 			}
 		],
+		"sfx.goblin_pain": [
+			{
+				"file": "sfx.goblin_pain.ogg",
+				"from": "freesound",
+				"original": "freesound 738437: Orc Grunt 1",
+				"sha256": "a72b4a1d5c91ea975e3b50fbfe326006b58bea65b60f65466a819d3ad99dfbaf",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/738437/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.goblin_pain.2.ogg",
+				"from": "freesound",
+				"original": "freesound 738439: Orc Grunt 3",
+				"sha256": "919ae1b6ab7dfba46927593c42f8f7c3b138ea4ab723fb2ebd989975df02443a",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/738439/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.goblin_rout": [
+			{
+				"file": "sfx.goblin_rout.ogg",
+				"from": "freesound",
+				"original": "freesound 202100: Goblin Scream.wav",
+				"sha256": "d1510a38bb1732d3960e7aae824a328dc9453454a2077de5957f0ea13a5c635e",
+				"by": "spookymodem",
+				"url": "https://freesound.org/people/spookymodem/sounds/202100/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_rout.2.ogg",
+				"from": "freesound",
+				"original": "freesound 442816: Goblin Scream",
+				"sha256": "784845838c28d9d0b7e93a1a9b8dbce26fe57d7ff6858cd7bfa94d7de00eb0fe",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/442816/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.hit_blade_armor": [
+			{
+				"file": "sfx.hit_blade_armor.ogg",
+				"from": "freesound",
+				"original": "freesound 420675: Cut Through Armor / Slice / Clang",
+				"sha256": "5abf54036f834e9314317b9fe2900f436347264d3cb9a41b5f40cce1b98d5809",
+				"by": "SypherZent",
+				"url": "https://freesound.org/people/SypherZent/sounds/420675/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"sfx.hit_blade_flesh": [
 			{
 				"file": "sfx.hit_blade_flesh.ogg",
@@ -297,12 +744,160 @@
 				"sha256": "bdcc47902f9f3d7bec48c530c8a805b3c30b4a1b4cfecf1cb7c079fac44275c1"
 			}
 		],
+		"sfx.hit_blunt_armor": [
+			{
+				"file": "sfx.hit_blunt_armor.ogg",
+				"from": "freesound",
+				"original": "freesound 337838: med-metal-hit-02.wav",
+				"sha256": "9d730d055d63f30f8a91f112e11d4a6f02c08b715b33ef3507b8f6044bde9bdf",
+				"by": "newagesoup",
+				"url": "https://freesound.org/people/newagesoup/sounds/337838/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.hit_blunt_flesh": [
+			{
+				"file": "sfx.hit_blunt_flesh.ogg",
+				"from": "freesound",
+				"original": "freesound 348242: PUNCH-BOXING-03.wav",
+				"sha256": "20e0d776a6270582cff472e4fcc058a213de6d59396a1e9b3e69a9c29064a510",
+				"by": "newagesoup",
+				"url": "https://freesound.org/people/newagesoup/sounds/348242/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.hit_fist_flesh": [
+			{
+				"file": "sfx.hit_fist_flesh.ogg",
+				"from": "freesound",
+				"original": "freesound 493914: light punch",
+				"sha256": "928f91c7c79bbba6232d33b326b0f3a07e26502b46ad75ebb615da1348b26434",
+				"by": "damnsatinist",
+				"url": "https://freesound.org/people/damnsatinist/sounds/493914/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"sfx.hit_wood": [
 			{
 				"file": "sfx.hit_wood.ogg",
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/David Dumais Audio - Melee Weapons Sound Effects Pack 1/WOODImpt_Impact Wood 23_DDUMAIS_NONE.wav (from 0 s for 0.8 s)",
 				"sha256": "18cab85d1674a2c815b6ec71e252fd143ef1c028b97c34f7396fe00ecbd86df4"
+			}
+		],
+		"sfx.item_drop_heavy": [
+			{
+				"file": "sfx.item_drop_heavy.ogg",
+				"from": "freesound",
+				"original": "freesound 271241: briefcaseDroppingFloor.wav",
+				"sha256": "c72be5f0b10637497ba81f227ea2f9205ed975406b3b5083e42f25e754942942",
+				"by": "bertiehs",
+				"url": "https://freesound.org/people/bertiehs/sounds/271241/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.item_drop_light": [
+			{
+				"file": "sfx.item_drop_light.ogg",
+				"from": "freesound",
+				"original": "freesound 339363: drop07.wav",
+				"sha256": "f177a367cbe7171cb6ec444e72045813bb654ed61294bfe79b97cd4a4ae82cf2",
+				"by": "newagesoup",
+				"url": "https://freesound.org/people/newagesoup/sounds/339363/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.item_drop_light.2.ogg",
+				"from": "freesound",
+				"original": "freesound 339364: drop06.wav",
+				"sha256": "0e008b6661d874e512de0de0f6a2a87cd6b36816760ed848147058066b809a9f",
+				"by": "newagesoup",
+				"url": "https://freesound.org/people/newagesoup/sounds/339364/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.item_pickup_heavy": [
+			{
+				"file": "sfx.item_pickup_heavy.ogg",
+				"from": "freesound",
+				"original": "freesound 216629: Picking up small box with items inside",
+				"sha256": "481f52a0242a67eb6a2abf89fa52135fb3882f935eb931b6297eb583d9d30487",
+				"by": "WiesenWiesel",
+				"url": "https://freesound.org/people/WiesenWiesel/sounds/216629/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.item_pickup_light": [
+			{
+				"file": "sfx.item_pickup_light.ogg",
+				"from": "freesound",
+				"original": "freesound 822565: Picking Up A Small Item",
+				"sha256": "e9d0743f80a08b32903f45b2822de5d5fc297ec697a6395dbc29ad22ebef3187",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/822565/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.knockdown": [
+			{
+				"file": "sfx.knockdown.ogg",
+				"from": "freesound",
+				"original": "freesound 346695: Body fall_01.wav",
+				"sha256": "37b641c47cb3b88bc0c69d628848513ca11e75e682a0b3762aa87a179409ff6e",
+				"by": "deleted_user_2104797",
+				"url": "https://freesound.org/people/deleted_user_2104797/sounds/346695/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.rabbit_death": [
+			{
+				"file": "sfx.rabbit_death.ogg",
+				"from": "freesound",
+				"original": "freesound 385850: Rabbit Squeaking 1 (from 0.08 s for 0.66 s)",
+				"sha256": "9c3681bc91d32872a9235971a9bb6ef7f129a12a84f150ac532ce871d67f3de0",
+				"by": "kessir",
+				"url": "https://freesound.org/people/kessir/sounds/385850/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.rabbit_death.2.ogg",
+				"from": "freesound",
+				"original": "freesound 385850: Rabbit Squeaking 1 (from 2.21 s for 0.56 s)",
+				"sha256": "005fd1b5c26d04a2c5c406527a0faab89d984586a75b841f7287073c1160fab8",
+				"by": "kessir",
+				"url": "https://freesound.org/people/kessir/sounds/385850/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.rabbit_rout": [
+			{
+				"file": "sfx.rabbit_rout.ogg",
+				"from": "freesound",
+				"original": "freesound 106114: bushmovement.wav",
+				"sha256": "d5591659e284db12bfff4ecab99781fdc8789a31a1436ff60aad5374e2f349d1",
+				"by": "j1987",
+				"url": "https://freesound.org/people/j1987/sounds/106114/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.rabbit_rout.2.ogg",
+				"from": "freesound",
+				"original": "freesound 386007: Rabbit Thump on Soil (from 0 s for 0.95 s)",
+				"sha256": "283735ef919ddb6c6a768d29293490e208c564a44e74a3c6998c012136901616",
+				"by": "kessir",
+				"url": "https://freesound.org/people/kessir/sounds/386007/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.splash": [
+			{
+				"file": "sfx.splash.ogg",
+				"from": "freesound",
+				"original": "freesound 482953: splash_1.wav",
+				"sha256": "c8648d28dcc055e21d89d6bdeb0bf2cc4a7d05b004b08aca1122a875267f22a6",
+				"by": "genel",
+				"url": "https://freesound.org/people/genel/sounds/482953/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.swing": [
@@ -347,6 +942,143 @@
 				"sha256": "8a8c8b691c6867b0547ba7c09e4f2e21de9b1056cf2e078af1ac179cb2397c75"
 			}
 		],
+		"sfx.wolf_death": [
+			{
+				"file": "sfx.wolf_death.ogg",
+				"from": "freesound",
+				"original": "freesound 163280: DogYelp.wav",
+				"sha256": "01ac613da0b6706dc7746eefb9725c650b876a606e55d2aa5190a5e9b2ea15e4",
+				"by": "TobiasKosmos",
+				"url": "https://freesound.org/people/TobiasKosmos/sounds/163280/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.wolf_death.2.ogg",
+				"from": "freesound",
+				"original": "freesound 735365: Small Dog Cry",
+				"sha256": "eb2c0036f07ba9952fa73f502f4dcab455cce32a750c21d4e5c1bb90bd237501",
+				"by": "haulaway",
+				"url": "https://freesound.org/people/haulaway/sounds/735365/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.wolf_howl": [
+			{
+				"file": "sfx.wolf_howl.ogg",
+				"from": "freesound",
+				"original": "freesound 712068: Giant Wolf Howl",
+				"sha256": "67efc674d1fbf56fe826e2912fd53ec360b17f277866b2a37d0499e31892b8d0",
+				"by": "NaturesTemper",
+				"url": "https://freesound.org/people/NaturesTemper/sounds/712068/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"ui.chat_ping": [
+			{
+				"file": "ui.chat_ping.ogg",
+				"from": "freesound",
+				"original": "freesound 760369: Message Receive",
+				"sha256": "d042fd9ff0b290da7848f9d50a7ddf64c7adb88666b1b24055fd098a88fc0ac3",
+				"by": "Froey_",
+				"url": "https://freesound.org/people/Froey_/sounds/760369/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.click": [
+			{
+				"file": "ui.click.ogg",
+				"from": "freesound",
+				"original": "freesound 448086: Normal click",
+				"sha256": "1dd81bed1e909366378cb25a315ae4a0d3f0611086ee8cf86f5bbbfaeab06d8a",
+				"by": "Breviceps",
+				"url": "https://freesound.org/people/Breviceps/sounds/448086/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.click.2.ogg",
+				"from": "freesound",
+				"original": "freesound 253168: SFX UI Button Click",
+				"sha256": "27ba802274bfa93e185958a29874f65715f54104fbc97ea07e1ebe5280714530",
+				"by": "suntemple",
+				"url": "https://freesound.org/people/suntemple/sounds/253168/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.error": [
+			{
+				"file": "ui.error.ogg",
+				"from": "freesound",
+				"original": "freesound 366103: Error Wooden",
+				"sha256": "fd13bf6cd866c40ad059da2486adc78c5d3b5caa7dc6d46ac0bc5b767d6e195a",
+				"by": "original_sound",
+				"url": "https://freesound.org/people/original_sound/sounds/366103/",
+				"license": "CC BY 3.0"
+			}
+		],
+		"ui.hover": [
+			{
+				"file": "ui.hover.ogg",
+				"from": "freesound",
+				"original": "freesound 488381: UIHover1.wav",
+				"sha256": "aeea4fb1f727e38849b20629a32e46c066a1565387c76cbebc721e972724bdf4",
+				"by": "wobesound",
+				"url": "https://freesound.org/people/wobesound/sounds/488381/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.notify": [
+			{
+				"file": "ui.notify.ogg",
+				"from": "freesound",
+				"original": "freesound 750607: Notification Sound 1",
+				"sha256": "a4f37a8c8633d316bb51ff968a83423c6affcc493573e969abea382749bcf5f7",
+				"by": "deadrobotmusic",
+				"url": "https://freesound.org/people/deadrobotmusic/sounds/750607/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.panel_close": [
+			{
+				"file": "ui.panel_close.ogg",
+				"from": "freesound",
+				"original": "freesound 484886: Book Close - 6",
+				"sha256": "89f11233aa5db25ddc6162c9b0a63c42dfc45be59055fecadce286d31087a3ba",
+				"by": "SpaceJoe",
+				"url": "https://freesound.org/people/SpaceJoe/sounds/484886/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.panel_open": [
+			{
+				"file": "ui.panel_open.ogg",
+				"from": "freesound",
+				"original": "freesound 397548: Page Turn 01",
+				"sha256": "cd1706f78a1279116c7bc61ed720f6e2cbbe973e0b480df2a285a80194e5acd5",
+				"by": "LilMati",
+				"url": "https://freesound.org/people/LilMati/sounds/397548/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.death_male": [
+			{
+				"file": "voice.death_male.ogg",
+				"from": "freesound",
+				"original": "freesound 547181: Voice_AdultMale_DeathScream_04.wav",
+				"sha256": "8bd87280ab416696e4e3b04c1ad5f60448d6570b47b1f8ca43789f9a86960ef9",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547181/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.death_male.2.ogg",
+				"from": "freesound",
+				"original": "freesound 547188: Voice_AdultMale_DeathScream_05.wav",
+				"sha256": "403fdabff383afd2d65c69de969cc7a32be5263ee8829af25a51ed179604f99a",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547188/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.effort_hurt_female": [
 			{
 				"file": "voice.effort_hurt_female.ogg",
@@ -371,6 +1103,55 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/Pole Position Production - The Grunts Library/Female 1 - Grunt - Getting Hit - Medium Intensity - Ehrlund M1.wav (from 5.56 s for 0.45 s)",
 				"sha256": "f7d265668aea65dfe40ee69799b2837462318d76e3ec91a53995256bff00270b"
+			}
+		],
+		"voice.effort_hurt_male": [
+			{
+				"file": "voice.effort_hurt_male.ogg",
+				"from": "freesound",
+				"original": "freesound 547193: Voice_AdultMale_PainGrunts_14.wav",
+				"sha256": "0d06ab453075da7a045916bc2888027e6daad9b607d6377b14336b388fc680aa",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547193/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.effort_hurt_male.2.ogg",
+				"from": "freesound",
+				"original": "freesound 547198: Voice_AdultMale_PainGrunts_15.wav",
+				"sha256": "f222ad9e4bfa43662d803e1dc32d81cbd2fb684afe582fba58ae1b41f96327ec",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547198/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.effort_hurt_male.3.ogg",
+				"from": "freesound",
+				"original": "freesound 547205: Voice_AdultMale_PainGrunts_07.wav",
+				"sha256": "17405132b335f02db0e84c625b16eb97fc3bf575b48dafd3c1bf55bb3d2e1246",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547205/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.effort_swing_male": [
+			{
+				"file": "voice.effort_swing_male.ogg",
+				"from": "freesound",
+				"original": "freesound 695378: Male Attack Grunt 1.wav",
+				"sha256": "34dffdd2e2396243b60317100e5d80fabaa6197ff97a142ae4f27e2c85c38eda",
+				"by": "F.M.Audio",
+				"url": "https://freesound.org/people/F.M.Audio/sounds/695378/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "voice.effort_swing_male.2.ogg",
+				"from": "freesound",
+				"original": "freesound 695380: Male Attack Grunt 3.wav",
+				"sha256": "982f314d785d9283944c2489ac8b6cea92461d107051d7e74c16c72514e40f55",
+				"by": "F.M.Audio",
+				"url": "https://freesound.org/people/F.M.Audio/sounds/695380/",
+				"license": "CC BY 4.0"
 			}
 		]
 	}

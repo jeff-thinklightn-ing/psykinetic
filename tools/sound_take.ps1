@@ -1,9 +1,9 @@
 # Adds a take to a sound slot from a third-party file (decision 268).
 #   tools\sound_take.ps1 -Slot sfx.door_wood_open -From sonniss-gdc-2024 -Source <file> [-Original <text>]
-#                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>]
+#                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>] [-License <name>] [-PeakDb -3]
 #
 # Cuts -Source (any format ffmpeg reads; -Start and -Length in seconds), trims silence off
-# both ends of a one-shot, makes a loop or bed seamless (its end cross-faded into its
+# both ends of a one-shot, raises or lowers it to peak at -PeakDb dBFS if given (a quiet source), makes a loop or bed seamless (its end cross-faded into its
 # start, -LoopFade s), makes a positional slot's take mono and any other stereo, encodes Ogg Vorbis, and
 # stores it as the slot's next take, <slot>.ogg, <slot>.2.ogg ...:
 #   a source stored "external" (Sonniss): in the sound library, <library>\takes\<slot>\,
@@ -22,8 +22,12 @@ param(
 	[double]$Length = -1,
 	[string]$By = '',
 	[string]$Url = '',
+	# The take's own licence, where its source's varies by sound (Freesound).
+	[string]$License = '',
 	# A loop's or bed's seam: this many seconds of its end cross-faded into its start.
 	[double]$LoopFade = 2.0,
+	# The take's loudest sample at this many dBFS (0 or above: left as the source has it).
+	[double]$PeakDb = 1,
 	[string]$Library = $(if ($env:PSYK_SOUND_DIR) { $env:PSYK_SOUND_DIR } else { 'N:\assets\sound' }),
 	[int]$TimeoutSeconds = 10
 )
@@ -72,13 +76,26 @@ $ffmpegArgs = @('-loglevel', 'error', '-y')
 if ($Start -ge 0) { $ffmpegArgs += @('-ss', "$Start") }
 $ffmpegArgs += @('-i', $Source)
 if ($Length -gt 0) { $ffmpegArgs += @('-t', "$Length") }
+# A gain to peak at -PeakDb: the cut's loudest sample measured first.
+$gain = ''
+if ($PeakDb -lt 0) {
+	$measure = @('-hide_banner', '-nostats')
+	if ($Start -ge 0) { $measure += @('-ss', "$Start") }
+	$measure += @('-i', $Source)
+	if ($Length -gt 0) { $measure += @('-t', "$Length") }
+	$ErrorActionPreference = 'Continue'
+	$report = (& ffmpeg @measure -af volumedetect -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
+	$ErrorActionPreference = 'Stop'
+	if ($report -notmatch 'max_volume: (-?[\d.]+) dB') { Fail "couldn't measure $Source's peak" }
+	$gain = ",volume=$($PeakDb - [double]$Matches[1])dB"
+}
 $positional = -not ($spec.PSObject.Properties['positional'] -and $spec.positional -eq $false)
 # Positional: mono (the 3D player places it). Flat: stereo, whatever the source
 # (quad and ambisonic beds folded down).
 $ffmpegArgs += @('-ac', $(if ($positional) { '1' } else { '2' }))
 if ($spec.type -eq 'oneshot') {
 	$trim = 'silenceremove=start_periods=1:start_threshold=-50dB'
-	$ffmpegArgs += @('-af', "$trim,areverse,$trim,areverse")
+	$ffmpegArgs += @('-af', "$trim,areverse,$trim,areverse$gain")
 } else {
 	# A loop or a bed loops without a seam: its last LoopFade seconds fade out
 	# over its first fading in, and it ends where that overlap began.
@@ -91,7 +108,7 @@ if ($spec.type -eq 'oneshot') {
 		"[a]atrim=0:$fade,asetpts=PTS-STARTPTS,afade=t=in:d=$fade[head];" +
 		"[b]atrim=${fade}:$body,asetpts=PTS-STARTPTS[mid];" +
 		"[c]atrim=${body}:$whole,asetpts=PTS-STARTPTS,afade=t=out:d=$fade[tail];" +
-		"[tail][head]amix=inputs=2:normalize=0[seam];[seam][mid]concat=n=2:v=0:a=1"))
+		"[tail][head]amix=inputs=2:normalize=0[seam];[seam][mid]concat=n=2:v=0:a=1$gain"))
 }
 $ffmpegArgs += @('-ar', '44100', '-c:a', 'libvorbis', '-q:a', '5', $out)
 & ffmpeg @ffmpegArgs
@@ -107,7 +124,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 	if (Test-Path $console) { $godot = $console }
 }
 $ErrorActionPreference = 'Continue'
-& $godot --headless --path $root --scene res://tools/sound_take.tscn -- "--slot=$Slot" "--file=$file" "--from=$From" "--original=$Original" "--sha256=$hash" "--by=$By" "--url=$Url" 2>&1 |
+& $godot --headless --path $root --scene res://tools/sound_take.tscn -- "--slot=$Slot" "--file=$file" "--from=$From" "--original=$Original" "--sha256=$hash" "--by=$By" "--url=$Url" "--license=$License" 2>&1 |
 	ForEach-Object { "$_" } | Where-Object { $_ -match '^sound_take|ERROR' }
 $listed = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'

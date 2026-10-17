@@ -445,6 +445,17 @@ static func third_party_block() -> String:
 			own.append("%s (%s, %s)" % [slot, by, spec(slot)["source"].get("license", "?")])
 	lines.append("")
 	lines.append("Slots whose own takes came from someone else: %s." % (", ".join(own) if not own.is_empty() else "none"))
+	var credits: Array[String] = []
+	for slot: String in all:
+		for take: Dictionary in takes(slot):
+			if str(take.get("by", "")) != "":
+				credits.append("- `%s` (%s): cut from [%s](%s) by %s, %s" % [slot, take.get("file", ""), str(take.get("original", "")).replace("[", "(").replace("]", ")"),
+					take.get("url", ""), take.get("by", ""), take.get("license", source(str(take.get("from", ""))).get("license", "?"))])
+	if not credits.is_empty():
+		lines.append("")
+		lines.append("Takes credited to their makers:")
+		lines.append("")
+		lines.append_array(credits)
 	lines.append("")
 	lines.append(THIRD_PARTY_END)
 	return "\n".join(lines)

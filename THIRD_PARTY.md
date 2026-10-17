@@ -31,12 +31,93 @@ files are copied unchanged and renamed; `art/audio/sfx/SOURCES.txt` names each o
 
 | Source | Licence | Where | Slots played from it |
 |--------|---------|-------|----------------------|
+| [Freesound](https://freesound.org) | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) (`docs/licenses/freesound.md`) | outside the repo (the sound library's `takes/`), copied to `art/audio/external/` by `tools/sound_sync.ps1` | amb.town_night, sfx.block_shield, sfx.block_weapon, sfx.boar_death, sfx.boar_rout, sfx.bodyfall, sfx.break_stone, sfx.chest_close, sfx.chest_open, sfx.deer_rout, sfx.deer_snort, sfx.door_wood_bar, sfx.door_wood_unbar, sfx.door_wood_unlock, sfx.footstep_sand_medium, sfx.footstep_stone_medium, sfx.footstep_water_medium, sfx.goblin_chatter, sfx.goblin_pain, sfx.goblin_rout, sfx.hit_blade_armor, sfx.hit_blunt_armor, sfx.hit_blunt_flesh, sfx.hit_fist_flesh, sfx.item_drop_heavy, sfx.item_drop_light, sfx.item_pickup_heavy, sfx.item_pickup_light, sfx.knockdown, sfx.rabbit_death, sfx.rabbit_rout, sfx.splash, sfx.wolf_death, sfx.wolf_howl, ui.chat_ping, ui.click, ui.error, ui.hover, ui.notify, ui.panel_close, ui.panel_open, voice.death_male, voice.effort_hurt_male, voice.effort_swing_male |
 | [Impact Sounds 1.0, Kenney](https://kenney.nl/assets/impact-sounds) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-impact-sounds.txt`) | `art/audio/sfx/` | sfx.break_wood, sfx.death_player, sfx.footstep, sfx.hit_flesh, sfx.knockback_body, sfx.knockback_body_soft, sfx.knockback_stone, sfx.knockback_wood |
-| [RPG Audio, Kenney](https://kenney.nl/assets/rpg-audio) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-rpg-audio.txt`) | `art/audio/sfx/` | sfx.chest_open, sfx.death_companion, sfx.pack_open |
+| [RPG Audio, Kenney](https://kenney.nl/assets/rpg-audio) | CC0 1.0 (`art/audio/sfx/LICENSE-kenney-rpg-audio.txt`) | `art/audio/sfx/` | sfx.death_companion, sfx.pack_open |
 | [#GameAudioGDC 2021 to 2023 bundle, Sonniss](https://sonniss.com/gameaudiogdc) | Sonniss #GameAudioGDC Bundle licence v2.0 (`docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt`) | outside the repo (the sound library's `takes/`), copied to `art/audio/external/` by `tools/sound_sync.ps1` | amb.forest_night, amb.rain, amb.torch_fire, amb.town_day, sfx.boar_charge, sfx.cart_roll, sfx.door_wood_close, sfx.door_wood_lock, sfx.door_wood_open, sfx.door_wood_rattle, sfx.footstep_claws, sfx.footstep_dirt_medium, sfx.footstep_grass_medium, sfx.footstep_hooves, sfx.footstep_paws, sfx.goblin_alert, sfx.goblin_death, sfx.hit_blade_flesh, sfx.hit_wood, sfx.swing, sfx.swing_heavy, voice.effort_hurt_female |
 | [#GameAudioGDC 2024 bundle, Sonniss](https://sonniss.com/gameaudiogdc) | Sonniss #GameAudioGDC Bundle licence v2.0 (`docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt`) | outside the repo (the sound library's `takes/`), copied to `art/audio/external/` by `tools/sound_sync.ps1` | amb.dungeon, amb.field_wind, amb.forest_dawn, amb.forest_day, amb.forest_night, amb.storm, sfx.bandage, sfx.boar_charge, sfx.crate_break, sfx.thrown_land_heavy |
 
 Slots whose own takes came from someone else: none.
+
+Takes credited to their makers:
+
+- `amb.town_night` (amb.town_night.ogg): cut from [freesound 450994: crickets night field diverse +distant village voices Putti, Uganda1 MS.wav (from 10 s for 60 s)](https://freesound.org/people/kyles/sounds/450994/) by kyles, CC0 1.0
+- `sfx.block_shield` (sfx.block_shield.ogg): cut from [freesound 370203: shield guard](https://freesound.org/people/nekoninja/sounds/370203/) by nekoninja, CC0 1.0
+- `sfx.block_weapon` (sfx.block_weapon.ogg): cut from [freesound 733887: Sword Impact](https://freesound.org/people/velcronator/sounds/733887/) by velcronator, CC0 1.0
+- `sfx.boar_death` (sfx.boar_death.ogg): cut from [freesound 233177: Pig - Grunt and Squeal 4 - 96kHz.wav](https://freesound.org/people/JarredGibb/sounds/233177/) by JarredGibb, CC0 1.0
+- `sfx.boar_rout` (sfx.boar_rout.ogg): cut from [freesound 233184: Pig - Multiple Snorts 1 - 96kHz.wav](https://freesound.org/people/JarredGibb/sounds/233184/) by JarredGibb, CC0 1.0
+- `sfx.boar_rout` (sfx.boar_rout.2.ogg): cut from [freesound 620080: LONG_Pig_Grunt_01.flac](https://freesound.org/people/wwstudioswastaken/sounds/620080/) by wwstudioswastaken, CC0 1.0
+- `sfx.bodyfall` (sfx.bodyfall.ogg): cut from [freesound 346694: Body fall_02.wav](https://freesound.org/people/deleted_user_2104797/sounds/346694/) by deleted_user_2104797, CC0 1.0
+- `sfx.break_stone` (sfx.break_stone.ogg): cut from [freesound 389618: Rock Tumble 2.wav](https://freesound.org/people/_stubb/sounds/389618/) by _stubb, CC0 1.0
+- `sfx.break_stone` (sfx.break_stone.2.ogg): cut from [freesound 426318: Rocks Falling.wav](https://freesound.org/people/MTJohnson/sounds/426318/) by MTJohnson, CC0 1.0
+- `sfx.chest_close` (sfx.chest_close.ogg): cut from [freesound 573648: Wooden Chest Lid Close.wav](https://freesound.org/people/The_Frisbee_of_Peace/sounds/573648/) by The_Frisbee_of_Peace, CC0 1.0
+- `sfx.chest_close` (sfx.chest_close.2.ogg): cut from [freesound 573649: Wooden Chest Lid Latches Close_02.wav](https://freesound.org/people/The_Frisbee_of_Peace/sounds/573649/) by The_Frisbee_of_Peace, CC0 1.0
+- `sfx.chest_open` (sfx.chest_open.ogg): cut from [freesound 573654: Wooden Chest Open.wav](https://freesound.org/people/The_Frisbee_of_Peace/sounds/573654/) by The_Frisbee_of_Peace, CC0 1.0
+- `sfx.chest_open` (sfx.chest_open.2.ogg): cut from [freesound 573653: Wooden Chest Lid Latches Open.wav](https://freesound.org/people/The_Frisbee_of_Peace/sounds/573653/) by The_Frisbee_of_Peace, CC0 1.0
+- `sfx.deer_rout` (sfx.deer_rout.ogg): cut from [freesound 106113: bushhit.wav](https://freesound.org/people/j1987/sounds/106113/) by j1987, CC0 1.0
+- `sfx.deer_rout` (sfx.deer_rout.2.ogg): cut from [freesound 540278: tree shake.wav](https://freesound.org/people/zepurple/sounds/540278/) by zepurple, CC0 1.0
+- `sfx.deer_rout` (sfx.deer_rout.3.ogg): cut from [freesound 190641: Rustling foilage 1.wav](https://freesound.org/people/GUS_MAN/sounds/190641/) by GUS_MAN, CC0 1.0
+- `sfx.deer_snort` (sfx.deer_snort.ogg): cut from [freesound 475480: Horse(snort)_1.wav](https://freesound.org/people/o_ciz/sounds/475480/) by o_ciz, CC0 1.0
+- `sfx.deer_snort` (sfx.deer_snort.2.ogg): cut from [freesound 475479: Horse(snort)_2.wav](https://freesound.org/people/o_ciz/sounds/475479/) by o_ciz, CC0 1.0
+- `sfx.deer_snort` (sfx.deer_snort.3.ogg): cut from [freesound 397236: Horse Snort.wav (from 0.4 s for 0.55 s)](https://freesound.org/people/black_trillium/sounds/397236/) by black_trillium, CC0 1.0
+- `sfx.door_wood_bar` (sfx.door_wood_bar.ogg): cut from [freesound 459641: slide_big_4.wav](https://freesound.org/people/blaukreuz/sounds/459641/) by blaukreuz, CC0 1.0
+- `sfx.door_wood_unbar` (sfx.door_wood_unbar.ogg): cut from [freesound 459643: slide_big_2.wav](https://freesound.org/people/blaukreuz/sounds/459643/) by blaukreuz, CC0 1.0
+- `sfx.door_wood_unlock` (sfx.door_wood_unlock.ogg): cut from [freesound 448395: Metallic Bolt Lock 2](https://freesound.org/people/LordForklift/sounds/448395/) by LordForklift, CC0 1.0
+- `sfx.footstep_sand_medium` (sfx.footstep_sand_medium.ogg): cut from [freesound 778548: Steps_Fine_Snow_Or_Sand_Strong_10](https://freesound.org/people/BlondPanda/sounds/778548/) by BlondPanda, CC0 1.0
+- `sfx.footstep_sand_medium` (sfx.footstep_sand_medium.2.ogg): cut from [freesound 778545: Steps_Fine_Snow_Or_Sand_Strong_07](https://freesound.org/people/BlondPanda/sounds/778545/) by BlondPanda, CC0 1.0
+- `sfx.footstep_sand_medium` (sfx.footstep_sand_medium.3.ogg): cut from [freesound 778547: Steps_Fine_Snow_Or_Sand_Strong_09](https://freesound.org/people/BlondPanda/sounds/778547/) by BlondPanda, CC0 1.0
+- `sfx.footstep_sand_medium` (sfx.footstep_sand_medium.4.ogg): cut from [freesound 778546: Steps_Fine_Snow_Or_Sand_Strong_08](https://freesound.org/people/BlondPanda/sounds/778546/) by BlondPanda, CC0 1.0
+- `sfx.footstep_sand_medium` (sfx.footstep_sand_medium.5.ogg): cut from [freesound 778543: Steps_Fine_Snow_Or_Sand_Strong_05](https://freesound.org/people/BlondPanda/sounds/778543/) by BlondPanda, CC0 1.0
+- `sfx.footstep_stone_medium` (sfx.footstep_stone_medium.ogg): cut from [freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 1.03 s for 0.5 s)](https://freesound.org/people/SecureSubset/sounds/813622/) by SecureSubset, CC0 1.0
+- `sfx.footstep_stone_medium` (sfx.footstep_stone_medium.2.ogg): cut from [freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 2.19 s for 0.5 s)](https://freesound.org/people/SecureSubset/sounds/813622/) by SecureSubset, CC0 1.0
+- `sfx.footstep_stone_medium` (sfx.footstep_stone_medium.3.ogg): cut from [freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 3.44 s for 0.5 s)](https://freesound.org/people/SecureSubset/sounds/813622/) by SecureSubset, CC0 1.0
+- `sfx.footstep_stone_medium` (sfx.footstep_stone_medium.4.ogg): cut from [freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 4.78 s for 0.5 s)](https://freesound.org/people/SecureSubset/sounds/813622/) by SecureSubset, CC0 1.0
+- `sfx.footstep_stone_medium` (sfx.footstep_stone_medium.5.ogg): cut from [freesound 521590: Hiking Boot Footsteps on Stone (from 0.68 s for 0.45 s)](https://freesound.org/people/Fission9/sounds/521590/) by Fission9, CC0 1.0
+- `sfx.footstep_stone_medium` (sfx.footstep_stone_medium.6.ogg): cut from [freesound 521590: Hiking Boot Footsteps on Stone (from 1.79 s for 0.45 s)](https://freesound.org/people/Fission9/sounds/521590/) by Fission9, CC0 1.0
+- `sfx.footstep_water_medium` (sfx.footstep_water_medium.ogg): cut from [freesound 861369: Splashing Footsteps Shallow Water (from 0.72 s for 0.45 s)](https://freesound.org/people/ChristopherJngs/sounds/861369/) by ChristopherJngs, CC0 1.0
+- `sfx.footstep_water_medium` (sfx.footstep_water_medium.2.ogg): cut from [freesound 861369: Splashing Footsteps Shallow Water (from 1.24 s for 0.45 s)](https://freesound.org/people/ChristopherJngs/sounds/861369/) by ChristopherJngs, CC0 1.0
+- `sfx.footstep_water_medium` (sfx.footstep_water_medium.3.ogg): cut from [freesound 861369: Splashing Footsteps Shallow Water (from 1.8 s for 0.45 s)](https://freesound.org/people/ChristopherJngs/sounds/861369/) by ChristopherJngs, CC0 1.0
+- `sfx.footstep_water_medium` (sfx.footstep_water_medium.4.ogg): cut from [freesound 861369: Splashing Footsteps Shallow Water (from 2.84 s for 0.45 s)](https://freesound.org/people/ChristopherJngs/sounds/861369/) by ChristopherJngs, CC0 1.0
+- `sfx.goblin_chatter` (sfx.goblin_chatter.ogg): cut from [freesound 202096: Goblin Cackle.wav](https://freesound.org/people/spookymodem/sounds/202096/) by spookymodem, CC0 1.0
+- `sfx.goblin_chatter` (sfx.goblin_chatter.2.ogg): cut from [freesound 442815: Goblin Snarl](https://freesound.org/people/qubodup/sounds/442815/) by qubodup, CC0 1.0
+- `sfx.goblin_chatter` (sfx.goblin_chatter.3.ogg): cut from [freesound 442817: Goblin Growl](https://freesound.org/people/qubodup/sounds/442817/) by qubodup, CC0 1.0
+- `sfx.goblin_pain` (sfx.goblin_pain.ogg): cut from [freesound 738437: Orc Grunt 1](https://freesound.org/people/qubodup/sounds/738437/) by qubodup, CC BY 4.0
+- `sfx.goblin_pain` (sfx.goblin_pain.2.ogg): cut from [freesound 738439: Orc Grunt 3](https://freesound.org/people/qubodup/sounds/738439/) by qubodup, CC BY 4.0
+- `sfx.goblin_rout` (sfx.goblin_rout.ogg): cut from [freesound 202100: Goblin Scream.wav](https://freesound.org/people/spookymodem/sounds/202100/) by spookymodem, CC0 1.0
+- `sfx.goblin_rout` (sfx.goblin_rout.2.ogg): cut from [freesound 442816: Goblin Scream](https://freesound.org/people/qubodup/sounds/442816/) by qubodup, CC0 1.0
+- `sfx.hit_blade_armor` (sfx.hit_blade_armor.ogg): cut from [freesound 420675: Cut Through Armor / Slice / Clang](https://freesound.org/people/SypherZent/sounds/420675/) by SypherZent, CC BY 4.0
+- `sfx.hit_blunt_armor` (sfx.hit_blunt_armor.ogg): cut from [freesound 337838: med-metal-hit-02.wav](https://freesound.org/people/newagesoup/sounds/337838/) by newagesoup, CC0 1.0
+- `sfx.hit_blunt_flesh` (sfx.hit_blunt_flesh.ogg): cut from [freesound 348242: PUNCH-BOXING-03.wav](https://freesound.org/people/newagesoup/sounds/348242/) by newagesoup, CC0 1.0
+- `sfx.hit_fist_flesh` (sfx.hit_fist_flesh.ogg): cut from [freesound 493914: light punch](https://freesound.org/people/damnsatinist/sounds/493914/) by damnsatinist, CC BY 4.0
+- `sfx.item_drop_heavy` (sfx.item_drop_heavy.ogg): cut from [freesound 271241: briefcaseDroppingFloor.wav](https://freesound.org/people/bertiehs/sounds/271241/) by bertiehs, CC0 1.0
+- `sfx.item_drop_light` (sfx.item_drop_light.ogg): cut from [freesound 339363: drop07.wav](https://freesound.org/people/newagesoup/sounds/339363/) by newagesoup, CC0 1.0
+- `sfx.item_drop_light` (sfx.item_drop_light.2.ogg): cut from [freesound 339364: drop06.wav](https://freesound.org/people/newagesoup/sounds/339364/) by newagesoup, CC0 1.0
+- `sfx.item_pickup_heavy` (sfx.item_pickup_heavy.ogg): cut from [freesound 216629: Picking up small box with items inside](https://freesound.org/people/WiesenWiesel/sounds/216629/) by WiesenWiesel, CC BY 4.0
+- `sfx.item_pickup_light` (sfx.item_pickup_light.ogg): cut from [freesound 822565: Picking Up A Small Item](https://freesound.org/people/qubodup/sounds/822565/) by qubodup, CC0 1.0
+- `sfx.knockdown` (sfx.knockdown.ogg): cut from [freesound 346695: Body fall_01.wav](https://freesound.org/people/deleted_user_2104797/sounds/346695/) by deleted_user_2104797, CC0 1.0
+- `sfx.rabbit_death` (sfx.rabbit_death.ogg): cut from [freesound 385850: Rabbit Squeaking 1 (from 0.08 s for 0.66 s)](https://freesound.org/people/kessir/sounds/385850/) by kessir, CC BY 4.0
+- `sfx.rabbit_death` (sfx.rabbit_death.2.ogg): cut from [freesound 385850: Rabbit Squeaking 1 (from 2.21 s for 0.56 s)](https://freesound.org/people/kessir/sounds/385850/) by kessir, CC BY 4.0
+- `sfx.rabbit_rout` (sfx.rabbit_rout.ogg): cut from [freesound 106114: bushmovement.wav](https://freesound.org/people/j1987/sounds/106114/) by j1987, CC0 1.0
+- `sfx.rabbit_rout` (sfx.rabbit_rout.2.ogg): cut from [freesound 386007: Rabbit Thump on Soil (from 0 s for 0.95 s)](https://freesound.org/people/kessir/sounds/386007/) by kessir, CC0 1.0
+- `sfx.splash` (sfx.splash.ogg): cut from [freesound 482953: splash_1.wav](https://freesound.org/people/genel/sounds/482953/) by genel, CC0 1.0
+- `sfx.wolf_death` (sfx.wolf_death.ogg): cut from [freesound 163280: DogYelp.wav](https://freesound.org/people/TobiasKosmos/sounds/163280/) by TobiasKosmos, CC BY 4.0
+- `sfx.wolf_death` (sfx.wolf_death.2.ogg): cut from [freesound 735365: Small Dog Cry](https://freesound.org/people/haulaway/sounds/735365/) by haulaway, CC0 1.0
+- `sfx.wolf_howl` (sfx.wolf_howl.ogg): cut from [freesound 712068: Giant Wolf Howl](https://freesound.org/people/NaturesTemper/sounds/712068/) by NaturesTemper, CC BY 4.0
+- `ui.chat_ping` (ui.chat_ping.ogg): cut from [freesound 760369: Message Receive](https://freesound.org/people/Froey_/sounds/760369/) by Froey_, CC0 1.0
+- `ui.click` (ui.click.ogg): cut from [freesound 448086: Normal click](https://freesound.org/people/Breviceps/sounds/448086/) by Breviceps, CC0 1.0
+- `ui.click` (ui.click.2.ogg): cut from [freesound 253168: SFX UI Button Click](https://freesound.org/people/suntemple/sounds/253168/) by suntemple, CC0 1.0
+- `ui.error` (ui.error.ogg): cut from [freesound 366103: Error Wooden](https://freesound.org/people/original_sound/sounds/366103/) by original_sound, CC BY 3.0
+- `ui.hover` (ui.hover.ogg): cut from [freesound 488381: UIHover1.wav](https://freesound.org/people/wobesound/sounds/488381/) by wobesound, CC0 1.0
+- `ui.notify` (ui.notify.ogg): cut from [freesound 750607: Notification Sound 1](https://freesound.org/people/deadrobotmusic/sounds/750607/) by deadrobotmusic, CC0 1.0
+- `ui.panel_close` (ui.panel_close.ogg): cut from [freesound 484886: Book Close - 6](https://freesound.org/people/SpaceJoe/sounds/484886/) by SpaceJoe, CC0 1.0
+- `ui.panel_open` (ui.panel_open.ogg): cut from [freesound 397548: Page Turn 01](https://freesound.org/people/LilMati/sounds/397548/) by LilMati, CC0 1.0
+- `voice.death_male` (voice.death_male.ogg): cut from [freesound 547181: Voice_AdultMale_DeathScream_04.wav](https://freesound.org/people/MrFossy/sounds/547181/) by MrFossy, CC0 1.0
+- `voice.death_male` (voice.death_male.2.ogg): cut from [freesound 547188: Voice_AdultMale_DeathScream_05.wav](https://freesound.org/people/MrFossy/sounds/547188/) by MrFossy, CC0 1.0
+- `voice.effort_hurt_male` (voice.effort_hurt_male.ogg): cut from [freesound 547193: Voice_AdultMale_PainGrunts_14.wav](https://freesound.org/people/MrFossy/sounds/547193/) by MrFossy, CC0 1.0
+- `voice.effort_hurt_male` (voice.effort_hurt_male.2.ogg): cut from [freesound 547198: Voice_AdultMale_PainGrunts_15.wav](https://freesound.org/people/MrFossy/sounds/547198/) by MrFossy, CC0 1.0
+- `voice.effort_hurt_male` (voice.effort_hurt_male.3.ogg): cut from [freesound 547205: Voice_AdultMale_PainGrunts_07.wav](https://freesound.org/people/MrFossy/sounds/547205/) by MrFossy, CC0 1.0
+- `voice.effort_swing_male` (voice.effort_swing_male.ogg): cut from [freesound 695378: Male Attack Grunt 1.wav](https://freesound.org/people/F.M.Audio/sounds/695378/) by F.M.Audio, CC BY 4.0
+- `voice.effort_swing_male` (voice.effort_swing_male.2.ogg): cut from [freesound 695380: Male Attack Grunt 3.wav](https://freesound.org/people/F.M.Audio/sounds/695380/) by F.M.Audio, CC BY 4.0
 
 <!-- end of sound slots -->
 
