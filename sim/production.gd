@@ -67,8 +67,8 @@ var on_built := Callable()
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
 ## (need -> step due), fed, hungry_since, last_trade, wage_due, loan
-## (owed to the town's bank, decision 354), working_off, the MIND (each
-## 1..10, not a companion's) and heard (companions' Hearsay's, kept as it is)}.
+## (owed to the town's bank, decision 354), working_off, type (hidden, npc's)
+## and the MIND (each 1..10; neither a companion's) and heard (companions' Hearsay's, kept as it is)}.
 var _workers: Dictionary[String, Dictionary] = {}
 ## Id -> {id, trade, town, worker, job, waited}.
 var _workshops: Dictionary[String, Dictionary] = {}
@@ -130,7 +130,9 @@ func book() -> ItemBook:
 
 ## A worker [param id] called [param worker_name], of [param trades], living
 ## in [param town]. False if the id is taken.
-func add_worker(id: String, worker_name: String, trades: Array, town: String, origin := "placeholder") -> bool:
+## [param type]: their hidden personality type (npc's; type_of's roll if
+## none is given, "" for a companion).
+func add_worker(id: String, worker_name: String, trades: Array, town: String, origin := "placeholder", type := "") -> bool:
 	if id.is_empty() or _workers.has(id):
 		return false
 	var list: Array[String] = []
@@ -139,13 +141,16 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0,
 		"loan": 0.0, "working_off": false, "heard": []}
-	# Their mind (companions' Hearsay, decision 378): rolled about their
-	# trade's profile by the id, so the same every load; a companion's comes
-	# from her card.
+	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
+	# roll), and the four rolled about their trade's and type's profile by
+	# the id, so the same every load; a companion's comes from her card.
 	if not id.begins_with("companion:"):
+		if type.is_empty() and type_of.is_valid():
+			type = str(type_of.call(id))
+		_workers[id]["type"] = type
 		var trade: String = list[0] if not list.is_empty() else ""
 		for each: String in MIND:
-			_workers[id][each] = mind_of(id, trade, each)
+			_workers[id][each] = mind_of(id, trade, each, type)
 	_town(town)
 	return true
 
@@ -164,19 +169,23 @@ const MIND_SPREAD := 2
 const MIND_MIDDLE := 5
 ## A profile's words as numbers.
 const MIND_WORDS := {"low": 2, "mid": 5, "middle": 5, "high": 8}
-## (trade) -> {intellect, superstition, creativity, integrity: 1..10 or a
-## word}, lore's role profiles (Lore.profile; Main sets it before the
-## snapshot loads). Unset, or {} for a trade with none: townsfolk's.
+## (trade, type) -> {intellect, superstition, creativity, integrity: 1..10
+## or a word}, lore's role profiles, the type's over the trade's
+## (Lore.profile; Main sets it before the snapshot loads). Unset, or {} for
+## a trade with none: townsfolk's.
 static var profile_of := Callable()
+## (worker id) -> String: a resident's hidden personality type, rolled by
+## the id (npc's Townsfolk.roll_type; Main sets it). Unset: "" (steady).
+static var type_of := Callable()
 
 
-## [param id]'s [param quality] (one of MIND), a resident of [param trade]:
-## about the trade's profile, by the id.
-static func mind_of(id: String, trade: String, quality: String) -> int:
+## [param id]'s [param quality] (one of MIND), a resident of [param trade]
+## and [param type]: about their profile, by the id.
+static func mind_of(id: String, trade: String, quality: String, type := "") -> int:
 	var middle := MIND_MIDDLE
-	var profile: Variant = profile_of.call(trade) if profile_of.is_valid() else {}
+	var profile: Variant = profile_of.call(trade, type) if profile_of.is_valid() else {}
 	if not profile is Dictionary or profile.is_empty():
-		profile = profile_of.call("townsfolk") if profile_of.is_valid() else {}
+		profile = profile_of.call("townsfolk", type) if profile_of.is_valid() else {}
 	var value: Variant = profile.get(quality) if profile is Dictionary else null
 	if value is float or value is int:
 		middle = int(value)
@@ -934,7 +943,8 @@ func from_dict(saved: Dictionary) -> void:
 			if not entry is Dictionary or not entry.get("trades") is Array:
 				print("[production] the snapshot's worker %s makes no sense; left out" % id)
 				continue
-			add_worker(id, str(entry.get("name", id)), entry["trades"], str(entry.get("town", "")), str(entry.get("origin", "placeholder")))
+			add_worker(id, str(entry.get("name", id)), entry["trades"], str(entry.get("town", "")), str(entry.get("origin", "placeholder")),
+				str(entry.get("type", "")))
 			_workers[id]["purse"] = maxi(int(entry.get("purse", 0)), 0)
 			_workers[id]["rent_due"] = int(entry.get("rent_due", _workers[id]["rent_due"]))
 			_workers[id]["away"] = bool(entry.get("away", false))

@@ -300,9 +300,12 @@ func _test_hearsay() -> void:
 	print("
 == a resident's mind and what they have heard ==")
 	_setup()
-	Production.profile_of = func(trade: String) -> Dictionary:
+	Production.profile_of = func(trade: String, type := "") -> Dictionary:
+		if type == "thief":
+			return {"intellect": 5, "superstition": 5, "creativity": 8, "integrity": 2}
 		return {"medicine_man": {"intellect": "high", "superstition": "high", "creativity": "low", "integrity": 8},
 			"townsfolk": {"intellect": 5, "superstition": 5, "creativity": 5, "integrity": 5}}.get(trade, {})
+	Production.type_of = func(id: String) -> String: return "thief" if id == "t1" else "steady"
 	_work.add_worker("h1", "Odo", ["hauler"], TOWN)
 	_work.add_worker("m1", "Hob", ["medicine_man"], TOWN)
 	_work.add_worker("companion:p1", "Garrow", ["smith"], TOWN)
@@ -312,6 +315,14 @@ func _test_hearsay() -> void:
 		"Odo, a hauler with no profile, about townsfolk's middle: %s" % [Production.MIND.map(func(q: String) -> int: return odo[q])])
 	_check(int(hob["intellect"]) >= 6 and int(hob["superstition"]) >= 6 and int(hob["creativity"]) <= 5 and int(hob["integrity"]) >= 6,
 		"Hob, a medicine man, about his profile: %s" % [Production.MIND.map(func(q: String) -> int: return hob[q])])
+	_check(odo["type"] == "steady" and hob["type"] == "steady", "a hidden type rolled by type_of: steady")
+	_work.add_worker("t1", "Nim", ["hauler"], TOWN)
+	var nim := _work.worker("t1")
+	_check(nim["type"] == "thief" and int(nim["integrity"]) <= 4 and int(nim["creativity"]) >= 6,
+		"Nim, a thief by type: the type's profile over the trade's (%s)" % [Production.MIND.map(func(q: String) -> int: return nim[q])])
+	_work.add_worker("b1", "Lark", ["hauler"], TOWN, "placeholder", "bard")
+	_check(_work.worker("b1")["type"] == "bard", "a type given is kept")
+	_check(not _work.worker("companion:p1").has("type"), "a companion has no town type")
 	var spread := {}
 	for i in 200:
 		spread[Production.mind_of("r%d" % i, "hauler", "intellect")] = true
@@ -327,6 +338,10 @@ func _test_hearsay() -> void:
 	var loaded := Production.new(saved, _stock, null, Callable(), _rules)
 	_check(int(loaded.worker("h1")["intellect"]) == 9 and loaded.worker("h1")["heard"].size() == 1
 		and loaded.worker("h1")["heard"][0]["text"] == "wolves at night", "the mind and what was heard are saved")
+	saved["workers"]["b1"]["intellect"] = 4
+	Production.type_of = Callable()
+	_check(Production.new(saved, _stock, null, Callable(), _rules).worker("b1")["type"] == "bard",
+		"the type is saved: loaded as it was, not rolled again")
 	for q: String in Production.MIND:
 		saved["workers"]["m1"].erase(q)
 	saved["workers"]["m1"].erase("heard")
@@ -334,6 +349,7 @@ func _test_hearsay() -> void:
 	_check(Production.MIND.all(func(q: String) -> bool: return old.worker("m1")[q] == hob[q]) and old.worker("m1")["heard"] == [],
 		"a save from before rolls the same mind and has heard nothing")
 	Production.profile_of = Callable()
+	Production.type_of = Callable()
 
 
 func _test_days() -> void:
