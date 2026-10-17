@@ -77,3 +77,11 @@ animations/goblin.res    Idle, Walk, Punch_Jab, Hit_Chest, Death01, Jog_Bwd, Hit
                          N:\assets\sources\quaternius\UAL Pro\ (Unreal-Godot\UAL1.glb
                          in place, UAL1_RM.glb with root motion); extract_clips.gd copies
                          UAL1.glb into build/ual_extract/ when clips are rebuilt.
+                         Also from the pack (decision 399): Sword_Idle, Sword_Attack_Standing,
+                         Dodge_Left, Dodge_Right, Pistol_Idle, Pistol_Aim_Neutral, Pistol_Shoot.
+                         Authored by pc-character on the pack's own skeleton (decision 399), by
+                         tools/humanoid_clips.py (UAL poses, joints turned, keyed), our own work
+                         under the pack's CC0: Block_Idle, Knockdown, Lie, Get_Up, Hit_Back,
+                         Axe_Overhead, Dagger_Stab, Spear_Thrust, Shield_Bash.
+                         blender -b -P tools/humanoid_clips.py -- build/ual_extract/UAL1.glb
+                         build/ual_extract/authored.glb, then extract_clips.gd from authored.glb.

@@ -16,7 +16,10 @@ extends SceneTree
 ## 4. Delete build/ual_extract.
 ##
 ## A library already at <out.res> keeps its clips; those named are added
-## (or replaced), so more can be taken later without the first ones.
+## (or replaced), so more can be taken later without the first ones. A clip
+## given as <pack name>=<name> is saved under the second. (Godot's import
+## already drops a pack clip's "_Loop" and loops it: Pistol_Idle_Loop is
+## Pistol_Idle here.)
 ##
 ## Track paths stay as retargeted (%GeneralSkeleton:<Bone>), so the library
 ## plays on any model imported with a SkeletonProfileHumanoid bone map.
@@ -40,12 +43,15 @@ func _init() -> void:
 		library = (load(args[1]) as AnimationLibrary).duplicate(true)
 		print("adding to %s's %d clips" % [args[1], library.get_animation_list().size()])
 	var missing := 0
-	for clip in args.slice(2):
+	for given in args.slice(2):
+		var names := str(given).split("=")
+		var clip := names[0]
 		if not source.has_animation(clip):
 			print("no clip %s" % clip)
 			missing += 1
 			continue
 		var animation := source.get_animation(clip).duplicate(true) as Animation
+		clip = names[1] if names.size() > 1 else clip
 		if library.has_animation(clip):
 			library.remove_animation(clip)
 		library.add_animation(clip, animation)

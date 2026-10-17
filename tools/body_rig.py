@@ -189,6 +189,18 @@ def load_mesh(path: str, name) -> object:
 		bpy.ops.object.join()
 	body = bpy.context.view_layer.objects.active
 	body.name = "Body"
+	# One surface: a textured mesh comes split along its UV seams (each a
+	# vertex twice), which bone heat sees as separate pieces and leaves
+	# unweighted. The UVs are the faces' corners', so welding keeps them.
+	import bmesh
+	bm = bmesh.new()
+	bm.from_mesh(body.data)
+	before = len(bm.verts)
+	bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+	bm.to_mesh(body.data)
+	bm.free()
+	if len(body.data.vertices) < before:
+		print("welded: %d vertices to %d" % (before, len(body.data.vertices)))
 	return body
 
 

@@ -431,13 +431,38 @@ const FOREST_DEPTH := 3
 ## art/models/animations), how tall it stands, and which way it faces as
 ## modelled ("faces": the yaw that turns its front to +X; the goblin faces
 ## +Z, its toes ahead of its feet, so a quarter turn).
+## What a humanoid on the UAL skeleton does in a fight (roadmap step 3, perf's
+## rig plays them): the strikes by what is in the striking hand (an Items id,
+## "" bare-handed), each [clip, contact]: the seconds in, at speed 1, its blow
+## lands (the striking hand's fastest forward, measured by
+## tools/humanoid_clips.py --contacts); the guard, the knockdown, lying and
+## getting up, the hits by the side a blow came from, the deaths, the bow (the pack's pistol stands in) and
+## the dodges. Clips the UAL lacks are authored by tools/humanoid_clips.py on
+## its skeleton; all are in art/models/animations/goblin.res.
+const HUMANOID_MOVES := {
+	"strikes": {
+		"": [["Punch_Jab", 0.17], ["Punch_Cross", 0.21]],
+		"sword": [["Sword_Attack", 0.38], ["Sword_Attack_Standing", 0.38]],
+		"giant_axe": [["Axe_Overhead", 0.42]],
+		"hammer": [["Axe_Overhead", 0.42]],
+		"dagger": [["Dagger_Stab", 0.17]],
+		"spear": [["Spear_Thrust", 0.29]],
+		"shield": [["Shield_Bash", 0.17]],
+		"kick": [["Kick", 0.25]],
+	},
+	"block": "Block_Idle", "knockdown": "Knockdown", "lying": "Lie", "get_up": "Get_Up",
+	# A blow taken, by the side it came from (each a list to pick from without repeats).
+	"hits": {"front": ["Hit_Chest", "Hit_Head"], "left": ["Hit_Shoulder_L"], "right": ["Hit_Shoulder_R"], "back": ["Hit_Back"]},
+	"deaths": ["Death01", "Death02"], "bow_aim": "Pistol_Aim_Neutral", "bow_shoot": "Pistol_Shoot", "bow_idle": "Pistol_Idle",
+	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle",
+}
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES},
 	"brute": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES},
 	"sneak": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES},
 }
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
@@ -516,24 +541,32 @@ const GAIT_HYSTERESIS := 1.15
 ## Players and companions: humanoid bodies (decision 243), a man's and a
 ## woman's (the entity's "body", decision 388), rigged to the animation
 ## library's own skeleton, so its clips play at the proportions they were
-## made for. Their gaits are their own (tools/gait_pace.gd: the two step
-## alike), as is their backpedal; one surface each, drawn in HUMAN_MATERIAL
+## made for. Their gaits are their own (HUMAN_GAITS: the two step alike), as
+## is their backpedal; one surface each, drawn in HUMAN_MATERIAL
 ## ("parts"), the tunic in the player's colour (the capsule's); standing,
 ## they only look about now and then. Their
 ## size is not their mass: what they carry counts in their mass, and picking
 ## up a hammer should not make them grow.
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
-	"gaits": [[CLIP_WALK, 0.93], [CLIP_JOG, 5.6], [CLIP_SPRINT, 8.47]], "backpedal": 4.66,
-	"parts": true, "fidgets": {"Idle_LookAround": 1}}
+	"gaits": HUMAN_GAITS, "backpedal": 4.66,
+	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES}
+## The human bodies' gaits (decision 399 amended): the pack's jog and sprint
+## take 2.6 m and 4 m steps, too long for a player's 4 tiles a second (Jeff
+## on v0.1.149); Jog_Short and Sprint_Short narrow their swing
+## (tools/humanoid_clips.py), so the same speed plays them faster, in about
+## 1.25 m steps. Paces by tools/gait_pace.gd on human_m (human_f alike): the
+## jog gives way to the sprint at about 4.4 tiles a second, between a
+## player's and a companion's.
+const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.93], ["Jog_Short", 2.66], ["Sprint_Short", 5.5]]
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
 const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
-	"gaits": [[CLIP_WALK, 0.93], [CLIP_JOG, 5.6], [CLIP_SPRINT, 8.47]], "backpedal": 4.66,
-	"parts": true, "fidgets": {"Idle_LookAround": 1}}
+	"gaits": HUMAN_GAITS, "backpedal": 4.66,
+	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES}
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15

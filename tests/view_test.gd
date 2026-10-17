@@ -1990,13 +1990,35 @@ func _test_humans() -> void:
 		_check(tint == Color.WHITE or mesh.get_instance_shader_parameter("tunic") == tint, "the tunic in the player's colour")
 	player.body = &"male"
 	_rig._process(0.0)
+	var library := load(str(Client3D.HUMAN["clips"])) as AnimationLibrary
+	var moves: Dictionary = Client3D.HUMAN["moves"]
+	var missing: Array[String] = []
+	for item: String in moves["strikes"]:
+		for strike: Array in moves["strikes"][item]:
+			var clip := library.get_animation(strike[0]) if library.has_animation(strike[0]) else null
+			if clip == null or float(strike[1]) <= 0.0 or float(strike[1]) >= clip.length:
+				missing.append("%s (%s)" % [strike[0], item])
+	for key: String in ["block", "knockdown", "lying", "get_up", "bow_aim", "bow_shoot", "bow_idle", "stance"]:
+		if not library.has_animation(moves[key]):
+			missing.append(moves[key])
+	var listed: Array = moves["dodges"] + moves["deaths"]
+	for gait: Array in Client3D.HUMAN_GAITS:
+		listed.append(gait[0])
+	for side: String in ["front", "left", "right", "back"]:
+		listed += moves["hits"][side]
+	for clip: String in listed:
+		if not library.has_animation(clip):
+			missing.append(clip)
+	_check(missing.is_empty(), "every move's clip is in the library, each strike's contact within it (%s)" % [missing])
+	_check(library.get_animation(moves["block"]).loop_mode != Animation.LOOP_NONE
+			and library.get_animation(moves["lying"]).loop_mode != Animation.LOOP_NONE, "the guard and lying loop")
 	var pet := _companion()
 	if pet != null:
-		var wanted := &"male" if str(pet.traits.get("pronoun", "")) == "he" else &"female"
+		var wanted := CompanionCard.body_of(pet.traits, pet.keeper_id)
 		var model: Node = _rig._puppets[pet.get_instance_id()].get_node_or_null("Body/Model")
 		_check(pet.body == wanted and model != null
 				and model.scene_file_path == str((Client3D.HUMAN if wanted == &"male" else Client3D.HUMAN_F)["scene"]),
-				"%s, \"%s\" on her card, wears the %s body" % [pet.name, pet.traits.get("pronoun", ""), wanted])
+				"%s wears her card's body, %s" % [pet.name, wanted])
 
 
 func _test_goblin() -> void:

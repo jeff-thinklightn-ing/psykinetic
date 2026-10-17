@@ -9,7 +9,8 @@ extends SceneTree
 ##       <model.glb>[@<blend>[@<yaw>]] [<model.glb>... ...] [-- <clip>[@<t>] ...]
 ## <clips.res> "self" plays each model's own clips. A model may be given as
 ## <model.glb>@<blend>@<yaw degrees> to turn it (e.g. a creature side on:
-## model.glb@@90). <blend> sets a model's "lean"/"heavy" shape keys (-1 lean .. 1 heavy);
+## model.glb@@90); a fourth field "srgb" reads its vertex colours as sRGB (glTF's
+## are linear: a file that wrote sRGB values as they are). <blend> sets a model's "lean"/"heavy" shape keys (-1 lean .. 1 heavy);
 ## <t> is how far through the clip (0..1, default 0.3); <pixels> a cell's
 ## width (default PIXELS); <cell> the metres between models (default CELL; 0.5 for a rabbit). "rest" is the rest pose. Clips default to: rest Idle Walk@0.25 Jog_Fwd@0.25 Sprint@0.3
 ## Sword_Attack@0.45 Hit_Chest@0.3 Death01@1.
@@ -56,7 +57,7 @@ func _initialize() -> void:
 				_blend(model, float(spec[1]))
 			if spec.size() > 2:
 				model.rotation.y = deg_to_rad(float(spec[2]))
-			_palette(model)
+			_palette(model, spec.size() > 3 and spec[3] == "srgb")
 			var clip := str(clips[column]).split("@")
 			if clip[0] != "rest":
 				var animator: AnimationPlayer
@@ -102,7 +103,7 @@ func _process(_delta: float) -> bool:
 ## A surface whose material is named "palette" drawn with art-kit's palette, as the
 ## game's drop-in does; one named "human" with the bodies' material, as the game
 ## draws them; one named "VertexColour" by its vertex colours.
-func _palette(model: Node3D) -> void:
+func _palette(model: Node3D, srgb := false) -> void:
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		for i in mesh.mesh.get_surface_count():
 			var material := mesh.mesh.surface_get_material(i)
@@ -118,7 +119,7 @@ func _palette(model: Node3D) -> void:
 				# The mesh's own colours (tools/body_build.py --vertex-colours), matte.
 				var own := StandardMaterial3D.new()
 				own.vertex_color_use_as_albedo = true
-				own.vertex_color_is_srgb = true
+				own.vertex_color_is_srgb = srgb  # glTF's are linear; "@srgb" for a file that wrote sRGB.
 				own.roughness = 1.0
 				mesh.set_surface_override_material(i, own)
 

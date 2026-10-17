@@ -18,6 +18,7 @@ notes (decision 324).
   gold; the store's ledger says only that something is missing.
 - The temple's entrance is one wide double door; each leaf still opens on
   its own.
+- People run in shorter, quicker strides that match their legs.
 - Doors are wider and taller, sized for the new bodies (an opening 0.8 m wide and 2.4 m tall), and drawn as a plank door instead of the old castle-kit door.
 - Past the edge of outdoor maps the forest is now crowded pine stands whose crowns merge into one canopy.
 - The music in the open country is a soft wind drone now, not an organ-like pad, and a

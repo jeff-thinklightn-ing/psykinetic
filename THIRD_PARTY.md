@@ -125,7 +125,7 @@ Takes credited to their makers:
 
 | Asset | By | Licence | Where | Notes |
 |-------|----|---------|-------|-------|
-| Universal Animation Library (Pro) | Quaternius | CC0 1.0 | `art/models/animations/LICENSE-quaternius-ual.txt` | the goblin's clips, retargeted, and the skeleton and clips of the human bodies (`art/models/SOURCES.txt`) |
+| Universal Animation Library (Pro) | Quaternius | CC0 1.0 | `art/models/animations/LICENSE-quaternius-ual.txt` | the goblin's clips, retargeted, and the skeleton and clips of the human bodies; the clips pc-character authored on its skeleton (decision 399) are our own, under the pack's CC0 (`art/models/SOURCES.txt`) |
 | Retro Textures Fantasy 1.0 | Kenney | CC0 1.0 | `art/kenney_retro-textures-fantasy/License.txt` | in the repo, not drawn by the game now |
 | Sonniss #GameAudioGDC bundles 2024 and 2021–23 | Sonniss | Sonniss GameAudioGDC Bundle licence v2.0, effective 2026-08-27: royalty-free, commercial use in our own projects; no redistributing the sounds as sounds, and no AI or machine-learning use | `docs/licenses/sonniss-gameaudiogdc_2026-10-14.txt` | a source library for the game's sounds; the files stay outside the repo (`N:\assets\sound`), and only what the game uses goes into it, inside the game |
 

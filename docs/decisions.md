@@ -8655,3 +8655,61 @@ Rejected: a speech field of residents.json's own (lore's roles are the
 one source); believing by a model's judgement (a seeded roll on the
 intellect is the stat Jeff asked for); a claims ask on every line said
 near anyone (only residents within earshot, and a word test first).
+## 399. Humanoid clips the pack lacks are authored on its skeleton; a moves table per model
+
+Roadmap step 3 (combat animation states) splits: perf's rig (390) plays
+the clips; pc-character gives it the clips and the tables. The Universal
+Animation Library (UAL1, the only pack on the NAS) has a sword strike,
+punches and a kick, but no block, no knockdown, lying or getting up, no
+blow from behind, and no axe, dagger, spear or shield blows.
+
+`tools/humanoid_clips.py` authors them in Blender on the pack's own
+skeleton, so they play on every body rigged to it (the human bodies, the
+goblin) as the pack's clips do: a clip is a few keyed poses, eased between,
+or a stretch of a pack clip again; a pose is a pack clip at a moment with
+joints turned about their heads in the character's own axes (LIFT, TURN,
+TILT) or a bone aimed along a direction (AIM), the pelvis moved. Made:
+Block_Idle (loops; the arms only, for an upper-body layer), Knockdown
+(Death01's fall), Lie (loops), Get_Up (lying, sitting, crouching, standing),
+Hit_Back, Axe_Overhead, Dagger_Stab, Spear_Thrust, Shield_Bash. A looping
+clip is named `_Loop` in Blender so Godot's import loops it and drops the
+suffix, as with the pack's. They, and more of the pack's own (Sword_Idle,
+Sword_Attack_Standing, Dodge_Left/Right, Pistol_Idle, Pistol_Aim_Neutral,
+Pistol_Shoot as the bow's stand-in until it has its own), are in
+`art/models/animations/goblin.res` (`tools/extract_clips.gd`, which also
+takes `<pack name>=<name>`). Authored clips are our own work under the
+pack's CC0 (SOURCES.txt, THIRD_PARTY.md).
+
+A strike's contact is measured, not guessed: the moment its striking hand
+(or foot) moves fastest forward and down relative to the pelvis
+(`humanoid_clips.py --contacts`): Punch_Jab 0.17 s, Punch_Cross 0.21,
+Sword_Attack 0.38 (CLIP_HEAVY_CONTACT's hand-measured 0.45 was "just past
+the fastest"), Axe_Overhead 0.42, Dagger_Stab 0.17, Spear_Thrust 0.29,
+Shield_Bash 0.17, Kick 0.25.
+
+`Client3D.HUMANOID_MOVES`, a model's "moves" (HUMAN, HUMAN_F, the goblin's
+MODELS entries): "strikes" by the Items id in the striking hand ("" bare,
+sword, giant_axe, hammer, dagger, spear, shield, kick), each [clip,
+contact]; "block", "knockdown", "lying", "get_up"; "hits" by the side a blow
+came from (front, left, right, back: lists to pick from without repeats; back
+is Hit_Back); "deaths"; "bow_aim", "bow_shoot", "bow_idle", "dodges",
+"stance" (the table's shape agreed with perf, whose rig reads it). The hammer borrows the axe's
+overhead until it has its own; the giant axe's heavy wind-up waits on
+items. view_test: every move's clip is in the library, each contact within
+its clip, the guard and lying loop. Nothing plays them until perf's rig
+reads the table. Client only; protocol unchanged.
+
+The run's stride (Jeff on v0.1.149: "character model running is out of
+sync the strides seem just a little too long for the legs"): the feet did
+not slide, the pack's Jog_Fwd takes 2.6 m steps (5.6 m/s at speed 1, a
+0.93 s cycle), a fast run's, so at a player's 4 tiles a second it played at
+0.71x in long bounding steps; no playback rate shortens a step. A
+`stride` on a clip segment narrows its swing about its mean (each group's
+bones turned only that share of the way: legs, arms, body; and the
+pelvis's bounce): Jog_Short (legs 0.45, arms 0.7, bounce 0.55: pace 2.66
+m/s on human_m, human_f alike) and Sprint_Short (0.72, 0.85, 0.75: 5.5).
+`Client3D.HUMAN_GAITS` (HUMAN's and HUMAN_F's): Walk 0.93, Jog_Short 2.66,
+Sprint_Short 5.5, so a player (3.8 to 4 tiles a second; a diagonal takes
+DIAGONAL_TICK_SCALE the ticks) jogs at about 1.5x, 3.3 steps a second of
+1.23 m, and the sprint takes over at about 4.4, between a player's and a
+companion's (4.7 to 5). The goblin keeps its own GAITS.
