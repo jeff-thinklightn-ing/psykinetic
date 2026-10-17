@@ -8213,8 +8213,10 @@ well. Lore's agreed facts reach her voice (Companion.lore_words):
 known_by her own knower when lore names her (wren, pip, nix), else the
 townsfolk's, weightiest first within LORE_CHARS (600), a rumour as "it is
 said that"; the town's facts and the other companions by name come so,
-once lore marks them agreed on Jeff's word. A companion resting in town
-as a resident is told the same.
+once lore marks them agreed on Jeff's word. What she reads never calls
+anyone a companion (her player is one she travels with by choice), so
+lore's "a companion who travels with the town's people" is told her as "a
+traveller". A companion resting in town as a resident is told the same.
 
 2. The follow. She set off at 3 and closed to 1, often in front of him:
 he walked into her five times in six minutes, and each set-off and

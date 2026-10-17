@@ -275,6 +275,10 @@ func _test_knows_her_town() -> void:
 		"what lore says the townsfolk know: weightiest first, a rumour as said, no draft (%s)" % known)
 	_check("Pip wants to become a squire." in Companion.lore_words("Pip") and "squire" not in known, "a companion lore names knows her own (Pip)")
 	_check(known in pet.voice_prompt("test"), "and her voice is told it")
+	Lore.use([{"id": "people", "status": "agreed", "facts": [{"id": "w1", "status": "agreed", "known": "common",
+		"text": "Wren is a woman, a companion who travels with the town's people."}]}], [{"id": "townsfolk", "status": "agreed", "where": [], "tags": []}])
+	_check("Wren is a woman, a traveller who travels" in Companion.lore_words("Isolde") and "companion" not in Companion.lore_words("Isolde").to_lower(),
+		"what she reads never calls anyone a companion: %s" % Companion.lore_words("Isolde"))
 	Lore.reload()
 
 
