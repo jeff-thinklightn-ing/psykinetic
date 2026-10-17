@@ -131,9 +131,9 @@ func _test_respawns_staggered() -> void:
 	_main._respawned_at.clear()
 	_main._arrived_at[_main._players.find_key(player)] = World.tick
 	_check(slots.all(func(slot: int) -> bool: return away.call(slot) <= _main.RESPAWN_JOIN_DISTANCE), "every spawn within %d tiles of the player" % _main.RESPAWN_JOIN_DISTANCE)
-	for i in _main.SPAWN_GRACE_TICKS - 1:
+	for i in _main.RESPAWN_ARRIVAL_TICKS - 1:
 		World.step()
-	_check(_monsters() == 0, "a player just come: nothing back within %d tiles for %d ticks" % [_main.RESPAWN_JOIN_DISTANCE, _main.SPAWN_GRACE_TICKS])
+	_check(_monsters() == 0, "a player just come: nothing back within %d tiles for %d ticks" % [_main.RESPAWN_JOIN_DISTANCE, _main.RESPAWN_ARRIVAL_TICKS])
 	World.step()
 	World.step()
 	_check(_monsters() == 1, "then the first, as before")

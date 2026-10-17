@@ -7972,8 +7972,12 @@ were; a record (352) is no dead slot, so never counted; the console's
 
 respawn_test: five due at once, one comes back, the farthest; none more
 within 60 ticks, a second at 60; a player just put down holds every spawn
-within 12 tiles back for SPAWN_GRACE_TICKS, then the first comes. Its older
+within 12 tiles back for the arrival time, then the first comes. Its older
 checks wait out the stagger (the crate) or clear it (the distance check).
 far_tier_test still fits (one slot, RESPAWN_DELAY_TICKS + 20). Server
 only; no protocol change.
+
+Amended (coordinator): the arrival quiet has its own constant,
+`RESPAWN_ARRIVAL_TICKS` = 100 (10 s), not `SPAWN_GRACE_TICKS` (30, 3 s, the
+monsters' grace for a new player), which was too short to look round.
 

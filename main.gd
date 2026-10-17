@@ -124,9 +124,10 @@ const RESPAWN_MIN_DISTANCE := 6
 ## player first, so a zone opened after a long sleep (or cleared and left)
 ## does not bring every due one back at once (decision 382).
 const RESPAWN_STAGGER_TICKS := 60
-## For SPAWN_GRACE_TICKS after a player joins or comes into the zone,
-## nothing comes back within this many tiles of them.
+## For RESPAWN_ARRIVAL_TICKS (10 s) after a player joins or comes into the
+## zone, nothing comes back within this many tiles of them.
 const RESPAWN_JOIN_DISTANCE := 12
+const RESPAWN_ARRIVAL_TICKS := 100
 ## The far tier hands over to records (decision 352): a monster FAR from
 ## every player and companion for RETIRE_AFTER_TICKS, more than
 ## retire_tiles from all of them, calm and with nowhere the world tick
@@ -207,7 +208,7 @@ var _dead_since: Dictionary[int, int] = {}
 ## Zone name -> the tick its last respawn came back (RESPAWN_STAGGER_TICKS).
 var _respawned_at: Dictionary[String, int] = {}
 ## Peer -> the tick its player was last put down (a join, a zone entered, a
-## respawn): the wider no-respawn radius while SPAWN_GRACE_TICKS last.
+## respawn): the wider no-respawn radius while RESPAWN_ARRIVAL_TICKS last.
 var _arrived_at: Dictionary[int, int] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
@@ -2240,7 +2241,7 @@ func _check_respawns(tick: int, force := false) -> int:
 ## How far [param tile] is from the nearest player in this zone (a big
 ## number with none); -1 if one is too near for a respawn there:
 ## within RESPAWN_MIN_DISTANCE, or RESPAWN_JOIN_DISTANCE of one put down
-## less than SPAWN_GRACE_TICKS ago.
+## less than RESPAWN_ARRIVAL_TICKS ago.
 func _nearest_player(tile: Vector2i, tick: int) -> int:
 	var nearest := 1 << 30
 	for peer: int in _players:
@@ -2248,7 +2249,7 @@ func _nearest_player(tile: Vector2i, tick: int) -> int:
 		if not is_instance_valid(player) or not player.spawned or player.zone != World.zone.name:
 			continue
 		var away := World.distance(player.tile, tile)
-		var arrived := tick - int(_arrived_at.get(peer, -SPAWN_GRACE_TICKS)) < SPAWN_GRACE_TICKS
+		var arrived := tick - int(_arrived_at.get(peer, -RESPAWN_ARRIVAL_TICKS)) < RESPAWN_ARRIVAL_TICKS
 		if away <= RESPAWN_MIN_DISTANCE or arrived and away <= RESPAWN_JOIN_DISTANCE:
 			return -1
 		nearest = mini(nearest, away)
