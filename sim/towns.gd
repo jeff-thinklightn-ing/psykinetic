@@ -282,6 +282,7 @@ func tick() -> void:
 	towns.sort()
 	for town in towns:
 		_spread(town)
+		_appoint(town)
 		if production.building_in(town):
 			continue
 		if _repair(town):
@@ -289,6 +290,30 @@ func tick() -> void:
 		var kind := choose(town)
 		if not kind.is_empty():
 			unlock(town, kind)
+
+
+## Each place the fallen come back at that is [param town]'s building
+## (rules' return.places, not "outside": the temple) given its official
+## (its trade: the priest) once it stands, if the town has none: a resident
+## named from the place's names by the town, seated there (decision 396).
+func _appoint(town: String) -> void:
+	var places: Dictionary = rules.get("return", {}).get("places", {})
+	var record := _town(town)
+	for kind: String in places:
+		var rule: Dictionary = places[kind]
+		var trade := str(rule.get("trade", ""))
+		if bool(rule.get("outside", false)) or trade.is_empty() or building(town, kind).get("state") != STANDING:
+			continue
+		if record["residents"].any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+			continue
+		var who := "%s:%s" % [trade, town]
+		var names: Array = rule.get("names", [])
+		var name := str(names[absi(hash(town)) % names.size()]) if not names.is_empty() else trade.capitalize()
+		if not production.add_worker(who, name, [trade], town, "appointed"):
+			continue
+		record["residents"].append(who)
+		_note(town, "%s comes to be the town's %s" % [name, trade.replace("_", " ")])
+		_seat(town)
 
 
 ## The building [param town] wants next ("" for none it can afford).

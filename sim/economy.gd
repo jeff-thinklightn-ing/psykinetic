@@ -330,7 +330,7 @@ func tick() -> void:
 	var towns := {}
 	for id in production.worker_ids():
 		var who := production.worker(id)
-		if bool(who["away"]) or str(who["town"]).is_empty():
+		if bool(who["away"]) or str(who["town"]).is_empty() or production.outside(id):
 			continue
 		towns[who["town"]] = true
 		_bank_turn(id, str(who["town"]))

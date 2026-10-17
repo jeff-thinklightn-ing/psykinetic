@@ -23,8 +23,15 @@
 	"rent_every": 54000,
 	"gold_floor": 20,
 	"start_gold": 150,
-	"official": {"guard": {"wage": 4, "every": 18000}, "hauler": {"wage": 2, "every": 18000}},
+	"official": {"guard": {"wage": 4, "every": 18000}, "hauler": {"wage": 2, "every": 18000}, "priest": {"wage": 4, "every": 18000}},
 	"town_work": {"fee": 1, "per_steps": 600},
+	"return": {
+		"steps": 600, "fee": 0, "give_up": 6000,
+		"places": {
+			"temple": {"trade": "priest", "names": ["Aldous", "Brother Cuth", "Osric", "Wendel"]},
+			"healers_hut": {"trade": "medicine_man", "outside": true, "names": ["Ned", "Old Tam", "Hob", "Gile"]}
+		}
+	},
 	"herds": {
 		"out_per_group": 6, "out_per_zone": 24, "seed": 0.5, "sample": 4,
 		"species": {
@@ -64,6 +71,7 @@
 		"forge": {"trade": "smith", "built_by": "carpenter", "xp": 20, "cost": {"wood": 10, "ore": 5}, "steps": 6000, "max_level": 3},
 		"kitchen": {"trade": "cook", "built_by": "carpenter", "xp": 10, "cost": {"wood": 6}, "steps": 3000, "max_level": 3},
 		"inn": {"built_by": "carpenter", "xp": 30, "cost": {"wood": 15, "cloth": 5}, "steps": 9000, "max_level": 3},
+		"temple": {"trade": "priest", "built_by": "carpenter", "xp": 30, "cost": {"wood": 10, "ore": 10}, "steps": 9000, "max_level": 1},
 		"walls": {"built_by": "carpenter", "xp": 25, "cost": {"wood": 20}, "steps": 9000, "max_level": 3}
 	}
 }

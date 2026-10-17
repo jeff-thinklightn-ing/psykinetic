@@ -8713,3 +8713,43 @@ Sprint_Short 5.5, so a player (3.8 to 4 tiles a second; a diagonal takes
 DIAGONAL_TICK_SCALE the ticks) jogs at about 1.5x, 3.3 steps a second of
 1.23 m, and the sprint takes over at about 4.4, between a player's and a
 companion's (4.7 to 5). The goblin keeps its own GAITS.
+## 396. The fallen are brought back at a temple or a healer's hut
+
+Jeff on B1 (2026-10-17): "temple building / priest job in town -- wilds has
+healer's hut and medicine man job - for now everyone can return"; the
+coordinator approved economy's design. On maps' return places (372: each
+placed building.temple and building.healers_hut a Holdings place of that
+kind, Holdings.nearest by walking steps across the levels) and buildings'
+kinds (373).
+
+- The temple is a town building (economy.json buildings: trade priest,
+  built by the carpenter, max level 1); a map's temple linked to its town
+  ("use": "temple", the wilds' now) stands as the map has it. A town whose
+  temple stands and that has no priest appoints one (Towns._appoint: a
+  resident, origin "appointed", named from return.places.temple.names by
+  the town), seated there; the priest is an official, paid by the bank like
+  the guard (official.priest: 4 every 18000 steps).
+- The healer's hut is not the town's: each hut place gets its medicine man
+  at boot (Main._seat_healers), a worker with a workshop of the place's
+  own, outside any town's purse (return.places' "outside":
+  Production.outside: no rent, no needs, no wage).
+- When a player, a companion or a resident dies (not taken: raids never
+  kill residents, and captives stay the rescue path), Main opens a "return"
+  job (Production.open_return) at the nearest manned place
+  (Production.manned: its keeper there, not away, its building standing;
+  the nearest of either kind, else of each kind alone). It is under way at
+  once and does not take the workshop's own job slot; after return.steps
+  (600) of its keeper's work Production.returned (Main._on_returned) brings
+  them back there at full stats: a player at the place's cell (travelling
+  there if it is another level; one not playing comes in there next time),
+  a companion with her player (at the place if they are in its level), a
+  resident home (away till then); told in the party log by name: "X is
+  brought back at the healer's hut by Ned". A job whose keeper is not
+  there for return.give_up (6000 steps), or whose place is gone, gives up
+  and brings them back as before. Where no place is manned, the old
+  respawn stands, unchanged.
+- return.fee (0) is the hook for a cost later. Return jobs are saved as any
+  job (who, who_kind, place, opened). Protocol unchanged: a respawn tile
+  and a party line, as sent before.
+
+tests/return_test.

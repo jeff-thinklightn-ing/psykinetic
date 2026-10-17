@@ -24,6 +24,7 @@ notes (decision 324).
 - The music in the open country is a soft wind drone now, not an organ-like pad, and a
   new place is marked by chimes. The pad plays beside and inside the temple instead.
 
+- When you fall, you are brought back at the nearest temple or healer's hut with someone there: after about a minute the priest or the medicine man brings you back at full health, and the party log says who did it. Companions and townsfolk who fall come back the same way. Where there is neither, you come back as before. The wilds town's temple now has its priest, paid by the town like the guard, and the healer's hut in the wilds has its medicine man.
 - Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.
 - The minimap and the big map (M) show when you host a game, not only when
   you join one.

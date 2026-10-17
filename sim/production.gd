@@ -64,6 +64,10 @@ var workshop_open := Callable()
 var workshop_level := Callable()
 ## (town, building id) -> void: a "build" job is done (Towns sets it).
 var on_built := Callable()
+## (job) -> void: a "return" job is done (decision 396; Main sets it): its
+## who and who_kind brought back at its workshop by its worker ("by"), or,
+## "fallback" true, given up on (nobody there for rules' return.give_up).
+var returned := Callable()
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
 ## (need -> step due), fed, hungry_since, last_trade, wage_due, loan
@@ -326,6 +330,44 @@ func workshop_of(worker_id: String) -> String:
 	return ""
 
 
+## A "return" job (decision 396) at [param workshop_id], under way at
+## once, worked by whoever works there: [param who] ([param who_kind]:
+## player, companion, resident) brought back after rules' return.steps, at
+## Holdings place [param place]. Its id; 0 if the workshop has nobody.
+func open_return(workshop_id: String, who: String, who_kind: String, place := "") -> int:
+	var shop: Dictionary = _workshops.get(workshop_id, {})
+	if shop.is_empty() or str(shop["worker"]).is_empty():
+		return 0
+	var id := _new_job("return", who, shop)
+	var each: Dictionary = _jobs[id]
+	each["state"] = "working"
+	each["worker"] = shop["worker"]
+	each["needed"] = maxi(int(rules.get("return", {}).get("steps", 600)), 1)
+	each["last"] = now()
+	each["opened"] = now()
+	each["who"] = who
+	each["who_kind"] = who_kind
+	each["place"] = place
+	print("[production] %s (%s) to be brought back at %s by %s" % [who, who_kind, workshop_id, _workers[shop["worker"]]["name"]])
+	return id
+
+
+## Whether someone works at [param workshop_id] now (there, not away, its
+## building standing): a place to bring the fallen back.
+func manned(workshop_id: String) -> bool:
+	return _present(str(_workshops.get(workshop_id, {}).get("worker", "")), workshop_id)
+
+
+## Whether [param worker_id] lives outside any town's purse (rules'
+## return.places with "outside": the medicine man): no rent, no needs.
+func outside(worker_id: String) -> bool:
+	var trades: Array = _workers.get(worker_id, {}).get("trades", [])
+	for place: Dictionary in rules.get("return", {}).get("places", {}).values():
+		if bool(place.get("outside", false)) and str(place.get("trade", "")) in trades:
+			return true
+	return false
+
+
 ## Whether [param town] has a "build" job queued or under way.
 func building_in(town: String) -> bool:
 	return _jobs.values().any(func(each: Dictionary) -> bool: return each["kind"] == "build" and each["town"] == town)
@@ -442,7 +484,10 @@ func _advance(at: int, cat: Dictionary) -> void:
 		if _present(each["worker"], each["workshop"]):
 			each["worked"] = int(each["worked"]) + at - int(each["last"])
 		each["last"] = at
-		if int(each["worked"]) >= int(each["needed"]):
+		if each["kind"] == "return" and int(each["worked"]) < int(each["needed"]) 				and at - int(each["opened"]) >= int(rules.get("return", {}).get("give_up", 6000)):
+			each["fallback"] = true  # Nobody there to do it: brought back as before.
+			_finish(each, cat)
+		elif int(each["worked"]) >= int(each["needed"]):
 			_finish(each, cat)
 
 
@@ -454,6 +499,15 @@ func _present(worker_id: String, workshop_id: String) -> bool:
 
 
 func _finish(each: Dictionary, cat: Dictionary) -> void:
+	if each["kind"] == "return":
+		_jobs.erase(int(each["id"]))
+		var done := each.duplicate(true)
+		done["by"] = str(_workers.get(each["worker"], {}).get("name", ""))
+		print("[production] %s %s at %s by %s, step %d" % [each["who"], "given up on, brought back as before" if done.get("fallback", false)
+			else "brought back", each["workshop"], done["by"], now()])
+		if returned.is_valid():
+			returned.call(done)
+		return
 	var worker_record: Dictionary = _workers[each["worker"]]
 	var made_at := "%s at %s" % [worker_record["name"], each["workshop"]]
 	var uid := 0
@@ -515,7 +569,7 @@ func _rent(at: int) -> void:
 	ids.sort()
 	for id in ids:
 		var worker_record: Dictionary = _workers[id]
-		if at < int(worker_record["rent_due"]):
+		if at < int(worker_record["rent_due"]) or outside(id):
 			continue
 		worker_record["rent_due"] = at + every
 		var pay := mini(rent, int(worker_record["purse"]))
@@ -1004,6 +1058,11 @@ func from_dict(saved: Dictionary) -> void:
 				"rework": int(entry.get("rework", 0)), "resources": {}, "uids": [], "needed": int(entry.get("needed", 0)),
 				"worked": int(entry.get("worked", 0)), "last": int(entry.get("last", 0)),
 				"trade": str(entry.get("trade", "")), "cost": {}, "steps": int(entry.get("steps", 0))}
+			if each["kind"] == "return":
+				each["who"] = str(entry.get("who", ""))
+				each["who_kind"] = str(entry.get("who_kind", ""))
+				each["opened"] = int(entry.get("opened", 0))
+				each["place"] = str(entry.get("place", ""))
 			var cost: Variant = entry.get("cost", {})
 			if cost is Dictionary:
 				for what: String in cost:
@@ -1017,9 +1076,10 @@ func from_dict(saved: Dictionary) -> void:
 					each["uids"].append(int(uid))
 			_next_job = maxi(_next_job, each["id"] + 1)
 			_jobs[each["id"]] = each
-			if not _workshops.has(each["workshop"]) and not (each["kind"] == "build" and each["state"] == "queued"):
+			# A return whose place is gone gives up in time (_advance): never lost.
+			if not _workshops.has(each["workshop"]) and not (each["kind"] == "build" and each["state"] == "queued") 					and each["kind"] != "return":
 				print("[production] the snapshot's job #%d is at %s, which is gone; its materials go back" % [each["id"], each["workshop"]])
 				_give_back(each)
 				_jobs.erase(each["id"])
-			elif each["state"] == "working":
+			elif each["state"] == "working" and each["kind"] != "return":
 				_workshops[each["workshop"]]["job"] = each["id"]

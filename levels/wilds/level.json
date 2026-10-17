@@ -262,7 +262,9 @@
 			"facing": [
 				0.0,
 				1.0
-			]
+			],
+			"use": "temple",
+			"town": "store"
 		},
 		{
 			"slot": "building.healers_hut",

@@ -1605,6 +1605,9 @@ func _boot() -> void:
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
 		return World.towns.building(town, kind).get("state") == Towns.STANDING
 	World.economy.dole_changed.connect(_on_dole_changed)
+	# The fallen come back at a temple or a healer's hut (decision 396).
+	World.production.returned = _on_returned
+	_seat_healers()
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
 	# The wildlife's herds (decision 367): counts on the world tick, bodies
@@ -1805,7 +1808,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 ## cell}: the edge crossed and the cell just beyond it; WorldMap.arrival);
 ## nobody else moves. The zone is opened if need be. False if there is no
 ## such map or no such player.
-func travel(peer: int, to_map: String, to_spawn := "", edge := {}) -> bool:
+func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.NO_CELL) -> bool:
 	var id: String = _peer_ids.get(peer, "")
 	var record: PlayerRecord = _records.get(id)
 	if record == null or not Level.exists(to_map):
@@ -1835,6 +1838,8 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}) -> bool:
 	record.tile = spawns.get(to_spawn, player_starts[0] if not player_starts.is_empty() else Vector2i.ZERO)
 	if not edge.is_empty():
 		record.tile = WorldMap.arrival(edge["side"], edge["cell"], level["size"])
+	if at != World.NO_CELL:
+		record.tile = at
 	record.zone = to_map
 	if not record.companion.is_empty() and not record.companion.has("resident"):
 		record.companion["tile"] = null  # Beside their player.
@@ -2522,7 +2527,7 @@ func _spawn(spec: Dictionary) -> GridEntity:
 ## player left off if the server has seen the id before (nearest free tile
 ## if its own is taken), fresh at a start tile if not. [param respawn] is a
 ## death: known player, but a start tile and full stats.
-func _join_player(peer: int, id: String, player_name: String, respawn := false) -> void:
+func _join_player(peer: int, id: String, player_name: String, respawn := false, at := World.NO_CELL) -> void:
 	var record: PlayerRecord = _records.get(id)
 	var known := record != null
 	if not known:
@@ -2537,6 +2542,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false) 
 		record.body = asked
 	var back := known and not respawn
 	var tile := _nearest_free(record.tile) if back else _free_start_tile()
+	if respawn and at != World.NO_CELL:
+		tile = _nearest_free(at)  # Brought back at a temple or a hut (decision 396).
 	if not World.is_free(tile):
 		print("[net] no free tile for %s (%s)" % [player_name, id.left(8)])
 		return
@@ -4075,17 +4082,169 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 	if entity is Player and _players.get(peer) == entity:
 		_players.erase(peer)
 		_fell_at[peer] = entity.tile
-		_respawn_at[peer] = World.tick + RESPAWN_TICKS
-		print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
+		if _start_return(str(_peer_ids.get(peer, "")), "player", entity.tile):
+			print("[net] %s died; to be brought back" % entity.name)
+		else:
+			_respawn_at[peer] = World.tick + RESPAWN_TICKS
+			print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
 	if entity is Companion:
 		var record: PlayerRecord = _records.get(entity.keeper_id)
 		if record != null and not record.companion.is_empty():
 			record.companion["alive"] = false
+			_start_return(entity.keeper_id, "companion", entity.tile)
 		_companions.erase(entity.keeper_id)
+	if entity is Resident and not (entity as Resident).worker_id.is_empty() and World.production != null:
+		# Their town's record is their truth: away till brought back.
+		var worker_id := (entity as Resident).worker_id
+		if not World.production.worker(worker_id).is_empty() and _start_return(worker_id, "resident", entity.tile):
+			World.production.set_away(worker_id, true)
 	if entity.is_creature():
 		party_log.add("%s died." % _display_name(entity))
 	elif entity.body_material == GridEntity.BodyMaterial.WOOD:
 		party_log.add("%s broke." % _display_name(entity))
+
+
+# --- The fallen brought back (decision 396) -----------------------------------------
+
+## Each healer's hut (a Holdings place of kind healers_hut, maps' 372) given
+## its medicine man if it has none: a workshop of the place's own, a worker
+## outside any town's purse (rules' return.places "outside"), named by the
+## place.
+func _seat_healers() -> void:
+	if World.holdings == null or World.production == null:
+		return
+	var places: Dictionary = World.production.rules.get("return", {}).get("places", {})
+	for kind: String in places:
+		var rule: Dictionary = places[kind]
+		if not bool(rule.get("outside", false)):
+			continue
+		var trade := str(rule.get("trade", ""))
+		var names: Array = rule.get("names", [])
+		for id: String in World.holdings.all_places():
+			if World.holdings.place(id).get("kind") != kind or not World.production.workshop(id).is_empty():
+				continue
+			var who := "%s:%s" % [trade, id]
+			var name := str(names[absi(hash(id)) % names.size()]) if not names.is_empty() else trade.capitalize()
+			World.production.add_worker(who, name, [trade], id, "wilds")
+			World.production.add_workshop(id, trade, id)
+			World.production.assign(id, who)
+			print("[return] %s the %s keeps %s" % [name, trade.replace("_", " "), id])
+
+
+## The workshop of Holdings place [param id] where the fallen are brought
+## back ("" if none): a hut's own; a temple's, its town's in its area.
+func _return_workshop(id: String) -> String:
+	if not World.production.workshop(id).is_empty():
+		return id
+	var place := World.holdings.place(id)
+	if World.towns == null or place.is_empty():
+		return ""
+	for town: String in World.towns.to_dict():
+		if str(World.holdings.place(town).get("area", "")) == str(place.get("area", "")) \
+				and not World.production.workshop("%s:%s" % [town, place["kind"]]).is_empty():
+			return "%s:%s" % [town, place["kind"]]
+	return ""
+
+
+## The place someone who fell at [param cell] of the zone World is in is
+## brought back at: the nearest of the return places that is manned, by
+## walking across the levels ({place, workshop}); {} if none is.
+func _return_place(cell: Vector2i) -> Dictionary:
+	if World.holdings == null or World.production == null:
+		return {}
+	var kinds: Array[String] = []
+	kinds.assign(World.production.rules.get("return", {}).get("places", {}).keys())
+	var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
+	var tries: Array = [kinds]
+	for kind in kinds:
+		var one: Array[String] = [kind]
+		tries.append(one)
+	for each: Array[String] in tries:
+		var id := World.holdings.nearest(each, World.zone.name, cell, routes)
+		var shop := _return_workshop(id) if not id.is_empty() else ""
+		if not shop.is_empty() and World.production.manned(shop):
+			return {"place": id, "workshop": shop}
+	return {}
+
+
+## [param who] ([param kind]: player (their id), companion (her player's),
+## resident (the worker)), fallen at [param cell], to be brought back at
+## the nearest manned place: true if a return job was opened.
+func _start_return(who: String, kind: String, cell: Vector2i) -> bool:
+	if who.is_empty():
+		return false
+	var at := _return_place(cell)
+	return not at.is_empty() and World.production.open_return(at["workshop"], who, kind, at["place"]) != 0
+
+
+## The peer [param player_id] plays on now; 0 if none.
+func _peer_of(player_id: String) -> int:
+	for peer: int in _peer_ids:
+		if _peer_ids[peer] == player_id:
+			return peer
+	return 0
+
+
+## A return job done (Production.returned): [param job]'s who brought back
+## at its place, said to them by whoever brought them back; on a fallback,
+## as before (a player at a start tile, a companion beside her player).
+func _on_returned(job: Dictionary) -> void:
+	var who := str(job.get("who", ""))
+	var place := World.holdings.place(str(job.get("place", "")))
+	var area := str(place.get("area", ""))
+	var cell: Vector2i = place.get("cell", World.NO_CELL)
+	if bool(job.get("fallback", false)) or place.is_empty():
+		cell = World.NO_CELL
+	var where := "the temple" if place.get("kind") == "temple" else "the healer's hut" if place.get("kind") == "healers_hut" \
+			else "a holy place"
+	var by := str(job.get("by", ""))
+	var was := World.zone
+	match str(job.get("who_kind", "")):
+		"player":
+			var record: PlayerRecord = _records.get(who)
+			if record == null:
+				return
+			var peer := _peer_of(who)
+			if _players.has(peer):
+				return  # Back already (a rejoin).
+			record.hp = 0  # Full stats.
+			if peer == 0:
+				# Not playing now: they come in there next time.
+				if cell != World.NO_CELL:
+					record.zone = area
+					record.tile = cell
+				return
+			if cell == World.NO_CELL:
+				_respawn_at[peer] = World.tick
+				return
+			if str(World.peer_zone.get(peer, record.zone)) == area:
+				World.enter_named(area)
+				_join_player(peer, who, record.name, true, cell)
+			else:
+				travel(peer, area, "", {}, cell)
+			Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s." % [record.name, where, by]})
+		"companion":
+			var record: PlayerRecord = _records.get(who)
+			if record == null or record.companion.is_empty():
+				return
+			var peer := _peer_of(who)
+			var player: Player = _players.get(peer)
+			var with_them := is_instance_valid(player) and player.spawned
+			record.companion["alive"] = true
+			record.companion["hp"] = 0  # Full stats.
+			record.companion["tile"] = [cell.x, cell.y] if with_them and player.zone == area and cell != World.NO_CELL else null
+			if with_them:
+				World.enter_named(player.zone)
+				_join_companion(record, player)
+				if cell != World.NO_CELL:
+					Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s." % [
+						record.companion.get("name", "Your companion"), where, by]})
+		"resident":
+			if World.production.worker(who).is_empty():
+				return
+			World.production.set_away(who, false)
+			print("[return] %s is back%s" % [World.production.worker(who)["name"], "" if cell == World.NO_CELL else " at %s by %s" % [where, by]])
+	World.enter(was)
 
 
 func _respawn_due_players(tick: int) -> void:
