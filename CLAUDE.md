@@ -68,7 +68,9 @@ which worktree owns each step, and the design rules not to break without asking 
 - Worktrees share one machine's CPU: take the bench lock before any run whose timings
   you report (map_bench, frame numbers, network benches with many processes):
   `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's
-  held, wait. Keep many-process runs short.
+  held, wait. Keep many-process runs short. A windowed clip recording (Godot's movie
+  maker writes gigabytes of frames and starves everything else) counts as a heavy run:
+  take the bench lock for it too, and clear its frames from `%TEMP%` after.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
   Stopping a background task can leave its shell script and Godot children running: after
