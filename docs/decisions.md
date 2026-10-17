@@ -8275,3 +8275,48 @@ barred state yet; the rattle is a server-only noise), bandaging, a cart rolling,
 breaking, and the UI sounds (next). Clip scenarios `sound_combat` and `sound_world`;
 sound_kit_test checks the mappings, and view_test's sound checks allow the voices. Client
 only.
+## 367. The wildlife's herds: counts on the world tick, bodies near someone
+
+Roadmap W3 (hunting and wildlife, enemy-ai leads; the coordinator approved
+economy's design). Nothing placed animals in a real level before, only
+perf's --test-herds. `Herds` (sim/herds.gd, new class_name; `World.herds`,
+made by Main at boot, server only) now keeps the world's wildlife as
+groups: {id, species (a monsters.json row's "herd": deer, rabbit, boar,
+wolf), area, home cell, count (kept, a float), out (bodies now), made}.
+
+- Capacity: an area's rich ground (every 4th cell each way, standing for
+  16, weighted by `richness(area, cell)` 0..1) times the species' density
+  a 1000 cells. Richness is maps' (WorldRichness, decision 368: thinning
+  toward the mine, none on dead ground, indoors, under a building or on a
+  faction's ground); without it (tests) 1 outdoors on ground nobody or the
+  town holds, 0 on a faction's (Holdings.ground).
+- The world tick (World.world_tick's first slice), every area, played or
+  not, deterministic: each species breeds toward capacity (logistic, its
+  breed a day, never past it); a predator eats its "eats" a day each from
+  its "prey" species' kept counts. Once a day: the ground read again, an
+  outdoor area with rich ground seeded the first time (seed, half, of its
+  capacity in groups of its size), an empty group gone, one past 1.5 times
+  its size split, and each with no bodies out roams its home to a rich
+  cell within its roam.
+- Bodies (the far tier's keeper, decision 352): `recall_near` makes the
+  groups of the zone World is in whose home is near someone into bodies
+  about their home (out_per_group 6 a group, out_per_zone 24 a zone:
+  decision 317's numbers, perf's to raise to about 40), each spawn spec
+  with "group", "home" (its wander, Monster._settle_idle) and a name of
+  the group's; the kind by the species' mix (a stag one deer in five).
+  `takes` is true for an Animal with a "group" only (others stay perf's
+  records); `retire` puts a calm far one back in its count. A death is
+  `killed(group, kind)` (enemy-ai's W4, from the death branch): gone for
+  good, so hunting depletes. A flight off an edge is `moved(group, area,
+  cell)`: the unit joins its species' nearest group there (or a new one),
+  whose id it returns. Animal records from before (no group, no level
+  slot) fold into groups when a zone's records are restored.
+- Saved: the snapshot's "herds" (groups, areas seeded, the clock); a
+  body's snapshot entry keeps its "group" and "home". A snapshot from
+  before loads with none, and the tick seeds them.
+
+Rules: levels/economy.json "herds" (group size, mix, density, breed,
+roam; the wolf's prey and eats, agreed with enemy-ai). The wilds seeds
+34 groups (deer 37, rabbits 75, boar 15, wolves 6), 24 bodies about a host
+at its start, the same after a restart. tests/herds_test. Protocol
+unchanged: animals spawn as monsters do.

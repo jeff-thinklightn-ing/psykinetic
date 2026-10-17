@@ -203,6 +203,8 @@ var mind_kind := "scripted"
 var _alive_slots: Dictionary[int, GridEntity] = {}
 ## The towns whose residents have bodies now, by place id (_town_near).
 var _towns_near := {}
+## The herds registered as a keeper (decision 367), so a second boot swaps it.
+var _herds_kept: Object = null
 ## Server only: level_entities index -> tick its entity died or broke.
 var _dead_since: Dictionary[int, int] = {}
 ## Zone name -> the tick its last respawn came back (RESPAWN_STAGGER_TICKS).
@@ -1591,6 +1593,21 @@ func _boot() -> void:
 	World.economy.dole_changed.connect(_on_dole_changed)
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
+	# The wildlife's herds (decision 367): counts on the world tick, bodies
+	# near someone through the far tier's keepers.
+	World.herds = Herds.new(snapshot.get("herds", {}), Herds.areas_of(world_map), {}, World.steps_now, World.holdings)
+	World.herds.richness = World.richness.richness  # Maps' (decision 368).
+	World.herds.here = func() -> String: return World.zone.name
+	World.herds.spawn = _spawn
+	World.herds.free_near = func(cell: Vector2i, reach: int) -> Vector2i:
+		if World.is_free(cell) and World.fields.under_sky(cell):
+			return cell
+		var draw := RandomNumberGenerator.new()
+		draw.seed = hash(cell)
+		return _free_cell_near(cell, reach, draw)
+	World.keepers.erase(_herds_kept)
+	_herds_kept = World.herds
+	World.keepers.append(World.herds)
 	# A beaten raid's companion captives come back (decision 314).
 	World.companion_freed = companion_freed
 	_records.clear()
@@ -1983,6 +2000,8 @@ func _spawn_saved(section: Dictionary) -> bool:
 		return false
 	# Monsters kept as records stay records, holding their slots (and their
 	# things) till someone comes near (decision 352); none before them.
+	if World.herds != null:
+		records = World.herds.fold_records(World.zone.name, records)  # Animals of before the herds (decision 367).
 	World.set_records(records)
 	var recorded := _recorded_slots()
 	for entry: Dictionary in saved:
@@ -2305,6 +2324,7 @@ func _save_state(wait := true) -> void:
 		"roofs": World.roofs_damaged.keys(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
+		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()

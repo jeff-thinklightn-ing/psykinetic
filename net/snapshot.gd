@@ -94,6 +94,11 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			entry["kind"] = str(spec["kind"])
 		if spec.has("art"):
 			entry["art"] = str(spec["art"])
+		# A herd's body (decision 367): its group and the group's home.
+		if spec.has("group"):
+			entry["group"] = str(spec["group"])
+		if spec.get("home") is Vector2i:
+			entry["home"] = [spec["home"].x, spec["home"].y]
 		if not entity.slots.is_empty():
 			entry["slots"] = Array(entity.slots)
 			entry["items"] = Array(World.slot_uids(entity))
@@ -131,8 +136,9 @@ static func _write(path: String, text: String) -> bool:
 ## "items" the ItemBook (ItemBook.to_dict; {} before instances), and
 ## "production" the town's work (Production.to_dict; {} before it), and
 ## "towns" how each grows (Towns.to_dict; {} before it), "roofs" the
-## damaged roofs (World.roofs_damaged's keys; [] before them), and "economy"
-## the players' gold (Economy.to_dict; {} before it). Entries that make
+## damaged roofs (World.roofs_damaged's keys; [] before them), "economy"
+## the players' gold (Economy.to_dict; {} before it), and "herds" the
+## wildlife (Herds.to_dict; {} before it). Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
@@ -185,6 +191,7 @@ static func load(path: String) -> Dictionary:
 	var towns: Variant = data.get("towns", {})
 	var roofs: Variant = data.get("roofs", [])
 	var economy: Variant = data.get("economy", {})
+	var herds: Variant = data.get("herds", {})
 	var sky: Variant = data.get("sky", {})
 	return {"ok": true, "zones": zones, "players": players,
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
@@ -195,6 +202,7 @@ static func load(path: String) -> Dictionary:
 		"towns": towns if towns is Dictionary else {},
 		"roofs": roofs if roofs is Array else [],
 		"economy": economy if economy is Dictionary else {},
+		"herds": herds if herds is Dictionary else {},
 		"sky": sky if sky is Dictionary else {}}
 
 
@@ -283,6 +291,10 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		# A monster that is no level entity (a level's own takes its kind,
 		# as all it is, from the level).
 		spec["kind"] = entry["kind"]
+	if entry.get("group") is String and not entry["group"].is_empty():
+		spec["group"] = entry["group"]
+	if vector(entry.get("home")) != null:
+		spec["home"] = vector(entry.get("home"))
 	return {
 		"spec": spec,
 		"hp": int(entry.get("hp", 0)),

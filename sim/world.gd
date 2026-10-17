@@ -439,6 +439,9 @@ var production: Production = null
 ## Server: how each town grows (Towns), choosing its buildings on the same
 ## slice; made by Main at boot, from the snapshot. Null on a client.
 var towns: Towns = null
+## Server: the wildlife's herds (Herds, decision 367), moved on by the
+## world tick's first slice; made by Main at boot. Null on a client.
+var herds: Herds = null
 ## Raid groups on the world map (decision 328), server only; null on a client.
 var raid_groups: WorldRaids = null
 ## How rich in game each cell of the world is (decision 368), for Herds;
@@ -578,6 +581,8 @@ func world_tick(slice := -1) -> void:
 			economy.tick()
 		if raid_groups != null:
 			raid_groups.world_tick()
+	if herds != null and slice <= 0:
+		herds.tick()
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())

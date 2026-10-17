@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wildlife lives in the world now: herds of deer, rabbits, boar and wolves roam the wilds, breed and are thinned by wolves even with nobody about, and appear near you as you come. What you hunt down is gone from the herd.
 - Your companion follows at your heel, a step or two behind the way you face,
   instead of closing in ahead of you, so you no longer walk into her.
 - Your companion knows where she is (the open land or old stone halls, and

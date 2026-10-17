@@ -25,6 +25,15 @@
 	"start_gold": 150,
 	"official": {"guard": {"wage": 4, "every": 18000}, "hauler": {"wage": 2, "every": 18000}},
 	"town_work": {"fee": 1, "per_steps": 600},
+	"herds": {
+		"out_per_group": 6, "out_per_zone": 24, "seed": 0.5, "sample": 4,
+		"species": {
+			"deer": {"size": [4, 7], "mix": {"deer": 4, "stag": 1}, "density": 1.5, "breed": 0.03, "roam": 12},
+			"rabbit": {"size": [3, 6], "mix": {"rabbit": 1}, "density": 3.0, "breed": 0.08, "roam": 8},
+			"boar": {"size": [2, 4], "mix": {"boar": 1}, "density": 0.6, "breed": 0.03, "roam": 10},
+			"wolf": {"size": [3, 5], "mix": {"wolf": 1}, "density": 0.25, "breed": 0.02, "roam": 20, "prey": ["rabbit", "deer"], "eats": 0.2}
+		}
+	},
 	"bank": {"cap": 30, "interest": 0.1, "repay_share": 0.5, "work_off": 6, "work_off_until": 0.5},
 	"folk": {
 		"needs": {
