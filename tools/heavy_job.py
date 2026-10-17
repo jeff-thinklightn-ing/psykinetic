@@ -1,0 +1,522 @@
+#!/usr/bin/env python3
+"""The resource gate for heavy jobs (decision 394, Jeff's rule): before a
+session starts a heavy job (mesh or image generation, a test suite, a bench,
+a Godot import or export) it asks this gate, shared by every tree and
+art-gen, which lets it start only when there is room:
+
+  * free RAM, less what running jobs have yet to take of their estimates,
+    at least the job's estimate plus MARGIN_GB (8: the machine keeps 8 GB
+    free);
+  * for a GPU kind, free GPU memory (nvidia-smi) at least its GPU estimate;
+  * fewer than MAX_RUNNING heavy jobs running, and never two GPU jobs.
+
+Otherwise it waits in a queue, first come first served: only the job at
+its head may start, so a big job is not starved by small ones. A job run
+through `run` is watched: if free RAM falls under the margin while it runs
+and it is the newest job running, its own wrapper stops its own child (no
+one else's process: never kill by name, never another session's) and puts
+it back in the queue, MAX_RESTARTS times at most. Each kind's estimate is
+updated from the peak `run` measures (the whole process tree's working
+set), rising at once and falling slowly.
+
+State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
+them elsewhere, as the test does): running/ and queue/ hold a file a job,
+kinds.json the estimates, heavy_jobs.log a line an event (`summary`).
+
+  heavy_job.py run <tree> <kind> -- <command...>   wait, run, release; the command's exit code
+  heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap)
+  heavy_job.py release <tree> <kind>               give back what take held
+  heavy_job.py holds <tree> <kind>                 exit 0 if <tree> holds a <kind> (run or take)
+  heavy_job.py status                              running, queued, free memory
+  heavy_job.py kinds                               the kinds and their estimates
+  heavy_job.py summary [YYYY-MM-DD]                what waited or was stopped that day (today)
+
+Standard library only (ctypes for Windows), so any Python can run it by path.
+"""
+import ctypes
+import datetime
+import json
+import os
+import subprocess
+import sys
+import time
+
+STATE_DIR = os.environ.get("HEAVY_JOBS_DIR", r"C:\dev\psykinetic-trees\heavy_jobs")
+MARGIN_GB = 8.0
+MAX_RUNNING = 3
+MAX_GPU_RUNNING = 1
+POLL_SECONDS = 5.0
+WATCH_SECONDS = 2.0
+## Free RAM under the margin this many watches running stops the newest job.
+LOW_WATCHES = 2
+MAX_RESTARTS = 2
+## A take with no process to watch is forgotten after this long.
+TAKE_STALE_SECONDS = 2 * 3600
+## The state's own lock, if its holder died holding it.
+LOCK_STALE_SECONDS = 30
+## The kinds and their first estimates (GB), before any is measured.
+KINDS = {
+    "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
+    "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
+    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False},  # tests/land.sh: 6.3 GB measured
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False},
+    "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False},
+    "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False},
+}
+GB = 1024.0 ** 3
+
+
+# --- The decision (pure: the test gives it numbers) -------------------------
+
+def reserved_gb(running):
+    """What running jobs are still owed: each one's estimate less what it
+    already uses (a take, unwatched, owes its whole estimate)."""
+    return sum(max(0.0, job["ram_gb"] - job.get("using_gb", 0.0)) for job in running)
+
+
+def decide(job, running, head, free_ram_gb, free_gpu_gb):
+    """Whether [job] may start now: (True, "") or (False, why). [running]:
+    the jobs running ({ram_gb, using_gb, gpu}); [head]: whether it is first
+    in the queue; free memory in GB (free_gpu_gb None: no GPU known)."""
+    if not head:
+        return False, "behind others in the queue"
+    if len(running) >= MAX_RUNNING:
+        return False, "%d heavy jobs running" % len(running)
+    if job["gpu"] and sum(1 for each in running if each["gpu"]) >= MAX_GPU_RUNNING:
+        return False, "a GPU job is running"
+    room = free_ram_gb - reserved_gb(running)
+    if room < job["ram_gb"] + MARGIN_GB:
+        return False, "%.1f GB free (%.1f GB owed to running jobs), %.1f + %.0f GB wanted" % (
+            free_ram_gb, reserved_gb(running), job["ram_gb"], MARGIN_GB)
+    if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
+        return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
+    return True, ""
+
+
+def should_stop(me, running, free_ram_gb):
+    """Whether the watched job [me] stops its child: free RAM is under the
+    margin and no running job started after it."""
+    if free_ram_gb >= MARGIN_GB:
+        return False
+    return all(each["started"] <= me["started"] for each in running)
+
+
+def updated_estimate(old_gb, peak_gb):
+    """A kind's estimate after a run that peaked at [peak_gb]: up to it at
+    once, down toward it slowly."""
+    return round(max(peak_gb, 0.8 * old_gb + 0.2 * peak_gb), 2)
+
+
+# --- The machine -------------------------------------------------------------
+
+def free_ram_gb():
+    if os.name == "nt":
+        class Status(ctypes.Structure):
+            _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
+                ("total_phys", ctypes.c_ulonglong), ("avail_phys", ctypes.c_ulonglong),
+                ("total_page", ctypes.c_ulonglong), ("avail_page", ctypes.c_ulonglong),
+                ("total_virtual", ctypes.c_ulonglong), ("avail_virtual", ctypes.c_ulonglong),
+                ("avail_extended", ctypes.c_ulonglong)]
+        status = Status()
+        status.length = ctypes.sizeof(Status)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))
+        return status.avail_phys / GB
+    with open("/proc/meminfo") as meminfo:
+        for line in meminfo:
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) * 1024 / GB
+    return 0.0
+
+
+def gpu_gb():
+    """(free, used) GPU memory in GB, or (None, None) with no nvidia-smi."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free,memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=10).stdout.strip().splitlines()
+        free, used = out[0].split(",")
+        return float(free) / 1024.0, float(used) / 1024.0
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None, None
+
+
+def alive(pid):
+    if not pid:
+        return False
+    if os.name == "nt":
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except OSError:
+        return False
+
+
+class Job:
+    """[child] (this wrapper's own) and every process it starts, in a
+    Windows job object: they join it as they are made, whatever runs them
+    (a shell's background subshells, timeout, an exec), so the job's memory
+    is theirs and stopping it stops them all. Elsewhere, the child alone."""
+
+    def __init__(self, child):
+        self.child = child
+        self.handle = None
+        if os.name == "nt":
+            kernel = ctypes.windll.kernel32
+            kernel.CreateJobObjectW.restype = ctypes.c_void_p
+            handle = kernel.CreateJobObjectW(None, None)
+            if handle and kernel.AssignProcessToJobObject(ctypes.c_void_p(handle), ctypes.c_void_p(int(child._handle))):
+                self.handle = handle
+
+    def using_gb(self):
+        """The working set of the job's processes now."""
+        if self.handle is None:
+            return 0.0
+        kernel = ctypes.windll.kernel32
+
+        class Ids(ctypes.Structure):
+            _fields_ = [("assigned", ctypes.c_ulong), ("listed", ctypes.c_ulong), ("ids", ctypes.c_size_t * 1024)]
+
+        class Counters(ctypes.Structure):
+            _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong),
+                ("peak_working_set", ctypes.c_size_t), ("working_set", ctypes.c_size_t),
+                ("quota_peak_paged", ctypes.c_size_t), ("quota_paged", ctypes.c_size_t),
+                ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
+                ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
+        ids = Ids()
+        if not kernel.QueryInformationJobObject(ctypes.c_void_p(self.handle), 3, ctypes.byref(ids), ctypes.sizeof(ids), None):
+            return 0.0  # 3: JobObjectBasicProcessIdList
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        total = 0
+        for i in range(ids.listed):
+            process = kernel.OpenProcess(0x1000 | 0x0010, False, int(ids.ids[i]))  # QUERY_LIMITED | VM_READ
+            if not process:
+                continue
+            counters = Counters()
+            counters.cb = ctypes.sizeof(Counters)
+            if kernel.K32GetProcessMemoryInfo(ctypes.c_void_p(process), ctypes.byref(counters), counters.cb):
+                total += counters.working_set
+            kernel.CloseHandle(ctypes.c_void_p(process))
+        return total / GB
+
+    def peak_gb(self):
+        """The most memory the job's processes held at once (committed), as
+        Windows counted it."""
+        if self.handle is None:
+            return 0.0
+
+        class Limits(ctypes.Structure):
+            _fields_ = [("user_time", ctypes.c_longlong), ("job_user_time", ctypes.c_longlong), ("flags", ctypes.c_ulong),
+                ("min_ws", ctypes.c_size_t), ("max_ws", ctypes.c_size_t), ("processes", ctypes.c_ulong),
+                ("affinity", ctypes.c_size_t), ("priority", ctypes.c_ulong), ("scheduling", ctypes.c_ulong),
+                ("io", ctypes.c_ulonglong * 6), ("process_limit", ctypes.c_size_t), ("job_limit", ctypes.c_size_t),
+                ("peak_process", ctypes.c_size_t), ("peak_job", ctypes.c_size_t)]
+        limits = Limits()
+        if not ctypes.windll.kernel32.QueryInformationJobObject(ctypes.c_void_p(self.handle), 9, ctypes.byref(limits),
+                ctypes.sizeof(limits), None):  # 9: JobObjectExtendedLimitInformation
+            return 0.0
+        return limits.peak_job / GB
+
+    def stop(self):
+        """Stops the child and everything it started."""
+        if self.handle is not None:
+            ctypes.windll.kernel32.TerminateJobObject(ctypes.c_void_p(self.handle), 1)
+        else:
+            self.child.kill()
+
+    def close(self):
+        if self.handle is not None:
+            ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(self.handle))
+            self.handle = None
+
+
+# --- State --------------------------------------------------------------------
+
+def _path(*parts):
+    return os.path.join(STATE_DIR, *parts)
+
+
+class StateLock:
+    """The state's own lock, held for a moment while files change."""
+
+    def __enter__(self):
+        os.makedirs(_path("running"), exist_ok=True)
+        os.makedirs(_path("queue"), exist_ok=True)
+        lock = _path("state.lock")
+        while True:
+            try:
+                os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                return self
+            except FileExistsError:
+                try:
+                    if time.time() - os.path.getmtime(lock) > LOCK_STALE_SECONDS:
+                        os.remove(lock)
+                        continue
+                except OSError:
+                    pass
+                time.sleep(0.05)
+
+    def __exit__(self, *_):
+        try:
+            os.remove(_path("state.lock"))
+        except OSError:
+            pass
+
+
+def _read(path):
+    try:
+        with open(path) as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return None
+
+
+def _write(path, data):
+    temp = path + ".tmp"
+    with open(temp, "w") as handle:
+        json.dump(data, handle)
+    for attempt in range(20):
+        try:
+            os.replace(temp, path)
+            return
+        except PermissionError:
+            # Windows: something (a scanner, a reader) has it open a moment.
+            time.sleep(0.05)
+    os.replace(temp, path)
+
+
+def kinds():
+    saved = _read(_path("kinds.json")) or {}
+    table = {}
+    for name, first in KINDS.items():
+        table[name] = dict(first, **saved.get(name, {}))
+    for name, row in saved.items():
+        table.setdefault(name, row)
+    return table
+
+
+def _entries(folder):
+    """The live entries of running/ or queue/, oldest first; stale ones
+    (their process gone, or a take past TAKE_STALE_SECONDS) removed."""
+    out = []
+    for name in sorted(os.listdir(_path(folder))):
+        if not name.endswith(".json"):
+            continue
+        entry = _read(_path(folder, name))
+        if entry is None:
+            continue
+        pid = entry.get("pid")
+        stale = not alive(pid) if pid else time.time() - entry.get("started", entry["queued"]) > TAKE_STALE_SECONDS
+        if stale:
+            os.remove(_path(folder, name))
+            log("stale", entry["tree"], entry["kind"], "%s dropped" % folder)
+            continue
+        entry["file"] = name
+        out.append(entry)
+    return out
+
+
+def log(event, tree, kind, detail=""):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(_path("heavy_jobs.log"), "a") as handle:
+        handle.write("%s\t%s\t%s\t%s\t%s\n" % (datetime.datetime.now().isoformat(timespec="seconds"), event, tree, kind, detail))
+
+
+# --- Commands -----------------------------------------------------------------
+
+def wait_turn(tree, kind, pid, watched):
+    """Queues, waits to be at the head with room, then moves to running.
+    Returns the running entry's file name."""
+    row = kinds()[kind]
+    queued = time.time()
+    ticket = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
+    with StateLock():
+        _write(_path("queue", ticket), {"tree": tree, "kind": kind, "pid": pid, "queued": queued})
+    said = 0.0
+    while True:
+        with StateLock():
+            queue = _entries("queue")
+            running = _entries("running")
+            free_gpu, _ = gpu_gb() if row["gpu"] else (None, None)
+            head = bool(queue) and queue[0]["file"] == ticket
+            ok, why = decide(row, running, head, free_ram_gb(), free_gpu)
+            if ok:
+                os.remove(_path("queue", ticket))
+                name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
+                _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "queued": queued,
+                    "started": time.time(), "ram_gb": row["ram_gb"], "gpu": row["gpu"], "using_gb": 0.0, "watched": watched})
+                waited = time.time() - queued
+                log("start", tree, kind, "waited %.0f s" % waited if waited >= POLL_SECONDS else "")
+                if waited >= POLL_SECONDS:
+                    print("heavy_job: %s %s starts after waiting %.0f s" % (tree, kind, waited), file=sys.stderr)
+                return name
+        if time.time() - said >= 60.0:
+            said = time.time()
+            print("heavy_job: %s %s waiting: %s" % (tree, kind, why), file=sys.stderr)
+        time.sleep(POLL_SECONDS)
+
+
+def run(tree, kind, command):
+    restarts = 0
+    while True:
+        name = wait_turn(tree, kind, os.getpid(), True)
+        started = time.time()
+        child = subprocess.Popen(command)
+        job = Job(child)
+        peak, low, stopped = 0.0, 0, False
+        gpu_peak = 0.0
+        row = kinds()[kind]
+        while child.poll() is None:
+            time.sleep(WATCH_SECONDS)
+            using = job.using_gb()
+            peak = max(peak, using, job.peak_gb())
+            if row["gpu"]:
+                _, used = gpu_gb()
+                gpu_peak = max(gpu_peak, used or 0.0)
+            with StateLock():
+                entry = _read(_path("running", name))
+                if entry is not None:
+                    entry["using_gb"] = using
+                    _write(_path("running", name), entry)
+                running = _entries("running")
+            free = free_ram_gb()
+            low = low + 1 if free < MARGIN_GB else 0
+            if low >= LOW_WATCHES and entry is not None and should_stop(entry, running, free) and child.poll() is None:
+                job.stop()
+                child.wait()
+                stopped = True
+                break
+        peak = max(peak, job.peak_gb())
+        job.close()
+        code = child.returncode
+        duration = time.time() - started
+        with StateLock():
+            try:
+                os.remove(_path("running", name))
+            except OSError:
+                pass
+            if not stopped and peak > 0.0:
+                table = _read(_path("kinds.json")) or {}
+                saved = dict(kinds()[kind])
+                saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
+                if saved["gpu"] and gpu_peak > 0.0:
+                    saved["gpu_gb"] = updated_estimate(saved["gpu_gb"], gpu_peak)
+                saved["last_peak_gb"] = round(peak, 2)
+                table[kind] = saved
+                _write(_path("kinds.json"), table)
+        if not stopped:
+            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB" % (code, duration, peak))
+            return code
+        restarts += 1
+        log("stopped", tree, kind, "free RAM under %.0f GB after %.0f s (peak %.1f GB); restart %d of %d" % (
+            MARGIN_GB, duration, peak, restarts, MAX_RESTARTS))
+        print("heavy_job: %s %s stopped: free RAM under %.0f GB, the newest job; queued again" % (tree, kind, MARGIN_GB), file=sys.stderr)
+        if restarts > MAX_RESTARTS:
+            return 75
+
+
+def take(tree, kind, pid):
+    wait_turn(tree, kind, pid, False)
+    print("heavy_job: %s %s taken" % (tree, kind))
+    return 0
+
+
+def release(tree, kind):
+    with StateLock():
+        for entry in _entries("running"):
+            if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
+                os.remove(_path("running", entry["file"]))
+                log("done", tree, kind, "released after %.0f s" % (time.time() - entry["started"]))
+                print("heavy_job: %s %s released" % (tree, kind))
+                return 0
+    print("heavy_job: %s holds no %s" % (tree, kind), file=sys.stderr)
+    return 1
+
+
+def holds(tree, kind):
+    """Whether [tree] holds a [kind] now (a take, or a run going): a script
+    called inside it (land.sh, under its session's take) does not queue
+    again."""
+    with StateLock():
+        return any(entry["tree"] == tree and entry["kind"] == kind for entry in _entries("running"))
+
+
+def status():
+    with StateLock():
+        running = _entries("running")
+        queue = _entries("queue")
+    free_gpu, used_gpu = gpu_gb()
+    print("free RAM %.1f GB (margin %.0f GB), GPU %s" % (free_ram_gb(), MARGIN_GB,
+        "%.1f GB free" % free_gpu if free_gpu is not None else "unknown"))
+    for entry in running:
+        print("running %s %s, %.0f s, using %.1f of %.1f GB%s" % (entry["tree"], entry["kind"], time.time() - entry["started"],
+            entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)"))
+    for entry in queue:
+        print("queued %s %s, %.0f s" % (entry["tree"], entry["kind"], time.time() - entry["queued"]))
+    if not running and not queue:
+        print("no heavy jobs")
+    return 0
+
+
+def show_kinds():
+    for name, row in sorted(kinds().items()):
+        print("%-14s %5.1f GB RAM%s%s" % (name, row["ram_gb"], ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
+            ", last peak %.1f GB" % row["last_peak_gb"] if "last_peak_gb" in row else ""))
+    return 0
+
+
+def summary(day):
+    lines = []
+    try:
+        with open(_path("heavy_jobs.log")) as handle:
+            for line in handle:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] == "stopped" or "waited" in parts[4]):
+                    lines.append(parts)
+    except OSError:
+        pass
+    if not lines:
+        print("%s: no heavy job waited or was stopped" % day)
+    for when, event, tree, kind, detail in lines:
+        print("%s %s %s %s: %s" % (when[11:16], tree, kind, "stopped" if event == "stopped" else "waited", detail))
+    return 0
+
+
+def main(args):
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(__doc__)
+        return 0
+    command = args[0]
+    if command in ("run", "take", "release", "holds") and (len(args) < 3 or args[2] not in kinds()):
+        print("heavy_job: %s <tree> <kind>, a kind of: %s" % (command, ", ".join(sorted(kinds()))), file=sys.stderr)
+        return 2
+    if command == "run":
+        if "--" not in args or args.index("--") == len(args) - 1:
+            print("heavy_job: run <tree> <kind> -- <command...>", file=sys.stderr)
+            return 2
+        return run(args[1], args[2], args[args.index("--") + 1:])
+    if command == "take":
+        pid = int(args[args.index("--pid") + 1]) if "--pid" in args else None
+        return take(args[1], args[2], pid)
+    if command == "release":
+        return release(args[1], args[2])
+    if command == "holds":
+        return 0 if holds(args[1], args[2]) else 1
+    if command == "status":
+        return status()
+    if command == "kinds":
+        return show_kinds()
+    if command == "summary":
+        return summary(args[1] if len(args) > 1 else datetime.date.today().isoformat())
+    print("heavy_job: no command %s (run, take, release, status, kinds, summary)" % command, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

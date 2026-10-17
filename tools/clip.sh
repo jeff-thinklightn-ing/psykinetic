@@ -9,6 +9,13 @@
 # so even a scenario whose script does not load stops), and clip.gd stops itself
 # then too.
 set -u
+# A heavy job (decision 394): the whole run goes through the gate as
+# <checkout> bench (tools/heavy_job.py), waiting there if the machine has
+# no room.
+if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
+	root="$(cd "$(dirname "$0")/.." && pwd)"
+	HEAVY_JOB_INSIDE=1 exec python "$root/tools/heavy_job.py" run "$(basename "$root")" bench -- bash "$root/tools/$(basename "$0")" "$@"
+fi
 GODOT="${GODOT_PATH:-godot}"
 case "$GODOT" in
 	*_console.exe) ;;

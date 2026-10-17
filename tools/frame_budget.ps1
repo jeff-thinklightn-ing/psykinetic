@@ -49,7 +49,9 @@ $bench = @("--path", $root, "--scene", "res://tools/map_bench.tscn", "--",
 if ($Clear) { $bench += @("--weather=clear", "--hour=12") } else { $bench += @("--weather=storm", "--hour=23", "--test-minimap") }
 if ($Off.Count -gt 0) { $bench += "--off=$($Off -join ',')" }
 if ($NoFade) { $bench += "--fade=0" }
-$log = & $Godot @bench 2>&1 | ForEach-Object { "$_" }
+# A heavy job (decision 394): through the gate as <checkout> bench.
+$gate = Join-Path $PSScriptRoot "heavy_job.py"
+$log = & python $gate run (Split-Path $root -Leaf) bench -- $Godot @bench 2>&1 | ForEach-Object { "$_" }
 $time = $log | Where-Object { $_ -like "BENCH frame time:*" } | Select-Object -First 1
 $frames = $log | Where-Object { $_ -like "BENCH frames:*" } | Select-Object -First 1
 $render = $log | Where-Object { $_ -like "BENCH a frame:*" } | Select-Object -First 1

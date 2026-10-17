@@ -8407,3 +8407,36 @@ Rejected: animals stepping off diagonally (they arrived a row off); a wolf's
 day kept as a sitting idle mode (the wander radius already holds it at home,
 and keeps W1's grazing poses); placement by line of sight (a distance check
 is enough at a recall's reach, and cheap).
+## 394. Heavy jobs wait for room: a shared resource gate
+
+Jeff's rule (2026-10-17), after two TRELLIS jobs at once ran the machine
+out of memory and Claude Code stopped other sessions' landings and
+watches: before any session starts a heavy job (mesh or image generation,
+a test suite, a bench, a Godot import or export) it asks one gate shared
+by every tree and art-gen, tools/heavy_job.py (`run`, `take`, `release`,
+`holds`, `status`, `kinds`, `summary`; tools/heavy_job.sh and .ps1 call
+it), Python's standard library only so art-gen's own Python runs it by
+path.
+
+A job starts only at the head of a first-come queue, and only if free RAM,
+less what running jobs have yet to take of their estimates, covers its
+estimate plus 8 GB; a GPU kind also needs its GPU estimate free
+(nvidia-smi); at most 3 heavy jobs run, never two on the GPU. A job run
+through `run` sits in a Windows job object with everything it starts (a
+shell's background subshells included, which a walk of parent ids loses),
+so its memory is measured whole and it can be stopped whole; each kind's
+estimate becomes max(peak, 0.8 old + 0.2 peak) after a run. If free RAM
+stays under 8 GB while jobs run, the newest one's own wrapper stops its
+own child and queues it again (twice at most); nobody stops another
+session's process. State and log live outside every checkout, in
+C:\dev\psykinetic-trees\heavy_jobs (running/, queue/, kinds.json,
+heavy_jobs.log, which `summary <date>` reads for the daily summary).
+
+tests/land.sh and land.ps1 run through it as `<checkout> suite` unless
+the checkout already holds suite: a landing takes it before the land lock
+and releases it after, so a landing never waits on the gate holding the
+lock. tools/clip.sh, net_bench.sh and frame_budget.ps1 run as bench. The
+bench lock stays, for timing. Measured: the landing suite 6.3 GB at its
+peak, an import 0.8 GB, frame_budget 1.6 GB. tests/heavy_job_test.py
+checks the decision with made-up numbers, and land.sh runs it.
+

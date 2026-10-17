@@ -7,8 +7,18 @@
 # The suite takes the job count (tests/jobs.sh) less the two the others use
 # most of the time; each part's whole output is shown if it fails, else only
 # its last line. tests/land.ps1 is the same; one of them is enough.
+# A heavy job (decision 394): it runs through the gate as <checkout> suite
+# (tools/heavy_job.py), waiting there if the machine has no room, unless
+# this checkout already holds suite (a landing takes it before the land
+# lock, so it never waits on the gate holding the lock). tests/heavy_job_test
+# runs first, alone.
 set -u
 cd "$(dirname "$0")/.."
+tree="$(basename "$(pwd)")"
+if [ -z "${HEAVY_JOB_INSIDE:-}" ] && ! python tools/heavy_job.py holds "$tree" suite; then
+	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
+	HEAVY_JOB_INSIDE=1 exec python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
+fi
 . tests/jobs.sh
 LOGS="$(mktemp -d -t psykinetic-land.XXXXXX)"
 trap 'rm -rf "$LOGS"' EXIT
@@ -28,6 +38,7 @@ part() {
 	read -r code took <"$LOGS/$name.status"
 	echo "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)  $name ${took}s"
 }
+part heavy_job_test python tests/heavy_job_test.py
 part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
 part net_test bash tests/net_test.sh &
 part state_test bash tests/state_test.sh &
@@ -35,7 +46,7 @@ wait
 
 code=0
 failed=""
-for name in suite net_test state_test; do
+for name in heavy_job_test suite net_test state_test; do
 	read -r status took <"$LOGS/$name.status"
 	if [ "$status" -ne 0 ]; then
 		code=1
@@ -62,7 +73,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	echo "LANDING TESTS: PASS (suite, net_test, state_test; $(( $(date +%s) - started ))s)"
+	echo "LANDING TESTS: PASS (suite, net_test, state_test, heavy_job_test; $(( $(date +%s) - started ))s)"
 else
 	echo "LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi

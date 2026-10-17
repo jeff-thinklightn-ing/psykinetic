@@ -6,7 +6,24 @@
 # The suite takes the job count (tests\jobs.ps1) less the two the others use
 # most of the time; each part's whole output is shown if it fails, else only
 # its result line. tests/land.sh is the same; one of them is enough.
+# A heavy job (decision 394): through the gate as <checkout> suite unless
+# this checkout already holds suite (see tests/land.sh); heavy_job_test first.
 $root = Split-Path $PSScriptRoot -Parent
+$tree = Split-Path $root -Leaf
+$gate = Join-Path $root 'tools\heavy_job.py'
+if (-not $env:HEAVY_JOB_INSIDE) {
+	& python $gate holds $tree suite
+	if ($LASTEXITCODE -ne 0) {
+		Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
+		$env:HEAVY_JOB_INSIDE = '1'
+		try {
+			& python $gate run $tree suite -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+			exit $LASTEXITCODE
+		} finally {
+			Remove-Item Env:HEAVY_JOB_INSIDE -ErrorAction SilentlyContinue
+		}
+	}
+}
 . (Join-Path $PSScriptRoot 'jobs.ps1')
 $logs = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-land-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force $logs | Out-Null
@@ -14,6 +31,9 @@ New-Item -ItemType Directory -Force $logs | Out-Null
 $suiteJobs = [Math]::Max(2, (Get-TestJobs $root) - 2)
 Write-Output "landing tests: the suite ($suiteJobs at once), net_test and state_test together"
 $started = Get-Date
+$gateTest = & python (Join-Path $root 'tests\heavy_job_test.py') 2>&1
+$gateOk = $LASTEXITCODE -eq 0
+Write-Output "$(if ($gateOk) { 'PASS' } else { 'FAIL' })  heavy_job_test"
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1' }
 $running = @{}
 $env:PSYKINETIC_TEST_JOBS = "$suiteJobs"  # Only the suite reads it.
@@ -29,6 +49,10 @@ try {
 	Remove-Item Env:PSYKINETIC_TEST_JOBS -ErrorAction SilentlyContinue
 }
 $failed = @()
+if (-not $gateOk) {
+	$failed += 'heavy_job_test'
+	$gateTest | Write-Output
+}
 $done = @{}
 while ($done.Count -lt $parts.Count) {
 	Start-Sleep -Milliseconds 500
