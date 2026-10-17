@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_charge()
 	_test_flank()
 	_test_hold_back()
+	_test_dread()
 	_test_reaction()
 	_test_kind_saved()
 	_test_facing()
@@ -282,6 +283,64 @@ func _test_hold_back() -> void:
 		if World.are_adjacent(timid.tile, player.tile):
 			joined = true
 	_check(joined, "with another at it, it joins in")
+
+
+func _test_dread() -> void:
+	print("\n== a dread weapon: cowards count its holder as two, the cautious wait for two and break sooner ==")
+	var e := _build(["##########", "#........#", "#P...i...#", "#........#", "#........#", "##########"])
+	var player: GridEntity = e["P"][0]
+	var imp: Monster = e["i"][0]
+	_bold(imp)
+	imp.target = player
+	imp.temper = Monster.Temper.CAUTIOUS
+	imp.hp = int(imp.max_hp * 0.45)
+	_check(imp._others_needed() == 1 and not imp._should_flee(), "a plain foe: the cautious wait for one, hold at 45% hp")
+	var sword := World.items.mint("sword", "built", "test")
+	World.put_item(player, player, Player.RIGHT_HAND, sword)
+	World.items.set_name(sword, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's sword"}, "dread")
+	_check(World.holder_dread(player), "the player is dreaded")
+	_check(imp._others_needed() == 2 and imp._should_flee(), "a dread holder: the cautious wait for two, break at 45% hp")
+	imp.temper = Monster.Temper.BOLD
+	_check(imp._others_needed() == 1 and not imp._should_flee(), "the bold take no notice")
+	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
+	var e1 := _build(["#######", "#P.i..#", "#######"])
+	player = e1["P"][0]
+	imp = e1["i"][0]
+	_bold(imp)
+	imp.target = player
+	imp.temper = Monster.Temper.COWARDLY
+	_check(not imp._should_flee(), "a coward alone against one plain foe stands")
+	sword = World.items.mint("sword", "built", "test")
+	World.put_item(player, player, Player.RIGHT_HAND, sword)
+	World.items.set_name(sword, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's sword"}, "dread")
+	_check(imp._should_flee(), "against a dread holder it runs")
+	var wolf := Animal.new()
+	wolf.temper = Monster.Temper.CAUTIOUS
+	wolf.target = player
+	_check(not wolf._dreads_target(), "a wolf (cautious by its row) takes no notice")
+	wolf.free()
+	# Holding back: a cautious one bolder than HOLD_BACK_BELOW comes on
+	# alone, but not at a dread holder.
+	var e2 := _build(["##########", "#........#", "#P...i...#", "#........#", "#........#", "##########"])
+	player = e2["P"][0]
+	imp = e2["i"][0]
+	_bold(imp)
+	imp.temper = Monster.Temper.CAUTIOUS
+	imp.boldness = 0.5
+	sword = World.items.mint("sword", "built", "test")
+	World.put_item(player, player, Player.RIGHT_HAND, sword)
+	World.items.set_name(sword, {"form": "holder_possessive", "holder": "Ash", "made_step": 0, "text": "Ash's sword"}, "dread")
+	for i in 40:
+		World.step()
+	_check(World.distance(imp.tile, player.tile) >= 2 and World.distance(imp.tile, player.tile) <= Monster.HOLD_BACK_RANGE,
+			"a bold-enough cautious one hangs back from a dread holder (%d tiles off)" % World.distance(imp.tile, player.tile))
+	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
+	var closed := false
+	for i in 30:
+		World.step()
+		if World.are_adjacent(imp.tile, player.tile):
+			closed = true
+	_check(closed, "the sword gone, it comes on")
 
 
 func _test_reaction() -> void:

@@ -58,11 +58,15 @@ const FLOAT_PROPS: Array[String] = ["mass", "move_ticks"]
 ## for help when it first sees someone. COWARDLY: calls for help, holds
 ## back till two others are at its target, breaks early, or alone against
 ## two or more (COWARD_ODDS_TILES). Each breaks below FLEE_BELOW of its hp;
-## its boldness (holding back) is drawn within BOLDNESS.
+## its boldness (holding back) is drawn within BOLDNESS. Its target holding
+## a dread weapon (World.holder_dread, decision 365): a coward counts it as
+## two, the cautious hold back till two others are at it and break below
+## DREAD_FLEE_BELOW; the bold take no notice.
 enum Temper { BOLD, CAUTIOUS, COWARDLY }
 const TEMPER_NAMES := {"bold": Temper.BOLD, "cautious": Temper.CAUTIOUS, "cowardly": Temper.COWARDLY}
 const BOLDNESS := {Temper.BOLD: Vector2(0.6, 1.0), Temper.CAUTIOUS: Vector2(0.1, 0.29), Temper.COWARDLY: Vector2(0.0, 0.09)}
 const FLEE_BELOW := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
+const DREAD_FLEE_BELOW := 0.5
 const BOLD_LEASH := 1.5
 const COWARD_ODDS_TILES := 3
 ## Fleeing (Alert.FLEEING): it runs FLEE_TILES at most at a time, and
@@ -521,8 +525,8 @@ func _sim_tick() -> void:
 		return
 	if World.wielded(self).is_empty() and _pick_up(true):
 		return  # Bare-handed: the weapon at its feet first.
-	if boldness < HOLD_BACK_BELOW and World.distance(tile, target.tile) <= HOLD_BACK_RANGE \
-			and not _target_beset(2 if temper == Temper.COWARDLY else 1):
+	if (boldness < HOLD_BACK_BELOW or _dreads_target()) \
+			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()):
 		return  # Waits for the others.
 	if _rng.randf() < pause_chance:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
@@ -1214,17 +1218,36 @@ func _settle_temper(kind: String) -> void:
 
 # --- Fleeing, calls and routs -------------------------------------------------------
 
-## Fighting: whether it breaks and runs (FLEE_BELOW of its hp, or a coward
-## alone against two or more near).
+## How many others it waits for at its target before it closes in: a
+## coward two, the cautious one (two at a dread holder), the bold one.
+func _others_needed() -> int:
+	if temper == Temper.COWARDLY or temper == Temper.CAUTIOUS and _dreads_target():
+		return 2
+	return 1
+
+
+## Whether its target holds a dread thing and it minds (not bold; an
+## animal never: a wolf is cautious by its row, but knows no names).
+func _dreads_target() -> bool:
+	return temper != Temper.BOLD and not self is Animal and is_instance_valid(target) and World.holder_dread(target)
+
+
+## Fighting: whether it breaks and runs (FLEE_BELOW of its hp, DREAD_FLEE_BELOW
+## for the cautious at a dread holder, or a coward alone against two or more
+## near, a dread holder counted as two).
 func _should_flee() -> bool:
-	if max_hp > 0 and hp < max_hp * float(FLEE_BELOW[temper]):
+	var dreaded := _dreads_target()
+	var below := float(FLEE_BELOW[temper])
+	if dreaded and temper == Temper.CAUTIOUS:
+		below = maxf(below, DREAD_FLEE_BELOW)
+	if max_hp > 0 and hp < max_hp * below:
 		return true
 	if temper != Temper.COWARDLY:
 		return false
 	var foes := 0
 	for entity in World.sought():
 		if World.distance(tile, entity.tile) <= COWARD_ODDS_TILES:
-			foes += 1
+			foes += 2 if dreaded and entity == target else 1
 	if foes < 2:
 		return false
 	for dy in range(-COWARD_ODDS_TILES, COWARD_ODDS_TILES + 1):

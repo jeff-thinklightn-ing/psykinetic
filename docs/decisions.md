@@ -7589,3 +7589,21 @@ world is lore's (H12, worded "kept from its namer rather than given"). Cursed
 ore waits on Jeff's D3. Rejected: cursing on any pick-up (a namer's own drop
 would curse a friend helping); lifting by laying it in the stockpile (the town
 would launder it); resetting ill on a drop (a drop and pick-up would clear it).
+
+## 371. Monsters take a dread weapon by their temper
+
+A monster whose own target holds a dread thing (`World.holder_dread`, decision
+365) takes it by its temper (`Monster`): a coward counts that foe as two in its
+odds (alone against a dread holder within COWARD_ODDS_TILES it breaks, as
+against two) and waits for two others at it, as it always does; the cautious
+hold back HOLD_BACK_RANGE off till two others are at it, not one, whatever
+their boldness (`_others_needed`), and break below DREAD_FLEE_BELOW (0.5) of
+their hp, not 0.35; the bold take no notice, nor do animals (`_dreads_target`: prey flee everyone,
+and a wolf, cautious by its row, knows no names). Raiders take it by their temper like any
+monster. Only the target is looked at, at the points that already decide
+holding back and fleeing: two slot lookups, no scan. Nothing is named in play
+yet, so nothing changes there till names are. monster_test's dread case gives
+the player a sword named with the dread strength.
+Rejected: fear of every dread holder seen (a scan of everyone's hands each look);
+the bold fearing it too (bold is the one temper that ignores odds); a morale
+penalty spread to the side (a rout already spreads).
