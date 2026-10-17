@@ -140,7 +140,7 @@
 			"facts": [
 				{
 					"id": "wren.companion",
-					"text": "Wren is a woman, a companion who travels with the town's people and rests in town between trips.",
+					"text": "Wren is a woman who goes out with the town's people by choice and rests in town between trips.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -168,7 +168,7 @@
 			"facts": [
 				{
 					"id": "pip.companion",
-					"text": "Pip is a companion who travels with the town's people and rests in town between trips.",
+					"text": "Pip goes out with the town's people by choice and rests in town between trips.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -214,7 +214,7 @@
 			"facts": [
 				{
 					"id": "nix.companion",
-					"text": "Nix is a woman, a companion who travels with the town's people and rests in town between trips.",
+					"text": "Nix is a woman who goes out with the town's people by choice and rests in town between trips.",
 					"known": "common",
 					"where": [
 						"town_lands"
