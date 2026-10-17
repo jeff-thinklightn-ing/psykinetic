@@ -26,6 +26,13 @@ notes (decision 324).
 - Storms can break roofs: a full storm breaks about one roof in four, open
   to the rain and the sky until someone mends it.
 - A damaged building's roof is broken in places: rain and daylight come in through the holes. The client must be updated with the server.
+- Fights and handling things sound like it now: a sword, a hammer and bare fists each hit
+  differently, two-handed weapons swing heavier, blows land on shields and blades, a
+  knocked-down body thumps, and the fallen hit the ground. People grunt with effort and
+  pain, and goblins yelp when struck and mutter while idle. Things put down, picked up and
+  thrown clink or thud by their weight, a chest's lid shuts, doors creak under blows and
+  splinter, a key turns in a locked door, and a body shoved into water splashes.
+
 - The wilds town has a temple beside its square. Out by the south edge of the forest stands a healer's hut, with a path from the town.
 
 - Coming back to a zone after a long time away no longer brings every dead

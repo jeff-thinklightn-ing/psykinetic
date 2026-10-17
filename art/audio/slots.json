@@ -70,7 +70,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -6.0,
-			"uses": "a two-handed or heavy weapon's swing; not played yet",
+			"uses": "a two-handed or heavy weapon's swing; Client3D._on_swung, a two-handed weapon (SoundKit.swing)",
 			"fallback": "sfx.swing"
 		},
 		"sfx.hit_flesh": {
@@ -97,7 +97,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a blade blow on flesh; not played yet",
+			"uses": "a blade blow on flesh; Client3D._on_struck, a person's blade (SoundKit.hit)",
 			"fallback": "sfx.hit_flesh"
 		},
 		"sfx.hit_blade_armor": {
@@ -115,7 +115,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a blunt blow on flesh; not played yet",
+			"uses": "a blunt blow on flesh; Client3D._on_struck, a person's blunt weapon (SoundKit.hit)",
 			"fallback": "sfx.hit_flesh"
 		},
 		"sfx.hit_blunt_armor": {
@@ -133,7 +133,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a fist blow on flesh; not played yet",
+			"uses": "a fist blow on flesh; Client3D._on_struck, a person's bare hands (SoundKit.hit)",
 			"fallback": "sfx.hit_flesh"
 		},
 		"sfx.hit_wood": {
@@ -160,7 +160,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a blow taken on a shield; not played yet"
+			"uses": "a blow taken on a shield; Client3D._on_guarded, a shield held (SoundKit.block)"
 		},
 		"sfx.block_weapon": {
 			"category": "combat",
@@ -168,7 +168,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a blow parried with a weapon; not played yet"
+			"uses": "a blow parried with a weapon; Client3D._on_guarded (SoundKit.block)"
 		},
 		"sfx.knockback_stone": {
 			"category": "combat",
@@ -248,7 +248,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a body knocked off its feet; not played yet",
+			"uses": "a body knocked off its feet; Client3D._sync_down, as it goes over",
 			"fallback": "sfx.bodyfall"
 		},
 		"sfx.break_wood": {
@@ -436,7 +436,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -4.0,
-			"uses": "a body hitting the ground; not played yet",
+			"uses": "a body hitting the ground; Client3D._fall, as the body lands",
 			"fallback": "sfx.knockback_body_soft"
 		},
 		"sfx.splash": {
@@ -446,7 +446,7 @@
 			"noise": null,
 			"range": 4,
 			"volume_db": 0.0,
-			"uses": "a body or thing falling into water; not played yet"
+			"uses": "a body or thing falling into water; a body shoved into water, a thing thrown into it (Client3D._on_pushed, _pile_sounds)"
 		},
 		"sfx.door_wood_open": {
 			"category": "doors",
@@ -486,7 +486,7 @@
 			"bus": "sfx",
 			"noise": "latch",
 			"volume_db": -6.0,
-			"uses": "a door locked; not played yet"
+			"uses": "a door locked; a locked door shut again (Client3D._sync_doors)"
 		},
 		"sfx.door_wood_unlock": {
 			"category": "doors",
@@ -494,7 +494,7 @@
 			"bus": "sfx",
 			"noise": "latch",
 			"volume_db": -6.0,
-			"uses": "a door unlocked; not played yet"
+			"uses": "a door unlocked; a locked door opening (Client3D._sync_doors)"
 		},
 		"sfx.door_wood_bar": {
 			"category": "doors",
@@ -526,7 +526,7 @@
 			"bus": "sfx",
 			"noise": "door_struck",
 			"volume_db": 0.0,
-			"uses": "a door struck by a blow; not played yet",
+			"uses": "a door struck by a blow; its hp falling (Client3D._sync_doors)",
 			"fallback": "sfx.hit_wood"
 		},
 		"sfx.door_wood_break": {
@@ -535,7 +535,7 @@
 			"bus": "sfx",
 			"noise": "door_broken",
 			"volume_db": 0.0,
-			"uses": "a door broken down; not played yet",
+			"uses": "a door broken down; its hp falling to broken (Client3D._sync_doors)",
 			"fallback": "sfx.break_wood"
 		},
 		"sfx.chest_open": {
@@ -560,7 +560,7 @@
 			"bus": "sfx",
 			"noise": "rummage",
 			"volume_db": -4.0,
-			"uses": "a chest shut; not played yet",
+			"uses": "a chest shut; the pack panel letting a chest go (PackPanel.open, SoundKit.closing)",
 			"fallback": "sfx.chest_open"
 		},
 		"sfx.crate_open": {
@@ -578,7 +578,7 @@
 			"bus": "sfx",
 			"noise": "break",
 			"volume_db": 0.0,
-			"uses": "a crate smashed; not played yet",
+			"uses": "a crate smashed; Client3D._on_impacted (SoundKit.breaking)",
 			"fallback": "sfx.break_wood"
 		},
 		"sfx.cart_roll": {
@@ -613,7 +613,7 @@
 			"noise": null,
 			"range": 2,
 			"volume_db": -6.0,
-			"uses": "a light item picked up; not played yet"
+			"uses": "a light item picked up; a pile losing a thing (Client3D._pile_sounds, SoundKit.handled)"
 		},
 		"sfx.item_drop_light": {
 			"category": "items",
@@ -621,7 +621,7 @@
 			"bus": "sfx",
 			"noise": "thud_light",
 			"volume_db": -4.0,
-			"uses": "a light item dropped (under 5 kg); not played yet"
+			"uses": "a light item dropped (under 5 kg); a pile gaining a thing (Client3D._pile_sounds, SoundKit.handled)"
 		},
 		"sfx.item_pickup_heavy": {
 			"category": "items",
@@ -630,7 +630,7 @@
 			"noise": null,
 			"range": 2,
 			"volume_db": -6.0,
-			"uses": "a heavy item picked up; not played yet"
+			"uses": "a heavy item picked up; a pile losing a thing (Client3D._pile_sounds, SoundKit.handled)"
 		},
 		"sfx.item_drop_heavy": {
 			"category": "items",
@@ -638,7 +638,7 @@
 			"bus": "sfx",
 			"noise": "thud_heavy",
 			"volume_db": -4.0,
-			"uses": "a heavy item dropped (from 5 kg); not played yet"
+			"uses": "a heavy item dropped (from 5 kg); a pile gaining a thing (Client3D._pile_sounds, SoundKit.handled)"
 		},
 		"sfx.throw": {
 			"category": "items",
@@ -647,7 +647,7 @@
 			"noise": null,
 			"range": 3,
 			"volume_db": -8.0,
-			"uses": "an item thrown, the release; not played yet",
+			"uses": "an item thrown, the release; where a thrown thing left (Client3D._pile_sounds)",
 			"fallback": "sfx.swing"
 		},
 		"sfx.thrown_land_light": {
@@ -656,7 +656,7 @@
 			"bus": "sfx",
 			"noise": "thud_light",
 			"volume_db": -4.0,
-			"uses": "a thrown item under 5 kg landing; not played yet"
+			"uses": "a thrown item under 5 kg landing; as its flight ends (Client3D._pile_sounds)"
 		},
 		"sfx.thrown_land_heavy": {
 			"category": "items",
@@ -664,7 +664,7 @@
 			"bus": "sfx",
 			"noise": "thud_heavy",
 			"volume_db": -4.0,
-			"uses": "a thrown item from 5 kg landing; not played yet"
+			"uses": "a thrown item from 5 kg landing; as its flight ends (Client3D._pile_sounds)"
 		},
 		"sfx.bandage": {
 			"category": "items",
@@ -682,7 +682,7 @@
 			"noise": null,
 			"range": 6,
 			"volume_db": -8.0,
-			"uses": "a goblin muttering while idle; pitched by kind (imp, brute, sneak); not played yet"
+			"uses": "a goblin muttering while idle; pitched by kind (imp, brute, sneak); Client3D._sync_chatter, every 8 to 25 s while idle"
 		},
 		"sfx.goblin_alert": {
 			"category": "creatures",
@@ -690,7 +690,7 @@
 			"bus": "voice",
 			"noise": "call",
 			"volume_db": -2.0,
-			"uses": "a goblin calling its pack on spotting you (the sim's call); not played yet"
+			"uses": "a goblin calling its pack on spotting you (the sim's call); Monster.cried call (SoundKit.cry)"
 		},
 		"sfx.goblin_rout": {
 			"category": "creatures",
@@ -698,7 +698,7 @@
 			"bus": "voice",
 			"noise": "rout",
 			"volume_db": -2.0,
-			"uses": "a goblin breaking and running: a yelp and a scramble (the sim's rout); not played yet"
+			"uses": "a goblin breaking and running: a yelp and a scramble (the sim's rout); Monster.cried rout (SoundKit.cry)"
 		},
 		"sfx.goblin_pain": {
 			"category": "creatures",
@@ -706,7 +706,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": -4.0,
-			"uses": "a goblin hurt; not played yet"
+			"uses": "a goblin hurt; Client3D._pain, one blow in two"
 		},
 		"sfx.goblin_death": {
 			"category": "creatures",
@@ -876,7 +876,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": -6.0,
-			"uses": "a male grunt with a heavy swing; not played yet"
+			"uses": "a male grunt with a heavy swing; a male-bodied person's swing, one in three (Client3D._on_swung, SoundKit.voice)"
 		},
 		"voice.effort_hurt_male": {
 			"category": "voices",
@@ -884,7 +884,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": -4.0,
-			"uses": "a male cry when hurt; not played yet"
+			"uses": "a male cry when hurt; a male-bodied person struck (Client3D._pain)"
 		},
 		"voice.effort_lift_male": {
 			"category": "voices",
@@ -893,7 +893,7 @@
 			"noise": null,
 			"range": 3,
 			"volume_db": -8.0,
-			"uses": "a male strain lifting or throwing something heavy; not played yet"
+			"uses": "a male strain lifting or throwing something heavy; a male-bodied person lifting a heavy thing (Client3D._pile_sounds)"
 		},
 		"voice.death_male": {
 			"category": "voices",
@@ -901,7 +901,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": 0.0,
-			"uses": "a male death cry; not played yet"
+			"uses": "a male death cry; a male-bodied person's death (Client3D._fall)"
 		},
 		"voice.effort_swing_female": {
 			"category": "voices",
@@ -909,7 +909,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": -6.0,
-			"uses": "a female grunt with a heavy swing; not played yet"
+			"uses": "a female grunt with a heavy swing; a female-bodied person's swing, one in three (Client3D._on_swung, SoundKit.voice)"
 		},
 		"voice.effort_hurt_female": {
 			"category": "voices",
@@ -917,7 +917,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": -4.0,
-			"uses": "a female cry when hurt; not played yet"
+			"uses": "a female cry when hurt; a female-bodied person struck (Client3D._pain)"
 		},
 		"voice.effort_lift_female": {
 			"category": "voices",
@@ -926,7 +926,7 @@
 			"noise": null,
 			"range": 3,
 			"volume_db": -8.0,
-			"uses": "a female strain lifting or throwing something heavy; not played yet"
+			"uses": "a female strain lifting or throwing something heavy; a female-bodied person lifting a heavy thing (Client3D._pile_sounds)"
 		},
 		"voice.death_female": {
 			"category": "voices",
@@ -934,7 +934,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": 0.0,
-			"uses": "a female death cry; not played yet"
+			"uses": "a female death cry; a female-bodied person's death (Client3D._fall)"
 		},
 		"ui.click": {
 			"category": "ui",
@@ -998,7 +998,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "wind over open ground; a bed under a zone, time or weather; not played yet"
+			"uses": "wind over open ground; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.forest_dawn": {
 			"category": "ambience",
@@ -1006,7 +1006,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "a forest at dawn: birds; a bed under a zone, time or weather; not played yet"
+			"uses": "a forest at dawn: birds; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.forest_day": {
 			"category": "ambience",
@@ -1014,7 +1014,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "a forest by day; a bed under a zone, time or weather; not played yet"
+			"uses": "a forest by day; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.forest_night": {
 			"category": "ambience",
@@ -1022,7 +1022,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "a forest at night: crickets, an owl; a bed under a zone, time or weather; not played yet"
+			"uses": "a forest at night: crickets, an owl; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.dungeon": {
 			"category": "ambience",
@@ -1030,7 +1030,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "under stone: air, drips; a bed under a zone, time or weather; not played yet"
+			"uses": "under stone: air, drips; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.town_day": {
 			"category": "ambience",
@@ -1038,7 +1038,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "the town's daily noise; a bed under a zone, time or weather; not played yet"
+			"uses": "the town's daily noise; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.town_night": {
 			"category": "ambience",
@@ -1046,7 +1046,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "the town at night; a bed under a zone, time or weather; not played yet"
+			"uses": "the town at night; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.rain": {
 			"category": "ambience",
@@ -1054,7 +1054,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "rain; a bed under a zone, time or weather; not played yet"
+			"uses": "rain; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.storm": {
 			"category": "ambience",
@@ -1062,7 +1062,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "wind and rain hard; a bed under a zone, time or weather; not played yet"
+			"uses": "wind and rain hard; a bed under a zone, time or weather; Ambience.weights"
 		},
 		"music.town_base": {
 			"category": "music",
@@ -1186,7 +1186,7 @@
 			"noise": null,
 			"range": 4,
 			"volume_db": -10.0,
-			"uses": "the crackle of a torch or brazier, from where it burns; not played yet"
+			"uses": "the crackle of a torch or brazier, from where it burns; Ambience, from the nearest torch heard"
 		}
 	}
 }

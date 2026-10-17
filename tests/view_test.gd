@@ -263,11 +263,15 @@ func _test_sounds_follow_events() -> void:
 	var player := _player()
 	var imp := _spawn_imp(Vector2i(9, 4))
 	_rig._process(0.0)
-	_check(_heard(func() -> void: player._world_swung(Vector2i(1, 0))) == ["sfx.swing"], "a swing: a whoosh")
+	var swung := _heard(func() -> void: player._world_swung(Vector2i(1, 0)))
+	_check(swung.slice(0, 1) == [SoundKit.swing(World.wielded(player))] and swung.slice(1) in [[], ["voice.effort_swing_male"]],
+			"a swing: a whoosh, a grunt now and then (%s)" % [swung])
 	_check(_heard(func() -> void: imp.cried.emit(&"call")) == ["sfx.goblin_alert"], "a goblin calls its pack: its alert")
 	_check(_heard(func() -> void: imp.cried.emit(&"rout")) == ["sfx.goblin_rout"], "a goblin breaks and runs: its rout")
 	_check(_heard(func() -> void: imp.cried.emit(&"howl_unknown")).is_empty(), "a cry with no slot: nothing")
-	_check(_heard(func() -> void: World.damage(imp, 1, player, &"attack")) == ["sfx.hit_flesh"], "a blow: a thud on flesh")
+	var blow := _heard(func() -> void: World.damage(imp, 1, player, &"attack"))
+	_check(blow.slice(0, 1) == [SoundKit.hit(World.wielded(player))] and blow.slice(1) in [[], ["sfx.goblin_pain"]],
+			"a blow just after the player's swing: its weapon's hit on flesh, the imp crying out now and then (%s)" % [blow])
 	_check(_heard(func() -> void: World._impact(imp, 1, player, &"stone")) == ["sfx.knockback_stone"], "into a wall: stone")
 	_check(_heard(func() -> void: World._impact(imp, 1, player, &"wood")) == ["sfx.knockback_wood"], "into a door or crate: wood")
 	_check(_heard(func() -> void: World._impact(imp, 1, player, &"body")) == ["sfx.knockback_body", "sfx.knockback_body_soft"],

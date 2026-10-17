@@ -110,6 +110,39 @@ func _test_noises_are_the_sims() -> void:
 			"a charge carries Animal.NOISE_CHARGE, a howl the call's")
 	_check(SoundKit.death("rabbit") == "sfx.rabbit_death" and SoundKit.death("stag") == "sfx.deer_death" and SoundKit.death("brute") == "sfx.goblin_death",
 			"a death by kind: an animal's own, a goblin's")
+	_check(SoundKit.hit("") == "sfx.hit_fist_flesh" and SoundKit.hit("hammer") == "sfx.hit_blunt_flesh" and SoundKit.hit("sword") == "sfx.hit_blade_flesh"
+			and SoundKit.hit("dagger") == "sfx.hit_blade_flesh", "a blow by weapon: fists, a blunt hammer, a blade")
+	_check(SoundKit.block("shield") == "sfx.block_shield" and SoundKit.block("sword") == "sfx.block_weapon" and SoundKit.block("") == "sfx.block_weapon",
+			"a guard: a shield's knock, else a parry")
+	_check(SoundKit.swing("giant_axe") == "sfx.swing_heavy" and SoundKit.swing("sword") == "sfx.swing" and SoundKit.swing("") == "sfx.swing"
+			and SoundKit.swing("bow") == "sfx.swing", "a two-handed weapon swings heavy; a bow is no club")
+	var light := ""
+	var heavy := ""
+	for id: String in Items.ids():
+		if Items.weight_of(id) >= World.THUD_HEAVY_KG and heavy == "":
+			heavy = id
+		elif Items.weight_of(id) < World.THUD_HEAVY_KG and light == "":
+			light = id
+	_check(SoundKit.handled(light, "drop") == "sfx.item_drop_light" and SoundKit.handled(heavy, "drop") == "sfx.item_drop_heavy"
+			and SoundKit.handled(light, "pickup") == "sfx.item_pickup_light" and SoundKit.handled(heavy, "land") == "sfx.thrown_land_heavy",
+			"a thing handled: light or heavy at the sim's thud split (%s, %s)" % [light, heavy])
+	var chest := Chest.new()
+	_check(SoundKit.closing(chest) == "sfx.chest_close" and SoundKit.closing(null) == "", "a chest's lid shuts; nothing else")
+	chest.free()
+	var someone := Player.new()
+	var her := Companion.new()
+	var imp := Monster.new()
+	_check(SoundKit.voice(someone, "effort_swing") == "voice.effort_swing_male" and SoundKit.voice(her, "death") == "voice.death_female"
+			and SoundKit.voice(imp, "effort_hurt") == "", "voices by body: a player's (male by default), a companion's (female by default), a monster none")
+	someone.body = &"female"
+	her.body = &"male"
+	_check(SoundKit.voice(someone, "effort_hurt") == "voice.effort_hurt_female" and SoundKit.voice(her, "effort_lift") == "voice.effort_lift_male",
+			"a player with the female body, a companion like Pip with the male one")
+	for one: Node in [someone, her, imp]:
+		one.free()
+	for slot: String in ["sfx.hit_blade_flesh", "sfx.hit_blunt_flesh", "sfx.hit_fist_flesh", "sfx.block_shield", "sfx.block_weapon", "sfx.swing_heavy",
+			"voice.effort_swing_male", "voice.death_female"]:
+		_check(SoundKit.has(slot), "%s is a slot" % slot)
 	for ground: String in SoundKit.STEP_GROUNDS:
 		for mass: float in [20.0, 80.0, 150.0]:
 			_check(SoundKit.has(SoundKit.footstep(ground, mass)), "%s is a slot" % SoundKit.footstep(ground, mass))

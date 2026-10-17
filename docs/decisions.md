@@ -8241,3 +8241,37 @@ Rejected: a world text per zone written in the levels (content, not
 Jeff's yet; the kind and the name say enough); stopping the follow at 1
 behind (still in his way at every turn); listing friends she cannot see
 (the same rules as monsters).
+## 386. Sound hooks inferred on the client
+
+The sound slots that weren't played are hooked using only what clients already get. There
+are no new messages or RPCs, and the protocol is unchanged.
+
+- A blow's weapon: `Client3D._on_swung` remembers each puppet's last swing (when, and
+  `World.wielded`). A blow (`struck`, cause attack) within 700 ms of a swing by someone
+  within 2 cells is that swinger's, and sounds by its weapon (`SoundKit.hit`: bare hands a
+  fist's, a blunt weapon's, else a blade's). Only players' and companions' hands reach
+  clients (`slots` is replicated for them), so a monster's blow keeps the plain hit. A
+  two-handed weapon swings heavy (`SoundKit.swing`; a bow is no club). Armour hits wait
+  for armour.
+- A guard (`guarded`): a shield held knocks, else a weapon parries (`SoundKit.block`); a
+  broken guard is the same sound 4 dB louder. A knockdown sounds as the body tips
+  (`_sync_down`), and a death is followed by the body landing as its fall ends.
+- Voices (`SoundKit.voice`): a person's follow their body (`Player.body`, `Companion.body`,
+  decision 388): a man's or a woman's, Pip's a young man's. The body is kept on the puppet
+  for the death cry, since the entity may already be gone. A person grunts on one swing in three (`EFFORT_EVERY`), and also when struck, when lifting
+  a heavy thing, and at death. A goblin cries out at one blow in two, and mutters every 8
+  to 25 s while idle (heard by players only), pitched by its kind.
+- Things handled: each ground pile's things are remembered as drawn (`_pile_sounds`). A thing
+  more is put down, or thrown: the throw sounds where it left, and the landing as its
+  flight ends, a splash on water. A thing fewer is picked up. Each sound is light or heavy
+  at the sim's own thud split (`World.THUD_HEAVY_KG`; `SoundKit.handled`). A redraw of a
+  zone's piles is quiet for 500 ms, and another zone's piles are never heard. A chest's
+  lid shuts as the pack panel lets it go (`SoundKit.closing`).
+- Doors (`_sync_doors`): struck as their hp falls, broken at the end, unlocked as a locked
+  door opens, locked again as it shuts. A body shoved into water splashes where it lands.
+
+Still unplayed, for want of something to hook: armour hits, a door's bar and its rattle (no
+barred state yet; the rattle is a server-only noise), bandaging, a cart rolling, stone
+breaking, and the UI sounds (next). Clip scenarios `sound_combat` and `sound_world`;
+sound_kit_test checks the mappings, and view_test's sound checks allow the voices. Client
+only.

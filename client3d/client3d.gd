@@ -883,6 +883,27 @@ var show_all_bars := false
 ## Entity instance id -> when it was last in a fight (msec), and its hp as
 ## last seen.
 var _combat_at: Dictionary[int, int] = {}
+## Puppet id -> [msec, what it swung with] of its last swing: a blow that
+## lands soon after, beside it, was its (_struck_with).
+var _swings: Dictionary[int, Array] = {}
+## Each pile's things as last drawn: what came or went is heard
+## (_pile_sounds). Quiet till this msec after the piles are drawn anew (a
+## zone's piles coming and going are no one's doing).
+var _pile_ids: Dictionary = {}
+var _piles_quiet_until := 0
+## Each door's hp as last drawn: a blow on it is heard (_sync_doors).
+var _door_hp: Dictionary[Vector3i, int] = {}
+## A thing that slid this far, or a body pushed, lands this long after.
+const SLIDE_SECONDS := 0.35
+## A swing's blow lands within this many ms of it, this many cells off.
+const BLOW_AFTER_MS := 700
+const BLOW_REACH := 2
+## A person grunts with one swing in this many, and a goblin cries out at
+## one blow in this many (a grunt every time wears thin).
+const EFFORT_EVERY := 3
+const PAIN_EVERY := 2
+## A goblin standing idle mutters every so often (s, picked between these).
+const CHATTER_SECONDS := Vector2(8.0, 25.0)
 var _last_hp: Dictionary[int, int] = {}
 ## Entity instance id -> its tile as last seen, for footsteps.
 var _last_tile: Dictionary[int, Vector2i] = {}
@@ -3512,6 +3533,8 @@ func _show_piles() -> void:
 	if not World.pile_shown.is_connected(_on_pile_shown):
 		World.pile_shown.connect(_on_pile_shown)
 		World.pile_gone.connect(_on_pile_gone)
+	_piles_quiet_until = Time.get_ticks_msec() + 500
+	_pile_ids.clear()
 	for pile: GroundPile in World.zone.piles.values():
 		_on_pile_shown(pile)
 
@@ -3520,7 +3543,8 @@ func _on_pile_shown(pile: GroundPile) -> void:
 	# Only the zone shown (a host's other zones' nodes sit under hidden holders).
 	if _room == null or not is_instance_valid(pile) or not pile.is_inside_tree() or not (pile.get_parent() as Node2D).visible:
 		return
-	_on_pile_gone(pile)
+	_pile_sounds(pile, pile.ids)
+	_drop_heap(pile)
 	var heap := Node3D.new()
 	heap.name = GroundPile.name_for(pile.tile)
 	heap.position = _tile_position(pile.tile)
@@ -3546,12 +3570,53 @@ func _on_pile_shown(pile: GroundPile) -> void:
 	_pile_nodes[pile] = heap
 
 
+## A pile gone (World.pile_gone): its last things picked up.
 func _on_pile_gone(pile: GroundPile) -> void:
+	_pile_sounds(pile, PackedStringArray())
+	_drop_heap(pile)
+
+
+func _drop_heap(pile: GroundPile) -> void:
 	var heap: Node3D = _pile_nodes.get(pile)
 	if heap != null:
 		_pile_nodes.erase(pile)
 		if is_instance_valid(heap):
 			heap.queue_free()
+
+
+## A pile's things now [param ids], against what it held: one more is a
+## thing put down (or thrown, landing as its flight ends, and the throw
+## heard where it left), one fewer a thing picked up.
+func _pile_sounds(pile: GroundPile, ids: PackedStringArray) -> void:
+	var was: PackedStringArray = _pile_ids.get(pile, PackedStringArray())
+	if ids.is_empty():
+		_pile_ids.erase(pile)
+	else:
+		_pile_ids[pile] = ids.duplicate()
+	if Time.get_ticks_msec() < _piles_quiet_until or _room == null:
+		return
+	if World.zone != null and pile.zone != "" and pile.zone != World.zone.name:
+		return  # Another zone's (a host's), or the one just left.
+	var at := _tile_position(pile.tile) + Vector3.UP * 0.2
+	if ids.size() > was.size():
+		var top := ids[ids.size() - 1]
+		if pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
+			sfx.play("sfx.throw", _tile_position(pile.thrown_from) + Vector3.UP * 1.2)
+			_play_later("sfx.splash" if World.is_water(pile.tile) else SoundKit.handled(top, "land"), at, THROW_FLIGHT_SECONDS)
+		else:
+			sfx.play(SoundKit.handled(top, "drop"), at)
+	elif ids.size() < was.size():
+		var gone := was[was.size() - 1]
+		for id: String in was:
+			if id not in ids:
+				gone = id
+		sfx.play(SoundKit.handled(gone, "pickup"), at)
+		if Items.weight_of(gone) >= World.THUD_HEAVY_KG:
+			# A heavy thing lifted: a grunt from the person beside it.
+			for entity in World.get_entities():
+				if (entity is Player or entity is Companion) and _cells_apart(entity.tile, pile.tile) <= 1:
+					sfx.play(SoundKit.voice(entity, "effort_lift"), _tile_position(entity.tile) + Vector3.UP * 1.5)
+					break
 
 
 ## The ring under a pile: one mesh and material for all of them.
@@ -5681,6 +5746,7 @@ func _sync_puppets() -> void:
 				lantern.visible = entity.emit_light > 0.0  # Covered (L).
 		elif entity is Monster:
 			_sync_alert(entity as Monster, puppet)
+			_sync_chatter(entity as Monster, puppet)
 		_sync_down(entity, puppet)
 		_sync_ailments(entity, puppet)
 		if puppet.has_meta("animator"):
@@ -5779,8 +5845,9 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).hit()
 	if puppet != null and cause == &"attack":
-		sfx.play("sfx.hit_flesh", puppet.position + Vector3.UP * 0.8)
 		var struck := instance_from_id(id) as GridEntity
+		sfx.play(_struck_with(struck), puppet.position + Vector3.UP * 0.8)
+		_pain(struck, puppet)
 		if music != null and struck != null and sfx.listener != null and _cells_apart(struck.tile, sfx.listener) <= Music.TENSION_NEAR:
 			music.fight_near()
 
@@ -5791,6 +5858,11 @@ func _on_pushed(tiles: int, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var puppet: Node3D = _puppets.get(id)
 	var entity := instance_from_id(id) as GridEntity
+	if entity != null and tiles > 0:
+		# Shoved into water: a splash as it lands there.
+		get_tree().create_timer(SLIDE_SECONDS).timeout.connect(func() -> void:
+			if is_instance_valid(entity) and is_instance_valid(sfx) and sfx.is_inside_tree() and World.is_water(entity.tile):
+				sfx.play("sfx.splash", _tile_position(entity.tile)))
 	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("animator"):
 		return
 	if puppet.has_meta("knock"):
@@ -5861,6 +5933,10 @@ func _sync_down(entity: GridEntity, puppet: Node3D) -> void:
 	if body == null:
 		return
 	var lying := World.tick + World.tick_alpha < entity.down_until
+	if lying != bool(puppet.get_meta("lying", false)):
+		puppet.set_meta("lying", lying)
+		if lying:
+			sfx.play("sfx.knockdown", puppet.position + Vector3.UP * 0.3)
 	var want := DOWN_TILT if lying else 0.0
 	if not is_equal_approx(body.rotation.x, want):
 		body.rotation.x = move_toward(body.rotation.x, want, get_process_delta_time() * DOWN_TILT_SPEED)
@@ -5911,6 +5987,11 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	if kind == "monster":
 		death_slot = SoundKit.death(str(puppet.get_meta("creature", "")))
 	sfx.play(death_slot, puppet.position + Vector3.UP * 0.5)
+	# Their body's voice (decision 388), kept on the puppet: the entity may be gone.
+	var voice := "voice.death_%s" % puppet.get_meta("body", "male" if kind == "player" else "female") if kind in ["player", "companion"] else ""
+	if voice != "":
+		sfx.play(voice, puppet.position + Vector3.UP * 1.5)
+	_play_later("sfx.bodyfall", puppet.position, FALL_SECONDS * 0.75)
 	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
 	if lantern != null:
 		lantern.reparent(self)
@@ -5969,6 +6050,65 @@ func _mourn_local() -> void:
 	_mourning = true
 	if music != null:
 		music.sting("death")
+
+
+## What a blow on [param struck] sounds like: the weapon of whoever swung
+## beside it just now (_swings; a person's, whose hands are known), else
+## the plain hit.
+func _struck_with(struck: GridEntity) -> String:
+	if struck == null:
+		return "sfx.hit_flesh"
+	var now := Time.get_ticks_msec()
+	var best := -1
+	var best_cells := BLOW_REACH + 1
+	for swinger_id: int in _swings:
+		var swinger := instance_from_id(swinger_id) as GridEntity
+		if swinger == null or swinger == struck or now - int(_swings[swinger_id][0]) > BLOW_AFTER_MS:
+			continue
+		var cells := _cells_apart(swinger.tile, struck.tile)
+		if cells < best_cells:
+			best = swinger_id
+			best_cells = cells
+	if best < 0:
+		return "sfx.hit_flesh"
+	var by := instance_from_id(best) as GridEntity
+	if not (by is Player or by is Companion):
+		return "sfx.hit_flesh"  # A monster's hands aren't sent to clients.
+	return SoundKit.hit(str(_swings[best][1]))
+
+
+## [param struck] cries out at a blow: a person's grunt now and then, a
+## goblin's yelp, pitched by its kind.
+func _pain(struck: GridEntity, puppet: Node3D) -> void:
+	var voice := SoundKit.voice(struck, "effort_hurt")
+	if voice != "":
+		sfx.play(voice, puppet.position + Vector3.UP * 1.5)
+		return
+	var creature := str(puppet.get_meta("creature", ""))
+	if struck is Monster and not struck is Animal and creature in SoundKit.GOBLINS and randi() % PAIN_EVERY == 0:
+		sfx.play("sfx.goblin_pain", puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+
+
+## A goblin standing idle mutters now and then (heard by players only:
+## its slot carries no noise).
+func _sync_chatter(monster: Monster, puppet: Node3D) -> void:
+	if monster is Animal or monster.alert != Monster.Alert.IDLE or str(puppet.get_meta("creature", "")) not in SoundKit.GOBLINS:
+		return
+	var now := Time.get_ticks_msec()
+	if not puppet.has_meta("chatter_at"):
+		puppet.set_meta("chatter_at", now + int(randf_range(CHATTER_SECONDS.x, CHATTER_SECONDS.y) * 1000.0))
+	elif now >= int(puppet.get_meta("chatter_at")):
+		puppet.set_meta("chatter_at", now + int(randf_range(CHATTER_SECONDS.x, CHATTER_SECONDS.y) * 1000.0))
+		sfx.play("sfx.goblin_chatter", puppet.position + Vector3.UP * 0.8,
+				float(SoundKit.CREATURE_PITCH.get(str(puppet.get_meta("creature", "")), 1.0)))
+
+
+## [param slot] at [param at] after [param seconds] (a body landing as its
+## fall ends).
+func _play_later(slot: String, at: Vector3, seconds: float) -> void:
+	get_tree().create_timer(seconds).timeout.connect(func() -> void:
+		if is_instance_valid(sfx) and sfx.is_inside_tree():
+			sfx.play(slot, at))
 
 
 ## Cells between [param a] and [param b], Chebyshev (as hearing counts).
@@ -6441,6 +6581,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		_hook(entity.swung, _on_swung.bind(id))
 		_hook(entity.shot, _on_shot.bind(id))
 		_hook(entity.guarded, _on_guarded.bind(id))
+		if entity is Player or entity is Companion:
+			puppet.set_meta("body", str(entity.get("body")))
 		_hook(entity.struck, _on_struck.bind(id))
 		_hook(entity.impacted, _on_impacted.bind(id))
 		_hook(entity.pushed, _on_pushed.bind(id))
@@ -6495,7 +6637,12 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var swinger := instance_from_id(id) as GridEntity
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
-	sfx.play("sfx.swing", puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
+	var weapon := World.wielded(swinger) if swinger != null else ""
+	_swings[id] = [Time.get_ticks_msec(), weapon]
+	sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
+	var effort := SoundKit.voice(swinger, "effort_swing")
+	if effort != "" and randi() % EFFORT_EVERY == 0:
+		sfx.play(effort, puppet.position + Vector3.UP * 1.5)
 	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
 		_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
 		if puppet.has_meta("creature_view"):
@@ -6515,7 +6662,15 @@ func _on_guarded(broken: bool, id: int) -> void:
 	if puppet == null:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
-	sfx.play("sfx.break_wood" if broken else "sfx.knockback_wood", puppet.position + Vector3.UP * 0.9)
+	var guard := ""
+	var holder := instance_from_id(id) as GridEntity
+	if holder != null and World.holds_in_hands(holder):
+		for slot in [Items.LEFT_HAND, Items.RIGHT_HAND]:
+			var held := holder.slots[slot] if slot < holder.slots.size() else ""
+			if held != "" and str(Items.verb_of(held).get("kind", "")) == "block":
+				guard = held if guard == "" or Items.has_tag(held, "shield") else guard
+	# A guard broken: the same knock, harder.
+	sfx.play(SoundKit.block(guard), puppet.position + Vector3.UP * 0.9, 1.0, 4.0 if broken else 0.0)
 	if broken:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 
@@ -6646,8 +6801,16 @@ func _sync_doors() -> void:
 			continue
 		var hinge := doorway.get_node(DOOR_LEAF) as Node3D
 		var same_door: bool = _door_node.get(door.key, 0) == door.get_instance_id()
+		var at := doorway.position + Vector3.UP
 		if same_door and _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
-			sfx.play("sfx.door_wood_open" if door.is_open() else "sfx.door_wood_close", doorway.position + Vector3.UP)
+			if door.is_open() and door.lock != "":
+				sfx.play("sfx.door_wood_unlock", at)  # A key turned first.
+			sfx.play("sfx.door_wood_open" if door.is_open() else "sfx.door_wood_close", at)
+			if not door.is_open() and door.lock != "":
+				_play_later("sfx.door_wood_lock", at, 0.4)  # And locked again behind.
+		if same_door and _door_hp.has(door.key) and door.hp < _door_hp[door.key]:
+			sfx.play("sfx.door_wood_break" if door.is_broken() else "sfx.door_wood_struck", at)
+		_door_hp[door.key] = door.hp
 		_door_open[door.key] = door.is_open()
 		_door_node[door.key] = door.get_instance_id()
 		# The art's "state_<name>" nodes (art_style.md) show in that state

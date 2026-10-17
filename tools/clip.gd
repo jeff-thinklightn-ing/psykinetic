@@ -93,6 +93,13 @@ extends Node
 ##     danger stinger), and falls once it is stunned; then the dungeon's
 ##     layer, and each stinger. The log says each layer's level, the tension
 ##     and the phrase every second.
+##   sound_combat: a fight's sounds by weapon: a sword's blade, a hammer's
+##     blunt blows, bare fists, the imp's blows on a raised shield, a giant
+##     axe's heavier swing knocking it down, and its death and fall; grunts
+##     and the imp's cries now and then.
+##   sound_world: things handled and the doors' sounds: a dagger and a sack
+##     of ore put down and picked up (light, heavy), a dagger thrown (the
+##     throw, the landing), a chest opened and shut, a door struck and broken.
 ##   sound_reel: a listening reel of the slots given (--slots=a,b,...; else
 ##     every slot with third-party takes, SoundKit.takes): each played
 ##     beside the player once per take, its name and source as the caption,
@@ -201,6 +208,10 @@ func _ready() -> void:
 			_sound_ambience()
 		"sound_music":
 			_sound_music()
+		"sound_combat":
+			_sound_combat()
+		"sound_world":
+			_sound_world()
 		"door_hide", "door_noise", "door_brute":
 			_door(scenario)
 		"pack":
@@ -224,7 +235,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "wild", "boar"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -1031,6 +1042,82 @@ func _sound_reel() -> void:
 
 ## An open field, outdoors, a fire at its east end, an imp held at the far
 ## side; the script runs the clock and the weather.
+func _sound_world() -> void:
+	var cells: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var rows := Terrain.expand(cells)
+	# The wall between cells x 8 and 9 (pixel 17), its door on row 2.
+	for y in range(1, rows.size() - 1):
+		rows[y] = rows[y].substr(0, 17) + ("+" if y == 4 else "#") + rows[y].substr(18)
+	var markers := {Vector2i(3, 2): "start", Vector2i(3, 1): "chest", Vector2i(11, 3): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [{"at": [3, 1], "props": {"slots": ["", "", "", ""]}},
+		{"at": [11, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(rows, markers, config), null, config)
+	_script = [
+		["item_give", ["dagger", Player.RIGHT_HAND], ""],
+		["item_give", ["ore_sack", Player.LEFT_HAND], ""],
+		["sound_world", ["drop", Player.RIGHT_HAND], "A dagger put down: a light clink."],
+		["wait", 25, ""],
+		["sound_world", ["pick", null], "Picked up again."],
+		["wait", 25, ""],
+		["sound_world", ["drop", Player.LEFT_HAND], "A sack of ore put down: a heavy thud (from 5 kg)."],
+		["wait", 25, ""],
+		["sound_world", ["pick", null], "Lifted again."],
+		["wait", 25, ""],
+		["sound_world", ["throw", Vector2i(5, 2)], "The dagger thrown: the throw, and its landing."],
+		["wait", 30, ""],
+		["item_open", true, "The chest opened..."],
+		["wait", 25, ""],
+		["item_open", false, "...and shut."],
+		["wait", 25, ""],
+		["walk", Vector2i(8, 2), "Blows on a door..."],
+		["sound_world", ["bash", 6], ""],
+		["wait", 15, ""],
+		["sound_world", ["bash", 6], ""],
+		["wait", 15, ""],
+		["sound_world", ["bash", 100], "...and it breaks."],
+		["wait", 30, ""],
+	]
+
+
+func _sound_combat() -> void:
+	var cells: Array[String] = [
+		"###########",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"###########",
+	]
+	var markers := {Vector2i(3, 2): "start", Vector2i(5, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [{"at": [5, 2], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(cells), markers, config), null, config)
+	_script = [
+		["sound_imp_hp", 100000, ""],
+		["item_give", ["sword", Player.RIGHT_HAND], "A sword: blade blows. The imp cries out now and then."],
+		["sound_fight", 60, ""],
+		["item_clear", Player.RIGHT_HAND, ""],
+		["item_give", ["hammer", Player.RIGHT_HAND], "A hammer: blunt blows."],
+		["sound_fight", 60, ""],
+		["item_clear", Player.RIGHT_HAND, "Bare hands: fists."],
+		["sound_fight", 50, ""],
+		["item_give", ["shield", Player.LEFT_HAND], "A shield raised: the imp's blows land on it."],
+		["item_raise", null, ""],
+		["wait", 80, ""],
+		["item_lower", null, ""],
+		["item_clear", Player.LEFT_HAND, ""],
+		["item_give", ["giant_axe", Player.RIGHT_HAND], "A giant axe: a heavier swing, and it knocks the imp down."],
+		["sound_fight", 80, ""],
+		["sound_imp_hp", 1, "The imp falls: its death, and the body landing."],
+		["sound_fight", 40, ""],
+		["wait", 30, ""],
+	]
+
+
 func _sound_music() -> void:
 	var cells: Array[String] = [
 		"################################",
@@ -1227,6 +1314,23 @@ func _on_tick(tick: int) -> void:
 			_repeat_until = -1
 		"sound_hour":
 			DayNight.set_hour(float(step[1]))
+		"sound_world":
+			var what: Array = step[1]
+			match str(what[0]):
+				"drop":
+					World.try_drop(_player, int(what[1]))
+				"pick":
+					World.try_pick_up(_player, _player.tile)
+				"throw":
+					var hand := Player.RIGHT_HAND if not _player.slots[Player.RIGHT_HAND].is_empty() else Player.LEFT_HAND
+					World.try_throw(_player, hand, what[1])
+				"bash":
+					if not World.try_bash_door(_player, World.get_doors()[0].key, int(what[1])):
+						return
+		"sound_imp_hp":
+			_monster.max_hp = maxi(_monster.max_hp, int(step[1]))
+			_monster.hp = int(step[1])
+			_fight_until = -1
 		"sound_music":
 			var music: Music = _main._client3d.music
 			match str(step[1]):
@@ -1266,6 +1370,7 @@ func _on_tick(tick: int) -> void:
 					else:
 						World.order_attack(_player, _monster)
 					return
+			_fight_until = -1  # The next fight step times itself.
 		"work_door":
 			if tick < _player.next_move_tick:
 				return
@@ -1366,7 +1471,7 @@ func _log(tick: int) -> void:
 		print("[clip] tick %d: hour %.1f, tension %.2f, phrase %s; layers %s; ambience duck %.1f dB; imp %s" % [tick,
 			DayNight.hour(DayNight.now()), music.tension, music.phrase_on, ", ".join(layers), _main._client3d.ambience.duck_db,
 			Monster.Alert.keys()[_monster.alert] if is_instance_valid(_monster) else "gone"])
-	if scenario in ["sounds", "sound_hearing", "sound_reel", "sound_ambience"]:
+	if scenario in ["sounds", "sound_hearing", "sound_reel", "sound_ambience", "sound_combat", "sound_world"]:
 		var sfx: Sfx = _main._client3d.sfx if _main._client3d != null else null
 		if sfx != null:
 			for entry: Array in sfx.played.slice(_sounds_logged):

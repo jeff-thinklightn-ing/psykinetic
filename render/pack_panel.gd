@@ -213,6 +213,8 @@ func _process(_delta: float) -> void:
 
 ## Shows [param opened]'s row, a chest or a companion (null closes it).
 func open(opened: GridEntity) -> void:
+	if opened != other and is_instance_valid(other) and sound.is_valid() and SoundKit.closing(other) != "":
+		sound.call(SoundKit.closing(other), other)
 	other = opened
 	_refresh()
 

@@ -12,8 +12,8 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 |------|------|-----|-------|-----------|----------|
 | `sfx.crate_open` | oneshot | sfx | rummage 4 | `sfx.chest_open` | a crate or cart opened (Main._sound, SoundKit.opening) |
 | `sfx.deer_death` | oneshot | voice | fight 5 | `sfx.knockback_body_soft` | a deer killed (Client3D._fall) |
-| `sfx.door_wood_break` | oneshot | sfx | door_broken 14 | `sfx.break_wood` | a door broken down; not played yet |
-| `sfx.door_wood_struck` | oneshot | sfx | door_struck 10 | `sfx.hit_wood` | a door struck by a blow; not played yet |
+| `sfx.door_wood_break` | oneshot | sfx | door_broken 14 | `sfx.break_wood` | a door broken down; its hp falling to broken (Client3D._sync_doors) |
+| `sfx.door_wood_struck` | oneshot | sfx | door_struck 10 | `sfx.hit_wood` | a door struck by a blow; its hp falling (Client3D._sync_doors) |
 | `sfx.footstep_dirt_large` | oneshot | sfx | step 3 | `sfx.footstep_dirt_medium` | a large body's footstep on dirt (Client3D._step_sound, SoundKit.footstep) |
 | `sfx.footstep_dirt_small` | oneshot | sfx | step 3 | `sfx.footstep_dirt_medium` | a small body's footstep on dirt (Client3D._step_sound, SoundKit.footstep) |
 | `sfx.footstep_grass_large` | oneshot | sfx | step 3 | `sfx.footstep_grass_medium` | a large body's footstep on grass (Client3D._step_sound, SoundKit.footstep) |
@@ -25,12 +25,12 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `sfx.footstep_water_large` | oneshot | sfx | step 3 | `sfx.footstep_water_medium` | a large body's footstep on water (Client3D._step_sound, SoundKit.footstep) |
 | `sfx.footstep_water_small` | oneshot | sfx | step 3 | `sfx.footstep_water_medium` | a small body's footstep on water (Client3D._step_sound, SoundKit.footstep) |
 | `sfx.hit_stone` | oneshot | sfx | fight 5 | `sfx.knockback_stone` | a blow on stone; not played yet |
-| `sfx.throw` | oneshot | sfx | players 3 | `sfx.swing` | an item thrown, the release; not played yet |
-| `sfx.thrown_land_light` | oneshot | sfx | thud_light 2 | blip | a thrown item under 5 kg landing; not played yet |
-| `voice.death_female` | oneshot | voice | fight 5 | blip | a female death cry; not played yet |
-| `voice.effort_lift_female` | oneshot | voice | players 3 | blip | a female strain lifting or throwing something heavy; not played yet |
-| `voice.effort_lift_male` | oneshot | voice | players 3 | blip | a male strain lifting or throwing something heavy; not played yet |
-| `voice.effort_swing_female` | oneshot | voice | fight 5 | blip | a female grunt with a heavy swing; not played yet |
+| `sfx.throw` | oneshot | sfx | players 3 | `sfx.swing` | an item thrown, the release; where a thrown thing left (Client3D._pile_sounds) |
+| `sfx.thrown_land_light` | oneshot | sfx | thud_light 2 | blip | a thrown item under 5 kg landing; as its flight ends (Client3D._pile_sounds) |
+| `voice.death_female` | oneshot | voice | fight 5 | blip | a female death cry; a female-bodied person's death (Client3D._fall) |
+| `voice.effort_lift_female` | oneshot | voice | players 3 | blip | a female strain lifting or throwing something heavy; a female-bodied person lifting a h... |
+| `voice.effort_lift_male` | oneshot | voice | players 3 | blip | a male strain lifting or throwing something heavy; a male-bodied person lifting a heavy... |
+| `voice.effort_swing_female` | oneshot | voice | fight 5 | blip | a female grunt with a heavy swing; a female-bodied person's swing, one in three (Client... |
 
 ## Third-party fills to replace
 

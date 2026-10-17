@@ -252,6 +252,36 @@ static func footstep(ground: String, mass: float, creature := "") -> String:
 ## are the goblin's slots, pitched by size: an imp high, a brute low.
 const GOBLINS := ["", "imp", "brute", "sneak"]
 const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05}
+## The slot a blow lands with, by the weapon [param id] it was struck with
+## (World.wielded): bare hands a fist's, a blunt weapon (Items' blunt) a
+## blunt one's, any other weapon a blade's. Always on flesh: there is no
+## armour yet.
+static func hit(id: String) -> String:
+	if id == "" or Items.verb_of(id).is_empty():
+		return "sfx.hit_fist_flesh"
+	return "sfx.hit_blunt_flesh" if bool(Items.def(id).get("blunt", false)) else "sfx.hit_blade_flesh"
+
+
+## The slot a blow taken on a guard makes: a shield's (Items tag shield)
+## knock, else a weapon's parry.
+static func block(guard_id: String) -> String:
+	return "sfx.block_shield" if guard_id != "" and Items.has_tag(guard_id, "shield") else "sfx.block_weapon"
+
+
+## A swing's slot: a two-handed weapon's heavier whoosh.
+static func swing(id: String) -> String:
+	return "sfx.swing_heavy" if id != "" and int(Items.def(id).get("hands", 1)) >= 2 and not Items.verb_of(id).is_empty() 			and str(Items.verb_of(id).get("kind", "")) != "ranged" else "sfx.swing"
+
+
+## A person's voice slot for [param what] (effort_swing, effort_hurt,
+## effort_lift, death), by its body (Player.body, Companion.body: male or
+## female; decision 388); "" for anyone else.
+static func voice(entity: Object, what: String) -> String:
+	if entity is Player or entity is Companion:
+		return "voice.%s_%s" % [what, "female" if entity.get("body") == &"female" else "male"]
+	return ""
+
+
 ## A cry (Monster.cried) -> the part of its slot's name after the creature;
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
@@ -293,6 +323,25 @@ static func opening(entity: GridEntity) -> String:
 	if entity is Chest:
 		return "sfx.chest_open"
 	return "sfx.crate_open" if entity is Cargo else "sfx.pack_open"
+
+
+## The slot [param entity]'s row shuts with as the pack panel lets it go:
+## a chest's lid, "" for anything else.
+static func closing(entity: GridEntity) -> String:
+	return "sfx.chest_close" if entity is Chest else ""
+
+
+## A thing of [param id] put down, picked up, or thrown and landing
+## ([param what]: "drop", "pickup", "land"): light under World.THUD_HEAVY_KG,
+## heavy from it (the sim's thud noises split there too).
+static func handled(id: String, what: String) -> String:
+	var weight := "heavy" if Items.weight_of(id) >= World.THUD_HEAVY_KG else "light"
+	match what:
+		"pickup":
+			return "sfx.item_pickup_" + weight
+		"land":
+			return "sfx.thrown_land_" + weight
+	return "sfx.item_drop_" + weight
 
 
 ## Forget what was resolved (after takes land, for tools and tests).
