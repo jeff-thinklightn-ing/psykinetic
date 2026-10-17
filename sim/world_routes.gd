@@ -327,6 +327,76 @@ func steps_from(area_name: String, from: Vector2i, targets: Array[Vector2i], fac
 	return _flood(_areas[area_name], from, wanted, PackedFloat32Array(), layer.obstacles.get(area_name, {}))
 
 
+## Walking steps from the nearest of [param starts] ({area, cell}) to every
+## cell of every area it reaches, across the ways (each CROSSING steps),
+## held ground walked and no way blocked: area name -> PackedFloat32Array
+## by cell (-1 where none reaches). For thinning by distance from a place
+## (WorldRichness, decision 368). Reads only what never changes after the
+## routes are made, so a WorkerThreadPool task may call it.
+func distances_from(starts: Array[Dictionary]) -> Dictionary[String, PackedFloat32Array]:
+	# Area -> exit cell -> [[area, arrival cell], ...].
+	var leads: Dictionary[String, Dictionary] = {}
+	for key: Vector2i in _crossings:
+		var exit: Dictionary = _portals[key.x]
+		var arrival: Dictionary = _portals[key.y]
+		var from_area: Dictionary = leads.get_or_add(exit["area"], {})
+		(from_area.get_or_add(exit["cell"], []) as Array).append([arrival["area"], arrival["cell"]])
+	# Costs in half steps: a straight step 2, a diagonal 3, a crossing 2.
+	# Area -> half steps by cell (an Array, not a packed one: written in
+	# place, never copied).
+	var best: Dictionary[String, Array] = {}
+	var buckets: Array[Array] = [[]]
+	for start: Dictionary in starts:
+		_reach(str(start["area"]), start["cell"], 0, best, buckets)
+	var cost := 0
+	while cost < buckets.size():
+		for entry: Array in buckets[cost]:
+			var area_name: String = entry[0]
+			var cell: Vector2i = entry[1]
+			var area: Dictionary = _areas[area_name]
+			if best[area_name][cell.y * area["size"].x + cell.x] != cost:
+				continue
+			for direction in STRAIGHTS:
+				if can_step(area, cell, direction):
+					_reach(area_name, cell + direction, cost + 2, best, buckets)
+			for direction in DIAGONALS:
+				if can_step(area, cell, direction):
+					_reach(area_name, cell + direction, cost + 3, best, buckets)
+			for lead: Array in leads.get(area_name, {}).get(cell, []):
+				_reach(lead[0], lead[1], cost + roundi(CROSSING * 2.0), best, buckets)
+		buckets[cost] = []
+		cost += 1
+	var out: Dictionary[String, PackedFloat32Array] = {}
+	for area_name: String in best:
+		var halves: Array = best[area_name]
+		var steps := PackedFloat32Array()
+		steps.resize(halves.size())
+		for i in halves.size():
+			steps[i] = halves[i] / 2.0 if halves[i] < 1 << 30 else -1.0
+		out[area_name] = steps
+	return out
+
+
+func _reach(area_name: String, cell: Vector2i, cost: int, best: Dictionary[String, Array], buckets: Array[Array]) -> void:
+	var area: Dictionary = _areas.get(area_name, {})
+	if area.is_empty() or not area["floor"].has(cell):
+		return
+	var size: Vector2i = area["size"]
+	if not best.has(area_name):
+		var fresh := []
+		fresh.resize(size.x * size.y)
+		fresh.fill(1 << 30)
+		best[area_name] = fresh
+	var halves: Array = best[area_name]
+	var index := cell.y * size.x + cell.x
+	if halves[index] <= cost:
+		return
+	halves[index] = cost
+	while buckets.size() <= cost:
+		buckets.append([])
+	buckets[cost].append([area_name, cell])
+
+
 ## The cheapest route in [param layer], ignoring nothing; [] if none.
 func _route_in(layer: Layer, from_area: String, from_cell: Vector2i, to_area: String, to_cell: Vector2i) -> Array[Dictionary]:
 	var none: Array[Dictionary] = []

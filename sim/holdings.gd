@@ -149,6 +149,20 @@ func ground(area_name: String, cell: Vector2i) -> String:
 	return found
 
 
+## Every camp (a place of kind "camp") a faction holds, of
+## [param faction] only if given: {id, area, cell, size (its worth),
+## faction}. Raid groups set out from them (WorldRaids); Herds keeps game
+## off them.
+func camps(faction := "") -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for id in all_places():
+		var place := place(id)
+		var holder := holder(id)
+		if place.get("kind") == "camp" and holder != Factions.NOBODY and holder != "" and (faction.is_empty() or holder == faction):
+			out.append({"id": id, "area": place["area"], "cell": place["cell"], "size": float(place.get("worth", 1)), "faction": holder})
+	return out
+
+
 ## Whether place [param id]'s ground takes in [param cell] (its area's).
 func covers(id: String, cell: Vector2i) -> bool:
 	var place_cell: Vector2i = _places[id]["cell"]

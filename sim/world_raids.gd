@@ -108,13 +108,7 @@ func set_on(value: bool) -> void:
 ## The camps that can raid: places of kind "camp" a faction holds, {id,
 ## area, cell, size (its worth), faction}.
 func camps() -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	for id in holdings.all_places():
-		var place := holdings.place(id)
-		var faction := holdings.holder(id)
-		if place.get("kind") == "camp" and faction != Factions.NOBODY and faction != "":
-			out.append({"id": id, "area": place["area"], "cell": place["cell"], "size": float(place.get("worth", 1)), "faction": faction})
-	return out
+	return holdings.camps()
 
 
 ## The towns a camp of [param faction] would raid: Towns' towns whose place

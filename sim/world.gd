@@ -419,6 +419,9 @@ var production: Production = null
 var towns: Towns = null
 ## Raid groups on the world map (decision 328), server only; null on a client.
 var raid_groups: WorldRaids = null
+## How rich in game each cell of the world is (decision 368), for Herds;
+## server only, null on a client.
+var richness: WorldRichness = null
 ## Server: prices, players' gold and trade with the town (Economy); made by
 ## Main at boot, from the snapshot. Null on a client.
 var economy: Economy = null

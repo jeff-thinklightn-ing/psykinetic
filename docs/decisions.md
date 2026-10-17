@@ -7313,3 +7313,42 @@ the only form is style.md's holder form, as a draft; no bynames are invented.
 lore_test checks the file and the readers. Rejected: items keeping its own name
 tables (lore's words and gate in a second place), and storing the rendered text
 (a reforged thing would keep the old word).
+## 368. Game's richness: dead ground, the sky, held ground, the mine
+
+Economy's herds (decision 367) place wildlife by capacity = open cells x
+density x richness, and richness is the world map's to say: a new
+`WorldRichness` (`sim/world_richness.gd`, `World.richness`, made at boot
+on the server), whose `richness(area, cell) -> 0..1` is the Callable
+Herds asks.
+
+0 on dead ground (`WorldMap.is_dead`: level.json `"dead_ground": true`;
+the lore's Blood Rot land is a draft fact in prose with no machine flag,
+and lore code reads only agreed entries, so a level says it until a region
+flag is agreed), out of the sky (an indoor level, or a cell under a
+building's rect, as `Fields` roofs it), and on ground any faction but the
+town holds (`Holdings.ground`, contested too). Elsewhere 1, times the
+mine's thinning, Jeff's "game thins with distance toward the mine": the
+walking steps from the nearest place of kind `"mine"`, 0 within
+`mine_dead`, 1 from `mine_full`, straight between (levels/economy.json
+`"wildlife"`, 40 and 400 by default). Walking, not straight-line: a mine
+behind a wall or a ridge, or in another level, is as far as the walk.
+
+The steps are one flood from the mines over every area and across the
+ways (`WorldRoutes.distances_from`: a bucketed Dijkstra in half steps
+with World's step rules, `can_step`, and each way's exit leading to its
+arrival at `CROSSING`), run once on a WorkerThreadPool task started at
+boot and kept as a float per cell, so a richness is an array read. About
+2.2 s across today's five levels from a cell in the wilds, off the main
+thread; the first richness waits for it, and Main's `_exit_tree` waits
+too (as for raid routes). No mine, no flood, nothing thins (no level has
+one yet). Mines are read when it is made; a world map built again wants
+a new one.
+
+Beside it, as promised to enemy-ai and economy: `WorldMap.is_dead(area)`,
+`WorldMap.is_outdoor(area)`, and `Holdings.camps(faction := "")` (every
+held camp, of one faction if given: {id, area, cell, size, faction}),
+which `WorldRaids.camps()` now returns. richness_test: dead, indoor,
+roofed and held ground 0, the steps walked, the thinning, the town's
+ground thinned like open ground, the steps going on across an edge, no
+mine no thinning. Server only; no protocol change.
+

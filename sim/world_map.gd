@@ -314,6 +314,17 @@ func routes() -> WorldRoutes:
 	return _routes
 
 
+## Whether [param area_name] is dead ground, where nothing lives (no game,
+## no crops): its level.json says "dead_ground": true (decision 368).
+func is_dead(area_name: String) -> bool:
+	return bool(_configs.get(area_name, {}).get("dead_ground", false))
+
+
+## Whether [param area_name] is under the sky (level.json "outdoor").
+func is_outdoor(area_name: String) -> bool:
+	return bool(_configs.get(area_name, {}).get("outdoor", false))
+
+
 ## The ways out of [param area_name].
 func ways_from(area_name: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

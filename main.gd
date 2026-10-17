@@ -1531,6 +1531,10 @@ func _boot() -> void:
 	World.raid_groups.hook(World.raids)
 	if Net.raids:
 		World.raid_groups.set_on(true)
+	# Game's richness (decision 368): the steps from the mines worked out on
+	# a pool task now, for Herds (decision 367) to ask cell by cell.
+	World.richness = WorldRichness.new(world_map, World.holdings)
+	World.richness.start()
 	# Companions taken and freed in raids (decision 314).
 	# In play: its residents have bodies, which raiders take themselves; not
 	# (its zone asleep, or nobody near it: _town_near, decision 355), Towns
@@ -2341,6 +2345,8 @@ func _exit_tree() -> void:
 	# Routes still being made on pool tasks would crash a server on its way out.
 	if World.raid_groups != null:
 		World.raid_groups.finish()
+	if World.richness != null:
+		World.richness.finish()
 	# The stdin thread runs this node's method: it must have stopped before
 	# the node goes, or the server crashes on its way out (one stopped within
 	# 2 s of starting found it still waiting out stdin's end; decision 299).

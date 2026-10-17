@@ -119,6 +119,14 @@ No `height.png` means everything is at 0.
   wall does; a companion is told she is outdoors, and her map's `#` is
   "wall or forest". `levels/castle` is outdoors. (Later the forest's edge
   may be crossable, into a forest map.)
+- `"dead_ground"` (`true` or `false`, default `false`): nothing lives here,
+  no game and no crops (`WorldMap.is_dead`, decision 368). Game's richness
+  (`WorldRichness`, for the herds) is 0 on it, as it is indoors, under a
+  building's roof and on ground a faction other than the town holds; on
+  the rest it thins toward the mine (any place of kind `"mine"`), by the
+  walking steps from it across the world map: none within
+  `levels/economy.json` `wildlife.mine_dead` (40) steps, full from
+  `mine_full` (400) on.
 - `"north"` (`"up"`, `"down"`, `"left"` or `"right"`, default `"up"`):
   which way in layout.png is north. Every direction a companion hears is a
   compass point from it, and the HUD compass shows it.
