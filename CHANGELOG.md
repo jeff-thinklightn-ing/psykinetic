@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk have hidden natures now, most of them steady, a few of them
+  thieves, bards or scoundrels, rolled once when they join the town and never
+  shown. A thief lifts a thing from the town's store now and then, one piece
+  of cloth, ore, wood or food, never the last few of anything and never
+  gold; the store's ledger says only that something is missing.
 - The temple's entrance is one wide double door; each leaf still opens on
   its own.
 - Doors are wider and taller, sized for the new bodies (an opening 0.8 m wide and 2.4 m tall), and drawn as a plank door instead of the old castle-kit door.

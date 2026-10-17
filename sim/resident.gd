@@ -47,6 +47,9 @@ var card := ""
 var town_name := ""
 var town := ""
 var trade := ""
+## Its hidden personality type (decision 393: the worker record's,
+## Townsfolk.roll_type; "" for a companion), server side only, never shown.
+var type := ""
 ## Where it goes: "work", "home", "square" -> Rect2i of cells (Main's).
 var places: Dictionary = {}
 var senses: Senses
@@ -214,14 +217,20 @@ func voice_ask(speaker: String, line: String, serial: int) -> Dictionary:
 
 
 ## Who it is: a companion's own card; else a card rolled as a companion's
-## is, by its worker id (the same every time), its name and trade its own.
+## is, by its worker id (the same every time), its name and trade its own,
+## and its hidden type when it has one (decision 393): a standing fact,
+## kept hidden, that shapes its lines; the type's profile (companions' 378)
+## does the rest.
 func card_words() -> String:
 	if not card.is_empty():
 		return card
 	var traits := CompanionCard.roll(worker_id, person)
 	traits.erase("aspiration")
 	traits["profession"] = "a " + trade if not trade.is_empty() else "without a trade of %s own" % {"she": "her", "he": "his"}.get(str(traits.get("pronoun", "")), "their")
-	return CompanionCard.plain_card(traits)
+	var words := CompanionCard.plain_card(traits)
+	if not type.is_empty() and type != Townsfolk.STEADY:
+		words += "\n%s is a %s, and keeps it hidden." % [person, type.replace("_", " ")]
+	return words
 
 
 ## What is true now, a sentence each: the hour and the weather, its work,

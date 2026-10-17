@@ -1,0 +1,5 @@
+{
+	"_about": "Who the town's people are, beyond their trade (decision 393; the npc tree's). type_weights: each hidden personality type's share per 100 residents at the founding roll (Townsfolk.roll_type, by worker id); the types are lore's roles.json, only those agreed are rolled, and the rest are steady. The numbers are npc's drafts until Jeff weighs them. thief: the side-doing of a thief (Townsfolk.tick on the world tick): every so many steps (a day is 54000), with this chance, one of the first of takes the store holds more than leave of goes missing (a ledger line by 'missing', no name; never gold, never the last of anything).",
+	"type_weights": {"thief": 8, "scoundrel": 8, "bard": 6, "scholar": 6, "merchant": 8},
+	"thief": {"every": 54000, "chance": 0.5, "leave": 2, "takes": ["cloth", "ore", "wood", "food"]}
+}

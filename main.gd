@@ -1553,6 +1553,7 @@ func _boot() -> void:
 	# The town's workers, workshops and jobs, as the snapshot left them.
 	# A resident's mind about their trade's role profile (decision 378).
 	Production.profile_of = Lore.profile
+	Production.type_of = Townsfolk.roll_type  # The hidden type, by id (decision 393).
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
@@ -2885,7 +2886,8 @@ func _sync_residents() -> void:
 			for who in ids:
 				var trades: Array = World.production.worker(who).get("trades", [])
 				folk.append({"key": who, "name": str(World.production.worker(who).get("name", who)),
-					"trade": str(trades[0]) if not trades.is_empty() else "", "player": ""})
+					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "",
+					"type": str(World.production.worker(who).get("type", ""))})
 			folk.append_array(_companions_resting(place_id))
 			var homes := _homes(area, place)
 			for i in folk.size():
@@ -3062,6 +3064,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	body.card = str(record.companion.get("card", "")) if record != null else ""
 	body.town = town
 	body.trade = trade
+	body.type = str(each.get("type", ""))
 	body.places = places
 	body.doing = doing
 	return body

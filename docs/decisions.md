@@ -8520,3 +8520,69 @@ Rejected: a door.double in the sim (one Door over two edges would change the
 wire format, the pathing and every lock and break rule for no gain a player
 sees); a "double" flag in level.json or the building slot (the layout already
 says it: two door edges side by side).
+## 393. Townsfolk have hidden personality types; a thief lifts from the store
+
+Jeff's word (2026-10-17): "scoundrel, thieves, and bards isn't a profession
+might be more of a hidden personality type -- same for scholar, merchant".
+Every town resident has a personality type under their profession, rolled
+once at founding (when their worker record is first made) and never shown:
+not in the label (333 amended, "Bram [smith]"), no panel, no prose, no
+ledger name; the Resident body's `type` is a plain server-side var, nothing
+replicated. The types and their stat profiles are lore's `roles.json`
+(376 amended; `Lore.profile(trade, type)`); the npc tree owns the roll and
+what a type does beyond speech, in the new class `Townsfolk`
+(`sim/townsfolk.gd`) and its rules `levels/townsfolk.json`.
+
+The roll (`Townsfolk.roll_type(worker_id)`): one draw of 0..100 from an RNG
+seeded by the worker id (as `CompanionCard.roll` is), walked over the agreed
+types' weights (`Lore.types()`, in roles.json's order; `type_weights`, each
+a share per 100 residents: npc's drafts, thief 8, scoundrel 8, bard 6,
+scholar 6, merchant 8, for Jeff to weigh); past them the person is steady.
+A type that is still a draft (scholar, merchant) is weighted but never
+rolled until Jeff agrees it. A companion resting in town ("companion:<player
+id>") has no type: her card is who she is. The weights live in npc's file,
+not roles.json: lore gives words and never sets numbers (lore-2a). The roll
+being by id, a save from before this rolls the same type on load (the box's
+founded town gets its types on its next load) and a record made again keeps
+it. Economy's `Production` keeps the type on the worker record and saves it
+(its `add_worker` takes it, else asks the `Production.type_of` hook, which
+Main sets to `Townsfolk.roll_type`; economy's 05b2615, 378 amended), and
+rolls the four stats around `Lore.profile(trade, type)` (fc57301, 353 amended).
+
+The type reaches the voice the cheap way: a non-steady type is a standing
+fact in `Resident.card_words` ("Bram is a thief, and keeps it hidden."),
+and companions' 378 passes the record's type to `Lore.profile` and
+`Lore.binding` for its rule lines; no other prompt change until the voices
+move to npc (step 5).
+
+The first side-doing, the thief's lift (`Townsfolk.tick(production,
+stockpile)`, on the world tick after `Economy.tick`, slice 0): a thief in
+town (not away) has a "lift" clock in the record's needs
+(`Production.need_due`, no new field); every `every` steps (54000, a day),
+with `chance` (0.5, drawn by id and due step so a replayed day lifts the
+same), they take one of the first of `takes` (cloth, ore, wood, food:
+dearest first) the store holds more than `leave` (2) of, through
+`Stockpile.take(town, what, 1, "missing")`: the ledger line's `by` is
+"missing", no name, and nothing else is told. Never gold (the treasury is
+counted) and never the last of anything. The goods vanish: no gold is made
+or moved, so economy's books stay closed (folk_test drives Economy.tick
+and Production.tick directly and never sees a lift). A merchant's sharper
+price and a scholar's wider knowledge (known_by with the type's domain
+already covers most of it) come later, each its own design.
+
+townsfolk_test: the file's keys are lore's types and the agreed shares leave
+room for steady; the roll is by id, matches the weights over 4000 ids,
+rolls nothing weighted 0 or unagreed, none for a companion; the record keeps
+the type, saves it, and rolls one for a save from before; the thief's lift
+on the clock, with the chance, dearest first, never gold or below leave,
+nothing away; the label and a steady card carry no type, a thief's card the
+standing fact. Protocol unchanged.
+
+Rejected: the weights in roles.json (lore's file is words; a getter to keep
+in step); a `Townsfolk` instance saved with the world (its only state is the
+clock, which the worker record already saves); the thief gaining gold for
+what he lifts (a leak into economy's closed books; fencing can come with the
+resident cards, step 3); rolling from every type in the file (Jeff has not
+agreed scholar or merchant); showing the type to a player who talks long
+enough (it is hidden by Jeff's word; what a thief lets slip is the voice's
+to decide from the standing fact).
