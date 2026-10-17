@@ -10,6 +10,7 @@
 				"rock.large", "rock.boulder",
 				"scatter.tuft", "scatter.stone", "scatter.flower", "scatter.root", "scatter.reeds",
 				"building.hut", "building.house", "building.shed", "building.well",
+				"material.roof.shingle", "roof.shingle.ridge", "roof.shingle.end", "roof.shingle.broken",
 				"material.wall.wood", "floor.wood",
 				"wall.wood.straight", "wall.wood.post", "wall.wood.end", "wall.wood.corner", "wall.wood.t", "wall.wood.cross",
 				"wall.wood.window", "wall.wood.straight_ruined", "wall.wood.rubble", "wall.wood.tower",
@@ -68,8 +69,8 @@
 		},
 		{
 			"name": "profiles",
-			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, not a model",
-			"slots": ["wall.castle.profile", "wall.wood.profile", "wall.stone.profile", "wall.cave.profile"]
+			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model",
+			"slots": ["wall.castle.profile", "wall.wood.profile", "wall.stone.profile", "wall.cave.profile", "roof.shingle.profile"]
 		}
 	]
 }

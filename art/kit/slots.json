@@ -246,6 +246,48 @@
 			"pixels": 512,
 			"uses": "the planks of swept wall.wood runs (wall.wood.profile): u is metres along the run, v metres up"
 		},
+		"roof.shingle.profile": {
+			"category": "roofs",
+			"type": "profile",
+			"kind": "cell",
+			"size": [1, 0.75, 1],
+			"uses": "the shingle roof set: buildings' code-drawn gable roofs over a level's \"roofs\" (a rect, a set, the ridge along x or z), both slopes, the eaves and the fascia extruded from it, so no slope or eave mesh; the gable infill from the room's wall set. rise: metres the roof climbs a cell in from the eave (a 4-cell span rises 1.5 m, as building.house's roof); thickness: the slope's, metres; overhang: metres past the outline at the eaves and the gable ends",
+			"rise": 0.75,
+			"thickness": 0.15,
+			"overhang": 0.3,
+			"material": "material.roof.shingle"
+		},
+		"material.roof.shingle": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"uses": "the shingles of roof.shingle.profile's slopes: u is metres along the ridge, v metres down the slope"
+		},
+		"roof.shingle.ridge": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.5, 0.25, 1],
+			"budget": 200,
+			"uses": "a shingle roof's ridge cap, 1 m along z, laid once a cell along the ridge (turned for a ridge along x); a saddle over the apex hugging both slopes (0.75 down a metre out each way), its lowest edges 0.25 m either side of the apex line; origin the middle of its base (y 0 at those lowest edges, as every mesh slot stands on its origin), so code lays it 0.19 m below the apex of the slopes' top faces"
+		},
+		"roof.shingle.end": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.3, 0.6, 0.3],
+			"budget": 300,
+			"uses": "a shingle roof's gable finial at each end of the ridge, facing out along -z; origin at the apex of the slopes' top faces at the gable's overhang; the barge boards under it are code's, extruded down the pitch as the fascia is, so this never stretches with the span"
+		},
+		"roof.shingle.broken": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.25, 0.3, 1],
+			"budget": 400,
+			"uses": "one roof cell's hole dressing on a damaged shingle roof (a third of its cells, by hash, as walls' 298): snapped battens and ragged shingles round a hole about 0.7 m across, which code cuts in the slope and leaves open to the sky; modelled lying flat, x down the slope (1.25 m: a cell's run on a slope rising 0.75 a metre), z along the ridge; origin the cell's middle on the slope's top face, the dressing on it (nothing below y 0); code tilts it onto the slope"
+		},
 		"floor.wood": {
 			"category": "floors",
 			"type": "texture",

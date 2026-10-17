@@ -181,6 +181,13 @@ func _test_profile() -> void:
 		var entry := ArtKit.spec(slot)
 		if str(entry.get("type", "")) != "profile":
 			continue
+		if slot.begins_with("roof."):
+			# A roof set's: its pitch, thickness and overhang, and its material.
+			var roof_set := slot.trim_prefix("roof.").trim_suffix(".profile")
+			_check(float(entry.get("rise", 0.0)) > 0.0 and float(entry.get("thickness", 0.0)) > 0.0 and float(entry.get("overhang", -1.0)) >= 0.0
+					and str(entry.get("material", "")) == "material.roof." + roof_set and ArtKit.has("material.roof." + roof_set),
+					"%s: rise %s, thickness %s, overhang %s, %s" % [slot, entry.get("rise"), entry.get("thickness"), entry.get("overhang"), entry.get("material")])
+			continue
 		var set_name := slot.trim_prefix("wall.").trim_suffix(".profile")
 		sets.append(set_name)
 		var points: Array = entry.get("points", [])
