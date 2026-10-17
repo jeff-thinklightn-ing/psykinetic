@@ -380,16 +380,17 @@ func killed(id: String, _kind := "") -> void:
 		_groups[id]["out"] = maxi(int(_groups[id]["out"]) - 1, 0)
 
 
-## A body of group [param id] fled into [param to_area] at [param cell]:
-## its unit is out of the group of its species nearest there (or a new
-## one at the cell). That group's id, for the body's spec.
+## A body of group [param id] fled into [param to_area] at [param cell]
+## (and is gone from here: Main despawns it, kept): its unit is kept in the
+## group of its species nearest there (or a new one at the cell), to be
+## made again there near someone. That group's id.
 func moved(id: String, to_area: String, cell: Vector2i) -> String:
 	var from: Dictionary = _groups.get(id, {})
 	if from.is_empty():
 		return id
 	from["out"] = maxi(int(from["out"]) - 1, 0)
 	var to := _group_for("", to_area, str(from["species"]), cell)
-	to["out"] = int(to["out"]) + 1
+	to["count"] = float(to["count"]) + 1.0
 	return str(to["id"])
 
 

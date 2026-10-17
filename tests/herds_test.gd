@@ -220,8 +220,8 @@ func _test_bodies() -> void:
 	herds.killed(str(deer["id"]), "deer")
 	_check(int(deer["out"]) == out.size() - 2 and absf(_sum(herds, "meadow") - (all - 1.0)) < 0.001, "a kill is gone for good")
 	var into := herds.moved(str(deer["id"]), "fields", Vector2i(3, 3))
-	_check(int(deer["out"]) == out.size() - 3 and int(herds.group(into)["out"]) == 1 and herds.group(into)["area"] == "fields",
-		"a flight off the edge: out of a deer group in the next area (%s)" % into)
+	_check(int(deer["out"]) == out.size() - 3 and float(herds.group(into)["count"]) >= 1.0 and int(herds.group(into)["out"]) == 0
+		and herds.group(into)["area"] == "fields", "a flight off the edge: kept in a deer group in the next area (%s)" % into)
 	_check(herds.moved(str(deer["id"]), "fields", Vector2i(5, 3)) == into, "the next one joins the same group there")
 	var gone := herds.groups_in("meadow", "boar")[0]
 	gone["count"] = 0.0

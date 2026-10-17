@@ -8356,8 +8356,9 @@ wolf), area, home cell, count (kept, a float), out (bodies now), made}.
   records); `retire` puts a calm far one back in its count. A death is
   `killed(group, kind)` (enemy-ai's W4, from the death branch): gone for
   good, so hunting depletes. A flight off an edge is `moved(group, area,
-  cell)`: the unit joins its species' nearest group there (or a new one),
-  whose id it returns. Animal records from before (no group, no level
+  cell)`: the unit is kept in its species' nearest group there (or a new
+  one), whose id it returns; the body is despawned, kept (enemy-ai's W4,
+  397), and made again there near someone. Animal records from before (no group, no level
   slot) fold into groups when a zone's records are restored.
 - Saved: the snapshot's "herds" (groups, areas seeded, the clock); a
   body's snapshot entry keeps its "group" and "home". A snapshot from

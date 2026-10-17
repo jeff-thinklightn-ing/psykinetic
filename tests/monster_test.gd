@@ -1770,8 +1770,8 @@ func _test_herd_hunt() -> void:
 	_check(not crossed.is_empty() and crossed[0]["to"] == "fields" and crossed[0]["side"] == "east" and (crossed[0]["at"] as Vector2i).x == 0,
 			"a deer runs off the east edge into fields, at its west edge (%s)" % [crossed.slice(0, 1)])
 	var there := herds.groups_in("fields", "deer")
-	_check(not there.is_empty() and int(there[0]["out"]) == crossed.size() and int(deer["out"]) == 4 - crossed.size(),
-			"its unit is out of the fields' deer now (%d moved)" % crossed.size())
+	_check(not there.is_empty() and is_equal_approx(float(there[0]["count"]), float(crossed.size())) and int(there[0]["out"]) == 0
+			and int(deer["out"]) == 4 - crossed.size(), "its unit is kept in the fields' deer now (%d moved)" % crossed.size())
 	# One of no group (a level's own) at the edge stays.
 	var plain := EntityFactory.build(Level._spec_for("monster_deer", Level.MONSTER_TYPES).merged({"name": "LevelDoe", "kind": "deer"})) as Animal
 	_room.add_child(plain)
