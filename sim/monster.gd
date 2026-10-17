@@ -850,7 +850,9 @@ func _alert_tick() -> void:
 		_idle_tick()
 		return
 	if _beyond_leash():
-		_give_up(_quarry)
+		# The quarry may be gone (a player who died): a freed one can't be
+		# passed as a GridEntity.
+		_give_up(_quarry if is_instance_valid(_quarry) else null)
 		return
 	if World.tick >= _alert_until:
 		if alert == Alert.HUNTING:

@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_flank()
 	_test_hold_back()
 	_test_dread()
+	_test_quarry_gone()
 	_test_reaction()
 	_test_kind_saved()
 	_test_facing()
@@ -341,6 +342,21 @@ func _test_dread() -> void:
 		if World.are_adjacent(imp.tile, player.tile):
 			closed = true
 	_check(closed, "the sword gone, it comes on")
+
+
+func _test_quarry_gone() -> void:
+	print("\n== hunting past its leash a quarry since gone, it gives up and goes back ==")
+	var e := _build(["##########", "#....i...#", "##########"])
+	var imp: Monster = e["i"][0]
+	_bold(imp)
+	var gone := GridEntity.new()
+	imp._quarry = gone
+	gone.free()
+	imp.alert = Monster.Alert.HUNTING
+	imp._alert_until = World.tick + 100
+	imp._post = imp.tile + Vector2i(imp.leash + 5, 0)
+	imp._alert_tick()
+	_check(imp.alert == Monster.Alert.IDLE and imp._returning, "calm and going back (alert %d)" % imp.alert)
 
 
 func _test_reaction() -> void:
