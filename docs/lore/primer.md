@@ -1,14 +1,16 @@
 # World primer
 
-Status: **draft**. This page states only what has been decided: the roadmap's
+Status: **draft**, except where Jeff has said it word for word: those facts are
+agreed in `levels/lore/` (the Blood Rot's own wait on H4, since a faction is
+agreed only once maps has its key). This page states only what has been decided: the roadmap's
 first scenario, the companions' world text (`VOICE_WORLD` in `sim/companion.gd`),
 the tone, and Jeff's points in `docs/lore/blood_rot.md` (his Blood Rot starter,
 where each point is marked [Jeff] or [proposal]; only [Jeff] points are stated
 here). Everything else is left open and marked *(asked: X)*, where X is the
-question's code in the list Jeff and Dire are answering (`docs/lore_questions.md`
+question's code in the list Jeff is answering (`docs/lore_questions.md`
 in the main checkout). The structured facts behind this page are in
 `levels/lore/*.json` (format: `docs/lore/README.md`); where the two disagree, the
-data is wrong and gets fixed. Nothing is confirmed until Jeff and Dire say so.
+data is wrong and gets fixed. Nothing else is confirmed until Jeff says so.
 
 ## Tone
 

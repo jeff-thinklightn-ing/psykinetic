@@ -4,7 +4,7 @@
 		{
 			"id": "townsfolk",
 			"name": "townsfolk",
-			"status": "draft",
+			"status": "agreed",
 			"where": [
 				"town_lands",
 				"blood_rot_lands"
@@ -14,7 +14,7 @@
 		{
 			"id": "learned",
 			"name": "the learned",
-			"status": "draft",
+			"status": "agreed",
 			"where": [],
 			"tags": [
 				"history",
@@ -37,7 +37,7 @@
 		{
 			"id": "blood_rot",
 			"name": "the Blood Rot",
-			"status": "draft",
+			"status": "agreed",
 			"where": [
 				"blood_rot_lands"
 			],
@@ -49,7 +49,7 @@
 		{
 			"id": "wren",
 			"name": "Wren",
-			"status": "draft",
+			"status": "agreed",
 			"where": [
 				"town_lands",
 				"blood_rot_lands"
@@ -59,7 +59,7 @@
 		{
 			"id": "pip",
 			"name": "Pip",
-			"status": "draft",
+			"status": "agreed",
 			"where": [
 				"town_lands",
 				"blood_rot_lands"
@@ -69,7 +69,7 @@
 		{
 			"id": "nix",
 			"name": "Nix",
-			"status": "draft",
+			"status": "agreed",
 			"where": [
 				"town_lands",
 				"blood_rot_lands"

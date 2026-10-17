@@ -218,7 +218,7 @@ func _test_known_by() -> void:
 	var ore := Lore.known_by("learned", PackedStringArray(["ore"]), "draft").map(func(fact: Dictionary) -> String: return fact["id"])
 	_check("blighted_ore.carries" in ore and not "the_land.fire" in ore, "on the files, about the ore: the ore's facts, not the fire's %s" % [ore])
 	var weighted: Array = Lore.known_by("learned", PackedStringArray(), "draft").filter(func(fact: Dictionary) -> bool: return fact["weight"] != Lore.DEFAULT_WEIGHT)
-	_check(weighted.is_empty(), "no fact is weighted until Jeff and Dire have agreed facts to weigh")
+	_check(weighted.is_empty(), "no fact is weighted until Jeff weighs them")
 
 
 func _test_names_file() -> void:

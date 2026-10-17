@@ -5,7 +5,7 @@
 			"id": "blood_rot_lands",
 			"type": "region",
 			"name": "the Blood Rot's land",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The region the Blood Rot raid, with their mine at its heart and the town at a distance from it.",
 			"relations": [],
@@ -19,14 +19,16 @@
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "blood_rot_lands.neighbours",
 					"text": "Other regions lie beyond the Blood Rot's land.",
 					"known": "common",
 					"where": [],
-					"source": "lore"
+					"source": "lore",
+					"status": "draft"
 				}
 			]
 		},
@@ -106,7 +108,7 @@
 			"id": "temple",
 			"type": "place",
 			"name": "the temple",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The town's temple, kept by a priest, where the fallen are brought back.",
 			"place_kind": "other",
@@ -127,7 +129,8 @@
 					"where": [],
 					"tags": [
 						"return"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "temple.whose",
@@ -143,7 +146,7 @@
 			"id": "healers_hut",
 			"type": "place",
 			"name": "the healer's hut",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "A healer's hut out in the wilds, where a medicine man lives and the fallen are brought back.",
 			"place_kind": "other",
@@ -159,7 +162,8 @@
 					"where": [],
 					"tags": [
 						"return"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},
@@ -194,7 +198,7 @@
 			"id": "mine",
 			"type": "place",
 			"name": "the mine",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "An old mine, the heart of the Blood Rot's land, over the fallen star.",
 			"place_kind": "mine",
@@ -214,7 +218,8 @@
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "mine.deeper",
@@ -223,7 +228,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"true": true
+					"true": true,
+					"status": "agreed"
 				},
 				{
 					"id": "mine.dug_toward",
@@ -237,7 +243,8 @@
 					"source": "proposal",
 					"tags": [
 						"history"
-					]
+					],
+					"status": "draft"
 				}
 			]
 		},
@@ -245,7 +252,7 @@
 			"id": "tower",
 			"type": "place",
 			"name": "the tower",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "A tower built by the earlier humans, standing over the mine and still holding their artifacts and treasures.",
 			"place_kind": "other",
@@ -269,7 +276,8 @@
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "tower.treasures",
@@ -278,7 +286,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"true": true
+					"true": true,
+					"status": "agreed"
 				}
 			]
 		},
@@ -286,7 +295,7 @@
 			"id": "star_chamber",
 			"type": "place",
 			"name": "the fallen star",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "Deep in the mine lies the source of the rot: a star that fell into the land many thousands of years ago.",
 			"aka": [
@@ -313,13 +322,15 @@
 					],
 					"tags": [
 						"rot"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "star_chamber.common_name",
 					"text": "Common folk call it a fallen star.",
 					"known": "common",
-					"where": []
+					"where": [],
+					"status": "agreed"
 				},
 				{
 					"id": "star_chamber.near_name",
@@ -327,7 +338,8 @@
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "star_chamber.taken",
@@ -338,7 +350,8 @@
 					],
 					"tags": [
 						"captives"
-					]
+					],
+					"status": "draft"
 				}
 			]
 		}

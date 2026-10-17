@@ -5,7 +5,7 @@
 			"id": "iron",
 			"type": "material",
 			"name": "iron",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "Ordinary iron, found near the town.",
 			"resource": "ore",
@@ -29,7 +29,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},
@@ -37,7 +38,7 @@
 			"id": "blighted_ore",
 			"type": "material",
 			"name": "blighted ore",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "Ore from the Blood Rot's mine, carrying the rot.",
 			"resource": "ore",
@@ -66,7 +67,8 @@
 					],
 					"tags": [
 						"rot"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "blighted_ore.learned",
@@ -78,7 +80,8 @@
 					],
 					"tags": [
 						"rot"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "blighted_ore.carries",
@@ -92,7 +95,8 @@
 					"source": "proposal",
 					"tags": [
 						"rot"
-					]
+					],
+					"status": "draft"
 				}
 			]
 		}

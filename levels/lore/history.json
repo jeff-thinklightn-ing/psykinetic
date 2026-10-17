@@ -5,7 +5,7 @@
 			"id": "star_fall",
 			"type": "event",
 			"name": "the fall of the star",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "A star fell into the land many thousands of years ago, before the town and before the Blood Rot.",
 			"relations": [
@@ -28,7 +28,8 @@
 					"tags": [
 						"history"
 					],
-					"source": "proposal"
+					"source": "proposal",
+					"status": "draft"
 				},
 				{
 					"id": "star_fall.age",
@@ -40,7 +41,8 @@
 					],
 					"tags": [
 						"history"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},

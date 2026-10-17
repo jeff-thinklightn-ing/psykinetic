@@ -22,8 +22,8 @@ const DIR := "res://levels/lore/"
 const FILES := ["world", "factions", "regions", "materials", "people", "history"]
 const KNOWN := ["common", "rumour", "secret", "lived"]
 ## A fact's weight when it gives none: how much it matters beside others,
-## for a prompt that has room for only some. Left at this until Jeff and
-## Dire have agreed facts to weigh.
+## for a prompt that has room for only some. Left at this until Jeff weighs
+## them.
 const DEFAULT_WEIGHT := 1.0
 ## How a name came, and what a form may be filled from.
 const NAME_HOWS := ["holder", "deed", "maker"]

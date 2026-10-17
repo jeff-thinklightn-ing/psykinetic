@@ -46,7 +46,8 @@ Each file is `{"_about": "...", "entries": [...]}`.
   `region` names, and a key of `levels/climates.json` (environment owns it and its
   weather numbers; a region that isn't `asked` needs a key there).
 - `type`: world, faction, people, region, place, material, person, weapon, event.
-- `status`: `agreed` (Jeff or Dire decided it, or it is already in the game),
+- `status`: `agreed` (Jeff said it, word for word, or it is already in the game;
+  Dire plays and tests, and his ideas go to Jeff, who decides: Jeff, 2026-10-17),
   `draft` (written from what is decided but not yet confirmed), `asked` (an open
   question; `ask` names its code, e.g. `"A2"`). Code uses only `agreed`.
 - `source`: who it comes from: `Jeff`, `Dire`, `roadmap`, `game` (already true in
@@ -114,7 +115,7 @@ or the entry's name (any case, a plural "s" allowed).
 `Lore.known_by(id, [], "draft")` previews drafts too, and asked facts never
 count. A fact may give a `weight` (a number above 0, how much it matters beside
 others when a prompt has room for only some). Without one it is
-`Lore.DEFAULT_WEIGHT`. None is set until Jeff and Dire have agreed facts to weigh.
+`Lore.DEFAULT_WEIGHT`. None is set until Jeff weighs them.
 Fact text is a third-person statement: lore_test refuses I, we or you in a fact or
 a summary. To see what a knower would know:
 

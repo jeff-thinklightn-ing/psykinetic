@@ -5,7 +5,7 @@
 			"id": "priest",
 			"type": "person",
 			"name": "the priest",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The priest who keeps the town's temple and brings the fallen back.",
 			"relations": [
@@ -25,7 +25,8 @@
 					"where": [],
 					"tags": [
 						"return"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},
@@ -33,7 +34,7 @@
 			"id": "medicine_man",
 			"type": "person",
 			"name": "the medicine man",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The medicine man who lives in the healer's hut in the wilds and brings the fallen back.",
 			"relations": [
@@ -53,7 +54,8 @@
 					"where": [],
 					"tags": [
 						"return"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},
@@ -121,7 +123,7 @@
 			"id": "wren",
 			"type": "person",
 			"name": "Wren",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "Wren is a woman, a companion who rests in town between trips; the rest of who she is comes from her card, which the companions tree rolls and grows.",
 			"relations": [
@@ -140,7 +142,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},
@@ -148,7 +151,7 @@
 			"id": "pip",
 			"type": "person",
 			"name": "Pip",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "Pip is a young man, a companion who rests in town between trips and wants to become a squire; the rest of who he is comes from his card, which the companions tree rolls and grows.",
 			"relations": [
@@ -167,7 +170,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "pip.young_man",
@@ -175,7 +179,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "pip.squire",
@@ -183,7 +188,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		},
@@ -191,7 +197,7 @@
 			"id": "nix",
 			"type": "person",
 			"name": "Nix",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "Nix is a woman, a companion who rests in town between trips; the rest of who she is comes from her card, which the companions tree rolls and grows.",
 			"relations": [
@@ -210,7 +216,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "agreed"
 				}
 			]
 		}

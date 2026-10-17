@@ -5,7 +5,7 @@
 			"id": "the_land",
 			"type": "world",
 			"name": "the land",
-			"status": "draft",
+			"status": "agreed",
 			"source": "game",
 			"summary": "Old stone places and the open ground around them, where monsters prowl.",
 			"relations": [],
@@ -17,26 +17,30 @@
 					"id": "the_land.stone_places",
 					"text": "The land holds old stone places, rooms and corridors lit by lanterns and fires, and the open ground beyond them.",
 					"known": "common",
-					"where": []
+					"where": [],
+					"status": "draft"
 				},
 				{
 					"id": "the_land.monsters",
 					"text": "Monsters prowl the stone places and the open ground and attack whoever they see.",
 					"known": "common",
-					"where": []
+					"where": [],
+					"status": "draft"
 				},
 				{
 					"id": "the_land.fire",
 					"text": "Fire burns whoever stands in it.",
 					"known": "common",
-					"where": []
+					"where": [],
+					"status": "draft"
 				},
 				{
 					"id": "the_land.deadly",
 					"text": "Raiders can kill.",
 					"known": "common",
 					"where": [],
-					"source": "Jeff"
+					"source": "Jeff",
+					"status": "agreed"
 				},
 				{
 					"id": "the_land.brought_back",
@@ -46,7 +50,8 @@
 					"source": "Jeff",
 					"tags": [
 						"return"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "the_land.bringing_back",
@@ -60,7 +65,8 @@
 					"id": "the_land.directions",
 					"text": "People give directions as north, south, east and west.",
 					"known": "common",
-					"where": []
+					"where": [],
+					"status": "draft"
 				},
 				{
 					"id": "the_land.name",
@@ -91,7 +97,8 @@
 					"text": "No one has been knighted in ages.",
 					"known": "common",
 					"where": [],
-					"source": "Jeff"
+					"source": "Jeff",
+					"status": "agreed"
 				},
 				{
 					"id": "the_land.knights_once",

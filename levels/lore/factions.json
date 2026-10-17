@@ -5,7 +5,7 @@
 			"id": "town",
 			"type": "faction",
 			"name": "the town",
-			"status": "draft",
+			"status": "agreed",
 			"source": "roadmap",
 			"summary": "The people the players fight for; what is found on the road comes home to the town.",
 			"relations": [
@@ -35,7 +35,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"source": "Jeff"
+					"source": "Jeff",
+					"status": "agreed"
 				},
 				{
 					"id": "town.threat",
@@ -44,7 +45,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"source": "Jeff"
+					"source": "Jeff",
+					"status": "agreed"
 				},
 				{
 					"id": "town.stockpile",
@@ -55,7 +57,8 @@
 					],
 					"tags": [
 						"economy"
-					]
+					],
+					"status": "draft"
 				},
 				{
 					"id": "town.rescued",
@@ -63,7 +66,8 @@
 					"known": "common",
 					"where": [
 						"town_lands"
-					]
+					],
+					"status": "draft"
 				},
 				{
 					"id": "town.ruler",
@@ -353,7 +357,7 @@
 			"id": "earlier_humans",
 			"type": "people",
 			"name": "the earlier humans",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
 			"summary": "The humans who built the tower over the mine and died off from the rot.",
 			"relations": [
@@ -379,7 +383,8 @@
 					],
 					"tags": [
 						"history"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "earlier_humans.died",
@@ -392,7 +397,8 @@
 					"tags": [
 						"history",
 						"rot"
-					]
+					],
+					"status": "agreed"
 				},
 				{
 					"id": "earlier_humans.who",
