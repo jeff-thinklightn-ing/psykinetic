@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The temple's entrance is one wide double door; each leaf still opens on
+  its own.
 - Doors are wider and taller, sized for the new bodies (an opening 0.8 m wide and 2.4 m tall), and drawn as a plank door instead of the old castle-kit door.
 - Past the edge of outdoor maps the forest is now crowded pine stands whose crowns merge into one canopy.
 - Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.

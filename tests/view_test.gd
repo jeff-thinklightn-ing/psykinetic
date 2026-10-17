@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_buildings()
 	_test_roofs()
 	_test_wall_heights()
+	await _test_double_doors()
 	_test_roof_damage()
 	_test_building_states()
 	_test_town_walls()
@@ -927,19 +928,7 @@ func _test_roof_damage() -> void:
 func _test_wall_heights() -> void:
 	print("
 == the temple and the healer's hut: kit prefabs; a building's walls as tall as its slot says ==")
-	var map := LevelMap.new(Vector2i(16, 12))
-	for y in 12:
-		for x in 16:
-			map.set_cell(Vector2i(x, y), "grass")
-	var config := {"outdoor": true}
-	for stamp: Array in [["building_temple", Vector2i(1, 1)], ["building_healers_hut", Vector2i(9, 1)]]:
-		var changes := Prefab.stamp_changes(Prefab.load_prefab(stamp[0]), map, stamp[1], config)
-		for cell: Vector2i in changes["cells"]:
-			map.set_cell(cell, changes["cells"][cell])
-		for key: Vector3i in changes["edges"]:
-			map.set_edge(key, changes["edges"][key])
-		config.merge(changes.get("config", {}), true)
-	var level := Level.parse(map.to_image(), null, config)
+	var level := _kit_level()
 	var rects := (level["buildings"] as Array).map(func(b: Dictionary) -> Array: return [b["slot"], b["rect"]])
 	_check(rects == [["building.temple", Rect2i(2, 2, 4, 6)], ["building.healers_hut", Rect2i(10, 2, 3, 3)]]
 			and (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building")).is_empty(),
@@ -981,6 +970,84 @@ func _test_wall_heights() -> void:
 	_check(corner != null and _rig._bounds(corner).end.y > tall - 0.2, "its corner posts as tall")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(_rig._wall_heights.is_empty(), "and none left on another map")
+
+
+## The temple (at 2, 2) and the healer's hut (at 10, 2) stamped from their
+## prefabs on grass, parsed.
+func _kit_level() -> Dictionary:
+	var map := LevelMap.new(Vector2i(16, 12))
+	for y in 12:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := {"outdoor": true}
+	for stamp: Array in [["building_temple", Vector2i(1, 1)], ["building_healers_hut", Vector2i(9, 1)]]:
+		var changes := Prefab.stamp_changes(Prefab.load_prefab(stamp[0]), map, stamp[1], config)
+		for cell: Vector2i in changes["cells"]:
+			map.set_cell(cell, changes["cells"][cell])
+		for key: Vector3i in changes["edges"]:
+			map.set_edge(key, changes["edges"][key])
+		config.merge(changes.get("config", {}), true)
+	return Level.parse(map.to_image(), null, config)
+
+
+func _test_double_doors() -> void:
+	print("
+== a building's doorway two edges wide is one door.double, each leaf its own edge's Door (decision 403) ==")
+	_rig.rebuild(_kit_level()["terrain"], Vector2i(7, 6))
+	var entrance := Level.outline(Rect2i(2, 2, 4, 6)).filter(func(key: Vector3i) -> bool: return _rig._doorways.has(key))
+	_check(entrance.size() == 2 and _rig._doorways[entrance[0]] == _rig._doorways[entrance[1]]
+			and _rig._doorways[entrance[0]].get_node("Door").has_node("leaf_b"),
+			"the temple's two door edges %s: one doorway, a door.double" % [entrance])
+	var hut := Level.outline(Rect2i(10, 2, 3, 3)).filter(func(key: Vector3i) -> bool: return _rig._doorways.has(key))
+	_check(hut.size() == 1 and _rig._doorways[hut[0]].has_node(Client3D.DOOR_LEAF), "the hut's one door edge: a door.single")
+	if entrance.size() != 2:
+		return
+	var doorway: Node3D = _rig._doorways[entrance[0]]
+	var leaves := entrance.map(func(key: Vector3i) -> Node3D: return _rig._door_hinges[key][0])
+	var picks := doorway.get_children().filter(func(node: Node) -> bool: return node is Area3D)
+	var centre := doorway.global_position
+	_check(leaves[0] != leaves[1] and picks.size() == 2
+			and entrance.all(func(key: Vector3i) -> bool:
+				var leaf: Node3D = _rig._door_hinges[key][0]
+				var middle := Client3D._edge_midpoint(key)
+				# Each edge's leaf hinged at that edge's end of the doorway.
+				return (leaf.global_position - centre).dot(middle - Vector3(centre.x, 0.0, centre.z)) > 0.0),
+			"a leaf for each edge, on that edge's half, and a pick each (%d)" % picks.size())
+	# Each leaf follows its own Door: one open, the other locked, then broken.
+	var doors: Array[Door] = []
+	for key in entrance:
+		var door := Door.new()
+		door.key = key
+		World._doors[key] = door
+		doors.append(door)
+	var locked := Node3D.new()
+	locked.name = "state_locked"
+	(leaves[1] as Node3D).add_child(locked)
+	var settle := func() -> void:
+		for key in entrance:
+			_rig._doors_due[key] = true
+			_rig._door_states.erase(key)
+		await _settle_doors()
+	doors[0].open = true
+	doors[1].lock = "test key"
+	await settle.call()
+	_check(is_equal_approx(leaves[0].rotation.y, _rig._door_hinges[entrance[0]][1]) and is_zero_approx(leaves[1].rotation.y)
+			and locked.visible and leaves[0].visible and leaves[1].visible,
+			"one open, swung (%.2f); the other locked, shut, its lock showing (%.2f)" % [leaves[0].rotation.y, leaves[1].rotation.y])
+	doors[1].lock = ""
+	doors[1].hp = 0
+	await settle.call()
+	_check(leaves[0].visible and not leaves[1].visible and not locked.visible and is_equal_approx(leaves[0].rotation.y, _rig._door_hinges[entrance[0]][1]),
+			"the other broken: its leaf gone, the open one still open")
+	doors[0].open = false
+	doors[1].hp = doors[1].max_hp
+	await settle.call()
+	_check(is_zero_approx(leaves[0].rotation.y) and is_zero_approx(leaves[1].rotation.y) and leaves[1].visible,
+			"both shut and whole: both leaves home")
+	for door in doors:
+		World._doors.erase(door.key)
+		door.free()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_building_states() -> void:
@@ -2255,7 +2322,7 @@ func _test_door_states() -> void:
 	var broken := Node3D.new()
 	broken.name = "state_broken"
 	hinge.add_child(broken)
-	doorway.remove_meta(&"states")
+	_rig._door_states.erase(door.key)
 	door.hp = door.max_hp
 	door.lock = "test key"
 	await _settle_doors()
@@ -2270,7 +2337,7 @@ func _test_door_states() -> void:
 			"broken: the leaf stays, swung open, its boards splintered (leaf %s, %.2f)" % [hinge.visible, hinge.rotation.y])
 	locked.free()
 	broken.free()
-	doorway.remove_meta(&"states")
+	_rig._door_states.erase(door.key)
 	_rig._door_open.erase(door.key)
 	door.hp = kept["hp"]
 	door.lock = kept["lock"]

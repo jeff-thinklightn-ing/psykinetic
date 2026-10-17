@@ -8488,3 +8488,35 @@ Rejected: scaling the Kenney frame (a 0.66 m opening at any height);
 scaling the door per building (the opening is the slot's, every doorway
 alike); a grey box until a pick (the town would show grey).
 
+
+## 403. A building's doorway two edges wide is one door.double
+
+Jeff found the doors too small beside the 1.75 m bodies (v0.1.149); art-kit
+widens door.single's opening (402), and the coordinator wants the temple's
+entrance wide. The temple's prefab already has two door edges side by side in
+its south wall, drawn till now as two door.single with a pier between.
+- Drawing only: `Client3D._double_doors` pairs a building's door edges side by
+  side on its outline (`Level.outline` of each building's rect), two at a time
+  from each run's start (a third left a door.single), and `_add_doorway(key,
+  pair)` puts one door.double over both, at their joint, its lintel (a tall
+  wall's) the two edges long. No level, prefab or slot changes: any building
+  whose layout has such a pair gets it; town walls and other maps' doors stay
+  door.single (a town gate is door.gate's, later).
+- The sim is unchanged: each edge keeps its own Door (open, hp, lock,
+  replicated as before). Both edges' `_doorways` entries are the one node;
+  `_door_hinges` gives each edge its leaf (leaf_a on the doorway's -z half,
+  opening +90 degrees; leaf_b on the +z half, -90, the slot's ranges) and
+  `_sync_doors` swings that leaf to its own Door. Each edge has its own pick
+  area over its half, so a click opens the door the player clicked.
+- States (decision 256): a leaf's state_<name> nodes follow its own edge's
+  Door; the frame's follow the first edge's (`_states_of`, cached in
+  `_door_states`). A broken edge's leaf goes (or stays splintered with
+  state_broken art) while the other swings as its own Door says.
+- One frame, one occluder: the doorway's frame fades with its run once.
+view_test's double door case (the stamped temple: one doorway with two leaves
+and two picks, the healer's hut a door.single; one Door open and the other
+locked, then broken, then both shut). Client only, protocol unchanged.
+Rejected: a door.double in the sim (one Door over two edges would change the
+wire format, the pathing and every lock and break rule for no gain a player
+sees); a "double" flag in level.json or the building slot (the layout already
+says it: two door edges side by side).

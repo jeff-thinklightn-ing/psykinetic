@@ -868,8 +868,15 @@ var _building_dry: Array[Vector2i] = []
 ## them. The sim still has them as water. Filled the same way.
 var _dry_water: Dictionary[Vector2i, bool] = {}
 var _posts: Dictionary[Vector2i, Node3D] = {}
-## Door edge key -> the doorway node (jambs, lintel, hinge).
+## Door edge key -> the doorway node (jambs, lintel, hinge). A double
+## door's two edges share theirs (decision 403).
 var _doorways: Dictionary[Vector3i, Node3D] = {}
+## Door edge key -> [its leaf's hinge, the leaf's open angle, whether the
+## frame's own state_<name> nodes follow this edge's Door]: a door.single's
+## "leaf"; a door.double's leaf_a or leaf_b, the one on this edge's half.
+var _door_hinges: Dictionary[Vector3i, Array] = {}
+## Door edge key -> the state_<name> nodes that follow its Door.
+var _door_states: Dictionary[Vector3i, Array] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
@@ -2202,6 +2209,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_scatter_aim = Vector2i(1 << 30, 0)
 	_posts.clear()
 	_doorways.clear()
+	_door_hinges.clear()
+	_door_states.clear()
 	_doors_due.clear()
 	_grounds.clear()
 	_ground_kinds.clear()
@@ -2447,6 +2456,8 @@ func _add_walls() -> void:
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
 	var wall_keys: Array[Vector3i] = []
+	var doubles := _double_doors()
+	var seconds := doubles.values()
 	for key: Vector3i in edges:
 		if _outdoor and _is_outline(key):
 			continue  # The forest's edge, not a wall (_add_forest).
@@ -2457,7 +2468,8 @@ func _add_walls() -> void:
 				else:
 					wall_keys.append(key)
 			Terrain.Edge.DOOR:
-				_add_doorway(key)
+				if not key in seconds:
+					_add_doorway(key, doubles.get(key, key))
 			_:
 				continue
 		for end in 2:
@@ -5167,15 +5179,22 @@ static func _stone_courses(rows: int, shortest: float, longest: float, salt: int
 
 ## A door.single on the edge, its leaf (DOOR_LEAF) hinged at the edge's
 ## start end and swinging with the Door node, and an Area3D over the module
-## for picking. Its frame (DOOR_FRAME) fades with its wall's run.
-func _add_doorway(key: Vector3i) -> void:
+## for picking. Its frame (DOOR_FRAME) fades with its wall's run. With
+## [param pair] the next edge along (_double_doors), a door.double over
+## both instead (decision 403): each edge's Door still its own, swinging the
+## leaf on its half, picked by its own area.
+func _add_doorway(key: Vector3i, pair := key) -> void:
+	var double := pair != key
 	var doorway := Node3D.new()
 	doorway.name = "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
-	doorway.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
+	doorway.position = (_edge_midpoint(key) + _edge_midpoint(pair)) * 0.5 + Vector3(0.0, _edge_base(key), 0.0)
 	doorway.rotation.y = _edge_yaw(key)
-	var piece := ArtKit.instance("door.single")
+	var piece := ArtKit.instance("door.double" if double else "door.single")
 	piece.name = "Door"
 	doorway.add_child(piece)
+	var keys: Array[Vector3i] = [key]
+	if double:
+		keys.append(pair)
 	# In a wall taller than the frame (a building's wall_height), the wall
 	# goes on over it: a lintel of the wall's set, in the frame's Body so it
 	# fades with it.
@@ -5185,27 +5204,54 @@ func _add_doorway(key: Vector3i) -> void:
 		var lintel := MeshInstance3D.new()
 		lintel.name = "Lintel"
 		var block := BoxMesh.new()
-		block.size = Vector3(float(wall_set["half"]) * 2.0, tall - WALL_HEIGHT, 1.0)
+		block.size = Vector3(float(wall_set["half"]) * 2.0, tall - WALL_HEIGHT, float(keys.size()))
 		lintel.mesh = block
 		lintel.material_override = _wall_material(_set_of(key))
 		lintel.position.y = (tall + WALL_HEIGHT) * 0.5
 		piece.get_node("Body").add_child(lintel)
-	if _glimpse:
-		_room.add_child(doorway)
-		_doorways[key] = doorway
-		return  # Nothing in a glimpse is picked.
-	var area := Area3D.new()
-	area.name = "Pick"
-	area.set_meta("door", key)
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(WALL_THICKNESS, WALL_HEIGHT, 1.0)
-	shape.shape = box
-	shape.position.y = WALL_HEIGHT * 0.5
-	area.add_child(shape)
-	doorway.add_child(area)
+	for each in keys:
+		# Where the edge's half lies along the doorway (its local z).
+		var along := (doorway.transform.affine_inverse() * _edge_midpoint(each)).z if double else 0.0
+		if not double:
+			_door_hinges[each] = [doorway.get_node(DOOR_LEAF), PI * 0.5, true]
+		elif along < 0.0:
+			_door_hinges[each] = [piece.get_node("leaf_a"), PI * 0.5, true]
+		else:
+			_door_hinges[each] = [piece.get_node("leaf_b"), -PI * 0.5, false]
+		_doorways[each] = doorway
+		if _glimpse:
+			continue  # Nothing in a glimpse is picked.
+		var area := Area3D.new()
+		area.name = "Pick" if not double else "Pick_%d_%d" % [each.x, each.y]
+		area.set_meta("door", each)
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(WALL_THICKNESS, WALL_HEIGHT, 1.0)
+		shape.shape = box
+		shape.position = Vector3(0.0, WALL_HEIGHT * 0.5, along)
+		area.add_child(shape)
+		doorway.add_child(area)
 	_room.add_child(doorway)
-	_doorways[key] = doorway
+
+
+## The doorways drawn as one door.double (decision 403): a building's door
+## edges side by side on its outline, two at a time from each run's start
+## (a third left a door.single). First edge -> the next along.
+func _double_doors() -> Dictionary[Vector3i, Vector3i]:
+	var edges: Dictionary = _terrain["edges"]
+	var out: Dictionary[Vector3i, Vector3i] = {}
+	for building: Dictionary in _terrain.get("buildings", []):
+		var outline := Level.outline(building["rect"])
+		var door := func(key: Vector3i) -> bool: return key in outline and edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.DOOR
+		for key in outline:
+			var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+			if not door.call(key) or door.call(key - step):
+				continue
+			var at := key
+			while door.call(at) and door.call(at + step):
+				out[at] = at + step
+				at += step * 2
+	return out
 
 
 ## How tall the wall a doorway stands in is: the tallest of the walls on
@@ -5570,9 +5616,12 @@ func _index_occluders() -> void:
 	for key: Vector3i in _walls:
 		var bounds := _bounds(_walls[key]) if BOX_WALLS else _edge_bounds(key)
 		_occluders.append([_walls[key], bounds, false, runs[key]])
+	var framed: Dictionary[Node3D, bool] = {}
 	for key: Vector3i in _doorways:
 		var frame := _doorways[key].get_node(DOOR_FRAME) as Node3D
-		_occluders.append([frame, _bounds(frame), false, runs[key]])
+		if not framed.has(frame):  # A double door's two edges: one frame.
+			framed[frame] = true
+			_occluders.append([frame, _bounds(frame), false, runs[key]])
 	for post: Node3D in _posts.values():
 		_occluders.append([post, _bounds(post), false, [post]])
 	for tree: Node3D in _trees.values() + _saplings.values():
@@ -6807,6 +6856,18 @@ func _label(name_: String, text: String, color: Color, height: float) -> Label3D
 	return label
 
 
+## The state_<name> nodes door edge [param key]'s Door shows: those in its
+## leaf, and if it has the frame's (_door_hinges), those in no leaf.
+func _states_of(key: Vector3i) -> Array:
+	var hinge: Node3D = _door_hinges[key][0]
+	var piece := _doorways[key].get_node(^"Door")
+	var leaves := piece.get_children().filter(func(node: Node) -> bool: return str(node.name).begins_with("leaf"))
+	return piece.find_children("state_*", "Node3D", true, false).filter(func(node: Node) -> bool:
+		if hinge.is_ancestor_of(node):
+			return true
+		return _door_hinges[key][2] and not leaves.any(func(leaf: Node) -> bool: return leaf.is_ancestor_of(node)))
+
+
 func _on_door_shown(door: Door) -> void:
 	_doors_due[door.key] = true
 
@@ -6821,7 +6882,7 @@ func _sync_doors() -> void:
 		if door == null or doorway == null:
 			_doors_due.erase(key)
 			continue
-		var hinge := doorway.get_node(DOOR_LEAF) as Node3D
+		var hinge: Node3D = _door_hinges[key][0]
 		var same_door: bool = _door_node.get(door.key, 0) == door.get_instance_id()
 		var at := doorway.position + Vector3.UP
 		if same_door and _door_open.has(door.key) and _door_open[door.key] != door.is_open() and not door.is_broken():
@@ -6837,16 +6898,17 @@ func _sync_doors() -> void:
 		_door_node[door.key] = door.get_instance_id()
 		# The art's "state_<name>" nodes (art_style.md) show in that state
 		# alone; a broken door whose art has state_broken keeps its leaf,
-		# open and splintered, else the leaf goes.
-		if not doorway.has_meta(&"states"):
-			doorway.set_meta(&"states", doorway.get_node(^"Door").find_children("state_*", "Node3D", true, false))
+		# open and splintered, else the leaf goes. A double door's leaf's
+		# own follow its edge's Door, the frame's the first edge's.
+		if not _door_states.has(key):
+			_door_states[key] = _states_of(key)
 		var shown := "state_" + door.state()
 		var broken_art := false
-		for node: Node3D in doorway.get_meta(&"states"):
+		for node: Node3D in _door_states[key]:
 			node.visible = str(node.name) == shown
 			broken_art = broken_art or str(node.name) == "state_broken"
 		hinge.visible = not door.is_broken() or broken_art
-		var target: float = PI * 0.5 if door.is_open() else 0.0
+		var target: float = float(_door_hinges[key][1]) if door.is_open() else 0.0
 		hinge.rotation.y = move_toward(hinge.rotation.y, target, get_process_delta_time() / Door.SWING_SECONDS * PI * 0.5)
 		if is_equal_approx(hinge.rotation.y, target):  # (A float32 angle: never == PI / 2.)
 			_doors_due.erase(key)
