@@ -299,6 +299,8 @@ func _test_overheard() -> void:
 	_check("Bo is " in others and "near enough to hear" in others and ("%s, who travels with Bo," % nix.label) in others,
 		"Pip's prompt says who else is here, where, and who can hear: %s" % others)
 	_check(pip.others_here() in pip.voice_prompt("test"), "it is in her voice's now")
+	_check(others.begins_with("Friends near you:") and bo in pip.friends_seen() and not pip._hostile(bo),
+		"another player is a friend she sees, not a threat (decision 381)")
 	# A line to Bo: Pip hears it as her player's, Nix as Jeff's; neither is told it is for them.
 	pip_mind.voice_answer = {"say": "...", "stance": "PRESS"}
 	nix_mind.voice_answer = {"say": "...", "stance": "PRESS"}

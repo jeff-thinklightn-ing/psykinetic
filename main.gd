@@ -2647,6 +2647,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# Working in a town (decision 284): elsewhere, she stays at it; here,
 	# she leaves it and goes with them, her job waiting.
 	var resident: Dictionary = record.companion.get("resident", {})
+	if not resident.is_empty() and not record.companion.has("home"):
+		record.companion["home"] = resident.duplicate()  # A record from before decision 381.
 	if not resident.is_empty():
 		if str(resident.get("zone", "")) != World.zone.name:
 			print("[net] %s's companion %s works in %s; not here" % [record.name, record.companion.get("name", "?"), resident.get("zone", "?")])
@@ -2669,6 +2671,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var existing: Companion = _companions.get(record.player_id)
 	if is_instance_valid(existing) and existing.spawned:
 		existing.works_as = ""
+		existing.home = record.companion.get("home", {})
 		existing.keeper = player
 		# A rejoin is a new peer: she is theirs again (replicated, so their
 		# client knows her for their own: a right click opens her pack).
@@ -2725,6 +2728,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.restore_said(record.companion.get("said", []))
 	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
 	pet.party_log = party_log
+	pet.home = record.companion.get("home", {})
 	pet.mind = _make_mind()
 	if _claude_voices.has(record.player_id):
 		pet.mind = ClaudeMind.new(pet.mind, _claude_voices[record.player_id], self)
@@ -3095,6 +3099,7 @@ func companion_freed(player_id: String, place := "") -> bool:
 		var trade := str(record.companion.get("traits", {}).get("trade", ""))
 		var zone := str(World.holdings.place(place).get("area", ""))
 		record.companion["resident"] = {"place": place, "zone": zone, "trade": trade}
+		record.companion["home"] = record.companion["resident"].duplicate()
 		if not trade.is_empty() and World.towns != null:
 			World.towns.note_companion_in(place, pet_name, trade, player_id)
 		town = str(Level.load_level(zone).get("display_name", zone)) if Level.exists(zone) else zone
@@ -3188,7 +3193,9 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 		return false
 	World.towns.note_companion_in(place, pet_name, trade, record.player_id)
 	record.companion["resident"] = {"place": place, "zone": World.zone.name, "trade": trade}
+	record.companion["home"] = record.companion["resident"].duplicate()
 	pet.works_as = trade
+	pet.home = record.companion["home"]
 	print("[town] %s's companion %s stays in %s and works as its %s" % [record.name, pet_name, place, trade])
 	party_log.add("%s stays in the town and works as its %s." % [pet_name, trade])
 	return true
@@ -3217,6 +3224,7 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
 	if not trade.is_empty():
 		World.towns.note_companion_in(place, pet_name, trade, record.player_id)
 	record.companion["resident"] = {"place": place, "zone": str(World.holdings.place(place).get("area", "")), "trade": trade}
+	record.companion["home"] = record.companion["resident"].duplicate()
 	record.companion["tile"] = null  # Wherever she rests: beside her player when they come.
 	_travelling = true  # She leaves; she does not die.
 	World.despawn(pet)

@@ -8194,3 +8194,48 @@ and whether to say it at all (companions' SKY_WORDS) stay with the
 caller. HOURS, time_words and WEATHER_WORDS move here from Companion,
 which keeps its names for them as forwards (Resident reads them there).
 Agreed with companions, who switch where_words to describe.
+## 381. A companion knows where she is, walks at his heel, and sees friends
+
+From Jeff's playtest of 2026-10-17 (Wren, the castle and the wilds town),
+the coordinator's three fixes, one entry.
+
+1. Where she is. In the wilds she was told of the castle's stone, knew
+nothing of the town she rests in ("I have not seen a town here before")
+and nothing of Pip. Her world text is now by the zone's kind
+(Companion.where_world: STONE_WORLD indoors, in a dungeon or a cave,
+OPEN_WORLD outdoors) and names the place (its display name), then
+VOICE_WORLD as before. Her home town is kept on her record as "home"
+({place, zone, trade}, written wherever "resident" is and never erased
+when she travels; a record from before gets it from "resident" when her
+player comes) and on her (Companion.home): standing_words tells her she
+rests there between trips and her trade, and in it, that she knows it
+well. Lore's agreed facts reach her voice (Companion.lore_words):
+known_by her own knower when lore names her (wren, pip, nix), else the
+townsfolk's, weightiest first within LORE_CHARS (600), a rumour as "it is
+said that"; the town's facts and the other companions by name come so,
+once lore marks them agreed on Jeff's word. A companion resting in town
+as a resident is told the same.
+
+2. The follow. She set off at 3 and closed to 1, often in front of him:
+he walked into her five times in six minutes, and each set-off and
+close-in was a mind-log line (most of a 2 MB log). Now she makes for his
+heel (Companion._heel: a free cell within FOLLOW_STOP, 2, behind his
+facing, nearest him), keeps on for it while he walks (moved within
+WALKING_TICKS), and once he stands stops there or within 2 of him and not
+ahead; she sets off again only at 3. The follow is not logged.
+
+3. Friends in sight (Jeff: "companions should be able to see NPC the same
+as enemies but marked as friendly"). Other players, other companions and
+the town's residents she sees by Senses, as she sees monsters, within
+PERCEPTION_RANGE (Companion.friends_seen), are listed in her voice's now
+as "Friends near you:", by name (a resident with their trade: "Snagfin
+the smith"), where, and whether they can hear; each comes into sight once,
+as a monster does, held back in a fight. Her hands never count them as a
+threat. Reporting only: Senses, Monster and World are unchanged.
+
+companion_test and zone_test cover each. Protocol unchanged.
+
+Rejected: a world text per zone written in the levels (content, not
+Jeff's yet; the kind and the name say enough); stopping the follow at 1
+behind (still in his way at every turn); listing friends she cannot see
+(the same rules as monsters).

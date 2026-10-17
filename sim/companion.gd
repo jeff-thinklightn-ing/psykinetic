@@ -95,6 +95,12 @@ const PHRASE_STANCES := {1: Stance.STAY_CLOSE, 2: Stance.PULL_BACK, 3: Stance.PR
 ## she moves, then closes in to FOLLOW_CLOSE, finding her way afresh each step.
 const FOLLOW_START := 3
 const FOLLOW_CLOSE := 1
+## Where a follow stops (decision 381): within this of her player, at his
+## heel (_heel: behind his facing), not in his way; set off again only at
+## FOLLOW_START. While he walks (moved within WALKING_TICKS) she keeps on
+## for the cell just behind him instead of stopping.
+const FOLLOW_STOP := 2
+const WALKING_TICKS := 12
 ## Her own last lines: SAID_REMEMBERED kept (in her record, across
 ## sessions) and never said again.
 const SAID_REMEMBERED := 20
@@ -208,8 +214,14 @@ PULL_BACK: get away from the monsters, to safety. Follow the standing instructio
 ## events as bracketed narration. She answers in plain words; when her
 ## player has just asked something of her, she may end with a [STANCE: ...]
 ## line (VOICE_ASKED), the one place the stances are named.
-const VOICE_WORLD := """You walk the old stone places and the land around them: rooms and corridors lit by lanterns and
-by fires, and the open ground beyond. Monsters prowl there, imps and brutes and worse, and they attack whoever they
+## Where she walks, by the zone's kind (decision 381: in the wilds she was
+## told of the castle's stone): before VOICE_WORLD, with the place's name.
+const STONE_WORLD := """You walk the old stone places and the land around them: rooms and corridors lit by lanterns and
+by fires, and the open ground beyond."""
+const OPEN_WORLD := "You walk the open land: fields and forest, and towns where people live and work."
+## The most of lore's facts her voice is told, in characters.
+const LORE_CHARS := 600
+const VOICE_WORLD := """Monsters prowl there, imps and brutes and worse, and they attack whoever they
 see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
 Wounds do not close on their own; a bandaging kit, used away from danger, mends them.
 Whoever falls can be brought back, but it hurts, and no one wants to fall.
@@ -365,6 +377,8 @@ var _retreat_goal := NONE
 var _retreat_at := NONE
 var _retreat_heading := Vector2i.ZERO
 var _known_hostiles: Dictionary[int, bool] = {}
+## The friends she has seen (friends_seen), so each comes into sight once.
+var _known_friends: Dictionary[int, bool] = {}
 ## Hostiles that have been next to her or her player this fight: one that
 ## steps away and back is not new.
 var _adjacent_before: Dictionary[int, bool] = {}
@@ -456,6 +470,12 @@ var _reask_next := false
 ## The trade she works in a town she stays in while her player is away
 ## (Main._stay_in_town; decision 284), or "".
 var works_as := ""
+## Her home town, kept while she travels (decision 381: her record's
+## "home", {place, zone, trade}): where she rests between trips (Main's).
+var home: Dictionary = {}
+## Where her player was, and when they last moved (_follow).
+var _keeper_at := NONE
+var _keeper_moved := -1000
 
 
 ## Her slots (Items): a pack and two hands, as a player's, empty at first;
@@ -704,18 +724,40 @@ func carried() -> String:
 func others_here() -> String:
 	var parts: Array[String] = []
 	var near := 0
-	for entity in World.get_entities():
-		if entity == self or entity == keeper or not entity.spawned or not (entity is Player or entity is Companion):
-			continue
+	for entity in friends_seen():
 		var close := World.distance(tile, entity.tile) <= HEARING_RANGE
 		near += 1 if close else 0
-		var who := _name_of(entity)
-		if entity is Companion:
-			who = "%s, who travels with %s," % [who, (entity as Companion).keeper_name()]
-		parts.append("%s is %s, %s" % [who, _paces_toward(Vector2(entity.tile)), "near enough to hear" if close else "too far to hear"])
+		parts.append("%s is %s, %s" % [friend_words(entity), _paces_toward(Vector2(entity.tile)), "near enough to hear" if close else "too far to hear"])
 	if parts.is_empty():
 		return "No one else is here."
-	return "Also here: %s.%s" % ["; ".join(parts), "" if near > 0 else " No one else is near enough to hear."]
+	return "Friends near you: %s.%s" % ["; ".join(parts), "" if near > 0 else " No one else is near enough to hear."]
+
+
+## Those she sees who are friends (decision 381, Jeff: "the same as enemies
+## but marked as friendly"): other players, other companions and the
+## town's residents, by Senses' sight as a monster is seen, within
+## PERCEPTION_RANGE; never a threat to her hands. Nearest first.
+func friends_seen() -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	for entity in World.get_entities():
+		if entity == self or entity == keeper or not entity.spawned or not (entity is Player or entity is Companion or entity is Resident):
+			continue
+		if World.distance(tile, entity.tile) <= PERCEPTION_RANGE and senses.sees(entity):
+			out.append(entity)
+	out.sort_custom(func(a: GridEntity, b: GridEntity) -> bool: return World.distance(tile, a.tile) < World.distance(tile, b.tile))
+	return out
+
+
+## A friend by name: a companion with whom she travels, a resident with
+## their trade ("Snagfin the smith").
+func friend_words(entity: GridEntity) -> String:
+	if entity is Companion:
+		return "%s, who travels with %s," % [_name_of(entity), (entity as Companion).keeper_name()]
+	if entity is Resident:
+		var body := entity as Resident
+		var who := body.person if not body.person.is_empty() else _name_of(entity)
+		return "%s the %s" % [who, body.trade] if not body.trade.is_empty() else who
+	return _name_of(entity)
 
 
 ## A quick phrase ([param phrase], 1-4) sets its stance at once
@@ -1004,6 +1046,13 @@ func _watch() -> void:
 			if not fight and not _was_in_fight:
 				events.append("%s came into sight." % _name_of(entity))
 				_narrate("%s came into sight, %s." % [refer(entity, true), _paces_toward(Vector2(entity.tile))])
+	for friend in friends_seen():
+		if not _known_friends.has(friend.get_instance_id()):
+			_known_friends[friend.get_instance_id()] = true
+			if not fight and not _was_in_fight:
+				var who := _name_of(friend) if friend is Companion else friend_words(friend)
+				events.append("%s came into sight." % who)
+				_narrate("%s came into sight, %s." % [who, _paces_toward(Vector2(friend.tile))])
 	var had_deaths := not _deaths.is_empty()
 	var dead_names: Array[String] = []
 	for death: Dictionary in _deaths:
@@ -1482,16 +1531,61 @@ func _take_facts(trigger: String, answer: Dictionary, entry: Dictionary) -> void
 	facts_changed.emit()
 
 
+## Her voice's world: STONE_WORLD or OPEN_WORLD by the zone, the place's
+## name, then VOICE_WORLD.
+func where_world() -> String:
+	return "%s This place is %s.\n%s" % [OPEN_WORLD if World.outdoor else STONE_WORLD, _place_words(), VOICE_WORLD]
+
+
+## Her home town in words (decision 381), "" for none: where she rests
+## between trips and her trade there; there now, that she knows it well.
+func standing_words() -> String:
+	var zone := str(home.get("zone", ""))
+	if zone.is_empty():
+		return ""
+	var town := place_name(zone)
+	var trade := str(home.get("trade", ""))
+	var out := "You rest in %s between trips%s." % [town, ", and work there as %s" % _a(trade) if not trade.is_empty() else ""]
+	if World.zone != null and World.zone.name == zone:
+		out += " You are in %s now; you know it well." % town
+	return out
+
+
+## What lore says [param who] knows of the world (decision 381): her own
+## knower (a companion lore names: Wren, Pip, Nix), else the townsfolk's;
+## agreed facts only, weightiest first, within LORE_CHARS, a rumour as what
+## is said. "" for none.
+static func lore_words(who: String) -> String:
+	var knower := who.to_lower() if Lore.knowers().has(who.to_lower()) else "townsfolk"
+	var facts := Lore.known_by(knower, PackedStringArray(), "agreed")
+	facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["weight"]) > float(b["weight"]))
+	var said: Array[String] = []
+	var length := 0
+	for fact in facts:
+		var text := str(fact["text"]).strip_edges()
+		if bool(fact.get("hearsay", false)):
+			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
+		if length + text.length() > LORE_CHARS:
+			break
+		length += text.length() + 1
+		said.append(text)
+	return "What you know of the world: %s" % " ".join(said) if not said.is_empty() else ""
+
+
+## A zone's shown name ("The Castle"), its own name when it has none.
+static func place_name(zone_name: String) -> String:
+	if not _place_names.has(zone_name):
+		var shown := str(Level.load_level(zone_name).get("display_name", "")) if Level.exists(zone_name) else ""
+		_place_names[zone_name] = shown if not shown.is_empty() else zone_name.replace("_", " ")
+	return _place_names[zone_name]
+
+
 ## Where she is, for a fact: the level's name ("the castle").
 static var _place_names: Dictionary[String, String] = {}
 
 
 func _place_words() -> String:
-	var zone_name := World.zone.name if World.zone != null else ""
-	if not _place_names.has(zone_name):
-		var shown := str(Level.load_level(zone_name).get("display_name", "")) if Level.exists(zone_name) else ""
-		_place_names[zone_name] = shown if not shown.is_empty() else zone_name.replace("_", " ")
-	return _place_names[zone_name]
+	return place_name(World.zone.name if World.zone != null else "")
 
 
 static func _a(word: String) -> String:
@@ -1563,7 +1657,12 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var since := grown.prompt_words()
 	if not since.is_empty():
 		met += " " + since
-	var system := "%s %s%s%s\n\n%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, VOICE_WORLD, " ".join(now),
+	var standing := standing_words()
+	if not standing.is_empty():
+		met += " " + standing
+	var known := Companion.lore_words(_name_of(self))
+	var system := "%s %s%s%s\n\n%s%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, where_world(),
+		"\n" + known if not known.is_empty() else "", " ".join(now),
 		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who]]
 	var addressed := addressed_to(heard)
 	var speaker := heard.get_slice(" ", 0)
@@ -2975,8 +3074,11 @@ func _log(entry: Dictionary) -> void:
 
 
 ## FOLLOW: still while her player is within FOLLOW_START - 1 cells; once
-## they are FOLLOW_START away she sets off and closes to FOLLOW_CLOSE, the
-## path found afresh every step (they keep moving).
+## they are FOLLOW_START away she sets off for their heel (_heel), the path
+## found afresh every step (they keep moving), and, once they stand, stops
+## there or within FOLLOW_STOP of them and not ahead (decision 381: she had
+## closed to 1 in front of him and been walked into). Not logged: hands,
+## every step.
 func _follow() -> void:
 	if not _alive(keeper):
 		_catching_up = false
@@ -2987,14 +3089,58 @@ func _follow() -> void:
 	var quiet := stalking() != null
 	if distance >= (STALK_START if quiet else FOLLOW_START) and not _catching_up:
 		_catching_up = true
-		_log({"kind": "follow", "companion": String(name), "mind": "hands", "trigger": "%s %d away" % [keeper_name(), distance],
-			"outcome": "set off"})
-	if _catching_up and distance <= (STALK_CLOSE if quiet else FOLLOW_CLOSE):
+	if quiet:
+		if _catching_up and distance <= STALK_CLOSE:
+			_catching_up = false
+		if _catching_up:
+			_approach(keeper, STALK_CLOSE)
+		return
+	if keeper.tile != _keeper_at:
+		_keeper_at = keeper.tile
+		_keeper_moved = World.tick
+	if not _catching_up:
+		return
+	var walking := World.tick - _keeper_moved <= WALKING_TICKS
+	var heel := _heel()
+	var ahead := _ahead_of(tile - keeper.tile, keeper.facing) > 0
+	if tile == heel:
+		if not walking:
+			_catching_up = false
+		return
+	if not walking and (distance <= FOLLOW_STOP and not ahead or heel == NONE and distance <= FOLLOW_STOP):
 		_catching_up = false
-		_log({"kind": "follow", "companion": String(name), "mind": "hands", "trigger": "%s %d away" % [keeper_name(), distance],
-			"outcome": "closed in"})
-	if _catching_up:
-		_approach(keeper, STALK_CLOSE if quiet else FOLLOW_CLOSE)
+		return
+	if heel != NONE:
+		_step_toward(heel, false)
+	else:
+		_approach(keeper, FOLLOW_CLOSE)
+
+
+## The cell at her player's heel: of the free walkable cells within
+## FOLLOW_STOP of them (hers among them), one behind their facing (not
+## ahead, nor beside if any behind is free), the nearest to them, then to
+## her; NONE if none.
+func _heel() -> Vector2i:
+	var best := NONE
+	var best_key := Vector2i(1 << 20, 1 << 20)
+	for dy in range(-FOLLOW_STOP, FOLLOW_STOP + 1):
+		for dx in range(-FOLLOW_STOP, FOLLOW_STOP + 1):
+			var at := keeper.tile + Vector2i(dx, dy)
+			if at == keeper.tile or World.distance(at, keeper.tile) > FOLLOW_STOP:
+				continue
+			if at != tile and not (World.is_walkable(at) and World.is_free(at)):
+				continue
+			var along := _ahead_of(Vector2i(dx, dy), keeper.facing)
+			var key := Vector2i(0 if along < 0 else 1 + along, World.distance(at, keeper.tile) * 100 + World.distance(tile, at))
+			if key.x < best_key.x or key.x == best_key.x and key.y < best_key.y:
+				best_key = key
+				best = at
+	return best
+
+
+## How far [param offset] lies along [param facing] (a dot product).
+static func _ahead_of(offset: Vector2i, facing: Vector2i) -> int:
+	return offset.x * facing.x + offset.y * facing.y
 
 
 ## One A* step toward [param goal]. False if there is no way there.

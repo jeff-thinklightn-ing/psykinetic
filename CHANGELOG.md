@@ -7,6 +7,12 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion follows at your heel, a step or two behind the way you face,
+  instead of closing in ahead of you, so you no longer walk into her.
+- Your companion knows where she is (the open land or old stone halls, and
+  the place's name), the town she rests in between trips and her trade
+  there, and what the town's lore says she knows; and she sees other
+  players, companions and townsfolk as friends, by name.
 - Townsfolk are named with their profession in brackets over their head, "Bram
   [smith]", and the party log names them the same way when raiders carry one off.
 - Players and companions are people now, not capsules: a man or a woman in a tunic
@@ -19,15 +25,14 @@ notes (decision 324).
 - A building with taller walls than a house's, as the temple's, has them drawn up to its roof, its door with wall over it.
 - Storms can break roofs: a full storm breaks about one roof in four, open
   to the rain and the sky until someone mends it.
-
 - A damaged building's roof is broken in places: rain and daylight come in through the holes. The client must be updated with the server.
-
 - The wilds town has a temple beside its square. Out by the south edge of the forest stands a healer's hut, with a path from the town.
+
 - Coming back to a zone after a long time away no longer brings every dead
   monster back at once round you: they return one at a time, about every 6
   seconds, the farthest from you first, and none within 12 tiles of you for
+  the first moments after you arrive.
   the first 10 seconds after you arrive.
-
 - Arrows come in a bundle held in the hand your bow isn't in. The bow is one-handed now, and it draws only with a bundle in the other hand. Shooting never uses the bundle up, but blunt hits on you (a hammer, being knocked into something, a knockdown) wear it down, 1 of 10 each, and at 0 you can't shoot until the fletcher mends it. Flame arrows set what they hit burning, and barbed arrows make it bleed until bandaged. Burning and bleeding bodies show it in their name's colour.
 - Builder mode can roof a room you walled yourself or an open shelter on
   posts, such as a market stall or a woodshed, and the proposal outlines

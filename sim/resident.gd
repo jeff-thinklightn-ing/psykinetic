@@ -237,6 +237,11 @@ func facts_now() -> Array[String]:
 	out.append("It is %s%s." % [hour, sky])
 	out.append(work_words())
 	out.append_array(means_words())
+	# A companion resting here knows what she knows with her player (decision 381).
+	if not player_id.is_empty():
+		var known := Companion.lore_words(person)
+		if not known.is_empty():
+			out.append(known)
 	# A companion's past is in her own card; a resident's, in the town's records.
 	var taken := World.towns.taken_before(worker_id) if World.towns != null and player_id.is_empty() else 0
 	if taken > 0:

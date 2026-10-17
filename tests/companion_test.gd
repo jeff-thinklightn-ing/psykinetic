@@ -71,6 +71,8 @@ func _ready() -> void:
 	_test_spoken_polish()
 	_test_speaks_only_for_herself()
 	_test_claude_voice()
+	_test_knows_her_town()
+	_test_sees_friends()
 	_test_quiet_after_minor()
 	_test_senses()
 	_test_errands()
@@ -227,17 +229,78 @@ func _test_following() -> void:
 	for i in 12:
 		World.step()
 		distances.append(World.distance(pet.tile, owner.tile))
-	_check(pet.tile != was and distances.back() <= Companion.FOLLOW_CLOSE, "3 away: she sets off and closes in (%s)" % [distances])
-	# Walking away from her: she keeps within 3, finding her way each step.
+	_check(pet.tile != was and distances.back() <= Companion.FOLLOW_STOP, "3 away: she sets off and stops within 2, at their heel (%s)" % [distances])
+	# Walking away from her: she keeps within 3, finding her way each step,
+	# and never stands in the cell ahead of them (decision 381).
 	var far: Array[int] = []
+	var in_the_way := 0
+	var logged := MindLog.written
 	World.order_move(owner, Vector2i(18, 11))
 	for i in 40:
 		World.step()
 		far.append(World.distance(pet.tile, owner.tile))
+		if pet.tile == owner.tile + owner.facing:
+			in_the_way += 1
 	_check(far.max() <= Companion.FOLLOW_START and far.back() <= 2, "following a walk: never more than 3 behind (%s)" % [far])
+	_check(in_the_way == 0 and pet.tile.x < owner.tile.x, "and never in their way: behind them, east-bound (%s, they at %s)" % [pet.tile, owner.tile])
+	_check(MindLog.written - logged <= 2, "her steps after them are not each logged (%d written)" % (MindLog.written - logged))
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+
+func _test_knows_her_town() -> void:
+	print("\n== she knows where she is, the town she rests in, and what lore says she knows (decision 381) ==")
+	var pet := _companion()
+	_check(Companion.STONE_WORLD in pet.where_world() and "This place is %s." % pet._place_words() in pet.where_world(),
+		"indoors: the old stone places, and the place by name (%s)" % pet.where_world().get_slice("\n", 0))
+	var outdoors := World.outdoor
+	World.outdoor = true
+	_check(Companion.OPEN_WORLD in pet.where_world() and Companion.STONE_WORLD not in pet.where_world(), "outdoors: the open land, not the castle's stone")
+	World.outdoor = outdoors
+	var was: Dictionary = pet.home
+	pet.home = {"place": "elsewhere/store", "zone": "no_such_zone", "trade": "carpenter"}
+	_check(pet.standing_words() == "You rest in no such zone between trips, and work there as a carpenter.", "her home town, kept while she travels: %s" % pet.standing_words())
+	pet.home = {"place": World.zone.name + "/store", "zone": World.zone.name, "trade": ""}
+	_check("you know it well" in pet.standing_words() and pet.standing_words() in pet.voice_prompt("test"), "in it now: she knows it well, and her voice is told (%s)" % pet.standing_words())
+	pet.home = was
+	Lore.use([{"id": "town", "status": "agreed", "facts": [
+			{"id": "t1", "status": "agreed", "known": "common", "text": "The town has a temple.", "weight": 2.0},
+			{"id": "t2", "status": "agreed", "known": "rumour", "text": "No one has been knighted in ages.", "weight": 1.0},
+			{"id": "t3", "status": "draft", "known": "common", "text": "A draft is never told."}]},
+		{"id": "people", "status": "agreed", "facts": [{"id": "p1", "status": "agreed", "known": "secret", "knowers": ["pip"], "text": "Pip wants to become a squire."}]}],
+		[{"id": "townsfolk", "status": "agreed", "where": [], "tags": []}, {"id": "pip", "status": "agreed", "where": [], "tags": []}])
+	var known := Companion.lore_words(String(pet.name))
+	_check(known == "What you know of the world: The town has a temple. It is said that no one has been knighted in ages.",
+		"what lore says the townsfolk know: weightiest first, a rumour as said, no draft (%s)" % known)
+	_check("Pip wants to become a squire." in Companion.lore_words("Pip") and "squire" not in known, "a companion lore names knows her own (Pip)")
+	_check(known in pet.voice_prompt("test"), "and her voice is told it")
+	Lore.reload()
+
+
+func _test_sees_friends() -> void:
+	print("\n== she sees the town's folk as she sees monsters, marked as friends, and never as a threat (decision 381) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	pet._exchange.clear()
+	var smith := _main._spawn({"script": Main.RESIDENT, "shape": "capsule", "name": "Resident_test_smith", "label": "Snagfin, smith",
+		"tile": _main._nearest_free(Vector2i(13, 6))}) as Resident
+	smith.person = "Snagfin"
+	smith.trade = "smith"
+	for i in 6:
+		World.step()
+	_check(smith in pet.friends_seen() and "Friends near you: Snagfin the smith is" in pet.others_here(),
+		"in sight: listed as a friend, by name and trade (%s)" % pet.others_here())
+	_check(_narrated(pet, "Snagfin the smith came into sight"), "and she sees them come into sight")
+	_check(pet.others_here() in pet.voice_prompt("test"), "her voice is told")
+	_check(pet.current_intent != Companion.Intent.ATTACK and pet.current_intent != Companion.Intent.RETREAT and not pet._hostile(smith),
+		"never a threat to her hands (%s)" % pet.intent_name())
+	World._relocate(smith, _main._nearest_free(pet.tile + Vector2i(Companion.PERCEPTION_RANGE + 3, 0)))
+	_check(smith not in pet.friends_seen(), "out of range: not listed")
+	World.despawn(smith)
 
 
 func _test_persists_and_resumes() -> void:
@@ -2528,7 +2591,7 @@ func _test_players_heal() -> void:
 		World.step()
 	_check(owner.hp == 10, "calm for 80 ticks, no bandage: still 10 (%d)" % owner.hp)
 	_check("Wounds do not close on their own; a bandaging kit, used away from danger, mends them." in Companion.VOICE_WORLD
-			and "the old stone places and the land around them" in Companion.VOICE_WORLD and not "underground" in Companion.VOICE_WORLD,
+			and "the old stone places and the land around them" in Companion.STONE_WORLD and not "underground" in Companion.VOICE_WORLD,
 			"her world says so, and is not only underground")
 	owner.hp = owner.max_hp
 
