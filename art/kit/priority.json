@@ -11,6 +11,7 @@
 				"scatter.tuft", "scatter.stone", "scatter.flower", "scatter.root", "scatter.reeds",
 				"building.hut", "building.house", "building.shed", "building.well",
 				"material.roof.shingle", "roof.shingle.ridge", "roof.shingle.end", "roof.shingle.broken",
+				"building.temple", "building.healers_hut",
 				"material.wall.wood", "floor.wood",
 				"wall.wood.straight", "wall.wood.post", "wall.wood.end", "wall.wood.corner", "wall.wood.t", "wall.wood.cross",
 				"wall.wood.window", "wall.wood.straight_ruined", "wall.wood.rubble", "wall.wood.tower",

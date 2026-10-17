@@ -880,6 +880,75 @@
 				]}
 			]
 		},
+		"building.temple": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [4, 6],
+			"size": [4.6, 7.0, 6.6],
+			"budget": 4000,
+			"uses": "the town's temple, where its priest serves (Jeff, 2026-10-17), 4 x 6 cells, its ridge along z, the door at -z: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Taller than the house: its eaves at 4.5 m, so its walls want a run 4.5 m tall (stone's _tall pieces' height). Its roof steeper than the house's, 2 m from eaves to ridge, with a small belfry over the -z gable, so it reads as no house from above. Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 4.5 m",
+			"grey": "none",
+			"wall_set": "stone",
+			"floor_set": "stone",
+			"states": ["damaged"],
+			"parts": [
+				{"name": "roof", "motion": "fixed", "pivot": [0, 4.5, 0], "grey": [
+					{"at": [0, 0.35, 0], "size": [4.6, 0.7, 6.6]},
+					{"at": [0, 1.05, 0], "size": [2.76, 0.7, 6.6]},
+					{"at": [0, 1.65, 0], "size": [1.0, 0.5, 6.6]},
+					{"at": [0, 2.2, -2.6], "size": [0.8, 0.6, 0.8]}
+				]},
+				{"name": "trim", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-2, 4.45, 0], "size": [0.15, 0.1, 6.6]},
+					{"at": [2, 4.45, 0], "size": [0.15, 0.1, 6.6]}
+				]},
+				{"name": "roof_damaged", "motion": "fixed", "pivot": [0, 4.5, 0], "grey": [
+					{"at": [0, 0.35, -1.65], "size": [4.6, 0.7, 3.3]},
+					{"at": [0, 1.05, -1.65], "size": [2.76, 0.7, 3.3]},
+					{"at": [0, 0.15, 1.98], "size": [4.6, 0.3, 2.64]}
+				]},
+				{"name": "state_damaged", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-1.75, 0.25, 0], "size": [0.5, 0.5, 2.4]},
+					{"at": [1.75, 0.2, 1.5], "size": [0.5, 0.4, 0.8]}
+				]}
+			]
+		},
+		"building.healers_hut": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [3, 3],
+			"size": [3.6, 4.5, 3.6],
+			"budget": 3000,
+			"uses": "the healer's hut in the wilds, where its medicine man brings the fallen back (Jeff, 2026-10-17), 3 x 3 cells, as building.hut: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Told apart from a hut by its trim: herb bundles and charms hung at the eaves, a smoke hole in the roof. Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
+			"grey": "none",
+			"wall_set": "wood",
+			"floor_set": "wood",
+			"states": ["damaged"],
+			"parts": [
+				{"name": "roof", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
+					{"at": [0, 0.3, 0], "size": [3.6, 0.6, 3.6]},
+					{"at": [0, 0.9, 0], "size": [2.16, 0.6, 3.6]},
+					{"at": [0, 1.35, 0], "size": [0.9, 0.3, 3.6]}
+				]},
+				{"name": "trim", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-1.5, 2.95, 0], "size": [0.15, 0.1, 3.6]},
+					{"at": [1.5, 2.95, 0], "size": [0.15, 0.1, 3.6]},
+					{"at": [-1.5, 2.6, -1.0], "size": [0.1, 0.5, 0.1]},
+					{"at": [1.5, 2.6, 1.0], "size": [0.1, 0.5, 0.1]}
+				]},
+				{"name": "roof_damaged", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
+					{"at": [0, 0.3, -0.9], "size": [3.6, 0.6, 1.8]},
+					{"at": [0, 0.9, -0.9], "size": [2.16, 0.6, 1.8]},
+					{"at": [0, 0.15, 1.08], "size": [3.6, 0.3, 1.44]}
+				]},
+				{"name": "state_damaged", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
+					{"at": [-1.25, 0.2, 0], "size": [0.5, 0.4, 1.2]},
+					{"at": [1.25, 0.15, 0.75], "size": [0.5, 0.3, 0.8]}
+				]}
+			]
+		},
 		"building.shed": {
 			"category": "buildings",
 			"type": "mesh",
