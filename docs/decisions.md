@@ -7295,3 +7295,21 @@ stops sight on the valley floor but not from the rim. view_test's
 map_bench gains `--zoom=Z` (past ZOOM_MAX, for an overview) and `--yaw=D`,
 and a shot leaves out the hints. Content and tools only; no protocol
 change.
+
+## 366. Names are lore's words in levels/lore/names.json, filled in by Lore at display time
+
+How a thing is named (items' naming: a long-time holder, later deeds and makers)
+is a list of forms in `levels/lore/names.json`, e.g. `"{holder}'s {thing}"`, each
+with its own id, status and source, filled only from the slots holder, thing,
+deed and maker. Beside them are thing words: lore's word for a thing where it
+differs from the item's own, by item id or tag. Both pass decision 258's gate:
+only agreed ones count, drafts when previewed, never an asked one. `Lore` reads
+the file: `name_forms(how, least)`, `thing_word(item_id, tags, least)`, and
+`render_name(name, item_id, tags, noun)`. Items stores a name as {form, holder,
+made_step} (decision 365), not as text, and renders it when shown, so a reforged
+thing keeps its name with its new word ("Wren's spear"). A stored form renders
+whatever its status now, so a name once given stays given. Until F1 is answered
+the only form is style.md's holder form, as a draft; no bynames are invented.
+lore_test checks the file and the readers. Rejected: items keeping its own name
+tables (lore's words and gate in a second place), and storing the rendered text
+(a reforged thing would keep the old word).

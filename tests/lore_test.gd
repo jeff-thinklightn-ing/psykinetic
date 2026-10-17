@@ -27,6 +27,8 @@ func _ready() -> void:
 	_test_shared_ids()
 	_test_known_by_files()
 	_test_known_by()
+	_test_names_file()
+	_test_names()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -217,6 +219,70 @@ func _test_known_by() -> void:
 	_check("blighted_ore.carries" in ore and not "the_land.fire" in ore, "on the files, about the ore: the ore's facts, not the fire's %s" % [ore])
 	var weighted: Array = Lore.known_by("learned", PackedStringArray(), "draft").filter(func(fact: Dictionary) -> bool: return fact["weight"] != Lore.DEFAULT_WEIGHT)
 	_check(weighted.is_empty(), "no fact is weighted until Jeff and Dire have agreed facts to weigh")
+
+
+func _test_names_file() -> void:
+	print("\n== names.json: forms filled only from known slots, thing words, the status gate (decision 366) ==")
+	var data: Variant = _read("names")
+	_check(data is Dictionary and data.get("forms") is Array and data.get("things") is Array, "names.json is {forms: [...], things: [...]}")
+	if not data is Dictionary:
+		return
+	var bad: Array = []
+	var ids := {}
+	for form in data.get("forms", []):
+		var text: Variant = form.get("form")
+		var ok: bool = _is_id(form.get("id")) and not ids.has(form.get("id")) and form.get("how") in Lore.NAME_HOWS \
+				and _status_ok(form) and form.get("source") is String and text is String and text.contains("{")
+		ids[form.get("id")] = true
+		if ok:
+			var bare: String = text
+			for slot in Lore.NAME_SLOTS:
+				bare = bare.replace("{%s}" % slot, "")
+			# A name is a name, not a line: no other slot, no quotes, no I or you.
+			ok = not bare.contains("{") and not bare.contains("}") and not bare.contains("\"") and not _personal(bare)
+		if not ok:
+			bad.append(form.get("id"))
+	_check(bad.is_empty(), "every form is well formed, filled only from %s %s" % [Lore.NAME_SLOTS, bad])
+	bad = []
+	for thing in data.get("things", []):
+		if not (_is_id(thing.get("id")) and not ids.has(thing.get("id")) and thing.get("for") is String \
+				and thing.get("words") is String and not thing["words"].is_empty() and _status_ok(thing) and thing.get("source") is String):
+			bad.append(thing.get("id"))
+		ids[thing.get("id")] = true
+	_check(bad.is_empty(), "every thing word is well formed %s" % [bad])
+	Lore.reload()
+	var drafts := Lore.name_forms("", "draft").map(func(form: Dictionary) -> String: return form["id"])
+	_check("holder_possessive" in drafts, "the holder form from style.md is there to preview %s" % [drafts])
+
+
+func _test_names() -> void:
+	print("\n== Lore.name_forms, thing_word, render_name ==")
+	var forms := [
+		{"id": "held", "how": "holder", "form": "{holder}'s {thing}", "status": "agreed"},
+		{"id": "slayer", "how": "deed", "form": "{deed}", "status": "draft"},
+		{"id": "open", "how": "maker", "form": "{maker}'s work", "status": "asked", "ask": "X"},
+	]
+	var things := [
+		{"id": "brand", "for": "sword", "words": "brand", "status": "agreed"},
+		{"id": "edge", "for": "blade", "words": "edge", "status": "agreed"},
+		{"id": "pole", "for": "spear", "words": "pole", "status": "draft"},
+	]
+	Lore.use([], [], forms, things)
+	var form_ids := func(how: String, least := "agreed") -> Array:
+		return Lore.name_forms(how, least).map(func(form: Dictionary) -> String: return form["id"])
+	_check(form_ids.call("") == ["held"] and form_ids.call("", "draft") == ["held", "slayer"], "only agreed forms count; drafts when previewed; never an asked one")
+	_check(form_ids.call("deed", "draft") == ["slayer"] and form_ids.call("maker", "draft").is_empty(), "forms by how the name came")
+	_check(Lore.thing_word("sword") == "brand" and Lore.thing_word("axe", PackedStringArray(["blade"])) == "edge", "a thing's word by its item id, else by a tag")
+	_check(Lore.thing_word("sword", PackedStringArray(["blade"])) == "brand", "the item id wins over a tag")
+	_check(Lore.thing_word("spear") == "" and Lore.thing_word("spear", PackedStringArray(), "draft") == "pole", "a draft word counts only when previewed")
+	var wren := {"form": "held", "holder": "Wren", "made_step": 10}
+	_check(Lore.render_name(wren, "sword") == "Wren's brand" and Lore.render_name(wren, "dagger", PackedStringArray(), "dagger") == "Wren's dagger",
+			"a name renders with lore's word for the thing, else the item's own")
+	_check(Lore.render_name(wren, "spear", PackedStringArray(), "spear") == "Wren's spear", "reforged into a spear, it keeps the name with the new word")
+	_check(Lore.render_name({"form": "slayer", "deed": "Goblin-bane"}, "sword") == "Goblin-bane", "a stored form renders whatever its status now")
+	_check(Lore.render_name({"form": "gone", "holder": "Wren"}, "sword") == "" and Lore.render_name({"form": "held"}, "sword") == ""
+			and Lore.render_name({"form": "held", "holder": "Wren"}, "axe") == "", "an unknown form, a missing holder or no word for the thing renders nothing")
+	Lore.reload()
 
 
 ## Whether [param text] speaks as I or we, or to you: lore is stated in the

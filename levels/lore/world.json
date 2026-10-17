@@ -99,6 +99,14 @@
 					"ask": "A4"
 				},
 				{
+					"id": "the_land.taken_named",
+					"text": "Whether a named thing taken from the remains of the one it is named for, not given, is cursed, and who knows it.",
+					"known": "common",
+					"where": [],
+					"status": "asked",
+					"ask": "H12"
+				},
+				{
 					"id": "the_land.gods",
 					"text": "Which gods are worshipped, and whether anyone besides the Blood Rot worships or fears the fallen star.",
 					"known": "common",

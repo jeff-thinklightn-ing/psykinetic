@@ -12,6 +12,11 @@ extends RefCounted
 ## sharing a tag with its tags wherever they are, and the secret and lived
 ## facts that name it. A rumour comes back as hearsay and a lived fact as
 ## memory; whether a rumour is true stays here.
+##
+## names.json (decision 366) says how things are named: forms by how a name
+## came (holder, deed, maker) and lore's word for a thing, under the same
+## gate. Items stores a name as {form, holder, ...} and render_name fills it
+## at display time, so a reforged thing keeps its name with its new word.
 
 const DIR := "res://levels/lore/"
 const FILES := ["world", "factions", "regions", "materials", "people", "history"]
@@ -20,9 +25,15 @@ const KNOWN := ["common", "rumour", "secret", "lived"]
 ## for a prompt that has room for only some. Left at this until Jeff and
 ## Dire have agreed facts to weigh.
 const DEFAULT_WEIGHT := 1.0
+## How a name came, and what a form may be filled from.
+const NAME_HOWS := ["holder", "deed", "maker"]
+const NAME_SLOTS := ["holder", "thing", "deed", "maker"]
 
 static var _entries: Dictionary = {}
 static var _knowers: Dictionary = {}
+static var _forms: Array = []
+static var _things: Array = []
+static var _names_read := false
 
 
 ## Every entry by id, read on first use.
@@ -42,13 +53,19 @@ static func knowers() -> Dictionary:
 static func reload() -> void:
 	_entries = {}
 	_knowers = {}
+	_forms = []
+	_things = []
+	_names_read = false
 
 
-## Uses [param entry_list] and [param knower_list] in place of the files
-## (tests, tools).
-static func use(entry_list: Array, knower_list: Array) -> void:
+## Uses [param entry_list] and [param knower_list] (and, given, the name
+## forms and thing words) in place of the files (tests, tools).
+static func use(entry_list: Array, knower_list: Array, form_list := [], thing_list := []) -> void:
 	_entries = {}
 	_knowers = {}
+	_forms = form_list.filter(func(form: Variant) -> bool: return form is Dictionary)
+	_things = thing_list.filter(func(thing: Variant) -> bool: return thing is Dictionary)
+	_names_read = true
 	for entry: Variant in entry_list:
 		if entry is Dictionary and entry.get("id") is String:
 			_entries[entry["id"]] = entry
@@ -90,6 +107,54 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 						"hearsay": known == "rumour", "memory": known == "lived",
 						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT))})
 	return out
+
+
+## The name forms that count ([param least] as for known_by), in file
+## order: [{id, how, form}], those of [param how] when given.
+static func name_forms(how := "", least := "agreed") -> Array[Dictionary]:
+	_load_names()
+	var out: Array[Dictionary] = []
+	for form: Dictionary in _forms:
+		if _counts(str(form.get("status", "")), least) and (how.is_empty() or form.get("how") == how):
+			out.append({"id": str(form.get("id", "")), "how": str(form.get("how", "")), "form": str(form.get("form", ""))})
+	return out
+
+
+## Lore's word for a thing ([param item_id] first, then any of [param tags]),
+## or "" when it has none and the item's own word stands.
+static func thing_word(item_id: String, tags := PackedStringArray(), least := "agreed") -> String:
+	_load_names()
+	for pass_tags: bool in [false, true]:
+		for thing: Dictionary in _things:
+			var match_for: Variant = thing.get("for")
+			if _counts(str(thing.get("status", "")), least) and (match_for in tags if pass_tags else match_for == item_id):
+				return str(thing.get("words", ""))
+	return ""
+
+
+## A stored name ([param name]: {form, holder, deed, maker}) as text, its
+## {thing} lore's word for the item or else [param noun] (the item's own).
+## The form is used whatever its status now, so a name given stays given (the
+## thing's word goes by [param least]); "" when the form is unknown or a slot
+## it needs is empty.
+static func render_name(name: Dictionary, item_id: String, tags := PackedStringArray(), noun := "", least := "agreed") -> String:
+	_load_names()
+	var text := ""
+	for form: Dictionary in _forms:
+		if form.get("id") == name.get("form"):
+			text = str(form.get("form", ""))
+	if text.is_empty():
+		return ""
+	var word := thing_word(item_id, tags, least)
+	var slots := {"holder": str(name.get("holder", "")), "thing": word if not word.is_empty() else noun,
+			"deed": str(name.get("deed", "")), "maker": str(name.get("maker", ""))}
+	for slot: String in NAME_SLOTS:
+		var key := "{%s}" % slot
+		if text.contains(key):
+			if slots[slot].is_empty():
+				return ""
+			text = text.replace(key, slots[slot])
+	return text
 
 
 ## Whether [param fact] (in [param entry]) is on one of the topics in
@@ -144,3 +209,15 @@ static func _load() -> void:
 		for knower: Variant in known["knowers"]:
 			if knower is Dictionary and knower.get("id") is String:
 				_knowers[knower["id"]] = knower
+
+
+static func _load_names() -> void:
+	if _names_read:
+		return
+	_names_read = true
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(DIR + "names.json"))
+	if data is not Dictionary or data.get("forms") is not Array or data.get("things") is not Array:
+		push_warning("Lore: %snames.json has no forms and things lists" % DIR)
+		return
+	_forms = data["forms"].filter(func(form: Variant) -> bool: return form is Dictionary)
+	_things = data["things"].filter(func(thing: Variant) -> bool: return thing is Dictionary)

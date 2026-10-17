@@ -1,0 +1,7 @@
+{
+	"_about": "How things are named (docs/lore/README.md; decision 366): forms by how a name came (holder, deed, maker), filled from {holder}, {thing}, {deed} and {maker}, and lore's word for a thing where it differs from the item's own. Read by Lore.name_forms, thing_word and render_name; only agreed ones count. Until F1 is answered, the holder form from style.md is the only one, and it is draft.",
+	"forms": [
+		{"id": "holder_possessive", "how": "holder", "form": "{holder}'s {thing}", "status": "draft", "source": "lore"}
+	],
+	"things": []
+}

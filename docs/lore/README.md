@@ -18,6 +18,7 @@ levels and the status gate). `tests/lore_test.gd` checks every rule below.
 | `levels/lore/people.json` | named people and named weapons (`person`, `weapon`) |
 | `levels/lore/history.json` | things that happened (`event`) |
 | `levels/lore/knowers.json` | who knows what: groups and characters (not entries; see below) |
+| `levels/lore/names.json` | how things are named: name forms and thing words (not entries; see below) |
 
 Each file is `{"_about": "...", "entries": [...]}`.
 
@@ -118,3 +119,25 @@ Fact text is a third-person statement: lore_test refuses I, we or you in a fact 
 a summary. To see what a knower would know:
 
     godot --headless --path . --script tools/lore_known.gd -- townsfolk --draft --about=ore
+
+## Names
+
+`names.json` is `{"_about": "...", "forms": [...], "things": [...]}` (decision 366).
+How a thing gets a name (a long-time holder, a deed) is items' business; the words
+are lore's.
+
+- A form is `{"id", "how", "form", "status", "source"}`. `how` is holder, deed or
+  maker. `form` is the name with slots filled in later: `{holder}`, `{thing}`,
+  `{deed}`, `{maker}` and no others, e.g. `"{holder}'s {thing}"`. No quotes, no I
+  or you.
+- A thing word is `{"id", "for", "words", "status", "source"}`: lore's word for a
+  thing where it differs from the item's own, `for` naming an item id or a tag.
+- Only `agreed` ones count, as with facts. Until F1 is answered the only form is
+  the holder form from `style.md`, as a draft, and no bynames are invented.
+
+`Lore.name_forms(how, least)` gives the forms that count. `Lore.thing_word(item_id,
+tags, least)` gives lore's word, or `""`. Items stores a name as `{form, holder,
+made_step}` and shows it with `Lore.render_name(name, item_id, tags, noun)`: the
+form filled in, `{thing}` being lore's word for the item now or else `noun`, so a
+reforged thing keeps its name with its new word ("Wren's spear"). A stored form
+renders whatever its status now: a name given stays given.
