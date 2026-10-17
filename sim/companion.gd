@@ -1663,23 +1663,14 @@ func doing() -> String:
 	return "You are %s; right now you are %s." % [words, action]
 
 
-## The hour, in words (DayNight.hour: 0 midnight, 12 noon): "dusk", "the
-## middle of the night"; never a number.
-const HOURS := [[4.0, "the middle of the night"], [5.5, "the small hours before dawn"], [7.0, "dawn"],
-	[11.0, "morning"], [13.0, "midday"], [17.0, "afternoon"], [18.0, "evening"], [19.5, "dusk"],
-	[22.0, "night"], [24.0, "the middle of the night"]]
+## The hour and the weather in words: DayNight's (describe, decision 389),
+## kept here by name for those that read them from Companion.
+const HOURS := DayNight.HOURS
+const WEATHER_WORDS := DayNight.WEATHER_WORDS
 
 
 static func time_words(hour: float) -> String:
-	for each: Array in HOURS:
-		if hour < float(each[0]):
-			return each[1]
-	return HOURS.back()[1]
-
-
-## The weather outdoors (Weather.KINDS), in words, after the hour.
-const WEATHER_WORDS := {"clear": "the sky is clear", "overcast": "the sky is grey with cloud", "rain": "it is raining",
-	"fog": "fog lies thick", "wind": "a strong wind is blowing", "storm": "a storm is raging"}
+	return DayNight.time_words(hour)
 
 
 ## Words that ask about the hour or the sky: then her voice is told them

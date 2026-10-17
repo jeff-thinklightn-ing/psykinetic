@@ -3,7 +3,8 @@ extends Node
 ## World.steps and is saved; the sun's path follows it (a winter noon low,
 ## its days short, the sim's daylight with them); the seasons blend at
 ## their boundaries; snow falls and lies in the cold, by the region's
-## climate; the view's sky takes the season's tint.
+## climate; the view's sky takes the season's tint; DayNight.describe says
+## it all in words (decision 389).
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -20,6 +21,7 @@ func _ready() -> void:
 	_test_snow()
 	_test_saved()
 	_test_look()
+	_test_describe()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -156,6 +158,30 @@ func _test_look() -> void:
 	_check(summer["light"].r >= summer["light"].b, "summer's light is warm")
 	var spring := Client3D.seasoned_look(noon, {"spring": 1.0})
 	_check(spring["light"] == noon["light"] and is_equal_approx(spring["energy"], noon["energy"]), "spring leaves the day as it is")
+
+
+func _test_describe() -> void:
+	print("\n== the sky in words ==")
+	Weather.use({"default": {"weights": {"clear": 1}}, "wet": {"weights": {"rain": 1}}, "stormy": {"weights": {"storm": 1}}})
+	World.steps = 0
+	var noon := DayNight.describe("default", _steps_at(0.375))
+	_check(noon["season"] == "summer" and noon["season_words"] == "midsummer" and noon["weather"] == "the sky is clear"
+			and noon["ground"] == "" and not noon["storm"], "midsummer, clear (%s)" % noon["sentence"])
+	var wet := DayNight.describe("wet", _steps_at(0.3))
+	_check(wet["weather"] == "it is raining" and wet["season_words"] == "early summer", "rain in early summer (%s)" % wet["sentence"])
+	var winter := DayNight.describe("wet", _steps_at(0.875))
+	_check(winter["weather"] == "snow is falling" and winter["ground"] == "snow lies on the ground"
+			and winter["sentence"].contains("snow is falling, and snow lies on the ground"), "in midwinter: snow (%s)" % winter["sentence"])
+	var blizzard := DayNight.describe("stormy", _steps_at(0.875))
+	_check(blizzard["storm"] and blizzard["weather"] == "snow is blowing in a storm", "a winter storm is a storm, of snow")
+	DayNight.set_hour(0.0)
+	var night := DayNight.describe("default", World.steps)
+	_check(night["dark"] and night["hour"] == "the middle of the night" and night["sentence"].begins_with("It is the middle of the night in "),
+			"at midnight: dark, in words (%s)" % night["sentence"])
+	_check(Companion.time_words(18.5) == DayNight.time_words(18.5) and Companion.WEATHER_WORDS == DayNight.WEATHER_WORDS,
+			"Companion's names for them still answer")
+	DayNight.reset()
+	Weather.reload()
 
 
 func _check(ok: bool, label: String) -> void:

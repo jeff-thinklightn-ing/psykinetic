@@ -36,6 +36,22 @@ const TWILIGHT_HIGH := 12.0
 ## companion carries a lantern, so nothing is black.
 const ZONES: Array[String] = ["outdoors", "indoors", "cave", "dungeon"]
 const ZONE_AMBIENT := {"outdoors": 0.4, "indoors": 0.4, "cave": 0.2, "dungeon": 0.1}
+## The sky in words, for voices (describe, decision 389). The hour by the
+## clock (0 midnight, 12 noon): "dusk", "the middle of the night"; never a
+## number.
+const HOURS := [[4.0, "the middle of the night"], [5.5, "the small hours before dawn"], [7.0, "dawn"],
+	[11.0, "morning"], [13.0, "midday"], [17.0, "afternoon"], [18.0, "evening"], [19.5, "dusk"],
+	[22.0, "night"], [24.0, "the middle of the night"]]
+## The weather (Weather.KINDS) in words; in the cold, SNOW_WORDS.
+const WEATHER_WORDS := {"clear": "the sky is clear", "overcast": "the sky is grey with cloud", "rain": "it is raining",
+	"fog": "fog lies thick", "wind": "a strong wind is blowing", "storm": "a storm is raging"}
+const SNOW_WORDS := {"rain": "snow is falling", "storm": "snow is blowing in a storm"}
+## A season in thirds: early, the middle, late.
+const SEASON_WORDS := {"spring": ["early spring", "mid-spring", "late spring"],
+	"summer": ["early summer", "midsummer", "late summer"], "autumn": ["early autumn", "mid-autumn", "late autumn"],
+	"winter": ["early winter", "midwinter", "late winter"]}
+## The light under which it is dark: the night's (Animal.NIGHT_LIGHT).
+const DARK_LIGHT := Animal.NIGHT_LIGHT
 
 ## Steps a day takes.
 static var day_steps := int(DEFAULT_DAY_MINUTES * 60.0 * 10.0)
@@ -170,3 +186,39 @@ static func set_day_minutes(minutes: float) -> void:
 ## The light where no daylight reaches in a zone of [param zone] (ZONES).
 static func base_ambient(zone: String) -> float:
 	return float(ZONE_AMBIENT.get("indoors" if zone == "outdoors" else zone, ZONE_AMBIENT["indoors"]))
+
+
+## The hour [param hour] (0..24) in words (HOURS).
+static func time_words(hour: float) -> String:
+	for each: Array in HOURS:
+		if hour < float(each[0]):
+			return each[1]
+	return HOURS.back()[1]
+
+
+## The sky over [param region] at world step [param steps] in plain facts,
+## for a voice's "now" (decision 389): {"hour": time_words, "season": its
+## name, "season_words": "midwinter", "late autumn", "weather": the
+## weather in words (snow's in the cold), "ground": "snow lies on the
+## ground" or "", "dark": whether it is night-dark under the open sky,
+## "storm": whether a storm blows (snow's too), "sentence": all of it in
+## one line}. Where one is (indoors, under a roof) is the caller's.
+static func describe(region: String, steps: float) -> Dictionary:
+	var season := Season.at(region, steps)
+	var weather := Weather.at(region, steps)
+	var kind := str(weather["kind"])
+	var words := str(WEATHER_WORDS.get(kind, ""))
+	var snowing: bool = weather.get("snow", 0.0) > weather["rain"] and SNOW_WORDS.has(kind)
+	if snowing:
+		words = SNOW_WORDS[kind]
+	var name := str(season["name"])
+	var third := clampi(floori(fposmod(Season.year_fraction(steps) * 4.0, 1.0) * 3.0), 0, 2)
+	var ground := "snow lies on the ground" if season["snow"] > 0.5 else ""
+	var hour_words := time_words(hour(steps))
+	var sentence := "It is %s in %s" % [hour_words, SEASON_WORDS[name][third]]
+	if words != "":
+		sentence += "; " + words
+	if ground != "":
+		sentence += (", and " if words != "" else "; ") + ground
+	return {"hour": hour_words, "season": name, "season_words": SEASON_WORDS[name][third], "weather": words, "ground": ground,
+		"dark": daylight(steps) < DARK_LIGHT, "storm": kind == "storm", "sentence": sentence + "."}

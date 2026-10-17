@@ -8173,3 +8173,24 @@ view_test: each body, its scene, animated, standing in Idle, upright (head
 over hips over feet), its feet on the ground, its toes where it faces, belt
 and boots on the palette, the tunic in the player's colour; a puppet made
 again when its body changes. Client only; no protocol change of its own.
+## 389. The sky in words, in one call: DayNight.describe
+
+Voices (companions, residents, the coming npc tree) say the hour, the
+season and the weather in plain words in their "now". So that no tree
+works them out again, DayNight.describe(region, steps) gives:
+- hour: HOURS' words, "dusk" or "the middle of the night", never a number;
+- season and season_words: early, mid or late by thirds, "midwinter",
+  "late autumn";
+- weather: WEATHER_WORDS' line, or in the cold SNOW_WORDS' ("snow is
+  falling", "snow is blowing in a storm");
+- ground: "snow lies on the ground" past half cover;
+- dark: daylight under Animal.NIGHT_LIGHT;
+- storm: a storm, of rain or snow;
+- sentence: all of it in one line, "It is midday in midwinter; snow is
+  falling, and snow lies on the ground."
+
+It speaks for the sky only. Where one is (indoors, under a roof, a cave)
+and whether to say it at all (companions' SKY_WORDS) stay with the
+caller. HOURS, time_words and WEATHER_WORDS move here from Companion,
+which keeps its names for them as forwards (Resident reads them there).
+Agreed with companions, who switch where_words to describe.
