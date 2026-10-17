@@ -28,6 +28,11 @@ func _ready() -> void:
 	_register_levels()
 	Net.map_name = TOWN
 	await _boot()
+	# Every resident here is steady: a thief's night in the square (decision
+	# 404) would move the bodies these cases watch. A static method, not a
+	# lambda: a lambda kept in a static Callable outlives this node and
+	# crashes the engine at exit.
+	Production.type_of = _steady
 
 	_test_stays_when_told()
 	_test_stays_when_left()
@@ -35,11 +40,13 @@ func _ready() -> void:
 	_test_legacy_rests_in_town()
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
+	_test_healer_at_hut()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
+	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -57,6 +64,11 @@ func _ready() -> void:
 ## at (2, 2), the store (a stockpile the town holds) at (5, 3), radius 2, a
 ## hut at (9, 5) (no walls of its own: its inside, (9, 5) to (11, 7), is a
 ## home). rs_road: a bare room.
+## Every resident steady (see _ready).
+static func _steady(_id: String) -> String:
+	return Townsfolk.STEADY
+
+
 func _register_levels() -> void:
 	for level_name: String in [TOWN, ROAD]:
 		var rows: Array[String] = []
@@ -66,7 +78,8 @@ func _register_levels() -> void:
 		if level_name == TOWN:
 			spec["places"] = {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}}
 			# A home for residents' bodies (decision 333): a hut linked to nothing.
-			spec["buildings"] = [{"slot": "building.hut", "at": [9, 5]}]
+			# And a healer's hut (decision 404): a place of its own, no town.
+			spec["buildings"] = [{"slot": "building.hut", "at": [9, 5]}, {"slot": "building.healers_hut", "at": [1, 6], "facing": [0, -1]}]
 		Level.register(level_name, Level.image_from_rows(rows, {Vector2i(2, 2): "start"}), null, spec)
 
 
@@ -270,8 +283,9 @@ func _test_bodies_in_town() -> void:
 	_step_until(func() -> bool: return bram.doing == Resident.Doing.HOME and hut.has_point(bram.tile), 150)
 	_check(bram.doing == Resident.Doing.HOME and hut.has_point(bram.tile), "night: home in the hut (at %s)" % bram.tile)
 	DayNight.set_hour(19.5)
-	_step_until(func() -> bool: return bram.doing == Resident.Doing.SQUARE and square.has_point(bram.tile), 150)
-	_check(bram.doing == Resident.Doing.SQUARE and square.has_point(bram.tile), "evening, between work and home: the square (at %s)" % bram.tile)
+	# A smith's evening is at the inn (decision 404); this town has none, so the square.
+	_step_until(func() -> bool: return bram.doing == Resident.Doing.INN and square.has_point(bram.tile), 150)
+	_check(bram.doing == Resident.Doing.INN and square.has_point(bram.tile), "evening, the inn's hour in a town with no inn: the square (at %s)" % bram.tile)
 	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RsRaider%d" % World.tick,
 		"tile": _main._nearest_free(Vector2i(2, 7)), "props": {"sight_range": 0}}) as Monster
 	_step_until(func() -> bool: return bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), 150)
@@ -325,6 +339,47 @@ func _test_bodies_in_town() -> void:
 	DayNight.phase = phase
 	DayNight.anchor = anchor
 	DayNight.update()
+
+
+## The medicine man at the healer's hut (decision 404): economy seats him as
+## a worker whose town is the hut's place id; the sync gives him a body at
+## the hut, work and home both, by the clock, while someone is near.
+func _test_healer_at_hut() -> void:
+	print("\n== the medicine man has a body at the healer's hut (decision 404) ==")
+	# The hut's place, at its front cell, as maps' 372 makes it for a map (a
+	# registered level's places are the spec's: put it in by hand, as return_test does).
+	var hut_place := ""
+	for building: Dictionary in _main._world_map.areas.get(TOWN, {}).get("buildings", []):
+		if str(building.get("slot", "")) == "building.healers_hut":
+			var front := Level.front_cell(building["rect"], building.get("facing", Vector2i(0, 1)))
+			hut_place = "%s/healers_hut@%d,%d" % [TOWN, front.x, front.y]
+			World.holdings._places[hut_place] = {"id": hut_place, "area": TOWN, "key": hut_place.get_slice("/", 1), "cell": front,
+				"name": "the healer's hut", "kind": "healers_hut", "radius": 1, "worth": 0, "start": Factions.NOBODY}
+	_check(not hut_place.is_empty() and World.holdings.places_in(TOWN).has(hut_place), "(the test town's hut has a place of its own: %s; buildings %s)" % [hut_place,
+		_main._world_map.areas.get(TOWN, {}).get("buildings", []).map(func(b: Dictionary) -> String: return str(b.get("slot", "")))])
+	var cell: Vector2i = World.holdings.place(hut_place).get("cell", Vector2i.ZERO)
+	# The town's folk away: the zone's RESIDENTS_MAX bodies were theirs.
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	_check(World.production.add_worker("medicine_man:" + hut_place, "Oren", ["medicine_man"], hut_place, "wilds"), "(Oren seated at the hut, as economy does)")
+	_sync()
+	var oren := _body("medicine_man:" + hut_place)
+	_check(oren != null and oren.town == hut_place and oren.trade == "medicine_man" and oren.label == "Oren [medicine man]", "a body at the hut, its town the hut's place")
+	_check(oren != null and oren.doing == Resident.Doing.WORK and World.distance(oren.tile, cell) <= 3, "at midday he is at his work, in or beside the hut (at %s, the front %s)" % [oren.tile if oren != null else Vector2i.ZERO, cell])
+	DayNight.set_hour(23.0)
+	_step_until(func() -> bool: return oren.doing == Resident.Doing.HOME, 40)
+	_check(oren.doing == Resident.Doing.HOME and World.distance(oren.tile, cell) <= 3, "at night he is at home, which is the hut")
+	DayNight.set_hour(12.0)
+	World.production.set_away("medicine_man:" + hut_place, true)
+	_sync()
+	_check(_body("medicine_man:" + hut_place) == null, "away (fetched out), no body")
+	World.production.set_away("medicine_man:" + hut_place, false)
+	_sync()
+	_check(_body("medicine_man:" + hut_place) != null, "back, his body again")
+	World.production.set_away("medicine_man:" + hut_place, true)
+	_sync()
 
 
 func _test_resident_voices() -> void:

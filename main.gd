@@ -3028,6 +3028,29 @@ func _sync_residents() -> void:
 					each["town"] = place_id
 					each["places"] = _resident_places(area, place, each["trade"], homes, i)
 					wanted[each["key"]] = each
+		# The healer's hut (decision 404): whoever economy seats there (the
+		# medicine man, a worker whose town is the hut's place id) has a body
+		# at the hut as a town's folk have theirs, only while someone is near.
+		for place_id: String in World.holdings.places_in(World.zone.name):
+			var place := World.holdings.place(place_id)
+			if place.get("kind") != "healers_hut" or not _town_near(place_id, place):
+				continue
+			var cell: Vector2i = place.get("cell", Vector2i.ZERO)
+			var hut := Rect2i(cell - Vector2i.ONE, Vector2i(3, 3))
+			for building: Dictionary in area.get("buildings", []):
+				var rect: Rect2i = building.get("rect", Rect2i())
+				if str(building.get("slot", "")) == "building.healers_hut" and rect.grow(1).has_point(cell):
+					hut = rect
+			var ids := World.production.worker_ids(place_id).filter(func(who: String) -> bool:
+				return not who.begins_with("companion:") and not bool(World.production.worker(who).get("away", false)))
+			for who: String in ids:
+				if wanted.size() >= RESIDENTS_MAX:
+					break
+				var trades: Array = World.production.worker(who).get("trades", [])
+				wanted[who] = {"key": who, "name": str(World.production.worker(who).get("name", who)),
+					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "", "town": place_id,
+					"type": str(World.production.worker(who).get("type", "")),
+					"places": {"work": hut, "home": hut, "square": Rect2i(cell - Vector2i(2, 2), Vector2i(5, 5))}}
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
@@ -3307,7 +3330,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var town: String = each["town"]
 	var places: Dictionary = each["places"]
 	var trade: String = each["trade"]
-	var doing := Resident.doing_at(trade, DayNight.hour(DayNight.now()))
+	var doing := Resident.doing_now(trade, str(each.get("type", "")), who)
 	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
 	var label := Resident.label_of(str(each["name"]), trade)
@@ -3371,8 +3394,27 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		elif standing and building["use"] == "inn":
 			inn = building["rect"]
 	var home := homes[index] if index < homes.size() else (inn if inn.size != Vector2i.ZERO else work)
-	return {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
+	var out := {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
 		"square": square}
+	# The routine's other places (decision 404): the inn when linked and
+	# standing, the temple and the well by their slots (no "use" or town of
+	# their own yet, buildings' word), the nearest within HOME_TILES of the
+	# store; a place the town lacks stays out, and the body keeps to the square.
+	if inn.size != Vector2i.ZERO:
+		out["inn"] = inn
+	for want: Array in [["temple", "building.temple"], ["well", "building.well"]]:
+		var best := Rect2i()
+		for building: Dictionary in area.get("buildings", []):
+			var rect: Rect2i = building.get("rect", Rect2i())
+			if str(building.get("slot", "")) == want[1] and World.distance(rect.get_center(), store) <= HOME_TILES \
+					and (best.size == Vector2i.ZERO or World.distance(rect.get_center(), store) < World.distance(best.get_center(), store)):
+				best = rect
+		if best.size != Vector2i.ZERO:
+			# A 1x1 on water (the well) is stood beside, not in.
+			out[want[0]] = best if want[0] != "well" else best.grow(1)
+	if trade == "priest" and out.has("temple"):
+		out["work"] = out["temple"]
+	return out
 
 
 ## The companion of player [param player_id] is held by raid group

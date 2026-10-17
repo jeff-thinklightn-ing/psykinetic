@@ -17,8 +17,12 @@ extends GridEntity
 ## FAR_EVERY ticks and is walked there at once (World.walk), as monsters
 ## are by the world tick.
 
-enum Doing { WORK, HOME, SQUARE, HIDE }
-const FILE := "res://levels/residents.json"
+enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE }
+## Doing by the place word Townsfolk.whereabouts gives (decision 404).
+const DOING_AT := {"work": Doing.WORK, "home": Doing.HOME, "square": Doing.SQUARE, "well": Doing.WELL, "inn": Doing.INN, "temple": Doing.TEMPLE}
+## Where it is, in its voice's words (facts_now).
+const WHERE_WORDS := {Doing.WORK: "at your work", Doing.HOME: "at home", Doing.SQUARE: "in the square", Doing.HIDE: "hiding at home from raiders",
+	Doing.WELL: "at the well", Doing.INN: "at the inn", Doing.TEMPLE: "at the temple"}
 const SIGHT_RANGE := 7
 ## It looks and listens for raiders every so many ticks.
 const LOOK_EVERY := 5
@@ -31,7 +35,8 @@ const FAR_EVERY := 20
 ## A step blocked so many times, and it looks for a new way.
 const STUCK_TRIES := 3
 const NO_CELL := Vector2i(-99999, -99999)
-const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home"}
+const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home",
+	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple"}
 
 ## Production's worker id ("companion:<player id>" for a companion resting
 ## in town: decision 333 amended), the town (a stockpile place id) and its
@@ -60,7 +65,6 @@ var _stuck := 0
 var _hide_until := -1
 var _wander_at := -1
 var _listened := -1
-static var _days := {}
 
 
 ## Its voice (decision 336): asked only when spoken to, one ask at a time
@@ -102,19 +106,6 @@ func _init() -> void:
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
 
-## The days by trade, read on first use.
-static func days() -> Dictionary:
-	if _days.is_empty():
-		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE))
-		if data is Dictionary:
-			for key: String in data:
-				if not key.begins_with("_") and key != "hearsay" and data[key] is Dictionary:
-					_days[key] = data[key]
-		if not _days.has("default"):
-			_days["default"] = {"work": [8, 18], "home": [21, 6]}
-	return _days
-
-
 ## The name over a resident's head: "Bram [smith]", the profession in
 ## brackets after the name (Jeff, 2026-10-17: never "Bram, smith"), a trade
 ## id's underscores spaced ("medicine man"); the bare name for no trade.
@@ -124,23 +115,19 @@ static func label_of(person_name: String, of_trade: String) -> String:
 	return "%s [%s]" % [person_name, of_trade.replace("_", " ")]
 
 
-## What one of [param of_trade] is doing at [param hour] (0..24): WORK, HOME
-## or SQUARE.
-static func doing_at(of_trade: String, hour: float) -> Doing:
-	var day: Dictionary = days().get(of_trade, days()["default"])
-	if _within(hour, day.get("work", [])):
-		return Doing.WORK
-	if _within(hour, day.get("home", [])):
-		return Doing.HOME
-	return Doing.SQUARE
+## What one of [param of_trade] is doing at [param hour] (0..24), by its
+## routine (decision 404, Townsfolk.whereabouts: the season, its hidden
+## type, its own clock and the temple day by [param worker_id]).
+static func doing_at(of_trade: String, hour: float, season := "", type := "", worker_id := "", day := -1) -> Doing:
+	return DOING_AT.get(Townsfolk.whereabouts(of_trade, hour, season, type, worker_id, day), Doing.SQUARE)
 
 
-static func _within(hour: float, span: Variant) -> bool:
-	if not span is Array or span.size() != 2:
-		return false
-	var from := float(span[0])
-	var to := float(span[1])
-	return from <= hour and hour < to if from <= to else hour >= from or hour < to
+## What one of [param of_trade] (hidden [param type], [param worker_id]) is
+## doing now, on the world's clock and season: from the clock alone, so a
+## body spawned as a player walks up starts at the right stint.
+static func doing_now(of_trade: String, type := "", worker_id := "") -> Doing:
+	var now := DayNight.now()
+	return doing_at(of_trade, DayNight.hour(now), Season.name_at(World.steps), type, worker_id, Townsfolk.day_of(now))
 
 
 func _sim_tick() -> void:
@@ -153,7 +140,7 @@ func _sim_tick() -> void:
 		_look()
 	if World.tick - hurt_tick <= 1:
 		_hide_until = World.tick + HIDE_TICKS
-	var now := Doing.HIDE if World.tick < _hide_until else doing_at(trade, DayNight.hour(DayNight.now()))
+	var now := Doing.HIDE if World.tick < _hide_until else doing_now(trade, type, worker_id)
 	if now != doing or _goal == NO_CELL:
 		doing = now
 		_pick_goal()
@@ -266,6 +253,7 @@ func facts_now() -> Array[String]:
 	if World.fields.outdoor and Companion.WEATHER_WORDS.has(str(World.fields.weather.get("kind", ""))):
 		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
 	out.append("It is %s%s." % [hour, sky])
+	out.append("You are %s." % WHERE_WORDS.get(doing, "in the town"))
 	out.append(work_words())
 	out.append_array(means_words())
 	# What it knows of the world, and has heard (decision 378); a companion

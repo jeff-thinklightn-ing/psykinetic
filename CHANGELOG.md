@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk keep hours now: the well at dawn, the forge or kitchen through the
+  day, the inn at midday and in the evening where the town has one, home at
+  night, each on their own clock, later out in winter and earlier home, a
+  morning at the temple every so often; and the medicine man is at his hut in
+  the wilds when you walk up. Ask one where they are and they say.
 - A weapon's tooltip tells its story: who carried it longest and for how long, who it is named for or who made it, whom it was kept from and what it has avenged. Weapons and their strengths now come with a few words on what they do.
 - The town's carpenter mends worn bundles of arrows left in the store, using a piece of leather and some wood. The same bundle comes back whole, with its name and history.
 - Leather has uses: the carpenter can mend a worn bundle of arrows back to full with a piece of leather and some wood, and the tanner makes a leather buckler, lighter and cheaper to hold up than the round shield but covering only straight ahead, letting a little through and breaking sooner.

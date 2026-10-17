@@ -9292,3 +9292,57 @@ it), on each naming strength ("its blows make half the fight noise"; read_naming
 keeps a strength's row whole) and for bane and vengeance (growth's "says",
 Items.growth). The client reads them through Items.def(id)["verb"], Items.naming()
 and Items.growth(); without them a tooltip shows the verb's or strength's name.
+## 404. Resident routines: where a town's person is, through the day and the year
+
+A resident's day (333: work, home, else the square, two spans a trade) is now
+stints, data in `levels/residents.json`: per trade a list of {from, to, at},
+`at` one of work, home, square, well, inn, temple, and a default for a trade
+not listed; any hour no stint covers is the square, and a place the town
+lacks (no inn linked, no temple or well on the map) is the square too, so a
+town with a forge and nothing else looks as it did. "work" is where the body
+stands, never when the job runs: economy's production ticks on the world
+tick wherever the body is, and its timing is untouched. The coordinator's
+note, word for word.
+
+`Townsfolk.whereabouts(trade, hour, season, type, worker_id, day)` answers
+from the clock alone (perf's 355: bodies only while someone is near, so a
+body spawned as a player walks up must start at the right stint;
+`Resident.doing_now` gathers the hour, the season and the day from
+DayNight and Season): first the temple day (every `every_days`, the day by
+the id, an hour of the morning at the temple), then the hidden type's
+stints (393: a bard's evening at the inn runs late, a thief is in the
+square after dark, a scholar's hour at the temple), then the trade's, their
+edges moved by the season (every boundary before noon by `morning` hours,
+after by `evening`: winter out later and home earlier, summer the other
+way; a boundary's shift is a function of its hour, so adjacent stints keep
+their shared edge and no gap opens), on the resident's own clock, ahead of
+or behind the town's by at most `offset_hours`, by the id, so the town never
+moves in lockstep. `Resident.Doing` gains WELL, INN and TEMPLE; `PLACE_OF`
+and `_pick_goal` are as before (a missing place falls to the square).
+
+Places (`Main._resident_places`): the inn when linked and standing, the
+temple and the well by their slots (`building.temple`, `building.well`:
+buildings' word, they carry no "use" or town yet), the nearest within
+HOME_TILES of the store; the well, a 1x1 on water, is stood beside; a
+priest's work is the temple. The healer's hut (economy's return, 396: the
+medicine man a worker whose town is the hut's Holdings place id, origin
+"wilds"; maps' 372: a place of kind `healers_hut` at the hut's front cell):
+`_sync_residents` also takes those places, their residents
+`Production.worker_ids(place id)`, work and home the hut's rect (the
+`building.healers_hut` whose rect touches the place cell, else three by
+three round it), the square round the cell, bodies only while someone is
+near as a town's. The voice (`facts_now`) says where it is: "You are at
+the well." routine_test covers the file (whole days, known places), the
+places through a smith's day, the default, the square for a gap, the
+offsets' spread and constancy, the type and season rules and that no season
+opens a gap, the temple day and `day_of`, and `Resident.doing_at`.
+Protocol unchanged.
+
+Rejected: moving residents on the world tick between stints (a body is only
+where it is now; its place is a function of the clock, so a spawn and a
+standing body agree); a per-resident timetable saved on the record (data
+plus the id gives it); the well as a Holdings place (environment counts
+rain for the building; a slot match is enough); shifting whole stints by
+the season (gaps and overlaps at the seams; edges shift by their hour
+instead); the priest or the medicine man as Towns residents (economy seats
+them; the sync reads the record's town either way).

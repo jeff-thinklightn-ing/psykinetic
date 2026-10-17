@@ -311,3 +311,82 @@ static func _loan(production: Production, worker_id: String, owed: float, workin
 		var card := card_of(production, worker_id)
 		if card.get("facts", []).any(func(fact: Dictionary) -> bool: return str(fact.get("text", "")).contains("borrowed from the town's coffer")):
 			learn(production, worker_id, "%s paid the town's coffer back." % name)
+
+
+# --- Routines (decision 404) ----------------------------------------------------------
+
+const DAYS_FILE := "res://levels/residents.json"
+const PLACES: Array[String] = ["work", "home", "square", "well", "inn", "temple"]
+static var _days := {}
+
+
+## The days by trade and the rest of residents.json, read on first use.
+static func days() -> Dictionary:
+	if _days.is_empty():
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(DAYS_FILE)) if FileAccess.file_exists(DAYS_FILE) else null
+		_days = data if data is Dictionary else {}
+		if not _days.has("default"):
+			_days["default"] = {"stints": [{"from": 8, "to": 18, "at": "work"}, {"from": 21, "to": 6, "at": "home"}]}
+	return _days
+
+
+## Uses [param given] in place of DAYS_FILE ({} to read it again): tests.
+static func use_days(given: Dictionary) -> void:
+	_days = given.duplicate(true)
+	if not given.is_empty() and not _days.has("default"):
+		_days["default"] = {"stints": [{"from": 8, "to": 18, "at": "work"}, {"from": 21, "to": 6, "at": "home"}]}
+
+
+## Where one of [param trade] is at [param hour] (0..24): one of PLACES,
+## from the clock alone, so a body spawned when a player walks up starts at
+## the right stint. In order: the temple day ([param day], the day's count
+## on the world clock, every so many days by [param worker_id]); the hidden
+## [param type]'s stints; the trade's stints (the default's for a trade not
+## listed), their edges moved by [param season]; else the square. The hour
+## is read on the resident's own clock, ahead of or behind the town's by
+## their offset (offset_hours at most, by the id).
+static func whereabouts(trade: String, hour: float, season := "", type := "", worker_id := "", day := -1) -> String:
+	var table := days()
+	var at := fposmod(hour - offset_of(worker_id), 24.0)
+	var temple: Dictionary = table.get("temple", {})
+	var every := int(temple.get("every_days", 0))
+	if day >= 0 and every > 0 and (day + absi(hash("temple:" + worker_id))) % every == 0 \
+			and _within(at, float(temple.get("from", 9)), float(temple.get("to", 10))):
+		return "temple"
+	for stint: Variant in table.get("types", {}).get(type, []):
+		if stint is Dictionary and _within(at, float(stint.get("from", 0)), float(stint.get("to", 0))):
+			return str(stint.get("at", "square"))
+	var edges: Dictionary = table.get("seasons", {}).get(season, {})
+	var morning := float(edges.get("morning", 0.0))
+	var evening := float(edges.get("evening", 0.0))
+	var day_of: Dictionary = table.get(trade, table["default"]) if table.get(trade) is Dictionary else table["default"]
+	for stint: Variant in day_of.get("stints", []):
+		if not stint is Dictionary:
+			continue
+		var from := float(stint.get("from", 0))
+		var to := float(stint.get("to", 0))
+		from = fposmod(from + (morning if from < 12.0 else evening), 24.0)
+		to = fposmod(to + (morning if to < 12.0 else evening), 24.0)
+		if _within(at, from, to):
+			return str(stint.get("at", "square"))
+	return "square"
+
+
+## How far resident [param worker_id]'s own clock runs ahead (+) or behind
+## the town's, in hours: within offset_hours, by the id; 0 for no id.
+static func offset_of(worker_id: String) -> float:
+	if worker_id.is_empty():
+		return 0.0
+	var most := float(days().get("offset_hours", 0.0))
+	return (float(absi(hash("clock:" + worker_id)) % 1000) / 999.0 * 2.0 - 1.0) * most
+
+
+## The day's count on the world clock at [param steps].
+static func day_of(steps: float) -> int:
+	return int(floor(steps / float(maxi(DayNight.day_steps, 1))))
+
+
+static func _within(hour: float, from: float, to: float) -> bool:
+	if from == to:
+		return false
+	return from <= hour and hour < to if from < to else hour >= from or hour < to

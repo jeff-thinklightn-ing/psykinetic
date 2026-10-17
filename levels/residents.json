@@ -1,9 +1,23 @@
 {
-	"_": "Each trade's day, for a resident's body in its town (decision 333): the hours (0-24, on DayNight's clock) it is at its work and at home; any other hour it is in the square. A span may run over midnight ([21, 6]). A trade not listed has the default's. Placeholders until Jeff and economy settle each trade's day.",
+	"_": "Each trade's day, for a resident's body in its town (decisions 333 and 404): stints of {from, to, at} on DayNight's clock (hours 0-24; a stint may run over midnight), 'at' one of work, home, square, well, inn, temple; any hour no stint covers is the square, and a place the town lacks (no inn, no well, no temple standing) is the square too. A trade not listed has the default's. 'work' is where the body stands, never when economy's job runs. offset_hours: each resident's own clock runs this far ahead or behind the town's at most, by worker id, so the town never moves in lockstep. types: a hidden type's stints, over the trade's where they overlap. seasons: the day's edges move: every boundary before noon by 'morning' hours, after by 'evening'. temple: every so many days (the day by worker id), this morning hour at the temple, when the town has one. Placeholders until Jeff and economy settle each trade's day.",
 	"hearsay": {"_": "What a resident keeps of what they hear (decision 378, Hearsay): at most max claims; the newest shown believed ones reach their voice; a claims ask per resident at most every claims_ticks; a claim against what they know is believed with chance max(0, (against[0] - intellect) / against[1]), one beyond it with beyond's; a line of fewer than min_words words is never weighed.",
 		"max": 8, "shown": 3, "claims_ticks": 150, "against": [7, 6], "beyond": [11, 10], "min_words": 4},
-	"default": {"work": [8, 18], "home": [21, 6]},
-	"smith": {"work": [7, 18], "home": [21, 6]},
-	"cook": {"work": [6, 15], "home": [20, 5]},
-	"carpenter": {"work": [7, 17], "home": [21, 6]}
+	"default": {"stints": [{"from": 6, "to": 7, "at": "well"}, {"from": 7, "to": 12, "at": "work"}, {"from": 12, "to": 13, "at": "inn"}, {"from": 13, "to": 18, "at": "work"}, {"from": 18, "to": 20, "at": "inn"}, {"from": 20, "to": 6, "at": "home"}]},
+	"smith": {"stints": [{"from": 6, "to": 7, "at": "well"}, {"from": 7, "to": 12, "at": "work"}, {"from": 12, "to": 13, "at": "inn"}, {"from": 13, "to": 18, "at": "work"}, {"from": 18, "to": 20, "at": "inn"}, {"from": 20, "to": 6, "at": "home"}]},
+	"cook": {"stints": [{"from": 5, "to": 6, "at": "well"}, {"from": 6, "to": 15, "at": "work"}, {"from": 15, "to": 17, "at": "square"}, {"from": 17, "to": 19, "at": "inn"}, {"from": 19, "to": 5, "at": "home"}]},
+	"carpenter": {"stints": [{"from": 6, "to": 7, "at": "well"}, {"from": 7, "to": 12, "at": "work"}, {"from": 12, "to": 13, "at": "square"}, {"from": 13, "to": 17, "at": "work"}, {"from": 17, "to": 20, "at": "inn"}, {"from": 20, "to": 6, "at": "home"}]},
+	"priest": {"stints": [{"from": 6, "to": 12, "at": "work"}, {"from": 12, "to": 13, "at": "square"}, {"from": 13, "to": 19, "at": "work"}, {"from": 19, "to": 21, "at": "square"}, {"from": 21, "to": 6, "at": "home"}]},
+	"guard": {"stints": [{"from": 6, "to": 14, "at": "work"}, {"from": 14, "to": 16, "at": "inn"}, {"from": 16, "to": 22, "at": "square"}, {"from": 22, "to": 6, "at": "home"}]},
+	"medicine_man": {"stints": [{"from": 6, "to": 7, "at": "square"}, {"from": 7, "to": 21, "at": "work"}, {"from": 21, "to": 6, "at": "home"}]},
+	"offset_hours": 0.75,
+	"types": {
+		"bard": [{"from": 18, "to": 23, "at": "inn"}],
+		"thief": [{"from": 22, "to": 1, "at": "square"}],
+		"scholar": [{"from": 9, "to": 10, "at": "temple"}]
+	},
+	"seasons": {
+		"winter": {"morning": 1.0, "evening": -1.0},
+		"summer": {"morning": -0.5, "evening": 1.0}
+	},
+	"temple": {"every_days": 7, "from": 9, "to": 10}
 }
