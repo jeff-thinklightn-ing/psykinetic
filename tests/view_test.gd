@@ -1487,6 +1487,12 @@ func _test_pine_stands() -> void:
 		if distance[cell] >= PineStands.FROM and not taken.has(cell):
 			holes += 1
 	_check(holes * 5 < taken.size(), "stands fill most of the band (%d cells in stands, %d trees between)" % [taken.size(), holes])
+	if Client3D._deadwood_drawn("tree.pine"):
+		var solo := 0
+		for cell: Vector2i in distance:
+			if distance[cell] >= PineStands.FROM and not taken.has(cell) and _rig._trees.has(cell) 					and str(_rig._trees[cell].get_meta("slot", "")) == "tree.pine":
+				solo += 1
+		_check(solo == holes, "the trees between them solo pines (%d of %d)" % [solo, holes])
 	var on_lane := 0
 	for cell: Vector2i in taken:
 		for dy in range(-1, 2):

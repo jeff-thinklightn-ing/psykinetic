@@ -7605,6 +7605,10 @@ approved the design.
   it never draws in play.
 - The single `tree.pine` slot stays for pines inside a map; stands are the
   border's only.
+- Amended (2026-10-17, once `tree.pine` had art of its own): a cell left
+  between stands takes a single `tree.pine` (`_add_tree`'s kind), so the
+  gaps read as more of the stand; broadleaf or small while the pine has
+  no art.
 
 Cost, map_bench windowed, before and after with the stand-in (about 400
 triangles a stand against the slot's 1,500), under the bench lock: the

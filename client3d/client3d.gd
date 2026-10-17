@@ -2986,7 +2986,9 @@ func _add_forest() -> void:
 		if away == 0 or stood.has(cell):
 			continue
 		if stands and away >= PineStands.FROM:
-			_add_tree(cell, 1.0)
+			# A solo pine between stands, once tree.pine has art: the holes
+			# read as more of the stand.
+			_add_tree(cell, 1.0, "tree.pine" if _deadwood_drawn("tree.pine") else "")
 			continue
 		# Trees in clumps: thick where the clump field is high, thin
 		# between; the first ring always, so the edge reads closed.
@@ -3526,9 +3528,11 @@ func _draw_glimpse(terrain: Dictionary) -> void:
 ## A tree slot on [param cell], sized by [param clump] (the biggest in a
 ## clump's heart) and by the cell, turned, leaning a little and set off its
 ## cell's middle, so every peer grows the same forest and no row shows.
-func _add_tree(cell: Vector2i, clump := 0.5) -> void:
-	var slot := "tree.broadleaf" if _roll(cell, 1) < 0.6 else "tree.small"
-	if _roll(cell, 59) < DEAD_TREE_CHANCE and _deadwood_drawn("tree.dead"):
+## [param kind] a slot to use (a solo pine between stands), else broadleaf
+## or small, now and then dead.
+func _add_tree(cell: Vector2i, clump := 0.5, kind := "") -> void:
+	var slot := kind if kind != "" else ("tree.broadleaf" if _roll(cell, 1) < 0.6 else "tree.small")
+	if kind == "" and _roll(cell, 59) < DEAD_TREE_CHANCE and _deadwood_drawn("tree.dead"):
 		slot = "tree.dead"
 	var tree := ArtKit.instance(slot, 1 + int(_roll(cell, 60) * maxi(1, ArtKit.variant_count(slot))))
 	tree.name = "Tree_%d_%d" % [cell.x, cell.y]
