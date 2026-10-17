@@ -7786,6 +7786,16 @@ lore's drafts until he confirms them.
 Rejected: a binding field on person entries (it would state guards, officials
 and bards into the world before A3, A4 or Jeff say they exist); the binding only
 derived (with the profiles still draft, every official would speak as townsfolk).
+Amended (Jeff, same day: "scoundrel, thieves, and bards isn't a profession might be
+more of a hidden personality type"): roles.json holds professions (trade ids, each
+with its binding and profile) and personality types (thief, bard, scoundrel,
+scholar, merchant, and steady, the default), which are hidden and never in a
+label. A person's profile is the profession's stats with the type's over them
+where it sets them, and both domains; the binding derives from that, so a
+thieving smith is free with a smith's domain, and a profession or type whose
+profile is still a draft stands on its binding. `Lore.profile(trade, type)`,
+`Lore.binding(trade, type)`, `Lore.types()`, and `known_by(..., type)` for the
+type's domain. Until the npc tree starts, lore owns the file's shape.
 ## 380. Archers' arrows come worn or whole
 
 Enemies drop their arrow bundles (Jeff, decision 375), and a player may swap

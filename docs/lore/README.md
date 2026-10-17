@@ -145,26 +145,36 @@ renders whatever its status now: a name given stays given.
 
 ## Roles
 
-`roles.json` is `{"_about": "...", "roles": [...]}` (decision 376): who is bound to
-lore facts, by Jeff's rule (`style.md`). A role is `{"id", "name", "binding",
-"status", "source"}`. `id` is a trade id shared with economy (`levels/economy.json`'s
-official jobs and buildings, `items.json`'s `made.by`), or a role with no job yet.
-`binding` is `official` (speaks only lore facts: priests, guards, the town's
-officials) or `free` (may embellish and lie, in character: bards, scoundrels,
-thieves). A trade not listed is `townsfolk`. A listed role says how such a person
-speaks, not that one exists. A person entry may name its `role`.
+`roles.json` (decision 376) says how people speak of the world, by Jeff's rule
+(`style.md`): `{"_about", "professions": [...], "types": [...], "default_type",
+"townsfolk"}`.
 
-A role's `profile` (Jeff) is `{"domain": [tags or entry ids], "superstition",
-"creativity", "intellect", "integrity", "status", "source"}`, each stat `low`,
-`mid` or `high`; the file's top-level `townsfolk` is the profile for a trade not
-listed. A profile's stats make a binding (creativity low and integrity high:
-official; creativity high or integrity low: free; else townsfolk), which must be
-the role's: lore_test checks. A role's knower knows the common facts and rumours
-on its domain wherever they are.
+- A **profession** is `{"id", "name", "binding", "status", "source", "profile"}`.
+  `id` is a trade id shared with economy (`levels/economy.json`'s official jobs and
+  buildings, `items.json`'s `made.by`), or one with no job yet. `binding` is Jeff's
+  word: `official` (speaks only lore facts: priests, guards, the town's officials,
+  the medicine man) or `free`.
+- A **personality type** (thief, bard, scoundrel, scholar, merchant, and `steady`,
+  the default) is hidden: never shown in a label, which names only the profession
+  ("Name [profession]", Jeff). It has the same fields, `binding` optional.
+- A **profile** is `{"domain": [tags or entry ids], "superstition", "creativity",
+  "intellect", "integrity", "status", "source"}`, each stat `low`, `mid` or `high`.
+  A profession sets every stat, a type only those it changes. The top-level
+  `townsfolk` is the profile for a trade not listed.
+- A person's profile is the profession's stats with the type's over them where it
+  sets them, and both domains. Its binding derives from the stats: creativity low
+  and integrity high is official, creativity high or integrity low is free, and
+  anything else is townsfolk. So a thieving smith is free, with a smith's domain.
+  A profession or type whose profile doesn't count yet stands on its `binding`.
+  lore_test checks every profile makes its binding.
+- Listing one says how such a person speaks, not that one exists. A person entry
+  may name its `role`.
 
-`Lore.binding(trade)` gives the binding, `"townsfolk"` when unlisted.
-`Lore.profile(trade)` gives `{domain, binding, words: {stat: word}}` and each stat
-as a number (low 2, mid 5, high 8), or `{}` when the profile doesn't count yet.
-`Lore.knower_for(trade)` gives the knower to ask `known_by` for: the trade's own
-knower when there is one (`priest`, `guard`), else `townsfolk`. What a resident
-hears and believes is that resident's, kept by companions, never a fact here.
+`Lore.binding(trade, type)` gives the binding. `Lore.profile(trade, type)` gives
+`{domain, binding, words: {stat: word}}` and each stat as a number (low 2, mid 5,
+high 8), or `{}` when no profile counts yet. `Lore.types()` lists the types that
+count, to roll from. `Lore.knower_for(trade)` gives the knower to ask `known_by`
+for: the trade's own (`priest`, `guard`, `medicine_man`), else `townsfolk`;
+`Lore.known_by(knower, about, least, type)` adds the type's domain. What a
+resident hears and believes is that resident's, kept by companions, never a fact
+here.

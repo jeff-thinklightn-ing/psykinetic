@@ -1,6 +1,6 @@
 {
-	"_about": "Who is bound to lore facts, by trade (docs/lore/README.md; decision 376). An official speaks only lore facts; a free one may embellish and lie, in character; anyone unlisted is townsfolk, who do not make things up but keep what they hear. Ids are economy's trade ids (levels/economy.json, items.json made.by), or a role with no job yet. A listed role says how such a person speaks, not that one exists. Each binding is Jeff's word; a profile (Jeff, 2026-10-17) gives the role's domain (the lore tags or entry ids it knows wherever they are) and its superstition, creativity, intellect and integrity, low, mid or high, and must make the same binding. Read by Lore.binding, profile and known_by.",
-	"roles": [
+	"_about": "How people speak of the world (docs/lore/README.md; decision 376). A profession (economy's trade ids, or one with no job yet) gives a profile: a domain (lore tags or entry ids known wherever they are) and superstition, creativity, intellect and integrity, low, mid or high. A personality type (hidden, never in a label: Jeff, 2026-10-17) changes the stats it sets and adds its domain. Creativity low and integrity high speak only lore facts (official); creativity high or integrity low may embellish and lie, in character (free); anything else is townsfolk, who make nothing up but keep what they hear. A profession not listed has the townsfolk profile; a person with no type is steady. A binding is Jeff's word and a profile must make the same one. Listing one says how such a person speaks, not that one exists. Read by Lore.profile, binding and known_by.",
+	"professions": [
 		{"id": "priest", "name": "a priest", "binding": "official", "status": "agreed", "source": "Jeff",
 			"profile": {"domain": ["faith", "return"], "superstition": "high", "creativity": "low", "intellect": "mid", "integrity": "high", "status": "draft", "source": "lore"}},
 		{"id": "guard", "name": "a guard", "binding": "official", "status": "agreed", "source": "Jeff",
@@ -8,14 +8,22 @@
 		{"id": "official", "name": "one of the town's officials", "binding": "official", "status": "agreed", "source": "Jeff",
 			"profile": {"domain": ["town", "law"], "superstition": "low", "creativity": "low", "intellect": "mid", "integrity": "high", "status": "draft", "source": "lore"}},
 		{"id": "medicine_man", "name": "a medicine man", "binding": "official", "status": "agreed", "source": "Jeff",
-			"profile": {"domain": ["nature"], "superstition": "high", "creativity": "low", "intellect": "high", "integrity": "high", "status": "agreed", "source": "Jeff"}},
-		{"id": "bard", "name": "a bard", "binding": "free", "status": "agreed", "source": "Jeff",
-			"profile": {"domain": ["history"], "superstition": "mid", "creativity": "high", "intellect": "mid", "integrity": "mid", "status": "draft", "source": "lore"}},
-		{"id": "scoundrel", "name": "a scoundrel", "binding": "free", "status": "agreed", "source": "Jeff",
-			"profile": {"domain": [], "superstition": "mid", "creativity": "mid", "intellect": "mid", "integrity": "low", "status": "draft", "source": "lore"}},
-		{"id": "thief", "name": "a thief", "binding": "free", "status": "agreed", "source": "Jeff",
-			"profile": {"domain": ["commerce", "goods"], "superstition": "low", "creativity": "high", "intellect": "low", "integrity": "low", "status": "draft", "source": "Jeff",
-				"_note": "domain, creativity and integrity are Jeff's; superstition and intellect low are lore's reading of his 'opposite', asked"}}
+			"profile": {"domain": ["nature"], "superstition": "high", "creativity": "low", "intellect": "high", "integrity": "high", "status": "agreed", "source": "Jeff"}}
 	],
+	"types": [
+		{"id": "steady", "name": "steady", "status": "draft", "source": "lore",
+			"profile": {"domain": [], "status": "draft", "source": "lore"}},
+		{"id": "thief", "name": "a thief", "binding": "free", "status": "agreed", "source": "Jeff",
+			"profile": {"domain": ["commerce", "goods"], "creativity": "high", "integrity": "low", "status": "agreed", "source": "Jeff"}},
+		{"id": "bard", "name": "a bard", "binding": "free", "status": "agreed", "source": "Jeff",
+			"profile": {"domain": ["history"], "superstition": "mid", "creativity": "high", "integrity": "mid", "status": "draft", "source": "lore"}},
+		{"id": "scoundrel", "name": "a scoundrel", "binding": "free", "status": "agreed", "source": "Jeff",
+			"profile": {"domain": [], "integrity": "low", "status": "draft", "source": "lore"}},
+		{"id": "scholar", "name": "a scholar", "status": "draft", "source": "Jeff",
+			"profile": {"domain": ["history"], "creativity": "low", "intellect": "high", "status": "draft", "source": "lore"}},
+		{"id": "merchant", "name": "a merchant", "status": "draft", "source": "Jeff",
+			"profile": {"domain": ["commerce", "goods"], "status": "draft", "source": "lore"}}
+	],
+	"default_type": "steady",
 	"townsfolk": {"domain": [], "superstition": "mid", "creativity": "low", "intellect": "mid", "integrity": "mid", "status": "draft", "source": "lore"}
 }

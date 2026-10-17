@@ -18,9 +18,11 @@ extends RefCounted
 ## gate. Items stores a name as {form, holder, ...} and render_name fills it
 ## at display time, so a reforged thing keeps its name with its new word.
 ##
-## roles.json (decision 376) says who is bound to lore facts, by trade id:
-## an official speaks only what it knows here, a free one (a bard, a thief)
-## may embellish and lie in character, and anyone unlisted is townsfolk.
+## roles.json (decision 376) says who is bound to lore facts: professions by
+## trade id and hidden personality types, each a profile whose stats make
+## the binding. An official speaks only what it knows here, a free one (a
+## thieving smith, a bard) may embellish and lie in character, and anyone
+## else is townsfolk.
 
 const DIR := "res://levels/lore/"
 const FILES := ["world", "factions", "regions", "materials", "people", "history"]
@@ -47,7 +49,9 @@ static var _knowers: Dictionary = {}
 static var _forms: Array = []
 static var _things: Array = []
 static var _names_read := false
-static var _roles: Dictionary = {}
+static var _professions: Dictionary = {}
+static var _types: Dictionary = {}
+static var _default_type := "steady"
 static var _roles_read := false
 
 
@@ -71,7 +75,8 @@ static func reload() -> void:
 	_forms = []
 	_things = []
 	_names_read = false
-	_roles = {}
+	_professions = {}
+	_types = {}
 	_townsfolk = {}
 	_roles_read = false
 
@@ -97,14 +102,14 @@ static func use(entry_list: Array, knower_list: Array, form_list := [], thing_li
 ## DEFAULT_WEIGHT). [param about], when given, keeps the facts on any of
 ## those topics (_about). [param least] is "agreed" (what code uses) or
 ## "draft" (to preview drafts).
-static func known_by(knower: String, about := PackedStringArray(), least := "agreed") -> Array[Dictionary]:
+static func known_by(knower: String, about := PackedStringArray(), least := "agreed", type := "") -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var who: Dictionary = knowers().get(knower, {})
 	if who.is_empty() or not _counts(str(who.get("status", "")), least):
 		return out
 	var where: Array = who.get("where", [])
 	var tags: Array = who.get("tags", [])
-	var domain := PackedStringArray(profile(knower, least).get("domain", []) if _roles_has(knower) else [])
+	var domain := PackedStringArray(profile(knower, type, least).get("domain", []) if _knows_as_role(knower, type) else [])
 	for id: String in entries():
 		var entry: Dictionary = _entries[id]
 		var entry_status := str(entry.get("status", ""))
@@ -177,34 +182,55 @@ static func render_name(name: Dictionary, item_id: String, tags := PackedStringA
 	return text
 
 
-## How [param trade] is bound to lore facts: "official" (speaks only what it
-## knows here), "free" (may embellish and lie, in character) or "townsfolk"
-## (unlisted, or listed but not counting under [param least]).
-static func binding(trade: String, least := "agreed") -> String:
+## How someone of [param trade] (and of personality [param type], none
+## for the steady default) is bound to lore facts: "official" (speaks only
+## what it knows here), "free" (may embellish and lie, in character) or
+## "townsfolk". It derives from their stats (derived_binding); a profession
+## or type whose profile does not count yet stands on its binding, Jeff's
+## word, so a draft profile never turns an official into townsfolk.
+static func binding(trade: String, type := "", least := "agreed") -> String:
 	_load_roles()
-	var role: Dictionary = _roles.get(trade, {})
-	if role.is_empty() or not _counts(str(role.get("status", "")), least):
-		return TOWNSFOLK
-	return str(role.get("binding", TOWNSFOLK))
+	var words := _layer(_professions.get(trade, {}), least, true)
+	if not _professions.has(trade):
+		words = _counted(_townsfolk, least)
+	words.merge(_layer(_types.get(_type_of(type), {}), least, true), true)
+	return derived_binding(words) if not words.is_empty() else TOWNSFOLK
 
 
-## [param trade]'s profile: {domain, binding, words: {stat: "low" | "mid" |
-## "high"}} and each of STATS as its number (LEVELS), the townsfolk's for a
-## trade not listed, or {} when the profile does not count under
-## [param least] (economy then rolls a plain resident). A listed role's
-## binding is Jeff's word; lore_test holds its profile to it.
-static func profile(trade: String, least := "agreed") -> Dictionary:
+## The profile of someone of [param trade] and personality [param type]:
+## {domain, binding, words: {stat: "low" | "mid" | "high"}} and each of
+## STATS as its number (LEVELS). The profession's stats (the townsfolk's
+## for a trade not listed), then the type's where it sets them, else mid;
+## the domain is both. {} when neither profile counts under [param least]
+## (economy then rolls a plain resident). The type is hidden: never shown.
+static func profile(trade: String, type := "", least := "agreed") -> Dictionary:
 	_load_roles()
-	var role: Dictionary = _roles.get(trade, {})
-	var shown: Dictionary = role.get("profile", {}) if not role.is_empty() else _townsfolk
-	if shown.is_empty() or not _counts(str(shown.get("status", "")), least):
+	var base: Dictionary = _professions[trade].get("profile", {}) if _professions.has(trade) else _townsfolk
+	var base_words := _counted(base, least)
+	var kind: Dictionary = _types.get(_type_of(type), {}).get("profile", {})
+	var kind_words := _counted(kind, least)
+	if base_words.is_empty() and kind_words.is_empty():
 		return {}
-	var out := {"domain": shown.get("domain", []).duplicate(),
-			"binding": binding(trade, least) if not role.is_empty() else TOWNSFOLK, "words": {}}
+	var out := {"domain": [], "binding": binding(trade, type, least), "words": {}}
+	for shown: Dictionary in [base, kind]:
+		if _counts(str(shown.get("status", "")), least):
+			for topic: Variant in shown.get("domain", []):
+				if not topic in out["domain"]:
+					out["domain"].append(topic)
 	for stat: String in STATS:
-		var word := str(shown.get(stat, "mid"))
+		var word := str(kind_words.get(stat, base_words.get(stat, "mid")))
 		out["words"][stat] = word
 		out[stat] = LEVELS.get(word, LEVELS["mid"])
+	return out
+
+
+## The personality types that count under [param least], to roll from.
+static func types(least := "agreed") -> PackedStringArray:
+	_load_roles()
+	var out := PackedStringArray()
+	for id: String in _types:
+		if _counts(str(_types[id].get("status", "")), least):
+			out.append(id)
 	return out
 
 
@@ -227,15 +253,49 @@ static func knower_for(trade: String) -> String:
 	return trade if knowers().has(trade) else TOWNSFOLK
 
 
-## Uses [param role_list] (and [param townsfolk], the profile for a trade
-## not listed) in place of roles.json (tests).
-static func use_roles(role_list: Array, townsfolk := {}) -> void:
-	_roles = {}
+## Uses these professions and types (and [param townsfolk], the profile for
+## a trade not listed) in place of roles.json (tests).
+static func use_roles(profession_list: Array, type_list := [], townsfolk := {}, default_type := "steady") -> void:
+	_professions = {}
+	_types = {}
 	_townsfolk = townsfolk
-	for role: Variant in role_list:
-		if role is Dictionary and role.get("id") is String:
-			_roles[role["id"]] = role
+	_default_type = default_type
+	for each: Variant in profession_list:
+		if each is Dictionary and each.get("id") is String:
+			_professions[each["id"]] = each
+	for each: Variant in type_list:
+		if each is Dictionary and each.get("id") is String:
+			_types[each["id"]] = each
 	_roles_read = true
+
+
+## A profile's stats as set (only those it sets), when it counts.
+static func _counted(shown: Dictionary, least: String) -> Dictionary:
+	var out := {}
+	if _counts(str(shown.get("status", "")), least):
+		for stat: String in STATS:
+			if shown.has(stat):
+				out[stat] = str(shown[stat])
+	return out
+
+
+## [param role]'s stats for its binding: its profile's when that counts,
+## else (with [param stand_on_binding]) the stats its binding stands for.
+static func _layer(role: Dictionary, least: String, stand_on_binding: bool) -> Dictionary:
+	if role.is_empty() or not _counts(str(role.get("status", "")), least):
+		return {}
+	var words := _counted(role.get("profile", {}), least)
+	if words.is_empty() and stand_on_binding:
+		match str(role.get("binding", "")):
+			"official":
+				words = {"creativity": "low", "integrity": "high"}
+			"free":
+				words = {"creativity": "high"}
+	return words
+
+
+static func _type_of(type: String) -> String:
+	return type if not type.is_empty() else _default_type
 
 
 ## Whether [param fact] (in [param entry]) is on one of the topics in
@@ -297,15 +357,18 @@ static func _load_roles() -> void:
 		return
 	_roles_read = true
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(DIR + "roles.json"))
-	if data is not Dictionary or data.get("roles") is not Array:
-		push_warning("Lore: %sroles.json has no roles list" % DIR)
+	if data is not Dictionary or data.get("professions") is not Array or data.get("types") is not Array:
+		push_warning("Lore: %sroles.json has no professions and types lists" % DIR)
 		return
-	use_roles(data["roles"], data.get("townsfolk", {}) if data.get("townsfolk") is Dictionary else {})
+	use_roles(data["professions"], data["types"], data.get("townsfolk", {}) if data.get("townsfolk") is Dictionary else {},
+			str(data.get("default_type", "steady")))
 
 
-static func _roles_has(trade: String) -> bool:
+## Whether [param knower] knows by a profile's domain: a profession's
+## knower, or anyone given a personality type.
+static func _knows_as_role(knower: String, type: String) -> bool:
 	_load_roles()
-	return _roles.has(trade)
+	return _professions.has(knower) or not type.is_empty()
 
 
 static func _load_names() -> void:

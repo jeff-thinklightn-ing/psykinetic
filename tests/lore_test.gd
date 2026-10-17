@@ -288,89 +288,107 @@ func _test_names() -> void:
 
 
 func _test_roles_file() -> void:
-	print("\n== roles.json: who is bound to lore facts, by economy's trade ids (decision 376) ==")
+	print("\n== roles.json: professions by economy's trade ids, hidden personality types (decision 376) ==")
 	var data: Variant = _read("roles")
-	_check(data is Dictionary and data.get("roles") is Array, "roles.json is {roles: [...]}")
+	_check(data is Dictionary and data.get("professions") is Array and data.get("types") is Array, "roles.json is {professions: [...], types: [...]}")
 	if not data is Dictionary:
 		return
 	var trades := _trades()
 	var bad: Array = []
 	var ids := {}
 	var jobless: Array = []
-	for role in data.get("roles", []):
-		var id: Variant = role.get("id")
-		if not (_is_id(id) and not ids.has(id) and role.get("binding") in Lore.BINDINGS and role.get("name") is String
-				and _status_ok(role) and role.get("source") is String):
-			bad.append(id)
-		ids[id] = true
-		if not trades.has(id):
-			jobless.append(id)
-	_check(bad.is_empty(), "every role is well formed, its binding one of %s %s" % [Lore.BINDINGS, bad])
-	bad = []
-	var profiles: Array = data.get("roles", []).map(func(role: Dictionary) -> Array: return [role.get("id"), role.get("profile"), role.get("binding")])
-	profiles.append(["townsfolk", data.get("townsfolk"), Lore.TOWNSFOLK])
-	for each in profiles:
-		var shown: Variant = each[1]
-		var ok: bool = shown is Dictionary and shown.get("domain") is Array and _status_ok(shown) and shown.get("source") is String
-		for stat in Lore.STATS:
-			ok = ok and shown is Dictionary and shown.get(stat) in Lore.LEVELS
-		# A role's binding is Jeff's word; its profile must make the same one.
-		if not ok or Lore.derived_binding(shown) != each[2]:
-			bad.append(each[0])
-	_check(bad.is_empty(), "every role and the townsfolk have a profile (domain, %s each %s) that makes its binding %s" % [Lore.STATS, Lore.LEVELS.keys(), bad])
-	print("  (roles with no job yet: %s)" % [jobless])
+	for list in ["professions", "types"]:
+		for role in data.get(list, []):
+			var id: Variant = role.get("id")
+			var shown: Variant = role.get("profile")
+			var ok: bool = _is_id(id) and not ids.has(id) and role.get("name") is String and _status_ok(role) \
+					and role.get("source") is String and (not role.has("binding") or role["binding"] in Lore.BINDINGS) \
+					and (list == "types" or role.has("binding"))
+			ok = ok and shown is Dictionary and shown.get("domain") is Array and _status_ok(shown) and shown.get("source") is String
+			for stat in Lore.STATS:
+				# A profession sets every stat; a type only those it changes.
+				ok = ok and shown is Dictionary and (shown.get(stat) in Lore.LEVELS or (list == "types" and not shown.has(stat)))
+			# A binding is Jeff's word: the profile (a type's over a plain mid one) must make it.
+			if ok and role.has("binding") and Lore.derived_binding(shown) != role["binding"]:
+				ok = false
+			ids[id] = true
+			if not ok:
+				bad.append(id)
+			if list == "professions" and not trades.has(id):
+				jobless.append(id)
+	var plain: Variant = data.get("townsfolk")
+	var plain_ok: bool = plain is Dictionary and _status_ok(plain) and Lore.derived_binding(plain) == Lore.TOWNSFOLK
+	for stat in Lore.STATS:
+		plain_ok = plain_ok and plain is Dictionary and plain.get(stat) in Lore.LEVELS
+	_check(bad.is_empty() and plain_ok, "every profession, type and the townsfolk have a well formed profile that makes its binding %s" % [bad])
+	_check(data.get("default_type") in data.get("types", []).map(func(role: Dictionary) -> Variant: return role.get("id")), "the default type is a type")
+	print("  (professions with no job yet: %s)" % [jobless])
 	bad = []
 	for id in _entries:
 		var role: Variant = _entries[id].get("role")
 		if role != null and not (ids.has(role) or trades.has(role)):
 			bad.append(id)
-	_check(bad.is_empty(), "an entry's role is a listed role or a trade %s" % [bad])
+	_check(bad.is_empty(), "an entry's role is a listed profession or a trade %s" % [bad])
 	Lore.reload()
-	_check(Lore.binding("priest") == "official" and Lore.binding("bard") == "free" and Lore.binding("hauler") == Lore.TOWNSFOLK,
-			"on the files: a priest is official, a bard free, a hauler (unlisted) townsfolk")
+	_check(Lore.binding("priest") == "official" and Lore.binding("hauler") == Lore.TOWNSFOLK and Lore.binding("hauler", "thief") == "free",
+			"on the files: a priest is official, a hauler townsfolk, a thieving hauler free")
+	_check(Lore.binding("priest", "thief") == "free", "a thieving priest may lie")
 	_check(Lore.knower_for("priest") == "priest" and Lore.knower_for("hauler") == "townsfolk", "a priest knows as a priest; a hauler as the townsfolk")
 	var healer := Lore.profile("medicine_man")
 	_check(healer.get("intellect") == 8 and healer.get("creativity") == 2 and healer["words"]["superstition"] == "high"
 			and healer["domain"] == ["nature"] and healer["binding"] == "official", "on the files: Jeff's medicine man, as words and numbers %s" % [healer])
+	var thieving := Lore.profile("medicine_man", "thief")
+	_check(thieving["integrity"] == 2 and thieving["creativity"] == 8 and thieving["intellect"] == 8 and thieving["domain"] == ["nature", "commerce", "goods"]
+			and thieving["binding"] == "free", "a thieving medicine man: the type's stats over his, both domains %s" % [thieving])
+	_check("thief" in Lore.types() and not "steady" in Lore.types(), "Lore.types lists the agreed types (Jeff's thief, not the draft steady) %s" % [Lore.types()])
 
 
 func _test_roles() -> void:
-	print("\n== Lore.binding: the status gate, townsfolk by default ==")
-	Lore.use_roles([
-		{"id": "reeve", "binding": "official", "status": "agreed"},
-		{"id": "liar", "binding": "free", "status": "draft"},
-		{"id": "maybe", "binding": "official", "status": "asked", "ask": "X"},
-	])
-	_check(Lore.binding("reeve") == "official" and Lore.binding("nobody") == Lore.TOWNSFOLK, "a listed role's binding; townsfolk when unlisted")
-	_check(Lore.binding("liar") == Lore.TOWNSFOLK and Lore.binding("liar", "draft") == "free", "a draft role counts only when previewed")
-	_check(Lore.binding("maybe", "draft") == Lore.TOWNSFOLK, "an asked role never counts")
+	print("\n== Lore.binding and profile: professions, types, the status gate ==")
 	var plain := {"domain": [], "superstition": "mid", "creativity": "low", "intellect": "mid", "integrity": "mid", "status": "draft"}
 	Lore.use_roles([
-		{"id": "sage", "binding": "official", "status": "agreed", "profile": {"domain": ["history"], "superstition": "low",
+		{"id": "reeve", "binding": "official", "status": "agreed", "profile": {"domain": ["law"], "superstition": "low",
 				"creativity": "low", "intellect": "high", "integrity": "high", "status": "agreed"}},
-		{"id": "liar", "binding": "free", "status": "agreed", "profile": {"domain": ["a"], "creativity": "high", "status": "draft"}},
+		{"id": "porter", "binding": "official", "status": "agreed", "profile": {"domain": ["a"], "creativity": "low", "integrity": "high",
+				"superstition": "mid", "intellect": "mid", "status": "draft"}},
+		{"id": "maybe", "binding": "official", "status": "asked", "ask": "X", "profile": {"status": "asked", "ask": "X"}},
+	], [
+		{"id": "steady", "status": "agreed", "profile": {"domain": [], "status": "agreed"}},
+		{"id": "liar", "binding": "free", "status": "agreed", "profile": {"domain": ["b"], "integrity": "low", "status": "agreed"}},
+		{"id": "dreamer", "binding": "free", "status": "agreed", "profile": {"domain": [], "creativity": "high", "status": "draft"}},
 	], plain)
-	_check(Lore.profile("sage")["intellect"] == 8 and Lore.profile("sage")["binding"] == "official", "an agreed profile: numbers and the binding")
-	_check(Lore.profile("liar").is_empty() and Lore.profile("liar", "draft")["superstition"] == 5, "a draft profile counts only when previewed, a missing stat mid")
-	_check(Lore.profile("hauler").is_empty() and Lore.profile("hauler", "draft")["binding"] == Lore.TOWNSFOLK, "an unlisted trade has the townsfolk's profile")
+	_check(Lore.binding("reeve") == "official" and Lore.binding("nobody") == Lore.TOWNSFOLK, "a profession's binding; townsfolk when unlisted")
+	_check(Lore.binding("porter") == "official", "a profession whose profile is a draft stands on its binding")
+	_check(Lore.binding("maybe", "", "draft") == Lore.TOWNSFOLK, "an asked profession never counts")
+	_check(Lore.binding("reeve", "liar") == "free" and Lore.binding("nobody", "dreamer") == "free", "a type that may lie makes anyone free, its profile counted or its binding")
+	var reeve := Lore.profile("reeve", "liar")
+	_check(reeve["integrity"] == 2 and reeve["intellect"] == 8 and reeve["domain"] == ["law", "b"], "a type's stats over the profession's where set; both domains %s" % [reeve])
+	_check(Lore.profile("porter").is_empty() and Lore.profile("porter", "", "draft")["superstition"] == 5, "a draft profile counts only when previewed")
+	_check(Lore.profile("nobody").is_empty() and Lore.profile("nobody", "", "draft")["binding"] == Lore.TOWNSFOLK, "an unlisted trade has the townsfolk's profile")
+	_check(Lore.profile("nobody", "liar")["integrity"] == 2 and Lore.profile("nobody", "liar")["creativity"] == 5, "a type alone: its stats, the rest mid")
 	_check(Lore.derived_binding({"creativity": "low", "integrity": "high"}) == "official" and Lore.derived_binding({"creativity": "high", "integrity": "high"}) == "free"
 			and Lore.derived_binding({"integrity": "low"}) == "free" and Lore.derived_binding({"creativity": "low"}) == Lore.TOWNSFOLK,
 			"low creativity and high integrity speak only lore; high creativity or low integrity may make things up; else townsfolk")
+	_check(Lore.types() == PackedStringArray(["steady", "liar", "dreamer"]), "the types that count, to roll from")
 	Lore.use([
 		{"id": "near", "type": "region", "status": "agreed", "facts": []},
 		{"id": "far", "type": "region", "status": "agreed", "facts": []},
-		{"id": "a", "status": "agreed", "tags": [], "facts": [
-			{"id": "a.old", "text": "old", "known": "common", "where": ["far"], "tags": ["history"]},
-			{"id": "a.far", "text": "far", "known": "common", "where": ["far"]},
-			{"id": "a.hid", "text": "hid", "known": "secret", "where": [], "knowers": ["folk"]},
+		{"id": "law", "status": "agreed", "tags": [], "facts": [
+			{"id": "law.old", "text": "old", "known": "common", "where": ["far"]},
+		]},
+		{"id": "b", "status": "agreed", "tags": [], "facts": [
+			{"id": "b.far", "text": "far", "known": "common", "where": ["far"]},
+			{"id": "b.hid", "text": "hid", "known": "secret", "where": [], "knowers": ["folk"]},
 		]},
 	], [
-		{"id": "sage", "status": "agreed", "where": ["near"], "tags": []},
-		{"id": "liar", "status": "agreed", "where": ["near"], "tags": []},
+		{"id": "reeve", "status": "agreed", "where": ["near"], "tags": []},
+		{"id": "townsfolk", "status": "agreed", "where": ["near"], "tags": []},
 	])
-	var sage := Lore.known_by("sage").map(func(fact: Dictionary) -> String: return fact["id"])
-	_check(sage == ["a.old"], "a role knows what is on its domain wherever it is, not the rest elsewhere, nor others' secrets %s" % [sage])
-	_check(Lore.known_by("liar").is_empty() and Lore.known_by("liar", PackedStringArray(), "draft").size() == 2, "a draft profile's domain counts only when previewed")
+	var known := func(knower: String, type := "") -> Array:
+		return Lore.known_by(knower, PackedStringArray(), "agreed", type).map(func(fact: Dictionary) -> String: return fact["id"])
+	_check(known.call("reeve") == ["law.old"], "a profession knows what is on its domain wherever it is, not others' secrets %s" % [known.call("reeve")])
+	_check(known.call("reeve", "liar") == ["law.old", "b.far"] and known.call("townsfolk", "liar") == ["b.far"], "a type adds its domain %s" % [known.call("reeve", "liar")])
+	_check(known.call("townsfolk").is_empty(), "plain townsfolk know only their home's")
 	Lore.reload()
 
 
