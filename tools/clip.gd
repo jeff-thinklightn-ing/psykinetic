@@ -90,7 +90,8 @@ extends Node
 ##     says each bed's level every second.
 ##   sound_music: the music (decision 377), outdoors: a phrase by day, the
 ##     night layer, then an imp: tension rises as it hunts and fights you (the
-##     danger stinger), and falls once it is stunned; then the dungeon's
+##     danger stinger), and falls once it is stunned; then a temple's
+##     ground, the dungeon's
 ##     layer, and each stinger. The log says each layer's level, the tension
 ##     and the phrase every second.
 ##   sound_combat: a fight's sounds by weapon: a sword's blade, a hammer's
@@ -1178,6 +1179,9 @@ func _sound_music() -> void:
 		["wait", 120, ""],
 		["sound_music", "calm", "The imp stunned: tension holds a moment, then falls slowly."],
 		["wait", 170, ""],
+		["sound_music", "temple", "Beside a temple: its own ground."],
+		["sound_music", "phrase", ""],
+		["wait", 100, ""],
 		["sound_music", "dungeon", "Under stone: the dungeon's layer."],
 		["wait", 100, ""],
 		["sound_music", "discovery", "Stingers: a level's first visit..."],
@@ -1401,7 +1405,11 @@ func _on_tick(tick: int) -> void:
 					_monster.stunned_until_tick = 1 << 30
 					_monster.alert = Monster.Alert.IDLE
 				"dungeon":
+					_main._client3d._terrain["buildings"] = []
 					_main._client3d._terrain["zone"] = "dungeon"
+				"temple":
+					# A temple's walls round where the player stands (the clip's map has none).
+					_main._client3d._terrain["buildings"] = [{"slot": "building.temple", "rect": Rect2i(_player.tile - Vector2i(1, 1), Vector2i(3, 3))}]
 				_:
 					music._last_sting = -INF  # The clip shows each, whatever played last.
 					music.sting(str(step[1]))

@@ -51,7 +51,14 @@ const STING_SAME := 120.0
 const WEIGH_EVERY := 0.25
 ## Below this weight a layer is stopped.
 const SILENT := 0.01
-const ZONES: Array[String] = ["town", "wilds", "dungeon"]
+const ZONES: Array[String] = ["town", "wilds", "dungeon", "temple"]
+## Zones with no night layer (under stone, in a temple), and with no melody.
+const NO_NIGHT: Array[String] = ["dungeon", "temple"]
+const NO_MELODY: Array[String] = ["temple"]
+## A temple's layer: full within TEMPLE_NEAR cells of one, gone by TEMPLE_FAR
+## (Chebyshev, from its walls); it is the zone from half way.
+const TEMPLE_NEAR := 3.0
+const TEMPLE_FAR := 8.0
 const STINGS: Array[String] = ["discovery", "danger", "death", "victory"]
 
 ## Levels (World.zone's names) been in this session: a stinger on the
@@ -148,10 +155,13 @@ static func may_sting(kind: String, now: float, last: float, last_of: Dictionary
 
 
 ## The music zone for the terrain's [param zone] ("outdoors", "indoors",
-## "cave", "dungeon") and [param town] (0..1, Ambience's nearness).
-static func zone_of(zone: String, town: float) -> String:
+## "cave", "dungeon"), [param town] (0..1, Ambience's nearness) and
+## [param temple] (0..1, temple_nearness).
+static func zone_of(zone: String, town: float, temple := 0.0) -> String:
 	if zone in ["cave", "dungeon"]:
 		return "dungeon"
+	if temple >= 0.5:
+		return "temple"
 	return "town" if zone == "indoors" or town >= 0.5 else "wilds"
 
 
@@ -198,8 +208,9 @@ static func weights(zone: String, day: float, level_tension: float, in_phrase: b
 	var out := {}
 	for name: String in ZONES:
 		out["music.%s_base" % name] = 0.0
-		out["music.melody_" + name] = 0.0
-		if name != "dungeon":
+		if name not in NO_MELODY:
+			out["music.melody_" + name] = 0.0
+		if name not in NO_NIGHT:
 			out["music.%s_night" % name] = 0.0
 	out["music.tension_low"] = 0.0
 	out["music.tension_high"] = 0.0
@@ -209,12 +220,12 @@ static func weights(zone: String, day: float, level_tension: float, in_phrase: b
 	if not in_phrase and level_tension <= 0.0:
 		return out
 	var ground := 1.0 - 0.5 * level_tension
-	if zone == "dungeon":
-		out["music.dungeon_base"] = ground
+	if zone in NO_NIGHT:
+		out["music.%s_base" % zone] = ground
 	else:
 		out["music.%s_base" % zone] = ground * clampf(day, 0.0, 1.0)
 		out["music.%s_night" % zone] = ground * (1.0 - clampf(day, 0.0, 1.0))
-	if in_phrase:
+	if in_phrase and zone not in NO_MELODY:
 		out["music.melody_" + zone] = 0.8 * clampf(1.0 - (level_tension - 0.25) / 0.25, 0.0, 1.0)
 	return out
 
@@ -264,9 +275,23 @@ func _weigh(delta: float) -> void:
 	var day := clampf((DayNight.daylight(steps) - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
 	var terrain_zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
 	var town: float = view.ambience._town_nearness(cell) if view.ambience != null else 0.0
-	targets.assign(by_take(weights(zone_of(terrain_zone, town), day, tension, phrase_on)))
+	targets.assign(by_take(weights(zone_of(terrain_zone, town, temple_nearness(view._terrain.get("buildings", []), cell)), day, tension, phrase_on)))
 	if view.ambience != null:
 		view.ambience.duck_db = AMBIENCE_DUCK_DB * clampf((tension - 0.5) / 0.5, 0.0, 1.0)
+
+
+## 0..1: how near [param cell] is to a temple among [param buildings]
+## (the terrain's: slot building.temple, rect).
+static func temple_nearness(buildings: Array, cell: Vector2i) -> float:
+	var nearest := INF
+	for building: Dictionary in buildings:
+		if str(building.get("slot", "")) != "building.temple" or not building.get("rect") is Rect2i:
+			continue
+		var rect: Rect2i = building["rect"]
+		var dx := maxi(0, maxi(rect.position.x - cell.x, cell.x - rect.end.x + 1))
+		var dy := maxi(0, maxi(rect.position.y - cell.y, cell.y - rect.end.y + 1))
+		nearest = minf(nearest, maxf(dx, dy))
+	return clampf((TEMPLE_FAR - nearest) / (TEMPLE_FAR - TEMPLE_NEAR), 0.0, 1.0)
 
 
 ## [param wanted]'s weights summed by the slot each plays from

@@ -1130,6 +1130,14 @@
 			"volume_db": -12.0,
 			"uses": "a dungeon or cave: a sparse melodic layer over the ground, out when tension is high (Music)"
 		},
+		"music.temple_base": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": -10.0,
+			"uses": "in or beside a temple: a held, organ-like ground, in phrases (Music, zone_of)"
+		},
 		"music.tension_low": {
 			"category": "music",
 			"type": "bed",

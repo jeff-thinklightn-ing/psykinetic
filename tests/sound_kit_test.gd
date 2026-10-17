@@ -247,7 +247,16 @@ func _test_music() -> void:
 		if slot.begins_with("music."):
 			_check(not SoundKit.positional(slot) and str(SoundKit.spec(slot).get("bus")) == "music", "%s: flat, on Music" % slot)
 	for zone: String in Music.ZONES:
-		_check(SoundKit.has("music.%s_base" % zone) and SoundKit.has("music.melody_" + zone), "%s has a base and a melody" % zone)
+		_check(SoundKit.has("music.%s_base" % zone) and (zone in Music.NO_MELODY or SoundKit.has("music.melody_" + zone)),
+				"%s has a base, and a melody unless it goes without" % zone)
+	var temple := Music.weights("temple", 0.0, 0.0, true)
+	_check(temple["music.temple_base"] == 1.0 and temple.keys().all(func(k: String) -> bool: return k == "music.temple_base" or temple[k] == 0.0),
+			"in a temple, by night too: its ground alone")
+	var buildings := [{"slot": "building.temple", "rect": Rect2i(10, 10, 4, 4)}, {"slot": "building.house", "rect": Rect2i(0, 0, 2, 2)}]
+	_check(Music.temple_nearness(buildings, Vector2i(12, 12)) == 1.0 and is_equal_approx(Music.temple_nearness(buildings, Vector2i(10, 5)), 0.6)
+			and Music.temple_nearness(buildings, Vector2i(1, 1)) == 0.0, "a temple near: full inside, fading out from its walls, none by a house")
+	_check(Music.zone_of("outdoors", 1.0, 0.6) == "temple" and Music.zone_of("indoors", 0.0, 1.0) == "temple"
+			and Music.zone_of("dungeon", 0.0, 1.0) == "dungeon", "a temple near is its zone, but not under stone")
 	for kind: String in Music.STINGS:
 		_check(SoundKit.has("music.sting_" + kind), "a %s stinger" % kind)
 	_check(Music.zone_of("dungeon", 0.0) == "dungeon" and Music.zone_of("cave", 1.0) == "dungeon" and Music.zone_of("indoors", 0.0) == "town"

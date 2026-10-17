@@ -142,8 +142,8 @@
 			{
 				"file": "music.sting_discovery.ogg",
 				"from": "sonniss-gdc-2021-23",
-				"original": "2021-23/InspectorJ - RPG Orchestral Essentials (Music FX)/Discovery_01-03_Organ-A_WET.wav",
-				"sha256": "17ea8a5402e6d967ca5a581f5b93ea384caeca554bd3c6e2336f9eda1ae6b21c"
+				"original": "2021-23/BluezoneCorp - Eternity - Ethereal Ambient/Bluezone_BC0273_eternity_synth_chimes_texture_001.wav",
+				"sha256": "8f7982e2b244f0466289de4705ec2a23ac2ba619f409ae9cf674a972f5b6963f"
 			}
 		],
 		"music.sting_victory": [
@@ -152,6 +152,14 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/CB Sound Design - Dreamcatcher - The Sound of Dreams & Magic/Harp_Glissando_10b.wav",
 				"sha256": "47bc6c89e08a374715584f6a96ad4f731b1edfe328e44c6126a25a27db2a4aef"
+			}
+		],
+		"music.temple_base": [
+			{
+				"file": "music.temple_base.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - Mind States/Pad 3.wav (from 0 s for 90 s)",
+				"sha256": "e82861aa1044c8accc081ff2b4efe2b80b085444a6a07672ab531e8ff25ef3df"
 			}
 		],
 		"music.tension_high": [
@@ -190,8 +198,8 @@
 			{
 				"file": "music.wilds_base.ogg",
 				"from": "sonniss-gdc-2021-23",
-				"original": "2021-23/344 Audio - Mind States/Pad 3.wav (from 0 s for 90 s)",
-				"sha256": "377be768aa8fd4c5b0dd125003a836b2ed788b50c94d528a5989ca25b02ac9fd"
+				"original": "2021-23/CB Sound Design - Exoplanets - Drones & Atmosphere Sound Effects/Ice_and_Wind_Drone_6.wav (from 0 s for 90 s)",
+				"sha256": "059ca15002d90ec9fe7d64476e1a80f69b242d92a0c4d57933806cf79142d1e2"
 			}
 		],
 		"music.wilds_night": [

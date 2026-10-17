@@ -16,6 +16,9 @@ notes (decision 324).
   its own.
 - Doors are wider and taller, sized for the new bodies (an opening 0.8 m wide and 2.4 m tall), and drawn as a plank door instead of the old castle-kit door.
 - Past the edge of outdoor maps the forest is now crowded pine stands whose crowns merge into one canopy.
+- The music in the open country is a soft wind drone now, not an organ-like pad, and a
+  new place is marked by chimes. The pad plays beside and inside the temple instead.
+
 - Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.
 - The minimap and the big map (M) show when you host a game, not only when
   you join one.

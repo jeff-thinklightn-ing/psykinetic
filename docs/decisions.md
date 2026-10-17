@@ -7893,6 +7893,15 @@ step_tension's rise, hold and fall, the stinger limits, by_take, and the slider 
 also checks that every music slot is flat on Music. The clip scenario is `sound_music`.
 Client only; no protocol change.
 
+Amended (2026-10-17, Jeff's veto): "i dont like the organ music in the first few seconds.
+that could be saved for the town or the temple". The organ-like takes leave the wilds: the
+wilds' ground is now a wind drone (CB Exoplanets "Ice_and_Wind_Drone_6"), and the discovery
+stinger is a chime texture (Bluezone Eternity). The old pad (344 "Pad 3") becomes the ground
+of a new zone, `temple`: within 3 cells of a temple's walls (slot building.temple) in full,
+fading out by 8 (`temple_nearness`). It is the zone from half way, never under stone, with
+no night layer and no melody (`NO_NIGHT`, `NO_MELODY`). The vetoed takes are kept aside in
+the sound library's `takes/_vetoed/`.
+
 ## 383. Roof damage: a third of a roof open to the sky
 
 Roof pieces step (b) (364; the coordinator's design, Jeff's go-ahead
