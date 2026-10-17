@@ -96,9 +96,18 @@ try {
 	# Godot reports warnings (a file's metadata, say) on stderr; under 'Stop'
 	# the first one would end the release. The exit code and the exe decide.
 	$ErrorActionPreference = 'Continue'
-	& $godot --headless --path $root --export-release 'Windows Client' (Join-Path $out 'psykinetic.exe') 2>&1 |
-		ForEach-Object { "$_" } | Where-Object { $_ -match 'ERROR|WARNING' } | Write-Output
-	$exported = $LASTEXITCODE
+	# The export is a heavy job (decision 394): it waits at the gate for memory, held while it runs.
+	$gate = Join-Path $root 'tools\heavy_job.py'
+	$tree = Split-Path $root -Leaf
+	& python $gate take $tree godot_export --pid $PID
+	if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = 'Stop'; throw 'the heavy-job gate refused the export' }
+	try {
+		& $godot --headless --path $root --export-release 'Windows Client' (Join-Path $out 'psykinetic.exe') 2>&1 |
+			ForEach-Object { "$_" } | Where-Object { $_ -match 'ERROR|WARNING' } | Write-Output
+		$exported = $LASTEXITCODE
+	} finally {
+		& python $gate release $tree godot_export | Out-Null
+	}
 	$ErrorActionPreference = 'Stop'
 	if ($exported -ne 0 -or -not (Test-Path (Join-Path $out 'psykinetic.exe'))) {
 		throw 'export failed'
