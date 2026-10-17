@@ -649,20 +649,18 @@
 			"kind": "edge",
 			"size": [0.5, 3.0, 1.0],
 			"budget": 600,
-			"uses": "a door on a cell edge: the frame in the wall, its leaf swinging with the Door (Client3D._add_doorway, _sync_doors); open and closed are the leaf's swing, the other states (decision 256) are state_<name> nodes, a broken door's on its open leaf",
+			"uses": "a door on a cell edge: the frame in the wall, its leaf swinging with the Door (Client3D._add_doorway, _sync_doors); open and closed are the leaf's swing, the other states (decision 256) are state_<name> nodes, a broken door's on its open leaf. Its opening 0.8 x 2.4 m (decision 402, Jeff: the doors read too small beside a 1.75 m body): jambs 0.1 m, the lintel from 2.4 to 3.0 m, the leaf hinged at the -z jamb",
 			"states": ["locked", "barred", "broken"],
 			"parts": [
-				{"name": "leaf", "motion": "hinge", "axis": "y", "pivot": [0, 0, -0.33], "range": [0, 90], "size": [0.15, 2.1, 0.66]}
+				{"name": "leaf", "motion": "hinge", "axis": "y", "pivot": [0, 0, -0.4], "range": [0, 90], "size": [0.12, 2.4, 0.8]}
 			],
 			"grey": [
-				{"at": [0, 1.5, -0.415], "size": [0.5, 3.0, 0.17]},
-				{"at": [0, 1.5, 0.415], "size": [0.5, 3.0, 0.17]},
-				{"at": [0, 2.55, 0], "size": [0.5, 0.9, 0.66]}
+				{"at": [0, 1.5, -0.45], "size": [0.5, 3.0, 0.1]},
+				{"at": [0, 1.5, 0.45], "size": [0.5, 3.0, 0.1]},
+				{"at": [0, 2.7, 0], "size": [0.5, 0.6, 0.8]}
 			],
-			"fill": {
-				"from": "kenney-castle", "piece": "wall-doorway", "offset": [0.25, 0, 0], "scale": [1, 2.290076, 1],
-				"parts": {"leaf": {"from": "kenney-castle", "piece": "gate", "pivot": [0, 0, -0.331075], "offset": [0, 0, 0.331075], "scale": [1, 2.290076, 1]}}
-			}
+			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
+				"notes": "a plank door by hand (a stand-in until Jeff picks a candidate): timber jambs and lintel, four planks, two battens, iron straps and latch; replaced the Kenney fill, whose frame could not open 0.8 x 2.4"}
 		},
 		"tree.broadleaf": {
 			"category": "trees",

@@ -8461,3 +8461,30 @@ beside its panels. It plays the ui.* slots flat on the UI bus through the view's
 sound_kit_test's `_test_ui_sounds` checks a button made after the hook, the hover limit, a
 slider, a watched panel, the UI bus, and the quiet start. The clip scenario is `sound_ui`.
 Client only; no protocol change.
+
+## 402. door.single's opening 0.8 x 2.4 m, its own plank door
+
+Jeff on v0.1.149: "walking and scale seems good, but now the doors are way
+too small" (the town's buildings: "its still the kenney door"). Every
+doorway draws one door.single unscaled; its slot left an opening 0.66 m
+wide and 2.1 m tall (jambs 0.17 m, the lintel from 2.1 m), which read
+right beside the old capsules and tiny beside the 1.75 m bodies (243, 388).
+
+The slot keeps its box (0.5 x 3.0 x 1.0, a cell edge) and opens 0.8 x 2.4:
+jambs 0.1 m, the lintel from 2.4 to 3.0 m, the leaf part 0.12 x 2.4 x 0.8
+hinged at the -z jamb (pivot z -0.4). The Kenney fill could not be fitted
+to that (its frame's opening is fixed and stretching it widens the whole
+piece past the edge), so the slot gets art-kit's own door, a stand-in until
+Jeff picks a candidate: timber jambs and lintel, four planks, two battens,
+iron straps and latch, on the palette, about 140 triangles. The hinge code
+(Client3D's DOOR_LEAF, ArtKit's part pivots) reads the slot and is
+unchanged; the door's cell, blocking, hp and lock are the sim's and
+unchanged. The lintel's top stays at 3.0 m, so walls' fade and roofs are as
+before, and a taller wall (the temple's 4.5 m) still closes over it with
+its lintel box. door.double and door.gate already open 1.8 m wide (2.4 and
+3.4 m tall) and stay. Art-gen's door candidates are fitted to the new box
+in cleanup. Client only, protocol unchanged.
+Rejected: scaling the Kenney frame (a 0.66 m opening at any height);
+scaling the door per building (the opening is the slot's, every doorway
+alike); a grey box until a pick (the town would show grey).
+
