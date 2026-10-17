@@ -7,6 +7,14 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.149
+
+- This release changes what the server and client send each other, so update the
+  client to keep playing (the launcher's update does it). New in it: human bodies,
+  male or female, chosen in the Options panel (O); anti-aliasing (SMAA by default,
+  under Video); seasons with snow where it is cold; the temple and the healer's hut
+  in the wilds; roofs, which storms can break; gear that takes its holder's name;
+  arrows in bundles; music; and many new sounds. Details below.
 - A companion who goes by "they" now has a body of her own, one or the other,
   the same every time, instead of always the woman's.
 - Wildlife lives in the world now: herds of deer, rabbits, boar and wolves roam the wilds, breed and are thinned by wolves even with nobody about, and appear near you as you come. What you hunt down is gone from the herd.
