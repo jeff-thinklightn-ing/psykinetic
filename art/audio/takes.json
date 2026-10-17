@@ -384,6 +384,17 @@
 				"sha256": "a137926de2e10f16e2c348c6e1d9b27c2f7762f2f05be5cf209901c5013a34e2"
 			}
 		],
+		"sfx.deer_death": [
+			{
+				"file": "sfx.deer_death.ogg",
+				"from": "freesound",
+				"original": "freesound 696777: Deer_chucker_call_s",
+				"sha256": "e3885257ab8f1424b4e0bc1db6dd9efadeb6453ba8de678fd999c02df3d57bcb",
+				"by": "ferventtorpor",
+				"url": "https://freesound.org/people/ferventtorpor/sounds/696777/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.deer_rout": [
 			{
 				"file": "sfx.deer_rout.ogg",
@@ -450,6 +461,26 @@
 				"sha256": "f3834c56687db112f24b4c75501ec4855f6d4eae753736eea113846a322a0956",
 				"by": "blaukreuz",
 				"url": "https://freesound.org/people/blaukreuz/sounds/459641/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.door_wood_break": [
+			{
+				"file": "sfx.door_wood_break.ogg",
+				"from": "freesound",
+				"original": "freesound 160213: Kicking/Forcing/Breaking Wooden Door",
+				"sha256": "d6fd8aba446ae4ba99cfde3a5b0f0d7179ac3f6b36fcae8acffdb40206ab25ca",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/160213/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.door_wood_break.2.ogg",
+				"from": "freesound",
+				"original": "freesound 723974: Wooden Door breaks",
+				"sha256": "99b59a7c6e11af7994839378f5c11cf47aa11defa5e17b6e07537efb20c39594",
+				"by": "Saladsounds",
+				"url": "https://freesound.org/people/Saladsounds/sounds/723974/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -897,6 +928,26 @@
 				"license": "CC BY 4.0"
 			}
 		],
+		"sfx.hit_stone": [
+			{
+				"file": "sfx.hit_stone.ogg",
+				"from": "freesound",
+				"original": "freesound 431019: Stone hit",
+				"sha256": "14f36e117f6f42d3f254b414a9a2a0c863d933a985ad754a73f82953fc97b5e4",
+				"by": "CamoMano",
+				"url": "https://freesound.org/people/CamoMano/sounds/431019/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hit_stone.2.ogg",
+				"from": "freesound",
+				"original": "freesound 760567: Pickaxe3",
+				"sha256": "56c0ca8c45f6bff7c9fd5d1e56602e055500e9eae2e4ff8d00556da8319f4f2d",
+				"by": "NoisyRedFox",
+				"url": "https://freesound.org/people/NoisyRedFox/sounds/760567/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.hit_wood": [
 			{
 				"file": "sfx.hit_wood.ogg",
@@ -1054,12 +1105,34 @@
 				"sha256": "8b7f6ce8015bda340516c056323176fcb5e54a6af987e8b4a2f8c3c742a46535"
 			}
 		],
+		"sfx.throw": [
+			{
+				"file": "sfx.throw.ogg",
+				"from": "freesound",
+				"original": "freesound 346373: Throwing / Whip Effect",
+				"sha256": "8d7837722f38b11eb6cb76fb3e87024fac8b95eef37ca12b98602d0994ca04d9",
+				"by": "denao270",
+				"url": "https://freesound.org/people/denao270/sounds/346373/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.thrown_land_heavy": [
 			{
 				"file": "sfx.thrown_land_heavy.ogg",
 				"from": "sonniss-gdc-2024",
 				"original": "2024/InMotionAudio - Wood/WOODImpt_Drops20_InMotionAudio_Wood.wav",
 				"sha256": "8a8c8b691c6867b0547ba7c09e4f2e21de9b1056cf2e078af1ac179cb2397c75"
+			}
+		],
+		"sfx.thrown_land_light": [
+			{
+				"file": "sfx.thrown_land_light.ogg",
+				"from": "freesound",
+				"original": "freesound 339362: drop08.wav",
+				"sha256": "a829eb504473d0a445c38a28d320e0ca5039827b5c4569785f538b22961f94f8",
+				"by": "newagesoup",
+				"url": "https://freesound.org/people/newagesoup/sounds/339362/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.wolf_death": [
@@ -1179,6 +1252,17 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"voice.death_female": [
+			{
+				"file": "voice.death_female.ogg",
+				"from": "freesound",
+				"original": "freesound 845164: Woman Screaming (from 0 s for 2.2 s)",
+				"sha256": "17aa692ad76a06ab8664fb240cb2512dfd1bc1bc30c517a2d11e26bfaf10f97c",
+				"by": "DanJFilms",
+				"url": "https://freesound.org/people/DanJFilms/sounds/845164/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.death_male": [
 			{
 				"file": "voice.death_male.ogg",
@@ -1223,6 +1307,24 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/Pole Position Production - The Grunts Library/Female 1 - Grunt - Getting Hit - Medium Intensity - Ehrlund M1.wav (from 5.56 s for 0.45 s)",
 				"sha256": "f7d265668aea65dfe40ee69799b2837462318d76e3ec91a53995256bff00270b"
+			},
+			{
+				"file": "voice.effort_hurt_female.5.ogg",
+				"from": "freesound",
+				"original": "freesound 203976: female_hurt.wav",
+				"sha256": "df4bebe044d77f34829450be9c11b7f4bf01bd9ec2de43e50659b83a7936ee60",
+				"by": "thatbennyguy",
+				"url": "https://freesound.org/people/thatbennyguy/sounds/203976/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.effort_hurt_female.6.ogg",
+				"from": "freesound",
+				"original": "freesound 547344: Ouch !",
+				"sha256": "a84390dde1e145b3603f3747c0b10dc29e8161544b46d8714b97e98d6706ab3d",
+				"by": "Legnalegna55",
+				"url": "https://freesound.org/people/Legnalegna55/sounds/547344/",
+				"license": "CC0 1.0"
 			}
 		],
 		"voice.effort_hurt_male": [
@@ -1251,6 +1353,57 @@
 				"sha256": "17405132b335f02db0e84c625b16eb97fc3bf575b48dafd3c1bf55bb3d2e1246",
 				"by": "MrFossy",
 				"url": "https://freesound.org/people/MrFossy/sounds/547205/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.effort_lift_female": [
+			{
+				"file": "voice.effort_lift_female.ogg",
+				"from": "freesound",
+				"original": "freesound 507730: EffortNoise.wav",
+				"sha256": "04f96b255b10587ac1e5025cb549a16d07dda2b2c281fd48bbb30ddb05bd0589",
+				"by": "Keskaowl",
+				"url": "https://freesound.org/people/Keskaowl/sounds/507730/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.effort_lift_male": [
+			{
+				"file": "voice.effort_lift_male.ogg",
+				"from": "freesound",
+				"original": "freesound 557131: ManlyGrunt02.wav",
+				"sha256": "a431518fcf0c5ce40606a7b9340ca416c9ccbb7873fa2d1ea3f65208ba8d5e67",
+				"by": "melisandepope",
+				"url": "https://freesound.org/people/melisandepope/sounds/557131/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.effort_lift_male.2.ogg",
+				"from": "freesound",
+				"original": "freesound 557134: ManlySounds01.wav",
+				"sha256": "d4918a635c9e093d0ac8ab03b1ce11f00e16dd47ccd3862a8fcd62fdf6bfb5e9",
+				"by": "melisandepope",
+				"url": "https://freesound.org/people/melisandepope/sounds/557134/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.effort_swing_female": [
+			{
+				"file": "voice.effort_swing_female.ogg",
+				"from": "freesound",
+				"original": "freesound 242623: grunt.wav",
+				"sha256": "6c4eedbe17a6061f7816ca5bcedd4853b35b4043d843d275ea17bdcf8e5b6bcd",
+				"by": "Reitanna",
+				"url": "https://freesound.org/people/Reitanna/sounds/242623/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.effort_swing_female.2.ogg",
+				"from": "freesound",
+				"original": "freesound 242622: grunt2.wav",
+				"sha256": "0b3a9d42b92ac62fa0755987c8e956efa07189624eca0a37c8f9a381e062fe4b",
+				"by": "Reitanna",
+				"url": "https://freesound.org/people/Reitanna/sounds/242622/",
 				"license": "CC0 1.0"
 			}
 		],

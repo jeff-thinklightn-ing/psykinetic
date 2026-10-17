@@ -111,7 +111,10 @@ if ($spec.type -eq 'oneshot') {
 		"[tail][head]amix=inputs=2:normalize=0[seam];[seam][mid]concat=n=2:v=0:a=1$gain"))
 }
 $ffmpegArgs += @('-ar', '44100', '-c:a', 'libvorbis', '-q:a', '5', $out)
-& ffmpeg @ffmpegArgs
+# A warning on stderr (a source's truncated last sample) is not a failure: its exit code says.
+$ErrorActionPreference = 'Continue'
+& ffmpeg @ffmpegArgs 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch 'Invalid PCM packet' } | ForEach-Object { [Console]::Error.WriteLine($_) }
+$ErrorActionPreference = 'Stop'
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $out)) { Fail "ffmpeg could not make $out" }
 
 $hash = (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash.ToLower()

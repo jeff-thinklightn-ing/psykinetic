@@ -14,6 +14,10 @@ notes (decision 324).
   sharp or superstitious they are, they may believe it and pass it on as
   hearsay ("Talos told me..."); priests and guards speak only of what is
   known, and a few townsfolk are not as honest as they look.
+- More sounds from Freesound (each credited in THIRD_PARTY.md): women's grunts, cries and
+  death screams for female characters, a grunt when anyone lifts something heavy, a door
+  bursting, a throw's whoosh, blows on stone, a deer's last call, and a small thing landing.
+
 - Townsfolk have hidden natures now, most of them steady, a few of them
   thieves, bards or scoundrels, rolled once when they join the town and never
   shown. A thief lifts a thing from the town's store now and then, one piece

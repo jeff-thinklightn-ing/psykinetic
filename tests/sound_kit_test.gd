@@ -161,7 +161,7 @@ func _test_fallbacks() -> void:
 				break
 		_check(at == "", "%s: its fallbacks are slots and end (%s)" % [slot, " -> ".join(seen)])
 	# As if these had no takes yet, whatever the library holds now.
-	_without_takes(["sfx.footstep_sand_medium", "sfx.knockdown", "sfx.bodyfall", "sfx.block_shield"])
+	_without_takes(["sfx.footstep_sand_medium", "sfx.knockdown", "sfx.bodyfall", "sfx.block_shield", "sfx.door_wood_break"])
 	_check(SoundKit.played_from("sfx.footstep_sand_medium", false) == "sfx.footstep", "sand underfoot sounds as the footstep meanwhile")
 	_check(SoundKit.played_from("sfx.footstep_grass_small", false) == "sfx.footstep_grass_medium", "a small body on grass, as a medium one meanwhile")
 	_check(SoundKit.played_from("sfx.door_wood_break") == "sfx.break_wood", "a door broken sounds as wood breaking meanwhile")
