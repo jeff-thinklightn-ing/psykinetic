@@ -25,6 +25,7 @@ func _ready() -> void:
 	if FileAccess.file_exists(Net.state_path):
 		DirAccess.remove_absolute(Net.state_path)
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	for i in 3:
 		World.step()
@@ -173,6 +174,7 @@ func _test_restart() -> void:
 	_main.free()
 	World.clear_zones()
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	await get_tree().process_frame
 	chest = _chest()
@@ -188,6 +190,7 @@ func _test_restart() -> void:
 	_main.free()
 	World.clear_zones()
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	await get_tree().process_frame
 	chest = _chest()
@@ -238,6 +241,7 @@ func _test_new_in_the_level() -> void:
 	file.store_string(JSON.stringify(data, "\t"))
 	file.close()
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	await get_tree().process_frame
 	var chest := _chest()
@@ -280,6 +284,7 @@ func _test_companion_pack() -> void:
 	_main.free()
 	World.clear_zones()
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	await get_tree().process_frame
 	pet = _main._companions.get(Net.player_id)

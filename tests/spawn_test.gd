@@ -13,6 +13,7 @@ func _ready() -> void:
 	Net.port = preload("res://tests/test_ports.gd").of(17787)  # Not 7777: the editor may be hosting there.
 	Net.companions = false  # A companion would pick fights with the test's imps.
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	_kill_monsters()
 

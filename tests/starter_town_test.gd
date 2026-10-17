@@ -47,7 +47,7 @@ func _test_town() -> void:
 	var towns := Towns.new({}, work, {}, clock)
 	var economy := Economy.new({}, stock, work, clock)
 	var seeded := towns.seed_from(world_map)
-	_check(seeded == [TOWN + "/forge", TOWN + "/kitchen"], "seeded from the map: the forge and the kitchen (%s)" % [seeded])
+	_check(seeded == [TOWN + "/forge", TOWN + "/kitchen", TOWN + "/temple"], "seeded from the map: the forge, the kitchen and the temple (%s)" % [seeded])
 	var forge := towns.building(TOWN, "forge")
 	var kitchen := towns.building(TOWN, "kitchen")
 	_check(forge.get("state") == Towns.STANDING and forge.get("level") == 1 and kitchen.get("state") == Towns.STANDING and kitchen.get("level") == 1,

@@ -8755,5 +8755,8 @@ kinds (373).
 - return.fee (0) is the hook for a cost later. Return jobs are saved as any
   job (who, who_kind, place, opened). Protocol unchanged: a respawn tile
   and a party line, as sent before.
+- Main.returns (true) turns it off: the test room's routes reach the wilds'
+  healer's hut, so tests of the old respawn (view, companion, spawn, chest)
+  set it false rather than wait a return out.
 
 tests/return_test.

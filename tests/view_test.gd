@@ -15,6 +15,7 @@ func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17791)  # Not 7777 (the editor may be hosting there), nor any other test's or eval's.
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 	_rig = preload("res://client3d/client3d.tscn").instantiate()
 	_main.add_child(_rig)

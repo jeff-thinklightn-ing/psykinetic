@@ -15,6 +15,7 @@ func _ready() -> void:
 	# they need beside them, and a wandering imp would join in.
 	Monster.idling = false
 	_main = preload("res://main.tscn").instantiate()
+	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
 
 	_test_follows_through_the_passage()

@@ -96,6 +96,10 @@ const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 const COMPANION_DEATH_LINES: Array[String] = ["Go on... without me.", "I'm sorry.", "Tell them I tried.", "Keep... going."]
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
+## Whether the fallen are brought back at a temple or a healer's hut
+## (decision 396); off, every death respawns as before (tests of the old
+## respawn turn it off).
+var returns := true
 ## A player is not put down (on respawn or on coming back) with a hostile
 ## this close to the intended tile; it goes to the safest start tile instead.
 const SPAWN_SAFE_DISTANCE := 5
@@ -4171,7 +4175,7 @@ func _return_place(cell: Vector2i) -> Dictionary:
 ## resident (the worker)), fallen at [param cell], to be brought back at
 ## the nearest manned place: true if a return job was opened.
 func _start_return(who: String, kind: String, cell: Vector2i) -> bool:
-	if who.is_empty():
+	if who.is_empty() or not returns:
 		return false
 	var at := _return_place(cell)
 	return not at.is_empty() and World.production.open_return(at["workshop"], who, kind, at["place"]) != 0
