@@ -9,6 +9,9 @@ notes (decision 324).
 
 - The land keeps the seasons: grass dries toward straw out of season and browns in autumn, broadleaf trees turn gold, orange or rust in autumn and fade in winter, pines and the border's stands stay green, and in winter snow lies on the ground and on the tops of trees, never on slopes or a building's floor.
 - A building with taller walls than a house's, as the temple's, has them drawn up to its roof, its door with wall over it.
+- Storms can break roofs: a full storm breaks about one roof in four, open
+  to the rain and the sky until someone mends it.
+
 - A damaged building's roof is broken in places: rain and daylight come in through the holes. The client must be updated with the server.
 
 - The wilds town has a temple beside its square. Out by the south edge of the forest stands a healer's hut, with a path from the town.

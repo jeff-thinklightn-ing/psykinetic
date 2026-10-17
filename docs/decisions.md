@@ -8035,3 +8035,47 @@ map_bench windowed on the wilds, summer then winter twice, under the bench
 lock: frame median 1.65 / 1.30 ms in summer, 1.39 / 1.24 ms in winter, 99th
 percentile 3.56 / 3.37 and 3.61 / 3.16 ms, the 3D rebuild 1,174 / 874 and
 940 / 837 ms: no cost found. Client only; no protocol change.
+## 384. Weather in the towns: storms break roofs, rain is counted for the wells
+
+Two pure helpers in Weather say what fell between two world steps, from
+the same clock and climates as Weather.at (decision 307). Nothing is
+stepped:
+- storms_between(region, from, to): [{id, strength, at}], one for each
+  storm whose peak falls in the span. A climate's storm spell peaks in
+  its middle (id "storm:<region>:<spell>") unless an override holds then.
+  A storm override peaks once it has fully come in (id
+  "storm:<region>:override:<from>"). Strength is what falls (rain and
+  snow) times the wind at the peak: a full storm is 1.
+- rain_between(region, from, to): the rain in days of full rain, sampled
+  every WORLD_TICK_STEPS. Snow is not counted: it lies, and melt is a later
+  step.
+
+Storms break roofs (environment's part). On the world tick the server
+calls Weather.break_roofs(WorldMap.areas, World.steps). For every level
+with roofs (WorldMap's areas carry each level's "roofs" and "region",
+from buildings), each storm since the last check breaks each standing
+roof with chance roof_chance × smoothstep(storm_min, 1, strength). The
+defaults are ROOF_CHANCE 0.25 and STORM_MIN 0.6; a climate's
+"roof_chance" and "storm_min" in levels/climates.json override them,
+both placeholders. The roll is the md5 unit of "<storm id>:<level>:<roof
+index>", so a replay breaks the same roofs. A hit calls World.damage_roof
+(buildings' decision 383), which skips a broken roof, opens the sky over a
+third of it and emits roof_changed. Only storms break roofs: a wind spell
+(no rain) does not. Every level counts, open or not. The step checked up
+to (Weather.storms_checked) is saved in the snapshot's "sky" but not sent,
+and after a gap (the server down) storms count back at most CATCH_UP (2)
+days. There is no protocol change: buildings' "roofs" message carries the
+state.
+
+The repair load: on town_lands' climate (storm weight 0.5 of 12, four
+spells a day) a 7-day season has 28 spells, so about 1.2 storms, nearly
+all full strength. Each breaks about a quarter of a town's roofs, so
+about 0.3 broken roofs per roof per season: in a town of 10 roofs, 2 or 3
+repairs a storm and about 3 a season, though a season can have none or
+three storms. The Blood Rot's climate (storm 0.7 of 11.7) has about 1.7
+storms a season.
+
+Wells (economy's part, pulled). Towns asks rain_between for its town's
+region on its own town tick and keeps water on the town record, with its
+well rules. The carpenter's repair of a broken roof calls
+World.repair_roof, found through World.damaged_roofs and roof_changed.

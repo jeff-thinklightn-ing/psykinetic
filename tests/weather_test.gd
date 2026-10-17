@@ -6,7 +6,9 @@ extends Node
 ## the weather dims the sky's light and cuts sight and hearing, not under a
 ## roof and not indoors; climates.json names only lore regions. How it
 ## looks (decision 309): cloud greys the sky and takes the sun, fog
-## thickens the haze, and the drawn weather eases toward the sim's.
+## thickens the haze, and the drawn weather eases toward the sim's. In
+## the towns (decision 384): storms and rain between two steps, and storms
+## breaking roofs, the same ones on a replay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -23,6 +25,8 @@ func _ready() -> void:
 	_test_in_the_field()
 	_test_climates_file()
 	_test_view()
+	_test_between()
+	_test_roofs()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -170,6 +174,87 @@ func _test_view() -> void:
 	_check(not view.ease_toward(Weather.KINDS["storm"], 1.0) and view.weather["rain"] == 0.0 and not view.visible,
 			"indoors none is drawn")
 	view.free()
+
+
+func _test_between() -> void:
+	print("\n== storms and rain between two steps ==")
+	Weather.use({"default": {"weights": {"clear": 1}}, "stormy": {"weights": {"storm": 1}}, "mixed": {"weights": {"clear": 1, "storm": 1}}})
+	var spell := Weather.spell_steps("stormy")
+	var day := float(DayNight.day_steps)
+	_check(Weather.storms_between("default", 0, day * 4).is_empty(), "a clear climate has none")
+	var storms := Weather.storms_between("stormy", 0, day)
+	_check(storms.size() == 4 and storms[0]["id"] == "storm:stormy:0" and is_equal_approx(storms[0]["at"], spell * 0.5)
+			and is_equal_approx(storms[0]["strength"], 1.0), "all storms: four a day, each at its spell's middle, full (%s)" % [storms.slice(0, 1)])
+	var halves := Weather.storms_between("stormy", 0, day * 0.5) + Weather.storms_between("stormy", day * 0.5, day)
+	_check(halves.map(func(each: Dictionary) -> String: return each["id"]) == storms.map(func(each: Dictionary) -> String: return each["id"]),
+			"cut in two, the same storms, each counted once")
+	var mixed := Weather.storms_between("mixed", 0, day * 10).size()
+	_check(mixed > 8 and mixed < 32, "an even climate: about half its spells (%d of 40)" % mixed)
+	World.steps = 1000
+	Weather.set_override("default", "storm", 10.0)
+	var override := Weather.storms_between("default", 0, 1000 + day)
+	_check(override.size() == 1 and str(override[0]["id"]).begins_with("storm:default:override:") and override[0]["strength"] > 0.9,
+			"a storm called from the console counts once (%s)" % [override])
+	Weather.set_override("default", "auto", 0.0)
+	World.steps = 0
+	Weather.use({"default": {"weights": {"clear": 1}}, "wet": {"weights": {"rain": 1}}})
+	_check(is_zero_approx(Weather.rain_between("default", 0, day)), "a clear day: no rain")
+	var wet := Weather.rain_between("wet", 0, day * 2)
+	_check(absf(wet - 2.0 * Weather.KINDS["rain"]["rain"]) < 0.01, "two days of rain: two days of it, at rain's strength (%.3f)" % wet)
+	var winter := Season.year_anchor + fposmod(0.875 - Season.year_phase, 1.0) * Season.year_steps()
+	_check(Weather.rain_between("wet", winter, winter + day) < 0.05, "in midwinter it falls as snow, not counted")
+	Weather.reload()
+
+
+func _test_roofs() -> void:
+	print("\n== storms break roofs ==")
+	var map := LevelMap.new(Vector2i(24, 24))
+	for y in 24:
+		for x in 24:
+			map.set_cell(Vector2i(x, y), "grass")
+	var listed := []
+	for y in 10:
+		for x in 10:
+			listed.append({"rect": [x * 2 + 1, y * 2 + 1, 1, 1]})
+	var terrain: Dictionary = Level.parse(map.to_image(), null, {"outdoor": true, "roofs": listed})["terrain"]
+	terrain["level"] = "storm_fixture"
+	var zone := Zone.new("storm_fixture")
+	zone.fields.load(terrain)
+	zone.fields.outdoor = true
+	World.zones["storm_fixture"] = zone
+	var areas := {"storm_fixture": {"roofs": terrain["roofs"], "region": "stormy"}}
+	Weather.use({"default": {"weights": {"clear": 1}}, "stormy": {"weights": {"storm": 1}}, "calm": {"weights": {"clear": 1}}})
+	var spell := Weather.spell_steps("stormy")
+	Weather.storms_checked = -1
+	_check(Weather.break_roofs(areas, 100).is_empty() and Weather.storms_checked == 100, "the first check only starts the count")
+	var broke := Weather.break_roofs(areas, 100 + spell)
+	_check(broke.size() > 10 and broke.size() < 45, "one full storm breaks about a quarter of %d roofs (%d)" % [listed.size(), broke.size()])
+	_check(World.damaged_roofs("storm_fixture").size() == broke.size(), "through World.damage_roof")
+	var first: Array = World.damaged_roofs("storm_fixture")
+	for index in listed.size():
+		World.repair_roof("storm_fixture", index)
+	Weather.storms_checked = 100
+	Weather.break_roofs(areas, 100 + spell)
+	_check(World.damaged_roofs("storm_fixture") == first, "a replay breaks the same ones")
+	for index in listed.size():
+		World.repair_roof("storm_fixture", index)
+	areas["storm_fixture"]["region"] = "calm"
+	Weather.storms_checked = 100
+	_check(Weather.break_roofs(areas, 100 + spell * 8).is_empty(), "no storm, no broken roofs")
+	Weather.use({"default": {"weights": {"clear": 1}}, "weak": {"weights": {"rain": 1}}, "stormy": {"weights": {"storm": 1}, "roof_chance": 0.0}})
+	areas["storm_fixture"]["region"] = "stormy"
+	Weather.storms_checked = 100
+	_check(Weather.break_roofs(areas, 100 + spell * 8).is_empty(), "a climate's roof_chance 0: none")
+	Weather.use({"default": {"weights": {"clear": 1}}, "stormy": {"weights": {"storm": 1}}})
+	Weather.storms_checked = 0
+	var long_gap := int(DayNight.day_steps * 30)
+	Weather.break_roofs(areas, long_gap)
+	var after_gap := World.damaged_roofs("storm_fixture").size()
+	_check(after_gap < listed.size() and Weather.storms_checked == long_gap, "a month away counts only the last two days' storms (%d broken)" % after_gap)
+	for index in listed.size():
+		World.repair_roof("storm_fixture", index)
+	World.zones.erase("storm_fixture")
+	Weather.reload()
 
 
 func _check(ok: bool, label: String) -> void:

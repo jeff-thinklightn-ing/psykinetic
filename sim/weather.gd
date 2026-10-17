@@ -25,6 +25,13 @@ extends RefCounted
 ## snow cuts sight at SNOW_SIGHT, and covers no noise. A climate's "seasons"
 ## may give a season weights of its own, and its "cold" makes the region
 ## colder (or, below 0, warmer) than the year.
+##
+## Weather in the towns (decision 384): storms_between and rain_between
+## say what fell between two world steps, for whoever keeps count (the
+## towns' wells pull rain_between). On the world tick the server breaks
+## roofs with break_roofs: each storm since the last check may break each
+## standing roof of every level, by a roll seeded from the storm and the
+## roof, so a replay breaks the same ones.
 
 const FILE := "res://levels/climates.json"
 ## Each kind as how much cloud, rain, fog and wind it brings, 0..1.
@@ -43,6 +50,13 @@ const DEFAULT_CHANGE := 0.1
 ## How much of the day's light full cloud takes (a storm's day stays well
 ## over Senses.DARK).
 const CLOUD_DIM := 0.25
+## Roofs and storms (break_roofs): a storm under STORM_MIN breaks none, a
+## full one each roof with ROOF_CHANCE; a climate's "storm_min" and
+## "roof_chance" override them. After a gap (a server down) storms count
+## back at most CATCH_UP days.
+const STORM_MIN := 0.6
+const ROOF_CHANCE := 0.25
+const CATCH_UP := 2.0
 ## Sight and hearing at full fog, rain and wind: a share of the range each
 ## takes away.
 const FOG_SIGHT := 0.55
@@ -56,6 +70,9 @@ const WIND_HEARING := 0.25
 static var _climates := {}
 ## The console's overrides, by region: {kind, from, until} (world steps).
 static var overrides := {}
+## Server: the world step up to which storms have broken roofs
+## (break_roofs), saved with the sky; -1 for never.
+static var storms_checked := -1
 
 
 ## The climates, read on first use.
@@ -84,6 +101,7 @@ static func use(data: Dictionary) -> void:
 static func reload() -> void:
 	_climates = {}
 	overrides = {}
+	storms_checked = -1
 
 
 static func _climate(region: String) -> Dictionary:
@@ -206,3 +224,82 @@ static func live_overrides(steps: int) -> Dictionary:
 		if float(overrides[region]["until"]) + spell_steps(region) > steps:
 			out[region] = overrides[region]
 	return out
+
+
+## The storms whose peak falls in [[param from], [param to]) world steps in
+## [param region]: [{id, strength (0..1: what falls, rain and snow, times
+## the wind, at the peak), at (the peak's step)}], oldest first. A climate's
+## storm spell peaks in its middle ("storm:<region>:<spell>"), unless an
+## override holds then; a storm override peaks once it has fully come in
+## ("storm:<region>:override:<from>").
+static func storms_between(region: String, from: float, to: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if to <= from:
+		return out
+	var spell := spell_steps(region)
+	var change := maxf(float(_climate(region).get("change", DEFAULT_CHANGE)) * spell, 1.0)
+	var override: Dictionary = overrides.get(region, {})
+	var index := ceili((from - spell * 0.5) / spell)
+	while index * spell + spell * 0.5 < to:
+		var peak := index * spell + spell * 0.5
+		var overridden := not override.is_empty() and peak >= float(override["from"]) and peak < float(override["until"]) + change
+		if not overridden and kind_of(region, index) == "storm":
+			out.append({"id": "storm:%s:%d" % [region, index], "strength": _strength(region, peak), "at": peak})
+		index += 1
+	if not override.is_empty() and override.get("kind") == "storm":
+		var peak := minf(float(override["from"]) + change, float(override["until"]))
+		if peak >= from and peak < to:
+			out.append({"id": "storm:%s:override:%d" % [region, int(override["from"])], "strength": _strength(region, peak), "at": peak})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["at"] < b["at"])
+	return out
+
+
+static func _strength(region: String, steps: float) -> float:
+	var here := at(region, steps)
+	return clampf((here["rain"] + here.get("snow", 0.0)) * here["wind"], 0.0, 1.0)
+
+
+## The rain that fell in [param region] from world step [param from] to
+## [param to], in days of full rain (rain 0..1 times days), sampled every
+## World.WORLD_TICK_STEPS; snow is not counted (it lies).
+static func rain_between(region: String, from: float, to: float) -> float:
+	var total := 0.0
+	var step := float(World.WORLD_TICK_STEPS)
+	var t := from
+	while t < to:
+		var span := minf(step, to - t)
+		total += float(at(region, t + span * 0.5)["rain"]) * span
+		t += span
+	return total / DayNight.day_steps
+
+
+## Server, on the world tick: every storm since the last check (at most
+## CATCH_UP days back) breaks each standing roof of each level in
+## [param areas] (WorldMap.areas: "roofs", "region") with the level's
+## climate's chance, through World.damage_roof. Returns what broke:
+## [{level, index, storm}].
+static func break_roofs(areas: Dictionary, to: int) -> Array[Dictionary]:
+	var broke: Array[Dictionary] = []
+	var from := maxf(float(storms_checked), to - CATCH_UP * DayNight.day_steps) if storms_checked >= 0 else float(to)
+	storms_checked = to
+	if to <= from:
+		return broke
+	var by_region := {}
+	for level: String in areas:
+		var roofs: Array = areas[level].get("roofs", [])
+		if roofs.is_empty():
+			continue
+		var region := str(areas[level].get("region", Level.DEFAULT_REGION))
+		if not by_region.has(region):
+			by_region[region] = storms_between(region, from, to)
+		var climate := _climate(region)
+		var least := float(climate.get("storm_min", STORM_MIN))
+		var chance := float(climate.get("roof_chance", ROOF_CHANCE))
+		for storm: Dictionary in by_region[region]:
+			var odds := chance * smoothstep(least, 1.0, storm["strength"])
+			if odds <= 0.0:
+				continue
+			for index in roofs.size():
+				if _unit("%s:%s:%d" % [storm["id"], level, index]) < odds and World.damage_roof(level, index):
+					broke.append({"level": level, "index": index, "storm": storm["id"]})
+	return broke

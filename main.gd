@@ -1524,6 +1524,7 @@ func _boot() -> void:
 	Weather.reload()
 	var saved_weather: Variant = snapshot.get("sky", {}).get("overrides", {})
 	Weather.overrides = saved_weather if saved_weather is Dictionary else {}
+	Weather.storms_checked = int(snapshot.get("sky", {}).get("storms_checked", -1))
 	if Net.day_minutes > 0.0:
 		DayNight.set_day_minutes(Net.day_minutes)
 	if Net.start_hour >= 0.0:
@@ -2334,6 +2335,7 @@ func _on_world_stepped() -> void:
 ## World.steps now, which a client counts on from (decision 290).
 func sky_message() -> Dictionary:
 	var data := _sky_saved()
+	data.erase("storms_checked")  # The server's own: not sent.
 	data["steps"] = World.steps
 	# The server's climates: a client works the weather out from them.
 	data["climates"] = Weather.climates()
@@ -2344,6 +2346,7 @@ func sky_message() -> Dictionary:
 func _sky_saved() -> Dictionary:
 	var data := DayNight.to_dict()
 	data["overrides"] = Weather.live_overrides(World.steps)
+	data["storms_checked"] = Weather.storms_checked
 	return data
 
 
@@ -3930,6 +3933,10 @@ func _respawn_due_players(tick: int) -> void:
 
 func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
+		if tick % World.WORLD_TICK_STEPS == 0 and _world_map != null:
+			# Storms break roofs (Weather.break_roofs).
+			for broke: Dictionary in Weather.break_roofs(_world_map.areas, World.steps):
+				print("[weather] %s broke roof %d of %s" % [broke["storm"], broke["index"], broke["level"]])
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		if tick % RESIDENT_SYNC_TICKS == 0:
