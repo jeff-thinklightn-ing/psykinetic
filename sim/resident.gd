@@ -339,6 +339,19 @@ func facts_now() -> Array[String]:
 		# The town's lawspeaker (decision 459): what he is for, whose door he
 		# stands at, and the disputes before him.
 		out.append("You are the town's lawspeaker: you keep what the town remembers and hold it straight. Lore is fact; what the town remembers is memory; one person's talk is talk.")
+		var scholar := _scholar_of_town()
+		if not scholar.is_empty():
+			out.append("%s, the town's scholar, keeps the chronicle: what is set down there the town remembers; send a doubter to %s." % [scholar, scholar])  # 491
+	if hidden_type() == Townsfolk.SCHOLAR:
+		# The scholar's chronicle (decision 491): what they keep, and what they proposed to lore.
+		out.append("You keep the town's chronicle: what the lawspeaker set down, what the town proposed to the lore-keepers, and the disputes before him. When asked what is true, say what is set down and no more.")
+		var kept: Variant = Offers._call(Offers.ctx, "memory", [town]) if not town.is_empty() else null
+		var statuses: Variant = Offers._call(Offers.ctx, "statuses")
+		if kept is Array:
+			for entry: Variant in kept:
+				if entry is Dictionary and bool(entry.get("proposed", false)):
+					var status := str(statuses.get("%s %s" % [town, entry.get("id", "")], "open")) if statuses is Dictionary else "open"
+					out.append("You proposed to the lore-keepers that %s: it is %s." % [TownMemory.clause(str(entry.get("text", ""))), status])
 		var stop := _round_stop()
 		if doing == Doing.ROUNDS and not str(stop.get("who", "")).is_empty():
 			out.append("You stand at %s's door." % stop["who"])
@@ -563,6 +576,16 @@ func world_facts() -> Array[String]:
 			length += text.length() + 1
 			out.append(text)
 	return out
+
+
+## The name of this town's scholar (the hidden type, 440), "" for none.
+func _scholar_of_town() -> String:
+	if World.production == null or town.is_empty():
+		return ""
+	for id: String in World.production.worker_ids(town):
+		if str(World.production.worker(id).get("type", "")) == Townsfolk.SCHOLAR and not bool(World.production.worker(id).get("away", false)):
+			return str(World.production.worker(id).get("name", id))
+	return ""
 
 
 ## [param parts] in words: "a, b and c".

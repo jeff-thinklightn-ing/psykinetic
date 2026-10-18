@@ -8,15 +8,30 @@ extends Node
 ## entries. A scene, so the autoloads load (the day's length for the day
 ## numbers); it reads no level and writes nothing but --out. Headless:
 ##   godot --headless --path <repo> --scene res://tools/proposed_page.tscn -- --snapshot=<world.json> --out=<proposed.md>
+## With --chronicle=<town id> it writes that town's chronicle instead (the
+## scholar's page, decision 491; TownMemory.chronicle, every memory, no cut),
+## the proposals' statuses read from --statuses=<proposed.md> when given.
+
+var _chronicle := ""
+var _statuses_from := ""
+
 
 func _ready() -> void:
 	var snapshot := ""
 	var out := ""
+	var chronicle := ""
+	var statuses_from := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--snapshot="):
 			snapshot = arg.trim_prefix("--snapshot=")
 		elif arg.begins_with("--out="):
 			out = arg.trim_prefix("--out=")
+		elif arg.begins_with("--chronicle="):
+			chronicle = arg.trim_prefix("--chronicle=")
+		elif arg.begins_with("--statuses="):
+			statuses_from = arg.trim_prefix("--statuses=")
+	_chronicle = chronicle
+	_statuses_from = statuses_from
 	get_tree().quit(_run(snapshot, out))
 
 
@@ -49,6 +64,23 @@ func _run(snapshot: String, out: String) -> int:
 		return "%s the %s" % [worker.get("name", id), str(trades[0]).replace("_", " ")] if not trades.is_empty() else str(worker.get("name", id))
 	var statuses := TownMemory.proposed_statuses(FileAccess.get_file_as_string(out)) if FileAccess.file_exists(out) else {}
 	var page := TownMemory.proposed_page(logs, names, who, statuses)
+	if not _chronicle.is_empty():
+		# One town's chronicle (decision 491): every memory, its scholar as keeper when it has one.
+		if not logs.has(_chronicle):
+			push_error("proposed_page: no town %s in the snapshot (towns: %s)" % [_chronicle, ", ".join(logs.keys())])
+			return 1
+		var keeper := "nobody yet"
+		var town_names: Array = []
+		if workers is Dictionary:
+			for id: String in workers:
+				var worker: Variant = workers[id]
+				if worker is Dictionary and str(worker.get("town", "")) == _chronicle:
+					town_names.append(str(worker.get("name", "")))
+					if str(worker.get("type", "")) == "scholar":
+						keeper = who.call(id)
+		if not _statuses_from.is_empty() and FileAccess.file_exists(_statuses_from):
+			statuses = TownMemory.proposed_statuses(FileAccess.get_file_as_string(_statuses_from))
+		page = "\n".join(TownMemory.chronicle(logs[_chronicle], names.get(_chronicle, _chronicle), keeper, who, [], statuses, _chronicle, 1000000, 0, town_names)) + "\n"
 	var file := FileAccess.open(out, FileAccess.WRITE)
 	if file == null:
 		push_error("proposed_page: cannot write %s (%s)" % [out, error_string(FileAccess.get_open_error())])

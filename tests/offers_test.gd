@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_lapse()
 	_test_voice_words()
 	_test_scholar_and_merchant()
+	_test_chronicle()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	Townsfolk.use_days({})
@@ -460,6 +461,32 @@ func _test_walk_home() -> void:
 	_check(_done.size() == 3 and _done[2][3] == 0 and str(_done[2][2]) == "Tam came home on his own." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(), "on his own: the plea closes unpaid: %s" % [_done[2]])
 
 
+func _test_chronicle() -> void:
+	print("\n== Read the chronicle: at the scholar's desk only, read aloud, nothing on the card (decision 491) ==")
+	_types = {"o-odo": "scholar"}
+	_setup([["o-odo", "Odo", "smith"], ["o-tam", "Tam", "hauler"]])
+	_types = {}
+	_log = []
+	_ctx["memory"] = func(_town: String) -> Array: return _log.duplicate(true)
+	_ctx["set_memory"] = func(_town: String, log: Array) -> void: _log = log.duplicate(true)
+	_ctx["town_name"] = func(_town: String) -> String: return "Ashford"
+	_ctx["lore"] = func(_town: String) -> Array: return ["Deer graze in the wilds."]
+	_ctx["statuses"] = func() -> Dictionary: return {}
+	# _setup's day is at home all day: the desk.
+	var mine := _offers("o-odo")
+	_check(mine.size() >= 1 and mine[0]["kind"] == Offers.PAGE and mine[0]["title"] == "Read the chronicle" and mine[0]["accept"] == Offers.READ and mine[0]["cost"] == 0,
+		"at home, the scholar offers the chronicle first: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["kind"]))])
+	_check(_offers("o-tam").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE), "a hauler keeps no chronicle")
+	var read := Offers.accept("o-odo", "p1", "Jeff", mine[0]["id"], 0, _ctx)
+	_check(read["ok"] and read.get("read", []).size() == 3 and read["read"][0] == "The chronicle of Ashford, kept by Odo the smith." and read["read"][1] == "The town has set down nothing yet."
+		and read["read"][2] == "Of Ashford it is known that deer graze in the wilds.", "read aloud: the lines come back, empty but for lore: %s" % [read.get("read")])
+	_check(Townsfolk.card_of(_work, "o-odo").get("asks", []).is_empty() and _asked.is_empty() and _done.is_empty(), "no ask, no promise, nothing paid")
+	_check(Standing.words(Townsfolk.card_of(_work, "o-odo"), "p1") != "" and Townsfolk.card_of(_work, "o-odo").get("standing", {}).has("p1"), "they have met")
+	Townsfolk.use_days({"default": {"stints": [{"from": 0, "to": 12, "at": "well"}, {"from": 12, "to": 24, "at": "well"}]}, "gossip": {"every": 0}})
+	_check(_offers("o-odo").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE), "at the well, no chronicle: it is at the desk")
+	Offers.ctx = _ctx
+
+
 func _test_lapse() -> void:
 	print("\n== a promise not kept lapses after the days ==")
 	_setup([["o-mara", "Mara", "smith"]])
@@ -508,7 +535,7 @@ func _test_scholar_and_merchant() -> void:
 	_types = {"o-odo": "scholar", "o-mara": "merchant"}
 	_setup([["o-odo", "Odo", "hauler"], ["o-mara", "Mara", "smith"]])
 	_plant("o-odo", "The mine is cursed", "Tam", "well")
-	var his := _offers("o-odo")
+	var his := _offers("o-odo").filter(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE)  # The chronicle comes first at home (491).
 	_check(his.size() == 1 and his[0]["kind"] == Offers.RUMOUR and his[0]["what"].get("lore", false) and his[0]["title"] == "What Odo knows"
 		and his[0]["words"] == "The old mine was dug by dwarves.", "the scholar offers the weightiest lore fact, not the rumour he believes: %s" % [his])
 	_goods = [{"uid": 9, "id": "knife", "price": 12}, {"uid": 7, "id": "wood", "price": 2}, {"uid": 11, "id": "wood", "price": 20}]

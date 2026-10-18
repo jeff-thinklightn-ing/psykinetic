@@ -4002,7 +4002,9 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 	if body == null or World.distance(body.tile, player.tile) > HEARING_RANGE:
 		return
 	var result := Offers.accept(worker_id, player.player_id, _display_name(player), offer_id, gold)
-	if int(result.get("buy", 0)) > 0:
+	if result.get("read") is Array and not result["read"].is_empty():
+		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
+	elif int(result.get("buy", 0)) > 0:
 		var counter := _counter_near(player, str(World.production.worker(worker_id).get("town", "")))
 		if counter == null:
 			party_log.add("%s must stand at the town's counter to buy." % _display_name(player))
@@ -4011,6 +4013,22 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 	elif not str(result.get("line", "")).is_empty():
 		party_log.add(str(result["line"]))
 	_send_offers(body, player.player_id, player.owner_peer)
+
+
+## Server: [param body] reads [param lines] (a page: the scholar's
+## chronicle, decision 491) to [param player]: one "party" message from the
+## reader with the lines joined by newlines (ui's shape: one entry in the
+## talk log that wraps and scrolls, one prefix, one timestamp; never
+## "speech", which would pop the whole page as a bubble). Nobody else gets
+## it.
+func _read_page(player: Player, body: Resident, lines: Array) -> void:
+	if player == null or lines.is_empty():
+		return
+	var reader := body.person if body != null else "The scholar"
+	Net.broadcast_to([player.owner_peer], "party", {"from": reader, "text": "
+".join(lines.map(func(line: Variant) -> String: return str(line)))})
+	if body != null:
+		Transcript.record(body.person, _display_name(player), "[reads the chronicle: %d lines]" % lines.size())
 
 
 ## The shop counter of [param town] that [param player] reaches, if any.
@@ -4087,6 +4105,9 @@ func _offers_context() -> Dictionary:
 			var facts := Lore.known_by(Lore.knower_for("townsfolk"), PackedStringArray(), "agreed")
 			facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
 			return facts.map(func(fact: Dictionary) -> String: return str(fact.get("text", ""))),
+		# The proposals' statuses from Jeff's page (458), for the scholar's chronicle (491).
+		"statuses": func() -> Dictionary:
+			return TownMemory.proposed_statuses(FileAccess.get_file_as_string(Net.proposed_path)) if not Net.proposed_path.is_empty() and FileAccess.file_exists(Net.proposed_path) else {},
 		"town_name": func(town: String) -> String:
 			return str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town,
 		"players_words": func() -> bool: return Net.lawspeaker_players,

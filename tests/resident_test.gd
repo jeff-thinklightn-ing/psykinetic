@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
+	_test_what_is_true()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -508,6 +509,28 @@ func _test_strayed_body() -> void:
 	World.production.set_away("rs-folk02", true)
 	World.production.set_away("rs-folk03", true)
 	Townsfolk.use_rules({})
+	_sync()
+
+
+## The scholar keeps the chronicle and the lawspeaker says so (decision 491).
+func _test_what_is_true() -> void:
+	print("\n== what is true: the scholar's chronicle in the lawspeaker's and the scholar's facts (decision 491) ==")
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	World.production.set_away("rs-snag", true)
+	World.production.set_away("rs-folk05", false)
+	World.production._workers["rs-folk05"]["type"] = "scholar"
+	World.production.set_away("rs-law", false)
+	DayNight.set_hour(10.0)
+	_sync()
+	var law := _body("rs-law")
+	var scholar := _body("rs-folk05")
+	_check(law != null and law.facts_now().any(func(f: String) -> bool: return f.begins_with("Folk5, the town's scholar, keeps the chronicle")), "the lawspeaker names the scholar as the keeper of what is true")
+	_check(scholar != null and scholar.facts_now().any(func(f: String) -> bool: return f.begins_with("You keep the town's chronicle")), "the scholar knows what they keep")
+	World.production._workers["rs-folk05"]["type"] = ""
+	World.production.set_away("rs-folk05", true)
+	World.production.set_away("rs-law", true)
 	_sync()
 
 

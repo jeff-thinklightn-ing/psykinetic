@@ -27,6 +27,7 @@ func _ready() -> void:
 	World.set_process(false)
 	_test_tags_and_world()
 	_test_told()
+	_test_chronicle()
 	_test_hold_drop_left()
 	_test_candidates()
 	_test_gossip_spreads_it()
@@ -97,6 +98,46 @@ func _test_tags_and_world() -> void:
 	_check(TownMemory.is_world("Old Marta once cooked for the Goblins") and TownMemory.is_world("Wren was born in the town"), "a lore name makes it the world's")
 	_check(TownMemory.is_world("The king rode through last spring") and TownMemory.is_world("Marta's son went to the war"), "the world's words too (king, war)")
 	_check(not TownMemory.is_world("The miller's dog bit the smith"), "a dog and a smith are small life")
+
+
+func _test_chronicle() -> void:
+	print("\n== the scholar's chronicle: what the town set down, proposed and disputes, as a page (decision 491) ==")
+	_setup()
+	var day := DayNight.day_steps
+	var log: Array = []
+	var who := func(id: String) -> String: return {"m-tam": "Tam", "m-mara": "Mara"}.get(id, id)
+	var lore := ["Deer graze in the wilds.", "The mine is older than the town."]
+	var empty := TownMemory.chronicle(log, "Ashford", "Odo the smith", who, lore, {}, TOWN, 12, 1)
+	_check(empty == ["The chronicle of Ashford, kept by Odo the smith.", "The town has set down nothing yet.", "Of Ashford it is known that deer graze in the wilds."],
+		"nothing set down: the heading, the empty line, lore up to the cap: %s" % [empty])
+	var well := TownMemory.note(log, "The well was dug by Bram's grandfather", "m-mara", "m-tam", 0)
+	well["tier"] = TownMemory.MEMORY
+	well["ruling"] = {"ruling": "accept", "because": "", "step": 3 * day}
+	var deed := TownMemory.note(log, "Jeff drove the goblins from the mill", "player:p1", "m-tam", day)
+	deed["tier"] = TownMemory.MEMORY
+	deed["ruling"] = {"ruling": "accept", "because": "three of the town saw it", "step": 5 * day}
+	var proposed := TownMemory.note(log, "The rot-source lies under the mine", "m-tam", "m-mara", day)
+	proposed["tier"] = TownMemory.MEMORY
+	proposed["proposed"] = true
+	proposed["ruling"] = {"ruling": "propose", "because": "lore should know", "step": 6 * day}
+	var quarrel := TownMemory.note(log, "Tam and Mara are at odds", "m-tam", "m-mara", 7 * day)
+	quarrel["tier"] = TownMemory.CANDIDATE
+	quarrel["dispute"] = true
+	quarrel["pair"] = ["m-tam", "m-mara"]
+	var page := TownMemory.chronicle(log, "Ashford", "Odo the smith", who, lore, {"%s tm.3" % TOWN: "accepted"}, TOWN, 12, 6, ["Jeff", "Tam", "Mara"])
+	_check(page.size() == 6 and page[1] == "On day 3 the town set down that the well was dug by Bram's grandfather."
+		and page[2] == "On day 5 the town set down that Jeff drove the goblins from the mill. The lawspeaker's word: three of the town saw it.",
+		"memories oldest first, the ruling's word after, a name at the front kept: %s" % [page])
+	_check(page.size() == 6 and page[3] == "On day 6 the town set down that the rot-source lies under the mine. The lawspeaker's word: lore should know."
+		and page[4] == "Proposed to the lore-keepers on day 6: the rot-source lies under the mine (accepted)." and page[5] == "Before the lawspeaker: Tam and Mara are at odds, says Tam.",
+		"then the proposal with its status from the page, then the dispute: %s" % [page.slice(3)])
+	for i in 14:
+		var more := TownMemory.note(log, "Thing %d happened" % i, "m-mara", "m-tam", (10 + i) * day)
+		more["tier"] = TownMemory.MEMORY
+		more["ruling"] = {"ruling": "accept", "because": "", "step": (10 + i) * day}
+	page = TownMemory.chronicle(log, "Ashford", "Odo the smith", who, lore, {}, TOWN, 12, 6)
+	_check(page.size() == 1 + 12 + 1 + 1 + 1 and page[1] == "On day 12 the town set down that thing 2 happened." and page[13] == "The rest is in the book."
+		and page[14].begins_with("Proposed"), "the newest twelve memories, the rest in the book, the proposals and disputes still whole (%d lines)" % page.size())
 
 
 func _test_told() -> void:

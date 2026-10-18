@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The scholar's chronicle (decision 491, on 440): a resident of the scholar type keeps the town's chronicle, what the lawspeaker set down (with his word on it), what the town proposed to the lore-keepers and its status from Jeff's page, and the disputes before him; at their desk (home) the offers panel has "Read the chronicle" and the lines come to your talk log, the newest twelve memories and the rest in the book, lore's facts when nothing is set down; the lawspeaker's facts name the scholar as the keeper of what is true; the page tool takes --chronicle=<town>; with the lawspeaker off the chronicle is empty but for lore.
 - A sack, a bolt, a hide or a bundle of arrows can come out short: it holds less than full measure and says "short measure". Weapons, tools and gear never do (decision 493).
 - The bard sings what the town remembers (decision 490, on 393): at a standing inn, once a night, a resident of the bard type sings one true thing to whoever is in the inn: a town memory naming a player present (their own story told back, once), else the newest memory not sung lately, else lore's facts every other night at most; a line or two in the talk log, the body's words for the bubble, residents at the inn holding the memory, standing with the bard a notch (twice for your own deed); with the lawspeaker off the town remembers nothing, so only lore is sung.
 ## v0.1.153

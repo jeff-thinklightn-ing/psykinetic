@@ -56,6 +56,10 @@ const SHOP := "shop"
 const COMMISSION := "commission"
 const RUMOUR := "rumour"
 const PLEA := "plea"
+## A page read to the player (decision 491: the scholar's chronicle); its
+## accept word "read" records nothing: the lines come back as "read".
+const PAGE := "page"
+const READ := "read"
 const BUY := "buy"
 const TAKE := "take"
 const LEND := "lend"
@@ -139,6 +143,9 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 		for offer: Dictionary in ([job, shop] if trusted else [shop, job]):
 			if not offer.is_empty():
 				fresh.append(offer)
+		var page := _page_offer(worker_id, who, town, given)
+		if not page.is_empty():
+			fresh.push_front(page)  # The desk is what you came for (decision 491).
 		var rumour := _rumour_offer(worker_id, who, given)
 		if not rumour.is_empty():
 			fresh.append(rumour)
@@ -290,6 +297,59 @@ static func _rumour_offer(worker_id: String, who: Dictionary, given: Dictionary)
 		Hearsay._lower_first(str(entry.get("text", "")))], {"heard": str(entry.get("id", ""))}, "")
 
 
+## The scholar's chronicle (decision 491): at home (their desk, by the
+## routine, 404) a scholar offers to read it; nothing elsewhere, nothing
+## from anyone else.
+static func _page_offer(worker_id: String, who: Dictionary, town: String, given: Dictionary) -> Dictionary:
+	if str(who.get("type", "")) != SCHOLAR or town.is_empty():
+		return {}
+	var production: Production = given["production"]
+	var at := production.now()
+	var hour := DayNight.hour(at)
+	if is_nan(hour) or is_inf(hour):
+		return {}
+	if Townsfolk.whereabouts(_trade_of(who), hour, Season.name_at(at), SCHOLAR, worker_id, Townsfolk.day_of(at)) != "home":
+		return {}
+	var name := str(who.get("name", worker_id))
+	return _offer(worker_id, PAGE, "chronicle", "Read the chronicle",
+		"%s keeps the town's chronicle here at %s desk, and will read it to you." % [name, _their(who.get("card", {}))], {"page": "chronicle"}, READ)
+
+
+## "her", "his" or "their" for [param their_card]'s pronoun.
+static func _their(their_card: Variant) -> String:
+	var pronoun := str(their_card.get("traits", {}).get("pronoun", "")) if their_card is Dictionary else ""
+	return {"she": "her", "he": "his"}.get(pronoun, "their")
+
+
+## The chronicle's lines (TownMemory.chronicle) for [param worker_id]'s
+## town, from Main's context: the memory log, the town's name, lore's
+## facts, the proposals' statuses ("statuses", 458's page); the newest
+## "chronicle.lines" memories, "chronicle.lore" facts when nothing is set
+## down (residents.json).
+static func chronicle_of(worker_id: String, town: String, given: Dictionary = ctx) -> Array[String]:
+	var production: Production = given.get("production")
+	if production == null:
+		return []
+	var log: Variant = _call(given, "memory", [town])
+	var town_name := str(_call(given, "town_name", [town]))
+	if town_name.is_empty() or town_name == "<null>":
+		town_name = town.get_slice("/", 0)
+	var who := production.worker(worker_id)
+	var keeper := "%s the %s" % [who.get("name", worker_id), _trade_of(who).replace("_", " ")] if not _trade_of(who).is_empty() else str(who.get("name", worker_id))
+	var lore: Variant = _call(given, "lore", [town])
+	var statuses: Variant = _call(given, "statuses")
+	var rule: Dictionary = Townsfolk.days().get("chronicle", {})
+	var names: Array = []
+	for id: String in production.worker_ids(town):
+		names.append(str(production.worker(id).get("name", "")))
+	if log is Array:
+		for entry: Variant in log:
+			if entry is Dictionary and str(entry.get("said_by", "")).begins_with(TownMemory.PLAYER):
+				names.append(str(_call(given, "name_of", [str(entry["said_by"]).trim_prefix(TownMemory.PLAYER)])))
+	return TownMemory.chronicle(log if log is Array else [], town_name, keeper, func(id: String) -> String: return str(production.worker(id).get("name", id)),
+		lore if lore is Array else [], statuses if statuses is Dictionary else {}, town, int(rule.get("lines", 12)), int(rule.get("lore", 6)), names)
+
+
 ## Help with a loan (economy's pay_loan), else a word to one the resident
 ## holds a grudge against.
 static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, town: String, given: Dictionary) -> Dictionary:
@@ -373,6 +433,13 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		BUY:
 			out["buy"] = int(offer["what"].get("uid", 0))
 			out["ok"] = out["buy"] > 0
+		READ:
+			# A page read (decision 491): the lines back to Main, nothing on the card but that they met.
+			var card := Townsfolk.card_of(production, worker_id)
+			if not card.is_empty() and Standing.met(card, player_id, now):
+				production.set_card(worker_id, card)
+			out["read"] = chronicle_of(worker_id, str(who.get("town", "")), given)
+			out["ok"] = not out["read"].is_empty()
 		TAKE:
 			if _open_count(production, player_id) >= int(settings().get("per_player", 3)):
 				out["line"] = "%s has taken on enough already." % player_name

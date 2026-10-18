@@ -12953,3 +12953,77 @@ piece of gear (no quality tiers on gear).
   it is banked.
 Protocol unchanged: a client reads no yield, and the note is the server's
 text. items_test's _test_short.
+
+## 491. The scholar's chronicle
+
+The hidden types' side-doings (393; the scholar's first three in 440),
+the coordinator's assignment and approval of 2026-10-18; ui's answer on
+the talk log (one message, the lines joined by newlines, wrapped and
+scrolled as one entry; accept word "read", which the offers panel
+renders from its word table). Rules: everything on the page is a
+sentence the town holds already (447's memory, 448's rulings, 458's
+proposals, lore's facts); nothing written by a model; prompts say what is
+true, never what to say.
+
+- The page (TownMemory.chronicle, pure, 458's shape): "The chronicle of
+  <town>, kept by <scholar>." Then, oldest first, what the town set down:
+  each MEMORY entry as "On day N the town set down that <sentence>." with
+  the lawspeaker's "because" after it ("The lawspeaker's word: ..."); the
+  newest "chronicle.lines" (12) of them and "The rest is in the book."
+  when cut. Then the proposals to lore (458's "proposed" entries) with
+  their status read as 458 reads it from Jeff's page
+  (TownMemory.proposed_statuses of Net.proposed_path; Main's "statuses").
+  Then the open disputes before the lawspeaker (486's entries). With
+  nothing set down: "The town has set down nothing yet." and what lore
+  knows of the town ("Of <town> it is known that ...", the townsfolk's
+  agreed facts, weightiest first, "chronicle.lore" (6) at most). A name at
+  the front of a sentence keeps its capital (TownMemory.clause).
+- Whose: the scholar's (type "scholar"). A town without one has no
+  chronicle (the lawspeaker keeps memory in his head, the bard in his
+  songs). The desk is the scholar's home (404's routine): the offer "Read
+  the chronicle" (Offers kind "page", accept "read", cost 0, first in the
+  list) appears only while the scholar's whereabouts is home; at the
+  counter or the well they offer nothing of it. Taking it records no ask
+  and pays nothing: Offers.accept returns the lines ("read"), Main sends
+  them to that player's talk log as one "party" message from the scholar
+  with the lines joined by newlines (Main._read_page; never "speech",
+  which would pop the page as a bubble); standing: met only.
+- Read aloud: the scholar's voice holds the same truth as facts (the
+  memories already, 447; now "You proposed to the lore-keepers that ...:
+  it is open/accepted"), so a question in words gets what is set down and
+  no more.
+- "What is true" in the facts (Resident.facts_now): a lawspeaker in a
+  town with a scholar gets "X, the town's scholar, keeps the chronicle:
+  what is set down there the town remembers; send a doubter to X."; a
+  scholar gets "You keep the town's chronicle: what the lawspeaker set
+  down, what the town proposed to the lore-keepers, and the disputes
+  before him. When asked what is true, say what is set down and no more."
+  Statements of what is true of them, not lines to say; the lawspeaker's
+  request to the model (448) is unchanged.
+- The page tool (458, tools/proposed_page.tscn) takes --chronicle=<town
+  id> (and --statuses=<proposed.md>) to write a town's whole chronicle from
+  a local or test snapshot for Jeff; the server writes no chronicle file
+  (the proposals page is Jeff's channel; one more file later if he wants
+  it).
+- Lawspeaker off (the box today): the town sets down nothing, proposes
+  nothing and notes no disputes, so a scholar's chronicle reads "The town
+  has set down nothing yet." and lore's facts of the town; the facts above
+  still hold (the chronicle exists, and is empty). That is the server's
+  behaviour until Jeff turns rulings on.
+- Cost: the page is built when read (one pass over the log, at most 200
+  entries); no tick work; no model.
+
+Numbers (npc's drafts, Jeff's to move): residents.json "chronicle"
+{lines 12, lore 6}. memory_test (empty with lore to the cap; the parts in
+order with the ruling's word, a name kept, the status from the page, the
+dispute; the newest twelve and the rest in the book); offers_test (the
+offer first and only at home, only from a scholar; the read returns the
+lines; no ask, no pay, met); resident_test (the lawspeaker's and the
+scholar's facts). Protocol unchanged (the new kind and accept word ride the
+"offers" message as data the client renders from title and words, "read"
+as "Read" until ui's word table has it; accept uses the "offer" verb
+with no new field; "party" exists); no new class_name.
+
+Rejected: a model writing the chronicle (invention); a new message kind
+for a page (ui's work and a protocol bump for a dozen talk-log lines); a
+chronicle file on the box; the chronicle as an item to carry.

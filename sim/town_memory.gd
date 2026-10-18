@@ -316,6 +316,60 @@ next rebuild keeps it.
 """
 
 
+## The chronicle (decision 491): what [param town_name]'s people set down,
+## kept by [param keeper], as lines a scholar reads at the desk: the
+## heading; oldest first, each MEMORY entry ("On day N the town set down
+## that ...", with the lawspeaker's "because"), the newest [param most] of
+## them and "The rest is in the book." when cut; then the proposals to
+## lore ("proposed", 458) with their status from [param statuses] (458's
+## page, keyed "<town id> <entry id>", "open" when none); then the open
+## disputes before the lawspeaker ("Before the lawspeaker: ..., says X";
+## [param who] names an id). With nothing set down: "The town has set down
+## nothing yet." and the first [param lore_most] of [param lore] ("Of
+## <town> it is known that ..."). A name at the front of a sentence keeps
+## its capital ([param names]).
+static func chronicle(log: Array, town_name: String, keeper: String, who: Callable, lore: Array, statuses: Dictionary, town_id := "",
+		most := 12, lore_most := 6, names: Array = []) -> Array[String]:
+	var day := maxi(DayNight.day_steps, 1)
+	var out: Array[String] = ["The chronicle of %s, kept by %s." % [town_name, keeper]]
+	var memories := of_tier(log, MEMORY)
+	var cut := memories.size() > most
+	if cut:
+		memories = memories.slice(memories.size() - most)
+	for entry: Dictionary in memories:
+		var ruling: Dictionary = entry.get("ruling", {})
+		var step := int(ruling.get("step", entry.get("first_said", 0)))
+		var line := "On day %d the town set down that %s." % [int(step / day), clause(str(entry.get("text", "")), names)]
+		var because := str(ruling.get("because", "")).strip_edges()
+		if not because.is_empty():
+			line += " The lawspeaker's word: %s." % because.trim_suffix(".")
+		out.append(line)
+	if cut:
+		out.append("The rest is in the book.")
+	for entry: Variant in log:
+		if entry is Dictionary and bool(entry.get("proposed", false)):
+			var status := str(statuses.get("%s %s" % [town_id, entry.get("id", "")], "open"))
+			out.append("Proposed to the lore-keepers on day %d: %s (%s)." % [int(int(entry.get("ruling", {}).get("step", 0)) / day),
+				clause(str(entry.get("text", "")), names), status])
+	for entry: Variant in log:
+		if entry is Dictionary and bool(entry.get("dispute", false)) and str(entry.get("tier", "")) in [BELIEF, CANDIDATE] and entry.get("ruling", {}).is_empty():
+			out.append("Before the lawspeaker: %s, says %s." % [clause(str(entry.get("text", "")), names), _name(who, str(entry.get("said_by", "")))])
+	if out.size() == 1:
+		out.append("The town has set down nothing yet.")
+		for i in mini(lore.size(), lore_most):
+			out.append("Of %s it is known that %s." % [town_name, clause(str(lore[i]), names)])
+	return out
+
+
+## [param text] as a clause after "that": no full stop, its first letter
+## lowered unless its first word is one of [param names] (a deed starts
+## with its doer).
+static func clause(text: String, names: Array = []) -> String:
+	var clean := text.strip_edges().trim_suffix(".")
+	var first := clean.get_slice(" ", 0).trim_suffix(",").trim_suffix("'s")
+	return clean if first in names else Hearsay._lower_first(clean)
+
+
 ## The page: one section per town of [param logs] (town id -> log), named
 ## by [param names] (town id -> display name), people named by [param who]
 ## (worker id -> words), each "proposed" entry a block with its source,

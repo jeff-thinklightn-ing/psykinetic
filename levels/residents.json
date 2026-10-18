@@ -23,6 +23,7 @@
 		"summer": {"morning": -0.5, "evening": 1.0}
 	},
 	"temple": {"every_days": 7, "from": 9, "to": 10},
+	"chronicle": {"_": "Decision 491: the scholar's chronicle (TownMemory.chronicle): read at the scholar's desk (home) through the offers panel: the newest lines memories at most (the rest is in the book), and with nothing set down, lore facts of the town.", "lines": 12, "lore": 6},
 	"bard": {"_": "Decision 490: the bard's side-doing (Townsfolk.perform, on the gossip tick): at the inn, once a night, one piece: a town memory naming a player in the inn (told back to them once), else the newest memory not sung within again days, else lore's facts, every lore_every_nights nights at most; kinds are the words round the memory's own sentence.", "again": 30, "lore_every_nights": 2, "kinds": ["sings of how", "tells the tale of how", "has a song of how"]},
 	"gossip": {"_": "Decision 422: every 'every' steps, in each town, residents standing at one of 'places' (never at work or home) pass one thing between two of them: a belief, or something the teller saw. No model call.", "every": 1200, "places": ["well", "inn", "square", "temple"]},
 	"lore_chars": {"_": "Decision 440: the voice's budget of lore facts by hidden type, in characters; a type not listed has Resident.LORE_CHARS (600).", "scholar": 1200},
