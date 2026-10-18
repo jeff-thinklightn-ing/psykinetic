@@ -278,8 +278,8 @@ func _test_wages_and_rent() -> void:
 	_at(2000)
 	_check(_work.worker("cora")["purse"] == 9 and _stock.count(STORE, "gold") == 22, "the next: 9 more would take the town below 20; unpaid")
 	_at(6000)
-	_check(_work.worker("cora")["purse"] == 6 and _work.upkeep(STORE) == 3 and _stock.count(STORE, "gold") == 22,
-		"rent: Cora pays 3 at step 6000 to the town's upkeep, gone from the economy; the treasury untouched")
+	_check(_work.worker("cora")["purse"] == 6 and _work.upkeep(STORE) == 3 and _stock.count(STORE, "gold") == 25,
+		"rent: Cora pays 3 at step 6000 into the treasury (22 -> 25), counted as upkeep")
 	_check(_work.worker("bram")["purse"] == 0 and _work.upkeep(STORE) == 3, "Bram, with nothing, pays nothing and owes nothing")
 
 

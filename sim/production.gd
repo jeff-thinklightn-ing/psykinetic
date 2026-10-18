@@ -31,7 +31,7 @@ extends RefCounted
 ## (none in the game's rules: makers earn from sales; decision 353), and
 ## official trades a wage of their own every so often, never below rules'
 ## gold_floor; they pay rent from their purse every rent_every
-## steps, which leaves the economy (the town's upkeep). Rules: levels/economy.json.
+## steps, into the town's treasury (counted as its upkeep). Rules: levels/economy.json.
 ## World keeps one (World.production), made by Main at boot; saved in the
 ## snapshot ("production": to_dict). Server only.
 
@@ -688,8 +688,12 @@ func _rent(at: int) -> void:
 			continue
 		worker_record["purse"] = int(worker_record["purse"]) - pay
 		var town := _town(worker_record["town"])
+		# Into the treasury, the town's bank (Jeff: "they collect the 'tax'
+		# but its just there as loans to keep the economy going"): gold only
+		# moves. upkeep counts what was paid.
 		town["upkeep"] = int(town["upkeep"]) + pay
-		print("[production] %s paid %d gold rent to %s's upkeep, step %d (%d left)" % [worker_record["name"], pay,
+		stockpile.deposit(worker_record["town"], "gold", pay, "rent:%s" % id, "%s paid %d gold rent" % [worker_record["name"], pay])
+		print("[production] %s paid %d gold rent to %s's treasury, step %d (%d left)" % [worker_record["name"], pay,
 			worker_record["town"], at, worker_record["purse"]])
 
 

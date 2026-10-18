@@ -212,18 +212,22 @@ func _test_taken() -> void:
 	_now = 0
 	var fed := _herds(_rules, {"seeded": ["meadow", "fields", "cave"]})
 	var herd := fed._add_group("meadow", "deer", Vector2i(30, 30), 10.0)
+	var others: Array[Dictionary] = []
+	for i in 3:  # Enough to spare at take_share for the camp's fill.
+		others.append(fed._add_group("meadow", "deer", Vector2i(36 + 6 * i, 30), 10.0))
 	fed.camps = func() -> Array: return [{"id": "meadow/camp", "area": "meadow", "cell": Vector2i(30, 32), "size": 1.0, "faction": "goblins"}]
 	_check(fed.camp_fed("meadow/camp") == 1.0, "before a day has passed it reads fed")
 	fed.tick()
 	for step in DAY / World.WORLD_TICK_STEPS:
 		_now += World.WORLD_TICK_STEPS
 		fed.tick()
-	var eaten := 10.0 - float(herd["count"])
+	var eaten: float = 40.0 - float(herd["count"]) - others.reduce(func(sum: float, each: Dictionary) -> float: return sum + float(each["count"]), 0.0)
 	_check(eaten > 0.0 and fed.camp_fed("meadow/camp") > 0.9, "the camp ate its fill of a big herd (%.1f, fed %.2f)" % [eaten, fed.camp_fed("meadow/camp")])
 	herd["count"] = least + 0.2
-	_now += World.WORLD_TICK_STEPS
-	fed.tick()  # A new day's budget, from the herd as it is now.
-	for step in DAY / World.WORLD_TICK_STEPS - 1:
+	for each in others:
+		each["count"] = least
+	fed._budget["meadow"] = 0.0  # Today's budget spent: what is left to take is what breeds.
+	for step in DAY / World.WORLD_TICK_STEPS:
 		_now += World.WORLD_TICK_STEPS
 		fed.tick()
 	_now += World.WORLD_TICK_STEPS

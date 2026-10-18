@@ -6971,6 +6971,13 @@ haulers and town work.
 - Rent is now the largest drain: 3 a day each takes 150 down by 65 in
   3 days with no players. `rent` 1 or 2 slows that.
 - (b), the treasury hiring more officials as it grows, is a later step.
+
+Amended (the balance runs, 2026-10-17): a meal falls due once a day,
+folk.needs.meal every 18000 -> 54000. Three meals a day (27 food a day for
+nine residents) was a slip of scale against the rest of the day's clock
+(rent, wages, needs by the day), not a design choice. folk_test keeps its
+own 18000 to test the meal's mechanics before the day's rent.
+
 ## 352. The far tier hands over to records: far monsters stop being nodes
 
 Roadmap: "the far tier hands over to the world tick, not to a stop".
@@ -7152,6 +7159,18 @@ treasury, never below gold_floor, at rules' "commissions" (rescue 10,
 camp 20, fetch 1 a unit, npc's to use); Stockpile.deposited(place, by,
 by_id, what, count) says who banked what (by_id the carrier key,
 "player:<id>", from a depot), for fetch commissions.
+
+Amended (the balance runs, 2026-10-17; a change to Jeff's bank design, put
+to him by the coordinator): rent is paid into the town's treasury, the
+bank, instead of leaving the economy. Jeff's words: "they collect the
+'tax' but its just there as loans to keep the economy going": the bank's
+gold should move, and a sink never was asked for. Before, 1 gold a day
+from each resident vanished (nine residents, 810 gold in 90 days, against
+150 to start): every purse was empty by day 75. After, over 90 days with no
+players, all the town's gold stays 150. It gathers with the makers who sell
+(two purses of 47 and 93, seven at 0) and the loans to the rest climb to
+about 170 of their caps: a drift left for Jeff, with the treasury's seed
+and gold_floor. Production.upkeep still counts the rent paid.
 
 ## 355. A town's residents have bodies only while someone is near
 
@@ -9210,6 +9229,17 @@ stalking.
 Protocol unchanged: all sim. tests/herds_test (reserves, the stalked herd,
 the budget, a camp fed and short, wolves starving and fed), tests/larder_test
 (the hunter's catch, no game, away).
+
+Amended (the coordinator's 30- and 90-day balance runs, 2026-10-17):
+take_share 0.25 -> 0.05 and the wolf's eats 0.2 -> 0.1. At 0.25 a town's
+hunter and the wolves emptied the wilds of deer and rabbits within 75 days
+(deer 38 -> 0, rabbits 69 -> 0, wolves starving 9 -> 1), against breeding
+of 3 to 8 a hundred a day, and an emptied area is never seeded again; at
+0.10 the same by day 90. At 0.05 deer and boar held but wolves still ate
+the rabbits out (70 -> 11); with wolves eating 0.1 as well, over 90 days:
+deer 52 -> 53, rabbits 81 -> 67, boar 21 -> 28, wolves 8 -> 11. The hunter
+brings home less meat for it; a farmer (Jeff: "farms and farmers too -
+tune with seasons") is to feed the town.
 
 ## 409. A hungry camp raids for food
 

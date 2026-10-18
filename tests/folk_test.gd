@@ -13,7 +13,7 @@ extends Node
 ## back from half their purse, and is worked off at the cap, the dole only
 ## then or when it is empty; and over seven game days the bank, filled by
 ## sales, pays the official jobs (a guard, haulers) and the walls it
-## orders, never below nothing, gold conserved but for rent, every purse
+## orders, never below nothing, gold conserved (rent into the treasury), every purse
 ## and debt bounded and everyone fed. Reads the repo's levels, never the shared overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
@@ -37,6 +37,9 @@ var _inn := true
 func _ready() -> void:
 	World.set_process(false)
 	_rules = Production.read_rules()
+	# Meals on this test's own clock, a third of a day, so a meal falls due
+	# before the day's rent (the game's is once a day: 353 amended).
+	_rules["folk"]["needs"]["meal"]["every"] = 18000
 	_test_founded()
 	_test_meals()
 	_test_services()
@@ -424,7 +427,7 @@ func _test_days() -> void:
 				_work.on_dole(TOWN), owed])
 	print("  7 days: %s; rent %d" % [counts, _work.upkeep(TOWN)])
 	_check(start == gold, "the town starts with its %d gold in its residents' purses" % gold)
-	_check(_gold() + _work.upkeep(TOWN) == start, "gold conserved but for rent, the sink (%d + %d upkeep = %d)" % [_gold(), _work.upkeep(TOWN), start])
+	_check(_gold() == start and _work.upkeep(TOWN) > 0, "gold conserved: rent goes into the treasury (%d, %d paid in rent)" % [_gold(), _work.upkeep(TOWN)])
 	_check(lowest >= 0, "the bank never went below nothing (lowest %d)" % lowest)
 	_check(richest <= gold, "no purse ran away (the most: %d)" % richest)
 	_check(most_owed <= cap + 0.001, "nobody owed past the cap (the most: %.2f)" % most_owed)

@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk eat once a day, not three times. Their rent now goes into the town's bank, where it is lent back out, instead of vanishing. Goblin camps, wolves and the town's hunter hunt more gently, so the deer and rabbits of the wilds last instead of being hunted out within a season.
+
 ## v0.1.150
 
 - This release changes what the server and client send each other, so update the
