@@ -59,8 +59,12 @@ func _test_strangers() -> void:
 	_check(again.strangers(TOWN) == towns.strangers(TOWN), "the same stranger every run")
 	towns.tick()
 	_check(towns.strangers(TOWN)[CAMP].size() == held.size(), "held once, not again each tick")
+	towns.set_memory(TOWN, [{"id": "m1", "tier": "rumour", "text": "the well is cursed"}])
+	towns.set_lawspeaker(TOWN, {"name": "Ulf", "last_round": 3, "rulings": []})
 	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
 	_check(saved.strangers(TOWN) == towns.strangers(TOWN), "saved and loaded")
+	_check(saved.memory(TOWN)[0]["text"] == "the well is cursed" and saved.lawspeaker(TOWN)["name"] == "Ulf" and saved.memory("x/none") == [],
+		"npc's memory and lawspeaker kept with the town, as they are")
 
 
 func _test_freed() -> void:

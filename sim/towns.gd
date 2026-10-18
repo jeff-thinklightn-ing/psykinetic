@@ -566,6 +566,28 @@ func _repair(town: String) -> bool:
 	return false
 
 
+# --- The town's memory, npc's lawspeaker (npc's decision, economy's side) ------------
+
+## [param town]'s memory: npc's log, kept as it is ({id, tier, text,
+## said_by, holders, spread, tags, ruling...}); a deep copy, [] for none.
+func memory(town: String) -> Array:
+	return (_towns.get(town, {}).get("memory", []) as Array).duplicate(true)
+
+
+## [param town]'s memory set to [param log], saved with the town as it is.
+func set_memory(town: String, log: Array) -> void:
+	_town(town)["memory"] = log.duplicate(true)
+
+
+## [param town]'s lawspeaker ({name, last_round, rulings}: npc's); {} for none.
+func lawspeaker(town: String) -> Dictionary:
+	return (_towns.get(town, {}).get("lawspeaker", {}) as Dictionary).duplicate(true)
+
+
+func set_lawspeaker(town: String, record: Dictionary) -> void:
+	_town(town)["lawspeaker"] = record.duplicate(true)
+
+
 # --- Held for their owners (decision 434) ------------------------------------------
 
 ## The things [param town] holds for [param owner] (a carrier key) at its
@@ -1090,6 +1112,11 @@ func from_dict(saved: Dictionary) -> void:
 					record["strangers"] = record.get("strangers", {})
 					record["strangers"][str(camp)] = (held_at[camp] as Array).filter(func(each: Variant) -> bool:
 						return each is Dictionary and str(each.get("id", "")) != "" and str(each.get("trade", "")) != "")
+		# npc's memory and lawspeaker, kept as they are.
+		if entry.get("memory") is Array:
+			record["memory"] = (entry["memory"] as Array).duplicate(true)
+		if entry.get("lawspeaker") is Dictionary:
+			record["lawspeaker"] = (entry["lawspeaker"] as Dictionary).duplicate(true)
 		var held_for: Variant = entry.get("held_for", {})
 		if held_for is Dictionary:
 			for owner: Variant in held_for:

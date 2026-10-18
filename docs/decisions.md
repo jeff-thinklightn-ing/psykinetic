@@ -8794,6 +8794,13 @@ beard=none headwear=hood apron=yes"): body from the pronoun (none for
 (smith, cook, carpenter, medicine man). Main._spawn_resident puts it in the
 body's spawn spec as "look", the medicine man's too; today's client ignores
 it, pc-character's PersonLook reads it.
+
+447, economy's side (npc's town memory, the lawspeaker's phase 1): Towns
+keeps npc's memory log and its lawspeaker on the town record, saved as
+given, as Production keeps a resident's card: Towns.memory(town) (a deep
+copy, [] for none), set_memory(town, log), lawspeaker(town) ({} for none),
+set_lawspeaker(town, record).
+
 ## 399. Humanoid clips the pack lacks are authored on its skeleton; a moves table per model
 
 Roadmap step 3 (combat animation states) splits: perf's rig (390) plays
