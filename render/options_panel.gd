@@ -5,9 +5,11 @@ extends PanelContainer
 ## controls in the box it returns, rather than giving each its own key.
 ## Sound is the first: a slider (0 to 100%) per volume, applied as it moves
 ## (Net.set_volume) and written to settings.cfg when let go or when the
-## panel is hidden. Character: the body the player wears (decision 388),
-## written at once and sent with the next join (a character creation flow
-## will replace it). Video: the 3D view's anti-aliasing, a button per kind
+## panel is hidden. Character (decisions 388, 419, 439): the body the player
+## wears and their look (build, height, hair and its colour, beard, skin;
+## a "Surprise me" for a new seed and the rest left to it), beside a live
+## preview of them (CharacterPreview); written at once (Net.player_body,
+## Net.player_look) and sent with the next join. Video: the 3D view's anti-aliasing, a button per kind
 ## (Net.ANTIALIAS), applied and written at a click (Net.set_antialias,
 ## decision 385), the window (fullscreen or windowed, Net.set_fullscreen)
 ## and the windowed resolution (Net.set_window_size). Controls: the scheme
@@ -32,8 +34,16 @@ const VOLUMES := [["master_volume", "Master"], ["sfx_volume", "Effects"], ["voic
 
 var _column: VBoxContainer
 var _scroll: ScrollContainer
-## Character's body: Net.BODIES' labels, in their order.
-const BODY_LABELS := ["Male", "Female"]
+## The Character section's rows, beside its preview: [the look's key, its
+## label, its choices as [value, label]] (PersonLook.PLAYER_CHOICES' values).
+const LOOK_ROWS := [
+	["build", "Build", [["lean", "Lean"], ["middling", "Middling"], ["heavy", "Heavy"]]],
+	["stature", "Height", [["short", "Short"], ["middling", "Middling"], ["tall", "Tall"]]],
+	["hair", "Hair", [["cropped", "Cropped"], ["bound", "Bound"], ["long", "Long"], ["bald", "Bald"]]],
+	["beard", "Beard", [["none", "None"], ["short", "Short"], ["full", "Full"]]],
+]
+## A swatch's size (ui: big enough to hit at 1080p).
+const SWATCH := Vector2(56, 56)
 ## Net's setting -> its slider.
 var sliders: Dictionary[String, HSlider] = {}
 ## The Video section's buttons: Net.ANTIALIAS's value -> its button.
@@ -48,8 +58,11 @@ var choices: Dictionary[String, Dictionary] = {}
 var resolution: OptionButton
 ## A slider moved since the settings were last written.
 var _unsaved := false
-## Which body the player wears (Net.player_body).
-var body_choice: OptionButton
+## The Character section's preview, its swatch rows (the look's key ->
+## value -> button) and the beard's row (a man's only).
+var preview: CharacterPreview
+var swatches: Dictionary[String, Dictionary] = {}
+var beard_row: Control
 
 
 func _ready() -> void:
@@ -77,7 +90,7 @@ func _ready() -> void:
 	_column.add_child(title)
 	# Who you are first: what a new player sets before anything else.
 	var character := add_section("Character")
-	character.add_child(_body_row())
+	character.add_child(_character_block())
 	var sound := add_section("Sound")
 	for volume: Array in VOLUMES:
 		sound.add_child(_slider_row(volume[0], volume[1]))
@@ -139,7 +152,7 @@ func toggle() -> void:
 	if visible:
 		for key: String in sliders:
 			sliders[key].set_value_no_signal(float(Net.get(key)))
-		body_choice.select(Net.BODIES.find(Net.player_body))
+		_show_look()
 		for value: String in antialias_buttons:
 			antialias_buttons[value].set_pressed_no_signal(value == Net.antialias)
 		for key: String in choices:
@@ -181,28 +194,138 @@ func _slider_row(key: String, text: String) -> HBoxContainer:
 	return row
 
 
-## Body: a choice of Net.BODIES, saved when picked; it shows from the next join.
-func _body_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	var name := _label("Body", FONT_SIZE)
-	name.custom_minimum_size = Vector2(200, 0)
-	row.add_child(name)
-	body_choice = OptionButton.new()
-	for text: String in BODY_LABELS:
-		body_choice.add_item(text)
-	body_choice.select(Net.BODIES.find(Net.player_body))
-	body_choice.focus_mode = Control.FOCUS_NONE
-	row.add_child(body_choice)
+## Character: the choices on the left (the body, then LOOK_ROWS, the hair's
+## and skin's colours as swatches, "Surprise me"), the preview on the right.
+func _character_block() -> HBoxContainer:
+	var block := HBoxContainer.new()
+	block.add_theme_constant_override("separation", UiTheme.constant("row"))
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", UiTheme.constant("unit"))
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	block.add_child(rows)
+	rows.add_child(_choice_row("Body", "body", [["male", "Man"], ["female", "Woman"]],
+		func() -> String: return String(Net.player_body),
+		func(value: String) -> void:
+			Net.player_body = StringName(value)
+			if value == "female":
+				_set_look_word("beard", "")  # Hers are none unless chosen again as a man.
+			Net.save_view_settings()
+			_show_look()))
+	for row: Array in LOOK_ROWS:
+		var key: String = row[0]
+		var line := _choice_row(row[1], "look_" + key, row[2],
+			func() -> String: return str(_look().get(key)),
+			func(value: String) -> void: _pick_look(key, value))
+		rows.add_child(line)
+		if key == "beard":
+			beard_row = line
+	var hair_colours: Array = []
+	for name: String in PersonLook.HAIR_COLOURS:
+		hair_colours.append([name, Color(PersonLook.HAIR_COLOURS[name])])
+	rows.add_child(_swatch_row("Hair colour", "hair_colour", hair_colours))
+	var skins: Array = []
+	for i in PersonLook.SKINS.size():
+		skins.append([str(i + 1), Color(PersonLook.SKINS[i])])
+	rows.add_child(_swatch_row("Skin", "skin", skins))
+	var last := HBoxContainer.new()
+	last.add_theme_constant_override("separation", 16)
+	var surprise := Button.new()
+	surprise.text = "Surprise me"
+	surprise.focus_mode = Control.FOCUS_NONE
+	surprise.pressed.connect(func() -> void:
+		Net.player_look = "seed=%d" % randi_range(1, 2147483646)
+		Net.save_view_settings()
+		_show_look())
+	last.add_child(surprise)
 	var note := Label.new()
 	note.text = "from your next join"
 	note.theme_type_variation = &"Caption"
 	note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(note)
-	body_choice.item_selected.connect(func(index: int) -> void:
-		Net.player_body = Net.BODIES[index]
-		Net.save_view_settings())
+	last.add_child(note)
+	rows.add_child(last)
+	preview = CharacterPreview.new()
+	preview.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	block.add_child(preview)
+	_show_look.call_deferred()
+	return block
+
+
+## A row of colour swatches for the look's [param key]: [param options] are
+## [value, colour] pairs.
+func _swatch_row(text: String, key: String, options: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var name := _label(text, FONT_SIZE)
+	name.custom_minimum_size = Vector2(200, 0)
+	row.add_child(name)
+	var group := ButtonGroup.new()
+	var buttons: Dictionary[String, Button] = {}
+	for option: Array in options:
+		var value: String = option[0]
+		var button := Button.new()
+		button.custom_minimum_size = SWATCH
+		button.toggle_mode = true
+		button.button_group = group
+		button.focus_mode = Control.FOCUS_NONE
+		button.tooltip_text = value.capitalize() if not value.is_valid_int() else ""
+		button.set_meta("colour", option[1])
+		button.pressed.connect(func() -> void: _pick_look(key, value))
+		row.add_child(button)
+		buttons[value] = button
+	swatches[key] = buttons
 	return row
+
+
+## The player's look as the game will draw it: their words, seeded by their
+## id where they have chosen no seed yet (the seed a first pick writes).
+func _look() -> PersonLook:
+	return PersonLook.make(_look_words(), Net.player_body)
+
+
+func _look_words() -> String:
+	var words := Net.player_look
+	if not words.begins_with("seed=") and not " seed=" in words:
+		words = "seed=%d" % absi(hash(Net.player_id)) + (" " + words if words != "" else "")
+	return words
+
+
+## [param key] chosen as [param value]: written (with the seed it was seen
+## with, so the rest stays as shown) and shown.
+func _pick_look(key: String, value: String) -> void:
+	_set_look_word(key, value)
+	Net.save_view_settings()
+	_show_look()
+
+
+func _set_look_word(key: String, value: String) -> void:
+	var kept: Array[String] = []
+	for word in _look_words().split(" ", false):
+		if not word.begins_with(key + "="):
+			kept.append(word)
+	if value != "":
+		kept.append(key + "=" + value)
+	Net.player_look = Net.tidy_look(" ".join(kept))
+
+
+## Every Character control as the look now is, and the preview.
+func _show_look() -> void:
+	var look := _look()
+	for key: String in choices:
+		if key == "body" or key.begins_with("look_"):
+			var current: String = choices[key]["current"].call()
+			for value: String in choices[key]["buttons"]:
+				(choices[key]["buttons"][value] as Button).set_pressed_no_signal(value == current)
+	for key: String in swatches:
+		var current := str(look.get(key))
+		for value: String in swatches[key]:
+			var button := swatches[key][value] as Button
+			button.set_pressed_no_signal(value == current)
+			for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
+				button.add_theme_stylebox_override(state, UiTheme.swatch_style(button.get_meta("colour"), value == current))
+	if beard_row != null:
+		beard_row.visible = look.body == &"male"
+	if preview != null:
+		preview.show_look(look)
 
 
 ## Anti-aliasing: a button per Net.ANTIALIAS, applied and saved at a click.

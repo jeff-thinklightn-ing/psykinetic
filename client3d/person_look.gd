@@ -49,6 +49,19 @@ const POSTURES := ["straight", "stooped", "slouching"]
 ## How likely an old person with no posture named stoops.
 const OLD_STOOPED := 0.3
 
+## What a player may choose for their look (the options panel's Character
+## section; Net.tidy_look keeps only these): each key's values; seed's empty
+## list, a whole number.
+const PLAYER_CHOICES := {
+	"seed": [],
+	"build": ["lean", "middling", "heavy"],
+	"stature": ["short", "middling", "tall"],
+	"hair": ["cropped", "bound", "long", "bald"],
+	"hair_colour": ["black", "dark", "brown", "chestnut", "fair", "blond", "red", "grey"],
+	"beard": ["none", "short", "full"],
+	"skin": ["1", "2", "3", "4", "5", "6", "7", "8"],
+}
+
 var seed := 0
 var body := &"male"
 var words := {}
@@ -60,6 +73,14 @@ var parts: Array[String] = []
 ## skin, hair, tunic, trousers -> colour.
 var colours := {}
 var posture := "straight"
+## Its words as they came out, said or seeded (the Character section shows them).
+var build := ""
+var stature := ""
+var age := ""
+var hair := ""
+var hair_colour := ""
+var beard := ""
+var skin := 1
 
 
 ## The look [param look] gives; [param body_by_default] when it names none
@@ -92,9 +113,9 @@ func _resolve(body_by_default: StringName) -> void:
 		body = body_by_default
 	else:
 		body = &"male" if body_roll < 0.5 else &"female"
-	var build := _word("build", ["lean", "middling", "heavy"], rng, BUILDS)
-	var stature := _word("stature", ["short", "middling", "tall"], rng, STATURES)
-	var age := _word("age", ["young", "grown", "old"], rng, AGES)
+	build = _word("build", ["lean", "middling", "heavy"], rng, BUILDS)
+	stature = _word("stature", ["short", "middling", "tall"], rng, STATURES)
+	age = _word("age", ["young", "grown", "old"], rng, AGES)
 	if build != "middling":
 		keys[build] = BUILD_KEY + rng.randf_range(-KEY_SPREAD, KEY_SPREAD)
 	else:
@@ -118,6 +139,7 @@ func _resolve(body_by_default: StringName) -> void:
 	if str(words.get("skin", "")).is_valid_int():
 		skin_index = clampi(int(words["skin"]) - 1, 0, SKINS.size() - 1)
 	colours["skin"] = Color(SKINS[skin_index])
+	skin = skin_index + 1
 	var grey_roll := rng.randf()
 	var grey := age == "old" and grey_roll < OLD_GREY
 	var hair_name: String = HAIR_COLOURS.keys()[rng.randi() % (HAIR_COLOURS.size() - 1)]  # Any but grey.
@@ -126,13 +148,14 @@ func _resolve(body_by_default: StringName) -> void:
 	if str(words.get("hair_colour", "")) in HAIR_COLOURS:
 		hair_name = str(words["hair_colour"])
 	colours["hair"] = Color(HAIR_COLOURS[hair_name])
+	hair_colour = hair_name
 	colours["tunic"] = Color(TUNICS[rng.randi() % TUNICS.size()])
 	colours["trousers"] = Color(TROUSERS[rng.randi() % TROUSERS.size()])
 	# Parts.
 	var styles: Array = HAIR_STYLES[String(body)]
-	var hair := _word("hair", HAIR_PARTS.keys(), rng, styles)
+	hair = _word("hair", HAIR_PARTS.keys(), rng, styles)
 	var beard_roll := rng.randf()
-	var beard := "none"
+	beard = "none"
 	if body == &"male" and age != "young" and beard_roll < BEARD_CHANCE:
 		beard = "short" if rng.randf() < 0.5 else "full"
 	else:

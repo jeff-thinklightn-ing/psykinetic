@@ -9,6 +9,10 @@ notes (decision 324).
 
 - At the temple's counter or the smith's, a screen beside your pack shows what can be done to what you carry (a blessing, a reforge), what it costs, what of yours is being worked and when it will be ready, and what waits for you to collect.
 - Townsfolk eat once a day, not three times. Their rent now goes into the town's bank, where it is lent back out, instead of vanishing. Goblin camps, wolves and the town's hunter hunt more gently, so the deer and rabbits of the wilds last instead of being hunted out within a season.
+- Choose how you look: the Character section of the options (O) now picks
+  your build, height, hair and its colour, beard and skin beside a turning
+  preview of you, or "Surprise me" for someone new. It shows from your next
+  join.
 
 ## v0.1.150
 

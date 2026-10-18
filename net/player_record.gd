@@ -11,6 +11,9 @@ var name := "Player"
 ## The body the player wears (Net.BODIES; decision 388): what they asked for
 ## at their last join.
 var body: StringName = &"male"
+## The look they chose beside it (Net.tidy_look's words; decision 439), as
+## they asked at their last join; "" for none chosen (seeded by their name).
+var look := ""
 var tile := Vector2i.ZERO
 var hp := 0
 var stamina := 0
@@ -58,6 +61,7 @@ func to_dict() -> Dictionary:
 		"index": index,
 		"name": name,
 		"body": String(body),
+		"look": look,
 		"tile": [tile.x, tile.y],
 		"hp": hp,
 		"stamina": stamina,
@@ -84,6 +88,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.index = int(entry.get("index", 0))
 	record.name = str(entry.get("name", "Player"))
 	record.body = Net.tidy_body(entry.get("body", ""))  # Older snapshots have none: male.
+	record.look = Net.tidy_look(entry.get("look", ""))  # Nor a look: seeded by name.
 	record.tile = tile_value
 	record.hp = int(entry.get("hp", 0))
 	record.stamina = int(entry.get("stamina", 0))

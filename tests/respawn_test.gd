@@ -354,6 +354,50 @@ func _test_player_body() -> void:
 	_check(PlayerRecord.from_dict(old).body == &"male", "an older snapshot's record (no body) wears male")
 	_check(Net.tidy_body("") == &"male" and Net.tidy_body("Female ") == &"female" and Net.tidy_body("x") == &"male",
 			"tidy_body: female, else male")
+	print("
+== a player's look (decision 439): asked for at the join, cleaned, kept, in the spawn spec ==")
+	Net._bodies[SAM_ID] = &"male"
+	Net._looks[SAM_ID] = Net.tidy_look("seed=77 build=heavy hair=long skin=6")
+	_main._admit(SAM, SAM_ID, "Sam")
+	sam = _main._players.get(SAM)
+	record = _main._records.get(SAM_ID)
+	_check(sam != null and record.look == "seed=77 build=heavy hair=long skin=6"
+			and str(sam.spawn_spec.get("look", "")) == record.look,
+			"a player's chosen look is kept on the record and spawned in their spec (%s)" % record.look)
+	_check(sam != null and Client3D.look_for(sam).keys.has("heavy") and "Hair_Long" in Client3D.look_for(sam).parts,
+			"and drawn as it says: heavy, long hair")
+	_main._leave(SAM, sam, SAM_ID)
+	Net._bodies.erase(SAM_ID)
+	Net._looks.erase(SAM_ID)
+	_main._admit(SAM, SAM_ID, "Sam")
+	sam = _main._players.get(SAM)
+	_check(sam != null and str(sam.spawn_spec.get("look", "")) == "seed=77 build=heavy hair=long skin=6",
+			"back without asking: the record's look")
+	_main._leave(SAM, sam, SAM_ID)
+	back = PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(back.look == record.look, "saved and loaded, the record keeps it")
+	old = record.to_dict()
+	old.erase("look")
+	_check(PlayerRecord.from_dict(old).look == "", "an older snapshot's record has none (seeded by name)")
+	# A look comes from any client and goes to every other: cleaned before it is kept.
+	var junk := "seed=12 build=enormous hair=long hair=bald headwear=hood apron=yes age=old skin=9 skin=3 beard=full x=1 <b>=y seed=99"
+	_check(Net.tidy_look(junk) == "seed=12 hair=long skin=3 beard=full",
+			"tidy_look: only what a player may choose, known values, each once (%s)" % Net.tidy_look(junk))
+	_check(Net.tidy_look("seed=-4 build=lean") == "build=lean" and Net.tidy_look("seed=123456789012 build=lean") == "build=lean"
+			and Net.tidy_look("seed=4x hair=long") == "hair=long", "a seed a whole number in range, else dropped")
+	var long := ""
+	for i in 5000:
+		long += "hair=long "
+	_check(Net.tidy_look(long) == "hair=long" and Net.tidy_look("build=lean ".repeat(100) + "stature=tall").length() <= Net.MAX_LOOK_LENGTH,
+			"a huge look is cut, never kept whole")
+	Net._bodies[SAM_ID] = &"male"  # A join this run sends both.
+	Net._looks[SAM_ID] = Net.tidy_look("build=" + "x".repeat(10000))
+	_main._admit(SAM, SAM_ID, "Sam")
+	sam = _main._players.get(SAM)
+	_check(sam != null and str(sam.spawn_spec.get("look", "")) == "", "a junk look asked for is none")
+	_main._leave(SAM, sam, SAM_ID)
+	Net._bodies.erase(SAM_ID)
+	Net._looks.erase(SAM_ID)
 
 
 func _check(ok: bool, label: String) -> void:

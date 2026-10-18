@@ -202,6 +202,8 @@ const DEFAULT_NAME := "Player"
 const MAX_NAME_LENGTH := 24
 ## The bodies a player or companion may wear (decision 388), the first the default.
 const BODIES: Array[StringName] = [&"male", &"female"]
+## The longest look a player's settings may carry (tidy_look).
+const MAX_LOOK_LENGTH := 160
 
 ## From version.txt at the project root. Sent on join; must match the server.
 var version := UNKNOWN_VERSION
@@ -302,6 +304,12 @@ var player_name := DEFAULT_NAME
 var player_body: StringName = &"male"
 ## Server only: the body each player id asked for when it joined.
 var _bodies: Dictionary[String, StringName] = {}
+## The look this client's player chose beside their body (PersonLook's
+## words, tidy_look; decision 439): settings.cfg "look", chosen in the
+## options panel's Character section, sent with the join like the body.
+var player_look := ""
+## Server only: the look each player id asked for when it joined.
+var _looks: Dictionary[String, String] = {}
 ## Server only: peers told to go that have not yet gone.
 var _leaving: Dictionary[int, bool] = {}
 ## Server only: peers dropped early (see _drop) whose ENet disconnect event
@@ -368,7 +376,7 @@ var _settings_kept: Dictionary = {}
 ## that a rewrite drops it.
 const WRITTEN_SETTINGS: Array[String] = ["address", "port", "token", "player_id", "name", "display_delay",
 	"window_width", "window_height", "window_mode", "camera_yaw", "camera_pitch", "camera_zoom",
-	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4", "hints", "body"]
+	"renderer", "controls", "phrase1", "phrase2", "phrase3", "phrase4", "hints", "body", "look"]
 ## Saves the window settings a moment after the last resize, not on each.
 var _window_save: SceneTreeTimer
 var _mode_given := false
@@ -513,6 +521,33 @@ static func tidy_body(raw: Variant) -> StringName:
 	return &"female" if str(raw).strip_edges().to_lower() == "female" else &"male"
 
 
+## A player's look as the game keeps it (decision 439; it comes from any
+## client and goes to every other): only the words a player may choose
+## (PersonLook.PLAYER_CHOICES), each once, with a value it knows (a seed
+## a whole number in range), at most MAX_LOOK_LENGTH long; the rest dropped.
+static func tidy_look(raw: Variant) -> String:
+	var kept: Array[String] = []
+	var said := {}
+	for word in str(raw).substr(0, MAX_LOOK_LENGTH * 2).split(" ", false):
+		var pair := word.split("=")
+		if pair.size() != 2 or said.has(pair[0]) or not PersonLook.PLAYER_CHOICES.has(pair[0]):
+			continue
+		var choices: Array = PersonLook.PLAYER_CHOICES[pair[0]]
+		var known := pair[1] in choices if not choices.is_empty() else (pair[1].is_valid_int() and pair[1].length() <= 10 and int(pair[1]) >= 0)
+		if known:
+			said[pair[0]] = true
+			kept.append(pair[0] + "=" + pair[1])
+	return " ".join(kept).substr(0, MAX_LOOK_LENGTH)
+
+
+## Server side: the look [param id] asked for when it joined this run (this
+## host's own player: its setting); "" if none.
+func asked_look(id: String) -> String:
+	if _looks.has(id):
+		return _looks[id]
+	return player_look if id == player_id else ""
+
+
 ## Server side: the body [param id] asked for when it joined this run (this
 ## host's own player: its setting); &"" if it has not joined since the server
 ## started, so its record keeps the one it had.
@@ -560,6 +595,7 @@ func _apply_settings() -> void:
 			settings.get("token", ""))
 	player_name = tidy_name(settings.get("name", DEFAULT_NAME))
 	player_body = tidy_body(settings.get("body", ""))
+	player_look = tidy_look(settings.get("look", ""))
 	# display_delay (ticks) was written by older builds, always, so a new
 	# default could never reach anyone: it is dropped, and only a hand-written
 	# display_delay_ms (kept as it is, never written) counts.
@@ -832,6 +868,8 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		file.store_string("phrase%d=%s\n" % [i + 1, phrases[i]])
 	file.store_string("hints=%s\n" % ("on" if hints else "off"))
 	file.store_string("body=%s\n" % player_body)
+	if player_look != "":
+		file.store_string("look=%s\n" % player_look)
 	for key: String in _settings_kept:
 		file.store_string("%s=%s\n" % [key, _settings_kept[key]])
 	file.close()
@@ -1006,6 +1044,7 @@ func authenticate(hello: Dictionary) -> void:
 			print("[net] peer %d is v%s, the server v%s: the same protocol %s, so it plays" % [
 				peer, client_version, version, protocol()])
 		_bodies[id] = tidy_body(hello.get("body", ""))
+		_looks[id] = tidy_look(hello.get("look", ""))
 		_admit(peer, id, player_name_given)
 
 
@@ -1344,7 +1383,7 @@ func _on_connected_to_server() -> void:
 	print("[net] connected as peer %d" % multiplayer.get_unique_id())
 	authenticate.rpc_id(1, {
 		"token": token, "version": claimed_version(), "player_id": player_id, "name": player_name,
-		"body": String(player_body), "protocol": _test_protocol if _test_protocol != "" else protocol()})
+		"body": String(player_body), "look": player_look, "protocol": _test_protocol if _test_protocol != "" else protocol()})
 
 
 func _on_server_disconnected() -> void:

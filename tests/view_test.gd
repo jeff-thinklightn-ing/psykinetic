@@ -166,12 +166,30 @@ func _test_options_panel() -> void:
 	var settings: Array = [Net._settings_override, Net.player_id, Net.player_name]
 	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("view_test_body.cfg")
 	Net.save_settings("127.0.0.1", 17789, "", Net.player_name)  # A file to rewrite, as a client has.
-	_check(panel.body_choice.selected == Net.BODIES.find(Net.player_body), "Character: the body shown as set")
-	panel.body_choice.item_selected.emit(1)
+	var bodies: Dictionary = panel.choices["body"]["buttons"]
+	_check(bodies[String(Net.player_body)].button_pressed, "Character: the body shown as set")
+	var look_was := Net.player_look
+	(bodies["female"] as Button).pressed.emit()
 	_check(Net.player_body == &"female"
 			and "body=female" in FileAccess.get_file_as_string(Net._settings_override),
-			"Female picked: Net's body and settings.cfg follow (decision 388)")
-	panel.body_choice.item_selected.emit(0)
+			"Woman picked: Net's body and settings.cfg follow (decision 388)")
+	_check(panel.preview != null and panel.preview._body == &"female" and not panel.beard_row.visible,
+			"the preview shows her; no beard row for a woman (decision 439)")
+	(bodies["male"] as Button).pressed.emit()
+	(panel.choices["look_build"]["buttons"]["heavy"] as Button).pressed.emit()
+	(panel.swatches["skin"]["7"] as Button).pressed.emit()
+	var written := Net._read_settings(Net._settings_override).get("look", "") as String
+	_check("build=heavy" in written and "skin=7" in written and written.begins_with("seed=")
+			and panel.preview._model.find_children("*", "MeshInstance3D", true, false).any(func(m: MeshInstance3D) -> bool:
+				return m.name == "Body" and m.get_blend_shape_value(m.find_blend_shape_by_name(&"heavy")) > 0.3),
+			"Heavy and the seventh skin picked: written with the seed it was shown with (%s), the preview heavy" % written)
+	var seed_was := Net.player_look.get_slice(" ", 0)
+	for button: Button in panel.find_children("*", "Button", true, false):
+		if button.text == "Surprise me":
+			button.pressed.emit()
+	_check(Net.player_look.begins_with("seed=") and not " " in Net.player_look and Net.player_look != seed_was,
+			"Surprise me: a new seed, the rest left to it (%s)" % Net.player_look)
+	Net.player_look = look_was
 	DirAccess.remove_absolute(Net._settings_override)
 	Net._settings_override = settings[0]
 	Net.player_id = settings[1]

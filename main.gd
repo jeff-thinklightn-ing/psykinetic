@@ -2880,6 +2880,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	var asked := Net.asked_body(id)
 	if asked != &"":
 		record.body = asked
+	if Net.asked_body(id) != &"" or Net.asked_look(id) != "":
+		record.look = Net.asked_look(id)  # Their choice this join (none: seeded by name).
 	var back := known and not respawn
 	var tile := _nearest_free(record.tile) if back else _free_start_tile()
 	if respawn and at != World.NO_CELL:
@@ -2909,7 +2911,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 			player_name, "saved" if back else "start", tile, SPAWN_SAFE_DISTANCE])
 	var player := _spawn({
 		"script": PLAYER, "shape": "capsule", "name": "Player%d" % record.index, "tile": tile,
-		"peer": peer, "tint": record.color, "label": player_name,
+		"peer": peer, "tint": record.color, "label": player_name, "look": record.look,
 	}) as Player
 	if player == null:
 		return

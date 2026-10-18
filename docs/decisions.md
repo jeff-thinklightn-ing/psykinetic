@@ -10587,3 +10587,36 @@ screen: a blessing could only be dragged onto the temple's chest.
 Client only; nothing on the wire from ui. tests/ui_test: the rows, the
 refusal, Order and Collect, nothing to do. `--test-show=counter` shows the
 screen with sample work (a test's words). Shots in docs/ui/shots/step4/.
+## 439. A player chooses their look: the Character section, sent with the join
+
+A player picks how they look in the options panel's Character section, which
+replaces 388's Body drop-down: their body (Man, Woman), then build, height,
+hair, beard (a man's) as rows of toggle buttons, hair colour and skin as rows of
+swatches, a "Surprise me" (a new seed, everything else left to it), and a live
+preview: their body as their look makes it (419's PersonLook on the human
+bodies), idling and turning slowly in a SubViewport of its own world, framed as
+a slot box (CharacterPreview, 440 x 640 HUD units, drawn only while the panel
+shows). Layout agreed with ui (its _choice_row, its swatch style); sound, which
+owns the panel, agreed. A pick is written at once, with the seed it was seen
+with, so what was shown is what others see: settings.cfg "look", beside
+"body" (Net.player_look); it is sent with the next join as a new hello field,
+"look", as 388's "body" is, and the server keeps it on the PlayerRecord (saved;
+an older record has none and is seeded by name, as 419 has it) and puts it in
+the player's spawn spec as "look", where Client3D.look_for reads it (seeded by
+the name where it names no seed; a player wears no headwear or apron).
+
+A look comes from any client and goes to every other, so the server cleans it
+before keeping it (Net.tidy_look, release's requirement): only the words a
+player may choose (PersonLook.PLAYER_CHOICES: seed, build, stature, hair,
+hair_colour, beard, skin), each once, each with a value it knows (a seed a whole
+number from 0 under 10 digits), at most MAX_LOOK_LENGTH (160) characters; the
+rest is dropped. respawn_test checks the look asked for, kept, saved, spawned,
+drawn, and junk, repeats and huge text cleaned; view_test drives the section
+(the body, a build, a skin, the preview following, Surprise me).
+
+Protocol: unchanged (release's ruling): an optional hello field older servers
+ignore, whose absence means 419's seeded look, as "body"; and a spawn spec key,
+purely visual (419). Rejected: replicating the look as a property (a protocol
+change, and the look, like the body, shows from the next join); letting the
+client's words through as they are (a hand-edited settings.cfg would send junk
+or huge text to everyone).

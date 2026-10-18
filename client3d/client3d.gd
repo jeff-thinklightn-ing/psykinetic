@@ -6689,14 +6689,14 @@ static func _hook(sig: Signal, callable: Callable) -> void:
 
 
 ## A person's look (decision 419): their spawn spec's "look" (a resident's
-## from npc's card, a companion's from hers, as Main writes them), else one
-## seeded by their name; a player's (and anyone's that names none) body is
-## their "body"; a player wears no headwear or apron until they choose (the
-## Character panel, later).
+## from npc's card, a companion's from hers, a player's as they chose it in
+## the options panel's Character section, decision 439; as Main writes them),
+## seeded by their name where it names no seed; a player's (and anyone's that
+## names none) body is their "body"; a player wears no headwear or apron.
 static func look_for(entity: GridEntity) -> PersonLook:
 	var look := str(entity.spawn_spec.get("look", ""))
-	if look == "":
-		look = "seed=%d" % absi(hash(String(entity.name)))
+	if not look.begins_with("seed=") and not " seed=" in look:
+		look = ("seed=%d " % absi(hash(String(entity.name)))) + look
 	if entity is Player:
 		look += " headwear=none apron=no"
 	return PersonLook.make(look, body_of(entity))
