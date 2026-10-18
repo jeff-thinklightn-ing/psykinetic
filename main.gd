@@ -3769,9 +3769,36 @@ func _sync_residents() -> void:
 					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "", "town": place_id,
 					"type": str(World.production.worker(who).get("type", "")),
 					"places": {"work": hut, "home": hut, "square": Rect2i(cell - Vector2i(2, 2), Vector2i(5, 5))}}
+	# The lost (decision 487): a town's people beyond the walls stand at their
+	# cell of this zone, chosen once here (far from the store, off held
+	# ground, reachable), while a player is near that cell; a walked one home
+	# at the town's ground is home.
+	for place_id: String in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(place_id)
+		if place.get("kind") != "stockpile":
+			continue
+		for who: String in Townsfolk.strayed_of(World.production, place_id):
+			if wanted.size() >= RESIDENTS_MAX:
+				break
+			var cell: Variant = Townsfolk.stray_cell(World.production, who)
+			if cell == null:
+				cell = _stray_cell(place)
+				if cell == null:
+					continue
+				Townsfolk.set_stray_cell(World.production, who, cell)
+			var origins := World._tier_origins()
+			if not origins.is_empty() and _nearest_of(cell, origins) > recall_tiles:
+				continue
+			var trades: Array = World.production.worker(who).get("trades", [])
+			var store: Vector2i = place.get("cell", Vector2i.ZERO)
+			wanted[who] = {"key": who, "name": str(World.production.worker(who).get("name", who)), "trade": str(trades[0]) if not trades.is_empty() else "",
+				"player": "", "town": place_id, "type": str(World.production.worker(who).get("type", "")), "strayed": true,
+				"places": {"strayed": Rect2i(cell, Vector2i.ONE), "square": Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))}}
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
+		if body.strayed and not body.escort_of.is_empty() and _at_towns_ground(body):
+			_came_home(body)
 		if wanted.has(body.worker_id):
 			have[body.worker_id] = true
 			body.places = wanted[body.worker_id]["places"]
@@ -3782,6 +3809,73 @@ func _sync_residents() -> void:
 	for who: String in wanted:
 		if not have.has(who):
 			_spawn_resident(wanted[who])
+
+
+## Where the lost of the town at [param place] stand (decision 487): a
+## walkable free cell of this zone at least "strays.far" from the store,
+## not inside a building, off held ground (covered by no place whose holder
+## is not the town's), among the farthest dozen one a path over the zone's
+## grid reaches from the store (the coordinator's condition: walkable from
+## the town); null when the zone has none. One in three cells is looked
+## at, which is enough to find the far edge.
+func _stray_cell(place: Dictionary) -> Variant:
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	var far := int(Townsfolk.rules().get("strays", {}).get("far", 24))
+	var mine := World.holdings.holder(str(place.get("id", "")))
+	var buildings: Array = _world_map.areas.get(World.zone.name, {}).get("buildings", []) if _world_map != null else []
+	var could: Array[Vector2i] = []
+	for cell: Vector2i in World.floor_cells():
+		if (cell.x + cell.y) % 3 != 0 or World.distance(cell, store) < far or not World.is_walkable(cell) or not World.is_free(cell):
+			continue
+		if _on_held_ground(cell, mine) or buildings.any(func(b: Dictionary) -> bool: return (b.get("rect", Rect2i()) as Rect2i).has_point(cell)):
+			continue
+		could.append(cell)
+	if could.is_empty():
+		return null
+	could.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return World.distance(a, store) > World.distance(b, store))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("stray:%s:%d" % [place.get("id", ""), Townsfolk.day_of(World.steps)])
+	var top := could.slice(0, mini(could.size(), 12))
+	while not top.is_empty():
+		var cell: Vector2i = top.pop_at(rng.randi() % top.size())
+		# Walkable from the town: a path over this zone's own grid (206's routes
+		# join areas; within one zone the grid is the finer truth), doors opened.
+		if not World.find_path(cell, store, true).is_empty():
+			return cell
+	return null
+
+
+## Whether [param cell] lies within the radius of a place of this zone held
+## by anyone but [param mine] (a raiders' camp, another's keep).
+func _on_held_ground(cell: Vector2i, mine: String) -> bool:
+	for id: String in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(id)
+		if World.holdings.holder(id) != mine and World.holdings.covers(id, cell):
+			return true
+	return false
+
+
+## Whether the lost [param body], walked home, stands on its town's ground
+## (within the store's radius and a step).
+func _at_towns_ground(body: Resident) -> bool:
+	var place := World.holdings.place(body.town)
+	return not place.is_empty() and World.distance(body.tile, place.get("cell", Vector2i.ZERO)) <= int(place.get("radius", 2)) + 1
+
+
+## The lost [param body] is home (decision 487): the card and economy's
+## record say so, the pleas to walk them home are met (Offers.walked_home:
+## the notice, the pay, the standing), and the body is one of the town's
+## again from the next sync.
+func _came_home(body: Resident) -> void:
+	var by := str(Offers._call(Offers.ctx, "name_of", [body.escort_of]))
+	if by.is_empty() or by == "<null>":
+		by = body.escort_name
+	Townsfolk.came_home(World.production, body.worker_id, by)
+	Offers.walked_home(body.town, body.worker_id, body.escort_of, by)
+	print("[state] %s was walked home to %s by %s" % [body.person, body.town, by])
+	body.strayed = false
+	body.escort_of = ""
+	body.escort_name = ""
 
 
 ## Whether the town at [param place_id] has its residents' bodies: once a
@@ -3865,6 +3959,8 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 	var player_id := player.player_id if player != null else ""
 	if not player_id.is_empty():
 		Offers.spoke_to(player_id, body.worker_id)  # An errand to them is done by speaking (decision 435).
+		if body.strayed:
+			body.start_escort(player_id, speaker)  # Lost beyond the walls: a word, and they follow you home (decision 487).
 	body.asked_by = player_id
 	body.asked_by_name = speaker
 	if not player_id.is_empty() and World.production != null:
@@ -4477,7 +4573,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var town: String = each["town"]
 	var places: Dictionary = each["places"]
 	var trade: String = each["trade"]
-	var doing := Resident.doing_now(trade, str(each.get("type", "")), who)
+	var doing := Resident.Doing.STRAYED if bool(each.get("strayed", false)) else Resident.doing_now(trade, str(each.get("type", "")), who)
 	# On his rounds (the lawspeaker, decision 459) "rounds" is a list of stops:
 	# he starts at the hour's stop (as Resident._round_stop has it), or the
 	# square with none.
@@ -4512,6 +4608,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	body.type = str(each.get("type", ""))
 	body.places = places
 	body.doing = doing
+	body.strayed = bool(each.get("strayed", false))
 	return body
 
 

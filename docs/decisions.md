@@ -12755,3 +12755,89 @@ heard as any sound there):
 - both at night only, hushed by rain as the birds are, never under stone.
 The retired takes are kept in the sound library's retired/ folder, out of
 the game and its credits.
+
+## 487. Someone walked home
+
+The coordinator's assignment of 2026-10-18 ("errands from what is
+between people", half two; half one is 486), on 435 as Jeff amended it,
+398's kin, 355's bodies and companions' Heel (485). Approved with two
+conditions: the stray's cell is chosen off held ground and walkable from
+the town by the routes of 206, and the stray is never a resident with an
+official's seat or a counter, only the trades listed.
+
+- Who is lost (Townsfolk.stray, on the world tick; townsfolk.json
+  "strays": every 54000, chance 0.1, days 3, far 24, trades hunter,
+  hauler, farmer, tanner): by town, a seeded draw a day sends one of its
+  people of those trades beyond the walls, never an official (origin
+  "appointed"), the merchant or an outcast, one at a time per town. The
+  card says so ("strayed": {since}), economy counts them away
+  (Production.set_away: no work, no meals, not taken in a raid; rent
+  still due, as for a captive), a fact on the card. After "days" the
+  lost find their own way home (Townsfolk.came_home with nobody: back,
+  not away, a fact), so no one is ever stranded and nothing of this
+  needs a player.
+- Where they stand (Main._stray_cell, chosen once with the zone in hand
+  and kept on the card): a walkable free cell of the town's own zone at
+  least "far" from the store, not inside a building, off held ground
+  (Holdings.covers of any place not held by the town's holder: a camp, a
+  keep), among the farthest dozen one a path over the zone's own grid
+  reaches from the store (World.find_path, doors opened: the condition
+  "walkable from the town"; 206's routes join areas, and within one zone
+  the grid is the finer truth and knows a test level too), picked by a
+  draw seeded by the day. One in three cells is looked at and at most a
+  dozen paths are tried, once per stray, which finds the far edge at no
+  cost worth naming. A zone with no such cell leaves them unplaced and they come
+  home on their own.
+- The body (Main._sync_residents): as a town body is (355), made while
+  a player is within recall_tiles of the cell and unmade when none is,
+  labelled "<Name> [<trade>]", friend to a click, standing still
+  (Resident.Doing.STRAYED); their facts say they are lost, which way the
+  town lies and that they follow whoever speaks to them. A zone change
+  by the player despawns it as any resident; the card keeps the cell, so
+  the body is made there again. One zone by design: Main.travel is
+  untouched and no body crosses a portal.
+- The plea (Offers._plea_offer, first of the pleas, it is urgent): on the
+  card of their kin (398), "Walk B home": "My sister B has not come back
+  from beyond the walls; if you find her out there, walk her home."
+  Taking it records interest only (a commission ask, sub "escort"). The
+  lost one's own first words ask the same.
+- The walk: a word to the lost one (Main._ask_resident) and they follow
+  that player (Resident.start_escort; Doing.ESCORT) at heel with
+  companions' Heel.follow(self, leader) once a tick while the player is
+  within FAR_TILES; beyond it, or with the player gone, they stand where
+  they are and wait for the next word. No pathing of npc's.
+- Home (Main._came_home, when the followed body stands within the
+  store's radius and a step): Townsfolk.came_home (the card clear, back,
+  the fact "Jeff walked B home from beyond the walls" on their card) and
+  Offers.walked_home: every plea to walk them home is met; the player who
+  walked them gets the party-log notice, the treasury's pay through
+  economy's pay_commission at rules "commissions.escort" (8, economy's
+  key, b90b957; Offers.DEFAULT_PAY until then), standing "walked_home"
+  (3) from the kin who asked and from the one walked home; a player who
+  never took the plea is paid the same (the arrival is the event); a plea
+  held by another player closes with the notice and no pay; home on
+  their own, the plea closes with the fact and no pay. Nothing accepted,
+  nothing handed in.
+- Danger: a lost body is left alone by every monster but a raider's
+  group (enemy-ai: targeting by class), and wakes none (World.sought
+  ignores Residents); the player beside them wakes what the player
+  wakes. If Jeff wants the escortee hunted, enemy-ai offers one more case
+  in the target filter, not asked for now.
+
+Numbers (npc's drafts, Jeff's to move): strays every 54000, chance 0.1,
+days 3, far 24, the four trades; commissions.escort 8; standing
+walked_home 3. townsfolk_test (who is lost and who never is, one at a
+time, the cell kept, home on their own after three days); offers_test
+(the kin's plea, taken, walked home by the one who took it: notice, pay,
+standing both ways, both cards; by another with no plea: notice and pay;
+on their own: the plea closes unpaid); resident_test (the body at the
+chosen cell far from the store on walkable ground, her facts, her kin's
+plea, a word and she follows, home at the town's ground: back, the card
+clear, her body the town's again). Protocol unchanged (a resident body
+is an existing spawn; no new message); no new class_name of npc's (Heel
+is companions', 485).
+
+Rejected: a body carried through portals (a Main.travel change for one
+errand); the escortee as a far record (never away from a player); the
+stray as a captive (that is the rescue, 435); a verb to parse ("come
+with me": any word to the lost one is enough; they want to go home).

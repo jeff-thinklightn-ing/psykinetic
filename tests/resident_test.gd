@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_healer_at_hut()
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
+	_test_strayed_body()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -456,6 +457,57 @@ func _test_lawspeaker_mid_rounds() -> void:
 	World.production.set_away("rs-law", true)
 	World.production.set_away("rs-folk00", true)
 	World.production.set_away("rs-folk01", true)
+	_sync()
+
+
+## Lost beyond the walls (decision 487): a body at the chosen cell, far
+## from the store; a word and it follows the player; home at the town's
+## ground, the plea met.
+func _test_strayed_body() -> void:
+	print("\n== someone lost beyond the walls: a body out there, a word, walked home (decision 487) ==")
+	var rules := Townsfolk.rules().duplicate(true)
+	rules["strays"] = {"every": 54000, "chance": 0.0, "days": 3, "far": 6, "trades": ["hauler"]}  # The test town is 15 x 10 cells.
+	Townsfolk.use_rules(rules)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	World.production.set_away("rs-snag", true)
+	World.production.set_away("rs-law", true)
+	var card := Townsfolk.card_of(World.production, "rs-folk02")
+	card[Townsfolk.STRAYED] = {"since": World.production.now()}
+	World.production.set_card("rs-folk02", card)
+	World.production.set_away("rs-folk02", true)
+	var kin := Townsfolk.card_of(World.production, "rs-folk03")
+	kin["kin"] = {"rs-folk02": "sibling"}
+	World.production.set_card("rs-folk03", kin)
+	World.production.set_away("rs-folk03", false)
+	DayNight.set_hour(10.0)
+	_sync()
+	var lost := _body("rs-folk02")
+	var cell: Variant = Townsfolk.stray_cell(World.production, "rs-folk02")
+	_check(lost != null and lost.strayed and lost.doing == Resident.Doing.STRAYED and cell is Vector2i and lost.tile == cell,
+		"a body at the cell Main chose for her, far from the store (%s)" % [cell])
+	_check(cell is Vector2i and World.distance(cell, Vector2i(5, 3)) >= 6 and World.is_walkable(cell), "at least the far distance away, on walkable ground")
+	_check(lost != null and lost.facts_now().any(func(f: String) -> bool: return f.begins_with("You lost your way beyond the walls")), "her facts say she is lost and would be walked home")
+	var plea := Offers.of("rs-folk03", Net.player_id)
+	_check(plea.any(func(o: Dictionary) -> bool: return o.get("what", {}).get("stray", "") == "rs-folk02"), "her kin asks for her to be walked home: %s" % [plea.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	var player := _player()
+	_check(player != null, "(a player to speak to her)")
+	if lost != null and player != null:
+		_main._ask_resident(lost, "Jeff", "Come with me.", player)
+		_check(lost.escort_of == player.player_id, "a word, and she follows that player")
+		World.step()
+		_check(lost.doing == Resident.Doing.ESCORT or lost.doing == Resident.Doing.STRAYED, "(her tick ran with the player far: %s)" % [lost.doing])
+		_put(lost, _town_cell(Vector2i(-1, -1)))
+		_sync()
+	_check(World.production.worker("rs-folk02")["away"] == false and not Townsfolk.card_of(World.production, "rs-folk02").has(Townsfolk.STRAYED),
+		"at the town's ground she is home: back, not away, the card clear")
+	_check(str(Townsfolk.card_of(World.production, "rs-folk02")["facts"].back()["text"]).ends_with("home from beyond the walls."), "her card: who walked her home")
+	var home := _body("rs-folk02")
+	_check(home != null and not home.strayed and home.doing != Resident.Doing.STRAYED, "her body is one of the town's again")
+	World.production.set_away("rs-folk02", true)
+	World.production.set_away("rs-folk03", true)
+	Townsfolk.use_rules({})
 	_sync()
 
 

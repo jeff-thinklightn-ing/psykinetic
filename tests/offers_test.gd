@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_accept_and_meet()
 	_test_errand()
 	_test_quarrel()
+	_test_walk_home()
 	_test_lapse()
 	_test_voice_words()
 	_test_scholar_and_merchant()
@@ -412,6 +413,51 @@ func _test_quarrel() -> void:
 	_model = "claude-haiku-5-5"
 	_law = ""
 	_check(_offers("o-bram")[0]["what"].has("to"), "no sitting lawspeaker: the carried word too")
+
+
+func _test_walk_home() -> void:
+	print("\n== kin lost beyond the walls: walk them home (decision 487) ==")
+	_setup([["o-mara", "Mara", "smith"], ["o-tam", "Tam", "hauler"]])
+	var card := Townsfolk.card_of(_work, "o-mara")
+	card["kin"] = {"o-tam": "sibling"}
+	_work.set_card("o-mara", card)
+	_check(_offers().is_empty(), "Tam at home: nothing to ask")
+	var his := Townsfolk.card_of(_work, "o-tam")
+	his[Townsfolk.STRAYED] = {"since": 0}
+	_work.set_card("o-tam", his)
+	_work.set_away("o-tam", true)
+	var mine := _offers()
+	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.TAKE and mine[0]["what"]["stray"] == "o-tam" and mine[0]["title"] == "Walk Tam home"
+		and str(mine[0]["words"]).begins_with("My ") and str(mine[0]["words"]).contains("Tam has not come back from beyond the walls"), "Mara's plea: walk her kin home: %s" % [mine])
+	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(taken["ok"] and _asked.size() == 1 and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1, "taken, interest only: %s" % [taken])
+	Townsfolk.came_home(_work, "o-tam", "Jeff")
+	Offers.walked_home(TOWN, "o-tam", "p1", "Jeff", _ctx)
+	_check(_work.worker("o-tam")["away"] == false and not Townsfolk.card_of(_work, "o-tam").has(Townsfolk.STRAYED), "Tam is home and not away")
+	_check(_done.size() == 1 and _done[0][0] == "p1" and _done[0][3] == 8 and _paid.size() == 1 and _paid[0][2] == 8 and str(_done[0][2]).begins_with("Jeff walked Tam home. Mara remembers it."),
+		"Jeff gets the notice and the escort's pay (8, the default until economy's key): %s" % [_done])
+	_check(Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") >= Standing.setting("walked_home") and Standing.score(Townsfolk.card_of(_work, "o-tam"), "p1") >= Standing.setting("walked_home"),
+		"standing from the kin who asked and from Tam himself")
+	_check(str(Townsfolk.card_of(_work, "o-tam")["facts"].back()["text"]) == "Jeff walked Tam home from beyond the walls." and str(Townsfolk.card_of(_work, "o-mara")["facts"].back()["text"]) == "Jeff walked Tam home from beyond the walls.",
+		"both cards remember")
+	_check(Townsfolk.card_of(_work, "o-mara")["asks"].is_empty() and _offers().is_empty(), "the plea is met and gone")
+	# Nobody took the plea: whoever walks him home is paid the same.
+	his = Townsfolk.card_of(_work, "o-tam")
+	his[Townsfolk.STRAYED] = {"since": _now}
+	_work.set_card("o-tam", his)
+	_work.set_away("o-tam", true)
+	Townsfolk.came_home(_work, "o-tam", "Ann")
+	Offers.walked_home(TOWN, "o-tam", "p2", "Ann", _ctx)
+	_check(_done.size() == 2 and _done[1][0] == "p2" and _done[1][3] == 8 and _done[1][1]["kind"] == "notice", "a notice and the pay with no plea taken: %s" % [_done[1]])
+	# Found his own way home: the plea is met by the road, nobody paid.
+	his = Townsfolk.card_of(_work, "o-tam")
+	his[Townsfolk.STRAYED] = {"since": _now}
+	_work.set_card("o-tam", his)
+	_work.set_away("o-tam", true)
+	Offers.accept("o-mara", "p1", "Jeff", _offers()[0]["id"], 0, _ctx)
+	Townsfolk.came_home(_work, "o-tam", "")
+	Offers.walked_home(TOWN, "o-tam", "", "", _ctx)
+	_check(_done.size() == 3 and _done[2][3] == 0 and str(_done[2][2]) == "Tam came home on his own." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(), "on his own: the plea closes unpaid: %s" % [_done[2]])
 
 
 func _test_lapse() -> void:

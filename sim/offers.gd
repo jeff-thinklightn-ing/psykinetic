@@ -294,6 +294,18 @@ static func _rumour_offer(worker_id: String, who: Dictionary, given: Dictionary)
 ## holds a grudge against.
 static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, town: String, given: Dictionary) -> Dictionary:
 	var production: Production = given["production"]
+	# Kin lost beyond the walls (decision 487): walk them home. First, it is urgent.
+	var kin: Dictionary = card.get("kin", {})
+	var kin_ids: Array = kin.keys()
+	kin_ids.sort()
+	for kin_id: Variant in kin_ids:
+		var theirs := Townsfolk.card_of(production, str(kin_id))
+		if theirs.is_empty() or not theirs.get(Townsfolk.STRAYED) is Dictionary or production.worker(str(kin_id)).is_empty():
+			continue
+		var name := str(production.worker(str(kin_id)).get("name", kin_id))
+		return _offer(worker_id, PLEA, "walk:" + str(kin_id), "Walk %s home" % name,
+			"My %s %s has not come back from beyond the walls; if you find %s out there, walk %s home." % [_relation(str(kin[kin_id]), theirs), name, _them(theirs), _them(theirs)],
+			{"stray": str(kin_id), "name": name, "sub": "escort"}, TAKE)
 	var owed := ceili(float(who.get("loan", 0.0)))
 	var can_lend: Variant = given.get("pay_loan")
 	if owed > 0 and can_lend is Callable and can_lend.is_valid():
@@ -759,6 +771,44 @@ static func ruled(town: String, entry: Dictionary, kind: String, memory: String,
 			"dispute", 1, given, "word", "spoke for them before the lawspeaker")
 		if kind == "reconcile":
 			_regard(production, other, str(ask.get("by", "")), 1, "brought the quarrel with %s to a reconciling" % mine_name)
+
+
+## The lost [param who_id] of [param town] is home (decision 487; Main on
+## the body reaching the town's ground, or Townsfolk.came_home on their
+## own): every plea to walk them home is met: by [param player_id] (named
+## [param player_name]), who gets the notice, the treasury's "escort" pay
+## and standing "walked_home" from the kin who asked and from the one
+## walked home (a player who never took the plea is paid the same: the
+## arrival is the event); by nobody ("") when they found their own way,
+## with the fact and no pay. The cards remember.
+static func walked_home(town: String, who_id: String, player_id: String, player_name: String, given: Dictionary = ctx) -> void:
+	var production: Production = given.get("production")
+	if production == null:
+		return
+	var who_name := str(production.worker(who_id).get("name", who_id))
+	var their := Townsfolk._their(Townsfolk.card_of(production, who_id))
+	var paid_this := false
+	for pair: Array in _asks(production, town):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("what", {}).get("stray", "")) != who_id:
+			continue
+		var kin_id: String = pair[0]
+		if player_id.is_empty():
+			_close(kin_id, ask, "%s found %s own way home; nobody walked %s." % [who_name, their, _them(Townsfolk.card_of(production, who_id))],
+				"%s came home on %s own." % [who_name, their], "", 1, given)
+		elif str(ask.get("by", "")) == player_id:
+			paid_this = true
+			_close(kin_id, ask, "%s walked %s home from beyond the walls." % [player_name, who_name],
+				"%s walked %s home. %s remembers it." % [player_name, who_name, production.worker(kin_id).get("name", kin_id)],
+				"escort", 1, given, "walked_home", "walked %s home" % who_name)
+		else:
+			_close(kin_id, ask, "%s walked %s home from beyond the walls." % [player_name, who_name],
+				"%s walked %s home before %s could." % [player_name, who_name, ask.get("by_name", "you")], "", 1, given)
+	if player_id.is_empty():
+		return
+	_regard(production, who_id, player_id, Standing.setting("walked_home"), "walked them home")
+	if not paid_this:
+		_notice(player_id, town, "escort:" + who_id, "%s walked %s home to the town." % [player_name, who_name], "escort", 1, given)
 
 
 ## Asks older than "offers.days" lapse, with a fact told once.

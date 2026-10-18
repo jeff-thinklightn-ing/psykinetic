@@ -17,13 +17,14 @@ extends GridEntity
 ## FAR_EVERY ticks and is walked there at once (World.walk), as monsters
 ## are by the world tick.
 
-enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE, ROUNDS }
+enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE, ROUNDS, STRAYED, ESCORT }
 ## Doing by the place word Townsfolk.whereabouts gives (decision 404).
 const DOING_AT := {"work": Doing.WORK, "home": Doing.HOME, "square": Doing.SQUARE, "well": Doing.WELL, "inn": Doing.INN, "temple": Doing.TEMPLE,
 	"rounds": Doing.ROUNDS}
 ## Where it is, in its voice's words (facts_now).
 const WHERE_WORDS := {Doing.WORK: "at your work", Doing.HOME: "at home", Doing.SQUARE: "in the square", Doing.HIDE: "hiding at home from raiders",
-	Doing.WELL: "at the well", Doing.INN: "at the inn", Doing.TEMPLE: "at the temple", Doing.ROUNDS: "on your rounds, at a neighbour's door"}
+	Doing.WELL: "at the well", Doing.INN: "at the inn", Doing.TEMPLE: "at the temple", Doing.ROUNDS: "on your rounds, at a neighbour's door",
+	Doing.STRAYED: "lost beyond the walls, far from the town", Doing.ESCORT: "being walked home, following at heel"}
 const SIGHT_RANGE := 7
 ## It looks and listens for raiders every so many ticks.
 const LOOK_EVERY := 5
@@ -37,7 +38,7 @@ const FAR_EVERY := 20
 const STUCK_TRIES := 3
 const NO_CELL := Vector2i(-99999, -99999)
 const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home",
-	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds"}
+	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds", Doing.STRAYED: "strayed", Doing.ESCORT: "strayed"}
 
 ## Production's worker id ("companion:<player id>" for a companion resting
 ## in town: decision 333 amended), the town (a stockpile place id) and its
@@ -66,6 +67,16 @@ var first_words := false
 var places: Dictionary = {}
 var senses: Senses
 var doing := Doing.SQUARE
+## Lost beyond the walls (decision 487): standing at the card's cell till
+## someone walks them home; escort_of is the player they follow (whoever
+## spoke to them last), at heel (companions' Heel, decision 485).
+var strayed := false
+var escort_of := ""
+var escort_name := ""
+## Companions' Heel (decision 485), loaded by path so this script stands
+## with or without it: without, the lost one waits where they are.
+const HEEL_SCRIPT := "res://sim/heel.gd"
+var _heel: RefCounted = null
 var _goal := NO_CELL
 var _route: Array[Vector2i] = []
 var _stuck := 0
@@ -140,6 +151,9 @@ static func doing_now(of_trade: String, type := "", worker_id := "") -> Doing:
 func _sim_tick() -> void:
 	if not Net.is_authority():
 		return
+	if strayed:
+		_tick_strayed()
+		return
 	var far := _far()
 	if far and (World.tick + id) % FAR_EVERY != 0:
 		return
@@ -158,6 +172,38 @@ func _sim_tick() -> void:
 			World.walk(self, _goal, FAR_EVERY)
 		return
 	_step()
+
+
+## Lost (decision 487): stands where it is, or follows the player who spoke
+## to it at heel while they are near; Main ends it at the town's ground.
+func _tick_strayed() -> void:
+	var leader := _escort_leader()
+	if leader == null:
+		doing = Doing.STRAYED
+		escort_of = ""
+		return
+	doing = Doing.ESCORT
+	if _heel == null and ResourceLoader.exists(HEEL_SCRIPT):
+		_heel = load(HEEL_SCRIPT).new()
+	if _heel != null:
+		_heel.call("follow", self, leader)
+
+
+## The player it follows, while spawned here and within FAR_TILES; null.
+func _escort_leader() -> GridEntity:
+	if escort_of.is_empty():
+		return null
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and (entity as Player).player_id == escort_of and World.distance(tile, entity.tile) <= FAR_TILES:
+			return entity
+	return null
+
+
+## [param player_id] (named [param player_name]) spoke to it while lost: it
+## follows them home from now (decision 487).
+func start_escort(player_id: String, player_name: String) -> void:
+	escort_of = player_id
+	escort_name = player_name
 
 
 ## Whether no player or companion is within FAR_TILES.
@@ -278,6 +324,17 @@ func facts_now() -> Array[String]:
 		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
 	out.append("It is %s%s." % [hour, sky])
 	out.append("You are %s." % WHERE_WORDS.get(doing, "in the town"))
+	if strayed:
+		# Lost beyond the walls (decision 487): where home lies, and that it follows whoever speaks to it.
+		var square: Rect2i = places.get("square", Rect2i())
+		var toward := ""
+		if square.size != Vector2i.ZERO:
+			var d := square.get_center() - tile
+			toward = (" The town lies to the %s." % ("east" if d.x > 0 else "west")) if absi(d.x) >= absi(d.y) else (" The town lies to the %s." % ("south" if d.y > 0 else "north"))
+		if doing == Doing.ESCORT and not escort_name.is_empty():
+			out.append("You lost your way beyond the walls; %s is walking you home and you follow close.%s" % [escort_name, toward])
+		else:
+			out.append("You lost your way beyond the walls and have not been home.%s You would be glad to be walked home: you follow whoever speaks to you." % toward)
 	if trade == "lawspeaker":
 		# The town's lawspeaker (decision 459): what he is for, whose door he
 		# stands at, and the disputes before him.

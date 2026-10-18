@@ -99,6 +99,7 @@ static func roll_type(worker_id: String) -> String:
 static func tick(production: Production, stockpile: Stockpile, economy: Economy = null) -> void:
 	if production == null or stockpile == null:
 		return
+	stray(production)  # Someone lost beyond the walls, and the lost come home (decision 487).
 	var thief: Dictionary = rules().get("thief", {})
 	var every := int(thief.get("every", 0))
 	if every <= 0:
@@ -145,6 +146,129 @@ static func tick(production: Production, stockpile: Stockpile, economy: Economy 
 static func _rich_line(economy: Economy) -> int:
 	var rules: Dictionary = economy.rules if economy != null and economy.rules is Dictionary else Production.read_rules(Economy.PATH)
 	return int(rules.get("folk", {}).get("rich_above", 25))
+
+
+## The card key of someone lost beyond the walls (decision 487): {since,
+## cell: [x, y] once Main chose where they stand}.
+const STRAYED := "strayed"
+static var _stray_due := {}
+
+
+## Strays (decision 487; townsfolk.json "strays"): every "every" steps, by
+## town, a seeded draw against "chance" sends one of the town's people of
+## the listed trades (not away, never an official, the merchant or an
+## outcast) beyond the walls: the card says so, economy counts them away
+## (no work, no meals), a fact on their card; one at a time per town. The
+## lost come home on their own after "days" (came_home with nobody), so no
+## one is ever stranded. Where they stand is Main's to choose, with the
+## zone in hand (set_stray_cell).
+static func stray(production: Production) -> void:
+	if production == null:
+		return
+	var rule: Dictionary = rules().get("strays", {})
+	var every := int(rule.get("every", 0))
+	if every <= 0:
+		return
+	var at := production.now()
+	var day := maxi(DayNight.day_steps, 1)
+	var towns := {}
+	for id: String in production.worker_ids():
+		var town := str(production.worker(id).get("town", ""))
+		if not town.is_empty() and not id.begins_with(COMPANION):
+			towns.get_or_add(town, []).append(id)
+	var names: Array = towns.keys()
+	names.sort()
+	for town: String in names:
+		var lost := strayed_of(production, town)
+		var home_today := false
+		for id: String in lost:
+			if at - int(lost[id].get("since", at)) >= int(rule.get("days", 3)) * day:
+				came_home(production, id, "")
+				home_today = true
+		var due := int(_stray_due.get(town, 0))
+		if due == 0:
+			_stray_due[town] = at + every
+			continue
+		if at < due:
+			continue
+		_stray_due[town] = at + every
+		if home_today or not strayed_of(production, town).is_empty():
+			continue  # One at a time, and not again the day one came home.
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("stray:%s:%d" % [town, due])
+		if rng.randf() >= float(rule.get("chance", 0.0)):
+			continue
+		var trades: Array = rule.get("trades", [])
+		var could: Array[String] = []
+		for id: String in towns[town]:
+			var who := production.worker(id)
+			if bool(who.get("away", false)) or str(who.get("origin", "")) == "appointed" or str(who.get("type", "")) == "merchant":
+				continue
+			if _trade_of(production, id) not in trades or bool(card_of(production, id).get("outcast", false)):
+				continue
+			could.append(id)
+		if could.is_empty():
+			continue
+		could.sort()
+		var id := could[rng.randi() % could.size()]
+		var card := card_of(production, id)
+		card[STRAYED] = {"since": at}
+		production.set_card(id, card)
+		production.set_away(id, true)
+		var name := str(production.worker(id).get("name", id))
+		learn(production, id, "%s lost %s way beyond the walls." % [name, _their(card)])
+		print("[townsfolk] %s: %s has not come back from beyond the walls, step %d" % [town, name, at])
+
+
+## The lost of [param town]: id -> the card's strayed record ({since, cell?}).
+static func strayed_of(production: Production, town: String) -> Dictionary:
+	var out := {}
+	for id: String in production.worker_ids(town):
+		var record: Variant = production.worker(id).get("card", {}).get(STRAYED)
+		if record is Dictionary:
+			out[id] = record
+	return out
+
+
+## Where the lost [param id] stands, once Main chose it; null before.
+static func stray_cell(production: Production, id: String) -> Variant:
+	var record: Variant = card_of(production, id).get(STRAYED)
+	if record is Dictionary and record.get("cell") is Array and record["cell"].size() == 2:
+		return Vector2i(int(record["cell"][0]), int(record["cell"][1]))
+	return null
+
+
+## Main chose [param cell] for the lost [param id] (kept on the card, so a
+## body is made there again after a zone change or a save).
+static func set_stray_cell(production: Production, id: String, cell: Vector2i) -> void:
+	var card := card_of(production, id)
+	if card.get(STRAYED) is Dictionary:
+		card[STRAYED]["cell"] = [cell.x, cell.y]
+		production.set_card(id, card)
+
+
+## The lost [param id] is home: walked by [param by_name] (a player), or on
+## their own (""): the card's record goes, economy counts them back, a
+## fact says how.
+static func came_home(production: Production, id: String, by_name: String) -> void:
+	var card := card_of(production, id)
+	if not card.get(STRAYED) is Dictionary:
+		return
+	var since := int(card[STRAYED].get("since", production.now()))
+	card.erase(STRAYED)
+	production.set_card(id, card)
+	production.set_away(id, false)
+	var name := str(production.worker(id).get("name", id))
+	if by_name.is_empty():
+		var days := maxi(int((production.now() - since) / maxi(DayNight.day_steps, 1)), 1)
+		learn(production, id, "%s found %s own way home after %d day%s beyond the walls." % [name, _their(card), days, "" if days == 1 else "s"])
+	else:
+		learn(production, id, "%s walked %s home from beyond the walls." % [by_name, name])
+
+
+## "her", "his" or "their" for [param card]'s pronoun.
+static func _their(card: Dictionary) -> String:
+	return {"she": "her", "he": "his"}.get(str(card.get("traits", {}).get("pronoun", "")), "their")
 
 
 ## Quarrels before the lawspeaker (decision 486): in [param town], with a

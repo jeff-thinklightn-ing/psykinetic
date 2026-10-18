@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_hidden()
 	_test_gold_lift()
 	_test_fence_and_catch()
+	_test_strays()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Offers.ctx = {}  # Static callables into this node would crash the quit.
@@ -280,6 +281,37 @@ func _test_fence_and_catch() -> void:
 	_now += 100
 	Townsfolk.tick(_work, _stock, economy)
 	_check(_work.worker("t-odo")["purse"] == 50, "and lifts nothing while he does")
+
+
+func _test_strays() -> void:
+	print("\n== someone loses their way beyond the walls, and comes home on their own (decision 487) ==")
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 0}, "strays": {"every": 100, "chance": 1.0, "days": 3, "far": 24, "trades": ["hauler"]}})
+	_setup()
+	Townsfolk._stray_due.clear()
+	Production.type_of = Callable()
+	_work.add_worker("s-nell", "Nell", ["hauler"], TOWN, "placeholder")
+	_work.add_worker("s-odo", "Odo", ["smith"], TOWN, "placeholder")
+	_work.add_worker("s-reeve", "Reeve", ["hauler"], TOWN, "appointed")
+	_work.add_worker("s-mab", "Mab", ["hauler"], TOWN, "placeholder", "merchant")
+	Production.type_of = Townsfolk.roll_type
+	Townsfolk.tick(_work, _stock)  # Arms the clock.
+	_now += 100
+	Townsfolk.tick(_work, _stock)
+	var lost := Townsfolk.strayed_of(_work, TOWN)
+	_check(lost.keys() == ["s-nell"] and _work.worker("s-nell")["away"] == true, "the one hauler who is neither an official nor the merchant is lost, and away (%s)" % [lost])
+	_check(str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).ends_with("lost her way beyond the walls.") or str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).ends_with("way beyond the walls."), "her card says so")
+	_check(Townsfolk.stray_cell(_work, "s-nell") == null, "where she stands is Main's to choose: nothing yet")
+	Townsfolk.set_stray_cell(_work, "s-nell", Vector2i(40, 7))
+	_check(Townsfolk.stray_cell(_work, "s-nell") == Vector2i(40, 7), "and kept on the card once chosen")
+	_now += 100
+	Townsfolk.tick(_work, _stock)
+	_check(Townsfolk.strayed_of(_work, TOWN).size() == 1, "one at a time per town")
+	_now += 3 * DayNight.day_steps
+	Townsfolk.tick(_work, _stock)
+	_check(Townsfolk.strayed_of(_work, TOWN).is_empty() and _work.worker("s-nell")["away"] == false, "after three days she found her own way home: back, not away")
+	_check(str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).contains("found") and str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).contains("own way home"),
+		"her card: %s" % [Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]])
+	Townsfolk._stray_due.clear()
 
 
 func _work_has(method: String) -> bool:

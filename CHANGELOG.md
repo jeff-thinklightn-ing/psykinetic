@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Someone walked home (decision 487, on 435 and Jeff's rule): now and then one of a town's people of the working trades loses their way beyond the walls and stands at a far cell of the town's zone (off held ground, reachable), away from work till walked home; their kin ask you to walk them home, a word to the lost one and they follow you at heel (companions' Heel), and reaching the town's ground pays whoever walked them (economy's commissions.escort, 8) with the notice and memories on both cards; after three days the lost find their own way back, so nobody is ever stranded.
 - Internal: the way a companion walks at your heel is shared, ready for townspeople
   who walk home with you (decision 485). Companions walk as before.
 - A quarrel brought before the lawspeaker (decision 486, on 435 and Jeff's rule): in a town with a sitting lawspeaker and rulings on, two residents who hold a grudge become a dispute before him on their own; the wronged one asks you to speak for them, a word to him when you see him lays it before him (nothing handed in), and his ruling, whichever it is, closes the quarrel on both cards and pays whoever spoke for them (economy's commissions.dispute, 5) with the notice and a memory of it; with the lawspeaker off (the server today) nothing changes.
