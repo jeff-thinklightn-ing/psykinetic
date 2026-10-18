@@ -11729,6 +11729,19 @@ under anyone's feet, Jeff's words on the castle as the persistent
 marker); a new prune field in the "world" message (the full resend does
 it); marking levels/castle (the halls are a level below it); keeping
 entities outside the anchors by name (their markers are gone).
+
+Amended (maps' side: raids take the regenerated map). Raid groups kept
+the WorldMap they were made with, its routes and every group's route, so
+after a generation they walked the old floor. WorldRaids.use_map(map)
+waits for the old routes, takes the new map and drops the routes and the
+groups' legs; each group's route is made again from where it stands when
+next it moves, and one with no way on from there breaks up as any group
+with no route does. Main._regenerate calls it after the holdings rebind
+(dungeon's side). Holdings.attach keeps any number of routes up with who
+holds what, held weakly on one place_taken connection (it connected once
+per routes, and a second set logged an engine error). raid_groups_test:
+a group under way when its camp's level is laid again without the way to
+the town breaks up.
 ## 466. A forest's canopy: trunks as void cells, a cover layer on every peer
 
 Jeff (2026-10-17, through the coordinator): "a forest zone - while walking

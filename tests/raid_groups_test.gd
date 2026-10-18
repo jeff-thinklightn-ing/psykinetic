@@ -11,7 +11,8 @@ extends Node
 ## sooner, the hungrier the sooner, and its group is for food, which goes
 ## with it into play and survives a restart, while a fed camp's is as ever;
 ## a group coming home to a fallen camp breaks up, its captive freed
-## (decision 429); a restart keeps the groups and the switch, one in play going on from
+## (decision 429); a group under way when a level is made again (465) goes
+## by the new map: its old route dropped, none there, it breaks up; a restart keeps the groups and the switch, one in play going on from
 ## where it was. In play for real (decision 408): the same map's town strip
 ## loaded into World, the group handed to the real World.raids, its raiders
 ## marching on the store, raiding it (Towns.raid_arrives), marching back out
@@ -55,6 +56,7 @@ func _ready() -> void:
 	_test_handed_over()
 	_test_hungry()
 	_test_fallen_home()
+	_test_new_map()
 	_test_saved()
 	_test_in_play()
 	print("")
@@ -239,6 +241,31 @@ func _test_fallen_home() -> void:
 		"a group coming home to a camp its side no longer holds breaks up, and Dag goes free (decision 429; %s)" % [held])
 	_check(_groups.camps().is_empty() and _groups.groups.is_empty(), "and the fallen camp sends no more")
 	_holdings.take(CAMP, "goblins")
+
+
+func _test_new_map() -> void:
+	print("== a level made again under a group's feet (decision 465) ==")
+	_fresh({})
+	_groups.set_on(true)
+	var id := _groups.send(CAMP, TOWN)
+	_tick()
+	var old_routes := _groups.routes
+	_check(id != "" and _groups.groups[id]["state"] == WorldRaids.OUT, "a group under way (%s)" % [_groups.groups.keys()])
+	# The town cut off from the camp: no neighbour east any more.
+	Level.register("rg_camp", Level.image_from_rows(_strip), null, {
+		"places": {"camp": {"at": [3, 2], "kind": "camp", "holder": "goblins", "worth": 10}}})
+	var names: Array[String] = ["rg_camp", "rg_town"]
+	var map := WorldMap.build(names)
+	_tick()
+	_check(_groups.groups.has(id), "on the old map's route it walks on")
+	_groups.use_map(map)
+	_check(_groups.world_map == map and _groups.routes != old_routes, "use_map: the new map, its routes made again")
+	_groups.routes.wait()
+	_tick()
+	_check(not _groups.groups.has(id), "no way on there from where it stands: it breaks up")
+	_register()
+	_fresh({})
+	_groups.set_on(true)
 
 
 func _test_saved() -> void:

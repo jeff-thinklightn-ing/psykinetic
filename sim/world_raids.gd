@@ -102,6 +102,17 @@ func finish() -> void:
 		_routes.wait()
 
 
+## The world as [param map] has it now (a level regenerated: decision 465):
+## the routes made on the old map waited for and dropped, made again when
+## next wanted, and every group's route with them, each going on from where
+## it is.
+func use_map(map: WorldMap) -> void:
+	finish()
+	world_map = map
+	_routes = null
+	_legs.clear()
+
+
 ## World.raids' signals, so groups come back from play.
 func hook(with_raids: Object) -> void:
 	raids = with_raids

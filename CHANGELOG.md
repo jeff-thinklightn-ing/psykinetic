@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Raiding parties on the world map follow a shifting level's new layout instead of its old one (465 amended).
 - Your companion speaks to what just happened. A threat comes before a
   friend's arrival, a kill of yours gets a word, "we should move on" lines
   come at most every half minute, and she no longer goes quiet by saying

@@ -31,6 +31,8 @@ var _since: Dictionary[String, int] = {}
 ## A fallen camp's id -> the faction that held it (decision 429): taken back
 ## by it in time (Main._retake_camps); forgotten once anyone holds it.
 var _fell_from: Dictionary[String, String] = {}
+## The routes kept up with who holds what (attach), held weakly.
+var _attached: Array[WeakRef] = []
 
 
 ## The holdings of [param world_map]'s places: their starting holders, then
@@ -248,24 +250,28 @@ func make_routes(world_map: WorldMap) -> WorldRoutes:
 
 ## Keeps [param routes]' obstacles up with who holds what: now, and on every
 ## place taken (only that place's area is made again). The routes are held
-## weakly: once they are freed, this stops.
+## weakly: once they are freed, this stops. Any number may be attached, one
+## after another (raids given a regenerated map: decision 465).
 func attach(routes: WorldRoutes) -> void:
-	var held: WeakRef = weakref(routes)
 	for faction in routes.factions():
 		for area_name in _areas():
 			routes.set_obstacles(faction, area_name, blocked_cells(area_name, faction))
+	_attached = _attached.filter(func(held: WeakRef) -> bool: return held.get_ref() != null)
+	_attached.append(weakref(routes))
 	# A bound method, not a lambda: a lambda here would hold this Holdings
 	# in its own signal, and neither would ever be freed.
-	place_taken.connect(_retake_routes.bind(held))
+	if not place_taken.is_connected(_retake_routes):
+		place_taken.connect(_retake_routes)
 
 
-func _retake_routes(id: String, _from: String, _to: String, held: WeakRef) -> void:
-	var live: WorldRoutes = held.get_ref()
-	if live == null:
-		return
+func _retake_routes(id: String, _from: String, _to: String) -> void:
 	var area_name: String = _places[id]["area"]
-	for faction in live.factions():
-		live.set_obstacles(faction, area_name, blocked_cells(area_name, faction))
+	for held: WeakRef in _attached:
+		var live: WorldRoutes = held.get_ref()
+		if live == null:
+			continue
+		for faction in live.factions():
+			live.set_obstacles(faction, area_name, blocked_cells(area_name, faction))
 
 
 ## The areas with places, sorted.
