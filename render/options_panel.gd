@@ -12,7 +12,9 @@ extends PanelContainer
 ## decision 385), the window (fullscreen or windowed, Net.set_fullscreen)
 ## and the windowed resolution (Net.set_window_size). Controls: the scheme
 ## (click to move or WASD, Net.set_controls) and whether the controls list
-## shows (H; Net.set_hints, hints_changed for Main). Sizes in the HUD's
+## shows (H; Net.set_hints, hints_changed for Main). Credits: who made the
+## sounds (credit_providers, decision 406), a line each and a button for the
+## full list with each maker's page. Sizes in the HUD's
 ## 3840 x 2160 units; its look is the shared theme's (UiTheme,
 ## docs/ui_style.md): the title the Title variation, a section's name a
 ## Heading, a note a Caption.
@@ -79,6 +81,22 @@ func _ready() -> void:
 		func(value: String) -> void:
 			Net.set_hints(value == "on")
 			hints_changed.emit(value == "on")))
+	_credits_section(add_section("Credits"))
+
+
+## Who made what the game uses (decision 406): a Callable each giving
+## {summary, entries: [{title, by, license, url}]}; sound's now, art's, the
+## fonts' and the animations' can join here. THIRD_PARTY.md (in the zip)
+## has everything.
+static func credit_providers() -> Array[Callable]:
+	return [SoundKit.credits]
+
+
+## The Credits section's full list (a plain ScrollContainer, which the
+## theme insets, decision 401), shown by its button.
+var credits_box: ScrollContainer
+var credits_list: VBoxContainer
+var credits_button: Button
 
 
 ## A titled section, its controls to be added to the box returned.
@@ -244,6 +262,61 @@ func _show_resolution() -> void:
 		resolution.add_item("%d x %d" % [size.x, size.y])
 		resolution.set_item_metadata(resolution.item_count - 1, size)
 	resolution.select(sizes.find(Net.window_size))
+
+
+## Credits: each provider's summary line, then a button that shows the
+## full list, every credited thing with its maker, licence and page. The
+## theme styles all of it: nothing is set here but sizes.
+func _credits_section(section: VBoxContainer) -> void:
+	var providers: Array[Dictionary] = []
+	for provider: Callable in credit_providers():
+		providers.append(provider.call())
+	for given: Dictionary in providers:
+		section.add_child(_credit_label(str(given.get("summary", "")), true))
+	section.add_child(_credit_label("Every asset and its licence: THIRD_PARTY.md, beside the game.", true))
+	credits_button = Button.new()
+	credits_button.text = "Show all credits"
+	credits_button.focus_mode = Control.FOCUS_NONE
+	credits_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	credits_button.pressed.connect(toggle_credits)
+	section.add_child(credits_button)
+	credits_box = ScrollContainer.new()
+	credits_box.custom_minimum_size.y = 600.0
+	credits_box.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	credits_box.visible = false
+	section.add_child(credits_box)
+	credits_list = VBoxContainer.new()
+	credits_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	credits_box.add_child(credits_list)
+	for given: Dictionary in providers:
+		for entry: Dictionary in given.get("entries", []):
+			credits_list.add_child(_credit_label("\"%s\" by %s" % [entry.get("title", ""), entry.get("by", "")], false))
+			credits_list.add_child(_credit_label(str(entry.get("license", "")), true))
+			var url := str(entry.get("url", ""))
+			if url != "":
+				var link := LinkButton.new()
+				link.text = url
+				link.focus_mode = Control.FOCUS_NONE
+				link.pressed.connect(OS.shell_open.bind(url))
+				credits_list.add_child(link)
+
+
+## Shows or hides the full credits list.
+func toggle_credits() -> void:
+	credits_box.visible = not credits_box.visible
+	credits_button.text = "Hide credits" if credits_box.visible else "Show all credits"
+
+
+## A wrapping line of the credits; [param caption] a dimmer one (the
+## theme's Caption).
+func _credit_label(text: String, caption: bool) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = WIDTH - 80.0
+	if caption:
+		label.theme_type_variation = &"Caption"
+	return label
 
 
 ## A label in the theme's body text; [param size] only when another size

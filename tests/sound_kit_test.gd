@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_folders()
 	_test_sfx_plays_slots()
 	await _test_ui_sounds()
+	_test_credits()
 	_test_status_current()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -357,6 +358,31 @@ func _without_takes(slots: Array) -> void:
 	for slot: String in slots:
 		SoundKit.all_takes().erase(slot)
 	SoundKit._files.clear()
+
+
+func _test_credits() -> void:
+	print("
+== the Credits section's sounds (decision 406): each source in play by name, each maker once ==")
+	var given := SoundKit.credits()
+	_check(str(given.get("summary", "")) == "Sounds: Freesound, Kenney, Sonniss", "summary: %s" % given.get("summary"))
+	var entries: Array = given.get("entries", [])
+	var urls := {}
+	var problems: Array[String] = []
+	for entry: Dictionary in entries:
+		for key: String in ["title", "by", "license", "url"]:
+			if str(entry.get(key, "")) == "":
+				problems.append("%s has no %s" % [entry, key])
+		if urls.has(entry.get("url")):
+			problems.append("%s twice" % entry.get("url"))
+		urls[entry.get("url")] = true
+	_check(not entries.is_empty() and problems.is_empty(), "%d entries, each with a title, maker, licence and page, once%s" % [
+		entries.size(), "" if problems.is_empty() else ": " + "; ".join(problems.slice(0, 3))])
+	var missing: Array[String] = []
+	for slot: String in SoundKit.all_takes():
+		for take: Dictionary in SoundKit.takes(slot):
+			if str(take.get("license", "")).begins_with("CC BY") and not urls.has(str(take.get("url", ""))):
+				missing.append(slot)
+	_check(missing.is_empty(), "every CC BY take's maker is credited (missing: %s)" % [missing])
 
 
 func _test_ui_sounds() -> void:

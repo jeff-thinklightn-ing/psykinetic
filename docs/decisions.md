@@ -9921,3 +9921,30 @@ Clients cope: no answer within 2 s is "no answer" (ui shows "status
 unknown"), and joining never depends on it.
 
 tests/status_test.
+
+## 406. Credits in the options: who made the sounds, from the takes list
+
+The options panel ends with a Credits section. It names who made what the game
+plays, without the player opening THIRD_PARTY.md.
+- What it shows: a summary line per provider ("Sounds: Freesound, Kenney,
+  Sonniss": each source a slot plays now, by its maker's name), a caption
+  that THIRD_PARTY.md beside the game lists every asset and its licence, and
+  a "Show all credits" button. The button shows a list of each sound a take
+  was cut from that has a maker: "title" by maker, its licence, and a link to
+  its page (OS.shell_open).
+- Where it comes from: SoundKit.credits() reads art/audio/takes.json and
+  slots.json, the same lists THIRD_PARTY.md's sound block is written from,
+  so the two cannot disagree. A source used by several takes is listed once.
+- Extensible: OptionsPanel.credit_providers() is a list of Callables each
+  giving {summary, entries: [{title, by, license, url}]}. Sound's is the
+  first; art, the fonts (OFL) and animations (Quaternius) add theirs there.
+- Look: the shared theme's (401). A plain ScrollContainer (inset, brass bar),
+  600 high, holds a VBoxContainer that fills the width so lines wrap; the
+  summary and licences are Captions. Nothing else is styled here.
+sound_kit_test (the summary, each entry complete and once, every CC BY take
+credited); view_test (the list hidden, a link per entry, the button shows
+and hides it).
+Client only: the protocol is unchanged.
+Rejected: a separate credits screen from the title menu (there is none yet;
+the options are where a player looks); copying THIRD_PARTY.md's text into the
+panel (it is long, Markdown, and written for the zip).

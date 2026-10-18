@@ -192,6 +192,14 @@ func _test_options_panel() -> void:
 	Net._settings_override = saved_override
 	DirAccess.remove_absolute(path)
 	Net.set_antialias(aa_was, false)
+	var credited: int = SoundKit.credits()["entries"].size()
+	_check(panel.credits_box != null and not panel.credits_box.visible
+			and panel.credits_list.get_children().filter(func(node: Node) -> bool: return node is LinkButton).size() == credited,
+			"Credits: the list hidden, a page link per credited sound (%d; decision 406)" % credited)
+	panel.credits_button.pressed.emit()
+	_check(panel.credits_box.visible and panel.credits_button.text == "Hide credits", "its button shows the list")
+	panel.credits_button.pressed.emit()
+	_check(not panel.credits_box.visible, "and hides it")
 	_main.toggle_options()
 	_check(not panel.visible, "O again hides it")
 	Net.set_volume("ambience_volume", was, false)

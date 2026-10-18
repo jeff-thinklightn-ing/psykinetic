@@ -344,6 +344,41 @@ static func handled(id: String, what: String) -> String:
 	return "sfx.item_drop_" + weight
 
 
+## The sounds' credits for the game's Credits (decision 406):
+## {summary: "Sounds: <each source a slot plays from now, by name>",
+##  entries: [{title, by, license, url}] each sound a take was cut from that
+##  has a maker (Freesound's: CC BY asks it, CC0 has it too), once however
+##  many takes it gave}.
+static func credits() -> Dictionary:
+	var sources: Dictionary = manifest().get("sources", {})
+	var all := slots().keys()
+	all.sort()
+	var used: Array[String] = []
+	for name: String in sources:
+		for slot: String in all:
+			if filled_by(slot) != "placeholder" and name in _sources_of(slot):
+				# "Impact Sounds 1.0, Kenney" -> Kenney; "Freesound" as it is.
+				var full := str(sources[name].get("name", name))
+				var short := full.get_slice(", ", 1) if ", " in full else full
+				if short not in used:
+					used.append(short)
+				break
+	used.sort()
+	var seen := {}
+	var entries: Array[Dictionary] = []
+	for slot: String in all:
+		for take: Dictionary in takes(slot):
+			var url := str(take.get("url", ""))
+			if str(take.get("by", "")) == "" or seen.has(url):
+				continue
+			seen[url] = true
+			var original := str(take.get("original", ""))
+			var title := original.get_slice(": ", 1) if ": " in original else original
+			entries.append({"title": title.get_slice(" (from ", 0), "by": str(take["by"]),
+				"license": str(take.get("license", source(str(take.get("from", ""))).get("license", "?"))), "url": url})
+	return {"summary": "Sounds: " + ", ".join(used), "entries": entries}
+
+
 ## Forget what was resolved (after takes land, for tools and tests).
 static func reload() -> void:
 	_manifest = {}
