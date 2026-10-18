@@ -13166,6 +13166,19 @@ can be down by seed, and the ears scaled about their root.
 view_test: each goblin its own by name, alike for the same name; one shared material, the look
 as instance parameters; a raid of 40 with marks and builds; the outline's stencil with the
 goblin's shader. Sheet of ten for Jeff: C:\dev\review\goblins\goblins_v1.png.
+
+Amended (the coordinator's item 5, and perf's first-hover hitch): the goblin's hood and ears.
+tools/goblin_hood.py makes art/models/characters/goblin.glb again from its .blend: the hood's
+faces above the neck (cloth by the paint, not its skin's green nor the face's dark details)
+split off into their own skinned mesh, "Hood"; the hole they leave filled, and the back of the
+head closed by a skin-green dome on the Head bone; two shape keys on the body, Ears_Big and
+Ears_Small, its ears scaled about their roots. goblin_look draws after all else (so a goblin
+keeps the look it had) its hood up (GOBLIN_HOOD_UP) or down, bare-headed, and its ears from
+small to big, with words for each where it stands out ("hood=down", "ears=big"); _make_model
+shows the Hood or not and sets the keys. The hover outline's stencil twin is warmed at the first
+room build through 495's warm_ups (Client3D.warm_goblin, two skinned goblins, one in each):
+cold, its first use took a 20.6 ms frame; warmed, the hover frame is 0.7 ms (a scratch scene on
+a fresh profile, against 3.2 to 4.0 ms unwarmed once the driver's own cache had it).
 ## 489. BuildingComposer: a kind's look, seeded, off the grid
 
 Step 3 of Jeff's building variety (488 is step 1; art-kit's slots are

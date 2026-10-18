@@ -657,6 +657,11 @@ const GOBLIN_GEAR := {"brown": "6b4a35", "dark": "3d2a1f", "grey": "7d8086", "re
 const GOBLIN_OWN_GEAR := 0.3
 const GOBLIN_MARKS := ["scarred", "striped", "red-handed"]
 const GOBLIN_UNMARKED := 0.55
+## Its hood up (GOBLIN_HOOD_UP of the time) or down, bare-headed; its ears
+## from small to big (goblin.glb's Ears_Small and Ears_Big, tools/goblin_hood.py),
+## a word past GOBLIN_EARS_SAID either way (decision 494 amended).
+const GOBLIN_HOOD_UP := 0.7
+const GOBLIN_EARS_SAID := 0.6
 const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
 ## A PersonLook's posture: its pose in the clips (rest plus the bend,
 ## tools/humanoid_clips.py), added at full weight.
@@ -3251,7 +3256,7 @@ static func _warm_art() -> void:
 ## cast below the ground). Godot (Forward+ on d3d12, 4.4 and on) also
 ## compiles pipelines in the background with its ubershaders, and keeps a
 ## shader cache in user data: check those before adding a warm-up.
-static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm")]
+static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin")]
 static var _warmed_ups: Dictionary[String, bool] = {}
 const WARM_FRAMES := 2
 const WARM_DEPTH := 6.0
@@ -6872,6 +6877,13 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 			mesh.set_instance_shader_parameter("skin", look["skin"])
 			mesh.set_instance_shader_parameter("gear", look["gear"])
 			mesh.set_instance_shader_parameter("mark", look["mark"])
+			if mesh.name == "Hood":
+				mesh.visible = look["hood"]
+			var ears := float(look["ears"])
+			for key: String in ["Ears_Big", "Ears_Small"]:
+				var index := mesh.find_blend_shape_by_name(key)
+				if index >= 0:
+					mesh.set_blend_shape_value(index, maxf(ears, 0.0) if key == "Ears_Big" else maxf(-ears, 0.0))
 	if model.has("tint"):
 		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
@@ -7124,6 +7136,22 @@ static func _tint(scene: Node3D, material: String, colour: Color) -> void:
 				mesh.set_surface_override_material(surface, tinted)
 
 
+## Two goblins for the warm-up (warm_ups, decision 495; 494 amended): one in
+## GOBLIN_MATERIAL, one in its hover outline's stencil twin, skinned and
+## casting shadows as in play, so the first hover on a goblin does not stall
+## a frame compiling the twin (20.6 ms, cold, before).
+static func warm_goblin() -> Node3D:
+	var piece := Node3D.new()
+	var twin := GOBLIN_MATERIAL.duplicate() as ShaderMaterial
+	twin.shader = GOBLIN_MARKING_SHADER
+	for material: Material in [GOBLIN_MATERIAL, twin]:
+		var scene := (load(MODELS["imp"]["scene"]) as PackedScene).instantiate() as Node3D
+		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+			mesh.material_override = material
+		piece.add_child(scene)
+	return piece
+
+
 ## A goblin's look by its name (decision 494), the same on every peer (a
 ## hash of the name's bytes, not the engine's String.hash): {width, skin
 ## (Vector3: hue shift, saturation, value), gear (Color, its amount in .a),
@@ -7165,7 +7193,14 @@ static func goblin_look(goblin_name: String) -> Dictionary:
 		words.append("gear=" + gear_name)
 	if marked:
 		words.append("mark=" + GOBLIN_MARKS[mark_index])
-	return {"width": width, "skin": skin, "gear": gear, "mark": mark, "words": " ".join(words)}
+	# Drawn after the rest, so a goblin keeps the look it had before (494 amended).
+	var hood := rng.randf() < GOBLIN_HOOD_UP
+	var ears := rng.randf_range(-1.0, 1.0)
+	if not hood:
+		words.append("hood=down")
+	if absf(ears) > GOBLIN_EARS_SAID:
+		words.append("ears=" + ("big" if ears > 0.0 else "small"))
+	return {"width": width, "skin": skin, "gear": gear, "mark": mark, "hood": hood, "ears": ears, "words": " ".join(words)}
 
 
 ## [param entity]'s own look and manner (see MODEL_MASS), on its puppet:

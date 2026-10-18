@@ -2323,6 +2323,21 @@ func _test_goblins_differ() -> void:
 		if "build=" in str(look["words"]):
 			stocky_or_lean += 1
 	_check(marked > 5 and marked < 30 and stocky_or_lean > 5, "a raid of 40: %d marked, %d lean or stocky" % [marked, stocky_or_lean])
+	# Its hood and ears (494 amended): the hood its own mesh, shown or not; its ears' shape keys.
+	var hood_mesh := a.find_children("Hood", "MeshInstance3D", true, false)
+	var goblin_body: MeshInstance3D = a.find_children("*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool:
+		return m.name != "Hood" and m.get_parent() is Skeleton3D)[0]
+	var big_key := goblin_body.find_blend_shape_by_name("Ears_Big")
+	var small_key := goblin_body.find_blend_shape_by_name("Ears_Small")
+	_check(hood_mesh.size() == 1 and (hood_mesh[0] as MeshInstance3D).visible == bool(la["hood"]) and big_key >= 0 and small_key >= 0
+			and is_equal_approx(goblin_body.get_blend_shape_value(big_key), maxf(float(la["ears"]), 0.0))
+			and is_equal_approx(goblin_body.get_blend_shape_value(small_key), maxf(-float(la["ears"]), 0.0)),
+			"its hood %s, its ears %.2f" % ["up" if la["hood"] else "down", la["ears"]])
+	var bare := 0
+	for i in 40:
+		if not Client3D.goblin_look("Raider%d" % i)["hood"]:
+			bare += 1
+	_check(bare > 4 and bare < 25, "a raid of 40: %d bare-headed" % bare)
 	var animators: Array[AnimRig] = [a.get_meta("rig"), b.get_meta("rig")]
 	_check(absf(animators[0].position() - animators[1].position()) > 0.01,
 			"standing side by side, out of step (%.2f s, %.2f s into Idle)" % [animators[0].position(), animators[1].position()])
