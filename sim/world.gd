@@ -2298,7 +2298,7 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 	taken_uids[from_slot] = 0
 	from.slots = taken
 	from.slot_items = taken_uids
-	_bank_thing(place, uid, _label_of(by), _label_of(from), depot.zone, depot.tile)
+	_bank_thing(place, uid, _label_of(by), _label_of(from), depot.zone, depot.tile, owner_of(by))
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
 	_slots_changed(from)
 	return true
@@ -2307,13 +2307,13 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 ## Banks the instance [param uid] (held by nothing now) at stockpile
 ## [param place], brought [param who] someone from [param from]: a resource
 ## item as its yield (its instance ended, "banked"), gear as itself.
-func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i) -> void:
+func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i, by_id := "") -> void:
 	var yields := Items.yield_of(items.id_of(uid))
 	if yields.is_empty():
-		stockpile.bank(place, uid, who, from, at_zone, tile)
+		stockpile.bank(place, uid, who, from, at_zone, tile, "banked", by_id)
 		return
 	for what: String in yields:
-		stockpile.deposit(place, what, int(yields[what]), who, from)
+		stockpile.deposit(place, what, int(yields[what]), who, from, by_id)
 	items.end(uid, "banked", "%s by %s" % [place, who], at_zone, tile)
 
 

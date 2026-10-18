@@ -7126,6 +7126,16 @@ Players depositing and borrowing at the counter is a later step.
 Snapshot: workers gain `loan` and `working_off`; older saves owe nothing.
 Server only.
 
+Amended for npc's 435 (conversation offers; economy's side, no number of
+its own): Economy.pay_loan(player, worker, gold) lets a player pay a
+resident's debt to the bank (never more than they have or it owes; the
+loan lowered through set_loan, "paid the town's coffer back" at nothing);
+Economy.pay_commission(player, town, gold) pays a commission met from the
+treasury, never below gold_floor, at rules' "commissions" (rescue 10,
+camp 20, fetch 1 a unit, npc's to use); Stockpile.deposited(place, by,
+by_id, what, count) says who banked what (by_id the carrier key,
+"player:<id>", from a depot), for fetch commissions.
+
 ## 355. A town's residents have bodies only while someone is near
 
 Far-tier step (b) (decision 352 is (a)). A resident is Towns' and

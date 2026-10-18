@@ -552,6 +552,44 @@ func _pay(town: String, payee: String, amount: int, kind: String, why: String) -
 	return str(worker["name"])
 
 
+# --- For npc's offers (decision 435, economy's side) -------------------------------
+
+## Player [param player_id] pays up to [param gold] of worker
+## [param worker_id]'s loan to their town's bank: never more than they have
+## or it owes. The loan lowered (Production.set_loan: loan_changed), the
+## treasury paid, a ledger line. The gold paid.
+func pay_loan(player_id: String, worker_id: String, gold_offered: int) -> int:
+	var who := production.worker(worker_id)
+	if who.is_empty() or player_id.is_empty():
+		return 0
+	var owed := float(who["loan"])
+	var paid := mini(mini(gold_offered, gold(player_id)), ceili(owed))
+	if paid <= 0:
+		return 0
+	var town := str(who["town"])
+	add_gold(player_id, -paid, "paid %s's debt to %s" % [who["name"], town])
+	stockpile.deposit(town, "gold", paid, "debt:%s" % player_id, "%s paid %d of %s's debt to the town" % [player_id, paid, who["name"]])
+	var left := maxf(owed - paid, 0.0)
+	production.set_loan(worker_id, left, bool(who["working_off"]) and left > 0.0)
+	if left <= 0.0:
+		stockpile.note(town, "gold", 0, "debt:%s" % player_id, "%s has paid the town's coffer back" % who["name"])
+	return paid
+
+
+## [param town]'s treasury pays player [param player_id] up to
+## [param gold] for a commission met (rules' "commissions" say how much
+## for what; npc's), never below gold_floor. The gold paid.
+func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
+	if player_id.is_empty() or gold_owed <= 0:
+		return 0
+	var paid := mini(gold_owed, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
+	if paid <= 0 or not stockpile.take(town, "gold", paid, "commission:%s" % player_id):
+		return 0
+	add_gold(player_id, paid, "a commission from %s" % town)
+	stockpile.note(town, "gold", -paid, "commission:%s" % player_id, "paid %s %d gold for a commission" % [player_id, paid])
+	return paid
+
+
 # --- Saving --------------------------------------------------------------------------
 
 ## For the snapshot: {purses: {player id: gold}, log}.

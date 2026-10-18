@@ -18,6 +18,13 @@ extends RefCounted
 ## World keeps one (World.stockpile), made by Main at boot from the
 ## snapshot ("stockpile": to_dict). Null on a client.
 
+## Something was banked at [param place] (deposit, bank): [param what] (a
+## resource, or a thing's id), [param count] of it, brought by [param by]
+## (as the caller names them) whose carrier key is [param by_id]
+## ("player:<id>", "" if unknown): npc's fetch commissions (decision 435,
+## economy's side).
+signal deposited(place: String, by: String, by_id: String, what: String, count: int)
+
 const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food", "meat", "hide", "leather"]
 const KIND := "stockpile"
 ## The faction whose stockpiles take deposits.
@@ -197,12 +204,13 @@ func ledger(place: String) -> Array[Dictionary]:
 ## Banks [param amount] of resource [param what] at [param place], brought
 ## [param by] someone [param from] somewhere. False (nothing banked) for no
 ## place, an amount under 1, or no such resource.
-func deposit(place: String, what: String, amount := 1, by := "", from := "") -> bool:
+func deposit(place: String, what: String, amount := 1, by := "", from := "", by_id := "") -> bool:
 	if place.is_empty() or amount < 1 or what not in RESOURCES:
 		return false
 	var store := _store(place)
 	store["resources"][what] = int(store["resources"].get(what, 0)) + amount
 	_record(store, what, amount, by, from)
+	deposited.emit(place, by, by_id, what, amount)
 	print("[stockpile] %s banked %d %s at %s (from %s), step %d" % [by if by != "" else "someone", amount,
 		what, place, from if from != "" else "nowhere said", now()])
 	return true
@@ -213,7 +221,7 @@ func deposit(place: String, what: String, amount := 1, by := "", from := "") -> 
 ## [param zone] [param tile]: the book has it at the store, carried by
 ## nobody, with an [param event] ("banked"; none for "", as for a thing a
 ## cancelled job gives back). False (nothing banked) if not.
-func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vector2i(-1, -1), event := "banked") -> bool:
+func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vector2i(-1, -1), event := "banked", by_id := "") -> bool:
 	if place.is_empty() or not book.has(uid) or uid in all_items():
 		return false
 	var store := _store(place)
@@ -222,6 +230,7 @@ func bank(place: String, uid: int, by := "", from := "", zone := "", tile := Vec
 	if not event.is_empty():
 		book.note(uid, event, "%s by %s" % [place, by if by != "" else "someone"], zone, tile)
 	_record(store, book.id_of(uid), 1, by, from, uid)
+	deposited.emit(place, by, by_id, book.id_of(uid), 1)
 	print("[stockpile] %s banked %s (#%d) at %s (from %s), step %d" % [by if by != "" else "someone",
 		Items.name_of(book.id_of(uid)), uid, place, from if from != "" else "nowhere said", now()])
 	return true

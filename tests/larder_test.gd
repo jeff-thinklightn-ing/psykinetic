@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_raid()
 	_test_hunter()
 	_test_mend()
+	_test_offers()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -214,6 +215,45 @@ func _test_mend() -> void:
 	_check(_started(work, 1200).is_empty(), "nothing worn left: no more mending")
 	var saved := Production.new(JSON.parse_string(JSON.stringify(work.to_dict())), work.stockpile, null, func() -> int: return _now, _rules)
 	_check(saved.jobs().is_empty(), "and nothing left over in a save")
+
+
+## npc's offers' hooks (decision 435, economy's side): a player pays a
+## resident's debt, the store says who banked what, the treasury pays a
+## commission never below its floor.
+func _test_offers() -> void:
+	print("
+== hooks for npc's offers ==")
+	var rules := _rules.duplicate(true)
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, rules)
+	var economy := Economy.new({}, stock, work, clock, rules)
+	work.add_worker("h1", "Ash", ["hauler"], TOWN)
+	work.set_loan("h1", 7.5, true)
+	var told: Array = []
+	work.loan_changed.connect(func(id: String, owed: float, working: bool) -> void: told.append([id, owed, working]))
+	economy.add_gold("p1", 5, "test")
+	_check(economy.pay_loan("p1", "h1", 20) == 5 and economy.gold("p1") == 0 and stock.count(TOWN, "gold") == 5,
+		"pay_loan: never more than the player has (5 of 7.5)")
+	_check(is_equal_approx(float(work.worker("h1")["loan"]), 2.5) and told.back() == ["h1", 2.5, true], "the loan lowered, loan_changed said")
+	economy.add_gold("p1", 10, "test")
+	_check(economy.pay_loan("p1", "h1", 10) == 3 and float(work.worker("h1")["loan"]) == 0.0 and not work.worker("h1")["working_off"],
+		"never more than it owes (3); paid off")
+	_check(stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return "has paid the town's coffer back" in str(line.get("from", ""))), "the ledger says so")
+	var banked: Array = []
+	stock.deposited.connect(func(place: String, by: String, by_id: String, what: String, count: int) -> void: banked.append([place, by, by_id, what, count]))
+	stock.deposit(TOWN, "wood", 5, "Player1", "", "player:p1")
+	var uid := stock.book.mint("dagger", "made", "test")
+	stock.bank(TOWN, uid, "Player1", "", "", Vector2i(-1, -1), "banked", "player:p1")
+	_check(banked == [[TOWN, "Player1", "player:p1", "wood", 5], [TOWN, "Player1", "player:p1", "dagger", 1]], "deposited: who banked what (%s)" % [banked])
+	var floor_gold := int(rules.get("gold_floor", 0))
+	stock.deposit(TOWN, "gold", floor_gold + 12)
+	var have := stock.count(TOWN, "gold")
+	var paid := economy.pay_commission("p2", TOWN, 1000)
+	_check(paid > 0 and paid == maxi(have - floor_gold, 0) and stock.count(TOWN, "gold") == mini(have, floor_gold) and economy.gold("p2") == paid,
+		"pay_commission: what the treasury has above its floor (%d)" % paid)
+	_check(int(rules["commissions"]["rescue"]) == 10 and int(rules["commissions"]["camp"]) == 20 and int(rules["commissions"]["fetch"]) == 1, "commissions' rates in the rules")
 
 
 func _check(ok: bool, what: String) -> void:
