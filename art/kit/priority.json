@@ -71,6 +71,11 @@
 			"slots": ["creature.deer", "creature.stag", "creature.wolf"]
 		},
 		{
+			"name": "monster bodies",
+			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)",
+			"slots": ["creature.orc", "creature.kobold"]
+		},
+		{
 			"name": "profiles",
 			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model",
 			"slots": ["wall.castle.profile", "wall.wood.profile", "wall.stone.profile", "wall.cave.profile", "roof.shingle.profile"]

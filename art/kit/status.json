@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 154,
 		"fill": 0,
-		"placeholder": 13
+		"placeholder": 15
 	},
 	"slots": [
 		{
@@ -1759,31 +1759,31 @@
 			"for": "pc-character: the pack's animals moved onto palette swatches (art-kit drops them in)"
 		},
 		{
-			"slot": "wall.castle.profile",
+			"slot": "creature.orc",
 			"status": "placeholder",
-			"group": "profiles",
+			"group": "monster bodies",
 			"order": 160,
-			"type": "profile",
-			"kind": "edge",
-			"category": "walls",
-			"size": "0.5 x 3.0 x 1.0",
-			"budget": 0,
-			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+			"type": "mesh",
+			"kind": "creature",
+			"category": "creatures",
+			"size": "0.85 x 1.95 x 0.5",
+			"budget": 5000,
+			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
 		{
-			"slot": "wall.wood.profile",
+			"slot": "creature.kobold",
 			"status": "placeholder",
-			"group": "profiles",
+			"group": "monster bodies",
 			"order": 161,
-			"type": "profile",
-			"kind": "edge",
-			"category": "walls",
-			"size": "0.3 x 3.0 x 1.0",
-			"budget": 0,
-			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+			"type": "mesh",
+			"kind": "creature",
+			"category": "creatures",
+			"size": "0.45 x 1.0 x 0.75",
+			"budget": 5000,
+			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
 		{
-			"slot": "wall.stone.profile",
+			"slot": "wall.castle.profile",
 			"status": "placeholder",
 			"group": "profiles",
 			"order": 162,
@@ -1795,10 +1795,34 @@
 			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
 		},
 		{
-			"slot": "wall.cave.profile",
+			"slot": "wall.wood.profile",
 			"status": "placeholder",
 			"group": "profiles",
 			"order": 163,
+			"type": "profile",
+			"kind": "edge",
+			"category": "walls",
+			"size": "0.3 x 3.0 x 1.0",
+			"budget": 0,
+			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+		},
+		{
+			"slot": "wall.stone.profile",
+			"status": "placeholder",
+			"group": "profiles",
+			"order": 164,
+			"type": "profile",
+			"kind": "edge",
+			"category": "walls",
+			"size": "0.5 x 3.0 x 1.0",
+			"budget": 0,
+			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+		},
+		{
+			"slot": "wall.cave.profile",
+			"status": "placeholder",
+			"group": "profiles",
+			"order": 165,
 			"type": "profile",
 			"kind": "edge",
 			"category": "walls",
@@ -1810,7 +1834,7 @@
 			"slot": "roof.shingle.profile",
 			"status": "placeholder",
 			"group": "profiles",
-			"order": 164,
+			"order": 166,
 			"type": "profile",
 			"kind": "cell",
 			"category": "roofs",
@@ -1822,7 +1846,7 @@
 			"slot": "item.buckler",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 165,
+			"order": 167,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
@@ -1833,7 +1857,7 @@
 			"slot": "item.leather",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 166,
+			"order": 168,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
@@ -1844,7 +1868,7 @@
 			"slot": "item.roast",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 167,
+			"order": 169,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
