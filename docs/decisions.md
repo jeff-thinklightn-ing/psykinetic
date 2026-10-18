@@ -12286,3 +12286,25 @@ was the same face and every tunic bare.
 
 view_test _test_person_garb. Sheets for Jeff in C:\dev\review\people\: people_v1.png
 (ten seeds; a row of trades), faces_v1.png (each plane at full), garb_v1.png.
+## 483. A monster's hands are seen by every peer
+
+pc-character: on a client that is not the host no monster showed what it
+held, and a goblin archer's "draw" (455, 462) drew no bow, since a
+monster's slots were server only (338) and Client3D reads entity.slots and
+World.drawn_with. Its clips looked right because they ran as host. The
+coordinator: the playtest build's biggest visible hole, ahead of the rest;
+the hands, not the pack, to keep what is sent small.
+- A Monster (and so an Animal) replicates "hands", [right, left] Items ids
+  ("" empty), from its spawn on; empty for one without hands (Items.CARRIED
+  slots, a kind's "wields").
+- On the server it follows the slots: GridEntity.slots has a setter calling
+  _slots_set, which a Monster overrides; World writes slots whole, so every
+  change (a pick-up, 347; a drop; set_slots) reaches it.
+- On a client its setter writes the two into its slots (the pack empty), so
+  Client3D, holds_in_hands and drawn_with read a monster's hands as a
+  player's, with no change on the client's side.
+A new replicated name, seen by protocol() itself: the protocol changes
+with no PROTOCOL_REVISION bump (release); the server ships with the next
+cut.
+
+tests/monster_test (the replication config; the kobold case's hands).

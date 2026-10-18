@@ -353,6 +353,31 @@ var world_queued := false
 var far_since := -1
 
 
+## Its two hands, [right, left] Items ids ("" empty), when it has them
+## (Items.CARRIED slots, a kind's "wields", decision 338); else empty.
+## Replicated (decision 483) where its slots are not, so a client draws
+## what it holds and the bow it draws without being sent its pack: the
+## server's follows its slots (_slots_set); a client's is written into
+## them, the pack left empty, for the views to read as a player's.
+var hands := PackedStringArray():
+	set(value):
+		hands = value
+		if value.size() != 2:
+			return
+		if slots.size() == Items.CARRIED and slots[Items.RIGHT_HAND] == value[0] and slots[Items.LEFT_HAND] == value[1]:
+			return
+		var held := slots.duplicate() if slots.size() == Items.CARRIED else Items.tidy([], Items.CARRIED)
+		held[Items.RIGHT_HAND] = value[0]
+		held[Items.LEFT_HAND] = value[1]
+		slots = held
+
+
+func _slots_set() -> void:
+	var now := PackedStringArray([slots[Items.RIGHT_HAND], slots[Items.LEFT_HAND]]) if slots.size() == Items.CARRIED else PackedStringArray()
+	if now != hands:
+		hands = now
+
+
 func _init() -> void:
 	super()
 	mass = 40.0
@@ -374,6 +399,8 @@ func _init() -> void:
 	# (decision 455).
 	replicate("raised")
 	replicate("raised_tick")
+	# What its hands hold (decision 483): drawn, and its bow when drawn.
+	replicate("hands")
 
 
 func _ready() -> void:

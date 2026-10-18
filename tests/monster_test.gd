@@ -428,8 +428,9 @@ func _test_facing() -> void:
 		var replication := (node as MultiplayerSynchronizer).replication_config
 		config_ok = replication.has_property(NodePath(".:facing")) and replication.property_get_spawn(NodePath(".:facing")) \
 				and replication.has_property(NodePath(".:pose")) and replication.has_property(NodePath(".:raised")) \
-				and replication.has_property(NodePath(".:raised_tick"))
-	_check(config_ok, "replicated to every peer, from its spawn on (facing, its pose, its bow drawn or guard up and since when)")
+				and replication.has_property(NodePath(".:raised_tick")) and replication.has_property(NodePath(".:hands")) \
+				and replication.property_get_spawn(NodePath(".:hands")) and not replication.has_property(NodePath(".:slots"))
+	_check(config_ok, "replicated to every peer, from its spawn on (facing, its pose, its bow drawn or guard up and since when, its hands but not its pack)")
 
 
 func _test_guard() -> void:
@@ -1881,6 +1882,22 @@ func _test_kobold_dagger_and_pick() -> void:
 	_check(slots.size() == Items.CARRIED and slots[Items.RIGHT_HAND] == "dagger" and slots[Items.LEFT_HAND] == "",
 			"a sneak spawned outside a level (a raider) holds its kind's dagger (%s)" % [slots])
 	_check(Items.verb_of("dagger").get("kind") == "backstab", "a backstabber's weapon, for a flanker")
+	# Its hands follow its slots, and a client's slots follow its hands (decision 483).
+	var server := Monster.new()
+	var held := Items.tidy(["meat"], Items.CARRIED)
+	held[Items.RIGHT_HAND] = "dagger"
+	server.slots = held
+	var bare := Monster.new()
+	bare.slots = PackedStringArray(["meat"])
+	var client := Monster.new()
+	client.hands = PackedStringArray(["", "bow"])
+	_check(server.hands == PackedStringArray(["dagger", ""]) and bare.hands.is_empty(),
+			"a monster's hands follow its slots, right then left; none without hands (%s)" % [server.hands])
+	_check(client.slots.size() == Items.CARRIED and client.slots[Items.LEFT_HAND] == "bow" and client.slots[Items.RIGHT_HAND] == ""
+			and client.slots[0] == "" and World.drawn_with(client) == "bow",
+			"on a client its hands are written into its slots, the pack empty, so a drawn bow is found (%s)" % [client.slots])
+	for each: Monster in [server, bare, client]:
+		each.free()
 	var roll := RandomNumberGenerator.new()
 	roll.seed = 471
 	var picks := 0

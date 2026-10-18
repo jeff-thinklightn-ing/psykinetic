@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Monsters now show what they hold to every player, not only the host: a kobold's dagger, a goblin archer's bow, and the bow drawn before it shoots. Server and client need the new release together.
 - Kobolds now fight with a dagger, deadly from behind, raiding kobolds included, and about one in five leaves a pick when it falls.
 - Townspeople and companions look more like themselves: faces differ (jaw, nose, brow, cheeks, eyes), and people wear vests, long coats, capes, rolled sleeves and caps, dressed by their trade: guards in vests, merchants in coats, haulers with their sleeves rolled (decision 480).
 - A level's dwarven or dark elven make reaches what its crates and carts hold, as well as its chests and monsters (decision 474).

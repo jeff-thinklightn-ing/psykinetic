@@ -184,8 +184,12 @@ var protected_until_tick := 0
 var facing := Vector2i(0, 1)
 ## What it holds, a slot each: Items ids, "" for empty. None for most
 ## things; a player and a chest have theirs (Player.SLOTS, Chest.SLOTS),
-## replicated (replicate). Written only by World (try_transfer, set_slots).
-var slots := PackedStringArray()
+## replicated (replicate). Written only by World (try_transfer, set_slots),
+## always whole (_slots_set follows each write).
+var slots := PackedStringArray():
+	set(value):
+		slots = value
+		_slots_set()
 ## Server only, never sent: the instance in each slot (ItemBook uid), 0 for
 ## none yet (a level's chest: made on first need, World.slot_uid). Kept
 ## beside slots by the same World calls.
@@ -335,6 +339,11 @@ func replicate(property: String) -> void:
 	sync.replication_config.add_property(path)
 	sync.replication_config.property_set_spawn(path, true)
 	sync.replication_config.property_set_replication_mode(path, SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
+
+
+## Each time slots is written: a Monster keeps its hands from it (decision 483).
+func _slots_set() -> void:
+	pass
 
 
 ## Whether the client [param peer] is sent this entity (World.peer_sees).
