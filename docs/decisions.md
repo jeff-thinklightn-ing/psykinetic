@@ -11390,3 +11390,25 @@ in its town). Protocol unchanged; no new class_name.
 Rejected: the rounds only when a body walks (nothing would happen with no
 player watching); a scripted greeting at the door (facts, and the voice
 greets); his own building (he has the town).
+## 468. A level chest's stock reaches a saved world once
+
+Jeff (2026-10-17, through the coordinator): "make sure that there is a bow
+and arrow bundle in the town chest for practice". The town's chest is the
+cache at 221,225 in the wilds (food sack, coin purse; Chest4 by Level's
+count); the depot and the shop counter by the starts keep nothing. The box's
+saved world keeps its own chest contents (433), and the admin console has
+no give, so the change delivers itself:
+- A level chest entry's props may list "stock": ids it starts with (also in
+  its "slots", so a fresh world has them).
+- Loading a save (Main._spawn_saved -> _top_up), a chest whose level entry
+  (found by its spawn key, 433) has stock gets each id it was never given
+  minted ("stocked") into a free slot. "Never given" means not in its saved
+  props' "stocked"; one already in the chest counts as given. "stocked" stays
+  in its props, which the snapshot keeps, so a bow taken never comes back.
+  With no free slot it is logged and waits for the next load.
+- Logged for release: "[state] Chest4 topped up: bow, arrows".
+The wilds chest at 221,225 now lists slots food_sack, coin_purse, bow,
+arrows and stock bow, arrows. The castle has no listed chests and players
+start in the wilds, so it has none. Rejected: an admin "stock <chest>
+<item>" command (a step for release on each deploy; the level file as the
+source of a chest's kit comes up again).

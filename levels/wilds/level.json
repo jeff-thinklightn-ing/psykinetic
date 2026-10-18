@@ -142,8 +142,12 @@
 				"slots": [
 					"food_sack",
 					"coin_purse",
-					"",
-					""
+					"bow",
+					"arrows"
+				],
+				"stock": [
+					"bow",
+					"arrows"
 				]
 			}
 		},

@@ -2457,6 +2457,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
 		if entry.get("slots") != null:
 			World.set_slots(entity, entry["slots"], entry.get("items", []))
+		_top_up(entity, entry["spec"])
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
 		var dead := _slot_for(int(respawn["spawn"]), str(respawn.get("spawn_key", "")))
@@ -2626,6 +2627,46 @@ func _recall(record: Dictionary) -> GridEntity:
 		monster._route_index = clampi(int(record.get("route_index", 0)), 0, maxi(monster.route.size() - 1, 0))
 		monster._route_step = int(record.get("route_step", 1))
 	return entity
+
+
+## A level chest's starting kit brought to a saved world (decision 468;
+## Jeff: "make sure that there is a bow and arrow bundle in the town chest
+## for practice"): each id of its level props' "stock" that the saved chest
+## was never given (not in its saved props' "stocked") is minted into a free
+## slot, once; one already in it counts as given. "stocked" stays in the
+## chest's props, so the save keeps it and a thing taken never comes back.
+## With no free slot it waits for the next load. Logged for release.
+func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
+	var props: Dictionary = entity.spawn_spec.get("props", {})
+	var stock: Variant = props.get("stock", [])
+	if not entity is Chest or not stock is Array or stock.is_empty():
+		return
+	var saved_props: Variant = saved_spec.get("props", {})
+	var had: Variant = saved_props.get("stocked", []) if saved_props is Dictionary else []
+	var stocked: Array = had.duplicate() if had is Array else []
+	var slots := entity.slots.duplicate()
+	var uids := World.slot_uids(entity)
+	var given: Array[String] = []
+	for each: Variant in stock:
+		var id := str(each)
+		if id in stocked or not Items.exists(id):
+			continue
+		if id in slots:
+			stocked.append(id)
+			continue
+		var free := slots.find("")
+		if free < 0:
+			print("[state] %s has no room for its stock: %s" % [entity.name, id])
+			continue
+		slots[free] = id
+		uids[free] = World.items.mint(id, "stocked", World._label_of(entity), entity.zone, entity.tile)
+		stocked.append(id)
+		given.append(id)
+	props["stocked"] = stocked
+	entity.spawn_spec["props"] = props
+	if not given.is_empty():
+		World.set_slots(entity, slots, uids)
+		print("[state] %s topped up: %s" % [entity.name, ", ".join(given)])
 
 
 ## The spawn slots the zone's records hold.

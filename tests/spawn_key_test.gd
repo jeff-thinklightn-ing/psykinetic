@@ -39,6 +39,7 @@ func _run() -> void:
 	_test_a_gained_entity_moves_nobody(path, saved)
 	_test_a_lost_marker(path, saved)
 	_test_an_old_snapshot_by_slots(path, saved)
+	_test_stock_tops_up_once(path, saved)
 	DirAccess.remove_absolute(path)
 	Net.state_path = ""
 	Level.unregister(LEVEL)
@@ -49,11 +50,13 @@ func _run() -> void:
 
 ## The level, as saved or with GAINED (a chest, props {"temple": true}),
 ## or without the marker at [param lost].
-func _register(gained: bool, lost := Vector2i(-1, -1)) -> void:
+func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = []) -> void:
 	Level.unregister(LEVEL)
 	var markers := MARKERS.duplicate()
 	markers.erase(lost)
 	var entries: Array = []
+	if not stock.is_empty():
+		entries.append({"at": [6, 2], "props": {"slots": stock, "stock": stock}})
 	if gained:
 		markers[GAINED] = "chest"
 		entries.append({"at": [GAINED.x, GAINED.y], "props": {"temple": true}})
@@ -166,6 +169,28 @@ func _test_an_old_snapshot_by_slots(path: String, data: Dictionary) -> void:
 	var imp: Variant = at.get(Vector2i(10, 4))
 	_check(imp is Monster and imp.spawn_spec["spawn_key"] == "10,2",
 			"the old record made again by its slot, with its key now for the next save")
+
+
+func _test_stock_tops_up_once(path: String, data: Dictionary) -> void:
+	print("\n== a level chest's stock reaches a saved world once (decision 468: Jeff's practice bow) ==")
+	_write(path, data)
+	_register(false, Vector2i(-1, -1), ["bow", "arrows"])
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	var chest: Variant = _by_tile().get(Vector2i(6, 4))
+	_check(chest is Chest and chest.spawn_spec["spawn_key"] == "6,2" and "bow" in chest.slots and "arrows" in chest.slots
+			and World.items.id_of(World.slot_uids(chest)[chest.slots.find("bow")]) == "bow",
+			"the saved chest, found by its key though the listed entry moved it up the order, gets a bow and arrows (%s)" % [chest.slots if chest is Chest else null])
+	_check(chest is Chest and chest.spawn_spec["props"].get("stocked") == ["bow", "arrows"], "and remembers it was given them")
+	var slots: PackedStringArray = chest.slots.duplicate()
+	slots[slots.find("bow")] = ""
+	World.set_slots(chest, slots, World.slot_uids(chest))
+	_main._save_state()
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	chest = _by_tile().get(Vector2i(6, 4))
+	_check(chest is Chest and not "bow" in chest.slots and "arrows" in chest.slots and chest.spawn_spec["props"].get("stocked") == ["bow", "arrows"],
+			"the bow taken and the world saved: loaded again, it does not come back (%s)" % [chest.slots if chest is Chest else null])
 
 
 ## The level entity with [param key] in Main's table now: its slot, or -1.

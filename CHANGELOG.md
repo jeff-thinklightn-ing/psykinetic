@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town's chest in the wilds (by the guard, south-east of the well) now holds a hunting bow and a bundle of arrows for practice, put into existing worlds once (decision 468).
 - Wild animals are named by what they are, "Wild doe", "Wild stag", "Wild boar", "Wild rabbit", "Wolf", not a name and number. Deer and rabbits are drawn with their own models at last.
 - Shingle roofs are wooden shingles, and a damaged one shows its rafters and battens through the torn shingles.
 - Arrow bundles are twelve shafts tied with a cord, and the floor under the pine stands is a bed of fallen needles (four tiles, as the slot's art arrives in terrain's floor).
