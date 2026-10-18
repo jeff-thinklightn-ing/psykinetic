@@ -1844,7 +1844,7 @@
 			"kind": "creature",
 			"category": "creatures",
 			"size": "2.7 x 1.95 x 0.73",
-			"budget": 5000,
+			"budget": 12000,
 			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
 		{
@@ -1856,7 +1856,7 @@
 			"kind": "creature",
 			"category": "creatures",
 			"size": "1.26 x 1.0 x 1.1",
-			"budget": 5000,
+			"budget": 12000,
 			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
 		{
