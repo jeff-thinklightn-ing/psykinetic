@@ -340,6 +340,7 @@
 			"kind": "vertex",
 			"size": [0.3, 3, 0.3],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.corner/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one post mesh for corner, t and cross): c2's 200 mesh, its stone footing cut off, the timber post fitted to 0.3 x 3 m"},
 			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.wood.t": {
@@ -348,6 +349,7 @@
 			"kind": "vertex",
 			"size": [0.3, 3, 0.3],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "as wall.wood.corner: art-gen's wall.wood.corner c2 post, its footing cut off (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\")"},
 			"uses": "a T joint, a run along z met by one along +x"
 		},
 		"wall.wood.cross": {
@@ -356,6 +358,7 @@
 			"kind": "vertex",
 			"size": [0.3, 3, 0.3],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "as wall.wood.corner: art-gen's wall.wood.corner c2 post, its footing cut off (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\")"},
 			"uses": "a + joint, runs along z and x crossing"
 		},
 		"wall.wood.post": {
@@ -661,7 +664,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [1.4, 5.5, 1.4],
-			"budget": 600,
+			"budget": 2000,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.tower/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; budget 600 -> 2000, a few per town): c3's 2400 mesh decimated to 1854 and fitted to 1.4 x 5.5"},
 			"uses": "a timber watchtower on a palisade at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
 			"sockets": {"top": [0, 4.5, 0]}
 		},
@@ -776,6 +780,7 @@
 			"size": [0.2, 0.3, 0.2],
 			"budget": 150,
 			"materials": 1,
+			"source": {"by": "art-kit, by hand to art-gen's c4", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/scatter.flower/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's meshes fail the budget, so rebuilt by hand to c4's look): three stems of pale five-petalled flowers with a yellow eye over four leaves, 92 tris, one mesh"},
 			"uses": "small flowers terrain scatters over grass (terrain part 5), drawn by MultiMesh; its colours are terrain's to tint; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.8, 1.2], "yaw": "free", "tilt_max": 10, "sink": 0.02, "footprint_r": 0.1, "blocks": false}
 		},
@@ -1214,6 +1219,7 @@
 			"size": [0.5, 0.5, 2],
 			"budget": 400,
 			"variants": 3,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/tree.log/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c8): c8's 400 mesh stretched along z to the 2 m, bark on row 2 in blocks, its cut ends pale, moss on its top"},
 			"uses": "a fallen log lying along z"
 		},
 		"plant.bush": {
@@ -1230,8 +1236,9 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [0.8, 0.5, 0.8],
-			"budget": 250,
+			"budget": 500,
 			"variants": 3,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/plant.fern/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c7, budget 250 -> 500, no alpha cards): c7's 500 mesh fitted to the box, fronds on row 4's greens in blocks"},
 			"uses": "a fern, in the forest's shade"
 		},
 		"scatter.reeds": {
@@ -1241,6 +1248,7 @@
 			"size": [0.4, 0.8, 0.4],
 			"budget": 150,
 			"materials": 1,
+			"source": {"by": "art-kit, by hand to art-gen's c1", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/scatter.reeds/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; rebuilt by hand to c1's look): thirteen bent two-sided blades and four cattails, 150 tris, one mesh"},
 			"uses": "reeds terrain scatters along water's edge (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.7, 1.3], "yaw": "free", "tilt_max": 6, "sink": 0.03, "footprint_r": 0.2, "blocks": false}
 		},
@@ -1370,6 +1378,7 @@
 			"size": [1.6, 1.8, 1.2],
 			"budget": 800,
 			"materials": 2,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.forge/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2, its 800 mesh, 476 tris after the weld): stone on row 1 in blocks, the coal bed ember and flame"},
 			"uses": "the smith's forge; its fire glows at the flame socket",
 			"sockets": {"flame": [0, 0.9, 0.3]}
 		},
@@ -1387,6 +1396,7 @@
 			"kind": "cell",
 			"size": [2, 2.4, 1.2],
 			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.market_stall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c7, scaled x 0.8, z 0.86): its awning in banner red and cloth, counter and posts on row 2"},
 			"uses": "a market stall: a counter under an awning",
 			"grey": [
 				{"at": [0, 0.5, 0.3], "size": [2, 1, 0.6]},
@@ -1432,7 +1442,8 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.4, 2.6, 1],
-			"budget": 300,
+			"budget": 500,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.palisade/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c5 at 500): c5's three sharpened stakes squeezed along z to the 1 m and across to 0.4, a lashing band on row 5"},
 			"uses": "a 1 m palisade section of sharpened stakes on a cell edge, tiling along z"
 		},
 		"prop.cage": {
