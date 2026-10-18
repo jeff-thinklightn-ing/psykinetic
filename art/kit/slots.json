@@ -1485,6 +1485,9 @@
 			"size": [0.18, 0.32, 0.42],
 			"tolerance": 0.15,
 			"budget": 1200,
+			"source": {"by": "art-gen (mesh), pc-character (rig and clips)", "tool": "Qwen-Image-2512, TRELLIS.2, blender (pc-character's tools/rabbit_rig.py)",
+				"license": "own", "date": "2026-10-17",
+				"notes": "N:/assets/candidates/creature.rabbit/notes.md (Jeff's pick c4); N:/assets/candidates/creature.rabbit/rigged/"},
 			"uses": "a rabbit: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. An art-gen mesh on pc-character's small four-legged rig",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},

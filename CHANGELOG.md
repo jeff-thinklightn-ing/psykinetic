@@ -59,6 +59,8 @@ notes (decision 324).
 - A thing someone has carried long enough takes their name, such as "Wren's dagger".
 - Taking up a bundle of arrows while you hold a bow and a bundle swaps them: yours is put down where the new one lay, and the party log names both with their condition, so you can keep the better one and have it mended.
 - Meat and hides you bring home now build the town. The store keeps meat, hides and leather apart from its food; the cook roasts meat into a better meal than a ration, and townsfolk eat meat when the food runs out. A rescued tanner gets the town to build a tannery and turns hides into leather for the shop. Raiders take meat as they take food, never hides or leather.
+- Rabbits in the wilds are rabbits now, not grey boxes: they hop, bolt,
+  nibble, sit up to listen, flinch and fall.
 - Townsfolk remember what they hear. Tell one something and, depending on how
   sharp or superstitious they are, they may believe it and pass it on as
   hearsay ("Talos told me..."); priests and guards speak only of what is
