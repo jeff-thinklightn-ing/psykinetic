@@ -12848,3 +12848,67 @@ Rejected: a body carried through portals (a Main.travel change for one
 errand); the escortee as a far record (never away from a player); the
 stray as a captive (that is the rescue, 435); a verb to parse ("come
 with me": any word to the lost one is enough; they want to go home).
+
+## 490. The bard sings what the town remembers
+
+The hidden types' side-doings (393: "scoundrel, thieves, and bards isn't
+a profession might be more of a hidden personality type"; the thief 393
+and 461, the scholar and the merchant 440), the coordinator's assignment
+and approval of 2026-10-18 with two adds (lore at most every other night
+with the lawspeaker off; a founding fact). Rules: the source is the
+town's memory (447) and the lawspeaker's rulings (448), else lore's
+facts; never a sentence that is not in one of those; no model call;
+prompts say what is true, never what to say.
+
+- When: on the gossip tick (422) in a town whose inn stands
+  (Towns.building "inn"; Offers.ctx "has_inn") with a bard whose
+  whereabouts is the inn (residents.json "types".bard: 18 to 23), once a
+  night (the card's "sang"). Townsfolk.perform.
+- What, in this order: a town memory (TownMemory's MEMORY tier: the
+  lawspeaker's accepted and reconciled sentences) that names a player in
+  the inn tonight (said by them, or their name in it) and has not been
+  sung to them ("sung_to" on the entry), so a player hears their story
+  told back, once per story; else the newest memory not sung within
+  "again" days (30); else lore's agreed facts for the town (Offers.ctx
+  "lore", 448's source), the weightiest not sung within the same span, and
+  lore at most every "lore_every_nights" nights (2), so the inn does not
+  hear the same three facts nightly. Nothing else exists to sing.
+- The words: a kind drawn by seed (the bard and the day) round the
+  entry's own sentence: "At the inn, Tam sings of how / tells the tale of
+  how / has a song of how <sentence>." The sentence is the entry's text,
+  its first letter lowered unless the first word is somebody's name (a
+  deed starts with its doer); nothing added inside it. A second line, "The
+  lawspeaker's word on it: <because>.", when the ruling has one. The body,
+  when one stands in the inn, says "Hear now how <sentence>." for the
+  bubble (Main._sung, the usual speech message).
+- Who hears: every player standing in the town's inn (Main's "listeners":
+  the inn's rect in this zone, the players whose tile is in it), a "party"
+  line each (and the second), and the named one "It is your own deed Tam
+  sings of."; nobody outside the inn. Residents at the inn that hour hold
+  the memory (TownMemory.hold): a song spreads what the town remembers.
+- After: each listening player's standing with the bard moves "song" (1;
+  Standing, a new key beside heard), twice for their own deed, their entry
+  made if new (Standing.met); the bard's card learns "Tam sang of ... at
+  the inn tonight" (the voice knows it after, 398); the entry keeps the
+  night and whom it was sung to. At founding, a bard's card gets "Tam sings
+  at the inn of an evening." (Townsfolk.card_of), so the voice can say what
+  they do when asked.
+- Lawspeaker off (the box today): the town remembers nothing (memories
+  come only from rulings), so a bard at an inn sings lore every other night
+  at most, the weightiest facts first and round again after 30 days, and no
+  player's deed is ever sung, since no ruling ever names one. That is the
+  server's behaviour until Jeff turns rulings on.
+- Cost: one table lookup per town per gossip tick; a line a night; no
+  model.
+
+Numbers (npc's drafts, Jeff's to move): residents.json "bard" {again 30,
+lore_every_nights 2, kinds}; standing song 1. gossip_test (the founding
+fact; Jeff in the inn hears his own deed first with the ruling's word,
+twice the notch, the entry marked, Mara holding it; once a night; the
+newest memory the next night; lore when both are lately sung, every other
+night, the next fact after; no standing inn, no song). Protocol unchanged
+("party" and "speech" are existing messages); no new class_name.
+
+Rejected: a model writing the song (invention); singing beliefs or
+rumours (422 passes those as talk); every zone hearing it (the inn's
+walls); pay for the bard (Jeff may want a hat passed, later).

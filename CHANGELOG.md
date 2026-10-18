@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The bard sings what the town remembers (decision 490, on 393): at a standing inn, once a night, a resident of the bard type sings one true thing to whoever is in the inn: a town memory naming a player present (their own story told back, once), else the newest memory not sung lately, else lore's facts every other night at most; a line or two in the talk log, the body's words for the bubble, residents at the inn holding the memory, standing with the bard a notch (twice for your own deed); with the lawspeaker off the town remembers nothing, so only lore is sung.
 ## v0.1.153
 
 - This release changes what the server and client send each other, so update the

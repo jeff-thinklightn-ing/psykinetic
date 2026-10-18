@@ -4069,6 +4069,20 @@ func _offers_context() -> Dictionary:
 		"note": func(town: String, line: String) -> void:
 			print("[lawspeaker] %s: %s" % [town, line])
 			party_log.add("In %s, %s." % [str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town, line]),
+		# The bard's night (decision 490): who stands in the town's inn, whether it stands, and the song to them.
+		"has_inn": func(town: String) -> bool:
+			return World.towns != null and str(World.towns.building(town, "inn").get("state", "")) == Towns.STANDING,
+		"listeners": func(town: String) -> Array:
+			var inn := _inn_rect(town)
+			var out: Array = []
+			if inn.size == Vector2i.ZERO:
+				return out
+			for peer: int in _players:
+				var player: Player = _players[peer]
+				if player != null and player.spawned and inn.has_point(player.tile):
+					out.append(player.player_id)
+			return out,
+		"say": func(town: String, song: Dictionary) -> void: _sung(town, song),
 		"lore": func(_town: String) -> Array:
 			var facts := Lore.known_by(Lore.knower_for("townsfolk"), PackedStringArray(), "agreed")
 			facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
@@ -4198,6 +4212,40 @@ func _write_settled_card(id: String, entry: Dictionary) -> void:
 	if not str(entry.get("fact", "")).is_empty():
 		ResidentCard.add_fact(card, World.production.now(), str(entry["fact"]))
 	World.production.set_card(id, card)
+
+
+## The standing inn of [param town] in this zone, as a rect; an empty one
+## for none (decision 490).
+func _inn_rect(town: String) -> Rect2i:
+	if _world_map == null or World.holdings == null:
+		return Rect2i()
+	var key := str(World.holdings.place(town).get("key", ""))
+	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		if str(building.get("town", "")) == key and str(building.get("use", "")) == "inn":
+			return building.get("rect", Rect2i())
+	return Rect2i()
+
+
+## Server: the bard sang in [param town] (decision 490, Townsfolk.perform's
+## "say"): the lines to the players in the inn (their talk log), the
+## named one told it is their own deed, and the bard's body, when one
+## stands here, says it for the bubble.
+func _sung(town: String, song: Dictionary) -> void:
+	var listeners: Array = song.get("listeners", [])
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if player == null or player.player_id not in listeners:
+			continue
+		Net.broadcast_to([peer], "party", {"from": str(song.get("name", "The bard")), "text": str(song.get("line", ""))})
+		if not str(song.get("second", "")).is_empty():
+			Net.broadcast_to([peer], "party", {"from": str(song.get("name", "The bard")), "text": str(song.get("second", ""))})
+		if str(song.get("named", "")) == player.player_id:
+			Net.broadcast_to([peer], "party", {"from": str(song.get("name", "The bard")), "text": "It is your own deed %s sings of." % song.get("name", "the bard")})
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body != null and body.worker_id == str(song.get("bard", "")) and body.town == town:
+			Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": str(song.get("spoken", ""))})
+			Transcript.record(body.person, body.person, "[sings] " + str(song.get("spoken", "")))
 
 
 ## Server: the proposals list for Jeff (decision 458), every town's

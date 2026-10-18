@@ -148,6 +148,130 @@ static func _rich_line(economy: Economy) -> int:
 	return int(rules.get("folk", {}).get("rich_above", 25))
 
 
+const BARD := "bard"
+
+
+## The bard's piece (decision 490; residents.json "bard"): among [param
+## at_inn] (the ids whose whereabouts is the inn now) the first bard, once
+## a night, with the town's inn standing (Offers.ctx "has_inn", true when
+## nobody says), sings one true thing: first a town memory (447's MEMORY
+## tier, the lawspeaker's sentences) naming a player in the inn tonight
+## (Offers.ctx "listeners", "name_of") not yet sung to them; else the
+## newest memory not sung within "again" days; else lore's facts for the
+## town (Offers.ctx "lore"), the weightiest not sung within "again" days,
+## at most every "lore_every_nights" nights (with the lawspeaker off the
+## town remembers nothing, and the inn should not hear the same three
+## facts nightly). The words are a kind drawn by seed round the entry's
+## own sentence, and a second line of the ruling's "because" when it has
+## one. Residents at the inn hold the memory; each listening player's
+## standing with the bard moves "song" (twice for their own deed); the
+## bard's card learns it; Main is told ("say": the lines to those players
+## and the body's speech). What was sung: {bard, line, second, listeners,
+## named, text}; {} for no performance.
+static func perform(production: Production, town: String, at_inn: Array, at: int) -> Dictionary:
+	if production == null or at_inn.is_empty():
+		return {}
+	var rule: Dictionary = days().get("bard", {})
+	var bards: Array = at_inn.filter(func(id: Variant) -> bool: return not str(id).begins_with(COMPANION) and str(production.worker(str(id)).get("type", "")) == BARD)
+	if bards.is_empty():
+		return {}
+	bards.sort()
+	var bard := str(bards[0])
+	var day := day_of(at)
+	var card := card_of(production, bard)
+	if card.is_empty() or int(card.get("sang", -1)) == day:
+		return {}
+	var inn: Variant = Offers._call(Offers.ctx, "has_inn", [town])
+	if inn == false:
+		return {}
+	var listeners: Array = []
+	var given: Variant = Offers._call(Offers.ctx, "listeners", [town])
+	if given is Array:
+		listeners = given.duplicate()
+	listeners.sort()
+	var again := int(rule.get("again", 30)) * maxi(DayNight.day_steps, 1)
+	var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+	var memories: Array = TownMemory.of_tier(log, TownMemory.MEMORY) if log is Array else []
+	var entry := {}
+	var named := ""
+	# A listener's own deed, told back to them once.
+	for player_id: Variant in listeners:
+		var name := str(Offers._call(Offers.ctx, "name_of", [player_id]))
+		for each: Dictionary in memories:
+			var text := str(each.get("text", ""))
+			var theirs: bool = str(each.get("said_by", "")) == TownMemory.PLAYER + str(player_id) or (not name.is_empty() and name != "<null>" and text.contains(name))
+			if theirs and not each.get("sung_to", {}).has(str(player_id)):
+				entry = each
+				named = str(player_id)
+				break
+		if not entry.is_empty():
+			break
+	# Else the newest memory not sung lately.
+	if entry.is_empty():
+		for i in range(memories.size() - 1, -1, -1):
+			if at - int(memories[i].get("sung", -again)) >= again:
+				entry = memories[i]
+				break
+	var text := ""
+	var because := ""
+	if not entry.is_empty():
+		text = str(entry.get("text", ""))
+		because = str(entry.get("ruling", {}).get("because", ""))
+	else:
+		# Lore, every other night at most.
+		if day - int(card.get("lore_day", -99)) < int(rule.get("lore_every_nights", 2)):
+			return {}
+		var lore: Variant = Offers._call(Offers.ctx, "lore", [town])
+		var sung: Dictionary = card.get("sung_lore", {})
+		if lore is Array:
+			for fact: Variant in lore:
+				if at - int(sung.get(str(fact), -again)) >= again:
+					text = str(fact)
+					break
+		if text.is_empty():
+			return {}
+		sung[text] = at
+		card["sung_lore"] = sung
+		card["lore_day"] = day
+	var kinds: Array = rule.get("kinds", ["sings of how"])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("song:%s:%d" % [bard, day])
+	var kind := str(kinds[rng.randi() % kinds.size()]) if not kinds.is_empty() else "sings of how"
+	var name := str(production.worker(bard).get("name", bard))
+	# The sentence as the town has it, its first letter lowered after "how"
+	# unless the first word is somebody's name (a deed starts with its doer).
+	var clean := text.strip_edges().trim_suffix(".")
+	var first := clean.get_slice(" ", 0).trim_suffix(",").trim_suffix("'s")
+	var known := listeners.map(func(id: Variant) -> String: return str(Offers._call(Offers.ctx, "name_of", [id])))
+	for id: String in production.worker_ids(town):
+		known.append(str(production.worker(id).get("name", "")))
+	if first not in known:
+		clean = Hearsay._lower_first(clean)
+	var line := "At the inn, %s %s %s." % [name, kind, clean]
+	var second := "The lawspeaker's word on it: %s." % because.trim_suffix(".") if not because.is_empty() else ""
+	# What it leaves behind: the night on the bard's card, the entry sung,
+	# the inn's people holding it, the listeners' regard.
+	card["sang"] = day
+	ResidentCard.add_fact(card, at, "%s sang of %s at the inn tonight." % [name, clean])
+	for player_id: Variant in listeners:
+		Standing.met(card, str(player_id), at)
+		Standing.bump(card, str(player_id), Standing.setting("song") * (2 if str(player_id) == named else 1), "heard %s sing" % name, at)
+	production.set_card(bard, card)
+	if not entry.is_empty() and log is Array:
+		entry["sung"] = at
+		if not named.is_empty():
+			entry.get_or_add("sung_to", {})[named] = day
+		for id: Variant in at_inn:
+			if str(id) != bard and not str(id).begins_with(COMPANION):
+				TownMemory.hold(log, text, str(id), bard, at)
+		Offers._call(Offers.ctx, "set_memory", [town, log])
+	var out := {"bard": bard, "name": name, "line": line, "second": second, "listeners": listeners, "named": named, "text": clean,
+		"spoken": "Hear now how %s." % clean}
+	print("[bard] %s: %s%s" % [town, line, " " + second if not second.is_empty() else ""])
+	Offers._call(Offers.ctx, "say", [town, out])
+	return out
+
+
 ## The card key of someone lost beyond the walls (decision 487): {since,
 ## cell: [x, y] once Main chose where they stand}.
 const STRAYED := "strayed"
@@ -507,6 +631,8 @@ static func card_of(production: Production, worker_id: String) -> Dictionary:
 	card = ResidentCard.roll(worker_id, str(who.get("name", worker_id)), str(trades[0]) if not trades.is_empty() else "", str(who.get("origin", "")))
 	production.set_card(worker_id, card)
 	_found_among(production, worker_id, card, str(who.get("town", "")))
+	if str(who.get("type", "")) == BARD:
+		ResidentCard.add_fact(card, production.now(), "%s sings at the inn of an evening." % who.get("name", worker_id))  # Decision 490.
 	production.set_card(worker_id, card)
 	return card
 
@@ -675,6 +801,7 @@ static func gossip(production: Production) -> void:
 		for place: String in keys:
 			if groups[place].size() >= 2:
 				_pass(production, town, place, groups[place], at)
+		perform(production, town, groups.get("inn", []), at)  # The bard's piece (decision 490).
 
 
 ## Remembered people moving in (decision 460): each entry of [param log]

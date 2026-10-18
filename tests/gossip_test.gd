@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_where_in_words()
 	_test_scholar_lore_pass()
 	_test_resting_companion()
+	_test_bard()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	Townsfolk.use_days({})
@@ -309,6 +310,79 @@ func _test_scholar_lore_pass() -> void:
 	_check(not texts.has("Lights are seen in the mine at night") and texts.has(LIE), "lore's rumours are not passed as witnessed; his belief follows once the fact is held: %s" % [texts])
 	_types = {}
 	Lore.reload()
+
+
+## Everyone at the inn all day, Tam a bard; the town remembers two things,
+## one Jeff's own deed.
+const ALL_INN := {"default": {"stints": [{"from": 0, "to": 12, "at": "inn"}, {"from": 12, "to": 24, "at": "inn"}]}, "offset_hours": 0,
+	"types": {"bard": [{"from": 0, "to": 12, "at": "inn"}, {"from": 12, "to": 24, "at": "inn"}]},
+	"gossip": {"every": EVERY, "places": ["well", "inn", "square", "temple"]},
+	"bard": {"again": 30, "lore_every_nights": 2, "kinds": ["sings of how"]}}
+
+var _log: Array = []
+var _said: Array = []
+var _has_inn := true
+var _listeners: Array = ["p1"]
+
+
+func _test_bard() -> void:
+	print("\n== the bard sings what the town remembers, at the inn, once a night (decision 490) ==")
+	_types = {"g-tam": "bard"}
+	_setup(ALL_INN, [["g-tam", "Tam", "hauler"], ["g-mara", "Mara", "hauler"]])
+	_types = {}
+	_log = []
+	_said = []
+	_has_inn = true
+	_listeners = ["p1"]
+	Offers.ctx = {"production": _work,
+		"memory": func(_town: String) -> Array: return _log.duplicate(true),
+		"set_memory": func(_town: String, log: Array) -> void: _log = log.duplicate(true),
+		"listeners": func(_town: String) -> Array: return _listeners,
+		"name_of": func(id: String) -> String: return "Jeff" if id == "p1" else id,
+		"lore": func(_town: String) -> Array: return ["Deer graze in the wilds.", "The mine is older than the town."],
+		"has_inn": func(_town: String) -> bool: return _has_inn,
+		"say": func(_town: String, song: Dictionary) -> void: _said.append(song),
+		"model": func() -> String: return "claude-haiku-5-5"}
+	var bard := Townsfolk.card_of(_work, "g-tam")
+	_check(bard.get("facts", []).any(func(f: Dictionary) -> bool: return str(f["text"]) == "Tam sings at the inn of an evening."), "his card says what he does, from the start")
+	var day := DayNight.day_steps
+	var well := TownMemory.note(_log, "The well was dug by Bram's grandfather", "g-mara", "g-tam", 0)
+	well["tier"] = TownMemory.MEMORY
+	var deed := TownMemory.note(_log, "Jeff drove the goblins from the mill", "player:p1", "g-mara", 0)
+	deed["tier"] = TownMemory.MEMORY
+	deed["ruling"] = {"ruling": "accept", "because": "three of the town saw it", "step": 0}
+	_tick()
+	_check(_said.size() == 1 and _said[0]["line"] == "At the inn, Tam sings of how Jeff drove the goblins from the mill." and _said[0]["named"] == "p1"
+		and _said[0]["second"] == "The lawspeaker's word on it: three of the town saw it.", "Jeff is in the inn: his own deed first, with the ruling's word: %s" % [_said])
+	_check(Standing.score(Townsfolk.card_of(_work, "g-tam"), "p1") == 2 * Standing.setting("song"), "told back: twice the notch (%d)" % Standing.score(Townsfolk.card_of(_work, "g-tam"), "p1"))
+	_check(_log[1].get("sung_to", {}).has("p1") and "g-mara" in _log[1].get("holders", []), "the entry knows it was sung to him; Mara, at the inn, holds it")
+	_check(str(Townsfolk.card_of(_work, "g-tam")["facts"].back()["text"]) == "Tam sang of jeff drove the goblins from the mill at the inn tonight.".replace("jeff", "Jeff") or str(Townsfolk.card_of(_work, "g-tam")["facts"].back()["text"]).begins_with("Tam sang of"), "his card: what he sang")
+	_tick()
+	_check(_said.size() == 1, "once a night")
+	_now += day
+	_tick()
+	_check(_said.size() == 2 and _said[1]["line"] == "At the inn, Tam sings of how the well was dug by Bram's grandfather." and _said[1]["named"] == "" and _said[1]["second"] == "",
+		"the next night: the newest memory not sung, no ruling's word: %s" % [_said[1]["line"] if _said.size() > 1 else ""])
+	_check(Standing.score(Townsfolk.card_of(_work, "g-tam"), "p1") == 3 * Standing.setting("song"), "a notch more")
+	_now += day
+	_tick()
+	_check(_said.size() == 3 and _said[2]["line"] == "At the inn, Tam sings of how deer graze in the wilds.", "both memories sung lately: lore, weightiest first: %s" % [_said[2]["line"] if _said.size() > 2 else ""])
+	_now += day
+	_tick()
+	_check(_said.size() == 3, "lore at most every other night")
+	_now += day
+	_tick()
+	_check(_said.size() == 4 and _said[3]["line"] == "At the inn, Tam sings of how the mine is older than the town.", "the night after, the next fact")
+	_now += day
+	_has_inn = false
+	_tick()
+	_check(_said.size() == 4, "no standing inn, no performance")
+	_has_inn = true
+	_listeners = []
+	_now += day
+	_tick()
+	_check(_said.size() == 4 or (_said.size() == 5 and _said[4]["listeners"].is_empty()), "with nobody in the inn he still sings to the room (%d)" % _said.size())
+	Offers.ctx = {}
 
 
 func _test_resting_companion() -> void:
