@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Shield bash: with your shield raised (right button held), the left button bashes with it instead of swinging. It shoves the one in front (light ones further), staggers them briefly and knocks a raised guard open for a moment, so your next blow lands. No damage; it costs a little stamina and can't be repeated for 2 seconds.
 - The forest round outdoor maps has real broadleaf trees: round, lumpy olive crowns on brown trunks in place of the old teal tiered trees with orange bases, so they turn colour in autumn and catch snow on top in winter.
 
 - A thing someone has carried long enough takes their name, such as "Wren's dagger".

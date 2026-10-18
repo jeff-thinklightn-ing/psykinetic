@@ -476,6 +476,7 @@ func _go_online() -> void:
 		World.item_named.connect(_narrate_named)
 		World.item_kept.connect(_narrate_kept)
 		World.bundle_swapped.connect(_narrate_swap)
+		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
@@ -3944,6 +3945,14 @@ func _narrate_swap(by: GridEntity, taken: int, left: int) -> void:
 ## A blow that knocked someone down (World.knocked_down).
 func _narrate_down(entity: GridEntity, source: GridEntity) -> void:
 	party_log.add("%s knocks %s down." % [_display_name(source), _display_name(entity)])
+
+
+## A shield bash (World.shield_bashed; decision 379).
+func _narrate_bash(by: GridEntity, target: GridEntity, opened: bool) -> void:
+	if opened:
+		party_log.add("%s bashes %s's guard open." % [_display_name(by), _display_name(target)])
+	else:
+		party_log.add("%s shoves %s with a shield." % [_display_name(by), _display_name(target)])
 
 
 ## A blow taken on a guard, or one that broke it (World.guard_met).

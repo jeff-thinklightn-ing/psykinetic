@@ -70,6 +70,9 @@ signal pile_gone(pile: GroundPile)
 ## [param target]'s guard met a blow or a shot from [param source]
 ## (decision 340): taken on it, or [param broken] by it.
 signal guard_met(target: GridEntity, source: GridEntity, broken: bool)
+## [param by] bashed [param target] with its shield (decision 379):
+## [param opened], the target's guard was up and is open now.
+signal shield_bashed(by: GridEntity, target: GridEntity, opened: bool)
 ## [param target] was knocked down by [param source]'s blow (decision 343).
 signal knocked_down(target: GridEntity, source: GridEntity)
 ## [param holder]'s braced spear stopped [param charger]'s charge (decision
@@ -486,6 +489,9 @@ class Hit:
 	## source's right hand (decision 365: struck, behind, downed, braced;
 	## felled if it kills); "" for none (a shove).
 	var deed := ""
+	## A shield bash's (decision 379): the ticks it staggers; 0 for any
+	## other hit.
+	var bash := 0
 	var target: GridEntity
 	var source_id := 0
 	var source_name := ""
@@ -2753,7 +2759,8 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 		return {}
 	var held := ""
 	if target.raised == "block":
-		held = target.slots[Items.LEFT_HAND]
+		if tick >= target.bash_moment_until:  # Down for a bash's moment (decision 379).
+			held = target.slots[Items.LEFT_HAND]
 	elif target.raised.is_empty() and tick >= target.next_attack_tick:
 		held = target.slots[Items.RIGHT_HAND]
 	var verb := Items.verb_of(held) if not held.is_empty() else {}
@@ -3240,6 +3247,78 @@ func try_shove(attacker: GridEntity, target: GridEntity,
 	if attacker.strength <= 0:
 		return false
 	return _try_hit(attacker, target, 0, true, direction)
+
+
+## The shield in [param entity]'s left hand, if it can bash (decision 379):
+## its block verb, with bash_force over 0; {} for none.
+func bash_verb(entity: GridEntity) -> Dictionary:
+	if not is_instance_valid(entity) or not holds_in_hands(entity):
+		return {}
+	var verb := Items.verb_of(entity.slots[Items.LEFT_HAND])
+	return verb if verb.get("kind") == "block" and float(verb.get("bash_force", 0.0)) > 0.0 else {}
+
+
+## Whether [param entity] could bash now (decision 379): a shield that bashes,
+## not stunned, its bash_ticks since the last one passed, and the stamina for
+## it. For the monsters' AI as well as the player's.
+func bash_ready(entity: GridEntity) -> bool:
+	var verb := bash_verb(entity)
+	if verb.is_empty() or is_stunned(entity) or tick < entity.next_bash_tick:
+		return false
+	return entity.max_stamina <= 0 or entity.stamina >= int(verb["bash_stamina"])
+
+
+## A shield bash by [param by] on [param target], the body beside it
+## (decision 379; the player's left button with the shield raised, Player's
+## _pursue_action, and any monster's AI): a shove through _push, its force a
+## blow's push (ATTACK_FORCE_FACTOR) times the shield's bash_force, pushing
+## only from knockback_min_force; no damage; always a stagger of
+## bash_stagger ticks; a guard up against it (guarding) is opened: lowered,
+## not raised again for GUARD_BROKEN_TICKS, without 340's long stun. Costs
+## bash_stamina, then bash_ticks till the next. The bearer's own raised shield
+## is down for the bash's moment (bash_stagger ticks). Queued like an attack;
+## no guard meets it. False, nothing spent, if it cannot.
+func try_bash(by: GridEntity, target: GridEntity) -> bool:
+	if not Net.is_authority() or not is_instance_valid(by) or not is_instance_valid(target):
+		return false
+	if not by.spawned or not target.spawned or by == target or not can_target(by, target) or not bash_ready(by):
+		return false
+	if not can_melee(by.tile, target.tile) or tick < by.next_move_tick:
+		return false
+	var verb := bash_verb(by)
+	var aim := target.tile - by.tile
+	var force := push_force(by, target) * ATTACK_FORCE_FACTOR * float(verb["bash_force"])
+	var raw_force := force
+	if force < knockback_min_force:
+		force = 0.0  # Too light to move it: the stagger alone.
+	if by.max_stamina > 0:
+		by.stamina -= int(verb["bash_stamina"])
+	by.next_bash_tick = tick + int(verb["bash_ticks"])
+	by.bash_moment_until = tick + int(verb["bash_stagger"])
+	by._world_set_facing(aim)
+	by._world_swung(aim)
+	entity_swung.emit(by, aim)
+	by._world_note_exertion(tick)
+	by.protected = false
+	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
+	_queue_hit(by, target, aim, aim.clamp(Vector2i(-1, -1), Vector2i(1, 1)), 0, force, raw_force, true, 0)
+	_hits[-1].bash = int(verb["bash_stagger"])
+	return true
+
+
+## A bash's hit landing (try_bash, decision 379): the guard up against it
+## opened, the target staggered, the shield credited "guarded" (365).
+func _bash_lands(hit: Hit) -> void:
+	var opened := not guarding(hit.target, hit.source).is_empty()
+	if opened:
+		hit.target.raised = ""
+		hit.target.guard_broken_until = tick + GUARD_BROKEN_TICKS
+		hit.target._world_guarded(true)
+	_stun_for(hit.target, hit.bash)
+	_log("bash: %s bashes %s%s, force %.2f" % [hit.source_name, hit.target_name, ", its guard opened" if opened else "", hit.force])
+	if hit.target.is_creature():
+		_credit(hit.source, Items.LEFT_HAND, "guarded")
+	shield_bashed.emit(hit.source, hit.target, opened)
 
 
 ## [param cause] is &"attack", &"shot", &"impact" or &"fire". Only FLESH and WOOD with
@@ -3812,6 +3891,8 @@ func _resolve_hits() -> void:
 			if is_instance_valid(hit.source) and _logs_for(hit.source):
 				_log("hit dropped: %s -> %s (no longer lined up)" % [hit.source_name, hit.target_name])
 			continue
+		if hit.bash > 0:
+			_bash_lands(hit)
 		if not hit.shove:
 			var met: Variant = _meet_guard(hit.target, hit.source, hit.damage, hit.raw_force)
 			if met != null:

@@ -328,7 +328,10 @@ static func weight_of(id: String) -> float:
 ##   block (sword, shield): the guard's arc (cells either side of facing:
 ##     0 straight ahead, 1 the three in front), absorb (the share of a
 ##     blow's damage taken off), stamina per blow taken, breaks_at (a blow
-##     with this force or more breaks the guard).
+##     with this force or more breaks the guard); a shield's bash (decision
+##     379): bash_force (a multiple of a blow's push; 0, a sword's, no
+##     bash), bash_stagger (ticks stunned), bash_stamina, bash_ticks (the
+##     least between two).
 ##   knockdown (giant axe): arc, down_ticks (prone, can't act or resist).
 ##   reach (spear): cells (how far it hits), brace (stops a charge).
 ##   backstab (dagger): behind (damage multiple from behind, by facing).
@@ -336,7 +339,8 @@ static func weight_of(id: String) -> float:
 ##     that shoots, and the one that shoots at full strength).
 const VERBS := {
 	"knockback": {"force": 3.0},
-	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0},
+	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0,
+		"bash_force": 0.0, "bash_stagger": 4, "bash_stamina": 3, "bash_ticks": 20},
 	"knockdown": {"arc": 1, "down_ticks": 15},
 	"reach": {"cells": 2, "brace": true},
 	"backstab": {"behind": 2.0},

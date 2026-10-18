@@ -73,6 +73,10 @@ extends Node
 ##   items_arrows: arrows in a bundle (decision 375): bow in one hand,
 ##     flame arrows in the other; drawn and loosed at an imp, it burns
 ##     (its name orange) and goes out; the bundle is never used up.
+##   items_bash: the shield bash (decision 379): sword and shield against
+##     an imp behind its own raised shield; the player raises theirs and
+##     bashes (the left button with the shield up): the imp is shoved and
+##     staggered, its guard open and kept down, and the sword's blow lands.
 ##   items_buffs: a travel ration from a chest, eaten from the pack: the HUD
 ##     shows "Fed +10" and its time running down; the log, the mass.
 ##   sounds: the sound slots heard in play (SoundKit): the player walks
@@ -202,6 +206,8 @@ func _ready() -> void:
 			_items_curse()
 		"items_arrows":
 			_items_arrows()
+		"items_bash":
+			_items_bash()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -750,6 +756,35 @@ func _items_arrows() -> void:
 	]
 
 
+func _items_bash() -> void:
+	var rows: Array[String] = [
+		"###########",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"###########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [5, 2], "facing": [-1, 0], "idle": {"mode": "guard"}, "wields": {"left": "shield"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["shield", Player.LEFT_HAND], "Sword and shield, against an imp behind its own shield."],
+		["item_give", ["sword", Player.RIGHT_HAND], ""],
+		["item_foe_raise", "imp", "The imp stands behind its raised shield."],
+		["walk", Vector2i(4, 2), ""],
+		["item_face", "imp", ""],
+		["item_raise", null, "Shield up (right button held)."],
+		["wait", 15, ""],
+		["item_bash", "imp", "Left button with the shield up: a bash. Shoved, staggered, its guard knocked open."],
+		["wait", 12, ""],
+		["item_lower", null, ""],
+		["item_close", "imp", "Its shield stays down a while: in close..."],
+		["item_strike", "imp", "...and the sword's blow lands."],
+		["wait", 30, ""],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -1283,10 +1318,38 @@ func _on_tick(tick: int) -> void:
 					World.face(_player, Vector2i(signi(entity.tile.x - _player.tile.x), signi(entity.tile.y - _player.tile.y)))
 					break
 		"item_strike":
-			# A blow at whoever stands on cell step[1], once the player can strike.
-			var struck: GridEntity = World.get_entity_at(step[1])
+			# A blow at whoever stands on cell step[1] (or the first monster of
+			# kind step[1]), once the player can strike.
+			var struck: GridEntity = World.get_entity_at(step[1]) if step[1] is Vector2i else null
+			for entity in World.monsters():
+				if step[1] is String and str(entity.spawn_spec.get("kind", "")) == step[1]:
+					struck = entity
 			if struck != null and not World.try_attack(_player, struck):
 				return
+		"item_foe_raise":
+			# The first monster of kind step[1] stands still (its AI off) with its
+			# shield raised toward the player.
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					entity.acts = false
+					entity.raised = "block"
+					entity._world_set_facing(Vector2i(signi(_player.tile.x - entity.tile.x), signi(_player.tile.y - entity.tile.y)))
+					World._roster_changed()  # Who acts is kept a tick at a time.
+		"item_bash":
+			# The left button on the first monster of kind step[1] (with the
+			# shield raised, a bash: Player._pursue_action), once it can.
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					if not World.bash_ready(_player):
+						return
+					World.command_attack(_player, entity)
+		"item_close":
+			# The player steps up beside the first monster of kind step[1].
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					if World.distance(_player.tile, entity.tile) > 1:
+						World.order_move(_player, entity.tile - Vector2i(signi(entity.tile.x - _player.tile.x), 0))
+						return
 		"item_pick":
 			# The first monster takes up a weapon beside it, when there is one.
 			if not World.try_pick_up_weapon(_monster):
@@ -1605,10 +1668,11 @@ func _log(tick: int) -> void:
 		print("[clip] tick %d: player %s hands %s; ground %s; %s" % [tick, _player.tile, [_player.slots[Player.RIGHT_HAND], _player.slots[Player.LEFT_HAND]],
 			World.zone.ground.keys(), hands])
 		return
-	if scenario == "items_block":
+	if scenario in ["items_block", "items_bash"]:
 		var them := []
 		for entity in World.monsters():
-			them.append("%s at %s" % [entity.name, entity.tile])
+			them.append("%s at %s hp %d raised %s%s%s" % [entity.name, entity.tile, entity.hp, entity.raised,
+				" stunned" if World.is_stunned(entity) else "", " guarding" if not World.guarding(entity, _player).is_empty() else ""])
 		print("[clip] tick %d: player %s hp %d stamina %d raised %s%s; %s" % [tick, _player.tile, _player.hp, _player.stamina,
 			_player.raised, " stunned" if World.is_stunned(_player) else "", ", ".join(them)])
 		return

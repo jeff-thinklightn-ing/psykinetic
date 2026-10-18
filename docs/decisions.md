@@ -8792,3 +8792,32 @@ worn. Taking up a bundle while holding a bow and a bundle swaps them
 party log names both with their condition (World.bundle_swapped, item_note),
 so the choice reads in play; nothing shows a ground pile's things yet. Bundles
 are 0.12 by 0.75 m (art-kit).
+
+## 379. The shield bash: the left button with the shield raised
+
+Jeff (2026-10-17): "shield bash is a good addition, approved". With the shield
+raised (329's right button, held), the left button bashes with it instead of
+striking with the right hand (Player._pursue_action routes the attack order to
+World.try_bash); lowered, the left button is the right hand's weapon as ever. No
+new key, message or replicated value: the server already knows "raised", so the
+protocol is unchanged.
+
+World.try_bash(by, target) (and bash_ready(entity), bash_verb(entity), for the
+monsters' AI too; whether and when enemy-ai's shield-bearers bash is theirs) is a
+shove on the body beside it, queued like a blow and met by no guard: through
+_push, so the mass rules hold, its force a blow's push (ATTACK_FORCE_FACTOR)
+times the shield's bash_force, moving it only from knockback_min_force (305), and
+a pushed body is stunned by _push's own rule as after a hammer. It does no damage
+and always staggers the target bash_stagger ticks. A guard up against it
+(guarding: a shield raised, a sword ready) is opened: lowered and not raised again
+for GUARD_BROKEN_TICKS, without 340's long stun. The bearer's own shield is down
+for the bash's moment (GridEntity.bash_moment_until, bash_stagger ticks; guarding
+finds none) and back up after it while the button is held. It costs bash_stamina,
+then bash_ticks until the next (GridEntity.next_bash_tick, server only); short of
+stamina, no bash. The numbers are the block verb's: bash_force 0 (a sword's, no
+bash) by default; the round shield 2.0, stagger 4, stamina 3, 20 ticks. A bash on
+a creature credits the shield "guarded" (365), so a much-used shield still tends
+to steady; not "struck", the right hand's deed. The party log says "X bashes Y's
+guard open" or "X shoves Y with a shield" (World.shield_bashed). Rejected: a key
+of its own (the hands are the buttons, 329); damage (an interruption, not a
+blow); counting it as the right hand's "struck".

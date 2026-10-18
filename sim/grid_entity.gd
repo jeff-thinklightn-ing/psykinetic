@@ -98,6 +98,11 @@ var raised_tick := 0
 ## Server: until this tick a broken guard cannot be raised again
 ## (World._meet_guard, decision 340).
 var guard_broken_until := 0
+## Server: a shield bash (World.try_bash, decision 379) is ready again at
+## this tick, and until bash_moment_until its raised shield is down for the
+## bash's moment (World.guarding finds no guard).
+var next_bash_tick := 0
+var bash_moment_until := 0
 ## Knocked down until this tick (World.knock_down, decision 343): lying,
 ## it cannot act and is easily pushed. A creature's replicates, for the
 ## views.

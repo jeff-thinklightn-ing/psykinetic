@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_weapons()
 	_test_blows()
 	_test_block()
+	_test_bash()
 	_test_axe()
 	_test_spear()
 	_test_pickup()
@@ -684,6 +685,102 @@ func _test_block() -> void:
 	imp.raised = ""
 	imp.slots = PackedStringArray()
 	imp.acts = true
+
+
+func _test_bash() -> void:
+	print("\n== the shield bash: the left button with the shield raised shoves and staggers, no damage; it opens a guard; stamina and a cooldown (decision 379) ==")
+	var host := _player(Net.local_id)
+	var far := _open_line(host, 4)
+	_check(far != World.NO_CELL, "an open line four cells long from the host")
+	if far == World.NO_CELL:
+		return
+	var d := (far - host.tile) / 4
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "BashImp%d" % World.tick,
+		"tile": host.tile + d, "kind": "imp", "props": {"sight_range": 0}}) as GridEntity
+	imp.acts = false
+	imp.max_hp = 50
+	imp.hp = 50
+	var put_back := func() -> void:
+		if imp.tile != host.tile + d:
+			World._relocate(imp, host.tile + d)
+		imp.stunned_until_tick = 0
+		host._world_set_facing(d)
+		host.stamina = host.max_stamina
+		host.next_move_tick = 0
+	put_back.call()
+	host.next_attack_tick = 0
+	host.next_bash_tick = 0
+	var shield := _give(host, "shield", Player.LEFT_HAND)
+	var verb := World.bash_verb(host)
+	_check(verb.get("bash_force") == 2.0 and verb.get("bash_stagger") == 4 and verb.get("bash_stamina") == 3 and verb.get("bash_ticks") == 20,
+			"a shield bashes, its numbers in its verb (%s)" % verb)
+	_check(Items.verb_of("sword").get("bash_force") == 0.0, "a sword does not")
+	_give(host, "sword", Player.RIGHT_HAND)
+	var bashes := []
+	var bashed := func(by: GridEntity, target: GridEntity, opened: bool) -> void: bashes.append(opened)
+	World.shield_bashed.connect(bashed)
+	# Lowered, the left button is the sword's.
+	var hp := imp.hp
+	World.command_attack(host, imp)
+	_steps(1)
+	_check(imp.hp < hp and bashes.is_empty() and host.next_bash_tick == 0, "the shield lowered: the left button strikes with the sword (%d -> %d)" % [hp, imp.hp])
+	# Raised, it bashes.
+	put_back.call()
+	World.try_stance(host, "block")
+	host.next_attack_tick = World.tick + 100  # The sword not ready: the bash is the shield's own.
+	hp = imp.hp
+	var expect := World.push_force(host, imp) * World.ATTACK_FORCE_FACTOR * 2.0
+	var from := imp.tile
+	var at := World.tick
+	World.command_attack(host, imp)
+	_steps(1)
+	_check(bashes == [false] and imp.hp == hp and World.is_stunned(imp), "raised: the left button bashes; no damage, the imp staggered")
+	_check(host.stamina == host.max_stamina - 3 and host.next_bash_tick >= at + 20 and not World.bash_ready(host),
+			"3 stamina (%d of %d), and not again for 20 ticks" % [host.stamina, host.max_stamina])
+	_check((imp.tile != from) == (expect >= World.knockback_min_force),
+			"pushed only past the least knockback force (%.2f against %.2f; moved %s)" % [expect, World.knockback_min_force, imp.tile != from])
+	_check(World.guarding(host, imp).is_empty(), "the bearer's own shield is down for the bash's moment")
+	_steps(5)
+	_check(host.raised == "block" and not World.guarding(host, imp).is_empty(), "and up again after it, the button still held")
+	_check(World.items.history(shield)["carriers"][0]["deeds"].get("guarded", 0) == 1, "the bash counts for the shield as guarded (365)")
+	# Under the least force: a stagger alone.
+	put_back.call()
+	host.next_bash_tick = 0
+	var least := World.knockback_min_force
+	World.knockback_min_force = 99.0
+	from = imp.tile
+	_check(World.try_bash(host, imp), "bashed again")
+	_steps(1)
+	World.knockback_min_force = least
+	_check(imp.tile == from and World.is_stunned(imp) and imp.stunned_until_tick <= World.tick + 4, "too light to move it: staggered where it stands")
+	_check(not World.try_bash(host, imp), "and not a third time at once")
+	# Against a raised guard: opened.
+	put_back.call()
+	host.next_bash_tick = 0
+	imp.slots = Items.tidy(["", "", "", "", "", "shield"], Items.CARRIED)
+	imp._world_set_facing(-d)
+	imp.raised = "block"
+	_check(not World.guarding(imp, host).is_empty(), "the imp's shield up against the host")
+	World.knockback_min_force = 99.0  # No knockback: a push stuns by its own rule (_push), as a hammer's does.
+	World.try_bash(host, imp)
+	_steps(1)
+	World.knockback_min_force = least
+	_check(bashes.back() == true and imp.raised == "" and imp.guard_broken_until > World.tick and World.is_stunned(imp)
+			and imp.stunned_until_tick <= World.tick + 4 and not World.try_stance(imp, "block"),
+			"bashed: its guard open and kept down, staggered only the bash's ticks, not a broken guard's")
+	# Short of stamina: no bash.
+	put_back.call()
+	host.next_bash_tick = 0
+	host.stamina = 2
+	_check(not World.bash_ready(host) and not World.try_bash(host, imp), "with 2 stamina, no bash")
+	World.shield_bashed.disconnect(bashed)
+	host.raised = ""
+	host.stamina = host.max_stamina
+	host.next_attack_tick = 0
+	host.next_bash_tick = 0
+	World.items.end(World.take_item(host, host, Player.LEFT_HAND), "gone")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	World.despawn(imp)
 
 
 func _test_axe() -> void:

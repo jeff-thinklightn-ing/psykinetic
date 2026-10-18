@@ -155,7 +155,16 @@ func _pursue_action() -> void:
 	if not is_instance_valid(action_target) or not action_target.spawned:
 		_clear_action()
 		return
-	if World.in_reach(self, action_target, action_order != Order.ATTACK):
+	# The left button with the shield raised bashes with it (decision 379).
+	var bashes := action_order == Order.ATTACK and raised == "block" and not World.bash_verb(self).is_empty()
+	if World.in_reach(self, action_target, action_order != Order.ATTACK or bashes):
+		if bashes:
+			if World.tick < maxi(next_bash_tick, next_move_tick):
+				return
+			var bashed := action_target
+			_clear_action()
+			World.try_bash(self, bashed)
+			return
 		# World refuses hits during the cooldown and while still mid-step.
 		if World.tick < maxf(next_attack_tick, next_move_tick):
 			return
