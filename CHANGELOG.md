@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Drawing a bow shows where it will go: the body it would hit is outlined, or the spot where the arrow would come down. A missed arrow stands in the ground for a few seconds. Your arrows never harm a resident, a companion or another player: they stop at them and stick there a moment. Over a monster with a bow ready, the cursor says "RMB  draw, let go to shoot" (decision 456).
 - A goblin archer's draw and a monster's raised shield are now sent to every player, so a drawn bow can be seen, and dodged, before the arrow flies. Server and client need the new release together.
 - Bows and arrows are drawn as themselves: a hunting bow with a leather grip and its string, bundles of arrows tied with a cord (plain, flame and barbed heads), and a real arrow in flight instead of a grey stick.
 - Fixed: after a server restart a companion forgot what she had heard and her

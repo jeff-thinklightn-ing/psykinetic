@@ -2930,9 +2930,9 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 ## anything else.
 func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
 	var uid := ground_uids(cell)[index]
-	if Items.ammo_of(items.id_of(uid)).is_empty() or _drawn_slot(by) < 0:
+	if Items.ammo_of(items.id_of(uid)).is_empty() or drawn_slot(by) < 0:
 		return false
-	var hand := Items.LEFT_HAND if _drawn_slot(by) == Items.RIGHT_HAND else Items.RIGHT_HAND
+	var hand := Items.LEFT_HAND if drawn_slot(by) == Items.RIGHT_HAND else Items.RIGHT_HAND
 	if Items.ammo_of(by.slots[hand]).is_empty():
 		return false
 	take_from_ground(cell, index)
@@ -3092,7 +3092,7 @@ func off_hand(entity: GridEntity) -> String:
 	var left := entity.slots[Items.LEFT_HAND]
 	if not left.is_empty() and Items.verb_of(left).get("kind") == "block":
 		return "block"
-	if not _drawn_with(entity).is_empty() and quiver_check.call(entity):
+	if not drawn_with(entity).is_empty() and quiver_check.call(entity):
 		return "draw"  # A bow with arrows to shoot (decision 375).
 	return ""
 
@@ -3100,7 +3100,7 @@ func off_hand(entity: GridEntity) -> String:
 ## The hand [param entity]'s bundle of arrows is in, the one its bow is not
 ## (decision 375), while it has condition left; -1 for none.
 func bundle_slot(entity: GridEntity) -> int:
-	var bow := _drawn_slot(entity)
+	var bow := drawn_slot(entity)
 	if bow < 0:
 		return -1
 	var other := Items.LEFT_HAND if bow == Items.RIGHT_HAND else Items.RIGHT_HAND
@@ -3174,13 +3174,13 @@ func _tend_ailments() -> void:
 
 
 ## The ranged thing in [param entity]'s hands (left first), "" for none.
-func _drawn_with(entity: GridEntity) -> String:
-	var slot := _drawn_slot(entity)
+func drawn_with(entity: GridEntity) -> String:
+	var slot := drawn_slot(entity)
 	return entity.slots[slot] if slot >= 0 else ""
 
 
-## The hand [param entity]'s bow is in (_drawn_with); -1 for none.
-func _drawn_slot(entity: GridEntity) -> int:
+## The hand [param entity]'s bow is in (drawn_with); -1 for none.
+func drawn_slot(entity: GridEntity) -> int:
 	if not holds_in_hands(entity):
 		return -1
 	for slot in [Items.LEFT_HAND, Items.RIGHT_HAND]:
@@ -3215,12 +3215,12 @@ func try_stance(by: GridEntity, kind: String) -> bool:
 func draw_of(entity: GridEntity) -> float:
 	if not is_instance_valid(entity) or entity.raised != "draw":
 		return 0.0
-	var verb := Items.verb_of(_drawn_with(entity))
+	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty():
 		return 0.0
 	var drawn := tick - entity.raised_tick
 	# A quick bow (decision 365) draws in less time.
-	var quick := float(Items.strength_value(slot_strength(entity, _drawn_slot(entity)), "draw", 1.0))
+	var quick := float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0))
 	if drawn < roundi(int(verb["draw_min"]) * quick):
 		return 0.0
 	return clampf(float(drawn) / maxf(1.0, float(verb["draw_full"]) * quick), 0.0, 1.0)
@@ -3246,7 +3246,7 @@ func try_loose(by: GridEntity, at: Vector2i) -> bool:
 ## to 1; decision 335). Along the line from its cell through
 ## [param at] and on (shot_line), as far as its bow's cells, it hits the
 ## first body there; a wall, a closed door, higher ground or the map's end
-## stops it first. A body it may not attack (can_target) stops it unharmed.
+## stops it first. A body it may not attack (can_target) or a friend it spares (spares) stops it unharmed.
 ## Damage is its blow (attack_damage) times the bow's damage times the
 ## draw, at least 1, cause &"shot"; no push. It faces the shot, is heard
 ## NOISE_BOW about it, and the views draw the arrow's flight
@@ -3254,21 +3254,16 @@ func try_loose(by: GridEntity, at: Vector2i) -> bool:
 func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
 	if not Net.is_authority() or not is_instance_valid(by) or at == by.tile or strength <= 0.0:
 		return null
-	var verb := Items.verb_of(_drawn_with(by))
-	if verb.is_empty():
+	var aim := shot_aim(by, at)
+	if aim.is_empty():
 		return null
-	var hit: GridEntity = null
-	var end := by.tile
-	for cell in shot_line(by.tile, at, int(verb["cells"])):
-		end = cell
-		var body: GridEntity = _occupancy.get(cell)
-		if body != null and body != by:
-			hit = body
-			break
+	var verb := Items.verb_of(drawn_with(by))
+	var hit: GridEntity = aim["hit"]
+	var end: Vector2i = aim["end"]
 	by._world_set_facing(Vector2i(signi(at.x - by.tile.x), signi(at.y - by.tile.y)))
 	by._world_shot(end)
 	noise(by.tile, NOISE_BOW, &"bow", by)
-	if hit == null or not can_target(by, hit) or not hit.is_breakable():
+	if hit == null or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
 		_log("shot: %s at %s, drawn %.2f, %s" % [by.name, end, strength, "nothing hit" if hit == null else "stopped by %s" % hit.name])
 		return null
 	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * strength))
@@ -3281,9 +3276,9 @@ func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
 		var ammo := Items.ammo_of(by.slots[bundle_slot(by)]) if bundle_slot(by) >= 0 else {}
 		damage(hit, amount, by, &"shot")
 		if creature:
-			_credit(by, _drawn_slot(by), "felled" if not _alive(hit) else "shot")
+			_credit(by, drawn_slot(by), "felled" if not _alive(hit) else "shot")
 			if not _alive(hit):
-				_felled_with(by, _drawn_slot(by), hit)
+				_felled_with(by, drawn_slot(by), hit)
 		if not str(ammo.get("effect", "")).is_empty() and _alive(hit):
 			afflict(hit, ammo["effect"], int(ammo["ticks"]), int(ammo["every"]), int(ammo["amount"]))  # Flame, barbed.
 	return hit
@@ -3352,6 +3347,34 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	guard_met.emit(target, source, false)
 	_credit(target, slot, "guarded")
 	return [maxi(0, amount - ceili(amount * absorb - 0.001)), force * (1.0 - absorb)]
+
+
+## Whether [param by]'s arrow spares [param body] (decision 456; Jeff:
+## "arrows dont harm friendlies, but it might hit and stick out for a
+## little while"): a player's or a companion's shot ends at a resident, a
+## companion or a player on the line, no harm, no stagger, no ailment (the
+## views stick the arrow in them a while). A monster's is never stopped.
+static func spares(by: GridEntity, body: GridEntity) -> bool:
+	return (by is Player or by is Companion) and (body is Resident or body is Companion or body is Player)
+
+
+## Where [param by]'s shot toward [param at] would go with the bow in its
+## hands: {end: the last cell it crosses (its own if none), hit: the first
+## body on the way, or null}; {} with no bow. The server's shoot and the
+## client's aim while drawing (Main) read the same line.
+func shot_aim(by: GridEntity, at: Vector2i) -> Dictionary:
+	var verb := Items.verb_of(drawn_with(by))
+	if verb.is_empty() or at == by.tile:
+		return {}
+	var hit: GridEntity = null
+	var end := by.tile
+	for cell in shot_line(by.tile, at, int(verb["cells"])):
+		end = cell
+		var body: GridEntity = _occupancy.get(cell)
+		if body != null and body != by:
+			hit = body
+			break
+	return {"end": end, "hit": hit}
 
 
 ## The cells a shot from [param from] toward [param toward] crosses, in

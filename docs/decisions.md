@@ -11274,3 +11274,34 @@ Net.SUBCLASS_REPLICATED, so protocol() could not see the change of the
 synchronizer's layout: PROTOCOL_REVISION 16. Nothing of the sim changes.
 
 tests/monster_test (the replication config of a monster).
+## 456. The bow, ready for a playtest: the aim, a friend spared, the arrow that stays
+
+Jeff (2026-10-17, through the coordinator): "we need to prioritize bow
+since archery is already working, it needs play testing". Items audited the
+loop (pick up a bow and a bundle, draw, loose, a deer) and fixed its own
+part; the rest went to its owners (pc-character the bow and shield clips,
+enemy-ai `raised` on monsters, sound the bow's five sounds, art-kit an
+fx.arrow slot, perf the hit reaction timed to the flight).
+- The aim while drawing: World.shot_aim(by, at) is shoot's line ({end,
+  hit}), read by Main each frame while the local player's bow is drawn:
+  the body the shot would strike is outlined, else the cell where it would
+  come down is marked. shoot reads the same.
+- A friend on the line. Jeff: "arrows dont harm friendlies, but it might
+  hit and stick out for a little while". World.spares(by, body): a
+  player's or a companion's shot ends at a resident, a companion or a
+  player, with no damage, stagger or ailment, and no standing change (an
+  accident). A monster's spares nobody. Unlike a melee blow (454) there is
+  no Shift for it.
+- The arrow that stays: a miss stands in the ground where it came down
+  SHOT_STUCK_SECONDS (4), and one that meets a friend sticks in them as
+  long, moving with them. The client works both out from the shot's end
+  cell and who stands there (World.spares), so the wire is unchanged. It is
+  never a thing to pick up: Jeff, "instead of arrows wasting, arrows come
+  in a bundle", so a shot spends nothing.
+- The hint over a monster with a bow ready: "LMB  attack   RMB  draw, let
+  go to shoot".
+- World.drawn_with and drawn_slot are public (they were _drawn_with and
+  _drawn_slot), for pc-character's bow clips.
+Rejected: a missed arrow as a pickup (bundles are never spent), and a
+party-log line for a glancing arrow (it adds a message; it can come with
+the bow's sounds if the playtest misses it).

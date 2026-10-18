@@ -543,11 +543,22 @@ func _test_weapons() -> void:
 		var hp := imp.hp
 		_check(World.shoot(host, mark + (mark - host.tile), 1.0) == imp and imp.hp == hp - 4 and ends == [mark],
 				"a full draw aimed past it: the imp, the first body, hit for 4 (a blow of 2, the bow's 2) (%d -> %d); the arrow ends there" % [hp, imp.hp])
+		_check(World.shot_aim(host, mark + (mark - host.tile)) == {"end": mark, "hit": imp},
+				"the aim while drawing reads the same line: the imp outlined, where the arrow ends")
 		hp = imp.hp
 		_check(World.shoot(host, mark, 0.5) == imp and imp.hp == hp - 2, "a half draw: 2 (%d -> %d)" % [hp, imp.hp])
 		_check(World.shoot(host, mark, 0.1) == imp and imp.hp == hp - 3, "a short draw: still at least 1")
+		var friend := Resident.new()
+		friend.name = "Tam"
 		World._relocate(imp, _far_cell(host))
+		_check(World.spawn(friend, mark), "(a resident stands where the imp stood)")
+		var friend_hp := friend.hp
+		_check(World.shoot(host, mark, 1.0) == null and friend.hp == friend_hp and friend.ailments.is_empty() and ends.back() == mark,
+				"a shot meets a friend: it ends there, no harm (Jeff: arrows dont harm friendlies, decision 456)")
+		_check(World.spares(host, friend) and not World.spares(imp, host) and not World.spares(host, imp), "a player's arrow spares a friend; a monster's spares nobody")
+		World.despawn(friend)
 		hp = imp.hp
+		_check(World.shot_aim(host, near)["hit"] == null and World.shot_aim(host, host.tile).is_empty(), "the aim with nobody on the line: no body, and none at its own cell")
 		_check(World.shoot(host, near, 1.0) == null and imp.hp == hp, "nothing on the line: nothing hit")
 		host.shot.disconnect(seen)
 		World.try_stance(host, "draw")

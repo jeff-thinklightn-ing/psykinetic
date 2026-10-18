@@ -730,7 +730,14 @@ func _process(delta: float) -> void:
 	# nothing standing on the map intercepts it. In 3D a monster a click
 	# would attack is outlined instead, and the cell is not shown.
 	var tile := _mouse_tile()
-	if _client3d != null:
+	var player := _local_player()
+	var aim := World.shot_aim(player, tile) if player != null and player.raised == "draw" else {}
+	if _client3d != null and not aim.is_empty():
+		# A bow drawn: the body the shot would strike is outlined, else
+		# the cell where it would come down.
+		_client3d.target(aim["hit"])
+		_client3d.hover(aim["end"], aim["hit"] == null)
+	elif _client3d != null:
 		var foe := _foe_under_mouse()
 		_client3d.target(foe)
 		_client3d.hover(tile, foe == null and World.is_walkable(tile))
@@ -4660,7 +4667,7 @@ func context_hint_for(thing: Node) -> String:
 	if thing is Resident:
 		return "LMB  talk"  # Decision 454: Shift+LMB attacks, said in the controls list.
 	if thing is Monster and World.can_target(player, thing):
-		return "LMB  attack"
+		return "LMB  attack   RMB  draw, let go to shoot" if World.off_hand(player) == "draw" else "LMB  attack"
 	if thing is Player and thing != player:
 		return "LMB  talk   E hold  bandage"
 	return ""

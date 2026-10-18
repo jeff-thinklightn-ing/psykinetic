@@ -778,6 +778,9 @@ const SHOT_SPEED := 40.0
 ## Cell -> the msec the arrow shot at it gets there (_on_shot, _on_struck).
 var _arrows_due: Dictionary[Vector2i, int] = {}
 const SHOT_PITCH := 1.8
+## A shot that strikes nobody stands in the ground this long, and one that
+## meets a friend sticks in them as long (decision 456).
+const SHOT_STUCK_SECONDS := 4.0
 const LUNGE_SECONDS := 0.16
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
@@ -7101,7 +7104,28 @@ func _on_shot(to: Vector2i, id: int) -> void:
 	_arrows_due[to] = Time.get_ticks_msec() + int(flight * 1000.0)
 	var tween := create_tween()
 	tween.tween_property(arrow, "position", end, flight)
-	tween.tween_callback(arrow.queue_free)
+	var struck := World.get_entity_at(to)
+	var shooter := instance_from_id(id) as GridEntity
+	var body: Node3D = _puppets.get(struck.get_instance_id()) if struck != null else null
+	if body != null and shooter != null and World.spares(shooter, struck):
+		# A friend on the line (decision 456): it sticks in them a while,
+		# moving with them.
+		tween.tween_callback(func() -> void:
+			if is_instance_valid(body) and is_instance_valid(arrow):
+				arrow.reparent(body))
+		tween.tween_interval(SHOT_STUCK_SECONDS)
+	elif struck == null:
+		# A miss: it stands in the ground where it came down a while.
+		var stuck := _tile_position(to)
+		stuck.y = _ground_height(Vector2(stuck.x, stuck.z)) + 0.2
+		var along := Vector3(end.x - from.x, 0.0, end.z - from.z).normalized()
+		if along.is_zero_approx():
+			along = Vector3.FORWARD
+		tween.tween_callback(func() -> void: arrow.look_at_from_position(stuck, stuck + along + Vector3.DOWN, Vector3.UP))
+		tween.tween_interval(SHOT_STUCK_SECONDS)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(arrow):
+			arrow.queue_free())
 
 
 ## A blow wound up over [param ticks]: the heavy swing, timed to connect
