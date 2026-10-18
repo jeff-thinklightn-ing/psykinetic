@@ -7,6 +7,18 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.151
+
+- This release changes what the server and client send each other, so update the
+  client to keep playing (the launcher's update does it). New in it: choose how you
+  look in the options; people hold what's in their hands; a practice bow and arrows
+  in the wilds' town chest, and bows that show their aim, spare friends and stick in
+  the ground, with archers whose draw you can see; every key can be rebound, with
+  interface and text sizes and a colour set for colour blindness; the world map (M
+  twice); the counter screen at the temple and the smith; the lawspeaker and the
+  town's memory; townsfolk who remember what you did for them; your companion
+  remembers your gifts, and a fix for what she forgot after a restart; farms; deer
+  and named wild animals; no more fetch errands.
 - The town's chest in the wilds (by the guard, south-east of the well) now holds a hunting bow and a bundle of arrows for practice, put into existing worlds once (decision 468).
 - Wild animals are named by what they are, "Wild doe", "Wild stag", "Wild boar", "Wild rabbit", "Wolf", not a name and number. Deer and rabbits are drawn with their own models at last.
 - Shingle roofs are wooden shingles, and a damaged one shows its rafters and battens through the torn shingles.
