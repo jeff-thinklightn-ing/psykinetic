@@ -254,7 +254,8 @@ what you will do, exactly one of:
 [STANCE: PRESS] go for the monsters
 [STANCE: GUARD] keep beside %s and fight whatever comes at either of you
 [STANCE: PULL_BACK] get away to safety
-If %s asked nothing of you, leave that line out."""
+If %s asked nothing of you, leave that line out. If %s asked you to do something that is neither one of these nor on
+a list of what you can do here, say plainly that you cannot do it; never say you will."""
 ## What she can do now, by number, after VOICE_ASKED.
 const VOICE_CAN_DO := """These you can do here and now:
 %s
@@ -371,6 +372,11 @@ var _last_bump_tick := -1000
 ## Where YIELD goes (her own tile when there was nowhere) and until when.
 var _yield_tile := NONE
 var _yield_until := -1
+## The door cell she holds this tick (_door_to_hold), NONE for none; and
+## whether her player asked her to hold it ("hold_door"), till the fight
+## is over or they ask something else (decision 391).
+var _door_hold := NONE
+var _door_asked := false
 ## RETREAT: the safe cell she is making for (NONE: none chosen); where she
 ## was last, and the way she last stepped.
 var _retreat_goal := NONE
@@ -534,6 +540,16 @@ func bumped(direction: Vector2i) -> bool:
 	if World.tick - _last_bump_tick < BUMP_REPEAT_TICKS or current_intent == Intent.YIELD:
 		return false
 	_last_bump_tick = World.tick
+	step_aside(direction)
+	return true
+
+
+## She gets out of the way of her player going [param direction] (a bump,
+## or "step out of the way": decision 391): to the nearest free cell off
+## their path and off any doorway, else she and her player change places,
+## else she says there is no room. Standing as told (HOLD), she stands
+## there from now on, not back where she was in the way.
+func step_aside(direction: Vector2i) -> void:
 	_bump_direction = direction
 	_yield_tile = _find_yield_tile()
 	_bump_direction = Vector2i.ZERO
@@ -548,7 +564,8 @@ func bumped(direction: Vector2i) -> bool:
 	current_intent = Intent.YIELD
 	intent_target = null
 	_yield_until = World.tick + DECISION_INTERVAL_TICKS
-	return true
+	if stance == Stance.HOLD:
+		hold_tile = _yield_tile
 
 
 ## Her player said [param text] to her, typed or a quick phrase: the voice
@@ -1726,7 +1743,7 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 			# What she knows of what was mentioned, right by the answer it is for.
 			system += "\nWhat you know of what %s mentioned: %s" % [who, knowledge_of(kinds)]
 		if addressed != "other":
-			system += "\n" + VOICE_ASKED % [who, who, who, who]
+			system += "\n" + VOICE_ASKED % [who, who, who, who, who]
 			_offering = can_do()
 			if not _offering.is_empty():
 				var listed: Array[String] = []
@@ -1833,19 +1850,24 @@ static var _zone_kinds: Dictionary[String, String] = {}
 
 
 ## Where she is and the hour, for her voice, in one sentence: outdoors
-## under the sky (or under a roof there) with the weather (Fields.weather),
-## indoors, in a cave or a dungeon.
+## under the sky (or inside a building, or under a roof there) with the
+## season and the weather (DayNight.describe, decision 391), indoors, in a
+## cave or a dungeon.
 func where_words(full := true) -> String:
 	var hour := time_words(DayNight.hour(DayNight.now()))
 	if not full:
 		return _where_briefly()
 	if World.outdoor:
-		var sky := ""
-		if WEATHER_WORDS.has(str(World.fields.weather.get("kind", ""))):
-			sky = ", and " + WEATHER_WORDS[World.fields.weather["kind"]]
+		var now: String = DayNight.describe(World.fields.region, DayNight.now())["sentence"]
+		var outside := now.left(1).to_lower() + now.substr(1)
+		var inside := inside_words()
+		if not inside.is_empty():
+			return "%s; outside, %s" % [inside, outside]
 		if World.fields.outdoor and not World.fields.under_sky(tile):
-			return "You are under a roof; outside it is %s%s." % [hour, sky]
-		return "It is %s%s. You are outdoors, under the sky, with forest all around the edge of this place." % [hour, sky]
+			return "You are under a roof; outside, %s" % outside
+		return "%s You are outdoors, under the sky, with forest all around the edge of this place." % now
+	if not inside_words().is_empty():
+		return "%s; outside it is %s." % [inside_words(), hour]
 	var zone_name := World.zone.name if World.zone != null else ""
 	if not _zone_kinds.has(zone_name):
 		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
@@ -1864,9 +1886,14 @@ func where_words(full := true) -> String:
 func _where_briefly() -> String:
 	if World.outdoor:
 		var storm := " A storm is raging." if str(World.fields.weather.get("kind", "")) == "storm" else ""
+		var inside := inside_words()
+		if not inside.is_empty():
+			return "%s.%s" % [inside, storm]
 		if World.fields.outdoor and not World.fields.under_sky(tile):
 			return "You are under a roof.%s" % storm
 		return "You are outdoors, under the sky, with forest all around the edge of this place.%s" % storm
+	if not inside_words().is_empty():
+		return inside_words() + "."
 	var zone_name := World.zone.name if World.zone != null else ""
 	if not _zone_kinds.has(zone_name):
 		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
@@ -1878,6 +1905,63 @@ func _where_briefly() -> String:
 			return "You are in a dungeon, under the ground."
 		_:
 			return "You are indoors."
+
+
+## Buildings in words, by slot, their size said (decision 391: inside
+## Pip's house she was told she was outdoors, under the sky).
+const BUILDING_WORDS := {"building.hut": "a small hut", "building.house": "a house", "building.shed": "a shed",
+	"building.temple": "the temple", "building.healers_hut": "the healer's hut"}
+## Each zone's buildings with an inside (Level's "buildings"), by zone name, read once.
+static var _zone_buildings: Dictionary[String, Array] = {}
+
+
+## The building whose inside holds [param cell] in this zone (Level's
+## {slot, rect, use, town, ...}), {} for none.
+static func building_at(cell: Vector2i) -> Dictionary:
+	var zone_name := World.zone.name if World.zone != null else ""
+	if not _zone_buildings.has(zone_name):
+		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
+		_zone_buildings[zone_name] = level.get("buildings", []).filter(func(each: Dictionary) -> bool:
+			return BUILDING_WORDS.has(str(each.get("slot", ""))))
+	for building: Dictionary in _zone_buildings[zone_name]:
+		if (building["rect"] as Rect2i).has_point(cell):
+			return building
+	return {}
+
+
+## [param building] in words: what the town uses it for ("the forge"),
+## else its kind by size ("a small hut"), and whose home it is when a
+## resident's is ("Snagfin's home"): "the forge (a small hut)", "a house
+## (Snagfin's home)".
+static func building_words(building: Dictionary) -> String:
+	var kind := str(BUILDING_WORDS.get(str(building.get("slot", "")), "a building"))
+	var use := str(building.get("use", ""))
+	var words := "the %s (%s)" % [use.replace("_", " "), kind] if not use.is_empty() and not kind.begins_with("the ") else kind
+	var owners: Array[String] = []
+	for body: GridEntity in World.townsfolk():
+		var resident := body as Resident
+		if resident != null and resident.places.get("home") == building["rect"]:
+			var who := resident.person if not resident.person.is_empty() else _name_of(resident)
+			if who not in owners:
+				owners.append(who)
+	if not owners.is_empty():
+		words += " (%s's home)" % " and ".join(owners)
+	return words
+
+
+## "You are inside a house (Snagfin's home)" when she stands in a
+## building, else "".
+func inside_words() -> String:
+	var building := building_at(tile)
+	return "" if building.is_empty() else "You are inside %s" % building_words(building)
+
+
+## The short name of [param building], for an errand: "the forge", "the hut".
+static func building_short(building: Dictionary) -> String:
+	var use := str(building.get("use", ""))
+	if not use.is_empty():
+		return "the " + use.replace("_", " ")
+	return "the " + str(building.get("slot", "building.building")).trim_prefix("building.").replace("_", " ").replace("healers", "healer's")
 
 
 ## Whether [param heard] asks about the hour or the sky (SKY_WORDS).
@@ -2626,6 +2710,7 @@ func _take_result(result: Dictionary) -> void:
 func _set_stance(wanted: int, serial: int, source: String) -> void:
 	_stance_serial = serial
 	last_mind = source
+	_door_asked = false
 	if wanted == stance:
 		return
 	stance = wanted as Stance
@@ -2908,6 +2993,7 @@ func _act() -> void:
 	if current_intent == Intent.YIELD and World.tick < _yield_until and not (low and foe != null):
 		return
 	intent_target = null
+	_door_hold = NONE
 	# Bandaging herself, low, with nothing at her: she keeps at it.
 	var mending_self: bool = str(errand.get("verb", "")) == "bandage" and errand.get("patient") == self and foe == null
 	if low and not mending_self:
@@ -2916,6 +3002,8 @@ func _act() -> void:
 		current_intent = Intent.RETREAT
 	elif _on_errand():
 		current_intent = Intent.ERRAND
+	elif _holds_door(foe):
+		pass
 	else:
 		match stance:
 			Stance.PULL_BACK:
@@ -2931,6 +3019,21 @@ func _act() -> void:
 	if current_intent != before or intent_target != before_target:
 		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
 			" " + String(intent_target.name) if intent_target != null else "", stance_name()])
+
+
+## A door to hold (_door_to_hold), asked or, guarding or pressing, of her
+## own choice: she stands in it and fights what comes at her there. True
+## if she does; the ask lapses once there is none.
+func _holds_door(foe: GridEntity) -> bool:
+	if not _door_asked and stance != Stance.GUARD and stance != Stance.PRESS:
+		return false
+	var door := _door_to_hold()
+	if door == NONE:
+		_door_asked = false
+		return false
+	_door_hold = door
+	_fight_or(foe, Intent.HOLD)
+	return true
 
 
 func _fight_or(foe: GridEntity, otherwise: Intent) -> void:
@@ -2992,8 +3095,9 @@ func _execute() -> void:
 		Intent.RETREAT:
 			_retreat()
 		Intent.HOLD:
-			if tile != hold_tile and World.is_free(hold_tile):
-				_step_toward(hold_tile, true)
+			var spot := _door_hold if _door_hold != NONE else hold_tile
+			if tile != spot and World.is_free(spot):
+				_step_toward(spot, true)
 		Intent.ATTACK:
 			if not _alive(intent_target):
 				current_intent = Intent.FOLLOW
@@ -3101,10 +3205,11 @@ func _find_yield_tile() -> Vector2i:
 	var best := NONE
 	var best_steps := YIELD_REACH + 1
 	var best_ahead := INF
+	var doors := door_cells()
 	for dy in range(-YIELD_REACH, YIELD_REACH + 1):
 		for dx in range(-YIELD_REACH, YIELD_REACH + 1):
 			var cell := tile + Vector2i(dx, dy)
-			if cell == tile or line.has(cell) or not World.is_free(cell) or World.is_burning(cell):
+			if cell == tile or line.has(cell) or doors.has(cell) or not World.is_free(cell) or World.is_burning(cell):
 				continue
 			var path := World.find_path(tile, cell)
 			if path.is_empty() or path.size() > YIELD_REACH:
@@ -3161,6 +3266,11 @@ func _follow() -> void:
 	if keeper.tile != _keeper_at:
 		_keeper_at = keeper.tile
 		_keeper_moved = World.tick
+	# In a doorway, or on the other side of a building's walls from her
+	# player (they went in, or out): she moves, however near (decision 391).
+	var astray := door_cells().has(tile) or _inside_of(tile) != _inside_of(keeper.tile)
+	if astray:
+		_catching_up = true
 	if not _catching_up:
 		return
 	var walking := World.tick - _keeper_moved <= WALKING_TICKS
@@ -3170,7 +3280,7 @@ func _follow() -> void:
 		if not walking:
 			_catching_up = false
 		return
-	if not walking and (distance <= FOLLOW_STOP and not ahead or heel == NONE and distance <= FOLLOW_STOP):
+	if not walking and not astray and (distance <= FOLLOW_STOP and not ahead or heel == NONE and distance <= FOLLOW_STOP):
 		_catching_up = false
 		return
 	if heel != NONE:
@@ -3179,25 +3289,93 @@ func _follow() -> void:
 		_approach(keeper, FOLLOW_CLOSE)
 
 
+## The cells either side of each door: a door's inside cell and the one
+## outside it, where she never stops of her own accord (decision 391, Jeff:
+## "companions tend to stand in doorways"; holding one is a tactic,
+## _door_to_hold).
+static func door_cells() -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for door: Door in World.get_doors():
+		for cell in Terrain.edge_cells(door.key):
+			out[cell] = true
+	return out
+
+
+## The inside of the building [param cell] is in (Rect2i() for none).
+static func _inside_of(cell: Vector2i) -> Rect2i:
+	var building := building_at(cell)
+	return Rect2i() if building.is_empty() else building["rect"]
+
+
 ## The cell at her player's heel: of the free walkable cells within
-## FOLLOW_STOP of them (hers among them), one behind their facing (not
-## ahead, nor beside if any behind is free), the nearest to them, then to
-## her; NONE if none.
+## FOLLOW_STOP of them (hers among them), never a door's (door_cells), one
+## on their side of a building's walls (inside with them, or outside), then
+## one behind their facing (not ahead, nor beside if any behind is free),
+## the nearest to them, then to her; NONE if none.
 func _heel() -> Vector2i:
 	var best := NONE
 	var best_key := Vector2i(1 << 20, 1 << 20)
+	var doors := door_cells()
+	var theirs := _inside_of(keeper.tile)
 	for dy in range(-FOLLOW_STOP, FOLLOW_STOP + 1):
 		for dx in range(-FOLLOW_STOP, FOLLOW_STOP + 1):
 			var at := keeper.tile + Vector2i(dx, dy)
-			if at == keeper.tile or World.distance(at, keeper.tile) > FOLLOW_STOP:
+			if at == keeper.tile or World.distance(at, keeper.tile) > FOLLOW_STOP or doors.has(at):
 				continue
 			if at != tile and not (World.is_walkable(at) and World.is_free(at)):
 				continue
 			var along := _ahead_of(Vector2i(dx, dy), keeper.facing)
-			var key := Vector2i(0 if along < 0 else 1 + along, World.distance(at, keeper.tile) * 100 + World.distance(tile, at))
+			var apart := 0 if _inside_of(at) == theirs else 10
+			var key := Vector2i(apart + (0 if along < 0 else 1 + along), World.distance(at, keeper.tile) * 100 + World.distance(tile, at))
 			if key.x < best_key.x or key.x == best_key.x and key.y < best_key.y:
 				best_key = key
 				best = at
+	return best
+
+
+## The free walkable cell of [param rect] nearest its middle (its middle
+## when none is free).
+static func _middle_of(rect: Rect2i) -> Vector2i:
+	var middle := rect.position + rect.size / 2
+	var best := middle
+	var best_distance := 1 << 20
+	for cell in Level.rect_cells(rect):
+		if World.is_walkable(cell) and World.is_free(cell) and World.distance(cell, middle) < best_distance:
+			best = cell
+			best_distance = World.distance(cell, middle)
+	return best
+
+
+## The door she holds in a fight (decision 391, Jeff: "doorway plugging a
+## battle strategy not a routine"): with her player inside a building and a
+## hostile outside it that she sees or hears (within GUARD_RANGE of her)
+## within GUARD_RANGE of one of its doors, or in sight going for either of
+## them, that door's inside cell, the one nearest the hostile; NONE
+## otherwise. Once the fight is over it is NONE again, and she steps off.
+func _door_to_hold() -> Vector2i:
+	if not _alive(keeper):
+		return NONE
+	var inside := _inside_of(keeper.tile)
+	if inside.size == Vector2i.ZERO:
+		return NONE
+	var best := NONE
+	var best_distance := 1 << 20
+	for door: Door in World.get_doors():
+		var sides := Terrain.edge_cells(door.key)
+		if inside.has_point(sides[0]) == inside.has_point(sides[1]):
+			continue
+		var within: Vector2i = sides[0] if inside.has_point(sides[0]) else sides[1]
+		var outside: Vector2i = sides[1] if within == sides[0] else sides[0]
+		for entity in World.get_entities():
+			var monster := entity as Monster
+			if monster == null or not _hostile(monster) or inside.has_point(monster.tile) \
+					or not (senses.sees(monster) or World.distance(tile, monster.tile) <= GUARD_RANGE):
+				continue
+			var distance := World.distance(monster.tile, outside)
+			var after_us := monster.target != null and (monster.target == self or monster.target == keeper)
+			if (distance <= GUARD_RANGE or after_us and distance <= SIGHT_RANGE) and distance < best_distance:
+				best = within
+				best_distance = distance
 	return best
 
 
@@ -3224,7 +3402,8 @@ const AILING := {"bleed": "bleeding", "burn": "burning"}
 
 
 ## What she can do here and now, nearest first, at most ACTIONS_MAX: each
-## {verb ("open", "close", "open_chest", "fetch", "give", "bandage", "look"), words
+## {verb ("open", "close", "open_chest", "fetch", "give", "bandage", "look",
+## and decision 391's "look_inside", "make_way", "hold_door"), words
 ## (for her voice: "open the closed door, a few paces to the south"), at,
 ## and its door, chest, item or cell}. Only what she sees: a door not
 ## broken, a chest, and, with her player in sight (the only one she may
@@ -3235,7 +3414,9 @@ const AILING := {"bleed": "bleeding", "burn": "burning"}
 ## nearest walkable cells she
 ## cannot see within her sight's range, one a compass point, LOOKS_OFFERED
 ## of them. A bandage for someone bleeding comes first, before anything
-## nearer (decision 320 amended).
+## nearer (decision 320 amended); then holding a door in a fight, or else
+## stepping out of her player's way when next to them or in a doorway; and
+## inside a building, a look round it (decision 391).
 func can_do() -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
 	for door: Door in World.get_doors():
@@ -3274,7 +3455,21 @@ func can_do() -> Array[Dictionary]:
 			if patient != null and patient.hp < patient.max_hp and patient.mending == 0 and World.calm(patient):
 				actions.append({"verb": "bandage", "patient": patient, "at": patient.tile,
 					"words": "bandage your own wounds" if patient == self else "bandage %s's wounds" % keeper_name()})
+	# Inside a building: a look round all of it (decision 391).
+	var building := building_at(tile)
+	if not building.is_empty():
+		var middle := _middle_of(building["rect"])
+		actions.append({"verb": "look_inside", "building": building, "cell": middle, "at": middle,
+			"words": "look round inside %s and see what is there" % building_short(building)})
 	actions.sort_custom(_nearer_found)
+	# Getting out of her player's way, and holding a door in a fight, come
+	# before anything nearer (decision 391).
+	var door := _door_to_hold()
+	if door != NONE:
+		actions.push_front({"verb": "hold_door", "cell": door, "at": door,
+			"words": "hold the door of %s against what is coming" % building_short(building_at(door))})
+	if _alive(keeper) and (World.distance(tile, keeper.tile) == 1 or door_cells().has(tile)) and door == NONE:
+		actions.push_front({"verb": "make_way", "cell": tile, "at": tile, "words": "step out of %s's way" % keeper_name()})
 	# Bleeding: the bandage first, before anything nearer.
 	var stanch := actions.filter(func(each: Dictionary) -> bool: return each["verb"] == "bandage" and each["patient"].ailments.has("bleed"))
 	if not stanch.is_empty():
@@ -3310,9 +3505,17 @@ static func _errand_verbs(text: String) -> Array[String]:
 		verbs.append("open")
 	if door and has.call("\\b(close|shut)"):
 		verbs.append("close")
-	if not chest and not door and has.call("\\b(look|check|scout|see|peek)") \
+	# A building named: a look round inside it (decision 391), not a look off somewhere.
+	var building: bool = has.call("\\b(hut|house|shed|temple|forge|kitchen|store|building|room|inside|in here)\\b")
+	if not chest and building and has.call("\\b(look|check|search|see|peek|loot)"):
+		verbs.append("look_inside")
+	elif not chest and not door and has.call("\\b(look|check|scout|see|peek)") \
 			and has.call(COMPASS_WORD + "|\\b(dark|there|ahead|around|corner)\\b"):
 		verbs.append("look")
+	if has.call("\\b(step|move|stand)\\b[^.]*\\b(aside|over|out of (the|your|his|her|their) way|out of the door\\w*|clear)\\b|\\b(make way|get out of (the|your|his|her|their) way)\\b"):
+		verbs.append("make_way")
+	if door and has.call("\\b(hold|guard|block|keep)\\b"):
+		verbs.append("hold_door")
 	# Handing over and fetching: only of a thing named (or the chest), so
 	# "I'll get them" or "I'll take the imps" is no errand.
 	var thing := _item_words("").search(text) != null
@@ -3386,6 +3589,17 @@ func _promises(line: String, offered: Array, chosen: int) -> Dictionary:
 
 
 func _start_errand(action: Dictionary, serial: int) -> void:
+	# Out of the way, and holding a door: the hands at once, no errand kept.
+	match str(action["verb"]):
+		"make_way":
+			step_aside(keeper.facing if _alive(keeper) else facing)
+			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": action["words"], "outcome": "done",
+				"note": "to %s" % _yield_tile})
+			return
+		"hold_door":
+			_door_asked = true
+			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": action["words"], "outcome": "set off"})
+			return
 	errand = action.duplicate()
 	errand["phase"] = "going"
 	errand["serial"] = serial
@@ -3444,6 +3658,8 @@ func _errand_there() -> bool:
 		"bandage":
 			var patient: GridEntity = errand["patient"]
 			return patient == self or _alive(patient) and World.can_melee(tile, patient.tile)
+		"look_inside":
+			return World.distance(tile, errand["cell"]) <= 1
 		_:
 			return _sees(errand["cell"])
 
@@ -3550,6 +3766,13 @@ func _errand_do() -> void:
 			if held != "nothing":
 				note_fact("%s found %s in a chest in %s." % [_name_of(self), held, _place_words()])
 			_report_errand("You looked in the chest %s: it holds %s." % [_paces_toward(Vector2(chest.tile)), held])
+		"look_inside":
+			var building: Dictionary = errand["building"]
+			var seen := _found_in(building["rect"])
+			var short := building_short(building)
+			if not seen.is_empty():
+				note_fact("%s looked round inside %s in %s and found %s." % [_name_of(self), short, _place_words(), _listed(seen)])
+			_report_errand("You looked round inside %s: %s." % [short, "there is nothing in it" if seen.is_empty() else "there is " + _listed(seen)])
 		_:
 			var cell: Vector2i = errand["cell"]
 			var seen: Array[String] = []
@@ -3566,6 +3789,38 @@ func _errand_do() -> void:
 			errand["told"] = "You went and looked %s, and came back: %s." % [str(errand["words"]).get_slice(", ", 0).trim_prefix("go and look "),
 				"nothing there" if seen.is_empty() else "you saw " + ", ".join(seen) + " there"]
 			errand["phase"] = "returning"
+
+
+## What lies in [param rect], for a look round a building: each chest and
+## what it holds, each thing on the ground, each crate or such, and anyone
+## there but her and her player ("a chest holding a dagger", "a bandaging
+## kit on the floor").
+func _found_in(rect: Rect2i) -> Array[String]:
+	var seen: Array[String] = []
+	for entity in World.get_entities():
+		if entity == self or entity == keeper or not entity.spawned or not rect.has_point(entity.tile):
+			continue
+		if entity is Chest:
+			var held: Array[String] = []
+			for id: String in (entity as Chest).slots:
+				if not id.is_empty():
+					held.append(_a(Items.name_of(id)))
+			seen.append("a chest holding %s" % _listed(held) if not held.is_empty() else "an empty chest")
+		elif entity is Monster or entity is Player or entity is Companion or entity is Resident:
+			seen.append(refer(entity))
+		elif entity.pushable:
+			seen.append("a " + object_word(entity))
+	for cell in Level.rect_cells(rect):
+		for id: String in World.ground_at(cell):
+			seen.append("%s on the floor" % _a(Items.name_of(id)))
+	return seen
+
+
+## "a, b and c".
+static func _listed(things: Array[String]) -> String:
+	if things.size() <= 1:
+		return "".join(things)
+	return "%s and %s" % [", ".join(things.slice(0, -1)), things.back()]
 
 
 ## Her errand is done: [param told] narrated, and her voice asked to tell it.

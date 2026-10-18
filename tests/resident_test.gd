@@ -13,6 +13,9 @@ extends Node
 const TOWN := "rs_town"
 const ROAD := "rs_road"
 const STORE := "rs_town/store"
+## The shed (decision 391): its inside, and its door's pixel in the layout.
+const SHED := Rect2i(13, 1, 2, 3)
+const SHED_DOOR_PIXEL := Vector2i(26, 7)
 
 var _failures := 0
 var _main: Node
@@ -44,6 +47,7 @@ func _ready() -> void:
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
+	_test_houses()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
 	Production.type_of = Townsfolk.roll_type
@@ -60,15 +64,17 @@ func _ready() -> void:
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
-## rs_town: a room of stone (30 x 20 rows of the layout) in a wall, the start
-## at (2, 2), the store (a stockpile the town holds) at (5, 3), radius 2, a
-## hut at (9, 5) (no walls of its own: its inside, (9, 5) to (11, 7), is a
-## home). rs_road: a bare room.
 ## Every resident steady (see _ready).
 static func _steady(_id: String) -> String:
 	return Townsfolk.STEADY
 
 
+## rs_town: a room of stone (30 x 20 rows of the layout) in a wall, the start
+## at (2, 2), the store (a stockpile the town holds) at (5, 3), radius 2, a
+## hut at (9, 5) (no walls of its own: its inside, (9, 5) to (11, 7), is a
+## home), a healer's hut at (1, 6) (decision 404), and a shed (decision 391:
+## no one's home) with walls of its own, its inside (13, 1) to (14, 3), its
+## door on the south side between (13, 3) and (13, 4). rs_road: a bare room.
 func _register_levels() -> void:
 	for level_name: String in [TOWN, ROAD]:
 		var rows: Array[String] = []
@@ -78,8 +84,14 @@ func _register_levels() -> void:
 		if level_name == TOWN:
 			spec["places"] = {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}}
 			# A home for residents' bodies (decision 333): a hut linked to nothing.
-			# And a healer's hut (decision 404): a place of its own, no town.
-			spec["buildings"] = [{"slot": "building.hut", "at": [9, 5]}, {"slot": "building.healers_hut", "at": [1, 6], "facing": [0, -1]}]
+			# And a healer's hut (decision 404): a place of its own, no town; and a shed (decision 391).
+			spec["buildings"] = [{"slot": "building.hut", "at": [9, 5]}, {"slot": "building.healers_hut", "at": [1, 6], "facing": [0, -1]},
+				{"slot": "building.shed", "at": [13, 1], "facing": [0, 1]}]
+			# The shed's walls: its outline's edges in the layout's double resolution, the door at (13, 3)'s south edge.
+			for y in range(1, 8):
+				for x in range(25, 30):
+					if y == 1 or y == 7 or x == 25 or x == 29:
+						rows[y] = rows[y].substr(0, x) + ("+" if Vector2i(x, y) == SHED_DOOR_PIXEL else "#") + rows[y].substr(x + 1)
 		Level.register(level_name, Level.image_from_rows(rows, {Vector2i(2, 2): "start"}), null, spec)
 
 
@@ -622,6 +634,114 @@ class BusyMind:
 ## A town far from everyone has no bodies, and is not in play: a raid on
 ## it takes its people off the record (decision 355). The room is small,
 ## so the distances are made small (Main.recall_tiles, retire_tiles).
+func _test_houses() -> void:
+	print("\n== inside a building she knows it; out of doorways but to hold one in a fight (decision 391) ==")
+	if World.zone.name != TOWN:
+		_main.travel(Net.local_id, TOWN)
+	var owner := _player()
+	var pet := _companion()
+	_check(owner != null and pet != null, "(a player and a companion in the town)")
+	if owner == null or pet == null:
+		return
+	for entity in World.get_entities():
+		if entity is Monster:
+			World.damage(entity, 999)
+	_settle(pet)
+	pet.errand = {}
+	pet.hp = pet.max_hp
+	var door: Door = null
+	for each: Door in World.get_doors():
+		if Terrain.edge_cells(each.key) == [Vector2i(13, 3), Vector2i(13, 4)]:
+			door = each
+	_check(door != null and Companion.door_cells().has(Vector2i(13, 3)) and Companion.door_cells().has(Vector2i(13, 4)),
+		"(the shed's door, its cells either side: %s)" % [Companion.door_cells().keys()])
+	if door == null:
+		return
+	door.open = true
+	# Inside: the building by name, and whose home.
+	_put(owner, Vector2i(14, 1))
+	_put(pet, Vector2i(13, 1))
+	_check(pet.inside_words() == "You are inside a shed" and pet.where_words().begins_with("You are inside a shed")
+		and pet.where_words(false).begins_with("You are inside a shed"), "in the shed: she is told so, not outdoors (%s)" % pet.where_words())
+	_sync()
+	var homed := ""
+	for body: GridEntity in World.townsfolk():
+		if (body as Resident).places.get("home") == Rect2i(9, 5, 3, 3):
+			homed = (body as Resident).person
+	_put(pet, Vector2i(10, 6))
+	_check(pet.inside_words().begins_with("You are inside a small hut") and (homed.is_empty() or ("%s's home" % homed) in pet.inside_words()),
+		"in the hut: a small hut, and whose home it is when a resident's (%s; %s)" % [pet.inside_words(), homed])
+	# A look round inside, offered there and done.
+	_put(pet, Vector2i(13, 2))
+	var look := pet.can_do().filter(func(each: Dictionary) -> bool: return each["verb"] == "look_inside")
+	_check(look.size() == 1 and "look round inside the shed" in str(look[0]["words"]), "inside, she can look round it: %s" % [pet.can_do().map(func(e: Dictionary) -> String: return e["words"])])
+	_check("look_inside" in Companion._errand_verbs("i will check this shed for loot.") and "look" not in Companion._errand_verbs("i will check this shed for loot."),
+		"\"check this shed for loot\" promises that look, not a look off somewhere")
+	var kit := World.put_on_ground(World.items.mint("bandaging_kit", "built"), Vector2i(14, 3))
+	if not look.is_empty():
+		pet._start_errand(look[0], pet._serial)
+	_step_until(func() -> bool: return pet.errand.is_empty(), 60)
+	var narrated := pet._exchange.filter(func(turn: Dictionary) -> bool: return "You looked round inside the shed" in str(turn["text"]))
+	_check(pet.errand.is_empty() and not narrated.is_empty() and "bandaging kit on the floor" in str(narrated.back()["text"]).to_lower(),
+		"the look done, what she found is told to her voice: %s" % [narrated.back()["text"] if not narrated.is_empty() else pet._exchange.slice(-3)])
+	World.take_from_ground(kit, 0)
+	# She follows her player in, and never stops in the doorway.
+	_settle(pet)
+	_put(owner, Vector2i(14, 2))
+	owner.facing = Vector2i(0, -1)
+	_put(pet, Vector2i(11, 4))
+	_step_until(func() -> bool: return SHED.has_point(pet.tile) and not Companion.door_cells().has(pet.tile) and pet.current_intent == Companion.Intent.FOLLOW, 80)
+	for i in 20:
+		World.step()
+	_check(SHED.has_point(pet.tile) and not Companion.door_cells().has(pet.tile), "her player went in: she followed, inside and off the door's cells (%s)" % pet.tile)
+	# Asked to step aside in the doorway (standing as told): off it, and she stays off it.
+	_told_to_stay(pet)
+	_put(owner, Vector2i(13, 5))
+	owner.facing = Vector2i(0, -1)
+	_put(pet, Vector2i(13, 4))
+	pet.hold_tile = pet.tile
+	var way := pet.can_do().filter(func(each: Dictionary) -> bool: return each["verb"] == "make_way")
+	_check(way.size() == 1 and pet.can_do()[0]["verb"] == "make_way", "in the doorway, stepping out of the way is offered first (%s)" % [way])
+	_check("make_way" in Companion._errand_verbs("i will step aside.") and "make_way" in Companion._errand_verbs("sorry, let me get out of your way."),
+		"\"step aside\" and \"get out of your way\" promise it")
+	if not way.is_empty():
+		pet._start_errand(way[0], pet._serial)
+	for i in 40:
+		World.step()
+	_check(pet.tile != Vector2i(13, 4) and not Companion.door_cells().has(pet.tile) and pet.hold_tile == pet.tile,
+		"asked, she stepped off the doorway and holds there, not back in it (%s)" % pet.tile)
+	# A bump moves her out of the way, never into a doorway.
+	_settle(pet)
+	_put(pet, Vector2i(5, 9))
+	_put(owner, Vector2i(4, 9))
+	owner.facing = Vector2i(1, 0)
+	pet.bumped(Vector2i(1, 0))
+	for i in 12:
+		World.step()
+	_check(pet.tile.y != 9 and not Companion.door_cells().has(pet.tile), "bumped, she stepped aside, off her player's way (%s)" % pet.tile)
+	# A fight: her player inside, an imp coming to the door: she holds it, and leaves it after.
+	_settle(pet)
+	_put(owner, Vector2i(14, 1))
+	_put(pet, Vector2i(14, 2))
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "HouseImp%d" % World.tick, "tile": Vector2i(12, 5)}) as Monster
+	imp.sight_range = 0  # It stays where it is: the hold is hers, not the fight's.
+	var offered := pet.can_do().filter(func(each: Dictionary) -> bool: return each["verb"] == "hold_door")
+	_check(offered.size() == 1 and offered[0]["cell"] == Vector2i(13, 3), "an imp near the door, her player inside: holding the door is offered (%s)" % [offered])
+	_step_until(func() -> bool: return pet.tile == Vector2i(13, 3), 40)
+	_check(pet.tile == Vector2i(13, 3), "guarding, she takes the door's inside cell herself (%s)" % pet.tile)
+	World.damage(imp, 999)
+	for i in 40:
+		World.step()
+	_check(not Companion.door_cells().has(pet.tile), "the imp down, she steps off the door (%s)" % pet.tile)
+	if is_instance_valid(imp) and imp.spawned:
+		World.despawn(imp)
+	for body: GridEntity in World.townsfolk():
+		(body as Resident)._hide_until = -1  # They saw the imp; the tests after are of quiet days.
+	_put(owner, Vector2i(2, 2))
+	for i in 3:
+		World.step()
+
+
 func _test_bodies_only_near() -> void:
 	print("
 == a town's residents have bodies only while someone is near; out of play while none (decision 355) ==")
@@ -635,7 +755,8 @@ func _test_bodies_only_near() -> void:
 	_put(player, Vector2i(26, 17))
 	_put(pet, Vector2i(27, 17))
 	_sync()
-	_check(World.townsfolk().is_empty(), "everyone 20 and more cells off the store: no bodies (%d)" % World.townsfolk().size())
+	_check(World.townsfolk().is_empty(), "everyone 20 and more cells off the store: no bodies (%s)" % [World.townsfolk().map(
+		func(body: GridEntity) -> String: return "%s %s %s" % [(body as Resident).worker_id, body.tile, Resident.Doing.keys()[(body as Resident).doing]])])
 	_check(not World.towns.in_play.call(STORE), "and the town is not in play: a raid takes its people off the record")
 	_put(player, Vector2i(8, 3))
 	_sync()

@@ -9709,3 +9709,52 @@ talk panel's pin, fade and channel, the hint, the place, the two columns,
 the progress, cancel and status).
 `--test-show` gains tip (a sample named dagger: nothing in play is named
 until lore's holder form is agreed). Shots in docs/ui/shots/step3/.
+## 391. A companion inside buildings and in doorways
+
+Jeff's play (2026-10-17, through the coordinator): in Pip's house her voice
+was told "You are outdoors, under the sky"; "check this hut for loot" got
+"I will look inside the hut" and nothing done; "You are blocking the door"
+and "Step aside please" got "I will move" and she did not ("she didn't
+move when asked to move, even though she verbally said she would"); and
+"companions tend to stand in doorways, when i move into building they
+should consider, doorway plugging a battle strategy not a routine".
+
+Inside: Companion.building_at(cell) is the building of this zone's Level
+"buildings" whose inside holds the cell (those with an inside: hut,
+house, shed, temple, healer's hut); her place line says "You are inside a
+small hut (Snagfin's home)": what the town uses it for, else its kind by
+size, and whose home it is when a resident's body has it as home. The
+hour, season and weather come from DayNight.describe (389), said as
+outside.
+
+A look round: inside a building, can_do offers "look round inside the
+<building> and see what is there", an errand that walks to its middle
+and reports each chest and what it holds, each thing on the floor, each
+crate and anyone there, a fact when she finds something. "Check this
+shed for loot" promises it, not a look off somewhere. VOICE_ASKED gains
+the rule: asked something that is neither a stance nor on her list, she
+says plainly she cannot, never that she will.
+
+Out of the way: Companion.door_cells (each door's two cells, its inside
+and the one outside it) are where she never stops of her own accord: her
+heel cell (381) is never one, nor a yield's; and it is on her player's
+side of a building's walls, so she follows them in, or waits outside off
+the door when there is no room. In a doorway, or on the other side of
+the walls from her player, she moves however near she is. Next to her
+player or in a doorway, can_do offers "step out of <player>'s way" (make
+way), done by the hands at once, as a bump is (step_aside: the nearest
+free cell off their way and off any doorway, else she and they change
+places); standing as told, she stands there from then on.
+
+Holding a door is a tactic: with her player inside a building and a
+hostile outside that she sees or hears, within GUARD_RANGE of one of its
+doors or in sight going for either of them, she guarding or pressing
+takes that door's inside cell and fights what comes at her there
+(Companion._door_to_hold), and can_do offers "hold the door of <the
+building> against what is coming" for any stance; once there is no such
+hostile she steps off it. resident_test covers it (its town gains a shed
+with walls and a door). Protocol unchanged.
+
+Rejected: a door cell barred to her pathing (she must pass through
+doors, only not stop in them); asking enemy-ai for "the way in" (a
+building's doors are it).
