@@ -773,6 +773,13 @@ func _world_tick_one(monster: GridEntity) -> void:
 	monster._world_tick(mini(since, WORLD_TICK_STEPS * 2) * TICK_DT)
 
 
+## Whether [param each] is awake, or will be at the next step: someone has
+## just come in (each.awake follows at the step). Regen asks this before
+## laying a level again (decision 465).
+func zone_awake(each: Zone) -> bool:
+	return each.awake or _is_awake(each)
+
+
 ## Whether [param each] has a player in it: one standing there, or a
 ## connected peer whose player belongs there (dead, waiting to respawn).
 func _is_awake(each: Zone) -> bool:

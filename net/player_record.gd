@@ -47,6 +47,10 @@ var slot_items := PackedInt32Array()
 ## of (decision 446, WorldNews), sorted: what their world map shows.
 var known_areas: Array[String] = []
 var known_places: Array[String] = []
+## The generation of each regenerating area they were last in (decision
+## 465), area -> n: coming back to a newer one is told "The ways have
+## shifted since you were last here."
+var seen_generation: Dictionary = {}
 
 
 ## Copies the live state off the player's entity.
@@ -82,6 +86,7 @@ func to_dict() -> Dictionary:
 		"items": Array(slot_items),
 		"known_areas": known_areas.duplicate(),
 		"known_places": known_places.duplicate(),
+		"seen_generation": seen_generation.duplicate(),
 	}
 
 
@@ -111,6 +116,11 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.slot_items = _uids(entry.get("items", []))
 	record.known_areas = _strings(entry.get("known_areas", []))
 	record.known_places = _strings(entry.get("known_places", []))
+	var seen: Variant = entry.get("seen_generation", {})
+	if seen is Dictionary:
+		for area: Variant in seen:
+			if seen[area] is float or seen[area] is int:
+				record.seen_generation[str(area)] = int(seen[area])
 	var asks: Variant = entry.get("commissions", [])
 	record.commissions = asks.duplicate(true) if asks is Array else []
 	var pet: Variant = entry.get("companion", {})

@@ -66,6 +66,13 @@ static func parse_entry(raw: Variant) -> Dictionary:
 	return _parse_entry(raw)
 
 
+## A zone's section as written (data_of) read back as load gives it
+## (_parse_zone): a live zone's section put through the save and back, for
+## Main to rebuild the zone from part of it (Regen.keep_section).
+static func parse_zone(raw: Dictionary) -> Dictionary:
+	return _parse_zone(raw)
+
+
 static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 	var list: Array[Dictionary] = []
 	for entity in entities:
@@ -197,7 +204,9 @@ static func load(path: String) -> Dictionary:
 	var economy: Variant = data.get("economy", {})
 	var herds: Variant = data.get("herds", {})
 	var sky: Variant = data.get("sky", {})
+	var regen: Variant = data.get("regen", {})
 	return {"ok": true, "zones": zones, "players": players,
+		"regen": regen if regen is Dictionary else {},
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
 		"holdings": holdings if holdings is Dictionary else {},
 		"stockpile": stockpile if stockpile is Dictionary else {},

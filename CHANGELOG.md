@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Levels can shift: a level marked `"regenerate"` in its level.json is laid again by a generator every few days while nobody is in it (or just before someone travels in), its anchors (the gatehouse, the deepest room, the ways in and out) kept exactly and the corridors between them new each time. Things left lying in the corridors are lost to the shifting halls; a chest in an anchor keeps what it holds. Coming back after a shift says "The ways have shifted since you were last here", and someone saved where rock now stands comes back at the nearest anchor. No real level shifts yet: the castle stays as it is. Server and client both: the "map" message gains the level's generation (decision 465, protocol 18).
+
 - When the town has talked long enough of someone who would live there, and
   the lawspeaker agrees, they turn out to have lived there all along: Old
   Marta by the east field, with everything the town said of her as her own

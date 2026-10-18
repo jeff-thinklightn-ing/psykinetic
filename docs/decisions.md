@@ -11541,3 +11541,77 @@ talk has spread and held); a card invented by a model (the talk is the
 card, and the rest is rolled as for anyone); dying by memory alone (Q4's
 default); a founding gold share (a newcomer's, not a neighbour's who was
 always here).
+## 465. Regenerating levels: the shifting halls, anchors kept, the rest laid again
+
+Jeff (2026-10-17): "castle stays persistent, its the entrance marker for
+the shifting halls which are underground"; his lore pages: "The overworld
+stays consistent. The labyrinths under the castle are the delve-again
+places: they make new maps fairly often. The tower's inside shifts too."
+Maps' design, approved by the coordinator 2026-10-17 and moved to the
+dungeon tree with the roadmap row ("floor loot outside anchors lost to the
+shifting halls"). Infrastructure only: the mark, one generator, tests; no
+real level is marked until Jeff says.
+
+- The mark: level.json "regenerate": {generator, every_days, anchors:
+  [{rect, name}], monsters: {kind: count}} (Level.regenerate_from,
+  level["regenerate"]). The authored files are the template
+  (Level.template, never the overlay); each anchor's cells are copied
+  verbatim every generation, and every link, spawn point and start must
+  sit in one (Level warns otherwise: the next generation loses it).
+- The generator: sim/level_gen/<name>.gd, static generate(template:
+  LevelMap, config, seed) -> LevelMap, loaded by name. "maze": a perfect
+  maze on the odd cells outside the anchors (recursive backtracker), a
+  doorway or two per anchor on an open side, the parts the anchors cut
+  apart joined by straight corridors, monster markers on dead ends first.
+  Regen (sim/regen.gd, a new class_name) seeds it with hash(area,
+  generation, attempt), flood fills between the anchors, tries 8 seeds,
+  and keeps the last map when none joins them; the generated level.json
+  is the template's with entities, starts, places, buildings outside the
+  anchors dropped and "generation" written in.
+- When: Main checks every WORLD_TICK_STEPS (World.stepped) and on travel
+  into a level (travel, _open_zone); a due level (every_days of the
+  world's days since its last generation, or never made) is laid again
+  only when its zone is not open or asleep, never awake. The state is the
+  snapshot's "regen": {area: {generation, at_step}}.
+- What stays and goes: the zone's live state goes through Snapshot's
+  form and Regen.keep_section keeps the entities, respawn timers, records
+  and floor piles whose marker cell (decision 433's key) or cell sits in
+  an anchor; the rest is dropped and its things ended in the ItemBook as
+  "lost in the shifting halls"; _start_level rebuilds the zone on the new
+  map with that section. Places outside the anchors leave the holdings
+  (rebind) and each record's known_places, and those players are sent the
+  full "world" message again (no new field there: a full message starts
+  the client's state over, decision 446). A companion left waiting in the
+  zone is remembered with no tile, to come back beside her owner.
+- Clients: Regen.write registers the generated level (Level.register,
+  a test's template kept aside first) and writes it to Level.overlay_dir,
+  so Level.overlaid is true and _show_zone_to sends the "terrain" message;
+  it refuses a level that sits in the overlay without the mark (a level
+  edited in the game is never written over). The "map" message gains
+  "generation": a new field in an existing message, PROTOCOL_REVISION 18
+  (release's ruling).
+- Coming back: PlayerRecord.seen_generation {area: n}; _join_player tells
+  "The ways have shifted since you were last here." when the generation is
+  newer than the one seen, nothing on a first visit, and a returning
+  player whose zone shifted since lands at the nearest anchor spawn point
+  (Regen.anchor_spawn_near), else the nearest floor, their companion
+  beside them.
+- The castle and the tower are never marked: the halls and the tower's
+  inside are separate levels linked from them, the link's cell an anchor
+  on the shifting side.
+
+tests/regen_test (port 17860): the generator (anchors verbatim, the rest
+different between generations, joined, the same seed the same map,
+monsters laid, the shrine and imp outside dropped), the mark's warnings,
+travel into a level never made, never while awake, laid again on the tick
+once asleep with the corridor's thing lost and the deep room's kept (the
+chest's things too), the known places pruned, the line on coming back
+(once), the returning player at the deep room's spawn with his companion,
+the edited level refused, the snapshot and records round trip, no real
+level marked. level_test: a link outside an anchor warns.
+
+Rejected: regenerating a zone with players in it and moving them (never
+under anyone's feet, Jeff's words on the castle as the persistent
+marker); a new prune field in the "world" message (the full resend does
+it); marking levels/castle (the halls are a level below it); keeping
+entities outside the anchors by name (their markers are gone).

@@ -95,6 +95,13 @@ func update() -> void:
 			send.call(peer, {"full": false, "party": party})
 
 
+## [param peer] is sent its full message again on the next update: what
+## it knows has shrunk (a regenerated area's places gone, decision 465),
+## and a full message starts the client's state over.
+func resend(peer: int) -> void:
+	_full_sent.erase(peer)
+
+
 ## Place [param id] changed hands or strength: told to the players who know it.
 func place_changed(id: String) -> void:
 	if not peers.is_valid():

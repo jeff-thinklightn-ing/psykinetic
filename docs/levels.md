@@ -281,6 +281,68 @@ players cross for now; `WorldMap.crossing(area, cell, direction)` gives
 the same answer without a player or a zone, for the world tick to move
 groups across.
 
+## Regenerating levels
+
+The delve-again places (the labyrinths under the castle, the tower's
+inside: decision 465) are laid again every few days. A level opts in with
+level.json `"regenerate"`:
+
+```json
+"regenerate": {
+	"generator": "maze",
+	"every_days": 3,
+	"anchors": [{"rect": [1, 1, 5, 5], "name": "gatehouse"}, {"rect": [19, 11, 5, 5], "name": "deep"}],
+	"monsters": {"imp": 3}
+}
+```
+
+The authored layout.png, height.png and level.json are the template. Each
+anchor's cells are copied verbatim every generation: walls, floor,
+markers, heights, the links in and out, spawn points, starts, places and
+the entities listed there. Every link, spawn point and start must sit
+inside an anchor; Level warns of one that does not, since the next
+generation loses it. The rest of the map is the generator's: a script
+`sim/level_gen/<generator>.gd` with `static func generate(template:
+LevelMap, config, seed) -> LevelMap`. `maze` carves a one-cell maze in the
+rock between the anchors, opens a doorway or two into each (on a side the
+template leaves open; a wall pixel seals a side), joins up what the
+anchors cut apart, and lays `monsters` markers (`{kind: count}`) in the
+corridors, dead ends first. The seed is the area's name and the
+generation number, so a generation is the same on any machine; a map whose
+anchors do not all reach each other is thrown away and the next seed
+tried, eight times, after which the last map stands.
+
+When it shifts: on the slow world tick (every `World.WORLD_TICK_STEPS`), a
+level whose `every_days` have gone by since its last generation is laid
+again, only while its zone is asleep (nobody in it, nobody dead there
+waiting to respawn); a level that is due when someone travels into it is
+laid again first, before they arrive; never under anyone's feet. The
+generation count lives in the snapshot (`"regen": {area: {generation,
+at_step}}`).
+
+What stays: the anchors, and in them every saved entity, respawn timer,
+monster record and floor pile, matched by its marker cell (the cells are
+the same, so the keys of decision 433 still mean the same markers): a
+chest in the gatehouse keeps what was put in it. What goes: everything
+outside, laid fresh from the new markers; things lying on the floor out
+there are gone, their ItemBook history ending "lost in the shifting
+halls"; places outside the anchors leave the holdings and every player's
+map. The generated level is registered in memory and written to the
+server's level overlay (`Level.overlay_dir`), so `Level.overlaid` is true
+and clients are sent its "terrain" message on entry; the "map" message
+says `"generation"`. A level that is in the overlay without the mark (one
+edited in builder mode) is never written over. Coming back at a newer
+generation than the one you last saw says "The ways have shifted since you
+were last here."; a first visit says nothing. A player (or a companion
+left waiting) whose saved cell is rock now comes back at the nearest
+anchor's spawn point, else the nearest floor, their companion beside them.
+
+The castle and the tower are never marked: they are the consistent
+overworld, and the entrance markers; the halls below and the tower's
+inside are levels of their own, linked from them, the link's cell an
+anchor on the shifting side. No real level is marked yet (tests make
+their own in code: `tests/regen_test`).
+
 ## The world map
 
 `WorldMap.build()` (`sim/world_map.gd`) reads every level (`Level.names()`:

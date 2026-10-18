@@ -193,7 +193,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## offers asked for and one accepted) and the "offers" message (decision 435).
 ## 16: monsters and animals replicate raised and raised_tick, as players do
 ## (decision 455): their synchronizer's layout, unseen by the names above.
-const PROTOCOL_REVISION := 16
+## 18: the "map" message carries "generation", the regenerating level's
+## generation the client is sent (decision 465).
+const PROTOCOL_REVISION := 18
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

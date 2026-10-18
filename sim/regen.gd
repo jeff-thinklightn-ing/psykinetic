@@ -1,0 +1,296 @@
+class_name Regen
+extends RefCounted
+## Regenerating levels (decision 465): a level whose level.json carries
+## "regenerate" (Level.regenerate_from) is laid again by its generator
+## every few days. Its template (the authored files: Level.template) is
+## what each generation starts from; the anchors' cells are copied
+## verbatim and the generator makes the rest; the result is registered in
+## memory and written to the server's level overlay, so Level reads it
+## from then on and clients are sent it as a "terrain" message. Main says
+## when (the slow world tick, or travel into a due level, never while the
+## zone is awake) and rebuilds the zone; this does the making.
+
+## Tries at a generation before the last good map is kept.
+const TRIES := 8
+## How a thing lost outside the anchors is ended in the ItemBook.
+const LOST := "in the shifting halls"
+const GENERATORS := "res://sim/level_gen/"
+
+
+## Whether level [param level_name] regenerates (its template says so).
+static func marked(level_name: String) -> bool:
+	return Level.regenerates(level_name)
+
+
+## Every level that regenerates, sorted.
+static func marked_levels() -> Array[String]:
+	var out: Array[String] = []
+	var names := Level.names()
+	for level_name in Level.registered_names():
+		if level_name not in names:
+			names.append(level_name)  # A test's, made in code.
+	names.sort()
+	for level_name in names:
+		if marked(level_name):
+			out.append(level_name)
+	return out
+
+
+## Level [param level_name]'s "regenerate" block as Level.regenerate_from
+## reads it from its template; {} for a level that does not regenerate.
+static func config_of(level_name: String) -> Dictionary:
+	var warnings: Array[String] = []
+	return Level.regenerate_from(Level.template(level_name)["config"], warnings)
+
+
+## The seed of [param area]'s generation [param generation], attempt
+## [param attempt]: the same every time, on any machine.
+static func seed_for(area: String, generation: int, attempt := 0) -> int:
+	return ("%s#%d#%d" % [area, generation, attempt]).hash()
+
+
+## Whether a level in [param state] ({generation, at_step}) with
+## [param config] (config_of) is due at world step [param steps]: never
+## tried yet, or every_days of the world's days gone by since the last
+## generation (or the last try that made no map).
+static func due(state: Dictionary, config: Dictionary, steps: int) -> bool:
+	if config.is_empty():
+		return false
+	if int(state.get("generation", 0)) <= 0 and int(state.get("at_step", 0)) <= 0:
+		return true
+	return steps - int(state.get("at_step", 0)) >= int(config["every_days"]) * DayNight.day_steps
+
+
+## The saved "regen" section ({area: {generation, at_step}}) read back;
+## entries that make no sense are dropped.
+static func states_from(saved: Variant) -> Dictionary:
+	var out := {}
+	if saved is Dictionary:
+		for area: Variant in saved:
+			var entry: Variant = saved[area]
+			if entry is Dictionary:
+				out[str(area)] = {"generation": maxi(int(entry.get("generation", 0)), 0), "at_step": maxi(int(entry.get("at_step", 0)), 0)}
+	return out
+
+
+## Generation [param generation] of level [param level_name]: {layout,
+## height, config, seed, tries, anchors}, the map the generator made from
+## the template with the first seed (seed_for) whose anchors all reach
+## each other, TRIES seeds tried; {} when none did, or the level has no
+## template or generator (said in a warning): the caller keeps the last map.
+static func generate(level_name: String, generation: int) -> Dictionary:
+	var made := Level.template(level_name)
+	var layout: Image = made["layout"]
+	if layout == null:
+		push_warning("[regen] %s has no template to generate from" % level_name)
+		return {}
+	var warnings: Array[String] = []
+	var config := Level.regenerate_from(made["config"], warnings)
+	for warning in warnings:
+		push_warning("[regen] %s: %s" % [level_name, warning])
+	if config.is_empty():
+		push_warning("[regen] %s is not marked \"regenerate\"" % level_name)
+		return {}
+	var generator_path := GENERATORS + str(config["generator"]) + ".gd"
+	if not ResourceLoader.exists(generator_path):
+		push_warning("[regen] %s names a generator there is not: %s" % [level_name, generator_path])
+		return {}
+	var generator: GDScript = load(generator_path)
+	var template := LevelMap.from_image(layout, made["config"])
+	template.read_heights(made["height"])
+	var anchors: Array = config["anchors"]
+	for attempt in TRIES:
+		var seed := seed_for(level_name, generation, attempt)
+		var map: LevelMap = generator.generate(template, config, seed)
+		if map == null:
+			continue
+		if not connected(map, anchors):
+			continue
+		var height: Image = map.to_height_image() if made["height"] != null or not map.heights.is_empty() else null
+		return {"layout": map.to_image(), "height": height, "config": generated_config(made["config"], anchors, generation),
+			"seed": seed, "tries": attempt + 1, "anchors": anchors}
+	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
+	return {}
+
+
+## Whether every anchor's floor reaches every other's on [param map], on
+## foot through open and door edges (an anchor with no floor is let be).
+static func connected(map: LevelMap, anchors: Array) -> bool:
+	var starts: Array[Vector2i] = []
+	for anchor: Dictionary in anchors:
+		for cell in Level.rect_cells(anchor["rect"]):
+			if map.walkable(cell):
+				starts.append(cell)
+				break
+	if starts.size() < 2:
+		return true
+	var seen: Dictionary[Vector2i, bool] = {starts[0]: true}
+	var queue: Array[Vector2i] = [starts[0]]
+	while not queue.is_empty():
+		var here: Vector2i = queue.pop_front()
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := here + direction
+			if seen.has(next) or not map.in_bounds(next) or not map.walkable(next):
+				continue
+			if map.edge(Terrain.edge_key(here, direction)) == "wall":
+				continue
+			seen[next] = true
+			queue.append(next)
+	for start in starts:
+		if not seen.has(start):
+			return false
+	return true
+
+
+## The generated level's level.json: [param template_config] with what
+## lies outside [param anchors] left out (entities, starts, places,
+## buildings, town walls, roofs; links and spawn points are kept, as Level
+## warns of any outside), and "generation" written in for the record.
+static func generated_config(template_config: Dictionary, anchors: Array, generation: int) -> Dictionary:
+	var config := template_config.duplicate(true)
+	var inside := func(value: Variant) -> bool:
+		var at: Variant = Level._tile(value)
+		return at != null and Level.in_anchors(anchors, at)
+	if config.get("entities") is Array:
+		config["entities"] = config["entities"].filter(func(entry: Variant) -> bool:
+			return entry is Dictionary and inside.call(entry.get("at")))
+	if config.get("starts") is Array:
+		config["starts"] = config["starts"].filter(inside)
+	if config.get("places") is Dictionary:
+		var places := {}
+		for key: Variant in config["places"]:
+			var entry: Variant = config["places"][key]
+			if entry is Dictionary and inside.call(entry.get("at")):
+				places[key] = entry
+		config["places"] = places
+	if config.get("buildings") is Array:
+		config["buildings"] = config["buildings"].filter(func(entry: Variant) -> bool:
+			return entry is Dictionary and inside.call(entry.get("at")))
+	for key: String in ["town_walls", "roofs"]:
+		if config.get(key) is Array:
+			config[key] = config[key].filter(func(entry: Variant) -> bool:
+				var rect: Variant = Level.town_wall_rect(entry)
+				return rect != null and Level.in_anchors(anchors, rect.position) and Level.in_anchors(anchors, rect.end - Vector2i.ONE))
+	config["generation"] = generation
+	return config
+
+
+## Puts [param made] (generate) in place as level [param level_name]:
+## registered in memory (Level.register, so it is read at once, a test's
+## template kept aside first) and written to the overlay (Level.overlay_dir:
+## a restart reads it, and Level.overlaid makes clients be sent it).
+## Refused, with a warning, when the overlay holds that level without
+## "regenerate" in its level.json: a level edited in the game (builder
+## mode) is never written over. False when nothing was written.
+static func write(level_name: String, made: Dictionary) -> bool:
+	var folder := Level.overlay_dir + level_name + "/"
+	if Level.overlaid(level_name):
+		var there: Variant = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json")) \
+				if FileAccess.file_exists(folder + "level.json") else null
+		if not (there is Dictionary and there.get("regenerate") is Dictionary):
+			push_warning("[regen] %s is in the overlay without \"regenerate\" (edited in the game): not written over" % level_name)
+			return false
+	if not Level._templates.has(level_name):
+		Level.keep_template(level_name, Level.template(level_name))
+	var absolute := ProjectSettings.globalize_path(folder)
+	if not DirAccess.dir_exists_absolute(absolute):
+		DirAccess.make_dir_recursive_absolute(absolute)
+	var layout: Image = made["layout"]
+	var error := layout.save_png(absolute.path_join("layout.png"))
+	if error != OK:
+		push_warning("[regen] could not write %slayout.png (%s)" % [folder, error_string(error)])
+		return false
+	var height: Image = made["height"]
+	if height != null:
+		error = height.save_png(absolute.path_join("height.png"))
+		if error != OK:
+			push_warning("[regen] could not write %sheight.png (%s)" % [folder, error_string(error)])
+			return false
+	elif FileAccess.file_exists(folder + "height.png"):
+		DirAccess.remove_absolute(absolute.path_join("height.png"))
+	var json := FileAccess.open(folder + "level.json", FileAccess.WRITE)
+	if json == null:
+		push_warning("[regen] could not write %slevel.json" % folder)
+		return false
+	json.store_string(JSON.stringify(made["config"], "\t", false) + "\n")
+	json.close()
+	Level.register(level_name, layout, height, made["config"])
+	return true
+
+
+## What of a zone's saved section (Snapshot's {tick, entities, respawns,
+## ground, records}) survives a generation: {kept: the section with only
+## what sits inside [param anchors] (an entity, respawn timer or record by
+## its marker-cell key, decision 433, else its cell; a ground pile by its
+## cell), lost: the ItemBook uids of everything else, to be ended}.
+static func keep_section(section: Dictionary, anchors: Array) -> Dictionary:
+	var lost: Array[int] = []
+	var kept := {"tick": int(section.get("tick", 0)), "entities": [], "respawns": [], "ground": [], "records": []}
+	for entry: Dictionary in section.get("entities", []):
+		if _keeps(anchors, entry["spec"]):
+			kept["entities"].append(entry)
+		else:
+			_uids_of(entry.get("items", []), lost)
+	for respawn: Dictionary in section.get("respawns", []):
+		var at: Variant = _key_cell(str(respawn.get("spawn_key", "")))
+		if at != null and Level.in_anchors(anchors, at):
+			kept["respawns"].append(respawn)
+	for pile: Dictionary in section.get("ground", []):
+		if Level.in_anchors(anchors, pile["cell"]):
+			kept["ground"].append(pile)
+		else:
+			_uids_of(pile.get("items", []), lost)
+	for record: Dictionary in section.get("records", []):
+		var entry: Variant = record.get("entry", {})
+		var spec: Variant = Snapshot.parse_entry(entry).get("spec", {})
+		if spec is Dictionary and not spec.is_empty() and _keeps(anchors, spec):
+			kept["records"].append(record)
+		elif entry is Dictionary:
+			_uids_of(entry.get("items", []), lost)
+	return {"kept": kept, "lost": lost}
+
+
+## Whether a saved entity's [param spec] sits in [param anchors]: by its
+## marker-cell key when it has one, else by its tile.
+static func _keeps(anchors: Array, spec: Dictionary) -> bool:
+	var at: Variant = _key_cell(str(spec.get("spawn_key", "")))
+	if at == null:
+		at = spec.get("tile")
+	return at is Vector2i and Level.in_anchors(anchors, at)
+
+
+## A spawn key "x,y" as a cell; null for none or one that is no pair.
+static func _key_cell(key: String) -> Variant:
+	var parts := key.split(",")
+	if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+		return null
+	return Vector2i(parts[0].to_int(), parts[1].to_int())
+
+
+static func _uids_of(values: Variant, into: Array[int]) -> void:
+	if not values is Array:
+		return
+	for value: Variant in values:
+		if (value is int or value is float) and int(value) != 0:
+			into.append(int(value))
+
+
+## The spawn point inside an anchor of [param level] nearest [param cell]
+## (where a player saved in what is now rock comes back); null if the level
+## has none in an anchor.
+static func anchor_spawn_near(level: Dictionary, cell: Vector2i) -> Variant:
+	var anchors: Array = level.get("regenerate", {}).get("anchors", [])
+	var best: Variant = null
+	var best_distance := 0
+	var spawn_points: Dictionary = level.get("spawn_points", {})
+	var names: Array = spawn_points.keys()
+	names.sort()
+	for spawn_name: String in names:
+		var at: Vector2i = spawn_points[spawn_name]
+		if not Level.in_anchors(anchors, at):
+			continue
+		var d := absi(at.x - cell.x) + absi(at.y - cell.y)
+		if best == null or d < best_distance:
+			best = at
+			best_distance = d
+	return best

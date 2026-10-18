@@ -28,7 +28,7 @@ extends RefCounted
 ## no wall: nothing is built along it, and sight passes over it.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
-## links, neighbours, places, buildings, centre, size (in cells), warnings}; terrain is what World.load_terrain and the
+## links, neighbours, places, buildings, regenerate (decision 465), centre, size (in cells), warnings}; terrain is what World.load_terrain and the
 ## views take: floor, fire, edges (as Terrain.parse), and kinds (cell ->
 ## "stone" | "grass" | "dirt"), water, heights (cell -> 1..6; 0 is left
 ## out), stairs (cell -> the direction it climbs), torches, buildings (as
@@ -145,6 +145,59 @@ static func register(level_name: String, layout: Image, height: Image = null, co
 
 static func unregister(level_name: String) -> void:
 	_registered.erase(level_name)
+
+
+## The authored files of the levels that regenerate (decision 465): name ->
+## {layout, height, config}, kept from before their first generation put a
+## generated map in their place (register, the overlay). Regen keeps them.
+static var _templates: Dictionary[String, Dictionary] = {}
+
+
+## Keeps [param made] ({layout, height, config}) as level [param level_name]'s
+## template: what each generation starts from.
+static func keep_template(level_name: String, made: Dictionary) -> void:
+	_templates[level_name] = {"layout": made["layout"], "height": made["height"], "config": made["config"]}
+
+
+## Level [param level_name]'s template: the authored level a generation
+## starts from (decision 465): the one kept (keep_template), else the one
+## made in code (a test's), else the files in DIR. Never the overlay, which
+## holds the last generation. {layout: null, ...} for a level there is not.
+static func template(level_name: String) -> Dictionary:
+	if _templates.has(level_name):
+		return _templates[level_name]
+	if _registered.has(level_name):
+		return _registered[level_name]
+	var folder := DIR + level_name + "/"
+	return {"layout": _image(folder + "layout.png"), "height": _image(folder + "height.png"), "config": template_config(level_name)}
+
+
+## The template's level.json alone (template, without its images read).
+static func template_config(level_name: String) -> Dictionary:
+	if _templates.has(level_name):
+		return _templates[level_name]["config"]
+	if _registered.has(level_name):
+		return _registered[level_name]["config"]
+	var path := DIR + level_name + "/level.json"
+	if FileAccess.file_exists(path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if parsed is Dictionary:
+			return parsed
+	return {}
+
+
+## Whether level [param level_name]'s template marks it regenerating
+## (level.json "regenerate"; decision 465).
+static func regenerates(level_name: String) -> bool:
+	return template_config(level_name).get("regenerate") is Dictionary
+
+
+## The levels made in code (register), sorted: Regen looks at them beside names().
+static func registered_names() -> Array[String]:
+	var out: Array[String] = []
+	out.assign(_registered.keys())
+	out.sort()
+	return out
 
 
 ## Whether there is a level called [param level_name].
@@ -465,6 +518,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 		"warnings": warnings,
 	}
 	_place(level, markers, config, warnings)
+	level["regenerate"] = regenerate_from(config, warnings)
+	_check_anchors(level, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
@@ -640,6 +695,72 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["links"] = links
 	level["centre"] = centre if centre != null else starts[0] if not starts.is_empty() else Vector2i.ZERO
 	level["display_name"] = str(config.get("name", ""))
+
+
+## level.json's "regenerate" (decision 465: a level laid again by a
+## generator every few days), as {generator (a script in sim/level_gen/,
+## "maze" if not said), every_days (at least 1), anchors: [{rect: Rect2i,
+## name}] (the cells copied verbatim each generation), monsters: {kind:
+## count} (markers the generator lays)}; {} for a level that does not
+## regenerate. An anchor with no rect, or a generator name that is no
+## plain word, is said in [param warnings].
+static func regenerate_from(config: Dictionary, warnings: Array[String]) -> Dictionary:
+	var given: Variant = config.get("regenerate")
+	if given == null:
+		return {}
+	if not given is Dictionary:
+		warnings.append("\"regenerate\" in level.json is not an object")
+		return {}
+	var generator := str(given.get("generator", "maze"))
+	if not generator.is_valid_identifier():
+		warnings.append("\"regenerate\" names a generator %s: a plain word (a script in sim/level_gen/); it is maze" % generator)
+		generator = "maze"
+	var anchors: Array[Dictionary] = []
+	var listed: Variant = given.get("anchors", [])
+	if listed is Array:
+		for entry: Variant in listed:
+			var rect: Variant = town_wall_rect(entry)
+			if rect == null:
+				warnings.append("an anchor in \"regenerate\" has no \"rect\": [x, y, w, h] (%s)" % [entry])
+				continue
+			anchors.append({"rect": rect, "name": str(entry.get("name", "anchor %d" % (anchors.size() + 1)))})
+	else:
+		warnings.append("\"regenerate\" has no anchors list")
+	if anchors.is_empty():
+		warnings.append("\"regenerate\" has no anchors: nothing of the level is kept between generations")
+	var monsters := {}
+	var counts: Variant = given.get("monsters", {})
+	if counts is Dictionary:
+		for kind: Variant in counts:
+			monsters[str(kind)] = maxi(int(counts[kind]), 0)
+	return {"generator": generator, "every_days": maxi(int(given.get("every_days", 3)), 1), "anchors": anchors, "monsters": monsters}
+
+
+## Whether [param cell] lies in one of [param anchors] (regenerate_from's).
+static func in_anchors(anchors: Array, cell: Vector2i) -> bool:
+	for anchor: Dictionary in anchors:
+		if (anchor["rect"] as Rect2i).has_point(cell):
+			return true
+	return false
+
+
+## A regenerating level's links, spawn points and starts must sit inside
+## an anchor (decision 465: the rest of the map is laid again); one that
+## does not is said in [param warnings].
+static func _check_anchors(level: Dictionary, warnings: Array[String]) -> void:
+	if level["regenerate"].is_empty():
+		return
+	var anchors: Array = level["regenerate"]["anchors"]
+	for link: Dictionary in level["links"]:
+		if not in_anchors(anchors, link["tile"]):
+			warnings.append("the link at %s to %s is outside every anchor: a generation loses it" % [link["tile"], link["to_map"]])
+	var spawn_points: Dictionary = level["spawn_points"]
+	for spawn_name: String in spawn_points:
+		if not in_anchors(anchors, spawn_points[spawn_name]):
+			warnings.append("the spawn point %s at %s is outside every anchor: a generation loses it" % [spawn_name, spawn_points[spawn_name]])
+	for start: Vector2i in level["starts"]:
+		if not in_anchors(anchors, start):
+			warnings.append("the start at %s is outside every anchor: a generation loses it" % [start])
 
 
 ## level.json's "neighbours", {side: map name} ("east": "wilds": walk off

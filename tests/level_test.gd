@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_buildings()
 	_test_field()
 	_test_building_links()
+	_test_regenerate_mark()
 	_test_town_walls()
 	_test_roofs()
 	await _test_level_links()
@@ -539,6 +540,19 @@ func _test_roofs() -> void:
 	var stamped := Prefab.stamp_changes({"map": piece, "config": {"roofs": [{"rect": [1, 1, 2, 2]}]}}, map, Vector2i(8, 8), config)
 	var after: Array = stamped.get("config", {}).get("roofs", [])
 	_check(after.size() == 8 and after[7]["rect"] == [9, 9, 2, 2], "a prefab's roof is stamped with it, moved (%s)" % [after.back() if not after.is_empty() else null])
+
+
+func _test_regenerate_mark() -> void:
+	print("\n== a level marked \"regenerate\" (decision 465): a link outside an anchor warns ==")
+	var layout := Level.image_from_rows(_rows(1, 6, 1, 1), {Vector2i(1, 1): "start", Vector2i(6, 1): "link"})
+	var config := {"links": [{"at": [6, 1], "to_map": "test_link_b", "to_spawn": "gate"}],
+		"regenerate": {"generator": "maze", "every_days": 2, "anchors": [{"rect": [1, 1, 2, 1], "name": "gate"}]}}
+	var level := Level.parse(layout, null, config)
+	_check(level["regenerate"]["generator"] == "maze" and level["regenerate"]["every_days"] == 2 and level["regenerate"]["anchors"].size() == 1,
+		"the mark is read (%s)" % [level["regenerate"]])
+	var said: Array = level["warnings"].filter(func(text: String) -> bool: return text.contains("outside every anchor"))
+	_check(said.size() == 1 and said[0].contains("link at (6, 1)"), "the link at (6, 1), outside the anchor, is warned of (%s)" % [level["warnings"]])
+	_check(Level.parse(layout, null, {"links": config["links"]})["regenerate"].is_empty(), "a level without the mark has no \"regenerate\"")
 
 
 func _test_level_links() -> void:

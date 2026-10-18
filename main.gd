@@ -188,6 +188,13 @@ var _respawn_at: Dictionary[int, int] = {}
 ## Server only: player_id -> that player's live companion.
 ## The world map the towns' buildings are read from (_sync_residents).
 var _world_map: WorldMap
+## Server: each regenerating level's state (decision 465), area ->
+## {generation (0 until its first), at_step (the world step of it)}; saved
+## as the snapshot's "regen".
+var _regen: Dictionary = {}
+## A client: the generation of the regenerating level its player is in, as
+## the "map" message said (0: a level that does not regenerate).
+var map_generation := 0
 ## Residents' voices (decision 336): one mind for them all, made on first
 ## use; the asks waiting for it ({body: instance id, ask, at: tick}), one per
 ## resident; the ask out, by serial.
@@ -1755,6 +1762,128 @@ func reload_zone(zone_name: String) -> void:
 	_view_zone = ""  # A host in that zone draws it again.
 
 
+# --- Regenerating levels (decision 465) ------------------------------------------
+
+## Server: the "map" message for zone [param zone_name]: its name, the
+## server's build, and the generation of a regenerating level (0 for the rest).
+func map_message(zone_name: String) -> Dictionary:
+	return {"name": zone_name, "server": Net.version, "generation": generation_of(zone_name)}
+
+
+## The generation level [param level_name] is at: 0 before its first, and
+## for a level that does not regenerate.
+func generation_of(level_name: String) -> int:
+	return int(_regen.get(level_name, {}).get("generation", 0))
+
+
+## Server, on the slow world tick: every regenerating level that is due
+## is laid again, unless its zone is awake.
+func _regenerate_due() -> void:
+	for level_name in Regen.marked_levels():
+		_regenerate_if_due(level_name)
+
+
+## Server: level [param level_name] laid again now if it regenerates, its
+## time has come (Regen.due) and nobody is in it (its zone not open, or
+## asleep). True if it was.
+func _regenerate_if_due(level_name: String) -> bool:
+	if not Net.is_authority() or not Regen.marked(level_name):
+		return false
+	var config := Regen.config_of(level_name)
+	var state: Dictionary = _regen.get(level_name, {"generation": 0, "at_step": 0})
+	if not Regen.due(state, config, World.steps):
+		return false
+	var zone: Zone = World.zones.get(level_name)
+	if zone != null and World.zone_awake(zone):
+		return false  # Never under anyone's feet: it waits for the zone to sleep.
+	return _regenerate(level_name, config)
+
+
+## Server: level [param level_name]'s next generation made (Regen.generate),
+## written (Regen.write) and, when its zone is open, the zone rebuilt on
+## it: what sits in an anchor stays as it was, the rest is laid fresh from
+## the new markers and what lay outside is lost (ItemBook); places gone
+## with it leave the holdings and every player's map. When no map joins
+## the anchors, or the overlay refuses it, the level stands as it is and
+## waits a period again.
+func _regenerate(level_name: String, config: Dictionary) -> bool:
+	var state: Dictionary = _regen.get(level_name, {"generation": 0, "at_step": 0})
+	var generation := int(state["generation"]) + 1
+	var made := Regen.generate(level_name, generation)
+	if made.is_empty() or not Regen.write(level_name, made):
+		_regen[level_name] = {"generation": int(state["generation"]), "at_step": World.steps}
+		return false
+	_regen[level_name] = {"generation": generation, "at_step": World.steps}
+	print("[regen] %s: generation %d (seed %d, %d of %d tries, every %d days)" % [level_name, generation, made["seed"], made["tries"],
+		Regen.TRIES, config["every_days"]])
+	if World.zones.has(level_name):
+		_rebuild_regenerated(level_name, made["anchors"])
+	# Places outside the anchors are gone: from the holdings, and from the
+	# maps of those who knew them, sent their world over again.
+	_world_map = WorldMap.build()
+	if World.holdings != null:
+		var gone := World.holdings.rebind(_world_map)
+		if not gone.is_empty():
+			_forget_places(gone)
+	return true
+
+
+## Server: zone [param level_name], open and asleep, rebuilt on its new
+## map: its live state goes through the snapshot's form and only what sits
+## in [param anchors] comes back (Regen.keep_section); a companion waiting
+## there is remembered, to come back beside her owner.
+func _rebuild_regenerated(level_name: String, anchors: Array) -> void:
+	var was := World.enter_named(level_name)
+	for id: String in _companions.keys():
+		var pet: Companion = _companions[id]
+		if is_instance_valid(pet) and pet.spawned and pet.zone == level_name:
+			_remember_companion(id)
+			if _records.has(id):
+				_records[id].companion["tile"] = null
+	var respawns: Array[Dictionary] = []
+	for slot: int in _dead_since:
+		respawns.append({"spawn": slot, "spawn_key": _key_of(slot),
+			"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
+	for entity in World.get_entities():
+		World.slot_uids(entity)
+	var ground: Array[Dictionary] = []
+	for cell: Vector2i in World.zone.ground:
+		ground.append({"cell": [cell.x, cell.y], "items": Array(World.zone.ground[cell]), "ids": Array(World.ground_at(cell))})
+	var raw: Dictionary = Snapshot.data_of({level_name: {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns,
+		"ground": ground, "records": World.record_list()}})["zones"][level_name]
+	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors)
+	_lose_items(sifted["lost"], level_name)
+	_load_level(level_name)
+	_start_level(false, false, sifted["kept"])
+	_level_stamps[level_name] = _level_stamp(level_name)
+	World.enter(was)
+
+
+## Server: things left outside the anchors of [param level_name] when it
+## was laid again: gone from the world, their histories saying so.
+func _lose_items(uids: Array, level_name: String) -> void:
+	for uid: int in uids:
+		if World.items.has(uid):
+			World.items.end(uid, "lost", Regen.LOST, level_name)
+
+
+## Server: places [param gone] are no more: every record's known places
+## forget them, and the players on whose map they were are sent their
+## world again (WorldNews.resend).
+func _forget_places(gone: Array[String]) -> void:
+	for id: String in _records:
+		var record: PlayerRecord = _records[id]
+		var before := record.known_places.size()
+		record.known_places = record.known_places.filter(func(place_id: String) -> bool: return place_id not in gone)
+		if record.known_places.size() == before or _world_news == null:
+			continue
+		for peer: int in _peer_ids:
+			if _peer_ids[peer] == id:
+				_world_news.resend(peer)
+	if _world_news != null:
+		_world_news.update()
+
+
 ## What level [param level_name]'s files on disk are: their folder and each
 ## one's md5, so the console's reload sees an edited level however soon.
 func _level_stamp(level_name: String) -> String:
@@ -1858,6 +1987,8 @@ func _boot() -> void:
 	# The world's clock goes on from where it stopped: the world waits while
 	# the server is down.
 	World.steps = snapshot.get("steps", 0)
+	# Each regenerating level's generation (decision 465), before any zone opens.
+	_regen = Regen.states_from(snapshot.get("regen", {}))
 	# The hour and the day's length go on as saved (DayNight), unless
 	# --hour or --day-minutes say otherwise.
 	DayNight.reset()
@@ -2057,6 +2188,12 @@ func _open_zone(zone_name: String, saved := {}) -> Zone:
 		return World.zones[zone_name]
 	if not Level.exists(zone_name):
 		return null
+	# A regenerating level due is laid again before it opens (decision
+	# 465); the snapshot's section for it keeps only what sits in an anchor.
+	if _regenerate_if_due(zone_name) and not saved.is_empty():
+		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"])
+		saved = sifted["kept"]
+		_lose_items(sifted["lost"], zone_name)
 	var opened := World.add_zone(zone_name)
 	var was := World.enter(opened)
 	_load_level(zone_name)
@@ -2193,7 +2330,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	if Level.overlaid(zone_name):
 		# Edited in the game: the client's own copy (its pck's) is not it.
 		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
-	Net.message_to(peer, "map", {"name": zone_name, "server": Net.version})
+	Net.message_to(peer, "map", map_message(zone_name))
 	Net.message_to(peer, "sky", sky_message())
 	_send_towns(peer, zone_name)
 	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
@@ -2211,6 +2348,9 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	var record: PlayerRecord = _records.get(id)
 	if record == null or not Level.exists(to_map):
 		return false
+	# A regenerating level due is laid again before anyone arrives
+	# (decision 465); a zone already open does the same here.
+	_regenerate_if_due(to_map)
 	var target := _open_zone(to_map)
 	var from_name: String = World.peer_zone.get(peer, record.zone)
 	World.enter_named(from_name)
@@ -2331,7 +2471,7 @@ func _spawn_doors() -> void:
 ## --state file when it has this zone; otherwise the room starts whole
 ## ([param whole]): its players healed and dead companions back. Everyone in
 ## the zone keeps their place; nobody in another zone is touched.
-func _start_level(from_snapshot := false, whole := true) -> void:
+func _start_level(from_snapshot := false, whole := true, with_saved := {}) -> void:
 	if not Net.is_authority():
 		return
 	var here := World.zone.name
@@ -2362,7 +2502,7 @@ func _start_level(from_snapshot := false, whole := true) -> void:
 		_respawn_at.erase(peer)
 	_alive_slots.clear()
 	_dead_since.clear()
-	var saved := {}
+	var saved := with_saved
 	if from_snapshot and Net.state_path != "":
 		var snapshot := Snapshot.load(Net.state_path)
 		if snapshot["ok"]:
@@ -2875,6 +3015,7 @@ func _save_state(wait := true) -> void:
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
+		"regen": _regen,
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()
 	_saver = Thread.new()
@@ -2898,6 +3039,7 @@ func _on_world_stepped() -> void:
 	if Net.is_authority() and World.steps % World.WORLD_TICK_STEPS == 0:
 		# The clients' clocks, kept from drifting off the world's.
 		Net.broadcast("sky", sky_message())
+		_regenerate_due()
 
 
 ## The "sky" message: the world clock (DayNight.to_dict) and the server's
@@ -3048,6 +3190,16 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	if Net.asked_body(id) != &"" or Net.asked_look(id) != "":
 		record.look = Net.asked_look(id)  # Their choice this join (none: seeded by name).
 	var back := known and not respawn
+	# The zone laid again since they were last in it (decision 465): their
+	# saved cell may be rock now, so the nearest anchor's spawn point, or
+	# the nearest floor, and their companion beside them.
+	var generation := generation_of(World.zone.name)
+	var shifted := generation > 0 and not respawn and int(record.seen_generation.get(World.zone.name, 0)) != generation
+	if shifted and back:
+		var spawn: Variant = Regen.anchor_spawn_near(level, record.tile)
+		if spawn != null:
+			record.tile = spawn
+		record.companion["tile"] = null
 	var tile := _nearest_free(record.tile) if back else _free_start_tile()
 	if respawn and at != World.NO_CELL:
 		tile = _nearest_free(at)  # Brought back at a temple or a hut (decision 396).
@@ -3099,6 +3251,11 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	print("[net] %s (%s) joined as %s at %s%s" % [
 		player_name, id.left(8), player.name, tile, " (back)" if back else ""])
 	party_log.add("%s joined." % player_name)
+	if shifted:
+		# Back at a newer generation: told; a first visit is not.
+		if int(record.seen_generation.get(World.zone.name, 0)) > 0:
+			Net.broadcast_to([peer], "party", {"from": "Server", "text": "The ways have shifted since you were last here."})
+		record.seen_generation[World.zone.name] = generation
 	_join_companion(record, player)
 	_on_gold_changed(id, World.gold_of(id))
 
@@ -5100,6 +5257,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		# map, and its entities arrive under that zone's node.
 		var wanted := str(data.get("name", ""))
 		Net.server_version = str(data.get("server", Net.server_version))
+		map_generation = int(data.get("generation", 0))
 		if not Net.is_authority() and Net.newer_version(Net.server_version, Net.claimed_version()) and not _told_newer:
 			# The same protocol, so it plays; the next start updates it.
 			_told_newer = true
