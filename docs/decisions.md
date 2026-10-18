@@ -8965,3 +8965,17 @@ AnimationTree resource shared by all (each body's clips and speeds are its
 own); an AnimationNodeStateMachine of every clip (the tables name clips at
 run time, and the code picks them); posing everything every frame (over
 the 1 ms budget at sixty people and a herd).
+## 415. Kill counts: what a thing has felled, by kind
+
+Jeff: items held and used grow, with kill counts (growth step 1, approved by
+the coordinator). ItemBook tallies what each thing has felled by the kind of
+body (ItemBook.fell, felled_of; entry "felled" {kind: count}, saved), across
+every holder: a monster's dagger counts too, and the tally stays with the thing
+when it changes hands, unlike 365's deeds, which are each carrier's. A body is
+felled by a blow (_resolve_hits) or a shot (shoot) that kills it; the kind is
+World.kind_of: a monster's or an animal's spawn kind, "person" for a player or a
+companion. The slot's note (slot_notes, the pack's tooltip) shows it on a line
+under the thing's name: "felled 14: 9 imps, 4 wolves, 1 brute", the most first
+(World.kills_line; its own plurals until lore has words for kinds). Display
+text only: the protocol is unchanged. The tallies are what bane (25 of a kind)
+and vengeance's paying (5) count, in growth step 2.

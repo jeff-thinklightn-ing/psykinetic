@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Weapons keep count of what they've felled, by kind, whoever held them: hover a slot in your pack to see "felled 14: 9 imps, 4 wolves, 1 brute" under its name.
 - People strike with what they hold: a sword swings, an axe falls overhead, a dagger stabs, a spear thrusts, and bare hands punch. Each blow is timed so it lands as the hit does. Bodies far from the middle of the view, or out of it, move less often, which keeps crowds cheap. Client only.
 - Companions know that brutes are orcs and sneaks are kobolds, allied to the Blood
   Rot's goblins (the imps), and why they fight for them.

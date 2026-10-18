@@ -1960,6 +1960,10 @@ func _show_notes(entity: GridEntity) -> void:
 	for slot in mini(entity.slots.size(), entity.slot_items.size()):
 		if entity.slot_items[slot] != 0:
 			names[slot] = item_note(entity.slot_items[slot])
+			var kills := kills_line(entity.slot_items[slot])
+			if not kills.is_empty():
+				# The tally on a line of its own (decision 415), under the thing's name.
+				names[slot] = "%s\n%s" % [names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot]), kills]
 			any = any or not names[slot].is_empty()
 	if not any:
 		names = PackedStringArray()
@@ -1976,6 +1980,53 @@ func item_note(uid: int) -> String:
 		note = "%s, %d of %d" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)),
 			items.condition_of(uid), Items.condition_max(items.id_of(uid))]
 	return note
+
+
+## What [param uid] has felled, as its slot's note shows it (decision 415):
+## "felled 14: 9 imps, 4 wolves, 1 brute", the most first; "" for nothing.
+func kills_line(uid: int) -> String:
+	var felled := items.felled_of(uid)
+	if felled.is_empty():
+		return ""
+	var kinds: Array = felled.keys()
+	kinds.sort_custom(func(a: String, b: String) -> bool: return felled[a] > felled[b] or felled[a] == felled[b] and a < b)
+	var parts := PackedStringArray()
+	var total := 0
+	for kind: String in kinds:
+		total += int(felled[kind])
+		parts.append("%d %s" % [felled[kind], kind if int(felled[kind]) == 1 else _plural(kind)])
+	return "felled %d: %s" % [total, ", ".join(parts)]
+
+
+## The kind a body felled counts as (decision 415): a monster's or an
+## animal's own (its spawn kind), "person" for a player or a companion; ""
+## for anything else.
+func kind_of(entity: GridEntity) -> String:
+	if entity is Player or entity is Companion:
+		return "person"
+	if entity is Monster:
+		return str(entity.spawn_spec.get("kind", ""))
+	return ""
+
+
+static func _plural(kind: String) -> String:
+	match kind:
+		"person":
+			return "people"
+		"wolf":
+			return "wolves"
+		"deer", "sheep":
+			return kind
+	return kind + "s"
+
+
+## The thing in [param entity]'s slot [param slot] felled [param victim]
+## (decision 415): its tally counts it, whoever holds it, and its note shows it.
+func _felled_with(entity: GridEntity, slot: int, victim: GridEntity) -> void:
+	if not is_instance_valid(entity) or slot < 0 or slot >= entity.slot_items.size() or entity.slot_items[slot] == 0:
+		return
+	items.fell(entity.slot_items[slot], kind_of(victim))
+	_show_notes(entity)
 
 
 ## The strength (decision 365) of the thing in [param entity]'s slot
@@ -2747,6 +2798,8 @@ func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
 		damage(hit, amount, by, &"shot")
 		if creature:
 			_credit(by, _drawn_slot(by), "felled" if not _alive(hit) else "shot")
+			if not _alive(hit):
+				_felled_with(by, _drawn_slot(by), hit)
 		if not str(ammo.get("effect", "")).is_empty() and _alive(hit):
 			afflict(hit, ammo["effect"], int(ammo["ticks"]), int(ammo["every"]), int(ammo["amount"]))  # Flame, barbed.
 	return hit
@@ -3999,6 +4052,8 @@ func _resolve_hits() -> void:
 				_wear_bundle(hit.target)
 			if creature and not hit.deed.is_empty():
 				_credit(hit.source, Items.RIGHT_HAND, "felled" if not _alive(hit.target) else hit.deed)
+			if creature and not _alive(hit.target):
+				_felled_with(hit.source, Items.RIGHT_HAND, hit.target)
 		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, hit.push_direction, hit.force, hit.push_direction != hit.direction)
 

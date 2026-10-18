@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_wind_up()
 	_test_spear()
 	_test_pickup()
+	_test_kills()
 	_test_names()
 	_test_curse()
 	_test_arrows()
@@ -1056,6 +1057,40 @@ func _test_pickup() -> void:
 				World.items.end(uid, "gone")
 	lying.sort()
 	_check("dagger" in lying and "shield" in lying, "beaten, it drops what it took up (%s)" % [lying])
+
+func _test_kills() -> void:
+	print("\n== kill counts: what a thing has felled, by kind, whoever held it; its note shows it (decision 415) ==")
+	var host := _player(Net.local_id)
+	var far := _open_line(host, 2)
+	_check(far != World.NO_CELL, "an open cell beside the host")
+	if far == World.NO_CELL:
+		return
+	var d := (far - host.tile) / 2
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	var fell := func(kind: String) -> void:
+		var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "KillImp%d" % World.tick,
+			"tile": host.tile + d, "kind": kind, "props": {"sight_range": 0}}) as GridEntity
+		foe.acts = false
+		foe.hp = 1
+		host._world_set_facing(d)
+		host.next_attack_tick = 0
+		host.next_move_tick = 0
+		World.try_attack(host, foe)
+		World._resolve_hits()
+		while not World.ground_uids(host.tile + d).is_empty():
+			World.items.end(World.take_from_ground(host.tile + d, 0), "gone")  # What it carried (loot, decision 330).
+	_check(World.kills_line(dagger).is_empty(), "a new dagger has felled nothing")
+	fell.call("imp")
+	fell.call("imp")
+	fell.call("wolf")
+	_check(World.items.felled_of(dagger) == {"imp": 2, "wolf": 1}, "two imps and a wolf, counted by kind (%s)" % World.items.felled_of(dagger))
+	_check(World.kills_line(dagger) == "felled 3: 2 imps, 1 wolf", "the tally: %s" % World.kills_line(dagger))
+	_check(host.slot_notes.size() > Player.RIGHT_HAND and host.slot_notes[Player.RIGHT_HAND] == "dagger\nfelled 3: 2 imps, 1 wolf",
+			"the slot's note: its name, the tally under it (%s)" % [host.slot_notes])
+	var back := ItemBook.from_dict(World.items.to_dict())
+	_check(back.felled_of(dagger) == {"imp": 2, "wolf": 1}, "saved and read back")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+
 
 func _test_names() -> void:
 	print("\n== names from long-time holders and the strength they leave (decision 365) ==")

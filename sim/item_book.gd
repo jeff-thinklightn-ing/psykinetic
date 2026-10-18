@@ -158,6 +158,22 @@ func deed(uid: int, who: String, kind: String) -> void:
 			return
 
 
+## [param uid] felled a body of [param kind] (decision 415): counted for
+## the thing, whoever held it, by kind.
+func fell(uid: int, kind: String) -> void:
+	if not _book.has(uid) or kind.is_empty():
+		return
+	var felled: Dictionary = _book[uid].get("felled", {})
+	felled[kind] = int(felled.get(kind, 0)) + 1
+	_book[uid]["felled"] = felled
+
+
+## What [param uid] has felled, by kind ({kind: count}; decision 415); {}
+## for none.
+func felled_of(uid: int) -> Dictionary:
+	return _book[uid].get("felled", {}) if _book.has(uid) else {}
+
+
 ## [param uid]'s name ({form, holder, who (its namer's carrier key),
 ## made_step, text}); {} for none.
 func name_of(uid: int) -> Dictionary:
@@ -316,6 +332,12 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				"carriers": carriers, "events": events}
 			if entry.get("condition") is float or entry.get("condition") is int:
 				items._book[int(key)]["condition"] = int(entry["condition"])
+			if entry.get("felled") is Dictionary and not entry["felled"].is_empty():
+				var felled := {}
+				for kind: Variant in entry["felled"]:
+					if int(entry["felled"][kind]) > 0:
+						felled[str(kind)] = int(entry["felled"][kind])
+				items._book[int(key)]["felled"] = felled
 			var name: Variant = entry.get("name")
 			if name is Dictionary and name.get("form") is String and name.get("holder") is String:
 				items._book[int(key)]["name"] = {"form": name["form"], "holder": name["holder"],
