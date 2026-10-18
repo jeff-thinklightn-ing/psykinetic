@@ -6835,6 +6835,13 @@ static func creature_slot_for(entity: GridEntity) -> String:
 ## person (a player, a companion, a resident), MODELS' entry for a monster of a
 ## kind that has one, or {}.
 static func model_for(entity: GridEntity) -> Dictionary:
+	var kind := str(entity.spawn_spec.get("kind", ""))
+	if entity is Resident and MODELS.has(kind):
+		# A goblin among the townsfolk (decision 471, Snagfin): its kind's body, at home in
+		# town, bare-headed (494's hood down).
+		var model: Dictionary = MODELS[kind].duplicate()
+		model["at_home"] = true
+		return model
 	if entity is Player or entity is Companion or entity is Resident:
 		return HUMAN_F if look_for(entity).body == &"female" else HUMAN
 	if not entity is Monster:
@@ -6870,6 +6877,9 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	if model.get("goblin", false):
 		# Its own goblin (decision 494): the shared material, its variation as instance parameters.
 		var look := goblin_look(str(puppet.get_meta("entity_name", "")))
+		if model.get("at_home", false) and look["hood"]:
+			look["hood"] = false
+			look["words"] = (str(look["words"]) + " hood=down").strip_edges()
 		puppet.set_meta("goblin_look", look)
 		scene.scale = Vector3(scene.scale.x * float(look["width"]), scene.scale.y, scene.scale.z * float(look["width"]))
 		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):

@@ -2338,6 +2338,21 @@ func _test_goblins_differ() -> void:
 		if not Client3D.goblin_look("Raider%d" % i)["hood"]:
 			bare += 1
 	_check(bare > 4 and bare < 25, "a raid of 40: %d bare-headed" % bare)
+	# A goblin among the townsfolk (decision 471, Snagfin): its kind's body, hood down, never a person's.
+	var occupant := World.get_entity_at(Vector2i(12, 2))
+	if occupant != null:
+		World.despawn(occupant)
+	var merchant: GridEntity = _main._spawn({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Resident_snagfin_view",
+		"tile": Vector2i(12, 2), "kind": "imp", "label": "Snagfin [merchant]", "look": "seed=1 body=male"})
+	_rig._process(0.0)
+	var his: Node3D = _rig._puppets.get(merchant.get_instance_id())
+	var his_model := his.get_node_or_null("Body/Model") if his != null else null
+	var hoods: Array = his_model.find_children("Hood", "MeshInstance3D", true, false) if his_model != null else []
+	_check(his_model != null and his_model.scene_file_path == str(Client3D.MODELS["imp"]["scene"]) and hoods.size() == 1
+			and not (hoods[0] as MeshInstance3D).visible and "hood=down" in str(his.get_meta("goblin_look")["words"]),
+			"a goblin resident is the goblin, its hood down (%s)" % [his_model.scene_file_path if his_model != null else "no model"])
+	World.despawn(merchant)
+	_rig._process(0.0)
 	var animators: Array[AnimRig] = [a.get_meta("rig"), b.get_meta("rig")]
 	_check(absf(animators[0].position() - animators[1].position()) > 0.01,
 			"standing side by side, out of step (%.2f s, %.2f s into Idle)" % [animators[0].position(), animators[1].position()])

@@ -13179,6 +13179,13 @@ shows the Hood or not and sets the keys. The hover outline's stencil twin is war
 room build through 495's warm_ups (Client3D.warm_goblin, two skinned goblins, one in each):
 cold, its first use took a 20.6 ms frame; warmed, the hover frame is 0.7 ms (a scratch scene on
 a fresh profile, against 3.2 to 4.0 ms unwarmed once the driver's own cache had it).
+
+Amended (the coordinator: npc's 471 seats Snagfin as a Resident of kind "imp"): Client3D.model_for
+gave every Resident a person's body. A Resident whose spawn spec names a kind with a model draws
+that model (MODELS), marked at home, and a goblin at home goes bare-headed (its look's hood down,
+"hood=down" in its words). Checked on a wilds host: Snagfin by the store, the goblin, his hood
+down (C:\deveview\people\snagfin.png). His look string carries no trade (an outcast's, npc),
+and a goblin has no apron, so no apron.
 ## 489. BuildingComposer: a kind's look, seeded, off the grid
 
 Step 3 of Jeff's building variety (488 is step 1; art-kit's slots are
