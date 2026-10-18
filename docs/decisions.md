@@ -14280,3 +14280,34 @@ external takes moved aside, where no loop is held.
 Rejected: a few fixed emitters along each stream (gaps or doubling as you
 walk; many players for a long stream); a bed weighed by distance to water
 (no direction); terrain calling the cues (the coordinator: sound's).
+## 476. The interface's panels redraw only when something changed
+
+Ui, from the coordinator's list (Jeff: performance first). Measured on the
+wilds town host (4 herds, a storm at night, the talk box and the pack shown,
+1080p windowed) with a new tally, UiCost (render/ui_cost.gd, class_name
+UiCost): each panel adds the microseconds its frame work took under a name,
+and --test-ui-cost prints the average per frame at exit. Before: pack 0.295
+ms/frame every frame, the HUD block (compass place, counter placement, the
+cursor hint with its picks) 0.055, shop 0.006, talk 0.003; all 0.360
+ms/frame. After: the off-peak run's numbers follow in an amendment to this entry.
+
+- PackPanel laid out both rows every frame (Items lookups, icon lookups,
+  label overrides). It now keeps a signature of what it shows (the player,
+  the open thing, shown, the icon source, copies of each shown entity's
+  slots and slot_notes, a count of icons arrived through
+  ItemIcons.icon_ready) and refreshes only when the signature differs;
+  open(), the setters and _ready still refresh at once. The "landed" sound
+  (a slot changing) is unchanged: every slot change is a refresh.
+- Main picked the body under the cursor twice a frame (the target outline
+  and the hint), cast the door ray, walked every entity and read the
+  ground each frame. It now picks the entity once a frame and shares it,
+  works the hint out again only when the cursor moved, the world ticked,
+  the thing under the cursor or the typing state changed, sets the label's
+  text (and resets its size) only when the words change, works the
+  compass's place out when the player's cell or the tick changes, and
+  places the counter panel only when the pack's rect, the shop's box or its
+  own minimum size changed.
+- Not mine, reported to maps and perf: render/minimap.gd queue_redraw()s
+  every frame.
+
+Behaviour unchanged (ui_test, items_test); client only; protocol unchanged.

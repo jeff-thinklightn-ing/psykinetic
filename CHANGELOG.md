@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The interface's panels no longer lay themselves out every frame: the pack refreshes only when its slots, notes or icons change, and the cursor hint, the compass place and the counter panel are worked out only when their inputs change (decision 476).
 - Tools: the heavy-job gate stops a run that is over its time limit or hung (394 amended). The limit is --expect MIN when given, else 3x its kind's median run (at least 30 min), else 90 min for benches, suites, imports and exports. A run off the GPU using under 3% of a core for 10 minutes counts as hung. Its own wrapper stops it and exits 5. Long soaks must pass --expect MIN. status shows "held N of M min"; the daily summary counts overruns and hangs.
 - Tools: heavy_job_test's step-aside check waits on the queue order and the log line (polled, up to 60 s) instead of fixed sleeps, which a loaded landing overran (release: art-kit's landing failed it twice at 22:39).
 - The level editor has a properties panel: click a link, chest, place, market, stream or the level itself to see and edit its settings, checked as you go (506).

@@ -402,6 +402,20 @@ var _connect_joining := false
 var _hud_tick := 0
 ## The hint over what the cursor is on ("E  open"), outlined, by the cursor.
 var _context_hint: Label
+## The hint's inputs at its last working-out (ui's perf pass): the picks and
+## the entity loop run again only when the cursor moved, the world ticked,
+## or what is under the cursor or the typing state changed.
+var _hint_mouse := Vector2(-1.0, -1.0)
+var _hint_tick := -1
+var _hint_under_id := 0
+var _hint_typing := false
+var _hint_words := ""
+## The compass's place, worked out again when the player's cell or the tick changes.
+var _place_tile := Vector2i(-100000, -100000)
+var _place_tick := -1
+var _place_words := ""
+## What the counter panel was last placed from (the pack's rect, the shop's box, its own size).
+var _counter_placed_from: Array = []
 ## --test-show=hint: the thing the hint is shown on, as if the cursor were on it.
 var _test_hint_thing: GridEntity
 ## --test-show=counter: the pack panel, for the counter screen's sample.
@@ -729,6 +743,7 @@ func _go_online() -> void:
 ## _ready): the entities have placed themselves and the 3D view has moved
 ## its camera, so the pick below is made against the frame as drawn.
 func _process(delta: float) -> void:
+	UiCost.frame()
 	_measure_smoothness(delta)
 	_show_home_zone()
 	_follow_player(delta)
@@ -750,6 +765,8 @@ func _process(delta: float) -> void:
 	# would attack is outlined instead, and the cell is not shown.
 	var tile := _mouse_tile()
 	var player := _local_player()
+	# One pick of the body under the cursor a frame, for the target and the hint both.
+	var under_mouse := _entity_under_mouse()
 	var aim := World.shot_aim(player, tile) if player != null and player.raised == "draw" else {}
 	if _client3d != null and not aim.is_empty():
 		# A bow drawn: the body the shot would strike is outlined, else
@@ -757,7 +774,7 @@ func _process(delta: float) -> void:
 		_client3d.target(aim["hit"])
 		_client3d.hover(aim["end"], aim["hit"] == null)
 	elif _client3d != null:
-		var foe := _foe_under_mouse()
+		var foe: GridEntity = under_mouse if player != null and under_mouse is Monster and World.can_target(player, under_mouse) else null
 		_client3d.target(foe)
 		_client3d.hover(tile, foe == null and World.is_walkable(tile))
 	else:
@@ -768,9 +785,15 @@ func _process(delta: float) -> void:
 	_retarget_held()
 	_update_pack()
 	_update_talk()
+	var hud_began := Time.get_ticks_usec()
 	if compass != null:
 		compass.north_on_screen = screen_north()
-		compass.place = place_text(_local_player())
+		var standing := player.tile if player != null else NONE
+		if standing != _place_tile or _hud_tick != _place_tick:
+			_place_tile = standing
+			_place_tick = _hud_tick
+			_place_words = place_text(player)
+		compass.place = _place_words
 	if counter_panel != null and pack_panel != null:
 		var at_counter := pack_panel.visible and is_instance_valid(pack_panel.other) \
 				and not World.counter_kind(pack_panel.other).is_empty() or is_instance_valid(_test_counter_shown)
@@ -778,34 +801,46 @@ func _process(delta: float) -> void:
 		if at_counter:
 			var rect := pack_panel.get_global_rect()
 			var shop_box := shop_panel.box_rect() if shop_panel != null else Rect2()
-			counter_panel.reset_size()
-			var bottom := shop_box.position.y - ShopPanel.GAP if shop_box.size.y > 0.0 else rect.end.y
-			counter_panel.global_position = Vector2(rect.position.x - counter_panel.size.x - ShopPanel.GAP, bottom - counter_panel.size.y)
+			var placed_from := [rect, shop_box, counter_panel.get_combined_minimum_size()]
+			if placed_from != _counter_placed_from:
+				_counter_placed_from = placed_from
+				counter_panel.reset_size()
+				var bottom := shop_box.position.y - ShopPanel.GAP if shop_box.size.y > 0.0 else rect.end.y
+				counter_panel.global_position = Vector2(rect.position.x - counter_panel.size.x - ShopPanel.GAP, bottom - counter_panel.size.y)
 	if _context_hint != null:
-		var words := ""
-		if not is_typing() and DisplayServer.get_name() != "headless":
-			words = context_hint_for(_entity_under_mouse())
-			if words.is_empty():
-				words = context_hint_for(_door_under_mouse())
-			if words.is_empty():
-				# A prop on the cell under the cursor (the pick ray finds bodies, not chests).
-				var under := _mouse_tile()
-				for entity in World.get_entities():
-					if entity.spawned and entity.tile == under and (entity is Chest or entity is Cargo or entity is Companion):
-						words = context_hint_for(entity)
-						break
-			if words.is_empty() and _local_player() != null and not World.ground_at(_mouse_tile()).is_empty():
-				words = "%s  pick up" % Keys.name_of("pick_up")
 		var at := get_viewport().get_mouse_position()
+		var typing := is_typing()
+		var under_id := under_mouse.get_instance_id() if under_mouse != null else 0
+		if at != _hint_mouse or _hud_tick != _hint_tick or under_id != _hint_under_id or typing != _hint_typing:
+			_hint_mouse = at
+			_hint_tick = _hud_tick
+			_hint_under_id = under_id
+			_hint_typing = typing
+			_hint_words = ""
+			if not typing and DisplayServer.get_name() != "headless":
+				_hint_words = context_hint_for(under_mouse)
+				if _hint_words.is_empty():
+					_hint_words = context_hint_for(_door_under_mouse())
+				if _hint_words.is_empty():
+					# A prop on the cell under the cursor (the pick ray finds bodies, not chests).
+					for entity in World.get_entities():
+						if entity.spawned and entity.tile == tile and (entity is Chest or entity is Cargo or entity is Companion):
+							_hint_words = context_hint_for(entity)
+							break
+				if _hint_words.is_empty() and player != null and not World.ground_at(tile).is_empty():
+					_hint_words = "%s  pick up" % Keys.name_of("pick_up")
+		var words := _hint_words
 		if is_instance_valid(_test_hint_thing) and _client3d != null:
 			# --test-show=hint: the hint as the cursor on that thing would show it.
 			words = context_hint_for(_test_hint_thing)
 			at = _client3d.screen_of_tile(_test_hint_thing.tile)
 		_context_hint.visible = not words.is_empty()
 		if not words.is_empty():
-			_context_hint.text = words
-			_context_hint.reset_size()
+			if _context_hint.text != words:
+				_context_hint.text = words
+				_context_hint.reset_size()
 			_context_hint.position = at + Vector2(28.0, 28.0)
+	UiCost.add("hud", Time.get_ticks_usec() - hud_began)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -8126,6 +8161,8 @@ func _report_test() -> void:
 		print("[test] screenshot %s: %s" % [Net.screenshot_path, "saved" if error == OK else error_string(error)])
 	print("[test] final tick=%d entities=%d occupancy_consistent=%s" % [
 		World.tick, World.get_entities().size(), World.is_occupancy_consistent()])
+	if Net.test_ui_cost:
+		print(UiCost.report())
 	var player := _local_player()
 	if player != null and not Net.is_authority():
 		print("[test] display: %s server_tile=%s shown_tile=%s mispredicts=%d snaps=%d color=%s" % [

@@ -151,12 +151,14 @@ func keeps_showing() -> bool:
 
 
 func _process(_delta: float) -> void:
+	var began := Time.get_ticks_usec()
 	if visible and not keeps_showing():
 		visible = false
 	if _box != null and _box.visible:
 		_show_channel()  # Main may set the text (Tab), which text_changed does not say.
 	# As tall as its lines, up to LIST_HEIGHT while pinned (then it scrolls).
 	_scroll.custom_minimum_size.y = minf(_list.get_combined_minimum_size().y, LIST_HEIGHT)
+	UiCost.add("talk", Time.get_ticks_usec() - began)
 
 
 func _show_channel() -> void:

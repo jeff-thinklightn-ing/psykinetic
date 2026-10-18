@@ -40,8 +40,23 @@ var sound: Callable
 ## Called with (slot) for a right click on a thing in the player's own row:
 ## use it.
 var use: Callable
-## Where icons come from; null: names only.
-var icons: ItemIcons
+## Where icons come from; null: names only. An icon that finishes loading
+## (icon_ready) is a change to show.
+var icons: ItemIcons:
+	set(value):
+		if icons == value:
+			return
+		if icons != null and icons.icon_ready.is_connected(_icon_arrived):
+			icons.icon_ready.disconnect(_icon_arrived)
+		icons = value
+		if icons != null:
+			icons.icon_ready.connect(_icon_arrived)
+		_icons_seen += 1
+## Counts the icons that arrived, part of the shown signature.
+var _icons_seen := 0
+## What the rows showed at the last refresh (_signature): the panel lays
+## itself out again only when it differs (ui's perf pass; it ran every frame).
+var _signature_shown: Array = []
 ## Whose pack the bottom row shows; null for none (no player).
 var player: GridEntity:
 	set(value):
@@ -234,7 +249,29 @@ func _process(_delta: float) -> void:
 	if Net.mode == Net.Mode.SERVER:
 		set_process(false)  # Nobody sees a dedicated server's pack (decision 469).
 		return
-	_refresh()
+	var began := Time.get_ticks_usec()
+	if _signature() != _signature_shown:
+		_refresh()
+	UiCost.add("pack", Time.get_ticks_usec() - began)
+
+
+func _icon_arrived(_id: String) -> void:
+	_icons_seen += 1
+
+
+## Everything the rows are laid out from: whose, shown or not, the icon
+## source and each entity's slots and notes (copies: they change in place
+## under replication). Arrays compare by value, so a frame with the same
+## signature draws nothing again.
+func _signature() -> Array:
+	var who := player if is_instance_valid(player) else null
+	var opened := other if is_instance_valid(other) else null
+	var sig: Array = [who, opened, shown, icons != null, _icons_seen]
+	for entity in [who, opened]:
+		if entity != null:
+			sig.append(entity.slots.duplicate())
+			sig.append(entity.slot_notes.duplicate())
+	return sig
 
 
 ## Shows [param opened]'s row, a chest or a companion (null closes it).
@@ -313,6 +350,7 @@ func _refresh() -> void:
 			carried += Items.weight_of(item)
 	_weight.text = "carrying %s kg" % str(snappedf(carried, 0.1)) if carried > 0.0 else ""
 	_weight.visible = carried > 0.0
+	_signature_shown = _signature()
 
 
 ## [param picture] in [param box], its name a caption under it; null: the

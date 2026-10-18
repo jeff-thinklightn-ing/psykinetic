@@ -101,6 +101,7 @@ extends Node
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
 ##   --menu                       start at the main menu, as an exported client does (for screenshots)
+##   --test-ui-cost               print the interface's per-frame cost at exit (UiCost; ui's measure)
 ##   --test-show=<a,b>            open these on the HUD once the player is in (for the ui tree's screenshots):
 ##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's),
 ##                                game_menu, menu, setup (the connect screen's fields), connect, failed (its states), over the game;
@@ -451,6 +452,8 @@ var test_builder := ""
 var test_exit_after := 0.0
 var test_exit_on := ""
 var test_minimap := false
+## --test-ui-cost: the interface's per-frame cost printed at exit (UiCost).
+var test_ui_cost := false
 ## --menu: the main menu first, whatever the mode (MainMenu).
 var show_menu := false
 ## --test-show: HUD panels opened once the local player is in (Main._run_test_show).
@@ -1557,6 +1560,8 @@ func _parse_args() -> void:
 				test_minimap = true
 			"--menu":
 				show_menu = true
+			"--test-ui-cost":
+				test_ui_cost = true
 			"--raids":
 				raids = true
 			"--test-smooth":

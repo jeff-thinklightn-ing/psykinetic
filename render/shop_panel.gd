@@ -180,6 +180,12 @@ func _rebuild() -> void:
 
 
 func _process(_delta: float) -> void:
+	var began := Time.get_ticks_usec()
+	_place()
+	UiCost.add("shop", Time.get_ticks_usec() - began)
+
+
+func _place() -> void:
 	if not is_instance_valid(shop):
 		shop = null
 	var pack_shown := pack != null and pack.visible
