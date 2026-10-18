@@ -96,6 +96,13 @@
 			"dread": {"from": "felled", "dread": true}
 		}
 	},
+	"growth": {
+		"_about": "Bane and vengeance (decision 417). A thing that has felled bane_after of one kind (ItemBook's tally, decision 415) is that kind's bane for life: that kind dreads its bearer and notices them bane_notice times further (World.holder_bane; enemy-ai reads it). A thing held by someone felled by a kind takes a grudge against it: its blows stagger that kind grudge_stagger ticks, and that kind seeks its bearer first (World.holder_grudge; enemy-ai); grudge_paid of that kind felled with it, the grudge lifts.",
+		"bane_after": 25,
+		"bane_notice": 1.5,
+		"grudge_stagger": 4,
+		"grudge_paid": 5
+	},
 	"curse": {
 		"_about": "Cursed heirlooms (Items.curse, decision 370). A named thing taken by anyone but its namer, other than from the namer's own hand (off the ground, out of a chest or the stockpile, from a monster's spill), is kept from its namer until it is back in the namer's hands. While kept, a holder it counts for gathers ill, 0 to 1 over full_days of the world clock held, and loses it at fade of that rate while not holding it. follows: thing (every holder but the namer) or taker (only who took it); Jeff's question, thing until he answers. below_baseline: whether ill may take the holder below baseline (true: noticed farther off, slower mending) or only shortens their buffs (false); null until Jeff answers, and until then ill does nothing.",
 		"follows": "thing",

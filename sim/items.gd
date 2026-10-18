@@ -44,6 +44,7 @@ static var _catalog: Dictionary = {}
 static var _loot: Dictionary = {}
 static var _naming: Dictionary = {}
 static var _curse: Dictionary = {}
+static var _growth := {}
 
 
 ## Every definition by id, read on first use.
@@ -193,6 +194,7 @@ static func reset() -> void:
 	_loot = {}
 	_naming = {}
 	_curse = {}
+	_growth = {}
 
 
 ## The catalog's "curse" (decision 370), read on first use: {follows
@@ -222,6 +224,34 @@ static func read_curse(text: String) -> Dictionary:
 ## For tests: curse's values replaced by [param values] until reset.
 static func set_curse_for_test(values: Dictionary) -> void:
 	curse().merge(values, true)
+
+
+## The catalog's "growth" (decision 417), read on first use: {bane_after (a
+## thing that has felled this many of one kind is its bane), bane_notice
+## (how much further that kind notices a bane's bearer: enemy-ai reads it),
+## grudge_stagger (the ticks a grudge's blows stagger its kind), grudge_paid
+## (that kind felled this many times with it, the grudge lifts)}.
+static func growth() -> Dictionary:
+	if _growth.is_empty():
+		_growth = read_growth(FileAccess.get_file_as_string(CATALOG))
+	return _growth
+
+
+## The "growth" of [param text] (the catalog file), with defaults.
+static func read_growth(text: String) -> Dictionary:
+	var data: Variant = JSON.parse_string(text)
+	var given: Variant = data.get("growth", {}) if data is Dictionary else {}
+	if given is not Dictionary:
+		given = {}
+	return {"bane_after": maxi(int(given.get("bane_after", 25)), 1),
+		"bane_notice": maxf(float(given.get("bane_notice", 1.5)), 0.0),
+		"grudge_stagger": maxi(int(given.get("grudge_stagger", 4)), 0),
+		"grudge_paid": maxi(int(given.get("grudge_paid", 5)), 1)}
+
+
+## For tests: growth's values replaced by [param values] until reset.
+static func set_growth_for_test(values: Dictionary) -> void:
+	growth().merge(values, true)
 
 
 ## The catalog's "naming" (decision 365), read on first use: {held_days,

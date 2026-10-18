@@ -8987,3 +8987,33 @@ under the thing's name: "felled 14: 9 imps, 4 wolves, 1 brute", the most first
 (World.kills_line; its own plurals until lore has words for kinds). Display
 text only: the protocol is unchanged. The tallies are what bane (25 of a kind)
 and vengeance's paying (5) count, in growth step 2.
+
+## 417. Bane and vengeance: sidegrades a thing earns against one kind
+
+Jeff: items held and used grow, with bane and vengeance (growth step 2,
+approved by the coordinator; its numbers in items.json's "growth", Items.growth,
+open to Jeff's answers). Both change how a fight with one kind goes, never
+damage, and are counted from 415's tally.
+
+Bane: a thing that has felled bane_after (25) of one kind is that kind's bane
+for life (ItemBook.bane_of, set_bane, the history's "bane" event). That kind
+dreads its bearer whatever its temper, and notices the bearer bane_notice (1.5)
+times further: World.holder_bane(entity, kind) is the hook, read by enemy-ai as
+it reads holder_dread (365), the numbers theirs to apply. So fewer stand-up
+fights against that kind, and no sneaking among them.
+
+Vengeance: a thing in the hands of a player or a companion felled by a monster
+(damage reaching 0, before the fallen are spared, 396) takes a grudge against
+that monster's kind, one at a time (ItemBook.grudge_of, set_grudge; World.
+_take_grudges). Its blows on that kind stagger them grudge_stagger (4) ticks,
+and that kind seeks its bearer first: World.holder_grudge(entity, kind), read by
+enemy-ai's target choice. grudge_paid (5) of that kind felled with it, the grudge
+lifts (pay_grudge; "avenged" in its history), those kills still counting toward a
+bane. Bane makes them flee you; vengeance draws them to you and breaks their
+rhythm.
+
+The slot's note names both ("dagger, imp-bane, vengeance on wolves"; World.
+item_note), and the party log tells each as it comes (World.item_grew). Saved in
+ItemBook; display text only, so the protocol is unchanged. Questions with Jeff:
+whether a bane should cost stealth, whether drawing a kind's fire is too harsh a
+cost for vengeance.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Weapons can earn a bane or a vengeance. One that fells 25 of a kind becomes their bane: that kind dreads whoever holds it, but notices them from further off. One held by someone who falls to a creature holds a grudge against that kind: its blows stagger them, but they come for its bearer first, until five of them have fallen to it. The pack and the party log say which.
 - Your companion now knows when she or you are bleeding or burning, and
   while one of you bleeds, bandaging comes first among what she offers.
 - Weapons keep count of what they've felled, by kind, whoever held them: hover a slot in your pack to see "felled 14: 9 imps, 4 wolves, 1 brute" under its name.

@@ -479,6 +479,7 @@ func _go_online() -> void:
 		World.braced_against.connect(_narrate_brace)
 		World.item_named.connect(_narrate_named)
 		World.item_kept.connect(_narrate_kept)
+		World.item_grew.connect(_narrate_grew)
 		World.bundle_swapped.connect(_narrate_swap)
 		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
@@ -3946,6 +3947,21 @@ func _narrate_brace(holder: GridEntity, charger: GridEntity) -> void:
 ## A thing carried long took its name (World.item_named; decision 365).
 func _narrate_named(entity: GridEntity, uid: int, text: String) -> void:
 	party_log.add("%s's %s is %s now." % [_display_name(entity), Items.name_of(World.items.id_of(uid)), text])
+
+
+## A thing grew (World.item_grew; decision 417): a bane, a grudge, avenged.
+func _narrate_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> void:
+	var thing := World.item_title(uid)
+	if thing.is_empty():
+		thing = "%s's %s" % [_display_name(entity), Items.name_of(World.items.id_of(uid))]
+	var kinds := World._plural(kind)
+	match mark:
+		"bane":
+			party_log.add("%s has felled so many %s it is their bane." % [thing, kinds])
+		"grudge":
+			party_log.add("%s holds a grudge against %s." % [thing, kinds])
+		"avenged":
+			party_log.add("%s has had its vengeance on %s." % [thing, kinds])
 
 
 ## A named thing kept from its namer, or back with them (World.item_kept;

@@ -55,6 +55,7 @@ func _ready() -> void:
 	_test_spear()
 	_test_pickup()
 	_test_kills()
+	_test_bane()
 	_test_names()
 	_test_curse()
 	_test_arrows()
@@ -1090,6 +1091,66 @@ func _test_kills() -> void:
 	var back := ItemBook.from_dict(World.items.to_dict())
 	_check(back.felled_of(dagger) == {"imp": 2, "wolf": 1}, "saved and read back")
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+
+
+func _test_bane() -> void:
+	print("\n== bane and vengeance: a thing that fells enough of a kind is its bane; one whose holder fell to a kind holds a grudge, paid in their felling (decision 417) ==")
+	var host := _player(Net.local_id)
+	var far := _open_line(host, 2)
+	_check(far != World.NO_CELL, "an open cell beside the host")
+	if far == World.NO_CELL:
+		return
+	var d := (far - host.tile) / 2
+	Items.set_growth_for_test({"bane_after": 3, "grudge_paid": 2})
+	var grew := []
+	var growing := func(_entity: GridEntity, _uid: int, mark: String, kind: String) -> void: grew.append([mark, kind])
+	World.item_grew.connect(growing)
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	var foe_of := func(kind: String) -> GridEntity:
+		var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "BaneFoe%d" % World.tick,
+			"tile": host.tile + d, "kind": kind, "props": {"sight_range": 0}}) as GridEntity
+		foe.acts = false
+		return foe
+	var strike := func(foe: GridEntity) -> void:
+		host._world_set_facing(d)
+		host.next_attack_tick = 0
+		host.next_move_tick = 0
+		World.try_attack(host, foe)
+		World._resolve_hits()
+		while not World.ground_uids(host.tile + d).is_empty():
+			World.items.end(World.take_from_ground(host.tile + d, 0), "gone")
+	for i in 3:
+		var imp: GridEntity = foe_of.call("imp")
+		imp.hp = 1
+		strike.call(imp)
+	_check(World.items.bane_of(dagger) == "imp" and World.holder_bane(host, "imp") and not World.holder_bane(host, "wolf")
+			and grew == [["bane", "imp"]], "three imps felled (3 here, 25 in play): the dagger is their bane (%s)" % [grew])
+	_check(World.item_note(dagger) == "dagger, imp-bane", "its note says so (%s)" % World.item_note(dagger))
+	# A grudge: its holder falls to a wolf.
+	var wolf: GridEntity = foe_of.call("wolf")
+	World._take_grudges(host, wolf)
+	_check(World.items.grudge_of(dagger) == {"kind": "wolf", "paid": 0} and World.holder_grudge(host, "wolf") and grew.back() == ["grudge", "wolf"],
+			"its holder fell to a wolf: it holds a grudge against wolves")
+	_check(World.item_note(dagger) == "dagger, imp-bane, vengeance on wolves", "and says so (%s)" % World.item_note(dagger))
+	wolf.max_hp = 50
+	wolf.hp = 50
+	wolf.stunned_until_tick = 0
+	strike.call(wolf)
+	_check(World.is_stunned(wolf) and wolf.stunned_until_tick == World.tick + 4, "its blow on a wolf staggers it 4 ticks")
+	wolf.hp = 1
+	strike.call(wolf)
+	_check(World.items.grudge_of(dagger).get("paid") == 1, "one wolf felled: paid one of two")
+	var other: GridEntity = foe_of.call("wolf")
+	other.hp = 1
+	strike.call(other)
+	_check(World.items.grudge_of(dagger).is_empty() and not World.holder_grudge(host, "wolf") and grew.back() == ["avenged", "wolf"]
+			and World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "avenged"),
+			"two wolves: the grudge lifts, avenged in its history")
+	var back := ItemBook.from_dict(World.items.to_dict())
+	_check(back.bane_of(dagger) == "imp", "the bane saved and read back")
+	World.item_grew.disconnect(growing)
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	Items.reset()
 
 
 func _test_names() -> void:

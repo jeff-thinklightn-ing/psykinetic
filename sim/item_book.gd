@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -172,6 +172,47 @@ func fell(uid: int, kind: String) -> void:
 ## for none.
 func felled_of(uid: int) -> Dictionary:
 	return _book[uid].get("felled", {}) if _book.has(uid) else {}
+
+
+## The kind [param uid] is the bane of (decision 417); "" for none.
+func bane_of(uid: int) -> String:
+	return str(_book[uid].get("bane", "")) if _book.has(uid) else ""
+
+
+## [param uid] made the bane of [param kind], for life (decision 417).
+func set_bane(uid: int, kind: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or kind.is_empty() or not bane_of(uid).is_empty():
+		return
+	_book[uid]["bane"] = kind
+	note(uid, "bane", kind, zone, tile)
+
+
+## [param uid]'s grudge (decision 417): {kind, paid}; {} for none.
+func grudge_of(uid: int) -> Dictionary:
+	return _book[uid].get("grudge", {}) if _book.has(uid) else {}
+
+
+## [param uid] takes a grudge against [param kind] (its holder fell to one;
+## decision 417), unless it holds one already.
+func set_grudge(uid: int, kind: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or kind.is_empty() or not grudge_of(uid).is_empty():
+		return
+	_book[uid]["grudge"] = {"kind": kind, "paid": 0}
+	note(uid, "grudge", kind, zone, tile)
+
+
+## One of [param uid]'s grudge's kind felled with it; [param paid] of them
+## and the grudge lifts ("avenged"). True when it lifted.
+func pay_grudge(uid: int, paid: int, zone := "", tile := Vector2i(-1, -1)) -> bool:
+	var grudge := grudge_of(uid)
+	if grudge.is_empty():
+		return false
+	grudge["paid"] = int(grudge["paid"]) + 1
+	if int(grudge["paid"]) < paid:
+		return false
+	_book[uid].erase("grudge")
+	note(uid, "avenged", str(grudge["kind"]), zone, tile)
+	return true
 
 
 ## [param uid]'s name ({form, holder, who (its namer's carrier key),
@@ -332,6 +373,10 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				"carriers": carriers, "events": events}
 			if entry.get("condition") is float or entry.get("condition") is int:
 				items._book[int(key)]["condition"] = int(entry["condition"])
+			if entry.get("bane") is String and not entry["bane"].is_empty():
+				items._book[int(key)]["bane"] = entry["bane"]
+			if entry.get("grudge") is Dictionary and entry["grudge"].get("kind") is String:
+				items._book[int(key)]["grudge"] = {"kind": entry["grudge"]["kind"], "paid": int(entry["grudge"].get("paid", 0))}
 			if entry.get("felled") is Dictionary and not entry["felled"].is_empty():
 				var felled := {}
 				for kind: Variant in entry["felled"]:

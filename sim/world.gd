@@ -84,6 +84,9 @@ signal item_named(entity: GridEntity, uid: int, text: String)
 ## A named thing is kept from its namer (decision 370) by [param entity],
 ## or is back with its namer ([param kept] false).
 signal item_kept(entity: GridEntity, uid: int, kept: bool)
+## [param uid], in [param entity]'s hands, grew (decision 417): [param mark]
+## "bane", "grudge" or "avenged", against [param kind].
+signal item_grew(entity: GridEntity, uid: int, mark: String, kind: String)
 ## [param by] took up the bundle [param taken] and put down the one it held,
 ## [param left], in its place (decision 375).
 signal bundle_swapped(by: GridEntity, taken: int, left: int)
@@ -1976,9 +1979,15 @@ func _show_notes(entity: GridEntity) -> void:
 ## thing.
 func item_note(uid: int) -> String:
 	var note := item_title(uid)
+	var more := PackedStringArray()
 	if items.condition_of(uid) >= 0:
-		note = "%s, %d of %d" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)),
-			items.condition_of(uid), Items.condition_max(items.id_of(uid))]
+		more.append("%d of %d" % [items.condition_of(uid), Items.condition_max(items.id_of(uid))])
+	if not items.bane_of(uid).is_empty():
+		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
+	if not items.grudge_of(uid).is_empty():
+		more.append("vengeance on %s" % _plural(str(items.grudge_of(uid)["kind"])))
+	if not more.is_empty():
+		note = "%s, %s" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)), ", ".join(more)]
 	return note
 
 
@@ -2025,8 +2034,60 @@ static func _plural(kind: String) -> String:
 func _felled_with(entity: GridEntity, slot: int, victim: GridEntity) -> void:
 	if not is_instance_valid(entity) or slot < 0 or slot >= entity.slot_items.size() or entity.slot_items[slot] == 0:
 		return
-	items.fell(entity.slot_items[slot], kind_of(victim))
+	var uid := entity.slot_items[slot]
+	var kind := kind_of(victim)
+	items.fell(uid, kind)
+	# Growth (decision 417): enough of one kind and it is their bane; one of
+	# its grudge's kind pays the grudge down.
+	var growth := Items.growth()
+	if not kind.is_empty() and items.bane_of(uid).is_empty() and int(items.felled_of(uid).get(kind, 0)) >= int(growth["bane_after"]):
+		items.set_bane(uid, kind, zone.name, entity.tile)
+		_log("growth: %s's %s is %s-bane" % [entity.name, items.id_of(uid), kind])
+		item_grew.emit(entity, uid, "bane", kind)
+	if not kind.is_empty() and str(items.grudge_of(uid).get("kind", "")) == kind \
+			and items.pay_grudge(uid, int(growth["grudge_paid"]), zone.name, entity.tile):
+		_log("growth: %s's %s has its vengeance on %s" % [entity.name, items.id_of(uid), _plural(kind)])
+		item_grew.emit(entity, uid, "avenged", kind)
 	_show_notes(entity)
+
+
+## Whether a thing in [param entity]'s hands is the bane of [param kind]
+## (decision 417): that kind dreads its bearer and notices it further
+## (Items.growth's bane_notice); enemy-ai reads it, as holder_dread.
+func holder_bane(entity: GridEntity, kind: String) -> bool:
+	return _in_hands_any(entity, func(uid: int) -> bool: return items.bane_of(uid) == kind)
+
+
+## Whether a thing in [param entity]'s hands holds a grudge against
+## [param kind] (decision 417): that kind seeks its bearer first (enemy-ai
+## reads it), and its blows stagger them.
+func holder_grudge(entity: GridEntity, kind: String) -> bool:
+	return _in_hands_any(entity, func(uid: int) -> bool: return str(items.grudge_of(uid).get("kind", "")) == kind)
+
+
+## Whether [param test] holds for a thing in [param entity]'s hands.
+func _in_hands_any(entity: GridEntity, test: Callable) -> bool:
+	if not is_instance_valid(entity) or not holds_in_hands(entity):
+		return false
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if slot < entity.slot_items.size() and entity.slot_items[slot] != 0 and test.call(entity.slot_items[slot]):
+			return true
+	return false
+
+
+## [param fallen] (a player or a companion) fell to [param by] (decision
+## 417): what it held in its hands takes a grudge against [param by]'s kind.
+func _take_grudges(fallen: GridEntity, by: GridEntity) -> void:
+	if not (fallen is Player or fallen is Companion) or not by is Monster or not holds_in_hands(fallen):
+		return
+	var kind := kind_of(by)
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		var uid := fallen.slot_items[slot] if slot < fallen.slot_items.size() else 0
+		if uid != 0 and items.grudge_of(uid).is_empty() and not kind.is_empty():
+			items.set_grudge(uid, kind, zone.name, fallen.tile)
+			_log("growth: %s's %s takes a grudge against %s" % [fallen.name, items.id_of(uid), _plural(kind)])
+			item_grew.emit(fallen, uid, "grudge", kind)
+	_show_notes(fallen)
 
 
 ## The strength (decision 365) of the thing in [param entity]'s slot
@@ -3481,6 +3542,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		noise(target.tile, roundi(loud), &"fight", source)
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
+	if target.hp == 0 and is_instance_valid(source):
+		_take_grudges(target, source)  # Decision 417.
 	if target.hp == 0 and spared.is_valid():
 		var by := str(spared.call(target, source, cause))
 		if by != "":
@@ -4054,6 +4117,8 @@ func _resolve_hits() -> void:
 				_credit(hit.source, Items.RIGHT_HAND, "felled" if not _alive(hit.target) else hit.deed)
 			if creature and not _alive(hit.target):
 				_felled_with(hit.source, Items.RIGHT_HAND, hit.target)
+			elif creature and holder_grudge(hit.source, kind_of(hit.target)):
+				_stun_for(hit.target, int(Items.growth()["grudge_stagger"]))  # A grudge's blow (decision 417).
 		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, hit.push_direction, hit.force, hit.push_direction != hit.direction)
 
