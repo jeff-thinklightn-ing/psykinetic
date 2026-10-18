@@ -448,6 +448,7 @@ const HUMANOID_MOVES := {
 		"sword": [["Sword_Attack", 0.38], ["Sword_Attack_Standing", 0.38]],
 		"giant_axe": [["Axe_Overhead", 0.42]],
 		"hammer": [["Axe_Overhead", 0.42]],
+		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
 		"dagger": [["Dagger_Stab", 0.17]],
 		"spear": [["Spear_Thrust", 0.29]],
 		"shield": [["Shield_Bash", 0.17]],
@@ -484,13 +485,27 @@ static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dict
 	}
 const HUMAN_SOCKETS := {"hand": 1.0, "hip": 0.17, "back": 0.13, "chest": 0.04}
 const GOBLIN_SOCKETS := {"hand": 0.69, "hip": 0.19, "back": 0.16, "chest": 0.02}
+## The Blood Rot's allies' (decision 478): their hands as long as a human's
+## times their people's (body_gen's PROPORTIONS and height), their bodies
+## broader or slighter.
+const ORC_SOCKETS := {"hand": 1.47, "hip": 0.24, "back": 0.19, "chest": 0.06}
+const KOBOLD_SOCKETS := {"hand": 0.92, "hip": 0.12, "back": 0.1, "chest": 0.03}
+## Their gaits' paces, by tools/gait_pace.gd (the kobold's short legs
+## scurry: it jogs at 1.8 tiles a second where a man jogs at 3.6).
+const ORC_GAITS: Array[Array] = [[CLIP_WALK, 1.05], ["Jog_Short", 4.10], ["Sprint_Short", 6.30]]
+const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.46], ["Jog_Short", 1.82], ["Sprint_Short", 2.75]]
+## The imp is the Blood Rot goblin; the brute an orc and the sneak a kobold,
+## allied peoples (decision 416), each body_gen's (decision 478) and drawn as a
+## person is ("parts", a PersonLook of its "people").
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
 		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
-	"brute": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
-	"sneak": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
+	"brute": {"scene": "res://art/models/characters/orc.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.95,
+		"faces": PI * 0.5, "by_mass": false, "gaits": ORC_GAITS, "backpedal": 5.26, "parts": true, "people": "orc",
+		"fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": ORC_SOCKETS},
+	"sneak": {"scene": "res://art/models/characters/kobold.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.0,
+		"faces": PI * 0.5, "by_mass": false, "gaits": KOBOLD_GAITS, "backpedal": 2.34, "parts": true, "people": "kobold",
+		"fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": KOBOLD_SOCKETS},
 }
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
@@ -6538,9 +6553,11 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 			if own != null and own.resource_name == ArtKit.PALETTE_NAME:
 				mesh.set_surface_override_material(surface, load(ArtKit.PALETTE))
 	if model.get("parts", false):
-		_dress(scene, puppet.get_meta("tint", Color.WHITE))
+		# A person's tunic in their colour; an ally's in its look's.
+		var tunic: Color = Color.WHITE if model.has("people") else puppet.get_meta("tint", Color.WHITE)
+		_dress(scene, tunic)
 		if puppet.has_meta("look"):
-			(puppet.get_meta("look") as PersonLook).apply(scene, puppet.get_meta("tint", Color.WHITE))
+			(puppet.get_meta("look") as PersonLook).apply(scene, tunic)
 	if model.has("tint"):
 		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
@@ -7089,13 +7106,19 @@ static func _hook(sig: Signal, callable: Callable) -> void:
 ## from npc's card, a companion's from hers, a player's as they chose it in
 ## the options panel's Character section, decision 439; as Main writes them),
 ## seeded by their name where it names no seed; a player's (and anyone's that
-## names none) body is their "body"; a player wears no headwear or apron.
+## names none) body is their "body"; a player wears no headwear or apron. A
+## monster of an allied people (MODELS' "people") is drawn as one of them
+## (decision 478).
 static func look_for(entity: GridEntity) -> PersonLook:
 	var look := str(entity.spawn_spec.get("look", ""))
 	if not look.begins_with("seed=") and not " seed=" in look:
 		look = ("seed=%d " % absi(hash(String(entity.name)))) + look
 	if entity is Player:
 		look += " headwear=none apron=no"
+	if entity is Monster:
+		var people := str(MODELS.get(str(entity.spawn_spec.get("kind", "")), {}).get("people", ""))
+		if people != "":
+			look += " people=" + people
 	return PersonLook.make(look, body_of(entity))
 
 

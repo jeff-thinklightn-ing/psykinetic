@@ -7,6 +7,10 @@ extends RefCounted
 ##   seed=48213 body=female build=heavy stature=tall age=old posture=stooped
 ##   hair=long hair_colour=grey beard=none headwear=hood apron=yes skin=3
 ##   shoulders=broad
+## and people=orc or people=kobold (decision 478): one of the Blood Rot's
+## allies (orc.glb, kobold.glb), drawn in its people's own skins (PEOPLE_SKINS,
+## the Blood Rot's greens), wearing only its people's parts (an orc its hair
+## or none, a kobold its miner's cap or none), in its people's posture.
 ## A word missing (or a value not known) is decided by the seed, the same on
 ## every client; a key not known is passed over, so words can be added later.
 ## The look gives the body (male or female), its shape keys' values, its
@@ -46,6 +50,16 @@ const BEARD_CHANCE := 0.5
 const HOOD_CHANCE := 0.1
 const HAT_CHANCE := 0.12
 const POSTURES := ["straight", "stooped", "slouching"]
+## An ally's skins (decision 478), tints of the Blood Rot's green, and hair.
+const PEOPLE_SKINS := {"orc": ["6f8a4a", "5f7a40", "7d9152", "56703c", "68804a"],
+	"kobold": ["7f8a52", "8a8a4a", "6e7d48", "93955a", "77854e"]}
+const PEOPLE_HAIR := "1f1a17"
+## An orc's hair: cropped, bound (a topknot) or none.
+const ORC_HAIR := ["cropped", "bound", "bald"]
+## How likely a kobold wears its miner's cap.
+const KOBOLD_CAP_CHANCE := 0.6
+## An ally's posture: an orc's slouch, a kobold's crouch.
+const PEOPLE_POSTURES := {"orc": "slouching", "kobold": "stooped"}
 ## How likely an old person with no posture named stoops.
 const OLD_STOOPED := 0.3
 
@@ -64,6 +78,8 @@ const PLAYER_CHOICES := {
 
 var seed := 0
 var body := &"male"
+## "human", "orc" or "kobold" (decision 478).
+var people := "human"
 var words := {}
 ## Shape key name -> value (0..1).
 var keys := {}
@@ -178,6 +194,34 @@ func _resolve(body_by_default: StringName) -> void:
 	var said_posture := str(words.get("posture", ""))
 	var stoop_roll := rng.randf()
 	posture = said_posture if said_posture in POSTURES else ("stooped" if age == "old" and stoop_roll < OLD_STOOPED else "straight")
+	var said_people := str(words.get("people", ""))
+	if said_people in PEOPLE_SKINS:
+		_ally(said_people, rng)
+
+
+## As one of [param said]'s people (decision 478), after the rest is drawn (so
+## a person's draws are the same with or without this): one body, its
+## people's skin and parts, its posture; no beard, no apron.
+func _ally(said: String, rng: RandomNumberGenerator) -> void:
+	people = said
+	body = &"male"
+	keys.erase("hips")
+	var skins: Array = PEOPLE_SKINS[people]
+	skin = rng.randi() % skins.size() + 1
+	colours["skin"] = Color(skins[skin - 1])
+	colours["hair"] = Color(PEOPLE_HAIR)
+	hair_colour = "black"
+	beard = "none"
+	parts.clear()
+	if people == "orc":
+		hair = ORC_HAIR[rng.randi() % ORC_HAIR.size()]
+		if HAIR_PARTS[hair] != "":
+			parts.append(HAIR_PARTS[hair])
+	else:
+		hair = "bald"
+		if rng.randf() < KOBOLD_CAP_CHANCE:
+			parts.append("Cap_Candle")
+	posture = str(words.get("posture", "")) if str(words.get("posture", "")) in POSTURES else PEOPLE_POSTURES[people]
 
 
 ## [param scene] (a body_gen body, as body_build made it) drawn as this look:

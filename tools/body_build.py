@@ -50,7 +50,7 @@ LEAN = {
 ## Flat colour regions, each its own material (the game tints "Tunic"), and which of
 ## them a face may be, by the bone that moves it most: the concept's colour picks
 ## among these, so a dark boot is never read as hair.
-REGIONS = ["Skin", "Hair", "Tunic", "Trousers", "Belt", "Boots", "Hat", "Apron"]
+REGIONS = ["Skin", "Hair", "Tunic", "Trousers", "Belt", "Boots", "Hat", "Apron", "Bone"]
 ALLOWED = [
 	(("Head", "neck_01"), ("Skin", "Hair")),
 	(("hand_", "thumb_", "index_", "middle_", "ring_", "pinky_"), ("Skin",)),  # Sleeves end at the wrist.
@@ -66,8 +66,9 @@ ALLOWED = [
 MATERIAL = "human"
 TINTED = ["Skin", "Hair", "Tunic", "Trousers"]
 ## The regions that go on the palette, and the palette rows each picks its swatch from
-## (5 cloth and leather, 6 metal).
-PALETTE_ROWS = {"Belt": (5,), "Boots": (5, 6), "Hat": (5,), "Apron": (5,)}
+## (5 cloth and leather, 6 metal, 7 the accents: an orc's tusks, a kobold's horns and claws,
+## decision 478).
+PALETTE_ROWS = {"Belt": (5,), "Boots": (5, 6), "Hat": (5,), "Apron": (5,), "Bone": (7,)}
 PALETTE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "art", "kit", "palette.png")
 ## The neck opening, where the chest may show skin: within this far of the centre line
 ## (metres) and above this far below the neck bone's head.
@@ -449,7 +450,7 @@ def dress(obj, region: list, refs: dict) -> None:
 ## A body built of named parts (tools/body_gen.py): each face's region is its
 ## material's name; the tinted parts' colours are the concept c4's (PART_COLOURS).
 PART_COLOURS = {"Skin": "c49075", "Hair": "564135", "Tunic": "838065", "Trousers": "533e2d", "Belt": "3d2a1f",
-	"Boots": "29231b", "Hat": "6e5a44", "Apron": "b8a888"}
+	"Boots": "29231b", "Hat": "6e5a44", "Apron": "b8a888", "Bone": "f4efe6"}
 
 
 def colour_parts(obj) -> None:

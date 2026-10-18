@@ -4,6 +4,14 @@
 # every UAL clip plays on it. No mesh from elsewhere: every vertex is placed here.
 #
 #   blender -b -P tools/body_gen.py -- <UAL1.glb> <out.glb> [--height M] [--sex male|female]
+#       [--people human|orc|kobold]
+#
+# --people (decision 478): a human (the default), or the Blood Rot's allies (decision 416),
+# the orc (the brute: big and heavy, bare-armed in a kilt, tusked) or the kobold (the sneak:
+# small and crouched, a digger: big clawed hands, a snouted head, a tail, a miner's cap). On
+# the same skeleton, its joints moved to the people's proportions (PROPORTIONS: an orc's
+# long arms and short neck, a kobold's short legs), so every UAL clip plays on them too; the
+# body is then scaled so its head's top is at the height.
 #
 # The UAL armature, scaled to the height, rigs it as built (bone heat; each leg's weights its
 # own below the crotch): no fitting is needed, the joints are the armature's.
@@ -33,9 +41,41 @@ UAL_HEIGHT = 1.829
 BUILD_HEIGHT = 1.75
 ## Each sex's height when --height isn't given.
 HEIGHTS = {"male": 1.75, "female": 1.66}
+## Each people's (decision 478), its head's top.
+PEOPLE_HEIGHTS = {"orc": 1.95, "kobold": 1.0}
 
 ## The body being built: "male" or "female" (set by main from --sex).
 SEX = "male"
+## Its people: "human", "orc" or "kobold" (set by main from --people).
+PEOPLE = "human"
+
+
+def per(human, orc=None, kobold=None):
+	"""[human] for a human, else the people's own (a human's where it gives none)."""
+	own = {"orc": orc, "kobold": kobold}.get(PEOPLE)
+	return human if own is None else own
+
+
+## The skeleton's segments scaled by people (decision 478), as the UAL stands at
+## BUILD_HEIGHT: each bone's offset from its parent by the parent's segment (legs: thigh and
+## calf; arms: upper and lower arm; shoulders: the clavicles' across; hips: the thighs'
+## across; spine; neck: to the head; hands: the fingers; feet: heel to toe). The feet are
+## then put back on the ground.
+PROPORTIONS = {
+	"orc": {"legs": 0.94, "arms": 1.12, "shoulders": 1.3, "hips": 1.18, "spine": 1.0, "neck": 0.55,
+		"hands": 1.25, "feet": 1.15},
+	"kobold": {"legs": 0.66, "arms": 1.0, "shoulders": 0.95, "hips": 0.9, "spine": 0.84, "neck": 0.8,
+		"hands": 1.4, "feet": 1.45},
+}
+## The torso's rings (torso_rings' ten) widened or narrowed by people: across, front to back.
+TORSO_WIDTH = {
+	"orc": [1.15, 1.15, 1.15, 1.2, 1.22, 1.3, 1.32, 1.34, 1.5, 1.5],
+	"kobold": [1.08, 1.04, 1.0, 0.9, 0.92, 0.98, 0.96, 0.95, 0.85, 0.85],
+}
+TORSO_DEPTH = {
+	"orc": [1.15, 1.15, 1.15, 1.2, 1.25, 1.3, 1.3, 1.3, 1.45, 1.45],
+	"kobold": [1.08, 1.04, 1.0, 0.95, 0.98, 1.0, 0.95, 0.92, 0.85, 0.85],
+}
 
 
 def female() -> bool:
@@ -113,6 +153,96 @@ def skeleton(ual: str, height: float) -> tuple:
 		out[b.name] = arm.matrix_world @ b.head_local
 		out[b.name + ".tail"] = arm.matrix_world @ b.tail_local
 	return arm, out
+
+
+def _segment(parent: str, child: str, P: dict) -> Vector:
+	"""The scale of [child]'s offset from [parent] (PROPORTIONS' [P])."""
+	f = lambda k: P.get(k, 1.0)
+	if child.startswith("thigh_"):
+		return Vector((f("hips"), 1.0, 1.0))
+	if parent == "root":
+		return Vector((1.0, 1.0, f("legs")))
+	if parent.startswith(("thigh_", "calf_")):
+		return Vector((1.0, 1.0, 1.0)) * f("legs")
+	if child.startswith("clavicle_"):
+		return Vector((f("shoulders"), 1.0, f("spine")))
+	if parent.startswith("clavicle_"):
+		return Vector((1.0, 1.0, 1.0)) * f("shoulders")
+	if parent.startswith(("upperarm_", "lowerarm_")):
+		return Vector((1.0, 1.0, 1.0)) * f("arms")
+	if parent.startswith(("hand_", "thumb_", "index_", "middle_", "ring_", "pinky_")):
+		return Vector((1.0, 1.0, 1.0)) * f("hands")
+	if parent.startswith(("foot_", "ball_")):
+		return Vector((1.0, 1.0, 1.0)) * f("feet")
+	if parent in ("pelvis", "spine_01", "spine_02", "spine_03"):
+		return Vector((1.0, 1.0, 1.0)) * f("spine")
+	if parent == "neck_01":
+		return Vector((1.0, 1.0, 1.0)) * f("neck")
+	return Vector((1.0, 1.0, 1.0))
+
+
+def proportion(arm) -> dict:
+	"""[arm]'s joints moved to the people's PROPORTIONS (none for a human), the feet back on
+	the ground; each bone's head (and tail) where it now stands, as skeleton gives them."""
+	P = PROPORTIONS.get(PEOPLE, {})
+	bpy.ops.object.select_all(action="DESELECT")
+	arm.select_set(True)
+	bpy.context.view_layer.objects.active = arm
+	bpy.ops.object.mode_set(mode="EDIT")
+	bones = arm.data.edit_bones
+	old = {b.name: (b.head.copy(), b.tail.copy()) for b in bones}
+	new = {}
+
+	def place(b):
+		if b.parent is None:
+			new[b.name] = old[b.name][0].copy()
+		else:
+			p = b.parent.name
+			d = old[b.name][0] - old[p][0]
+			new[b.name] = new[p] + d * _segment(p, b.name, P)
+		for c in b.children:
+			place(c)
+
+	for b in bones:
+		b.use_connect = False
+	for b in [b for b in bones if b.parent is None]:
+		place(b)
+	# The feet's lowest point (the toes' tails) where it was.
+	toes = [n for n in old if n.startswith("ball_leaf_")]
+	drop = 0.0
+	if toes:
+		was = min(old[n][1].z for n in toes)
+		now = min((new[n] + (old[n][1] - old[n][0]) * _segment(n, n, P)).z for n in toes)
+		drop = was - now
+	for b in bones:
+		first = b.children[0].name if b.children else b.name
+		tail = new[b.name] + (old[b.name][1] - old[b.name][0]) * _segment(b.name, first, P)
+		lift = Vector((0.0, 0.0, drop)) if b.parent is not None else Vector()
+		b.head = new[b.name] + lift
+		b.tail = tail + lift
+	bpy.ops.object.mode_set(mode="OBJECT")
+	out = {}
+	for b in arm.data.bones:
+		out[b.name] = arm.matrix_world @ b.head_local
+		out[b.name + ".tail"] = arm.matrix_world @ b.tail_local
+	return out
+
+
+def people_skeleton(ual: str, scale: float) -> tuple:
+	"""The UAL skeleton at BUILD_HEIGHT, PROPORTIONS' joints, then scaled by [scale] whole."""
+	arm, J = skeleton(ual, BUILD_HEIGHT)
+	J = proportion(arm)
+	if abs(scale - 1.0) > 1e-6:
+		arm.scale = arm.scale * scale
+		bpy.ops.object.select_all(action="DESELECT")
+		arm.select_set(True)
+		bpy.context.view_layer.objects.active = arm
+		bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+		J = {}
+		for b in arm.data.bones:
+			J[b.name] = arm.matrix_world @ b.head_local
+			J[b.name + ".tail"] = arm.matrix_world @ b.tail_local
+	return arm, J
 
 
 def skin(body, arm, J: dict) -> None:
@@ -266,7 +396,7 @@ TORSO_BONES = ["pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "clavicl
 
 def torso(J: dict) -> Part:
 	"""The body in its tunic: rings from the hem up to the base of the neck (torso_rings)."""
-	p = Part("Tunic", "Tunic")
+	p = Part("Tunic", per("Tunic", "Skin", "Tunic"))  # An orc's chest bare.
 	p.bones = TORSO_BONES
 	for r in torso_rings(J):
 		p.add(r)
@@ -312,7 +442,7 @@ def torso_rings(J: dict) -> list:
 	for k, (z, w, d, sq, bf, bb, dy) in enumerate(stations):
 		# MORPH: [0, 3) the hips and hem, [3, 5) the waist and belly, 5 the chest, [6, 8) the
 		# shoulders, [8, 10) the neck's base.
-		w, d = w * m("torso"), d * m("torso")
+		w, d = w * m("torso") * TORSO_WIDTH.get(PEOPLE, [1.0] * 10)[k], d * m("torso") * TORSO_DEPTH.get(PEOPLE, [1.0] * 10)[k]
 		if k < 3:
 			w *= m("hips")
 		elif k < 5:
@@ -333,7 +463,7 @@ def torso_rings(J: dict) -> list:
 def sleeve(J: dict, side: str) -> Part:
 	"""An arm in its sleeve, T-pose along X: from inside the shoulder to the wrist."""
 	sign = 1.0 if side == "l" else -1.0
-	p = Part("Sleeve_" + side, "Tunic")
+	p = Part("Sleeve_" + side, per("Tunic", "Skin", "Skin"))
 	p.bones = ["spine_03", "clavicle_" + side, "upperarm_" + side, "lowerarm_" + side, "hand_" + side]
 	sh, el, wr = J["upperarm_" + side], J["lowerarm_" + side], J["hand_" + side]
 	along = (wr - sh).normalized()
@@ -343,7 +473,7 @@ def sleeve(J: dict, side: str) -> Part:
 	p.pins = {0: "clavicle_" + side}
 	stations = [(inner, 0.068, 0.075), (sh + along * 0.03, 0.074, 0.074), (sh.lerp(el, 0.45), 0.058, 0.058),
 		(el, 0.048, 0.050), (el.lerp(wr, 0.5), 0.046, 0.044), (wr - along * 0.01, 0.040, 0.036)]
-	k = pick(1.0, 0.86) * m("arms")  # The woman's arms slighter.
+	k = pick(1.0, 0.86) * m("arms") * per(1.0, 1.45, 1.05)  # The woman's arms slighter, an orc's thick.
 	for c, rv, ru in stations:
 		# u forward, v up: the arm's front-to-back depth and its height.
 		p.add(ring(c, FRONT, Z, ru * k, rv * k, 8, 0.3))
@@ -369,20 +499,20 @@ def leg(J: dict, side: str) -> Part:
 	scale = pick([1.0] * 7, [1.04, 1.0, 0.95, 0.9, 0.9, 0.88, 0.88])
 	for k, (c, ru, rv, dx) in enumerate(stations):
 		back = {1: 0.018, 4: 0.012}.get(k, 0.0)  # The seat; the calf.
-		f = scale[k] * m("legs") * (m("thighs") if k < 2 else 1.0)
+		f = scale[k] * m("legs") * (m("thighs") if k < 2 else 1.0) * per(1.0, 1.35, 0.95)
 		p.add(ring(c + Vector((dx * out, 0, 0)), X, FRONT, ru * f, rv * f, 8, 0.25, (0.0, back)))
 	return p
 
 
 def boot(J: dict, side: str) -> Part:
 	"""A boot: a shaft from below the knee to the ankle, then the foot to the toe, flat soled."""
-	p = Part("Boot_" + side, "Boots")
+	p = Part("Boot_" + side, per("Boots", "Boots", "Skin"))
 	p.bones = ["calf_" + side, "foot_" + side, "ball_" + side]
 	knee, ankle, ball, toe = J["calf_" + side], J["foot_" + side], J["ball_" + side], J["ball_" + side + ".tail"]
 	top = knee.lerp(ankle, 0.30)
 	x = ankle.x
-	k = pick(1.0, 0.9)  # The woman's boots narrower (their length is her feet's, the skeleton's).
-	shaft = k * m("legs")  # The shaft round the leg, as thick as it is.
+	k = pick(1.0, 0.9) * per(1.0, 1.3, 1.15)  # The woman's boots narrower (their length is her feet's, the skeleton's).
+	shaft = k * m("legs") * per(1.0, 1.05, 0.85)  # The shaft round the leg, as thick as it is.
 	# The shaft: rings round the leg, a little wider than the trousers.
 	for c, r in [(top, 0.072), (top + Vector((0, 0, -0.02)), 0.070), (top.lerp(ankle, 0.5), 0.064),
 			(ankle + Vector((0, 0, 0.03)), 0.060)]:
@@ -401,10 +531,11 @@ def hand(J: dict, side: str) -> Part:
 	p = Part("Hand_" + side, "Skin")
 	p.bones = ["lowerarm_" + side, "hand_" + side, "middle_01_" + side, "middle_02_" + side]
 	wr = J["hand_" + side]
-	k = pick(1.0, 0.88) * m("hands")  # The woman's hands narrower and thinner.
+	k = pick(1.0, 0.88) * m("hands") * per(1.0, 1.3, 1.35)  # The woman's hands narrower and thinner.
+	reach = per(1.0, *PROPORTIONS_OF("hands"))  # As long as the skeleton's fingers.
 	for dx, w, h in [(-0.015, 0.036, 0.028), (0.02, 0.050, 0.027), (0.065, 0.053, 0.023), (0.105, 0.048, 0.018),
 			(0.135, 0.034, 0.013)]:
-		p.add(ring(wr + Vector((dx * sign, 0, -0.005)), FRONT, Z, w * k, h * k, 8, 0.6))
+		p.add(ring(wr + Vector((dx * reach * sign, 0, -0.005)), FRONT, Z, w * k, h * k, 8, 0.6))
 	return p
 
 
@@ -413,12 +544,13 @@ def thumb(J: dict, side: str) -> Part:
 	p = Part("Thumb_" + side, "Skin")
 	p.bones = ["hand_" + side, "thumb_01_" + side, "thumb_02_" + side]
 	wr = J["hand_" + side]
-	base = wr + Vector((0.025 * sign, -0.035, -0.005))
-	tip = base + Vector((0.035 * sign, -0.03, -0.004))
+	k = per(1.0, *PROPORTIONS_OF("hands"))
+	base = wr + Vector((0.025 * sign, -0.035, -0.005)) * k
+	tip = base + Vector((0.035 * sign, -0.03, -0.004)) * k
 	for t, r in [(0.0, 0.014), (0.5, 0.012), (1.0, 0.008)]:
 		c = base.lerp(tip, t)
 		along = (tip - base).normalized()
-		p.add(ring(c, Z, along.cross(Z).normalized(), r * m("hands"), r * m("hands"), 6))
+		p.add(ring(c, Z, along.cross(Z).normalized(), r * m("hands") * k, r * m("hands") * k, 6))
 	return p
 
 
@@ -426,7 +558,7 @@ def neck(J: dict) -> Part:
 	p = Part("Neck", "Skin")
 	p.bones = ["spine_03", "neck_01", "Head"]
 	n, h = J["neck_01"], J["Head"]
-	k = pick(1.0, 0.86) * m("neck")  # The woman's neck slimmer.
+	k = pick(1.0, 0.86) * m("neck") * per(1.0, 1.55, 0.8)  # The woman's neck slimmer, an orc's a bull's.
 	for c, r, fwd in [(n + Vector((0, 0, -0.01)), 0.066, 0.0), (n.lerp(h, 0.5), 0.060, 0.008),
 			(h + Vector((0, 0.005, 0.03)), 0.060, 0.014)]:
 		p.add(ring(c + Vector((0, 0.008, 0)) + FRONT * fwd, X, FRONT, r * k, r * 1.05 * k, 8))
@@ -467,8 +599,11 @@ def head_rings(J: dict) -> list:
 	]
 	# The woman's head a touch smaller, her chin and nose less forward.
 	kw, kd, kp = pick((1.0, 1.0, 1.0), (0.95, 0.97, 0.75))
+	# An orc's lower face broad (the jaw, the chin, the mouth) and its brow a ridge; a
+	# kobold's head narrow, its mouth and nose drawn out into a snout (SNOUT).
+	jaw_wide = per({}, {0.040: 1.28, 0.070: 1.18, 0.102: 1.08}, {0.010: 0.8, 0.040: 0.72, 0.070: 0.7, 0.102: 0.72})
 	for z, w, d, yc, push in stations:
-		w, d, push = w * kw, d * kd, push * kp
+		w, d, push = w * kw * jaw_wide.get(z, per(1.0, 1.04, 0.86)), d * kd, push * kp
 		pts = ring(base + Vector((0, yc, z)), X, FRONT, w, d, 12, 0.3, (0.0, 0.012 if 0.09 < z < 0.23 else 0.0))
 		# The face's middle point (straight ahead, index 3: +v, FRONT) pushed out: chin, nose
 		# line, brows; its neighbours (2, 4: the eyes' columns) in at the eyes' height (the
@@ -484,11 +619,30 @@ def head_rings(J: dict) -> list:
 			pts[4] = pts[4] + FRONT * 0.008
 		if abs(z - 0.040) < 0.01:
 			# A squarer jaw: its corners out (the man's); the woman's in, toward a narrower chin.
-			jaw = pick(0.006, -0.004)
+			jaw = per(pick(0.006, -0.004), 0.016, 0.0)
 			pts[1] = pts[1] + X * jaw
 			pts[5] = pts[5] - X * jaw
+		if PEOPLE == "orc" and abs(z - 0.158) < 0.01:
+			for i in (2, 3, 4):
+				pts[i] = pts[i] + FRONT * 0.022  # The brow's ridge.
+		if PEOPLE == "kobold":
+			out = SNOUT.get(z, 0.0)
+			pts[3] = pts[3] + FRONT * out
+			pts[2] = pts[2] + FRONT * out * 0.85
+			pts[4] = pts[4] + FRONT * out * 0.85
+			pts[1] = pts[1] + FRONT * out * 0.4
+			pts[5] = pts[5] + FRONT * out * 0.4
 		rings.append(pts)
 	return rings
+
+
+## A kobold's snout: how far its face's front comes forward, by head_rings' height.
+SNOUT = {0.010: 0.02, 0.040: 0.075, 0.070: 0.095, 0.102: 0.09, 0.132: 0.035, 0.158: 0.01}
+
+
+def PROPORTIONS_OF(key: str) -> tuple:
+	"""PROPORTIONS' [key] for the orc and the kobold, in per's order."""
+	return (PROPORTIONS["orc"].get(key, 1.0), PROPORTIONS["kobold"].get(key, 1.0))
 
 
 def box(name: str, region: str, centre: Vector, size: Vector, front_taper: float = 1.0, rigid: str = "") -> Part:
@@ -510,17 +664,109 @@ def face(J: dict) -> list:
 	kw, kd = pick((1.0, 1.0), (0.95, 0.97))
 	at = lambda x, y, z: base + Vector((x * kw, y * kd, z))
 	parts = []
+	if PEOPLE == "kobold":
+		return parts + kobold_face(J)
 	nose = Part("Nose", "Skin", rigid="Head")
-	top, tip = at(0, -0.100, 0.150), at(0, pick(-0.128, -0.124), 0.098)
-	for t, w in [(0.0, 0.010), (0.7, pick(0.016, 0.013)), (1.0, pick(0.012, 0.010))]:
+	top, tip = at(0, -0.100, 0.150), at(0, per(pick(-0.128, -0.124), -0.118), 0.098)
+	for t, w in [(0.0, 0.010), (0.7, per(pick(0.016, 0.013), 0.024)), (1.0, per(pick(0.012, 0.010), 0.02))]:
 		c = top.lerp(tip, t)
 		nose.add([c + Vector((-w, 0.012, 0)), c + Vector((0, -0.004, 0)), c + Vector((w, 0.012, 0))])
 	parts.append(nose)
 	for side in (1.0, -1.0):
 		parts.append(box("Brow", "Hair", at(0.030 * side, -0.100, 0.150), Vector((0.032, 0.012, pick(0.008, 0.005))), rigid="Head"))
 		parts.append(box("Eye", "Belt", at(0.030 * side, -0.090, 0.130), Vector((0.016, 0.006, 0.008)), rigid="Head"))
-		parts.append(box("Ear", "Skin", at(0.080 * side, 0.004, 0.120), Vector((0.012, 0.030, pick(0.045, 0.040))), 0.8, rigid="Head"))
+		if PEOPLE == "orc":
+			# Small ears swept back to a point; two tusks up from the lower jaw.
+			parts.append(box("Ear", "Skin", at(0.088 * side, 0.030, 0.128), Vector((0.012, 0.060, 0.026)), 0.45, rigid="Head"))
+			parts.append(spike("Tusk", "Bone", at(0.040 * side, -0.100, 0.046), at(0.047 * side, -0.112, 0.094), 0.010))
+		else:
+			parts.append(box("Ear", "Skin", at(0.080 * side, 0.004, 0.120), Vector((0.012, 0.030, pick(0.045, 0.040))), 0.8, rigid="Head"))
 	return parts
+
+
+def spike(name: str, region: str, base: Vector, tip: Vector, r: float, bone: str = "Head") -> Part:
+	"""A cone from [base] to [tip], [r] across at the base: a tusk, a horn, a claw."""
+	p = Part(name, region, rigid=bone)
+	along = (tip - base).normalized()
+	u = along.cross(Z if abs(along.z) < 0.9 else X).normalized()
+	v = along.cross(u).normalized()
+	for t, k in [(0.0, 1.0), (0.6, 0.6), (1.0, 0.12)]:
+		p.add(ring(base.lerp(tip, t), u, v, r * k, r * k, 5))
+	return p
+
+
+def kobold_face(J: dict) -> list:
+	"""A kobold's face on its snout (head_rings' SNOUT): nostrils at its end, eyes set to the
+	sides under a ridge, two horns swept back from the crown, no ears."""
+	base = J["Head"] + Vector((0, 0.0, -0.015))
+	at = lambda x, y, z: base + Vector((x, y, z)) * 1.0
+	parts = []
+	for side in (1.0, -1.0):
+		parts.append(box("Nostril", "Belt", at(0.018 * side, -0.188, 0.100), Vector((0.010, 0.006, 0.006)), rigid="Head"))
+		parts.append(box("Eye", "Belt", at(0.048 * side, -0.104, 0.136), Vector((0.016, 0.010, 0.010)), rigid="Head"))
+		parts.append(box("Brow", "Skin", at(0.050 * side, -0.104, 0.152), Vector((0.03, 0.02, 0.012)), 0.8, rigid="Head"))
+		parts.append(spike("Horn", "Bone", at(0.040 * side, 0.030, 0.205), at(0.060 * side, 0.140, 0.235), 0.016))
+	return parts
+
+
+def tail(J: dict) -> Part:
+	"""A kobold's tail: stiff, from under the back of its belt out and down behind it."""
+	p = Part("Tail", "Skin")
+	p.bones = ["pelvis", "spine_01"]
+	pv = J["pelvis"]
+	for c, r in [((0, 0.06, -0.01), 0.065), ((0, 0.20, -0.07), 0.052), ((0, 0.36, -0.15), 0.036),
+			((0, 0.50, -0.21), 0.020), ((0, 0.60, -0.23), 0.006)]:
+		p.add(ring(pv + Vector(c), X, Vector((0, 0.45, 1.0)).normalized(), r, r * 0.85, 8, 0.2))
+	return p
+
+
+def claws(J: dict, side: str) -> list:
+	"""A kobold's digging claws: three, past the ends of its mitten's fingers."""
+	sign = 1.0 if side == "l" else -1.0
+	wr = J["hand_" + side]
+	reach = per(1.0, *PROPORTIONS_OF("hands"))
+	out = []
+	for dy in (-0.028, 0.0, 0.028):
+		base = wr + Vector((0.128 * reach * sign, dy, -0.008))
+		out.append(spike("Claw", "Bone", base, base + Vector((0.07 * sign, 0.0, -0.035)), 0.016, "middle_02_" + side))
+	return out
+
+
+def kilt(J: dict) -> Part:
+	"""An orc's kilt: cloth from its belt down to the middle of its thighs, over the hips."""
+	p = Part("Kilt", "Tunic")
+	p.bones = ["pelvis", "spine_01", "thigh_l", "thigh_r"]
+	rings = torso_rings(J)
+	knee = J["calf_l"].z
+	low = J["pelvis"].z + (knee - J["pelvis"].z) * 0.5
+	hem = rings[0]
+	axis = Vector((0, 0, 0))
+	for z, flare in [(low, 1.42), ((low + hem[0].z) * 0.5, 1.3)]:
+		p.add([Vector((q.x * flare, q.y * flare, z)) for q in hem])
+	for r, k in [(rings[0], 1.2), (rings[1], 1.12), (rings[2], 1.06), (rings[3], 1.03)]:
+		p.add([Vector((q.x * k, q.y * k, q.z)) for q in r])
+	return p
+
+
+def harness(J: dict) -> list:
+	"""An orc's harness: a leather strap from its right hip up across its chest to its left
+	shoulder, and on across its back down to the hip again (the torso's rings, followed)."""
+	rings = torso_rings(J)
+	axis = Vector((0, 0, 0))
+
+	def at(r, f):
+		i = int(math.floor(f)) % len(r)
+		return r[i].lerp(r[(i + 1) % len(r)], f - math.floor(f))
+
+	out = []
+	for name, start, end in [("Harness_Front", 4.6, 1.5), ("Harness_Back", 7.4, 10.5)]:
+		p = Part(name, "Belt", follow=True)
+		for k in range(3, 8):
+			f = start + (end - start) * (k - 3) / 4.0
+			a, b = at(rings[k], f - 0.28), at(rings[k], f + 0.28)
+			p.add(slab([a, b], axis, 0.008, 0.002))
+		out.append(p)
+	return out
 
 
 def collar(J: dict) -> Part:
@@ -572,6 +818,7 @@ def belt(J: dict) -> Part:
 	z = J["spine_01"].z
 	w, d = pick((0.155, 0.105), (0.141, 0.096))  # Just over the tunic's waist (torso()'s s1 ring).
 	w, d = w * m("torso") * m("waist"), d * m("torso") * m("waist")
+	w, d = w * TORSO_WIDTH.get(PEOPLE, [1.0] * 10)[3] * per(1.0, 1.06, 1.0), d * TORSO_DEPTH.get(PEOPLE, [1.0] * 10)[3] * per(1.0, 1.06, 1.0)
 	for dz, dw in [(-0.022, 0.001), (0.022, -0.001)]:
 		p.add(ring(Vector((0, -0.005, z + dz)), X, FRONT, w + dw, d + dw, 12, 0.45, (0.01 + m("belly"), 0.0)))
 	return p
@@ -693,6 +940,19 @@ def apron(J: dict) -> list:
 	return [p]
 
 
+def miner_cap(J: dict) -> list:
+	"""A kobold's miner's cap: leather over the crown behind its horns, a candle stub on it."""
+	p = Part("Cap", "Hat", rigid="Head")
+	base = J["Head"] + Vector((0, 0.01, -0.015))
+	for z, w, d, yc in [(0.170, 0.078, 0.096, 0.004), (0.200, 0.084, 0.104, 0.006), (0.232, 0.072, 0.092, 0.010),
+			(0.258, 0.040, 0.054, 0.012)]:
+		p.add(ring(base + Vector((0, yc, z)), X, FRONT, w, d, 12, 0.3))
+	candle = Part("Candle", "Bone", rigid="Head")
+	for z, r in [(0.250, 0.016), (0.300, 0.016), (0.304, 0.008)]:
+		candle.add(ring(base + Vector((0, -0.01, z)), X, FRONT, r, r, 6))
+	return [p, candle]
+
+
 ## The parts a person may wear, by name: each its own mesh on the skeleton, shape-keyed
 ## as the body is, shown or not by the game. Bald is no hair part.
 WEARABLES = {
@@ -705,6 +965,13 @@ WEARABLES = {
 	"Hat_Brimmed": brimmed_hat,
 	"Apron": apron,
 }
+## An ally's own (decision 478): an orc may crop or bind its hair (a topknot); a kobold wears
+## its cap or goes bare-headed.
+PEOPLE_WEARABLES = {
+	"orc": ["Hair_Cropped", "Hair_Bound"],
+	"kobold": ["Cap_Candle"],
+}
+WEARABLES["Cap_Candle"] = miner_cap
 
 
 ## Each region's material, made once.
@@ -716,14 +983,19 @@ def assemble(J: dict, which: str = "Body"):
 	joined into one object named [which], a material a region. What moves with the head (the
 	Head bone, or as near) grows by MORPH's "head" about the Head bone."""
 	if which == "Body":
-		parts = [torso(J), belt(J), neck(J), head(J), collar(J)] + face(J)
+		parts = [torso(J), belt(J), neck(J), head(J)] + per([collar(J)], [], []) + face(J)
+		parts += per([], [kilt(J)] + harness(J), [tail(J)])
 		for side in ("l", "r"):
 			parts += [sleeve(J, side), leg(J, side), boot(J, side), hand(J, side), thumb(J, side)]
+			if PEOPLE == "kobold":
+				parts += claws(J, side)
 	else:
 		parts = WEARABLES[which](J)
+	# A kobold's head large for its body.
+	grow = m("head") * per(1.0, 1.0, 1.55)
 	for p in parts:
-		if (p.rigid == "Head" or "Head" in p.bones) and m("head") != 1.0:
-			p.rings = [[J["Head"] + (q - J["Head"]) * m("head") for q in r] for r in p.rings]
+		if (p.rigid == "Head" or "Head" in p.bones) and grow != 1.0:
+			p.rings = [[J["Head"] + (q - J["Head"]) * grow for q in r] for r in p.rings]
 	objects = [p.mesh(J) for p in parts]
 	for obj in objects:
 		region = obj["region"]
@@ -754,18 +1026,26 @@ def assemble(J: dict, which: str = "Body"):
 def main() -> None:
 	a = args()
 	if len(a) < 2:
-		raise SystemExit("usage: -- <UAL1.glb> <out.glb> [--height M] [--sex male|female]")
+		raise SystemExit("usage: -- <UAL1.glb> <out.glb> [--height M] [--sex male|female] [--people human|orc|kobold]")
 	ual, out = (os.path.abspath(p) for p in a[:2])
-	global SEX
+	global SEX, PEOPLE
 	SEX = a[a.index("--sex") + 1] if "--sex" in a else "male"
 	if SEX not in HEIGHTS:
 		raise SystemExit("--sex is male or female")
-	height = float(a[a.index("--height") + 1]) if "--height" in a else HEIGHTS[SEX]
+	PEOPLE = a[a.index("--people") + 1] if "--people" in a else "human"
+	if PEOPLE not in ("human", "orc", "kobold"):
+		raise SystemExit("--people is human, orc or kobold")
+	if PEOPLE != "human" and SEX != "male":
+		raise SystemExit("--sex is a human's (an orc's and a kobold's bodies are one)")
+	height = float(a[a.index("--height") + 1]) if "--height" in a else PEOPLE_HEIGHTS.get(PEOPLE, HEIGHTS[SEX])
 	bpy.ops.wm.read_factory_settings(use_empty=True)
-	arm, J = skeleton(ual, BUILD_HEIGHT)
+	if PEOPLE == "human":
+		arm, J = skeleton(ual, BUILD_HEIGHT)
+	else:
+		arm, J = people_skeleton(ual, 1.0)
 	global MORPH
 	objects = []
-	for which in ["Body"] + list(WEARABLES):
+	for which in ["Body"] + PEOPLE_WEARABLES.get(PEOPLE, [w for w in WEARABLES if w != "Cap_Candle"]):
 		obj = assemble(J, which)
 		# The shape keys: it built again by each KEYS' proportions.
 		obj.shape_key_add(name="Basis", from_mix=False)
@@ -783,7 +1063,19 @@ def main() -> None:
 			bpy.data.meshes.remove(mesh)
 		obj.name = which  # The key builds took the name for a moment.
 		objects.append(obj)
-	if abs(height - BUILD_HEIGHT) > 1e-4:
+	if PEOPLE != "human":
+		# Built at the UAL's BUILD_HEIGHT on the people's joints: scaled whole so the body's
+		# top (its head's, not a cap's or a horn's) is at the height, its skeleton with it.
+		from mathutils import Matrix
+		body = objects[0]
+		top = max(v.co.z for v in body.data.vertices)
+		s = height / top
+		for obj in objects:
+			obj.data.transform(Matrix.Scale(s, 4), shape_keys=True)
+		bpy.data.objects.remove(arm)
+		arm, J = people_skeleton(ual, s)
+		print("people %s: built %.3f m tall, scaled %.3f" % (PEOPLE, top, s))
+	elif abs(height - BUILD_HEIGHT) > 1e-4:
 		# Built at BUILD_HEIGHT: the meshes scaled to the height, onto the skeleton at it (the
 		# weights are by bone name, so they carry over).
 		from mathutils import Matrix

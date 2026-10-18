@@ -12164,3 +12164,59 @@ spawn-spec key the client reads: pc-character's side); no new class_name.
 
 Rejected: new art (he is the imp Jeff knows); an official's place (tolerated,
 not trusted); a house (a stall); keeping a respawn.
+
+## 478. The orc and the kobold: the Blood Rot's allies' own bodies
+
+Lore and Jeff (416, the primer): brutes are orcs, paid muscle, big and heavy,
+standing guard; sneaks are kobolds, who dig the Blood Rot's shafts, patrol
+and come from the side; the imp is the Blood Rot goblin. Both drew the
+goblin's mesh. The coordinator approved the design; Jeff's veto comes off
+the review sheet (C:\dev\review\orc_kobold\) or in game, as for art picks.
+
+- Built by tools/body_gen.py as the humans are (419), `--people orc|kobold`
+  (human the default, byte for byte as before), on the same UAL skeleton, so
+  every humanoid clip (the shared library, through art/models/bonemaps/ual.tres)
+  and HUMAN_SOCKETS' grips work on them: no new rig, no clips to author.
+- Proportions by moving the skeleton's joints (PROPORTIONS: legs, arms,
+  shoulders, hips, spine, neck, hands, feet, each bone's offset from its parent
+  scaled by its parent's segment, the feet put back on the ground), not only
+  by scaling: the clips are rotations and the hips' one position track is
+  retargeted by each body's own hip height, so they play on an orc's long arms
+  and short neck and a kobold's short legs (checked on the sheet; no fallback
+  to whole-body scaling was needed). Then the body is scaled whole so its top
+  is at its people's height: an orc 1.95 m, a kobold 1.0 m.
+- The orc: very broad chest and shoulders (TORSO_WIDTH and DEPTH), bare thick
+  arms, a bull's neck, big hands, a heavy brow ridge and broad jaw, two tusks,
+  small ears swept back, a leather harness strap across its chest and back
+  (harness), a kilt over trousers, wrapped feet; may crop or bind
+  its hair (Hair_Cropped, Hair_Bound). The kobold (reptilian-leaning,
+  unfussy: no fur, scales only in the faceting): small and crouched, a large
+  head drawn out into a snout with nostrils, eyes to the sides, two horns swept
+  back, no ears, long arms with big hands and three digging claws, long bare
+  feet, a stiff tail, a jerkin; may wear a miner's leather cap with a candle
+  stub (Cap_Candle). The tusks, horns, claws and candle are a new region,
+  "Bone", on the palette's accents row (body_build PALETTE_ROWS).
+- In game (Client3D.MODELS): the brute is orc.glb and the sneak kobold.glb,
+  drawn as people are ("parts"), each its own PersonLook with the word
+  people=orc or people=kobold (look_for adds it from the model's "people"):
+  one body, PEOPLE_SKINS (the Blood Rot's greens), only its people's parts
+  (an orc's hair or none, a kobold's cap at KOBOLD_CAP_CHANCE), its people's
+  posture (an orc slouching, a kobold stooped), shape keys and stature as a
+  person's; its kilt or jerkin in its look's colours, not its sprite's.
+  Sized by its look, not its mass (by_mass false). Gaits by tools/gait_pace.gd
+  (ORC_GAITS, KOBOLD_GAITS: a kobold scurries, its jog 1.8 m/s at speed 1),
+  their backpedals scaled from a man's; sockets ORC_SOCKETS, KOBOLD_SOCKETS.
+  Held things keep their one size (a kobold's bow is a longbow on it, as on a
+  goblin).
+- The rot's changes on the allies near the mine (lore's open question) are
+  left for a later variant. The kobold fights with items' dagger (the sneak's
+  backstab stays; its "wields" are enemy-ai's, levels/monsters.json); items' pick
+  (479, two-handed) is a chance drop from kobolds, and a digging kobold that wields it
+  comes with the mine (the coordinator with enemy-ai). HUMANOID_MOVES strikes a pick
+  with Axe_Overhead, as the hammer, checked on both bodies' arms.
+- Art-kit's slots creature.orc and creature.kobold (04d9a66) let ArtCheck
+  cover them.
+
+view_test _test_allies (each its people's skin, parts and posture, its clips
+playing and its hands; an orc about 1.95 m, a kobold about 1 m; two orcs
+differ); _test_goblins_differ's brute an orc, much bigger than an imp.

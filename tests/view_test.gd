@@ -62,6 +62,7 @@ func _ready() -> void:
 	_test_attach_points()
 	_test_bow()
 	_test_goblins_differ()
+	_test_allies()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
 	await _test_doors_swing()
@@ -2004,6 +2005,47 @@ func _test_fade() -> void:
 	await get_tree().create_timer(1.0).timeout
 
 
+func _test_allies() -> void:
+	print("
+== the Blood Rot's allies (decision 478): the brute an orc, the sneak a kobold, each its own ==")
+	var orcs: Array[Monster] = [_spawn_imp(Vector2i(9, 6), "brute"), _spawn_imp(Vector2i(10, 6), "brute")]
+	var kobold := _spawn_imp(Vector2i(11, 6), "sneak")
+	_rig._process(0.0)
+	for entity: Monster in orcs + [kobold]:
+		var puppet: Node3D = _rig._puppets[entity.get_instance_id()]
+		var people := str(Client3D.MODELS[str(entity.spawn_spec["kind"])]["people"])
+		var look := puppet.get_meta("look") as PersonLook
+		var scene := puppet.get_node("Body/Model") as Node3D
+		var shown := []
+		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+			if mesh.visible and mesh.get_parent() is Skeleton3D and mesh.name != "Body":
+				shown.append(String(mesh.name))
+		var allowed: Array = ["Hair_Cropped", "Hair_Bound"] if people == "orc" else ["Cap_Candle"]
+		_check(look.people == people and (PersonLook.PEOPLE_SKINS[people] as Array).has(look.colours["skin"].to_html(false))
+				and shown.all(func(part: String) -> bool: return part in allowed)
+				and look.posture == PersonLook.PEOPLE_POSTURES[people],
+				"a %s: %s's skin (%s), only its own parts (%s), %s" % [entity.spawn_spec["kind"], people, look.colours["skin"].to_html(false), shown, look.posture])
+		var rig := puppet.get_meta("rig") as AnimRig
+		var sockets: Dictionary = puppet.get_meta("sockets", {})
+		_check(rig.playing() == Client3D.CLIP_IDLE and sockets.has("hand_r") and sockets.has("hand_l"),
+				"its clips play on it (%s) and it has hands to hold things" % rig.playing())
+	var heights := []
+	for puppet: Node3D in [_rig._puppets[orcs[0].get_instance_id()], _rig._puppets[kobold.get_instance_id()]]:
+		var top := 0.0
+		for mesh: MeshInstance3D in (puppet.get_node("Body/Model") as Node3D).find_children("Body", "MeshInstance3D", true, false):
+			top = maxf(top, mesh.get_aabb().end.y * float(puppet.get_meta("model_scale")))
+		heights.append(snappedf(top, 0.01))
+	_check(absf(heights[0] - 1.95) < 0.15 and absf(heights[1] - 1.0) < 0.1,
+			"an orc stands about 1.95 m, a kobold about 1 m (%s)" % [heights])
+	var two := [(_rig._puppets[orcs[0].get_instance_id()].get_meta("look") as PersonLook),
+		(_rig._puppets[orcs[1].get_instance_id()].get_meta("look") as PersonLook)]
+	_check(two[0].keys != two[1].keys or two[0].colours != two[1].colours or two[0].parts != two[1].parts,
+			"two orcs differ")
+	for entity: Monster in orcs + [kobold]:
+		World.despawn(entity)
+	_rig._process(0.0)
+
+
 func _test_goblins_differ() -> void:
 	print("\n== no two goblins alike: size by mass, their own pace and tempo, out of step; they look about, and stand tired ==")
 	var imps: Array[Monster] = [_spawn_imp(Vector2i(9, 2), "imp"), _spawn_imp(Vector2i(10, 2), "imp")]
@@ -2013,13 +2055,16 @@ func _test_goblins_differ() -> void:
 	var a: Node3D = _rig._puppets[imps[0].get_instance_id()]
 	var b: Node3D = _rig._puppets[imps[1].get_instance_id()]
 	var big: Node3D = _rig._puppets[brute.get_instance_id()]
-	_check(big.has_meta("rig"), "a brute is the goblin too")
+	_check(big.has_meta("rig"), "a brute is modelled too")
 	var looks := func(puppet: Node3D) -> Array:
 		return [snappedf(puppet.get_meta("model_scale"), 0.001), snappedf(puppet.get_meta("pace"), 0.001), snappedf(puppet.get_meta("tempo"), 0.001)]
 	_check(looks.call(a) != looks.call(b), "two imps differ in size, pace or tempo (%s, %s)" % [looks.call(a), looks.call(b)])
 	_check(absf(float(a.get_meta("model_scale")) - 1.0) <= Client3D.MODEL_SCALE_SPREAD + 0.001,
 			"an imp is about the goblin's size (x%.2f)" % a.get_meta("model_scale"))
-	_check(float(big.get_meta("model_scale")) > 1.12, "and the brute, heavier, bigger (x%.2f)" % big.get_meta("model_scale"))
+	var tall := func(puppet: Node3D, model: Dictionary) -> float:
+		return float(model["height"]) * float(puppet.get_meta("model_scale"))
+	_check(tall.call(big, Client3D.MODELS["brute"]) > tall.call(a, Client3D.MODELS["imp"]) * 1.4,
+			"and the brute, an orc, much bigger (%.2f m, an imp %.2f m)" % [tall.call(big, Client3D.MODELS["brute"]), tall.call(a, Client3D.MODELS["imp"])])
 	var animators: Array[AnimRig] = [a.get_meta("rig"), b.get_meta("rig")]
 	_check(absf(animators[0].position() - animators[1].position()) > 0.01,
 			"standing side by side, out of step (%.2f s, %.2f s into Idle)" % [animators[0].position(), animators[1].position()])
