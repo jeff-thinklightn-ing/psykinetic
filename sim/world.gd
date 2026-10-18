@@ -475,6 +475,8 @@ var _bandaging: Dictionary[GridEntity, Dictionary] = {}
 ## looked at for fading.
 var _buffed: Dictionary[GridEntity, bool] = {}
 var _mending: Dictionary[GridEntity, Dictionary] = {}
+## The longest a thing's story line runs in its slot's note (story_line).
+const STORY_LONGEST := 80
 ## Whoever is winding up a blow (try_wind_up), for _tend_wind_ups.
 var _winders: Dictionary[GridEntity, bool] = {}
 
@@ -1963,10 +1965,11 @@ func _show_notes(entity: GridEntity) -> void:
 	for slot in mini(entity.slots.size(), entity.slot_items.size()):
 		if entity.slot_items[slot] != 0:
 			names[slot] = item_note(entity.slot_items[slot])
-			var kills := kills_line(entity.slot_items[slot])
-			if not kills.is_empty():
-				# The tally on a line of its own (decision 415), under the thing's name.
-				names[slot] = "%s\n%s" % [names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot]), kills]
+			# The tally (decision 415) and the story (decision 421), each on a
+			# line of its own under the thing's name, found by its first word.
+			for line in [kills_line(entity.slot_items[slot]), story_line(entity.slot_items[slot])]:
+				if not line.is_empty():
+					names[slot] = "%s\n%s" % [names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot]), line]
 			any = any or not names[slot].is_empty()
 	if not any:
 		names = PackedStringArray()
@@ -2005,6 +2008,44 @@ func kills_line(uid: int) -> String:
 		total += int(felled[kind])
 		parts.append("%d %s" % [felled[kind], kind if int(felled[kind]) == 1 else _plural(kind)])
 	return "felled %d: %s" % [total, ", ".join(parts)]
+
+
+## [param uid]'s story, as its slot's note shows it (decision 421, for
+## ui's tooltip): "story: carried by Wren for 3 days; named for Wren; kept
+## from Wren", from its history: its longest carrier (a day or more, in the
+## world clock's days), its naming or else how it came to be (made, hunted),
+## a keeping, its vengeances. Parts dropped from the end until it is at most
+## STORY_LONGEST; "" for nothing to tell.
+func story_line(uid: int) -> String:
+	var history := items.history(uid)
+	if history.is_empty():
+		return ""
+	var parts := PackedStringArray()
+	var rows: Array = history["carriers"].filter(func(row: Dictionary) -> bool: return not str(row.get("name", "")).is_empty())
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["held"]) > int(b["held"]))
+	var days := int(rows[0]["held"]) / maxi(DayNight.day_steps, 1) if not rows.is_empty() else 0
+	if days >= 1:
+		parts.append("carried by %s for %d day%s" % [rows[0]["name"], days, "" if days == 1 else "s"])
+	var name := items.name_of(uid)
+	if not name.is_empty():
+		parts.append("named for %s" % name["holder"])
+	else:
+		var origin := ""
+		for event: Dictionary in history["events"]:
+			if origin.is_empty() and event["kind"] == "made" and not str(event["what"]).is_empty():
+				origin = "made by %s" % event["what"]
+			elif origin.is_empty() and event["kind"] == "hunted":
+				origin = "from %s's hunt" % event["what"] if not str(event["what"]).is_empty() else "from a hunt"
+		if not origin.is_empty():
+			parts.append(origin)
+	if not items.kept_from(uid).is_empty() and not name.is_empty():
+		parts.append("kept from %s" % name["holder"])
+	for event: Dictionary in history["events"]:
+		if event["kind"] == "avenged":
+			parts.append("avenged on %s" % _plural(str(event["what"])))
+	while not parts.is_empty() and ("story: " + "; ".join(parts)).length() > STORY_LONGEST:
+		parts.remove_at(parts.size() - 1)
+	return "" if parts.is_empty() else "story: " + "; ".join(parts)
 
 
 ## The kind a body felled counts as (decision 415): a monster's or an

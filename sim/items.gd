@@ -265,7 +265,8 @@ static func read_growth(text: String) -> Dictionary:
 	return {"bane_after": maxi(int(given.get("bane_after", 25)), 1),
 		"bane_notice": maxf(float(given.get("bane_notice", 1.5)), 0.0),
 		"grudge_stagger": maxi(int(given.get("grudge_stagger", 4)), 0),
-		"grudge_paid": maxi(int(given.get("grudge_paid", 5)), 1)}
+		"grudge_paid": maxi(int(given.get("grudge_paid", 5)), 1),
+		"says": given["says"] if given.get("says") is Dictionary else {}}
 
 
 ## For tests: growth's values replaced by [param values] until reset.
@@ -421,8 +422,10 @@ static func verb_from(id: String, verb: Dictionary) -> Dictionary:
 		else:
 			push_warning("Items: %s's verb %s is %s; %s" % [id, key, given, defaults[key]])
 			out[key] = defaults[key]
+	if verb.get("says") is String:
+		out["says"] = verb["says"]  # What it does, in plain words, for the tooltip (decision 421).
 	for key: String in verb:
-		if key != "kind" and not defaults.has(key):
+		if key not in ["kind", "says"] and not defaults.has(key):
 			push_warning("Items: %s's verb has an unknown %s; left out" % [id, key])
 	return out
 

@@ -9268,3 +9268,27 @@ steps). Production does the work, agreed with items.
 Protocol unchanged: sim only. tests/larder_test (waits without leather, a
 mend, the same uid whole and banked, the materials used, none for a whole
 bundle, nothing left over in a save).
+## 421. A thing's story and the words for what it does, for ui's tooltip
+
+Ui's step 3 (the themed item tooltip, ItemTip; approved by the coordinator)
+asked for two things items owns.
+
+The story line: a slot's note (World._show_notes, slot_notes; 365, 375, 415,
+417) gains a line "story: ...", after the kills line, built on the server from
+the thing's history (World.story_line): its longest carrier, when held a day or
+more of the world clock ("carried by Wren for 3 days"); its naming ("named for
+Wren"), or else how it came to be ("made by Bram at the smithy", "from Osric's
+hunt"); a keeping ("kept from Wren"); each vengeance had ("avenged on wolves").
+Parts joined by "; " and dropped from the end until the line is at most
+STORY_LONGEST (80); no line when there is nothing to tell. The note's layout for
+ItemTip: the first line is the head (the title or catalog name, then its marks,
+comma separated: condition, bane, vengeance); each further line is found by its
+first word, "felled " (415) or "story: ". Display text in a value already
+replicated: the protocol is unchanged.
+
+The words: "says", plain words for what a thing does, as catalog data items owns:
+on each weapon's verb ("quick; twice the hurt from behind"; Items.verb_from keeps
+it), on each naming strength ("its blows make half the fight noise"; read_naming
+keeps a strength's row whole) and for bane and vengeance (growth's "says",
+Items.growth). The client reads them through Items.def(id)["verb"], Items.naming()
+and Items.growth(); without them a tooltip shows the verb's or strength's name.

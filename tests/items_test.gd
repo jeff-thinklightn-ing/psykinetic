@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_pickup()
 	_test_kills()
 	_test_bane()
+	_test_story()
 	_test_names()
 	_test_curse()
 	_test_arrows()
@@ -1169,6 +1170,33 @@ func _test_bane() -> void:
 	Items.reset()
 
 
+func _test_story() -> void:
+	print("\n== a thing's story and the words for what it does (decision 421, for ui's tooltip) ==")
+	var host := _player(Net.local_id)
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	_check(World.story_line(dagger).is_empty(), "just taken up: no story yet")
+	World.items._book[dagger]["carriers"][0]["held"] = DayNight.day_steps * 3
+	var carrier: String = World.items.history(dagger)["carriers"][0]["name"]
+	_check(World.story_line(dagger) == "story: carried by %s for 3 days" % carrier, "three days carried (%s)" % World.story_line(dagger))
+	World.items.set_name(dagger, {"form": "holder_possessive", "holder": "Wren", "who": "companion:test:Wren", "made_step": World.steps,
+		"text": "Wren's dagger"}, "quiet")
+	World._show_notes(host)
+	_check(World.story_line(dagger) == "story: carried by %s for 3 days; named for Wren" % carrier, "named (%s)" % World.story_line(dagger))
+	_check(host.slot_notes[Player.RIGHT_HAND].split("\n")[-1] == World.story_line(dagger), "the note's last line (%s)" % [host.slot_notes])
+	World.items.note(dagger, "avenged", "wolf")
+	World.items.note(dagger, "avenged", "goblin_archer_of_the_long_marsh")
+	_check(World.story_line(dagger).length() <= World.STORY_LONGEST and World.story_line(dagger).ends_with("avenged on wolves"),
+			"too long: cut from the end to %d (%s)" % [World.STORY_LONGEST, World.story_line(dagger)])
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_check(["hammer", "sword", "shield", "buckler", "giant_axe", "spear", "dagger", "bow"].all(
+			func(id: String) -> bool: return not str(Items.verb_of(id).get("says", "")).is_empty()), "every weapon says what it does")
+	_check(Items.verb_of("dagger")["says"] == "quick; twice the hurt from behind", "the dagger: %s" % Items.verb_of("dagger")["says"])
+	_check(Items.naming()["strengths"].values().all(func(row: Dictionary) -> bool: return not str(row.get("says", "")).is_empty()),
+			"every strength says what it means")
+	_check(not str(Items.growth()["says"].get("bane", "")).is_empty() and not str(Items.growth()["says"].get("vengeance", "")).is_empty(),
+			"and bane and vengeance")
+
+
 func _test_names() -> void:
 	print("\n== names from long-time holders and the strength they leave (decision 365) ==")
 	var book := ItemBook.new()
@@ -1229,7 +1257,8 @@ func _test_names() -> void:
 	_check(World.items.name_of(dagger).get("text") == named and World.items.strength_of(dagger) == "quiet"
 			and World.items.name_of(dagger).get("form") == "holder_possessive",
 			"the form counting, the next deed names it: %s, quiet from its stabs in the back" % World.items.name_of(dagger).get("text"))
-	_check(host.slot_notes.size() == Items.CARRIED and host.slot_notes[Player.RIGHT_HAND] == named + " (quiet)",
+	_check(host.slot_notes.size() == Items.CARRIED and host.slot_notes[Player.RIGHT_HAND].split("
+")[0] == named + " (quiet)",
 			"the hand shows it (%s)" % [host.slot_notes])
 	_check(World.items.history(dagger)["events"][-1]["kind"] == "named", "its history says when")
 	_check(is_equal_approx(float(Items.strength_value(World.slot_strength(host, Player.RIGHT_HAND), "noise", 1.0)), 0.5),
@@ -1313,7 +1342,8 @@ func _test_curse() -> void:
 	World.put_item(pet, pet, World.free_slot_for(pet, "dagger"), dagger)
 	var slot := pet.slot_items.find(dagger)
 	_check(World.items.kept_from(dagger) == namer, "taken up by another, not given: kept from its namer")
-	_check(slot >= 0 and pet.slot_notes.size() > slot and pet.slot_notes[slot].ends_with("(quiet, ill-starred)"), "and marked (%s)" % [pet.slot_notes])
+	_check(slot >= 0 and pet.slot_notes.size() > slot and pet.slot_notes[slot].split("
+")[0].ends_with("(quiet, ill-starred)"), "and marked (%s)" % [pet.slot_notes])
 	_check(World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "kept"), "its history says so")
 	var who := World._carrier_of(pet)[0]
 	_steps(50)
@@ -1331,7 +1361,8 @@ func _test_curse() -> void:
 	# Another taker: follows the thing.
 	var held := World.items.ill_of(dagger, namer)
 	World.try_transfer(pet, pet, pet.slot_items.find(dagger), host, Player.RIGHT_HAND)
-	_check(World.items.kept_from(dagger).is_empty() and host.slot_notes[Player.RIGHT_HAND].ends_with("(quiet)"),
+	_check(World.items.kept_from(dagger).is_empty() and host.slot_notes[Player.RIGHT_HAND].split("
+")[0].ends_with("(quiet)"),
 			"back in its namer's hands: lifted (%s)" % host.slot_notes[Player.RIGHT_HAND])
 	_check(World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "back") and is_equal_approx(held, 0.0), "noted; the namer never gathered ill")
 	_steps(20)
