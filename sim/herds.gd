@@ -33,6 +33,12 @@ extends RefCounted
 ## Ground counted for capacity: every sample-th cell each way, standing for
 ## sample x sample cells.
 const DEFAULT_SAMPLE := 4
+## Sampled cells weighed a tick while an area's ground is built again
+## (rules' "ground_per_tick"), and floor cells looked over a tick for the
+## samples on its first build: a big area's ground spread over ticks, not
+## one (perf's slow-tick line, decision 469).
+const DEFAULT_GROUND_PER_TICK := 300
+const FLOOR_PER_TICK := 5000
 
 var rules := {}
 ## Area name -> {floor: {cell: true}, outdoor: bool}, as WorldMap has them.
@@ -63,8 +69,14 @@ var _next := 1
 var _at := -1
 var _day := -1
 ## Area -> {cells: Array[Vector2i] (rich samples), weights: Array[float],
-## total: float (rich cells, weighted)}: the ground, again each day.
+## total: float (rich cells, weighted)}: the ground, built again each day
+## over ticks (_build_grounds), the last one kept till the new is done.
 var _ground: Dictionary = {}
+## Area -> its sampled floor cells, sorted (the floor never changes).
+var _samples: Dictionary = {}
+## Area -> the ground being built: {keys (the floor's, while sampling),
+## key_at, at (the next sample to weigh), out}.
+var _building: Dictionary = {}
 ## Area -> what camps and hunters may still take from it today (take_share
 ## of its spare at the day's start).
 var _budget: Dictionary = {}
@@ -153,24 +165,88 @@ func rich(area: String, cell: Vector2i) -> float:
 	return 1.0
 
 
+## [param area]'s ground: the last one built, else (asked before the tick
+## built any: a test, a tool) built now, all at once.
 func _ground_of(area: String) -> Dictionary:
 	if _ground.has(area):
 		return _ground[area]
+	_building.erase(area)
+	while not _build_ground(area, 1 << 30):
+		pass
+	return _ground[area]
+
+
+## Starts [param area]'s ground again, the one it has kept meanwhile.
+func _rebuild(area: String) -> void:
+	_building[area] = {"keys": [], "key_at": 0, "at": 0,
+		"out": {"cells": [] as Array[Vector2i], "weights": [] as Array[float], "total": 0.0}}
+
+
+## Builds [param area]'s ground by up to [param budget] samples weighed
+## (and FLOOR_PER_TICK x budget / the default floor cells looked over for
+## its samples, once); true when it is done and in _ground.
+func _build_ground(area: String, budget: int) -> bool:
+	if not _building.has(area):
+		_rebuild(area)
+	var build: Dictionary = _building[area]
 	var sample := maxi(int(rules.get("sample", DEFAULT_SAMPLE)), 1)
-	var out := {"cells": [] as Array[Vector2i], "weights": [] as Array[float], "total": 0.0}
-	var floor_cells: Dictionary = areas.get(area, {}).get("floor", {})
-	var cells: Array = floor_cells.keys()
-	cells.sort()  # In no set order otherwise: the draws must be.
-	for cell: Vector2i in cells:
-		if cell.x % sample != 0 or cell.y % sample != 0:
-			continue
+	if not _samples.has(area):
+		if build["keys"].is_empty() and int(build["key_at"]) == 0:
+			build["keys"] = areas.get(area, {}).get("floor", {}).keys()
+			build["found"] = [] as Array[Vector2i]
+		var keys: Array = build["keys"]
+		var from := int(build["key_at"])
+		var to := mini(keys.size(), from + maxi(FLOOR_PER_TICK * budget / DEFAULT_GROUND_PER_TICK, 1))
+		for index in range(from, to):
+			var cell: Vector2i = keys[index]
+			if cell.x % sample == 0 and cell.y % sample == 0:
+				build["found"].append(cell)
+		build["key_at"] = to
+		if to < keys.size():
+			return false
+		var found: Array[Vector2i] = build["found"]
+		found.sort()  # In no set order otherwise: the draws must be.
+		_samples[area] = found
+		build.erase("keys")
+		build.erase("found")
+		return false
+	var cells: Array[Vector2i] = _samples[area]
+	var out: Dictionary = build["out"]
+	var at := int(build["at"])
+	var stop := mini(cells.size(), at + budget)
+	for index in range(at, stop):
+		var cell := cells[index]
 		var weight := rich(area, cell)
 		if weight > 0.0:
 			out["cells"].append(cell)
 			out["weights"].append(weight)
 			out["total"] += weight * sample * sample
+	build["at"] = stop
+	if stop < cells.size():
+		return false
 	_ground[area] = out
-	return out
+	_building.erase(area)
+	return true
+
+
+## Each area's ground built on by this tick's share, areas in order: a
+## floor still to sample takes the tick; an area is seeded when its first
+## ground is done.
+func _build_grounds() -> void:
+	var left := maxi(int(rules.get("ground_per_tick", DEFAULT_GROUND_PER_TICK)), 1)
+	var building: Array = _building.keys()
+	building.sort()
+	for area: String in building:
+		var sampled := _samples.has(area)
+		var from := int(_building[area]["at"])
+		if _build_ground(area, left) and not _seeded.has(area):
+			_seed(area)
+		if not sampled:
+			return
+		var weighed_to := int(_building[area]["at"]) if _building.has(area) else int(_samples[area].size())
+		left -= maxi(weighed_to - from, 1)
+		if left <= 0:
+			return
 
 
 # --- The world tick -------------------------------------------------------------
@@ -185,17 +261,18 @@ func tick() -> void:
 	var day := steps / day_steps
 	if day != _day:
 		_day = day
-		_ground.clear()  # Holdings move: the ground again, once a day.
 		for area: String in areas:
-			if not _seeded.has(area):
-				_seed(area)
+			_rebuild(area)  # Holdings move: the ground again, once a day.
 		_daily(day)
 		_new_budgets()
+	_build_grounds()
 	if since <= 0:
 		return
 	var days := minf(float(since) / day_steps, 1.0)
 	var all_species: Dictionary = rules.get("species", {})
 	for area: String in _areas_with_groups():
+		if not _ground.has(area):
+			continue  # Not weighed yet: capacity 0 would shrink them (perf).
 		for species: String in all_species:
 			_breed(area, species, days)
 		for species: String in all_species:

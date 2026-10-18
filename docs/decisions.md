@@ -8501,6 +8501,21 @@ area ("herds") into Herds.areas_of, so seeding and breeding both follow.
 Its first user is maps' forest zone (464). Raise the prey with the wolves:
 at the old rates wolves ate the rabbits out.
 
+Amended (perf's slow-tick line, decision 469: a herds tick of 60 ms on the
+box's world, 2026-10-18): an area's ground is no longer built again all at
+once on the day's first tick. Each day every area's ground is started
+again and built over the ticks (Herds._build_grounds: rules'
+ground_per_tick, 300 sampled cells weighed a tick; an area's floor sampled
+once, FLOOR_PER_TICK cells a tick, then kept), the last ground kept for
+capacity until the new one is done; at start the same, an area seeded when
+its first ground is done. An area with no ground yet neither breeds nor
+hunts (perf: capacity 0 would shrink its herds, not hold them). A direct
+capacity() call before any ground (a test, a tool) builds it then, all at
+once. Timed here on the real levels (5 areas, 57968 floor cells): the old
+day tick's ground 16.6 to 19.1 ms; spread, the worst tick of a later day
+1.7 ms. A fresh world's first day still has one tick of about 17 ms, the
+seeding itself, once (saved worlds are not seeded again). herds_test.
+
 ## 385. Anti-aliasing: SMAA by default, chosen in the Options panel
 
 Jeff found the new human bodies in game looking like a hundred polygons.

@@ -52,13 +52,47 @@ func _ready() -> void:
 	_test_records()
 	_test_taken()
 	_test_multiplier()
+	_test_spread()
 	for body in _bodies:
 		body.free()
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
+## The ground built over ticks (perf's slow-tick line, decision 469): a
+## big area's not in one tick; herds loaded before it neither breed nor
+## shrink; the day's new ground built while the last one is kept.
+func _test_spread() -> void:
+	print("
+== the ground built over ticks ==")
+	_now = 0
+	var herds := _herds()
+	var ticks := 0
+	while ticks < 1000 and (ticks == 0 or not herds._building.is_empty()):
+		herds.tick()
+		ticks += 1
+	_check(ticks > 3 and herds.groups_in("meadow").size() > 0, "%d ticks to weigh and seed the areas" % ticks)
+	var loaded := _herds(_rules, JSON.parse_string(JSON.stringify(herds.to_dict())))
+	var before := _sum(loaded, "meadow")
+	_now = 3000
+	loaded.tick()
+	_now = 6000
+	loaded.tick()
+	_check(not loaded._ground.has("meadow") and is_equal_approx(_sum(loaded, "meadow"), before), "loaded herds hold till their ground is weighed (%.1f, %.1f)" % [_sum(loaded, "meadow"), before])
+	_now = DAY
+	herds.tick()
+	_check(herds._building.has("meadow") and herds._ground.has("meadow") and herds.capacity("meadow", "deer") > 0.0, "a new day's ground built beside the last")
+
+
 func _herds(rules := _rules, saved := {}) -> Herds:
 	return Herds.new(saved, _areas, rules, func() -> int: return _now)
+
+
+## A tick of [param herds], its ground then finished at the same step (no
+## time passes, so nothing breeds): the ground spread over ticks (469).
+func _tick(herds: Herds) -> void:
+	herds.tick()
+	while not herds._building.is_empty():
+		herds.tick()
 
 
 func _sum(herds: Herds, area: String) -> float:
@@ -72,7 +106,7 @@ func _test_seed() -> void:
 	print("\n== seeding: half of what the ground keeps, outdoors only ==")
 	_now = 0
 	var herds := _herds()
-	herds.tick()
+	_tick(herds)
 	var good := true
 	for species: String in _rules["species"]:
 		var cap := herds.capacity("meadow", species)
@@ -87,7 +121,7 @@ func _test_seed() -> void:
 	_check(herds.groups_in("cave").is_empty() and herds.capacity("cave", "deer") == 0.0, "an indoor area keeps no game")
 	var count := herds.groups_in("meadow").size()
 	_now = DAY
-	herds.tick()
+	_tick(herds)
 	_check(_sum(herds, "meadow") > 0.0 and herds.groups_in("meadow").size() >= count - 2, "seeded once: a new day does not seed again")
 	var again := _herds_at_zero()
 	_check(JSON.stringify(again.to_dict()) == JSON.stringify(_herds_at_zero().to_dict()), "the same ground seeds the same herds")
@@ -96,7 +130,7 @@ func _test_seed() -> void:
 func _herds_at_zero() -> Herds:
 	_now = 0
 	var herds := _herds()
-	herds.tick()
+	_tick(herds)
 	return herds
 
 
@@ -107,14 +141,14 @@ func _test_breed() -> void:
 	var tame := _herds(calm)
 	var wild := _herds()
 	_now = 0
-	tame.tick()
-	wild.tick()
+	_tick(tame)
+	_tick(wild)
 	var over := false
 	for day in 120:
 		for step in DAY / World.WORLD_TICK_STEPS:
 			_now += World.WORLD_TICK_STEPS
-			tame.tick()
-			wild.tick()
+			_tick(tame)
+			_tick(wild)
 		for species: String in _rules["species"]:
 			over = over or tame.total("meadow", species) > tame.capacity("meadow", species) + 0.01
 		if day % 30 == 29:
@@ -136,7 +170,7 @@ func _test_daily() -> void:
 	for each in herds.groups_in("meadow"):
 		before[each["id"]] = each["home"]
 	_now = DAY
-	herds.tick()
+	_tick(herds)
 	var moved := 0
 	var within := true
 	for id: String in before:
@@ -154,7 +188,7 @@ func _test_daily() -> void:
 	var groups := herds.groups_in("meadow", "deer").size()
 	var all := herds.total("meadow", "deer")
 	_now = 2 * DAY
-	herds.tick()
+	_tick(herds)
 	_check(herds.groups_in("meadow", "deer").size() == groups + 1 and absf(float(deer["count"]) - 10.0) < 0.5,
 		"a group of 20 deer splits in two")
 	_check(absf(herds.total("meadow", "deer") - all) < 1.0, "splitting loses none")
@@ -164,14 +198,14 @@ func _test_saved() -> void:
 	print("\n== saved and loaded ==")
 	var herds := _herds_at_zero()
 	_now = DAY + 300
-	herds.tick()
+	_tick(herds)
 	var saved: Dictionary = JSON.parse_string(JSON.stringify(herds.to_dict()))
 	var loaded := _herds(_rules, saved)
 	_check(JSON.stringify(loaded.to_dict()) == JSON.stringify(herds.to_dict()), "the herds as they were")
 	var group: Dictionary = loaded.groups_in("meadow")[0]
 	_check(group["home"] is Vector2i and group["count"] is float, "a group's home a cell again, its count a number")
 	_now += 300
-	loaded.tick()
+	_tick(loaded)
 	_check(loaded.groups_in("meadow").size() == herds.groups_in("meadow").size(), "a loaded world is not seeded again")
 	var none := _herds(_rules, {})
 	_check(none.groups_in("meadow").is_empty(), "a snapshot from before the herds has none till the tick seeds them")
@@ -190,7 +224,7 @@ func _test_taken() -> void:
 	var least := float(_rules["species"]["deer"]["size"][0])
 	_check(is_equal_approx(herds.spare(deer), 10.0 - least) and herds.spare(near) == 0.0,
 		"a group spares what it has above its reserve (%.1f); one with bodies out nothing" % herds.spare(deer))
-	herds.tick()
+	_tick(herds)
 	var budget := (20.0 - 2.0 * least) * float(_rules["take_share"])
 	_check(is_equal_approx(float(herds._budget["meadow"]), budget),
 		"the day's budget: take_share of the spare (%.2f)" % float(herds._budget["meadow"]))
@@ -206,7 +240,7 @@ func _test_taken() -> void:
 	deer["count"] = least
 	other["count"] = least
 	_now = DAY
-	herds.tick()
+	_tick(herds)
 	_check(herds.hunt_one("meadow", Vector2i(0, 0)) == "", "nothing above the reserves: no game")
 
 	print("  a camp eats by its size")
@@ -218,10 +252,10 @@ func _test_taken() -> void:
 		others.append(fed._add_group("meadow", "deer", Vector2i(36 + 6 * i, 30), 10.0))
 	fed.camps = func() -> Array: return [{"id": "meadow/camp", "area": "meadow", "cell": Vector2i(30, 32), "size": 1.0, "faction": "goblins"}]
 	_check(fed.camp_fed("meadow/camp") == 1.0, "before a day has passed it reads fed")
-	fed.tick()
+	_tick(fed)
 	for step in DAY / World.WORLD_TICK_STEPS:
 		_now += World.WORLD_TICK_STEPS
-		fed.tick()
+		_tick(fed)
 	var eaten: float = 40.0 - float(herd["count"]) - others.reduce(func(sum: float, each: Dictionary) -> float: return sum + float(each["count"]), 0.0)
 	_check(eaten > 0.0 and fed.camp_fed("meadow/camp") > 0.9, "the camp ate its fill of a big herd (%.1f, fed %.2f)" % [eaten, fed.camp_fed("meadow/camp")])
 	herd["count"] = least + 0.2
@@ -230,9 +264,9 @@ func _test_taken() -> void:
 	fed._budget["meadow"] = 0.0  # Today's budget spent: what is left to take is what breeds.
 	for step in DAY / World.WORLD_TICK_STEPS:
 		_now += World.WORLD_TICK_STEPS
-		fed.tick()
+		_tick(fed)
 	_now += World.WORLD_TICK_STEPS
-	fed.tick()
+	_tick(fed)
 	_check(fed.camp_fed("meadow/camp") < 0.9 and float(herd["count"]) >= least - 0.01,
 		"a herd at its reserve: the camp goes short, eating only what breeds (fed %.2f), the herd kept (%.2f)" % [fed.camp_fed("meadow/camp"), herd["count"]])
 	var again := _herds(_rules, JSON.parse_string(JSON.stringify(fed.to_dict())))
@@ -261,8 +295,8 @@ func _test_multiplier() -> void:
 	_check(is_equal_approx(rich.capacity("meadow", "wolf"), plain.capacity("meadow", "wolf") * 10.0), "\"wolf\": 4 on top: ten times the wolves")
 	_check(is_equal_approx(rich.capacity("fields", "deer"), plain.capacity("fields", "deer")), "another level as it was")
 	_now = 0
-	rich.tick()
-	plain.tick()
+	_tick(rich)
+	_tick(plain)
 	_check(rich.total("meadow", "wolf") > plain.total("meadow", "wolf") * 5.0, "seeded by it (%.0f wolves, %.0f)" % [rich.total("meadow", "wolf"), plain.total("meadow", "wolf")])
 	var empty: Array[String] = []
 	_check(Herds.areas_of(WorldMap.build(empty)).is_empty(), "(areas_of with no levels)")
