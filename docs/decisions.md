@@ -8544,6 +8544,15 @@ whatever it left running in its job object is stopped and logged ("left"):
 a killed landing's net_test and state_test ran on for an hour outside the
 gate. A wait prints its reason, its place in the queue and what the head
 waits on each minute, and goes in the log (and `summary`) at 5 minutes.
+Amended a third time (2026-10-17 evening, the coordinator): a bench and a
+suite never run together (a kind's "excludes", in kinds.json): one build
+benched 20 to 42 ms a frame by whether a suite ran beside it, so a bench's
+numbers beside a suite are not the build's. And a job may go past those
+queued before it that wait only on their own kind (a suite behind the
+running suite, a bench behind it: may_pass) when it is of another kind
+neither excludes: a suite at the head waiting for a suite held a release's
+client export and four imports for ten minutes with room for them all. A
+wait for memory or for the running count stays first come first served.
 
 
 ## 395. UI sounds

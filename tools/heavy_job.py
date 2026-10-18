@@ -14,10 +14,15 @@ art-gen, which lets it start only when there is room:
   * fewer than MAX_RUNNING heavy jobs running, never two GPU jobs, and no
     more of a kind than its max_running (suite 1: a suite runs its scenes
     in parallel and fills the CPU, and two together took ten times as long
-    each; bench 1, as the bench lock).
+    each; bench 1, as the bench lock);
+  * none of the kinds it excludes running: a bench and a suite never run
+    together (a bench's timings beside a suite are the suite's, not the
+    build's: one build measured 20 to 42 ms a frame by what ran beside it).
 
 Otherwise it waits in a queue, first come first served: only the job at
-its head may start, so a big job is not starved by small ones. A job run
+its head may start, so a big job is not starved by small ones; except that
+a job may go past those before it that wait only on their own kind (a
+suite behind a suite: may_pass), when it is of another kind. A job run
 through `run` is watched: if free RAM falls under the margin while it runs
 and it is the newest job running, its own wrapper stops its own child (no
 one else's process: never kill by name, never another session's) and puts
@@ -77,8 +82,8 @@ LOCK_STALE_SECONDS = 30
 KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
-    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1},  # tests/land.sh: 6.3 GB measured
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1},
+    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"]},  # tests/land.sh: 6.3 GB measured
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite"]},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False},
 }
@@ -102,6 +107,9 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
         return False, "behind others in the queue"
     if len(running) >= MAX_RUNNING:
         return False, "%d heavy jobs running" % len(running)
+    for each in running:
+        if each.get("kind") in job.get("excludes", []):
+            return False, "a %s running (never beside a %s)" % (each.get("kind"), job.get("kind"))
     cap = job.get("max_running")
     if cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")) >= cap:
         return False, "%d %s running, at most %d at once" % (cap, job.get("kind"), cap)
@@ -117,6 +125,29 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
         return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
     return True, ""
+
+
+def kind_blocked(job, running):
+    """Whether [job] waits only on its own kind: one it excludes running, or
+    as many of its kind as its max_running."""
+    if any(each.get("kind") in job.get("excludes", []) for each in running):
+        return True
+    cap = job.get("max_running")
+    return cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")) >= cap
+
+
+def may_pass(job, ahead, running):
+    """Whether [job] may start though [ahead] (the rows queued before it)
+    came first: none, or each waits only on its own kind (kind_blocked: a
+    suite behind a suite, a bench beside one) and [job] is of another kind
+    that neither excludes. A wait for memory, or for the running count, is
+    first come first served for everyone: a big job is not starved."""
+    for other in ahead:
+        if not kind_blocked(other, running):
+            return False
+        if other.get("kind") == job.get("kind") or other.get("kind") in job.get("excludes", [])                 or job.get("kind") in other.get("excludes", []):
+            return False
+    return True
 
 
 def should_stop(me, running, free_ram_gb):
@@ -401,11 +432,15 @@ def wait_turn(tree, kind, pid, watched):
                 print("heavy_job: %s %s: its place in the queue was dropped (pid %s is no live process); not waiting" % (
                     tree, kind, pid), file=sys.stderr)
                 raise SystemExit(3)
-            head = queue[0]["file"] == ticket
+            place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
+            ahead = [dict(kinds().get(each["kind"], row), kind=each["kind"]) for each in queue[:place - 1]]
+            # First in the queue, or every job before it waits on its own
+            # kind alone (may_pass): an import is not held behind a suite
+            # waiting for a suite.
+            head = may_pass(row, ahead, running)
             free_ram, free_commit = _memory()
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
-            place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
-            if not head and queue:
+            if not head and queue and queue[0]["file"] != ticket:
                 first = queue[0]
                 first_row = dict(kinds().get(first["kind"], row), kind=first["kind"])
                 first_gpu = gpu_gb()[0] if first_row["gpu"] else None
