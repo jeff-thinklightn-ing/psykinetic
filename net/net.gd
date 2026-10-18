@@ -103,7 +103,8 @@ extends Node
 ##                                tip (a sample named dagger's tip over the pack: nothing in play is named yet),
 ##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it),
 ##                                converse (the conversation panel on the nearest town's person, sample offers),
-##                                credits (the Options with its Credits list open), counter (the counter screen, sample work)
+##                                credits (the Options with its Credits list open), counter (the counter screen, sample work),
+##                                world (the world map)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is

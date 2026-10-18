@@ -10863,3 +10863,38 @@ touched; protocol unchanged.
 Rejected: a fence edge kind in Terrain (every edge reader and the map
 format would learn it, for what one list does); fence art as map walls in
 a "fence" wall_set (the slot carries it whole, gap and all).
+
+## 445. The world map: areas, ways, places, the party
+
+Roadmap `ui`, step 5 (the coordinator approved it as written; maps' world
+graph 194 to 206, its minimap 321, lore's factions). The player had the
+zone's map alone; nothing showed the world's areas, the ways between them,
+or where the party was.
+
+- `WorldMapPanel` (render/world_map_panel.gd, new class_name): M after the
+  zone's big map (Main.press_m: M the zone, M again the world in its place,
+  M again closed; Esc closes either). Built on the client the first time it
+  opens from WorldMap.build (the levels the client ships): every area a box
+  in the serif with its display name and its places listed; the ways as
+  lines (an edge way solid, a point link lighter with its far end marked);
+  the player's own area edged in brass with the place they stand in marked
+  ("> The well"); the party named on their areas in the friend colour; a
+  faction's holding colouring a place's line with the faction's name beside
+  it, the name and colour from levels/factions.json. The wheel zooms (five
+  steps about the screen's middle), a drag pans. The editor's box positions
+  (levels/world_map.json "positions") are read where an area has one and
+  never written; the rest are laid out from the start zone outward: an edge
+  neighbour on its side, a point link's far end in the next free slot to the
+  right, the rest in a row below.
+- Phase A, now: the graph, the places, the player's area and place, this
+  zone's players and companions. Phase B: maps' Main.world_state {holdings:
+  {place_id: [faction, strength]}, known_areas, known_places, party} and its
+  world_changed (approved, maps building it): the panel reads it through
+  set_world_state when it is there (holdings coloured, unknown areas drawn
+  as a dark outline with no name, unknown places left out, the party
+  elsewhere named), and draws as phase A until then.
+
+Client only; nothing on the wire from ui. tests/ui_test: the layout from
+the levels (no two boxes overlap), the player's area, the factions' look,
+maps' state read, Esc and M's order. `--test-show=world` opens it. Shots
+in docs/ui/shots/step5/.

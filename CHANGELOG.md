@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Press M twice for the world map: every area as a box with its places, the ways between them, your own area edged in brass with the place you stand in marked, and your party named where they are; the wheel zooms, a drag pans, Esc or M closes it. Who holds what and what you have seen come as the server learns to tell you.
 - The temple in the wilds has its counter now, at the back behind the doors: hand the priest a thing and an offering there, and come back to it for what waits.
 - The server now tells your game what you have seen of the world, who holds the places you know, and where the rest of the party is, for the world map. What you have seen is kept with your character on the server.
 - No more "fetch six wood" errands from the townsfolk: a shortage is something

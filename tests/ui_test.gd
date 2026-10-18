@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_context_and_place()
 	_test_converse_panel()
 	_test_counter_panel()
+	_test_world_map()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -292,10 +293,10 @@ func _test_converse_panel() -> void:
 		{"id": "b", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked today.", "accept": "buy", "cost": 2},
 		{"id": "c", "kind": "rumour", "title": "What Tam said", "words": "The mine is cursed.", "accept": "", "cost": 0},
 		{"id": "d", "kind": "plea", "title": "A loan of 10", "words": "Lend me ten gold.", "accept": "lend", "cost": 10}],
-		[{"id": "z", "kind": "commission", "title": "Fetch the ore sack", "open": true}])
+		[{"id": "z", "kind": "commission", "title": "Walk Tam home", "open": true}])
 	_check(panel.offers_shown() == ["Bring Bram home [Take it on]", "A loaf, 2 gold [Buy]", "What Tam said", "A loan of 10 [Lend]"],
 		"the offers: a title, the accept's words, none for a rumour (%s)" % [panel.offers_shown()])
-	_check(panel._owed.visible and panel._owed.text == "You owe them: Fetch the ore sack", "an open commission as what the player owes")
+	_check(panel._owed.visible and panel._owed.text == "You owe them: Walk Tam home", "an open commission as what the player owes")
 	var got := []
 	panel.offer_accepted.connect(func(id: String, gold: int) -> void: got.assign([id, gold]))
 	(panel._offer_rows.get_child(0).get_node("Accept") as Button).pressed.emit()
@@ -343,6 +344,39 @@ func _test_counter_panel() -> void:
 	panel.show_counter({"kind": "shop", "jobs": [], "working": [], "waiting": [], "why": ""}, Callable())
 	_check(panel.rows_shown() == ["Nothing you carry can be worked here."] and panel.why_shown() == "",
 		"nothing to do: said so")
+
+
+func _test_world_map() -> void:
+	print("== the world map: the areas laid out, the ways, the player's area, M and Esc ==")
+	var panel: WorldMapPanel = _main.world_map_panel
+	_check(panel != null and not panel.visible and panel.world == null, "there, hidden, not built yet")
+	_main.open_world_map()
+	var boxes: Dictionary = panel.boxes()
+	_check(panel.visible and panel.world != null and boxes.has("castle") and boxes.has("wilds"),
+		"opened: built from the levels (%d areas)" % boxes.size())
+	var apart := true
+	var names: Array = boxes.keys()
+	for i in names.size():
+		for j in range(i + 1, names.size()):
+			if (boxes[names[i]] as Rect2).intersects(boxes[names[j]]):
+				apart = false
+	_check(apart, "no two areas' boxes overlap")
+	_check(panel.own_area == World.zone.name, "the player's area is the zone (%s)" % panel.own_area)
+	_check(panel.faction_look("goblins")["name"] == "the Blood Rot" and panel.faction_look("nobody")["name"] == "nobody",
+		"a faction's name and colour from levels/factions.json")
+	panel.set_world_state({"holdings": {"wilds/camp": ["goblins", 3]}, "known_areas": ["wilds"], "known_places": ["wilds/camp"],
+		"party": [{"name": "Wren", "area": "castle", "kind": "companion"}]}, [{"name": "Tam", "area": panel.own_area, "kind": "player"}])
+	_check(panel.holdings.has("wilds/camp") and panel.known_areas.has("wilds") and panel.party.size() == 2,
+		"maps' world_state read: holdings, known, the party here and elsewhere")
+	panel.set_world_state({}, [])
+	_main.escape()
+	_check(not panel.visible, "Esc closes it")
+	_main.press_m()
+	_check(_main.minimap.big and not panel.visible, "M: the zone's big map")
+	_main.press_m()
+	_check(not _main.minimap.big and panel.visible, "M again: the world map in its place")
+	_main.press_m()
+	_check(not panel.visible and not _main.minimap.big, "M again: closed")
 
 
 func _check(ok: bool, label: String) -> void:

@@ -395,6 +395,8 @@ var _test_counter_shown: Node
 var _test_converse_due := false
 ## Talking with a town's person (ConversePanel; ui's step 4).
 var converse: ConversePanel
+## The world map (WorldMapPanel; ui's step 5), M after the zone's big map.
+var world_map_panel: WorldMapPanel
 ## The counter screen beside the pack (CounterPanel; economy's job, 438).
 var counter_panel: CounterPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
@@ -786,8 +788,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_TAB:
 		talk.toggle_pin()
 		return
-	if key != null and key.pressed and not key.echo and minimap != null \
-			and (key.keycode == KEY_M or key.keycode == KEY_ESCAPE and minimap.big):
+	if key != null and key.pressed and not key.echo and minimap != null and key.keycode == KEY_M:
+		press_m()
+		get_viewport().set_input_as_handled()
+		return
+	if key != null and key.pressed and not key.echo and minimap != null and key.keycode == KEY_ESCAPE and minimap.big:
 		minimap.toggle()
 		get_viewport().set_input_as_handled()
 		return
@@ -4411,6 +4416,10 @@ func _build_talk() -> void:
 	counter_panel.collect_pressed.connect(_collect_at_counter)
 	$HUD.add_child(counter_panel)
 	counter_told.connect(_on_counter_told)
+	world_map_panel = WorldMapPanel.new()
+	$HUD.add_child(world_map_panel)
+	if has_signal("world_changed"):
+		connect("world_changed", _refresh_world_map)
 	converse = ConversePanel.new()
 	converse.ask_pressed.connect(func(line: String) -> void: _send_chat(line))
 	converse.offer_accepted.connect(_accept_offer_from_panel)
@@ -5528,6 +5537,8 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_show(player)
 	if _test_converse_due and player != null:
 		_test_converse_due = not _test_converse(player)
+	if world_map_panel != null and world_map_panel.visible:
+		_refresh_world_map()
 
 
 ## The controls for the HUD's list, a line each, "key\twhat it does".
@@ -5555,10 +5566,49 @@ func hint_lines() -> Array[String]:
 	return lines
 
 
+## M: the zone's big map; M again, the world map in its place; M again, closed.
+func press_m() -> void:
+	if world_map_panel != null and world_map_panel.visible:
+		world_map_panel.close()
+	elif minimap.big:
+		minimap.toggle()
+		open_world_map()
+	else:
+		minimap.toggle()
+
+
+## The world map opened on the player's area, with this zone's party and
+## maps' world_state (holdings, what is known, the party elsewhere) when
+## it is there.
+func open_world_map() -> void:
+	if world_map_panel == null:
+		return
+	_refresh_world_map()
+	world_map_panel.open()
+
+
+func _refresh_world_map() -> void:
+	if world_map_panel == null:
+		return
+	var player := _local_player()
+	world_map_panel.own_area = World.zone.name if World.zone != null else map_name
+	world_map_panel.own_cell = player.tile if player != null else Vector2i(-1, -1)
+	var here: Array[Dictionary] = []
+	for entity in World.get_entities():
+		if entity is Player and entity != player and entity.spawned:
+			here.append({"name": _display_name(entity), "area": world_map_panel.own_area, "kind": "player"})
+		elif entity is Companion and entity.spawned:
+			here.append({"name": String(entity.name), "area": world_map_panel.own_area, "kind": "companion"})
+	var state: Variant = get("world_state")
+	world_map_panel.set_world_state(state if state is Dictionary else {}, here)
+
+
 ## Esc: whatever is open closes first (the options, an open chest or
 ## companion's pack, the pause itself); with nothing open, the pause.
 func escape() -> void:
-	if pause_panel != null and pause_panel.visible:
+	if world_map_panel != null and world_map_panel.visible:
+		world_map_panel.close()
+	elif pause_panel != null and pause_panel.visible:
 		pause_panel.open(false)
 	elif converse != null and converse.visible:
 		converse.close()
@@ -6491,7 +6541,7 @@ func _test_converse(player: Player) -> bool:
 		{"id": "t1", "kind": "commission", "title": "Bring Bram home", "words": "He was carried off in the raid.", "accept": "take", "cost": 0},
 		{"id": "t2", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked this morning.", "accept": "buy", "cost": 2},
 		{"id": "t3", "kind": "rumour", "title": "What Tam said", "words": "At the well, Tam told me the mine is cursed.", "accept": "", "cost": 0}],
-		[{"id": "t0", "kind": "commission", "title": "Fetch the ore sack", "open": true}])
+		[{"id": "t0", "kind": "commission", "title": "Walk Tam home", "open": true}])
 	return true
 
 
@@ -6536,6 +6586,8 @@ func _run_test_show(player: Player) -> void:
 					"working": [{"uid": 3, "id": "bow", "effect": "bless", "left": 900, "left_seconds": 90}],
 					"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]},
 					func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
+			"world":
+				open_world_map()
 			"credits":
 				if not options_panel.visible:
 					options_panel.toggle()
