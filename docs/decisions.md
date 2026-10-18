@@ -13166,3 +13166,54 @@ can be down by seed, and the ears scaled about their root.
 view_test: each goblin its own by name, alike for the same name; one shared material, the look
 as instance parameters; a raid of 40 with marks and builds; the outline's stencil with the
 goblin's shader. Sheet of ten for Jeff: C:\dev\review\goblins\goblins_v1.png.
+## 489. BuildingComposer: a kind's look, seeded, off the grid
+
+Step 3 of Jeff's building variety (488 is step 1; art-kit's slots are
+step 2), approved by the coordinator, client only. 488's rule binds it:
+the grid is the rules, the look need not show it.
+- BuildingComposer (new class_name, client3d/building_composer.gd) draws
+  what stands over a kind's walls: each block's roof by its role (488's
+  "roles"), the main block's a gable along its longer side at the kind's
+  eaves; a wing's a gable 0.25 to 0.5 m lower; a lean-to's, an outshot's or
+  a bay's a single slope rising to the block it leans on, its low eave 0.7
+  to 1 m under the main eaves and its high side LEAN_TUCK under them; a
+  round kind's one faceted cone (FACETS, each point straying FACET_STRAY)
+  over all its blocks. Every roof reaches 0.3 to 0.5 m past its walls,
+  rises 0.75 to 1.1 of its half-span, sags 1 to 2.5% of its length in the
+  middle of its ridge (its eaves straight), is shifted up to SHIFT and the
+  whole tilted up to TILT off true, its ends closed down to the eaves in
+  the kind's wall set. A chimney at one gable end of a house's main block,
+  a little off its middle, by kind (CHIMNEYS' odds; a ruin's less):
+  art-kit's chimney.stone on the roof line when that slot is there, else
+  a stack and cap of the stone set. A ruin has no roof.
+- Seeded: each block draws from its own stream (the building's seed and
+  its index), its eaves first, so Client3D draws each outline wall to its
+  block's eaves (wall_heights: a wing's and a lean-to's lower, at heights
+  no whole metre) without building the roof; the building's own (tilt,
+  chimney) from another. Every peer draws one building alike.
+- Kept by kind, size, seed, facing, ruin, eaves and roof set: one build a
+  look, the copies (Node.duplicate) sharing their meshes (the coordinator's
+  condition: a street costs one build each).
+- Client3D._add_kind places the composed node; its "roof" is what hides
+  while the player is inside, fades and sags damaged as a slot's roof does.
+  A ruin's outline walls are drawn broken here and there (RUIN_BROKEN of
+  them, by cell; its doors kept) before the walls are built.
+- Not yet: a wall set inside its edge or of another thickness, and the
+  stone plinth (terrain's advice: a second surface in the wall sweep, the
+  profile split at 0.6 m, its top cut at each edge's base), and the
+  porches, cruck frames, shutters and signs when art-kit's slots come; the
+  thatch roof set when art-kit makes it (shingle until then).
+- tools/kinds_town (a scene; APPDATA a temp folder only) writes a street
+  of twenty kinds, one a ruin, an imp by each for scale, into the overlay
+  for map_bench: the frame number for perf and the review shots in
+  C:\dev\review\buildings\. Frame time (map_bench, kinds_town, clear noon,
+  bench lock, back to back on the same level): with the composer median
+  1.45 ms, 99th 2.28 ms, up to 245 draw calls, 766 objects, the street's 3D
+  build 278 ms; main's gable per block before it 1.51 ms, 3.71 ms, 295
+  draw calls, 880 objects, 245 ms (perf: level or better; the worst frames
+  scatter chunks in both). Nothing is composed in play: once at zone load.
+view_test _test_composer (a wing's walls to its lower eaves, not whole
+metres; one look built once, two copies sharing a mesh; a round hut's
+cone; a ruin with no roof, no inside and broken walls). Protocol unchanged.
+Rejected: a mesh per kind from art-kit (no variation, and the grid shows);
+art-kit's roofs as pieces per cell (the joints and repeats show).

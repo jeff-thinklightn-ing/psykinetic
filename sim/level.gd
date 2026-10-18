@@ -1292,7 +1292,7 @@ static func kind_doors(entry: Dictionary) -> Array[Vector3i]:
 
 
 ## Sets kind building [param building]'s own from [param entry]: its kind,
-## size, seed (its entry's, else from its cell, so every peer draws it
+## size, its blocks' roles, seed (its entry's, else from its cell, so every peer draws it
 ## alike), ruined (no roof, no inside), its kind's words, sets, storeys,
 ## eaves and place, and its front (the cell outside its first door).
 static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
@@ -1309,6 +1309,9 @@ static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 	building["storeys"] = int(kind.get("storeys", 1))
 	building["eaves"] = float(kind.get("eaves", STOREY * building["storeys"]))
 	building["place"] = str(kind.get("place", ""))
+	# Each block's role, as its blocks are ordered (main, wing, leanto, ...).
+	building["roles"] = (kind_size(entry)["blocks"] as Array).map(func(block: Array) -> String:
+		return str(block[4]) if block.size() > 4 else "main")
 	var doors := kind_doors(entry)
 	building["doors"] = doors
 	if not doors.is_empty():

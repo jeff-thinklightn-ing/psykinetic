@@ -1180,6 +1180,56 @@ func _test_kinds() -> void:
 	_check(walls.size() == outline.size() - 1 and doors == [Vector3i(4, 9, Terrain.SOUTH)]
 			and outline.all(func(key: Vector3i) -> bool: return _rig._wall_sets.get(key, "wood") == "wood"),
 			"its outline walled round both blocks, its door a doorway (%d of %d; %s)" % [walls.size(), outline.size(), doors])
+	_test_composer()
+
+
+## BuildingComposer (decision 489): a wing's walls drawn to its own lower
+## eaves; one look made once, its copies sharing their meshes; a round
+## hut's one cone; a ruin with no roof, its walls broken here and there.
+func _test_composer() -> void:
+	print("\n== the composer: a wing's lower walls, one build a look, a round roof, a ruin (decision 489) ==")
+	var main_wall: float = _rig._wall_heights.get(Vector3i(1, 4, Terrain.EAST), Client3D.WALL_HEIGHT)
+	var wing_wall: float = _rig._wall_heights.get(Vector3i(11, 7, Terrain.EAST), Client3D.WALL_HEIGHT)
+	_check(is_equal_approx(main_wall, Client3D.WALL_HEIGHT) and wing_wall < main_wall - 0.2 and wing_wall > main_wall - 0.6,
+			"the main block's walls at its eaves (%.2f), the wing's a little lower (%.2f), not whole metres" % [main_wall, wing_wall])
+	var level := _kinds_level([["building_l_house_small", Vector2i(1, 1), false], ["building_round_hut_small", Vector2i(13, 1), false],
+		["building_house_small", Vector2i(1, 12), true]])
+	var buildings: Array = level["buildings"]
+	BuildingComposer.forget()
+	var one := BuildingComposer.compose(buildings[0], "shingle")
+	var two := BuildingComposer.compose(buildings[0], "shingle")
+	var slopes := func(node: Node3D) -> Mesh: return (node.find_child("Slopes", true, false) as MeshInstance3D).mesh
+	_check(one != two and slopes.call(one) == slopes.call(two) and BuildingComposer._made.size() == 1,
+			"one look built once: two copies, one mesh between them")
+	one.free()
+	two.free()
+	_rig.rebuild(level["terrain"], Vector2i(4, 11))
+	var round_hut := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(14, 2, 5, 5))
+	_check(round_hut.size() == 1 and (round_hut[0]["node"] as Node3D).find_child("Cone", true, false) != null,
+			"the round hut: one cone over its blocks")
+	var ruin := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 13, 6, 8))
+	var broken := Level.blocks_outline(Level._union([Rect2i(2, 13, 6, 8)])).filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "broken")
+	_check(ruin.size() == 1 and ruin[0]["roof"] == null and broken.size() > 3 and not _rig._building_at.has(Vector2i(4, 16)),
+			"the ruined house: no roof, no inside, %d of its walls broken" % broken.size())
+
+
+## [param stamps] ([prefab, top-left, ruined]) stamped on grass, parsed.
+func _kinds_level(stamps: Array) -> Dictionary:
+	var map := LevelMap.new(Vector2i(24, 24))
+	for y in 24:
+		for x in 24:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := {"outdoor": true}
+	for stamp: Array in stamps:
+		var changes := Prefab.stamp_changes(Prefab.load_prefab(stamp[0]), map, stamp[1], config)
+		for cell: Vector2i in changes["cells"]:
+			map.set_cell(cell, changes["cells"][cell])
+		for key: Vector3i in changes["edges"]:
+			map.set_edge(key, changes["edges"][key])
+		config.merge(changes.get("config", {}), true)
+		if stamp[2]:
+			(config["buildings"] as Array)[-1]["ruined"] = true
+	return Level.parse(map.to_image(), null, config)
 
 
 func _test_double_doors() -> void:

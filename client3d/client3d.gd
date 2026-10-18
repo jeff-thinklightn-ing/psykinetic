@@ -91,6 +91,8 @@ const WALL_HEIGHT := 3.0
 ## A kind's roof set (decision 488): thatch, Jeff's default until he says,
 ## shingle (Level.ROOF_SETS' first) while art-kit has no thatch set.
 const KIND_ROOF := "thatch"
+## How much of a ruin's walls stand broken (decision 489).
+const RUIN_BROKEN := 0.45
 ## Wall runs (_add_wall_runs), each in its set's profile and variation
 ## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
 ## many edges a mesh; a height every WALL_SWAY edges, the body up to the
@@ -2608,12 +2610,20 @@ func _build_room() -> void:
 			spec.erase("floor_set")
 		var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
 		var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
+		# A kind's walls each to its block's eaves (BuildingComposer, 489).
+		var heights: Dictionary[Vector3i, float] = {}
+		if building.has("kind"):
+			heights = BuildingComposer.wall_heights(building)
 		for key in Level.building_outline(building):
 			if not _wall_sets.has(key):
 				_building_walls.append(key)
 				_wall_sets[key] = wall_set
-				if not is_equal_approx(wall_height, WALL_HEIGHT):
-					_wall_heights[key] = wall_height
+				var tall: float = heights.get(key, wall_height)
+				if not is_equal_approx(tall, WALL_HEIGHT):
+					_wall_heights[key] = tall
+			# A ruin's walls broken here and there before they are drawn (489).
+			if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL 					and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
+				_set_wall_state(key, "broken")
 		if spec.has("floor_set"):
 			var floor_set := _known_set(str(spec["floor_set"]))
 			for cell in Level.building_cells(building):
@@ -2771,33 +2781,22 @@ func _add_buildings() -> void:
 
 
 ## A building of a kind (Level.kinds, decision 488): its walls and floor are
-## the map's, in its kind's sets (_build_room); over each of its blocks a
-## gable of its roof set at its eaves, its ridge along the block's longer
-## side, all of them its "roof" (off while the local player is inside any
-## of its cells, as a slot's is); none on a ruin. What it looks like beyond
-## that is BuildingComposer's (decision 489).
+## the map's, in its kind's sets (_build_room), each wall to its block's
+## eaves; what stands over them is BuildingComposer's (decision 489): its
+## "roof" (off while the local player is inside any of its cells, as a
+## slot's is; none on a ruin) and its parts. A ruin's walls were broken
+## here and there as the sets were (_build_room), as a damaged one's are.
 func _add_kind(building: Dictionary) -> void:
 	var rect: Rect2i = building["rect"]
 	var cells := Level.building_cells(building)
 	var base := _height(rect.position) * LEVEL_RISE
 	var eaves := float(building["eaves"])
-	var node := Node3D.new()
+	var roof_set := KIND_ROOF if KIND_ROOF in Level.ROOF_SETS else Level.ROOF_SETS[0]
+	var node := BuildingComposer.compose(building, roof_set)
 	node.name = "Building_%d_%d" % [rect.position.x, rect.position.y]
+	node.position = Vector3(rect.position.x, base, rect.position.y)
 	_room.add_child(node)
-	var roof: Node3D = null
-	if not building.get("ruined", false):
-		roof = Node3D.new()
-		roof.name = "roof"
-		node.add_child(roof)
-		var roof_set := KIND_ROOF if KIND_ROOF in Level.ROOF_SETS else Level.ROOF_SETS[0]
-		for block: Rect2i in building["blocks"]:
-			var along_x := block.size.x > block.size.y
-			var span := Vector2(block.size.y, block.size.x) if along_x else Vector2(block.size)
-			var piece := _roof_mesh(roof_set, span.x, span.y)
-			var middle := Vector2(block.position) + Vector2(block.size - Vector2i.ONE) * 0.5
-			piece.position = Vector3(middle.x, base + eaves, middle.y)
-			piece.rotation.y = PI * 0.5 if along_x else 0.0
-			roof.add_child(piece)
+	var roof: Node3D = node.get_node_or_null("roof")
 	var inside: Dictionary[Vector2i, bool] = {}
 	for cell in cells:
 		inside[cell] = true
