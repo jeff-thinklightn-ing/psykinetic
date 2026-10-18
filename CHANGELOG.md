@@ -38,6 +38,9 @@ notes (decision 324).
   for Jeff (docs/lore/proposed.md) instead of into the world's lore; he agrees
   or declines each in his own time, and nothing becomes lore by itself.
 - Someone shot with an arrow flinches when the arrow reaches them, not before it gets there. Client only.
+- Stags and wolves in the wilds are themselves now: the stag with its
+  antlers, the grey wolf, both walking, running, grazing or eating, and
+  falling.
 - Archers draw their bows: the bow comes up, an arrow is nocked and pulled to
   the jaw, held there at full draw, and loosed. A raised shield is held up in
   guard.

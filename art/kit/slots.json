@@ -1505,6 +1505,9 @@
 			"size": [0.9, 1.95, 1.7],
 			"tolerance": 0.15,
 			"budget": 4000,
+			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette)", "tool": "blender (tools/animal_palette.py)",
+				"license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Stag, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-17",
+				"notes": "N:/assets/sources/quaternius/animals/ultimate_animated_animal_pack/glTF/Stag.gltf (Jeff: \"deer stag wolf look amazing\")"},
 			"uses": "a stag, the antlered male: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. From the Ultimate Animated Animal Pack's Stag",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},
@@ -1531,6 +1534,9 @@
 			"size": [0.35, 0.95, 1.9],
 			"tolerance": 0.15,
 			"budget": 2500,
+			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette)", "tool": "blender (tools/animal_palette.py)",
+				"license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Wolf, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-17",
+				"notes": "N:/assets/sources/quaternius/animals/ultimate_animated_animal_pack/glTF/Wolf.gltf (Jeff: \"deer stag wolf look amazing\")"},
 			"uses": "a wolf: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. From the Ultimate Animated Animal Pack's Wolf; howl's stand-in is idle with a head-up tween until it has one",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},
