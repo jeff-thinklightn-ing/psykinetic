@@ -9983,6 +9983,19 @@ with walls and a door). Protocol unchanged.
 Rejected: a door cell barred to her pathing (she must pass through
 doors, only not stop in them); asking enemy-ai for "the way in" (a
 building's doors are it).
+
+Amended (2026-10-18, perf's two finds): a companion's first turn in a zone
+parsed its level.json again (building_at's Level.load_level, 145 ms), and
+one with a foe she could not reach pathfound to it every tick (Wren and
+Snagfin, seven a second), giving up and picking it again. Main hands her
+each level it loads (Companion.know_level from Main._load_level: its
+display name, zone kind and buildings), so she parses none in play; one
+she was not handed is still read once. A target _approach finds out of
+reach is skipped by GUARD's and PRESS's picks (her quarry with them) for
+UNREACHABLE_TICKS (30, three seconds), or till it or she has moved
+UNREACHABLE_MOVED (3) cells; "cannot reach" is printed once for each. A
+foe next to her is fought all the same. companion_test covers both.
+Protocol unchanged.
 ## 423. The needles' floor: a ground.needles texture under the pine stands
 
 The floor under the border's pine stands (369) was the flat NEEDLES colour

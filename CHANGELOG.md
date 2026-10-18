@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions no longer stall a tick on their first turn in a zone, and one
+  who can't reach a foe stops trying for a few seconds instead of
+  pathfinding to it over and over (391 amended).
 - A drawn bow creaks as it's held, the creak rising in pitch and louder as the string comes back to the jaw, and stopping when the arrow goes or the draw is let down (decision 475).
 - A thing holds a grudge against whatever has hurt the people carrying it most, once that kind has taken 30 hp from them, not when they fall. Each thing grows one way: a bane holds no grudge, and becoming one drops the grudge it had (decision 473).
 

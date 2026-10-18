@@ -83,6 +83,8 @@ func _ready() -> void:
 	_test_card_things()
 	_test_record_loads()
 	_test_bond()
+	_test_out_of_reach()
+	_test_knows_level()
 	_test_wild()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
@@ -1318,6 +1320,40 @@ func _test_bond() -> void:
 	record.companion.erase("standing")
 	record.companion.erase("bond_day")
 	record.companion.erase("struck_day")
+
+
+func _test_out_of_reach() -> void:
+	print("
+== a foe found out of reach is not picked again for a while (391 amended) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var imp := _spawn_imp(_free_tile_between(pet, 4, 5))
+	_check(pet._nearest_hostile(Companion.SIGHT_RANGE) == imp and not pet._out_of_reach(imp), "a foe in sight is picked")
+	pet._unreachable[imp.get_instance_id()] = {"until": World.tick + Companion.UNREACHABLE_TICKS, "her": pet.tile, "its": imp.tile}
+	_check(pet._nearest_hostile(Companion.SIGHT_RANGE) == null and pet._guard_target() == null,
+		"found out of reach (_approach): neither PRESS nor GUARD picks it")
+	pet._unreachable[imp.get_instance_id()]["its"] = imp.tile + Vector2i(Companion.UNREACHABLE_MOVED, 0)
+	_check(pet._nearest_hostile(Companion.SIGHT_RANGE) == imp and pet._unreachable.is_empty(),
+		"once it has moved UNREACHABLE_MOVED cells it is picked again")
+	pet._unreachable[imp.get_instance_id()] = {"until": World.tick, "her": pet.tile, "its": imp.tile}
+	_check(not pet._out_of_reach(imp) and pet._unreachable.is_empty(), "and after UNREACHABLE_TICKS")
+	World.despawn(imp)
+	_settle(pet)
+
+
+func _test_knows_level() -> void:
+	print("
+== Main hands her each level it loads: no level parsed in play (391 amended) ==")
+	var zone := "companion_test_keep"
+	Companion.know_level(zone, {"display_name": "the test keep", "terrain": {"zone": "cave"},
+		"buildings": [{"slot": "building.shed", "rect": Rect2i(0, 0, 3, 3)}, {"slot": "building.wall", "rect": Rect2i(5, 5, 1, 1)}]})
+	_check(Companion.place_name(zone) == "the test keep" and Companion._zone_kind(zone) == "cave"
+		and Companion._zone_buildings[zone].size() == 1, "its name, kind of place and buildings with an inside, from the dict")
+	_check(Companion._zone_kinds.has(_main.map_name) and Companion._zone_buildings.has(_main.map_name),
+		"the level Main loaded is known")
+	for cache: Dictionary in [Companion._place_names, Companion._zone_kinds, Companion._zone_buildings]:
+		cache.erase(zone)
 
 
 func _test_log_collapsed() -> void:

@@ -1734,6 +1734,7 @@ func _load_level(level_name: String) -> bool:
 		return false
 	level = loaded
 	map_name = str(loaded["name"])
+	Companion.know_level(map_name, loaded)
 	_terrain = loaded["terrain"]
 	level_entities.assign(loaded["entities"])
 	_index_keys()

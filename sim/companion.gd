@@ -465,6 +465,11 @@ var _wolf_warned_tick := -100000
 ## The wild animal "Get them!" marked (decision 332), or null: hostile to
 ## her as a monster is, till it dies, is out of sight or the call lapses.
 var _quarry: GridEntity = null
+## Targets _approach found out of reach, by instance id: {until, her, its}
+## (_out_of_reach).
+var _unreachable: Dictionary = {}
+const UNREACHABLE_TICKS := 30
+const UNREACHABLE_MOVED := 3
 var _stalk_tick := -1
 var _stalked: GridEntity = null
 ## Her errand, or empty: what can_do offered ({verb, words, at, and its
@@ -1643,9 +1648,26 @@ func lore_topics(things: Array[Dictionary]) -> PackedStringArray:
 
 static func place_name(zone_name: String) -> String:
 	if not _place_names.has(zone_name):
-		var shown := str(Level.load_level(zone_name).get("display_name", "")) if Level.exists(zone_name) else ""
-		_place_names[zone_name] = shown if not shown.is_empty() else zone_name.replace("_", " ")
+		know_level(zone_name, Level.load_level(zone_name) if Level.exists(zone_name) else {})
 	return _place_names[zone_name]
+
+
+## What she reads of level [param zone_name] (its name, kind of place and
+## buildings), from [param level] as Level.load_level gives it: Main hands
+## her each level it loads, so she parses none in play (perf: a first turn
+## in a zone parsed it again, 145 ms). One she was not handed is read once.
+static func know_level(zone_name: String, level: Dictionary) -> void:
+	var shown := str(level.get("display_name", ""))
+	_place_names[zone_name] = shown if not shown.is_empty() else zone_name.replace("_", " ")
+	_zone_kinds[zone_name] = str(level.get("terrain", {}).get("zone", "indoors"))
+	_zone_buildings[zone_name] = level.get("buildings", []).filter(func(each: Dictionary) -> bool:
+		return BUILDING_WORDS.has(str(each.get("slot", ""))))
+
+
+static func _zone_kind(zone_name: String) -> String:
+	if not _zone_kinds.has(zone_name):
+		know_level(zone_name, Level.load_level(zone_name) if Level.exists(zone_name) else {})
+	return _zone_kinds[zone_name]
 
 
 ## Where she is, for a fact: the level's name ("the castle").
@@ -1879,11 +1901,7 @@ func where_words(full := true) -> String:
 		return "%s You are outdoors, under the sky, with forest all around the edge of this place." % now
 	if not inside_words().is_empty():
 		return "%s; outside it is %s." % [inside_words(), hour]
-	var zone_name := World.zone.name if World.zone != null else ""
-	if not _zone_kinds.has(zone_name):
-		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
-		_zone_kinds[zone_name] = str(level.get("terrain", {}).get("zone", "indoors"))
-	match _zone_kinds[zone_name]:
+	match _zone_kind(World.zone.name if World.zone != null else ""):
 		"cave":
 			return "You are in a cave; outside it is %s." % hour
 		"dungeon":
@@ -1905,11 +1923,7 @@ func _where_briefly() -> String:
 		return "You are outdoors, under the sky, with forest all around the edge of this place.%s" % storm
 	if not inside_words().is_empty():
 		return inside_words() + "."
-	var zone_name := World.zone.name if World.zone != null else ""
-	if not _zone_kinds.has(zone_name):
-		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
-		_zone_kinds[zone_name] = str(level.get("terrain", {}).get("zone", "indoors"))
-	match _zone_kinds[zone_name]:
+	match _zone_kind(World.zone.name if World.zone != null else ""):
 		"cave":
 			return "You are in a cave."
 		"dungeon":
@@ -1931,9 +1945,7 @@ static var _zone_buildings: Dictionary[String, Array] = {}
 static func building_at(cell: Vector2i) -> Dictionary:
 	var zone_name := World.zone.name if World.zone != null else ""
 	if not _zone_buildings.has(zone_name):
-		var level := Level.load_level(zone_name) if Level.exists(zone_name) else {}
-		_zone_buildings[zone_name] = level.get("buildings", []).filter(func(each: Dictionary) -> bool:
-			return BUILDING_WORDS.has(str(each.get("slot", ""))))
+		know_level(zone_name, Level.load_level(zone_name) if Level.exists(zone_name) else {})
 	for building: Dictionary in _zone_buildings[zone_name]:
 		if (building["rect"] as Rect2i).has_point(cell):
 			return building
@@ -3071,7 +3083,7 @@ func _guard_target() -> GridEntity:
 	var best_distance := 999
 	for entity in World.get_entities():
 		var monster := entity as Monster
-		if monster == null or not _hostile(monster):
+		if monster == null or not _hostile(monster) or _out_of_reach(monster):
 			continue
 		var distance := World.distance(tile, monster.tile)
 		var after_us := monster.target != null and (monster.target == self or monster.target == keeper)
@@ -3086,7 +3098,7 @@ func _nearest_hostile(reach: int) -> GridEntity:
 	var best: GridEntity = null
 	var best_distance := reach + 1
 	for entity in World.get_entities():
-		if _hostile(entity):
+		if _hostile(entity) and not _out_of_reach(entity):
 			var distance := World.distance(tile, entity.tile)
 			if distance < best_distance and World.has_line_of_sight(tile, entity.tile):
 				best = entity
@@ -3240,8 +3252,24 @@ func _approach(target: Variant, reach: int) -> void:
 	# A FOLLOW that cannot get closer just waits; anything else gives up.
 	if not _step_toward(target.tile, true) and current_intent != Intent.FOLLOW:
 		print("[mind] %s: cannot reach %s; following" % [name, target.name])
+		_unreachable[target.get_instance_id()] = {"until": World.tick + UNREACHABLE_TICKS, "her": tile, "its": target.tile}
 		current_intent = Intent.FOLLOW
 		intent_target = null
+
+
+## Whether [param entity] was found out of her reach lately (_approach): she
+## does not pick it again for UNREACHABLE_TICKS, or till it or she has moved
+## UNREACHABLE_MOVED cells (perf: Wren pathfound to Snagfin seven times a
+## second). One next to her is fought all the same (_adjacent_hostile).
+func _out_of_reach(entity: GridEntity) -> bool:
+	var id := entity.get_instance_id()
+	if not _unreachable.has(id):
+		return false
+	var entry: Dictionary = _unreachable[id]
+	if World.tick < int(entry["until"]) and World.distance(tile, entry["her"]) < UNREACHABLE_MOVED 			and World.distance(entity.tile, entry["its"]) < UNREACHABLE_MOVED:
+		return true
+	_unreachable.erase(id)
+	return false
 
 
 ## [param entry] in the mind log, with her stance and how far her player is
