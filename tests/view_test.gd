@@ -1542,8 +1542,32 @@ func _test_pine_stands() -> void:
 		if distance.get(_rig._ground_cells[index], 0) >= PineStands.FROM:
 			ringed += 1
 	var forest_floor := _rig._room.get_node("ForestFloor") as MeshInstance3D
-	_check(ringed == 0 and (forest_floor.material_override as ShaderMaterial).get_shader_parameter("albedo_color") == PineStands.NEEDLES,
+	var flat := PineStands.needles_texture() == null
+	_check(ringed == 0 and (not flat or (forest_floor.material_override as ShaderMaterial).get_shader_parameter("albedo_color") == PineStands.NEEDLES),
 			"under them the needles' floor; the land's ground runs only into the first ring")
+	# The needles' own texture (decision 423), tested with one made here
+	# while ground.needles has none.
+	var needles := PineStands.needles_texture()
+	if needles == null:
+		var image := Image.create(8, 8, false, Image.FORMAT_RGB8)
+		image.fill(PineStands.NEEDLES)
+		needles = ImageTexture.create_from_image(image)
+		PineStands.needles_stand_in = needles
+		PineStands.forget()
+		_rig.rebuild(castle["terrain"], castle["centre"])
+	var floors: Array[ShaderMaterial] = [(_rig._room.get_node("ForestFloor") as MeshInstance3D).material_override]
+	if _rig._border != null:
+		floors.append((_rig._border.get_node("FarFloor") as MeshInstance3D).material_override)
+	var tiled := 0
+	for material in floors:
+		var see_through := material.get_meta(Client3D.SEASON_NEAR_META) as ShaderMaterial
+		if material.shader == Client3D.SEASON_SHADER and not material.get_shader_parameter("leaf") \
+				and material.get_shader_parameter("tile_texture") == needles and float(material.get_shader_parameter("world_tile")) > 0.0 \
+				and see_through.get_shader_parameter("tile_texture") == needles:
+			tiled += 1
+	_check(floors.size() == 2 and tiled == 2,
+			"the needles' texture on the forest floor and the far floor, tiled in world metres, snow only, its see-through copy too (%d of %d)" % [tiled, floors.size()])
+	PineStands.needles_stand_in = null
 	PineStands.stand_in = false
 	PineStands.forget()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)

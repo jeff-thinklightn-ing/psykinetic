@@ -38,15 +38,49 @@ const SWEEP_JITTER := 1.0
 const NEEDLES := Color("7a4e2c")
 const FOOTPRINT: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
 
+## The needles' own ground texture (decision 423): the floor under the
+## stands tiled with it, NEEDLES while it has none.
+const NEEDLES_SLOT := "ground.needles"
+
 ## Shots only: stands drawn with a stand-in made here while the slot has no
 ## art (map_bench --stand-in).
 static var stand_in := false
+## Tests only: the needles' floor drawn with this while NEEDLES_SLOT has no
+## image of its own, so it is tested before the art.
+static var needles_stand_in: Texture2D
 static var _meshes: Dictionary[int, Mesh] = {}
+static var _needles: Array[Texture2D] = []
 
 
 ## Whether stands are drawn: the slot has art or a fill, or the stand-in is on.
 static func drawn() -> bool:
 	return stand_in or ArtKit.has(SLOT) and ArtKit.filled_by(SLOT) != "placeholder"
+
+
+## The needles' texture: NEEDLES_SLOT's image (looked for once), else the
+## tests' stand-in, else null (the flat NEEDLES).
+static func needles_texture() -> Texture2D:
+	if _needles.is_empty():
+		_needles.append(ArtKit.texture(NEEDLES_SLOT) if ArtKit.has(NEEDLES_SLOT) else null)
+	return _needles[0] if _needles[0] != null else needles_stand_in
+
+
+## The needles' floor (the ForestFloor plane, the border's far floor) in
+## season (snow, never dried or turned): NEEDLES_SLOT's texture tiled in
+## world metres (its tile_m) and darkened by [param shade], else flat
+## [param colour]. One material a build, as the planes are.
+static func floor_material(colour: Color, shade := 1.0) -> Material:
+	var texture := needles_texture()
+	var base := StandardMaterial3D.new()
+	base.albedo_color = colour if texture == null else Color(shade, shade, shade)
+	base.roughness = 1.0
+	var made := Client3D.season_material(base, false, false) as ShaderMaterial
+	if texture != null:
+		var tile := float(ArtKit.spec(NEEDLES_SLOT).get("tile_m", 4.0)) if ArtKit.has(NEEDLES_SLOT) else 4.0
+		for material: ShaderMaterial in [made, made.get_meta(Client3D.SEASON_NEAR_META)]:
+			material.set_shader_parameter("tile_texture", texture)
+			material.set_shader_parameter("world_tile", tile)
+	return made
 
 
 ## How many variants to pick from.
@@ -159,9 +193,11 @@ static func mesh(variant: int) -> Mesh:
 	return _meshes[variant]
 
 
-## Forgets the meshes made (the slot's art changed, or the stand-in).
+## Forgets the meshes made and the needles' texture looked for (the slots'
+## art changed, or a stand-in).
 static func forget() -> void:
 	_meshes.clear()
+	_needles.clear()
 
 
 ## Every mesh under [param root] as one mesh, in root's space.

@@ -75,7 +75,8 @@ func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, f
 	far_floor = MeshInstance3D.new()
 	far_floor.name = "FarFloor"
 	far_floor.mesh = plane
-	far_floor.material_override = Client3D.season_material(floor_material, false, false)
+	# Past pine stands, their needles (decision 423), a shade darker.
+	far_floor.material_override = PineStands.floor_material(floor_material.albedo_color, 0.85) if stands else Client3D.season_material(floor_material, false, false)
 	far_floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	far_floor.position = Vector3((low.x + high.x) * 0.5, -floor_depth - FAR_SINK, (low.y + high.y) * 0.5)
 	add_child(far_floor)

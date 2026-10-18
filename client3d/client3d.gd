@@ -3015,13 +3015,16 @@ func _add_forest() -> void:
 			_add_deadwood(cell, "tree.log" if _roll(cell, 58) < LOG_SHARE else "tree.stump", distance)
 	var floor_mesh := PlaneMesh.new()
 	floor_mesh.size = Vector2(high - low) + Vector2.ONE * 2.0
-	var material := StandardMaterial3D.new()
-	material.albedo_color = _forest_floor_colour()
-	material.roughness = 1.0
 	var forest_floor := MeshInstance3D.new()
 	forest_floor.name = "ForestFloor"
 	forest_floor.mesh = floor_mesh
-	forest_floor.material_override = season_material(material, false, false)
+	if PineStands.drawn():
+		forest_floor.material_override = PineStands.floor_material(_forest_floor_colour())
+	else:
+		var material := StandardMaterial3D.new()
+		material.albedo_color = _forest_floor_colour()
+		material.roughness = 1.0
+		forest_floor.material_override = season_material(material, false, false)
 	forest_floor.position = Vector3((low.x + high.x) * 0.5, -FOREST_FLOOR_DEPTH, (low.y + high.y) * 0.5)
 	_room.add_child(forest_floor)
 

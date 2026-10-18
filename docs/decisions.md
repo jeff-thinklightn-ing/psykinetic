@@ -9758,3 +9758,36 @@ with walls and a door). Protocol unchanged.
 Rejected: a door cell barred to her pathing (she must pass through
 doors, only not stop in them); asking enemy-ai for "the way in" (a
 building's doors are it).
+## 423. The needles' floor: a ground.needles texture under the pine stands
+
+The floor under the border's pine stands (369) was the flat NEEDLES colour
+(7a4e2c). It becomes real ground: a texture slot `ground.needles` (art-kit:
+category ground, type texture, tile_m 4, 512 px, seamless), its image
+art-gen's, procedural as its dirt and sand (orange-brown needles averaging
+near NEEDLES, a few cones and twigs, patches of bare earth, no baked light).
+The coordinator approved the design.
+
+- Read by `PineStands.floor_material` for the two needle planes: the
+  ForestFloor plane under the stands (`Client3D._add_forest`, while
+  `PineStands.drawn()`) and TerrainBorder's far floor past them (a shade
+  darker, 0.85). Each is one material a build, as the planes are.
+- Tiled in world metres, not UV: season.gdshaderinc takes `tile_texture`
+  and `world_tile` (the slot's tile_m); above 0 the colour is multiplied by
+  the texture at the fragment's world xz over it, so planes of any size
+  tile the same and the two planes' needles line up where they meet. Its
+  own sampler, linear with mipmaps (the palette's albedo_texture is
+  nearest).
+- In season as the floor was: snow where it faces up, never dried or
+  turned (leaf off); the see-through copy (SEASON_NEAR_META) carries the
+  texture too.
+- While the slot has no image (or isn't in the manifest yet), the flat
+  NEEDLES as before: `PineStands.needles_texture` looks once (forget()
+  looks again). `PineStands.needles_stand_in` lets view_test check the
+  wiring with a texture made in code, so this lands before the art.
+- Ring 1, the land's ground (ground.gdshader), keeps its ragged line into
+  the forest floor unchanged; wiring ground.grass, dirt, sand and stone into
+  that shader is a later step of its own.
+
+Cost: one 512 x 512 texture with mipmaps (about 1.4 MB of video memory)
+and one texture read on two planes that already exist. Client only; no
+protocol change.
