@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A drawn bow creaks as it's held, the creak rising in pitch and louder as the string comes back to the jaw, and stopping when the arrow goes or the draw is let down (decision 475).
 - A thing holds a grudge against whatever has hurt the people carrying it most, once that kind has taken 30 hp from them, not when they fall. Each thing grows one way: a bane holds no grudge, and becoming one drops the grudge it had (decision 473).
 
 ## v0.1.152
@@ -48,7 +49,6 @@ notes (decision 324).
 - The wilds have their own art for fallen logs, ferns, wild flowers, reeds,
   the palisade, the timber wall joints and watchtower, the market stall and
   the forge (art-gen's candidates, applied for Jeff to look over in game).
-- A drawn bow creaks as it's held, the creak rising in pitch and louder as the string comes back to the jaw, and stopping when the arrow goes or the draw is let down (decision 475).
 - Only gear you carry and use grows now. A thing starts counting what it fells, and can become a bane or hold a grudge, once one player or companion has carried it a season with 10 deeds, or done 20 deeds with it, or once it is blessed. A bundle of arrows never grows; its bow does (decision 472).
 - Ready for the coming forest zone: a level can have a canopy over its trees, dark under the roof and open in its clearings, and its trees can come from a stand grown year by year by a new offline tool (decisions 466 and 467). Nothing changes in the current levels.
 
