@@ -9884,3 +9884,40 @@ blessed and held after its steps, shown to its owner and put back with
 nobody there, the counter's other things left alone, held in a saved world
 and read back, taken back and no longer held, refused with the priest
 away); rescue_test's mend job is kind "work".
+
+## 431. A server answers a status query before anyone joins
+
+ui's menu and connect screen (418, 427) want to say whether the server is
+there, its build and how full it is, before Play. Joining depends on
+Net.protocol() (239), and Godot numbers RPCs by each node's methods, which
+change between builds: a status RPC on Net would not work across them.
+
+- A UDP exchange of its own (net/server_status.gd, ServerStatus, a new
+  class_name): the client sends {"status": 1} padded to 512 bytes
+  (ServerStatus.request); the server answers {"status", "version",
+  "protocol", "players", "accepting"} and nothing else (no token, no
+  names), never more bytes than the request held, and at most once a second
+  per address (Responder), so it cannot amplify traffic. A short request,
+  another "status" version or junk gets nothing.
+- A server answers only when given --status-port (and only in --server
+  mode): the box's unit gives 7779 and staging (server/stage.sh) the game
+  port + 2, beside the admin console's TCP 7778/7788, which UDP does not
+  clash with. Hosts and tests' servers never listen, so none takes a
+  neighbour's port (net_test's phases run on ports one apart). ufw is
+  inactive on the box: nothing to open.
+- A client asks with Net.query_status(address, port) at --status-port or
+  settings status_port=, else the game port + 2 (port_for); the answer
+  comes once a query through Net.status_received(address, port, result):
+  {ok: true, version, protocol, players, accepting, compatible (the same
+  protocol, or a newer server it could update to)}, or {ok: false, why},
+  "no answer" after 2 s (an old server, a blocked port, or none).
+
+Joining is unchanged, so PROTOCOL_REVISION is too; the exchange is versioned
+by its own "status" number. The unit change is not installed by deploy.sh
+(its sudo covers install and systemctl restart only): Jeff copies
+server/psykinetic.service to /etc/systemd/system and runs daemon-reload by
+hand (docs/server.md), and until then the live server does not answer.
+Clients cope: no answer within 2 s is "no answer" (ui shows "status
+unknown"), and joining never depends on it.
+
+tests/status_test.

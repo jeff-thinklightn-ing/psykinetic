@@ -17,7 +17,9 @@ WorkingDirectory=/opt/psykinetic
 EnvironmentFile=/etc/psykinetic/env
 # The Dedicated Server export strips visuals but is not headless by itself.
 # --admin-port is the console: server/admin.sh talks to it on localhost.
-ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --token=${PSYKINETIC_TOKEN} --admin-port=7778
+# --status-port answers clients' status queries over UDP (decision 431): the
+# game port + 2, where clients ask (7778 is the console's, TCP).
+ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --token=${PSYKINETIC_TOKEN} --admin-port=7778 --status-port=7779
 # Creates /var/lib/psykinetic owned by the service user.
 StateDirectory=psykinetic
 # Godot keeps its own user data under $HOME; give it somewhere writable.

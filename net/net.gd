@@ -11,6 +11,8 @@ extends Node
 ##   --state=<path>               server/host: JSON snapshot of entity state, written every
 ##                                30 ticks and on clean shutdown, loaded on start if present
 ##   --admin-port=<n>             server/host: accept console commands on 127.0.0.1:<n> (TCP)
+##   --status-port=<n>            server: answer status queries on UDP <n> (decision 431; the box's unit gives the game port + 2,
+##                                which is where clients ask; none without it, so tests' servers never take a neighbour's port)
 ##   --max-players=<n>            server/host: players at once (default 16)
 ##   --no-interest                server/host: send every client everything in its zone, not only
 ##                                what is near its player (decision 217)
@@ -144,6 +146,12 @@ signal peer_authenticated(peer: int, player_id: String, player_name: String)
 ## disconnecting it.
 signal join_rejected(reason: String, server_version: String)
 
+## A server's status asked with query_status (decision 431), once a query:
+## {ok: true, version, protocol, players, accepting, compatible (the same
+## protocol, or a newer server this client could update to)}, or {ok:
+## false, why} ("no answer" within 2 s).
+signal status_received(address: String, port: int, result: Dictionary)
+
 ## What decides whether a client may join is protocol(), not the build
 ## (decision 239): a client and a server of different builds play together
 ## as long as what goes over the wire is the same. protocol() sees by itself:
@@ -199,6 +207,13 @@ var port := DEFAULT_PORT
 var state_path := ""
 ## Localhost TCP port for console commands, or 0 for none.
 var admin_port := 0
+## UDP status port (decision 431): a server answers there only when given
+## (--status-port); a client asks there (--status-port, settings
+## status_port=), else at the game port + 2 (ServerStatus.port_for).
+var status_port := 0
+var _status_responder: ServerStatus.Responder
+## [ServerStatus.Query, game port] waiting for an answer.
+var _status_queries: Array[Array] = []
 ## Read console commands from stdin. Always on for --server.
 var console := false
 ## OpenAI-compatible chat endpoint and model for companion minds, from
@@ -568,6 +583,8 @@ func _apply_renderer_setting() -> void:
 		_settings_controls = str(settings.get("controls", ""))
 		if not _controls_given and _settings_controls != "":
 			controls = controls_from(_settings_controls)
+		if status_port == 0 and str(settings.get("status_port", "")).is_valid_int():
+			status_port = str(settings["status_port"]).to_int()
 		apply_view_options(settings)
 
 
@@ -881,6 +898,7 @@ func mispredicts_per_minute() -> int:
 ## Net's _process runs before every other node's, so the RPCs sent this
 ## frame never see the peer either.
 func _process(_delta: float) -> void:
+	_poll_status()
 	if online and mode == Mode.CLIENT and stats.log_due():
 		print("[net] client: rtt %d ms, %s" % [roundi(rtt_ms()), stats.client_text()])
 	if not online or not is_authority():
@@ -1201,10 +1219,53 @@ func message(kind: String, data: Dictionary) -> void:
 
 ## Closes the connection, if any. Safe to call more than once.
 func shutdown() -> void:
+	if _status_responder != null:
+		_status_responder.close()
+		_status_responder = null
 	if online:
 		online = false
 		get_tree().multiplayer_poll = true
 		multiplayer.multiplayer_peer.close()
+
+
+## Asks the server at [param at_address] (its game [param at_port]) how it
+## is: answered through status_received (decision 431). Needs no
+## connection, so the menu can ask before joining.
+func query_status(at_address: String, at_port: int) -> void:
+	var query := ServerStatus.Query.new()
+	query.send(at_address, ServerStatus.port_for(at_port, status_port))
+	_status_queries.append([query, at_port])
+
+
+## The status responder on --status-port; a port that cannot be had is
+## said and left (the game plays on without it).
+func _listen_status() -> void:
+	var at := status_port
+	_status_responder = ServerStatus.Responder.new()
+	_status_responder.info = func() -> Dictionary:
+		return {"version": claimed_version(), "protocol": protocol(), "players": _authenticated.size(),
+			"accepting": _authenticated.size() < max_players}
+	var error := _status_responder.listen(at)
+	if error != OK:
+		print("[net] status port %d unavailable (%s): no status answers" % [at, error_string(error)])
+		_status_responder = null
+	else:
+		print("[net] answering status on UDP %d" % at)
+
+
+func _poll_status() -> void:
+	if _status_responder != null:
+		_status_responder.poll()
+	for i in range(_status_queries.size() - 1, -1, -1):
+		var query: ServerStatus.Query = _status_queries[i][0]
+		var game_port: int = _status_queries[i][1]
+		var result := query.poll()
+		if result.is_empty():
+			continue
+		_status_queries.remove_at(i)
+		if result.get("ok", false):
+			result["compatible"] = result["protocol"] == protocol() or newer_version(str(result["version"]), claimed_version())
+		status_received.emit(query.address, game_port, result)
 
 
 ## Creates the ENet peer for the chosen mode. Called once by Main, after its
@@ -1248,6 +1309,8 @@ func start() -> void:
 			", token required" if token != "" else ", no token: open to anyone"])
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+		if mode == Mode.SERVER and status_port > 0:
+			_listen_status()
 		# The authority polls the network itself; see _process.
 		get_tree().multiplayer_poll = false
 	multiplayer.multiplayer_peer = peer
@@ -1386,6 +1449,9 @@ func _set_option(key: String, value: String) -> void:
 		"--admin-port":
 			if value.is_valid_int():
 				admin_port = value.to_int()
+		"--status-port":
+			if value.is_valid_int():
+				status_port = value.to_int()
 		"--max-players":
 			if value.is_valid_int():
 				max_players = clampi(value.to_int(), 1, 64)

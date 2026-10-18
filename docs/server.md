@@ -13,6 +13,7 @@ reset it.
 | Deploy script: pull, export, install, restart | `server/deploy.sh` |
 | Snapshot code | `net/snapshot.gd`, used by `main.gd` |
 | Console client | `server/admin.sh` → `--admin-port` |
+| Status before joining | `--status-port` (UDP, the game port + 2: 7779 live, 7789 staging), `ServerStatus` (decision 431) |
 | Token file template | `server/env.example` → `/etc/psykinetic/env` |
 | Client bundle | `client/` (`launch.bat`, `update.ps1`, `README.txt`, `settings.example.cfg`), built by `tools/release_client.ps1` |
 | Version | `version.txt`, `CHANGELOG.md` |

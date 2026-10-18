@@ -89,7 +89,7 @@ GAME_DATA="$STAGE/home/.local/share/godot/app_userdata/Psykinetic"
 mkdir -p "$GAME_DATA"
 cp -r "$LIVE_LEVELS" "$GAME_DATA/" 2>/dev/null || true
 TOKEN="stage-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
-HOME="$STAGE/home" APPDATA="$STAGE/home" $SERVER_CMD --headless --server "--port=$PORT" "--admin-port=$ADMIN" \
+HOME="$STAGE/home" APPDATA="$STAGE/home" $SERVER_CMD --headless --server "--port=$PORT" "--admin-port=$ADMIN" "--status-port=$((PORT + 2))" \
 	"--state=$STAGE/world.json" "--token=$TOKEN" "--mind-log=$STAGE/mind.log" \
 	"--transcripts=$STAGE/transcripts" --test-exit-after=120 </dev/null >"$STAGE/server.log" 2>&1 &
 SERVER=$!

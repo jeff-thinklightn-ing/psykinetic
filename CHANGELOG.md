@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The game can ask a server whether it is up, its version and how many are playing before you join, so the menu can show it.
 - Companions know when they are inside a building, and whose home it is; can
   look round inside one for you; step out of your way when asked or bumped;
   follow you indoors instead of standing in the doorway; and hold a door
