@@ -2600,7 +2600,8 @@ func _add_buildings() -> void:
 		var index := _buildings.size()
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
-			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false})
+			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
+			"open_air": slot in Level.OPEN_AIR, "crop": ""})
 		_show_state(_buildings[index])
 		if slot in Level.ON_WATER or slot in Level.OPEN_AIR or _glimpse:
 			continue  # Nobody stands in a well, a field is open (or a glimpse): no inside.
@@ -2858,6 +2859,22 @@ func _show_holes(building: Dictionary) -> void:
 				node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 
+## An open-air building's crop (decision 452 amended, economy's 449): its
+## town record's "crop" ("sown", "growing", "ripe", "flattened"; "" or none
+## bare) shows the slot's state_<crop>, the other crop states hidden; a
+## name the slot has no node for shows none.
+func _show_crop(building: Dictionary) -> void:
+	var crop := ""
+	if not str(building["use"]).is_empty():
+		crop = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("crop", ""))
+	if crop == building["crop"]:
+		return
+	building["crop"] = crop
+	for part: Node3D in (building["node"] as Node3D).find_children("state_*", "Node3D", true, false):
+		if part.name != "state_damaged":
+			part.visible = not crop.is_empty() and part.name == "state_" + crop
+
+
 ## Sets the buildings of [param town] (its id) to [param buildings] ({kind:
 ## {state, level}}, the "town" message, decision 297), and draws each of
 ## its buildings so. Kept across rebuilds: a town's state is not the map's.
@@ -2880,6 +2897,8 @@ func _show_state(building: Dictionary) -> void:
 	var state := Towns.STANDING
 	if not str(building["use"]).is_empty():
 		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+	if building.get("open_air", false):
+		_show_crop(building)
 	var damaged := state == Towns.DAMAGED
 	if damaged == building["damaged"]:
 		return
@@ -2907,7 +2926,7 @@ func _show_state(building: Dictionary) -> void:
 	# Its walls broken here and there (terrain's "broken": a ragged stub,
 	# never a way through; the sim keeps the wall).
 	var changed: Array[Vector3i] = []
-	for key in Level.outline(building["rect"]):
+	for key in Level.outline(building["rect"]) if not building.get("open_air", false) else []:
 		if _terrain["edges"].get(key) == Terrain.Edge.WALL and _broken_pick(key):
 			_set_wall_state(key, "broken" if damaged else "")
 			changed.append(key)

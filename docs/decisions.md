@@ -10907,6 +10907,15 @@ touched; protocol unchanged.
 Rejected: a fence edge kind in Terrain (every edge reader and the map
 format would learn it, for what one list does); fence art as map walls in
 a "fence" wall_set (the slot carries it whole, gap and all).
+Amended (the crop shown; economy's design with the coordinator): the
+"town" message's record for a town's "field" carries "crop" ("sown",
+"growing", "ripe", "flattened", "" bare), re-sent as it changes
+(building_changed); economy's side bumps the protocol. Client3D._show_crop,
+from _show_state (so set_town), shows the field's state_<crop> alone, every
+other crop state hidden; no "crop" (an older record or server), "" or a
+name the slot has no node for: bare. A damaged open-air building draws no
+broken wall stubs on its outline (its fence is the slot's). view_test
+_test_field: bare, ripe, sown, flattened while damaged, none, unknown.
 
 ## 445. The world map: areas, ways, places, the party
 

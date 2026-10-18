@@ -1043,6 +1043,28 @@ func _test_field() -> void:
 			"no wall drawn round the field, the temple's drawn (%s)" % [walled])
 	_check(Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not _rig._building_at.has(cell)) and _rig._building_at.has(Vector2i(3, 3)),
 			"the field has no inside; the temple has")
+	if field.size() != 1:
+		return
+	# Its crop (decision 452 amended): the town record's "crop" picks the
+	# slot's state_<crop>, one at a time; none, "" or an unknown name bare.
+	var building: Dictionary = field[0]
+	building["use"] = "field"
+	building["town_id"] = "crop_town"
+	var states := (building["node"] as Node3D).find_children("state_*", "Node3D", true, false)
+	var shown := func() -> Array: return states.filter(func(part: Node3D) -> bool: return part.visible).map(func(part: Node3D) -> String: return str(part.name))
+	_check(states.size() >= 4 and shown.call().is_empty(), "bare to begin with: none of its %d states shown" % states.size())
+	_rig.set_town("crop_town", {"field": {"state": Towns.STANDING, "crop": "ripe"}})
+	_check(shown.call() == ["state_ripe"], "ripe: state_ripe alone (%s)" % [shown.call()])
+	_rig.set_town("crop_town", {"field": {"state": Towns.STANDING, "crop": "sown"}})
+	_check(shown.call() == ["state_sown"], "sown: state_sown alone (%s)" % [shown.call()])
+	_rig.set_town("crop_town", {"field": {"state": Towns.DAMAGED, "crop": "flattened"}})
+	_check(shown.call() == ["state_flattened"] and Level.outline(rect).all(func(key: Vector3i) -> bool: return not _rig._wall_states.has(key)),
+			"flattened, damaged: state_flattened alone, no broken wall drawn on its fence (%s)" % [shown.call()])
+	_rig.set_town("crop_town", {"field": {"state": Towns.STANDING}})
+	_check(shown.call().is_empty(), "a record with no crop: bare")
+	_rig.set_town("crop_town", {"field": {"state": Towns.STANDING, "crop": "weeds"}})
+	_check(shown.call().is_empty(), "a crop the slot has no state for: bare")
+	_rig.town_states.erase("crop_town")
 
 
 func _test_double_doors() -> void:
