@@ -289,7 +289,7 @@ func _test_bodies_in_town() -> void:
 	_check(Resident.label_of("Odo", "medicine_man") == "Odo [medicine man]" and Resident.label_of("Wren", "") == "Wren",
 		"a trade id's underscores spaced in the label, a bare name for no trade")
 	var look := str(bram.spawn_spec.get("look", "")) if bram != null else ""
-	_check(look.begins_with("seed=") and look.contains(" build=") and look.ends_with("apron=yes"),
+	_check(look.begins_with("seed=") and look.contains(" build=") and look.ends_with("apron=yes trade=smith"),
 		"his spawn spec carries his look for the character generator (419), the smith's apron on: %s" % look)
 	_check(World.townsfolk().size() == 1 and not World.sought().has(bram), "one of the townsfolk, not sought (no monster's tier wakes for him)")
 	var hut := Rect2i(9, 5, 3, 3)

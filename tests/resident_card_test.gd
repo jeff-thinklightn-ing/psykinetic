@@ -146,14 +146,18 @@ func _test_plain_card() -> void:
 	_check(spec.begins_with("seed=%d " % card["look"]["seed"]) and pairs.get("apron") == "yes" and pairs.has("headwear") and pairs.has("shoulders")
 		and pairs.get("hair_colour") == card["look"]["hair_colour"], "seed first, every look word as key=value, an apron for the medicine man: %s" % spec)
 	_check(pairs.get("body", "") == {"she": "female", "he": "male"}.get(card["traits"]["pronoun"], ""), "body from the pronoun (%s -> %s)" % [card["traits"]["pronoun"], pairs.get("body", "none")])
-	_check(ResidentCard.look_spec(card, "hauler").ends_with("apron=no"), "no apron for a hauler")
+	_check(ResidentCard.look_spec(card, "hauler").ends_with("apron=no trade=hauler"), "no apron for a hauler, and his trade last (decision 480)")
+	var outcast := card.duplicate(true)
+	outcast["outcast"] = true
+	_check(outcast.get("outcast") == true and ResidentCard.look_spec(outcast, "merchant").ends_with("apron=no") and not ResidentCard.look_spec(outcast, "merchant").contains("trade="),
+		"an outcast's string names no trade: he stays as drawn (471)")
 	var bound := card.duplicate(true)
 	bound["look"]["hair"] = "bound up"
 	bound["traits"]["pronoun"] = "they"
 	bound["look"].erase("headwear")
 	var their := ResidentCard.look_spec(bound, "")
-	_check(their.contains("hair=bound ") and not their.contains("body=") and not their.contains("headwear="),
-		"'bound up' is written bound, 'they' leaves body to the seed, an old card without headwear leaves it out: %s" % their)
+	_check(their.contains("hair=bound ") and not their.contains("body=") and not their.contains("headwear=") and not their.contains("trade="),
+		"'bound up' is written bound, 'they' leaves body to the seed, an old card without headwear leaves it out, no trade no word: %s" % their)
 	_check(ResidentCard.look_spec({}, "smith").is_empty(), "no look, no string")
 	_check(ResidentCard.words(card) == words, "words() is the plain card while nothing is written")
 	_check(not ResidentCard.take_written(card, "Too short.") and not ResidentCard.take_written(card, "He says \"hello\" and this is long enough to pass the length test but has speech in it, so no."),

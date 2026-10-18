@@ -96,10 +96,12 @@ static func _roll_look(table: Dictionary, rng: RandomNumberGenerator, pronoun: S
 ## optional, so a word a card lacks (an old card's headwear) or a client
 ## does not know is left to the seed. "seed=48213 body=female build=heavy
 ## stature=tall age=old posture=stooped shoulders=narrow hair=bound
-## hair_colour=grey beard=none headwear=hood apron=yes": body from the
-## pronoun (none for "they": the seed picks), "bound" for the card's "bound
-## up", the apron from [param trade] (APRON_TRADES). "" for a card with no
-## look.
+## hair_colour=grey beard=none headwear=hood apron=yes trade=smith": body
+## from the pronoun (none for "they": the seed picks), "bound" for the
+## card's "bound up", the apron from [param trade] (APRON_TRADES), and the
+## trade itself last (pc-character's decision 480: garb for a trade the
+## look names none for; left out for a card marked "outcast", 471's
+## Snagfin, who stays as drawn). "" for a card with no look.
 static func look_spec(card: Dictionary, trade := "") -> String:
 	var look: Dictionary = card.get("look", {})
 	if look.is_empty():
@@ -116,6 +118,8 @@ static func look_spec(card: Dictionary, trade := "") -> String:
 			word = "bound"
 		parts.append("%s=%s" % [key, word])
 	parts.append("apron=%s" % ("yes" if trade in APRON_TRADES else "no"))
+	if not trade.is_empty() and not bool(card.get("outcast", false)):
+		parts.append("trade=" + trade)
 	return " ".join(parts)
 
 
