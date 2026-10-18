@@ -1675,6 +1675,16 @@ spread is 10% either way, as asked; loops already start anywhere along
 them. All of it is the view's: every peer draws the same monster the same,
 each from its name.
 
+
+Amended (Jeff, 2026-10-18: "the idle need variability and same scratch is very predictable"):
+people stood with one fidget, the head scratch, at the same second every run. Now each body
+has its own table (Client3D.HUMAN_FIDGETS, ORC_FIDGETS, KOBOLD_FIDGETS; the goblin's FIDGETS
+gains two), from five fidgets tools/humanoid_clips.py authors on the humanoid library
+(Fidget_Shift, Fidget_LookBack, Fidget_Shoulders, Fidget_Sleeve, Fidget_ArmsCrossed), the
+scratch the rarest of a person's. When and which come from a generator of each body's own,
+seeded by its name and a seed of this run's (_session_seed), every FIDGET_SECONDS_MIN to MAX
+(now 6 to 25 s), never the same clip twice running; its size, pace and blows stay its name's
+alone (162), alike on every view. Client only.
 ## 172. The network stats trim themselves, whether or not anyone reads them
 
 NetStats kept a sample per tick and per frame and dropped those older than

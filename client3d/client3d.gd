@@ -515,10 +515,10 @@ const MODELS := {
 		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
 	"brute": {"scene": "res://art/models/characters/orc.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.95,
 		"faces": PI * 0.5, "by_mass": false, "gaits": ORC_GAITS, "backpedal": 5.26, "parts": true, "people": "orc",
-		"fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": ORC_SOCKETS},
+		"fidgets": ORC_FIDGETS, "moves": HUMANOID_MOVES, "sockets": ORC_SOCKETS},
 	"sneak": {"scene": "res://art/models/characters/kobold.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.0,
 		"faces": PI * 0.5, "by_mass": false, "gaits": KOBOLD_GAITS, "backpedal": 2.34, "parts": true, "people": "kobold",
-		"fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": KOBOLD_SOCKETS},
+		"fidgets": KOBOLD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": KOBOLD_SOCKETS},
 }
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
@@ -538,19 +538,31 @@ const ATTACK_CLIPS: Array[String] = ["Punch_Jab", "Punch_Cross", "Kick"]
 const HIT_CLIPS: Array[String] = ["Hit_Chest", "Hit_Head", "Hit_Shoulder_L", "Hit_Shoulder_R"]
 const DEATH_CLIPS: Array[String] = ["Death01", "Death02"]
 ## Standing, a model now and then fidgets (once FIDGET_CALM_SECONDS from the
-## last blow near it, every FIDGET_SECONDS_MIN to MAX): one of FIDGETS, by
-## weight, not the one before; a loop among them is played for one round
-## of it. Hurt or winded it stands tired.
+## last blow near it, every FIDGET_SECONDS_MIN to MAX): one of FIDGETS (or
+## its model's "fidgets"), by weight, not the one before; a loop among them
+## is played for one round of it. When, and which, are its own and differ
+## run to run (its "fidget_rng", seeded by its name and _session_seed; Jeff:
+## "the idle need variability and same scratch is very predictable"), while
+## its size, pace and blows stay its name's alone, alike on every view. Hurt
+## or winded it stands tired.
 const CLIP_LOOK_ABOUT := "Idle_LookAround"
 const FIDGETS := {"Idle_LookAround": 4, "Idle_Talking": 2, "Drink": 1, "Fixing_Kneeling": 1,
-	"PickUp_Kneeling": 1, "Crouch_Idle": 1}
+	"PickUp_Kneeling": 1, "Crouch_Idle": 1, "Fidget_Shift": 1, "Fidget_LookBack": 1}
+## A person's: the head scratch (Idle_LookAround) the rarest of them
+## (tools/humanoid_clips.py's fidgets); the orc's and the kobold's their own.
+const HUMAN_FIDGETS := {"Idle_LookAround": 1, "Fidget_Shift": 3, "Fidget_LookBack": 3, "Fidget_Shoulders": 3,
+	"Fidget_Sleeve": 2, "Fidget_ArmsCrossed": 2}
+const ORC_FIDGETS := {"Idle_LookAround": 1, "Fidget_Shoulders": 3, "Fidget_ArmsCrossed": 3, "Fidget_Shift": 2}
+const KOBOLD_FIDGETS := {"Idle_LookAround": 1, "Fidget_LookBack": 3, "Fidget_Sleeve": 3, "Fidget_Shift": 2}
+## This run's: so a person's fidgets come at other moments each run.
+static var _session_seed := randi()
 const CLIP_TIRED := "Idle_Tired"
 ## Sitting (Monster.Pose.SIT, at a gathering): down, sat, and up again.
 const CLIP_SIT_DOWN := "GroundSit_Enter"
 const CLIP_SITTING := "GroundSit_Idle"
 const CLIP_SIT_UP := "GroundSit_Exit"
-const FIDGET_SECONDS_MIN := 7.0
-const FIDGET_SECONDS_MAX := 20.0
+const FIDGET_SECONDS_MIN := 6.0
+const FIDGET_SECONDS_MAX := 25.0
 const FIDGET_CALM_SECONDS := 4.0
 const TIRED_BELOW := 0.34
 ## A wound-up blow (Monster's HEAVY): this clip, played so that its swing
@@ -609,7 +621,7 @@ const GAIT_HYSTERESIS := 1.15
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
+	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
 ## The human bodies' gaits (decision 399 amended twice): the pack's jog and
 ## sprint take 2.6 m and 4 m steps, too long for a player's 4 tiles a second
 ## (Jeff on v0.1.149); Jog_Short and Sprint_Short narrow their swing
@@ -631,7 +643,7 @@ const POSTURES := {"stooped": "Posture_Stooped", "slouching": "Posture_Slouch"}
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_F_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
+	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
@@ -7037,7 +7049,10 @@ static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void
 	puppet.set_meta("pace", size * (1.0 + rng.randf_range(-PACE_SPREAD, PACE_SPREAD)))
 	puppet.set_meta("tempo", 1.0 + rng.randf_range(-TEMPO_SPREAD, TEMPO_SPREAD))
 	puppet.set_meta("rng", rng)
-	puppet.set_meta("fidget_at", Time.get_ticks_msec() + int(rng.randf_range(2.0, FIDGET_SECONDS_MAX) * 1000.0))
+	var fidget_rng := RandomNumberGenerator.new()
+	fidget_rng.seed = hash(String(entity.name)) ^ _session_seed
+	puppet.set_meta("fidget_rng", fidget_rng)
+	puppet.set_meta("fidget_at", Time.get_ticks_msec() + int(fidget_rng.randf_range(2.0, FIDGET_SECONDS_MAX) * 1000.0))
 
 
 ## One of [param clips], at random, not [param puppet]'s last of them.
@@ -7056,7 +7071,7 @@ static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 ## One of FIDGETS for [param puppet], by weight, not its last (any with no
 ## clip in [param rig] left out); "" for none.
 static func _pick_fidget(puppet: Node3D, rig: AnimRig) -> String:
-	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
+	var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng", null))
 	var last := str(puppet.get_meta("last_fidget", ""))
 	var fidgets: Dictionary = puppet.get_meta("fidgets", FIDGETS)
 	var total := 0
@@ -7143,7 +7158,7 @@ func _animate(puppet: Node3D) -> void:
 		return
 	var idle := _idle_clip(puppet)
 	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
-		var rng: RandomNumberGenerator = puppet.get_meta("rng")
+		var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng"))
 		puppet.set_meta("fidget_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
 		var fidget := _pick_fidget(puppet, rig)
 		if not fidget.is_empty():

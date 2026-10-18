@@ -160,6 +160,45 @@ NOCK = SIDE_ON + [("upperarm_l", Vector((0.15, -1.0, -0.25)), AIM), ("lowerarm_l
 	("upperarm_r", Vector((-0.2, -0.7, -0.6)), AIM), ("lowerarm_r", Vector((0.55, -0.8, 0.15)), AIM)] + ROLL
 DRAWN = SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, 0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.04)), AIM),
 	("upperarm_r", Vector((-0.35, 0.9, 0.05)), AIM), ("lowerarm_r", Vector((0.5, -0.85, 0.05)), AIM)] + ROLL
+# Fidgets (Jeff: "the idle need variability and same scratch is very predictable"): short
+# things a person does standing about, each from Idle and back to it, so any may follow any.
+# Shift: the weight onto one leg, the hip out and the shoulders tilting against it.
+SHIFT = [("spine_01", TILT, -4.0), ("spine_02", TILT, 3.0), ("spine_03", TILT, 2.0), ("Head", TILT, 2.0),
+	("thigh_r", TILT, -3.0), ("calf_r", LIFT, -10.0), ("thigh_r", LIFT, 6.0)]
+# Look back: over the right shoulder, the trunk turning with the head.
+LOOK_BACK = [("spine_01", TURN, -8.0), ("spine_02", TURN, -12.0), ("spine_03", TURN, -14.0), ("neck_01", TURN, -25.0),
+	("Head", TURN, -30.0)]
+# Shoulders: both clavicles up (a shrug, a roll), the chest a little back.
+SHRUG = [("clavicle_l", TILT, 14.0), ("clavicle_r", TILT, -14.0), ("spine_03", LIFT, 4.0), ("Head", LIFT, -4.0)]
+# Brush the sleeve: the left forearm before the waist, the right hand across it, eyes down.
+SLEEVE = [("upperarm_l", Vector((0.15, -0.35, -1.0)), AIM), ("lowerarm_l", Vector((-0.75, -0.6, 0.1)), AIM),
+	("upperarm_r", Vector((-0.1, -0.45, -1.0)), AIM), ("lowerarm_r", Vector((0.85, -0.5, 0.2)), AIM),
+	("Head", LIFT, -18.0), ("neck_01", LIFT, -8.0)]
+# Arms crossed: both forearms folded across the chest.
+CROSSED = [("upperarm_l", Vector((0.12, -0.3, -1.0)), AIM), ("lowerarm_l", Vector((-1.0, -0.3, 0.25)), AIM),
+	("upperarm_r", Vector((-0.12, -0.32, -1.0)), AIM), ("lowerarm_r", Vector((1.0, -0.35, 0.3)), AIM),
+	("spine_03", LIFT, 3.0)]
+CLIPS["Fidget_Shift"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0)), (0.7, P("Idle_Loop", 0.7, SHIFT, move=(-0.035, 0.0, -0.01))),
+	(2.2, P("Idle_Loop", 2.2, SHIFT, move=(-0.035, 0.0, -0.01))), (3.0, P("Idle_Loop", 0.0)),
+]}
+CLIPS["Fidget_LookBack"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0)), (0.8, P("Idle_Loop", 0.8, LOOK_BACK)), (1.8, P("Idle_Loop", 1.8, LOOK_BACK)),
+	(2.6, P("Idle_Loop", 0.0)),
+]}
+CLIPS["Fidget_Shoulders"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0)), (0.45, P("Idle_Loop", 0.45, SHRUG)), (0.9, P("Idle_Loop", 0.9)),
+	(1.35, P("Idle_Loop", 1.35, SHRUG)), (2.0, P("Idle_Loop", 0.0)),
+]}
+CLIPS["Fidget_Sleeve"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0)), (0.6, P("Idle_Loop", 0.6, SLEEVE)),
+	(1.0, P("Idle_Loop", 1.0, SLEEVE + [("lowerarm_r", LIFT, 12.0)])), (1.4, P("Idle_Loop", 1.4, SLEEVE)),
+	(1.8, P("Idle_Loop", 1.8, SLEEVE + [("lowerarm_r", LIFT, 12.0)])), (2.5, P("Idle_Loop", 0.0)),
+]}
+CLIPS["Fidget_ArmsCrossed"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0)), (0.7, P("Idle_Loop", 0.7, CROSSED)),
+	(2.6, P("Idle_Loop", 2.6, CROSSED + [("Head", TURN, 8.0)])), (3.4, P("Idle_Loop", 0.0)),
+]}
 CLIPS["Bow_Idle_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
 	(1.25, P("Idle_Loop", 1.25, BOW_LOW + [("spine_02", LIFT, -2.0)])),

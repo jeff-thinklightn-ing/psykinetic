@@ -2141,7 +2141,8 @@ func _test_allies() -> void:
 				"a %s: %s's skin (%s), only its own parts (%s), %s" % [entity.spawn_spec["kind"], people, look.colours["skin"].to_html(false), shown, look.posture])
 		var rig := puppet.get_meta("rig") as AnimRig
 		var sockets: Dictionary = puppet.get_meta("sockets", {})
-		_check(rig.playing() == Client3D.CLIP_IDLE and sockets.has("hand_r") and sockets.has("hand_l"),
+		var model_fidgets: Dictionary = Client3D.MODELS[str(entity.spawn_spec["kind"])]["fidgets"]
+		_check((rig.playing() == Client3D.CLIP_IDLE or model_fidgets.has(rig.playing())) and sockets.has("hand_r") and sockets.has("hand_l"),
 				"its clips play on it (%s) and it has hands to hold things" % rig.playing())
 	var heights := []
 	for puppet: Node3D in [_rig._puppets[orcs[0].get_instance_id()], _rig._puppets[kobold.get_instance_id()]]:
@@ -2155,6 +2156,31 @@ func _test_allies() -> void:
 		(_rig._puppets[orcs[1].get_instance_id()].get_meta("look") as PersonLook)]
 	_check(two[0].keys != two[1].keys or two[0].colours != two[1].colours or two[0].parts != two[1].parts,
 			"two orcs differ")
+	# Their fidgets (Jeff: "the idle need variability"): their own, never the same twice
+	# running, timed by a generator of this run's (the name and _session_seed).
+	var orc_puppet: Node3D = _rig._puppets[orcs[0].get_instance_id()]
+	var orc_rig := orc_puppet.get_meta("rig") as AnimRig
+	_rig._combat_at.erase(orcs[0].get_instance_id())
+	var picked: Array[String] = []
+	for i in 30:
+		orc_puppet.set_meta("fidget_at", 0)
+		orc_puppet.set_meta("busy_until", 0)
+		orc_puppet.set_meta("fidgeting", false)
+		_rig._animate(orc_puppet)
+		picked.append(orc_rig.playing())
+	var kinds := {}
+	for clip in picked:
+		kinds[clip] = true
+	_check(picked.all(func(clip: String) -> bool: return Client3D.ORC_FIDGETS.has(clip)) and kinds.size() >= 3
+			and range(1, picked.size()).all(func(i: int) -> bool: return picked[i] != picked[i - 1]),
+			"an orc fidgets its own ways, never the same twice running (%s)" % [kinds.keys()])
+	var fidget_rng := orc_puppet.get_meta("fidget_rng") as RandomNumberGenerator
+	_check(fidget_rng != null and fidget_rng.seed == hash(String(orcs[0].name)) ^ Client3D._session_seed
+			and (orc_puppet.get_meta("rng") as RandomNumberGenerator).seed == hash(String(orcs[0].name)),
+			"when it fidgets is this run's (its name and the session's seed); its size and blows its name's alone")
+	_check(Client3D.HUMAN_FIDGETS.size() >= 5 and Client3D.HUMAN_FIDGETS.values().min() == Client3D.HUMAN_FIDGETS["Idle_LookAround"]
+			and Client3D.HUMAN_FIDGETS.keys().all(func(clip: String) -> bool: return orc_rig.has(clip)),
+			"a person has %d fidgets in the library, the head scratch the rarest" % Client3D.HUMAN_FIDGETS.size())
 	for entity: Monster in orcs + [kobold]:
 		World.despawn(entity)
 	_rig._process(0.0)
@@ -2358,7 +2384,10 @@ func _test_humans() -> void:
 		if model == null or not puppet.has_meta("rig"):
 			continue
 		var animator := puppet.get_meta("rig") as AnimRig
-		_check(animator.playing() == Client3D.CLIP_IDLE, "standing: Idle")
+		# Standing, now and then fidgeting (decision 171: the first fidget comes at a moment of
+		# this run's, as early as 2 s in).
+		_check(animator.playing() == Client3D.CLIP_IDLE or Client3D.HUMAN_FIDGETS.has(animator.playing()),
+				"standing: Idle, or a fidget (%s)" % animator.playing())
 		var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 		var y := func(bone: String) -> float:
 			return (skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(bone)).origin).y
@@ -2663,7 +2692,8 @@ func _test_goblin() -> void:
 			and (Client3D.ATTACK_CLIPS + Client3D.HIT_CLIPS + Client3D.DEATH_CLIPS + Client3D.FIDGETS.keys()
 				+ [Client3D.CLIP_SIT_DOWN, Client3D.CLIP_SITTING, Client3D.CLIP_SIT_UP]).all(
 			func(clip: String) -> bool: return clip in clips), "with all its clips (%s)" % [clips])
-	_check(animator.playing() == "Idle", "standing: Idle")
+	_check(animator.playing() == "Idle" or Client3D.FIDGETS.has(animator.playing()),
+			"standing: Idle, or a fidget (%s)" % animator.playing())
 	var bone_count := 0
 	for skeleton in puppet.find_children("*", "Skeleton3D", true, false):
 		bone_count = (skeleton as Skeleton3D).get_bone_count()
