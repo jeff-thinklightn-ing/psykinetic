@@ -47,6 +47,7 @@ notes (decision 324).
 - Archers draw their bows: the bow comes up, an arrow is nocked and pulled to
   the jaw, held there at full draw, and loosed. A raised shield is held up in
   guard.
+- The bow is heard: a creak as it's drawn, a twang as it's loosed, and the arrow where it ends as it gets there: a body struck, a friend's soft thud as it sticks in, a door's wood, a wall's stone, a splash, or the arrow falling where it ran out (Freesound takes; decision 386).
 
 ## v0.1.151
 
@@ -90,7 +91,6 @@ notes (decision 324).
   town remembers as memory, never as fact. Off unless the server turns him on.
 - Deer in the wilds are deer now, not grey boxes: they walk, bound away,
   graze, look up and fall.
-- The bow is heard: a creak as it's drawn, a twang as it's loosed, and the arrow where it ends as it gets there: a body struck, a friend's soft thud as it sticks in, a door's wood, a wall's stone, a splash, or the arrow falling where it ran out (Freesound takes; decision 386).
 - The town starts keeping its own stories: when a bard or a tale-teller among
   the townsfolk speaks of a neighbour, an ailment, a quarrel, the town
   remembers who said it and to whom, and the tale spreads at the well with
