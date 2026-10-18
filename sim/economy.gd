@@ -22,6 +22,9 @@ extends RefCounted
 ## the treasury. A player's gold is theirs: nothing takes it but buying.
 
 ## A town's count of residents on the dole changed (decision 353).
+## Hidden types (npc's 393) with a rules entry of their own here: buy and
+## sell factors on their trade, and a scoundrel's repay share.
+const TYPE_RULES: Array[String] = ["merchant", "scoundrel"]
 signal dole_changed(town: String, count: int)
 
 const PATH := "res://levels/economy.json"
@@ -535,7 +538,10 @@ func _bank_turn(id: String, town: String) -> void:
 	var owed := float(who["loan"])
 	if bank.is_empty() or owed <= 0.0:
 		return
-	var back := mini(ceili(owed), ceili(int(who["purse"]) * float(bank.get("repay_share", 0.5))))
+	var share := float(bank.get("repay_share", 0.5))
+	var by_type: Dictionary = rules.get(str(who.get("type", "")), {}) if str(who.get("type", "")) in TYPE_RULES else {}
+	share = float(by_type.get("repay", share))  # A scoundrel's 0: he never pays back on his own.
+	var back := mini(ceili(owed), ceili(int(who["purse"]) * share))
 	if back > 0 and production.spend(id, back, "paying back the town"):
 		owed = maxf(owed - back, 0.0)
 		stockpile.deposit(town, "gold", back, "repay:%s" % id, "%s paid back %d to the town (owes %d)" % [who["name"], back, ceili(owed)])
@@ -567,12 +573,14 @@ func _pay(town: String, payee: String, amount: int, kind: String, why: String, b
 # --- Merchants (decision 440, economy's side) --------------------------------------
 
 ## How worker [param worker_id]'s hidden type (npc's 393) bends their own
-## trade on [param side] ("buy" or "sell"): rules' merchant buy or sell for
-## a merchant, 1 for everyone else (and for no worker).
+## trade on [param side] ("buy" or "sell"): the type's rules buy or sell for
+## a type in TYPE_RULES (a merchant, a scoundrel: decision 492), 1
+## for everyone else (and for no worker).
 func folk_factor(worker_id: String, side: String) -> float:
-	if worker_id.is_empty() or str(production.worker(worker_id).get("type", "")) != "merchant":
+	var type := str(production.worker(worker_id).get("type", "")) if not worker_id.is_empty() else ""
+	if type not in TYPE_RULES:
 		return 1.0
-	return float(rules.get("merchant", {}).get(side, 1.0))
+	return float(rules.get(type, {}).get(side, 1.0))
 
 
 ## [param base] as resident [param buyer] pays it to [param seller] (a

@@ -12912,3 +12912,20 @@ night, the next fact after; no standing inn, no song). Protocol unchanged
 Rejected: a model writing the song (invention); singing beliefs or
 rumours (422 passes those as talk); every zone hearing it (the inn's
 walls); pay for the bard (Jeff may want a hat passed, later).
+## 492, economy's side (npc's scoundrel, on 393: the coordinator's approval)
+
+The hooks npc's scoundrel calls; the numbers are npc's drafts, Jeff's to
+move (economy.json "scoundrel": {"buy": 1.0, "sell": 1.1, "repay": 0.0}).
+- Production.made(town, worker_id, uid): every made thing, told just
+  after it is minted, before a raw's yield is banked as stock (the
+  tanner's leather) or a thing goes on its maker's shelf. The scoundrel
+  measures it short there (items' 493: the raws, never gear).
+- Economy.folk_factor by type: the hidden types with rules of their own
+  are Economy.TYPE_RULES (merchant, scoundrel), each its rules' buy and
+  sell; everyone else 1. A scoundrel sells to his neighbours a little dear.
+- The bank's repay share by type: a type in TYPE_RULES with "repay" uses
+  it in place of bank.repay_share. The scoundrel's 0 means he never pays
+  back on his own; the cap, interest and working it off as labour (354)
+  are as for anyone, so the bank is never cheated past them.
+larder_test. Protocol unchanged.
+

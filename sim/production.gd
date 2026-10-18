@@ -86,6 +86,10 @@ signal hunted(town: String, worker_id: String, kind: String)
 ## effect, for (an owner's carrier key), town) is done (decision 434): Towns
 ## holds a blessed thing for its owner.
 signal work_done(job: Dictionary)
+## Worker [param worker_id] of [param town] made a thing, [param uid], just
+## minted: before a raw's yield is banked as stock or a thing goes on their
+## shelf, so npc's scoundrel can measure it short first (decision 492).
+signal made(town: String, worker_id: String, uid: int)
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
 ## (need -> step due), fed, hungry_since, last_trade, wage_due, hunt_due, loan
@@ -658,6 +662,9 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		# Gear it was made from is in what it became.
 		for used: int in each["uids"]:
 			book().end(used, "used", "made into %s #%d" % [each["recipe"], uid])
+		# Told before its yield is read or it is shelved: a scoundrel's
+		# measures it short here (492, items' 493).
+		made.emit(str(each["town"]), str(worker_record["id"]), uid)
 	each["uids"] = []
 	var yields := Items.yield_of(book().id_of(uid)) if uid != 0 else {}
 	if not yields.is_empty():

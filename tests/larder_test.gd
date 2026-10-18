@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_merchant()
 	_test_first_stores()
 	_test_thief_hooks()
+	_test_scoundrel_hooks()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -377,6 +378,42 @@ func _test_thief_hooks() -> void:
 	_check(all_gold.call() == before, "gold only moved (%d)" % all_gold.call())
 	stock.take(TOWN, "gold", stock.count(TOWN, "gold"))
 	_check(economy.fence(TOWN, "m1", "t1", "cloth", 0.5, 0.4) == 0 and stock.count(TOWN, "cloth") == 1, "the treasury at its floor: nothing moves")
+
+
+## The scoundrel's hooks (decision 492, economy's side): a made thing told
+## before it is shelved, his trade a little dear, no repaying on his own.
+func _test_scoundrel_hooks() -> void:
+	print("
+== the scoundrel's hooks ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.add_worker("s1", "Grub", ["cook"], TOWN, "test", "scoundrel")
+	work.add_worker("h1", "Ash", ["hauler"], TOWN, "test", "steady")
+	var rule: Dictionary = _rules["scoundrel"]
+	_check(is_equal_approx(economy.folk_factor("s1", "sell"), float(rule["sell"])) and is_equal_approx(economy.folk_factor("s1", "buy"), float(rule["buy"]))
+		and economy.folk_factor("h1", "sell") == 1.0, "he sells at %.2f, buys at %.2f; anyone else at 1" % [economy.folk_factor("s1", "sell"), economy.folk_factor("s1", "buy")])
+	_check(economy._folk_price(10, "h1", "s1") == roundi(10 * float(rule["sell"])), "a neighbour pays him a little dear (%d for 10)" % economy._folk_price(10, "h1", "s1"))
+	for id in ["s1", "h1"]:
+		work.pay(id, 20)
+		work.set_loan(id, 10.0)
+		economy._bank_turn(id, TOWN)
+	_check(int(work.worker("s1")["purse"]) == 20 and is_equal_approx(float(work.worker("s1")["loan"]), 10.0), "he pays nothing back on his own (owes %.0f)" % float(work.worker("s1")["loan"]))
+	_check(int(work.worker("h1")["purse"]) < 20 and float(work.worker("h1")["loan"]) < 10.0, "a steady one does")
+	var told := []
+	work.made.connect(func(town: String, who: String, uid: int) -> void: told.append([town, who, uid, uid in stock.all_items()]))
+	work.add_workshop("k1", "cook", TOWN)
+	work.assign("k1", "s1")
+	stock.deposit(TOWN, "food", 5)
+	work.order("k1", "ration")
+	var until := _now + 20000
+	while _now < until and told.is_empty():
+		_now += World.WORLD_TICK_STEPS
+		work.tick()
+	_check(told.size() == 1 and told[0][0] == TOWN and told[0][1] == "s1" and stock.book.id_of(int(told[0][2])) == "ration"
+		and not told[0][3] and int(told[0][2]) in stock.all_items(), "made: the town, the maker and the ration's uid, before it is shelved (%s)" % [told])
 
 
 func _check(ok: bool, what: String) -> void:
