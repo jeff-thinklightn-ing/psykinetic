@@ -5858,7 +5858,10 @@ func _sync_puppets() -> void:
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
-			(puppet.get_meta("creature_view") as CreatureView).frame(puppet, entity as Monster)
+			var view := puppet.get_meta("creature_view") as CreatureView
+			if view.rig != null:
+				view.rig.every = _pose_every(puppet)
+			view.frame(puppet, entity as Monster)
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
 	for id in _puppets.keys():

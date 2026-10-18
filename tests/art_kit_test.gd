@@ -457,6 +457,11 @@ func _test_creature_rig() -> void:
 	library.remove_animation("Attack")
 	var biteless := ArtCheck.check_node("creature.wolf", grey)
 	_check(biteless.any(func(line: String) -> bool: return line.begins_with("error: no \"attack\" clip")), "no attack: an error, it reads wrong without one")
+	var timed := func(contact: Variant) -> Array[String]:
+		return ArtCheck._check_rig({"clips": [{"name": "death", "names": ["death"], "contact": contact}]}, grey)
+	_check(timed.call(0.35).is_empty() and timed.call(1.5).any(func(line: String) -> bool: return "contact" in line)
+			and timed.call("mid").any(func(line: String) -> bool: return "contact" in line),
+			"a clip's contact (where its blow lands, for CreatureView): a fraction of it, else an error")
 	grey.free()
 
 

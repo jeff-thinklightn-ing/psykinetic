@@ -2447,14 +2447,34 @@ func _test_creature_puppets() -> void:
 			"the Pig's clips found by the slot's names: %s" % [view.clips])
 	_check(view.resolve("charge") == view.clips["run"] and view.resolve("alert") == view.clips["idle"] and not view.clips.has("hit"),
 			"no charge, alert or hit of its own: run and idle stand in (a flinch for a hit)")
-	var player := art.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
-	_check(player.get_animation(view.clips["walk"]).loop_mode == Animation.LOOP_LINEAR
+	var rig := view.rig
+	_check(rig != null and art.is_ancestor_of(rig) and rig.tree.tree_root.has_node("action") and not rig.tree.tree_root.has_node("upper")
+			and art.find_children("*", "AnimationPlayer", true, false).size() == 1,
+			"played by an AnimRig of its own in the art (decision 390): no upper layer, one AnimationPlayer (the rig's)")
+	var player := rig.player if rig != null else null
+	_check(player != null and player.get_animation(view.clips["walk"]).loop_mode == Animation.LOOP_LINEAR
 			and player.get_animation(view.clips["death"]).loop_mode == Animation.LOOP_NONE, "its walk loops, its death plays once")
+	if rig == null:
+		World.despawn(boar)
+		return
 	view.frame(puppet, boar)
-	_check(player.current_animation == view.clips["idle"], "standing still: idle")
+	_check(rig.playing() == view.clips["idle"], "standing still: idle")
+	_rig._process(0.0)
+	_check(rig.every >= 1, "posed as often as Client3D says (_pose_every)")
+	view._loop("walk", 1.3)
+	view._loop("walk", 0.8)
+	_check(rig.base_clip() == view.clips["walk"] and is_equal_approx(rig.speed(), 0.8), "a gait's pace changes its speed, not its clip")
 	view.wind(0.6)
-	_check(player.current_animation == view.clips["attack"] and player.speed_scale > 0.0, "a wound-up blow plays its headbutt")
-	_check(view.die() > 0.0 and player.current_animation == view.clips["death"], "dying plays its death")
+	var length := rig.length(view.clips["attack"])
+	_check(rig.striking() and rig.playing() == view.clips["attack"]
+			and is_equal_approx(rig.speed(), clampf(length * CreatureView.CONTACT / 0.6, AnimRig.STRIKE_SPEED_MIN, AnimRig.STRIKE_SPEED_MAX)),
+			"a wound-up blow strikes its headbutt, its middle landing in 0.6 s")
+	var wound := rig.speed()
+	view.swing()
+	_check(rig.playing() == view.clips["attack"] and is_equal_approx(rig.speed(), wound), "a swing while it plays is let be")
+	view.unwind()
+	_check(not rig.striking(), "a wind-up given up stops it")
+	_check(view.die() > 0.0 and rig.playing() == view.clips["death"], "dying plays its death")
 	World.despawn(boar)
 	await _frames(2)
 
