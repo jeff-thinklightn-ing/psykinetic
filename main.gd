@@ -374,6 +374,10 @@ var _went_online := false
 var _connect_joining := false
 ## The last tick this view saw, for F3.
 var _hud_tick := 0
+## The hint over what the cursor is on ("E  open"), outlined, by the cursor.
+var _context_hint: Label
+## --test-show=hint: the thing the hint is shown on, as if the cursor were on it.
+var _test_hint_thing: GridEntity
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
@@ -471,6 +475,7 @@ func _play() -> void:
 		# An exported client with no settings.cfg yet: ask once, then join.
 		_connect_screen().edit()
 		return
+	_ask_server_status()
 	if Net.mode == Net.Mode.CLIENT:
 		_connect_status("connecting to %s:%d" % [Net.address, Net.port])
 	if not _went_online:
@@ -490,6 +495,43 @@ func _show_menu() -> void:
 	$HUD.visible = false
 	if connect_screen != null:
 		connect_screen.visible = false
+	_ask_server_status()
+
+
+## The server's status for the menu and the connect screen (maps' Net.query_status
+## and status_received, once they exist): "online, v0.1.150, 3 players", "no
+## answer", with "out of date: updates when you join" when the build would not fit.
+func _ask_server_status() -> void:
+	if not Net.has_method("query_status") or Net.address.is_empty():
+		return
+	if not Net.is_connected("status_received", _on_server_status):
+		Net.connect("status_received", _on_server_status)
+	Net.call("query_status", Net.address, Net.port)
+
+
+func _on_server_status(address: String, port: int, result: Dictionary) -> void:
+	if address != Net.address or port != Net.port:
+		return
+	var words := server_status_words(result)
+	if main_menu != null:
+		main_menu.set_status(words)
+	if connect_screen != null:
+		connect_screen.set_status(words)
+
+
+## [param result] (maps' shape: ok, version, players, accepting, compatible;
+## or ok false with why) in words, the parts set off by middle dots.
+static func server_status_words(result: Dictionary) -> String:
+	if not bool(result.get("ok", false)):
+		return str(result.get("why", "no answer"))
+	var players := int(result.get("players", 0))
+	var parts: Array[String] = ["online", "v%s" % str(result.get("version", "?")),
+		"%d player%s" % [players, "" if players == 1 else "s"]]
+	if not bool(result.get("accepting", true)):
+		parts.append("not taking players now")
+	if not bool(result.get("compatible", true)):
+		parts.append("out of date: updates when you join")
+	return " · ".join(parts)
 
 
 ## The join flow's screen (ConnectScreen), made the first time.
@@ -652,6 +694,32 @@ func _process(delta: float) -> void:
 	_update_pack()
 	if compass != null:
 		compass.north_on_screen = screen_north()
+		compass.place = place_text(_local_player())
+	if _context_hint != null:
+		var words := ""
+		if not is_typing() and DisplayServer.get_name() != "headless":
+			words = context_hint_for(_entity_under_mouse())
+			if words.is_empty():
+				words = context_hint_for(_door_under_mouse())
+			if words.is_empty():
+				# A prop on the cell under the cursor (the pick ray finds bodies, not chests).
+				var under := _mouse_tile()
+				for entity in World.get_entities():
+					if entity.spawned and entity.tile == under and (entity is Chest or entity is Cargo or entity is Companion):
+						words = context_hint_for(entity)
+						break
+			if words.is_empty() and _local_player() != null and not World.ground_at(_mouse_tile()).is_empty():
+				words = "F  pick up"
+		var at := get_viewport().get_mouse_position()
+		if is_instance_valid(_test_hint_thing) and _client3d != null:
+			# --test-show=hint: the hint as the cursor on that thing would show it.
+			words = context_hint_for(_test_hint_thing)
+			at = _client3d.screen_of_tile(_test_hint_thing.tile)
+		_context_hint.visible = not words.is_empty()
+		if not words.is_empty():
+			_context_hint.text = words
+			_context_hint.reset_size()
+			_context_hint.position = at + Vector2(28.0, 28.0)
 	if debug_overlay.visible:
 		debug_overlay.text = _debug_text()
 	_update_toss_aim()
@@ -667,7 +735,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_TAB:
-		talk.visible = not talk.visible
+		talk.toggle_pin()
 		return
 	if key != null and key.pressed and not key.echo and minimap != null \
 			and (key.keycode == KEY_M or key.keycode == KEY_ESCAPE and minimap.big):
@@ -3835,28 +3903,85 @@ func _build_talk() -> void:
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
 	talk.anchor_bottom = 1.0
-	talk.offset_left = 30
-	talk.offset_bottom = -170
+	talk.offset_left = UiTheme.constant("margin")
+	talk.offset_bottom = -UiTheme.constant("margin")
 	talk.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	$HUD.add_child(talk)
 	_chat_box = LineEdit.new()
 	_chat_box.name = "ChatBox"
 	_chat_box.max_length = CHAT_MAX_CHARS
-	_chat_box.placeholder_text = "say it aloud; /p for party chat (Enter sends, Esc cancels)"
+	_chat_box.placeholder_text = "say it aloud (Tab: party; Enter sends, Esc cancels)"
 	_chat_box.visible = false
-	_chat_box.anchor_top = 1.0
-	_chat_box.anchor_bottom = 1.0
-	_chat_box.offset_left = 30
-	_chat_box.offset_right = 1500
-	_chat_box.offset_top = -150
-	_chat_box.offset_bottom = -60
 	_chat_box.text_submitted.connect(_send_chat)
 	_chat_box.gui_input.connect(func(event: InputEvent) -> void:
 		var key := event as InputEventKey
 		if key != null and key.pressed and key.keycode == KEY_ESCAPE:
 			_close_chat()
-			get_viewport().set_input_as_handled())
-	$HUD.add_child(_chat_box)
+			get_viewport().set_input_as_handled()
+		elif key != null and key.pressed and key.keycode == KEY_TAB:
+			# The channel swapped, the cursor kept: Tab never leaves the box.
+			_swap_chat_channel()
+			_chat_box.accept_event())
+	talk.set_box(_chat_box)
+	_context_hint = Label.new()
+	_context_hint.name = "ContextHint"
+	_context_hint.theme_type_variation = &"Outlined"
+	_context_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_context_hint.visible = false
+	$HUD.add_child(_context_hint)
+
+
+## Tab in the chat box: a line for the party becomes one said aloud and
+## back (PARTY_PREFIX), the caret at the end.
+func _swap_chat_channel() -> void:
+	if _chat_box.text.begins_with(PARTY_PREFIX.strip_edges()):
+		_chat_box.text = _chat_box.text.trim_prefix(PARTY_PREFIX.strip_edges()).strip_edges()
+	else:
+		_chat_box.text = PARTY_PREFIX + _chat_box.text
+	_chat_box.caret_column = _chat_box.text.length()
+
+
+## What the keys do on [param thing] under the cursor (an entity or a
+## door), for the context hint: "" for nothing to say. The owners' verbs
+## (items' E and F, doors' E).
+func context_hint_for(thing: Node) -> String:
+	var player := _local_player()
+	if thing == null or player == null:
+		return ""
+	if thing is Chest:
+		return "E  open the shop" if (thing as Chest).shop else "E  open"
+	if thing is Cargo:
+		return "E  open"
+	if thing is Door:
+		return "E  open or close"
+	if thing is Companion:
+		return "E  her pack" if _is_own_companion(thing) else ""
+	if thing is Monster and World.can_target(player, thing):
+		return "LMB  attack"
+	if thing is Player and thing != player:
+		return "E hold  bandage"
+	return ""
+
+
+## The place the player stands in, for the compass: the level's place
+## whose disc covers their cell (the nearest centre of several; maps'
+## rule) and the zone's name; the zone alone outside every place.
+func place_text(player: GridEntity) -> String:
+	var zone_name := str(level.get("display_name", level.get("name", "")))
+	if player == null:
+		return zone_name
+	var best := ""
+	var best_distance := INF
+	var listed: Dictionary = level.get("places", {})
+	for key: String in listed:
+		var place: Dictionary = listed[key]
+		var cell: Vector2i = place.get("cell", Vector2i(-1000, -1000))
+		var radius := maxi(int(place.get("radius", 1)), 1)
+		var away := Vector2(player.tile - cell).length_squared()
+		if away <= radius * radius and away < best_distance:
+			best_distance = away
+			best = str(place.get("name", key))
+	return "%s, %s" % [best, zone_name] if not best.is_empty() and not zone_name.is_empty() else best + zone_name
 
 
 ## Where speaker [param key]'s bubble points on screen (see SpeechBubbles).
@@ -5551,7 +5676,8 @@ func _run_test_show(player: Player) -> void:
 				talk.add_line("Wren", "(a test line) The door's barred from the other side.")
 				talk.add_line(player.label, "(a test line) hold here", true)
 				talk.add_line(player.label, "(a test line) anyone near the well?", true, true)
-				talk.visible = true
+				if not talk.pinned:
+					talk.toggle_pin()
 			"chat":
 				_open_chat()
 			"debug":
@@ -5560,6 +5686,22 @@ func _run_test_show(player: Player) -> void:
 				_send_chat("(a test line) Stay close, the gate's watched.")
 			"pause":
 				escape()
+			"hint":
+				for entity in World.get_entities():
+					if entity is Cargo or entity is Chest:
+						if _test_hint_thing == null or World.distance(player.tile, entity.tile) < World.distance(player.tile, _test_hint_thing.tile):
+							_test_hint_thing = entity
+			"tip":
+				# A sample named dagger's tip over the pack's first slot: no named
+				# thing exists in play until lore's holder form is agreed (365).
+				pack_panel.shown = true
+				if pack_panel.tip == null:
+					pack_panel.tip = ItemTip.new()
+					$HUD.add_child(pack_panel.tip)
+				var sample := "Wren's dagger (quiet), imp-bane
+felled 12 imps
+story: carried by Wren for 3 days; named for Wren"
+				pack_panel.tip.show_for("dagger", sample, pack_panel._player_row.get_child(0).get_global_rect().position)
 			"menu":
 				_show_menu()
 			"setup":

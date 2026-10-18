@@ -6,7 +6,9 @@ extends Control
 ## with the ring but stay upright. Main sets north_on_screen each frame
 ## from the view. Sizes are in the HUD's units (the 3840 x 2160 canvas, so
 ## half as many pixels at 1080p): about 110 px across at 1080p. Its colours
-## and letters are the shared theme's (UiTheme, docs/ui_style.md).
+## and letters are the shared theme's (UiTheme, docs/ui_style.md). To its
+## left, [member place]: the zone and the place the player stands in
+## (Main, from the level's places; maps' data), in the serif, outlined.
 
 const RADIUS := 110.0
 const MARGIN := 40.0
@@ -27,6 +29,13 @@ var north_on_screen := Vector2.UP:
 			north_on_screen = value.normalized()
 			queue_redraw()
 var _bold: Font
+## "Castle yard, The Castle" or the zone alone; "" for nothing.
+var place := "":
+	set(value):
+		place = value
+		if _place != null:
+			_place.text = value
+var _place: Label
 
 
 func _ready() -> void:
@@ -37,6 +46,17 @@ func _ready() -> void:
 	offset_top = MARGIN
 	offset_bottom = MARGIN + RADIUS * 2.0
 	_bold = UiTheme.font("serif_bold")
+	_place = Label.new()
+	_place.theme_type_variation = &"Outlined"
+	_place.add_theme_font_override("font", UiTheme.font("serif"))
+	_place.add_theme_font_size_override("font_size", UiTheme.size("heading"))
+	_place.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_place.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_place.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place.position = Vector2(-1000.0 - MARGIN, 0.0)
+	_place.size = Vector2(1000.0, RADIUS * 2.0)
+	_place.text = place
+	add_child(_place)
 
 
 func _draw() -> void:

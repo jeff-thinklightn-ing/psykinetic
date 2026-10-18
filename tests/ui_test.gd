@@ -3,6 +3,8 @@ extends Node
 ## screen's fields, states and buttons, the pause panel, Esc's order
 ## (what is open closes first, then the pause), and the options' Window,
 ## Resolution, Controls and hints choices writing to Net and settings.cfg.
+## The in-game panels (step 3): the item tip's lines from a slot note, the
+## talk panel's pin, fade and channel, the context hint and the place.
 ## Run it with tests/run.ps1 or run.sh. Prints PASS/FAIL per assertion and
 ## quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -20,6 +22,9 @@ func _ready() -> void:
 	add_child(_main)
 	await _test_escape()
 	_test_options_choices()
+	_test_item_tip()
+	await _test_talk_panel()
+	_test_context_and_place()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -35,6 +40,8 @@ func _test_menu() -> void:
 	_check(played[0], "Play asks Main to play")
 	_check(menu.options.text == "Options" and menu.quit.text == "Quit", "Options and Quit are there")
 	_check(menu.version.text == "v%s" % Net.version, "the version in the corner (%s)" % menu.version.text)
+	menu.set_status("no answer")
+	_check(menu.status.visible and menu.status.text == "no answer", "the server's status under the buttons")
 	menu.queue_free()
 
 
@@ -70,6 +77,26 @@ func _test_connect_screen() -> void:
 	screen._name.text = "  Tester "
 	screen._submit()
 	_check(got == ["10.0.0.2", 7778, "secret", "Tester"], "filled in: submitted trimmed (%s)" % [got])
+	screen.set_progress(0.3, "downloading v0.1.150: 34 of 112 MB")
+	_check(screen.progressing and screen.buttons_shown() == ["Cancel"] and is_equal_approx(screen.progress_shown(), 0.3),
+		"an update's progress: the bar at 0.3, Cancel alone (%s)" % [screen.buttons_shown()])
+	screen.set_progress(-1.0, "unpacking v0.1.150")
+	_check(screen.progress_shown() < 0.0 and screen.state_shown() == "unpacking v0.1.150", "unknown progress: the words, no bar")
+	var cancelled := [false]
+	screen.cancel_pressed.connect(func() -> void: cancelled[0] = true)
+	screen._cancel.pressed.emit()
+	_check(cancelled[0], "Cancel asks Main to stop it")
+	screen.set_state("the download stopped", true)
+	_check(not screen.progressing and "Cancel" not in screen.buttons_shown(), "a state after it: Cancel gone")
+	screen.set_status("online, v0.1.150, 3 players")
+	_check(screen.status_shown() == "online, v0.1.150, 3 players", "the server's status shown under the fields")
+	var dot := " · "
+	_check(Main.server_status_words({"ok": true, "version": "0.1.150", "players": 3, "accepting": true, "compatible": true})
+			== "online%sv0.1.150%s3 players" % [dot, dot]
+			and Main.server_status_words({"ok": true, "version": "0.1.151", "players": 1, "accepting": true, "compatible": false})
+			== "online%sv0.1.151%s1 player%sout of date: updates when you join" % [dot, dot, dot]
+			and Main.server_status_words({"ok": false, "why": "no answer"}) == "no answer",
+		"the status in words from maps' answer")
 	screen.queue_free()
 
 
@@ -154,6 +181,91 @@ func _test_options_choices() -> void:
 	Net.controls = kept[3]
 	Net.hints = kept[4]
 	Net.window_size = kept[5]
+
+
+func _test_item_tip() -> void:
+	print("== the item tip: a thing's name, kind, strength, marks, kills and story from its note ==")
+	var dagger := ""
+	for id: String in Items.ids():
+		if str(Items.def(id).get("verb", {}).get("kind", "")) == "backstab":
+			dagger = id
+	_check(not dagger.is_empty(), "a dagger in the catalog (%s)" % dagger)
+	var note := "Wren's dagger (quiet, %s), imp-bane
+felled 12 imps
+story: carried by Wren for 3 days; named at the ford" % World.KEPT_MARK
+	var rows := ItemTip.lines_for(dagger, note)
+	var styles: Array[String] = []
+	for row in rows:
+		styles.append(row["style"])
+	_check(rows.size() >= 7 and rows[0]["text"] == "Wren's dagger" and rows[0]["style"] == "name"
+			and rows[1]["text"] == Items.name_of(dagger),
+		"a named thing: its name first, in brass, the catalog name under it (%s)" % [rows])
+	_check("strength" in styles and "warn" in styles and "mark" in styles and "kills" in styles and "story" in styles,
+		"a strength, the kept warning, the bane mark, the kills and the story each in their style (%s)" % [styles])
+	_check(rows.back()["text"] == "carried by Wren for 3 days; named at the ford", "the story line without its mark")
+	var plain := ItemTip.lines_for(dagger, "")
+	_check(plain.size() >= 1 and plain[0]["text"] == Items.name_of(dagger) and plain[0]["style"] == "title"
+			and plain.size() == 2 and "one hand" in plain[1]["text"] and "kg" in plain[1]["text"],
+		"a plain thing: the catalog name and what it is (%s)" % [plain])
+	var arrows := ItemTip.lines_for("arrows", "bundle of arrows, 6 of 10")
+	_check(arrows.size() >= 2 and arrows[0]["style"] == "title" and arrows.back()["text"] == "6 of 10",
+		"a condition after the comma is a mark (%s)" % [arrows])
+	_check(ItemTip.lines_for("", "").is_empty(), "nothing for an empty slot")
+
+
+func _test_talk_panel() -> void:
+	print("== the talk panel: a line shows it, it fades, Tab pins, the channel ==")
+	var talk: TalkPanel = _main.talk
+	_check(not talk.visible and not talk.pinned, "hidden and unpinned at the start")
+	talk.add_line("Wren", "The door's barred.")
+	_check(talk.visible and talk.keeps_showing(), "a line shows it")
+	talk._shown_until = 0.0
+	await get_tree().process_frame
+	_check(not talk.visible, "and it goes once the line is old (the mouse away, nothing typed)")
+	talk.toggle_pin()
+	_check(talk.visible and talk.pinned, "Tab pins it")
+	talk.toggle_pin()
+	await get_tree().process_frame
+	_check(not talk.visible, "and again lets it go")
+	_main._chat_box.text = ""
+	_main._chat_box.visible = true  # As _open_chat does once there is a player.
+	await get_tree().process_frame
+	_check(talk.visible and talk.channel_shown() == "say", "the chat box opens it, speaking aloud")
+	_main._swap_chat_channel()
+	await get_tree().process_frame
+	_check(_main._chat_box.text.begins_with("/p ") and talk.channel_shown() == "party", "Tab in the box: party")
+	_main._swap_chat_channel()
+	await get_tree().process_frame
+	_check(_main._chat_box.text == "" and talk.channel_shown() == "say", "and back")
+	_main._close_chat()
+	await get_tree().process_frame
+	_check(not talk.visible, "closed: it goes")
+
+
+func _test_context_and_place() -> void:
+	print("== the context hint and the place under the compass ==")
+	var chest: GridEntity = null
+	for entity in World.get_entities():
+		if entity is Chest and chest == null:
+			chest = entity
+	_check(chest != null and _main.context_hint_for(chest) == "E  open", "a chest: E open")
+	_check(_main.context_hint_for(null) == "", "nothing under the cursor: nothing")
+	var player: GridEntity = _main._local_player()
+	var zone_name := str(_main.level.get("display_name", _main.level.get("name", "")))
+	var places: Dictionary = _main.level.get("places", {})
+	var was := places.duplicate()
+	places["yard"] = {"cell": player.tile, "name": "The Yard", "kind": "other", "radius": 2}
+	_main.level["places"] = places
+	_check(_main.place_text(player) == "The Yard, %s" % zone_name, "standing in a place: its name, then the zone (%s)" % _main.place_text(player))
+	places["far"] = {"cell": player.tile + Vector2i(40, 40), "name": "Far", "kind": "other", "radius": 1}
+	_check(_main.place_text(player) == "The Yard, %s" % zone_name, "a place out of reach is not it")
+	_main.level["places"] = was
+	_check(_main.place_text(player) == zone_name or _main.place_text(player).ends_with(zone_name),
+		"outside every place: the zone (%s)" % _main.place_text(player))
+	_main.hint_panel.set_lines(_main.hint_lines())
+	_check(_main.hint_panel.lines().size() > 10 and _main.hint_panel._columns.size() == 2
+			and _main.hint_panel._columns[0].get_child_count() >= _main.hint_panel._columns[1].get_child_count(),
+		"the controls list in two columns (%d lines)" % _main.hint_panel.lines().size())
 
 
 func _check(ok: bool, label: String) -> void:

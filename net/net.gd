@@ -97,7 +97,9 @@ extends Node
 ##   --menu                       start at the main menu, as an exported client does (for screenshots)
 ##   --test-show=<a,b>            open these on the HUD once the player is in (for the ui tree's screenshots):
 ##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's),
-##                                pause, menu, setup (the connect screen's fields), connect, failed (its states), over the game
+##                                pause, menu, setup (the connect screen's fields), connect, failed (its states), over the game;
+##                                tip (a sample named dagger's tip over the pack: nothing in play is named yet),
+##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
@@ -311,8 +313,9 @@ var camera_yaw := 0.0
 ## The 3D camera's wheel zoom, a factor on its default size, kept with the
 ## yaw.
 var camera_zoom := 1.0
-## The HUD's list of controls shown (H toggles it); settings.cfg hints=on|off.
-var hints := true
+## The HUD's list of controls shown (H toggles it); settings.cfg hints=on|off,
+## off by default since the context hint (ui's step 3) says what the keys do.
+var hints := false
 ## settings.cfg hp_bars= (0 turns them off), and the volumes, 0..1, each a
 ## bus's (Sfx.VOLUME_SETTINGS) but master's: master_volume=, sfx_volume=,
 ## voice_volume=, ambience_volume=, ui_volume=, music_volume=.
@@ -631,7 +634,7 @@ func _apply_window_settings() -> void:
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
 		camera_yaw = saved_yaw(str(settings.get("camera_yaw", "")), camera_yaw)
 		camera_zoom = saved_zoom(str(settings.get("camera_zoom", "")), camera_zoom)
-		hints = str(settings.get("hints", "on")) != "off"
+		hints = str(settings.get("hints", "off")) == "on"
 	if _test_yaw_given:
 		camera_yaw = test_yaw
 	var window := get_window()

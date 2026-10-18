@@ -15,7 +15,9 @@ extends PanelContainer
 ## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L.
 ## Sizes in the HUD's 3840 x 2160 units, its look the shared theme's
 ## (UiTheme, docs/ui_style.md): the panel's box, a slot the Inset
-## variation, a hand's HandSlot.
+## variation, a hand's HandSlot. Hover a slot for what its thing is
+## (ItemTip: name, kind, strength, condition, kills, story); under the
+## player's row, what they carry weighs (the catalog's weights).
 
 ## A slot's box, the theme's "slot" constant square.
 static var SLOT_SIZE: Vector2 = Vector2.ONE * UiTheme.constant("slot")
@@ -60,6 +62,9 @@ var _other_title: Label
 var _other_row: HBoxContainer
 var _player_title: Label
 var _player_row: HBoxContainer
+var _weight: Label
+## The hover tip, a sibling above the panel (made on the first hover).
+var tip: ItemTip
 ## Each row's entity and contents as last shown: an item new in a slot is
 ## one that landed there.
 var _last: Dictionary[HBoxContainer, Array] = {}
@@ -73,6 +78,12 @@ class SlotBox:
 	var index := 0
 	var label: Label
 	var icon: TextureRect
+	## The slot's note (World._show_notes), for the tip.
+	var note := ""
+
+	func _ready() -> void:
+		mouse_entered.connect(func() -> void: panel.show_tip(self))
+		mouse_exited.connect(func() -> void: panel.hide_tip())
 
 	func owner_entity() -> GridEntity:
 		return panel.player if mine else panel.other
@@ -142,7 +153,32 @@ func _ready() -> void:
 	column.add_child(_player_title)
 	_player_row = _row(true)
 	column.add_child(_player_row)
+	_weight = Label.new()
+	_weight.theme_type_variation = &"Caption"
+	column.add_child(_weight)
 	_refresh()
+
+
+## The tip for [param box]'s thing, over the slot; nothing for an empty one.
+func show_tip(box: SlotBox) -> void:
+	var entity := box.owner_entity()
+	if not is_instance_valid(entity) or box.index >= entity.slots.size() or entity.slots[box.index].is_empty():
+		hide_tip()
+		return
+	if tip == null:
+		tip = ItemTip.new()
+		(get_parent() if get_parent() != null else self).add_child(tip)
+	tip.show_for(entity.slots[box.index], box.note, box.get_global_rect().position)
+
+
+func hide_tip() -> void:
+	if tip != null:
+		tip.visible = false
+
+
+## "carrying 9.5 kg" for the player's things (tests).
+func weight_shown() -> String:
+	return _weight.text
 
 
 func _title() -> Label:
@@ -259,7 +295,7 @@ func _refresh() -> void:
 			box.label.text = Items.short_of(item) if not item.is_empty() else ""
 			# A named thing (decision 365) is gilded, and says its name and strength on hover.
 			var noted := has and box.index < entity.slot_notes.size() and not entity.slot_notes[box.index].is_empty()
-			box.tooltip_text = entity.slot_notes[box.index] if noted else ""
+			box.note = entity.slot_notes[box.index] if noted else ""
 			# A plain thing's note (a bundle's condition) starts with its catalog
 			# name; a named one's with its name (decision 375).
 			var named := noted and not entity.slot_notes[box.index].begins_with(Items.name_of(item))
@@ -268,6 +304,12 @@ func _refresh() -> void:
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
+	var carried := 0.0
+	if is_instance_valid(player):
+		for item in player.slots:
+			carried += Items.weight_of(item)
+	_weight.text = "carrying %s kg" % str(snappedf(carried, 0.1)) if carried > 0.0 else ""
+	_weight.visible = carried > 0.0
 
 
 ## [param picture] in [param box], its name a caption under it; null: the

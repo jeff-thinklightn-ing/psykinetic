@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hover a thing in your pack or an open chest to read what it is: its name (a named thing's in brass), what it does, its strength, its condition and marks, what it has felled, and its story. The pack says what you carry weighs. What is said shows in one box at the bottom left and fades after a few seconds unless you pin it with Tab; Tab inside the chat box swaps between speaking aloud and the party. The compass names where you stand. A short hint by the cursor says what a key does on what it points at ("E  open"); the full controls list is off by default now, H shows it.
 - A named weapon can be reforged by the smith into another weapon taking no more hands, for half the metal and time of a new one. It keeps its name (Wren's dagger becomes Wren's sword), its history, its marks and its kills; its strength stays if it suits the new weapon. (The forge counter where you'll ask for it is coming.)
 - When the server is newer, the game now downloads the update itself with a progress bar on the connect screen (and a Cancel), rather than closing without a word while it updates.
 - Townsfolk talk among themselves now: at the well, the inn, the square or the

@@ -87,10 +87,10 @@ Base unit 8. Panel padding 24; between rows 12; between sections 24; a slot 132 
 
 | Where | What |
 |-------|------|
-| top left | the HUD line (mode, state, tick; outlined text, no box), the hints under it, the debug text (F3) |
-| top right | the compass; under it the corner map |
+| top left | the HUD line (the player's state; outlined text, no box), the controls list under it (H), the debug text (F3) |
+| top right | the compass, the place you stand in to its left; under it the corner map |
 | bottom right | the pack, with the open chest or companion above it; the gold over its corner; a shop to its left |
-| bottom left | the talk log, the chat box under it |
+| bottom left | the talk box: what was said, fading unless pinned (Tab), the chat box inside it |
 | top middle | builder mode's status and box |
 | middle | the options (O), the big map (M), the pause (Esc), the connect screen and the main menu |
 
@@ -127,13 +127,15 @@ and the inconsistencies the theme settles:
 - **Pack and chest** (I, E, `render/pack_panel.gd`): cool near-black backing, radius 16,
   slots with a warm grey edge, hands in brass with R and L; 26-unit text, 20 captions. The
   owner's colours for named and kept things stay as meanings but move onto palette swatches.
+  *Step 3 (decision 427): a themed tip on hover (`ItemTip`) and the carried weight.*
 - **Shop** (`render/shop_panel.gd`, beside the pack): copies the pack's constants; the
   engine's default Button for Buy. Not shot: it needs a counter in reach (the wilds' shop
   chest is not a `Chest.shop` at a host's start); its look is the pack's.
 - **Gold** (over the pack): its own small box with 26-unit brass text.
 - **Talk log** (Tab, `render/talk_panel.gd`): a square-cornered black box at 0.7, default
   48-unit text (the biggest in the game after titles), a clock time on every line, three
-  line colours of its own (yellow, blue, green).
+  line colours of its own (yellow, blue, green). *Step 3 (decision 427) made it one box
+  with the chat box, fading unless pinned; shots in `docs/ui/shots/step3/`.*
 - **Chat box** (Enter): the engine's default LineEdit, grey on grey, 48-unit text, a
   placeholder a sentence long.
 - **Speech bubbles** (`render/speech_bubbles.gd`): dark rounded bubble, light text, a tail;
@@ -147,7 +149,7 @@ and the inconsistencies the theme settles:
 - **Builder mode** (B, `builder/builder_ui.gd`): 28-unit outlined light-blue status text,
   the engine's default LineEdit, both top-middle; the box's placeholder is a sentence.
 - **Debug text** (F3): default 48-unit white text, no outline.
-- **First-run screen** (`net/setup_screen.gd`): a dark backdrop, the engine's default
+- **First-run screen** (then `net/setup_screen.gd`, now `render/connect_screen.gd`, ConnectScreen): a dark backdrop, the engine's default
   Label, LineEdit and Button; a 66-unit title; the panel has no visible box. Connection
   state and update progress were HUD-line text. *Step 2 (decision 418) replaced it with the
   connect screen, and added the main menu and the pause: shots in `docs/ui/shots/step2/`.*

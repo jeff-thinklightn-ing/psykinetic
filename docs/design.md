@@ -133,7 +133,8 @@ server_relay` is off: clients talk to the server only, and the server
 never announces one peer's coming or going to the others, which was the
 main sender into a closing link. An
 exported client with no arguments joins from `settings.cfg` next to its exe,
-or asks for the address and token once (`net/setup_screen.gd`) and writes
+or asks for the address and token once on the connect screen
+(`render/connect_screen.gd`, which also shows the join's state; decision 418) and writes
 that file. Details in `docs/server.md`.
 
 **Nothing derived is replicated.** A client's `World` is a mirror: it loads

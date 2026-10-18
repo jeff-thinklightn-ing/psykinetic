@@ -17,6 +17,8 @@ var play: Button
 var options: Button
 var quit: Button
 var version: Label
+## The server's status under the buttons (Main, from Net.query_status; maps').
+var status: Label
 
 
 func _init() -> void:
@@ -50,6 +52,11 @@ func _ready() -> void:
 	column.add_child(options)
 	quit = _button("Quit", quit_pressed)
 	column.add_child(quit)
+	status = Label.new()
+	status.theme_type_variation = &"Caption"
+	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status.visible = false
+	column.add_child(status)
 	version = Label.new()
 	version.text = "v%s" % Net.version
 	version.theme_type_variation = &"Caption"
@@ -60,6 +67,12 @@ func _ready() -> void:
 	version.offset_bottom = -UiTheme.constant("margin")
 	add_child(version)
 	play.grab_focus()
+
+
+## "online, v0.1.150, 3 players" under the buttons; "" for none.
+func set_status(text: String) -> void:
+	status.text = text
+	status.visible = not text.is_empty()
 
 
 func _button(text: String, pressed_signal: Signal) -> Button:

@@ -9657,3 +9657,55 @@ knockdown, dread any), else it is lost. Noted "reforged" ("dagger into sword;
 quiet lost"), never evicted, and told in the story ("reforged from a dagger";
 421). An unnamed thing is not reforged: the town makes a new one. The id lives in
 slots, already replicated: the protocol is unchanged.
+
+## 427. In-game panels: item tips, the talk box, the place, the cursor's hint
+
+Roadmap `ui`, step 3 (the coordinator approved the design; items, companions
+and maps answered its asks). A slot's note was a plain tooltip, the log and
+the chat box were two controls, the compass said nothing of where you were,
+and the controls list sat on screen by default.
+
+- `ItemTip` (render/item_tip.gd, new class_name): a themed hover tip over a
+  slot, made from the slot's note (World._show_notes, items' 421: line 1 the
+  title or catalog name then marks after commas; "felled ..." the tally;
+  "story: ..." the history line) and the catalog the client holds: the name
+  (brass_bright when named), the catalog name under it, what it does and
+  weighs (Items.verb_of(id)["says"], hands, weight), each strength's words
+  (naming "says"), the kept warning (370, in rust), the growth marks with
+  their words (Items.growth()["says"]), the kills, the story. ItemTip.lines_for
+  is the pure part, for tests. PackPanel shows it on a slot's mouse_entered
+  and says under the player's row what they carry weighs (the catalog's
+  weights; a caption on the inventory screen, never the HUD: the no-bars rule
+  holds, the coordinator's call).
+- TalkPanel holds Main's chat box (set_box): a new line shows the panel for
+  FADE_AFTER (8 s), then it goes unless pinned (Tab, toggle_pin), hovered or
+  the box is open; pinned, the list scrolls up to LIST_HEIGHT. The box's
+  channel ("say" or "party", from Main.PARTY_PREFIX) is named beside it, and
+  Tab inside the box swaps them without leaving the box (Main._swap_chat_channel;
+  companions: fading and the label fine, "[party] Wren:" enough, no
+  highlighting of a line she answers). lines[]'s shape and line_added stay.
+- The place you stand in, left of the compass (HudCompass.place, Main.place_text):
+  the level's place whose disc covers the player's cell, the nearest centre of
+  several, then the zone's name; the zone alone outside every place (maps'
+  rule: level["places"] on the client, never Holdings, no holder shown).
+- The controls list (H) in two columns, and off by default (Net.hints false,
+  hints= absent or off; a saved hints=on keeps it), because a context hint by
+  the cursor says what the keys do on what it points at: "E  open" (a chest,
+  a crate, a cart; "the shop" for a counter), "E  open or close" (a door),
+  "F  pick up" (a pile), "E  her pack" (your companion), "LMB  attack" (a
+  monster you can target), "E hold  bandage" (another player); Main.context_hint_for
+  from the thing under the cursor, the door under it, or a prop on the cell.
+- The stale net/setup_screen.gd references in docs point at ConnectScreen.
+- For maps' two connect-screen items, built against the shapes it gave:
+  ConnectScreen.set_progress(fraction, text) (a themed bar, -1 for not known;
+  Cancel offered, cancel_pressed for Main to stop the download) and
+  set_status(text) on the connect screen and the main menu, filled from
+  Net.query_status's status_received answer once it exists (Main asks when the
+  menu shows and before a join; Main.server_status_words: "online, vX, N
+  players", "out of date: updates when you join", or the why).
+
+Client only; protocol unchanged. tests/ui_test grows (the tip's lines, the
+talk panel's pin, fade and channel, the hint, the place, the two columns,
+the progress, cancel and status).
+`--test-show` gains tip (a sample named dagger: nothing in play is named
+until lore's holder form is agreed). Shots in docs/ui/shots/step3/.

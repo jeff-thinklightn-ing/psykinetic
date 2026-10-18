@@ -16,6 +16,8 @@ signal submitted(address: String, port: int, token: String, player_name: String)
 signal retry_pressed
 ## Back pressed: to the menu.
 signal back_pressed
+## Cancel pressed while an update's progress runs (maps' in-game update).
+signal cancel_pressed
 
 const WIDTH := 1300.0
 const DOTS_EVERY := 0.4
@@ -29,6 +31,8 @@ var has_menu := false
 
 var _status: Label
 var _dots: Label
+var _progress: ProgressBar
+var _server: Label
 var _fields: VBoxContainer
 var _address: LineEdit
 var _port: LineEdit
@@ -40,7 +44,10 @@ var _connect: Button
 var _retry: Button
 var _change: Button
 var _back: Button
+var _cancel: Button
 var _since := 0.0
+## An update's progress is running (set_progress): Cancel is offered.
+var progressing := false
 
 
 func _init() -> void:
@@ -76,6 +83,18 @@ func _ready() -> void:
 	_dots.custom_minimum_size = Vector2(60, 0)
 	status_row.add_child(_dots)
 	column.add_child(status_row)
+	_progress = ProgressBar.new()
+	_progress.min_value = 0.0
+	_progress.max_value = 1.0
+	_progress.show_percentage = false
+	_progress.custom_minimum_size = Vector2(0, 24)
+	_progress.visible = false
+	column.add_child(_progress)
+	_server = Label.new()
+	_server.theme_type_variation = &"Caption"
+	_server.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_server.visible = false
+	column.add_child(_server)
 	_fields = VBoxContainer.new()
 	_fields.add_theme_constant_override("separation", UiTheme.constant("row"))
 	column.add_child(_fields)
@@ -98,6 +117,7 @@ func _ready() -> void:
 	_buttons.alignment = BoxContainer.ALIGNMENT_END
 	column.add_child(_buttons)
 	_back = _button("Back", func() -> void: back_pressed.emit())
+	_cancel = _button("Cancel", func() -> void: cancel_pressed.emit())
 	_change = _button("Change server", edit)
 	_retry = _button("Retry", func() -> void: retry_pressed.emit())
 	_connect = _button("Connect", _submit)
@@ -126,10 +146,42 @@ func edit() -> void:
 func set_state(text: String, is_failed := false) -> void:
 	editing = false
 	failed = is_failed
+	progressing = false
+	_progress.visible = false
 	_status.text = text
 	_since = 0.0
 	_show_parts()
 	visible = true
+
+
+## An update's progress (maps' in-game update): [param fraction] 0..1 fills
+## the bar, -1 (not known yet) keeps the dots alone; [param text] says what
+## is happening ("downloading v0.1.150: 34 of 112 MB"). Cancel is offered.
+func set_progress(fraction: float, text: String) -> void:
+	editing = false
+	failed = false
+	progressing = true
+	_status.text = text
+	_progress.visible = fraction >= 0.0
+	_progress.value = clampf(fraction, 0.0, 1.0)
+	_show_parts()
+	visible = true
+
+
+## The server's status under the fields ("online, v0.1.150, 3 players"),
+## from Net.query_status's answer (maps'); "" for none.
+func set_status(text: String) -> void:
+	_server.text = text
+	_server.visible = not text.is_empty()
+
+
+func status_shown() -> String:
+	return _server.text
+
+
+## The bar's fraction while progressing, -1 when the bar is hidden (tests).
+func progress_shown() -> float:
+	return _progress.value if _progress.visible else -1.0
 
 
 ## The state shown ("" while editing) and whether it is a failure (tests).
@@ -147,7 +199,7 @@ func buttons_shown() -> Array[String]:
 
 
 func _process(delta: float) -> void:
-	if editing or failed:
+	if editing or failed or _progress.visible:
 		_dots.text = ""
 		return
 	_since += delta
@@ -160,6 +212,7 @@ func _show_parts() -> void:
 	_connect.visible = editing
 	_retry.visible = failed
 	_change.visible = failed
+	_cancel.visible = progressing
 	_back.visible = has_menu and (editing or failed)
 
 
