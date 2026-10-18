@@ -107,7 +107,9 @@ are texture slots, not materials on a model (see Budgets).
     prefix: the Quaternius pack's `AnimalArmature|Gallop` is a `run`.
   - A humanoid body (`creature.orc`, `creature.kobold`) bakes no clips: its slot's
     `clip_library` names the shared library it plays through the UAL bone map
-    (`art/models/animations/goblin.res`), and its clips are found there.
+    (`art/models/animations/goblin.res`), and its clips are found there. Its `model` names
+    the file the game draws (`art/models/characters/orc.glb`, Client3D's MODELS), and that
+    file is the slot's own art: no copy in `art/kit`.
   - A `required` clip missing is an error. One with a `fallback` missing is a warning naming
     the stand-in the game uses (a wolf's howl is idle with a head-up tween until it has one).
   - Every face sits on the palette, like any piece. A pack's flat materials move onto swatches

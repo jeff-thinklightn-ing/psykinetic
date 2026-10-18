@@ -608,7 +608,8 @@ func _check_fits(slot: String, box: AABB, what: String) -> void:
 	var low := absf(centre.y) if centred else absf(box.end.y if floor else box.position.y)
 	# A held piece's origin is its grip, anywhere across it (a bow's string behind it), as ArtCheck has it.
 	var held := str(ArtKit.spec(slot).get("kind", "")) == "held"
-	var across := held or absf(centre.x) < size.x * TOLERANCE + 0.01 and absf(centre.z) < size.z * TOLERANCE + 0.01
+	var share := float(ArtKit.spec(slot).get("tolerance", TOLERANCE))
+	var across := held or absf(centre.x) < size.x * share + 0.01 and absf(centre.z) < size.z * share + 0.01
 	var stands := low < 0.01 and across
 	_check(off.x <= TOLERANCE and off.y <= TOLERANCE and off.z <= TOLERANCE and stands,
 			"%s: %s is %s, the slot %s, standing on its origin (%s)" % [slot, what, box.size, size, box.position])

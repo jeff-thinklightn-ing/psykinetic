@@ -155,8 +155,13 @@ static func folder(slot: String) -> String:
 
 
 ## The path of the slot's own model, variant [param variant] (1 is
-## <slot>.glb, 2 <slot>.2.glb, ...).
+## <slot>.glb, 2 <slot>.2.glb, ...); a slot whose "model" names a file the
+## game draws from elsewhere (a humanoid body in art/models, Client3D's
+## MODELS) is that file, one variant, so the checks see the file drawn.
 static func own_path(slot: String, variant := 1) -> String:
+	var model := str(spec(slot).get("model", ""))
+	if model != "":
+		return model if variant <= 1 else ""
 	return folder(slot) + slot + (".glb" if variant <= 1 else ".%d.glb" % variant)
 
 
