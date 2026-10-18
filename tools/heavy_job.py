@@ -332,11 +332,21 @@ class StateLock:
         os.makedirs(_path("running"), exist_ok=True)
         os.makedirs(_path("queue"), exist_ok=True)
         lock = _path("state.lock")
+        denied_since = None
         while True:
             try:
                 os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
                 return self
+            except PermissionError:
+                # Windows: the lock is being deleted (its holder's __exit__)
+                # or a scanner has it open a moment: busy, as FileExistsError.
+                # Still denied after LOCK_STALE_SECONDS is a real fault.
+                denied_since = denied_since or time.time()
+                if time.time() - denied_since > LOCK_STALE_SECONDS:
+                    raise
+                time.sleep(0.05)
             except FileExistsError:
+                denied_since = None
                 try:
                     if time.time() - os.path.getmtime(lock) > LOCK_STALE_SECONDS:
                         os.remove(lock)

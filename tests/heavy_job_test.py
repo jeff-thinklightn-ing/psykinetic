@@ -160,6 +160,24 @@ with open(gate._path("heavy_jobs.log")) as log:
 check(adopted and float(adopted[0].split("peak ")[1].split(" GB")[0]) >= 0.15, "the run inside the take was measured: %s" % (
     adopted[0].strip() if adopted else "no line"))
 
+print("== the state lock denied a moment ==")
+# Windows answers PermissionError, not FileExistsError, while the lock is
+# being deleted by its holder: economy's waiter died of it and lost its place.
+real_open, denials = os.open, [3]
+def flaky_open(path, *rest):
+    if path.endswith("state.lock") and denials[0] > 0:
+        denials[0] -= 1
+        raise PermissionError(13, "Permission denied", path)
+    return real_open(path, *rest)
+os.open = flaky_open
+try:
+    with gate.StateLock():
+        locked = True
+except PermissionError:
+    locked = False
+os.open = real_open
+check(locked and denials[0] == 0, "a denied state lock is waited on, as a held one")
+
 print("== a gated run inside a gated run ==")
 # ui's bench script run through the gate, and frame_budget.ps1 inside it
 # asking for a bench again: bench is at most 1, so it queued behind its own
