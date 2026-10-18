@@ -256,7 +256,8 @@ func _test_offers() -> void:
 	var paid := economy.pay_commission("p2", TOWN, 1000)
 	_check(paid > 0 and paid == maxi(have - floor_gold, 0) and stock.count(TOWN, "gold") == mini(have, floor_gold) and economy.gold("p2") == paid,
 		"pay_commission: what the treasury has above its floor (%d)" % paid)
-	_check(int(rules["commissions"]["rescue"]) == 10 and int(rules["commissions"]["camp"]) == 20 and int(rules["commissions"]["fetch"]) == 1, "commissions' rates in the rules")
+	_check(int(rules["commissions"]["rescue"]) == 10 and int(rules["commissions"]["camp"]) == 20 and int(rules["commissions"]["fetch"]) == 1
+		and int(rules["commissions"]["dispute"]) == 5 and int(rules["commissions"]["escort"]) == 8, "commissions' rates in the rules")
 
 
 ## A merchant's sharper trades (decision 440, economy's side): buying a
