@@ -18,6 +18,7 @@ func _ready() -> void:
 	await _test_held_hands_over()
 	await _test_strike()
 	await _test_upper()
+	await _test_upper_timed()
 	await _test_no_upper()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -158,6 +159,25 @@ func _test_upper() -> void:
 	_check(is_zero_approx(float(rig.tree.get("parameters/posture/add_amount"))), "no posture: nothing added")
 	rig.get_parent().queue_free()
 	bare.get_parent().queue_free()
+
+
+func _test_upper_timed() -> void:
+	print("== the upper layer timed (decision 462: a bow's draw kept to the sim's) ==")
+	var rig := _goblin()
+	rig.loop("Idle")
+	rig.upper("Bow_Draw", 2.0, true)
+	rig.tree.advance(0.25)
+	_check(absf(rig.upper_position() - 0.5) < 0.02 and is_equal_approx(rig.upper_speed(), 2.0),
+		"Bow_Draw at speed 2: half a second in after a quarter (%.3f)" % rig.upper_position())
+	rig.upper("Bow_Draw", 2.0)
+	rig.tree.advance(0.1)
+	_check(absf(rig.upper_position() - 0.7) < 0.02, "asked again without from_start: it goes on (%.3f)" % rig.upper_position())
+	rig.upper("Bow_Draw", 2.0, true)
+	_check(rig.upper_position() < 0.02, "from_start: back at the nock (%.3f)" % rig.upper_position())
+	rig.upper("Bow_Draw", 0.5)
+	rig.tree.advance(0.2)
+	_check(absf(rig.upper_position() - 0.1) < 0.02, "a new speed, the same clip: slower, not restarted (%.3f)" % rig.upper_position())
+	rig.get_parent().queue_free()
 
 
 func _test_no_upper() -> void:

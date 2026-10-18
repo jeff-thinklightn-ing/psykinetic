@@ -456,7 +456,7 @@ const HUMANOID_MOVES := {
 	"block": "Block_Idle", "knockdown": "Knockdown", "lying": "Lie", "get_up": "Get_Up",
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
 	"hits": {"front": ["Hit_Chest", "Hit_Head"], "left": ["Hit_Shoulder_L"], "right": ["Hit_Shoulder_R"], "back": ["Hit_Back"]},
-	"deaths": ["Death01", "Death02"], "bow_aim": "Pistol_Aim_Neutral", "bow_shoot": "Pistol_Shoot", "bow_idle": "Pistol_Idle",
+	"deaths": ["Death01", "Death02"], "bow_draw": "Bow_Draw", "bow_aim": "Bow_Hold", "bow_shoot": "Bow_Loose", "bow_idle": "Bow_Idle",
 	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle",
 }
 ## Attach points (decision 451): where a humanoid holds and hangs things, on
@@ -5964,6 +5964,7 @@ func _sync_puppets() -> void:
 		if facing != null and not is_equal_approx(facing.rotation.y, yaw):
 			facing.rotation.y = yaw
 		_sync_held(entity, puppet)
+		_sync_bow(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
 			if lantern != null and lantern.visible != (entity.emit_light > 0.0):
@@ -6483,9 +6484,9 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		return
 	var held: Array = puppet.get_meta("held")
 	var sockets: Dictionary = puppet.get_meta("sockets")
+	var ids := held_ids(entity)
 	for hand in 2:
-		var slot := Items.RIGHT_HAND + hand
-		var id := entity.slots[slot] if entity.slots.size() > slot else ""
+		var id: String = ids[hand]
 		if id == held[hand]:
 			continue
 		held[hand] = id
@@ -6536,6 +6537,107 @@ static func _hanging_lantern() -> Node3D:
 		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if i == 1 else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		lantern.add_child(piece)
 	return lantern
+
+
+## What [param entity] holds as drawn [right hand, left hand]: its hand
+## slots, but a bow always in the left and the other hand's thing (its
+## arrows) in the right, as a right-handed archer holds them (decision 462).
+static func held_ids(entity: GridEntity) -> Array:
+	var right := entity.slots[Items.RIGHT_HAND] if entity.slots.size() > Items.RIGHT_HAND else ""
+	var left := entity.slots[Items.LEFT_HAND] if entity.slots.size() > Items.LEFT_HAND else ""
+	if right != "" and str(Items.verb_of(right).get("kind", "")) == "ranged":
+		return [left, right]
+	return [right, left]
+
+
+## A bow's look on its puppet (decision 462), from what the sim replicates
+## (items' signals): a bow in hand and nothing raised, Bow_Idle on the upper
+## layer; raised "draw", Bow_Draw from the nock, played so its end (full draw)
+## comes when World.draw_of reaches 1, then Bow_Hold while it stays drawn; the
+## shot (_on_shot), Bow_Loose; a draw let go with no shot, back to Bow_Idle. A
+## raised shield ("block") holds the guard (Block_Idle) on the upper layer.
+## While drawn the bundle's hand shows one arrow (fx.arrow, its kind's
+## variant) on the bow's string, the string pulled back to that hand.
+const BOW_DRAW_SECONDS := 2.0  # A bow's draw when its verb gives none (draw_full 20 ticks).
+func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
+	if not puppet.has_meta("rig") or not puppet.has_meta("sockets"):
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var moves: Dictionary = puppet.get_meta("moves", {})
+	if moves.is_empty():
+		return
+	var ids := held_ids(entity)
+	var bow: String = ids[1] if ids[1] != "" and str(Items.verb_of(ids[1]).get("kind", "")) == "ranged" else ""
+	var state := str(puppet.get_meta("bow_state", ""))
+	var now := Time.get_ticks_msec()
+	var want := ""
+	if entity.raised == "block":
+		want = "block"
+	elif bow != "" and entity.raised == "draw":
+		want = "hold" if World.draw_of(entity) >= 1.0 else "draw"
+	elif bow != "":
+		want = "loose" if state == "loose" and now < int(puppet.get_meta("bow_until", 0)) else "idle"
+	if want == "draw":
+		# Full draw when the sim's comes: the draw's ticks from its start, as far
+		# as draw_of tells them (a quick bow's are fewer), else the verb's.
+		var full := float(Items.verb_of(bow).get("draw_full", BOW_DRAW_SECONDS * World.TICK_RATE))
+		var drawn := float(World.tick - entity.raised_tick)
+		var progress := World.draw_of(entity)
+		if progress > 0.0:
+			full = drawn / progress
+		var left := maxf((full - drawn) * World.TICK_DT, 0.05)
+		var clip := str(moves.get("bow_draw", ""))
+		var at := rig.upper_position() if state == "draw" else 0.0
+		var speed := clampf((rig.length(clip) - at) / left, 0.2, 4.0)
+		rig.upper(clip, speed, state != "draw")
+	elif want != state:
+		match want:
+			"hold":
+				rig.upper(str(moves.get("bow_aim", "")))
+			"idle":
+				rig.upper(str(moves.get("bow_idle", "")))
+			"block":
+				rig.upper(str(moves.get("block", "")))
+			"":
+				rig.upper_off()
+	puppet.set_meta("bow_state", want)
+	_show_nocked(puppet, ids, want in ["draw", "hold"])
+
+
+## While drawn, the bundle hidden and one arrow on the bow's string at its
+## nock, the string (the bow art's "string" part) pulled back toward the
+## drawing hand; else as they were.
+func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var bundle := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held") as Node3D
+	if bow == null:
+		return
+	var string := bow.find_child("string", true, false) as Node3D
+	var arrow := bow.find_child("Nocked", true, false) as Node3D
+	if bundle != null:
+		bundle.visible = not drawn
+	if not drawn:
+		if arrow != null:
+			arrow.queue_free()
+		if string != null and string.has_meta("rest"):
+			string.position = string.get_meta("rest")
+		return
+	if string != null and not string.has_meta("rest"):
+		string.set_meta("rest", string.position)
+	if arrow == null and ArtKit.has("fx.arrow"):
+		var kinds := {"arrows": 1, "arrows_flame": 2, "arrows_barbed": 3}
+		arrow = ArtKit.instance("fx.arrow", int(kinds.get(str(ids[0]), 1)))
+		arrow.name = "Nocked"
+		# Its notch at the nock, its head (+y) toward the target (the bow's +z).
+		arrow.basis = Basis(Vector3.RIGHT, PI * 0.5)
+		var nock := bow.find_child("nock", true, false) as Node3D
+		(string if string != null else nock if nock != null else bow).add_child(arrow)
+	if string != null:
+		# Back toward the drawing hand, never past it nor forward of the brace.
+		var hand := bow.global_transform.affine_inverse() * (sockets["hand_r"] as Node3D).global_position
+		var rest: Vector3 = string.get_meta("rest")
+		string.position = Vector3(rest.x, rest.y, minf(rest.z, hand.z))
 
 
 ## A human body's meshes in HUMAN_MATERIAL, each part in its own colour (its
@@ -7083,6 +7185,13 @@ func _on_shot(to: Vector2i, id: int) -> void:
 	if puppet == null or puppet.get_parent() == null:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
+	# The bow's loose (decision 462): the release and the recovery, then idle.
+	if puppet.has_meta("rig") and str(puppet.get_meta("bow_state", "")) in ["draw", "hold"]:
+		var clip := str((puppet.get_meta("moves", {}) as Dictionary).get("bow_shoot", ""))
+		var rig := puppet.get_meta("rig") as AnimRig
+		rig.upper(clip, 1.0, true)
+		puppet.set_meta("bow_state", "loose")
+		puppet.set_meta("bow_until", Time.get_ticks_msec() + int(rig.length(clip) * 1000.0))
 	var from := puppet.position + Vector3.UP * 1.1
 	var end := _tile_position(to)
 	end.y = _ground_height(Vector2(end.x, end.z)) + 1.0

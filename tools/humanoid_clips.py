@@ -141,6 +141,49 @@ CLIPS["Jog_Short_Loop"] = {"loop": True, "segment": ("Jog_Fwd_Loop", 0.0, 0.9333
 CLIPS["Sprint_Short_Loop"] = {"loop": True, "segment": ("Sprint_Loop", 0.0, 0.6667), "stride": {"legs": 0.72, "arms": 0.85, "bounce": 0.75}}
 
 
+# The bow (Jeff: archery wants playtesting): a right-handed archer, the bow in the left hand
+# (Client3D draws a held bow there, the arrows in the right), side on to the shot: the trunk
+# turned to its right so the left shoulder leads, the head turned back to look ahead.
+# BOW_LOW: the bow held low and forward, an arrow's bundle at the right hip. NOCK: both
+# hands before the chest, an arrow to the string. DRAWN: the bow arm straight at the target,
+# the drawing hand back at the jaw, the elbow up behind it. The draw's contact is full draw.
+AHEAD = Vector((0.0, -1.0, 0.0))
+SIDE_ON = [("spine_01", TURN, -18.0), ("spine_02", TURN, -22.0), ("spine_03", TURN, -20.0),
+	("neck_01", TURN, 30.0), ("Head", TURN, 28.0)]
+# The bow hand rolled thumb up about the arm (ROLL), so the bow held in it stands upright.
+ROLL = [("hand_l", AHEAD, -90.0)]
+BOW_LOW = [("upperarm_l", LIFT, -55.0), ("upperarm_l", TURN, -10.0), ("lowerarm_l", LIFT, 30.0), ("hand_l", LIFT, -45.0),
+	("upperarm_r", LIFT, -60.0), ("lowerarm_r", LIFT, 15.0)]
+NOCK = SIDE_ON + [("upperarm_l", Vector((0.15, -1.0, -0.25)), AIM), ("lowerarm_l", Vector((-0.1, -1.0, -0.1)), AIM),
+	("upperarm_r", Vector((-0.2, -0.7, -0.6)), AIM), ("lowerarm_r", Vector((0.55, -0.8, 0.15)), AIM)] + ROLL
+DRAWN = SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, 0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.04)), AIM),
+	("upperarm_r", Vector((-0.35, 0.9, 0.05)), AIM), ("lowerarm_r", Vector((0.5, -0.85, 0.05)), AIM)] + ROLL
+CLIPS["Bow_Idle_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
+	(1.25, P("Idle_Loop", 1.25, BOW_LOW + [("spine_02", LIFT, -2.0)])),
+	(2.5, P("Idle_Loop", 0.0, BOW_LOW)),
+]}
+CLIPS["Bow_Draw"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
+	(0.3, P("Idle_Loop", 0.3, NOCK)),
+	(0.65, P("Idle_Loop", 0.6, DRAWN[:5] + [("upperarm_l", Vector((0.0, -1.0, 0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.04)), AIM),
+		("upperarm_r", Vector((-0.3, -0.2, 0.0)), AIM), ("lowerarm_r", Vector((0.4, -0.9, 0.05)), AIM)] + ROLL)),
+	(1.0, P("Idle_Loop", 0.9, DRAWN)),
+]}
+CLIPS["Bow_Hold_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, DRAWN)),
+	(0.75, P("Idle_Loop", 0.75, DRAWN + [("spine_02", LIFT, 1.0), ("upperarm_r", LIFT, 1.5)])),
+	(1.5, P("Idle_Loop", 0.0, DRAWN)),
+]}
+CLIPS["Bow_Loose"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, DRAWN)),
+	(0.08, P("Idle_Loop", 0.1, DRAWN[:5] + [("upperarm_l", Vector((0.0, -1.0, 0.0)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.0)), AIM),
+		("upperarm_r", Vector((-0.55, 0.85, 0.1)), AIM), ("lowerarm_r", Vector((-0.2, 0.3, 0.1)), AIM)] + ROLL)),
+	(0.45, P("Idle_Loop", 0.45, NOCK)),
+	(0.9, P("Idle_Loop", 0.9, BOW_LOW)),
+]}
+
+
 def args() -> list:
 	return sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 

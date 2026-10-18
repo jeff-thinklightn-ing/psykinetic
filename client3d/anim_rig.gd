@@ -48,6 +48,8 @@ var _base_speed := [1.0, 1.0]
 var _base_seek := [0.0, 0.0]  # Where each slot's clip was started.
 var _has_upper := false
 var _upper_clip := ""
+## The upper layer's speed (upper()): its clip played this many times as fast.
+var _upper_speed := 1.0
 var _posture: Animation
 var _action_clip := ""
 var _action_speed := 1.0
@@ -101,9 +103,13 @@ func _build(upper: bool) -> void:
 		for bone in UPPER_BONES:
 			layer.set_filter_path(NodePath("%GeneralSkeleton:" + bone), true)
 		_root.add_node("upper_clip", AnimationNodeAnimation.new())
+		_root.add_node("upper_seek", AnimationNodeTimeSeek.new())
+		_root.add_node("upper_speed", AnimationNodeTimeScale.new())
+		_root.connect_node("upper_seek", 0, "upper_clip")
+		_root.connect_node("upper_speed", 0, "upper_seek")
 		_root.add_node("upper", layer)
 		_root.connect_node("upper", 0, under)
-		_root.connect_node("upper", 1, "upper_clip")
+		_root.connect_node("upper", 1, "upper_speed")
 		under = "upper"
 	_root.add_node("pose", AnimationNodeAnimation.new())
 	_root.add_node("posture", AnimationNodeAdd2.new())
@@ -250,9 +256,12 @@ func cancel_strike() -> void:
 	_contact_msec = -1
 
 
-## The upper layer plays [param clip] over the body above the hips; "" lets
-## it go. (Nothing on a rig made without the layer.)
-func upper(clip: String) -> void:
+## The upper layer plays [param clip] over the body above the hips at
+## [param speed]; "" lets it go. A new clip, or [param from_start], starts it
+## from its beginning now; the same clip again only changes its speed (a
+## bow's draw timed to the sim's, decision 462). (Nothing on a rig made
+## without the layer.)
+func upper(clip: String, speed := 1.0, from_start := false) -> void:
 	if not _has_upper:
 		return
 	clip = _name(clip)
@@ -260,10 +269,31 @@ func upper(clip: String) -> void:
 		_upper_clip = ""
 		tree.set("parameters/upper/blend_amount", 0.0)
 		return
-	if clip != _upper_clip:
+	_upper_speed = speed
+	tree.set("parameters/upper_speed/scale", speed)
+	if clip != _upper_clip or from_start:
 		(_root.get_node("upper_clip") as AnimationNodeAnimation).animation = clip
 		_upper_clip = clip
+		tree.set("parameters/upper_seek/seek_request", 0.0)
+		tree.set("parameters/upper/blend_amount", 1.0)
+		_apply()
+		return
 	tree.set("parameters/upper/blend_amount", 1.0)
+
+
+## The upper layer's clip ("" for none) and its speed.
+func upper_clip() -> String:
+	return _upper_clip
+
+
+func upper_speed() -> float:
+	return _upper_speed
+
+
+## Seconds into the upper layer's clip.
+func upper_position() -> float:
+	var at: Variant = tree.get("parameters/upper_clip/current_position")
+	return float(at) if at != null else 0.0
 
 
 func upper_off() -> void:

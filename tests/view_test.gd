@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_humans()
 	_test_person_looks()
 	_test_attach_points()
+	_test_bow()
 	_test_goblins_differ()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
@@ -2280,6 +2281,64 @@ func _test_attach_points() -> void:
 	var held: Node3D = (goblin.get_meta("sockets", {}) as Dictionary).get("hand_r")
 	_check(held != null and held.get_node_or_null("Held") != null, "a goblin's dagger is in its hand")
 	World.despawn(imp)
+	_rig._process(0.0)
+
+
+func _test_bow() -> void:
+	print("
+== the bow (decision 462): held left, drawn, held at full draw, loosed; the shield's guard ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	slots[Items.RIGHT_HAND] = "bow"
+	slots[Items.LEFT_HAND] = "arrows"
+	player.slots = slots
+	player.raised = ""
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var rig := puppet.get_meta("rig") as AnimRig
+	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held")
+	var bundle := (sockets["hand_r"] as Node3D).get_node_or_null("Held")
+	_check(bow != null and bundle != null and Client3D.held_ids(player) == ["arrows", "bow"],
+			"a bow in the right hand's slot is drawn in the left, its arrows in the right")
+	_check(rig.upper_clip() == "Bow_Idle", "a bow in hand: Bow_Idle (%s)" % rig.upper_clip())
+	player.raised = "draw"
+	player.raised_tick = World.tick
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.05 and not bundle.visible,
+			"drawing: Bow_Draw from the nock, the bundle put away (%s, %.2f)" % [rig.upper_clip(), rig.upper_position()])
+	_check(absf(rig.upper_speed() - rig.length("Bow_Draw") / 2.0) < 0.05,
+			"played so full draw comes with the sim's, 2 s on (speed %.2f)" % rig.upper_speed())
+	_check(bow.find_child("Nocked", true, false) != null or not ArtKit.has("fx.arrow"), "an arrow on the string")
+	player.raised_tick = World.tick - 20
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Bow_Hold", "at full draw: Bow_Hold (%s)" % rig.upper_clip())
+	player.shot.emit(player.tile + Vector2i(4, 0))
+	player.raised = ""
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Bow_Loose" and bundle.visible, "loosed: Bow_Loose, the bundle back (%s)" % rig.upper_clip())
+	puppet.set_meta("bow_until", 0)
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Bow_Idle", "then Bow_Idle again")
+	player.raised = "draw"
+	player.raised_tick = World.tick
+	_rig._process(0.0)
+	player.raised = ""
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Bow_Idle", "a draw let go with no shot: back to Bow_Idle")
+	slots[Items.RIGHT_HAND] = "sword"
+	slots[Items.LEFT_HAND] = "shield"
+	player.slots = slots
+	player.raised = "block"
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Block_Idle", "a shield raised: the guard (%s)" % rig.upper_clip())
+	player.raised = ""
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "", "lowered, nothing on the upper layer (%s)" % rig.upper_clip())
+	player.slots = was
 	_rig._process(0.0)
 
 

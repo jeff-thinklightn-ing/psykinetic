@@ -11457,3 +11457,40 @@ way should be on the map, and say so, without taking anyone anywhere.
 Protocol unchanged.
 
 tests/world_map_test's closed links, respawn_test's closed link.
+## 462. Archery's look: the bow drawn, held and loosed
+
+Jeff: "we need to prioritize bow since archery is already working, it needs play
+testing". The bow's moves had pistol stand-ins (399) that nothing played. Now four
+clips of our own, authored by tools/humanoid_clips.py on the UAL skeleton (so on both
+human bodies and the goblin) for a right-handed archer, side on, the head turned to
+the shot: Bow_Idle (a loop, the bow held low), Bow_Draw (from the bow low to an arrow
+nocked before the chest to full draw, the drawing hand at the jaw; its end is full
+draw), Bow_Hold (a loop at full draw, the aim) and Bow_Loose (the release, the hand
+flying back, and the recovery to the bow held low). The bow hand is rolled thumb up
+so the bow stands upright (451's sockets: a held piece's length along the fist).
+
+Client3D plays them from items' signals (456; World.draw_of, raised, raised_tick,
+the shot), on AnimRig's upper layer (390) so an archer can step while drawing:
+a bow in hand and nothing raised, Bow_Idle; raised "draw", Bow_Draw from its start,
+its speed set each frame so its end comes when draw_of reaches 1 (the draw's ticks
+read from draw_of's progress, so a quick bow's shorter draw is kept to; a far body
+posed less often still keeps time); full draw, Bow_Hold; the shot, Bow_Loose, then
+Bow_Idle; a draw let go with no shot, back to Bow_Idle. A raised shield ("block")
+holds the guard, Block_Idle, on the same layer. AnimRig.upper gains a speed and a
+restart (upper(clip, speed, from_start); perf's shape: upper_clip, upper_seek,
+upper_speed as the action layer has them; the same clip asked again only changes its
+speed). A bow is always drawn in the left hand and the other hand's thing (its arrows)
+in the right, whichever slots they are in (Client3D.held_ids). While drawn, the bundle
+is put away and one arrow (art-kit's fx.arrow, the bundle's kind's variant) sits on
+the bow's string at its nock, the string part pulled back toward the drawing hand;
+the bow's layout is art-kit's (origin at the grip, back toward the target, "string",
+"nock", "rest").
+
+Client only. A monster archer's draw shows on clients once enemy-ai's 455 replicates
+raised on monsters (revision 16). anim_rig_test: the upper layer timed (half way at a
+quarter second at speed 2, going on when asked again, back to the start on from_start,
+a new speed without a restart). view_test: the bow left and the arrows right, Bow_Idle,
+the draw from the nock with the bundle put away, its speed for a 2 s draw, an arrow on
+the string, the hold, the loose, a cancelled draw, the shield's guard. Rejected: the
+draw as a whole-body strike (the legs would stop); one clip played at a fixed speed
+(full draw would not come when the sim's does).
