@@ -92,6 +92,8 @@ func _ready() -> void:
 	_test_worn_bundles()
 	_test_shield()
 	_test_monster_bash()
+	_test_monster_wind_up()
+	_test_meets_wind_up()
 	_test_boar_turns()
 	_test_pick_up()
 	_test_art_slots()
@@ -2135,6 +2137,77 @@ func _test_monster_bash() -> void:
 		World.step()
 	_check(bashes.is_empty(), "no shield, no bash")
 	World.shield_bashed.disconnect(on_bash)
+	Monster.idling = true
+
+
+func _test_monster_wind_up() -> void:
+	print("
+== a monster with a giant axe winds its blow up (World.try_wind_up) and stands till it falls; a brute with one uses only that ==")
+	Monster.idling = false
+	for symbol in ["i", "b"]:
+		var e := _build(["#######", "#.P" + symbol + "..#", "#######"])
+		var monster: Monster = e[symbol][0]
+		var player: GridEntity = e["P"][0]
+		_bold(monster)
+		monster.slots = PackedStringArray(["", "", "", "", "giant_axe", ""])  # As Level arms one wielding it.
+		var wound := {}
+		var stood := true
+		var struck_at := -1
+		for i in 40:
+			World.step()
+			if wound.is_empty():
+				wound = World.winding(monster).duplicate()
+			elif World.tick <= int(wound["lands"]) and monster.tile != wound["from"]:
+				stood = false
+			for hit: Dictionary in _damage_log:
+				if hit["source"] == monster and int(hit["tick"]) == World.tick and struck_at < 0:
+					struck_at = World.tick
+			if struck_at >= 0:
+				break
+		_check(not wound.is_empty() and wound["target"] == player and monster._windup.is_empty(),
+			"the %s winds up through World (%s), not its own wind-up" % [monster.name, wound])
+		_check(stood and not wound.is_empty() and struck_at >= int(wound["lands"]),
+			"it stands while winding and the blow falls when due (tick %d, due %s)" % [struck_at, wound.get("lands")])
+	Monster.idling = true
+
+
+func _test_meets_wind_up() -> void:
+	print("
+== a foe winding a heavy blow up at it: the cautious step out of reach, a shield-bearer bashes, the bold fight on ==")
+	Monster.idling = false
+	for case in ["cautious", "shield", "bold"]:
+		var e := _build(["########", "#.Pi...#", "########"])
+		var imp: Monster = e["i"][0]
+		var player: GridEntity = e["P"][0]
+		_bold(imp)
+		if case == "cautious":
+			imp.temper = Monster.Temper.CAUTIOUS
+		if case == "shield":
+			imp.slots = PackedStringArray(["", "", "", "", "", "shield"])
+		player.slots[Items.RIGHT_HAND] = "giant_axe"
+		for i in 30:
+			World.step()
+			if imp.target == player and World.try_wind_up(player, imp):
+				break
+		var wound := World.winding(player).duplicate()
+		_check(not wound.is_empty(), "%s: the player winds up at it" % case)
+		var hits_on_imp := 0
+		var reached_when_due := false
+		for i in World.windup_ticks(player) + 2:
+			World.step()
+			if World.tick == int(wound.get("lands", -1)):
+				reached_when_due = World.in_reach(player, imp)
+			for hit: Dictionary in _damage_log:
+				if hit["source"] == player and hit["entity"] == imp and int(hit["tick"]) == World.tick:
+					hits_on_imp += 1
+		match case:
+			"cautious":
+				_check(hits_on_imp == 0 and not reached_when_due, "a cautious one steps out of reach and keeps out: the blow strikes the air")
+			"shield":
+				_check(hits_on_imp == 0 and World.winding(player).is_empty() and player.next_bash_tick == 0 and imp.next_bash_tick > 0,
+					"a shield-bearer bashes it: the wind-up given up, no blow")
+			"bold":
+				_check(hits_on_imp == 1 and imp.tile == Vector2i(3, 1), "a bold one stands and takes it (%d blows)" % hits_on_imp)
 	Monster.idling = true
 
 

@@ -10364,3 +10364,26 @@ design.
   bash_moment_until), as a player's does.
 
 tests/monster_test (_test_monster_bash).
+
+## 412. Monsters wind up heavy weapons and meet a foe's wind-up (the AI side of 392)
+
+Items' wind-up (392: World.try_wind_up, winding, windup_ticks, a crushing
+blow that breaks any guard, struck by World when due) is the player's and
+any monster's; when a monster uses it, and what it does about one aimed at
+it, is enemy-ai's. Approved by the coordinator with items' design.
+
+- A monster holding a weapon that winds up (World.windup_ticks over 0: the
+  giant axe) winds its blow up with World.try_wind_up wherever it would
+  strike (Monster._strike, _blow), and stands while World.winding says it
+  is winding: no step, no other blow, till World strikes it. A HEAVY
+  monster (the brute) with one uses only that, not its own bare-handed
+  wind-up (Monster._windup), which is unchanged and still blockable.
+- Its target winding up at it (Monster._meet_wind_up): in that blow's
+  reach, a shield-bearer with its bash ready bashes (379, 411; the stagger
+  gives the wind-up up); else one not bold steps out of reach (_step_back)
+  and keeps out till the blow has fallen, then closes again; a bold one,
+  or one with nowhere to step, fights on and takes it. The bash comes
+  before temper: even a bold shield-bearer stops a blow it can.
+- Nothing new on the wire: the views already wind up from GridEntity.winding.
+
+tests/monster_test (_test_monster_wind_up, _test_meets_wind_up).

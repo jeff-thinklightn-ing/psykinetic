@@ -488,6 +488,10 @@ func _sim_tick() -> void:
 		if _should_flee():
 			_flee(target.tile)
 			return
+	if not World.winding(self).is_empty():
+		return  # Its heavy blow wound up: it stands till World strikes it.
+	if _meet_wind_up():
+		return
 	match World.off_hand(self):
 		"draw":
 			if _shoot_tick():
@@ -497,7 +501,7 @@ func _sim_tick() -> void:
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
 			if not _bash_guard():
-				World.try_attack(self, target)
+				_blow()
 		elif World.tick >= next_move_tick:
 			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 			if not path.is_empty():
@@ -616,6 +620,33 @@ func _bash_guard() -> bool:
 	return World.bash_ready(self) and not World.guarding(target, self).is_empty() and World.try_bash(self, target)
 
 
+## A plain blow at its target: its heavy weapon's wind-up, else at once.
+func _blow() -> void:
+	if World.windup_ticks(self) > 0:
+		World.try_wind_up(self, target)
+	else:
+		World.try_attack(self, target)
+
+
+## Its target winding a heavy blow up at it (World.winding, 392; decision
+## 412): in its reach, a shield-bearer with its bash ready bashes (the
+## stagger gives the blow up); else one not bold steps out of reach
+## (_step_back), and keeps out till the blow has fallen; a bold one, or one
+## with nowhere to step, fights on. Whether that was its turn.
+func _meet_wind_up() -> bool:
+	var theirs := World.winding(target)
+	if theirs.is_empty() or theirs.get("target") != self:
+		return false
+	var reached := World.in_reach(target, self)
+	if reached and World.bash_ready(self) and World.try_bash(self, target):
+		return true
+	if temper == Temper.BOLD:
+		return false
+	if not reached:
+		return true  # Out of its reach: it keeps out till the blow falls.
+	return _step_back() if World.tick >= next_move_tick else true
+
+
 ## Cornered while it flees, with a shield that bashes: a bash at a foe
 ## beside it (World.try_bash), to shove it off and stagger it, then away.
 ## Whether it bashed.
@@ -677,8 +708,12 @@ func _step_back() -> bool:
 	return best != Vector2i.ZERO and World.try_move(self, best)
 
 
-## A blow at its target, as its kind strikes.
+## A blow at its target, as its kind strikes; with a heavy weapon its
+## wind-up (World.try_wind_up, decision 392) in place of any of its kind's.
 func _strike() -> void:
+	if World.windup_ticks(self) > 0:
+		World.try_wind_up(self, target)
+		return
 	match tactic:
 		Tactic.HEAVY:
 			move_ticks = _pace
