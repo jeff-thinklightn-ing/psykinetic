@@ -13,6 +13,7 @@ notes (decision 324).
 - A pick: a two-handed miner's tool the smith makes from ore and wood. Its swing is slow and heavy and drives back whoever it hits. Sword, dagger, spear, hammer and great axe are drawn wider, so their guards and heads show (decision 479).
 - A thing can be of dwarven or dark elven make, set by where it came from: a level, a chest, a monster or what it drops. Its note says "dwarven dagger" and its story "dwarven work" (decision 474).
 - A forest east of the wilds: a path through it between sunlit clearings, the way to the elven stronghold (closed for now). Its trees are still to come.
+- An archer at rest now holds its arrows down at the hip instead of up at the chest.
 - The server no longer stalls for a moment at each dawn while it works out where the wild animals can live: it now does that a little at a time.
 - Companions no longer stall a tick on their first turn in a zone, and one
   who can't reach a foe stops trying for a few seconds instead of

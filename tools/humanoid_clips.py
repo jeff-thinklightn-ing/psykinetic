@@ -153,7 +153,9 @@ SIDE_ON = [("spine_01", TURN, -18.0), ("spine_02", TURN, -22.0), ("spine_03", TU
 # The bow hand rolled thumb up about the arm (ROLL), so the bow held in it stands upright.
 ROLL = [("hand_l", AHEAD, -90.0)]
 BOW_LOW = [("upperarm_l", LIFT, -55.0), ("upperarm_l", TURN, -10.0), ("lowerarm_l", LIFT, 30.0), ("hand_l", LIFT, -45.0),
-	("upperarm_r", LIFT, -60.0), ("lowerarm_r", LIFT, 15.0)]
+	# The bundle's arm hanging at its side, the hand by the hip (it was lifted, the bundle at the
+	# chest; the coordinator on the bow check).
+	("upperarm_r", Vector((-0.18, 0.02, -1.0)), AIM), ("lowerarm_r", Vector((-0.08, -0.3, -1.0)), AIM)]
 NOCK = SIDE_ON + [("upperarm_l", Vector((0.15, -1.0, -0.25)), AIM), ("lowerarm_l", Vector((-0.1, -1.0, -0.1)), AIM),
 	("upperarm_r", Vector((-0.2, -0.7, -0.6)), AIM), ("lowerarm_r", Vector((0.55, -0.8, 0.15)), AIM)] + ROLL
 DRAWN = SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, 0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.04)), AIM),
