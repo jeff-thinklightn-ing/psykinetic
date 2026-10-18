@@ -8,7 +8,8 @@ extends Node
 ## the town with their trade, logged; taken by another hostile faction,
 ## nothing; restocked only after rescue.restock_days; a raid group's
 ## captives freed by free_held; saved and loaded. The fletcher mends a
-## worn bundle; with no fletcher in town the carpenter stands in.
+## worn bundle; with no fletcher in town the carpenter stands in. Someone
+## the town remembers moves in (460) only with room, once, no xp or gold.
 ## Reads the repo's levels, never the shared overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
@@ -31,6 +32,7 @@ func _ready() -> void:
 	_test_lacking()
 	_test_fletcher()
 	_test_lawspeaker()
+	_test_move_in()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -166,6 +168,29 @@ func _test_lawspeaker() -> void:
 	_check(appointed.size() == 1 and towns.production.worker(appointed[0])["origin"] == "appointed"
 		and str(towns.production.worker(appointed[0])["name"]) in _rules["official"]["lawspeaker"]["names"], "%d: one is appointed (%s)" % [from, appointed])
 	_check(_rules["official"]["lawspeaker"]["wage"] == _rules["official"]["priest"]["wage"], "paid as the priest")
+
+
+## Someone the town remembers moves in (decision 460's economy side).
+func _test_move_in() -> void:
+	print("
+== moving in ==")
+	var towns := _towns()
+	var gold := towns.production.stockpile.count(TOWN, "gold")
+	var xp := towns.xp_earned(TOWN)
+	var told := []
+	towns.rescued.connect(func(_town: String, who: String, _by: String) -> void: told.append(who))
+	var marta := "remembered:%s:Marta" % TOWN
+	_check(towns.move_in(TOWN, marta, "Marta", "cook"), "Marta moves in")
+	var w := towns.production.worker(marta)
+	_check(marta in towns.residents(TOWN) and w["origin"] == "remembered" and w["trades"] == ["cook"]
+		and towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "Marta is found to have lived here all along"), "a resident, remembered, a cook, logged")
+	_check(towns.xp_earned(TOWN) == xp and towns.production.stockpile.count(TOWN, "gold") == gold and told.is_empty(), "no xp, no gold, no rescued signal")
+	_check(not towns.move_in(TOWN, marta, "Marta", "cook"), "not twice")
+	_check(towns.move_in(TOWN, "snagfin", "Snagfin", "hauler", "remembered", "thief") and towns.production.worker("snagfin")["type"] == "thief", "a type when given")
+	while towns.residents(TOWN).size() < towns.room(TOWN):
+		towns.note_rescue(TOWN, "f%d" % towns.residents(TOWN).size(), "Folk", "hauler")
+	_check(not towns.move_in(TOWN, "remembered:%s:Timmy" % TOWN, "Timmy", "hauler") and towns.production.worker("remembered:%s:Timmy" % TOWN).is_empty(),
+		"no room: they wait (%d residents)" % towns.residents(TOWN).size())
 
 
 func _check(ok: bool, what: String) -> void:

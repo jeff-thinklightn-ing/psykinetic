@@ -11550,6 +11550,10 @@ talk has spread and held); a card invented by a model (the talk is the
 card, and the rest is rolled as for anyone); dying by memory alone (Q4's
 default); a founding gold share (a newcomer's, not a neighbour's who was
 always here).
+
+Economy's side (2026-10-18): Towns.move_in(town, who_id, name, trade,
+origin := "remembered", type := "") as above; origin and type are for
+471's Snagfin (a type like the thief's, 461). rescue_test.
 ## 465. Regenerating levels: the shifting halls, anchors kept, the rest laid again
 
 Jeff (2026-10-17): "castle stays persistent, its the entrance marker for
