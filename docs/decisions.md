@@ -8634,6 +8634,23 @@ neither excludes: a suite at the head waiting for a suite held a release's
 client export and four imports for ten minutes with room for them all. A
 wait for memory or for the running count stays first come first served.
 
+Amended a fourth time (2026-10-18, release): a run gives its command
+HEAVY_JOB_HELD, the name of its running entry; a run, take or release
+started under it, while that entry stands, neither queues nor releases: the
+inner run just runs its command, since the outer run already holds the room
+and its job object measures every process under it. ui's gated bench
+script called frame_budget.ps1, which asked for a bench again; the bench
+cap is 1, so it queued behind its own parent with every pid alive (dead
+waiters drop out, live ones don't), and 13 jobs waited behind it for an
+hour. An env var rather than walking parent pids: Windows reuses pids, and
+the var crosses bash, PowerShell and python alike. And a job holding the
+gate an hour (LONG_HOLD_SECONDS) is flagged: "LONG" in status, a "long"
+line in the log and the daily summary (that bench and its lock were held
+588 minutes before anyone saw it). It is not stopped: a long bench may be
+meant. A suite still doesn't pass a bench waiting at the head on a held
+bench slot, since bench and suite exclude each other; the stuck holder is
+what had to be caught.
+
 
 ## 395. UI sounds
 

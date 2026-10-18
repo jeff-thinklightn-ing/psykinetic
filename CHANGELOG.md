@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tools: a heavy job run through the resource gate inside another gated run (a bench script calling frame_budget) goes straight through instead of queueing behind its own parent forever (394 amended).
 - Snagfin no longer spawns as a monster by the town chest in the wilds. A server that saved him hands him over once, ready to become the town's goblin merchant.
 - Weapons, the shield, rations, bandages, sacks, bundles, cloth, purses, nails
   and axe heads have their own art, and so do chests, ladders, beds, graves,

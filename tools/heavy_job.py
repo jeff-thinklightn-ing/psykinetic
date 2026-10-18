@@ -32,7 +32,11 @@ set), rising at once and falling slowly. A `run` by a tree that already
 holds a take of the kind (land.sh under its landing's take) adopts the
 take instead of queueing: it measures the take's entry, so what it is owed
 shrinks as it really uses memory, and it is never stopped (its landing
-holds the land lock, which must never wait on the gate).
+holds the land lock, which must never wait on the gate). A run gives its
+command HEAVY_JOB_HELD (its entry's name): a run, take or release started
+under it (frame_budget.ps1 inside a gated bench script) neither queues nor
+releases, since the outer run holds the room and measures its whole tree;
+before this, such a run queued behind its own parent forever.
 
 State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
 them elsewhere, as the test does): running/ and queue/ hold a file a job,
@@ -64,6 +68,11 @@ MARGIN_GB = 8.0
 ## fail and programs crash.
 COMMIT_MARGIN_GB = 8.0
 MAX_RUNNING = 3
+## A job holding the gate this long is flagged in status, the log and the
+## summary (a bench held 588 minutes on 2026-10-17 before anyone saw it).
+LONG_HOLD_SECONDS = 3600
+## Set by `run` for its command: the name of its running entry.
+HELD_ENV = "HEAVY_JOB_HELD"
 MAX_GPU_RUNNING = 1
 POLL_SECONDS = 5.0
 WATCH_SECONDS = 2.0
@@ -484,7 +493,30 @@ def _adopt_take(tree, kind):
     return None
 
 
+def _outer_run():
+    """The running entry of the gated run this process was started under
+    (HELD_ENV, which `run` gives its command), while that entry stands, or
+    None."""
+    held = os.environ.get(HELD_ENV, "")
+    if not held:
+        return None
+    with StateLock():
+        for entry in _entries("running"):
+            if entry["file"] == held:
+                return entry
+    return None
+
+
 def run(tree, kind, command):
+    # A gated run inside another (frame_budget.ps1 under a bench script run
+    # through the gate) would queue behind its own parent forever: the outer
+    # run already holds the room and measures every process under it.
+    outer = _outer_run()
+    if outer is not None:
+        print("heavy_job: %s %s inside %s's %s run, which holds and measures it; not queued again" % (
+            tree, kind, outer["tree"], outer["kind"]), file=sys.stderr)
+        log("nested", tree, kind, "inside %s %s" % (outer["tree"], outer["kind"]))
+        return subprocess.call(command)
     restarts = 0
     while True:
         adopted = _adopt_take(tree, kind)
@@ -494,9 +526,9 @@ def run(tree, kind, command):
         else:
             name = wait_turn(tree, kind, os.getpid(), True)
         started = time.time()
-        child = subprocess.Popen(command)
+        child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name}))
         job = Job(child)
-        peak, low, stopped = 0.0, 0, False
+        peak, low, stopped, long_logged = 0.0, 0, False, False
         gpu_peak = 0.0
         row = kinds()[kind]
         while child.poll() is None:
@@ -512,6 +544,10 @@ def run(tree, kind, command):
                     entry["using_gb"] = using
                     _write(_path("running", name), entry)
                 running = _entries("running")
+            if not long_logged and time.time() - started >= LONG_HOLD_SECONDS:
+                long_logged = True
+                log("long", tree, kind, "still running after %.0f min" % (LONG_HOLD_SECONDS / 60))
+                print("heavy_job: %s %s has held the gate %.0f min" % (tree, kind, LONG_HOLD_SECONDS / 60), file=sys.stderr)
             free = free_ram_gb()
             low = low + 1 if free < MARGIN_GB else 0
             if (adopted is None and low >= LOW_WATCHES and entry is not None and should_stop(entry, running, free)
@@ -565,12 +601,22 @@ def run(tree, kind, command):
 
 
 def take(tree, kind, pid):
+    outer = _outer_run()
+    if outer is not None:
+        print("heavy_job: %s %s inside %s's %s run, which holds it; nothing taken" % (
+            tree, kind, outer["tree"], outer["kind"]))
+        return 0
     wait_turn(tree, kind, pid, False)
     print("heavy_job: %s %s taken" % (tree, kind))
     return 0
 
 
 def release(tree, kind):
+    outer = _outer_run()
+    if outer is not None:
+        # What a take inside a run "took" was the run's own entry.
+        print("heavy_job: %s %s inside %s's %s run; nothing to release" % (tree, kind, outer["tree"], outer["kind"]))
+        return 0
     with StateLock():
         for entry in _entries("running"):
             if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
@@ -600,8 +646,10 @@ def status():
         "%.1f GB free (margin %.0f GB)" % (free_commit, COMMIT_MARGIN_GB) if free_commit is not None else "unknown",
         "%.1f GB free" % free_gpu if free_gpu is not None else "unknown"))
     for entry in running:
-        print("running %s %s, %.0f s, using %.1f of %.1f GB%s" % (entry["tree"], entry["kind"], time.time() - entry["started"],
-            entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)"))
+        held = time.time() - entry["started"]
+        print("running %s %s, %.0f s, using %.1f of %.1f GB%s%s" % (entry["tree"], entry["kind"], held,
+            entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)",
+            "  LONG: held %.0f min, is it stuck?" % (held / 60) if held >= LONG_HOLD_SECONDS else ""))
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place)))
     if not running and not queue:
@@ -623,14 +671,14 @@ def summary(day):
         with open(_path("heavy_jobs.log")) as handle:
             for line in handle:
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in ("stopped", "waiting") or "waited" in parts[4]):
+                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in ("stopped", "waiting", "long") or "waited" in parts[4]):
                     lines.append(parts)
     except OSError:
         pass
     if not lines:
         print("%s: no heavy job waited or was stopped" % day)
     for when, event, tree, kind, detail in lines:
-        print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in ("stopped", "waiting") else "waited", detail))
+        print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in ("stopped", "waiting", "long") else "waited", detail))
     return 0
 
 

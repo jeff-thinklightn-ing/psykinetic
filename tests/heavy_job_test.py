@@ -160,6 +160,23 @@ with open(gate._path("heavy_jobs.log")) as log:
 check(adopted and float(adopted[0].split("peak ")[1].split(" GB")[0]) >= 0.15, "the run inside the take was measured: %s" % (
     adopted[0].strip() if adopted else "no line"))
 
+print("== a gated run inside a gated run ==")
+# ui's bench script run through the gate, and frame_budget.ps1 inside it
+# asking for a bench again: bench is at most 1, so it queued behind its own
+# parent forever (2026-10-17, 13 jobs stuck behind it).
+script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "heavy_job.py")
+inner = ("import subprocess, sys; s = sys.argv[1]; py = sys.executable; "
+    "t = subprocess.run([py, s, 'take', 'inner', 'suite']).returncode; "
+    "r = subprocess.run([py, s, 'run', 'inner', 'bench', '--', py, '-c', 'raise SystemExit(7)'], timeout=60).returncode; "
+    "g = subprocess.run([py, s, 'release', 'inner', 'suite']).returncode; "
+    "sys.exit(r if t == 0 and g == 0 else 1)")
+code = gate.run("outer", "bench", [sys.executable, "-c", inner, script])
+check(code == 7, "the inner run goes straight through, its exit code back (got %s)" % code)
+check(not gate._entries("running") and not gate._entries("queue"), "nothing left held or queued after")
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tnested\tinner\tbench\tinside outer bench" in text, "the log says it ran inside the outer run")
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
