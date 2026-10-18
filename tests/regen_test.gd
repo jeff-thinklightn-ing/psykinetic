@@ -251,7 +251,10 @@ func _test_asleep_regenerates() -> void:
 	World.step()
 	World.step()
 	_check(not World.zones["rg_halls"].awake, "the halls sleep")
+	var richness_before := World.richness
 	_main._regenerate_due()
+	_check(World.richness != null and World.richness != richness_before and World.herds.richness == World.richness.richness,
+		"the game's richness is worked out again on the new floor, the herds pointed at it")
 	_check(_main.generation_of("rg_halls") == 2, "generation 2 is laid (%d)" % _main.generation_of("rg_halls"))
 	_check(_same_floor(Regen.generate("rg_halls", 2)["layout"]), "the zone stands on generation 2's map")
 	_check(not World.items.has(lost_uid), "the thing in the corridor is lost")

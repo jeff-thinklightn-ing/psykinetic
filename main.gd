@@ -1830,6 +1830,15 @@ func _regenerate(level_name: String, config: Dictionary) -> bool:
 		var gone := World.holdings.rebind(_world_map)
 		if not gone.is_empty():
 			_forget_places(gone)
+	# The map's other holders (maps-2a's reading, 2026-10-18): the game's
+	# richness is worked out again on the new floor (its steps from the
+	# mines are per cell and read once), the herds pointed at it.
+	if World.richness != null:
+		World.richness.finish()
+		World.richness = WorldRichness.new(_world_map, World.holdings)
+		World.richness.start()
+		if World.herds != null:
+			World.herds.richness = World.richness.richness
 	return true
 
 
