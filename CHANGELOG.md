@@ -22,6 +22,7 @@ notes (decision 324).
   preview of you, or "Surprise me" for someone new. It shows from your next
   join.
 
+- Credits: a sound's title no longer ends in its file's ".wav"; the list is built when the options are first opened, never on the server.
 ## v0.1.150
 
 - This release changes what the server and client send each other, so update the

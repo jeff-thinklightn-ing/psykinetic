@@ -375,7 +375,11 @@ static func credits() -> Dictionary:
 			seen[url] = true
 			var original := str(take.get("original", ""))
 			var title := original.get_slice(": ", 1) if ": " in original else original
-			entries.append({"title": title.get_slice(" (from ", 0), "by": str(take["by"]),
+			title = title.get_slice(" (from ", 0)
+			# Freesound titles are often file names: "Sword Impact.wav" -> "Sword Impact".
+			if title.get_extension().to_lower() in ["wav", "mp3", "ogg", "flac", "aif", "aiff"]:
+				title = title.get_basename()
+			entries.append({"title": title, "by": str(take["by"]),
 				"license": str(take.get("license", source(str(take.get("from", ""))).get("license", "?"))), "url": url})
 	return {"summary": "Sounds: " + ", ".join(used), "entries": entries}
 

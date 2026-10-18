@@ -153,7 +153,8 @@ func _test_ambience_runs() -> void:
 func _test_options_panel() -> void:
 	print("\n== O: the options panel, a slider per volume, moved: the bus follows, written when let go ==")
 	var panel: OptionsPanel = _main.options_panel
-	_check(panel != null and not panel.visible, "there, hidden")
+	_check(panel != null and not panel.visible and panel.credits_button == null,
+			"there, hidden, its credits not built till shown (the server builds it too)")
 	_main.toggle_options()
 	_check(panel.visible and panel.sliders.size() == OptionsPanel.VOLUMES.size(), "O shows it: %d sliders" % panel.sliders.size())
 	var was := Net.ambience_volume

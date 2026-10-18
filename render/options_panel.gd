@@ -108,7 +108,9 @@ func _ready() -> void:
 		func(value: String) -> void:
 			Net.set_hints(value == "on")
 			hints_changed.emit(value == "on")))
-	_credits_section(add_section("Credits"))
+	# Filled when first shown: the server builds this panel too, and has no
+	# art/audio to credit (2f0db21).
+	_credits = add_section("Credits")
 
 
 ## Who made what the game uses (decision 406): a Callable each giving
@@ -124,6 +126,8 @@ static func credit_providers() -> Array[Callable]:
 var credits_box: ScrollContainer
 var credits_list: VBoxContainer
 var credits_button: Button
+## The Credits section's box, empty till the panel is first shown.
+var _credits: VBoxContainer
 
 
 ## The column shown whole where it fits, else as tall as the screen allows.
@@ -150,6 +154,7 @@ func add_section(title: String) -> VBoxContainer:
 func toggle() -> void:
 	visible = not visible
 	if visible:
+		_fill_credits()
 		for key: String in sliders:
 			sliders[key].set_value_no_signal(float(Net.get(key)))
 		_show_look()
@@ -448,8 +453,15 @@ func _credits_section(section: VBoxContainer) -> void:
 
 ## Shows or hides the full credits list.
 func toggle_credits() -> void:
+	_fill_credits()
 	credits_box.visible = not credits_box.visible
 	credits_button.text = "Hide credits" if credits_box.visible else "Show all credits"
+
+
+## The Credits section built, once.
+func _fill_credits() -> void:
+	if credits_button == null:
+		_credits_section(_credits)
 
 
 ## A wrapping line of the credits; [param caption] a dimmer one (the

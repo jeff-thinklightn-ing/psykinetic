@@ -372,6 +372,8 @@ func _test_credits() -> void:
 		for key: String in ["title", "by", "license", "url"]:
 			if str(entry.get(key, "")) == "":
 				problems.append("%s has no %s" % [entry, key])
+		if str(entry.get("title", "")).get_extension().to_lower() in ["wav", "mp3", "ogg", "flac"]:
+			problems.append("%s keeps its file's extension" % entry.get("title"))
 		if urls.has(entry.get("url")):
 			problems.append("%s twice" % entry.get("url"))
 		urls[entry.get("url")] = true
