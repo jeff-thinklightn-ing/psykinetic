@@ -113,7 +113,7 @@ are texture slots, not materials on a model (see Budgets).
     game's own material it is drawn in (Client3D's HUMAN_MATERIAL, tinted per person; its
     fixed parts still UV'd onto the palette), accepted beside the shared palette.
   - A body whose shape puts its box's middle off its origin (the kobold's long tail behind its
-    feet) names where in `middle` ([0, 0, -0.229]); its centring is checked about that.
+    feet) names where in `middle` ([0, 0, -0.3]); its centring is checked about that.
   - A `required` clip missing is an error. One with a `fallback` missing is a warning naming
     the stand-in the game uses (a wolf's howl is idle with a head-up tween until it has one).
   - Every face sits on the palette, like any piece. A pack's flat materials move onto swatches
