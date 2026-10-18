@@ -27,6 +27,10 @@ these rules are in `docs/art_slots_review.md`.
   - **The tower over the mine** is dark elven design, built by orcs: majestic. Goblin
     additions (lashed timber, hides, offerings) are crudely built over it.
   - **The labyrinths below the castle** are a third style, older, belonging to neither.
+- **Damage is built the way the thing was built.** A damaged roof (`roof.*.broken`, a
+  building's `roof_damaged`, thatch or shingle) shows its rafters running one way, down the
+  slope, with the covering torn away between them and at most one snapped rafter end: never
+  splinters radiating round a hole (Jeff: "beams in one direction, not like spokes").
 
 ## Palette
 

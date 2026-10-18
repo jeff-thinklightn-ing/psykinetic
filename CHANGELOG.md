@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Shingle roofs are wooden shingles, and a damaged one shows its rafters and battens through the torn shingles.
 - Arrow bundles are twelve shafts tied with a cord, and the floor under the pine stands is a bed of fallen needles (four tiles, as the slot's art arrives in terrain's floor).
 - Every key can be rebound in Options, under Controls: click the key beside an action and press the new one (a key already in use swaps with it; Esc stays Esc; Reset keys puts them all back). The controls list and the hint by the cursor say your keys. The first time you stand near a townsperson, a line says how to talk to them.
 - The lawspeaker walks the town now: once it has six people of its own, one of

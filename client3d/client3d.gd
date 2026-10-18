@@ -2732,14 +2732,15 @@ func _roof_mesh(roof_set: String, across: float, along: float, holes: Array[Vect
 					tool.set_uv(Vector2(corner.z + length * 0.5, absf(corner.x) * down) / 2.0)
 					tool.add_vertex(corner)
 	tool.generate_normals()
-	# Each hole dressed: roof.<set>.broken lying on the slope, x down it.
+	# Each hole dressed: roof.<set>.broken lying on the slope, x down it, its
+	# origin on the slope's underside (its rafters within the slope).
 	if ArtKit.has("roof.%s.broken" % roof_set):
 		for i in holes.size():
 			var hole := holes[i]
 			var piece := ArtKit.instance("roof.%s.broken" % roof_set)
 			piece.name = "Broken_%d" % i
 			var side := 1.0 if hole.x >= 0.0 else -1.0
-			piece.position = Vector3(hole.x, height.call(hole.x) + thick, hole.y)
+			piece.position = Vector3(hole.x, height.call(hole.x), hole.y)
 			piece.rotation = Vector3(0.0, 0.0 if side > 0.0 else PI, -atan(pitch))
 			out.add_child(piece)
 	var slopes := MeshInstance3D.new()

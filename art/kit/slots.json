@@ -282,6 +282,7 @@
 			"type": "texture",
 			"tile_m": 2.0,
 			"pixels": 512,
+			"source": {"by": "art-gen, procedural (no model)", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/material.roof.shingle/notes.md: Jeff picked c6 (\"c6 roof shingles is good\"); c6, as p4: its look rebuilt procedurally from c6's own measurements (material.roof.shingle_p4_s32114.png), an exact repeat without the ghosted bands of c6's seamless version"},
 			"uses": "the shingles of roof.shingle.profile's slopes: u is metres along the ridge, v metres down the slope"
 		},
 		"roof.shingle.ridge": {
@@ -304,9 +305,10 @@
 			"category": "roofs",
 			"type": "mesh",
 			"kind": "cell",
-			"size": [1.25, 0.3, 1],
+			"size": [1.25, 0.2, 1],
 			"budget": 400,
-			"uses": "one roof cell's hole dressing on a damaged shingle roof (a third of its cells, by hash, as walls' 298): snapped battens and ragged shingles round a hole about 0.7 m across, which code cuts in the slope and leaves open to the sky; modelled lying flat, x down the slope (1.25 m: a cell's run on a slope rising 0.75 a metre), z along the ridge; origin the cell's middle on the slope's top face, the dressing on it (nothing below y 0); code tilts it onto the slope"
+			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17", "notes": "by hand (art-gen's candidates all had radial splinters): three rafters 0.06 wide down the slope, the middle one snapped and sagging, two battens across (one broken), shingle courses in c6's browns round the edges, two loose ones on the rafters; 384 tris"},
+			"uses": "one roof cell's hole dressing on a damaged shingle roof (a third of its cells, by hash, as walls' 298): the cell's slope is left out by code and this is all there is: its rafters running down the slope (three, at the cell's thirds, one snapped at most), battens across them, ragged courses of shingles left round the edges, open to the sky between; never radial splinters round a hole (Jeff: \"beams in one direction, not like spokes, that's not how roofs are made\"). Modelled lying flat, x down the slope (1.25 m: a cell's run on a slope rising 0.75 a metre), z along the ridge; origin the cell's middle on the slope's underside, the rafters within the slope's 0.15 m and the shingles on top (nothing below y 0); code tilts it onto the slope"
 		},
 		"floor.wood": {
 			"category": "floors",
