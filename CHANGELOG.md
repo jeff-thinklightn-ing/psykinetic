@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The forest round outdoor maps has real broadleaf trees: round, lumpy olive crowns on brown trunks in place of the old teal tiered trees with orange bases, so they turn colour in autumn and catch snow on top in winter.
+
 - A thing someone has carried long enough takes their name, such as "Wren's dagger".
 
 - Taking up a bundle of arrows while you hold a bow and a bundle swaps them: yours is put down where the new one lay, and the party log names both with their condition, so you can keep the better one and have it mended.

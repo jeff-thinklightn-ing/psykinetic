@@ -666,14 +666,15 @@
 			"category": "trees",
 			"type": "mesh",
 			"kind": "cell",
-			"size": [1.75, 3.6, 1.75],
+			"size": [2.0, 3.6, 2.0],
 			"budget": 1500,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-17",
+				"notes": "N:/assets/candidates/tree.broadleaf/notes.md (Jeff: \"c2 on broadleaf\"): c2's 1500 mesh, fitted: welded, squeezed to about 0.6 across (the concept is as wide as tall) and set to the box (widened from 1.75 to 2.0, as tree.small), wood told from leaves by thickness (a ray inward through the one shell: trunk and limbs thin, clumps thick), bark on row 2, the clumps on row 4's mid greens by facing (so the seasons turn it and snow sits on their tops); clean later: hidden limb faces inside the clumps (about 500 tris) could go"},
 			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 6 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 0.7, 0], "size": [0.3, 1.4, 0.3]},
-				{"at": [0, 2.5, 0], "size": [1.75, 2.2, 1.75]}
-			],
-			"fill": {"from": "kenney-castle", "piece": "tree-large", "fit": "height"}
+				{"at": [0, 2.5, 0], "size": [2.0, 2.2, 2.0]}
+			]
 		},
 		"tree.small": {
 			"category": "trees",
@@ -681,12 +682,14 @@
 			"kind": "cell",
 			"size": [2.0, 3.6, 2.0],
 			"budget": 1500,
+			"variants": 3,
+			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
+				"notes": "a stand-in by hand until a pick (replaced the Kenney fill, a teal conifer that turned orange in autumn): a tapered bark trunk with two limbs, a crown of 11 lumps fused by a 0.07 m voxel remesh and decimated, 900 tris; bark on row 2, the crown on row 4's mid greens by facing (the seasons turn it, snow sits on the lumps' tops); 3 seeds"},
 			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 4 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.25, 1.2, 0.25]},
 				{"at": [0, 2.3, 0], "size": [2.0, 2.6, 2.0]}
-			],
-			"fill": {"from": "kenney-castle", "piece": "tree-small", "fit": "height"}
+			]
 		},
 		"tree.pine": {
 			"category": "trees",
