@@ -2328,6 +2328,19 @@ func _test_goblin() -> void:
 	imp.struck.emit(1, &"attack")
 	_check(animator.playing() in Client3D.HIT_CLIPS, "struck: %s" % animator.playing())
 	await get_tree().create_timer(0.6).timeout
+	var aimed := imp.tile + Vector2i(6, 0)
+	imp.shot.emit(aimed)
+	var due := int(_rig._arrows_due.get(aimed, 0)) - Time.get_ticks_msec()
+	_check(due > 100 and due < 250, "an arrow shot six cells off gets there in its flight's time (%d ms)" % due)
+	_rig._arrows_due.erase(aimed)
+	_rig._animate(puppet)
+	var standing := animator.playing()
+	_rig._arrows_due[imp.tile] = Time.get_ticks_msec() + 300
+	imp.struck.emit(1, &"shot")
+	_check(animator.playing() == standing, "shot: no flinch before the arrow arrives (%s)" % animator.playing())
+	await get_tree().create_timer(0.45).timeout
+	_check(animator.playing() in Client3D.HIT_CLIPS, "and it flinches as it does (%s)" % animator.playing())
+	await get_tree().create_timer(0.6).timeout
 	var was := (puppet.get_node("Body") as Node3D).rotation.y
 	_push_imp(imp, Vector2i(1, 0))
 	# The first frame that turns it, against the ease for that frame's own

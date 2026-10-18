@@ -9118,6 +9118,10 @@ AnimationTree resource shared by all (each body's clips and speeds are its
 own); an AnimationNodeStateMachine of every clip (the tables name clips at
 run time, and the code picks them); posing everything every frame (over
 the 1 ms budget at sixty people and a herd).
+Amended (items' bow audit, the coordinator): a shot's hit plays when its
+arrow gets there, not when the sim's news does: _on_shot keeps when the
+arrow it draws reaches its cell (_arrows_due), and _on_struck holds a
+"shot" hit on whoever is there till then; the sim is as it was.
 ## 415. Kill counts: what a thing has felled, by kind
 
 Jeff: items held and used grow, with kill counts (growth step 1, approved by
