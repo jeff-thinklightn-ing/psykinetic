@@ -30,6 +30,14 @@ var _songs: Array = []
 var _stints := {}  # worker id -> {doing: true}
 var _hours_seen := 0
 var _out := ""
+## --ask: the words soak. Each day one player asks each resident one of the
+## usual things, in rotation, and the loop waits for the answer (the
+## resident mind on the box's Ollama over a tunnel) before stepping on, one
+## request per ask and no retries, so the box is never tied up.
+var _ask := false
+var _asks_made := 0
+var _asks_answered := 0
+const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
 
 
@@ -47,6 +55,8 @@ func _run() -> void:
 			players = clampi(int(arg.trim_prefix("--players=")), 1, 3)
 		elif arg.begins_with("--out="):
 			_out = arg.trim_prefix("--out=")
+		elif arg == "--ask":
+			_ask = true
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
 		push_error("town_soak: --out=<a local folder> is needed, never the box's or user://")
 		get_tree().quit(2)
@@ -70,7 +80,9 @@ func _run() -> void:
 	add_child(_main)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	print("######## soak: %d days, %d players, the wilds, lawspeaker %s ########" % [days, players, Net.lawspeaker])
+	if _ask:
+		_main.mind_kind = "ollama"  # The real resident mind (Net.llm_url and llm_model from the flags), never the stub for words.
+	print("######## soak: %d days, %d players, the wilds, lawspeaker %s, mind %s %s ########" % [days, players, Net.lawspeaker, _main.mind_kind, Net.llm_model if _ask else ""])
 	# The town's people.
 	for each: Array in FOLK:
 		World.towns.note_rescue(TOWN, each[0], each[1], each[2])
@@ -114,7 +126,7 @@ func _run() -> void:
 		if s >= next_hour:
 			next_hour += HOUR
 			await get_tree().process_frame
-			_hourly()
+			await _hourly()
 	_report(days)
 	# Main's callbacks back, so no closure into this node outlives it (a static Callable into a freed node crashes the quit).
 	for key: String in _prev:
@@ -168,8 +180,10 @@ func _hourly() -> void:
 			World._relocate(player, cell)
 	if at == "counter":
 		_at_the_counter(day)
-		if hour == 10 and day % 3 == 0:
+		if hour == 10 and day % 3 == 0 and not _ask:
 			_speak(day)
+	if _ask and hour == 9:
+		await _ask_round(day)
 	if hour == 0:
 		print("SOAK day %d: treasury %d, residents %d, bodies %d, inn %s" % [day, World.stockpile.count(TOWN, "gold"), World.towns.residents(TOWN).size(),
 			World.townsfolk().size(), "standing" if inn.size != Vector2i.ZERO else "none"])
@@ -239,7 +253,69 @@ func _speak(day: int) -> void:
 			_count("spoke")
 
 
+## The words soak's round for [param day]: every resident with a body is
+## asked one of QUESTIONS by one player (the kinds rotate by day and
+## resident), the player put beside them first; the answer is waited for
+## (the mind's one request), at most ANSWER_WAIT seconds, before the next.
+const ANSWER_WAIT := 60.0
+
+
+func _ask_round(day: int) -> void:
+	var bodies: Array = World.townsfolk().duplicate()
+	bodies.sort_custom(func(a: Resident, b: Resident) -> bool: return a.worker_id < b.worker_id)
+	var names: Array = bodies.map(func(b: Resident) -> String: return b.person)
+	var lore: Variant = Offers._call(Offers.ctx, "lore", [TOWN])
+	var facts: Array = lore if lore is Array else []
+	var i := 0
+	for body: Resident in bodies:
+		if not is_instance_valid(body) or not body.spawned:
+			continue
+		var player: Player = _players[i % _players.size()]
+		var kind := (day + i) % QUESTIONS.size()
+		var question: String = QUESTIONS[kind]
+		if kind == 3:
+			var others: Array = names.filter(func(n: String) -> bool: return n != body.person)
+			question = question % (others[(day + i) % others.size()] if not others.is_empty() else "the town")
+		elif kind == 4:
+			var fact := str(facts[(day + i) % facts.size()]).trim_suffix(".") if not facts.is_empty() else "the mine is old"
+			question = question % (fact.left(1).to_lower() + fact.substr(1) + "?")
+		var beside: Vector2i = _main._nearest_free(body.tile + Vector2i(1, 0))
+		if is_instance_valid(player) and player.spawned:
+			World._relocate(player, beside)
+			var before := Transcript.written  # The question is one record; the answer, when it comes, another.
+			_main._ask_resident(body, _main._display_name(player), question, player)
+			_asks_made += 1
+			print("SOAK ask day %d: %s -> %s [%d]: %s" % [day, _main._display_name(player), body.person, kind, question])
+			var waited := 0.0
+			while Transcript.written < before + 2 and waited < ANSWER_WAIT:
+				await get_tree().create_timer(0.5).timeout
+				waited += 0.5
+				_main._resident_voices()  # Main sends asks and takes answers on the world tick, which stands still while we wait.
+			if Transcript.written >= before + 2:
+				_asks_answered += 1
+			else:
+				print("SOAK ask unanswered after %.0f s: %s" % [waited, body.person])
+		i += 1
+
+
+## Every resident's card, beliefs and standing, and lore's facts, as JSON
+## under --out, so every word said can be checked against what is true.
+func _dump_cards() -> void:
+	var out := {"lore": Offers._call(Offers.ctx, "lore", [TOWN]), "residents": {}}
+	for id: String in World.production.worker_ids(TOWN):
+		var who := World.production.worker(id)
+		out["residents"][id] = {"name": who.get("name", id), "trades": who.get("trades", []), "type": who.get("type", ""), "purse": who.get("purse", 0),
+			"loan": who.get("loan", 0.0), "card": Townsfolk.card_of(World.production, id), "heard": who.get("heard", [])}
+	var file := FileAccess.open(_out.path_join("cards.json"), FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(out, "	"))
+		file.close()
+
+
 func _report(days: int) -> void:
+	_dump_cards()
+	if _ask:
+		print("SOAK asks made %d, answered %d" % [_asks_made, _asks_answered])
 	print("")
 	print("######## SOAK REPORT: %d days ########" % days)
 	var keys: Array = _counts.keys()
@@ -248,11 +324,8 @@ func _report(days: int) -> void:
 		print("SOAK count %s %d" % [key, _counts[key]])
 	print("SOAK offered by kind %s" % [_offered])
 	var ledger := World.stockpile.ledger(TOWN).map(func(line: Dictionary) -> String: return "%s %s" % [line.get("by", ""), line.get("from", "")])
-	print("SOAK ledger: lifted %d, store-missing %d, fenced %d, returned %d, loans %d, repaid %d" % [
-		ledger.filter(func(l: String) -> bool: return l.begins_with("lifted:")).size(),
-		ledger.filter(func(l: String) -> bool: return l.begins_with("missing")).size(),
-		ledger.filter(func(l: String) -> bool: return l.ends_with(" a dealer")).size(),
-		ledger.filter(func(l: String) -> bool: return l.begins_with("returned")).size(),
+	print("SOAK tally %s" % [Townsfolk.tally])  # The side-doings' own count: the store's ledger keeps only its last lines.
+	print("SOAK ledger (its last %d lines only): loans %d, repaid %d" % [ledger.size(),
 		ledger.filter(func(l: String) -> bool: return l.begins_with("loan:")).size(),
 		ledger.filter(func(l: String) -> bool: return l.begins_with("repay:")).size()])
 	print("SOAK songs %d" % _songs.size())

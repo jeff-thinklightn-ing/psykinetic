@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The words soak (496 amended; 336 amended): tools/town_soak --ask asks every resident the usual things with the resident mind on the box's model over a tunnel; from its first five days the voice rule is now held by code (at most two sentences, never the speaker's name first), an embellishing voice never puts a deed, look or trait on a named person, and Snagfin's card no longer calls him a merchant who keeps it hidden.
 - The server's lawspeaker is switched on, ruling on what the towns talk of once a day (once the box's service file is reloaded).
 - Towns can build again without players hauling wood: a woodcutter brings wood into the town's store, more with a woodshed, and turns up on his own when the town has building to do and no wood. An inn now takes leather instead of cloth, since nobody weaves yet.
 - Timber windows have plank shutters.

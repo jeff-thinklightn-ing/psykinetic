@@ -6470,6 +6470,20 @@ town labour, that they do and cannot borrow more.
 Rejected: a mind per resident (a dozen calls in flight against the box's
 budget); residents talking unasked (idle chatter costs calls and drowns the
 companions); answering for a hiding resident.
+
+Amended 2026-10-19 (the words soak, 496 amended): the voice rule is held
+by code as well as by the prompt. Resident.two_sentences(line, name) cuts
+a lead of the speaker's own name ("Bea says: ...", "Mags: ...") and
+anything past the second sentence, applied in Main._resident_answered
+before a line is said, recorded or heard; the prompt now says "never
+begin with your own name or 'says'". The "embellish" binding (378's tier
+for a creative role) reads "You may embellish what you know, in your own
+way, but never add a deed, a look or a trait to a named person that is
+not written above; of what is not written, say you cannot speak to it":
+in the soak a bard put a blade on the priest. The hidden-type line of the
+card words ("X is a merchant, and keeps it hidden") is left out when the
+type is the resident's own trade (471's Snagfin). resident_test.
+
 ## 335. The bow's shot: the first body on the line, by the draw
 
 Weapons as verbs in the fight, part 1 of 5 (the roadmap's combat step, the
@@ -13435,3 +13449,42 @@ Selling wood to the store at a price (Jeff's maker expenses) is the next
 step. Protocol unchanged. farm_test (a day's cutting, the woodshed, away,
 a newcomer only when a building waits on wood, and only one).
 
+Amended 2026-10-19: the words soak. tools/town_soak takes --ask: each day
+one test player asks each resident with a body one of five things in
+rotation ("Who are you?", "What is new in the town?", "What do you need?",
+"What do you think of <another resident>?", "Is it true that <a lore
+fact>?"), the player put beside them, and the loop waits for the answer
+(driving Main._resident_voices, which otherwise runs on the world tick)
+up to a minute, one request per ask and no retries, so the box's Ollama
+is never tied up; it writes cards.json (every card, belief and standing,
+and lore's facts) beside the transcripts and the mind log, whose "voice"
+entries carry each prompt and answer. Run with --llm-url and --llm-model
+pointing at the box's Ollama over the ssh tunnel (the box's world stays
+on the box: only prompts travel), and only when nobody is on the box's
+server. scratchpad words_read.py (npc's, not committed) reads a run:
+each answer against its prompt (sentences, names not in the prompt,
+talk of a thief or a debt the prompt does not hold, narration).
+
+The first five days (before): 60 asks, 60 answered (one timed out in
+the smoke); 11 answers over two sentences, 2 beginning with the
+speaker's name; no secret spoken (no one named the thief or another's
+debt, only their own); every name and place a card's, a player's or
+lore's; the bard embellished a blade onto the priest, the thief (a liar
+by 378) an invented meeting; Snagfin's card words called him "a
+merchant, and keeps it hidden"; the scholar spoke as the chronicler, the
+lawspeaker as the keeper of memory, Snagfin as a merchant with bees (his
+hobby) and never as a goblin though his prompt said so.
+The second five days (after): 60 asks, 60 answered; 0 over two
+sentences and 0 beginning with a name (the code's rule; the model still
+ran on in 10 of 60 and the cut took it to two); no secret spoken; every
+name a card's, a player's or lore's; the embellishers kept to their
+cards; what remained, fixed here too: a self-told fact passed on lost its
+subject ("Odo told me he's a goblin": a retold belief that begins with a
+pronoun now carries who said it), and asked about someone they know
+nothing of, four voices invented a past mention ("Gar spoke of him once,
+though not kindly": the voice is now told to say plainly it knows little
+of them). Still the model's, noted for Jeff: a liar lies about a
+neighbour (378's tier, lore asked), a plain or official voice slips a
+trait onto someone once in sixty, Snagfin never volunteers that he is a
+goblin though his prompt says so, and the soak tool now reads
+Townsfolk.tally instead of the store's windowed ledger.

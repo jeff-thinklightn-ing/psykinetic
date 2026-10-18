@@ -36,6 +36,13 @@ extends RefCounted
 const FILE := "res://levels/townsfolk.json"
 const STEADY := "steady"
 const THIEF := "thief"
+## What the side-doings did since the start, by key ("lifted", "store_lifted",
+## "fenced", "caught", "strayed", "walked_home"): for tools and tests
+## (tools/town_soak reads it; the store's ledger keeps only its last lines).
+static var tally := {}
+
+static func _tally(key: String, by := 1) -> void:
+	tally[key] = int(tally.get(key, 0)) + by
 const SCHOLAR := "scholar"
 ## The thief's clock in the worker record's needs (Production.need_due).
 const LIFT := "lift"
@@ -131,14 +138,17 @@ static func tick(production: Production, stockpile: Stockpile, economy: Economy 
 		var goods := lift(stockpile, town, thief)
 		if goods.is_empty():
 			continue
+		_tally("store_lifted")
 		var catcher := _catcher(production, town, id, "", at, due, thief)
 		if not catcher.is_empty():
+			_tally("caught")
 			stockpile.deposit(town, goods, 1, "returned")
 			_caught(production, town, id, catcher, "", "taking %s from the store" % goods.replace("_", " "), at, thief)
 			continue
 		var merchant := _merchant(production, town, id)
 		if not merchant.is_empty() and economy != null and economy.has_method("fence"):
-			economy.fence(town, merchant, id, goods, float(thief.get("fence", 0.5)), float(thief.get("margin", 0.4)))
+			if int(economy.fence(town, merchant, id, goods, float(thief.get("fence", 0.5)), float(thief.get("margin", 0.4)))) > 0:
+				_tally("fenced")
 
 
 ## Economy's line for a rich purse (economy.json folk.rich_above, the same
@@ -425,6 +435,7 @@ static func stray(production: Production) -> void:
 		production.set_away(id, true)
 		var name := str(production.worker(id).get("name", id))
 		learn(production, id, "%s lost %s way beyond the walls." % [name, _their(card)])
+		_tally("strayed")
 		print("[townsfolk] %s: %s has not come back from beyond the walls, step %d" % [town, name, at])
 
 
@@ -582,8 +593,11 @@ static func _lift_gold(production: Production, town: String, thief: String, vict
 	var taken := int(production.lift_gold(victim, int(rule.get("gold_take", 0)), thief))
 	if taken <= 0:
 		return 0
+	_tally("lifted")
+	_tally("lifted_gold", taken)
 	var catcher := _catcher(production, town, thief, victim, at, due, rule)
 	if not catcher.is_empty():
+		_tally("caught")
 		if production.has_method("return_gold"):
 			production.return_gold(thief, victim, taken)
 		_caught(production, town, thief, catcher, victim, "with a hand in %s's purse" % production.worker(victim).get("name", victim), at, rule)
@@ -1014,6 +1028,12 @@ static func _pass(production: Production, town: String, place: String, members: 
 			var said := str(entry.get("text", ""))
 			if bool(entry.get("believed", false)) and not said.is_empty() and not said.contains(hearer_name) and not Hearsay.holds(heard, said) and said not in told:
 				text = said
+				# A thing someone told of themselves ("he is a goblin among humans") keeps
+				# its subject when passed on, else the next hearer takes "he" for the teller.
+				var first := said.get_slice(" ", 0).to_lower()
+				var from := str(entry.get("from", ""))
+				if first in ["he", "she", "they"] and not from.is_empty() and from != teller_name:
+					text = "%s says %s" % [from, said]
 				fits = "beyond"
 				omen = bool(entry.get("omen", false))
 				break

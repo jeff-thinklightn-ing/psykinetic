@@ -4620,7 +4620,7 @@ func _heard_from_worker(record: PlayerRecord) -> void:
 func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> void:
 	var ask: Dictionary = out["ask"]
 	var body := instance_from_id(int(out["body"])) as Resident
-	var line := Companion.trim_line(str(answer.get("say", "")).strip_edges())
+	var line := Resident.two_sentences(Companion.trim_line(str(answer.get("say", "")).strip_edges()), body.person if body != null else "")  # The voice rule, by code too (336 amended).
 	var said := body != null and is_instance_valid(body) and body.spawned and not line.is_empty() and line != "..."
 	MindLog.record({"kind": "voice", "companion": str(ask.get("speaker", "")), "mind": "resident", "trigger": ask.get("trigger", ""),
 		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": line, "error": error,

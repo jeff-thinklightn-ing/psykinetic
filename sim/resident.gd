@@ -88,6 +88,23 @@ var _listened := -1
 ## Its voice (decision 336): asked only when spoken to, one ask at a time
 ## for all residents (Main), with facts only: who it is, its work, the
 ## town's wants and shop, the hour and weather.
+## What the model gives back is held to the rule by code too (the words
+## soak of 2026-10-19: a resident ran to three sentences one time in four,
+## and one began "Bea says:"): two_sentences, with the speaker's [param name]
+## so only their own name is cut from the front.
+static func two_sentences(line: String, name := "") -> String:
+	var said := line.strip_edges()
+	var lead_word := name if not name.is_empty() else "[A-Z][\\w'-]*"
+	var own := RegEx.create_from_string("^\\s*" + lead_word + "(\\s+says)?\\s*:\\s*\"?")
+	var lead := own.search(said)
+	if lead != null:
+		said = said.substr(lead.get_end()).strip_edges().trim_suffix("\"")
+	var parts: Array = RegEx.create_from_string("[^.!?]+[.!?]+[\"']?\\s*").search_all(said).map(func(m: RegExMatch) -> String: return m.get_string())
+	if parts.size() > 2:
+		said = ("".join(parts.slice(0, 2))).strip_edges()
+	return said
+
+
 const VOICE := """You are %s, who lives in %s and works there%s. You are no adventurer: you live and work in the town. Someone has just spoken to you.
 
 Who you are:
@@ -96,7 +113,7 @@ Who you are:
 What is true now:
 %s
 
-Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do. %s"""
+Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do, and never begin with your own name or "says". Asked about someone nothing above speaks of, say plainly that you know little of them: never invent what another said of them. %s"""
 ## What its voice may say of the world (decision 378): an official's what
 ## it knows alone; others' what they know and have heard, as heard; then by
 ## its role's creativity and integrity (Lore.profile, 1..10: HIGH or more,

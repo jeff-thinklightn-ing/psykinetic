@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
 	_test_what_is_true()
+	_test_two_sentences()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -532,6 +533,17 @@ func _test_what_is_true() -> void:
 	World.production.set_away("rs-folk05", true)
 	World.production.set_away("rs-law", true)
 	_sync()
+
+
+## The voice rule held by code (336 amended, the words soak): at most two
+## sentences, never the resident's own name first.
+func _test_two_sentences() -> void:
+	print("\n== the voice rule by code: two sentences, no name first ==")
+	_check(Resident.two_sentences("Bea says: \"I'm Bea. Hauler. You?\"", "Bea") == "I'm Bea. Hauler.", "a 'Bea says:' lead and a third sentence are cut")
+	_check(Resident.two_sentences("Yes. And so do rabbits. And so do most things when they're spooked.") == "Yes. And so do rabbits.", "three sentences become two")
+	_check(Resident.two_sentences("I need a blade, and a shield, and more bandage.") == "I need a blade, and a shield, and more bandage.", "one sentence stands")
+	_check(Resident.two_sentences("Mags: The fog is thick.", "Mags") == "The fog is thick.", "a bare name lead is cut")
+	_check(Resident.two_sentences("Bandages: we have none.", "Mags") == "Bandages: we have none.", "another word before a colon stands when the name is known")
 
 
 func _test_resident_voices() -> void:
