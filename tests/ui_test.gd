@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_item_tip()
 	await _test_talk_panel()
 	_test_context_and_place()
+	_test_converse_panel()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -100,7 +101,8 @@ func _test_connect_screen() -> void:
 			== "online%sv0.1.150%s3 players" % [dot, dot]
 			and Main.server_status_words({"ok": true, "version": "0.1.151", "players": 1, "accepting": true, "compatible": false})
 			== "online%sv0.1.151%s1 player%sout of date: updates when you join" % [dot, dot, dot]
-			and Main.server_status_words({"ok": false, "why": "no answer"}) == "no answer",
+			and Main.server_status_words({"ok": false, "why": "no answer"}) == "status unknown"
+			and Main.server_status_words({"ok": false, "why": "bad address"}) == "bad address",
 		"the status in words from maps' answer")
 	screen.queue_free()
 
@@ -271,6 +273,44 @@ func _test_context_and_place() -> void:
 	_check(_main.hint_panel.lines().size() > 10 and _main.hint_panel._columns.size() == 2
 			and _main.hint_panel._columns[0].get_child_count() >= _main.hint_panel._columns[1].get_child_count(),
 		"the controls list in two columns (%d lines)" % _main.hint_panel.lines().size())
+
+
+func _test_converse_panel() -> void:
+	print("== the conversation panel: who speaks, the exchange, the offers, the asks ==")
+	var panel: ConversePanel = _main.converse
+	_check(panel != null and not panel.visible, "there, hidden")
+	panel.open(null, "Mara [cook]")
+	_check(panel.visible and panel._name.text == "Mara [cook]", "opened on a label when the body has no person")
+	panel.add_line("Player", "Any work for me?", false)
+	panel.set_thinking(true)
+	_check(panel.thinking and panel._dots.text.begins_with("thinking"), "a line sent: thinking")
+	panel.add_line("Mara", "Bring Bram home.", true)
+	_check(not panel.thinking and panel._lines.get_child_count() == 2, "their answer: the exchange, thinking over")
+	panel.show_offers([
+		{"id": "a", "kind": "commission", "title": "Bring Bram home", "words": "He was carried off.", "accept": "take", "cost": 0},
+		{"id": "b", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked today.", "accept": "buy", "cost": 2},
+		{"id": "c", "kind": "rumour", "title": "What Tam said", "words": "The mine is cursed.", "accept": "", "cost": 0},
+		{"id": "d", "kind": "plea", "title": "A loan of 10", "words": "Lend me ten gold.", "accept": "lend", "cost": 10}],
+		[{"id": "z", "kind": "commission", "title": "Fetch the ore sack", "open": true}])
+	_check(panel.offers_shown() == ["Bring Bram home [Take it on]", "A loaf, 2 gold [Buy]", "What Tam said", "A loan of 10 [Lend]"],
+		"the offers: a title, the accept's words, none for a rumour (%s)" % [panel.offers_shown()])
+	_check(panel._owed.visible and panel._owed.text == "You owe them: Fetch the ore sack", "an open commission as what the player owes")
+	var got := []
+	panel.offer_accepted.connect(func(id: String, gold: int) -> void: got.assign([id, gold]))
+	(panel._offer_rows.get_child(0).get_node("Accept") as Button).pressed.emit()
+	_check(got == ["a", 0], "Take it on: the offer's id (%s)" % [got])
+	(panel._offer_rows.get_child(3).get_node("Accept") as Button).pressed.emit()
+	_check(got == ["d", 10], "Lend: the id and the gold asked, up to the loan (%s)" % [got])
+	var asked := [""]
+	panel.ask_pressed.connect(func(line: String) -> void: asked[0] = line)
+	(panel._asks.get_child(2) as Button).pressed.emit()
+	_check(asked[0] == "What's the news?" and panel.thinking, "a quick ask: its line sent, thinking")
+	_main.escape()
+	_check(not panel.visible, "Esc closes it")
+	_check(Main.server_status_words({"ok": false, "why": "no answer"}) == "status unknown", "no answer is status unknown")
+	var fonts := UiTheme.credits()
+	_check(fonts["entries"].size() == 2 and UiTheme.credits in OptionsPanel.credit_providers(),
+		"the fonts' credit (Alegreya, Alegreya Sans, OFL) is one of the Credits' providers")
 
 
 func _check(ok: bool, label: String) -> void:

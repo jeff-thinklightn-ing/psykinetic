@@ -31,6 +31,7 @@ const VOLUMES := [["master_volume", "Master"], ["sfx_volume", "Effects"], ["voic
 	["ambience_volume", "Ambience"], ["ui_volume", "Interface"]]
 
 var _column: VBoxContainer
+var _scroll: ScrollContainer
 ## Character's body: Net.BODIES' labels, in their order.
 const BODY_LABELS := ["Male", "Female"]
 ## Net's setting -> its slider.
@@ -52,11 +53,24 @@ var body_choice: OptionButton
 
 
 func _ready() -> void:
+	# Centred at the top whatever its width (a wide section grows it both ways).
 	custom_minimum_size = Vector2(WIDTH, 0)
-	position = Vector2((3840.0 - WIDTH) * 0.5, 180)
+	anchor_left = 0.5
+	anchor_right = 0.5
+	offset_left = -WIDTH * 0.5
+	offset_right = WIDTH * 0.5
+	offset_top = 180
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	# The column in a scroll box capped at the screen's height (the wheel scrolls
+	# it); no inset look inside the panel.
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	add_child(_scroll)
 	_column = VBoxContainer.new()
+	_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_column.add_theme_constant_override("separation", UiTheme.constant("row"))
-	add_child(_column)
+	_scroll.add_child(_column)
 	var title := Label.new()
 	title.text = "Options"
 	title.theme_type_variation = &"Title"
@@ -89,7 +103,7 @@ func _ready() -> void:
 ## fonts' and the animations' can join here. THIRD_PARTY.md (in the zip)
 ## has everything.
 static func credit_providers() -> Array[Callable]:
-	return [SoundKit.credits, ArtKit.credits]
+	return [SoundKit.credits, ArtKit.credits, UiTheme.credits]
 
 
 ## The Credits section's full list (a plain ScrollContainer, which the
@@ -97,6 +111,14 @@ static func credit_providers() -> Array[Callable]:
 var credits_box: ScrollContainer
 var credits_list: VBoxContainer
 var credits_button: Button
+
+
+## The column shown whole where it fits, else as tall as the screen allows.
+func _process(_delta: float) -> void:
+	if not visible or _scroll == null:
+		return
+	var room := get_viewport_rect().size.y - offset_top - UiTheme.constant("margin") - 2 * UiTheme.constant("pad")
+	_scroll.custom_minimum_size.y = minf(_column.get_combined_minimum_size().y, maxf(room, 200.0))
 
 
 ## A titled section, its controls to be added to the box returned.

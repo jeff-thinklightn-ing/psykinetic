@@ -60,6 +60,28 @@ static func constant(name: StringName) -> int:
 	return found.get_constant(name, TYPE)
 
 
+## The fonts' credit, for the Options' Credits section (sound's provider
+## hook, decision 406 amended): {summary, entries: [{title, by, license, url}]}.
+static func credits() -> Dictionary:
+	return {"summary": "Fonts: Alegreya and Alegreya Sans by Huerta Tipografica (SIL Open Font License 1.1)",
+		"entries": [
+			{"title": "Alegreya", "by": "Juan Pablo del Peral, Huerta Tipografica", "license": "SIL Open Font License 1.1",
+				"url": "https://github.com/huertatipografica/Alegreya"},
+			{"title": "Alegreya Sans", "by": "Juan Pablo del Peral, Huerta Tipografica", "license": "SIL Open Font License 1.1",
+				"url": "https://github.com/huertatipografica/Alegreya-Sans"}]}
+
+
+## A colour swatch's box for a Button (pc-character's hair and skin choices):
+## the colour itself, edged in brass when [param chosen], else in the edge.
+static func swatch_style(colour: Color, chosen: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = colour
+	box.set_corner_radius_all(constant("radius"))
+	box.set_border_width_all(3 if chosen else 2)
+	box.border_color = color("brass_bright") if chosen else color("edge")
+	return box
+
+
 ## A type's stylebox, for a control that draws one by hand: style("panel", "Inset").
 static func style(name: StringName, type: StringName) -> StyleBox:
 	var found := theme()

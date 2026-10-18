@@ -101,7 +101,9 @@ extends Node
 ##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's),
 ##                                pause, menu, setup (the connect screen's fields), connect, failed (its states), over the game;
 ##                                tip (a sample named dagger's tip over the pack: nothing in play is named yet),
-##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it)
+##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it),
+##                                converse (the conversation panel on the nearest town's person, sample offers),
+##                                credits (the Options with its Credits list open)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is

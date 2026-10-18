@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Talk to the town's people face to face: press E on someone (or just speak near them) and a panel at the left shows who you are talking to, what you have said to each other, and what they offer, with a button to take them up on it (work, wares, a plea), and three quick asks (what they sell, any work, the news). The world stays in view; they keep answering in speech. The main menu's server line says "status unknown" when the server does not answer, which older servers never do.
 - Companions weigh what they hear as townsfolk do: how sharp or superstitious
   each is decides whether she believes a tale, she repeats it as "Jeff told
   me...", and while she rests in town she trades gossip at the well.

@@ -10478,3 +10478,43 @@ Rejected: a claims ask on her own facts mind (the same local model; one
 queue keeps the asks apart in time); keeping her extracted beliefs beside
 the hearsay (two stores of the same thing, and the extracted one took a
 lie whole).
+## 436. The conversation panel: who speaks, the exchange, their offers
+
+Roadmap `ui`, step 4's first landing (the coordinator approved the design
+merged with npc's offers, 435; residents speak when spoken to, 336). Talking
+to a town's person was typed lines and bubbles: nothing showed who you were
+talking to, what had been said, or what they had to offer.
+
+- `ConversePanel` (render/converse_panel.gd, new class_name): a narrow box
+  at the left, the world and the bubbles untouched. Who speaks (the
+  resident's person and trade, never the hidden type; the label over their
+  head when the body has no person yet), "thinking" with moving dots while
+  their answer is out (from the line sent until their speech comes, or
+  THINKING_FOR 15 s, 336's wait: the ask queue is not sent), the exchange
+  with them alone (the player's lines and theirs, the last MAX_LINES 8), and
+  three quick asks that are ordinary chat lines their voice answers ("What
+  do you sell?", "Any work for me?", "What's the news?"), with Close.
+- Opened by Main.open_converse: E tapped on a resident within HEARING_RANGE
+  (the same key that opens things), or a line said to one (336's rule,
+  Main._resident_addressed read on the client too: the nearest in earshot or
+  the one named, never the player's companion); Esc closes it first of all.
+- The offers: npc's "offers" message (435) {entity, speaker, offers:
+  [{id, kind shop|commission|rumour|plea, title, words, what, accept, cost,
+  open}]}, sent when the panel opens (the client's "offers" command naming
+  the body), with each answer to the player, and after an accept. Drawn one
+  flat list in the order sent: the kind as a small word, the title in the
+  serif, the words under it, the cost in brass, and the accept's button
+  ("Buy", "Take it on", "Lend" with a slider up to the loan, "Carry it";
+  none for a rumour), which sends npc's "offer" {id} ({id, gold} for lend).
+  Offers marked open (an accepted commission) are listed as what the player
+  owes them. Both commands go only when "offers" is in Net.MESSAGE_KINDS, so
+  the panel works before and after 435 lands; the resident's speech fills
+  the exchange either way.
+- Maps' status caption: {ok: false, why: "no answer"} reads "status unknown"
+  (older servers never answer; the join never depends on it).
+
+Client only; nothing on the wire from ui (the message kinds are npc's).
+tests/ui_test: the panel's name, exchange, thinking, offers, the accept
+signals, the asks, Esc; the status words. `--test-show=converse` opens the
+panel on the nearest resident with sample offers (a test's words). The
+counter screen (economy's job, decision 434) is step 4's second landing.

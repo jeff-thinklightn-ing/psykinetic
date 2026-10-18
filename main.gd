@@ -389,6 +389,10 @@ var _hud_tick := 0
 var _context_hint: Label
 ## --test-show=hint: the thing the hint is shown on, as if the cursor were on it.
 var _test_hint_thing: GridEntity
+## --test-show=converse: the panel wanted on the nearest resident, once there is one.
+var _test_converse_due := false
+## Talking with a town's person (ConversePanel; ui's step 4).
+var converse: ConversePanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
@@ -538,7 +542,9 @@ func _on_server_status(address: String, port: int, result: Dictionary) -> void:
 ## or ok false with why) in words, the parts set off by middle dots.
 static func server_status_words(result: Dictionary) -> String:
 	if not bool(result.get("ok", false)):
-		return str(result.get("why", "no answer"))
+		# No answer is no verdict (older servers never answer; maps): unknown.
+		var why := str(result.get("why", "no answer"))
+		return "status unknown" if why == "no answer" else why
 	var players := int(result.get("players", 0))
 	var parts: Array[String] = ["online", "v%s" % str(result.get("version", "?")),
 		"%d player%s" % [players, "" if players == 1 else "s"]]
@@ -929,6 +935,10 @@ func _tap_e(player: Player) -> void:
 	if is_instance_valid(target) and target.spawned \
 			and (target is Chest or target is Cargo or _is_own_companion(target)):
 		_open_pack(player, target)
+		return
+	if is_instance_valid(target) and target.spawned and target is Resident \
+			and World.distance(player.tile, target.tile) <= HEARING_RANGE:
+		open_converse(target)
 		return
 	var door := _e_door
 	if is_instance_valid(door) and player.tile in Terrain.edge_cells(door.key):
@@ -4281,6 +4291,11 @@ func _build_talk() -> void:
 			_swap_chat_channel()
 			_chat_box.accept_event())
 	talk.set_box(_chat_box)
+	converse = ConversePanel.new()
+	converse.ask_pressed.connect(func(line: String) -> void: _send_chat(line))
+	converse.offer_accepted.connect(_accept_offer_from_panel)
+	converse.close_pressed.connect(func() -> void: converse.close())
+	$HUD.add_child(converse)
 	_context_hint = Label.new()
 	_context_hint.name = "ContextHint"
 	_context_hint.theme_type_variation = &"Outlined"
@@ -4396,6 +4411,63 @@ func _send_chat(text: String, phrase := 0) -> void:
 			World.command(me, "party", {"text": words})
 		return
 	World.command(me, "say", {"text": line, "phrase": phrase})
+	# Said to a town's person in earshot (decision 336's rule, read here too):
+	# the conversation panel on them, with the line and "thinking".
+	var body := _resident_addressed(me, line, _own_companion())
+	if body != null and converse != null:
+		if converse.resident != body:
+			open_converse(body)
+		converse.add_line(_display_name(me), line, false)
+		converse.set_thinking(true)
+
+
+## This peer's own companion in the world, or null.
+func _own_companion() -> Companion:
+	for entity in World.get_entities():
+		if _is_own_companion(entity):
+			return entity
+	return null
+
+
+## The conversation panel on [param body] (ConversePanel), and their offers
+## asked for once npc's "offers" message exists (the client's "offers"
+## command names the body; the server answers with the list).
+func open_converse(body: GridEntity) -> void:
+	if converse == null or body == null:
+		return
+	converse.open(body, _display_name(body))
+	var player := _local_player()
+	if player != null and "offers" in Net.MESSAGE_KINDS:
+		World.command(player, "offers", {"entity": str(body.get_path())})
+
+
+## An offer accepted on the panel: npc's "offer" command ({id}, and gold
+## for a loan); the server (its own _accept_offer, 435) answers with the
+## offers again.
+func _accept_offer_from_panel(id: String, gold: int) -> void:
+	var player := _local_player()
+	if player == null or "offers" not in Net.MESSAGE_KINDS:
+		return
+	var args := {"id": id}
+	if gold > 0:
+		args["gold"] = gold
+	World.command(player, "offer", args)
+
+
+## npc's "offers" message: the resident's offers for the panel (opened on
+## them if it is not), the open commissions listed as what the player owes.
+func _on_offers_message(data: Dictionary) -> void:
+	var body := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
+	if body == null or converse == null:
+		return
+	if converse.resident != body:
+		converse.open(body, _display_name(body))
+	var given: Array = []
+	var owed: Array = []
+	for each: Variant in data.get("offers", []):
+		if each is Dictionary:
+			(owed if bool(each.get("open", false)) else given).append(each)
+	converse.show_offers(given, owed)
 
 
 ## The latest blow (_narrate_damage): who was struck and by whom, so a
@@ -4629,6 +4701,10 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		talk.add_line(speaker, str(data.get("text", "")))
 		if entity != null:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
+		if converse != null and converse.visible and entity != null and entity == converse.resident:
+			converse.add_line(speaker, str(data.get("text", "")), true)
+	if kind == "offers":
+		_on_offers_message(data)
 
 
 ## A name for the party log: players by record name, residents by the label
@@ -5218,6 +5294,8 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_door(player, tick)
 	_run_test_chest(player)
 	_run_test_show(player)
+	if _test_converse_due and player != null:
+		_test_converse_due = not _test_converse(player)
 
 
 ## The controls for the HUD's list, a line each, "key\twhat it does".
@@ -5250,6 +5328,8 @@ func hint_lines() -> Array[String]:
 func escape() -> void:
 	if pause_panel != null and pause_panel.visible:
 		pause_panel.open(false)
+	elif converse != null and converse.visible:
+		converse.close()
 	elif options_panel != null and options_panel.visible:
 		toggle_options()
 	elif pack_panel != null and pack_panel.other != null:
@@ -6158,6 +6238,27 @@ func _run_test_chest(player: Player) -> void:
 	pack_panel.drop(from, from_slot, to, to_slot)
 
 
+## --test-show=converse: the panel on the nearest town's person, with sample
+## offers in npc's shape (the words are a test's); false while there is none.
+func _test_converse(player: Player) -> bool:
+	var nearest: GridEntity = null
+	for entity in World.get_entities():
+		if entity is Resident and (nearest == null
+				or World.distance(player.tile, entity.tile) < World.distance(player.tile, nearest.tile)):
+			nearest = entity
+	if nearest == null:
+		return false
+	open_converse(nearest)
+	converse.add_line(_display_name(player), "(a test line) Any work for me?", false)
+	converse.add_line(converse._name.text, "(a test line) Bram's boy is held at the goblins' camp. Bring him home and the town will not forget it.", true)
+	converse.show_offers([
+		{"id": "t1", "kind": "commission", "title": "Bring Bram home", "words": "He was carried off in the raid.", "accept": "take", "cost": 0},
+		{"id": "t2", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked this morning.", "accept": "buy", "cost": 2},
+		{"id": "t3", "kind": "rumour", "title": "What Tam said", "words": "At the well, Tam told me the mine is cursed.", "accept": "", "cost": 0}],
+		[{"id": "t0", "kind": "commission", "title": "Fetch the ore sack", "open": true}])
+	return true
+
+
 ## --test-show: the named HUD panels opened once the player is in, for
 ## screenshots of them (the ui tree's audit); the talk log gets a few
 ## marked test lines so there is something to see.
@@ -6188,6 +6289,12 @@ func _run_test_show(player: Player) -> void:
 				_send_chat("(a test line) Stay close, the gate's watched.")
 			"pause":
 				escape()
+			"credits":
+				if not options_panel.visible:
+					options_panel.toggle()
+				options_panel.toggle_credits()
+			"converse":
+				_test_converse_due = true  # Residents come with the town's sync: tried each tick.
 			"hint":
 				for entity in World.get_entities():
 					if entity is Cargo or entity is Chest:
