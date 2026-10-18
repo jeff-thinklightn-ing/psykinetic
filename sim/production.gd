@@ -183,7 +183,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0, "hunt_due": 0,
-		"loan": 0.0, "working_off": false, "heard": [], "card": {}, "owed": 0, "sick": false}
+		"loan": 0.0, "working_off": false, "heard": [], "card": {}, "owed": 0, "sick": false, "apprentice": "", "master": ""}
 	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
 	# roll), and the four rolled about their trade's and type's profile by
 	# the id, so the same every load; a companion's comes from her card.
@@ -412,6 +412,36 @@ func set_sick(worker_id: String, sick: bool) -> void:
 	_workers[worker_id]["sick"] = sick
 
 
+## [param master] takes [param apprentice] (decision 498 amended: Jeff's
+## "makers have more expense - raw material and apprentices"), or, with
+## apprentice "", lets theirs go. False if either is unknown or taken.
+func set_apprentice(master: String, apprentice: String) -> bool:
+	if not _workers.has(master):
+		return false
+	var had := str(_workers[master].get("apprentice", ""))
+	if apprentice.is_empty():
+		if _workers.has(had):
+			_workers[had]["master"] = ""
+		_workers[master]["apprentice"] = ""
+		return true
+	if not had.is_empty() or not _workers.has(apprentice) or not str(_workers[apprentice].get("master", "")).is_empty() \
+			or not str(_workers[apprentice].get("apprentice", "")).is_empty() or apprentice == master:
+		return false
+	_workers[master]["apprentice"] = apprentice
+	_workers[apprentice]["master"] = master
+	return true
+
+
+## When worker [param worker_id]'s purse first stood above the apprentice
+## line this run (-1 for not above), for Economy's apprentice turn.
+func set_above_since(worker_id: String, at: int) -> void:
+	if _workers.has(worker_id):
+		if at < 0:
+			_workers[worker_id].erase("above_since")
+		else:
+			_workers[worker_id]["above_since"] = at
+
+
 ## Whether [param worker_record] is kept from work: away, or sick (501).
 static func off_work(worker_record: Dictionary) -> bool:
 	return bool(worker_record.get("away", false)) or bool(worker_record.get("sick", false))
@@ -429,6 +459,10 @@ func remove_worker(worker_id: String) -> void:
 		if each["worker"] == worker_id and each["state"] == "working":
 			each["state"] = "queued"
 			each["worker"] = ""
+	set_apprentice(worker_id, "")
+	var master := str(_workers[worker_id].get("master", ""))
+	if _workers.has(master):
+		_workers[master]["apprentice"] = ""
 	_workers.erase(worker_id)
 
 
@@ -668,6 +702,10 @@ func _advance(at: int, cat: Dictionary) -> void:
 			continue
 		if _present(each["worker"], each["workshop"]):
 			var rate := float(work_rate.call(_workshops.get(each["workshop"], {}))) if work_rate.is_valid() else 1.0
+			# An apprentice at hand works the job faster (498 amended).
+			var helper := str(_workers.get(each["worker"], {}).get("apprentice", ""))
+			if not helper.is_empty() and _workers.has(helper) and not off_work(_workers[helper]):
+				rate *= float(rules.get("apprentice", {}).get("speed", 1.0))
 			each["worked"] = int(each["worked"]) + roundi((at - int(each["last"])) * rate)
 		each["last"] = at
 		if each["kind"] == "return" and int(each["worked"]) < int(each["needed"]) 				and at - int(each["opened"]) >= int(rules.get("return", {}).get("give_up", 6000)):
@@ -1366,6 +1404,10 @@ func from_dict(saved: Dictionary) -> void:
 			_workers[id]["hunt_due"] = maxi(int(entry.get("hunt_due", 0)), 0)
 			_workers[id]["owed"] = maxi(int(entry.get("owed", 0)), 0)
 			_workers[id]["sick"] = bool(entry.get("sick", false))
+			_workers[id]["apprentice"] = str(entry.get("apprentice", ""))
+			_workers[id]["master"] = str(entry.get("master", ""))
+			if entry.has("above_since"):
+				_workers[id]["above_since"] = int(entry["above_since"])
 			_workers[id]["loan"] = maxf(float(entry.get("loan", 0.0)), 0.0)
 			_workers[id]["working_off"] = bool(entry.get("working_off", false)) and float(_workers[id]["loan"]) > 0.0
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)

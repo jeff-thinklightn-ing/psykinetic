@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_thief_hooks()
 	_test_scoundrel_hooks()
 	_test_delivery()
+	_test_apprentice()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -492,6 +493,57 @@ func _test_delivery() -> void:
 	stock.deposit(TOWN, "gold", 100)
 	economy._pay_player("p1")
 	_check(economy.owed_to("p1", TOWN) == 0 and economy.gold("p1") == sale - now_paid and told == [["p1", sale - now_paid]], "the rest paid as gold comes in, and told")
+
+
+## Apprentices (decision 498 amended): a maker above apprentice.above for
+## apprentice.days takes a hauler, pays them a wage a day, works faster
+## with them, and lets them go under apprentice.below.
+func _test_apprentice() -> void:
+	print("
+== an apprentice ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var rule: Dictionary = _rules["apprentice"]
+	work.add_worker("c1", "Mags", ["cook"], TOWN, "test", "steady")
+	work.add_worker("h1", "Ash", ["hauler"], TOWN, "test", "steady")
+	work.pay("c1", int(rule["above"]) + 40)
+	economy._apprentice_turn("c1", TOWN)
+	_check(str(work.worker("c1")["apprentice"]).is_empty(), "rich today: not yet")
+	_now = int(float(rule["days"]) * DayNight.day_steps) + 1
+	economy._apprentice_turn("c1", TOWN)
+	_check(work.worker("c1")["apprentice"] == "h1" and work.worker("h1")["master"] == "c1", "rich for %d days: takes Ash" % int(rule["days"]))
+	_check(economy._hauler_for(TOWN, "x", "hauler").is_empty(), "an apprentice carries no loads")
+	work.add_workshop("k1", "cook", TOWN)
+	work.assign("k1", "c1")
+	stock.deposit(TOWN, "food", 5)
+	work.order("k1", "ration")
+	var steps := int(Items.def("ration")["made"]["steps"])
+	var start := _now
+	var per_tick := 0
+	while _now < start + steps * 2 and per_tick == 0:
+		_now += World.WORLD_TICK_STEPS
+		var before_tick := {}
+		for job_id in work.jobs():
+			if work.job(job_id)["state"] == "working":
+				before_tick[job_id] = int(work.job(job_id)["worked"])
+		work.tick()
+		for job_id in before_tick:
+			if work.job(job_id).get("state") == "working" and per_tick == 0:
+				per_tick = int(work.job(job_id)["worked"]) - int(before_tick[job_id])
+	var purse := int(work.worker("c1")["purse"])
+	economy._apprentice_turn("c1", TOWN)
+	_check(int(work.worker("h1")["purse"]) == 0, "no wage before the day is out")
+	_now = start + DayNight.day_steps
+	economy._apprentice_turn("c1", TOWN)
+	_check(int(work.worker("h1")["purse"]) == int(rule["wage"]) and int(work.worker("c1")["purse"]) == purse - int(rule["wage"]),
+		"a day on: Ash paid %d by Mags" % int(rule["wage"]))
+	_check(per_tick == roundi(World.WORLD_TICK_STEPS * float(rule["speed"])), "made faster with help: %d work a tick of %d" % [per_tick, World.WORLD_TICK_STEPS])
+	work.spend("c1", int(work.worker("c1")["purse"]) - int(rule["below"]) + 1)
+	economy._apprentice_turn("c1", TOWN)
+	_check(str(work.worker("c1")["apprentice"]).is_empty() and str(work.worker("h1")["master"]).is_empty(), "under %d: lets Ash go" % int(rule["below"]))
 
 
 func _check(ok: bool, what: String) -> void:

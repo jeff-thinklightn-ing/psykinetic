@@ -13980,3 +13980,26 @@ level_test's castle market.
 Rejected: visible caravans in awake zones now (economy: abstract for phase
 2); gold on caravans; a route as a level link; raids taking items; a
 passing event for tolls (later, its own step).
+## 498 amended: a maker's apprentice
+
+Jeff (2026-10-18): "makers have more expense - raw material and
+apprentices". The second expense, so a maker's purse turns over instead
+of piling up; numbers are economy.json's apprentice rule, Jeff's to move.
+- A maker (a resident of an Items.TRADES trade) whose purse has stood
+  above apprentice.above (60) for apprentice.days (3) takes one: a
+  resident of apprentice.from (the hauler) in town, at work, with no
+  master ("Edda takes Wat as an apprentice", in the ledger). One each.
+- The apprentice works with their master: while they are at work (not
+  away, not sick), the master's jobs go apprentice.speed (1.25) faster.
+  The master pays them apprentice.wage (2) a day from their purse,
+  whatever work came in: a wage a finished job was tried first, but in
+  the soak the smith finished no jobs in a month (his gold came from
+  services), so it cost him nothing.
+- An apprentice carries no loads: hauling goes to the town's other
+  haulers (or none, and the gatherer keeps the fee).
+- Let go when the master's purse falls under apprentice.below (20) or
+  can't pay the day's wage ("Edda lets Wat go"), or when either leaves
+  for good (Towns.died). Production.set_apprentice, "apprentice" and
+  "master" on the worker record, Economy's last wage paid (all saved);
+  Economy._apprentice_turn on its tick.
+Protocol unchanged. larder_test.

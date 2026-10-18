@@ -63,6 +63,8 @@ var _hauled: Dictionary = {}
 var _cant_pay: Dictionary = {}
 ## Player id -> {town: gold the town owes them for goods they banked}.
 var _player_owed: Dictionary = {}
+## Maker id -> the step their apprentice's wage was last paid (498 amended).
+var _apprentice_paid: Dictionary = {}
 const LOG_SIZE := 50
 
 
@@ -371,6 +373,7 @@ func tick() -> void:
 		towns[who["town"]] = true
 		_bank_turn(id, str(who["town"]))
 		_pay_owed(id, str(who["town"]))
+		_apprentice_turn(id, str(who["town"]))
 		for need: String in names:
 			var rule: Dictionary = needs[need]
 			var every := int(rule.get("every", 0))
@@ -704,7 +707,7 @@ func _hauler_for(town: String, gatherer: String, trade: String) -> String:
 	var best := ""
 	for id in production.worker_ids(town):
 		var who := production.worker(id)
-		if id == gatherer or Production.off_work(who) or production.outside(id) or trade not in who["trades"]:
+		if id == gatherer or Production.off_work(who) or production.outside(id) or trade not in who["trades"] or not str(who.get("master", "")).is_empty():
 			continue
 		if best.is_empty() or int(_hauled.get(id, -1)) < int(_hauled.get(best, -1)):
 			best = id
@@ -762,6 +765,62 @@ func _pay_player(player_id: String) -> void:
 ## What [param town] owes player [param player_id] for goods banked.
 func owed_to(player_id: String, town: String) -> int:
 	return int(_player_owed.get(player_id, {}).get(town, 0))
+
+
+## A maker's apprentice (decision 498 amended; Jeff: "makers have more
+## expense - raw material and apprentices"): a maker (Items.TRADES) whose
+## purse has stood above apprentice.above for apprentice.days takes one,
+## a resident of the apprentice.from trade (the hauler) with no
+## master, who then works with them (their jobs apprentice.speed faster,
+## Production) for apprentice.wage a day from the maker's purse; let go
+## when the purse falls under apprentice.below or can't pay the day's wage.
+func _apprentice_turn(id: String, town: String) -> void:
+	var rule: Dictionary = rules.get("apprentice", {})
+	var who := production.worker(id)
+	if rule.is_empty() or not who["trades"].any(func(trade: String) -> bool: return trade in Items.TRADES):
+		return
+	var purse := int(who["purse"])
+	var apprentice := str(who.get("apprentice", ""))
+	if not apprentice.is_empty():
+		var day := maxi(DayNight.day_steps, 1)
+		var wage := int(rule.get("wage", 0))
+		var due := now() - int(_apprentice_paid.get(id, now())) >= day
+		var name := str(production.worker(apprentice).get("name", apprentice))
+		if purse >= int(rule.get("below", 20)) and (not due or wage <= 0 or production.spend(id, wage, "%s's wage" % name)):
+			if due:
+				_apprentice_paid[id] = now()
+				if wage > 0:
+					production.pay(apprentice, wage, "an apprentice's wage")
+			return
+		production.set_apprentice(id, "")
+		_apprentice_paid.erase(id)
+		_say(town, id, "%s lets %s go" % [who["name"], name])
+		return
+	_apprentice_paid.erase(id)
+	if purse <= int(rule.get("above", 60)):
+		production.set_above_since(id, -1)
+		return
+	if not who.has("above_since"):
+		production.set_above_since(id, now())
+		return
+	if now() - int(who["above_since"]) < int(float(rule.get("days", 3)) * maxi(DayNight.day_steps, 1)):
+		return
+	var from := str(rule.get("from", "hauler"))
+	for other in production.worker_ids(town):
+		var them := production.worker(other)
+		if other == id or from not in them["trades"] or Production.off_work(them) or not str(them.get("master", "")).is_empty():
+			continue
+		if production.set_apprentice(id, other):
+			production.set_above_since(id, -1)
+			_apprentice_paid[id] = now()
+			_say(town, id, "%s takes %s as an apprentice" % [who["name"], them["name"]])
+			return
+
+
+## An apprentice taken or let go: the town's ledger and the log.
+func _say(town: String, id: String, what: String) -> void:
+	stockpile.note(town, "gold", 0, "apprentice:%s" % id, what)
+	print("[economy] %s, step %d" % [what, now()])
 
 
 ## Maker [param id] pays [param town]'s store for a job's materials
@@ -846,7 +905,7 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 ## For the snapshot: {purses: {player id: gold}, log}.
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
-		"player_owed": _player_owed.duplicate(true)}
+		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate()}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -857,6 +916,10 @@ func from_dict(saved: Dictionary) -> void:
 				_paid[str(town)] = {}
 				for what: Variant in paid[town]:
 					_paid[str(town)][str(what)] = maxf(float(paid[town][what]), 0.0)
+	var apprentice_paid: Variant = saved.get("apprentice_paid", {})
+	if apprentice_paid is Dictionary:
+		for id: Variant in apprentice_paid:
+			_apprentice_paid[str(id)] = int(apprentice_paid[id])
 	var player_owed: Variant = saved.get("player_owed", {})
 	if player_owed is Dictionary:
 		for id: Variant in player_owed:

@@ -25,6 +25,7 @@ notes (decision 324).
 - A companion who fell sick while resting in town still goes with you when you come for her, and the party log says so; she knows she is sick when she talks, and is well again after the same five days. If she was sick while you were away, you hear it when you come back, from the party log and from her, along with who cured her (decision 501, companions' side).
 - Herbs grow wild outside the town: a few a day in the wilds, standing like small ferns, for anyone to pick and sell at the town's store. Herbs left uncollected wither after three days (decision 502).
 - Tools: a heavy job too big to start also steps to the back of the resource gate's queue itself, so jobs waiting through an older copy of the gate get past it too (394 amended).
+- Makers take apprentices (498 amended): a smith, tanner or other maker who has stayed well off for three days takes a hauler on, works a quarter faster with them, and pays them two gold a day; when the maker's purse runs low, the apprentice is let go.
 
 ## v0.1.154
 
