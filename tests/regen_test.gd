@@ -255,6 +255,8 @@ func _test_asleep_regenerates() -> void:
 	_main._regenerate_due()
 	_check(World.richness != null and World.richness != richness_before and World.herds.richness == World.richness.richness,
 		"the game's richness is worked out again on the new floor, the herds pointed at it")
+	_check(World.raid_groups != null and World.raid_groups.world_map == _main._world_map and World.richness.world_map == _main._world_map,
+		"the raid groups and the richness hold the world map built on it")
 	_check(_main.generation_of("rg_halls") == 2, "generation 2 is laid (%d)" % _main.generation_of("rg_halls"))
 	_check(_same_floor(Regen.generate("rg_halls", 2)["layout"]), "the zone stands on generation 2's map")
 	_check(not World.items.has(lost_uid), "the thing in the corridor is lost")

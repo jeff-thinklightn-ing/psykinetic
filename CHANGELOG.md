@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Raiding groups route over a regenerated level's new floor: a generation drops their routes and each group goes on from where it stands (maps' use_map).
 - The thief balances the town (decision 461; Jeff: "thieves could be the answer to balancing the economy"): on his day he lifts a few gold from the richest purse above economy's line first (never the poor, the dole, a resting companion or the coffer; the victim's card remembers a loss with no name), the store only when nobody is rich; what he lifts from the store comes back through the town's merchant, who sells it to the store at half price and keeps a margin, the thief the rest; the victim at the same meeting place, or a guard, may catch him (seeded draws): the gold goes back, the catch is on three cards with a grudge, and the town's log holds a dispute for the lawspeaker; caught three times in a season he lies low a month. The numbers are townsfolk.json "thief" (Jeff's to move); a 90-day run of tools/town_balance with and without him is in the decision.
 - The minimap no longer redraws every frame, only when something on it moves (482).
 - Raiding parties on the world map follow a shifting level's new layout instead of its old one (465 amended).
