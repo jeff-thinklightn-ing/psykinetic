@@ -11046,3 +11046,87 @@ Amended (the coordinator, 2026-10-17): a town is founded with rules'
 start_food (120, Jeff's to tune, like start_gold) in its store
 (Towns._found), so it reaches its first harvest: in the 90-day run its
 first two weeks went from 114 hungry meals to none.
+## 448. The lawspeaker's rulings, offline, by batch
+
+Phase 2 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md: "the
+lawspeaker is perhaps a higher-powered API"; the coordinator's approval
+2026-10-18), on the town memory log (447), companions' Claude voice (363)
+and the builder's Claude client. Many cheap voices, one careful mind: the
+residents' small model handles the talk; the lawspeaker's model handles
+judgment, which is rare and bounded.
+
+Every "lawspeaker.every" steps (a day) a town whose log holds candidates
+gets one structured request (Lawspeaker.request, sim/lawspeaker.gd, new
+class Lawspeaker): the town's name, what it remembers, the lore facts that
+bear on it (Lore.known_by for the town's knower, the first lore_facts), and
+each candidate with its text, who first said it and to whom, who holds it
+now of how many heard it, and its age; and the rules in the system prompt:
+he never writes lore and never invents the world (no factions, history,
+places, gods, rulers, wars or the land's names; small life is free),
+reconcile never erase, lore as fact and memory as memory. He answers JSON
+rulings only ({"rulings": [{candidate, ruling, memory, because}]},
+Lawspeaker.parse: fences stripped, anything else is no answer), and code
+applies them (Lawspeaker.apply): accept, the candidate becomes town memory
+(tidied into "memory" when given); reconcile, a new memory entry said by
+the lawspeaker with his explanation, the candidate marked reconciled and
+pointing at it, its history kept; leave, a belief again, rested
+"rest_days" (7) before it can be a candidate again; move_in, marked ready
+and nothing more until phase 4; propose, memory and marked proposed for
+the list lore keeps for Jeff (phase 5). A memory text that trips the world
+guard (TownMemory.is_world) is refused by code and the candidate left, the
+reason logged. Each ruling goes to mind.log (kind "ruling": the town, the
+model, the candidates, the rulings, what was applied, the request id and
+the cost) and to the town's log ("the lawspeaker ruled: the town remembers
+that ..."). A player's words ("player:<id>" sources) are left out of the
+request unless Net.lawspeaker_players is on (--lawspeaker-players; the
+proposal's outside-API note: fine for Jeff and Dire, to be stated before a
+public release).
+
+What town memory does once it exists: every resident of the town is told
+it as memory, not fact: Resident.world_facts adds TownMemory.remembered's
+"The town remembers that ..." after lore's facts within the lore budget,
+officials included (378's binding: lore as fact, memory as memory, the
+proposal's rule for the most official person in town).
+
+The model path: the builder's ClaudeClient (the Messages API; send(body)
+awaited with a long timeout; usage, cost and request id logged; the key
+only from ANTHROPIC_API_KEY, read by the client and never logged), not
+ClaudeMind, which is shaped for one companion's voice with an inner mind
+to fall back on; the rules are ClaudeMind's: off by default (Net.lawspeaker
+"off"; --lawspeaker=<haiku|sonnet|opus> or PSYKINETIC_LAWSPEAKER turns it
+on, the server only), one request per town per day (Lawspeaker.tick from
+Main's world tick), and one budget: every round's calls, tokens and cost go
+through ClaudeMind.note_spend into the session's counters and no round is
+asked once ClaudeMind.spent() (CALL_BUDGET, COST_BUDGET), so the same key
+never spends two budgets and the console's `mind claude` line shows it all.
+Any failure (an error, a timeout, words that are not rulings, the budget
+spent) leaves the candidates for the next round and the lawspeaker's
+record says why: the town runs without him. No test and no default
+configuration makes a request or needs the key: lawspeaker_test answers
+through a stub that stands where ClaudeClient does (send(body) awaited),
+as the builder's StubClaude does.
+
+lawspeaker_test (pure sim, no port, no scratch, no network): the request
+(memory, lore, the candidates with source and holders, a traveller's words
+left out by default and in when allowed, nothing to rule on), the answer
+parsed (fenced JSON, words, an error, an unknown ruling), each ruling
+applied and the world refused, a round through the stub (asked once a
+day, applied to the saved log, the record and the town's log, the budget
+counted, nothing when off), a failed answer and words leaving the
+candidates, the budget spent stopping a round, memory in the voice's
+words. Protocol unchanged; new class_name Lawspeaker.
+
+Phases 3 to 5 on this: 3, the lawspeaker a Resident of trade
+"lawspeaker" (an official; a 404 routine "rounds" of a few homes a day),
+the batch built per visit from the people he stands with; 4, "ready"
+entries become residents through economy's add_worker with a card written
+from the talk, within the town's room; 5, "proposed" entries to lore's
+list for Jeff. Open for Jeff: the speech rule (a, b or c), the starter
+town's lawspeaker's name and face, disputes brought to him, whether
+remembered people can leave or die by memory alone, the model.
+
+Rejected: rulings on a player's question (the world tick, unwatched);
+the lawspeaker editing cards, logs or lore directly (rulings are data,
+code applies them); a budget of its own (one key, one cap); erasing a
+belief a ruling overrides (reconciled, with its history); running with a
+key by default (off until turned on).

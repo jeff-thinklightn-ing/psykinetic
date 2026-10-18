@@ -7,6 +7,12 @@ notes (decision 324).
 
 ## Unreleased
 
+- Each town has a lawspeaker now, unseen as yet, who keeps the town's memory
+  straight: once a day he weighs the tales several people have come to hold
+  (Old Marta by the east field, the boy who was sick all winter), takes some
+  up as what the town remembers, squares others with what is known ("the boy
+  is mending"), and leaves the rest as talk; the townsfolk tell you what the
+  town remembers as memory, never as fact. Off unless the server turns him on.
 - The town starts keeping its own stories: when a bard or a tale-teller among
   the townsfolk speaks of a neighbour, an ailment, a quarrel, the town
   remembers who said it and to whom, and the tale spreads at the well with

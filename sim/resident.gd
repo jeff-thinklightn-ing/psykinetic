@@ -464,6 +464,15 @@ func world_facts() -> Array[String]:
 			break
 		length += text.length() + 1
 		out.append(text)
+	# What the town remembers (447, ruled on by the lawspeaker, 448): as
+	# memory, not fact, after lore's facts, within the same budget.
+	var log: Variant = Offers._call(Offers.ctx, "memory", [town]) if not town.is_empty() else null
+	if log is Array:
+		for text: String in TownMemory.remembered(log):
+			if length + text.length() > lore_budget():
+				break
+			length += text.length() + 1
+			out.append(text)
 	return out
 
 

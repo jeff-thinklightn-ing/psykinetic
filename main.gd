@@ -1897,6 +1897,7 @@ func _boot() -> void:
 	Offers.watch(World.towns, World.holdings, World.stockpile)
 	if not World.handed.is_connected(_on_handed):
 		World.handed.connect(_on_handed)  # A gift to one of them (decision 443).
+	_make_lawspeaker()
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
@@ -3570,6 +3571,23 @@ func _offers_context() -> Dictionary:
 		"players_in": _players_in,
 		"memory": _town_memory,
 		"set_memory": _set_town_memory,
+		"lawspeaker": func(town: String) -> Dictionary: return World.towns.lawspeaker(town) if World.towns != null and World.towns.has_method("lawspeaker") else _lawspeaker_records.get(town, {}).duplicate(true),
+		"set_lawspeaker": func(town: String, record: Dictionary) -> void:
+			if World.towns != null and World.towns.has_method("set_lawspeaker"):
+				World.towns.set_lawspeaker(town, record)
+			else:
+				_lawspeaker_records[town] = record.duplicate(true),
+		"note": func(town: String, line: String) -> void:
+			print("[lawspeaker] %s: %s" % [town, line])
+			party_log.add("In %s, %s." % [str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town, line]),
+		"lore": func(_town: String) -> Array:
+			var facts := Lore.known_by(Lore.knower_for("townsfolk"), PackedStringArray(), "agreed")
+			facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
+			return facts.map(func(fact: Dictionary) -> String: return str(fact.get("text", ""))),
+		"town_name": func(town: String) -> String:
+			return str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town,
+		"players_words": func() -> bool: return Net.lawspeaker_players,
+		"model": func() -> String: return str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),
 		"area_of": func(town: String) -> String: return str(World.holdings.place(town).get("area", "")) if World.holdings != null else "",
 		"asked": _on_commission_asked,
 		"done": _on_commission_done,
@@ -3604,6 +3622,26 @@ func _on_handed(by: GridEntity, to: GridEntity, item: String, uid: int) -> void:
 	var line := Offers.gift(player.player_id, _display_name(player), body.worker_id, item)
 	if not line.is_empty():
 		party_log.add(line)
+
+
+## The lawspeaker's client (decision 448): the builder's ClaudeClient when
+## Net.lawspeaker names a model (off by default; the key is the
+## environment's, read by the client, never logged); null otherwise, and
+## no round is ever made.
+var _lawspeaker_client: Node = null
+## His records until economy's Towns.lawspeaker holds them: town -> record.
+var _lawspeaker_records: Dictionary = {}
+
+
+func _make_lawspeaker() -> void:
+	if _lawspeaker_client != null or not Net.is_authority() or Net.lawspeaker in ["", "off", "no", "false", "0"]:
+		return
+	var client := ClaudeClient.new()
+	client.log_tag = "lawspeaker"
+	add_child(client)
+	_lawspeaker_client = client
+	print("[lawspeaker] on: %s, one round a town a day; players' words %s" % [str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),
+		"in" if Net.lawspeaker_players else "out"])
 
 
 ## Server: [param player_id] took on [param ask]: on their record too.
@@ -5553,6 +5591,8 @@ func _on_world_ticked(tick: int) -> void:
 			_tell_world(tick)
 		if tick % World.WORLD_TICK_STEPS == 0:
 			_retake_camps()
+			if _lawspeaker_client != null and World.production != null:
+				Lawspeaker.tick(World.production.now(), _lawspeaker_client)  # His daily rulings (decision 448); a coroutine, not awaited.
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
 		_recall_due()

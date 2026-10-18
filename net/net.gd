@@ -268,6 +268,13 @@ var edit_size := LevelMap.NEW_SIZE
 ## (dollars per request) for Claude. It needs ANTHROPIC_API_KEY or the stub.
 var builders: PackedStringArray = []
 var builder_stub := false
+## The lawspeaker (decision 448), server only: --lawspeaker=<haiku|sonnet|opus|off>
+## (or PSYKINETIC_LAWSPEAKER) turns his daily rulings on through the Claude
+## API (ANTHROPIC_API_KEY, as the builder); off by default, and the box stays
+## off unless Jeff turns it on. --lawspeaker-players lets players' words into
+## his requests (an outside API).
+var lawspeaker := "off"
+var lawspeaker_players := false
 var builder_model := ClaudeClient.DEFAULT_MODEL
 var builder_effort := "medium"
 var builder_max_cost := 1.0
@@ -471,6 +478,8 @@ func _enter_tree() -> void:
 	llm_model = OS.get_environment("PSYKINETIC_LLM_MODEL")
 	voice_url = OS.get_environment("PSYKINETIC_VOICE_URL")
 	voice_model = OS.get_environment("PSYKINETIC_VOICE_MODEL")
+	if OS.get_environment("PSYKINETIC_LAWSPEAKER") != "":
+		lawspeaker = OS.get_environment("PSYKINETIC_LAWSPEAKER").strip_edges().to_lower()
 	if OS.get_environment("PSYKINETIC_BUILDERS") != "":
 		_set_option("--builders", OS.get_environment("PSYKINETIC_BUILDERS"))
 	if OS.get_environment("PSYKINETIC_MIND_WHY") in ["1", "true", "on", "yes"]:
@@ -1442,9 +1451,11 @@ func _parse_args() -> void:
 				world_map = true
 			"--builder-stub":
 				builder_stub = true
+			"--lawspeaker-players":
+				lawspeaker_players = true
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
-					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
+					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
@@ -1545,6 +1556,8 @@ func _set_option(key: String, value: String) -> void:
 		"--builder-max-cost":
 			if value.is_valid_float():
 				builder_max_cost = maxf(0.01, value.to_float())
+		"--lawspeaker":
+			lawspeaker = value.strip_edges().to_lower()
 		"--edit":
 			edit_map = value.strip_edges()
 		"--edit-size":
