@@ -160,15 +160,18 @@ static func own_path(slot: String, variant := 1) -> String:
 	return folder(slot) + slot + (".glb" if variant <= 1 else ".%d.glb" % variant)
 
 
-## The path of a texture slot's own image.
-static func texture_path(slot: String) -> String:
-	return folder(slot) + slot + ".png"
+## The path of a texture slot's own image (variant [param variant]:
+## <slot>.png, <slot>.2.png ...).
+static func texture_path(slot: String, variant := 1) -> String:
+	return folder(slot) + slot + (".png" if variant <= 1 else ".%d.png" % variant)
 
 
-## A texture slot's own image, or null while it has none (whoever draws
-## it then uses a stand-in of its own: terrain's procedural colour).
-static func texture(slot: String) -> Texture2D:
-	var path := texture_path(slot)
+## A texture slot's own image (variant [param variant], wrapped into range),
+## or null while it has none (whoever draws it then uses a stand-in of its
+## own: terrain's procedural colour).
+static func texture(slot: String, variant := 1) -> Texture2D:
+	var count := variant_count(slot)
+	var path := texture_path(slot, 1 + posmod(variant - 1, maxi(count, 1)))
 	if not _exists(path):
 		return null
 	if live:
@@ -178,15 +181,13 @@ static func texture(slot: String) -> Texture2D:
 
 
 ## How many variants of its own the slot has; 0: none (its fill or grey box).
-## A texture slot has one or none.
+## A texture slot's are its images (<slot>.png, <slot>.2.png ...).
 static func variant_count(slot: String) -> int:
 	if not _variants.has(slot):
 		var count := 0
-		if str(spec(slot).get("type", "mesh")) == "texture":
-			count = 1 if _exists(texture_path(slot)) else 0
-		else:
-			while _exists(own_path(slot, count + 1)):
-				count += 1
+		var texture_slot := str(spec(slot).get("type", "mesh")) == "texture"
+		while _exists(texture_path(slot, count + 1) if texture_slot else own_path(slot, count + 1)):
+			count += 1
 		_variants[slot] = count
 	return _variants[slot]
 

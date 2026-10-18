@@ -258,14 +258,16 @@ static func _check_blend(glb: String) -> Array[String]:
 
 static func _check_texture(slot: String) -> Array[String]:
 	var out: Array[String] = []
-	var texture := ArtKit.texture(slot)
-	if texture == null:
-		return out
-	var size := Vector2i(texture.get_width(), texture.get_height())
-	if size.x != size.y or size.x & (size.x - 1) != 0:
-		out.append("warning: %s is %d x %d: a tileable texture is square, a power of two (512, 1024)" % [ArtKit.texture_path(slot).get_file(), size.x, size.y])
-	if size.x > 2048:
-		out.append("error: %s is %d across: at most 2048" % [ArtKit.texture_path(slot).get_file(), size.x])
+	for variant in range(1, ArtKit.variant_count(slot) + 1):
+		var texture := ArtKit.texture(slot, variant)
+		if texture == null:
+			continue
+		var file := ArtKit.texture_path(slot, variant).get_file()
+		var size := Vector2i(texture.get_width(), texture.get_height())
+		if size.x != size.y or size.x & (size.x - 1) != 0:
+			out.append("warning: %s is %d x %d: a tileable texture is square, a power of two (512, 1024)" % [file, size.x, size.y])
+		if size.x > 2048:
+			out.append("error: %s is %d across: at most 2048" % [file, size.x])
 	return out
 
 

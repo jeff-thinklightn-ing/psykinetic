@@ -20,9 +20,9 @@
 			"grey": [{"at": [0, 0, 0.03], "size": [0.06, 1.3, 0.05]}],
 			"parts": [{"name": "string", "motion": "slide", "axis": "z", "pivot": [0, 0.06, -0.201],
 				"grey": [{"at": [0, -0.04, 0], "size": [0.006, 1.16, 0.006]}]}]},
-		"item.arrows": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17", "notes": "a stand-in by hand until art-gen's bundle: 7 fx.arrow shafts (plain iron heads) tied with a cord, the fletching one ring round the foot"}},
-		"item.arrows_flame": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17", "notes": "a stand-in by hand until art-gen's bundle: 7 fx.arrow shafts (flame: rag-wrapped heads) tied with a cord, the fletching one ring round the foot"}},
-		"item.arrows_barbed": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17", "notes": "a stand-in by hand until art-gen's bundle: 7 fx.arrow shafts (barbed heads) tied with a cord, the fletching one ring round the foot"}}
+		"item.arrows": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its own pyramid heads"}},
+		"item.arrows_flame": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its heads replaced by art-kit: rag-wrapped, a flame tip (row 7)"}},
+		"item.arrows_barbed": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its heads replaced by art-kit: wide and hooked"}}
 	},
 	"credits": [
 		{"title": "Ultimate Animated Animal Pack (the Pig's rig and clips)", "by": "Quaternius", "license": "CC0 1.0",
@@ -1651,6 +1651,9 @@
 			"type": "texture",
 			"tile_m": 4.0,
 			"pixels": 512,
+			"variants": 4,
+			"source": {"by": "art-gen, procedural (no model)", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-17",
+				"notes": "N:/assets/candidates/ground.needles/notes.md (Jeff: \"needle floor tile looks realistic\"; all four as one set): p1 to p4 from C:/dev/art-gen/needle_tile.py, drawn at 1024 and downsampled, seamless by construction; p1 to p3 a few soft bare patches, p4 many small ones; the variants are <slot>.png, .2.png to .4.png (ArtKit.texture(slot, variant))"},
 			"uses": "terrain's ground shader on the needle floor under the pine border and its stands: fallen pine needles, orange-brown, a few cones, seamless (art-gen, procedural); procedural colour while empty"
 		},
 		"material.rock": {

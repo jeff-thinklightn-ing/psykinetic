@@ -21,6 +21,12 @@ these rules are in `docs/art_slots_review.md`.
   undersides instead. Nothing near pure black or white, so a torch and the sun both read.
 - **Rough, not shiny.** The palette material's roughness is 0.9 for everything. Wear shows
   as a darker swatch at edges and bases, not all over.
+- **Who built it** (Jeff's lore, for concept prompts and cleanup):
+  - **The castle** (`wall.castle.*`, its dungeon pieces) is dwarven work: plain, heavy, built
+    to last. It is dilapidated and overrun, the overrunners' mess on top.
+  - **The tower over the mine** is dark elven design, built by orcs: majestic. Goblin
+    additions (lashed timber, hides, offerings) are crudely built over it.
+  - **The labyrinths below the castle** are a third style, older, belonging to neither.
 
 ## Palette
 

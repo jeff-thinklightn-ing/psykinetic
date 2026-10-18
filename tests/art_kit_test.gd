@@ -457,6 +457,10 @@ func _test_overrides() -> void:
 			"item.bow: the catalog's size, and by hand its centre origin, its string part and its nock and rest")
 	_check(ArtKit.spec("item.arrows").get("origin", "") == "centre" and ArtKit.has("fx.arrow") and ArtKit.variant_count("fx.arrow") == 3,
 			"the bundles held mid-shaft; fx.arrow, three heads")
+	_check(ArtKit.variant_count("ground.needles") == 4 and ArtKit.texture("ground.needles", 3) != null
+			and ArtKit.texture("ground.needles", 5) == ArtKit.texture("ground.needles", 1)
+			and ArtKit.texture_path("ground.needles", 2).ends_with("ground.needles.2.png"),
+			"a texture slot's variants: <slot>.png, .2.png ..., wrapped into range")
 
 
 func _test_creature_rig() -> void:
