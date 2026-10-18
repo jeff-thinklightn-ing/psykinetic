@@ -158,7 +158,7 @@ func threat_of(town: String) -> float:
 ## faction; -1 for no route.
 func _distance(camp: Dictionary, town: String) -> float:
 	var place := holdings.place(town)
-	var legs := routes.route(camp["area"], camp["cell"], place["area"], place["cell"], camp["faction"])
+	var legs := routes.route(camp["area"], camp["cell"], place["area"], place["cell"], holdings.factions.side(camp["faction"]))
 	if legs.is_empty():
 		return -1.0
 	var steps := 0.0
@@ -254,7 +254,7 @@ func _goal(id: String) -> Dictionary:
 func _route(id: String) -> Array:
 	var group := groups[id]
 	var goal := _goal(id)
-	var legs: Array = routes.route(group["area"], group["cell"], goal["area"], goal["cell"], group["faction"]) if not goal.is_empty() else []
+	var legs: Array = routes.route(group["area"], group["cell"], goal["area"], goal["cell"], holdings.factions.side(group["faction"])) if not goal.is_empty() else []
 	_legs[id] = legs
 	group["walked"] = 0.0
 	return legs
@@ -274,7 +274,7 @@ func _move(id: String) -> void:
 	group["walked"] = float(group["walked"]) + float(rules["steps_per_world_tick"])
 	var typed: Array[Dictionary] = []
 	typed.assign(legs)
-	var at := routes.along(typed, group["walked"], group["faction"])
+	var at := routes.along(typed, group["walked"], holdings.factions.side(group["faction"]))
 	group["area"] = at["area"]
 	group["cell"] = at["cell"]
 	if group["skip_area"] != "" and at["area"] != group["skip_area"]:

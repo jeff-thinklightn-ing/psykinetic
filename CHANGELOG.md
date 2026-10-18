@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The goblins are the Blood Rot now, with the orcs (brutes) and kobolds (sneaks) as their allies: they share ground and raid together, and the town's log names the Blood Rot.
 - With raids on, a raider camp that has hunted out the game around it grows hungry: it raids more often, and its raiders come for food rather than people.
 
 - Townsfolk keep hours now: the well at dawn, the forge or kitchen through the

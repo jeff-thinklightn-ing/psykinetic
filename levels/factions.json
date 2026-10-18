@@ -1,9 +1,24 @@
 {
 	"goblins": {
-		"name": "the goblins",
+		"name": "the Blood Rot",
 		"colour": "#6fa83a",
-		"monsters": ["imp", "brute", "sneak"],
-		"hostile_to": ["town"]
+		"monsters": ["imp"],
+		"hostile_to": ["town"],
+		"lore_id": "blood_rot"
+	},
+	"orcs": {
+		"name": "the orcs",
+		"colour": "#4f8a3a",
+		"monsters": ["brute"],
+		"allied_to": "goblins",
+		"lore_id": "goblins"
+	},
+	"kobolds": {
+		"name": "the kobolds",
+		"colour": "#8fb84a",
+		"monsters": ["sneak"],
+		"allied_to": "goblins",
+		"lore_id": "goblins"
 	},
 	"town": {
 		"name": "the town",

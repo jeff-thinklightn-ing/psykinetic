@@ -338,11 +338,16 @@ world map view (`--world-map`) lays out from it and marks its box
 ### Places and who holds them
 
 A place (level.json `places`) is a cell and a radius in an area that a
-faction holds. The factions are in `levels/factions.json` (the goblins and
-the town: a name, a colour, the monster kinds acting for each, who each is
-hostile to); "nobody" holds what no faction does. Held ground is the cells
-within a held place's radius (a disc); ground two factions' places both
-cover is contested; a place nobody holds is open ground and counts for no
+faction holds. The factions are in `levels/factions.json` (the Blood Rot,
+key `goblins`; the orcs and kobolds allied to it; the town): a name, a
+colour, the monster kinds acting for each (the one place a kind's faction
+is said), who each is hostile to, `lore_id` (its entry in levels/lore), and
+`allied_to`, the faction it is allied to (decision 416). An ally is on its
+lead's side, one level deep: it takes on the lead's enemies, walks its and
+the other allies' ground, and their raid groups draw on its kinds. "nobody"
+holds what no faction does. Held ground is the cells within a held place's
+radius (a disc); ground two factions' places both cover is contested (two
+of one side's is the lead's); a place nobody holds is open ground and counts for no
 one. An area's holder is only a label: the faction holding the most worth
 of its places (contested on a tie, nobody with none).
 

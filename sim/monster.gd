@@ -1349,8 +1349,8 @@ func _call_for_help() -> void:
 	_cry(&"call", Senses.NOISE_CALL)
 
 
-## Whether [param other] is of its side (Factions.of_kind; with no factions,
-## every monster of a kind is).
+## Whether [param other] is of its side (Factions.of_kind, allies one side,
+## decision 416; with no factions, every monster of a kind is).
 func _same_side(other: GridEntity) -> bool:
 	if not other is Monster or not (other as Monster)._wary or other is Animal:
 		return false  # An animal is of no side but its herd's (Animal).
@@ -1359,7 +1359,7 @@ func _same_side(other: GridEntity) -> bool:
 	var factions: Factions = World.holdings.factions if World.holdings != null else null
 	if factions == null:
 		return true
-	return factions.of_kind(mine) == factions.of_kind(theirs)
+	return factions.same_side(factions.of_kind(mine), factions.of_kind(theirs))
 
 
 ## A rout heard since it last looked, from its side: a coward breaks, and

@@ -281,16 +281,20 @@ func _spawn(record: Dictionary, at: Vector2i) -> void:
 		record["raiders"].append(raider)
 
 
-## The kinds faction [param faction] raids with: its monsters with a
-## strength, sorted.
+## The kinds faction [param faction] raids with: its monsters and its
+## allies' (decision 416: the Blood Rot's groups have orcs and kobolds in
+## them) with a strength, sorted.
 static func _kinds_of(faction: String) -> Array[String]:
 	var factions: Factions = World.holdings.factions if World.holdings != null else Factions.read()
 	var out: Array[String] = []
 	if factions == null or not factions.all.has(faction):
 		return out
-	for kind: String in factions.all[faction].get("monsters", []):
-		if Monster.kinds().has(kind) and _strength_of(kind) > 0.0:
-			out.append(kind)
+	var sides: Array[String] = [faction]
+	sides.append_array(factions.allies_of(faction))
+	for each in sides:
+		for kind: String in factions.all[each].get("monsters", []):
+			if Monster.kinds().has(kind) and _strength_of(kind) > 0.0 and not out.has(kind):
+				out.append(kind)
 	out.sort()
 	return out
 

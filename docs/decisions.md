@@ -9376,3 +9376,46 @@ the guards' lines can name a hungry camp later. Raids stay off until
 switched on. Protocol unchanged.
 
 tests/raid_groups_test.
+
+## 416. The Blood Rot: orcs and kobolds as allied factions
+
+Jeff, through lore (012d57b, levels/lore/factions.json's goblins entry,
+agreed): every goblin in the region is of the Blood Rot; brutes are orcs
+and sneaks are kobolds, allied peoples of the Blood Rot, not ranks; the
+allies don't worship the star, so an alliance can break or be turned.
+levels/factions.json had one "goblins" faction holding imp, brute and
+sneak.
+
+- "goblins" keeps its key (saves, place holders, raid groups, captives'
+  "by" and economy's raids.raiders all use it), shown as "the Blood Rot",
+  lore_id "blood_rot" (lore's entry, so its facts can reach the game). New
+  "orcs" (brute) and "kobolds" (sneak), each "allied_to": "goblins",
+  lore_id "goblins" (their facts are in that entry until lore gives them
+  their own, "orcs" and "kobolds"). Colours: the allies are tints of the
+  Blood Rot's green.
+- A kind's faction is said in one place, factions.json's "monsters" lists
+  (Factions.of_kind), not in monsters.json too (enemy-ai agreed).
+- Factions: allied_to is one level deep (an allied_to naming no faction,
+  itself, or an ally is dropped with a warning); side(id), same_side(a, b),
+  allies_of(id), lore_id(id). hostile goes through sides: an ally takes on
+  its lead's enemies (the town needs no new hostile_to), and one side is
+  never hostile to itself.
+- Holdings: an ally's ground does not block (blocked_cells), so allies
+  walk each other's ground on their own route layers; ground two of one
+  side cover reads as the lead's, not contested.
+- Raids._kinds_of (enemy-ai's, agreed): a faction's kinds and its allies',
+  sorted, so a Blood Rot group is imps, brutes and sneaks as before (the
+  draw, seeded over that list, is unchanged); an ally's group draws on its
+  own. Monster._same_side: factions.same_side of the two kinds' factions,
+  so brutes and imps stay one side.
+- Words: economy's town notes name a faction by display name (295
+  amended, Towns.faction_name): "a raid by the Blood Rot". The party log
+  is unchanged.
+- A save from before reads the same: every stored faction id is still
+  "goblins", now shown as the Blood Rot; monsters are not saved by faction,
+  so a brute is an orc by its kind.
+
+Not in this step: turned or broken alliances (the hook: an ally without
+allied_to is its own side). Protocol unchanged.
+
+tests/factions_test.

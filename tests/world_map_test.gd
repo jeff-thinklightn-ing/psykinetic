@@ -244,8 +244,9 @@ func _test_places() -> void:
 	print("places")
 	_register_place_maps()
 	var factions := Factions.read()
-	_check(factions.names() == _strings(["goblins", "town"]) and factions.of_kind("brute") == "goblins" and factions.of_kind("wolf") == "nobody",
-		"levels/factions.json: the goblins and the town; brutes act for the goblins (%s)" % [factions.names()])
+	_check(factions.names() == _strings(["goblins", "kobolds", "orcs", "town"]) and factions.of_kind("brute") == "orcs"
+		and factions.side("orcs") == "goblins" and factions.of_kind("wolf") == "nobody",
+		"levels/factions.json: the Blood Rot (goblins), its allies the orcs and kobolds, and the town; brutes act for the orcs, on the Blood Rot's side (decision 416; %s)" % [factions.names()])
 	_check(factions.hostile("goblins", "town") and not factions.hostile("town", "town") and factions.has("nobody") and not factions.has("elves"),
 		"goblins and town are hostile; nobody can hold, elves cannot")
 	var names: Array[String] = ["h_land", "h_bad"]
@@ -495,7 +496,7 @@ func _test_territory_routes() -> void:
 	var holdings := Holdings.new(world_map)
 	var routes := holdings.make_routes(world_map)
 	routes.wait()
-	_check(routes.factions() == _strings(["goblins", "town"]) and routes.is_ready(), "a layer per faction, every field in (%s)" % [routes.build_ms])
+	_check(routes.factions() == _strings(["goblins", "town"]) and routes.is_ready(), "a layer per side (the allies route on the Blood Rot's, decision 416), every field in (%s)" % [routes.build_ms])
 	var town := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
 	var goblins := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")
 	_check(goblins.size() == 1 and goblins[0]["steps"] == 20.0, "the goblins walk straight through their own camp: 20 steps (%s)" % [goblins])

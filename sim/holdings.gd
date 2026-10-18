@@ -144,7 +144,9 @@ func ground(area_name: String, cell: Vector2i) -> String:
 		if faction == Factions.NOBODY or faction == found or not covers(id, cell):
 			continue
 		if found != Factions.NOBODY:
-			return Factions.CONTESTED
+			if not factions.same_side(found, faction):
+				return Factions.CONTESTED
+			faction = factions.side(faction)  # Allies' ground is their lead's (decision 416).
 		found = faction
 	return found
 
@@ -206,8 +208,8 @@ func blocked_cells(area_name: String, faction: String) -> Dictionary[Vector2i, S
 	var out: Dictionary[Vector2i, String] = {}
 	for id in places_in(area_name):
 		var held: String = _holder[id]
-		if held == Factions.NOBODY or held == faction:
-			continue
+		if held == Factions.NOBODY or factions.same_side(held, faction):
+			continue  # Nobody's, its own or an ally's (decision 416).
 		var centre: Vector2i = _places[id]["cell"]
 		var radius: int = _places[id]["radius"]
 		for dy in range(-radius, radius + 1):
@@ -219,11 +221,13 @@ func blocked_cells(area_name: String, faction: String) -> Dictionary[Vector2i, S
 
 # --- Routes --------------------------------------------------------------------------
 
-## What each faction may not walk, area by area, as WorldRoutes takes it:
-## faction -> area -> {cell: place id}, for [param world_map]'s areas.
+## What each side may not walk, area by area, as WorldRoutes takes it:
+## faction -> area -> {cell: place id}, for [param world_map]'s areas. A
+## layer a side, its lead's (an ally walks where its lead does, decision
+## 416: route with Factions.side).
 func obstacles(world_map: WorldMap) -> Dictionary:
 	var out := {}
-	for faction in factions.names():
+	for faction in factions.names().filter(func(id: String) -> bool: return factions.side(id) == id):
 		var areas := {}
 		for area_name: String in world_map.areas:
 			areas[area_name] = blocked_cells(area_name, faction)
