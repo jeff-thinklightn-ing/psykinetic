@@ -1944,10 +1944,17 @@ func voice_situation() -> String:
 ## Wounds, for her voice (decision 320), when she or her player is hurt:
 ## a bandaging under way or mending, and for the rest whether she carries
 ## a kit (or her player does) and whether it is safe to bandage now
-## (World.calm). "" when neither is hurt.
+## (World.calm); and whether either bleeds or burns (World.afflict,
+## decision 375: a bandage stops bleeding). "" when neither is hurt or ailing.
 func _wound_words() -> String:
 	var who := keeper_name()
 	var told: Array[String] = []
+	for each: GridEntity in [self, keeper]:
+		if not _alive(each):
+			continue
+		for kind: String in AILING:
+			if each.ailments.has(kind):
+				told.append(("You are %s." if each == self else who + " is %s.") % AILING[kind])
 	var open_wounds: Array[GridEntity] = []
 	for each: GridEntity in [self, keeper]:
 		if not _alive(each) or each.hp >= each.max_hp:
@@ -3212,6 +3219,10 @@ func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
 
 # --- Errands: what she does when asked ------------------------------------------
 
+## What ails someone, in words (GridEntity.ailments' kinds).
+const AILING := {"bleed": "bleeding", "burn": "burning"}
+
+
 ## What she can do here and now, nearest first, at most ACTIONS_MAX: each
 ## {verb ("open", "close", "open_chest", "fetch", "give", "bandage", "look"), words
 ## (for her voice: "open the closed door, a few paces to the south"), at,
@@ -3223,7 +3234,8 @@ func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
 ## being bandaged or mending (World.try_bandage, decision 320); and the
 ## nearest walkable cells she
 ## cannot see within her sight's range, one a compass point, LOOKS_OFFERED
-## of them.
+## of them. A bandage for someone bleeding comes first, before anything
+## nearer (decision 320 amended).
 func can_do() -> Array[Dictionary]:
 	var actions: Array[Dictionary] = []
 	for door: Door in World.get_doors():
@@ -3263,6 +3275,12 @@ func can_do() -> Array[Dictionary]:
 				actions.append({"verb": "bandage", "patient": patient, "at": patient.tile,
 					"words": "bandage your own wounds" if patient == self else "bandage %s's wounds" % keeper_name()})
 	actions.sort_custom(_nearer_found)
+	# Bleeding: the bandage first, before anything nearer.
+	var stanch := actions.filter(func(each: Dictionary) -> bool: return each["verb"] == "bandage" and each["patient"].ailments.has("bleed"))
+	if not stanch.is_empty():
+		actions.assign(actions.filter(func(each: Dictionary) -> bool: return each not in stanch))
+		for each: Dictionary in stanch:
+			actions.push_front(each)
 	actions.resize(mini(actions.size(), ACTIONS_MAX - LOOKS_OFFERED))
 	var ways: Dictionary[int, bool] = {}
 	for cell in _cells_within(SIGHT_RANGE):

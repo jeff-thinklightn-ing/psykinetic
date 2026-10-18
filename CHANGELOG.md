@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion now knows when she or you are bleeding or burning, and
+  while one of you bleeds, bandaging comes first among what she offers.
 - Weapons keep count of what they've felled, by kind, whoever held them: hover a slot in your pack to see "felled 14: 9 imps, 4 wolves, 1 brute" under its name.
 - People strike with what they hold: a sword swings, an axe falls overhead, a dagger stabs, a spear thrusts, and bare hands punch. Each blow is timed so it lands as the hit does. Bodies far from the middle of the view, or out of it, move less often, which keeps crowds cheap. Client only.
 - Companions know that brutes are orcs and sneaks are kobolds, allied to the Blood

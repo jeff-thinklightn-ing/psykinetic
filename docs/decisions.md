@@ -5252,6 +5252,14 @@ wounds whether she carries a kit (or her player does, or neither) and
 whether it is safe to bandage now. Her world text says wounds do not
 close on their own. No protocol change: mending is already replicated.
 
+Amended (2026-10-17, the coordinator; release: no new number): items'
+ailments (decision 375, GridEntity.ailments) reach her voice. Her
+situation says when she or her player is bleeding or burning ("Player is
+bleeding.", Companion.AILING), and no more once it ends; and while
+either bleeds, bandaging them comes first in what she can do (can_do),
+before anything nearer, since a bandage stops bleeding at once. Facts
+only: what to do stays hers.
+
 ## 300. Where a new player starts is data: levels/world_map.json's start zone
 
 New players went to Level.DEFAULT_MAP (test_room) unless the server ran with

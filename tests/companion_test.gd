@@ -2594,6 +2594,23 @@ func _test_healing() -> void:
 	var words := _words(offered)
 	_check("bandage your own wounds" in words and "bandage %s's wounds" % pet.keeper_name() in words and "safe to bandage now" in pet.voice_situation(),
 		"with a kit, out of combat: herself and her player offered (%s)" % [words])
+	World.afflict(owner, "bleed", 150, 30, 1)
+	World.afflict(pet, "burn", 60, 30, 1)
+	_check("%s is bleeding." % pet.keeper_name() in pet.voice_situation() and "You are burning." in pet.voice_situation(),
+		"bleeding or burning, her voice is told so (%s)" % pet.voice_situation())
+	var first: Dictionary = pet.can_do()[0]
+	_check(first["verb"] == "bandage" and first["patient"] == owner, "her player bleeding: bandaging them is offered first (%s)" % first["words"])
+	for i in 31:
+		World.step()
+	_check(owner.ailments.has("bleed") and _offer(pet.can_do(), "bandage") >= 0 and pet.can_do()[0]["verb"] == "bandage",
+		"still bleeding after it hurt them: still offered first (calm %s)" % World.calm(owner))
+	World.cure(owner, "bleed")
+	World.cure(pet, "burn")
+	for i in World.BANDAGE_CALM_TICKS + 1:  # Calm again after what the ailments did.
+		World.step()
+	owner.hp = owner.max_hp - 6
+	pet.hp = 10
+	_check("bleeding" not in pet.voice_situation() and "burning" not in pet.voice_situation(), "and no more once it ends")
 
 	var both := ["bandage your own wounds", "bandage %s's wounds" % pet.keeper_name()].map(func(w: String) -> int: return words.find(w))
 	_check(Companion._errand_verbs("let me bandage you.") == ["bandage"] and Companion._errand_verbs("i'll give you my bandages.") == ["give"],
