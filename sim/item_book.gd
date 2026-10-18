@@ -349,6 +349,31 @@ func set_name(uid: int, name: Dictionary, strength: String, zone := "", tile := 
 	note(uid, "named", str(name.get("text", "")), zone, tile)
 
 
+## [param uid], a named thing, reforged into [param to_id] (decision 432;
+## economy's job finishes with it, while the job holds it): the same uid, its
+## id the new one; its name (rendered with the new thing's word), its curse,
+## its marks and its tally stay; its strength stays if it fits the new verb
+## (Items.strength_fits), else it is lost and the history says so. A
+## condition is set whole for a thing that has one. Noted "reforged" (never
+## evicted). False, nothing done, for an unnamed thing or a pair
+## Items.reforge_cost refuses.
+func reforge(uid: int, to_id: String, zone := "", tile := Vector2i(-1, -1)) -> bool:
+	if not _book.has(uid) or name_of(uid).is_empty() or Items.reforge_cost(id_of(uid), to_id).is_empty():
+		return false
+	var from := id_of(uid)
+	var lost := ""
+	if not strength_of(uid).is_empty() and not Items.strength_fits(strength_of(uid), to_id):
+		lost = strength_of(uid)
+		_book[uid]["strength"] = ""
+	_book[uid]["id"] = to_id
+	if Items.condition_max(to_id) > 0:
+		_book[uid]["condition"] = Items.condition_max(to_id)
+	else:
+		_book[uid].erase("condition")
+	note(uid, "reforged", "%s into %s%s" % [from, to_id, "; %s lost" % lost if not lost.is_empty() else ""], zone, tile)
+	return true
+
+
 ## [param uid] leaves the world ("banked", "eaten"): its entry, the last
 ## event added, is returned and it is gone from the book. {} for one not in it.
 func end(uid: int, kind: String, what := "", zone := "", tile := Vector2i(-1, -1)) -> Dictionary:

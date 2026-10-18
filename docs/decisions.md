@@ -9632,3 +9632,28 @@ first update into it goes the old way). Protocol unchanged.
 
 tests/self_update_test (no network: a local zip; update.ps1 -Stage's dry
 run on Windows).
+## 432. The reforge: a named thing made another of the smith's
+
+Jeff's heirlooms, the last of them (the curse design's step 4; approved by the
+coordinator): a named thing (365) taken to the forge counter may be reforged
+into another of the smith's things. Pairs (Items.reforge_cost, reforge_targets):
+from any thing with a verb (a weapon or a shield) to any other id with a verb
+the smith makes, taking the same hands or fewer; so a one-handed weapon becomes
+any other one-handed smith's thing, a giant axe anything the smith makes, and
+nothing becomes the tanner's buckler (it may become the smith's things). The
+smith's cost: half the target's made "from", each rounded up, at least 1 ore
+(the old metal goes into it), and half its steps: a dagger into a sword 2 ore
+and 1 wood in 1500 steps.
+
+ItemBook.reforge(uid, to_id), with which economy's job finishes (the general job
+of 414, effect "reforge", worked by the smith; its fee and the town's stock are
+economy's, amendments to this entry; the counter's screen ui's): the same uid,
+its id the new one. Its name stays, rendered with the new thing's word through
+Lore.render_name ("Wren's dagger" now "Wren's sword"); its curse (370), its bane
+and grudge (417), its tally (415) and its blessing (424) stay, and its carrier
+rows. Its strength stays if it fits the new verb (Items.strength_fits: steady a
+block verb, quick a bow, set a bracing reach, quiet a verb that strikes, heavy a
+knockdown, dread any), else it is lost. Noted "reforged" ("dagger into sword;
+quiet lost"), never evicted, and told in the story ("reforged from a dagger";
+421). An unnamed thing is not reforged: the town makes a new one. The id lives in
+slots, already replicated: the protocol is unchanged.

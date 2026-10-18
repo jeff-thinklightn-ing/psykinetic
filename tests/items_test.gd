@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_bane()
 	_test_story()
 	_test_bless()
+	_test_reforge()
 	_test_names()
 	_test_curse()
 	_test_arrows()
@@ -1229,6 +1230,37 @@ func _test_bless() -> void:
 	World.items.bless(dagger, me)
 	_check(ItemBook.from_dict(World.items.to_dict()).blessed_for(dagger) == me and back.blessed_for(dagger).is_empty(), "saved and read back")
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+
+
+func _test_reforge() -> void:
+	print("\n== the reforge: a named thing made another of the smith's, the same uid, its name and marks kept (decision 432) ==")
+	_check(Items.reforge_cost("dagger", "sword") == {"by": "smith", "from": {"ore": 2, "wood": 1}, "steps": 1500},
+			"a dagger into a sword: half the sword's ore and wood, rounded up; half its steps (%s)" % Items.reforge_cost("dagger", "sword"))
+	_check(Items.reforge_cost("giant_axe", "dagger") == {"by": "smith", "from": {"ore": 1}, "steps": 600}, "a giant axe into a dagger: 1 ore, 600 steps")
+	_check(Items.reforge_cost("dagger", "giant_axe").is_empty(), "not into more hands")
+	_check(Items.reforge_cost("dagger", "buckler").is_empty() and Items.reforge_cost("dagger", "dagger").is_empty()
+			and Items.reforge_cost("ration", "sword").is_empty(), "nor into the tanner's buckler, nor itself, nor from a ration")
+	_check(not Items.reforge_targets("buckler").is_empty() and "giant_axe" not in Items.reforge_targets("sword"),
+			"a buckler may become the smith's things (%s)" % [Items.reforge_targets("buckler")])
+	_check(Items.strength_fits("quiet", "sword") and not Items.strength_fits("quiet", "shield") and Items.strength_fits("steady", "shield")
+			and not Items.strength_fits("steady", "dagger") and Items.strength_fits("dread", "bow") and not Items.strength_fits("heavy", "hammer"),
+			"strengths fit their verbs")
+	var host := _player(Net.local_id)
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	var uid := World.take_item(host, host, Player.RIGHT_HAND)
+	_check(not World.items.reforge(uid, "sword"), "an unnamed dagger is not reforged")
+	World.items.set_name(uid, {"form": "holder_possessive", "holder": "Wren", "who": "companion:test:Wren", "made_step": World.steps,
+		"text": "Wren's dagger"}, "quiet")
+	World.items.fell(uid, "imp")
+	_check(World.items.reforge(uid, "sword") and World.items.id_of(uid) == "sword" and World.items.strength_of(uid) == "quiet"
+			and World.items.felled_of(uid) == {"imp": 1} and World.items.name_of(uid)["holder"] == "Wren",
+			"Wren's dagger into a sword: the same uid, its name, its quiet strength and its tally kept")
+	_check(World.items.reforge(uid, "shield") and World.items.strength_of(uid).is_empty()
+			and World.items.history(uid)["events"].back()["what"] == "sword into shield; quiet lost",
+			"into a shield: quiet does not fit, lost, and the history says so (%s)" % World.items.history(uid)["events"].back())
+	_check(World.story_line(uid).contains("reforged from a"), "its story tells it (%s)" % World.story_line(uid))
+	World.items.end(uid, "gone")
+	dagger = 0
 
 
 func _test_names() -> void:

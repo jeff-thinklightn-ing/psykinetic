@@ -2060,6 +2060,10 @@ func story_line(uid: int) -> String:
 	if not items.blessed_for(uid).is_empty():
 		parts.append("blessed at the temple")  # Decision 424.
 	for event: Dictionary in history["events"]:
+		if event["kind"] == "reforged":
+			parts.append("reforged from a %s" % Items.name_of(str(event["what"]).get_slice(" into ", 0)))  # Decision 432.
+			break
+	for event: Dictionary in history["events"]:
 		if event["kind"] == "avenged":
 			parts.append("avenged on %s" % _plural(str(event["what"])))
 	while not parts.is_empty() and ("story: " + "; ".join(parts)).length() > STORY_LONGEST:

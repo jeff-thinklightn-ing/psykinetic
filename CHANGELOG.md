@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A named weapon can be reforged by the smith into another weapon taking no more hands, for half the metal and time of a new one. It keeps its name (Wren's dagger becomes Wren's sword), its history, its marks and its kills; its strength stays if it suits the new weapon. (The forge counter where you'll ask for it is coming.)
 - When the server is newer, the game now downloads the update itself with a progress bar on the connect screen (and a Cancel), rather than closing without a word while it updates.
 - Townsfolk talk among themselves now: at the well, the inn, the square or the
   temple, what one believes or saw passes to a neighbour standing there, kin

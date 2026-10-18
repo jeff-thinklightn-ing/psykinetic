@@ -338,6 +338,68 @@ static func strength_value(strength: String, key: String, default: Variant) -> V
 	return naming()["strengths"].get(strength, {}).get(key, default) if not strength.is_empty() else default
 
 
+## Whether [param strength] (a naming strength, decision 365) works with
+## [param id]'s verb (decision 432): guard_stamina with a block verb, draw
+## with a ranged one, brace_ticks with a reach that braces, noise with any
+## verb that strikes (not a bow's, nor a shield's without damage),
+## down_ticks with a knockdown, dread with any verb.
+static func strength_fits(strength: String, id: String) -> bool:
+	var verb := verb_of(id)
+	var row: Dictionary = naming()["strengths"].get(strength, {})
+	if verb.is_empty() or row.is_empty():
+		return false
+	var kind := str(verb["kind"])
+	var strikes := kind != "ranged" and (kind != "block" or float(verb.get("damage", 0.0)) > 0.0)
+	for key: String in row:
+		match key:
+			"guard_stamina":
+				if kind != "block":
+					return false
+			"draw":
+				if kind != "ranged":
+					return false
+			"brace_ticks":
+				if kind != "reach" or not bool(verb.get("brace", false)):
+					return false
+			"noise":
+				if not strikes:
+					return false
+			"down_ticks":
+				if kind != "knockdown":
+					return false
+	return true
+
+
+## What reforging a [param from_id] into a [param to_id] costs the smith
+## (decision 432): half [param to_id]'s made "from" (each rounded up, at
+## least 1 ore: the old metal goes into it) and half its steps, as {by:
+## "smith", from, steps}; {} when the pair is not allowed: both have a verb,
+## not the same id, the smith makes [param to_id], and it takes no more
+## hands than [param from_id].
+static func reforge_cost(from_id: String, to_id: String) -> Dictionary:
+	if from_id == to_id or not exists(from_id) or not exists(to_id) or verb_of(from_id).is_empty() or verb_of(to_id).is_empty():
+		return {}
+	var made: Dictionary = def(to_id)["made"]
+	if str(made.get("by", "")) != "smith" or made.get("from") is not Dictionary \
+			or int(def(to_id)["hands"]) > int(def(from_id)["hands"]):
+		return {}
+	var from := {}
+	for what: String in made["from"]:
+		from[what] = ceili(int(made["from"][what]) / 2.0)
+	from["ore"] = maxi(int(from.get("ore", 0)), 1)
+	return {"by": "smith", "from": from, "steps": ceili(int(made["steps"]) / 2.0)}
+
+
+## The ids a [param id] may be reforged into (reforge_cost not {}), in
+## catalog order (decision 432).
+static func reforge_targets(id: String) -> Array[String]:
+	var out: Array[String] = []
+	for to_id: String in all():
+		if not reforge_cost(id, to_id).is_empty():
+			out.append(to_id)
+	return out
+
+
 static func exists(id: String) -> bool:
 	return all().has(id)
 
