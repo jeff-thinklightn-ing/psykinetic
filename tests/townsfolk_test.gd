@@ -307,9 +307,21 @@ func _test_strays() -> void:
 	_now += 100
 	Townsfolk.tick(_work, _stock)
 	_check(Townsfolk.strayed_of(_work, TOWN).size() == 1, "one at a time per town")
+	# Her kin's plea, taken by a player: it closes unpaid when she comes home on her own (the soak had it lapse against the player).
+	var kin := Townsfolk.card_of(_work, "s-odo")
+	kin["asks"] = [{"id": "o|plea|walk:s-nell", "kind": "commission", "sub": "escort", "by": "p1", "by_name": "Jeff", "step": _now, "town": TOWN, "worker": "s-odo",
+		"title": "Walk Nell home", "words": "", "what": {"stray": "s-nell", "name": "Nell", "sub": "escort"}}]
+	_work.set_card("s-odo", kin)
+	var done: Array = []
+	Offers.ctx = {"production": _work, "pay": func() -> Dictionary: return {}, "pay_commission": func(_p: String, _t: String, g: int) -> int: return g,
+		"done": func(player_id: String, ask: Dictionary, line: String, paid: int) -> void: done.append([player_id, ask, line, paid])}
 	_now += 3 * DayNight.day_steps
 	Townsfolk.tick(_work, _stock)
 	_check(Townsfolk.strayed_of(_work, TOWN).is_empty() and _work.worker("s-nell")["away"] == false, "after three days she found her own way home: back, not away")
+	_check(done.size() == 1 and done[0][3] == 0 and str(done[0][2]) == "Nell came home on her own." and Townsfolk.card_of(_work, "s-odo")["asks"].is_empty(),
+		"her kin's plea closed unpaid, no lapse against the player: %s" % [done])
+	_check(Standing.score(Townsfolk.card_of(_work, "s-odo"), "p1") == 0, "and Odo thinks no worse of Jeff for it")
+	Offers.ctx = {}
 	_check(str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).contains("found") and str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).contains("own way home"),
 		"her card: %s" % [Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]])
 	Townsfolk._stray_due.clear()

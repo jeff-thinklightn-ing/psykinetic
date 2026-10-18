@@ -489,6 +489,10 @@ static func _promise(ask: Dictionary) -> String:
 			return "to clear the camp of %s" % ResidentCard.faction_name(str(what.get("faction", "")))
 		FETCH:
 			return "to bring %d %s to the store" % [int(what.get("count", 0)), str(what.get("item", "")).replace("_", " ")]
+		"escort":
+			return "to walk %s home" % what.get("name", "")
+		"quarrel":
+			return "to lay the quarrel with %s before the lawspeaker" % what.get("name", "")
 	return str(ask.get("title", "")).to_lower()
 
 

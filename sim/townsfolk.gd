@@ -391,6 +391,7 @@ static func stray(production: Production) -> void:
 		for id: String in lost:
 			if at - int(lost[id].get("since", at)) >= int(rule.get("days", 3)) * day:
 				came_home(production, id, "")
+				Offers.walked_home(town, id, "", "")  # The kin's pleas close unpaid: no lapse against anyone (the soak).
 				home_today = true
 		var due := int(_stray_due.get(town, 0))
 		if due == 0:
@@ -937,6 +938,12 @@ static func _arrive(production: Production, town: String, log: Array, at: int) -
 
 ## One pass of gossip at [param place] in [param town] among [param
 ## members] (worker ids): what was told, or "" for nothing.
+## How many things a hearer remembers being told (the card's "told"), so
+## a thing that fell off their heard cap is not told to them again (the
+## soak of 2026-10-19: one pair told the same thing 36 times in a month).
+const TOLD_MAX := 64
+
+
 static func _pass(production: Production, town: String, place: String, members: Array, at: int) -> String:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("gossip:%s:%s:%d" % [town, place, at])
@@ -958,6 +965,8 @@ static func _pass(production: Production, town: String, place: String, members: 
 	var hearer_name := str(production.worker(hearer).get("name", ""))
 	var teller_name := str(production.worker(teller).get("name", ""))
 	var heard: Array = production.worker(hearer).get("heard", []).duplicate(true)
+	var hearer_card := card_of(production, hearer)
+	var told: Array = hearer_card.get("told", [])  # What they were told before: a thing that fell off their heard cap is not told them again.
 	var text := ""
 	var fits := ""
 	var omen := false
@@ -970,7 +979,7 @@ static func _pass(production: Production, town: String, place: String, members: 
 		known.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
 		for fact: Dictionary in known:
 			var lore_text := str(fact.get("text", "")).strip_edges().trim_suffix(".")
-			if not lore_text.is_empty() and not bool(fact.get("hearsay", false)) and not Hearsay.holds(heard, lore_text):
+			if not lore_text.is_empty() and not bool(fact.get("hearsay", false)) and not Hearsay.holds(heard, lore_text) and lore_text not in told:
 				text = lore_text
 				fits = Hearsay.WITNESSED
 				break
@@ -993,8 +1002,7 @@ static func _pass(production: Production, town: String, place: String, members: 
 			if player_name.is_empty() or player_name == "<null>":
 				player_name = newest_id
 			var said := "%s %s" % [player_name, str(newest["why"].back())]
-			if not Hearsay.holds(heard, said):
-				var hearer_card := card_of(production, hearer)
+			if not Hearsay.holds(heard, said) and said not in told:
 				if not hearer_card.is_empty() and Standing.heard(hearer_card, newest_id, signi(int(newest["score"])), str(newest["why"].back()), teller_name, at):
 					production.set_card(hearer, hearer_card)
 				text = said
@@ -1004,7 +1012,7 @@ static func _pass(production: Production, town: String, place: String, members: 
 		for i in range(beliefs.size() - 1, -1, -1):
 			var entry: Dictionary = beliefs[i]
 			var said := str(entry.get("text", ""))
-			if bool(entry.get("believed", false)) and not said.is_empty() and not said.contains(hearer_name) and not Hearsay.holds(heard, said):
+			if bool(entry.get("believed", false)) and not said.is_empty() and not said.contains(hearer_name) and not Hearsay.holds(heard, said) and said not in told:
 				text = said
 				fits = "beyond"
 				omen = bool(entry.get("omen", false))
@@ -1013,10 +1021,10 @@ static func _pass(production: Production, town: String, place: String, members: 
 		var facts: Array = card.get("facts", [])
 		for i in range(facts.size() - 1, -1, -1):
 			var fact := str(facts[i].get("text", "")) if facts[i] is Dictionary else ""
-			var told := _as_told(fact, card)
-			if fact.is_empty() or fact.contains(hearer_name) or Hearsay.holds(heard, told):
+			var told_as := _as_told(fact, card)
+			if fact.is_empty() or fact.contains(hearer_name) or Hearsay.holds(heard, told_as) or told_as in told:
 				continue
-			text = told
+			text = told_as
 			fits = Hearsay.WITNESSED
 			break
 	if text.is_empty():
@@ -1026,6 +1034,14 @@ static func _pass(production: Production, town: String, place: String, members: 
 	if entry.is_empty():
 		return ""
 	production.set_heard(hearer, heard)
+	if not hearer_card.is_empty():
+		hearer_card = card_of(production, hearer)  # Fresh: Standing.heard may have written it.
+		var remembered: Array = hearer_card.get("told", [])
+		remembered.append(text)
+		while remembered.size() > TOLD_MAX:
+			remembered.pop_front()
+		hearer_card["told"] = remembered
+		production.set_card(hearer, hearer_card)
 	if fits == "beyond" and bool(entry.get("believed", false)):
 		# A belief that spreads is the town's to remember (the lawspeaker, phase 1).
 		var log: Variant = Offers._call(Offers.ctx, "memory", [town])

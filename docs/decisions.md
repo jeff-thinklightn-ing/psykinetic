@@ -9877,6 +9877,14 @@ residents speaking aloud to each other (336 rejected idle chatter, and
 nothing reads lines not said to a player); passing lore (Lore.known_by has
 it already); believing a neighbour's sighting by the intellect roll (it is
 first-hand; the roll is for rumours).
+
+Amended 2026-10-19 (the soak, 496): a hearer's card keeps what it was told
+("told", Townsfolk.TOLD_MAX 64 texts), and gossip never tells them the same
+thing twice, even after it fell off their heard cap (the cap evicts the
+oldest not believed, and a small town where everyone knows everything then
+told one pair the same line 36 times in a month). With nothing new to tell,
+the pass is silent and nothing is recorded.
+
 ## 430. The in-game update fetches the server's release, showing how far
 
 ui's connect screen (step 2, decision 418) shows the join flow in words; an
@@ -10535,6 +10543,13 @@ before. Commissions come from people and what is between them (kin, a camp,
 a word, a loan; later a dispute for the lawspeaker, sick kin to the healer,
 someone walked home); the rule is in Offers' header and residents.json
 "offers", so no future kind is a fetch. offers_test and standing_test follow.
+
+Amended 2026-10-19 (the soak, 496): the promise in words (Offers._promise,
+in the party log's lapse and taking lines) has its own words for an escort
+("to walk Tam home", 487) and a quarrel ("to lay the quarrel with Bram
+before the lawspeaker", 486), so a name keeps its case; before, a title was
+lower-cased whole ("walk tam home").
+
 ## 440. The scholar and the merchant: what the last two hidden types do on the side
 
 Step 2's last two (393: a hidden type per resident, what it does beyond
@@ -12904,6 +12919,12 @@ errand); the escortee as a far record (never away from a player); the
 stray as a captive (that is the rescue, 435); a verb to parse ("come
 with me": any word to the lost one is enough; they want to go home).
 
+Amended 2026-10-19 (the soak, 496): a stray who finds their own way home
+closes the kin's pleas to walk them home unpaid, with the fact and the
+party-log line "Tam came home on his own" (Townsfolk.stray calls
+Offers.walked_home with nobody); before, the pleas stayed open and lapsed
+seven days later against the players who had taken them.
+
 ## 490. The bard sings what the town remembers
 
 The hidden types' side-doings (393: "scoundrel, thieves, and bards isn't
@@ -13294,3 +13315,66 @@ warm-up; the coordinator approved it on one condition, that it never shows.
 view_test _test_warm_ups (drawn under the ground after a build, freed after
 WARM_FRAMES, never twice in a process; the forest's registered); map_bench
 on a fresh profile exits 0 with no resources left at exit.
+
+## 496. The living-world soak: the town run for a month, and what it found
+
+The coordinator's ask of 2026-10-19, before the lawspeaker is turned on:
+run the wilds town locally for 30 days as the box runs it (the lawspeaker
+off, Snagfin seated, the thief, the bard, strays, the scoundrel) with test
+players standing in the inn of an evening and at the counter by day, read
+the transcripts and the talk log, fix what is npc's, route the rest. The
+proof Jeff's "living world" line asks for.
+
+- The tool: tools/town_soak.tscn (a scene, so the autoloads load; headless,
+  through the bench gate: --days=30 --players=3 --out=<a local folder>).
+  It boots Main as the server on the wilds with a scratch world (never the
+  box's), seats the balance tool's nine folk and a guard with their hidden
+  types set outright (a thief, a bard, a scholar, a scoundrel), admits two
+  far peers beside the host's player, gives each sixty gold, and steps the
+  world a day in about forty seconds. Every hour it stands the players
+  where a player would be (the inn's rect from 19 to 22 when the town has
+  one, a cell beside the counter at 10, 11, 15 and 16, the square else),
+  and at the counter each hears what the bodies within reach offer, takes
+  the first commission, plea or page and buys the first sale they can pay
+  for; every third day one speaks to the nearest body. It counts what
+  happened through Main's own Offers context (offers by kind, taken,
+  done, paid, bought) and prints "SOAK ..." lines: the ledger's moves,
+  every resident's stints seen, purse, loan, facts and standing with each
+  player, the songs, the errand lines, the party log's tail; transcripts
+  and the mind log go under --out. scratchpad soak_read.py (npc's, not
+  committed) reads a run: events, repeated lines, lines a day per resident.
+- The first month (before): 13 residents, 3 to 5 transcript lines a day
+  each; 4,587 offers heard (2,526 rumours, 1,582 pleas, 479 sales), 6
+  taken, 6 done (all lapses), 0 gold paid out, 18 bought for 43 gold; 15
+  gold lifts by the thief, 0 store lifts, 0 caught, 0 fenced; 2 strays, both
+  home on their own; 0 songs (the wilds built no inn in the month); the
+  scoundrel's debt 22 of the cap 30; 619 gossip passes.
+- What was npc's, fixed here: gossip told the same pair the same line up
+  to 36 times a month (a thing that fell off a hearer's heard cap could be
+  told them again; a hearer's card now keeps what it was told, "told",
+  TOLD_MAX 64, and nothing is told them twice: 422 amended); a stray who
+  came home on their own left the kin's pleas to lapse against the players
+  who took them (Townsfolk.stray now closes them unpaid through
+  Offers.walked_home: 487 amended); the promise words lower-cased names
+  ("walk ash home"; Offers._promise has words for an escort and a quarrel:
+  435 amended). gossip_test, offers_test, townsfolk_test.
+- Routed with the line: to economy, the carpenter who "waits for tannery:
+  its materials went to work that came first" 5,399 times in the month and
+  never built the inn the town wanted from day 0 (so the bard of 490 is
+  silent on the box until that moves), the treasury at its floor all month
+  with the officials unpaid 85 to 88 times each, and the hunter's "found no
+  game" 484 times. Not fabricated anywhere: every transcript line traced to
+  a card fact, a belief or lore; no resident stuck in one stint; no errand
+  paid twice (none paid: no raid, no captive and no camp threatened the
+  town in the month, so no commission was ever offered).
+- The second month (after): the same town, same month: 1.0 to 4.5 transcript
+  lines a day each (no line said to one hearer twice; the only repeats
+  left are the test players' own question and the stub mind's answer);
+  gossip passes 619 to 467; 3,097 offers heard (the fewer because the
+  players stood at the counter's four cells, not its corners), 6 taken, 6
+  done, all "came home on their own", unpaid and with no lapse against
+  anyone (the kin's standing with the players 0 where it had been -1 and
+  -2); 15 gold lifts again, 0 caught; 2 strays again; still no inn and no
+  song, the carpenter's line 5,399 times again, which is economy's.
+
+Protocol unchanged; no new class_name.

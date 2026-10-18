@@ -432,6 +432,7 @@ func _test_walk_home() -> void:
 		and str(mine[0]["words"]).begins_with("My ") and str(mine[0]["words"]).contains("Tam has not come back from beyond the walls"), "Mara's plea: walk her kin home: %s" % [mine])
 	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
 	_check(taken["ok"] and _asked.size() == 1 and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1, "taken, interest only: %s" % [taken])
+	_check(Offers._promise(Townsfolk.card_of(_work, "o-mara")["asks"][0]) == "to walk Tam home", "the promise in words keeps the name (the soak's 'walk tam home')")
 	Townsfolk.came_home(_work, "o-tam", "Jeff")
 	Offers.walked_home(TOWN, "o-tam", "p1", "Jeff", _ctx)
 	_check(_work.worker("o-tam")["away"] == false and not Townsfolk.card_of(_work, "o-tam").has(Townsfolk.STRAYED), "Tam is home and not away")

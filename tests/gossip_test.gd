@@ -35,6 +35,7 @@ static var _thief := ""
 func _ready() -> void:
 	World.set_process(false)
 	_test_belief_passes()
+	_test_told_once()
 	_test_not_across_places()
 	_test_never_at_home()
 	_test_witnessed_and_doubted()
@@ -148,6 +149,25 @@ func _test_belief_passes() -> void:
 	for i in 8:
 		_tick()
 	_check(_from("g-mara", "Tam").size() <= 1 and _from("g-tam", "Mara").size() <= 1, "told once: what one holds already is not told again")
+
+
+## A thing told to someone is not told them again by anyone, even after it
+## fell off their heard cap (the soak of 2026-10-19 had one pair repeat a
+## line 36 times in a month): the card's "told" list.
+func _test_told_once() -> void:
+	print("
+== told once: a thing that fell off the cap is not told again ==")
+	_setup()
+	_plant("g-tam", LIE)
+	var took := _until_heard("g-mara")
+	_check(took > 0 and Hearsay.holds(_heard("g-mara"), LIE), "Mara is told the lie (%d ticks)" % took)
+	_check(LIE in Townsfolk.card_of(_work, "g-mara").get("told", []), "and her card remembers she was told it")
+	_work.set_heard("g-mara", [])  # It fell off her cap.
+	_check(_until_heard("g-mara", 12) == 0, "Tam has nothing new for her: she is not told the lie again")
+	var card := Townsfolk.card_of(_work, "g-mara")
+	card["told"] = []
+	_work.set_card("g-mara", card)
+	_check(_until_heard("g-mara", 12) > 0, "(with the told list cleared she would hear it again: the list is what holds it)")
 
 
 func _test_not_across_places() -> void:
