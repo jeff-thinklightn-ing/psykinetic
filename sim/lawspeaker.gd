@@ -291,5 +291,7 @@ static func tick(step: int, client: Variant, given: Dictionary = Offers.ctx) -> 
 		Offers._call(given, "set_lawspeaker", [town, mine])
 		for line: String in lines:
 			Offers._call(given, "note", [town, line])
+		if rulings.any(func(each: Dictionary) -> bool: return str(each.get("ruling", "")) == "propose"):
+			Offers._call(given, "proposed")  # The list for Jeff (decision 458).
 		MindLog.record({"kind": "ruling", "mind": "lawspeaker", "town": town, "model": model, "candidates": body.get("candidates", []),
 			"rulings": rulings, "applied": lines, "outcome": "ruled", "cost": cost, "request_id": str(response.get("request_id", ""))})

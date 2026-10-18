@@ -3660,6 +3660,7 @@ func _offers_context() -> Dictionary:
 		"town_name": func(town: String) -> String:
 			return str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town,
 		"players_words": func() -> bool: return Net.lawspeaker_players,
+		"proposed": _write_proposed,
 		"model": func() -> String: return str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),
 		"area_of": func(town: String) -> String: return str(World.holdings.place(town).get("area", "")) if World.holdings != null else "",
 		"asked": _on_commission_asked,
@@ -3715,6 +3716,34 @@ func _make_lawspeaker() -> void:
 	_lawspeaker_client = client
 	print("[lawspeaker] on: %s, one round a town a day; players' words %s" % [str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),
 		"in" if Net.lawspeaker_players else "out"])
+
+
+## Server: the proposals list for Jeff (decision 458), every town's
+## "proposed" memories, written to Net.proposed_path (nothing when ""),
+## keeping the status lines written into it by hand.
+func _write_proposed() -> void:
+	if Net.proposed_path.is_empty() or World.production == null:
+		return
+	var logs := {}
+	var names := {}
+	for id: String in World.production.worker_ids():
+		var town := str(World.production.worker(id).get("town", ""))
+		if not town.is_empty() and not logs.has(town):
+			logs[town] = _town_memory(town)
+			names[town] = str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town
+	var who := func(worker_id: String) -> String:
+		var worker := World.production.worker(worker_id)
+		if worker.is_empty():
+			return worker_id
+		var trades: Array = worker.get("trades", [])
+		return "%s the %s" % [worker.get("name", worker_id), str(trades[0]).replace("_", " ")] if not trades.is_empty() else str(worker.get("name", worker_id))
+	var statuses := TownMemory.proposed_statuses(FileAccess.get_file_as_string(Net.proposed_path)) if FileAccess.file_exists(Net.proposed_path) else {}
+	var file := FileAccess.open(Net.proposed_path, FileAccess.WRITE)
+	if file == null:
+		push_warning("[lawspeaker] cannot write the proposals list %s (%s)" % [Net.proposed_path, error_string(FileAccess.get_open_error())])
+		return
+	file.store_string(TownMemory.proposed_page(logs, names, who, statuses))
+	file.close()
 
 
 ## Server: [param player_id] took on [param ask]: on their record too.

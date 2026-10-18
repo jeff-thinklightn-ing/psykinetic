@@ -51,6 +51,7 @@ func _ready() -> void:
 	await _test_round()
 	await _test_failures()
 	_test_remembered_in_voice()
+	_test_proposed_page()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	TownMemory.use_settings({})
@@ -229,6 +230,28 @@ func _test_remembered_in_voice() -> void:
 	TownMemory.note(log, "Old Marta lives by the east field", "l-mara", "", 0)
 	log[0]["tier"] = TownMemory.MEMORY
 	_check(TownMemory.remembered(log) == ["The town remembers that old Marta lives by the east field."], "as memory, not fact: %s" % [TownMemory.remembered(log)])
+
+
+func _test_proposed_page() -> void:
+	print("\n== the proposals list for Jeff (decision 458) ==")
+	_setup()
+	var log := _log_with_candidates()
+	var day := DayNight.day_steps
+	Lawspeaker.apply(log, [{"candidate": "tm.1", "ruling": "propose", "memory": "", "because": "every house says so"},
+		{"candidate": "tm.2", "ruling": "accept"}], 12 * day)
+	var who := func(id: String) -> String: return {"l-mara": "Mara the cook", "l-tam": "Tam the hauler", "l-bram": "Bram the smith"}.get(id, id)
+	var page := TownMemory.proposed_page({TOWN: log}, {TOWN: "Ashford"}, who)
+	_check(page.begins_with("# Proposed to lore") and page.contains("\n## Ashford (l/store)\n") and page.contains("\n### tm.1: Old Marta lives by the east field\n"),
+		"the page: the head, the town, the proposed entry")
+	_check(page.contains("- first said by Mara the cook to a traveller, on day 0; held by Mara the cook, Tam the hauler, Bram the smith (3 of 3 who heard it)\n")
+		and page.contains("- proposed on day 12: every house says so\n- status: open\n"), "its source, holders, the ruling's day and why, and an open status")
+	_check(not page.contains("tm.2"), "what was only accepted is not on it")
+	var edited := page.replace("- status: open", "- status: agreed, Jeff 2026-10-19")
+	var kept := TownMemory.proposed_statuses(edited)
+	_check(kept == {"l/store tm.1": "agreed, Jeff 2026-10-19"}, "a status written by hand is read back by town and id: %s" % [kept])
+	var again := TownMemory.proposed_page({TOWN: log}, {TOWN: "Ashford"}, who, kept)
+	_check(again.contains("- status: agreed, Jeff 2026-10-19\n"), "and kept on the next rebuild")
+	_check(TownMemory.proposed_page({}, {}, who).ends_with("Nothing proposed yet.\n"), "nothing proposed: the page says so")
 
 
 func _check(ok: bool, what: String) -> void:

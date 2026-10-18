@@ -278,6 +278,12 @@ var builder_stub := false
 ## his requests (an outside API).
 var lawspeaker := "off"
 var lawspeaker_players := false
+## Where the server writes the proposals list for Jeff (decision 458) after a
+## round that proposes: --proposed=<path>; the box's default when its folder
+## is there; "" writes nothing (clients, tests).
+const DEFAULT_PROPOSED := "/var/lib/psykinetic/proposed.md"
+var proposed_path := ""
+var _proposed_given := false
 var builder_model := ClaudeClient.DEFAULT_MODEL
 var builder_effort := "medium"
 var builder_max_cost := 1.0
@@ -510,6 +516,8 @@ func _enter_tree() -> void:
 		mind_log_path = DEFAULT_MIND_LOG
 	if mode == Mode.SERVER and not _transcripts_given and DirAccess.dir_exists_absolute(DEFAULT_TRANSCRIPTS.get_base_dir()):
 		transcripts_dir = DEFAULT_TRANSCRIPTS
+	if mode == Mode.SERVER and not _proposed_given and DirAccess.dir_exists_absolute(DEFAULT_PROPOSED.get_base_dir()):
+		proposed_path = DEFAULT_PROPOSED
 	if player_id.is_empty():
 		# A client run from the command line gets a throwaway id; a host or
 		# server run from the project is always the same dev player.
@@ -1518,7 +1526,7 @@ func _parse_args() -> void:
 				lawspeaker_players = true
 			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
-					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", \
+					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
@@ -1621,6 +1629,9 @@ func _set_option(key: String, value: String) -> void:
 				builder_max_cost = maxf(0.01, value.to_float())
 		"--lawspeaker":
 			lawspeaker = value.strip_edges().to_lower()
+		"--proposed":
+			proposed_path = value.strip_edges()
+			_proposed_given = true
 		"--edit":
 			edit_map = value.strip_edges()
 		"--edit-size":

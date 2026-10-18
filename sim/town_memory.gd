@@ -252,3 +252,83 @@ static func _most(log: Array) -> int:
 	for entry: Dictionary in log:
 		most = maxi(most, str(entry.get("id", "tm.0")).trim_prefix("tm.").to_int())
 	return most
+
+
+# --- The proposals list for Jeff (the lawspeaker, phase 5, decision 458) ---------------
+
+const PAGE_HEAD := """# Proposed to lore
+
+Written by code from the towns' memory logs (decision 458): what each town's lawspeaker (448)
+ruled good enough to be the world's. Nothing here is lore until Jeff says so; lore owns this
+page. Edit an entry's status line by hand ("open", "agreed", "declined", or words), and the
+next rebuild keeps it.
+"""
+
+
+## The page: one section per town of [param logs] (town id -> log), named
+## by [param names] (town id -> display name), people named by [param who]
+## (worker id -> words), each "proposed" entry a block with its source,
+## holders, the ruling's day and why, and a status line: the one in
+## [param statuses] (entry key -> status), else "open". Oldest first.
+static func proposed_page(logs: Dictionary, names: Dictionary, who: Callable, statuses: Dictionary = {}) -> String:
+	var out := PAGE_HEAD
+	var towns: Array = logs.keys()
+	towns.sort()
+	var day := maxi(DayNight.day_steps, 1)
+	var any := false
+	for town: String in towns:
+		var entries: Array[Dictionary] = []
+		for entry: Variant in logs[town]:
+			if entry is Dictionary and bool(entry.get("proposed", false)):
+				entries.append(entry)
+		if entries.is_empty():
+			continue
+		any = true
+		entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.get("ruling", {}).get("step", 0)) < int(b.get("ruling", {}).get("step", 0)))
+		out += "\n## %s (%s)\n" % [names.get(town, town), town]
+		for entry: Dictionary in entries:
+			var key := "%s %s" % [town, entry.get("id", "")]
+			var ruling: Dictionary = entry.get("ruling", {})
+			var holders: Array[String] = []
+			for id: Variant in entry.get("holders", []):
+				holders.append(_name(who, str(id)))
+			var ruled := int(ruling.get("step", 0))
+			out += "\n### %s: %s\n" % [entry.get("id", ""), entry.get("text", "")]
+			out += "- first said by %s to %s, on day %d; held by %s (%d of %d who heard it)\n" % [_name(who, str(entry.get("said_by", ""))),
+				_name(who, str(entry.get("to", ""))), int(int(entry.get("first_said", 0)) / day), ", ".join(holders) if not holders.is_empty() else "nobody now",
+				entry.get("holders", []).size(), int(entry.get("spread", 0))]
+			out += "- proposed on day %d%s\n" % [int(ruled / day), ": " + str(ruling.get("because", "")) if not str(ruling.get("because", "")).is_empty() else ""]
+			out += "- status: %s\n" % str(statuses.get(key, "open"))
+	if not any:
+		out += "\nNothing proposed yet.\n"
+	return out
+
+
+static func _name(who: Callable, id: String) -> String:
+	if id.is_empty():
+		return "someone"
+	if id.begins_with(PLAYER):
+		return "a traveller"
+	if who.is_valid():
+		var words: Variant = who.call(id)
+		if words is String and not words.is_empty():
+			return words
+	return id
+
+
+## The statuses written by hand into [param page] (a page proposed_page
+## made): entry key ("<town> <id>") -> status, from each "- status:" line
+## under its "### <id>" heading in its "## <name> (<town>)" section.
+static func proposed_statuses(page: String) -> Dictionary:
+	var out := {}
+	var town := ""
+	var id := ""
+	for line: String in page.split("\n"):
+		if line.begins_with("## ") and line.ends_with(")") and line.contains("("):
+			town = line.substr(line.rfind("(") + 1).trim_suffix(")")
+		elif line.begins_with("### "):
+			id = line.substr(4).get_slice(":", 0).strip_edges()
+		elif line.begins_with("- status:") and not town.is_empty() and not id.is_empty():
+			out["%s %s" % [town, id]] = line.substr(9).strip_edges()
+	return out

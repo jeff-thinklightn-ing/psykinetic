@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- What a town's lawspeaker thinks good enough to be the world's goes on a list
+  for Jeff (docs/lore/proposed.md) instead of into the world's lore; he agrees
+  or declines each in his own time, and nothing becomes lore by itself.
 - Someone shot with an arrow flinches when the arrow reaches them, not before it gets there. Client only.
 - A left click on a resident, a companion or another player no longer attacks them: you walk over and talk (the conversation panel, or the chat addressed to a companion). Shift+click attacks one; monsters stay click-to-attack. The cursor says "LMB  talk" over a friend (decision 454).
 - Over things on the ground, such as a deer's meat and hide, the cursor shows "F  pick up" when playing on a server again (decision 454).

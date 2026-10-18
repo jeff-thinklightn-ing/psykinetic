@@ -11202,3 +11202,44 @@ client's World.ground_at read Zone.ground, which only the server fills,
 so the "F  pick up" hover never showed on a client over any pile. A
 client now reads the cell's replicated GroundPile. Client only, protocol
 unchanged.
+## 458. The proposals list for Jeff: what the lawspeaker would make lore, never made lore
+
+Phase 5 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md: "Propose to
+lore: good enough to be bedrock. Goes to a list for Jeff, never straight
+into lore"), on the town memory log (447) and the rulings (448); the
+coordinator's defaults 2026-10-18, each phase its own decision. Built
+before phases 3 and 4 so the list exists from the first "propose".
+
+The page: docs/lore/proposed.md, lore's page, written by code, never by
+hand except its status lines. TownMemory.proposed_page renders it from
+the towns' logs: one section per town, one block per entry the lawspeaker
+marked "proposed" (448: it is town memory too), oldest ruling first: the
+sentence the town remembers, who first said it and to whom and on what
+day, who holds it of how many heard it, the day of the ruling and its
+reason, and a status line ("open" until Jeff writes "agreed", "declined"
+or his words). TownMemory.proposed_statuses reads the status lines back
+by town and entry id, so a rebuild keeps what Jeff wrote. A traveller's
+words stay "a traveller"; nothing of a player is named.
+
+Two writers of the same page: the server, after any round that proposed
+(Lawspeaker.tick, Main._write_proposed), to Net.proposed_path (the box's
+/var/lib/psykinetic/proposed.md when that folder exists; --proposed=<path>;
+"" for clients and tests: nothing written); and the headless tool
+tools/proposed_page.gd (--snapshot=<world.json> --out=<proposed.md>), which
+rebuilds the repo's page from a local or test snapshot's towns' memories and
+production's names, keeping the statuses it finds; it refuses the box's
+path and the shared user:// one by name, so it never reads the box's
+world.json (copy one down first if that is wanted). Nothing here touches
+lore's entries or files: lore reads the page and agrees or declines, and
+an agreed line becomes lore by lore's own hand.
+
+lawspeaker_test: the page's head, a town's section, a proposed entry with
+its source, holders, day and reason and an open status; an accepted
+entry not on it; a hand-written status read back and kept on the next
+rebuild; the empty page. Protocol unchanged; no new class_name
+(TownMemory grows; the tool is a script).
+
+Rejected: writing proposals into levels/lore (Jeff only, the proposal's
+guardrail); the server writing the repo's page (an exported build has no
+repo; the tool does, from a snapshot); the tool reading the box's save
+(release's rule: local or test snapshots only).
