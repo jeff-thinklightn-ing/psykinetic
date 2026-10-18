@@ -7612,6 +7612,15 @@ seconds, and the voice is what players hear); a key in a file of the game's
 or an argument (process lists and run logs show arguments); turning it on
 by a startup flag (on by mistake on the box would send players' chat out);
 retrying on Claude after a failure (her own mind answers in time instead).
+
+Amended (2026-10-17, release: no new number; for npc's 448, the
+lawspeaker's rulings): ClaudeMind.note_spend(model, input, output) adds one
+call's spend to the session's counters and returns its cost, and ClaudeMind
+counts its own calls through it; anything else sent on the same key (448's
+ClaudeClient batch) adds its spend there and checks spent() before sending,
+so one budget (CALL_BUDGET 200, COST_BUDGET $1.00, unchanged) caps them all.
+It reads no key and logs none. companion_test covers it.
+
 ## 369. The border's pine stands
 
 Jeff, 2026-10-17, of his reference photo (N:/assets/reference/sppine.jpg):

@@ -90,6 +90,19 @@ static func cost_of(model_id: String, input: int, output: int) -> float:
 	return (input * float(price[0]) + output * float(price[1])) / 1000000.0
 
 
+## One call's spend added to the session's (calls, tokens, cost): this
+## mind's and anything else sent on the same key (npc's lawspeaker rulings
+## through ClaudeClient), so one budget caps them all; spent() is checked
+## before sending. That call's cost, in dollars.
+static func note_spend(model_id: String, input: int, output: int) -> float:
+	var spent_now := cost_of(model_id, input, output)
+	calls += 1
+	tokens_in += input
+	tokens_out += output
+	cost += spent_now
+	return spent_now
+
+
 ## Unwrapped: its request node goes.
 func close() -> void:
 	if _http != null:
@@ -210,11 +223,7 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray, 
 	var usage: Dictionary = response.get("usage", {}) if response is Dictionary and response.get("usage") is Dictionary else {}
 	var used_in := int(usage.get("input_tokens", 0))
 	var used_out := int(usage.get("output_tokens", 0))
-	var spent_now := cost_of(model, used_in, used_out)
-	calls += 1
-	tokens_in += used_in
-	tokens_out += used_out
-	cost += spent_now
+	var spent_now := note_spend(model, used_in, used_out)
 	if content.strip_edges().is_empty():
 		_fail("no text in the reply")
 		return

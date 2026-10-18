@@ -610,6 +610,12 @@ func _test_claude_voice() -> void:
 	var before := own.voice_asks.size()
 	_check(budget.voice({"serial": 1}).get("say", "") == lines[5] and own.voice_asks.size() == before + 1 and budget.stubbed.size() == 1,
 		"the session's budget spent: her own mind, Claude not asked")
+	ClaudeMind.calls = 0
+	ClaudeMind.cost = 0.0
+	var one_call := ClaudeMind.note_spend(ClaudeMind.MODELS["haiku"], 1000000, 0)
+	_check(is_equal_approx(one_call, 0.10) and ClaudeMind.calls == 1 and is_equal_approx(ClaudeMind.cost, 0.10) and not ClaudeMind.spent()
+		and ClaudeMind.CALL_BUDGET == 200 and ClaudeMind.COST_BUDGET == 1.0,
+		"spend sent elsewhere on the same key counts toward the one budget (363 amended, npc's 448); the budget as it was")
 	ClaudeMind.calls = was_calls
 	ClaudeMind.cost = was_cost
 	var keyless := ClaudeMind.new(own, ClaudeMind.MODELS["haiku"], self, "")
