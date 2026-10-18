@@ -996,6 +996,83 @@
 				]}
 			]
 		},
+		"building.field": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [4, 4],
+			"size": [4.0, 1.2, 4.0],
+			"budget": 2500,
+			"uses": "economy's farm field (Jeff, 2026-10-17), 4 x 4 cells, open to the sky: a split-rail fence about 1 m high round the footprint, its posts and two rails within the outer 0.15 m, a gate gap one cell wide on the +z side from local x 0 to +1 m (an open gap, no edge and no leaf; buildings' prefab puts the map's WALL edges round the rest, which block walkers but neither sight nor drawing: an open-air building, no walls drawn), and 6 soil ridges along x, 0.1 m high, on palette row 3's browns; no roof, no wall_set or floor_set. Its crop is one state_<name> shown at a time, none when bare: sown (small green tufts), growing (knee-high green, row 4), ripe (waist-high gold, to the box's 1.2 m, row 7's #ffd27a with row 3's straw), flattened (the ripe crop laid over, straw); buildings picks one from economy's record. Origin the footprint's middle, base at 0, front at +z (Level.BUILDING_FACING)",
+			"grey": [
+				{"at": [0, 0.5, -1.925], "size": [4.0, 1.0, 0.15]},
+				{"at": [-1.925, 0.5, 0], "size": [0.15, 1.0, 4.0]},
+				{"at": [1.925, 0.5, 0], "size": [0.15, 1.0, 4.0]},
+				{"at": [-1.0, 0.5, 1.925], "size": [2.0, 1.0, 0.15]},
+				{"at": [1.5, 0.5, 1.925], "size": [1.0, 1.0, 0.15]},
+				{"at": [0, 0.05, -1.5], "size": [3.4, 0.1, 0.3]},
+				{"at": [0, 0.05, -0.9], "size": [3.4, 0.1, 0.3]},
+				{"at": [0, 0.05, -0.30000000000000004], "size": [3.4, 0.1, 0.3]},
+				{"at": [0, 0.05, 0.2999999999999998], "size": [3.4, 0.1, 0.3]},
+				{"at": [0, 0.05, 0.8999999999999999], "size": [3.4, 0.1, 0.3]},
+				{"at": [0, 0.05, 1.5], "size": [3.4, 0.1, 0.3]}
+			],
+			"states": ["sown", "growing", "ripe", "flattened"],
+			"parts": [
+				{
+					"name": "state_sown",
+					"motion": "fixed",
+					"pivot": [0, 0, 0],
+					"grey": [
+						{"at": [0, 0.175, -1.5], "size": [3.4, 0.15, 0.25]},
+						{"at": [0, 0.175, -0.9], "size": [3.4, 0.15, 0.25]},
+						{"at": [0, 0.175, -0.30000000000000004], "size": [3.4, 0.15, 0.25]},
+						{"at": [0, 0.175, 0.2999999999999998], "size": [3.4, 0.15, 0.25]},
+						{"at": [0, 0.175, 0.8999999999999999], "size": [3.4, 0.15, 0.25]},
+						{"at": [0, 0.175, 1.5], "size": [3.4, 0.15, 0.25]}
+					]
+				},
+				{
+					"name": "state_growing",
+					"motion": "fixed",
+					"pivot": [0, 0, 0],
+					"grey": [
+						{"at": [0, 0.35, -1.5], "size": [3.4, 0.5, 0.25]},
+						{"at": [0, 0.35, -0.9], "size": [3.4, 0.5, 0.25]},
+						{"at": [0, 0.35, -0.30000000000000004], "size": [3.4, 0.5, 0.25]},
+						{"at": [0, 0.35, 0.2999999999999998], "size": [3.4, 0.5, 0.25]},
+						{"at": [0, 0.35, 0.8999999999999999], "size": [3.4, 0.5, 0.25]},
+						{"at": [0, 0.35, 1.5], "size": [3.4, 0.5, 0.25]}
+					]
+				},
+				{
+					"name": "state_ripe",
+					"motion": "fixed",
+					"pivot": [0, 0, 0],
+					"grey": [
+						{"at": [0, 0.65, -1.5], "size": [3.4, 1.1, 0.25]},
+						{"at": [0, 0.65, -0.9], "size": [3.4, 1.1, 0.25]},
+						{"at": [0, 0.65, -0.30000000000000004], "size": [3.4, 1.1, 0.25]},
+						{"at": [0, 0.65, 0.2999999999999998], "size": [3.4, 1.1, 0.25]},
+						{"at": [0, 0.65, 0.8999999999999999], "size": [3.4, 1.1, 0.25]},
+						{"at": [0, 0.65, 1.5], "size": [3.4, 1.1, 0.25]}
+					]
+				},
+				{
+					"name": "state_flattened",
+					"motion": "fixed",
+					"pivot": [0, 0, 0],
+					"grey": [
+						{"at": [0, 0.2, -1.5], "size": [3.4, 0.2, 0.25]},
+						{"at": [0, 0.2, -0.9], "size": [3.4, 0.2, 0.25]},
+						{"at": [0, 0.2, -0.30000000000000004], "size": [3.4, 0.2, 0.25]},
+						{"at": [0, 0.2, 0.2999999999999998], "size": [3.4, 0.2, 0.25]},
+						{"at": [0, 0.2, 0.8999999999999999], "size": [3.4, 0.2, 0.25]},
+						{"at": [0, 0.2, 1.5], "size": [3.4, 0.2, 0.25]}
+					]
+				}
+			]
+		},
 		"building.well": {
 			"category": "buildings",
 			"type": "mesh",
