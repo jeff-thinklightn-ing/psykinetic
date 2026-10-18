@@ -149,6 +149,89 @@ static func _rich_line(economy: Economy) -> int:
 
 
 const BARD := "bard"
+const SCOUNDREL := "scoundrel"
+
+
+## A thing made by [param worker_id] of [param town] (economy's word that
+## the job finished, the instance [param uid] in [param book]) comes out
+## short when the maker is a scoundrel (decision 492): only a thing
+## measured by count or weight (Items.measured: a sack, a bolt, a bundle;
+## never a weapon, tool or piece of gear, Jeff's rule), by a seeded draw
+## against "scoundrel.short", to "scoundrel.weight" of its full
+## (ItemBook.make_short, items'), noted in the thing's history and nowhere
+## else: the counter sells it at the full price and the thing tells on him
+## in the hand. Whether it was shorted.
+static func made_short(production: Production, town: String, worker_id: String, uid: int, book: ItemBook) -> bool:
+	if production == null or book == null or uid == 0 or str(production.worker(worker_id).get("type", "")) != SCOUNDREL:
+		return false
+	var rule: Dictionary = rules().get("scoundrel", {})
+	var id := book.id_of(uid)
+	if id.is_empty() or not Callable(Items, "measured").is_valid() or not Items.measured(id) or not book.has_method("make_short"):
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("short:%s:%d" % [worker_id, uid])
+	if rng.randf() >= float(rule.get("short", 0.0)):
+		return false
+	book.make_short(uid, float(rule.get("weight", 0.6)))
+	print("[townsfolk] %s: a %s made short, step %d" % [town, id.replace("_", " "), production.now()])
+	return true
+
+
+## The bank's cap on a debt (economy.json "bank".cap), read once.
+static var _bank_cap := -1
+static func bank_cap() -> int:
+	if _bank_cap < 0:
+		_bank_cap = int(Production.read_rules(Economy.PATH).get("bank", {}).get("cap", 30))
+	return _bank_cap
+
+
+## A scoundrel's debt first at the bank's cap (decision 492; economy never
+## has him pay back on his own, so it gets there): the town's official (the
+## one whose trade binds official, 459; else the richest neighbour) learns
+## it as a thing seen, "X owes the town all it will lend and pays nothing
+## back", which gossip passes as witnessed (422); his own card learns what
+## he owes; with a sitting lawspeaker and rulings on, the same sentence is
+## a dispute before him (486's shape, said by the official, no pair: it is
+## the town's quarrel). Once per climb: cleared when he is worked down
+## under half the cap, so the next climb is talked of again.
+static func _debt_capped(production: Production, worker_id: String, owed: float) -> void:
+	var who := production.worker(worker_id)
+	var town := str(who.get("town", ""))
+	var name := str(who.get("name", worker_id))
+	var card := card_of(production, worker_id)
+	if town.is_empty() or card.is_empty() or bool(card.get("capped", false)):
+		return
+	card["capped"] = true
+	production.set_card(worker_id, card)
+	learn(production, worker_id, "%s owes the town %d gold and pays nothing of it." % [name, ceili(owed)])
+	var official := ""
+	var richest := ""
+	var most := -1
+	for id: String in production.worker_ids(town):
+		if id == worker_id or id.begins_with(COMPANION) or bool(production.worker(id).get("away", false)):
+			continue
+		if official.is_empty() and Lore.binding(_trade_of(production, id), str(production.worker(id).get("type", ""))) == "official":
+			official = id
+		if int(production.worker(id).get("purse", 0)) > most:
+			most = int(production.worker(id).get("purse", 0))
+			richest = id
+	var teller := official if not official.is_empty() else richest
+	if teller.is_empty():
+		return
+	var text := "%s owes the town all it will lend and pays nothing back" % name
+	learn(production, teller, text + ".")
+	var law := str(Offers._call(Offers.ctx, "lawspeaker_of", [town]))
+	var model := str(Offers._call(Offers.ctx, "model"))
+	if law.is_empty() or law == "<null>" or model.is_empty() or model == "off" or model == "<null>":
+		return
+	var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+	if not log is Array:
+		return
+	var entry := TownMemory.note(log, text, teller, worker_id, production.now())
+	if not entry.is_empty() and str(entry.get("tier", "")) in [TownMemory.BELIEF, TownMemory.CANDIDATE] and entry.get("ruling", {}).is_empty():
+		entry["tier"] = TownMemory.CANDIDATE
+		entry["dispute"] = true
+		Offers._call(Offers.ctx, "set_memory", [town, log])
 
 
 ## The bard's piece (decision 490; residents.json "bard"): among [param
@@ -716,6 +799,12 @@ static func watch(production: Production, towns: Towns) -> void:
 		var kept: Production = weak.get_ref()
 		if kept != null:
 			_loan(kept, worker_id, owed, working_off))
+	if production.has_signal("made"):
+		# A thing made, before it reaches the shelf (economy's 492 side): a scoundrel's may be short.
+		production.made.connect(func(town: String, worker_id: String, uid: int) -> void:
+			var kept: Production = weak.get_ref()
+			if kept != null and kept.stockpile != null:
+				made_short(kept, town, worker_id, uid, kept.stockpile.book))
 	if towns != null:
 		towns.raided.connect(func(town: String, report: Dictionary) -> void:
 			var kept: Production = weak.get_ref()
@@ -1059,6 +1148,15 @@ static func _loan(production: Production, worker_id: String, owed: float, workin
 	if who.is_empty() or worker_id.begins_with(COMPANION):
 		return
 	var name := str(who.get("name", worker_id))
+	# A scoundrel at the cap (decision 492), and the next climb once worked down.
+	if str(who.get("type", "")) == SCOUNDREL:
+		if owed >= float(bank_cap()) - 1.0:
+			_debt_capped(production, worker_id, owed)
+		elif owed < float(bank_cap()) * 0.5:
+			var mine := card_of(production, worker_id)
+			if bool(mine.get("capped", false)):
+				mine.erase("capped")
+				production.set_card(worker_id, mine)
 	if owed > 0.0 and working_off:
 		learn(production, worker_id, "%s works off a debt to the town." % name)
 	elif owed > 0.0:

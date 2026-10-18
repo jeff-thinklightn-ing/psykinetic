@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_gold_lift()
 	_test_fence_and_catch()
 	_test_strays()
+	_test_scoundrel()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Offers.ctx = {}  # Static callables into this node would crash the quit.
@@ -312,6 +313,59 @@ func _test_strays() -> void:
 	_check(str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).contains("found") and str(Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]).contains("own way home"),
 		"her card: %s" % [Townsfolk.card_of(_work, "s-nell")["facts"].back()["text"]])
 	Townsfolk._stray_due.clear()
+
+
+var _memory2: Array = []
+
+
+func _test_scoundrel() -> void:
+	print("\n== the scoundrel: short measures on what he makes, a debt ridden to the cap and talked of (decision 492) ==")
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 0}, "strays": {"every": 0}, "scoundrel": {"short": 1.0, "weight": 0.6}})
+	_setup()
+	Townsfolk.watch(_work, null)
+	Production.type_of = Callable()
+	_work.add_worker("c-sly", "Sly", ["cook"], TOWN, "placeholder", "scoundrel")
+	_work.add_worker("c-odo", "Odo", ["smith"], TOWN, "placeholder")
+	_work.add_worker("c-ald", "Aldous", ["priest"], TOWN, "appointed")
+	Production.type_of = Townsfolk.roll_type
+	_work.pay("c-odo", 40, "test")
+	var book: ItemBook = _stock.book
+	if book.has_method("make_short") and Callable(Items, "measured").is_valid():
+		var sack := book.mint("food_sack", "made", "Sly")
+		var knife := book.mint("knife", "made", "Sly")
+		_check(Townsfolk.made_short(_work, TOWN, "c-sly", sack, book), "a food sack he made comes out short (chance 1)")
+		_check(not Townsfolk.made_short(_work, TOWN, "c-sly", knife, book), "a knife never does: no tiers on gear")
+		_check(not Townsfolk.made_short(_work, TOWN, "c-odo", book.mint("food_sack", "made", "Odo"), book), "a steady cook's sack is whole")
+	else:
+		_check(true, "(items' make_short is not here yet: the short measure is skipped)")
+	# The debt: at the cap, the official learns it and his card too; once per climb.
+	_memory2 = []
+	Offers.ctx = {"production": _work, "memory": func(_town: String) -> Array: return _memory2.duplicate(true),
+		"set_memory": func(_town: String, log: Array) -> void: _memory2 = log.duplicate(true),
+		"lawspeaker_of": func(_town: String) -> String: return "c-ald", "model": func() -> String: return "claude-haiku-5-5"}
+	var cap := Townsfolk.bank_cap()
+	_work.set_loan("c-sly", 10.0, false)
+	_check(not Townsfolk.card_of(_work, "c-ald")["facts"].any(func(f: Dictionary) -> bool: return str(f["text"]).contains("owes the town all")), "a small debt is nobody's business")
+	_work.set_loan("c-sly", float(cap), false)
+	_check(str(Townsfolk.card_of(_work, "c-ald")["facts"].back()["text"]) == "Sly owes the town all it will lend and pays nothing back.", "at the cap the priest, the town's official, knows it as a thing seen")
+	_check(Townsfolk.card_of(_work, "c-sly")["facts"].any(func(f: Dictionary) -> bool: return str(f["text"]).begins_with("Sly owes the town %d gold" % cap)), "and his own card says what he owes")
+	_check(_memory2.size() == 1 and _memory2[0]["dispute"] == true and _memory2[0]["tier"] == TownMemory.CANDIDATE and _memory2[0]["said_by"] == "c-ald" and not _memory2[0].has("pair"),
+		"with rulings on, a dispute before the lawspeaker, the town's quarrel: %s" % [_memory2])
+	_work.set_loan("c-sly", float(cap) - 0.5, true)
+	_check(Townsfolk.card_of(_work, "c-ald")["facts"].filter(func(f: Dictionary) -> bool: return str(f["text"]).contains("owes the town all")).size() == 1, "said once per climb")
+	_work.set_loan("c-sly", float(cap) * 0.4, true)
+	_work.set_loan("c-sly", float(cap), false)
+	_check(_memory2.size() == 1, "worked down and up again: the same words are the same entry")
+	# Rulings off: the talk, no dispute.
+	Offers.ctx["model"] = func() -> String: return "off"
+	_memory2 = []
+	Production.type_of = Callable()
+	_work.add_worker("c-nix", "Nix", ["cook"], TOWN, "placeholder", "scoundrel")
+	Production.type_of = Townsfolk.roll_type
+	_work.set_loan("c-nix", float(cap), false)
+	_check(str(Townsfolk.card_of(_work, "c-ald")["facts"].back()["text"]) == "Nix owes the town all it will lend and pays nothing back." and _memory2.is_empty(),
+		"with the lawspeaker off: the official knows, nothing before him")
+	Offers.ctx = {}
 
 
 func _work_has(method: String) -> bool:

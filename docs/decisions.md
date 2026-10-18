@@ -13062,3 +13062,65 @@ with no new field; "party" exists); no new class_name.
 Rejected: a model writing the chronicle (invention); a new message kind
 for a page (ui's work and a protocol bump for a dozen talk-log lines); a
 chronicle file on the box; the chronicle as an item to carry.
+
+## 492. The scoundrel: short measures and a bad loan
+
+The hidden types' side-doings (393; the thief 393/461, the scholar and
+merchant 440, the bard 490, the scholar's chronicle 491), the coordinator's
+assignment and approval of 2026-10-18 with Jeff's rule on gear; economy's
+side is 8c65639 ("492, economy's side": Production.made, folk_factor and
+repay by type, rules "scoundrel" {buy 1.0, sell 1.1, repay 0.0}); items'
+side is Items.measured and ItemBook.make_short (their number). Rules: no
+model; nothing invented; the town learns of him only through what he does.
+
+- Short measures (Townsfolk.made_short, on Production.made, which
+  economy emits before the thing reaches the shelf and, for a made
+  resource, between the mint and the yield's banking, so a short sack
+  banks short: items' ordering point): when the maker's type is scoundrel and the thing
+  is measured by count or weight (Items.measured: a food or ore sack, a
+  cloth bolt, an arrow bundle, hides by the stack; never a weapon, tool,
+  armour or piece of gear: Jeff's rule, no damage or quality tiers on
+  gear), a seeded draw (the maker and the instance) against
+  townsfolk.json "scoundrel.short" (0.5) makes it short to "scoundrel.weight"
+  (0.6) of its full through ItemBook.make_short (an arrow bundle's count,
+  a sack's per-instance yield; items' side), noted in the thing's history
+  as "short measure" and nowhere else: the counter sells it at the full
+  price, and the thing tells on him only in the hand (the look reads its
+  measure and its story). A scoundrel who makes gear just makes it. The
+  maker is not named by the thing (a hidden type stays hidden; his "made"
+  event is on it as on everything).
+- A bad loan (economy's side): he borrows as anyone (the bank, never past
+  cap 30, interest 0.1) and never pays back on his own (repay 0.0 for the
+  type in place of repay_share), so his debt climbs to the cap on the
+  interest, where economy's own work-off takes him (hauling for the town
+  till half the cap); the bank is never cheated past 354's rule, and the
+  town's gold sits lent out to him meanwhile.
+- The town learns (Townsfolk._debt_capped, on Production.loan_changed at
+  owed >= cap - 1, once per climb: cleared when he is worked under half
+  the cap): the town's official (the one whose trade binds official, 459;
+  else the richest neighbour) learns "X owes the town all it will lend and
+  pays nothing back" as a thing seen, which gossip passes as witnessed
+  (422) and the voice says; his own card learns "X owes the town N gold and
+  pays nothing of it." With a sitting lawspeaker and rulings on, the same
+  sentence is noted as a dispute before him (486's shape, said by the
+  official, no pair: it is the town's quarrel), so his ruling may set it
+  down (447) and the bard sing it (490).
+- Lawspeaker off (the box today): the short measures and the loan run as
+  written (economy's and items' halves need no rulings), the belief passes
+  in gossip; no dispute is noted and nothing is set down. That is the
+  server's behaviour until Jeff turns rulings on.
+- Open for Jeff: a "cheated" standing key for a player who finds a short
+  thing of his (items would have to tell npc who looked); the merchant
+  fencing his short goods (461) is as any goods.
+
+Numbers (npc's drafts, Jeff's to move): townsfolk.json "scoundrel" {short
+0.5, weight 0.6}; economy's {buy 1.0, sell 1.1, repay 0.0}. townsfolk_test
+(a sack he made comes out short, a knife never, a steady cook's sack whole;
+at the cap the priest knows it as a thing seen, his card what he owes, a
+dispute with rulings on, once per climb, the same words one entry; with
+rulings off the official knows and nothing is before the lawspeaker).
+Protocol unchanged; no new class_name.
+
+Rejected: cheating the bank itself (354); stealing (the thief's); a
+model-written swindle; short weights in residents' fees (nobody would
+notice); short gear.
