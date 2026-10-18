@@ -10787,3 +10787,35 @@ start_gold) is Jeff's to choose.
 Protocol unchanged. tests/farm_test (a normal year, a drought, a summer
 storm, level 2 twice, saved and loaded, unsown with the farmer away in
 spring, rotted with him away in autumn, a farmer coming by growth).
+## 446. The "world" message: what each player's world map knows
+
+ui's world map (its step 5; 445 reads this) draws areas, ways and places
+from WorldMap.build on the client, but who holds what, what the player has
+seen and where the party is in other zones are the server's.
+
+- Known: a PlayerRecord keeps known_areas and known_places (sorted, saved;
+  an old record knows nothing yet), so it follows the player between
+  machines. An area is known once they stand in it; a place once they come
+  within 7 cells of its cell (Senses' sight range). Main looks at every
+  player every 10 ticks (WorldNews.observe), once a tick for all zones.
+- The message, Net kind "world", to one player (net/world_news.gd,
+  WorldNews, a new class_name): {"full": bool, "holdings": {place_id:
+  [faction, strength]}, "known": {"areas", "places"}, "party": [{name,
+  area, kind: player|companion}]}. Full once they are in; then only what
+  changed: newly known areas and places with the holdings of the places
+  just learned; a known place taken or its strength changed
+  (Holdings.strength_changed, which take emits too), to the players who
+  know it only; the party again when it differs from the last sent. Never
+  on a timer otherwise.
+- Fog: holdings go only for places the player knows.
+- Party: every player in the game and each companion, without the receiver
+  and without anyone in the receiver's zone (those bodies are replicated).
+- Client: Main.world_state ({holdings, known_areas, known_places, party},
+  WorldNews.merge; a full message starts it again) and signal
+  world_changed. A host's own map is told directly.
+
+A new MESSAGE_KINDS entry: Net.protocol() changes and the server needs the
+next release; PROTOCOL_REVISION stays (release: nothing existing changes
+meaning, and no client request is added).
+
+tests/world_news_test.

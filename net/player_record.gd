@@ -40,6 +40,10 @@ var commissions: Array = []
 var slots := Items.tidy([], Player.SLOTS)
 ## The instance in each slot (ItemBook uids, 0 none), beside slots.
 var slot_items := PackedInt32Array()
+## The areas they have stood in and the places they have come within sight
+## of (decision 446, WorldNews), sorted: what their world map shows.
+var known_areas: Array[String] = []
+var known_places: Array[String] = []
 
 
 ## Copies the live state off the player's entity.
@@ -73,6 +77,8 @@ func to_dict() -> Dictionary:
 		"commissions": commissions.duplicate(true),
 		"slots": Array(slots),
 		"items": Array(slot_items),
+		"known_areas": known_areas.duplicate(),
+		"known_places": known_places.duplicate(),
 	}
 
 
@@ -100,6 +106,8 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.zone = str(entry.get("zone", ""))
 	record.slots = Items.tidy(entry.get("slots", []), Player.SLOTS)
 	record.slot_items = _uids(entry.get("items", []))
+	record.known_areas = _strings(entry.get("known_areas", []))
+	record.known_places = _strings(entry.get("known_places", []))
 	var asks: Variant = entry.get("commissions", [])
 	record.commissions = asks.duplicate(true) if asks is Array else []
 	var pet: Variant = entry.get("companion", {})
@@ -157,3 +165,14 @@ static func _lines(value: Variant) -> Array[String]:
 		for line: Variant in value:
 			lines.append(str(line))
 	return lines
+
+
+## [param value] as sorted, distinct strings (the known lists), or none.
+static func _strings(value: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if value is Array:
+		for each: Variant in value:
+			if each is String and not each.is_empty() and not out.has(each):
+				out.append(each)
+	out.sort()
+	return out

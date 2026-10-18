@@ -413,6 +413,15 @@ var gold := 0
 ## The last "counter" message, for ui's counter screen (decision 438).
 var counter_data := {}
 signal counter_told(data: Dictionary)
+## Client: the world map's server data (decision 446, WorldNews.merge):
+## {holdings: {place_id: [faction, strength]}, known_areas, known_places,
+## party: [{name, area, kind}]}; world_changed after each "world" message.
+var world_state := {}
+signal world_changed
+## Server: what each player's world map is told (WorldNews), and the tick
+## it was last looked at.
+var _world_news: WorldNews
+var _news_tick := -1
 ## A chest or companion right-clicked from afar: opened once in reach.
 var _pack_wanted: GridEntity
 ## The pack sounds asked for, "set entity" each, newest last (tests).
@@ -1778,6 +1787,7 @@ func _boot() -> void:
 	# left them, on the world's clock.
 	var world_map := WorldMap.build()
 	World.holdings = Holdings.new(world_map, Factions.read(), snapshot.get("holdings", {}), func() -> int: return World.steps)
+	_start_world_news()
 	# Every thing in the world and its history, as the snapshot left them.
 	World.items = ItemBook.from_dict(snapshot.get("items", {}), World.steps_now)
 	# The town's stores, as the snapshot left them, their gear in the book.
@@ -4731,6 +4741,10 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
+	if kind == "world":
+		world_state = WorldNews.merge(world_state, data)
+		world_changed.emit()
+		return
 	if kind == "terrain":
 		_on_terrain(data)
 		return
@@ -5122,6 +5136,50 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 		party_log.add("%s broke." % _display_name(entity))
 
 
+## The world message's server side (decision 446): told who is in the game,
+## their records, and where everyone is.
+func _start_world_news() -> void:
+	_world_news = WorldNews.new(World.holdings)
+	_world_news.send = func(peer: int, data: Dictionary) -> void:
+		if peer == Net.local_id:
+			_on_message("world", data)  # A host's own map.
+		else:
+			Net.message_to(peer, "world", data)
+	_world_news.peers = func() -> Dictionary: return _peer_ids
+	_world_news.record_of = func(id: String) -> PlayerRecord: return _records.get(id)
+	_world_news.members = _party_members
+
+
+## Every player and companion in the game and where: WorldNews.members.
+func _party_members() -> Array:
+	var out: Array = []
+	var peer_of := {}
+	for peer: int in _peer_ids:
+		var id: String = _peer_ids[peer]
+		peer_of[id] = peer
+		var record: PlayerRecord = _records.get(id)
+		if record != null:
+			out.append({"name": record.name, "area": World.peer_zone.get(peer, record.zone), "kind": "player", "peer": peer})
+	for id: String in _companions:
+		var pet: Companion = _companions[id]
+		if is_instance_valid(pet) and pet.spawned:
+			out.append({"name": pet.name, "area": pet.zone, "kind": "companion", "peer": int(peer_of.get(id, 0))})
+	return out
+
+
+## Each player's world map told what changed (decision 446): once a tick
+## for all zones (Main hears each zone's tick), every CAMP_CHECK_TICKS.
+func _tell_world(tick: int) -> void:
+	if _world_news == null or tick == _news_tick:
+		return
+	_news_tick = tick
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and player.spawned:
+			_world_news.observe(peer, player.zone, player.tile)
+	_world_news.update()
+
+
 ## This zone's camps, each looked at (decision 429): one undefended, with a
 ## player in it, for CAMP_FALL_TICKS falls to nobody (Holdings.take, so
 ## place_taken: Towns.camp_taken frees who it held), told in the party log.
@@ -5424,6 +5482,7 @@ func _on_world_ticked(tick: int) -> void:
 		_check_respawns(tick)
 		if tick % CAMP_CHECK_TICKS == 0:
 			_check_camps(tick)
+			_tell_world(tick)
 		if tick % World.WORLD_TICK_STEPS == 0:
 			_retake_camps()
 		if tick % RESIDENT_SYNC_TICKS == 0:
