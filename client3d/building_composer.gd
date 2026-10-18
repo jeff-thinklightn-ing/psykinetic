@@ -63,6 +63,10 @@ static func compose(building: Dictionary, roof_set: String) -> Node3D:
 	if not _made.has(key):
 		var built := _build(building, roof_set)
 		for node in built.find_children("*", "", true, false):
+			# An art piece's body is an instance of its .glb's scene: made a
+			# plain node of this look's, or packing keeps the instance and
+			# its own nodes beside it, and each copy leaves those strays.
+			node.scene_file_path = ""
 			node.owner = built
 		var packed := PackedScene.new()
 		packed.pack(built)
