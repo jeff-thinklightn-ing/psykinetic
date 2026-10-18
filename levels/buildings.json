@@ -1,5 +1,5 @@
 {
-	"_about": "Building kinds (decision 488): each kind's sizes as blocks of cells in its own frame, x across, y deep, its front the +y side (the last row's south edges), doors as [x, y, side] on its outline (side N, S, E or W of that cell). A level.json building entry {kind, size, at, facing, seed, ruined, use, town} stands its blocks there, turned to its facing. The cells are the sim's rules (walls and doors are the map's edges round the blocks' union); what is drawn need not show them (BuildingComposer).",
+	"_about": "Building kinds (decision 488): each kind's sizes as blocks of cells in its own frame, x across, y deep, its front the +y side (the last row's south edges), doors as [x, y, side] on its outline (side N, S, E or W of that cell). A kind may name its roof_set (thatch, shingle; Client3D.KIND_ROOF when none). A level.json building entry {kind, size, at, facing, seed, ruined, use, town} stands its blocks there, turned to its facing. The cells are the sim's rules (walls and doors are the map's edges round the blocks' union); what is drawn need not show them (BuildingComposer).",
 	"kinds": {
 		"hut": {"words": "a small hut", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 4, 5, "main"]], "doors": [[1, 4, "S"]]},

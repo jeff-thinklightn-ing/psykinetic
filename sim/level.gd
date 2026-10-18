@@ -1832,6 +1832,8 @@ static func building_rect(entry: Variant) -> Variant:
 static func kinds() -> Dictionary:
 	if _kinds.is_empty():
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(KINDS_FILE))
+		if not parsed is Dictionary:
+			push_error("Level: %s does not read as JSON: no building kinds" % KINDS_FILE)
 		_kinds = parsed.get("kinds", {}) if parsed is Dictionary else {}
 	return _kinds
 
@@ -1926,6 +1928,7 @@ static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 	building["wall_set"] = str(kind.get("wall_set", ""))
 	building["floor_set"] = str(kind.get("floor_set", ""))
 	building["roof"] = str(kind.get("roof", "gable"))
+	building["roof_set"] = str(kind.get("roof_set", ""))
 	building["storeys"] = int(kind.get("storeys", 1))
 	building["eaves"] = float(kind.get("eaves", STOREY * building["storeys"]))
 	building["place"] = str(kind.get("place", ""))

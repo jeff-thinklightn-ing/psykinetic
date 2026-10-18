@@ -13635,6 +13635,17 @@ shutters swing out), stretched to the wall's height; two in three stand
 with their shutters open (each leaf 90 to 108 degrees, by the edge). The
 sim's wall is unchanged: a window is drawn, not seen through. view_test:
 the L-house's windows drawn, their shutters' side out.
+Amended (the coordinator, on the review shot): the default roof is Jeff's
+shingle (art-gen's c6, his only roof pick), not thatch: art-kit's thatch
+read as a pale woven mat that lit the whole view. Thatch stays a knob: a
+kind may name "roof_set" in levels/buildings.json (Level's building
+"roof_set"), drawn so when art-kit has its material; none names it until
+art-kit's rework (darker, weathered, lumpy courses, a thick ridge, ragged
+eaves, as the hut's hand thatch).
+A wall's corner post stands as tall as the tallest wall at it, squeezed
+under a storey where every wall there is lower (a lean-to's, a wing's):
+at a storey's height its cap poked through the low roof (the review
+shot's "salmon cubes"). view_test: no post taller than its walls.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 

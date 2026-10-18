@@ -1271,6 +1271,17 @@ func _test_composer() -> void:
 	var wing_wall: float = _rig._wall_heights.get(Vector3i(11, 7, Terrain.EAST), Client3D.WALL_HEIGHT)
 	_check(is_equal_approx(main_wall, Client3D.WALL_HEIGHT) and wing_wall < main_wall - 0.2 and wing_wall > main_wall - 0.6,
 			"the main block's walls at its eaves (%.2f), the wing's a little lower (%.2f), not whole metres" % [main_wall, wing_wall])
+	# A post stands no higher than the walls at it (a wing's corner posts
+	# lower, not a storey's poking through its roof).
+	var tall_posts: Array[Vector2i] = []
+	for vertex: Vector2i in _rig._posts:
+		var top := 0.0
+		for entry: Array in WallEdge.edges_at_vertex(vertex):
+			if _rig._terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN:
+				top = maxf(top, _rig._height_of(entry[0]))
+		if _rig._bounds(_rig._posts[vertex]).end.y > top + 0.35:
+			tall_posts.append(vertex)
+	_check(not _rig._posts.is_empty() and tall_posts.is_empty(), "every post no taller than the walls at it (%s)" % [tall_posts])
 	var level := _kinds_level([["building_l_house_small", Vector2i(1, 1), false], ["building_round_hut_small", Vector2i(13, 1), false],
 		["building_house_small", Vector2i(1, 12), true]])
 	var buildings: Array = level["buildings"]
@@ -1288,8 +1299,8 @@ func _test_composer() -> void:
 			"the round hut: one cone over its blocks")
 	var house := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 2, 10, 8))
 	var thatched: MeshInstance3D = (house[0]["roof"] as Node3D).find_child("Slopes", true, false) if house.size() == 1 else null
-	_check(thatched != null and thatched.material_override == Client3D._roof_material("thatch") and ArtKit.has("material.roof.thatch"),
-			"its roofs thatched, art-kit's thatch set there (decision 489 amended)")
+	_check(thatched != null and thatched.material_override == Client3D._roof_material(Client3D.KIND_ROOF) and Client3D.KIND_ROOF == "shingle",
+			"its roofs Jeff's shingle, a kind naming no other set (decision 489 amended)")
 	# A porch over the L-house's door (4, 9 south: out is +z), its front out;
 	# a cruck on the round hut's... none: a longhouse's far gable instead.
 	var porch := BuildingComposer.porch_of(buildings[0])

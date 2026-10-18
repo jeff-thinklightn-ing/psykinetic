@@ -88,9 +88,10 @@ extends Node3D
 const AIL_BURN := Color(1.0, 0.6, 0.25)
 const AIL_BLEED := Color(0.95, 0.3, 0.3)
 const WALL_HEIGHT := 3.0
-## A kind's roof set (decision 488): thatch, Jeff's default until he says,
-## shingle (Level.ROOF_SETS' first) while art-kit has no material.roof.thatch.
-const KIND_ROOF := "thatch"
+## A kind's roof set (decision 488): shingle, Jeff's pick (art-gen's c6),
+## unless its kind names another ("roof_set" in levels/buildings.json) that
+## art-kit has a material.roof.<set> for, as thatch once it reads as thatch.
+const KIND_ROOF := "shingle"
 ## How much of a ruin's walls stand broken (decision 489).
 const RUIN_BROKEN := 0.45
 ## A window's wall may differ from a storey this much (it is stretched to
@@ -3570,7 +3571,8 @@ func _add_kind(building: Dictionary) -> void:
 	var cells := Level.building_cells(building)
 	var base := _elevation(rect.position)
 	var eaves := float(building["eaves"])
-	var roof_set := KIND_ROOF if ArtKit.has("material.roof." + KIND_ROOF) else Level.ROOF_SETS[0]
+	var named := str(building.get("roof_set", ""))
+	var roof_set := named if not named.is_empty() and ArtKit.has("material.roof." + named) else KIND_ROOF
 	var node := BuildingComposer.compose(building, roof_set)
 	node.name = "Building_%d_%d" % [rect.position.x, rect.position.y]
 	node.position = Vector3(rect.position.x, base, rect.position.y)
@@ -8955,11 +8957,14 @@ func _add_post(vertex: Vector2i) -> void:
 	var set_name := _post_set(vertex)
 	var slot := "wall.%s.post" % set_name if ArtKit.has("wall.%s.post" % set_name) else "wall.%s.end" % set_name
 	# As tall as the tallest wall at it: the set's _tall piece where it has
-	# art, else the post stretched.
-	var tall := WALL_HEIGHT
+	# art, else the post stretched; squeezed where every wall at it is lower
+	# than a storey (a lean-to's, decision 489), so it stands no higher.
+	var tall := 0.0
 	for entry: Array in WallEdge.edges_at_vertex(vertex):
 		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN:
 			tall = maxf(tall, _height_of(entry[0]))
+	if tall <= 0.0:
+		tall = WALL_HEIGHT
 	var stretch := 1.0
 	if tall > WALL_HEIGHT:
 		var tall_slot := slot + "_tall"
@@ -8967,6 +8972,8 @@ func _add_post(vertex: Vector2i) -> void:
 			slot = tall_slot
 		else:
 			stretch = tall / WALL_HEIGHT
+	elif tall < WALL_HEIGHT:
+		stretch = tall / WALL_HEIGHT
 	if BOX_WALLS:
 		post = _box(Vector3(POST_SIZE, tall, POST_SIZE), _stone_opaque)
 	elif set_name == CAVE_SET and (not ArtKit.has(slot) or ArtKit.filled_by(slot) == "placeholder"):
