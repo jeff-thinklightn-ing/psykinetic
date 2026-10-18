@@ -137,7 +137,7 @@ CLIPS["Posture_Stooped"] = {"keys": [(0.0, P("rest", 0.0, [("spine_01", LIFT, -8
 	("spine_03", LIFT, -8.0), ("neck_01", LIFT, 12.0), ("Head", LIFT, 10.0)] + both("clavicle", TURN, -6.0)))]}
 CLIPS["Posture_Slouch"] = {"keys": [(0.0, P("rest", 0.0, [("spine_02", LIFT, -4.0), ("spine_03", LIFT, -7.0),
 	("neck_01", LIFT, -4.0), ("Head", LIFT, 8.0)] + both("clavicle", TURN, -14.0)))]}
-CLIPS["Jog_Short_Loop"] = {"loop": True, "segment": ("Jog_Fwd_Loop", 0.0, 0.9333), "stride": {"legs": 0.45, "arms": 0.7, "bounce": 0.55}}
+CLIPS["Jog_Short_Loop"] = {"loop": True, "segment": ("Jog_Fwd_Loop", 0.0, 0.9333), "stride": {"legs": 0.62, "arms": 0.8, "bounce": 0.7}}
 CLIPS["Sprint_Short_Loop"] = {"loop": True, "segment": ("Sprint_Loop", 0.0, 0.6667), "stride": {"legs": 0.72, "arms": 0.85, "bounce": 0.75}}
 
 

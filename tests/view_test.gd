@@ -2145,7 +2145,7 @@ func _test_humans() -> void:
 		if not library.has_animation(moves[key]):
 			missing.append(moves[key])
 	var listed: Array = moves["dodges"] + moves["deaths"]
-	for gait: Array in Client3D.HUMAN_GAITS:
+	for gait: Array in Client3D.HUMAN_GAITS + Client3D.HUMAN_F_GAITS:
 		listed.append(gait[0])
 	for side: String in ["front", "left", "right", "back"]:
 		listed += moves["hits"][side]
@@ -2243,6 +2243,9 @@ func _test_attach_points() -> void:
 				grip.origin.distance_to(knuckles) * scale, grip.basis.y.normalized().dot(fist)])
 		_check(absf((skeleton.global_transform.basis * grip.basis).get_scale().y - 1.0) < 0.02,
 				"at its own size, whatever the person's stature")
+	if shield != null:
+		_check((sockets["hand_l"] as Node3D).global_basis.x.normalized().dot(shield.global_basis.z.normalized()) > 0.99,
+				"the shield's face (+z) out of the back of the hand")
 	hold.call(player, "", "shield")
 	_check((sockets["hand_r"] as Node3D).get_children().all(func(n: Node) -> bool: return n.is_queued_for_deletion()),
 			"the hand emptied: nothing drawn in it")

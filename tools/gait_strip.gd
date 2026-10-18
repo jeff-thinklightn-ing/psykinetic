@@ -116,6 +116,9 @@ func _ground(y: float, length: float) -> void:
 ## A human body (tools/body_build.py's "human" material) drawn as the game draws it.
 func _dress(model: Node3D) -> void:
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		# A generated body's parts (decision 419): only the body and a short crop shown.
+		if mesh.get_parent() is Skeleton3D and mesh.name != "Body":
+			mesh.visible = mesh.name == "Hair_Cropped"
 		var own := mesh.mesh.surface_get_material(0)
 		if own != null and own.resource_name == "human":
 			mesh.material_override = load("res://art/models/characters/human_body.tres")

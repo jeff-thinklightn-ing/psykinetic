@@ -8868,6 +8868,16 @@ Sprint_Short 5.5, so a player (3.8 to 4 tiles a second; a diagonal takes
 DIAGONAL_TICK_SCALE the ticks) jogs at about 1.5x, 3.3 steps a second of
 1.23 m, and the sprint takes over at about 4.4, between a player's and a
 companion's (4.7 to 5). The goblin keeps its own GAITS.
+
+Amended (Jeff on v0.1.150, "the new jog is slightly better but maybe too short of
+strides now, theres a glide to it"): narrowed to 0.45 of the pack's swing, the
+jog's steps were 1.25 m at a player's 4 tiles a second, played at 1.5 times: a
+quick shuffle that read as a glide. Jog_Short now keeps 0.62 of the legs' swing
+(0.8 the arms', 0.7 the bounce): at 4 tiles a second it plays at about 1.1 times
+in 1.65 m steps, the planted foot still (tools/gait_strip.gd). Each body has its
+own paces, measured by tools/gait_pace.gd (HUMAN_GAITS 0.94, 3.63, 5.55;
+HUMAN_F_GAITS 0.89, 3.44, 5.27: her legs are shorter); the sprint is as it was.
+The jog gives way to the sprint at about 5.2 tiles a second now.
 ## 396. The fallen are brought back at a temple or a healer's hut
 
 Jeff on B1 (2026-10-17): "temple building / priest job in town -- wilds has
@@ -11011,3 +11021,8 @@ Rejected: a model deciding what counts as a new claim from raw transcripts
 knows, nothing more); logging every line said (only claims beyond what
 the speaker knows, from one allowed to embellish); erasing a belief when
 nobody holds it (kept as left, the proposal's "reconcile, never erase").
+
+Amended: a shield (an item tagged "shield") is turned a quarter about its grip's
+axis in the hand, so its face (+z, as art_style has it; art-kit centres its grey
+box on the grip, 46a81d1) looks out of the back of the hand and its thin side lies
+across the forearm.

@@ -582,14 +582,17 @@ const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "re
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
 	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
-## The human bodies' gaits (decision 399 amended): the pack's jog and sprint
-## take 2.6 m and 4 m steps, too long for a player's 4 tiles a second (Jeff
-## on v0.1.149); Jog_Short and Sprint_Short narrow their swing
-## (tools/humanoid_clips.py), so the same speed plays them faster, in about
-## 1.25 m steps. Paces by tools/gait_pace.gd on human_m (human_f alike): the
-## jog gives way to the sprint at about 4.4 tiles a second, between a
-## player's and a companion's.
-const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.93], ["Jog_Short", 2.66], ["Sprint_Short", 5.5]]
+## The human bodies' gaits (decision 399 amended twice): the pack's jog and
+## sprint take 2.6 m and 4 m steps, too long for a player's 4 tiles a second
+## (Jeff on v0.1.149); Jog_Short and Sprint_Short narrow their swing
+## (tools/humanoid_clips.py). Narrowed to 0.45 the jog's 1.25 m steps glided
+## (Jeff on v0.1.150: "too short of strides now, theres a glide to it"): at
+## 0.62 a player's jog plays at about 1.1 times, in 1.65 m steps. Paces by
+## tools/gait_pace.gd on each body (hers are shorter legs, 5% slower), scaled
+## by a person's stature: the jog gives way to the sprint at about 5.2 tiles
+## a second.
+const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.94], ["Jog_Short", 3.63], ["Sprint_Short", 5.55]]
+const HUMAN_F_GAITS: Array[Array] = [[CLIP_WALK, 0.89], ["Jog_Short", 3.44], ["Sprint_Short", 5.27]]
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
@@ -599,7 +602,7 @@ const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
 const POSTURES := {"stooped": "Posture_Stooped", "slouching": "Posture_Slouch"}
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
-	"gaits": HUMAN_GAITS, "backpedal": 4.66,
+	"gaits": HUMAN_F_GAITS, "backpedal": 4.66,
 	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
@@ -6463,6 +6466,11 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		if ArtKit.has(art):
 			var thing := ArtKit.instance(art)
 			thing.name = "Held"
+			if "shield" in Items.def(id).get("tags", []):
+				# A shield's face is its +z (art_style): a quarter turn about its
+				# grip's axis turns it out of the back of the hand, its thin side
+				# across the forearm.
+				thing.basis = Basis(Vector3.UP, PI * 0.5)
 			socket.add_child(thing)
 
 
