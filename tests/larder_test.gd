@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_mend()
 	_test_offers()
 	_test_merchant()
+	_test_first_stores()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -314,6 +315,35 @@ func _test_merchant() -> void:
 	economy._sale(TOWN, "s1", "sword", 17, "test", "to a merchant", 20)
 	_check(stock.count(TOWN, "gold") - before == town_plain and int(work.worker("s1")["purse"]) - maker_plain == maker_plain - 3,
 		"a sale of 20 at 17: the town's materials and tax the same (%d), the maker 3 less" % town_plain)
+
+
+## A town is founded with start_food in its store (449 amended); a
+## resident with no gold, while the store has food, eats the store's at
+## cost rather than borrowing for the cook's meal (354 amended).
+func _test_first_stores() -> void:
+	print("
+== a town's first stores; no borrowing for the cook's meal ==")
+	var work := _work()
+	var towns := Towns.new({}, work, _rules, func() -> int: return _now)
+	towns._found(TOWN)  # Its store first seen (seed_from).
+	_check(work.stockpile.count(TOWN, "food") == int(_rules["start_food"]), "founded with start_food in the store (%d)" % work.stockpile.count(TOWN, "food"))
+	var rules := _rules.duplicate(true)
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var folk := Production.new({}, stock, null, clock, rules)
+	var economy := Economy.new({}, stock, folk, clock, rules)
+	folk.add_worker("p1", "Pell", ["hauler"], TOWN)
+	folk.add_worker("c1", "Mags", ["cook"], TOWN)
+	stock.deposit(TOWN, "gold", 50)
+	stock.deposit(TOWN, "food", 5)
+	for i in 3:
+		stock.stock_shop(TOWN, stock.book.mint("ration", "made", "test"), "test", "c1")
+	economy._eat("p1", rules["folk"]["needs"]["meal"], Production.items_catalog())
+	_check(folk.worker("p1")["fed"] == "store" and stock.shop(TOWN).size() == 3, "no gold, food in the store: the store's food, not the cook's meal (%s)" % folk.worker("p1")["fed"])
+	stock.take(TOWN, "food", stock.count(TOWN, "food"))
+	economy._eat("p1", rules["folk"]["needs"]["meal"], Production.items_catalog())
+	_check(folk.worker("p1")["fed"] == "bought" and float(folk.worker("p1")["loan"]) > 0.0, "the store empty: then he borrows for the cook's meal")
 
 
 func _check(ok: bool, what: String) -> void:

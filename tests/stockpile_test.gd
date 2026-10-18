@@ -89,7 +89,7 @@ func _test_boot() -> void:
 	print("\n== the town, its stockpile place and depot ==")
 	var level := Level.load_level(TOWN)
 	_check(level["warnings"].is_empty(), "the town loads cleanly (%s)" % [level["warnings"]])
-	_check(World.stockpile != null and _only_founded(), "World has a stockpile, nothing in it yet but towns' starting gold (decision 353)")
+	_check(World.stockpile != null and _only_founded(), "World has a stockpile, nothing in it yet but towns' starting gold and food (decisions 353, 449)")
 	_check(World.holdings.place(STORE).get("kind") == "stockpile" and World.holdings.holder(STORE) == "town",
 		"the store is a stockpile place the town holds (%s)" % [World.holdings.place(STORE)])
 	var depot := _entity("Depot1") as Chest
@@ -103,10 +103,14 @@ func _test_boot() -> void:
 ## (decision 353): no gear, nothing in the shop, no other resource.
 func _only_founded() -> bool:
 	var gold := int(Production.read_rules().get("start_gold", 0))
+	var food := int(Production.read_rules().get("start_food", 0))
 	for place in World.stockpile.places():
 		var counts := World.stockpile.resources(place)
 		for what: String in counts:
-			if int(counts[what]) != (gold if what == "gold" else 0):
+			# A founded town's first stores (decision 449 amended), or none;
+			# its starting gold is in its residents' purses or still waiting.
+			var allowed := [0, gold] if what == "gold" else [0, food] if what == "food" else [0]
+			if int(counts[what]) not in allowed:
 				return false
 		if not World.stockpile.items(place).is_empty() or not World.stockpile.shop(place).is_empty():
 			return false
@@ -118,7 +122,7 @@ func _test_pickup_banks_nothing() -> void:
 	World._relocate(host, Vector2i(9, 4))
 	_check(World.try_transfer(host, _entity("Chest1"), 0, host, 0), "the host takes the kit from Chest1")
 	_check(Array(host.slots) == [KIT, "", "", "", "", ""], "it's in the host's pack (%s)" % [Array(host.slots)])
-	_check(World.stockpile.count(STORE, KIT) == 0 and _only_founded(), "and the stockpile has nothing but starting gold")
+	_check(World.stockpile.count(STORE, KIT) == 0 and _only_founded(), "and the stockpile has nothing but its starting gold and food")
 
 
 func _test_banking() -> void:

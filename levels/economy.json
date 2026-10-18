@@ -36,8 +36,8 @@
 	"trade": {"buy_ratio": 0.5, "min_factor": 0.5, "max_factor": 2.0},
 	"rent": 1,
 	"rent_every": 54000,
-	"gold_floor": 20,
-	"start_gold": 150,
+	"gold_floor": 5,
+	"start_gold": 150, "start_food": 120,
 	"official": {"guard": {"wage": 4, "every": 18000}, "hauler": {"wage": 2, "every": 18000}, "priest": {"wage": 4, "every": 18000}},
 	"town_work": {"fee": 1, "per_steps": 600},
 	"return": {
@@ -67,7 +67,7 @@
 		},
 		"skip": {"carpenter": ["mend"], "smith": ["tools"]},
 		"keep_in_shop": 1,
-		"rich_above": 40,
+		"rich_above": 25,
 		"rich_every": 0.5
 	},
 	"level_speed": 0.25,

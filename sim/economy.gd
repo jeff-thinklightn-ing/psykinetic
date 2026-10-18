@@ -380,6 +380,11 @@ func _meet(id: String, need: String, rule: Dictionary, cat: Dictionary) -> void:
 func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 	var who := production.worker(id)
 	var town: String = who["town"]
+	var stores: Array = rule["store"] if rule.get("store") is Array else [rule.get("store", "")]
+	# Nobody borrows for the cook's meal while the store has food of its own
+	# to sell them at cost (the balance run: the poor borrowed 4-5 gold a
+	# meal and their loans only grew; decision 354 amended).
+	var store_has := stores.any(func(each: Variant) -> bool: return not str(each).is_empty() and stockpile.has(town, str(each)))
 	var tags: Array = rule["tags"]
 	var food := goods(town).filter(func(each: Dictionary) -> bool:
 		return cat.get(each["id"], {}).get("tags", []).any(func(tag: Variant) -> bool: return tag in tags))
@@ -390,7 +395,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 		var maker := stockpile.maker_of(town, pick["uid"])
 		var base := int(pick["price"])
 		var cost := _folk_price(base, id, maker)
-		if _afford(id, town, cost):
+		if _afford(id, town, cost, not store_has):
 			var thing := Items.name_of(pick["id"])
 			stockpile.take_from_shop(town, pick["uid"], "folk:%s" % id)
 			stockpile.book.end(pick["uid"], "eaten", "by %s at %s" % [who["name"], town])
@@ -404,7 +409,6 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 			return
 	# The store's food, or what stands in for it when there is none (the
 	# hunt's meat, decision 405): the first of rule's "store" there is.
-	var stores: Array = rule["store"] if rule.get("store") is Array else [rule.get("store", "")]
 	var store := str(stores[0]) if not stores.is_empty() else ""
 	for each: Variant in stores:
 		if not str(each).is_empty() and stockpile.has(town, str(each)):
@@ -501,13 +505,13 @@ func _sale(town: String, maker: String, id: String, cost: int, by: String, why: 
 ## "loan"), never past cap owed, never more than the bank holds, never to
 ## one working off a debt. False (nothing lent) if not: then the dole, or
 ## the need waits.
-func _afford(id: String, town: String, cost: int) -> bool:
+func _afford(id: String, town: String, cost: int, borrow := true) -> bool:
 	var who := production.worker(id)
 	var purse := int(who["purse"])
 	if purse >= cost:
 		return true
 	var bank: Dictionary = rules.get("bank", {})
-	if bank.is_empty() or bool(who["working_off"]):
+	if not borrow or bank.is_empty() or bool(who["working_off"]):
 		return false
 	var short := cost - purse
 	var owed := float(who["loan"])

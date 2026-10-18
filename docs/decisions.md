@@ -6996,6 +6996,9 @@ nine residents) was a slip of scale against the rest of the day's clock
 (rent, wages, needs by the day), not a design choice. folk_test keeps its
 own 18000 to test the meal's mechanics before the day's rent.
 
+Amended (the next balance run, 2026-10-17): folk.rich_above 40 -> 25,
+so a maker's purse comes back out sooner as meals and services.
+
 ## 352. The far tier hands over to records: far monsters stop being nodes
 
 Roadmap: "the far tier hands over to the world tick, not to a stop".
@@ -7189,6 +7192,19 @@ players, all the town's gold stays 150. It gathers with the makers who sell
 (two purses of 47 and 93, seven at 0) and the loans to the rest climb to
 about 170 of their caps: a drift left for Jeff, with the treasury's seed
 and gold_floor. Production.upkeep still counts the rent paid.
+
+Amended again (the next balance run, 2026-10-17): nobody borrows for the
+cook's meal while the store has food of its own to sell at cost
+(Economy._afford's borrow, false then); they eat the store's, borrowing
+for that if short, and the dole after. Before, the poor borrowed 4-5 gold
+a meal and loans only grew. gold_floor 20 -> 5, so the officials' wages
+flow: the treasury had hovered at 5-20 and they were never paid. Over 90
+days with a farmer and a hunter (C:/dev/review/balance30/balance_money.txt):
+loans level at about 95 (they were 150-180 and rising), hungry meals 149
+(277 before), the haulers and the priest paid; the carpenter, paid for
+mending by everyone every two days, still gathers the gold (90 at the end),
+the smith 31, the rest near nothing: mending's fee or rhythm is the next
+tune.
 
 ## 355. A town's residents have bodies only while someone is near
 
@@ -11026,3 +11042,7 @@ Amended: a shield (an item tagged "shield") is turned a quarter about its grip's
 axis in the hand, so its face (+z, as art_style has it; art-kit centres its grey
 box on the grip, 46a81d1) looks out of the back of the hand and its thin side lies
 across the forearm.
+Amended (the coordinator, 2026-10-17): a town is founded with rules'
+start_food (120, Jeff's to tune, like start_gold) in its store
+(Towns._found), so it reaches its first harvest: in the 90-day run its
+first two weeks went from 114 hungry meals to none.

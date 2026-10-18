@@ -463,6 +463,11 @@ func _found(town: String) -> void:
 		return
 	record["founded"] = true
 	record["to_spread"] = maxi(int(rules.get("start_gold", 0)), 0)
+	# Its first stores (rules' start_food, Jeff's to tune): enough to reach
+	# its first harvest (decision 449 amended).
+	var food := maxi(int(rules.get("start_food", 0)), 0)
+	if food > 0:
+		production.stockpile.deposit(town, "food", food, "founding", "the town's first stores")
 	_note(town, "founded")
 	_spread(town)
 

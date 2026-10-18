@@ -23,6 +23,7 @@ notes (decision 324).
   you then and there and says so. The same for every favour: bring someone's
   kin home or clear the camp that raided the town and the thanks and the
   coin come whether or not anyone asked you first.
+- A new town starts with food in its store to last until its first harvest. Townsfolk with no gold eat the store's plain food instead of borrowing for the cook's meals, and the town pays its officials as it should.
 - Your companion remembers what passes between you: the things you give her
   and she gives you, the gear that takes her name, the named thing you kept
   from her, and who brought her back at the temple when she fell.
