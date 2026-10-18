@@ -103,23 +103,29 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 	if card.is_empty():
 		return out
 	var town := str(who.get("town", ""))
-	var open := false
+	var open := 0
 	for ask: Dictionary in card.get("asks", []):
 		if str(ask.get("by", "")) == player_id:
 			out.append(_as_open(ask))
-			open = true
+			open += 1
+	# What they think of this player scales it (decision 443): one they feel
+	# wronged by gets nothing but a plea; one they trust, the commission
+	# first and a second open one.
+	var regard := Standing.words(card, player_id)
+	var trusted := regard == "trusted"
 	var fresh: Array[Dictionary] = []
-	var shop := _shop_offer(worker_id, who, town, given)
-	if not shop.is_empty():
-		fresh.append(shop)
-	if not open and card.get("asks", []).is_empty():
-		var job := _commission_offer(worker_id, who, card, town, given)
-		if not job.is_empty():
-			fresh.append(job)
-	var rumour := _rumour_offer(worker_id, who, given)
-	if not rumour.is_empty():
-		fresh.append(rumour)
-	if not open:
+	if regard != "wronged":
+		var shop := _shop_offer(worker_id, who, town, given)
+		var job := {}
+		if card.get("asks", []).size() < (2 if trusted else 1) and open < (2 if trusted else 1):
+			job = _commission_offer(worker_id, who, card, town, given)
+		for offer: Dictionary in ([job, shop] if trusted else [shop, job]):
+			if not offer.is_empty():
+				fresh.append(offer)
+		var rumour := _rumour_offer(worker_id, who, given)
+		if not rumour.is_empty():
+			fresh.append(rumour)
+	if open == 0:
 		var plea := _plea_offer(worker_id, who, card, town, given)
 		if not plea.is_empty():
 			fresh.append(plea)
@@ -342,9 +348,14 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 			out["line"] = "%s takes %s's commission: %s." % [player_name, name, _promise(ask)]
 			out["ok"] = true
 		LEND:
+			var owed := maxi(int(offer["what"].get("loan", 0)), 1)
 			var paid := int(_call(given, "pay_loan", [player_id, worker_id, maxi(gold, 0)]))
 			if paid > 0:
 				Townsfolk.learn(production, worker_id, "%s paid %d gold of %s's debt to the town." % [player_name, paid, name])
+				var quarters := int(floor(paid * 4.0 / owed))
+				var cleared := float(production.worker(worker_id).get("loan", 0.0)) <= 0.0
+				var delta := Standing.setting("loan_quarter") * quarters + (Standing.setting("loan_cleared") if cleared else 0)
+				_regard(production, worker_id, player_id, delta, "cleared their debt to the town" if cleared else "paid %d gold of their debt" % paid)
 				out["line"] = "%s gives %d gold toward %s's debt." % [player_name, paid, name]
 				out["ok"] = true
 		CARRY:
@@ -384,6 +395,40 @@ static func _drop_ask(production: Production, worker_id: String, ask_id: String)
 	production.set_card(worker_id, card)
 
 
+## [param player_id]'s standing with [param worker_id] moved by [param delta]
+## for [param why] (decision 443), on the card.
+static func _regard(production: Production, worker_id: String, player_id: String, delta: int, why: String) -> void:
+	if delta == 0 or player_id.is_empty():
+		return
+	var card := Townsfolk.card_of(production, worker_id)
+	if card.is_empty():
+		return
+	Standing.bump(card, player_id, delta, why, production.now())
+	production.set_card(worker_id, card)
+
+
+## [param player_id] (named [param player_name]) put [param item_id] into
+## [param worker_id]'s hands (decision 443): a gift, worth more when it is
+## their favourite food or a tool; the card remembers. The party log's line.
+static func gift(player_id: String, player_name: String, worker_id: String, item_id: String, given: Dictionary = ctx) -> String:
+	var production: Production = given.get("production")
+	if production == null or player_id.is_empty():
+		return ""
+	var card := Townsfolk.card_of(production, worker_id)
+	if card.is_empty():
+		return ""
+	var catalog: Variant = _call(given, "catalog")
+	var entry: Dictionary = catalog.get(item_id, {}) if catalog is Dictionary else {}
+	var name := str(entry.get("name", item_id.replace("_", " ")))
+	var food := str(card.get("traits", {}).get("food", "")).to_lower()
+	var favourite: bool = (not food.is_empty() and (food.contains(name.to_lower()) or name.to_lower().contains(food.trim_suffix("s")))) \
+			or "tool" in entry.get("tags", [])
+	var who := str(production.worker(worker_id).get("name", worker_id))
+	_regard(production, worker_id, player_id, Standing.setting("gift_favourite" if favourite else "gift"), "gave them %s" % Companion._a(name))
+	Townsfolk.learn(production, worker_id, "%s gave %s %s." % [player_name, who, Companion._a(name)])
+	return "%s gives %s %s%s." % [player_name, who, Companion._a(name), ", and it is what they like best" if favourite else ""]
+
+
 static func _open_count(production: Production, player_id: String) -> int:
 	var count := 0
 	for id: String in production.worker_ids():
@@ -407,10 +452,13 @@ static func _asks(production: Production, town := "") -> Array:
 
 ## An ask met (or not): dropped from the card, the fact on it, the
 ## treasury's pay to the player through economy, Main told ("done").
-static func _close(worker_id: String, ask: Dictionary, fact: String, line: String, pay_key: String, units := 1, given: Dictionary = ctx) -> void:
+static func _close(worker_id: String, ask: Dictionary, fact: String, line: String, pay_key: String, units := 1, given: Dictionary = ctx,
+		regard_key := "", regard_why := "") -> void:
 	var production: Production = given["production"]
 	var player_id := str(ask.get("by", ""))
 	var paid := 0
+	if not regard_key.is_empty():
+		_regard(production, worker_id, player_id, Standing.setting(regard_key), regard_why)
 	if not pay_key.is_empty():
 		var pay: Variant = _call(given, "pay")
 		var each := int(pay.get(pay_key, 0)) if pay is Dictionary else 0
@@ -428,6 +476,28 @@ static func rescued(town: String, who_id: String, given: Dictionary = ctx) -> vo
 	var production: Production = given.get("production")
 	if production == null:
 		return
+	# Kin brought home with no commission asked (decision 443): the players
+	# standing in a camp's area are the ones who did it.
+	var asked: Array[String] = []
+	for pair: Array in _asks(production, town):
+		if str(pair[1].get("sub", "")) == RESCUE and str(pair[1].get("what", {}).get("captive", "")) == who_id:
+			asked.append(str(pair[0]))
+	var camps: Variant = _call(given, "camps")
+	var rescuers := {}
+	if camps is Array:
+		for camp: Variant in camps:
+			var there: Variant = _call(given, "players_in", [str(camp.get("area", ""))]) if camp is Dictionary else null
+			if there is Array:
+				for player_id: Variant in there:
+					rescuers[str(player_id)] = true
+	if not rescuers.is_empty():
+		var name := str(production.worker(who_id).get("name", who_id))
+		for id: String in production.worker_ids(town):
+			var card: Dictionary = production.worker(id).get("card", {})
+			if id in asked or not card.get("kin", {}).has(who_id):
+				continue
+			for player_id: String in rescuers:
+				_regard(production, id, player_id, Standing.setting("kin_home"), "brought %s home" % name)
 	for pair: Array in _asks(production, town):
 		var ask: Dictionary = pair[1]
 		if str(ask.get("sub", "")) != RESCUE or str(ask.get("what", {}).get("captive", "")) != who_id:
@@ -437,7 +507,8 @@ static func rescued(town: String, who_id: String, given: Dictionary = ctx) -> vo
 		var there := str(_call(given, "zone_of", [str(ask.get("by", ""))])) == str(ask["what"].get("area", "")) \
 				or str(ask["what"].get("area", "")).is_empty()
 		if there:
-			_close(pair[0], ask, "%s brought %s home." % [by, name], "%s brought %s home, as promised." % [by, name], RESCUE, 1, given)
+			_close(pair[0], ask, "%s brought %s home." % [by, name], "%s brought %s home, as promised." % [by, name], RESCUE, 1, given,
+				RESCUE, "brought %s home" % name)
 		else:
 			_close(pair[0], ask, "%s came home, though not by %s's hand." % [name, by], "%s is home; %s's promise is kept by another." % [name, by], "", 1, given)
 
@@ -456,7 +527,8 @@ static func camp_taken(camp_id: String, _from: String, to: String, given: Dictio
 		var by := str(ask.get("by_name", "someone"))
 		var faction := ResidentCard.faction_name(str(ask["what"].get("faction", "")))
 		if str(_call(given, "zone_of", [str(ask.get("by", ""))])) == str(ask["what"].get("area", "")):
-			_close(pair[0], ask, "%s cleared the camp of %s." % [by, faction], "%s cleared the camp of %s, as promised." % [by, faction], CAMP, 1, given)
+			_close(pair[0], ask, "%s cleared the camp of %s." % [by, faction], "%s cleared the camp of %s, as promised." % [by, faction], CAMP, 1, given,
+				"met", "cleared the camp of %s" % faction)
 		else:
 			_close(pair[0], ask, "The camp of %s was cleared, though not by %s." % [faction, by], "The camp of %s is cleared; %s's promise is kept by another." % [faction, by], "", 1, given)
 
@@ -483,7 +555,8 @@ static func deposited(place: String, _by: String, by_id: String, what: String, c
 		if int(ask["what"].get("got", 0)) >= wanted:
 			var by := str(ask.get("by_name", "someone"))
 			var item := what.replace("_", " ")
-			_close(pair[0], ask, "%s brought %d %s to the store." % [by, wanted, item], "%s brought %d %s to the store, as promised." % [by, wanted, item], FETCH, wanted, given)
+			_close(pair[0], ask, "%s brought %d %s to the store." % [by, wanted, item], "%s brought %d %s to the store, as promised." % [by, wanted, item], FETCH, wanted, given,
+				"met", "brought %d %s to the store" % [wanted, item])
 
 
 ## [param player_id] speaks to [param worker_id]: the errands carrying a
@@ -507,8 +580,9 @@ static func spoke_to(player_id: String, worker_id: String, given: Dictionary = c
 		mine["grudge"] = mine.get("grudge", []).filter(func(each: Variant) -> bool: return str(each) != worker_id)
 		production.set_card(from_id, mine)
 		Townsfolk.learn(production, worker_id, "%s carried %s's word to %s: the matter between them is forgotten." % [by, from_name, to_name])
+		_regard(production, worker_id, player_id, Standing.setting("word"), "carried %s's word" % from_name)
 		_close(from_id, ask, "%s carried %s's word to %s: the matter between them is forgotten." % [by, from_name, to_name],
-			"%s carried %s's word to %s." % [by, from_name, to_name], "", 1, given)
+			"%s carried %s's word to %s." % [by, from_name, to_name], "", 1, given, "word", "carried a word to %s" % to_name)
 
 
 ## Asks older than "offers.days" lapse, with a fact told once.
@@ -524,7 +598,8 @@ static func tick(given: Dictionary = ctx) -> void:
 			continue
 		var by := str(ask.get("by_name", "someone"))
 		var name := str(production.worker(pair[0]).get("name", pair[0]))
-		_close(pair[0], ask, "%s never kept the promise %s: %s." % [by, "to " + name, _promise(ask)], "%s's promise to %s lapsed: %s." % [by, name, _promise(ask)], "", 1, given)
+		_close(pair[0], ask, "%s never kept the promise %s: %s." % [by, "to " + name, _promise(ask)], "%s's promise to %s lapsed: %s." % [by, name, _promise(ask)], "", 1, given,
+			"errand_lapsed" if str(ask.get("kind", "")) == ERRAND else "lapsed", "let a promise lapse, %s" % _promise(ask))
 
 
 ## Connects the world's signals, once per instance: the objects are held

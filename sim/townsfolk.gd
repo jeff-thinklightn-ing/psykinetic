@@ -291,6 +291,13 @@ static func gossip(production: Production) -> void:
 		if at < due:
 			continue
 		_gossip_due[town] = at + every
+		for id: String in towns[town]:
+			# Standing fades toward 0 with time (decision 443): residents' cards only.
+			if id.begins_with(COMPANION):
+				continue
+			var card: Dictionary = production.worker(id).get("card", {})
+			if card.get("standing") is Dictionary and not Standing.decay(card, at).is_empty():
+				production.set_card(id, card)
 		var groups := {}  # place -> [worker ids]
 		for id: String in towns[town]:
 			var where := whereabouts(_trade_of(production, id), hour, Season.name_at(at),
@@ -343,6 +350,31 @@ static func _pass(production: Production, town: String, place: String, members: 
 				text = lore_text
 				fits = Hearsay.WITNESSED
 				break
+	if text.is_empty():
+		# What the teller thinks of a player, when it is strong and their own
+		# (decision 443): "Jeff brought Bram home", and the hearer leans the
+		# same way a little, if they have no dealings of their own.
+		var views: Variant = card.get("standing", {})
+		var newest := {}
+		var newest_id := ""
+		if views is Dictionary:
+			for player_id: String in views:
+				var it: Dictionary = views[player_id]
+				var value := int(it.get("score", 0))
+				if bool(it.get("own", false)) and (value >= Standing.setting("trusted") or value <= Standing.setting("wronged")) 						and (newest.is_empty() or int(it.get("since", 0)) > int(newest.get("since", 0))):
+					newest = it
+					newest_id = player_id
+		if not newest.is_empty() and not newest.get("why", []).is_empty():
+			var player_name := str(Offers._call(Offers.ctx, "name_of", [newest_id]))
+			if player_name.is_empty() or player_name == "<null>":
+				player_name = newest_id
+			var said := "%s %s" % [player_name, str(newest["why"].back())]
+			if not Hearsay.holds(heard, said):
+				var hearer_card := card_of(production, hearer)
+				if not hearer_card.is_empty() and Standing.heard(hearer_card, newest_id, signi(int(newest["score"])), str(newest["why"].back()), teller_name, at):
+					production.set_card(hearer, hearer_card)
+				text = said
+				fits = Hearsay.WITNESSED
 	if text.is_empty() and not official:
 		var beliefs: Array = production.worker(teller).get("heard", [])
 		for i in range(beliefs.size() - 1, -1, -1):
@@ -438,6 +470,16 @@ static func _true(card: Dictionary, step: int, text: String) -> bool:
 
 static func _raided(production: Production, town: String, report: Dictionary) -> void:
 	if bool(report.get("repelled", false)):
+		# Fought off with a player in the town (decision 443): every resident
+		# thinks the better of them, once per raid.
+		var area: Variant = Offers._call(Offers.ctx, "area_of", [town])
+		var there: Variant = Offers._call(Offers.ctx, "players_in", [str(area)]) if area is String and not str(area).is_empty() else null
+		if there is Array and not there.is_empty():
+			for id: String in production.worker_ids(town):
+				if id.begins_with(COMPANION):
+					continue
+				for player_id: Variant in there:
+					Offers._regard(production, id, str(player_id), Standing.setting("raid"), "stood with the town when raiders came")
 		return
 	var faction := ResidentCard.faction_name(str(report.get("faction", "")))
 	var taken: Array = report.get("captives", [])

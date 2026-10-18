@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town's people remember what you did for them, and to them: a promise
+  kept, kin brought home, a debt covered, a word carried, a gift pressed into
+  their hands, a raid you stood through with them, a promise let lapse. It
+  shows in how they greet you, what they offer you, and what they tell the
+  neighbours at the well; and it fades, slowly, with time.
 - At the temple's counter or the smith's, a screen beside your pack shows what can be done to what you carry (a blessing, a reforge), what it costs, what of yours is being worked and when it will be ready, and what waits for you to collect.
 - Townsfolk eat once a day, not three times. Their rent now goes into the town's bank, where it is lent back out, instead of vanishing. Goblin camps, wolves and the town's hunter hunt more gently, so the deer and rabbits of the wilds last instead of being hunted out within a season.
 - Choose how you look: the Character section of the options (O) now picks

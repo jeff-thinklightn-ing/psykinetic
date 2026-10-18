@@ -10620,3 +10620,79 @@ purely visual (419). Rejected: replicating the look as a property (a protocol
 change, and the look, like the body, shows from the next join); letting the
 client's words through as they are (a hand-edited settings.cfg would send junk
 or huge text to everyone).
+## 443. Standing: what each of the town's people thinks of each player
+
+The coordinator's approval 2026-10-18, on the cards (398), gossip (422)
+and the offers (435); companions' bond with her player takes the same
+shape through the same class (444, after this). A per-player score on the
+card, moved only by the world's own events, never by a model: card
+["standing"] = {player_id: {score, met (the step of their first words),
+since (the last change), why (the last three reasons, plain clauses
+without the player's name: "brought Bram home"), own (whether any reason
+is their own event, not hearsay)}}; saved with the worker record; a card
+from before has none. New class Standing (sim/standing.gd), all static,
+on any Dictionary that holds "standing" (a resident's card, a companion's
+record): met, first_words, bump, heard, score, words, fact, decay;
+numbers in residents.json "standing".
+
+The words come from the score through a ladder: Standing.RESIDENT
+(stranger: no entry, they have never spoken; wronged: -3 and down; known:
+-2..2, from the first words; trusted: 3 and up) or Standing.COMPANION
+(fond to start, wary, close from 3, devoted from 6), each word with its
+sentence frame. The voice is told one fact (Resident.facts_now, 336's rule:
+a fact, never a line): "You trust Jeff: they brought Bram home." / "Jeff
+wronged you: they let a promise lapse, to bring Bram home." / "You have
+met Jeff before." / for a stranger nothing, and on their first words "This
+is the first time Jeff has spoken to you." (Main._ask_resident makes the
+entry), so the greeting falls out of the facts. A companion's bond fact
+goes in her prompt the same way (444).
+
+What moves it, each through a hook 435 and 422 already had, the amounts
+data: a commission met +3 (a rescue +4), lapsed -2 (an errand -1); kin
+brought home with the player in a camp's area +4 even with no commission
+(Offers.rescued, the kin on the card, the players in a camp's area by
+Main's players_in); a loan paid down +1 per quarter of what was owed and
++2 when it is cleared (the lend accept); a word carried +2 on both cards
+(Offers.spoke_to); a gift +1, +2 for their favourite food or a tool: a
+thing a player puts into a resident's hands by the transfer that exists
+(World.try_transfer with a Resident as "to"; World.handed, Main._on_handed:
+the thing goes to the town's store in the resident's name, so nothing is
+lost, and Offers.gift moves the card); a raid fought off with the player
+in the town's area +1 on every resident's card (Townsfolk._raided, the
+repelled report; once per raid); being caught taking from the store: the
+sim has no verb for a player taking from a store (only the shop and the
+thief's lift), so the hook is named here (a Stockpile take with a player's
+by_id, -4) and left for when such a verb exists. The score is held within
+-10..10. Hearsay (Standing.heard) moves it by 1 only for one with no
+dealings of their own with that player, and never past 2 either way.
+
+Gossip (422): after a scholar's lore and before beliefs, a teller's view
+of a player that is strong (trusted or wronged) and their own passes as
+"Jeff brought Bram home" (the newest reason, with the player's name), kept
+by the hearer as witnessed hearsay from the teller, and the hearer's
+standing leans the teller's way by one (heard), so the town's view of a
+player spreads from those who dealt with them. Decay: on Townsfolk's
+gossip tick, every residents' card entry older than decay_days (10) since
+its last change moves one step toward 0, so trust fades and wrongs are
+slowly forgiven; a companion's record is swept only by companions, while
+she is apart from her player (444).
+
+Offers (435) scaled by the word: wronged, nothing but a plea (and the
+open asks); known, as before; trusted, the commission before the shop line
+and a second open commission allowed from that resident. Nothing on the
+wire: the "offers" message is unchanged (the panel sees the order; the
+words reach the player through the voice).
+
+standing_test (pure sim, a context of callables; no port, no scratch):
+the words by score and by both ladders, the facts, the first words, each
+event's move (a rescue by them and by another, a lapse, a fetch, a word on
+both cards, a loan by quarters and cleared, gifts plain and favourite, kin
+home with no commission, a raid with and without the player), hearsay's
+small move and its stop at their own dealings, the gossip pass, decay and
+Townsfolk's sweep, the offers' three orders. Protocol unchanged; new
+class_name Standing.
+
+Rejected: a model judging what a player deserves (events only); a town-wide
+reputation number (it is each person's, and spreads only by gossip);
+standing on the wire; scripted greetings (a fact, and the model greets);
+crediting a rescue or a camp to a player who was elsewhere.

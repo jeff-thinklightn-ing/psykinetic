@@ -59,6 +59,8 @@ var type := ""
 ## offers (decision 435); "" between asks.
 var asked_by := ""
 var asked_by_name := ""
+## Whether these are their first words together (decision 443).
+var first_words := false
 ## Where it goes: "work", "home", "square" -> Rect2i of cells (Main's).
 var places: Dictionary = {}
 var senses: Senses
@@ -279,6 +281,15 @@ func facts_now() -> Array[String]:
 		var offered := Offers.voice_words(worker_id, asked_by, asked_by_name)
 		if not offered.is_empty():
 			out.append(offered)
+	# What it thinks of them, and whether they have spoken before (decision 443).
+	if player_id.is_empty() and not asked_by.is_empty() and World.production != null:
+		var card := Townsfolk.card_of(World.production, worker_id)
+		if first_words:
+			out.append("This is the first time %s has spoken to you." % asked_by_name)
+		else:
+			var regard := Standing.fact(card, asked_by, asked_by_name)
+			if not regard.is_empty():
+				out.append(regard)
 	# A companion's past is in her own card; a resident's, in the town's records.
 	var taken := World.towns.taken_before(worker_id) if World.towns != null and player_id.is_empty() else 0
 	if taken > 0:

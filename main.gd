@@ -1870,6 +1870,8 @@ func _boot() -> void:
 	Townsfolk.watch(World.production, World.towns)
 	Offers.ctx = _offers_context()  # What the town's people can offer (decision 435).
 	Offers.watch(World.towns, World.holdings, World.stockpile)
+	if not World.handed.is_connected(_on_handed):
+		World.handed.connect(_on_handed)  # A gift to one of them (decision 443).
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
@@ -3446,11 +3448,18 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 		Offers.spoke_to(player_id, body.worker_id)  # An errand to them is done by speaking (decision 435).
 	body.asked_by = player_id
 	body.asked_by_name = speaker
+	if not player_id.is_empty() and World.production != null:
+		# Their first words make the standing entry (decision 443).
+		var card := Townsfolk.card_of(World.production, body.worker_id)
+		if not card.is_empty() and Standing.met(card, player_id, World.production.now()):
+			World.production.set_card(body.worker_id, card)
+			body.first_words = true
 	_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
 	_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick,
 		"player": player_id, "peer": player.owner_peer if player != null else -1})
 	body.asked_by = ""
 	body.asked_by_name = ""
+	body.first_words = false
 	Transcript.record(body.person, speaker, line)
 
 
@@ -3533,9 +3542,41 @@ func _offers_context() -> Dictionary:
 		"name_of": func(player_id: String) -> String:
 			var record: PlayerRecord = _records.get(player_id)
 			return record.name if record != null else player_id,
+		"players_in": _players_in,
+		"area_of": func(town: String) -> String: return str(World.holdings.place(town).get("area", "")) if World.holdings != null else "",
 		"asked": _on_commission_asked,
 		"done": _on_commission_done,
 	}
+
+
+## The ids of the players in play whose body or record is in [param area].
+func _players_in(area: String) -> Array:
+	var out := []
+	for peer: int in _peer_ids:
+		var player_id := str(_peer_ids[peer])
+		if not player_id.is_empty() and _zone_of_player(player_id) == area and player_id not in out:
+			out.append(player_id)
+	if Net.is_authority() and not Net.player_id.is_empty() and _zone_of_player(Net.player_id) == area and Net.player_id not in out:
+		out.append(Net.player_id)
+	return out
+
+
+## Server: [param by] put [param item] ([param uid]) into resident [param to]'s
+## hands (World.handed): a gift (decision 443). The thing goes to the town's
+## store in their name, so nothing is lost; the card remembers.
+func _on_handed(by: GridEntity, to: GridEntity, item: String, uid: int) -> void:
+	var player := by as Player
+	var body := to as Resident
+	if player == null or body == null or player.player_id.is_empty() or not body.player_id.is_empty() or World.production == null:
+		return
+	var slot := body.slots.find(item)
+	if slot >= 0 and World.stockpile != null and not body.town.is_empty():
+		var taken := World.take_item(body, body, slot)
+		if taken != 0:
+			World.stockpile.bank(body.town, taken, body.person, "a gift from %s" % _display_name(player), body.zone, body.tile, "banked", "player:" + player.player_id)
+	var line := Offers.gift(player.player_id, _display_name(player), body.worker_id, item)
+	if not line.is_empty():
+		party_log.add(line)
 
 
 ## Server: [param player_id] took on [param ask]: on their record too.

@@ -52,6 +52,8 @@ signal ground_changed(zone_name: String, cell: Vector2i, thrown_from: Vector2i)
 signal gold_changed(player_id: String, gold: int)
 ## [param by] traded at [param shop] (or was refused, [param why] said):
 ## Main sends them the shop again. Server only.
+## A player put a thing into a resident's hands (try_transfer): a gift (decision 443).
+signal handed(by: GridEntity, to: GridEntity, item: String, uid: int)
 signal traded(by: GridEntity, shop: GridEntity, why: String)
 ## A GroundPile came, changed or went, for the views (any peer).
 signal pile_shown(pile: GroundPile)
@@ -1589,6 +1591,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		to.slots = given
 		to.slot_items = given_uids
 		_moved_item(uid, from, to)
+		if to is Resident and by is Player and from != to:
+			handed.emit(by, to, item, uid)  # A gift to one of the town's people (decision 443).
 		if other_uid != 0:
 			_moved_item(other_uid, to, from)
 		if from is Chest and (from as Chest).temple and towns != null:
