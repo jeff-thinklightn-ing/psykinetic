@@ -16,6 +16,7 @@
 	"water": {"spring": 4, "catch": 12, "cap": 30, "draw": 0.5, "dry_slows": "cook", "dry_rate": 0.5},
 	"roof": {"by": "carpenter", "wood_base": 1, "wood_cells": 8, "steps": 1200},
 	"stand_in": {"fletcher": "carpenter"},
+	"bless": {"trade": "priest", "offering": 0.5, "least": 1, "steps": 600},
 	"rescue": {"per_camp": 1, "restock_days": 5, "lacking": 3,
 		"trades": {"hunter": 3, "tanner": 3, "fletcher": 3, "smith": 1, "cook": 1, "carpenter": 1},
 		"names": ["Hew", "Bram", "Tilda", "Ada", "Wat", "Joan", "Piers", "Agnes", "Col", "Maud", "Ren", "Sib"]},

@@ -105,6 +105,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.on_built = _built
 	production.work_rate = _work_rate
 	production.hunted.connect(_on_hunted)
+	production.work_done.connect(_on_work_done)
 	from_dict(saved)
 
 
@@ -563,6 +564,55 @@ func _repair(town: String) -> bool:
 		_note(town, "the %s is to be repaired" % kind)
 		return true
 	return false
+
+
+# --- Held for their owners (decision 434) ------------------------------------------
+
+## The things [param town] holds for [param owner] (a carrier key) at its
+## temple: blessed, waiting to be collected. Uids, oldest first.
+func held(town: String, owner: String) -> Array[int]:
+	var out: Array[int] = []
+	out.assign(_towns.get(town, {}).get("held_for", {}).get(owner, []))
+	return out
+
+
+## Every owner [param town] holds something for.
+func held_owners(town: String) -> Array[String]:
+	var out: Array[String] = []
+	out.assign(_towns.get(town, {}).get("held_for", {}).keys())
+	out.sort()
+	return out
+
+
+## [param uid] is no longer held for [param owner] at [param town] (they
+## took it). Whether it was.
+func release_held(town: String, owner: String, uid: int) -> bool:
+	var held_for: Dictionary = _towns.get(town, {}).get("held_for", {})
+	if not uid in held_for.get(owner, []):
+		return false
+	held_for[owner].erase(uid)
+	if held_for[owner].is_empty():
+		held_for.erase(owner)
+	return true
+
+
+## A thing handed in is done (Production.work_done): held at the town's
+## temple for whoever it was done for, however long they are away.
+func _on_work_done(job: Dictionary) -> void:
+	var town := str(job.get("town", ""))
+	var owner := str(job.get("for", ""))
+	var uid := int(job.get("worked_on", 0))
+	if town.is_empty() or owner.is_empty() or uid == 0:
+		return
+	var record := _town(town)
+	record["held_for"] = record.get("held_for", {})
+	if not record["held_for"].has(owner):
+		record["held_for"][owner] = []
+	record["held_for"][owner].append(uid)
+	production.book().place(uid, "temple:%s" % town)
+	production.book().note(uid, "held", "at %s's temple for %s, %s by %s" % [town, owner, job.get("effect", ""), job.get("by", "")])
+	_note(town, "%s %s a %s, held for its owner" % [job.get("by", "the priest"), "blessed" if job.get("effect") == "bless" else "worked on",
+		Items.name_of(production.book().id_of(uid))])
 
 
 # --- Rescues (decision 428) ---------------------------------------------
@@ -1037,6 +1087,16 @@ func from_dict(saved: Dictionary) -> void:
 					record["strangers"] = record.get("strangers", {})
 					record["strangers"][str(camp)] = (held_at[camp] as Array).filter(func(each: Variant) -> bool:
 						return each is Dictionary and str(each.get("id", "")) != "" and str(each.get("trade", "")) != "")
+		var held_for: Variant = entry.get("held_for", {})
+		if held_for is Dictionary:
+			for owner: Variant in held_for:
+				var uids: Array = []
+				for uid: Variant in held_for[owner] if held_for[owner] is Array else []:
+					if (uid is int or uid is float) and production.book().has(int(uid)):
+						uids.append(int(uid))
+				if not uids.is_empty():
+					record["held_for"] = record.get("held_for", {})
+					record["held_for"][str(owner)] = uids
 		var restock: Variant = entry.get("restock", {})
 		if restock is Dictionary:
 			record["restock"] = {}

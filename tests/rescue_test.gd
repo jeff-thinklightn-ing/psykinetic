@@ -134,7 +134,7 @@ func _test_fletcher() -> void:
 			_now += World.WORLD_TICK_STEPS
 			work.tick()
 			for id in work.jobs():
-				if work.job(id)["kind"] == "mend":
+				if work.job(id)["kind"] == "work":
 					shop = str(work.job(id)["workshop"])
 			if not shop.is_empty():
 				break

@@ -82,6 +82,10 @@ signal loan_changed(worker_id: String, owed: float, working_off: bool)
 ## A hunter of [param town] came home from a hunt ([param kind] caught, ""
 ## for none): for the town's log.
 signal hunted(town: String, worker_id: String, kind: String)
+## A "work" job on a thing for someone ([param job]: its uid in uids, its
+## effect, for (an owner's carrier key), town) is done (decision 434): Towns
+## holds a blessed thing for its owner.
+signal work_done(job: Dictionary)
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
 ## (need -> step due), fed, hungry_since, last_trade, wage_due, hunt_due, loan
@@ -381,6 +385,29 @@ func open_return(workshop_id: String, who: String, who_kind: String, place := ""
 	return id
 
 
+## A thing, [param uid], handed in at [param workshop_id] for
+## [param owner] (a carrier key) to be worked on with [param effect]
+## ("bless": rules' bless.steps), by its worker, held by the job; its
+## own job, not the workshop's slot. Its id, or 0 if nobody works there.
+func open_work(workshop_id: String, uid: int, effect: String, owner: String) -> int:
+	var shop: Dictionary = _workshops.get(workshop_id, {})
+	if shop.is_empty() or str(shop["worker"]).is_empty():
+		return 0
+	var id := _new_job("work", book().id_of(uid), shop)
+	var each: Dictionary = _jobs[id]
+	each["state"] = "working"
+	each["worker"] = shop["worker"]
+	each["effect"] = effect
+	each["for"] = owner
+	each["to_id"] = book().id_of(uid)
+	each["uids"] = [uid]
+	each["needed"] = maxi(int(rules.get(effect, {}).get("steps", 600)), 1)
+	each["last"] = now()
+	book().place(uid, "job:%d" % id)
+	print("[production] %s (#%d) handed in at %s to %s for %s" % [book().id_of(uid), uid, workshop_id, effect, owner])
+	return id
+
+
 ## Whether someone works at [param workshop_id] now (there, not away, its
 ## building standing): a place to bring the fallen back.
 func manned(workshop_id: String) -> bool:
@@ -550,7 +577,17 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		uid = int(each["uids"][0])
 		book().place(uid, "")
 		book().note(uid, "reworked", made_at)
-	elif each["kind"] == "mend":
+	elif each["kind"] == "work" and str(each.get("effect", "mend")) != "mend":
+		# A thing someone handed in (decision 434): blessed for its owner,
+		# then held for them (work_done: Towns).
+		var worked_on := int(each["uids"][0])
+		book().place(worked_on, "")
+		if each["effect"] == "bless":
+			book().bless(worked_on, str(each["for"]))
+		each["worked_on"] = worked_on
+		each["by"] = str(worker_record["name"])
+		work_done.emit(each.duplicate(true))
+	elif each["kind"] == "work":
 		# The same thing (its history, its name) back to its most, banked
 		# where it was taken from, not put up for sale (decision 414).
 		var mended := int(each["uids"][0])
@@ -574,7 +611,8 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 			and stockpile.take(each["town"], "gold", wage, "wage:%s" % worker_record["id"])
 	if paid:
 		worker_record["purse"] = int(worker_record["purse"]) + wage
-	print("[production] %s finished %s #%d (%s), step %d; %s" % [made_at, each["recipe"], uid if uid != 0 else int(each.get("mended", 0)), each["kind"], now(),
+	print("[production] %s finished %s #%d (%s), step %d; %s" % [made_at, each["recipe"], uid if uid != 0 else int(each.get("mended", each.get("worked_on", 0))),
+		each.get("effect", each["kind"]), now(),
 		"paid %d gold" % wage if paid else "unpaid (the town's gold is at its floor)" if wage > 0 else "no wage"])
 	var shop: Dictionary = _workshops.get(each["workshop"], {})
 	if not shop.is_empty() and shop["job"] == each["id"]:
@@ -918,7 +956,7 @@ func _mend_bid(shop: Dictionary, cat: Dictionary) -> Dictionary:
 		if not _mends(shop, str(mend.get("by", ""))) or book().condition_of(uid) < 0 or book().condition_of(uid) >= Items.condition_max(id):
 			continue
 		if _affords(shop["town"], mend, false):
-			return {"workshop": shop["id"], "recipe": id, "kind": "mend", "job": 0, "rework": uid}
+			return {"workshop": shop["id"], "recipe": id, "kind": "work", "effect": "mend", "job": 0, "rework": uid}
 	return {}
 
 
@@ -1007,7 +1045,7 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	var queued: Dictionary = _jobs.get(int(bid["job"]), {})
 	if int(bid["job"]) != 0 and queued.get("state") != "queued":
 		return false  # Another workshop took it this tick.
-	var mending: bool = bid["kind"] == "mend"
+	var mending: bool = bid["kind"] == "work"
 	var made: Dictionary = {"from": queued["cost"], "steps": queued["steps"]} if bid["kind"] == "build" \
 			else cat[bid["recipe"]]["mend"] if mending else cat[bid["recipe"]]["made"]
 	var rework := int(bid["rework"])
@@ -1034,8 +1072,12 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 		book().place(rework, "job:%d" % id)
 		each["uids"].append(rework)
 	if mending:
-		each["kind"] = "mend"
-		each["to_id"] = bid["recipe"]  # The same id: a mend (a reforge's later, decision 414).
+		# The general job on a thing (decision 434): a mend is its effect
+		# "mend", for the town (""), to_id the same id.
+		each["kind"] = "work"
+		each["effect"] = str(bid.get("effect", "mend"))
+		each["for"] = ""
+		each["to_id"] = bid["recipe"]
 	elif each["kind"] != "build":
 		each["kind"] = "rework" if rework != 0 else "make"
 	each["workshop"] = shop["id"]
@@ -1186,7 +1228,11 @@ func from_dict(saved: Dictionary) -> void:
 				"rework": int(entry.get("rework", 0)), "resources": {}, "uids": [], "needed": int(entry.get("needed", 0)),
 				"worked": int(entry.get("worked", 0)), "last": int(entry.get("last", 0)),
 				"trade": str(entry.get("trade", "")), "cost": {}, "steps": int(entry.get("steps", 0))}
-			if each["kind"] == "mend":
+			if each["kind"] in ["mend", "work"]:
+				# 414's "mend" jobs are the general job's effect "mend" now.
+				each["effect"] = str(entry.get("effect", "mend"))
+				each["kind"] = "work"
+				each["for"] = str(entry.get("for", ""))
 				each["to_id"] = str(entry.get("to_id", each["recipe"]))
 			if each["kind"] == "return":
 				each["who"] = str(entry.get("who", ""))
@@ -1206,10 +1252,12 @@ func from_dict(saved: Dictionary) -> void:
 					each["uids"].append(int(uid))
 			_next_job = maxi(_next_job, each["id"] + 1)
 			_jobs[each["id"]] = each
-			# A return whose place is gone gives up in time (_advance): never lost.
-			if not _workshops.has(each["workshop"]) and not (each["kind"] == "build" and each["state"] == "queued") 					and each["kind"] != "return":
+			# A return whose place is gone gives up in time (_advance), and a
+			# thing handed in for someone stays theirs in its job: never lost.
+			var own_job: bool = each["kind"] == "return" or not str(each.get("for", "")).is_empty()
+			if not _workshops.has(each["workshop"]) and not (each["kind"] == "build" and each["state"] == "queued") 					and not own_job:
 				print("[production] the snapshot's job #%d is at %s, which is gone; its materials go back" % [each["id"], each["workshop"]])
 				_give_back(each)
 				_jobs.erase(each["id"])
-			elif each["state"] == "working" and each["kind"] != "return":
+			elif each["state"] == "working" and not own_job:
 				_workshops[each["workshop"]]["job"] = each["id"]

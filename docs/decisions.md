@@ -9831,3 +9831,46 @@ slots).
 Snapshot only: the protocol is unchanged; old saves load.
 Rejected: a free-slot table written into level.json (every editor and tool
 would have to keep it); matching by name (names move with the count too).
+## 434. Things handed in at the temple counter: blessed, held for their owner
+
+On items' 424 (ItemBook.bless) and buildings' counter (424 amended: a
+Chest with temple true at the back of the temple), generalizing 414's
+mend. The coordinator's approval of 2026-10-17.
+
+- One job on a thing: Production's kind "work", {uids: [uid], to_id,
+  effect, for}. A mend (414) is its effect "mend", for the town ("");
+  a blessing is "bless", for its owner's carrier key; a reforge (items'
+  432) will be "reforge" with another to_id. Saved jobs of 414's kind
+  "mend" load as work/mend. A job for someone keeps its thing in the job
+  even if its workshop is gone at load (never lost), and takes no
+  workshop job slot (Production.open_work).
+- Handing in: a thing dragged onto a temple counter goes to the priest
+  (World._hand_to_priest, like a shop counter's sale). The counter's town
+  is the temple building whose rect holds it (Main sets
+  World.counter_town). Accepted when the town's temple workshop is manned
+  and the player can pay the offering: bless.offering (0.5) of the
+  thing's value, at least bless.least (1) gold, from their own gold into
+  the treasury. THE OFFERING IS A PLACEHOLDER, JEFF'S TO TUNE (economy.json
+  "bless"). Refused, it stays in hand and they are told why. A companion's
+  thing is her player's ("player:<keeper id>"). The thing's history says
+  it was handed in, and what was offered.
+- The work: bless.steps (600) by the priest; then ItemBook.bless(uid,
+  owner), and Production.work_done -> Towns holds it on the town record
+  ("held_for": {owner: [uids]}, saved), its book place "temple:<town>",
+  with no timer: it waits however long they are away. The town log says
+  so.
+- Collecting: no new message. Main looks at each temple counter every
+  TEMPLE_COUNTER_TICKS (5): the first player within reach is shown what is
+  held for them (World.show_held fills the counter's free slots; others'
+  held things go back to the town's keeping; anything else in the counter
+  stays). Only the owner can take a held thing out (try_transfer), which
+  releases it. ui's counter screen shows the counter's slots.
+- Not in this step: the reforge, which needs a target chosen, so a new
+  message (PROTOCOL_REVISION 14, from release) with ui's screen.
+
+Protocol unchanged. tests/blessing_test (in Main: refused without gold,
+handed in with the offering into the treasury, a bless job for its owner,
+blessed and held after its steps, shown to its owner and put back with
+nobody there, the counter's other things left alone, held in a saved world
+and read back, taken back and no longer held, refused with the priest
+away); rescue_test's mend job is kind "work".

@@ -96,6 +96,8 @@ const COMPANION_TINT := Color(0.45, 0.95, 0.85)
 const COMPANION_DEATH_LINES: Array[String] = ["Go on... without me.", "I'm sorry.", "Tell them I tried.", "Keep... going."]
 ## Ticks between a player dying and reappearing at a start tile.
 const RESPAWN_TICKS := 20
+## Ticks between looks at who stands at a temple counter (decision 434).
+const TEMPLE_COUNTER_TICKS := 5
 ## Whether the fallen are brought back at a temple or a healer's hut
 ## (decision 396); off, every death respawns as before (tests of the old
 ## respawn turn it off).
@@ -1775,6 +1777,16 @@ func _boot() -> void:
 		return zone != null and zone.awake and _towns_near.has(town)
 	World.towns.companion_taken = companion_taken
 	World.towns.companion_freed = companion_freed
+	# The temple counter's town: the temple building whose rect holds it
+	# (buildings' 424 amended), its "town" (decision 434).
+	World.counter_town = func(counter: GridEntity) -> String:
+		var area := counter.zone if not counter.zone.is_empty() else World.zone.name
+		for house: Dictionary in _world_map.areas.get(area, {}).get("buildings", []):
+			var rect: Variant = Level.building_rect(house)
+			if str(house.get("use", "")) == "temple" and rect is Rect2i and (rect as Rect2i).has_point(counter.tile) \
+					and not str(house.get("town", "")).is_empty():
+				return "%s/%s" % [area, house["town"]]
+		return Stockpile.place_at(World.holdings, area, counter.tile)
 	# Rescues (decision 428): a camp's held come home when it falls.
 	World.towns.camps = World.holdings.camps
 	World.towns.home_of = func(camp: String) -> String:
@@ -4589,6 +4601,22 @@ func _on_place_taken(id: String, from: String, to: String) -> void:
 		World.towns.camp_taken(id, from, to)
 
 
+## Each temple counter in the zone shows what is held for the first player
+## within reach of it, or nothing with nobody there (World.show_held,
+## decision 434).
+func _temple_counters() -> void:
+	for entity: GridEntity in World.get_entities():
+		if not (entity is Chest and (entity as Chest).temple):
+			continue
+		var at: GridEntity = null
+		for peer: int in _players:
+			var player: Player = _players[peer]
+			if is_instance_valid(player) and player.spawned and World.reaches(player, entity):
+				at = player
+				break
+		World.show_held(entity, at)
+
+
 # --- The fallen brought back (decision 396) -----------------------------------------
 
 ## Each healer's hut (a Holdings place of kind healers_hut, maps' 372) given
@@ -4758,6 +4786,8 @@ func _on_world_ticked(tick: int) -> void:
 		_recall_due()
 		if tick % RETIRE_EVERY_TICKS == 0:
 			_retire_and_recall()
+		if tick % TEMPLE_COUNTER_TICKS == 0:
+			_temple_counters()
 		_resident_voices()
 	if World.zone != World.home():
 		return  # Another zone's tick: the HUD and the test hooks are this view's.

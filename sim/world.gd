@@ -448,6 +448,10 @@ var production: Production = null
 ## Server: how each town grows (Towns), choosing its buildings on the same
 ## slice; made by Main at boot, from the snapshot. Null on a client.
 var towns: Towns = null
+## (counter) -> the town a temple counter is in (decision 434; Main: the
+## temple building whose rect holds it, its "town"); unset, the stockpile
+## place over its tile.
+var counter_town := Callable()
 ## Server: the wildlife's herds (Herds, decision 367), moved on by the
 ## world tick's first slice; made by Main at boot. Null on a client.
 var herds: Herds = null
@@ -1535,6 +1539,11 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	var item := from.slots[from_slot]
 	if item.is_empty():
 		return false
+	if from is Chest and (from as Chest).temple and from != to and not _collects(by, from, from_slot):
+		traded.emit(by, from, "that waits for someone else")
+		return false
+	if to is Chest and (to as Chest).temple:
+		return _hand_to_priest(by, from, from_slot, to)
 	if to is Chest and (to as Chest).depot:
 		return _bank(by, from, from_slot, to)
 	if to is Chest and (to as Chest).shop:
@@ -1570,6 +1579,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		_moved_item(uid, from, to)
 		if other_uid != 0:
 			_moved_item(other_uid, to, from)
+		if from is Chest and (from as Chest).temple and towns != null:
+			towns.release_held(temple_town(from), owner_of(by), uid)
 	_log("slots: %s moved %s from %s %d to %s %d%s" % [by.name, item, from.name, from_slot, to.name, to_slot,
 		"" if other.is_empty() else " (swapping %s)" % other])
 	_slots_changed(from)
@@ -2328,6 +2339,115 @@ func shop_place(shop: GridEntity) -> String:
 	if not shop is Chest or not (shop as Chest).shop or stockpile == null:
 		return ""
 	return Stockpile.place_at(holdings, shop.zone if not shop.zone.is_empty() else zone.name, shop.tile)
+
+
+# --- The temple counter (decision 434) ----------------------------------------------
+
+## The town temple counter [param counter] is in ("" if none).
+func temple_town(counter: GridEntity) -> String:
+	if counter_town.is_valid():
+		return str(counter_town.call(counter))
+	return Stockpile.place_at(holdings, counter.zone if not counter.zone.is_empty() else zone.name, counter.tile)
+
+
+## Whose a thing [param by] hands in is, as a carrier key: a player's own;
+## a companion's, her player's (it goes back to them).
+func owner_of(by: GridEntity) -> String:
+	var keeper_id: Variant = by.get("keeper_id")
+	if not by is Player and keeper_id is String and not keeper_id.is_empty():
+		return "player:" + keeper_id
+	return holder_key(by)
+
+
+## Whether [param by] may take what is in temple counter [param counter]'s
+## [param slot]: it is held for them.
+func _collects(by: GridEntity, counter: GridEntity, slot: int) -> bool:
+	return towns != null and slot_uid(counter, slot) in towns.held(temple_town(counter), owner_of(by))
+
+
+## [param by] hands [param from]'s [param from_slot] to the priest at
+## temple counter [param counter], with an offering (rules' bless.offering
+## of its value, at least bless.least) from their player's gold into the
+## treasury: a bless job (Production.open_work), the thing held for them
+## when done (Towns). Refused, nothing moves, and they are told why: no
+## priest there, or not enough gold.
+func _hand_to_priest(by: GridEntity, from: GridEntity, from_slot: int, counter: GridEntity) -> bool:
+	var town := temple_town(counter)
+	var owner := owner_of(by)
+	var who := owner.trim_prefix("player:")
+	var workshop := "%s:temple" % town
+	var item := from.slots[from_slot]
+	if from == counter or not owner.begins_with("player:") or town.is_empty() or production == null or economy == null:
+		traded.emit(by, counter, "nobody takes things here")
+		return false
+	if not production.manned(workshop):
+		traded.emit(by, counter, "there is no priest at the temple now")
+		return false
+	var rule: Dictionary = production.rules.get("bless", {})
+	var offering := maxi(ceili(float(economy.value_of(item)) * float(rule.get("offering", 0.5))), int(rule.get("least", 1)))
+	if economy.gold(who) < offering:
+		traded.emit(by, counter, "the offering is %d gold" % offering)
+		return false
+	var uid := slot_uid(from, from_slot)
+	var taken := from.slots.duplicate()
+	var taken_uids := from.slot_items.duplicate()
+	taken[from_slot] = ""
+	taken_uids[from_slot] = 0
+	from.slots = taken
+	from.slot_items = taken_uids
+	economy.add_gold(who, -offering, "an offering at %s's temple" % town)
+	stockpile.deposit(town, "gold", offering, "offering:%s" % who, "an offering for a blessing")
+	production.open_work(workshop, uid, "bless", owner)
+	items.note(uid, "handed in", "at %s's temple by %s, %d gold offered" % [town, _label_of(by), offering], counter.zone, counter.tile)
+	_log("temple: %s handed in %s at %s for %d gold" % [by.name, item, town, offering])
+	_slots_changed(from)
+	gold_changed.emit(who, economy.gold(who))
+	traded.emit(by, counter, "")
+	return true
+
+
+## Temple counter [param counter] shows what its town holds for
+## [param by] (Main, while they are within reach; null when nobody is): the
+## slots not theirs put back to the town's keeping, empty ones filled with
+## theirs. Only they can take them (try_transfer); what else is in it
+## stays.
+func show_held(counter: GridEntity, by: GridEntity) -> void:
+	if towns == null or not (counter is Chest and (counter as Chest).temple):
+		return
+	var town := temple_town(counter)
+	var mine: Array[int] = []
+	if by != null:
+		mine = towns.held(town, owner_of(by))
+	_fit_uids(counter)
+	var slots := counter.slots.duplicate()
+	var uids := counter.slot_items.duplicate()
+	var changed := false
+	var anyone: Array[int] = []
+	for each in towns.held_owners(town):
+		anyone.append_array(towns.held(town, each))
+	for i in slots.size():
+		var uid := int(uids[i])
+		# Only what the town holds for someone else goes back; anything
+		# else in the counter stays as it is.
+		if uid != 0 and uid in anyone and uid not in mine:
+			items.place(uid, "temple:%s" % town)
+			slots[i] = ""
+			uids[i] = 0
+			changed = true
+	for uid in mine:
+		if uid in uids:
+			continue
+		var free := slots.find("")
+		if free < 0:
+			break
+		slots[free] = items.id_of(uid)
+		uids[free] = uid
+		items.place(uid, holder_key(counter))
+		changed = true
+	if changed:
+		counter.slots = slots
+		counter.slot_items = uids
+		_slots_changed(counter)
 
 
 ## A player [param by] puts [param from]'s [param from_slot] into shop
