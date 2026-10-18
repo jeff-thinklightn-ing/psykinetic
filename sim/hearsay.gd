@@ -163,8 +163,8 @@ static func prompt_words(heard: Array) -> String:
 	for entry in believed(heard):
 		var from := str(entry.get("from", ""))
 		var where := place_words(str(entry.get("where", "")))
-		said.append("%s%s told you that %s." % [_upper_first(where) + ", " if not where.is_empty() else "",
-			from if not from.is_empty() else "Someone", _lower_first(str(entry["text"]))])
+		said.append("%s told you%s that %s." % [from if not from.is_empty() else "Someone",
+			" " + where if not where.is_empty() else "", _lower_first(str(entry["text"]))])
 	if said.is_empty():
 		return ""
 	return "You have heard, and believe it though you are not sure: %s" % " ".join(said)
@@ -205,10 +205,6 @@ static func _next_id(heard: Array) -> String:
 
 static func _key(text: String) -> String:
 	return RegEx.create_from_string("[^a-z0-9 ]").sub(text.to_lower(), "", true).strip_edges()
-
-
-static func _upper_first(text: String) -> String:
-	return text.left(1).to_upper() + text.substr(1)
 
 
 static func _lower_first(text: String) -> String:

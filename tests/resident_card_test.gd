@@ -138,6 +138,23 @@ func _test_plain_card() -> void:
 	_check(words.begins_with("Bram was born in %s" % card["traits"]["birthplace"]) and words.contains(card["came"]) and words.contains("a medicine man")
 		and words.contains(card["traits"]["fear"]) and words.contains(card["look"]["stature"]), "the plain card says where they were born, how they came, their trade spaced, their fear and their look")
 	_check(not words.contains("\"") and not words.contains("..") and not words.contains(", ."), "and reads clean: %s" % words)
+	print("\n== the look string for the character generator (decision 419) ==")
+	var spec := ResidentCard.look_spec(card, "medicine_man")
+	var pairs := {}
+	for part: String in spec.split(" "):
+		pairs[part.get_slice("=", 0)] = part.get_slice("=", 1)
+	_check(spec.begins_with("seed=%d " % card["look"]["seed"]) and pairs.get("apron") == "yes" and pairs.has("headwear") and pairs.has("shoulders")
+		and pairs.get("hair_colour") == card["look"]["hair_colour"], "seed first, every look word as key=value, an apron for the medicine man: %s" % spec)
+	_check(pairs.get("body", "") == {"she": "female", "he": "male"}.get(card["traits"]["pronoun"], ""), "body from the pronoun (%s -> %s)" % [card["traits"]["pronoun"], pairs.get("body", "none")])
+	_check(ResidentCard.look_spec(card, "hauler").ends_with("apron=no"), "no apron for a hauler")
+	var bound := card.duplicate(true)
+	bound["look"]["hair"] = "bound up"
+	bound["traits"]["pronoun"] = "they"
+	bound["look"].erase("headwear")
+	var their := ResidentCard.look_spec(bound, "")
+	_check(their.contains("hair=bound ") and not their.contains("body=") and not their.contains("headwear="),
+		"'bound up' is written bound, 'they' leaves body to the seed, an old card without headwear leaves it out: %s" % their)
+	_check(ResidentCard.look_spec({}, "smith").is_empty(), "no look, no string")
 	_check(ResidentCard.words(card) == words, "words() is the plain card while nothing is written")
 	_check(not ResidentCard.take_written(card, "Too short.") and not ResidentCard.take_written(card, "He says \"hello\" and this is long enough to pass the length test but has speech in it, so no."),
 		"a short paragraph or one with speech is not taken")

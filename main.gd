@@ -3558,8 +3558,11 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
 	var label := Resident.label_of(str(each["name"]), trade)
+	# Their look for the character generator (decision 419), from the card
+	# (made now if need be, 398).
+	var look := ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade)
 	var body := _spawn({"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(),
-		"label": label, "tile": at}) as Resident
+		"label": label, "tile": at, "look": look}) as Resident
 	if body == null:
 		return null
 	body.worker_id = who

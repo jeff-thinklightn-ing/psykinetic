@@ -260,8 +260,8 @@ func _test_where_in_words() -> void:
 	var heard := []
 	var entry := Hearsay.hear(heard, "x", 1, "The mine is cursed", "beyond", "Tam", 0, false, 5, "well")
 	_check(bool(entry.get("believed", false)) and str(entry.get("where", "")) == "well", "kept with where it was heard")
-	_check(Hearsay.prompt_words(heard) == "You have heard, and believe it though you are not sure: At the well, Tam told you that the mine is cursed.",
-		"told as 'At the well, Tam told you that ...': %s" % Hearsay.prompt_words(heard))
+	_check(Hearsay.prompt_words(heard) == "You have heard, and believe it though you are not sure: Tam told you at the well that the mine is cursed.",
+		"told as 'Tam told you at the well that ...': %s" % Hearsay.prompt_words(heard))
 	var told := []
 	Hearsay.hear(told, "y", 10, "She saw the barn burn", "beyond", "Mara", 0)
 	_check(Hearsay.prompt_words(told).is_empty() or Hearsay.prompt_words(told).ends_with(": Mara told you that she saw the barn burn."),

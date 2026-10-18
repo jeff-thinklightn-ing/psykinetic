@@ -13,7 +13,7 @@
 	"grudge": {"chance": 0.25, "causes": ["over a fence line", "over a bad knife sold", "over a debt never repaid", "over a word said at the inn", "over a dog", "over a share of a harvest", "over a promise broken"]},
 	"look": {"_note": "What a resident looks like, rolled with the card by worker id, words the voice can say and pc-character's generator maps to a body (seed: the id's hash, for the details no word names); agreed with pc-character 2026-10-17.",
 		"build": ["lean", "middling", "middling", "heavy"], "stature": ["short", "middling", "middling", "tall"], "posture": ["straight", "straight", "stooped", "slouching"],
-		"hair": ["cropped", "long", "bound up", "bald"], "hair_colour": ["dark", "brown", "fair", "red", "grey"], "beard": ["none", "short", "full"], "shoulders": ["narrow", "middling", "broad"],
+		"hair": ["cropped", "long", "bound up", "bald"], "hair_colour": ["dark", "brown", "fair", "red", "grey"], "beard": ["none", "short", "full"], "shoulders": ["narrow", "middling", "broad"], "headwear": ["none", "none", "none", "hood", "hat"],
 		"age": ["young", "grown", "grown", "old"]},
 	"growth": {"facts_max": 16, "shown": 6, "prompt_chars": 600}
 }

@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Each of the town's people carries their look with them now (build, age,
+  hair, beard, a hood or hat, the trade's apron), ready for the character
+  models when they come; nothing changes on screen yet.
 - Clearing a raider camp takes it: kill its defenders and hold it for ten seconds, and it falls, freeing whoever it held. Its monsters stay gone until the raiders take it back, and a raid party coming home to it scatters.
 - The game can ask a server whether it is up, its version and how many are playing before you join, so the menu can show it.
 - The options end with Credits: who made the sounds (Freesound, Kenney, Sonniss), and a button that lists each sound's maker, licence and page (decision 406).

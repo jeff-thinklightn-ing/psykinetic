@@ -8710,6 +8710,16 @@ Rejected: a speech field of residents.json's own (lore's roles are the
 one source); believing by a model's judgement (a seeded roll on the
 intellect is the stat Jeff asked for); a claims ask on every line said
 near anyone (only residents within earshot, and a word test first).
+Amended (2026-10-18, npc, with pc-character's 419 and companions): the look
+gains headwear (none, a hood, a hat; old cards lack it and leave it to the
+seed), and ResidentCard.look_spec writes the look as the character generator
+reads it, 419's string ("seed=48213 body=female build=heavy stature=tall
+age=old posture=stooped shoulders=narrow hair=bound hair_colour=grey
+beard=none headwear=hood apron=yes"): body from the pronoun (none for
+"they"), "bound" for the card's "bound up", the apron from the trade
+(smith, cook, carpenter, medicine man). Main._spawn_resident puts it in the
+body's spawn spec as "look", the medicine man's too; today's client ignores
+it, pc-character's PersonLook reads it.
 ## 399. Humanoid clips the pack lacks are authored on its skeleton; a moves table per model
 
 Roadmap step 3 (combat animation states) splits: perf's rig (390) plays
@@ -10077,3 +10087,8 @@ economy's rescues (428, Towns.camp_taken on place_taken) never fired.
 
 tests/camp_fall_test (the test room with a camp laid round its imp),
 raid_groups_test's home to a fallen camp.
+Amended (2026-10-18, the coordinator): the voice is told "Tam told you at the
+well that the mine is cursed." (Hearsay.prompt_words), not "At the well, Tam
+told you that": the first transcript had Mara answer "You heard from Tam at
+the well ...", the sentence's opening "You have heard" pulling her into the
+second person.

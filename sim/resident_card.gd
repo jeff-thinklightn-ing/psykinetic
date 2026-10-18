@@ -20,7 +20,11 @@ extends RefCounted
 
 const TRAITS := "res://levels/resident_traits.json"
 const KEYS: Array[String] = ["pronoun", "birthplace", "parentage", "hobby", "food", "temperament", "fear", "speech"]
-const LOOK_KEYS: Array[String] = ["build", "stature", "posture", "hair", "hair_colour", "beard", "shoulders"]
+const LOOK_KEYS: Array[String] = ["build", "stature", "posture", "hair", "hair_colour", "beard", "shoulders", "headwear"]
+## Trades that wear an apron (the look string's "apron", decision 419).
+const APRON_TRADES: Array[String] = ["smith", "cook", "carpenter", "medicine_man"]
+## The look string's keys, in order, after seed and body.
+const SPEC_KEYS: Array[String] = ["build", "stature", "age", "posture", "shoulders", "hair", "hair_colour", "beard", "headwear"]
 ## The card call: one paragraph, as JSON, from the facts given.
 const CARD_SYSTEM := """You write a character card for one of a town's people in a game: who they are, from facts given. Write in the
 third person with the pronoun given, in plain words, one paragraph of four to six sentences: what they are like, what they care about, how they
@@ -85,6 +89,34 @@ static func _roll_look(table: Dictionary, rng: RandomNumberGenerator, pronoun: S
 	if pronoun == "she":
 		look["beard"] = "none"
 	return look
+
+
+## The look as the character generator reads it (pc-character's decision
+## 419, agreed with companions): space-separated key=value, every key
+## optional, so a word a card lacks (an old card's headwear) or a client
+## does not know is left to the seed. "seed=48213 body=female build=heavy
+## stature=tall age=old posture=stooped shoulders=narrow hair=bound
+## hair_colour=grey beard=none headwear=hood apron=yes": body from the
+## pronoun (none for "they": the seed picks), "bound" for the card's "bound
+## up", the apron from [param trade] (APRON_TRADES). "" for a card with no
+## look.
+static func look_spec(card: Dictionary, trade := "") -> String:
+	var look: Dictionary = card.get("look", {})
+	if look.is_empty():
+		return ""
+	var parts: Array[String] = ["seed=%d" % int(look.get("seed", 0))]
+	var body: String = {"she": "female", "he": "male"}.get(str(card.get("traits", {}).get("pronoun", "")), "")
+	if not body.is_empty():
+		parts.append("body=" + body)
+	for key: String in SPEC_KEYS:
+		var word := str(look.get(key, ""))
+		if word.is_empty():
+			continue
+		if key == "hair" and word == "bound up":
+			word = "bound"
+		parts.append("%s=%s" % [key, word])
+	parts.append("apron=%s" % ("yes" if trade in APRON_TRADES else "no"))
+	return " ".join(parts)
 
 
 static func _pick(options: Array, rng: RandomNumberGenerator) -> String:
