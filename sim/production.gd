@@ -666,7 +666,7 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		# measures it short here (492, items' 493).
 		made.emit(str(each["town"]), str(worker_record["id"]), uid)
 	each["uids"] = []
-	var yields := Items.yield_of(book().id_of(uid)) if uid != 0 else {}
+	var yields := book().yields_of(uid) if uid != 0 else {}  # A short one's share (decision 493).
 	if not yields.is_empty():
 		# A raw made from raws (the tanner's leather) is the town's stock, for
 		# its own work to use (the mend, the buckler: decision 405 amended).

@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_kills()
 	_test_bane()
 	_test_style()
+	_test_short()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -1208,6 +1209,32 @@ func _test_style() -> void:
 	World.items.end(held, "gone")
 	imp.slots = had_slots
 	imp.spawn_spec["props"] = had_props
+
+
+func _test_short() -> void:
+	print("\n== short measure: a scoundrel's sack or bundle, never gear (decision 493) ==")
+	_check(Items.measured("food_sack") and Items.measured("arrows") and Items.measured("hide")
+			and not Items.measured("sword") and not Items.measured("bow") and not Items.measured("shield") and not Items.measured("ration"),
+			"measured: sacks, hides, a bundle of arrows; never a weapon, gear, or a whole ration")
+	var sword := World.items.mint("sword", "made")
+	_check(not World.items.make_short(sword) and World.items.short_of(sword) == 1.0, "a sword is never short")
+	var sack := World.items.mint("food_sack", "made")
+	_check(World.items.make_short(sack) and World.items.yields_of(sack) == {"food": 3} and Items.yield_of("food_sack") == {"food": 5},
+			"a short food sack banks 3 food of 5 (%s)" % [World.items.yields_of(sack)])
+	_check(not World.items.make_short(sack, 0.1) and World.items.yields_of(sack) == {"food": 3}, "short once only")
+	_check(World.item_note(sack) == Items.name_of("food_sack") + ", short measure" and World.story_line(sack).ends_with("short measure")
+			and World.items.history(sack)["events"].back()["kind"] == "short" and World.items.history(sack)["events"].back()["what"] == "",
+			"its note and story say so, naming no one (%s)" % World.item_note(sack))
+	var arrows := World.items.mint("arrows", "made")
+	World.items.make_short(arrows)
+	_check(World.items.condition_of(arrows) == 6, "a short bundle: 6 arrows of 10")
+	var hide := World.items.mint("hide", "made")
+	World.items.make_short(hide)
+	_check(World.items.yields_of(hide) == {"hide": 1}, "a single hide's one stays one")
+	var back := ItemBook.from_dict(World.items.to_dict())
+	_check(back.yields_of(sack) == {"food": 3} and back.short_of(sword) == 1.0, "saved and read back")
+	for uid in [sword, sack, arrows, hide]:
+		World.items.end(uid, "gone")
 
 
 func _test_bane() -> void:

@@ -12929,3 +12929,27 @@ move (economy.json "scoundrel": {"buy": 1.0, "sell": 1.1, "repay": 0.0}).
   are as for anyone, so the bank is never cheated past them.
 larder_test. Protocol unchanged.
 
+## 493. Short measure on an item instance
+
+For npc's scoundrel (393's hidden types; its 492), approved by the
+coordinator with Jeff's rule: a thing a scoundrel makes may come out short,
+but only a thing measured by count or weight, never a weapon, a tool or a
+piece of gear (no quality tiers on gear).
+- Items.measured(id): a resource with a yield (a sack, a bolt, a hide) or a
+  bundle of arrows with a count (its condition). Everything else, gear and
+  whole things like a ration, is never short.
+- ItemBook.make_short(uid, fraction := 0.6): once, for life. A bundle's
+  count drops to that share of its most (rounded down, at least 1: 6 arrows
+  of 10). A resource keeps "short" (saved), and ItemBook.yields_of(uid),
+  which banking (World._bank_thing) and Production's made goods now read
+  in place of Items.yield_of, gives each count's share (rounded down, at
+  least 1: a food sack banks 3 food of 5; a single hide stays 1, so a stack
+  comes up short by count, economy's call). False and nothing for a thing
+  not measured or already short.
+- Noted "short" (a kept event) naming no one: the maker is in its "made"
+  event, and a hidden scoundrel is found out by his debts, not his sacks.
+  Its note adds "short measure", and so does its story.
+- npc calls it once, when economy says a worker finished the thing, before
+  it is banked.
+Protocol unchanged: a client reads no yield, and the note is the server's
+text. items_test's _test_short.

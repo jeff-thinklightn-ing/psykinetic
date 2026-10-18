@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way", "short"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -316,6 +316,40 @@ func condition_of(uid: int) -> int:
 	return int(_book[uid].get("condition", Items.condition_max(id_of(uid))))
 
 
+## [param uid] made short (decision 493): a measured thing (Items.measured)
+## holds [param fraction] of its full measure, for life. A bundle's count
+## (its condition) drops to that share; a resource keeps "short" (saved) and
+## banks that share of its yield (yields_of). Noted "short", naming no one:
+## the maker is in its "made" event. False, and nothing, for a thing not
+## measured or already short.
+func make_short(uid: int, fraction := 0.6, zone := "", tile := Vector2i(-1, -1)) -> bool:
+	if not _book.has(uid) or not Items.measured(id_of(uid)) or _book[uid].has("short"):
+		return false
+	var share := clampf(fraction, 0.0, 1.0)
+	_book[uid]["short"] = share
+	if condition_of(uid) >= 0:
+		set_condition(uid, maxi(floori(Items.condition_max(id_of(uid)) * share), 1))
+	note(uid, "short", "", zone, tile)
+	return true
+
+
+## The share of its full measure [param uid] holds (decision 493): 1.0 for
+## a full or unmeasured thing.
+func short_of(uid: int) -> float:
+	return float(_book[uid].get("short", 1.0)) if _book.has(uid) else 1.0
+
+
+## What banking [param uid] gives (Items.yield_of its id), a short one's
+## each count cut to its share, rounded down, at least 1 (decision 493).
+func yields_of(uid: int) -> Dictionary:
+	var yields := Items.yield_of(id_of(uid))
+	var share := short_of(uid)
+	if share < 1.0:
+		for what: String in yields:
+			yields[what] = maxi(floori(int(yields[what]) * share), 1)
+	return yields
+
+
 ## [param uid]'s condition set to [param amount], within 0 and its most
 ## (wear, the fletcher's mending). Nothing for a thing with none.
 func set_condition(uid: int, amount: int) -> void:
@@ -504,6 +538,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				"carriers": carriers, "events": events}
 			if entry.get("condition") is float or entry.get("condition") is int:
 				items._book[int(key)]["condition"] = int(entry["condition"])
+			if (entry.get("short") is float or entry.get("short") is int) and float(entry["short"]) >= 0.0 and float(entry["short"]) < 1.0:
+				items._book[int(key)]["short"] = float(entry["short"])
 			if str(entry.get("style", "")) in Items.STYLES:
 				items._book[int(key)]["style"] = str(entry["style"])
 			if entry.get("blessed") is Dictionary and entry["blessed"].get("for") is String:

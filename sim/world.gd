@@ -2166,6 +2166,8 @@ func item_note(uid: int) -> String:
 			more.append(items.style_of(uid))
 	if items.condition_of(uid) >= 0:
 		more.append("%d of %d" % [items.condition_of(uid), Items.condition_max(items.id_of(uid))])
+	if items.short_of(uid) < 1.0:
+		more.append("short measure")  # Decision 493.
 	if not items.bane_of(uid).is_empty():
 		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
 	if not items.grudge_of(uid).is_empty():
@@ -2223,6 +2225,8 @@ func story_line(uid: int) -> String:
 			parts.append(origin)
 	if not items.style_of(uid).is_empty():
 		parts.append("%s work" % items.style_of(uid))  # Decision 474.
+	if items.short_of(uid) < 1.0:
+		parts.append("short measure")  # Decision 493.
 	if not items.kept_from(uid).is_empty() and not name.is_empty():
 		parts.append("kept from %s" % name["holder"])
 	if not items.blessed_for(uid).is_empty():
@@ -2498,7 +2502,7 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 ## [param place], brought [param who] someone from [param from]: a resource
 ## item as its yield (its instance ended, "banked"), gear as itself.
 func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i, by_id := "") -> void:
-	var yields := Items.yield_of(items.id_of(uid))
+	var yields := items.yields_of(uid)  # A short one's share (decision 493).
 	if yields.is_empty():
 		stockpile.bank(place, uid, who, from, at_zone, tile, "banked", by_id)
 		return

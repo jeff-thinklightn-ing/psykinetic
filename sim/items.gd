@@ -608,6 +608,14 @@ static func add_loot_for_test(table: String, rows: Array) -> void:
 	loot_tables()[table] = read_loot(JSON.stringify({"tables": {table: rows}}))[table]
 
 
+## Whether [param id] is a thing measured by count or weight (decision
+## 493; Jeff: a scoundrel's work may come out short in such things, never in
+## a weapon, tool or piece of gear): a resource with a yield (a sack, a
+## bolt, a hide) or a bundle of arrows with a count (its condition).
+static func measured(id: String) -> bool:
+	return not yield_of(id).is_empty() or not ammo_of(id).is_empty() and condition_max(id) > 0
+
+
 static func yield_of(id: String) -> Dictionary:
 	return def(id).get("yield", {}).duplicate() if has_tag(id, "resource") else {}
 
