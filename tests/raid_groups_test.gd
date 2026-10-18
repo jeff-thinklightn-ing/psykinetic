@@ -12,7 +12,11 @@ extends Node
 ## with it into play and survives a restart, while a fed camp's is as ever;
 ## a group coming home to a fallen camp breaks up, its captive freed
 ## (decision 429); a restart keeps the groups and the switch, one in play going on from
-## where it was. Run it with tests/run.ps1
+## where it was. In play for real (decision 408): the same map's town strip
+## loaded into World, the group handed to the real World.raids, its raiders
+## marching on the store, raiding it (Towns.raid_arrives), marching back out
+## and handed back to go home on the world map, its captive held at the
+## camp; a second group beaten in play is gone. Run it with tests/run.ps1
 ## or tests/run.sh.
 
 const RaidsTest := preload("res://tests/raids_test.gd")
@@ -39,6 +43,7 @@ var _now := 0
 var _towns: Towns
 var _holdings: Holdings
 var _groups: WorldRaids
+var _strip: Array[String] = []
 
 
 func _ready() -> void:
@@ -51,6 +56,7 @@ func _ready() -> void:
 	_test_hungry()
 	_test_fallen_home()
 	_test_saved()
+	_test_in_play()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -61,6 +67,7 @@ func _register() -> void:
 	var rows: Array[String] = []
 	for y in 2 * 5 - 1:
 		rows.append(".".repeat(2 * 30 - 1))
+	_strip = rows
 	var strip := Level.image_from_rows(rows)
 	Level.register("rg_camp", strip, null, {"neighbours": {"east": "rg_town"},
 		"places": {"camp": {"at": [3, 2], "kind": "camp", "holder": "goblins", "worth": 10}}})
@@ -243,6 +250,90 @@ func _test_saved() -> void:
 	_fresh(JSON.parse_string(JSON.stringify(saved)))
 	_check(_groups.on and _groups.groups.has(id), "raids are still on and the group still out")
 	_check(_groups.groups.get(id, {}).get("state") == WorldRaids.OUT, "one in play when saved (raiders are not) goes on from where it was")
+
+
+func _test_in_play() -> void:
+	print("== in play for real: World.raids marches on the town and hands the group back (decision 408) ==")
+	_fresh({})
+	World.reset()
+	World.load_terrain(Terrain.parse(_strip))  # The town's strip, as its zone would hold it.
+	var room := Node2D.new()
+	add_child(room)
+	var was_holdings := World.holdings
+	var was_towns := World.towns
+	World.holdings = _holdings
+	World.towns = _towns
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var entity := EntityFactory.build(spec)
+		room.add_child(entity)
+		if not World.spawn(entity, spec["tile"]):
+			entity.free()
+			return null
+		return entity
+	World.raids.clear()
+	_groups.hook(World.raids)
+	_groups.live = func(area: String) -> bool: return area == "rg_town"
+	_groups.set_on(true)
+	var done: Array[Dictionary] = []
+	var on_done := func(id: String, report: Dictionary) -> void: done.append({"id": id, "report": report})
+	World.raids.raid_done.connect(on_done)
+	var id := _groups.send(CAMP, TOWN)
+	_until_present(id)
+	var raiders := World.raids.raiders(id)
+	_check(_groups.groups.get(id, {}).get("state") == WorldRaids.PRESENT and not raiders.is_empty()
+		and raiders.all(func(each: Monster) -> bool: return each.raid == id),
+		"walking into the awake town zone it is real raiders (%d), its own" % raiders.size())
+	var came_in: Vector2i = _groups.groups.get(id, {}).get("cell", Vector2i.ZERO)
+	_check(came_in.x < 20 and raiders.all(func(each: Monster) -> bool: return World.distance(each.tile, came_in) <= Raids.SPREAD_TILES),
+		"about where the world map had it, short of the store (%s: %s)" % [came_in, raiders.map(func(each: Monster) -> Vector2i: return each.tile)])
+	_check(is_equal_approx(World.raids.strength(id), float(_groups.groups[id]["strength"])), "as strong as the group (%.1f)" % World.raids.strength(id))
+	var reached := false
+	for i in 4000:
+		World.step()
+		if not done.is_empty():
+			reached = true
+			break
+	_check(reached and done[0]["id"] == id, "they march on the store and raid it (%s)" % [done[0]["report"] if reached else "never got there"])
+	_check(reached and _groups.groups.get(id, {}).get("raided", false), "the world map hears it (raided)")
+	for i in 4000:
+		if _groups.groups.get(id, {}).get("state") != WorldRaids.PRESENT:
+			break
+		World.step()
+	var group: Dictionary = _groups.groups.get(id, {})
+	_check(group.get("state") == WorldRaids.HOME and World.raids.ids().is_empty() and World.monsters().is_empty(),
+		"back at the edge they leave play, going home on the world map (%s, %d monsters)" % [group.get("state"), World.monsters().size()])
+	_check(group.get("area") == "rg_town" and World.distance(group.get("cell", Vector2i(99, 99)), came_in) <= Raids.SPREAD_TILES + Raids.ARRIVE_TILES,
+		"from back where they came in (%s %s), Dag with them (%s)" % [group.get("area"), group.get("cell"), group.get("carries", {})])
+	for i in 60:
+		if not _groups.groups.has(id):
+			break
+		_tick()
+	var held: Array = _towns.captives(TOWN).map(func(captive: Dictionary) -> String: return str(captive.get("held_by", "")))
+	_check(not _groups.groups.has(id) and held.has(CAMP), "and walk home without coming back into play, Dag held at the camp (%s)" % [held])
+	# A second group, beaten in play.
+	id = _groups.send(CAMP, TOWN)
+	_until_present(id)
+	raiders = World.raids.raiders(id)
+	_check(not raiders.is_empty(), "a second group in play (%d raiders)" % raiders.size())
+	for each in raiders:
+		World.damage(each, 9999)
+	World.step()
+	_check(not _groups.groups.has(id) and World.raids.ids().is_empty(), "every raider down: beaten, gone from the world map too")
+	World.raids.raid_done.disconnect(on_done)
+	World.raids.clear()
+	World.spawn_spec = Callable()
+	World.holdings = was_holdings
+	World.towns = was_towns
+	World.reset()
+	room.free()
+
+
+## World ticks till group [param id] is in play (or 30 of them).
+func _until_present(id: String) -> void:
+	for i in 30:
+		if _groups.groups.get(id, {}).get("state") == WorldRaids.PRESENT:
+			return
+		_tick()
 
 
 func _strings(values: Array) -> Array[String]:

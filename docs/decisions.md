@@ -10315,3 +10315,26 @@ skips marks off the part it shows before placing them. After: 11.3 ms with
 8 players, about 14 with 2. Rejected: caching _local_player for a frame (a
 player spawned or gone in that frame would be missed); events for doors
 coming and going (more wiring for what half a second late does not show).
+## 408. The raid handover is tested on the real pieces, before any real camp
+
+No real level has a camp yet, so WorldRaids (328) has never handed a group to
+World.raids (313) outside a stand-in. raid_groups_test's two strips (a goblin
+camp, the town's store) now also run in play for real: the town strip loaded
+into World, real Holdings, Towns and WorldRaids hooked to the real World.raids,
+the town's area live. A group sent walks the world map into the town area and
+becomes real raiders about the cell the world tick had it at (it is already
+some steps in, not at the edge), as strong as the group; they march on the
+store and raid it (Towns.raid_arrives: food, and Dag carried off); WorldRaids
+hears raid_done; they march back to where they came in, leave play
+(raid_left) and the group walks home on the world map without coming back
+into play, its captive held at the camp. A second group, every raider struck
+down, is beaten (raid_beaten) and gone from the world map too.
+
+- A test, no game change: the same scene, port and scratch name. The check
+  through a real area (a held camp in a real level, a headless host with
+  --raids and the console's raids send) waits for Jeff or maps to place one.
+- Seen while writing it: Towns carries a resident off by the numbers here
+  because Towns.in_play is unset here; in a real game Main sets it, and
+  raiders' blows take people instead (331).
+
+tests/raid_groups_test.
