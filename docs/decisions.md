@@ -12360,6 +12360,20 @@ the loincloth (widened over the thighs); scales as banding (kobold_bands: every 
 SCALE_BAND on its back, the tail's top and the shins' fronts the crest's dark tint), its belly
 pale (a new palette region, "Belly", body_build); the crest and ruff half the size, the ears
 swept out.
+
+Amended (Jeff, "orc p2 from redo": art-gen's redo v7 p2, the hulking hunched brute, grey-blue,
+an iron shoulder plate and a chain): the orc restyled to it, at the kobold's second-pass effort.
+Grey-blue skins (PersonLook's orc PEOPLE_SKINS), bald (no hair parts), its loincloth brown
+(ORC_LOINCLOTH), stooped (PEOPLE_POSTURES). body_gen's orc: shoulders set far wider (its arms
+hang out from its body), a huge chest and traps, a very short neck (its head low), arms and hands
+far bigger, shorter thick legs, bare legs and feet (the "Skin" tint), a broader jaw and bigger
+lower tusks, the head a fifth larger; an iron plate rigid on its left shoulder with a dark rim
+(shoulder_plate), an iron buckle on its belt, and a chain where the harness strap was, from its
+left shoulder across its chest and back to its right hip in alternating iron and dark links;
+the iron a new palette region, "Iron" (body_build, the metal row). Its slot art-kit's (2.70 x
+1.95 x 0.73 in T-pose). The coordinator: the generator is at its limit for monsters; the next
+step is a trial of meshing the picked concepts (TRELLIS) and retargeting them onto these rigs,
+for Jeff to choose the route.
 ## 481. A kobold fights with a dagger and drops a pick 1 time in 5
 
 The coordinator, on the kobold's look (pc-character's 478) and items' pick
@@ -13184,7 +13198,8 @@ Amended (the coordinator: npc's 471 seats Snagfin as a Resident of kind "imp"): 
 gave every Resident a person's body. A Resident whose spawn spec names a kind with a model draws
 that model (MODELS), marked at home, and a goblin at home goes bare-headed (its look's hood down,
 "hood=down" in its words). Checked on a wilds host: Snagfin by the store, the goblin, his hood
-down (C:\deveview\people\snagfin.png). His look string carries no trade (an outcast's, npc),
+down (C:\dev
+eview\people\snagfin.png). His look string carries no trade (an outcast's, npc),
 and a goblin has no apron, so no apron.
 ## 489. BuildingComposer: a kind's look, seeded, off the grid
 

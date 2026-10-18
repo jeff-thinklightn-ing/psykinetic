@@ -76,9 +76,9 @@ const BEARD_CHANCE := 0.5
 const HOOD_CHANCE := 0.1
 const HAT_CHANCE := 0.12
 const POSTURES := ["straight", "stooped", "slouching"]
-## An ally's skins (decision 478): an orc's tints of the Blood Rot's green, a
-## kobold's light reds (Jeff's pick); and hair.
-const PEOPLE_SKINS := {"orc": ["6f8a4a", "5f7a40", "7d9152", "56703c", "68804a"],
+## An ally's skins (decision 478): an orc's grey-blues, a kobold's light reds
+## (Jeff's picks); and hair.
+const PEOPLE_SKINS := {"orc": ["6a7a8c", "5f7080", "74849a", "66768a", "5a6a7c"],
 	"kobold": ["c8656e", "d0707a", "b85a66", "c26a76", "d27880"]}
 ## A kobold's (Jeff's p1, 478 restyled): its limbs and tail purple (the
 ## "trousers" tint on body_gen's kobold), its crest and ruff dark purple, its
@@ -87,10 +87,10 @@ const KOBOLD_LIMBS := ["74508f", "6e4a8a", "7c5596", "664283"]
 const KOBOLD_CREST := "4a2f5e"
 const KOBOLD_LOINCLOTH := "6b4a35"
 const PEOPLE_HAIR := "1f1a17"
-## An orc's hair: cropped, bound (a topknot) or none.
-const ORC_HAIR := ["cropped", "bound", "bald"]
+## An orc's loincloth (Jeff's p2: bald, its loincloth brown).
+const ORC_LOINCLOTH := "6b4a35"
 ## An ally's posture: an orc's slouch, a kobold's crouch.
-const PEOPLE_POSTURES := {"orc": "slouching", "kobold": "slouching"}
+const PEOPLE_POSTURES := {"orc": "stooped", "kobold": "slouching"}
 ## How likely an old person with no posture named stoops.
 const OLD_STOOPED := 0.3
 
@@ -280,9 +280,8 @@ func _ally(said: String, rng: RandomNumberGenerator) -> void:
 	beard = "none"
 	parts.clear()
 	if people == "orc":
-		hair = ORC_HAIR[rng.randi() % ORC_HAIR.size()]
-		if HAIR_PARTS[hair] != "":
-			parts.append(HAIR_PARTS[hair])
+		hair = "bald"
+		colours["tunic"] = Color(ORC_LOINCLOTH)
 	else:
 		# No cap or lamp (kobolds see in the dark); its limbs, crest and loincloth.
 		hair = "bald"

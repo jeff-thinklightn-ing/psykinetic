@@ -64,18 +64,18 @@ def per(human, orc=None, kobold=None):
 ## across; spine; neck: to the head; hands: the fingers; feet: heel to toe). The feet are
 ## then put back on the ground.
 PROPORTIONS = {
-	"orc": {"legs": 0.94, "arms": 1.12, "shoulders": 1.3, "hips": 1.18, "spine": 1.0, "neck": 0.55,
-		"hands": 1.25, "feet": 1.15},
+	"orc": {"legs": 0.84, "arms": 1.16, "shoulders": 1.7, "hips": 1.2, "spine": 1.0, "neck": 0.3,
+		"hands": 1.5, "feet": 1.3},
 	"kobold": {"legs": 0.66, "arms": 1.0, "shoulders": 1.05, "hips": 0.92, "spine": 0.84, "neck": 0.55,
 		"hands": 1.55, "feet": 1.6},
 }
 ## The torso's rings (torso_rings' ten) widened or narrowed by people: across, front to back.
 TORSO_WIDTH = {
-	"orc": [1.15, 1.15, 1.15, 1.2, 1.22, 1.3, 1.32, 1.34, 1.5, 1.5],
+	"orc": [1.2, 1.18, 1.18, 1.3, 1.5, 1.85, 2.05, 2.05, 2.3, 1.8],
 	"kobold": [1.0, 0.98, 0.95, 0.86, 0.94, 1.08, 1.1, 1.08, 0.9, 0.9],
 }
 TORSO_DEPTH = {
-	"orc": [1.15, 1.15, 1.15, 1.2, 1.25, 1.3, 1.3, 1.3, 1.45, 1.45],
+	"orc": [1.2, 1.2, 1.25, 1.35, 1.5, 1.7, 1.75, 1.7, 1.85, 1.6],
 	"kobold": [1.08, 1.04, 1.0, 0.98, 1.04, 1.1, 1.0, 0.95, 0.88, 0.88],
 }
 
@@ -503,7 +503,7 @@ def sleeve(J: dict, side: str) -> Part:
 	down = Vector((0.0, 0.0, -0.018))
 	stations = [(inner + down, 0.052, 0.075), (sh + along * 0.03 + down, 0.060, 0.074), (sh.lerp(el, 0.45), 0.058, 0.058),
 		(el, 0.048, 0.050), (el.lerp(wr, 0.5), 0.046, 0.044), (wr - along * 0.01, 0.040, 0.036)]
-	k = pick(1.0, 0.86) * m("arms") * per(1.0, 1.45, 1.45)  # The woman's arms slighter, an orc's thick.
+	k = pick(1.0, 0.86) * m("arms") * per(1.0, 2.4, 1.45)  # The woman's arms slighter, an orc's massive.
 	for c, rv, ru in stations:
 		# u forward, v up: the arm's front-to-back depth and its height.
 		p.add(ring(c, FRONT, Z, ru * k, rv * k, 8, 0.3))
@@ -512,7 +512,7 @@ def sleeve(J: dict, side: str) -> Part:
 
 def leg(J: dict, side: str) -> Part:
 	"""A leg in its trousers: from inside the hip to the boot top."""
-	p = Part("Leg_" + side, "Trousers")
+	p = Part("Leg_" + side, per("Trousers", "Skin", "Trousers"))  # An orc's legs bare.
 	p.bones = ["pelvis", "thigh_" + side, "calf_" + side, "foot_" + side]
 	hip, knee, ankle = J["thigh_" + side], J["calf_" + side], J["foot_" + side]
 	out = 1.0 if side == "l" else -1.0
@@ -529,7 +529,7 @@ def leg(J: dict, side: str) -> Part:
 	scale = pick([1.0] * 7, [1.04, 1.0, 0.95, 0.9, 0.9, 0.88, 0.88])
 	for k, (c, ru, rv, dx) in enumerate(stations):
 		back = {1: 0.018, 4: 0.012}.get(k, 0.0)  # The seat; the calf.
-		f = scale[k] * m("legs") * (m("thighs") if k < 2 else 1.0) * per(1.0, 1.35, 1.45 if k < 3 else 1.4)
+		f = scale[k] * m("legs") * (m("thighs") if k < 2 else 1.0) * per(1.0, 1.85 if k < 3 else 1.7, 1.45 if k < 3 else 1.4)
 		# (2) A kobold's leg digitigrade on the same bones: the knee a little forward, the hock
 		# (three quarters down the calf) well back, the shin slanting down and forward from it.
 		bend = per(0.0, 0.0, [0.0, 0.0, -0.01, -0.045, -0.01, 0.075, 0.03][k])
@@ -539,7 +539,7 @@ def leg(J: dict, side: str) -> Part:
 
 def boot(J: dict, side: str) -> Part:
 	"""A boot: a shaft from below the knee to the ankle, then the foot to the toe, flat soled."""
-	p = Part("Boot_" + side, per("Boots", "Boots", "Trousers"))
+	p = Part("Boot_" + side, per("Boots", "Skin", "Trousers"))  # An orc's feet bare.
 	p.bones = ["calf_" + side, "foot_" + side, "ball_" + side]
 	knee, ankle, ball, toe = J["calf_" + side], J["foot_" + side], J["ball_" + side], J["ball_" + side + ".tail"]
 	top = knee.lerp(ankle, 0.30)
@@ -581,7 +581,7 @@ def hand(J: dict, side: str) -> Part:
 	p = Part("Hand_" + side, "Skin")
 	p.bones = ["lowerarm_" + side, "hand_" + side, "middle_01_" + side, "middle_02_" + side]
 	wr = J["hand_" + side]
-	k = pick(1.0, 0.88) * m("hands") * per(1.0, 1.3, 1.6)  # The woman's hands narrower and thinner.
+	k = pick(1.0, 0.88) * m("hands") * per(1.0, 1.75, 1.6)  # The woman's hands narrower and thinner.
 	reach = per(1.0, *PROPORTIONS_OF("hands"))  # As long as the skeleton's fingers.
 	for dx, w, h in [(-0.015, 0.036, 0.028), (0.02, 0.050, 0.027), (0.065, 0.053, 0.023), (0.105, 0.048, 0.018),
 			(0.135, 0.034, 0.013)]:
@@ -651,7 +651,7 @@ def head_rings(J: dict) -> list:
 	kw, kd, kp = pick((1.0, 1.0, 1.0), (0.95, 0.97, 0.75))
 	# An orc's lower face broad (the jaw, the chin, the mouth) and its brow a ridge; a
 	# kobold's head narrow, its mouth and nose drawn out into a snout (SNOUT).
-	jaw_wide = per({}, {0.040: 1.28, 0.070: 1.18, 0.102: 1.08}, {0.010: 0.8, 0.040: 0.72, 0.070: 0.7, 0.102: 0.72})
+	jaw_wide = per({}, {0.010: 1.25, 0.040: 1.48, 0.070: 1.32, 0.102: 1.12}, {0.010: 0.8, 0.040: 0.72, 0.070: 0.7, 0.102: 0.72})
 	for z, w, d, yc, push in stations:
 		w, d, push = w * kw * jaw_wide.get(z, per(1.0, 1.04, 0.86)), d * kd, push * kp
 		if z < 0.08:
@@ -739,7 +739,7 @@ def face(J: dict) -> list:
 		if PEOPLE == "orc":
 			# Small ears swept back to a point; two tusks up from the lower jaw.
 			parts.append(box("Ear", "Skin", at(0.088 * side, 0.030, 0.128), Vector((0.012, 0.060, 0.026)), 0.45, rigid="Head"))
-			parts.append(spike("Tusk", "Bone", at(0.040 * side, -0.100, 0.046), at(0.047 * side, -0.112, 0.094), 0.010))
+			parts.append(spike("Tusk", "Bone", at(0.048 * side, -0.104, 0.040), at(0.062 * side, -0.122, 0.112), 0.018))
 		else:
 			parts.append(box("Ear", "Skin", at(0.080 * side, 0.004, 0.120), Vector((0.012, 0.030, pick(0.045, 0.040))), 0.8, rigid="Head"))
 	return parts
@@ -845,14 +845,33 @@ def harness(J: dict) -> list:
 		return r[i].lerp(r[(i + 1) % len(r)], f - math.floor(f))
 
 	out = []
-	for name, start, end in [("Harness_Front", 4.6, 1.5), ("Harness_Back", 7.4, 10.5)]:
-		p = Part(name, "Belt", follow=True)
+	for name, start, end in [("Chain_Front", 4.6, 1.5), ("Chain_Back", 7.4, 10.5)]:
+		# Jeff's p2 (478 restyled): a heavy iron chain where the strap was, its links in
+		# alternate bands of the iron and the belt's dark.
 		for k in range(3, 8):
-			f = start + (end - start) * (k - 3) / 4.0
-			a, b = at(rings[k], f - 0.28), at(rings[k], f + 0.28)
-			p.add(slab([a, b], axis, 0.008, 0.002))
-		out.append(p)
+			# A link from this ring of the torso to the next, along the diagonal.
+			p = Part("%s_%d" % (name, k), "Iron" if k % 2 else "Belt", follow=True)
+			for kk in (k, k + 1):
+				f = start + (end - start) * (kk - 3) / 5.0
+				a, b = at(rings[kk], f - 0.3), at(rings[kk], f + 0.3)
+				p.add(slab([a, b], axis, 0.03, 0.002))
+			out.append(p)
 	return out
+
+
+def shoulder_plate(J: dict) -> list:
+	"""An orc's iron shoulder plate (Jeff's p2): curved over its left shoulder, rigid on the
+	upper arm's root, its rim flaring out over the arm."""
+	p = Part("Plate", "Iron", rigid="clavicle_l")
+	sh = J["upperarm_l"]
+	for z, w, d, out in [(0.16, 0.16, 0.17, 0.02), (0.10, 0.20, 0.20, 0.05), (0.03, 0.21, 0.21, 0.08), (-0.06, 0.20, 0.19, 0.11)]:
+		c = sh + Vector((out, 0.0, z))
+		p.add(ring(c, X, FRONT, w * 0.75, d * 0.75, 10, 0.45))
+	rim = Part("Plate_Rim", "Belt", rigid="clavicle_l")
+	for z, w in [(-0.08, 0.215), (-0.11, 0.205)]:
+		rim.add(ring(sh + Vector((0.11, 0.0, z)), X, FRONT, w * 0.75, w * 0.72, 10, 0.45))
+	buckle = box("Buckle", "Iron", J["spine_01"] + Vector((0.0, -0.21, 0.0)), Vector((0.11, 0.03, 0.09)), rigid="spine_01")
+	return [p, rim, buckle]
 
 
 def collar(J: dict) -> Part:
@@ -1135,7 +1154,7 @@ WEARABLES = {
 ## An ally's own (decision 478): an orc may crop or bind its hair (a topknot); a kobold wears
 ## its cap or goes bare-headed.
 PEOPLE_WEARABLES = {
-	"orc": ["Hair_Cropped", "Hair_Bound"],
+	"orc": [],  # Bald (Jeff's p2).
 	"kobold": [],  # Kobolds see in the dark: no cap, no lamp (Jeff's p1).
 }
 WEARABLES["Cap_Candle"] = miner_cap
@@ -1185,7 +1204,7 @@ def assemble(J: dict, which: str = "Body"):
 	Head bone, or as near) grows by MORPH's "head" about the Head bone."""
 	if which == "Body":
 		parts = [torso(J), belt(J), neck(J), head(J)] + per([collar(J)], [], []) + face(J)
-		parts += per([], [kilt(J)] + harness(J), [tail(J), kilt(J, 0.4, "Loincloth", 1.22)] + ruff(J))
+		parts += per([], [kilt(J, 0.62, "Loincloth", 1.12)] + harness(J) + shoulder_plate(J), [tail(J), kilt(J, 0.4, "Loincloth", 1.22)] + ruff(J))
 		for side in ("l", "r"):
 			parts += [sleeve(J, side), leg(J, side), hand(J, side), thumb(J, side)]
 			parts += kobold_foot(J, side) if PEOPLE == "kobold" else [boot(J, side)]
@@ -1194,7 +1213,7 @@ def assemble(J: dict, which: str = "Body"):
 	else:
 		parts = WEARABLES[which](J)
 	# A kobold's head large for its body.
-	grow = m("head") * per(1.0, 1.0, 1.55)
+	grow = m("head") * per(1.0, 1.2, 1.55)
 	for p in parts:
 		if (p.rigid == "Head" or "Head" in p.bones) and grow != 1.0:
 			p.rings = [[J["Head"] + (q - J["Head"]) * grow for q in r] for r in p.rings]
