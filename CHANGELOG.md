@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- Two more kinds of townsfolk walk the town, unmarked: a scholar, who knows
+  more of the old stories, tells them when asked and passes them on at the
+  well, and a merchant, who buys cheaper and sells dearer among the
+  neighbours, will sell you anything at the counter, and has an ear for talk
+  of prices.
 - The Credits in the options now name who made the art too: Kenney's Castle Kit and Quaternius's animal rig and animations, each with its licence and a link.
 - Each companion now has a look of her own (build, height, age, hair, beard),
   kept with who she is, for the new character bodies to draw; Wren, Nix and

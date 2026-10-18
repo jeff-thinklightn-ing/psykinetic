@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_cap()
 	_test_same_state_same_pass()
 	_test_where_in_words()
+	_test_scholar_lore_pass()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	Townsfolk.use_days({})
@@ -59,8 +60,12 @@ static func _profile(trade: String, _type := "") -> Dictionary:
 	return {"intellect": 1 if trade == "hauler" else 10, "superstition": 5, "creativity": 5, "integrity": 5}
 
 
+## Other ids' types (a scholar for the lore pass, decision 440).
+static var _types := {}
+
+
 static func _type(id: String) -> String:
-	return "thief" if id == _thief else ""
+	return "thief" if id == _thief else str(_types.get(id, ""))
 
 
 func _setup(table: Dictionary = ALL_WELL, folk: Array = [["g-tam", "Tam", "hauler"], ["g-mara", "Mara", "hauler"]], thief := "") -> void:
@@ -276,3 +281,28 @@ func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+
+
+func _test_scholar_lore_pass() -> void:
+	print("
+== a scholar passes on what lore knows, first, as witnessed (decision 440) ==")
+	# Our own lore: one agreed fact anyone's knower knows (no where, no tags).
+	Lore.use([{"id": "the_mine", "status": "agreed", "facts": [{"id": "f1", "text": "The old mine was dug by dwarves.", "known": "common", "weight": 5},
+		{"id": "f2", "text": "Lights are seen in the mine at night.", "known": "rumour", "weight": 3}]}],
+		[{"id": Lore.knower_for("hauler"), "status": "agreed"}, {"id": Lore.knower_for("smith"), "status": "agreed"}])
+	_types = {"g-tam": "scholar"}
+	_setup(ALL_WELL, [["g-tam", "Tam", "hauler"], ["g-mara", "Mara", "smith"]])
+	_check(str(_work.worker("g-tam").get("type", "")) == "scholar", "Tam is rolled a scholar (the test's pin)")
+	_check(not Lore.known_by(Lore.knower_for("hauler"), PackedStringArray(), "agreed", "scholar").is_empty(), "(the test's lore is known to his knower)")
+	_plant("g-tam", LIE)
+	var took := _until_heard("g-mara", 8)
+	var got := _from("g-mara", "Tam")
+	_check(took > 0 and not got.is_empty() and str(got[0].get("text", "")) == "The old mine was dug by dwarves" and str(got[0].get("fits", "")) == Hearsay.WITNESSED,
+		"the lore fact goes before his belief, as witnessed: %s" % [got.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	_check(not got.is_empty() and bool(got[0].get("believed", false)) and float(got[0].get("chance", 0.0)) == 1.0, "and sharp Mara believes it, for it is true")
+	for i in 8:
+		_tick()
+	var texts: Array = _from("g-mara", "Tam").map(func(e: Dictionary) -> String: return str(e["text"]))
+	_check(not texts.has("Lights are seen in the mine at night") and texts.has(LIE), "lore's rumours are not passed as witnessed; his belief follows once the fact is held: %s" % [texts])
+	_types = {}
+	Lore.reload()

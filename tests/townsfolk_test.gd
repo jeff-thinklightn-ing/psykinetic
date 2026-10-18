@@ -68,7 +68,7 @@ func _test_rules_file() -> void:
 
 func _test_roll() -> void:
 	print("\n== the roll: by id, weighted, steady the rest, none for a companion ==")
-	Townsfolk.use_rules({"type_weights": {"thief": 10.0, "bard": 20.0, "scoundrel": 0.0, "merchant": 50.0}})
+	Townsfolk.use_rules({"type_weights": {"thief": 10.0, "bard": 20.0, "scoundrel": 0.0, "wizard": 50.0}})
 	var first := Townsfolk.roll_type("resident:bram")
 	_check(first == Townsfolk.roll_type("resident:bram"), "the same id rolls the same type (%s)" % first)
 	_check(Townsfolk.roll_type("companion:jeff").is_empty() and Townsfolk.roll_type("").is_empty(), "a companion resting in town, or no id, has no type")
@@ -83,7 +83,7 @@ func _test_roll() -> void:
 	_check(absf(thieves - 10.0) < 2.0 and absf(bards - 20.0) < 2.5 and absf(steady - 70.0) < 3.0,
 		"over %d ids the shares match the weights (thief %.1f, bard %.1f, steady %.1f per 100)" % [n, thieves, bards, steady])
 	_check(not counts.has("scoundrel"), "a type weighted 0 is never rolled")
-	_check(not counts.has("merchant"), "a weighted type that is not agreed is never rolled (merchant is a draft)")
+	_check(not counts.has("wizard"), "a weighted type lore does not know, or has not agreed, is never rolled")
 	var kinds: Array = counts.keys()
 	kinds.sort()
 	_check(kinds == ["bard", "steady", "thief"], "nothing else comes out of the roll %s" % [kinds])

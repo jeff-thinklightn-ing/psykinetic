@@ -52,6 +52,11 @@ const FETCH := "fetch"
 const ERRAND := "errand"
 ## Parts of an offer id ("<worker>|<kind>|<key>"; worker ids hold ":").
 const SEP := "|"
+## The hidden types with offers of their own (decision 440; Townsfolk's).
+const SCHOLAR := "scholar"
+const MERCHANT := "merchant"
+## Talk of goods and prices, which a merchant's rumour prefers.
+const TRADE_WORDS := "(?i)\\b(price\\w*|gold|coin\\w*|cost\\w*|sell\\w*|sold|buy\\w*|bought|short of|dear\\w*|cheap\\w*)\\b"
 const KIN_WORDS := {"sister or brother": {"she": "sister", "he": "brother"}, "cousin": {}, "parent and child": {}}
 
 static var ctx: Dictionary = {}
@@ -147,11 +152,16 @@ static func _shop_offer(worker_id: String, who: Dictionary, town: String, given:
 	var catalog: Variant = _call(given, "catalog")
 	if trade.is_empty() or not goods is Array or not catalog is Dictionary:
 		return {}
-	for good: Variant in goods:
-		if not good is Dictionary:
-			continue
+	# A merchant deals in everything: any good at the counter, the dearest
+	# first (decision 440); anyone else, only their own trade's making.
+	var merchant := str(who.get("type", "")) == MERCHANT
+	var wares: Array = goods.filter(func(each: Variant) -> bool: return each is Dictionary)
+	if merchant:
+		wares.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.get("price", 0)) > int(b.get("price", 0)) or int(a.get("price", 0)) == int(b.get("price", 0)) and int(a.get("uid", 0)) < int(b.get("uid", 0)))
+	for good: Dictionary in wares:
 		var entry: Dictionary = catalog.get(str(good.get("id", "")), {})
-		if str(entry.get("made", {}).get("by", "")) != trade:
+		if not merchant and str(entry.get("made", {}).get("by", "")) != trade:
 			continue
 		var name := str(entry.get("name", str(good.get("id", "")).replace("_", " ")))
 		var price := int(good.get("price", 0))
@@ -238,7 +248,9 @@ static func _relation(kind: String, their_card: Variant) -> String:
 static func _rumour_offer(worker_id: String, who: Dictionary, given: Dictionary) -> Dictionary:
 	var trade := _trade_of(who)
 	var type := str(who.get("type", ""))
-	if Lore.binding(trade, type) == "official":
+	# An official's, or a scholar's (decision 440), is the weightiest lore
+	# fact it knows, never hearsay.
+	if Lore.binding(trade, type) == "official" or type == SCHOLAR:
 		var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", type)
 		facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
 		if facts.is_empty():
@@ -249,6 +261,14 @@ static func _rumour_offer(worker_id: String, who: Dictionary, given: Dictionary)
 	if believed.is_empty():
 		return {}
 	var entry: Dictionary = believed.back()
+	if type == MERCHANT:
+		# A merchant has an ear for talk of goods and prices (decision 440):
+		# the newest such, else the newest.
+		var trade_talk := RegEx.create_from_string(TRADE_WORDS)
+		for i in range(believed.size() - 1, -1, -1):
+			if trade_talk.search(str(believed[i].get("text", ""))) != null:
+				entry = believed[i]
+				break
 	var from := str(entry.get("from", ""))
 	var where := Hearsay.place_words(str(entry.get("where", "")))
 	return _offer(worker_id, RUMOUR, str(entry.get("id", "h")), "What %s said" % (from if not from.is_empty() else "someone"),

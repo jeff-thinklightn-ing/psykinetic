@@ -36,6 +36,7 @@ extends RefCounted
 const FILE := "res://levels/townsfolk.json"
 const STEADY := "steady"
 const THIEF := "thief"
+const SCHOLAR := "scholar"
 ## The thief's clock in the worker record's needs (Production.need_due).
 const LIFT := "lift"
 ## The ledger's "by" for a lift: no name.
@@ -330,8 +331,20 @@ static func _pass(production: Production, town: String, place: String, members: 
 	var text := ""
 	var fits := ""
 	var omen := false
-	var official := Lore.binding(_trade_of(production, teller), str(production.worker(teller).get("type", ""))) == "official"
-	if not official:
+	var teller_type := str(production.worker(teller).get("type", ""))
+	var official := Lore.binding(_trade_of(production, teller), teller_type) == "official"
+	if teller_type == SCHOLAR:
+		# A scholar passes on what lore knows first (decision 440): true, so
+		# witnessed, the weightiest the hearer has not heard.
+		var known := Lore.known_by(Lore.knower_for(_trade_of(production, teller)), PackedStringArray(), "agreed", teller_type)
+		known.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
+		for fact: Dictionary in known:
+			var lore_text := str(fact.get("text", "")).strip_edges().trim_suffix(".")
+			if not lore_text.is_empty() and not bool(fact.get("hearsay", false)) and not Hearsay.holds(heard, lore_text):
+				text = lore_text
+				fits = Hearsay.WITNESSED
+				break
+	if text.is_empty() and not official:
 		var beliefs: Array = production.worker(teller).get("heard", [])
 		for i in range(beliefs.size() - 1, -1, -1):
 			var entry: Dictionary = beliefs[i]

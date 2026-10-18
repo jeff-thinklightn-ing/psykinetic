@@ -423,6 +423,13 @@ func bound_words() -> String:
 	return " ".join(parts)
 
 
+## How much lore its voice is told, in characters: its hidden type's
+## (residents.json "lore_chars": a scholar's is doubled, decision 440),
+## else LORE_CHARS.
+func lore_budget() -> int:
+	return int(Townsfolk.days().get("lore_chars", {}).get(hidden_type(), LORE_CHARS))
+
+
 ## Lore's agreed facts it knows (Lore.knower_for its trade, by its domain),
 ## a sentence each, weightiest first (a superstitious role's rumours before
 ## the rest: it repeats what is said), within LORE_CHARS; a rumour as what
@@ -442,7 +449,7 @@ func world_facts() -> Array[String]:
 		var text := str(fact["text"]).strip_edges()
 		if bool(fact.get("hearsay", false)):
 			text = "It is said that %s" % Hearsay._lower_first(text)
-		if length + text.length() > LORE_CHARS:
+		if length + text.length() > lore_budget():
 			break
 		length += text.length() + 1
 		out.append(text)

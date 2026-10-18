@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_errand()
 	_test_lapse()
 	_test_voice_words()
+	_test_scholar_and_merchant()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	Townsfolk.use_days({})
@@ -62,8 +63,12 @@ static func _profile(_trade: String, _type := "") -> Dictionary:
 	return {"intellect": 1, "superstition": 5, "creativity": 5, "integrity": 5}
 
 
-static func _type(_id: String) -> String:
-	return ""
+## Ids' hidden types (a scholar, a merchant: decision 440).
+static var _types := {}
+
+
+static func _type(id: String) -> String:
+	return str(_types.get(id, ""))
 
 
 func _setup(folk: Array = [["o-mara", "Mara", "smith"], ["o-tam", "Tam", "hauler"]]) -> void:
@@ -366,3 +371,31 @@ func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+
+
+func _test_scholar_and_merchant() -> void:
+	print("
+== a scholar offers what lore knows; a merchant sells anything, dearest first, and hears talk of prices (decision 440) ==")
+	Lore.use([{"id": "the_mine", "status": "agreed", "facts": [{"id": "f1", "text": "The old mine was dug by dwarves.", "known": "common", "weight": 5},
+		{"id": "f2", "text": "The mine road was paved by the first lord.", "known": "common", "weight": 2}]}],
+		[{"id": Lore.knower_for("hauler"), "status": "agreed"}, {"id": Lore.knower_for("smith"), "status": "agreed"}])
+	_types = {"o-odo": "scholar", "o-mara": "merchant"}
+	_setup([["o-odo", "Odo", "hauler"], ["o-mara", "Mara", "smith"]])
+	_plant("o-odo", "The mine is cursed", "Tam", "well")
+	var his := _offers("o-odo")
+	_check(his.size() == 1 and his[0]["kind"] == Offers.RUMOUR and his[0]["what"].get("lore", false) and his[0]["title"] == "What Odo knows"
+		and his[0]["words"] == "The old mine was dug by dwarves.", "the scholar offers the weightiest lore fact, not the rumour he believes: %s" % [his])
+	_goods = [{"uid": 9, "id": "knife", "price": 12}, {"uid": 7, "id": "wood", "price": 2}, {"uid": 11, "id": "wood", "price": 20}]
+	_plant("o-mara", "The miller waters the flour", "Nell")
+	_plant("o-mara", "Cloth sells dear in the north", "Tam", "inn")
+	_plant("o-mara", "The mine is cursed", "Tam", "well")
+	var hers := _offers("o-mara")
+	_check(hers.size() == 2 and hers[0]["kind"] == Offers.SHOP and hers[0]["what"]["uid"] == 11 and hers[0]["cost"] == 20,
+		"the merchant smith offers the dearest thing at the counter, wood at 20, not her own knife: %s" % [hers.map(func(e: Dictionary) -> String: return str(e["title"]))])
+	_check(hers.size() == 2 and hers[1]["kind"] == Offers.RUMOUR and hers[1]["words"] == "Tam told me at the inn that cloth sells dear in the north.",
+		"and her rumour is the talk of prices, not the newest: %s" % (hers[1]["words"] if hers.size() == 2 else ""))
+	_types = {}
+	_setup([["o-mara", "Mara", "smith"]])
+	_goods = [{"uid": 9, "id": "knife", "price": 12}, {"uid": 11, "id": "wood", "price": 20}]
+	_check(_offers()[0]["what"]["uid"] == 9, "a steady smith still offers only her knife")
+	Lore.reload()

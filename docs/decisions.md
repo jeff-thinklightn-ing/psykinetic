@@ -10250,3 +10250,45 @@ provider ("Art: Kenney, Quaternius"). Its entries:
   and the goblin's clips, until the animations have a provider of their own.
 Our own and generated art have no line. art_kit_test checks the list;
 view_test counts the links across every provider.
+## 440. The scholar and the merchant: what the last two hidden types do on the side
+
+Step 2's last two (393: a hidden type per resident, what it does beyond
+speech designed one at a time), the coordinator's approval 2026-10-18.
+Neither had ever been rolled: lore's roles.json held scholar and merchant
+as drafts and Townsfolk.roll_type draws only Lore.types() (the agreed),
+though townsfolk.json weighted them. Lore marks the two ids agreed on
+Jeff's own words ("same for scholar, merchant etc."); their profile values
+stay draft until Jeff confirms the table, so under lore's rule a scholar or
+merchant still speaks with townsfolk's profile, while these side-doings run
+on the type alone.
+
+The scholar knows more: the voice's lore budget is doubled (residents.json
+"lore_chars": {"scholar": 1200}, Resident.world_facts; others keep
+LORE_CHARS 600), so they tell more of what lore knows; their offer (435)
+is a lore fact ("What Odo knows"), as an official's is, never hearsay,
+though as townsfolk they may still believe and repeat rumours when asked;
+and in gossip (422) a scholar passes a lore fact the hearer has not heard
+before any belief, as "witnessed" (true, believed), one per pass, so what
+the scholar knows walks through the town over the days. The temple hour
+(404) stays.
+
+The merchant trades sharper: economy's Economy.folk_factor(worker_id,
+side) (economy's d573a97, economy.json "merchant" buy 0.85, sell 1.15) on
+their own meals, store food, inn bed and paid services, and on their own
+making sold folk to folk; the difference is the seller's, never the
+treasury's tax; nothing for players' prices (shops are the town's, 353).
+In offers (435) a merchant's shop line covers any good at the counter, the
+dearest first, since they deal in everything, and their rumour prefers
+hearsay of goods and prices (a word test on the believed text: price,
+gold, sell, short, coin, cost), else the newest.
+
+townsfolk_test: the roll draws scholars and merchants once agreed, with
+the file's weights, and a weighted type lore does not know is never
+rolled. gossip_test: the scholar's lore pass, witnessed and believed by
+the sharpest, before a belief. offers_test: the scholar's lore offer; the
+merchant's any-good line, dearest first, and price-first rumour. Protocol
+unchanged; no new class_name.
+
+Rejected: a merchant who trades with players at private prices; a scholar
+who knows draft lore (lore's status rules stand); a scholar who repeats
+no rumours at all (they are townsfolk, not officials).
