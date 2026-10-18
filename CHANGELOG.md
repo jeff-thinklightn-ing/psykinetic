@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The game starts at a main menu now (Play, Options, Quit) when you run the downloaded client, and joining happens on one screen that says what it is doing in plain words: connecting, checking the version, the server restarting, or what went wrong, with Retry and Change server. Esc opens a pause panel (Resume, Options, Leave, Quit; the world goes on while you are away). Options gained Window (fullscreen or windowed), Resolution, and a Controls section (click to move or WASD, and whether the controls list shows). The line at the top left shows only your state now; "host" and the tick moved into F3.
 - Each of the town's people has a life of their own now: where they were born,
   how they came to the town, kin among the neighbours, maybe a grudge, and what
   they remember of what happened here (a raid that took a neighbour, one who came

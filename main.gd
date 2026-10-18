@@ -363,6 +363,17 @@ var compass: HudCompass
 var hint_panel: HintPanel
 ## The options (O): sound volumes; other trees add their sections.
 var options_panel: OptionsPanel
+## Esc's panel (PausePanel), the main menu (MainMenu) while it shows, and
+## the join flow's screen (ConnectScreen) while it shows; null otherwise.
+var pause_panel: PausePanel
+var main_menu: MainMenu
+var connect_screen: ConnectScreen
+## _go_online was called (Play once; Change server reconnects instead).
+var _went_online := false
+## The connect screen shows the join in progress: it goes once the player is in.
+var _connect_joining := false
+## The last tick this view saw, for F3.
+var _hud_tick := 0
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
@@ -442,23 +453,104 @@ func _ready() -> void:
 	if Net.test_fullscreen_after > 0.0:
 		get_tree().create_timer(Net.test_fullscreen_after).timeout.connect(Net.toggle_fullscreen)
 
-	if "setup" in Net.test_show:
-		# The first-run screen over the game, for screenshots: its answer is dropped.
-		add_child(SetupScreen.new())
+	# An exported client starts at the menu (--menu: anyone, for screenshots);
+	# a host, a server and a project run go straight in.
+	if Net.show_menu or OS.has_feature("template") and Net.mode == Net.Mode.CLIENT:
+		_show_menu()
+		return
+	_play()
+
+
+## Play: online, by way of the connect screen for a client (the first run
+## fills in the server's details first).
+func _play() -> void:
+	if main_menu != null:
+		main_menu.visible = false
+	$HUD.visible = true
 	if Net.needs_setup:
 		# An exported client with no settings.cfg yet: ask once, then join.
-		var setup := SetupScreen.new()
-		setup.submitted.connect(_on_setup_submitted)
-		add_child(setup)
-		hud.text = "enter the server address and token"
+		_connect_screen().edit()
 		return
-	_go_online()
+	if Net.mode == Net.Mode.CLIENT:
+		_connect_status("connecting to %s:%d" % [Net.address, Net.port])
+	if not _went_online:
+		_went_online = true
+		_go_online()
+
+
+## The main menu over everything (MainMenu), made the first time.
+func _show_menu() -> void:
+	if main_menu == null:
+		main_menu = MainMenu.new()
+		main_menu.play_pressed.connect(_play)
+		main_menu.options_pressed.connect(toggle_options)
+		main_menu.quit_pressed.connect(_quit_game)
+		add_child(main_menu)
+	main_menu.visible = true
+	$HUD.visible = false
+	if connect_screen != null:
+		connect_screen.visible = false
+
+
+## The join flow's screen (ConnectScreen), made the first time.
+func _connect_screen() -> ConnectScreen:
+	if connect_screen == null:
+		connect_screen = ConnectScreen.new()
+		connect_screen.has_menu = main_menu != null
+		connect_screen.submitted.connect(_on_setup_submitted)
+		connect_screen.retry_pressed.connect(_retry_connect)
+		connect_screen.back_pressed.connect(_show_menu)
+		add_child(connect_screen)
+	return connect_screen
+
+
+## What the connection is doing, on the connect screen when there is one
+## (a client), else the HUD line (a host's rare messages).
+func _connect_status(text: String, is_failed := false) -> void:
+	if connect_screen != null or Net.mode == Net.Mode.CLIENT and not Net.online:
+		_connect_screen().set_state(text, is_failed)
+		_connect_joining = true
+	else:
+		hud.text = text
+
+
+## Retry after a failed connection: the same server again.
+func _retry_connect() -> void:
+	_connect_status("connecting to %s:%d" % [Net.address, Net.port])
+	_rejected = false
+	if not Net.reconnect():
+		_connect_status("could not start a connection to %s:%d" % [Net.address, Net.port], true)
+
+
+## Leave: back to the menu, which for an exported game is the game started
+## again (the world here is let go); a project run quits.
+func _leave_game() -> void:
+	if OS.has_feature("template"):
+		# With the arguments it was started with (a renderer, --controls, a
+		# settings path), less any test hook.
+		var args: PackedStringArray = []
+		for arg: String in OS.get_cmdline_args():
+			if not arg.begins_with("--test-"):
+				args.append(arg)
+		OS.create_process(OS.get_executable_path(), args)
+	_quit_game()
+
+
+func _quit_game() -> void:
+	_release_zones()
+	Net.shutdown()
+	get_tree().quit()
 
 
 func _on_setup_submitted(address: String, port: int, token: String, player_name: String) -> void:
 	if not Net.save_settings(address, port, token, player_name):
-		hud.text = "could not write %s" % Net.settings_path()
+		print("[net] could not write %s" % Net.settings_path())
 	Net.configure_client(address, port, token)
+	_connect_status("connecting to %s:%d" % [address, port])
+	if _went_online:
+		_retry_connect()
+		return
+	_went_online = true
 	_go_online()
 
 
@@ -519,7 +611,7 @@ func _go_online() -> void:
 		World.mirror_terrain(_terrain)
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		multiplayer.connection_failed.connect(
-				func() -> void: hud.text = "connection failed")
+				func() -> void: _connect_status("the server at %s:%d did not answer" % [Net.address, Net.port], true))
 		Net.join_rejected.connect(_on_join_rejected)
 	Net.message_received.connect(_on_message)
 
@@ -580,6 +672,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key != null and key.pressed and not key.echo and minimap != null \
 			and (key.keycode == KEY_M or key.keycode == KEY_ESCAPE and minimap.big):
 		minimap.toggle()
+		get_viewport().set_input_as_handled()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_ESCAPE:
+		escape()
 		get_viewport().set_input_as_handled()
 		return
 	if key != null and key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
@@ -3624,6 +3720,9 @@ func _build_talk() -> void:
 	options_panel = OptionsPanel.new()
 	options_panel.name = "Options"
 	options_panel.visible = false
+	options_panel.hints_changed.connect(func(shown: bool) -> void:
+		if hint_panel != null:
+			hint_panel.visible = shown)
 	$HUD.add_child(options_panel)
 	pack_panel = PackPanel.new()
 	pack_panel.name = "Pack"
@@ -4400,10 +4499,11 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   shield raised"
 		elif player.raised == "draw":
 			hp_text += "   bow drawn %d%%" % roundi(World.draw_of(player) * 100.0)
-	var mode_text: String = Net.Mode.keys()[Net.mode].to_lower()
-	if not Net.online:
-		mode_text = "offline"
-	hud.text = "%s   %s   tick %d" % [mode_text, hp_text, tick]
+	_hud_tick = tick
+	hud.text = hp_text
+	if player != null and _connect_joining and connect_screen != null:
+		_connect_joining = false
+		connect_screen.visible = false  # In: the world shows.
 	if hint_panel != null:
 		hint_panel.set_lines(hint_lines())
 	if player != null:
@@ -4444,6 +4544,26 @@ func hint_lines() -> Array[String]:
 	if Net.mode == Net.Mode.HOST:
 		lines.append("B\tbuilder mode")
 	return lines
+
+
+## Esc: whatever is open closes first (the options, an open chest or
+## companion's pack, the pause itself); with nothing open, the pause.
+func escape() -> void:
+	if pause_panel != null and pause_panel.visible:
+		pause_panel.open(false)
+	elif options_panel != null and options_panel.visible:
+		toggle_options()
+	elif pack_panel != null and pack_panel.other != null:
+		close_other()
+	elif main_menu == null or not main_menu.visible:
+		if pause_panel == null:
+			pause_panel = PausePanel.new()
+			pause_panel.resume_pressed.connect(func() -> void: pause_panel.open(false))
+			pause_panel.options_pressed.connect(toggle_options)
+			pause_panel.leave_pressed.connect(_leave_game)
+			pause_panel.quit_pressed.connect(_quit_game)
+			$HUD.add_child(pause_panel)
+		pause_panel.open(true)
 
 
 ## O: the options shown or hidden; hiding writes what changed.
@@ -4741,8 +4861,8 @@ func screen_north() -> Vector2:
 
 
 func _debug_text() -> String:
-	var lines: Array[String] = ["peer id: %d (%s)" % [
-		Net.local_id, Net.Mode.keys()[Net.mode].to_lower() if Net.online else "offline"]]
+	var lines: Array[String] = ["%s   tick %d   peer id: %d" % [
+		Net.Mode.keys()[Net.mode].to_lower() if Net.online else "offline", _hud_tick, Net.local_id]]
 	var player := _local_player()
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
@@ -4782,17 +4902,19 @@ func _on_join_rejected(reason: String, server_version: String) -> void:
 		var why_not := SelfUpdate.refusal(reason, server_version, dir, int(Time.get_unix_time_from_system()))
 		if why_not.is_empty() and SelfUpdate.start(dir):
 			print("[update] the server runs v%s: updating this v%s and starting again" % [server_version, Net.claimed_version()])
-			hud.text = "updating to the server's v%s, then starting again…" % server_version
+			_connect_status("updating to the server's v%s: the game closes and starts again" % server_version)
+			# Drawn before the window goes (update.ps1 is already running).
+			await get_tree().create_timer(0.5).timeout
 			get_tree().quit()
 			return
 		print("[update] not updating itself: %s" % (why_not if not why_not.is_empty() else "update.ps1 could not be started"))
-		hud.text = "client out of date: the server runs v%s, this is v%s. Run launch.bat to update." % [
-			server_version, Net.version]
+		_connect_status("this game is out of date: the server runs v%s, this is v%s. Run launch.bat to update." % [
+			server_version, Net.version], true)
 	elif reason == "server out of date":
-		hud.text = "the server is out of date: it runs v%s, this is v%s. It will be updated soon; try again later." % [
-			server_version, Net.version]
+		_connect_status("the server is out of date: it runs v%s, this is v%s. It will be updated soon; try again later." % [
+			server_version, Net.version], true)
 	else:
-		hud.text = reason
+		_connect_status(reason, true)
 
 
 func _on_server_disconnected() -> void:
@@ -4801,7 +4923,7 @@ func _on_server_disconnected() -> void:
 	if _had_player:
 		_reconnect()
 	else:
-		hud.text = "authentication failed"
+		_connect_status("the server did not let you in: check the token", true)
 		print("[net] authentication failed: disconnected before a player was spawned")
 
 
@@ -4817,17 +4939,17 @@ func _reconnect() -> void:
 	_drop_zone_entities()
 	var started := Time.get_ticks_msec()
 	var tries := 0
-	hud.text = "server restarting, reconnecting…"
+	_connect_status("the server is restarting; trying again")
 	while Time.get_ticks_msec() - started < RECONNECT_FOR * 1000.0:
 		await get_tree().create_timer(RECONNECT_EVERY).timeout
 		tries += 1
-		hud.text = "server restarting, reconnecting… (%d)" % tries
+		_connect_status("the server is restarting; trying again (%d)" % tries)
 		if Net.reconnect() and await _connection_settled():
 			print("[net] reconnected (try %d)" % tries)
 			_reconnecting = false
 			return
 	print("[net] gave up reconnecting after %d tries" % tries)
-	hud.text = "the server is gone: start the game again to rejoin"
+	_connect_status("the server is gone", true)
 	_reconnecting = false
 
 
@@ -5315,6 +5437,17 @@ func _run_test_show(player: Player) -> void:
 				debug_overlay.visible = true
 			"say":
 				_send_chat("(a test line) Stay close, the gate's watched.")
+			"pause":
+				escape()
+			"menu":
+				_show_menu()
+			"setup":
+				_connect_screen().edit()
+			"connect":
+				_connect_screen().set_state("connecting to 100.64.0.5:7777")
+			"failed":
+				_connect_screen().has_menu = true
+				_connect_screen().set_state("the server at 100.64.0.5:7777 did not answer", true)
 			"shop":
 				# The nearest shop counter opened from where the player stands (the
 				# server may refuse the trade; the panel shows the same).

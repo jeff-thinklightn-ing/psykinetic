@@ -92,7 +92,7 @@ Base unit 8. Panel padding 24; between rows 12; between sections 24; a slot 132 
 | bottom right | the pack, with the open chest or companion above it; the gold over its corner; a shop to its left |
 | bottom left | the talk log, the chat box under it |
 | top middle | builder mode's status and box |
-| middle | the options (O), the big map (M), the first-run screen |
+| middle | the options (O), the big map (M), the pause (Esc), the connect screen and the main menu |
 
 Controls: a button is a flat `edge`-bordered box in `backing_deep` that goes `brass` at the
 border when hovered or focused; a slider's track is `edge`, its grabber `brass`; a text
@@ -149,7 +149,8 @@ and the inconsistencies the theme settles:
 - **Debug text** (F3): default 48-unit white text, no outline.
 - **First-run screen** (`net/setup_screen.gd`): a dark backdrop, the engine's default
   Label, LineEdit and Button; a 66-unit title; the panel has no visible box. Connection
-  state and update progress are HUD-line text (step 2).
+  state and update progress were HUD-line text. *Step 2 (decision 418) replaced it with the
+  connect screen, and added the main menu and the pause: shots in `docs/ui/shots/step2/`.*
 - **Names over heads** and alert marks (`!`, `?`) are Client3D's world labels (pc-character
   and enemy-ai), not the HUD. A `Label3D` with no font of its own draws in the project
   theme's default face, so they came out in Alegreya Sans with the theme; the outline rule

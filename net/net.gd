@@ -94,8 +94,10 @@ extends Node
 ##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
+##   --menu                       start at the main menu, as an exported client does (for screenshots)
 ##   --test-show=<a,b>            open these on the HUD once the player is in (for the ui tree's screenshots):
-##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's), setup (the first-run screen, over the game)
+##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's),
+##                                pause, menu, setup (the connect screen's fields), connect, failed (its states), over the game
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
@@ -373,6 +375,8 @@ var test_builder := ""
 var test_exit_after := 0.0
 var test_exit_on := ""
 var test_minimap := false
+## --menu: the main menu first, whatever the mode (MainMenu).
+var show_menu := false
 ## --test-show: HUD panels opened once the local player is in (Main._run_test_show).
 var test_show: PackedStringArray = []
 ## --raids: raid groups on from the start (World.raid_groups; the console can too).
@@ -739,6 +743,41 @@ func set_antialias(value: String, save := true) -> void:
 	if save:
 		_settings_kept["antialias"] = value
 		save_view_settings()
+
+
+## The options' Controls section: click-to-move or WASD, written to
+## settings.cfg as controls= (read again at the next start as before).
+func set_controls(value: String, save := true) -> void:
+	controls = controls_from(value)
+	_settings_controls = controls
+	if save:
+		save_view_settings()
+
+
+## The options' controls list on or off (as H does), written as hints=.
+func set_hints(shown: bool, save := true) -> void:
+	hints = shown
+	if save:
+		save_view_settings()
+
+
+## The options' Window choice: fullscreen or windowed, as F11 toggles.
+func set_fullscreen(value: bool) -> void:
+	if value != fullscreen:
+		toggle_fullscreen()
+
+
+## The options' Resolution choice: the windowed size, applied now when the
+## window is windowed, and remembered as the size fullscreen comes back to.
+func set_window_size(size: Vector2i) -> void:
+	if size.x <= 0 or size.y <= 0:
+		return
+	window_size = size
+	var window := get_window()
+	if window != null and not fullscreen and DisplayServer.get_name() != "headless":
+		window.size = size
+		window.move_to_center()
+	_save_window_settings()
 
 
 ## Writes the settings file, keeping (or minting) this client's player id.
@@ -1281,6 +1320,8 @@ func _parse_args() -> void:
 				print_protocol = true
 			"--test-minimap":
 				test_minimap = true
+			"--menu":
+				show_menu = true
 			"--raids":
 				raids = true
 			"--test-smooth":

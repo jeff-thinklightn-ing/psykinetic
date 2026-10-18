@@ -9166,3 +9166,49 @@ Herds.camp_fed under 0.5), "" otherwise; maps sends it.
 
 Protocol unchanged: sim only. tests/larder_test (a food raid, a plain one,
 an unknown want).
+## 418. The core screens: menu, connect, pause, and the options' choices
+
+Roadmap `ui`, step 2 (the coordinator approved the design; maps reviewed
+the join path and the controls setter as live-updates' owner, 241). The
+game had no menu and no pause: an exported client joined at once, the
+join's state was a sentence in the HUD line, controls= was read from
+settings.cfg but never written, and the HUD line carried "host" and the
+tick in the player's eye line.
+
+- `MainMenu` (render/main_menu.gd, new class_name, a CanvasLayer): an
+  exported client (OS.has_feature("template") and mode CLIENT) starts at
+  it; `--menu` forces it for anyone (screenshots). Play, Options, Quit, the
+  version in a corner; the HUD is hidden under it. A host, a server, a
+  project run and every test go straight in as before (Main._play).
+- `ConnectScreen` (render/connect_screen.gd, new; net/setup_screen.gd and
+  SetupScreen removed): the join flow in one place. Main._connect_status
+  routes what was hud.text: "connecting to a:p", "the server at a:p did
+  not answer", the join_rejected reasons in words, "updating to the
+  server's vX: the game closes and starts again" (SelfUpdate unchanged),
+  "the server did not let you in: check the token", "the server is
+  restarting; trying again (n)", "the server is gone". A failure offers
+  Retry (Net.reconnect, 240) and Change server (the fields, as the first
+  run shows them; a change reconnects when the game is already online);
+  Back when there is a menu. The screen goes once the local player is in.
+  Hosts' rare messages stay on the HUD line. In-game download progress and
+  a server status reply are maps' later items; the screen will show them.
+- `PausePanel` (render/pause_panel.gd, new): Esc with nothing open shows
+  Resume, Options, Leave and Quit and says the world goes on (co-op never
+  pauses the sim). Esc closes what is open first (Main.escape: the pause,
+  the options, an open chest or pack, the big map as before). Leave on an
+  exported build starts the game again and quits; a project run quits.
+- Options (sound's and perf's sections untouched): Video gains Window
+  (Net.set_fullscreen, F11's state) and Resolution (Net.set_window_size,
+  the windowed size); a Controls section with Move (Net.set_controls,
+  written as controls= at last) and the controls list (Net.set_hints;
+  hints_changed tells Main). Choice rows are toggle buttons as perf's
+  anti-aliasing row; the panel shows what is set each time it opens.
+- The HUD line shows the player's state alone; "host" and the tick are
+  F3's first line (perf's, agreed). The HP number stays until Jeff says
+  what shows hurt instead (the no-bars rule).
+
+Client only; protocol unchanged. tests/ui_test (base port 17840): the
+menu's and pause's signals, the connect screen's states, buttons and
+fields, Esc's order, the options' choices writing Net and settings.cfg.
+`--test-show` gains pause, menu, setup, connect, failed. Shots in
+docs/ui/shots/step2/.
