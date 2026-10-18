@@ -47,9 +47,11 @@ const RAIN_LAYER := 1 << 19
 ## noise needs to show (full fog fills them).
 const FOG_LAYERS: Array[float] = [0.35, 1.0, 1.9]
 const FOG_SIZE := 72.0
-## The clouds' shadow: the noise's period (m), how dark at most, and how fast
-## it drifts at full wind (m/s).
+## The clouds' shadow: the noise's period (m), the periods its decal spans
+## (odd, so the view stays a period from its edge), how dark at most, and
+## how fast it drifts at full wind (m/s).
 const CLOUD_PERIOD := 36.0
+const CLOUD_TILES := 3
 const CLOUD_DARK := 0.55
 const CLOUD_DRIFT := 3.0
 ## What drifts fog and clouds even in still air (m/s).
@@ -246,15 +248,16 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 		_fog_material[i].set_shader_parameter("drift", _drift)
 		_fog_material[i].set_shader_parameter("colour", fog_colour)
 	# Clouds: strongest broken, none overcast or in fog, by day only. The
-	# decal is two periods wide and jumps a period at a time, its texture
-	# tiled, so the jump never shows.
+	# decal is CLOUD_TILES periods wide, its texture tiled, and drifts with
+	# the wind; it jumps a whole period at a time to keep the view within
+	# half a period of its middle, so its edge is never on screen and the
+	# jump never shows.
 	var cloud: float = weather["cloud"]
 	var shade := cloud * (1.0 - smoothstep(0.75, 1.0, cloud)) * (1.0 - fog) * daylight * (1.0 - canopy)
 	_clouds.visible = shade > 0.01
 	_clouds.modulate = Color(1.0, 1.0, 1.0, minf(1.0, shade * 2.0) * CLOUD_DARK)
-	var offset := Vector2(fposmod(_drift.x, CLOUD_PERIOD), fposmod(_drift.y, CLOUD_PERIOD))
-	var snap := Vector2(snappedf(target.x, CLOUD_PERIOD), snappedf(target.z, CLOUD_PERIOD))
-	_clouds.global_position = Vector3(snap.x + offset.x, target.y + 12.0, snap.y + offset.y)
+	var middle := cloud_middle(Vector2(target.x, target.z), _drift)
+	_clouds.global_position = Vector3(middle.x, target.y + 12.0, middle.y)
 
 
 func _build_rain() -> void:
@@ -398,6 +401,15 @@ func _build_fog() -> void:
 		_fog_material.append(material)
 
 
+## Where the cloud decal's middle goes for the view's [param target]
+## (world xz) with the clouds [param drift]ed (m): on the drift's own grid
+## of CLOUD_PERIOD, the grid point nearest the target, so the target is
+## never more than half a period from it.
+static func cloud_middle(target: Vector2, drift: Vector2) -> Vector2:
+	var offset := Vector2(fposmod(drift.x, CLOUD_PERIOD), fposmod(drift.y, CLOUD_PERIOD))
+	return offset + Vector2(snappedf(target.x - offset.x, CLOUD_PERIOD), snappedf(target.y - offset.y, CLOUD_PERIOD))
+
+
 func _build_clouds() -> void:
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -406,19 +418,19 @@ func _build_clouds() -> void:
 	noise.seed = 7
 	var size := 128
 	var tile := noise.get_seamless_image(size, size)
-	# Two by two, so the decal can jump a period and look the same.
-	var image := Image.create(size * 2, size * 2, false, Image.FORMAT_RGBA8)
+	# CLOUD_TILES by CLOUD_TILES, so the decal can jump a period and look
+	# the same.
+	var image := Image.create(size * CLOUD_TILES, size * CLOUD_TILES, false, Image.FORMAT_RGBA8)
 	for y in size:
 		for x in size:
 			var shade := smoothstep(0.45, 0.62, tile.get_pixel(x, y).r)
 			var colour := Color(0.0, 0.0, 0.0, shade)
-			image.set_pixel(x, y, colour)
-			image.set_pixel(x + size, y, colour)
-			image.set_pixel(x, y + size, colour)
-			image.set_pixel(x + size, y + size, colour)
+			for ty in CLOUD_TILES:
+				for tx in CLOUD_TILES:
+					image.set_pixel(x + size * tx, y + size * ty, colour)
 	_clouds = Decal.new()
 	_clouds.name = "CloudShadow"
-	_clouds.size = Vector3(CLOUD_PERIOD * 2.0, 40.0, CLOUD_PERIOD * 2.0)
+	_clouds.size = Vector3(CLOUD_PERIOD * CLOUD_TILES, 40.0, CLOUD_PERIOD * CLOUD_TILES)
 	_clouds.texture_albedo = ImageTexture.create_from_image(image)
 	_clouds.albedo_mix = 1.0
 	_clouds.upper_fade = 0.0

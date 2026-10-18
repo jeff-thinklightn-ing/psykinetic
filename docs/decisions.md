@@ -6048,6 +6048,17 @@ smooths its ticks). Nothing here is in the sim or on the wire.
 - Cloud shadow: one Decal of seamless noise, tiled 2×2, drifting with the
   wind and jumping a period at a time so the jump never shows. Strongest
   in broken cloud, none in overcast, storm or fog, by day only.
+  Amended 2026-10-18 (Jeff on v0.1.153: "fix cloud light flicker"): the
+  decal was placed at the view's snapped cell plus the drift, so the view
+  could stand up to 54 m from its middle, past its 36 m half-width, and
+  each time the drift wrapped a period the edge jumped 36 m across the
+  screen: shadow over half the view gone in one frame (a 17.7% step in a
+  tile of a 30 fps capture of the wilds in wind, four in 40 s). Now it is
+  CLOUD_TILES (3) periods wide, tiled 3×3, and its middle is the point of
+  the drift's own grid nearest the view (WeatherView.cloud_middle), so the
+  view is never more than half a period from the middle, its edge at least
+  a period off, and the jump is a whole period of a tiled texture. The
+  same capture after: no step over 1.2%. Client only.
 - Wind: one global shader uniform, `wind` (project.godot [shader_globals]:
   xy the way it blows in the view's xz, z its strength), set each frame.
   Ground fire stretches downwind (fire.gdshader), torch flames lean

@@ -177,6 +177,27 @@ func _test_view() -> void:
 	_check(not view.ease_toward(Weather.KINDS["storm"], 1.0) and view.weather["rain"] == 0.0 and not view.visible,
 			"indoors none is drawn")
 	view.free()
+	# The clouds' decal: the view never more than half a period from its
+	# middle, the middle on the drift's grid, so moving it shows nothing.
+	var period := WeatherView.CLOUD_PERIOD
+	var near := true
+	var on_grid := true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	for i in 400:
+		var target := Vector2(rng.randf_range(-500.0, 500.0), rng.randf_range(-500.0, 500.0))
+		var drift := Vector2(rng.randf_range(-300.0, 300.0), rng.randf_range(-300.0, 300.0))
+		var middle := WeatherView.cloud_middle(target, drift)
+		var away := (middle - target).abs()
+		near = near and away.x <= period * 0.5 + 0.001 and away.y <= period * 0.5 + 0.001
+		var grid := (middle - drift) / period
+		on_grid = on_grid and absf(grid.x - roundf(grid.x)) < 0.001 and absf(grid.y - roundf(grid.y)) < 0.001
+	_check(near, "the cloud shadow's decal keeps the view within half a period of its middle")
+	_check(on_grid and (WeatherView.CLOUD_TILES - 1) * period * 0.5 >= 30.0,
+			"on the drift's grid, its edge %.0f m off the view at least" % ((WeatherView.CLOUD_TILES - 1) * period * 0.5))
+	var a := WeatherView.cloud_middle(Vector2(10.0, 0.0), Vector2(35.9, 0.0))
+	var b := WeatherView.cloud_middle(Vector2(10.0, 0.0), Vector2(36.1, 0.0))
+	_check(absf(a.x - b.x) < 0.5, "the drift wrapping a period moves it smoothly (%.2f to %.2f)" % [a.x, b.x])
 
 
 func _test_between() -> void:
