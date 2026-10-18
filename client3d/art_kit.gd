@@ -408,7 +408,10 @@ static func _grey_recipe(slot: String) -> Array:
 	var boxes: Array = given if given is Array else []
 	if boxes.is_empty() and not given is String:
 		var whole := size(slot)
-		var base := 0.0 if str(entry.get("origin", "base")) == "base" else -whole.y
+		# Its origin at the bottom ("base"), the middle ("centre": a shield,
+		# held at the middle of its back) or the top.
+		var origin := str(entry.get("origin", "base"))
+		var base := 0.0 if origin == "base" else -whole.y * 0.5 if origin == "centre" else -whole.y
 		boxes = [{"at": [0, base + whole.y * 0.5, 0], "size": [whole.x, whole.y, whole.z]}]
 	for i in boxes.size():
 		_grey_step(steps, body, "Box%d" % i, boxes[i], material)

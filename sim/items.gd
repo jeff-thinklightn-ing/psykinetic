@@ -625,6 +625,9 @@ static func art_slots() -> Dictionary:
 			entry["sockets"] = {"grip": [0, 0, 0]}
 			if item["hands"] == 2:
 				entry["sockets"]["grip_2"] = [0, snappedf(size.y * 0.6, 0.01), 0]
+			# A shield is held at the middle of its back, its face out.
+			if "shield" in item.get("tags", []):
+				entry["origin"] = "centre"
 		slots[item["art"]] = entry
 	return {"about": "Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand.", "slots": slots}
 

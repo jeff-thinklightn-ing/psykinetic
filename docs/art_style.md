@@ -74,6 +74,8 @@ are texture slots, not materials on a model (see Budgets).
 - **Held pieces** (items, weapons) have their origin at the `grip` socket, where the hand
   holds them, with their length along +Y. A two-handed one has a second socket `grip_2` (an
   empty named `grip_2`) for the other hand, so it fits the character's hand attach points.
+  A shield (an item tagged `shield`, `"origin": "centre"`) is held at the middle of its back:
+  its origin there, its face in x and y, its thickness along z.
 - **Buildings** are a roof and trim, **never walls or a floor**.
   - The walls are the map's wall edges in the slot's `wall_set`, drawn by terrain's wall runs and
     faded edge by edge. The inside is terrain's ground in its `floor_set` (wood for homes).

@@ -138,6 +138,7 @@
 			"budget": 500,
 			"category": "items",
 			"kind": "held",
+			"origin": "centre",
 			"size": [
 				0.35,
 				0.35,
@@ -428,6 +429,7 @@
 			"budget": 500,
 			"category": "items",
 			"kind": "held",
+			"origin": "centre",
 			"size": [
 				0.6,
 				0.6,
