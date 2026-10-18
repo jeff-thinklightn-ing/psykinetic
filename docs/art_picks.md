@@ -43,6 +43,8 @@ art-gen runs the slot again with the note.
 | 2026-10-15 | building.house roof | (awaits pick) | c5/c7 stretched x 1.8, z 1.65 to the 4.6×1.5×6.6 roof box, pivot at the eaves |
 | 2026-10-15 | plant.fern | (awaits pick) | budget 500 tris (was 250): c7 keeps its fronds at ~480 and is a lump at 250; no alpha cards, the kit stays mesh-on-palette (art-kit) |
 | 2026-10-15 | tree.log | (awaits pick) | c8 reads best; cleanup stretches it along z to the slot's 2 m |
+| 2026-10-17 | creature.rabbit | c4 | Jeff: "rabbit c4 - all look good"; rigged by pc-character (rabbit_rig, seven clips) |
+| 2026-10-17 | generator base man and woman v1 | pass | Jeff: "all look good" on the base pair sheet; shoulder tips to fix; shape keys and parts next |
 | 2026-10-17 | tree.broadleaf | c2 | Jeff: "c2 on broadleaf" |
 | 2026-10-17 | tree.pine | c25, c43, c44, c45 | Jeff: "go with the pine look, if it needs clean up we'll do later": the four variants as meshed (from the 12000 meshes, fitted to the box, no hand rework beyond the fit); the stands composed from them |
 | 2026-10-17 | tree.pine | c25 (solo) | Jeff: "c25 is close for pines.. i'd like to see that be for a solo tree, but cluster 4-5 variations together, should take up a few tiles with the trunks spread out.. but close enough to look impenatrable at the edges of the map when together the canopy would overlap and look like a cloud": c25 meshed as the solo pine with 4–5 variations; the border stand pieces (tree.pine_stand a–d) are composed from those variations, trunks spread over the footprint, canopies overlapping so neighbouring pieces merge into one cloud; art-gen's earlier stand meshes set aside |
