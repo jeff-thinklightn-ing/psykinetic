@@ -214,6 +214,27 @@ const PREFABS := {
 		],
 		"config": {"buildings": [{"slot": "building.healers_hut", "at": [1, 1], "facing": [0, 1]}]},
 	},
+	# A town's field (decision 452, economy's farms): a 4 x 4 plot of dirt,
+	# fenced on its outline (walls Level.OPEN_AIR keeps from blocking sight
+	# or being drawn; the slot's mesh is the fence), its gate a gap in the
+	# front just right of the middle; no inside, no roof. Its "use" and
+	# "town" a level gives it.
+	"building_field": {
+		"rows": [
+			", , , , , ,",
+			"  # # # #  ",
+			",#, , , ,#,",
+			"           ",
+			",#, , , ,#,",
+			"           ",
+			",#, , , ,#,",
+			"           ",
+			",#, , , ,#,",
+			"  # #   #  ",
+			", , , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.field", "at": [1, 1], "facing": [0, 1]}]},
+	},
 }
 
 

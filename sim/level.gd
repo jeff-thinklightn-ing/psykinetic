@@ -97,10 +97,16 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## facing east or west). The footprint is the inside; its walls and door
 ## are the map's own edges on its outline (decision 265).
 const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
-	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3)}
+	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
+	"building.field": Vector2i(4, 4)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
+## The buildings on floor with no inside (decision 452): open to the sky,
+## nothing roofed, walked into as ground. Their outline's walls are a fence
+## (the slot's own mesh draws it): they stop walkers, not sight, and are
+## not drawn as walls; a gap in it is an open edge.
+const OPEN_AIR: Array[String] = ["building.field"]
 ## A building's facing (the side its front is on) when level.json gives none.
 const BUILDING_FACING := Vector2i(0, 1)
 ## The region of a level that names none (region_of).
@@ -748,7 +754,7 @@ static func region_of(config: Dictionary, warnings: Array[String] = []) -> Strin
 ## floor (water, for ON_WATER's) of one height, clear of the others: one
 ## that does not, or of a slot there is not, is left out and said in
 ## [param warnings]; one whose outline has open edges stands, said (a shed
-## may be open; a well has no walls).
+## may be open; a well has no walls; an OPEN_AIR one's gate is a gap).
 static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var listed: Variant = config.get("buildings", [])
@@ -780,7 +786,7 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		for cell in cells:
 			taken[cell] = true
 		var open: Array[Vector3i] = []
-		for key in outline(rect) if not on_water else []:
+		for key in outline(rect) if not on_water and not str(entry["slot"]) in OPEN_AIR else []:
 			if not terrain["edges"].has(key):
 				open.append(key)
 		if not open.is_empty():

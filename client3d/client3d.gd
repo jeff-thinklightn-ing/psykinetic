@@ -2437,6 +2437,8 @@ func _build_room() -> void:
 					_building_dry.append(cell)
 					_dry_water[cell] = true
 			continue
+		if building["slot"] in Level.OPEN_AIR:
+			continue  # Its fence is its slot's mesh (_add_walls draws none).
 		var spec := ArtKit.spec(str(building["slot"]))
 		var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
 		var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
@@ -2507,7 +2509,8 @@ func _build_room() -> void:
 
 
 ## The walls, doorways and posts of the terrain's edges; none along an
-## outdoor map's outline, which is the forest's edge.
+## outdoor map's outline, which is the forest's edge, nor round an open-air
+## building (Level.OPEN_AIR), whose slot draws its fence.
 func _add_walls() -> void:
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
@@ -2515,9 +2518,16 @@ func _add_walls() -> void:
 	var wall_keys: Array[Vector3i] = []
 	var doubles := _double_doors()
 	var seconds := doubles.values()
+	var fences: Dictionary[Vector3i, bool] = {}
+	for building: Dictionary in _terrain.get("buildings", []):
+		if building["slot"] in Level.OPEN_AIR:
+			for key in Level.outline(building["rect"]):
+				fences[key] = true
 	for key: Vector3i in edges:
 		if _outdoor and _is_outline(key):
 			continue  # The forest's edge, not a wall (_add_forest).
+		if fences.has(key) and edges[key] == Terrain.Edge.WALL:
+			continue
 		match edges[key]:
 			Terrain.Edge.WALL:
 				if BOX_WALLS:
@@ -2562,8 +2572,8 @@ func _add_buildings() -> void:
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false})
 		_show_state(_buildings[index])
-		if slot in Level.ON_WATER or _glimpse:
-			continue  # Nobody stands in a well (or a glimpse): no inside.
+		if slot in Level.ON_WATER or slot in Level.OPEN_AIR or _glimpse:
+			continue  # Nobody stands in a well, a field is open (or a glimpse): no inside.
 		# The rain stops on its roof even while the roof is cut away
 		# (decision 309; WeatherView's heightfield sees only what is drawn).
 		var keep_dry := GPUParticlesCollisionBox3D.new()

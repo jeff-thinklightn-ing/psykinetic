@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_sight_over_walls()
 	_test_hills()
 	_test_buildings()
+	_test_field()
 	_test_building_links()
 	_test_town_walls()
 	_test_roofs()
@@ -400,6 +401,39 @@ func _test_buildings() -> void:
 	_check(level["buildings"].is_empty() and str(said.call(level["warnings"])).contains("water"), "a well on grass is left out: it stands on water")
 	var hut_at := Rect2i(13, 3, 3, 3)
 	_check(Level.rect_cells(hut_at).size() == 9 and Level.outline(hut_at).size() == 12, "a 3 x 3 footprint: nine cells, twelve outline edges")
+
+
+## A field (Level.OPEN_AIR, decision 452): its prefab's fence is walls on
+## its outline but the gate, which stop walkers and not sight; nothing of
+## it roofed, while a hut beside it is walled and roofed as ever.
+func _test_field() -> void:
+	print("\n== a field: fenced against walkers, open to sight and sky ==")
+	var map := LevelMap.new(Vector2i(12, 8))
+	for y in 8:
+		for x in 12:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(0, 0), "start")
+	var config := _stamp(map, {}, "building_field", Vector2i(1, 1))
+	config = _stamp(map, config, "building_hut", Vector2i(7, 1))
+	var level := Level.parse(map.to_image(), null, config)
+	var fields := (level["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == "building.field")
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building") or text.contains("field"))
+	_check(fields.size() == 1 and fields[0]["rect"] == Rect2i(2, 2, 4, 4) and fields[0]["facing"] == Vector2i(0, 1) and said.is_empty(),
+			"the prefab's field is 4 x 4, its front south, its gate not said to be open (%s, %s)" % [fields, level["warnings"]])
+	var edges: Dictionary = level["terrain"]["edges"]
+	var open := Level.outline(Rect2i(2, 2, 4, 4)).filter(func(key: Vector3i) -> bool: return edges.get(key) != Terrain.Edge.WALL)
+	_check(open == [Vector3i(4, 5, Terrain.SOUTH)], "fenced all round but the gate, in its front just right of the middle (%s)" % [open])
+	Level.register("test_field", map.to_image(), null, config)
+	_check(_main.load_map("test_field"), "the level with a field loads")
+	_check(World.edge_blocks(Vector2i(2, 3), Vector2i(-1, 0)) and World.edge_blocks(Vector2i(3, 2), Vector2i(0, -1)),
+			"the fence stops a walker")
+	_check(not World.edge_blocks(Vector2i(4, 5), Vector2i(0, 1)), "the gate lets one through")
+	_check(World.has_line_of_sight(Vector2i(0, 3), Vector2i(4, 3)) and World.has_line_of_sight(Vector2i(3, 0), Vector2i(3, 7)),
+			"sight crosses the fence, both sides")
+	_check(not World.has_line_of_sight(Vector2i(7, 3), Vector2i(9, 3)), "the hut's wall still stops sight")
+	_check(Level.rect_cells(Rect2i(2, 2, 4, 4)).all(func(cell: Vector2i) -> bool: return not World.fields._roofed.has(cell))
+			and World.fields._roofed.has(Vector2i(9, 3)), "nothing of the field is roofed; the hut is")
+	Level.unregister("test_field")
 
 
 func _test_building_links() -> void:

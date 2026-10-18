@@ -4904,13 +4904,13 @@ func edge_blocks(from: Vector2i, direction: Vector2i, opens_doors := false) -> b
 
 ## A closed door or a wall: what stops sight, unless the eye of the sight
 ## being walked is above both cells it stands between (higher cells see
-## over lower walls).
+## over lower walls), or the wall is a field's fence (Fields.fences).
 func edge_blocks_sight(from: Vector2i, direction: Vector2i) -> bool:
 	if _eye >= 0 and _eye > maxi(height_at(from), height_at(from + direction)):
 		return false
 	match edge_kind(from, direction):
 		Terrain.Edge.WALL:
-			return true
+			return not fields.fences.has(Terrain.edge_key(from, direction))
 		Terrain.Edge.DOOR:
 			var door := door_across(from, direction)
 			return door == null or not door.is_open()
@@ -5236,7 +5236,7 @@ func _sight_edge(from: Vector2i, direction: Vector2i, eye: int) -> Variant:
 		return true
 	match edge_kind(from, direction):
 		Terrain.Edge.WALL:
-			return null
+			return true if fields.fences.has(Terrain.edge_key(from, direction)) else null
 		Terrain.Edge.DOOR:
 			return Terrain.edge_key(from, direction)
 	return true

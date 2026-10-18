@@ -10826,3 +10826,40 @@ next release; PROTOCOL_REVISION stays (release: nothing existing changes
 meaning, and no client request is added).
 
 tests/world_news_test.
+
+## 452. The field: an open-air building, fenced against walkers, not sight
+
+Economy's farms (449, Jeff's): a town's crop grows in a field, a 4 x 4
+fenced plot with rows and no roof. Art-kit's slot building.field (fe18733;
+shape agreed with buildings) draws the fence, the ridges and the crop's
+states. Approved by the coordinator.
+- Level.BUILDINGS gains "building.field", 4 x 4, and Level.OPEN_AIR names
+  the buildings on floor with no inside. A level places one as any
+  building, with "use" (economy's "field") and "town"; a town may build it
+  record-only (449), with no level edit.
+- Its fence is the map's WALL edges on its outline, as a building's walls
+  are (265): walkers go round. Its gate is a gap, an open edge (no Door,
+  so no door.single drawn over the slot's gap): in the front, the cell
+  just right of the middle (local x 0..+1 m on +z), where the slot leaves
+  its gap. buildings_from says nothing of an OPEN_AIR building's open edges.
+- Sight crosses the fence: Fields.fences (each zone's, from the terrain's
+  OPEN_AIR outlines) and World.edge_blocks_sight / _sight_edge let a WALL
+  edge in it through, so light and heat do too. No new Terrain.Edge kind:
+  the edges and the protocol are unchanged.
+- No inside: nothing of it roofed (Fields), and the client draws no wall on
+  its outline (the slot's mesh is the fence), no rain cover, no roof to cut
+  away, no inside walls faded (_building_at). Companion.building_at has no
+  words for it, so it is not "inside".
+- The prefab, levels/prefabs/building_field (tools/seed_prefabs.gd): dirt
+  inside the fence, a ring of dirt round it.
+- The crop's state shows later, a name from economy's record ("sown",
+  "growing", "ripe", "flattened"; bare: none) picking the slot's state_*
+  node: a protocol change, with economy. No trampling or broken fence yet.
+level_test _test_field (stamped: 4 x 4, walled but the gate, nothing said;
+loaded: the fence stops walkers and not sight, the gate lets one through,
+nothing roofed, a hut beside it as ever); view_test _test_field (its slot
+drawn, no roof, no wall drawn on its outline, no inside). No real level
+touched; protocol unchanged.
+Rejected: a fence edge kind in Terrain (every edge reader and the map
+format would learn it, for what one list does); fence art as map walls in
+a "fence" wall_set (the slot carries it whole, gap and all).

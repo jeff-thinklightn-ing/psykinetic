@@ -66,6 +66,9 @@ var _roofed_whole: Dictionary[Vector2i, bool] = {}
 var level := ""
 var roofs: Array[Rect2i] = []
 var town_buildings: Array[Dictionary] = []
+## The wall edges on an open-air building's outline (Level.OPEN_AIR,
+## decision 452): a fence, which sight crosses (World.edge_blocks_sight).
+var fences: Dictionary[Vector3i, bool] = {}
 var _fire: Array[Vector2i] = []
 var _torches: Array[Vector2i] = []
 var _lanterns: Array[Vector2i] = []
@@ -111,7 +114,12 @@ func load(terrain: Dictionary) -> void:
 	outdoor = bool(terrain.get("outdoor", false))
 	region = str(terrain.get("region", Level.DEFAULT_REGION))
 	_roofed_whole.clear()
+	fences.clear()
 	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
+		if str(building.get("slot", "")) in Level.OPEN_AIR:
+			for key in Level.outline(building["rect"]):
+				fences[key] = true
+			continue
 		for cell in Level.rect_cells(building["rect"]):
 			_roofed_whole[cell] = true
 	level = str(terrain.get("level", ""))

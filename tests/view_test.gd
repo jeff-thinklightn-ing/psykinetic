@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_roofs()
 	_test_wall_heights()
 	await _test_double_doors()
+	_test_field()
 	_test_roof_damage()
 	_test_building_states()
 	_test_town_walls()
@@ -962,7 +963,7 @@ func _test_wall_heights() -> void:
 == the temple and the healer's hut: kit prefabs; a building's walls as tall as its slot says ==")
 	var level := _kit_level()
 	var rects := (level["buildings"] as Array).map(func(b: Dictionary) -> Array: return [b["slot"], b["rect"]])
-	_check(rects == [["building.temple", Rect2i(2, 2, 4, 6)], ["building.healers_hut", Rect2i(10, 2, 3, 3)]]
+	_check(rects == [["building.temple", Rect2i(2, 2, 4, 6)], ["building.healers_hut", Rect2i(10, 2, 3, 3)], ["building.field", Rect2i(10, 7, 4, 4)]]
 			and (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building")).is_empty(),
 			"each prefab stamps its building on its footprint, walled, nothing said (%s)" % [rects])
 	var counters := (level["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec.get("props", {}).get("temple") == true)
@@ -1007,15 +1008,16 @@ func _test_wall_heights() -> void:
 	_check(_rig._wall_heights.is_empty(), "and none left on another map")
 
 
-## The temple (at 2, 2) and the healer's hut (at 10, 2) stamped from their
-## prefabs on grass, parsed.
+## The temple (at 2, 2), the healer's hut (at 10, 2) and a field (at 10, 7)
+## stamped from their prefabs on grass, parsed.
 func _kit_level() -> Dictionary:
 	var map := LevelMap.new(Vector2i(16, 12))
 	for y in 12:
 		for x in 16:
 			map.set_cell(Vector2i(x, y), "grass")
 	var config := {"outdoor": true}
-	for stamp: Array in [["building_temple", Vector2i(1, 1)], ["building_healers_hut", Vector2i(9, 1)]]:
+	for stamp: Array in [["building_temple", Vector2i(1, 1)], ["building_healers_hut", Vector2i(9, 1)],
+			["building_field", Vector2i(9, 6)]]:
 		var changes := Prefab.stamp_changes(Prefab.load_prefab(stamp[0]), map, stamp[1], config)
 		for cell: Vector2i in changes["cells"]:
 			map.set_cell(cell, changes["cells"][cell])
@@ -1024,6 +1026,22 @@ func _kit_level() -> Dictionary:
 		config.merge(changes.get("config", {}), true)
 		config["entities"] = config.get("entities", []) + changes["entries"]
 	return Level.parse(map.to_image(), null, config)
+
+
+## A field (Level.OPEN_AIR, decision 452): its slot drawn, its fence the
+## slot's mesh, so no wall drawn on its outline, and no inside (no roof to
+## cut away, nothing kept dry); the temple beside it walled as ever.
+func _test_field() -> void:
+	print("\n== a field: its slot drawn, no walls on its outline, no inside (decision 452) ==")
+	_rig.rebuild(_kit_level()["terrain"], Vector2i(7, 6))
+	var rect := Rect2i(10, 7, 4, 4)
+	var field := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == rect)
+	_check(field.size() == 1 and field[0]["roof"] == null, "the field's slot stands over its footprint, no roof (%d)" % field.size())
+	var walled := Level.outline(rect).filter(func(key: Vector3i) -> bool: return _rig._runs.has(key) or _rig._walls.has(key))
+	_check(walled.is_empty() and Level.outline(Rect2i(2, 2, 4, 6)).any(func(key: Vector3i) -> bool: return _rig._runs.has(key) or _rig._walls.has(key)),
+			"no wall drawn round the field, the temple's drawn (%s)" % [walled])
+	_check(Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not _rig._building_at.has(cell)) and _rig._building_at.has(Vector2i(3, 3)),
+			"the field has no inside; the temple has")
 
 
 func _test_double_doors() -> void:
