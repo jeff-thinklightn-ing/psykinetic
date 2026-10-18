@@ -25,6 +25,7 @@ notes (decision 324).
   fact about themselves.
 - Shield bash: with your shield raised (right button held), the left button bashes with it instead of swinging. It shoves the one in front (light ones further), staggers them briefly and knocks a raised guard open for a moment, so your next blow lands. No damage; it costs a little stamina and can't be repeated for 2 seconds.
 - The forest round outdoor maps has real broadleaf trees: round, lumpy olive crowns on brown trunks in place of the old teal tiered trees with orange bases, so they turn colour in autumn and catch snow on top in winter.
+- Goblin camps hunt the herds around them, so game grows thin near a camp, and a rescued hunter brings the town meat, hides and the odd pair of antlers. Neither ever hunts a herd out, nor the animals you are stalking. Wolves that run out of prey dwindle.
 - A thing someone has carried long enough takes their name, such as "Wren's dagger".
 - Taking up a bundle of arrows while you hold a bow and a bundle swaps them: yours is put down where the new one lay, and the party log names both with their condition, so you can keep the better one and have it mended.
 - Meat and hides you bring home now build the town. The store keeps meat, hides and leather apart from its food; the cook roasts meat into a better meal than a ration, and townsfolk eat meat when the food runs out. A rescued tanner gets the town to build a tannery and turns hides into leather for the shop. Raiders take meat as they take food, never hides or leather.

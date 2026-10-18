@@ -87,6 +87,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.workshop_open = allows
 	production.workshop_level = level_for
 	production.on_built = _built
+	production.hunted.connect(_on_hunted)
 	from_dict(saved)
 
 
@@ -740,6 +741,13 @@ func _take_companion(town: String, who: String, faction: String, by: String) -> 
 	if companion_taken.is_valid():
 		companion_taken.call(origin.trim_prefix("companion:"), by)
 	return true
+
+
+## A hunter came home (Production.hunted, decision 407): the town log says
+## what with, or that there was no game.
+func _on_hunted(town: String, who: String, kind: String) -> void:
+	var name := str(production.worker(who).get("name", who))
+	_note(town, "%s the hunter found no game" % name if kind.is_empty() else "%s the hunter brought home a %s" % [name, kind])
 
 
 func _seated(who: String) -> bool:

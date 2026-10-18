@@ -21,6 +21,14 @@ extends RefCounted
 ## retire takes a calm far one back into its count. A death is killed (the
 ## body's unit leaves for good: hunting depletes), a flight off an edge
 ## moved. Rules: levels/economy.json "herds".
+##
+## Taken from (decision 407): each group keeps a reserve (its species' least
+## size) nobody but wolves eats into, and one with bodies out is never
+## taken from: what a player stalks is the herd before them. Camps
+## (Holdings.camps: camp_eats x their size a day) and town hunters
+## (hunt_one) share take_share of an area's game above the reserves a day.
+## Wolves that eat less than half their hunger starve by starve x the
+## shortfall a day.
 
 ## Ground counted for capacity: every sample-th cell each way, standing for
 ## sample x sample cells.
@@ -37,6 +45,9 @@ var clock := Callable()
 ## (holdings), 0 on a faction's.
 var richness := Callable()
 var holdings: Holdings = null
+## () -> the camps that hunt ({id, area, cell, size, faction}); unset,
+## holdings' (Holdings.camps). Tests set it.
+var camps := Callable()
 ## The keeper's view of the zone World is in: () -> its name, (spec) -> the
 ## body made or null (World.spawn_spec), (cell, reach) -> a free cell under
 ## the sky near it, or World.NO_CELL.
@@ -54,6 +65,12 @@ var _day := -1
 ## Area -> {cells: Array[Vector2i] (rich samples), weights: Array[float],
 ## total: float (rich cells, weighted)}: the ground, again each day.
 var _ground: Dictionary = {}
+## Area -> what camps and hunters may still take from it today (take_share
+## of its spare at the day's start).
+var _budget: Dictionary = {}
+## Camp id -> {want, got} today; and got / want over the last whole day.
+var _fed_today: Dictionary = {}
+var _fed: Dictionary = {}
 
 
 func _init(saved := {}, with_areas := {}, with_rules := {}, with_clock := Callable(), with_holdings: Holdings = null) -> void:
@@ -164,6 +181,7 @@ func tick() -> void:
 			if not _seeded.has(area):
 				_seed(area)
 		_daily(day)
+		_new_budgets()
 	if since <= 0:
 		return
 	var days := minf(float(since) / day_steps, 1.0)
@@ -173,6 +191,7 @@ func tick() -> void:
 			_breed(area, species, days)
 		for species: String in all_species:
 			_hunt(area, species, days)
+	_camps_eat(days)
 
 
 func _areas_with_groups() -> Array[String]:
@@ -210,7 +229,8 @@ func _hunt(area: String, species: String, days: float) -> void:
 	var hunters := total(area, species)
 	if hunters <= 0.0 or rule.get("prey", []).is_empty():
 		return
-	var hunger := hunters * float(rule.get("eats", 0.0)) * days
+	var wanted := hunters * float(rule.get("eats", 0.0)) * days
+	var hunger := wanted
 	for prey: Variant in rule.get("prey", []):
 		for each in groups_in(area, str(prey)):
 			if hunger <= 0.0:
@@ -218,6 +238,120 @@ func _hunt(area: String, species: String, days: float) -> void:
 			var eaten := minf(float(each["count"]), hunger)
 			each["count"] = float(each["count"]) - eaten
 			hunger -= eaten
+	# Less than half their hunger met: they starve by the shortfall.
+	if wanted > 0.0 and hunger > wanted * 0.5:
+		var lost := float(rules.get("starve", 0.1)) * (hunger / wanted) * hunters * days
+		var kept := 0.0
+		for each in groups_in(area, species):
+			kept += float(each["count"])
+		if kept <= 0.0:
+			return
+		for each in groups_in(area, species):
+			each["count"] = maxf(float(each["count"]) - lost * float(each["count"]) / kept, 0.0)
+
+
+# --- Taken by camps and hunters (decision 407) --------------------------------------
+
+## What [param each] can give camps and hunters: its count above its
+## species' reserve (least size); none while it has bodies out.
+func spare(each: Dictionary) -> float:
+	if int(each["out"]) > 0:
+		return 0.0
+	var size: Array = _species(str(each["species"])).get("size", [1, 1])
+	return maxf(float(each["count"]) - float(size[0]), 0.0)
+
+
+## Each area's budget for the day (take_share of its spare now), and each
+## camp's last whole day's feeding.
+func _new_budgets() -> void:
+	_budget.clear()
+	for area in _areas_with_groups():
+		var sum := 0.0
+		for each in groups_in(area):
+			sum += spare(each)
+		_budget[area] = sum * float(rules.get("take_share", 0.25))
+	for id: String in _fed_today:
+		var day: Dictionary = _fed_today[id]
+		_fed[id] = clampf(float(day["got"]) / float(day["want"]), 0.0, 1.0) if float(day["want"]) > 0.0 else 1.0
+	_fed_today.clear()
+
+
+## [param area]'s [param species] groups with something to spare, nearest
+## [param near] first.
+func _nearest_spare(area: String, species: String, near: Vector2i, least: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for each in groups_in(area, species):
+		if spare(each) >= least:
+			out.append(each)
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var da := Vector2(a["home"] - near).length()
+		var db := Vector2(b["home"] - near).length()
+		return da < db or da == db and str(a["id"]) < str(b["id"]))
+	return out
+
+
+## Up to [param amount] taken from [param area]'s [param species] above the
+## reserves and within today's budget, the groups nearest [param near]
+## first: how much.
+func _take(area: String, species: String, near: Vector2i, amount: float) -> float:
+	var got := 0.0
+	for each in _nearest_spare(area, species, near, 0.0001):
+		var room := minf(amount - got, float(_budget.get(area, 0.0)))
+		if room <= 0.0:
+			break
+		var bite := minf(spare(each), room)
+		each["count"] = float(each["count"]) - bite
+		_budget[area] = float(_budget.get(area, 0.0)) - bite
+		got += bite
+	return got
+
+
+## Each camp (Holdings.camps: area, cell, size, faction) eats camp_eats x
+## its size a day of its area's game, in camp_prey's order.
+func _camps_eat(days: float) -> void:
+	var all: Array = camps.call() if camps.is_valid() else (holdings.camps() if holdings != null else [])
+	for camp: Dictionary in all:
+		var want := float(rules.get("camp_eats", 0.5)) * float(camp["size"]) * days
+		if want <= 0.0:
+			continue
+		var got := 0.0
+		for prey: Variant in rules.get("camp_prey", []):
+			got += _take(str(camp["area"]), str(prey), camp["cell"], want - got)
+		var day: Dictionary = _fed_today.get(camp["id"], {"want": 0.0, "got": 0.0})
+		day["want"] = float(day["want"]) + want
+		day["got"] = float(day["got"]) + got
+		_fed_today[camp["id"]] = day
+
+
+## How well camp [param id] ate over the last whole day, 0..1 (1 before a
+## day has passed): a hook for maps (a hungry camp raiding for food).
+func camp_fed(id: String) -> float:
+	return float(_fed.get(id, 1.0))
+
+
+## A town hunter's catch in [param area], near [param near]: one animal of
+## the hunter_prey species with the most to spare, from its nearest group
+## above the reserves, within today's budget. Its kind (a stag or a deer,
+## by the mix), or "" if there is no game to take.
+func hunt_one(area: String, near: Vector2i) -> String:
+	if float(_budget.get(area, 0.0)) < 1.0:
+		return ""
+	var best := ""
+	var most := 0.0
+	for prey: Variant in rules.get("hunter_prey", []):
+		var sum := 0.0
+		for each in groups_in(area, str(prey)):
+			sum += floorf(spare(each))
+		if sum > most:
+			best = str(prey)
+			most = sum
+	if best.is_empty():
+		return ""
+	var each: Dictionary = _nearest_spare(area, best, near, 1.0)[0]
+	each["count"] = float(each["count"]) - 1.0
+	each["made"] = int(each["made"]) + 1
+	_budget[area] = float(_budget[area]) - 1.0
+	return _kind_for(best, "%s_%d" % [each["id"], int(each["made"])])
 
 
 ## [param area] given its first groups: each species to seed of its
@@ -441,7 +575,7 @@ func to_dict() -> Dictionary:
 		var home: Vector2i = each["home"]
 		each["home"] = [home.x, home.y]
 		groups[id] = each
-	return {"groups": groups, "seeded": _seeded.keys(), "next": _next, "at": _at}
+	return {"groups": groups, "seeded": _seeded.keys(), "next": _next, "at": _at, "fed": _fed.duplicate()}
 
 
 ## to_dict's [param saved] over what is here; a group that makes no sense
@@ -451,6 +585,10 @@ func from_dict(saved: Dictionary) -> void:
 	_at = int(saved.get("at", -1))
 	for area: Variant in saved.get("seeded", []):
 		_seeded[str(area)] = true
+	var fed: Variant = saved.get("fed", {})
+	if fed is Dictionary:
+		for id: Variant in fed:
+			_fed[str(id)] = clampf(float(fed[id]), 0.0, 1.0)
 	var groups: Variant = saved.get("groups", {})
 	if not groups is Dictionary:
 		return

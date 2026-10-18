@@ -10,7 +10,11 @@ extends Node
 ## its group and home, kept animals conserved, retire takes one back, a
 ## kill is gone for good, a flight moves it to the next area's group; old
 ## animal records fold into groups (not a level's own slots); a body's
-## group and home are in its snapshot entry. Reads the repo's levels, never
+## group and home are in its snapshot entry. Taken from (decision 407):
+## camps and hunters only above each group's reserve, never from one with
+## bodies out, at most take_share of the spare a day; a camp eats by its
+## size and camp_fed says how well; a hunter's catch is one animal; wolves
+## short of food starve, fed ones do not. Reads the repo's levels, never
 ## the shared overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
@@ -46,6 +50,7 @@ func _ready() -> void:
 	_test_saved()
 	_test_bodies()
 	_test_records()
+	_test_taken()
 	for body in _bodies:
 		body.free()
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -171,6 +176,73 @@ func _test_saved() -> void:
 	_check(none.groups_in("meadow").is_empty(), "a snapshot from before the herds has none till the tick seeds them")
 	var bad := _herds(_rules, {"groups": {"x": {"species": "deer"}, "y": 3}})
 	_check(bad.group("x").is_empty() and bad.group("y").is_empty(), "a group that makes no sense is left out")
+
+
+func _test_taken() -> void:
+	print("\n== taken from by camps and hunters, above the reserves; wolves starving (decision 407) ==")
+	_now = 0
+	var herds := _herds(_rules, {"seeded": ["meadow", "fields", "cave"]})
+	var deer := herds._add_group("meadow", "deer", Vector2i(20, 20), 10.0)
+	var other := herds._add_group("meadow", "deer", Vector2i(24, 20), 10.0)
+	var near := herds._add_group("meadow", "deer", Vector2i(60, 60), 7.0)
+	near["out"] = 2  # A player is on these.
+	var least := float(_rules["species"]["deer"]["size"][0])
+	_check(is_equal_approx(herds.spare(deer), 10.0 - least) and herds.spare(near) == 0.0,
+		"a group spares what it has above its reserve (%.1f); one with bodies out nothing" % herds.spare(deer))
+	herds.tick()
+	var budget := (20.0 - 2.0 * least) * float(_rules["take_share"])
+	_check(is_equal_approx(float(herds._budget["meadow"]), budget),
+		"the day's budget: take_share of the spare (%.2f)" % float(herds._budget["meadow"]))
+	var caught: Array[String] = []
+	for i in 10:
+		var kind := herds.hunt_one("meadow", Vector2i(0, 0))
+		if kind.is_empty():
+			break
+		caught.append(kind)
+	_check(caught.size() == floori(budget) and caught.all(func(k: String) -> bool: return k in ["deer", "stag"]),
+		"a hunter catches one deer at a time, within the budget (%s)" % [caught])
+	_check(float(deer["count"]) == 10.0 - caught.size() and float(near["count"]) == 7.0, "from the nearest group first; the stalked herd untouched (%.1f, %.1f)" % [deer["count"], near["count"]])
+	deer["count"] = least
+	other["count"] = least
+	_now = DAY
+	herds.tick()
+	_check(herds.hunt_one("meadow", Vector2i(0, 0)) == "", "nothing above the reserves: no game")
+
+	print("  a camp eats by its size")
+	_now = 0
+	var fed := _herds(_rules, {"seeded": ["meadow", "fields", "cave"]})
+	var herd := fed._add_group("meadow", "deer", Vector2i(30, 30), 10.0)
+	fed.camps = func() -> Array: return [{"id": "meadow/camp", "area": "meadow", "cell": Vector2i(30, 32), "size": 1.0, "faction": "goblins"}]
+	_check(fed.camp_fed("meadow/camp") == 1.0, "before a day has passed it reads fed")
+	fed.tick()
+	for step in DAY / World.WORLD_TICK_STEPS:
+		_now += World.WORLD_TICK_STEPS
+		fed.tick()
+	var eaten := 10.0 - float(herd["count"])
+	_check(eaten > 0.0 and fed.camp_fed("meadow/camp") > 0.9, "the camp ate its fill of a big herd (%.1f, fed %.2f)" % [eaten, fed.camp_fed("meadow/camp")])
+	herd["count"] = least + 0.2
+	_now += World.WORLD_TICK_STEPS
+	fed.tick()  # A new day's budget, from the herd as it is now.
+	for step in DAY / World.WORLD_TICK_STEPS - 1:
+		_now += World.WORLD_TICK_STEPS
+		fed.tick()
+	_now += World.WORLD_TICK_STEPS
+	fed.tick()
+	_check(fed.camp_fed("meadow/camp") < 0.9 and float(herd["count"]) >= least - 0.01,
+		"a herd at its reserve: the camp goes short, eating only what breeds (fed %.2f), the herd kept (%.2f)" % [fed.camp_fed("meadow/camp"), herd["count"]])
+	var again := _herds(_rules, JSON.parse_string(JSON.stringify(fed.to_dict())))
+	_check(is_equal_approx(again.camp_fed("meadow/camp"), fed.camp_fed("meadow/camp")), "how it ate is saved")
+
+	print("  wolves short of food starve")
+	var hungry := _herds(_rules, {"seeded": ["meadow", "fields", "cave"]})
+	var pack := hungry._add_group("meadow", "wolf", Vector2i(50, 50), 5.0)
+	hungry._hunt("meadow", "wolf", 1.0)
+	_check(is_equal_approx(float(pack["count"]), 5.0 - float(_rules["starve"]) * 5.0), "no prey: they lose starve x their number a day (%.2f)" % pack["count"])
+	var full := _herds(_rules, {"seeded": ["meadow", "fields", "cave"]})
+	var pack2 := full._add_group("meadow", "wolf", Vector2i(50, 50), 5.0)
+	full._add_group("meadow", "rabbit", Vector2i(52, 50), 30.0)
+	full._hunt("meadow", "wolf", 1.0)
+	_check(float(pack2["count"]) == 5.0, "fed, they keep their number")
 
 
 func _spawn(spec: Dictionary) -> Object:

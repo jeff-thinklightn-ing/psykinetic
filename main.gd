@@ -1650,6 +1650,11 @@ func _boot() -> void:
 	World.keepers.erase(_herds_kept)
 	_herds_kept = World.herds
 	World.keepers.append(World.herds)
+	# A town's hunter takes from its area's herds near its store (decision 407).
+	World.production.hunt = func(town: String) -> String:
+		var place := World.holdings.place(town)
+		var cell: Vector2i = place.get("cell", Vector2i.ZERO)
+		return World.herds.hunt_one(str(place.get("area", town.get_slice("/", 0))), cell) if World.herds != null else ""
 	# A beaten raid's companion captives come back (decision 314).
 	World.companion_freed = companion_freed
 	_records.clear()

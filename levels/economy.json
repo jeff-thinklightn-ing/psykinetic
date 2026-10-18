@@ -12,6 +12,7 @@
 		"surplus": ["goods", "rework"]
 	},
 	"always_want": ["resource"],
+	"hunter": {"trade": "hunter", "every": 3000},
 	"work_up": {"ore": ["weapon", "shield"], "wood": ["shield", "weapon"], "cloth": ["bandage"], "food": ["food"]},
 	"defend_trades": ["smith", "carpenter", "cook"],
 	"busy": {"quiet_below": 4, "busy_from": 20},
@@ -35,6 +36,7 @@
 	},
 	"herds": {
 		"out_per_group": 6, "out_per_zone": 24, "seed": 0.5, "sample": 4,
+		"take_share": 0.25, "camp_eats": 0.5, "camp_prey": ["deer", "boar", "rabbit"], "hunter_prey": ["deer", "boar", "rabbit"], "starve": 0.1,
 		"species": {
 			"deer": {"size": [4, 7], "mix": {"deer": 4, "stag": 1}, "density": 1.5, "breed": 0.03, "roam": 12},
 			"rabbit": {"size": [3, 6], "mix": {"rabbit": 1}, "density": 3.0, "breed": 0.08, "roam": 8},

@@ -5,7 +5,10 @@ extends Node
 ## meat and food before she bakes rations, and rations again once the meat
 ## is gone; the tanner makes leather from two hides whatever the tier, in
 ## his tannery; townsfolk eat the store's meat when it has no food; a raid
-## takes meat as it takes food. Reads the repo's levels, never the shared
+## takes meat as it takes food. A town's hunter (decision 407) every
+## hunter.every steps brings home what the herds give: a stag's meat and
+## hide into the store, its antlers banked; no game, nothing, and the town
+## log says so. Reads the repo's levels, never the shared
 ## overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
@@ -25,6 +28,7 @@ func _ready() -> void:
 	_test_tanner()
 	_test_eating()
 	_test_raid()
+	_test_hunter()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -130,6 +134,34 @@ func _test_raid() -> void:
 	var report := towns.raid_arrives(TOWN, {"id": "g1", "faction": "goblins", "strength": 100.0, "from": "x"})
 	_check(int(report["took"].get("meat", 0)) > 0 and int(report["took"].get("food", 0)) > 0, "meat and food taken (%s)" % [report["took"]])
 	_check(work.stockpile.count(TOWN, "hide") == 10 and work.stockpile.count(TOWN, "gold") == 10, "hides and gold left alone")
+
+
+func _test_hunter() -> void:
+	print("
+== the hunter ==")
+	var work := _work()
+	var towns := Towns.new({}, work, _rules, func() -> int: return _now)
+	var catches: Array[String] = ["stag", ""]
+	var asked: Array[String] = []
+	work.hunt = func(town: String) -> String:
+		asked.append(town)
+		return catches.pop_front() if not catches.is_empty() else ""
+	work.add_worker("u1", "Hob", ["hunter"], TOWN)
+	var every := int(_rules["hunter"]["every"])
+	_started(work, every - World.WORLD_TICK_STEPS)
+	_check(asked.is_empty(), "not before hunter.every steps")
+	_started(work, every + World.WORLD_TICK_STEPS)
+	_check(asked == [TOWN], "then he hunts the town's ground (%s)" % [asked])
+	_check(work.stockpile.count(TOWN, "meat") == 4 and work.stockpile.count(TOWN, "hide") == 1,
+		"a stag: the least of its meat and its hide into the store (%s)" % [work.stockpile.resources(TOWN)])
+	_check(work.stockpile.item_ids(TOWN) == ["antlers"], "its antlers banked (%s)" % [work.stockpile.item_ids(TOWN)])
+	_check(towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "Hob the hunter brought home a stag"), "the town log says so")
+	_started(work, every)
+	_check(asked.size() == 2 and work.stockpile.count(TOWN, "meat") == 4, "no game: nothing")
+	_check(towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "Hob the hunter found no game"), "and the log says that too")
+	work.set_away("u1", true)
+	_started(work, every * 2)
+	_check(asked.size() == 2, "away, he does not hunt")
 
 
 func _check(ok: bool, what: String) -> void:

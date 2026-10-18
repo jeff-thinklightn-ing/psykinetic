@@ -68,13 +68,20 @@ var on_built := Callable()
 ## who and who_kind brought back at its workshop by its worker ("by"), or,
 ## "fallback" true, given up on (nobody there for rules' return.give_up).
 var returned := Callable()
+## (town) -> String: a hunter of [param town] hunts its area's herds
+## (decision 407; Main sets it: Herds.hunt_one near its store): the kind
+## caught, or "" for no game.
+var hunt := Callable()
 
 ## What worker [param worker_id] owes the town's bank changed (set_loan):
 ## for npc's cards.
 signal loan_changed(worker_id: String, owed: float, working_off: bool)
+## A hunter of [param town] came home from a hunt ([param kind] caught, ""
+## for none): for the town's log.
+signal hunted(town: String, worker_id: String, kind: String)
 
 ## Id -> {id, name, trades, town, origin, purse, rent_due, away, needs
-## (need -> step due), fed, hungry_since, last_trade, wage_due, loan
+## (need -> step due), fed, hungry_since, last_trade, wage_due, hunt_due, loan
 ## (owed to the town's bank, decision 354), working_off, type (hidden, npc's)
 ## and the MIND (each 1..10; neither a companion's), card (npc's, kept as
 ## it is) and heard (companions' Hearsay's, kept as it is)}.
@@ -148,7 +155,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	list.assign(trades.map(func(trade: Variant) -> String: return str(trade)))
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
-		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0,
+		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0, "hunt_due": 0,
 		"loan": 0.0, "working_off": false, "heard": [], "card": {}}
 	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
 	# roll), and the four rolled about their trade's and type's profile by
@@ -483,6 +490,7 @@ func tick() -> void:
 	_advance(at, cat)
 	_rent(at)
 	_official_wages(at)
+	_hunts(at)
 	var towns: Array[String] = []
 	towns.assign(_towns.keys())
 	towns.sort()
@@ -603,6 +611,44 @@ func _rent(at: int) -> void:
 ## steps from the treasury while it stays at gold_floor or above (else it
 ## waits till next due), to each worker of that trade there, not away.
 ## Makers earn from what they sell.
+## Each hunter (rules' hunter.trade, in town and not away) every
+## hunter.every steps: the hunt hook's catch, its kind's drops (the least of
+## each, monsters.json) into the town's store, a resource as its yield and
+## a trophy as a thing banked there (decision 407).
+func _hunts(at: int) -> void:
+	var rule: Dictionary = rules.get("hunter", {})
+	var trade := str(rule.get("trade", ""))
+	if trade.is_empty() or not hunt.is_valid():
+		return
+	var every := maxi(int(rule.get("every", 3000)), 1)
+	for id in worker_ids():
+		var worker_record: Dictionary = _workers[id]
+		if trade not in worker_record["trades"] or worker_record["away"]:
+			continue
+		if int(worker_record["hunt_due"]) == 0:
+			worker_record["hunt_due"] = at + every
+			continue
+		if at < int(worker_record["hunt_due"]):
+			continue
+		worker_record["hunt_due"] = at + every
+		var town: String = worker_record["town"]
+		var kind := str(hunt.call(town))
+		var by := "hunter:%s" % id
+		for drop: Variant in Monster.kinds().get(kind, {}).get("drops", []):
+			var item := str(drop.get("item", "")) if drop is Dictionary else ""
+			var count: Variant = drop.get("count", [1, 1]) if drop is Dictionary else []
+			var least := int(count[0]) if count is Array and count.size() > 0 else 1
+			if item.is_empty() or least <= 0:
+				continue
+			var yields := Items.yield_of(item)
+			for what: String in yields:
+				stockpile.deposit(town, what, int(yields[what]) * least, by, "%s's hunt" % worker_record["name"])
+			if yields.is_empty():
+				for i in least:
+					stockpile.bank(town, book().mint(item, "hunted", worker_record["name"]), by, "%s's hunt" % worker_record["name"])
+		hunted.emit(town, id, kind)
+
+
 func _official_wages(at: int) -> void:
 	var official: Dictionary = rules.get("official", {})
 	if official.is_empty():
@@ -1034,6 +1080,7 @@ func from_dict(saved: Dictionary) -> void:
 					_workers[id]["needs"][str(need)] = int(needs[need])
 			_workers[id]["fed"] = str(entry.get("fed", ""))
 			_workers[id]["wage_due"] = maxi(int(entry.get("wage_due", 0)), 0)
+			_workers[id]["hunt_due"] = maxi(int(entry.get("hunt_due", 0)), 0)
 			_workers[id]["loan"] = maxf(float(entry.get("loan", 0.0)), 0.0)
 			_workers[id]["working_off"] = bool(entry.get("working_off", false)) and float(_workers[id]["loan"]) > 0.0
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)

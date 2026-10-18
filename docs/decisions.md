@@ -9111,3 +9111,37 @@ town.
 
 Protocol unchanged: stock ids ride the fields they did. tests/larder_test;
 builder_test's uses take the tannery.
+
+## 407. Camps and hunters take from the herds, above their reserves; wolves starve
+
+Herds step 3 (367, 397, 405), the coordinator's approval of 2026-10-17.
+What eats from the herds off-screen must never empty what a player is
+stalking.
+
+- A group's reserve is its species' least size: camps and hunters take
+  only its count above that (Herds.spare), and nothing from a group with
+  bodies out (a player is near it). Wolves are not bound by it: they are
+  the herds' own.
+- Each day an area's budget is take_share (0.25) of its spare at the
+  day's start; camps and hunters together take no more than that.
+- Camps (Holdings.camps: area, cell, size its worth) eat camp_eats (0.5)
+  x size a day, of camp_prey in order (deer, boar, rabbit), nearest groups
+  first. Nothing is stored: herds thin about camps. Herds.camp_fed(id),
+  0..1 over the last whole day (1 before one has passed; saved), is a hook
+  for maps (a hungry camp raiding for food); wiring it is maps' call.
+  Herds.camps (a Callable) stands in for Holdings.camps in tests.
+- The hunter (rules' hunter: trade hunter, every 3000 steps), a rescued
+  trade with no building, in town and not away: Production.hunt (Main:
+  Herds.hunt_one near the town's store) gives one animal of hunter_prey,
+  the species with the most to spare, from its nearest group; its kind's
+  drops (the least of each, monsters.json) go to the store, a resource as
+  its yield and a trophy (antlers, tusks) banked as a thing.
+  Production.hunted -> the town log: what he brought home, or "found no
+  game". The worker's hunt_due is saved.
+- Wolves that eat less than half their hunger lose starve (0.1) x the
+  shortfall x their number a day, from their kept counts; fed, they breed
+  as before. An area hunted out loses its wolves too.
+
+Protocol unchanged: all sim. tests/herds_test (reserves, the stalked herd,
+the budget, a camp fed and short, wolves starving and fed), tests/larder_test
+(the hunter's catch, no game, away).
