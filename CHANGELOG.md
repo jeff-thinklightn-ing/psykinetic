@@ -7,6 +7,18 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.153
+
+- This release changes what the server and client send each other, so update the
+  client to keep playing (the launcher's update does it). Fixed: grass tufts,
+  stones, roots, reeds and flowers are in their colours again, not white. New in
+  it: a forest east of the wilds, dark under a roof of grown pines, with sunlit
+  clearings, owls and bats at night and rain on the crowns; monsters show what
+  they hold to every player; orcs and kobolds with bodies of their own, kobolds
+  with daggers and picks; faces and clothes that differ from person to person;
+  Snagfin back as the wilds' goblin merchant; a thief, quarrels brought to the
+  lawspeaker, and townsfolk you can walk home; a companion who speaks to what just
+  happened; the pick; and a server that no longer stalls at dawn.
 - Grass tufts, stones, roots, reeds and flowers on the ground are in their colours again; since this morning's new art they were drawn white.
 - Someone walked home (decision 487, on 435 and Jeff's rule): now and then one of a town's people of the working trades loses their way beyond the walls and stands at a far cell of the town's zone (off held ground, reachable), away from work till walked home; their kin ask you to walk them home, a word to the lost one and they follow you at heel (companions' Heel), and reaching the town's ground pays whoever walked them (economy's commissions.escort, 8) with the notice and memories on both cards; after three days the lost find their own way back, so nobody is ever stranded.
 - Internal: the way a companion walks at your heel is shared, ready for townspeople
@@ -36,7 +48,6 @@ notes (decision 324).
 - A thing can be of dwarven or dark elven make, set by where it came from: a level, a chest, a monster or what it drops. Its note says "dwarven dagger" and its story "dwarven work" (decision 474).
 - A forest east of the wilds: a path through it between sunlit clearings, the way to the elven stronghold (closed for now).
 - The forest's trees: 700 tall pines grown by a simulation of a hundred years, close enough that their crowns make a roof, each one its own. Walking under them, the tree tops between you and the camera turn see-through around you, as near walls do, and follow you as you move (decision 467).
-- A forest east of the wilds: a path through it between sunlit clearings, the way to the elven stronghold (closed for now). Its trees are still to come.
 - An archer at rest now holds its arrows down at the hip instead of up at the chest.
 - The server no longer stalls for a moment at each dawn while it works out where the wild animals can live: it now does that a little at a time.
 - Companions no longer stall a tick on their first turn in a zone, and one
