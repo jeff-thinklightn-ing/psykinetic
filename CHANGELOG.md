@@ -16,6 +16,10 @@ notes (decision 324).
   Marta by the east field, with everything the town said of her as her own
   story, a home, a day and a trade, as long as the town has room for one
   more. Once here, only the world can take them away.
+
+- This release changes what the server and client send each other: update the game before joining. A town's field shows its crop as the year turns: sown, growing, ripe, or flattened after a storm.
+- A town of six or more gets a lawspeaker, paid by the town like its priest.
+
 ## v0.1.151
 
 - This release changes what the server and client send each other, so update the
@@ -43,8 +47,6 @@ notes (decision 324).
 - Bows and arrows are drawn as themselves: a hunting bow with a leather grip and its string, bundles of arrows tied with a cord (plain, flame and barbed heads), and a real arrow in flight instead of a grey stick.
 - Fixed: after a server restart a companion forgot what she had heard and her
   home town, and her looks and nature could come back different.
-- This release changes what the server and client send each other: update the game before joining. A town's field shows its crop as the year turns: sown, growing, ripe, or flattened after a storm.
-- A town of six or more gets a lawspeaker, paid by the town like its priest.
 - What a town's lawspeaker thinks good enough to be the world's goes on a list
   for Jeff (docs/lore/proposed.md) instead of into the world's lore; he agrees
   or declines each in his own time, and nothing becomes lore by itself.
