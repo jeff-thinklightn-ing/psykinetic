@@ -3432,6 +3432,14 @@ func _sync_residents() -> void:
 					var each: Dictionary = folk[i]
 					each["town"] = place_id
 					each["places"] = _resident_places(area, place, each["trade"], homes, i)
+					if each["trade"] == "lawspeaker":
+						# His rounds (decision 459): the town's homes in the order
+						# they are given, with who lives there; his own left out.
+						var stops: Array = []
+						for k in mini(folk.size(), homes.size()):
+							if k != i and str(folk[k].get("player", "")).is_empty():
+								stops.append({"rect": homes[k], "who": str(folk[k]["name"]), "id": str(folk[k]["key"])})
+						each["places"]["rounds"] = stops
 					wanted[each["key"]] = each
 		# The healer's hut (decision 404): whoever economy seats there (the
 		# medicine man, a worker whose town is the hut's place id) has a body
@@ -3667,6 +3675,12 @@ func _offers_context() -> Dictionary:
 		"town_name": func(town: String) -> String:
 			return str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town,
 		"players_words": func() -> bool: return Net.lawspeaker_players,
+		"lawspeaker_of": _lawspeaker_of,
+		"visits": func(town: String) -> Array:
+			var law := _lawspeaker_of(town)
+			if law.is_empty() or World.production == null:
+				return []
+			return Townsfolk.visits(_town_folk(town), law, World.production.now()),
 		"proposed": _write_proposed,
 		"model": func() -> String: return str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),
 		"area_of": func(town: String) -> String: return str(World.holdings.place(town).get("area", "")) if World.holdings != null else "",
@@ -3723,6 +3737,27 @@ func _make_lawspeaker() -> void:
 	_lawspeaker_client = client
 	print("[lawspeaker] on: %s, one round a town a day; players' words %s" % [str(Lawspeaker.MODELS.get(Net.lawspeaker, Net.lawspeaker)),
 		"in" if Net.lawspeaker_players else "out"])
+
+
+## [param town]'s lawspeaker's worker id (trade "lawspeaker", decision 459), "" for none.
+func _lawspeaker_of(town: String) -> String:
+	if World.production == null:
+		return ""
+	for id: String in _town_folk(town):
+		if "lawspeaker" in World.production.worker(id).get("trades", []):
+			return id
+	return ""
+
+
+## [param town]'s people in the order _sync_residents gives homes by: the
+## town's residents, no companions, none away, sorted.
+func _town_folk(town: String) -> Array:
+	if World.towns == null or World.production == null:
+		return []
+	var ids: Array = World.towns.residents(town).filter(func(who: String) -> bool:
+		return not who.begins_with("companion:") and not World.production.worker(who).is_empty() and not bool(World.production.worker(who).get("away", false)))
+	ids.sort()
+	return ids
 
 
 ## Server: the proposals list for Jeff (decision 458), every town's

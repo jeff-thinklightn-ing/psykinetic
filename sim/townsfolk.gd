@@ -540,7 +540,43 @@ static func _loan(production: Production, worker_id: String, owed: float, workin
 # --- Routines (decision 404) ----------------------------------------------------------
 
 const DAYS_FILE := "res://levels/residents.json"
-const PLACES: Array[String] = ["work", "home", "square", "well", "inn", "temple"]
+const PLACES: Array[String] = ["work", "home", "square", "well", "inn", "temple", "rounds"]
+
+
+## The lawspeaker's rounds (decision 459): of [param count] homes, the ones
+## he visits on day [param day], "rounds.homes_a_day" of them in turn, so
+## every home has its day; the indices, in the order of the day's stops.
+static func round_stops(count: int, day: int) -> Array[int]:
+	var out: Array[int] = []
+	if count <= 0:
+		return out
+	var a_day := maxi(int(days().get("rounds", {}).get("homes_a_day", 3)), 1)
+	for k in mini(a_day, count):
+		var index := (day * a_day + k) % count
+		if index not in out:
+			out.append(index)
+	return out
+
+
+## Which of the day's stops he is at by [param hour]: the day's rounds
+## hours split among them, in order.
+static func round_stop(count: int, day: int, hour: float) -> int:
+	var stops := round_stops(count, day)
+	if stops.is_empty():
+		return -1
+	var k := int(clampf((hour - 6.0) / 13.0, 0.0, 0.999) * stops.size())
+	return stops[k]
+
+
+## Who the lawspeaker [param lawspeaker_id] stands with on the day of
+## [param at]: of [param ids] (the town's people in the order Main gives
+## homes by: sorted), those at today's stops, himself left out.
+static func visits(ids: Array, lawspeaker_id: String, at: int) -> Array[String]:
+	var out: Array[String] = []
+	var homes: Array = ids.filter(func(id: Variant) -> bool: return str(id) != lawspeaker_id)
+	for index: int in round_stops(homes.size(), day_of(at)):
+		out.append(str(homes[index]))
+	return out
 static var _days := {}
 
 

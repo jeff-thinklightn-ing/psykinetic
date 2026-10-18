@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- The lawspeaker walks the town now: once it has six people of its own, one of
+  them is appointed to keep its memory, and you can find him at a neighbour's
+  door on his rounds, in the square at dawn and dusk, at the inn at noon. What
+  he rules on each day comes from the doors he knocked at, and any dispute the
+  town holds comes to him first.
 - Drawing a bow shows where it will go: the body it would hit is outlined, or the spot where the arrow would come down. A missed arrow stands in the ground for a few seconds. Your arrows never harm a resident, a companion or another player: they stop at them and stick there a moment. Over a monster with a bow ready, the cursor says "RMB  draw, let go to shoot" (decision 456).
 - A goblin archer's draw and a monster's raised shield are now sent to every player, so a drawn bow can be seen, and dodged, before the arrow flies. Server and client need the new release together.
 - Bows and arrows are drawn as themselves: a hunting bow with a leather grip and its string, bundles of arrows tied with a cord (plain, flame and barbed heads), and a real arrow in flight instead of a grey stick.

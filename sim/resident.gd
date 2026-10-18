@@ -17,12 +17,13 @@ extends GridEntity
 ## FAR_EVERY ticks and is walked there at once (World.walk), as monsters
 ## are by the world tick.
 
-enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE }
+enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE, ROUNDS }
 ## Doing by the place word Townsfolk.whereabouts gives (decision 404).
-const DOING_AT := {"work": Doing.WORK, "home": Doing.HOME, "square": Doing.SQUARE, "well": Doing.WELL, "inn": Doing.INN, "temple": Doing.TEMPLE}
+const DOING_AT := {"work": Doing.WORK, "home": Doing.HOME, "square": Doing.SQUARE, "well": Doing.WELL, "inn": Doing.INN, "temple": Doing.TEMPLE,
+	"rounds": Doing.ROUNDS}
 ## Where it is, in its voice's words (facts_now).
 const WHERE_WORDS := {Doing.WORK: "at your work", Doing.HOME: "at home", Doing.SQUARE: "in the square", Doing.HIDE: "hiding at home from raiders",
-	Doing.WELL: "at the well", Doing.INN: "at the inn", Doing.TEMPLE: "at the temple"}
+	Doing.WELL: "at the well", Doing.INN: "at the inn", Doing.TEMPLE: "at the temple", Doing.ROUNDS: "on your rounds, at a neighbour's door"}
 const SIGHT_RANGE := 7
 ## It looks and listens for raiders every so many ticks.
 const LOOK_EVERY := 5
@@ -36,7 +37,7 @@ const FAR_EVERY := 20
 const STUCK_TRIES := 3
 const NO_CELL := Vector2i(-99999, -99999)
 const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home",
-	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple"}
+	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds"}
 
 ## Production's worker id ("companion:<player id>" for a companion resting
 ## in town: decision 333 amended), the town (a stockpile place id) and its
@@ -194,7 +195,7 @@ func _look() -> void:
 func _pick_goal() -> void:
 	_route.clear()
 	_stuck = 0
-	var area: Rect2i = places.get(PLACE_OF[doing], places.get("square", Rect2i()))
+	var area: Rect2i = places.get(PLACE_OF[doing], places.get("square", Rect2i())) if doing != Doing.ROUNDS else _round_area()
 	if area.size == Vector2i.ZERO:
 		_goal = tile
 		return
@@ -204,6 +205,23 @@ func _pick_goal() -> void:
 		_goal = _free_cell(area)
 	if doing == Doing.SQUARE:
 		_wander_at = World.tick + WANDER_TICKS + (id * 7) % 40
+
+
+## The home the lawspeaker's rounds (decision 459) have him at now: one of
+## places["rounds"] ([{rect, who, id}], Main's, the town's homes in order),
+## by the day and the hour; his own home when the town has none.
+func _round_area() -> Rect2i:
+	var stop := _round_stop()
+	return stop.get("rect", places.get("home", Rect2i())) if not stop.is_empty() else places.get("home", Rect2i())
+
+
+func _round_stop() -> Dictionary:
+	var stops: Array = places.get("rounds", [])
+	if stops.is_empty():
+		return {}
+	var now := DayNight.now()
+	var index := Townsfolk.round_stop(stops.size(), Townsfolk.day_of(now), DayNight.hour(now))
+	return stops[index] if index >= 0 and index < stops.size() and stops[index] is Dictionary else {}
 
 
 ## A free cell of [param area], from a start its id and the tick choose;
@@ -260,6 +278,19 @@ func facts_now() -> Array[String]:
 		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
 	out.append("It is %s%s." % [hour, sky])
 	out.append("You are %s." % WHERE_WORDS.get(doing, "in the town"))
+	if trade == "lawspeaker":
+		# The town's lawspeaker (decision 459): what he is for, whose door he
+		# stands at, and the disputes before him.
+		out.append("You are the town's lawspeaker: you keep what the town remembers and hold it straight. Lore is fact; what the town remembers is memory; one person's talk is talk.")
+		var stop := _round_stop()
+		if doing == Doing.ROUNDS and not str(stop.get("who", "")).is_empty():
+			out.append("You stand at %s's door." % stop["who"])
+		var log: Variant = Offers._call(Offers.ctx, "memory", [town]) if not town.is_empty() else null
+		if log is Array:
+			for entry: Variant in log:
+				if entry is Dictionary and bool(entry.get("dispute", false)) and str(entry.get("tier", "")) in [TownMemory.BELIEF, TownMemory.CANDIDATE]:
+					out.append("A dispute is before you: %s, says %s." % [Hearsay._lower_first(str(entry.get("text", ""))),
+						World.production.worker(str(entry.get("said_by", ""))).get("name", "someone") if World.production != null else "someone"])
 	out.append(work_words())
 	out.append_array(means_words())
 	# What it knows of the world, and has heard (decision 378); a companion

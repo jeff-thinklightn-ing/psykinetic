@@ -52,6 +52,7 @@ func _ready() -> void:
 	await _test_failures()
 	_test_remembered_in_voice()
 	_test_proposed_page()
+	_test_rounds()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	TownMemory.use_settings({})
@@ -252,6 +253,32 @@ func _test_proposed_page() -> void:
 	var again := TownMemory.proposed_page({TOWN: log}, {TOWN: "Ashford"}, who, kept)
 	_check(again.contains("- status: agreed, Jeff 2026-10-19\n"), "and kept on the next rebuild")
 	_check(TownMemory.proposed_page({}, {}, who).ends_with("Nothing proposed yet.\n"), "nothing proposed: the page says so")
+
+
+func _test_rounds() -> void:
+	print("\n== his rounds (decision 459): a few homes a day in turn, the batch from the people he stands with ==")
+	Townsfolk.use_days({})
+	_check(Townsfolk.whereabouts("lawspeaker", 9.0) == "rounds" and Townsfolk.whereabouts("lawspeaker", 12.5) == "inn" and Townsfolk.whereabouts("lawspeaker", 15.0) == "rounds"
+		and Townsfolk.whereabouts("lawspeaker", 22.0) == "home", "his day from residents.json: rounds morning and afternoon, the inn at noon, home at night")
+	_check(Townsfolk.round_stops(7, 0) == [0, 1, 2] and Townsfolk.round_stops(7, 1) == [3, 4, 5] and Townsfolk.round_stops(7, 2) == [6, 0, 1], "three homes a day, in turn, round the town")
+	_check(Townsfolk.round_stops(2, 5) == [1, 0] and Townsfolk.round_stops(0, 3).is_empty(), "a small town's homes repeat; no homes, no stops")
+	_check(Townsfolk.round_stop(7, 0, 7.5) == 0 and Townsfolk.round_stop(7, 0, 11.0) == 1 and Townsfolk.round_stop(7, 0, 16.5) == 2, "the day's hours split among the stops")
+	var ids := ["l-bram", "l-law", "l-mara", "l-odo", "l-tam"]
+	_check(Townsfolk.visits(ids, "l-law", 0) == ["l-bram", "l-mara", "l-odo"] and Townsfolk.visits(ids, "l-law", DayNight.day_steps) == ["l-tam", "l-bram", "l-mara"],
+		"who he stands with today, himself left out: %s" % [Townsfolk.visits(ids, "l-law", 0)])
+	_setup()
+	_work.add_worker("l-law", "Hrolf", ["lawspeaker"], TOWN, "appointed")
+	var log := _log_with_candidates()
+	TownMemory.note(log, "Sly was caught with a hand in Odo's purse", "l-mara", "", 0)
+	TownMemory.find(log, "Sly was caught with a hand in Odo's purse")["dispute"] = true
+	TownMemory.find(log, "Sly was caught with a hand in Odo's purse")["tier"] = TownMemory.CANDIDATE
+	_ctx["visits"] = func(_town: String) -> Array: return ["l-tam"]
+	_ctx["lawspeaker_of"] = func(_town: String) -> String: return "l-law"
+	var body := Lawspeaker.request(TOWN, log, _ctx)
+	_check(body["candidates"] == ["tm.5", "tm.1", "tm.2"], "with Tam visited: the dispute first, then what Tam holds (tm.1, tm.2), not tm.3 (a traveller's) nor what nobody visited holds: %s" % [body["candidates"]])
+	_check(str(body["system"]).begins_with("You are Hrolf. You are the lawspeaker of Ashford"), "named, as the town's record has him")
+	_ctx["visits"] = func(_town: String) -> Array: return []
+	_check(Lawspeaker.request(TOWN, log, _ctx)["candidates"].size() == 3, "with no rounds (no lawspeaker in the town), the whole batch as before")
 
 
 func _check(ok: bool, what: String) -> void:

@@ -50,12 +50,12 @@ static func settings() -> Dictionary:
 	if _settings.is_empty():
 		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE)) if FileAccess.file_exists(FILE) else null
 		_settings = DEFAULTS.duplicate()
-		if data is Dictionary and data.get("lawspeaker") is Dictionary:
-			_settings.merge(data["lawspeaker"], true)
+		if data is Dictionary and data.get("rulings") is Dictionary:
+			_settings.merge(data["rulings"], true)  # "lawspeaker" is his day (459).
 	return _settings
 
 
-## Uses [param given] in place of the file's "lawspeaker" ({} to read it again): tests.
+## Uses [param given] in place of the file's "rulings" ({} to read it again): tests.
 static func use_settings(given: Dictionary) -> void:
 	_settings = {}
 	_due = {}
@@ -75,11 +75,21 @@ static func setting(key: String) -> int:
 static func request(town: String, log: Array, given: Dictionary) -> Dictionary:
 	var production: Production = given.get("production")
 	var players_words := bool(Offers._call(given, "players_words"))
+	# With a lawspeaker in the town (decision 459), the batch is built from the
+	# people he stood with on his rounds today: candidates they hold or said,
+	# and every dispute, which comes first.
+	var visited: Variant = Offers._call(given, "visits", [town])
+	var near: Array = visited if visited is Array else []
 	var candidates: Array[Dictionary] = []
-	for entry: Dictionary in TownMemory.of_tier(log, TownMemory.CANDIDATE):
+	var all: Array[Dictionary] = TownMemory.of_tier(log, TownMemory.CANDIDATE)
+	all.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return bool(a.get("dispute", false)) and not bool(b.get("dispute", false)))
+	for entry: Dictionary in all:
 		if bool(entry.get("world", false)) or bool(entry.get("ready", false)) or bool(entry.get("proposed", false)):
 			continue
 		if not players_words and str(entry.get("said_by", "")).begins_with(TownMemory.PLAYER):
+			continue
+		if not near.is_empty() and not bool(entry.get("dispute", false)) and str(entry.get("said_by", "")) not in near \
+				and not entry.get("holders", []).any(func(id: Variant) -> bool: return str(id) in near):
 			continue
 		candidates.append(entry)
 		if candidates.size() >= setting("max_candidates"):
@@ -119,7 +129,11 @@ static func request(town: String, log: Array, given: Dictionary) -> Dictionary:
 	var model := str(Offers._call(given, "model"))
 	if model.is_empty() or model == "<null>":
 		model = MODELS["haiku"]
-	return {"model": model, "max_tokens": setting("max_tokens"), "system": SYSTEM % name,
+	var law := str(Offers._call(given, "lawspeaker_of", [town]))
+	var system := SYSTEM % name
+	if not law.is_empty() and law != "<null>" and production != null and not production.worker(law).is_empty():
+		system = "You are %s. " % production.worker(law).get("name", law) + system  # Named (Jeff's Q2 hook).
+	return {"model": model, "max_tokens": setting("max_tokens"), "system": system,
 		"messages": [{"role": "user", "content": "\n".join(lines)}], "town": town, "candidates": candidates.map(func(e: Dictionary) -> String: return str(e["id"]))}
 
 

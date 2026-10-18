@@ -11305,3 +11305,57 @@ fx.arrow slot, perf the hit reaction timed to the flight).
 Rejected: a missed arrow as a pickup (bundles are never spent), and a
 party-log line for a glancing arrow (it adds a message; it can come with
 the bow's sounds if the playtest misses it).
+## 459. The lawspeaker in the town: his rounds, and the batch from the people he stands with
+
+Phase 3 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md: "the
+lawspeaker goes and talks to the people, and keeps everything straight";
+"he makes rounds through town, a few people a day"), on the memory log
+(447), the rulings (448) and the routines (404); the coordinator's
+defaults 2026-10-18: rolled like everyone else, with hooks left for Jeff's
+Q2 (a name and a face) and Q3 (disputes brought to him).
+
+The man: a resident of trade "lawspeaker" (lore's roles.json gives the
+profession its binding, official, "lore as fact, memory as memory"; until
+it does he speaks as townsfolk), one per town, appointed by economy as the
+priest is (459's economy side: worker id "lawspeaker:<town>", origin
+"appointed", named from economy.json official.lawspeaker.names, seated
+once a town has six residents of its own, paid by the bank, no building:
+his work place is the square). His day (residents.json "lawspeaker"): the
+square at dawn, rounds through the morning, the inn at noon, rounds in the
+afternoon, the square at dusk, home at night.
+
+The rounds: a new place "rounds" (Townsfolk.PLACES; Resident.Doing.ROUNDS):
+of the town's homes, in the order Main gives them (the residents sorted),
+he visits "rounds.homes_a_day" (3) a day in turn (Townsfolk.round_stops:
+day d's stops are indices d*3, d*3+1, d*3+2 round the town, so every home
+has its day), the day's rounds hours split among them (round_stop). Main
+gives his body places["rounds"], the homes with who lives there
+(_sync_residents), and he walks to the day's door (Resident._round_area);
+his voice is told "You stand at Mara's door." and what he is for ("You are
+the town's lawspeaker: you keep what the town remembers and hold it
+straight. Lore is fact; what the town remembers is memory; one person's
+talk is talk."), and each dispute before him. With no player near, no body
+walks, and the rounds still happen: who he stands with on a day is a
+matter of the calendar (Townsfolk.visits), not of a body.
+
+The batch (448) from the people he stands with: Lawspeaker.request takes
+the town's "visits" (Main: Townsfolk.visits over the town's sorted
+residents) and, when there are any, keeps only the candidates those people
+hold or said, plus every entry marked a dispute, which comes first (Q3's
+hook: the thief's catch, 461, logs one; a player's dispute brought to him
+can log one the same way); with no lawspeaker in the town the whole batch
+goes as before. The request names him when the town has one ("You are
+Hrolf. You are the lawspeaker of Ashford...": Q2's hook; the name is the
+record's, rolled or given). The settings block of 448 in residents.json is
+"rulings" now, since "lawspeaker" is his day.
+
+lawspeaker_test: his day from the file; the stops in turn over the days and
+a small town's repeating; the day's hours among the stops; who he stands
+with, himself left out; the batch filtered to the visited with the dispute
+first and a traveller's words out; the name in the request; the whole
+batch with no rounds. resident_test's bodies are untouched (no lawspeaker
+in its town). Protocol unchanged; no new class_name.
+
+Rejected: the rounds only when a body walks (nothing would happen with no
+player watching); a scripted greeting at the door (facts, and the voice
+greets); his own building (he has the town).
