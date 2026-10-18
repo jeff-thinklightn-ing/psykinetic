@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A thing holds a grudge against whatever has hurt the people carrying it most, once that kind has taken 30 hp from them, not when they fall. Each thing grows one way: a bane holds no grudge, and becoming one drops the grudge it had (decision 473).
+
 ## v0.1.152
 
 - This release changes what the server and client send each other, so update the

@@ -2261,6 +2261,7 @@ func _felled_with(entity: GridEntity, slot: int, victim: GridEntity) -> void:
 		items.set_bane(uid, kind, zone.name, entity.tile)
 		_log("growth: %s's %s is %s-bane" % [entity.name, items.id_of(uid), kind])
 		item_grew.emit(entity, uid, "bane", kind)
+		items.drop_grudge(uid, zone.name, entity.tile)  # One growth per thing (decision 473).
 	if not kind.is_empty() and str(items.grudge_of(uid).get("kind", "")) == kind \
 			and items.pay_grudge(uid, int(growth["grudge_paid"]), zone.name, entity.tile):
 		_log("growth: %s's %s has its vengeance on %s" % [entity.name, items.id_of(uid), _plural(kind)])
@@ -2310,19 +2311,36 @@ func _in_hands_any(entity: GridEntity, test: Callable) -> bool:
 	return false
 
 
-## [param fallen] (a player or a companion) fell to [param by] (decision
-## 417): what it held in its hands takes a grudge against [param by]'s kind.
-func _take_grudges(fallen: GridEntity, by: GridEntity) -> void:
-	if not (fallen is Player or fallen is Companion) or not by is Monster or not holds_in_hands(fallen):
+## [param who] (a player or a companion) lost [param amount] hp to
+## [param by] (decisions 417, 473): each thing with character in its hands
+## counts the harm by [param by]'s kind (ItemBook.hurt), and takes a grudge
+## against it once that kind has done it Items.growth's grudge_after, more
+## than any other kind has. One growth per thing: a bane takes no grudge.
+func _take_grudges(who: GridEntity, by: GridEntity, amount: int) -> void:
+	if not (who is Player or who is Companion) or not by is Monster or not holds_in_hands(who):
 		return
 	var kind := kind_of(by)
+	if kind.is_empty() or amount <= 0:
+		return
+	var after := int(Items.growth()["grudge_after"])
+	var took := false
 	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
-		var uid := fallen.slot_items[slot] if slot < fallen.slot_items.size() else 0
-		if uid != 0 and items.grudge_of(uid).is_empty() and not kind.is_empty():
-			items.set_grudge(uid, kind, zone.name, fallen.tile)
-			_log("growth: %s's %s takes a grudge against %s" % [fallen.name, items.id_of(uid), _plural(kind)])
-			item_grew.emit(fallen, uid, "grudge", kind)
-	_show_notes(fallen)
+		var uid := who.slot_items[slot] if slot < who.slot_items.size() else 0
+		if uid == 0 or not items.grows(uid):
+			continue
+		items.hurt(uid, kind, amount)
+		if not items.grudge_of(uid).is_empty() or not items.bane_of(uid).is_empty():
+			continue
+		var tally := items.hurt_of(uid)
+		var most := int(tally.get(kind, 0))
+		if most < after or tally.values().any(func(hp: Variant) -> bool: return int(hp) > most):
+			continue
+		items.set_grudge(uid, kind, zone.name, who.tile)
+		_log("growth: %s's %s takes a grudge against %s" % [who.name, items.id_of(uid), _plural(kind)])
+		item_grew.emit(who, uid, "grudge", kind)
+		took = true
+	if took:
+		_show_notes(who)
 
 
 ## The strength (decision 365) of the thing in [param entity]'s slot
@@ -4101,7 +4119,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		return
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
-	target.hp = maxi(target.hp - amount, 0)
+	var lost := mini(amount, target.hp)
+	target.hp -= lost
 	target.hurt_tick = tick
 	if cause != &"fire":
 		var loud := float(Senses.NOISE_FIGHT)
@@ -4110,8 +4129,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		noise(target.tile, roundi(loud), &"fight", source)
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
-	if target.hp == 0 and is_instance_valid(source):
-		_take_grudges(target, source)  # Decision 417.
+	if is_instance_valid(source):
+		_take_grudges(target, source, lost)  # Decisions 417, 473.
 	if target.hp == 0 and spared.is_valid():
 		var by := str(spared.call(target, source, cause))
 		if by != "":

@@ -248,8 +248,10 @@ static func set_curse_for_test(values: Dictionary) -> void:
 ## The catalog's "growth" (decision 417), read on first use: {bane_after (a
 ## thing that has felled this many of one kind is its bane), bane_notice
 ## (how much further that kind notices a bane's bearer: enemy-ai reads it),
-## grudge_stagger (the ticks a grudge's blows stagger its kind), grudge_paid
-## (that kind felled this many times with it, the grudge lifts)}.
+## grudge_after (the hp one kind has taken from its holders, more than any
+## other, before a thing takes a grudge; decision 473), grudge_stagger (the
+## ticks a grudge's blows stagger its kind), grudge_paid (that kind felled
+## this many times with it, the grudge lifts)}.
 static func growth() -> Dictionary:
 	if _growth.is_empty():
 		_growth = read_growth(FileAccess.get_file_as_string(CATALOG))
@@ -264,6 +266,7 @@ static func read_growth(text: String) -> Dictionary:
 		given = {}
 	return {"bane_after": maxi(int(given.get("bane_after", 25)), 1),
 		"bane_notice": maxf(float(given.get("bane_notice", 1.5)), 0.0),
+		"grudge_after": maxi(int(given.get("grudge_after", 30)), 1),
 		"grudge_stagger": maxi(int(given.get("grudge_stagger", 4)), 0),
 		"grudge_paid": maxi(int(given.get("grudge_paid", 5)), 1),
 		"says": given["says"] if given.get("says") is Dictionary else {}}

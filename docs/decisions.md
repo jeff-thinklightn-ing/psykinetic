@@ -11941,3 +11941,30 @@ unchanged.
 Rejected: a model judging the bond (the world's events move it, as 443);
 decay while they travel (a bond does not fade beside its friend); days
 alone reaching devoted.
+
+## 473. The hurt tally, and one growth per thing
+
+Coordinator's defaults while Jeff's growth questions wait (2026-10-17): "the
+hurt tally and one growth per thing, keeping the sidegrades (the agreed
+rule; a damage number only if Jeff asks)". On 472. This supersedes 417's
+grudge rule (a thing took a grudge when its holder fell to a kind) and its
+bane and grudge side by side (a thing could hold both).
+- ItemBook.hurt(uid, kind, hp) / hurt_of(uid): a thing with character
+  (472) counts the hp each kind has taken from whoever held it while it
+  was in their hands ("hurt" {kind: hp}, saved). World.damage reports the
+  hp actually lost (World._take_grudges(who, by, amount)), on every blow
+  from a monster to a player or a companion, not only the last one.
+- A grudge forms once one kind has done it items.json growth
+  "grudge_after" (30) hp, more than any other kind has: the vengeance is
+  against what has hurt its bearers most. Its sidegrades stay 417's (its
+  blows stagger that kind, they seek its bearer first); paid as before
+  (grudge_paid of them felled with it), when that kind's hurt starts over
+  so it does not come straight back.
+- One growth per thing, bane or vengeance, whichever count gets there:
+  a bane (25 of one kind felled, 415's tally) takes no grudge, and a thing
+  that becomes a bane drops the grudge it held (ItemBook.drop_grudge: its
+  kind's hurt forgotten, "gave way" in its history, a kept event).
+- The party log says "<thing> has seen its bearers hurt by <kinds> enough:
+  it holds a grudge against them".
+No damage number: the growths stay sidegrades unless Jeff asks. Protocol
+unchanged (the server's book and the notes' text). items_test's _test_bane.

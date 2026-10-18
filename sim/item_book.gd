@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -217,13 +217,42 @@ func grudge_of(uid: int) -> Dictionary:
 	return _book[uid].get("grudge", {}) if _book.has(uid) else {}
 
 
-## [param uid] takes a grudge against [param kind] (its holder fell to one;
-## decision 417), unless it holds one already.
+## [param uid] takes a grudge against [param kind] (its holders were hurt
+## enough by one; decisions 417, 473), unless it holds one already.
 func set_grudge(uid: int, kind: String, zone := "", tile := Vector2i(-1, -1)) -> void:
 	if not grows(uid) or kind.is_empty() or not grudge_of(uid).is_empty():
 		return
 	_book[uid]["grudge"] = {"kind": kind, "paid": 0}
 	note(uid, "grudge", kind, zone, tile)
+
+
+## [param amount] of harm a [param kind] did to [param uid]'s holder while
+## it was in their hands (decision 473): a thing with character keeps the
+## tally ("hurt" {kind: hp}, saved); a vengeance grows from it.
+func hurt(uid: int, kind: String, amount: int) -> void:
+	if not grows(uid) or kind.is_empty() or amount <= 0:
+		return
+	var tally: Dictionary = _book[uid].get("hurt", {})
+	tally[kind] = int(tally.get(kind, 0)) + amount
+	_book[uid]["hurt"] = tally
+
+
+## The harm done to [param uid]'s holders by kind ({kind: hp}; decision
+## 473); {} for none.
+func hurt_of(uid: int) -> Dictionary:
+	return _book[uid].get("hurt", {}) if _book.has(uid) else {}
+
+
+## [param uid]'s grudge gives way to the bane it has become (decision 473:
+## one growth per thing): gone, its kind's hurt forgotten, "gave way" in its
+## history.
+func drop_grudge(uid: int, zone := "", tile := Vector2i(-1, -1)) -> void:
+	var grudge := grudge_of(uid)
+	if grudge.is_empty():
+		return
+	_book[uid].erase("grudge")
+	hurt_of(uid).erase(str(grudge["kind"]))
+	note(uid, "gave way", "its grudge on %s to %s-bane" % [grudge["kind"], bane_of(uid)], zone, tile)
 
 
 ## One of [param uid]'s grudge's kind felled with it; [param paid] of them
@@ -236,6 +265,7 @@ func pay_grudge(uid: int, paid: int, zone := "", tile := Vector2i(-1, -1)) -> bo
 	if int(grudge["paid"]) < paid:
 		return false
 	_book[uid].erase("grudge")
+	hurt_of(uid).erase(str(grudge["kind"]))  # Paid: its hurt starts over (decision 473).
 	note(uid, "avenged", str(grudge["kind"]), zone, tile)
 	return true
 
@@ -476,6 +506,12 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 			elif entry.get("name") is Dictionary or entry.get("blessed") is Dictionary or entry.get("felled") is Dictionary:
 				# Saved before 472: a named, blessed or tallied thing has grown already.
 				items._book[int(key)]["character"] = {"how": "named" if entry.get("name") is Dictionary else "blessed" if entry.get("blessed") is Dictionary else "used", "step": int(entry.get("made", 0))}
+			if entry.get("hurt") is Dictionary and not entry["hurt"].is_empty():
+				var harm := {}
+				for kind: Variant in entry["hurt"]:
+					if int(entry["hurt"][kind]) > 0:
+						harm[str(kind)] = int(entry["hurt"][kind])
+				items._book[int(key)]["hurt"] = harm
 			if entry.get("felled") is Dictionary and not entry["felled"].is_empty():
 				var felled := {}
 				for kind: Variant in entry["felled"]:

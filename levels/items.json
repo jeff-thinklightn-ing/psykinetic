@@ -114,9 +114,10 @@
 		}
 	},
 	"growth": {
-		"_about": "Bane and vengeance (decision 417). A thing that has felled bane_after of one kind (ItemBook's tally, decision 415) is that kind's bane for life: that kind dreads its bearer and notices them bane_notice times further (World.holder_bane; enemy-ai reads it). A thing held by someone felled by a kind takes a grudge against it: its blows stagger that kind grudge_stagger ticks, and that kind seeks its bearer first (World.holder_grudge; enemy-ai); grudge_paid of that kind felled with it, the grudge lifts.",
+		"_about": "Bane and vengeance (decision 417). A thing that has felled bane_after of one kind (ItemBook's tally, decision 415) is that kind's bane for life: that kind dreads its bearer and notices them bane_notice times further (World.holder_bane; enemy-ai reads it). Only a thing with character grows (decision 472), and only one way (decision 473): a thing whose holders one kind has hurt grudge_after hp, more than any other kind, takes a grudge against it (none once it is a bane, and becoming one drops its grudge): its blows stagger that kind grudge_stagger ticks, and that kind seeks its bearer first (World.holder_grudge; enemy-ai); grudge_paid of that kind felled with it, the grudge lifts and that kind's hurt starts over.",
 		"bane_after": 25,
 		"bane_notice": 1.5,
+		"grudge_after": 30,
 		"grudge_stagger": 4,
 		"grudge_paid": 5,
 		"says": {"bane": "its kind dread whoever holds it, and notice them from further off", "vengeance": "its blows stagger that kind, and they come for whoever holds it first"}

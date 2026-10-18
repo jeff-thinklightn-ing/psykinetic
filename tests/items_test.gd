@@ -1152,14 +1152,14 @@ func _test_kills() -> void:
 
 
 func _test_bane() -> void:
-	print("\n== bane and vengeance: a thing that fells enough of a kind is its bane; one whose holder fell to a kind holds a grudge, paid in their felling (decision 417) ==")
+	print("\n== bane and vengeance: a thing that fells enough of a kind is its bane; one whose holders a kind hurt most holds a grudge, paid in their felling; one growth per thing (decisions 417, 473) ==")
 	var host := _player(Net.local_id)
 	var far := _open_line(host, 2)
 	_check(far != World.NO_CELL, "an open cell beside the host")
 	if far == World.NO_CELL:
 		return
 	var d := (far - host.tile) / 2
-	Items.set_growth_for_test({"bane_after": 3, "grudge_paid": 2})
+	Items.set_growth_for_test({"bane_after": 3, "grudge_paid": 2, "grudge_after": 30})
 	var grew := []
 	var growing := func(_entity: GridEntity, _uid: int, mark: String, kind: String) -> void: grew.append([mark, kind])
 	World.item_grew.connect(growing)
@@ -1178,20 +1178,29 @@ func _test_bane() -> void:
 		World._resolve_hits()
 		while not World.ground_uids(host.tile + d).is_empty():
 			World.items.end(World.take_from_ground(host.tile + d, 0), "gone")
-	for i in 3:
-		var imp: GridEntity = foe_of.call("imp")
-		imp.hp = 1
-		strike.call(imp)
-	_check(World.items.bane_of(dagger) == "imp" and World.holder_bane(host, "imp") and not World.holder_bane(host, "wolf")
-			and grew == [["bane", "imp"]], "three imps felled (3 here, 25 in play): the dagger is their bane (%s)" % [grew])
-	_check(not World.holder_bane(host, "") and not World.holder_grudge(host, ""), "no kind: nobody's bane or grudge (enemy-ai's find)")
-	_check(World.item_note(dagger) == "dagger, imp-bane", "its note says so (%s)" % World.item_note(dagger))
-	# A grudge: its holder falls to a wolf.
+	var hurt_by := func(foe: GridEntity, hp: int) -> void:
+		host.hp = host.max_hp
+		World.damage(host, hp, foe)
+		host.hp = host.max_hp
+	# A grudge (decision 473): one kind hurts its holders 30 hp, more than any other.
+	var goblin: GridEntity = foe_of.call("goblin")
+	hurt_by.call(goblin, 14)
+	goblin.hp = 1
+	strike.call(goblin)
 	var wolf: GridEntity = foe_of.call("wolf")
-	World._take_grudges(host, wolf)
-	_check(World.items.grudge_of(dagger) == {"kind": "wolf", "paid": 0} and World.holder_grudge(host, "wolf") and grew.back() == ["grudge", "wolf"],
-			"its holder fell to a wolf: it holds a grudge against wolves")
-	_check(World.item_note(dagger) == "dagger, imp-bane, vengeance on wolves", "and says so (%s)" % World.item_note(dagger))
+	hurt_by.call(wolf, 12)
+	_check(World.items.hurt_of(dagger) == {"goblin": 14, "wolf": 12} and World.items.grudge_of(dagger).is_empty() and grew.is_empty(),
+			"a goblin hurts its holder 14, a wolf 12: counted, no grudge yet (%s)" % [World.items.hurt_of(dagger)])
+	hurt_by.call(wolf, 12)
+	hurt_by.call(wolf, 8)
+	_check(World.items.grudge_of(dagger) == {"kind": "wolf", "paid": 0} and World.holder_grudge(host, "wolf") and grew.back() == ["grudge", "wolf"]
+			and World.items.hurt_of(dagger) == {"wolf": 32, "goblin": 14},
+			"wolves have hurt it 32 (30 here too), more than goblins' 14: it holds a grudge against wolves (%s)" % [World.items.hurt_of(dagger)])
+	_check(World.item_note(dagger) == "dagger, vengeance on wolves", "and says so (%s)" % World.item_note(dagger))
+	var plain := _give(host, "dagger", Player.LEFT_HAND)
+	hurt_by.call(wolf, 15)
+	_check(World.items.hurt_of(plain).is_empty() and World.items.grudge_of(plain).is_empty(), "a plain thing in the other hand keeps no tally (decision 472)")
+	World.items.end(World.take_item(host, host, Player.LEFT_HAND), "gone")
 	wolf.max_hp = 50
 	wolf.hp = 50
 	wolf.stunned_until_tick = 0
@@ -1204,10 +1213,35 @@ func _test_bane() -> void:
 	other.hp = 1
 	strike.call(other)
 	_check(World.items.grudge_of(dagger).is_empty() and not World.holder_grudge(host, "wolf") and grew.back() == ["avenged", "wolf"]
-			and World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "avenged"),
-			"two wolves: the grudge lifts, avenged in its history")
+			and World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "avenged")
+			and World.items.hurt_of(dagger) == {"goblin": 14},
+			"two wolves: the grudge lifts, avenged in its history, and wolves' hurt starts over (%s)" % [World.items.hurt_of(dagger)])
+	goblin = foe_of.call("goblin")
+	hurt_by.call(goblin, 16)
+	_check(World.items.grudge_of(dagger).get("kind") == "goblin" and grew.back() == ["grudge", "goblin"], "goblins reach 30: a grudge against them now")
+	goblin.hp = 1
+	strike.call(goblin)
+	# A bane: one growth per thing, so the grudge gives way.
+	for i in 3:
+		var imp: GridEntity = foe_of.call("imp")
+		imp.hp = 1
+		strike.call(imp)
+	_check(World.items.bane_of(dagger) == "imp" and World.holder_bane(host, "imp") and not World.holder_bane(host, "wolf")
+			and grew.slice(-1) == [["bane", "imp"]], "three imps felled (3 here, 25 in play): the dagger is their bane (%s)" % [grew])
+	_check(World.items.grudge_of(dagger).is_empty() and not World.holder_grudge(host, "goblin") and World.items.hurt_of(dagger).is_empty()
+			and World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "gave way"),
+			"one growth per thing: its grudge on goblins gave way to the bane (decision 473)")
+	_check(not World.holder_bane(host, "") and not World.holder_grudge(host, ""), "no kind: nobody's bane or grudge (enemy-ai's find)")
+	_check(World.item_note(dagger) == "dagger, imp-bane", "its note says so (%s)" % World.item_note(dagger))
+	var wolf3: GridEntity = foe_of.call("wolf")
+	hurt_by.call(wolf3, 15)
+	hurt_by.call(wolf3, 15)
+	_check(World.items.grudge_of(dagger).is_empty() and World.items.hurt_of(dagger) == {"wolf": 30} and grew.back() == ["bane", "imp"],
+			"a bane takes no grudge, though wolves hurt it 30 (%s)" % [World.items.hurt_of(dagger)])
+	wolf3.hp = 1
+	strike.call(wolf3)
 	var back := ItemBook.from_dict(World.items.to_dict())
-	_check(back.bane_of(dagger) == "imp", "the bane saved and read back")
+	_check(back.bane_of(dagger) == "imp" and back.hurt_of(dagger) == {"wolf": 30}, "the bane and the hurt saved and read back")
 	World.item_grew.disconnect(growing)
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	Items.reset()

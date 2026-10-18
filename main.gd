@@ -5535,7 +5535,7 @@ func _narrate_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> 
 		"bane":
 			party_log.add("%s has felled so many %s it is their bane." % [thing, kinds])
 		"grudge":
-			party_log.add("%s holds a grudge against %s." % [thing, kinds])
+			party_log.add("%s has seen its bearers hurt by %s enough: it holds a grudge against them." % [thing, kinds])  # Decision 473.
 		"avenged":
 			party_log.add("%s has had its vengeance on %s." % [thing, kinds])
 		"character":
