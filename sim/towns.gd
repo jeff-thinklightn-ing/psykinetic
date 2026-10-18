@@ -54,6 +54,9 @@ signal raided(town: String, report: Dictionary)
 ## [param who_id] came home to [param town] rescued ([param by]: the
 ## faction that had taken them, "" if none did): for npc's cards.
 signal rescued(town: String, who_id: String, by: String)
+## Resident [param who_id] ([param name]) of [param town] died by npc's word
+## (Towns.died, decision 501): for their card and kin.
+signal resident_died(town: String, who_id: String, name: String, why: String)
 ## A building of [param town]'s changed state or level (unlocked, built,
 ## raised, damaged, repaired): the views redraw it (buildings_of).
 signal building_changed(town: String, kind: String)
@@ -260,6 +263,37 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 	return true
 
 
+## Resident [param who_id] of [param town] dies of [param why] (npc's
+## sickness, decision 501): out of the residents and the workers, their
+## workshop freed, the house given up (_seat), "<Name> died of <why>" in the
+## log. Their gold is not lost: their purse pays any loan to the bank, the
+## rest to the treasury; what the town owed them is cleared. Not a
+## companion (hers is her own death and revival). False for no such
+## resident.
+func died(town: String, who_id: String, why: String) -> bool:
+	var record := _town(town)
+	if who_id.begins_with("companion:") or who_id not in record["residents"]:
+		return false
+	var worker := production.worker(who_id)
+	if worker.is_empty():
+		return false
+	var name := str(worker["name"])
+	var purse := int(worker["purse"])
+	var loan := ceili(float(worker["loan"]))
+	if purse > 0 and production.spend(who_id, purse, "left to the town at their death"):
+		var to_bank := mini(purse, loan)
+		if to_bank > 0:
+			production.stockpile.deposit(town, "gold", to_bank, "repay:%s" % who_id, "%s's loan, paid from what they left" % name)
+		if purse - to_bank > 0:
+			production.stockpile.deposit(town, "gold", purse - to_bank, "estate:%s" % who_id, "what %s left" % name)
+	record["residents"].erase(who_id)
+	production.remove_worker(who_id)
+	_note(town, "%s died of %s" % [name, why])
+	_seat(town)
+	resident_died.emit(town, who_id, name, why)
+	return true
+
+
 ## Someone the town remembers moves in (decisions 460 and 471): false when
 ## [param town]'s residents are at its room (the growth rescued captives
 ## use, so the town's talk never crowds them out; not for [param origin]
@@ -406,7 +440,7 @@ func choose(town: String) -> String:
 		wants.append("walls")
 	for who in residents(town):
 		var worker := production.worker(who)
-		if not worker.is_empty() and not _seated(who) and not worker["away"]:
+		if not worker.is_empty() and not _seated(who) and not Production.off_work(worker):
 			var kind := kind_for(worker["trades"][0])
 			if not kind.is_empty() and kind not in wants:
 				wants.append(kind)
@@ -967,7 +1001,7 @@ func _woodcut(town: String) -> void:
 	var levels := int(shed.get("level", 0)) if shed.get("state") in [STANDING, BUILDING] else 0
 	for who in residents(town):
 		var worker := production.worker(who)
-		if worker.is_empty() or trade not in worker.get("trades", []) or worker["away"] or production.outside(who):
+		if worker.is_empty() or trade not in worker.get("trades", []) or Production.off_work(worker) or production.outside(who):
 			continue
 		if not due.has(who):
 			due[who] = now() + every
@@ -1098,7 +1132,7 @@ func defence(town: String) -> float:
 	var walls := building(town, "walls")
 	var levels := int(walls.get("level", 0)) if walls.get("state") in [STANDING, BUILDING] else 0
 	var present := residents(town).filter(func(who: String) -> bool:
-		return not production.worker(who).is_empty() and not production.worker(who)["away"]).size()
+		return not production.worker(who).is_empty() and not Production.off_work(production.worker(who))).size()
 	return levels * float(per.get("per_wall_level", 0)) + present * float(per.get("per_resident", 0))
 
 
@@ -1231,7 +1265,7 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 			if report["captives"].size() >= int(taking.get("count", 0)):
 				break
 			var worker := production.worker(who)
-			if worker.is_empty() or worker["away"]:
+			if worker.is_empty() or Production.off_work(worker):
 				continue
 			# A companion only by her player's id (decision 331).
 			if who.begins_with("companion:") and not _take_companion(town, who, faction, group_id):

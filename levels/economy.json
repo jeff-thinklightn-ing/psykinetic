@@ -23,7 +23,7 @@
 	"stand_in": {"fletcher": "carpenter"},
 	"merchant": {"buy": 0.85, "sell": 1.15},
 	"scoundrel": {"buy": 1.0, "sell": 1.1, "repay": 0.0},
-	"commissions": {"rescue": 10, "camp": 20, "fetch": 1, "dispute": 5, "escort": 8},
+	"commissions": {"rescue": 10, "camp": 20, "fetch": 1, "dispute": 5, "escort": 8, "healing": 6},
 	"reforge": {"trade": "smith", "fee": 0.5, "least": 1},
 	"bless": {"trade": "priest", "offering": 0.5, "least": 1, "steps": 600},
 	"rescue": {"per_camp": 1, "restock_days": 5, "lacking": 3,

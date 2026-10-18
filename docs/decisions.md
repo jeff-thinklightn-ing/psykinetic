@@ -13578,3 +13578,24 @@ with 170 of the town's gold. The treasury still sits at its floor: phase
 second expense), players' contributions (499) and the luxury tax (phase
 3) are what bring it back.
 
+## 501, economy's side (npc's sickness: Jeff's yes, the coordinator's approval)
+
+The hooks npc's sickness calls; npc's numbers, Jeff's to move.
+- Production.set_sick(id, sick) and "sick" on the worker record (saved):
+  kept from work as one away is (Production.off_work: a workshop's job
+  waits, counted to when they fell sick; no hunt, cutting or shearing; no
+  official's wage; no hire of their trade; not a hauler; their building
+  not wanted; not counted for defence; not taken in a raid), but unlike
+  away their needs still come due: they eat, bought or doled, and pay
+  rent.
+- Towns.died(town, id, why) -> bool: a resident gone for good by npc's
+  word (npc calls it only for the town's own founding folk). Out of the
+  residents and the workers (Production.remove_worker: their workshop
+  freed, a job in progress back to the queue), the house given up, "<Name>
+  died of <why>" in the town's log, and resident_died(town, id, name,
+  why) for their card and kin. Their gold is not lost: their purse pays
+  any loan to the bank, the rest to the treasury; what the town owed them
+  is cleared. Never a companion. False for no such resident.
+- economy.json commissions.healing 6.
+Protocol unchanged. rescue_test.
+

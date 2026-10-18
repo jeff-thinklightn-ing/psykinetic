@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_fletcher()
 	_test_lawspeaker()
 	_test_move_in()
+	_test_sick_and_died()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -192,6 +193,29 @@ func _test_move_in() -> void:
 	_check(not towns.move_in(TOWN, "remembered:%s:Timmy" % TOWN, "Timmy", "hauler") and towns.production.worker("remembered:%s:Timmy" % TOWN).is_empty(),
 		"no room: they wait (%d residents)" % towns.residents(TOWN).size())
 	_check(towns.move_in(TOWN, "settler", "Snag", "merchant", "settled"), "one settled comes with no room: his own stall, not the town's growth")
+
+
+## Sickness's economy side (decision 501): a sick resident kept from work
+## with their needs still due; a death by npc's word, the purse to the loan
+## then the treasury, the residents and records cleared, the log told.
+func _test_sick_and_died() -> void:
+	print("
+== sick, and died ==")
+	var towns := _towns()
+	var work := towns.production
+	towns.note_rescue(TOWN, "h1", "Hob", "hunter")
+	work.set_sick("h1", true)
+	_check(Production.off_work(work.worker("h1")) and not bool(work.worker("h1")["away"]), "sick: kept from work, not away")
+	var told := []
+	towns.resident_died.connect(func(town: String, who: String, name: String, why: String) -> void: told.append([town, who, name, why]))
+	work.pay("h1", 12)
+	work.set_loan("h1", 5.0)
+	var gold := work.stockpile.count(TOWN, "gold")
+	_check(towns.died(TOWN, "h1", "the fever") and "h1" not in towns.residents(TOWN) and work.worker("h1").is_empty()
+		and work.stockpile.count(TOWN, "gold") == gold + 12 and told == [[TOWN, "h1", "Hob", "the fever"]]
+		and towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "Hob died of the fever"),
+		"died: gone from the town, the 12 gold to the loan and the treasury, the log and the signal")
+	_check(not towns.died(TOWN, "h1", "the fever") and not towns.died(TOWN, "companion:x", "the fever"), "nobody twice, and never a companion")
 
 
 func _check(ok: bool, what: String) -> void:

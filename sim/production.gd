@@ -183,7 +183,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0, "hunt_due": 0,
-		"loan": 0.0, "working_off": false, "heard": [], "card": {}, "owed": 0}
+		"loan": 0.0, "working_off": false, "heard": [], "card": {}, "owed": 0, "sick": false}
 	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
 	# roll), and the four rolled about their trade's and type's profile by
 	# the id, so the same every load; a companion's comes from her card.
@@ -395,6 +395,41 @@ func set_away(worker_id: String, away: bool) -> void:
 				each["worked"] = int(each["worked"]) + at - int(each["last"])
 			each["last"] = at
 	_workers[worker_id]["away"] = away
+
+
+## [param worker_id] is sick (true) or well (npc's sickness, decision 501):
+## kept from work as one away is (their job waits, counted to now first),
+## but their needs still come due.
+func set_sick(worker_id: String, sick: bool) -> void:
+	if not _workers.has(worker_id) or bool(_workers[worker_id].get("sick", false)) == sick:
+		return
+	var at := now()
+	for each: Dictionary in _jobs.values():
+		if each["state"] == "working" and each["worker"] == worker_id:
+			if _present(worker_id, each["workshop"]):
+				each["worked"] = int(each["worked"]) + at - int(each["last"])
+			each["last"] = at
+	_workers[worker_id]["sick"] = sick
+
+
+## Whether [param worker_record] is kept from work: away, or sick (501).
+static func off_work(worker_record: Dictionary) -> bool:
+	return bool(worker_record.get("away", false)) or bool(worker_record.get("sick", false))
+
+
+## Worker [param worker_id] gone for good (Towns.died, decision 501): out
+## of their workshop (a job in progress back to the queue) and the records.
+func remove_worker(worker_id: String) -> void:
+	if not _workers.has(worker_id):
+		return
+	for shop: Dictionary in _workshops.values():
+		if shop["worker"] == worker_id:
+			shop["worker"] = ""
+	for each: Dictionary in _jobs.values():
+		if each["worker"] == worker_id and each["state"] == "working":
+			each["state"] = "queued"
+			each["worker"] = ""
+	_workers.erase(worker_id)
 
 
 ## Where worker [param worker_id] came from, said again (a companion's
@@ -645,7 +680,7 @@ func _advance(at: int, cat: Dictionary) -> void:
 func _present(worker_id: String, workshop_id: String) -> bool:
 	var worker_record: Dictionary = _workers.get(worker_id, {})
 	var shop: Dictionary = _workshops.get(workshop_id, {})
-	return not worker_record.is_empty() and not worker_record["away"] and shop.get("worker", "") == worker_id \
+	return not worker_record.is_empty() and not off_work(worker_record) and shop.get("worker", "") == worker_id \
 			and (not workshop_open.is_valid() or workshop_open.call(shop))
 
 
@@ -792,7 +827,7 @@ func _hunts(at: int) -> void:
 	var every := maxi(int(rule.get("every", 3000)), 1)
 	for id in worker_ids():
 		var worker_record: Dictionary = _workers[id]
-		if trade not in worker_record["trades"] or worker_record["away"]:
+		if trade not in worker_record["trades"] or off_work(worker_record):
 			continue
 		if int(worker_record["hunt_due"]) == 0:
 			worker_record["hunt_due"] = at + every
@@ -830,7 +865,7 @@ func _official_wages(at: int) -> void:
 			if official.has(each):
 				trade = each
 				break
-		if trade.is_empty() or worker_record["away"]:
+		if trade.is_empty() or off_work(worker_record):
 			continue
 		var every := maxi(int(official[trade].get("every", 54000)), 1)
 		if int(worker_record["wage_due"]) == 0:
@@ -1090,7 +1125,7 @@ func _mends(shop: Dictionary, by: String) -> bool:
 	if str(rules.get("stand_in", {}).get(by, "")) != shop["trade"]:
 		return false
 	return not worker_ids(shop["town"]).any(func(id: String) -> bool:
-		return by in _workers[id]["trades"] and not _workers[id]["away"])
+		return by in _workers[id]["trades"] and not off_work(_workers[id]))
 
 
 func _recipe_ok(entry: Dictionary) -> bool:
@@ -1330,6 +1365,7 @@ func from_dict(saved: Dictionary) -> void:
 			_workers[id]["wage_due"] = maxi(int(entry.get("wage_due", 0)), 0)
 			_workers[id]["hunt_due"] = maxi(int(entry.get("hunt_due", 0)), 0)
 			_workers[id]["owed"] = maxi(int(entry.get("owed", 0)), 0)
+			_workers[id]["sick"] = bool(entry.get("sick", false))
 			_workers[id]["loan"] = maxf(float(entry.get("loan", 0.0)), 0.0)
 			_workers[id]["working_off"] = bool(entry.get("working_off", false)) and float(_workers[id]["loan"]) > 0.0
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)

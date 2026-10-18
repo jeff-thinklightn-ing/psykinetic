@@ -496,7 +496,7 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 	var least := 0
 	for other in production.worker_ids(town):
 		var them := production.worker(other)
-		if other == id or bool(them["away"]) or trade not in them["trades"]:
+		if other == id or Production.off_work(them) or trade not in them["trades"]:
 			continue
 		if best.is_empty() or int(them["purse"]) < least:
 			best = other
@@ -704,7 +704,7 @@ func _hauler_for(town: String, gatherer: String, trade: String) -> String:
 	var best := ""
 	for id in production.worker_ids(town):
 		var who := production.worker(id)
-		if id == gatherer or bool(who["away"]) or production.outside(id) or trade not in who["trades"]:
+		if id == gatherer or Production.off_work(who) or production.outside(id) or trade not in who["trades"]:
 			continue
 		if best.is_empty() or int(_hauled.get(id, -1)) < int(_hauled.get(best, -1)):
 			best = id
