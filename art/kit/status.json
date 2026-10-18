@@ -1731,7 +1731,7 @@
 			"type": "mesh",
 			"kind": "creature",
 			"category": "creatures",
-			"size": "0.7 x 1.95 x 1.7",
+			"size": "0.9 x 1.95 x 1.7",
 			"budget": 4000,
 			"for": "pc-character: the pack's animals moved onto palette swatches (art-kit drops them in)"
 		},
@@ -1743,7 +1743,7 @@
 			"type": "mesh",
 			"kind": "creature",
 			"category": "creatures",
-			"size": "0.35 x 0.95 x 1.4",
+			"size": "0.35 x 0.95 x 1.9",
 			"budget": 2500,
 			"for": "pc-character: the pack's animals moved onto palette swatches (art-kit drops them in)"
 		},
