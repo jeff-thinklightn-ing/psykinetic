@@ -12060,7 +12060,8 @@ The coordinator's item style, for the growth pass (2026-10-17): a drop is
 approved 2026-10-18; protocol unchanged.
 - Items.STYLES lists the makes. ItemBook.mint takes a style (one of them,
   else none), kept on the entry as "style" and saved; style_of(uid).
-- Its source sets it. Level._style gives a chest or a monster its props
+- Its source sets it. Level._style gives a chest, a crate or a cart (Cargo;
+  added after landing, for dungeon's halls) or a monster its props
   "style": its entry's own if it is a known make, else the level's
   "item_style" (dungeon sets it per halls level), else none; an unknown one
   is warned about. World.style_from(entity) reads it when what a chest

@@ -1155,7 +1155,8 @@ func _test_kills() -> void:
 func _test_style() -> void:
 	print("\n== a thing's make: dwarven or dark elven, from its source (decision 474) ==")
 	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
-	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "chest", Vector2i(2, 2): "monster_imp", Vector2i(5, 2): "start"}
+	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "chest", Vector2i(2, 2): "monster_imp",
+		Vector2i(3, 2): "crate", Vector2i(5, 2): "start"}
 	var config := {"name": "style_test", "item_style": "dwarven",
 		"entities": [{"at": [3, 1], "props": {"style": "dark elven"}}, {"at": [5, 1], "props": {"style": "elvish"}}]}
 	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
@@ -1164,6 +1165,7 @@ func _test_style() -> void:
 		style_at[spec["tile"]] = spec.get("props", {}).get("style", "")
 	_check(style_at.get(Vector2i(1, 1)) == "dwarven" and style_at.get(Vector2i(2, 2)) == "dwarven",
 			"the level's item_style: its chest and its imp are dwarven (%s)" % [style_at])
+	_check(style_at.get(Vector2i(3, 2)) == "dwarven", "and its crate's goods (dungeon's halls lay crates)")
 	_check(style_at.get(Vector2i(3, 1)) == "dark elven", "a marker's own style wins over the level's")
 	_check(style_at.get(Vector2i(5, 1)) == "dwarven" and level["warnings"].any(func(w: String) -> bool: return "elvish" in w),
 			"an unknown make: warned, the level's instead")

@@ -1313,8 +1313,8 @@ static func _arm(props: Dictionary, spec: Dictionary, entry: Dictionary, warning
 	props["slots"] = slots
 
 
-## The make of what a chest keeps or a monster carries and drops (decision
-## 474): its entry's props "style" if it is one of Items.STYLES, else the
+## The make of what a chest, a crate or a cart keeps or a monster carries
+## and drops (decision 474): its entry's props "style" if it is one of Items.STYLES, else the
 ## level's "item_style" (dungeon sets it per source: below the castle
 ## dwarven, the tower dark elven), else none. An unknown one is warned
 ## about and the next tried. Animals and the rest have none.
@@ -1322,9 +1322,9 @@ static func _style(props: Dictionary, spec: Dictionary, config: Dictionary, warn
 	var script := str(spec.get("script", ""))
 	var own: Variant = props.get("style")
 	props.erase("style")
-	if script != CHEST and script != MONSTER:
+	if script not in [CHEST, CARGO, MONSTER]:
 		if own != null:
-			warnings.append("style at %s: only a chest or a monster has a make" % at)
+			warnings.append("style at %s: only a chest, a crate, a cart or a monster has a make" % at)
 		return
 	for given: Variant in [own, config.get("item_style")]:
 		if given == null:
