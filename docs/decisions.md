@@ -12248,3 +12248,41 @@ A digging kobold that wields the pick, and fights badly with it, can be a
 kind of its own when the mine comes.
 
 tests/monster_test (_test_kobold_dagger_and_pick).
+
+## 480. People vary: faces, garb, and a townsperson dressed by their trade
+
+The character generator's variation step (roadmap row 4; the coordinator approved
+the design). 419 and 439 gave people a body, build, stature, age, posture, hair,
+beard, headwear, apron and colours from a seed and their card's words; every face
+was the same face and every tunic bare.
+
+- Face planes: five more shape keys on body_gen's bodies (KEYS jaw, nose, brow,
+  cheeks, eyes, each the head built again with that plane moved: a broad, square
+  jaw; a long nose, its tip out and down; a heavy brow ridge; high cheekbones;
+  deep-set eyes), the nose, brows and eyes following. PersonLook draws each
+  0..FACE_MAX by the seed, a woman's jaw and brow at most FACE_MAX_FEMALE; never
+  said in words (a player can't pick them yet; their seed gives them).
+- Garb: five garments as body_gen WEARABLES, each its own mesh on the skeleton and
+  shape-keyed as the body is: Vest (leather, open down the front), Coat (to the
+  knees, flaring), Cape (a short one over the shoulders), Sleeves_Rolled (bare
+  forearms and a roll of cloth at each elbow) and Cap_Soft (a labourer's cap,
+  headwear=cap). The vest, coat and cape are new palette regions (body_build
+  PALETTE_ROWS, row 5's leather and cloth: one colour each, for now). No more
+  garments until Jeff has seen the sheet (the coordinator).
+- Words: garb=none|vest|coat|cape|rolled; headwear gains cap; trade=<trade>, which
+  npc's ResidentCard.look_spec adds from the card (its own landing, citing this;
+  left out for a card with "outcast": true, so 471's Snagfin stays as drawn). A
+  trade dresses a person (TRADE_GARB: guard a vest; merchant, lawspeaker, priest a
+  coat; hauler and labourer rolled sleeves and a cap; farmer rolled sleeves and a
+  hat; hunter a cape; smith, carpenter, tanner rolled sleeves; fletcher a vest)
+  only where the look says no garb or headwear: the card's own words always win.
+  An unknown trade is plain clothes. With no trade, GARB_CHANCE of people wear
+  some garb by their seed. Purse, loan and rank are not read: no dressing by
+  wealth without Jeff (economy and npc).
+- Stable: every new value is drawn after all of 419's draws, so a seed's look
+  keeps every word it had; an older client passes over the new words.
+- A player's look is theirs: look_for adds garb=none (their face planes are their
+  seed's). The orc and kobold (478) keep their own looks: no face planes, no garb.
+
+view_test _test_person_garb. Sheets for Jeff in C:\dev\review\people\: people_v1.png
+(ten seeds; a row of trades), faces_v1.png (each plane at full), garb_v1.png.

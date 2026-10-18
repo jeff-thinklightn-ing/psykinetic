@@ -59,6 +59,7 @@ func _ready() -> void:
 	await _test_goblin()
 	_test_humans()
 	_test_person_looks()
+	_test_person_garb()
 	_test_attach_points()
 	_test_bow()
 	_test_goblins_differ()
@@ -2313,6 +2314,47 @@ func _test_humans() -> void:
 		_check(pet.body == wanted and model != null
 				and model.scene_file_path == str((Client3D.HUMAN if wanted == &"male" else Client3D.HUMAN_F)["scene"]),
 				"%s wears her card's body, %s" % [pet.name, wanted])
+
+
+func _test_person_garb() -> void:
+	print("
+== a person's face and garb (decision 480): faces seeded, a trade dresses them, said words win; a player's own ==")
+	var guard := PersonLook.make("seed=11 body=male headwear=none trade=guard")
+	var merchant := PersonLook.make("seed=11 body=male headwear=none trade=merchant")
+	var hauler := PersonLook.make("seed=12 body=male trade=hauler")
+	_check("Vest" in guard.parts and "Coat" in merchant.parts and "Sleeves_Rolled" in hauler.parts and "Cap_Soft" in hauler.parts,
+			"a guard in a vest, a merchant in a coat, a hauler's sleeves rolled and a cap (%s, %s, %s)" % [guard.parts, merchant.parts, hauler.parts])
+	_check(not "Cap_Soft" in PersonLook.make("seed=12 body=male trade=hauler headwear=hat").parts
+			and "Hat_Brimmed" in PersonLook.make("seed=12 body=male trade=hauler headwear=hat").parts
+			and "Coat" in PersonLook.make("seed=11 trade=guard garb=coat").parts,
+			"the look's own words win over the trade's (headwear, garb)")
+	var unknown := PersonLook.make("seed=11 body=male headwear=none trade=juggler")
+	_check(PersonLook.GARB_PARTS.values().all(func(part: String) -> bool: return part == "" or not part in unknown.parts),
+			"an unknown trade: plain clothes (%s)" % [unknown.parts])
+	var faces := []
+	for seed in 20:
+		var look := PersonLook.make("seed=%d" % seed)
+		faces.append(look)
+	_check(faces.all(func(look: PersonLook) -> bool: return PersonLook.FACE_KEYS.all(func(key: String) -> bool:
+			return look.keys.has(key) and float(look.keys[key]) >= 0.0 and float(look.keys[key]) <= 1.0)),
+			"every face its own planes, each 0..1")
+	_check(faces.filter(func(look: PersonLook) -> bool: return look.body == &"female").all(func(look: PersonLook) -> bool:
+			return float(look.keys["jaw"]) <= 0.35 and float(look.keys["brow"]) <= 0.4),
+			"a woman's jaw and brow kept lighter")
+	var garbed := faces.filter(func(look: PersonLook) -> bool: return look.garb != "none").size()
+	_check(garbed > 0 and garbed < 20, "with no trade, some wear garb by their seed, most not (%d of 20)" % garbed)
+	var before := PersonLook.make("seed=48213 body=female build=heavy hair=long")
+	_check(before.parts.has("Hair_Long") and before.skin == PersonLook.make("seed=48213 body=female build=heavy hair=long trade=guard").skin,
+			"a trade changes the clothes, not the person (the same skin, the same hair)")
+	var orc := PersonLook.make("seed=5 people=orc trade=guard")
+	_check(PersonLook.FACE_KEYS.all(func(key: String) -> bool: return not orc.keys.has(key)) and not "Vest" in orc.parts,
+			"an orc keeps its own look: no human face planes, no garb (%s)" % [orc.parts])
+	var player := Player.new()
+	player.name = "GarbPlayer"
+	player.spawn_spec = {"look": "seed=3 trade=merchant"}
+	var mine := Client3D.look_for(player)
+	_check(mine.garb == "none" and not "Coat" in mine.parts, "a player wears no garb: theirs is what they chose (%s)" % [mine.parts])
+	player.free()
 
 
 func _test_person_looks() -> void:

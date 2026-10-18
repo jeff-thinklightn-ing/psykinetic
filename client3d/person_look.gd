@@ -7,6 +7,11 @@ extends RefCounted
 ##   seed=48213 body=female build=heavy stature=tall age=old posture=stooped
 ##   hair=long hair_colour=grey beard=none headwear=hood apron=yes skin=3
 ##   shoulders=broad
+## and (decision 480) garb=none|vest|coat|cape|rolled (clothes over the
+## tunic), headwear=cap (a labourer's soft cap) and trade=<a resident's
+## trade> (npc's look_spec writes it from the card): a trade dresses them
+## (TRADE_GARB) where no garb or headwear is said, the card's own words
+## winning; a person's face its own (FACE_KEYS, seeded, never said);
 ## and people=orc or people=kobold (decision 478): one of the Blood Rot's
 ## allies (orc.glb, kobold.glb), drawn in its people's own skins (PEOPLE_SKINS,
 ## the Blood Rot's greens), wearing only its people's parts (an orc its hair
@@ -43,7 +48,28 @@ const TROUSERS := ["533e2d", "3f3a34", "4a4a3e", "5a4632"]
 const HAIR_STYLES := {"male": ["cropped", "cropped", "long", "bald"], "female": ["bound", "bound", "long"]}
 const HAIR_PARTS := {"cropped": "Hair_Cropped", "bound": "Hair_Bound", "long": "Hair_Long", "bald": ""}
 const BEARD_PARTS := {"none": "", "short": "Beard_Short", "full": "Beard_Full"}
-const HEADWEAR_PARTS := {"none": "", "hood": "Hood", "hat": "Hat_Brimmed"}
+const HEADWEAR_PARTS := {"none": "", "hood": "Hood", "hat": "Hat_Brimmed", "cap": "Cap_Soft"}
+## Garb (decision 480): what is worn over the tunic, by word; rolled is the
+## sleeves rolled to the elbows.
+const GARB_PARTS := {"none": "", "vest": "Vest", "coat": "Coat", "cape": "Cape", "rolled": "Sleeves_Rolled"}
+## How likely a person with no garb said and no trade to dress them wears
+## some, and which (one of these, alike).
+const GARB_CHANCE := 0.3
+const GARBS := ["vest", "coat", "cape", "rolled"]
+## A trade's clothes, [garb, headwear], each "" for the look's own (decision
+## 480, the trades economy's and npc's records name; an unknown trade is
+## plain clothes). APRON_TRADES' apron is npc's look_spec's, as before.
+const TRADE_GARB := {
+	"hauler": ["rolled", "cap"], "labourer": ["rolled", "cap"], "farmer": ["rolled", "hat"],
+	"guard": ["vest", ""], "hunter": ["cape", ""],
+	"merchant": ["coat", ""], "lawspeaker": ["coat", ""], "priest": ["coat", ""],
+	"smith": ["rolled", ""], "carpenter": ["rolled", ""], "tanner": ["rolled", ""], "fletcher": ["vest", ""],
+}
+## The face's planes (body_gen's face keys), each a seeded 0..FACE_MAX; a
+## woman's jaw and brow at most FACE_MAX_FEMALE of it.
+const FACE_KEYS := ["jaw", "nose", "brow", "cheeks", "eyes"]
+const FACE_MAX := 1.0
+const FACE_MAX_FEMALE := {"jaw": 0.35, "brow": 0.4}
 ## How likely an unnamed beard (a grown or old man's), and which.
 const BEARD_CHANCE := 0.5
 ## How likely unnamed headwear is a hood, a hat.
@@ -97,6 +123,8 @@ var hair := ""
 var hair_colour := ""
 var beard := ""
 var skin := 1
+var garb := "none"
+var trade := ""
 
 
 ## The look [param look] gives; [param body_by_default] when it names none
@@ -194,9 +222,42 @@ func _resolve(body_by_default: StringName) -> void:
 	var said_posture := str(words.get("posture", ""))
 	var stoop_roll := rng.randf()
 	posture = said_posture if said_posture in POSTURES else ("stooped" if age == "old" and stoop_roll < OLD_STOOPED else "straight")
+	# Drawn after everything above (decision 480), so a look from before keeps every
+	# word it had: the face, then garb.
+	var face := {}
+	for key: String in FACE_KEYS:
+		var most := float(FACE_MAX_FEMALE.get(key, FACE_MAX)) if body == &"female" else FACE_MAX
+		face[key] = rng.randf() * most
+	var garb_roll := rng.randf()
+	var garb_pick: String = GARBS[rng.randi() % GARBS.size()]
 	var said_people := str(words.get("people", ""))
 	if said_people in PEOPLE_SKINS:
 		_ally(said_people, rng)
+		return
+	keys.merge(face)
+	trade = str(words.get("trade", ""))
+	var dressed: Array = TRADE_GARB.get(trade, ["", ""])
+	var said_garb := str(words.get("garb", ""))
+	if said_garb in GARB_PARTS:
+		garb = said_garb
+	elif dressed[0] != "":
+		garb = dressed[0]
+	elif not words.has("trade"):
+		garb = garb_pick if garb_roll < GARB_CHANCE else "none"
+	if not str(words.get("headwear", "")) in HEADWEAR_PARTS and dressed[1] != "":
+		_wear_headwear(str(dressed[1]))
+	if GARB_PARTS[garb] != "":
+		parts.append(GARB_PARTS[garb])
+
+
+## [param worn] on the head, in place of any headwear drawn (a hood's hair
+## shown again under a cap or hat).
+func _wear_headwear(worn: String) -> void:
+	for part: String in HEADWEAR_PARTS.values():
+		parts.erase(part)
+	if HAIR_PARTS[hair] != "" and not HAIR_PARTS[hair] in parts:
+		parts.insert(0, HAIR_PARTS[hair])
+	parts.append(HEADWEAR_PARTS[worn])
 
 
 ## As one of [param said]'s people (decision 478), after the rest is drawn (so

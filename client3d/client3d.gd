@@ -7114,7 +7114,7 @@ static func look_for(entity: GridEntity) -> PersonLook:
 	if not look.begins_with("seed=") and not " seed=" in look:
 		look = ("seed=%d " % absi(hash(String(entity.name)))) + look
 	if entity is Player:
-		look += " headwear=none apron=no"
+		look += " headwear=none apron=no garb=none"
 	if entity is Monster:
 		var people := str(MODELS.get(str(entity.spawn_spec.get("kind", "")), {}).get("people", ""))
 		if people != "":
