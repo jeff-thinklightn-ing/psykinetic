@@ -107,6 +107,18 @@ const ON_WATER: Array[String] = ["building.well"]
 ## (the slot's own mesh draws it): they stop walkers, not sight, and are
 ## not drawn as walls; a gap in it is an open edge.
 const OPEN_AIR: Array[String] = ["building.field"]
+## Building kinds (decision 488), each a composition of blocks of cells in
+## sizes: levels/buildings.json's "kinds" (its "_about" says the format).
+## A level.json building entry names a "kind" (and "size") instead of a
+## "slot"; BuildingComposer draws it.
+const KINDS_FILE := "res://levels/buildings.json"
+## A kind's size when an entry names none.
+const KIND_SIZE := "small"
+## A kind's wall height when it names no "eaves": a storey's.
+const STOREY := 3.0
+## The sides a kind's door names, in its own frame (front +y).
+const DOOR_SIDES := {"N": Vector2i(0, -1), "S": Vector2i(0, 1), "E": Vector2i(1, 0), "W": Vector2i(-1, 0)}
+static var _kinds := {}
 ## A building's facing (the side its front is on) when level.json gives none.
 const BUILDING_FACING := Vector2i(0, 1)
 ## The region of a level that names none (region_of).
@@ -532,6 +544,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	level["regenerate"] = regenerate_from(config, warnings)
 	_check_anchors(level, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
+	level["building_cells"] = inside_cells(level["buildings"])
 	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
 	level["terrain"]["buildings"] = level["buildings"]
@@ -852,10 +865,10 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 ## as it is.
 static func building_places(buildings: Array, places: Dictionary) -> void:
 	for building: Dictionary in buildings:
-		var kind := str(BUILDING_PLACES.get(building["slot"], ""))
+		var kind := str(BUILDING_PLACES.get(building["slot"], building.get("place", "")))
 		if kind.is_empty():
 			continue
-		var cell := front_cell(building["rect"], building["facing"])
+		var cell: Vector2i = building.get("front", front_cell(building["rect"], building["facing"]))
 		var key := "%s@%d,%d" % [kind, cell.x, cell.y]
 		if not places.has(key):
 			places[key] = {"key": key, "cell": cell, "name": kind.replace("_", " ").capitalize(), "kind": kind,
@@ -976,26 +989,31 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 	for entry: Variant in listed:
 		var rect: Variant = building_rect(entry)
 		if rect == null:
-			warnings.append("the building %s has no \"at\" cell or no slot of %s" % [entry, ", ".join(BUILDINGS.keys())])
+			warnings.append("the building %s has no \"at\" cell, or no slot of %s or kind of %s" % [entry, ", ".join(BUILDINGS.keys()), ", ".join(kinds().keys())])
 			continue
-		var cells := rect_cells(rect)
-		var on_water := str(entry["slot"]) in ON_WATER
+		var blocks: Array[Rect2i] = building_blocks(entry)
+		var cells := _union(blocks)
+		var what := str(entry.get("slot", entry.get("kind", "")))
+		var on_water := str(entry.get("slot", "")) in ON_WATER
 		var under := wet if on_water else ground
 		var height: int = terrain["heights"].get(cells[0], 0)
 		var bad := cells.filter(func(cell: Vector2i) -> bool:
 			return not under.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
 		if not bad.is_empty():
-			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [entry["slot"], rect.position, "water" if on_water else "clear floor", bad[0]])
+			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [what, rect.position, "water" if on_water else "clear floor", bad[0]])
 			continue
 		for cell in cells:
 			taken[cell] = true
 		var open: Array[Vector3i] = []
-		for key in outline(rect) if not on_water and not str(entry["slot"]) in OPEN_AIR else []:
+		for key in blocks_outline(cells) if not on_water and not str(entry.get("slot", "")) in OPEN_AIR else []:
 			if not terrain["edges"].has(key):
 				open.append(key)
 		if not open.is_empty():
-			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [entry["slot"], rect.position, open.size(), open[0]])
-		var building := {"slot": str(entry["slot"]), "cell": rect.position, "facing": building_facing(entry), "rect": rect, "use": "", "town": ""}
+			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [what, rect.position, open.size(), open[0]])
+		var building := {"slot": str(entry.get("slot", "")), "cell": rect.position, "facing": building_facing(entry), "rect": rect,
+			"blocks": blocks, "use": "", "town": ""}
+		if entry.has("kind"):
+			_kind_of(building, entry)
 		_link(building, entry, config, linked, warnings)
 		out.append(building)
 	return out
@@ -1106,7 +1124,7 @@ static func roofs_from(config: Dictionary, terrain: Dictionary, buildings: Array
 	var taken: Dictionary[Vector2i, bool] = {}
 	var linked := {}
 	for building in buildings:
-		for cell in rect_cells(building["rect"]):
+		for cell in building_cells(building):
 			taken[cell] = true
 		if not str(building["use"]).is_empty():
 			linked[str(building["town"]) + "/" + str(building["use"])] = building["cell"]
@@ -1174,16 +1192,183 @@ static func building_facing(entry: Dictionary) -> Vector2i:
 	return facing if facing != null and (facing.x == 0 or facing.y == 0) else BUILDING_FACING
 
 
-## A level.json building entry's footprint (null if it has no "at" or no
-## slot in BUILDINGS).
+## A level.json building entry's footprint (null if it has no "at", or no
+## slot in BUILDINGS nor a kind and size in kinds()): a kind's the box
+## round its blocks (building_blocks).
 static func building_rect(entry: Variant) -> Variant:
-	if not entry is Dictionary or not BUILDINGS.has(str(entry.get("slot", ""))):
+	if not entry is Dictionary:
 		return null
+	var size: Variant = BUILDINGS.get(str(entry.get("slot", "")))
+	if size == null:
+		var spec := kind_size(entry)
+		size = _frame(spec) if not spec.is_empty() else null
 	var at: Variant = _tile(entry.get("at"))
-	if at == null:
+	if at == null or size == null:
 		return null
-	var size: Vector2i = BUILDINGS[str(entry["slot"])]
 	return Rect2i(at, size if building_facing(entry).x == 0 else Vector2i(size.y, size.x))
+
+
+## levels/buildings.json's kinds (decision 488), read once.
+static func kinds() -> Dictionary:
+	if _kinds.is_empty():
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(KINDS_FILE))
+		_kinds = parsed.get("kinds", {}) if parsed is Dictionary else {}
+	return _kinds
+
+
+## The size a kind building [param entry] names ({blocks, doors}), {} if
+## its kind or size is none there.
+static func kind_size(entry: Dictionary) -> Dictionary:
+	var kind: Dictionary = kinds().get(str(entry.get("kind", "")), {})
+	return kind.get("sizes", {}).get(str(entry.get("size", KIND_SIZE)), {})
+
+
+## A kind size's frame: across by deep, round its blocks.
+static func _frame(spec: Dictionary) -> Vector2i:
+	var out := Vector2i.ZERO
+	for block: Array in spec.get("blocks", []):
+		out = out.max(Vector2i(int(block[0]) + int(block[2]), int(block[1]) + int(block[3])))
+	return out
+
+
+## Cell [param local] of a frame [param size] (its front +y) turned to
+## [param facing]: the offset from the turned frame's top-left. The same
+## turn as Prefab.rotated's, so a stamped kind turned is its facing's.
+static func _turned(local: Vector2i, size: Vector2i, facing: Vector2i) -> Vector2i:
+	match facing:
+		Vector2i(0, -1):
+			return Vector2i(size.x - 1 - local.x, size.y - 1 - local.y)
+		Vector2i(1, 0):
+			return Vector2i(local.y, size.x - 1 - local.x)
+		Vector2i(-1, 0):
+			return Vector2i(size.y - 1 - local.y, local.x)
+	return local
+
+
+static func _turned_side(side: Vector2i, facing: Vector2i) -> Vector2i:
+	match facing:
+		Vector2i(0, -1):
+			return -side
+		Vector2i(1, 0):
+			return Vector2i(side.y, -side.x)
+		Vector2i(-1, 0):
+			return Vector2i(-side.y, side.x)
+	return side
+
+
+## A level.json building entry's blocks on the map ([] for none): a slot's
+## its footprint, a kind's each of its size's, turned to its facing.
+static func building_blocks(entry: Variant) -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	var rect: Variant = building_rect(entry)
+	if rect == null:
+		return out
+	if not entry.has("kind") or BUILDINGS.has(str(entry.get("slot", ""))):
+		out.append(rect)
+		return out
+	var spec := kind_size(entry)
+	var size := _frame(spec)
+	var facing := building_facing(entry)
+	for block: Array in spec["blocks"]:
+		var a := _turned(Vector2i(int(block[0]), int(block[1])), size, facing)
+		var b := _turned(Vector2i(int(block[0]) + int(block[2]) - 1, int(block[1]) + int(block[3]) - 1), size, facing)
+		out.append(Rect2i(rect.position + a.min(b), (a - b).abs() + Vector2i.ONE))
+	return out
+
+
+## A kind building entry's doors on the map, as Terrain edge keys.
+static func kind_doors(entry: Dictionary) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	var rect: Variant = building_rect(entry)
+	var spec := kind_size(entry)
+	if rect == null or spec.is_empty():
+		return out
+	var size := _frame(spec)
+	var facing := building_facing(entry)
+	for door: Array in spec.get("doors", []):
+		var cell: Vector2i = rect.position + _turned(Vector2i(int(door[0]), int(door[1])), size, facing)
+		out.append(Terrain.edge_key(cell, _turned_side(DOOR_SIDES[str(door[2])], facing)))
+	return out
+
+
+## Sets kind building [param building]'s own from [param entry]: its kind,
+## size, seed (its entry's, else from its cell, so every peer draws it
+## alike), ruined (no roof, no inside), its kind's words, sets, storeys,
+## eaves and place, and its front (the cell outside its first door).
+static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
+	var kind: Dictionary = kinds()[str(entry["kind"])]
+	var at: Vector2i = building["cell"]
+	building["kind"] = str(entry["kind"])
+	building["size"] = str(entry.get("size", KIND_SIZE))
+	building["seed"] = int(entry["seed"]) if entry.get("seed") is float or entry.get("seed") is int else hash(Vector2i(at))
+	building["ruined"] = bool(entry.get("ruined", false))
+	building["words"] = str(kind.get("words", "a building"))
+	building["wall_set"] = str(kind.get("wall_set", ""))
+	building["floor_set"] = str(kind.get("floor_set", ""))
+	building["roof"] = str(kind.get("roof", "gable"))
+	building["storeys"] = int(kind.get("storeys", 1))
+	building["eaves"] = float(kind.get("eaves", STOREY * building["storeys"]))
+	building["place"] = str(kind.get("place", ""))
+	var doors := kind_doors(entry)
+	building["doors"] = doors
+	if not doors.is_empty():
+		var sides := Terrain.edge_cells(doors[0])
+		var cells := _union(building["blocks"])
+		building["front"] = sides[1] if cells.has(sides[0]) else sides[0]
+
+
+## The cells of [param blocks], each once.
+static func _union(blocks: Array) -> Array[Vector2i]:
+	var seen: Dictionary[Vector2i, bool] = {}
+	for rect: Rect2i in blocks:
+		for cell in rect_cells(rect):
+			seen[cell] = true
+	var out: Array[Vector2i] = []
+	out.assign(seen.keys())
+	return out
+
+
+## A parsed building's cells: its blocks' (decision 488), its rect's for one
+## from before blocks.
+static func building_cells(building: Dictionary) -> Array[Vector2i]:
+	return _union(building.get("blocks", [building["rect"]]))
+
+
+## A parsed building's outline: the edges round its blocks' union.
+static func building_outline(building: Dictionary) -> Array[Vector3i]:
+	return blocks_outline(building_cells(building))
+
+
+## The edges round [param cells] (Terrain edge keys): each side of a cell
+## whose neighbour there is not one of them.
+static func blocks_outline(cells: Array[Vector2i]) -> Array[Vector3i]:
+	var inside: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		inside[cell] = true
+	var out: Array[Vector3i] = []
+	for cell in cells:
+		for side: Vector2i in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+			if not inside.has(cell + side):
+				out.append(Terrain.edge_key(cell, side))
+	return out
+
+
+## Whether a parsed building has an inside: walked into under a roof (not a
+## well, a field or a ruin).
+static func has_inside(building: Dictionary) -> bool:
+	return not str(building.get("slot", "")) in ON_WATER and not str(building.get("slot", "")) in OPEN_AIR \
+			and not building.get("ruined", false)
+
+
+## Each cell inside [param buildings] (has_inside) -> that building's index:
+## level["building_cells"], what asks which building a cell is in reads.
+static func inside_cells(buildings: Array) -> Dictionary[Vector2i, int]:
+	var out: Dictionary[Vector2i, int] = {}
+	for index in buildings.size():
+		if has_inside(buildings[index]):
+			for cell in building_cells(buildings[index]):
+				out[cell] = index
+	return out
 
 
 static func rect_cells(rect: Rect2i) -> Array[Vector2i]:

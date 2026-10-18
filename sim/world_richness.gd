@@ -95,7 +95,7 @@ func under_sky(area_name: String, cell: Vector2i) -> bool:
 	if not _roofed.has(area_name):
 		var roofed := {}
 		for building: Dictionary in world_map.areas[area_name].get("buildings", []):
-			for each in Level.rect_cells(building["rect"]):
+			for each in Level.building_cells(building):
 				roofed[each] = true
 		_roofed[area_name] = roofed
 	return not _roofed[area_name].has(cell)

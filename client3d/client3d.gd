@@ -88,6 +88,9 @@ extends Node3D
 const AIL_BURN := Color(1.0, 0.6, 0.25)
 const AIL_BLEED := Color(0.95, 0.3, 0.3)
 const WALL_HEIGHT := 3.0
+## A kind's roof set (decision 488): thatch, Jeff's default until he says,
+## shingle (Level.ROOF_SETS' first) while art-kit has no thatch set.
+const KIND_ROOF := "thatch"
 ## Wall runs (_add_wall_runs), each in its set's profile and variation
 ## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
 ## many edges a mesh; a height every WALL_SWAY edges, the body up to the
@@ -2554,10 +2557,14 @@ func _build_room() -> void:
 			continue
 		if building["slot"] in Level.OPEN_AIR:
 			continue  # Its fence is its slot's mesh (_add_walls draws none).
-		var spec := ArtKit.spec(str(building["slot"]))
+		# A kind (decision 488) names its sets and eaves; a slot's spec does.
+		var spec: Dictionary = {"wall_set": building["wall_set"], "wall_height": building["eaves"], "floor_set": building["floor_set"]} \
+				if building.has("kind") else ArtKit.spec(str(building["slot"]))
+		if str(spec.get("floor_set", "")).is_empty():
+			spec.erase("floor_set")
 		var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
 		var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
-		for key in Level.outline(building["rect"]):
+		for key in Level.building_outline(building):
 			if not _wall_sets.has(key):
 				_building_walls.append(key)
 				_wall_sets[key] = wall_set
@@ -2565,7 +2572,7 @@ func _build_room() -> void:
 					_wall_heights[key] = wall_height
 		if spec.has("floor_set"):
 			var floor_set := _known_set(str(spec["floor_set"]))
-			for cell in Level.rect_cells(building["rect"]):
+			for cell in Level.building_cells(building):
 				if not _floor_sets.has(cell):
 					_building_floors.append(cell)
 					_floor_sets[cell] = floor_set
@@ -2636,7 +2643,7 @@ func _add_walls() -> void:
 	var fences: Dictionary[Vector3i, bool] = {}
 	for building: Dictionary in _terrain.get("buildings", []):
 		if building["slot"] in Level.OPEN_AIR:
-			for key in Level.outline(building["rect"]):
+			for key in Level.building_outline(building):
 				fences[key] = true
 	for key: Vector3i in edges:
 		if _outdoor and _is_outline(key):
@@ -2668,6 +2675,9 @@ func _add_walls() -> void:
 ## inside (_update_roofs). The walls are the map's own wall runs.
 func _add_buildings() -> void:
 	for building: Dictionary in _terrain.get("buildings", []):
+		if building.has("kind"):
+			_add_kind(building)
+			continue
 		var rect: Rect2i = building["rect"]
 		var slot := str(building["slot"])
 		var facing: Vector2i = building["facing"]
@@ -2699,6 +2709,54 @@ func _add_buildings() -> void:
 		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
+
+
+## A building of a kind (Level.kinds, decision 488): its walls and floor are
+## the map's, in its kind's sets (_build_room); over each of its blocks a
+## gable of its roof set at its eaves, its ridge along the block's longer
+## side, all of them its "roof" (off while the local player is inside any
+## of its cells, as a slot's is); none on a ruin. What it looks like beyond
+## that is BuildingComposer's (decision 489).
+func _add_kind(building: Dictionary) -> void:
+	var rect: Rect2i = building["rect"]
+	var cells := Level.building_cells(building)
+	var base := _height(rect.position) * LEVEL_RISE
+	var eaves := float(building["eaves"])
+	var node := Node3D.new()
+	node.name = "Building_%d_%d" % [rect.position.x, rect.position.y]
+	_room.add_child(node)
+	var roof: Node3D = null
+	if not building.get("ruined", false):
+		roof = Node3D.new()
+		roof.name = "roof"
+		node.add_child(roof)
+		var roof_set := KIND_ROOF if KIND_ROOF in Level.ROOF_SETS else Level.ROOF_SETS[0]
+		for block: Rect2i in building["blocks"]:
+			var along_x := block.size.x > block.size.y
+			var span := Vector2(block.size.y, block.size.x) if along_x else Vector2(block.size)
+			var piece := _roof_mesh(roof_set, span.x, span.y)
+			var middle := Vector2(block.position) + Vector2(block.size - Vector2i.ONE) * 0.5
+			piece.position = Vector3(middle.x, base + eaves, middle.y)
+			piece.rotation.y = PI * 0.5 if along_x else 0.0
+			roof.add_child(piece)
+	var inside: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		inside[cell] = true
+	var index := _buildings.size()
+	_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
+		"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
+		"open_air": false, "crop": "", "inside": inside, "outline": Level.building_outline(building)})
+	_show_state(_buildings[index])
+	if _glimpse or roof == null:
+		return  # A glimpse is drawn only; a ruin is open to the sky.
+	for block: Rect2i in building["blocks"]:
+		var keep_dry := GPUParticlesCollisionBox3D.new()
+		keep_dry.size = Vector3(block.size.x, eaves, block.size.y)
+		var middle := Vector2(block.position) + Vector2(block.size - Vector2i.ONE) * 0.5
+		keep_dry.position = Vector3(middle.x, base + eaves * 0.5, middle.y)
+		_room.add_child(keep_dry)
+	for cell in cells:
+		_building_at[cell] = index
 
 
 ## The terrain's roofs (Level.roofs_from, decision 364): each a gable
@@ -3012,7 +3070,7 @@ func _show_state(building: Dictionary) -> void:
 	# Its walls broken here and there (terrain's "broken": a ragged stub,
 	# never a way through; the sim keeps the wall).
 	var changed: Array[Vector3i] = []
-	for key in Level.outline(building["rect"]) if not building.get("open_air", false) else []:
+	for key in building.get("outline", Level.outline(building["rect"])) if not building.get("open_air", false) else []:
 		if _terrain["edges"].get(key) == Terrain.Edge.WALL and _broken_pick(key):
 			_set_wall_state(key, "broken" if damaged else "")
 			changed.append(key)
@@ -3626,7 +3684,14 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 	for building: Dictionary in terrain.get("buildings", []):
 		var rect := Rect2i((building["rect"] as Rect2i).position + shift, (building["rect"] as Rect2i).size)
 		if Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return cells.has(cell)):
-			buildings.append({"slot": building["slot"], "rect": rect, "facing": building["facing"]})
+			var moved: Dictionary = building.duplicate()
+			moved["rect"] = rect
+			moved["cell"] = rect.position
+			moved["blocks"] = (building.get("blocks", [building["rect"]]) as Array).map(func(block: Rect2i) -> Rect2i:
+				return Rect2i(block.position + shift, block.size))
+			moved.erase("use")
+			moved.erase("town_id")
+			buildings.append(moved)
 	var roofs: Array[Dictionary] = []
 	for roof: Dictionary in terrain.get("roofs", []):
 		var rect := Rect2i((roof["rect"] as Rect2i).position + shift, (roof["rect"] as Rect2i).size)
@@ -5517,7 +5582,7 @@ func _double_doors() -> Dictionary[Vector3i, Vector3i]:
 	var edges: Dictionary = _terrain["edges"]
 	var out: Dictionary[Vector3i, Vector3i] = {}
 	for building: Dictionary in _terrain.get("buildings", []):
-		var outline := Level.outline(building["rect"])
+		var outline := Level.building_outline(building)
 		var door := func(key: Vector3i) -> bool: return key in outline and edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.DOOR
 		for key in outline:
 			var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
@@ -5796,11 +5861,14 @@ func _inside_walls(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D
 			inside[_building_at[cell]] = true
 	for index in inside:
 		var rect: Rect2i = _buildings[index]["rect"]
-		for key in Level.outline(rect):
+		var cells: Dictionary = _buildings[index].get("inside", {})
+		for key in _buildings[index].get("outline", Level.outline(rect)):
 			if not _runs.has(key):
 				continue
 			var outward := Vector2(1, 0) if key.z == Terrain.EAST else Vector2(0, 1)
-			if (key.z == Terrain.EAST and key.x < rect.position.x) or (key.z == Terrain.SOUTH and key.y < rect.position.y):
+			# Out is toward the edge's second cell when its first is inside.
+			var first := Terrain.edge_cells(key)[0]
+			if not (cells.has(first) if not cells.is_empty() else rect.has_point(first)):
 				outward = -outward
 			if outward.dot(flat) > NEAR_SIDE:
 				for piece: Node3D in _runs[key]:

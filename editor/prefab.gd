@@ -19,6 +19,12 @@ const DIR := "res://levels/prefabs/"
 const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places", "buildings", "roofs"]
 
 
+## The building kinds as prefabs (decision 488): "building_<kind>_<size>",
+## each made from levels/buildings.json as it is read (kind_prefab), never
+## saved, so the kinds file is their one source.
+const KIND_PREFIX := "building_"
+
+
 ## The prefabs there are, by name, sorted.
 static func names(dir := DIR) -> Array[String]:
 	var out: Array[String] = []
@@ -29,6 +35,44 @@ static func names(dir := DIR) -> Array[String]:
 			out.append(each)
 	out.sort()
 	return out
+
+
+## The building kinds' prefabs' names, "building_<kind>_<size>", sorted.
+static func kind_names() -> Array[String]:
+	var out: Array[String] = []
+	for kind: String in Level.kinds():
+		for size: String in Level.kinds()[kind].get("sizes", {}):
+			out.append("%s%s_%s" % [KIND_PREFIX, kind, size])
+	out.sort()
+	return out
+
+
+## Kind building prefab [param prefab_name] ({} if it names no kind and
+## size): its blocks' cells as ground (stone under a floor set, else dirt),
+## walls round their union but its doors, a ring of dirt round it so the
+## walls are its own, and its entry {kind, size, at, facing south}.
+static func kind_prefab(prefab_name: String) -> Dictionary:
+	if not prefab_name.begins_with(KIND_PREFIX):
+		return {}
+	var named := prefab_name.trim_prefix(KIND_PREFIX)
+	var size := named.get_slice("_", named.get_slice_count("_") - 1)
+	var kind := named.trim_suffix("_" + size)
+	var entry := {"kind": kind, "size": size, "at": [1, 1], "facing": [0, 1]}
+	var rect: Variant = Level.building_rect(entry)
+	if not Level.kinds().has(kind) or rect == null:
+		return {}
+	var map := LevelMap.new(rect.size + Vector2i(2, 2))
+	for y in map.size.y:
+		for x in map.size.x:
+			map.set_cell(Vector2i(x, y), "dirt")
+	var ground := "stone" if not str(Level.kinds()[kind].get("floor_set", "")).is_empty() else "dirt"
+	var cells := Level._union(Level.building_blocks(entry))
+	for cell in cells:
+		map.set_cell(cell, ground)
+	var doors := Level.kind_doors(entry)
+	for key in Level.blocks_outline(cells):
+		map.set_edge(key, "door" if key in doors else "wall")
+	return {"map": map, "config": {"buildings": [entry]}}
 
 
 ## The area [param rect] of [param map] with its part of [param config], as
@@ -117,7 +161,7 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, confi
 	var had: Array = config.get("buildings", []) if config.get("buildings") is Array else []
 	var buildings := had.filter(func(entry: Variant) -> bool:
 		var rect: Variant = Level.building_rect(entry)
-		return rect == null or Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not landed.has(cell)))
+		return rect == null or Level._union(Level.building_blocks(entry)).all(func(cell: Vector2i) -> bool: return not landed.has(cell)))
 	buildings.append_array(moved_config.get("buildings", []))
 	if buildings.size() != had.size() or not moved_config.get("buildings", []).is_empty():
 		var changed: Dictionary = out.get("config", {})
@@ -136,12 +180,13 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, confi
 	return out
 
 
-## Reads prefab [param prefab_name] ({} if there is none).
+## Reads prefab [param prefab_name] ({} if there is none): a saved one,
+## else a kind's (kind_prefab).
 static func load_prefab(prefab_name: String, dir := DIR) -> Dictionary:
 	var folder := dir + prefab_name + "/"
-	var image := Level._image(folder + "layout.png")
+	var image := Level._image(folder + "layout.png") if FileAccess.file_exists(folder + "layout.png") else null
 	if image == null:
-		return {}
+		return kind_prefab(prefab_name)
 	var config := {}
 	if FileAccess.file_exists(folder + "level.json"):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json"))

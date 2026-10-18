@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_wall_heights()
 	await _test_double_doors()
 	_test_field()
+	_test_kinds()
 	_test_roof_damage()
 	_test_building_states()
 	_test_town_walls()
@@ -1139,6 +1140,36 @@ func _test_field() -> void:
 	_rig.set_town("crop_town", {"field": {"state": Towns.STANDING, "crop": "weeds"}})
 	_check(shown.call().is_empty(), "a crop the slot has no state for: bare")
 	_rig.town_states.erase("crop_town")
+
+
+## A building of a kind (decision 488): an L-house's roof a gable over
+## each block, off as one while inside either; inside its wing, not the
+## corner its box leaves empty; its outline's walls in its kind's set.
+func _test_kinds() -> void:
+	print("\n== an L-house: a roof over each block, inside by its blocks (decision 488) ==")
+	var map := LevelMap.new(Vector2i(14, 12))
+	for y in 12:
+		for x in 14:
+			map.set_cell(Vector2i(x, y), "grass")
+	var changes := Prefab.stamp_changes(Prefab.load_prefab("building_l_house_small"), map, Vector2i(1, 1), {"outdoor": true})
+	for cell: Vector2i in changes["cells"]:
+		map.set_cell(cell, changes["cells"][cell])
+	for key: Vector3i in changes["edges"]:
+		map.set_edge(key, changes["edges"][key])
+	var config := {"outdoor": true}
+	config.merge(changes.get("config", {}), true)
+	_rig.rebuild(Level.parse(map.to_image(), null, config)["terrain"], Vector2i(4, 11))
+	var house := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 2, 10, 8))
+	_check(house.size() == 1 and house[0]["roof"] != null and (house[0]["roof"] as Node3D).get_child_count() == 2,
+			"one building, its roof a piece over each of its two blocks")
+	_check(_rig._building_at.get(Vector2i(9, 7), -1) == _rig._buildings.find(house[0] if not house.is_empty() else {}) and not _rig._building_at.has(Vector2i(9, 3)),
+			"inside it in its wing, not in the corner its box leaves")
+	var outline := Level.blocks_outline(Level._union([Rect2i(2, 2, 6, 8), Rect2i(8, 6, 4, 4)]))
+	var walls := outline.filter(func(key: Vector3i) -> bool: return not _rig._doorways.has(key) and (_rig._runs.has(key) or _rig._walls.has(key)))
+	var doors := outline.filter(func(key: Vector3i) -> bool: return _rig._doorways.has(key))
+	_check(walls.size() == outline.size() - 1 and doors == [Vector3i(4, 9, Terrain.SOUTH)]
+			and outline.all(func(key: Vector3i) -> bool: return _rig._wall_sets.get(key, "wood") == "wood"),
+			"its outline walled round both blocks, its door a doorway (%d of %d; %s)" % [walls.size(), outline.size(), doors])
 
 
 func _test_double_doors() -> void:

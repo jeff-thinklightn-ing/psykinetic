@@ -1688,8 +1688,14 @@ static func know_level(zone_name: String, level: Dictionary) -> void:
 	var shown := str(level.get("display_name", ""))
 	_place_names[zone_name] = shown if not shown.is_empty() else zone_name.replace("_", " ")
 	_zone_kinds[zone_name] = str(level.get("terrain", {}).get("zone", "indoors"))
-	_zone_buildings[zone_name] = level.get("buildings", []).filter(func(each: Dictionary) -> bool:
-		return BUILDING_WORDS.has(str(each.get("slot", ""))))
+	var buildings: Array = level.get("buildings", [])
+	var inside: Dictionary = level.get("building_cells", Level.inside_cells(buildings))
+	var cells: Dictionary[Vector2i, Dictionary] = {}
+	for cell: Vector2i in inside:
+		var building: Dictionary = buildings[inside[cell]]
+		if BUILDING_WORDS.has(str(building.get("slot", ""))) or building.has("kind"):
+			cells[cell] = building
+	_zone_buildings[zone_name] = cells
 
 
 static func _zone_kind(zone_name: String) -> String:
@@ -1967,8 +1973,10 @@ func _where_briefly() -> String:
 ## Pip's house she was told she was outdoors, under the sky).
 const BUILDING_WORDS := {"building.hut": "a small hut", "building.house": "a house", "building.shed": "a shed",
 	"building.temple": "the temple", "building.healers_hut": "the healer's hut"}
-## Each zone's buildings with an inside (Level's "buildings"), by zone name, read once.
-static var _zone_buildings: Dictionary[String, Array] = {}
+## Each zone's inside cells -> the building there (Level's "building_cells",
+## decision 488: a building of blocks is in by any of its cells), by zone
+## name, read once.
+static var _zone_buildings: Dictionary[String, Dictionary] = {}
 
 
 ## The building whose inside holds [param cell] in this zone (Level's
@@ -1977,10 +1985,7 @@ static func building_at(cell: Vector2i) -> Dictionary:
 	var zone_name := World.zone.name if World.zone != null else ""
 	if not _zone_buildings.has(zone_name):
 		know_level(zone_name, Level.load_level(zone_name) if Level.exists(zone_name) else {})
-	for building: Dictionary in _zone_buildings[zone_name]:
-		if (building["rect"] as Rect2i).has_point(cell):
-			return building
-	return {}
+	return _zone_buildings[zone_name].get(cell, {})
 
 
 ## [param building] in words: what the town uses it for ("the forge"),
@@ -1988,7 +1993,7 @@ static func building_at(cell: Vector2i) -> Dictionary:
 ## resident's is ("Snagfin's home"): "the forge (a small hut)", "a house
 ## (Snagfin's home)".
 static func building_words(building: Dictionary) -> String:
-	var kind := str(BUILDING_WORDS.get(str(building.get("slot", "")), "a building"))
+	var kind := str(BUILDING_WORDS.get(str(building.get("slot", "")), building.get("words", "a building")))
 	var use := str(building.get("use", ""))
 	var words := "the %s (%s)" % [use.replace("_", " "), kind] if not use.is_empty() and not kind.begins_with("the ") else kind
 	var owners: Array[String] = []

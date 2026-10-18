@@ -1178,7 +1178,7 @@ func _path_panel() -> void:
 ## The stamp tool's panel: every prefab, the one picked lit, and its turn.
 func _stamp_panel() -> void:
 	_panel_label("Stamp a prefab", 30)
-	var names := Prefab.names(prefab_dir)
+	var names := Prefab.names(prefab_dir) + Prefab.kind_names()
 	if names.is_empty():
 		_panel_label("none yet: save one with the area tool (A)", 22)
 	for each in names:

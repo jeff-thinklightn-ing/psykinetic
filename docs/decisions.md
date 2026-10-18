@@ -12529,3 +12529,70 @@ Ambience.weights takes canopy and drip as two more arguments (0 by default:
 no forest, as before). The tests weigh the beds, not their takes, so a
 checkout without the external takes passes alike.
 Client only, protocol unchanged.
+## 488. Buildings as blocks: kinds, sizes and their stamps
+
+Jeff (2026-10-18): "buildings need more variety and natural structures,
+boxes is too simple and some way too small". Proposed by buildings with
+art-kit, approved by the coordinator as infrastructure (steps 1 to 3; this
+is step 1, 489 the composer); nothing in a real level until Jeff asks.
+- The grid stays the rules, the look stops showing it (terrain's rule,
+  2026-10-14; Jeff today): a building's cells are cells only because its
+  walls and doors are the sim's edges. Nothing drawn is held to a cell:
+  a wall may sit inside its edge by any offset and be any thickness, jog
+  or bay by a fraction of a cell, eaves and ridges at any height, eaves
+  overhang past the footprint, a porch or step stands outside it, so long
+  as what blocks is the edges. No building should read as whole metres.
+- A building of a kind is blocks: levels/buildings.json "kinds", each kind
+  its words, wall and floor sets, storeys (eaves STOREY 3 m a storey unless
+  it names "eaves"), roof ("gable", "round"), place (temple, healer's hut)
+  and sizes ("small", "large"), a size its blocks [x, y, w, h, role] (main,
+  wing, leanto, outshot, bay) and doors [x, y, side] in its own frame,
+  front +y. Kinds: hut, round hut, shed, stone cottage, house, L-house,
+  house with a lean-to, house with a wing, two-storey house, longhouse,
+  barn, stable, inn, hall, mill, watchtower, temple, healer's hut. Sizes 1
+  cell = 1 m: hut 4 x 5 / 5 x 6, shed 3 x 4 / 4 x 5, house 6 x 8 / 7 x 10,
+  temple 6 x 10 / 8 x 12 and so on.
+- A level.json building entry {kind, size, at, facing, seed, ruined, use,
+  town} stands its blocks there turned to its facing (Level._turned, the
+  same turn as Prefab.rotated's, so a kind stamped turned is its facing's);
+  its footprint is their union, its outline the edges round the union
+  (Level.blocks_outline, building_outline), checked as a slot's rect is:
+  all on clear floor of one height, walled but its doors. Its "rect" is the
+  box round its blocks (what places, homes and nearness use); its "blocks",
+  "words", sets, "eaves", "seed" (the entry's, else from its cell, so every
+  peer draws it alike), "doors" and "front" (outside its first door: its
+  place's cell) are its own. A slot's building (building.hut and the rest)
+  is one block, as before: the wilds town is unchanged.
+- A ruin ("ruined": true) is any kind without a roof: no inside, nothing
+  roofed, its walls as walls.
+- What asks "inside which building": level["building_cells"] (cell ->
+  building index; Level.inside_cells, made once as the level is read), so
+  Companion.know_level fills its per-zone cache from the level Main already
+  parsed (perf: no per-call parse, a lookup not a scan); Fields roofs the
+  blocks' cells; the client's _building_at, rain cover and inside-wall fade
+  go by blocks (its outward side the one off the inside), the near walls
+  of a wing faded as the main block's.
+- Stamping: each kind and size is a prefab "building_<kind>_<size>"
+  (Prefab.kind_prefab, kind_names), made from the kinds file as it is read,
+  never saved: the blocks' cells ground, walls round them but the doors, a
+  ring of dirt. The editor's stamp panel and builder mode list them (the
+  builder's prompt says each in a line, not a grid). A stamp over a
+  building takes it by its blocks' cells.
+- Drawn for now (489 does the rest): walls and floors in the kind's sets
+  from the map's edges; a gable over each block at its eaves, its ridge
+  along the block's longer side, all one "roof" off while inside; roof set
+  thatch (Jeff's default; shingle until art-kit's thatch set is there).
+- No message carries buildings: a client parses its level, and a builder's
+  edit goes as the level's config in the "terrain" message, where an older
+  client leaves a kind entry out (said) and plays the same walls. Protocol
+  unchanged.
+level_test _test_kinds (every kind's sizes: blocks meeting and not
+overlapping, doors on the outline and one in front; every kind prefab at
+four turns stands walled with nothing said; an L-house's wing inside and
+roofed, its box's empty corner neither, a ruin neither, the wall where the
+wing meets the corner); view_test _test_kinds (an L-house: a roof piece
+per block, inside by its blocks, walled round both, its doorway);
+companion_test's know_level by cells.
+Rejected: a mesh per kind (boxes again, and no variation); footprints
+off the grid (the sim's walls are edges); saved prefab folders per kind
+(two sources for one shape).

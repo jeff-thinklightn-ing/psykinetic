@@ -127,10 +127,12 @@ func load(terrain: Dictionary) -> void:
 	fences.clear()
 	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
 		if str(building.get("slot", "")) in Level.OPEN_AIR:
-			for key in Level.outline(building["rect"]):
+			for key in Level.building_outline(building):
 				fences[key] = true
 			continue
-		for cell in Level.rect_cells(building["rect"]):
+		if building.get("ruined", false):
+			continue  # A ruin has no roof (decision 488).
+		for cell in Level.building_cells(building):
 			_roofed_whole[cell] = true
 	canopy.assign(terrain.get("canopy", {}))
 	canopy_kind = str(terrain.get("canopy_kind", ""))

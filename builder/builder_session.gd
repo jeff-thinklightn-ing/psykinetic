@@ -196,7 +196,7 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 	for meaning: String in CHARS:
 		legend.append("%s %s" % [CHARS[meaning], meaning.trim_prefix("monster_")])
 	var prefabs := PackedStringArray()
-	for prefab_name in Prefab.names(prefabs_from):
+	for prefab_name in Prefab.names(prefabs_from) + Prefab.kind_names():
 		var prefab := Prefab.load_prefab(prefab_name, prefabs_from)
 		if prefab.is_empty():
 			continue
@@ -204,7 +204,11 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 		# The grid shows cells only: a building is said in words.
 		var buildings: Array = prefab["config"].get("buildings", []) if prefab["config"].get("buildings") is Array else []
 		var kinds := PackedStringArray(buildings.map(func(entry: Variant) -> String:
-			return str(entry.get("slot", "")).trim_prefix("building.") if entry is Dictionary else ""))
+			return str(entry.get("slot", entry.get("kind", ""))).trim_prefix("building.") if entry is Dictionary else ""))
+		if prefab_name.begins_with(Prefab.KIND_PREFIX) and Prefab.kind_names().has(prefab_name):
+			# A building kind (decision 488): walls round its blocks, its doors in front; said, not drawn.
+			prefabs.append("%s (%d x %d): a building, %s" % [prefab_name, piece.size.x, piece.size.y, ", ".join(kinds)])
+			continue
 		prefabs.append("%s (%d x %d)%s:\n%s" % [prefab_name, piece.size.x, piece.size.y,
 			", a building: %s" % ", ".join(kinds) if not kinds.is_empty() else "",
 			grid(piece, prefab["config"], Rect2i(Vector2i.ZERO, piece.size), Rect2i(Vector2i.ZERO, piece.size))])
@@ -581,7 +585,7 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 				return _no("at is [x, y]")
 			var prefab := Prefab.load_prefab(prefab_name, prefab_dir)
 			if prefab.is_empty():
-				return _no("no prefab \"%s\" (there are: %s)" % [prefab_name, ", ".join(Prefab.names(prefab_dir))])
+				return _no("no prefab \"%s\" (there are: %s)" % [prefab_name, ", ".join(Prefab.names(prefab_dir) + Prefab.kind_names())])
 			prefab = Prefab.rotated(prefab, int(given.get("turns", 0)))
 			var size: Vector2i = (prefab["map"] as LevelMap).size
 			if not area.encloses(Rect2i(at, size)):
@@ -697,8 +701,7 @@ func _set_building(given: Dictionary) -> Dictionary:
 		return _no("%s is outside the area" % [at])
 	var buildings: Array = (working.config["buildings"] as Array).duplicate(true) if working.config.get("buildings") is Array else []
 	var index := buildings.find_custom(func(entry: Variant) -> bool:
-		var rect: Variant = Level.building_rect(entry)
-		return rect != null and rect.has_point(at))
+		return Level.building_blocks(entry).any(func(rect: Rect2i) -> bool: return rect.has_point(at)))
 	if index < 0:
 		return _no("no building stands on %s: stamp a building prefab first" % [at])
 	var use := str(given.get("use", "")).strip_edges()

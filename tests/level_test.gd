@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_forest()
 	_test_buildings()
 	_test_field()
+	_test_kinds()
 	_test_canopy()
 	_test_building_links()
 	_test_regenerate_mark()
@@ -510,6 +511,79 @@ func _test_canopy() -> void:
 	_check(not World.is_walkable(Vector2i(3, 3)) and not World.has_line_of_sight(Vector2i(2, 3), Vector2i(4, 3)), "a trunk stops walkers and sight")
 	Level.unregister("test_canopy")
 	DirAccess.remove_absolute(trees_path)
+
+
+## Building kinds (decision 488): every kind's every size is blocks that
+## meet and do not overlap, its doors on its outline and one in its front;
+## stamped from its prefab at each of four turns it stands with nothing
+## said, walled round its blocks but its doors; an L-house loaded: its
+## wing inside and roofed, the corner its box leaves empty neither; a ruin
+## has no inside and no roof.
+func _test_kinds() -> void:
+	print("\n== building kinds: blocks, doors, stamped at four turns, an L-house inside, a ruin ==")
+	var bad: Array[String] = []
+	for kind: String in Level.kinds():
+		for size: String in Level.kinds()[kind]["sizes"]:
+			var entry := {"kind": kind, "size": size, "at": [0, 0]}
+			var blocks := Level.building_blocks(entry)
+			var cells := Level._union(blocks)
+			var area := 0
+			for block in blocks:
+				area += block.get_area()
+			var reached := {cells[0]: true}
+			var todo: Array[Vector2i] = [cells[0]]
+			while not todo.is_empty():
+				var at: Vector2i = todo.pop_back()
+				for side: Vector2i in Level.SIDES.values():
+					if cells.has(at + side) and not reached.has(at + side):
+						reached[at + side] = true
+						todo.append(at + side)
+			var outline := Level.blocks_outline(cells)
+			var doors := Level.kind_doors(entry)
+			var rect: Rect2i = Level.building_rect(entry)
+			if area != cells.size() or reached.size() != cells.size() or doors.is_empty() \
+					or not doors.all(func(key: Vector3i) -> bool: return key in outline) \
+					or not doors.any(func(key: Vector3i) -> bool: return key.z == Terrain.SOUTH and key.y == rect.end.y - 1):
+				bad.append("%s %s" % [kind, size])
+	_check(bad.is_empty() and Prefab.kind_names().size() >= 30, "every kind's sizes: blocks meeting, not overlapping, a door in front (%d prefabs; bad %s)" % [Prefab.kind_names().size(), bad])
+	var unsaid: Array[String] = []
+	for prefab_name in Prefab.kind_names():
+		for turns in 4:
+			var prefab := Prefab.rotated(Prefab.load_prefab(prefab_name), turns)
+			var config: Dictionary = prefab["config"]
+			var level := Level.parse(prefab["map"].to_image(), null, config)
+			var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return not text.begins_with("no player start"))
+			var standing: Array = level["buildings"]
+			if not said.is_empty() or standing.size() != 1 or Level.building_outline(standing[0]).any(func(key: Vector3i) -> bool:
+					return not level["terrain"]["edges"].has(key)) or not Level.building_outline(standing[0]).any(func(key: Vector3i) -> bool:
+					return level["terrain"]["edges"][key] == Terrain.Edge.DOOR):
+				unsaid.append("%s turned %d: %s" % [prefab_name, turns, said])
+	_check(unsaid.is_empty(), "each kind's prefab at four turns: walled round its blocks, a door, nothing said (%s)" % [unsaid])
+	# An L-house and a ruined hut, loaded.
+	var map := LevelMap.new(Vector2i(24, 14))
+	for y in 14:
+		for x in 24:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(0, 0), "start")
+	var config := _stamp(map, {}, "building_l_house_small", Vector2i(1, 1))
+	config = _stamp(map, config, "building_hut_small", Vector2i(14, 1))
+	(config["buildings"] as Array)[1]["ruined"] = true
+	var level := Level.parse(map.to_image(), null, config)
+	var house: Dictionary = level["buildings"][0]
+	_check(house["kind"] == "l_house" and house["blocks"] == [Rect2i(2, 2, 6, 8), Rect2i(8, 6, 4, 4)] and house["rect"] == Rect2i(2, 2, 10, 8)
+			and house["words"] == "a house" and house["front"] == Vector2i(4, 10),
+			"the L-house: its main block and wing, its box, its words and the cell before its door (%s)" % [house])
+	_check(level["building_cells"].size() == 64 and level["building_cells"].get(Vector2i(9, 7)) == 0 and not level["building_cells"].has(Vector2i(9, 3))
+			and not level["building_cells"].has(Vector2i(15, 3)), "inside: the main block and wing (64 cells), not the empty corner, not the ruin")
+	Level.register("test_kinds", map.to_image(), null, config)
+	_check(_main.load_map("test_kinds"), "the level with kinds loads")
+	_check(Companion.building_at(Vector2i(9, 7)).get("kind") == "l_house" and Companion.building_at(Vector2i(9, 3)).is_empty()
+			and Companion.building_at(Vector2i(15, 3)).is_empty(), "a companion is inside the house in its wing, not in its corner, not in the ruin")
+	_check(World.fields._roofed.has(Vector2i(9, 7)) and not World.fields._roofed.has(Vector2i(9, 3)) and not World.fields._roofed.has(Vector2i(15, 3)),
+			"roofed over the wing; not the corner, not the ruin")
+	_check(World.edge_blocks(Vector2i(9, 5), Vector2i(0, 1)) and not World.edge_blocks(Vector2i(8, 7), Vector2i(-1, 0)),
+			"a wall where the wing meets the corner; none between the wing and the main block")
+	Level.unregister("test_kinds")
 
 
 func _test_building_links() -> void:
