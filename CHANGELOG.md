@@ -7,6 +7,12 @@ notes (decision 324).
 
 ## Unreleased
 
+- The ground, floors and walls have their own textures (dirt, sand, plank,
+  flagstone, cobble and cave floors, timber, stone, castle and cave walls,
+  cliffs), and bushes, rocks, tufts, roots, the well, roof ridges, timber
+  walls, fences, the campfire, tent, anvil, barrels, crates, sacks, cart,
+  signposts, lanterns, torches, banners, benches, tables, bridges, dead trees
+  and the rest of the stone and castle rubble their own art.
 - Houses, sheds and huts have their own roofs (shingle, plank and thatch); a
   damaged one shows a hole with its rafters running down the slope and rubble
   at the walls.

@@ -9,6 +9,19 @@ through the coordinator as a redo.
 
 | Date | Slot | Pick | Note |
 |---|---|---|---|
+| 2026-10-18 | ground.dirt, ground.sand | p1, p1, applied | procedural and seamless; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | floor.wood, floor.stone, floor.castle, floor.cave | c2, c10, c2, c9, applied | made seamless by art-gen (floor.wood's seam breaks its cross-board rows; a procedural plank rebuild if vetoed); art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | material.wall.wood, stone, castle, cave; material.rock | c5, c3, c6, c9; c6, applied | made seamless by art-gen; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | plant.bush, rock.large, rock.boulder | c4, c3, c1, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | scatter.tuft, scatter.stone, scatter.root | c4, c2, c1, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | building.well | c3, applied | 800 mesh scaled x/z 0.65, the roof its part; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | roof.shingle.ridge, roof.shingle.end | c5, c3, applied | the end is the finial; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.wood straight, post, end, window, straight_ruined, rubble | c4, c4, c4, c2, c1, c4, applied | cut to 1 m where a run, plinths trimmed; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | prop.fence, prop.fence_post | c3, c4, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | prop.campfire, tent, anvil, barrel, crate, sack, cart, signpost, lantern, torch, banner, bench, table, bridge | c1, c1, c2, c4, c18, c2, c4, c4, c1, c1, c1, c1, c1, c3, applied | the banner's cloth its part; colours from the concepts; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.stone.straight, wall.stone.rubble | c6, c4, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.castle.end_ruined, wall.castle.rubble | c1, c4, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | tree.dead | c4, applied | crown squeezed to the 1.6 box; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
 | 2026-10-15 | wall.castle post, end, corner, t, cross | c2, applied | post c2 as the one mesh for the 3 m castle set (not the tall pillar squashed), slimmed to 0.5×3×0.5; budget 200 → 800 (one per joint) |
 | 2026-10-15 | tree.small | c2, applied (variant 1; the hand stand-ins kept as 2 and 3) | c2 or c4; scaled x/z 0.67 to 2.0 wide, 3.6 tall, budget 1500 |
 | 2026-10-15 | wall.castle.straight_low | c4, applied | budget 300 → 600 (tiles a metre at a time); c4's 1200 mesh worked down by hand, cut to 1 m; faded block lines get alternate palette colours |

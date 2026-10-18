@@ -569,13 +569,8 @@ func _test_wall_runs() -> void:
 	print("  (breaches: %s)" % [_rig._wall_breaches])
 	for key: Vector3i in _rig._wall_breaches:
 		var middle := Client3D._edge_midpoint(key)
-		var top := 0.0
-		var body := _rig._walls[key].get_node("Body") as MeshInstance3D
-		for local: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
-			var point := body.global_transform * local
-			if Vector2(point.x - middle.x, point.z - middle.z).length() < 0.5:
-				top = maxf(top, point.y - _rig._edge_base(key))
-		_check(terrain["edges"].get(key) == Terrain.Edge.WALL and top >= Client3D.WALL_RUBBLE_LOW,
+		var top := _drawn_top(key, 0.5)
+		_check(terrain["edges"].get(key) == Terrain.Edge.WALL and top >= _rubble_low(key),
 				"the breach at %s is rubble %.2f m high where the sim keeps its wall" % [key, top])
 	# The castle's walls are its set's: half a metre thick (_edge_bounds).
 	var some: Vector3i = _rig._walls.keys()[0]
@@ -645,17 +640,9 @@ func _test_wall_runs() -> void:
 		var tops := {}
 		for key: Vector3i in [rubble_at, broken_at]:
 			var middle := Client3D._edge_midpoint(key)
-			var top := 0.0
-			# The run's swept body, and an art piece (wall.<set>.straight_ruined) where the set has one.
-			for drawn: MeshInstance3D in _rig._walls[key].find_children("*", "MeshInstance3D", true, false):
-				for surface in drawn.mesh.get_surface_count():
-					for local: Vector3 in drawn.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
-						var point := drawn.global_transform * local
-						if Vector2(point.x - middle.x, point.z - middle.z).length() < 0.45:
-							top = maxf(top, point.y - _rig._edge_base(key))
-			tops[key] = top
+			tops[key] = _drawn_top(key, 0.45)
 		var cap: float = Client3D._wall_set("castle")["cap"]
-		_check(rubble_at in _rig._wall_breaches and tops[rubble_at] >= Client3D.WALL_RUBBLE_LOW and tops[rubble_at] <= Client3D.WALL_RUBBLE_HIGH + 0.01
+		_check(rubble_at in _rig._wall_breaches and tops[rubble_at] >= _rubble_low(rubble_at) and tops[rubble_at] <= Client3D.WALL_RUBBLE_HIGH + 0.01
 				and terrain["edges"].get(rubble_at) == Terrain.Edge.WALL, "rubble: a bank %.2f m high, never a way through, the sim's wall kept" % tops[rubble_at])
 		_check(tops[broken_at] >= cap / 3.0 and tops[broken_at] < cap, "broken: a stub %.2f m high, never under a third of the wall" % tops[broken_at])
 		var still := 0
@@ -2799,6 +2786,8 @@ func _test_art_puppets() -> void:
 			if (connection["callable"] as Callable).get_object() == _rig:
 				kept.append(connection["callable"])
 				crate.disconnect(signal_name, connection["callable"])
+	# The crate's own art hidden (its variant count cached at none), whatever the kit has by now.
+	ArtKit._variants["prop.crate"] = 0
 	var before := _rig._make_puppet(crate)
 	_check(before.get_node("Body") is MeshInstance3D and Client3D.art_slot_for(crate) == "",
 			"no art of its own yet: its cube, as before")
@@ -2829,8 +2818,32 @@ func _test_art_puppets() -> void:
 	for callable in kept:
 		crate.impacted.connect(callable)
 	ArtKit.forget("prop.crate")
+	ArtKit._variants["prop.crate"] = 0
 	_check(Client3D.art_slot_for(crate) == "", "and back to its cube when the art is gone")
+	ArtKit.forget("prop.crate")
 
+
+## The highest point drawn at a wall edge's middle (within [param reach] of
+## it), over its run's swept body and any art piece in its place
+## (wall.<set>.straight_ruined, wall.<set>.rubble: Client3D's WALL_PIECE).
+func _drawn_top(key: Vector3i, reach: float) -> float:
+	var middle := Client3D._edge_midpoint(key)
+	var top := 0.0
+	for drawn: MeshInstance3D in _rig._walls[key].find_children("*", "MeshInstance3D", true, false):
+		for surface in drawn.mesh.get_surface_count():
+			for local: Vector3 in drawn.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+				var point := drawn.global_transform * local
+				if Vector2(point.x - middle.x, point.z - middle.z).length() < reach:
+					top = maxf(top, point.y - _rig._edge_base(key))
+	return top
+
+
+## How low a breach's rubble may stand: the swept bank's WALL_RUBBLE_LOW,
+## or, where the set's wall.<set>.rubble has art, that piece's own height
+## (its slot: at least 0.6 m, never a way through).
+func _rubble_low(key: Vector3i) -> float:
+	var slot := "wall.%s.rubble" % _rig._set_of(key)
+	return 0.6 if ArtKit.filled_by(slot) == "own" else Client3D.WALL_RUBBLE_LOW
 
 func _test_creature_puppets() -> void:
 	print("

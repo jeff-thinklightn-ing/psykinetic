@@ -124,10 +124,13 @@ func _test_grey_boxes() -> void:
 	ArtKit.show_placeholders = false
 	ArtKit.show_labels = false
 	ArtKit.forget()
+	# Its art hidden (the variant count cached at none), whatever the kit has by now.
+	ArtKit._variants["wall.castle.rubble"] = 0
 	var node := ArtKit.instance("wall.castle.rubble")
 	_check(ArtKit.filled_by("wall.castle.rubble") == "placeholder" and node.get_node_or_null("Label") == null,
 			"a slot with no art and no fill is its grey box in the game too, without a label unless asked")
 	node.free()
+	ArtKit.forget("wall.castle.rubble")
 
 
 func _test_parts() -> void:

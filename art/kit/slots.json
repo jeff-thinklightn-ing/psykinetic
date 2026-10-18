@@ -50,6 +50,7 @@
 		"material.wall.castle": {
 			"category": "materials",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.castle/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c6 made seamless by art-gen"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the stone of swept wall.castle runs (wall.castle.profile): u is metres along the run, v metres up"
@@ -57,6 +58,7 @@
 		"floor.castle": {
 			"category": "floors",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/floor.castle/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2 made seamless by art-gen"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a castle place (floor set \"castle\"): cobbles"
@@ -256,6 +258,7 @@
 			"kind": "vertex",
 			"size": [0.6, 1.8, 0.6],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.end_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 300 mesh squeezed to 0.6, 289 tris"},
 			"uses": "a run's broken free end: rubble and a jagged stub"
 		},
 		"wall.castle.rubble": {
@@ -264,6 +267,7 @@
 			"kind": "edge",
 			"size": [0.8, 0.7, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, 319 tris"},
 			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through"
 		},
 		"wall.wood.profile": {
@@ -280,6 +284,7 @@
 		"material.wall.wood": {
 			"category": "materials",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.wood/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c5 made seamless by art-gen"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the planks of swept wall.wood runs (wall.wood.profile): u is metres along the run, v metres up"
@@ -309,6 +314,7 @@
 			"kind": "edge",
 			"size": [0.5, 0.25, 1],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/roof.shingle.ridge/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c5's 200 mesh stretched to 0.5 x 1.0, shingles on row 2, 137 tris"},
 			"uses": "a shingle roof's ridge cap, 1 m along z, laid once a cell along the ridge (turned for a ridge along x); a saddle over the apex hugging both slopes (0.75 down a metre out each way), its lowest edges 0.25 m either side of the apex line; origin the middle of its base (y 0 at those lowest edges, as every mesh slot stands on its origin), so code lays it 0.19 m below the apex of the slopes' top faces"
 		},
 		"roof.shingle.end": {
@@ -317,6 +323,7 @@
 			"kind": "vertex",
 			"size": [0.3, 0.6, 0.3],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/roof.shingle.end/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 300 mesh squeezed to 0.3 x 0.3 (the finial), 271 tris"},
 			"uses": "a shingle roof's gable finial at each end of the ridge, facing out along -z; origin at the apex of the slopes' top faces at the gable's overhang; the barge boards under it are code's, extruded down the pitch as the fascia is, so this never stretches with the span"
 		},
 		"roof.shingle.broken": {
@@ -331,6 +338,7 @@
 		"floor.wood": {
 			"category": "floors",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/floor.wood/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2 (the _top concept) made seamless by art-gen (min-error cut; the cross-board rows break where the seam passes)"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a home place (floor set \"wood\"): planks"
@@ -341,6 +349,7 @@
 			"kind": "edge",
 			"size": [0.3, 3, 1],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.straight/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 300 mesh, a 1 m cut from its 3 m panel, 225 tris"},
 			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.wood.profile along runs",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -350,6 +359,7 @@
 			"kind": "vertex",
 			"size": [0.36, 3.1, 0.6],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.end/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 200 mesh, its plinth trimmed, fitted 0.36 x 3.1 x 0.6, 137 tris"},
 			"uses": "a run's free end, capping the wall.wood.profile section, a little proud of it"
 		},
 		"wall.wood.corner": {
@@ -385,6 +395,7 @@
 			"kind": "vertex",
 			"size": [0.3, 3, 0.3],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 200 mesh, its stone plinth trimmed, fitted 0.3 x 3, 89 tris"},
 			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post); a timber upright"
 		},
 		"wall.wood.window": {
@@ -393,6 +404,7 @@
 			"kind": "edge",
 			"size": [0.3, 3, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh cut to 1 m round the opening, depth to 0.3, 378 tris"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; shuttered",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.3, 1.2, 1]},
@@ -407,6 +419,7 @@
 			"kind": "edge",
 			"size": [0.3, 2.2, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.straight_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh, 1 m cut out of its 3.16 m run, 178 tris"},
 			"uses": "a 1 m wall section with a broken top, for ruins and broken runs; broken planks",
 			"grey": [
 				{"at": [0, 0.9, 0], "size": [0.3, 1.8, 1]},
@@ -419,6 +432,7 @@
 			"kind": "edge",
 			"size": [0.8, 0.7, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, 220 tris after its crumbs"},
 			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through; fallen planks and beams"
 		},
 		"wall.stone.profile": {
@@ -435,6 +449,7 @@
 		"material.wall.stone": {
 			"category": "materials",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3 made seamless by art-gen"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the dressed stone of swept wall.stone runs (wall.stone.profile): u is metres along the run, v metres up"
@@ -442,6 +457,7 @@
 		"floor.stone": {
 			"category": "floors",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/floor.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c10 (_top) made seamless by art-gen"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a dungeon or crypt place (floor set \"stone\"): flagstones"
@@ -452,6 +468,7 @@
 			"kind": "edge",
 			"size": [0.5, 3, 1],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.straight/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c6's 300 mesh, 1 m cut, depth to 0.5, 284 tris"},
 			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.stone.profile along runs",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -624,6 +641,7 @@
 			"kind": "edge",
 			"size": [0.8, 0.7, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh stretched along z to 1.0, 311 tris"},
 			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through"
 		},
 		"wall.cave.profile": {
@@ -639,6 +657,7 @@
 		"material.wall.cave": {
 			"category": "materials",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.cave/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c9 made seamless by art-gen"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the rock of swept wall.cave runs (wall.cave.profile): u is metres along the run, v metres up"
@@ -646,6 +665,7 @@
 		"floor.cave": {
 			"category": "floors",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/floor.cave/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c9 made seamless by art-gen"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a cave place (floor set \"cave\"): rock"
@@ -805,6 +825,7 @@
 			"size": [0.3, 0.25, 0.3],
 			"budget": 100,
 			"materials": 1,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/scatter.tuft/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 100 mesh, one mesh, 97 tris"},
 			"uses": "grass tufts terrain scatters over grass and dirt (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.7, 1.3], "yaw": "free", "tilt_max": 8, "sink": 0.02, "footprint_r": 0.15, "blocks": false}
 		},
@@ -826,6 +847,7 @@
 			"size": [0.3, 0.15, 0.3],
 			"budget": 80,
 			"materials": 1,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/scatter.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 80 mesh scaled to the box, 74 tris"},
 			"uses": "pebbles and small stones terrain scatters over dirt, sand and stone (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.6, 1.4], "yaw": "free", "tilt_max": 20, "sink": 0.04, "footprint_r": 0.15, "blocks": false}
 		},
@@ -836,6 +858,7 @@
 			"size": [0.6, 0.15, 0.2],
 			"budget": 120,
 			"materials": 1,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/scatter.root/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 120 mesh stretched along x to 0.6, 116 tris"},
 			"uses": "roots breaking the ground near trees (terrain part 5), drawn by MultiMesh, laid lengthwise along x; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.8, 1.3], "yaw": "free", "tilt_max": 5, "sink": 0.05, "footprint_r": 0.3, "blocks": false}
 		},
@@ -845,6 +868,7 @@
 			"kind": "cell",
 			"size": [0.8, 0.8, 0.8],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.crate/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c18's 300 mesh, 278 tris"},
 			"uses": "a crate, pushable and stackable to stand on (the crate entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)"
 		},
 		"prop.chest": {
@@ -867,6 +891,7 @@
 			"kind": "cell",
 			"size": [1.1, 1.2, 1.1],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/rock.boulder/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 300 mesh, grey with moss on its top, 283 tris"},
 			"uses": "the boulder, heavy and pushable, that sinks in water (the boulder entity; drawn as a sphere until the slot has art of its own, decision 264)"
 		},
 		"prop.cart": {
@@ -875,6 +900,7 @@
 			"kind": "cell",
 			"size": [0.9, 0.6, 1.2],
 			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.cart/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 800 mesh scaled up to 0.9 x 0.6 x 1.2, 694 tris (spiky spokes: clean later)"},
 			"uses": "a hand cart, pushable, to haul loot on (the cart entity; drawn as a slab until the slot has art of its own, decision 264); its length along z",
 			"grey": [
 				{"at": [0, 0.45, 0], "size": [0.9, 0.3, 1.2]},
@@ -1138,6 +1164,7 @@
 			"footprint": [1, 1],
 			"size": [1.4, 2.4, 1.4],
 			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.well/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 800 mesh scaled x/z 0.65 to the 1.4 box, the roof above 1.8 m cut out as its part (pivot 0, 1.8, 0), stone rim, timber posts and roof, 646 tris"},
 			"uses": "a well, 1 x 1 cell, a whole piece standing in the open: its rim and posts the body, its little roof a part (no floor; nothing to walk into)",
 			"grey": [
 				{"at": [0, 0.4, 0], "size": [1.2, 0.8, 1.2]},
@@ -1235,6 +1262,7 @@
 			"size": [1.6, 3.6, 1.6],
 			"budget": 1000,
 			"variants": 3,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/tree.dead/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 1000 mesh, its 3.3 m crown squeezed to the 1.6 box, 943 tris"},
 			"uses": "a dead, bare tree for the forest round an outdoor map and groves; sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 1.4, 0], "size": [0.3, 2.8, 0.3]},
@@ -1269,6 +1297,7 @@
 			"size": [1, 0.9, 1],
 			"budget": 400,
 			"variants": 3,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/plant.bush/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, foliage on row 4 in blocks, 384 tris"},
 			"uses": "a bush, among trees and along paths"
 		},
 		"plant.fern": {
@@ -1299,6 +1328,7 @@
 			"size": [2, 1.4, 2],
 			"budget": 400,
 			"variants": 3,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/rock.large/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 400 mesh stretched along z to 2.0, grey with moss on its top, 383 tris"},
 			"uses": "a large rock, about 2 m, in the wilds and at cliff feet"
 		},
 		"prop.barrel": {
@@ -1307,6 +1337,7 @@
 			"kind": "cell",
 			"size": [0.7, 0.9, 0.7],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.barrel/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, staves and hoops from the concept, 340 tris"},
 			"uses": "a barrel (drawn as the barrel shape today)"
 		},
 		"prop.torch": {
@@ -1316,6 +1347,7 @@
 			"size": [0.3, 0.6, 0.3],
 			"budget": 300,
 			"materials": 2,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.torch/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 300 mesh (a wall bracket), 260 tris"},
 			"uses": "a wall sconce with its torch; the flame (a shader and a light) burns at its flame socket",
 			"sockets": {"flame": [0, 0.6, 0]}
 		},
@@ -1326,6 +1358,7 @@
 			"size": [0.25, 0.4, 0.25],
 			"budget": 300,
 			"materials": 2,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.lantern/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 300 mesh, 274 tris"},
 			"uses": "a lantern, carried or hung from its hang socket; its light at the flame socket",
 			"sockets": {"flame": [0, 0.2, 0], "hang": [0, 0.4, 0]}
 		},
@@ -1336,6 +1369,7 @@
 			"size": [1, 0.4, 1],
 			"budget": 400,
 			"materials": 2,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.campfire/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh scaled to the 1 m box, its ring of stones grey, logs and embers from the concept, 371 tris"},
 			"uses": "a ring of stones and logs; the fire burns at its flame socket",
 			"sockets": {"flame": [0, 0.2, 0]}
 		},
@@ -1345,6 +1379,7 @@
 			"kind": "edge",
 			"size": [0.1, 1, 1],
 			"budget": 150,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.fence/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 150 mesh squeezed to 0.1 x 1.0, 148 tris"},
 			"uses": "a 1 m fence section on a cell edge, tiling along z"
 		},
 		"prop.fence_post": {
@@ -1353,6 +1388,7 @@
 			"kind": "vertex",
 			"size": [0.15, 1.1, 0.15],
 			"budget": 80,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.fence_post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 80 mesh slimmed to 0.15, 80 tris"},
 			"uses": "a fence post at a cell corner"
 		},
 		"prop.stairs": {
@@ -1370,6 +1406,7 @@
 			"kind": "cell",
 			"size": [1.6, 0.8, 0.9],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.table/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh stretched to 1.6, 400 tris"},
 			"uses": "a table"
 		},
 		"prop.bench": {
@@ -1378,6 +1415,7 @@
 			"kind": "cell",
 			"size": [1.4, 0.45, 0.4],
 			"budget": 250,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bench/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 250 mesh stretched to 1.4, 244 tris"},
 			"uses": "a bench"
 		},
 		"prop.bed": {
@@ -1394,6 +1432,7 @@
 			"kind": "cell",
 			"size": [0.5, 0.6, 0.4],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.sack/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 300 mesh, 214 tris"},
 			"uses": "a sack of grain or loot"
 		},
 		"prop.grave": {
@@ -1410,6 +1449,7 @@
 			"kind": "cell",
 			"size": [0.7, 0.8, 0.4],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.anvil/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh squeezed to 0.7 x 0.8 x 0.4 with its stump, iron and wood from the concept, 351 tris"},
 			"uses": "the smith's anvil on its block"
 		},
 		"prop.forge": {
@@ -1453,6 +1493,7 @@
 			"kind": "cell",
 			"size": [0.8, 2, 0.2],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.signpost/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's two boards, squeezed to 0.8 x 2 x 0.2, 250 tris"},
 			"uses": "a signpost, its arms pointing along x"
 		},
 		"prop.banner": {
@@ -1461,6 +1502,7 @@
 			"kind": "cell",
 			"size": [0.8, 2.6, 0.2],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.banner/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh, its crossbar squeezed to 0.8, the cloth cut out as its part (pivot -0.35, 2.4, 0), banner red from the concept, 397 tris"},
 			"uses": "a banner on its pole showing who holds a place; its cloth a part the game colours by faction",
 			"grey": [
 				{"at": [-0.35, 1.3, 0], "size": [0.1, 2.6, 0.2]}
@@ -1477,6 +1519,7 @@
 			"kind": "cell",
 			"size": [2.4, 2, 3],
 			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.tent/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 800 mesh, cloth and poles from the concept, 628 tris"},
 			"uses": "a goblin tent, its opening toward +z"
 		},
 		"prop.palisade": {
@@ -1515,6 +1558,7 @@
 			"kind": "cell",
 			"size": [1.6, 0.6, 3],
 			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bridge/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 800 mesh scaled to 1.6 x 0.6 x 3, 744 tris"},
 			"uses": "a plank bridge over a stream or a drop, 3 m along z, walkable along its length"
 		},
 		"prop.ladder": {
@@ -1676,6 +1720,7 @@
 		"ground.dirt": {
 			"category": "ground",
 			"type": "texture",
+			"source": {"by": "art-gen, procedural", "tool": "numpy (art-gen)", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/ground.dirt/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): p1, procedural and seamless, 1024 px taken down to the slot's 512"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on dirt; procedural colour while empty"
@@ -1690,6 +1735,7 @@
 		"ground.sand": {
 			"category": "ground",
 			"type": "texture",
+			"source": {"by": "art-gen, procedural", "tool": "numpy (art-gen)", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/ground.sand/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): p1, procedural and seamless, 1024 px taken down to the slot's 512"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on sand; procedural colour while empty"
@@ -1721,6 +1767,7 @@
 		"material.rock": {
 			"category": "materials",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.rock/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c6 made seamless by art-gen, 512 px"},
 			"tile_m": 2.0,
 			"uses": "the cliff faces terrain generates at ledges, mapped triplanar: no up or down in it"
 		}
