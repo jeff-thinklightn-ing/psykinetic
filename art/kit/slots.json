@@ -385,6 +385,35 @@
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "seven rough stone courses tapering 0.66 to 0.56, jittered, proud stones on their faces, row 1's greys in blocks; an overhanging slab cap and a clay pot; 288 tris; a stand-in for an art-gen concept"},
 			"uses": "a stone chimney stack for BuildingComposer (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): placed at a gable end, its origin at its foot on the roof line (the eaves' height), its lower part running down into the roof, its top over the ridge with a cap and a pot"
 		},
+		"porch.timber": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.43, 2.78, 2.0],
+			"middle": [0.71, 0, 0],
+			"budget": 800,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a wall plate, two posts out at 1.25 m with a beam and knee braces, rafters and a lean-to of planks falling from the wall (2.7 m) to past the posts (2.25 m), a plank deck a step high; 312 tris; a stand-in for an art-gen concept"},
+			"uses": "a timber porch 2 m wide on a wall's outside, for BuildingComposer (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): an edge piece along z, its origin on the edge's middle at the ground, its front (the open side) toward +x, so it stands from x 0 out to 1.43 (its box's middle 0.71 m out: \"middle\")"
+		},
+		"porch.timber_wide": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.43, 2.78, 3.0],
+			"middle": [0.71, 0, 0],
+			"budget": 800,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a wall plate, two posts out at 1.25 m with a beam and knee braces, rafters and a lean-to of planks falling from the wall (2.7 m) to past the posts (2.25 m), a plank deck a step high; 432 tris; a stand-in for an art-gen concept"},
+			"uses": "a timber porch 3 m wide on a wall's outside, for BuildingComposer (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): an edge piece along z, its origin on the edge's middle at the ground, its front (the open side) toward +x, so it stands from x 0 out to 1.43 (its box's middle 0.71 m out: \"middle\")"
+		},
+		"frame.cruck": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.34, 5.03, 4.16],
+			"budget": 600,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "two curved blades in three lengths from the ground at z +-1.9 to meet at the apex, a collar at 3.2 m, a tie at 2.2, an apex block, pegs proud on the front; 168 tris; a stand-in for an art-gen concept"},
+			"uses": "a cruck frame for a gable, for BuildingComposer (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): an edge piece along z (4.16 m across), its origin on the edge's middle at the ground, its front (the pegs) toward +x"
+		},
 		"floor.wood": {
 			"category": "floors",
 			"type": "texture",
@@ -1792,6 +1821,83 @@
 				{"at": [0, 0.15, -0.1], "size": [0.3, 0.3, 0.7]},
 				{"at": [0, 0.525, -0.105], "size": [0.41, 0.45, 0.92]},
 				{"at": [0, 0.5, 0.46], "size": [0.3, 0.3, 0.21]}
+			]
+		},
+		"creature.horse": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.5, 1.7, 2.0],
+			"tolerance": 0.15,
+			"budget": 4000,
+			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette)", "tool": "blender (tools/animal_palette.py)", "license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Horse; variant 2 Horse_White, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-18", "notes": "N:/assets/sources/quaternius/animals/ultimate_animated_animal_pack/glTF/Horse.gltf, Horse_White.gltf"},
+			"variants": 2,
+			"uses": "a horse, variant 2 the white horse (Horse.gltf, Horse_White.gltf): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a look for the set pieces, its rig ready (the coordinator scheduled it 2026-10-18), pc-character's from the Quaternius pack (Horse.gltf, Horse_White.gltf) through tools/animal_palette.py",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow", "idle_2_headlow"], "fallback": "idle"},
+				{"name": "alert", "names": ["alert", "look", "idle_2", "idle_headlow"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "attack", "names": ["attack", "attack_kick", "attack_headbutt"], "fallback": "a lunge tween"}
+			],
+			"grey": [
+				{"at": [0, 0.425, -0.1], "size": [0.35, 0.85, 1.4]},
+				{"at": [0, 1.1475, -0.15], "size": [0.5, 0.595, 1.7]},
+				{"at": [0, 1.445, 0.85], "size": [0.25, 0.51, 0.3]}
+			]
+		},
+		"creature.donkey": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.38, 1.3, 1.55],
+			"tolerance": 0.15,
+			"budget": 3000,
+			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette)", "tool": "blender (tools/animal_palette.py)", "license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Donkey, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-18", "notes": "N:/assets/sources/quaternius/animals/ultimate_animated_animal_pack/glTF/Donkey.gltf"},
+			"uses": "a donkey (Donkey.gltf): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a look for the set pieces, its rig ready (the coordinator scheduled it 2026-10-18), pc-character's from the Quaternius pack (Donkey.gltf) through tools/animal_palette.py",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow", "idle_2_headlow"], "fallback": "idle"},
+				{"name": "alert", "names": ["alert", "look", "idle_2", "idle_headlow"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "attack", "names": ["attack", "attack_kick", "attack_headbutt"], "fallback": "a lunge tween"}
+			],
+			"grey": [
+				{"at": [0, 0.325, -0.0775], "size": [0.266, 0.65, 1.085]},
+				{"at": [0, 0.8775, -0.1162], "size": [0.38, 0.455, 1.3175]},
+				{"at": [0, 1.105, 0.6587], "size": [0.19, 0.39, 0.2325]}
+			]
+		},
+		"creature.dog": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.21, 0.6, 0.77],
+			"tolerance": 0.15,
+			"budget": 2500,
+			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette)", "tool": "blender (tools/animal_palette.py)", "license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Husky; variant 2 ShibaInu, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-18", "notes": "N:/assets/sources/quaternius/animals/ultimate_animated_animal_pack/glTF/Husky.gltf, ShibaInu.gltf"},
+			"variants": 2,
+			"uses": "a dog, variant 1 the husky, 2 the shiba inu (Husky.gltf, ShibaInu.gltf): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a look for the set pieces, its rig ready (the coordinator scheduled it 2026-10-18), pc-character's from the Quaternius pack (Husky.gltf, ShibaInu.gltf) through tools/animal_palette.py",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow", "idle_2_headlow"], "fallback": "idle"},
+				{"name": "alert", "names": ["alert", "look", "idle_2", "idle_headlow"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "attack", "names": ["attack", "bite"], "fallback": "a lunge tween"}
+			],
+			"grey": [
+				{"at": [0, 0.15, -0.0385], "size": [0.147, 0.3, 0.539]},
+				{"at": [0, 0.405, -0.0577], "size": [0.21, 0.21, 0.6545]},
+				{"at": [0, 0.51, 0.3272], "size": [0.105, 0.18, 0.1155]}
 			]
 		},
 		"creature.rabbit": {

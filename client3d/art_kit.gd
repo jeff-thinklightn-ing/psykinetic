@@ -427,7 +427,10 @@ static func _grey_recipe(slot: String) -> Array:
 		# held at the middle of its back) or the top.
 		var origin := str(entry.get("origin", "base"))
 		var base := 0.0 if origin == "base" else -whole.y * 0.5 if origin == "centre" else -whole.y
-		boxes = [{"at": [0, base + whole.y * 0.5, 0], "size": [whole.x, whole.y, whole.z]}]
+		# A slot whose box's middle is off its origin ("middle": a porch out
+		# from its wall) has its box there.
+		var middle := _vec(entry.get("middle", [0, 0, 0]))
+		boxes = [{"at": [middle.x, base + whole.y * 0.5, middle.z], "size": [whole.x, whole.y, whole.z]}]
 	for i in boxes.size():
 		_grey_step(steps, body, "Box%d" % i, boxes[i], material)
 	for part: Dictionary in entry.get("parts", []):
