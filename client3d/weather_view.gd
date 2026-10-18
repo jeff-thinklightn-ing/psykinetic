@@ -10,6 +10,10 @@ extends Node3D
 ## eases it toward the zone's weather (World.fields.weather) every frame and
 ## moves it with the view; it is hidden indoors, and the rain stops on
 ## roofs (a heightfield the drops hide on).
+## Under a forest's canopy (decision 477, set_canopy) the crowns take the
+## rain and snow: what falls is thinned by the cover round the view, the
+## canopy drips instead (Weather.drip_at), the low fog lies thicker and
+## the clouds' shadows fade.
 
 ## How fast the drawn weather follows the sim's (per second): the sim's
 ## already changes gradually; this only smooths its ticks.
@@ -27,6 +31,16 @@ const SNOW_FLAKES := 1800
 const SNOW_SPEED := 2.2
 const SNOW_DRIFT := 1.6
 const SNOW_COLOUR := Color(0.95, 0.97, 1.0, 0.85)
+## Under a canopy: the snow its crowns let through at full cover, how much
+## thicker the low fog lies there, and the drips (drops at most, the box
+## they fall from, centred DRIP_HEIGHT up, their fall in m/s).
+const CANOPY_SNOW := 0.3
+const CANOPY_FOG := 0.6
+const DRIPS := 260
+const DRIP_BOX := Vector3(24.0, 4.0, 24.0)
+const DRIP_HEIGHT := 4.5
+const DRIP_SPEED := 8.0
+const DRIP_COLOUR := Color(0.78, 0.84, 0.9, 0.5)
 ## The visual layer the rain is on, so the roof heightfield leaves it out.
 const RAIN_LAYER := 1 << 19
 ## The fog's layers over the ground: their heights, and how much fog their
@@ -117,12 +131,16 @@ void fragment() {
 ## The weather drawn now, eased (Weather.at's keys), and whether it is drawn.
 var weather := {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 var outdoor := false
+## The canopy's cover round the view (0..1) and its drips now (set_canopy).
+var canopy := 0.0
+var drip := 0.0
 ## How far fog and clouds have drifted (m, world xz).
 var _drift := Vector2.ZERO
 var _rain: GPUParticles3D
 var _rain_process: ParticleProcessMaterial
 var _snow: GPUParticles3D
 var _snow_process: ParticleProcessMaterial
+var _drips: GPUParticles3D
 var _roofs: GPUParticlesCollisionHeightField3D
 var _fog: Array[MeshInstance3D] = []
 var _fog_material: Array[ShaderMaterial] = []
@@ -133,6 +151,7 @@ func _ready() -> void:
 	name = "Weather"
 	_build_rain()
 	_build_snow()
+	_build_drips()
 	_build_fog()
 	_build_clouds()
 	set_outdoor(false)
@@ -145,7 +164,10 @@ func set_outdoor(value: bool) -> void:
 	if _rain != null:
 		_rain.emitting = false
 		_snow.emitting = false
+		_drips.emitting = false
 	if not value:
+		canopy = 0.0
+		drip = 0.0
 		weather = {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 		RenderingServer.global_shader_parameter_set("wind", Vector4.ZERO)
 		RenderingServer.global_shader_parameter_set("season", Vector4(1.0, 0.0, 0.0, 0.0))
@@ -157,6 +179,13 @@ func set_season(season: Dictionary) -> void:
 	if outdoor:
 		RenderingServer.global_shader_parameter_set("season",
 				Vector4(season.get("green", 1.0), season.get("turn", 0.0), season.get("snow", 0.0), 0.0))
+
+
+## The canopy's [param cover] round the view and its [param drips]
+## (Weather.drip_at), both 0..1; drawn by place.
+func set_canopy(cover: float, drips: float) -> void:
+	canopy = clampf(cover, 0.0, 1.0)
+	drip = clampf(drips, 0.0, 1.0)
 
 
 ## Eases toward [param target] (Weather.at's, or {} for none) over
@@ -192,18 +221,24 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	_drift += way * (CALM_DRIFT + CLOUD_DRIFT * wind) * delta
 	# Rain: the box over the view, the drops slanted downwind.
 	var rain: float = weather["rain"]
-	_rain.emitting = rain > 0.02
-	_rain.amount_ratio = clampf(rain, 0.0, 1.0)
+	var through := rain * (1.0 - canopy)
+	_rain.emitting = through > 0.02
+	_rain.amount_ratio = clampf(through, 0.0, 1.0)
 	_rain.global_position = target + Vector3(0.0, RAIN_HEIGHT, 0.0)
 	_rain_process.direction = Vector3(way.x * RAIN_SLANT * wind, -1.0, way.y * RAIN_SLANT * wind).normalized()
 	# Snow: slow flakes, carried by the wind.
 	var snow: float = weather["snow"]
+	snow *= lerpf(1.0, CANOPY_SNOW, canopy)
 	_snow.emitting = snow > 0.02
 	_snow.amount_ratio = clampf(snow, 0.0, 1.0)
 	_snow.global_position = target + Vector3(0.0, RAIN_HEIGHT * 0.6, 0.0)
 	_snow_process.gravity = Vector3(way.x * SNOW_DRIFT * wind, -0.3, way.y * SNOW_DRIFT * wind)
+	# Drips: big slow drops from under the crowns, straight down.
+	_drips.emitting = drip > 0.02
+	_drips.amount_ratio = drip
+	_drips.global_position = target + Vector3(0.0, DRIP_HEIGHT, 0.0)
 	# Fog: layers centred on the view, their noise drifting.
-	var fog: float = weather["fog"]
+	var fog: float = minf(weather["fog"] * (1.0 + CANOPY_FOG * canopy), 1.0)
 	for i in _fog.size():
 		_fog[i].visible = fog > 0.02
 		_fog[i].global_position = Vector3(target.x, target.y + FOG_LAYERS[i], target.z)
@@ -214,7 +249,7 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	# decal is two periods wide and jumps a period at a time, its texture
 	# tiled, so the jump never shows.
 	var cloud: float = weather["cloud"]
-	var shade := cloud * (1.0 - smoothstep(0.75, 1.0, cloud)) * (1.0 - fog) * daylight
+	var shade := cloud * (1.0 - smoothstep(0.75, 1.0, cloud)) * (1.0 - fog) * daylight * (1.0 - canopy)
 	_clouds.visible = shade > 0.01
 	_clouds.modulate = Color(1.0, 1.0, 1.0, minf(1.0, shade * 2.0) * CLOUD_DARK)
 	var offset := Vector2(fposmod(_drift.x, CLOUD_PERIOD), fposmod(_drift.y, CLOUD_PERIOD))
@@ -303,6 +338,43 @@ func _build_snow() -> void:
 	_snow.draw_pass_1 = flake
 	_snow.emitting = false
 	add_child(_snow)
+
+
+## The canopy's drips: a few big drops falling from under the crowns,
+## in the box over the view; they start under the crowns (the rain's
+## heightfield would hide them at once), so they pass through nothing and
+## live just long enough to reach the ground.
+func _build_drips() -> void:
+	_drips = GPUParticles3D.new()
+	_drips.name = "Drips"
+	_drips.amount = DRIPS
+	_drips.lifetime = (DRIP_HEIGHT + DRIP_BOX.y * 0.5) / (DRIP_SPEED * 0.6)
+	_drips.preprocess = _drips.lifetime
+	_drips.visibility_aabb = AABB(Vector3(-DRIP_BOX.x, -DRIP_HEIGHT - 4.0, -DRIP_BOX.z), Vector3(DRIP_BOX.x * 2.0, DRIP_HEIGHT + 8.0, DRIP_BOX.z * 2.0))
+	_drips.local_coords = false
+	_drips.layers = RAIN_LAYER
+	_drips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_drips.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = DRIP_BOX * 0.5
+	process.direction = Vector3.DOWN
+	process.spread = 0.0
+	process.initial_velocity_min = DRIP_SPEED * 0.6
+	process.initial_velocity_max = DRIP_SPEED
+	process.gravity = Vector3(0.0, -4.0, 0.0)
+	_drips.process_material = process
+	var drop := QuadMesh.new()
+	drop.size = Vector2(0.04, 0.22)
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = DROP_SHADER
+	material.shader = shader
+	material.set_shader_parameter("colour", DRIP_COLOUR)
+	drop.material = material
+	_drips.draw_pass_1 = drop
+	_drips.emitting = false
+	add_child(_drips)
 
 
 func _build_fog() -> void:

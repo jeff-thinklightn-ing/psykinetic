@@ -52,6 +52,13 @@ uniform float needles_shade = 0.7;
 // the brighter of the two, so a torch's pool shows at night and the hour
 // changes one number, not every cell (decision 304). 0 indoors.
 uniform float sky_floor = 0.0;
+// Under a forest's canopy (decision 477): its cover, a texel a cell like
+// kinds (Client3D.canopy_texture, black where there is none), and the sky's
+// light on the floor under a full roof, so the floor is lit as the sim
+// lights it (Fields.ambient_at): sky_floor in the open, sky_floor_roof
+// under the crowns.
+uniform sampler2D canopy : hint_default_black, filter_linear, repeat_disable;
+uniform float sky_floor_roof = 0.0;
 // The floor sets (Client3D._floor_sets, decision 285), a byte a cell like
 // kinds but read cell by cell, so a floor ends at the walls' line: 0 the
 // ground's own look, 1 wood (planks), 2 stone (flagstones), 3 cave (rock).
@@ -251,7 +258,8 @@ void fragment() {
 	}
 
 	// Light and heat as the old floor had them, worked out in sRGB.
-	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * max(shade.r, sky_floor);
+	float sky_here = mix(sky_floor, sky_floor_roof, texture(canopy, (at - kinds_origin + 0.5) / kinds_size).r);
+	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * max(shade.r, sky_here);
 	vec3 warm_srgb = pow(warm, vec3(1.0 / 2.2));
 	ALBEDO = pow(mix(lit, warm_srgb, shade.g), vec3(2.2));
 	EMISSION = pow(warm_srgb * shade.g, vec3(2.2));

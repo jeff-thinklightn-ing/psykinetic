@@ -12376,3 +12376,63 @@ turn, opening, zooming and a rebuild each draw once; hidden, nothing.
 Rejected: drawing at a fixed rate (late when you move, wasted when you
 don't); a texture the marks are baked into (the marks are a few dozen
 shapes, the picture is already one texture).
+
+## 477. Under a forest's canopy: the light cut, drips, the darker look, shafts of sun
+
+Environment's part of the forest zone (Jeff, 2026-10-17; terrain's canopy
+layer, decision 466, gives each cell its cover, Fields.canopy_at, 0..1, the
+same on every peer, open in the clearings).
+
+The sim. Under the open sky a cell's light over the night's is cut by its
+cover: Fields.ambient_at is NIGHT + (light - NIGHT) x (1 - cloud's dim) x
+(1 - canopy_shade x cover). canopy_shade is DayNight.CANOPY_SHADE (0.7,
+a placeholder) for a level with a canopy, set with the weather each tick
+(DayNight.canopy_shade); a broadleaf canopy takes BROADLEAF_WINTER (0.6) of
+it less in winter, its leaves down, an evergreen none. So noon under a full
+roof is about 0.44, over Senses.DARK, and once the open sky's light is under
+0.7 (the morning, the evening) it is dark enough to hide in there while the
+clearings are lit. Senses, sneaking and companions read World.light_at and
+follow with no change of their own. Checks of "is it night" (Animal,
+Companion, DayNight.describe's dark) stay the open sky's: where one is is
+the caller's, as indoors. No protocol change: the cover comes from the level
+data every peer has.
+
+Drips. Weather.drip_at(region, steps, cover), 0..1, a function of the clock
+as Weather.at is: the cover while the rain is DRIP_RAIN (0.3) or more; after
+it, the cover fading linearly to nothing over DRIP_SECONDS (90) x cover, so
+a full roof drips longest and an open cell not at all; rain over 0.3 again
+starts it over. Snow does not drip (at's rain leaves it out). The seconds
+since the rain are found by looking back through Weather.at DRIP_LOOK (3 s)
+at a time, kept per region for that look. Agreed with sound: its drips
+(amb.drips) read the same call, with the cover round the listener.
+
+The view. Client3D eases the cover round the view's middle (the mean within
+CANOPY_AROUND cells) and:
+- canopied_look darkens the ambient (CANOPY_AMBIENT of it at full shade)
+  and tints it and the haze green; the sun's light is left as it is: the
+  crowns cast their own shadows (terrain's), so the clearings stay sunlit
+  and the patches move with the sun. Rejected: a shadow-only sheet at crown
+  height (the crowns' shadows do it; it stays the fallback if their shadow
+  pass costs too much).
+- The ground is lit as the sim lights it: ground.gdshader reads the cover
+  (its canopy, Client3D.canopy_texture) and lights the floor between
+  sky_floor (the open) and sky_floor_roof (under a full roof).
+- WeatherView.set_canopy: what falls is thinned by the cover (rain by all
+  of it, snow to CANOPY_SNOW), the canopy drips instead (a few big slow
+  drops from under the crowns, as many as drip_at says), the low fog lies
+  CANOPY_FOG thicker, and the clouds' shadows fade. The crowns are in the
+  rain's heightfield (every layer but RAIN_LAYER), so drops stop on them;
+  the thinning keeps rain from pouring through the cutaway hole over the
+  player.
+- Light shafts (client3d/light_shafts.gd): a quad glowing additively,
+  turned about its length to face the eye (fading when seen end on), hung from TOP (9 m) over each clearing (up to three, by its
+  radius) and each gap in the canopy (a cell under 0.5 cover, the most open
+  of its neighbours, inside the canopy, GAP_SPACING from another), their
+  feet on the floor and leaning toward the sun. At most SHOWN (8) at once,
+  the nearest the view within REACH, fading toward its edge and close to the
+  eye. Their strength: the day's light x clear sky x no rain, best in light
+  haze, none in thick fog, and none with the sun under SUN_LOW (15 degrees).
+  Rejected: Godot's volumetric fog (a cost on every frame for a few shafts).
+
+Placeholders all: the shade, the drips' length, the look's numbers, the
+shafts' strength, until Jeff has walked the forest.

@@ -8,7 +8,9 @@ extends Node
 ## looks (decision 309): cloud greys the sky and takes the sun, fog
 ## thickens the haze, and the drawn weather eases toward the sim's. In
 ## the towns (decision 384): storms and rain between two steps, and storms
-## breaking roofs, the same ones on a replay.
+## breaking roofs, the same ones on a replay. Under a forest's canopy
+## (decision 477): the sky's light cut by the cover, drips during and after
+## rain, the look darker, the shafts by day in clear air.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -27,6 +29,7 @@ func _ready() -> void:
 	_test_view()
 	_test_between()
 	_test_roofs()
+	_test_canopy()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -255,6 +258,79 @@ func _test_roofs() -> void:
 		World.repair_roof("storm_fixture", index)
 	World.zones.erase("storm_fixture")
 	Weather.reload()
+
+
+func _test_canopy() -> void:
+	print("
+== under a forest's canopy ==")
+	Weather.use({"default": {"weights": {"clear": 1}}})
+	World.steps = 0
+	var fields := Fields.new()
+	fields.daylight = true
+	fields.outdoor = true
+	fields.canopy = {Vector2i(1, 0): 1.0, Vector2i(2, 0): 0.5}
+	fields.canopy_kind = "evergreen"
+	fields.update_weather(0)
+	DayNight.light = 1.0
+	var roof := fields.ambient_at(Vector2i(1, 0))
+	_check(is_equal_approx(fields.ambient_at(Vector2i(0, 0)), 1.0), "a clearing has the full sky")
+	_check(absf(roof - 0.44) < 0.01 and roof > Senses.DARK, "noon under a full roof: about 0.44, not dark (%.2f)" % roof)
+	_check(fields.ambient_at(Vector2i(2, 0)) > roof and fields.ambient_at(Vector2i(2, 0)) < 1.0, "half cover, between")
+	DayNight.light = 0.6
+	_check(fields.ambient_at(Vector2i(1, 0)) < Senses.DARK and fields.ambient_at(Vector2i(0, 0)) > Senses.DARK,
+			"in the morning's light it is dark under the roof, not in the clearing")
+	DayNight.light = DayNight.NIGHT
+	_check(is_equal_approx(fields.ambient_at(Vector2i(1, 0)), DayNight.NIGHT), "at night the roof makes it no darker than night")
+	DayNight.light = 1.0
+	var winter := Season.year_anchor + fposmod(0.875 - Season.year_phase, 1.0) * Season.year_steps()
+	_check(is_equal_approx(DayNight.canopy_shade("evergreen", "default", winter), DayNight.CANOPY_SHADE)
+			and DayNight.canopy_shade("broadleaf", "default", winter) < DayNight.CANOPY_SHADE * 0.6
+			and DayNight.canopy_shade("", "default", 0) == 0.0, "an evergreen roof is as dark in winter; a broadleaf one lets light in; none none")
+	# Drips: during the rain, then fading by the cover.
+	Weather.set_override("default", "rain", 2.0, true)
+	_check(is_equal_approx(Weather.drip_at("default", 600, 0.8), 0.8) and Weather.drip_at("default", 600, 0.0) == 0.0,
+			"while it rains a roof drips as its cover; the open none")
+	var dry := 1200
+	while float(Weather.at("default", dry)["rain"]) >= Weather.DRIP_RAIN:
+		dry += 10
+	var full := Weather.drip_at("default", dry + 300, 1.0)
+	var half := Weather.drip_at("default", dry + 300, 0.5)
+	_check(absf(full - (1.0 - 30.0 / 90.0)) < 0.06, "30 s after the rain a full roof still drips (%.2f)" % full)
+	_check(absf(half - 0.5 * (1.0 - 30.0 / 45.0)) < 0.06, "half a roof drips half as long (%.2f)" % half)
+	_check(Weather.drip_at("default", dry + 1000, 1.0) == 0.0, "100 s after, none")
+	Weather.set_override("default", "auto", 0.0)
+	Weather.use({"default": {"weights": {"clear": 1}}, "wet": {"weights": {"rain": 1}}})
+	_check(Weather.drip_at("wet", winter, 1.0) == 0.0, "snow does not drip")
+	# The look and the shafts.
+	var noon := Client3D.sky_look(60.0)
+	var under := Client3D.canopied_look(noon, 1.0)
+	_check(under["ambient_energy"] < noon["ambient_energy"] * 0.5 and under["ambient"].g > under["ambient"].b
+			and under["energy"] == noon["energy"], "under the roof the ambient darker and greener; the sun's left to the crowns' shadows")
+	_check(Client3D.canopied_look(noon, 0.0) == noon, "no canopy, no change")
+	var LightShafts := preload("res://client3d/light_shafts.gd")
+	var clear: float = LightShafts.strength_for(1.0, Weather.KINDS["clear"])
+	_check(clear > 0.5 and LightShafts.strength_for(0.0, Weather.KINDS["clear"]) == 0.0
+			and LightShafts.strength_for(1.0, Weather.KINDS["rain"]) == 0.0, "shafts by day in clear air; none at night or in rain")
+	_check(LightShafts.strength_for(1.0, {"fog": 0.3}) > clear and LightShafts.strength_for(1.0, Weather.KINDS["fog"]) < 0.1,
+			"light haze shows them best, thick fog hides them")
+	var canopy := {}
+	for y in 30:
+		for x in 30:
+			canopy[Vector2i(x, y)] = 1.0
+	canopy[Vector2i(20, 20)] = 0.3
+	canopy[Vector2i(21, 20)] = 0.6
+	var shafts: Node3D = LightShafts.new()
+	add_child(shafts)
+	shafts.setup([{"centre": Vector2(6, 6), "radius": 5.0}], canopy, func(cell: Vector2i) -> Vector3: return Vector3(cell.x, 0.0, cell.y))
+	_check(shafts.spot_count() == 3 + 1, "three in a clearing, one in the gap (%d)" % shafts.spot_count())
+	shafts.place(Vector3(10, 0, 10), Vector3(0.3, 0.8, 0.2), 1.0)
+	var shown := shafts.get_children().filter(func(each: Node) -> bool: return each.visible).size()
+	_check(shown == 4, "by day all four hang (%d)" % shown)
+	shafts.place(Vector3(10, 0, 10), Vector3(0.95, 0.1, 0.0), 1.0)
+	_check(shafts.get_children().all(func(each: Node) -> bool: return not each.visible), "the sun low: none")
+	shafts.free()
+	Weather.reload()
+	World.steps = 0
 
 
 func _check(ok: bool, label: String) -> void:

@@ -64,6 +64,12 @@ const RAIN_SIGHT := 0.25
 const SNOW_SIGHT := 0.15
 const RAIN_HEARING := 0.3
 const WIND_HEARING := 0.25
+## Drips under a forest's canopy (drip_at, decision 477): while the rain is
+## DRIP_RAIN or more, and after it, fading over DRIP_SECONDS times the
+## cover; how far apart the look back steps (seconds).
+const DRIP_RAIN := 0.3
+const DRIP_SECONDS := 90.0
+const DRIP_LOOK := 3.0
 
 ## The climates by region, as levels/climates.json has them (or as the
 ## server sent them).
@@ -73,6 +79,9 @@ static var overrides := {}
 ## Server: the world step up to which storms have broken roofs
 ## (break_roofs), saved with the sky; -1 for never.
 static var storms_checked := -1
+## drip_at's look back, by region: [the DRIP_LOOK it was for, seconds since
+## the rain was last DRIP_RAIN].
+static var _rain_ago := {}
 
 
 ## The climates, read on first use.
@@ -91,6 +100,7 @@ static func climates() -> Dictionary:
 ## Uses [param data] for the climates (a "sky" message's, or a test's).
 static func use(data: Dictionary) -> void:
 	_climates = {}
+	_rain_ago = {}
 	for key: String in data:
 		if data[key] is Dictionary:
 			_climates[key] = data[key]
@@ -100,6 +110,7 @@ static func use(data: Dictionary) -> void:
 ## Forgets the climates read, and every override (the file read again).
 static func reload() -> void:
 	_climates = {}
+	_rain_ago = {}
 	overrides = {}
 	storms_checked = -1
 
@@ -207,6 +218,7 @@ static func hearing_factor(weather: Dictionary) -> float:
 ## [param minutes] real minutes from now ("auto": the climate's again),
 ## coming in over a change, or [param already] in (--weather).
 static func set_override(region: String, kind: String, minutes: float, already := false) -> void:
+	_rain_ago = {}
 	var regions: Array = climates().keys() if region == "all" else [region]
 	for each: String in regions:
 		if kind == "auto":
@@ -303,3 +315,38 @@ static func break_roofs(areas: Dictionary, to: int) -> Array[Dictionary]:
 				if _unit("%s:%s:%d" % [storm["id"], level, index]) < odds and World.damage_roof(level, index):
 					broke.append({"level": level, "index": index, "storm": storm["id"]})
 	return broke
+
+
+## How hard it drips under a canopy of [param cover] (Fields.canopy_at)
+## in [param region] at world step [param steps], 0..1 (decision 477): the
+## cover while the rain is DRIP_RAIN or more; after it, the cover fading
+## to nothing over DRIP_SECONDS times the cover, so a full roof drips
+## longest and an open cell not at all. Snow does not drip (at's "rain"
+## leaves it out). A function of the clock, as at is: the drawn drops and
+## the drips' sound read the same.
+static func drip_at(region: String, steps: float, cover: float) -> float:
+	if cover <= 0.0:
+		return 0.0
+	var ago := _seconds_since_rain(region, steps)
+	var lasts := DRIP_SECONDS * cover
+	return cover * clampf(1.0 - ago / lasts, 0.0, 1.0)
+
+
+## Seconds since the rain in [param region] was last DRIP_RAIN or more
+## (0 while it is), looking back DRIP_LOOK at a time up to DRIP_SECONDS
+## (INF past that); kept per region for the look it was worked out at.
+static func _seconds_since_rain(region: String, steps: float) -> float:
+	var look := floorf(steps / (DRIP_LOOK * World.TICK_RATE))
+	var kept: Array = _rain_ago.get(region, [])
+	if not kept.is_empty() and kept[0] == look:
+		return kept[1]
+	var ago := INF
+	var at_look := look * DRIP_LOOK * World.TICK_RATE
+	var back := 0.0
+	while back <= DRIP_SECONDS + DRIP_LOOK:
+		if float(at(region, at_look - back * World.TICK_RATE)["rain"]) >= DRIP_RAIN:
+			ago = back
+			break
+		back += DRIP_LOOK
+	_rain_ago[region] = [look, ago]
+	return ago

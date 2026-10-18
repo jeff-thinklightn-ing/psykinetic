@@ -53,6 +53,9 @@ var region := Level.DEFAULT_REGION
 ## takes, how far one sees and a noise carries under it (a share each).
 var weather := {}
 var sky_dim := 0.0
+## How much of the sky's light a full canopy takes here now
+## (DayNight.canopy_shade, decision 477), set with the weather.
+var canopy_shade := 0.0
 var weather_sight := 1.0
 var weather_hearing := 1.0
 ## The cells under a roof (inside a building's footprint): out of the sky's
@@ -274,10 +277,13 @@ func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> floa
 
 
 ## The light at [param cell] before any source's: the sky's (DayNight.light)
-## outdoors and not under a roof, else the level's ambient light.
+## outdoors and not under a roof, else the level's ambient light. Under a
+## forest's canopy the sky's share over the night's is cut by its cover
+## (canopy_shade, decision 477): a clearing has the full sky.
 func ambient_at(cell: Vector2i) -> float:
 	if open_sky(cell):
-		return DayNight.NIGHT + (DayNight.light - DayNight.NIGHT) * (1.0 - sky_dim)
+		var share := (1.0 - sky_dim) * (1.0 - canopy_shade * float(canopy.get(cell, 0.0)))
+		return DayNight.NIGHT + (DayNight.light - DayNight.NIGHT) * share
 	return ambient
 
 
@@ -312,11 +318,13 @@ func update_weather(steps: float) -> void:
 	if not outdoor:
 		weather = {}
 		sky_dim = 0.0
+		canopy_shade = 0.0
 		weather_sight = 1.0
 		weather_hearing = 1.0
 		return
 	weather = Weather.at(region, steps)
 	sky_dim = Weather.CLOUD_DIM * weather["cloud"]
+	canopy_shade = DayNight.canopy_shade(canopy_kind, region, steps)
 	weather_sight = Weather.sight_factor(weather)
 	weather_hearing = Weather.hearing_factor(weather)
 

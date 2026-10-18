@@ -52,6 +52,13 @@ const SEASON_WORDS := {"spring": ["early spring", "mid-spring", "late spring"],
 	"winter": ["early winter", "midwinter", "late winter"]}
 ## The light under which it is dark: the night's (Animal.NIGHT_LIGHT).
 const DARK_LIGHT := Animal.NIGHT_LIGHT
+## Under a forest's canopy (decision 477): the share of the sky's light
+## over the night's a full roof (Fields.canopy_at 1) takes, so noon under
+## it is about 0.44, dark enough to hide in once the open sky's light is
+## under 0.7; a broadleaf canopy takes BROADLEAF_WINTER less of it in
+## winter, its leaves down. Placeholders.
+const CANOPY_SHADE := 0.7
+const BROADLEAF_WINTER := 0.6
 
 ## Steps a day takes.
 static var day_steps := int(DEFAULT_DAY_MINUTES * 60.0 * 10.0)
@@ -181,6 +188,17 @@ static func set_day_minutes(minutes: float) -> void:
 	anchor = steps_now
 	day_steps = maxi(roundi(minutes * 60.0 * World.TICK_RATE), 600)
 	update()
+
+
+## How much of the sky's light a full canopy of [param kind] (Fields'
+## canopy_kind: "evergreen", "broadleaf", "" for none) takes in
+## [param region] at world step [param steps] (CANOPY_SHADE).
+static func canopy_shade(kind: String, region: String, steps: float) -> float:
+	if kind == "":
+		return 0.0
+	if kind == "broadleaf":
+		return CANOPY_SHADE * (1.0 - BROADLEAF_WINTER * float(Season.at(region, steps)["winter"]))
+	return CANOPY_SHADE
 
 
 ## The light where no daylight reaches in a zone of [param zone] (ZONES).

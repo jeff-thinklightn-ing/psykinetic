@@ -194,6 +194,7 @@ const TORCH := Color(1.0, 0.72, 0.38)
 ## draws, and squares off screen are culled.
 const FLOOR_CHUNK := 16
 const GROUND_SHADER := preload("res://client3d/ground.gdshader")
+const LightShafts := preload("res://client3d/light_shafts.gd")
 ## A cell's corners, from its top left, in the order the ground's arrays
 ## keep them.
 const GROUND_CORNERS: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
@@ -372,6 +373,15 @@ const WINTER_SKY := Color("9fb3c8")
 const SUMMER_LIGHT := Color(1.0, 0.93, 0.8)
 const WINTER_SUN := 0.2
 const SNOW_AMBIENT := 0.35
+## Under a forest's canopy (decision 477): the ambient's share full cover
+## at the sim's full shade (DayNight.CANOPY_SHADE) takes, the green it is
+## tinted, and the haze's; how fast the cover round the view eases (per
+## second), and how far round it is read (cells).
+const CANOPY_AMBIENT := 0.6
+const CANOPY_TINT := Color(0.42, 0.55, 0.36)
+const CANOPY_FOG := Color(0.3, 0.38, 0.28)
+const CANOPY_EASE := 3.0
+const CANOPY_AROUND := 2
 const FOG_DENSITY := 0.012
 const RAIN_FOG_DENSITY := 0.008
 const FOG_HEIGHT := 2.5
@@ -1072,6 +1082,11 @@ var _sky_step := -1
 var _look := {}
 var _look_daylight := 0.0
 var _weather_view: WeatherView
+## The canopy's cover round the view, eased (0..1), the way to the sun in
+## the view's directions, and the shafts (null where there is no canopy).
+var _canopy_cover := 0.0
+var _toward_sun := Vector3.UP
+var _shafts: Node3D
 ## The ground's material, and the sky's light on its floor (its sky_floor:
 ## 0 indoors).
 var _ground_shader_material: ShaderMaterial
@@ -1309,13 +1324,15 @@ static func floor_brightness(light: float) -> float:
 	return lerpf(FLOOR_DARKEST, 1.0, smoothstep(FLOOR_LIGHT_LOW, FLOOR_LIGHT_HIGH, light))
 
 
-## The sky's light on the outdoor floor, as a brightness (0 indoors).
-func _set_sky_floor(level: float) -> void:
+## The sky's light on the outdoor floor, as a brightness (0 indoors); under
+## a full canopy [param roof] (the same if under 0).
+func _set_sky_floor(level: float, roof := -1.0) -> void:
 	_sky_floor = level
 	if _ground_shader_material != null:
 		_ground_shader_material.set_shader_parameter("sky_floor", level)
+		_ground_shader_material.set_shader_parameter("sky_floor_roof", level if roof < 0.0 else roof)
 	for view in _glimpses:
-		view._set_sky_floor(level)
+		view._set_sky_floor(level, roof)
 
 
 ## Outdoors: the sky, its light and the sun or moon as the world clock
@@ -1329,8 +1346,11 @@ func _update_sky(delta: float) -> void:
 	var weathered := _weather_view.ease_toward(World.fields.weather, delta)
 	var season := Season.at(World.fields.region, DayNight.now())
 	_weather_view.set_season(season)
+	var covered := _ease_canopy(delta)
 	_weather_view.place(_camera_target, delta, _look.get("weather_fog", SKY_HORIZON), _look_daylight, _level_direction)
-	if step == _sky_step and not weathered:
+	if _shafts != null:
+		_shafts.place(_camera_target, _toward_sun, LightShafts.strength_for(_look_daylight, _weather_view.weather))
+	if step == _sky_step and not weathered and not covered:
 		return
 	if step != _sky_step:
 		_sky_step = step
@@ -1341,11 +1361,13 @@ func _update_sky(delta: float) -> void:
 		# The moon by night, opposite the sun; either casts from at least
 		# SHADOW_LOW up.
 		var toward := DayNight.sun_at(fraction)
+		_toward_sun = _level_direction(toward).normalized()
 		if elevation < MOON_BELOW:
 			toward = -toward
 		toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
 		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
-	var look := weathered_look(seasoned_look(_look, season), _weather_view.weather)
+	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather),
+			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)
 	_look["weather_fog"] = look["fog"]
 	_sky_material.sky_top_color = look["top"]
 	_sky_material.sky_horizon_color = look["horizon"]
@@ -1360,8 +1382,11 @@ func _update_sky(delta: float) -> void:
 	# The floor as the sim lights it: cloud takes Weather.CLOUD_DIM of the
 	# day's light over the night's (Fields.ambient_at).
 	var day := DayNight.daylight_at(float(_sky_step) / SKY_STEPS)
-	var light := DayNight.NIGHT + (day - DayNight.NIGHT) * (1.0 - Weather.CLOUD_DIM * float(_weather_view.weather["cloud"]))
-	_set_sky_floor(floor_brightness(light) if bool(_terrain.get("daylight", false)) else 0.0)
+	var share := 1.0 - Weather.CLOUD_DIM * float(_weather_view.weather["cloud"])
+	var light := DayNight.NIGHT + (day - DayNight.NIGHT) * share
+	var roof := DayNight.NIGHT + (day - DayNight.NIGHT) * share * (1.0 - World.fields.canopy_shade)
+	var lit := bool(_terrain.get("daylight", false))
+	_set_sky_floor(floor_brightness(light) if lit else 0.0, floor_brightness(roof) if lit else 0.0)
 
 
 ## [param look] (sky_look's) in [param season] (Season.at's): winter's
@@ -1402,6 +1427,37 @@ static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
 	out["fog_height"] = FOG_HEIGHT
 	out["fog_height_density"] = FOG_HEIGHT_DENSITY * fog
 	return out
+
+
+## [param look] under a forest's canopy of [param under] (0..1: its cover
+## round the view, as a share of the sim's full shade; decision 477): the
+## ambient darker and greener, the haze too. The sun's light stays: the
+## crowns' shadows take it, so the clearings stay sunlit.
+static func canopied_look(look: Dictionary, under: float) -> Dictionary:
+	if under <= 0.0:
+		return look
+	var out := look.duplicate()
+	out["ambient"] = (look["ambient"] as Color).lerp(CANOPY_TINT, 0.45 * under)
+	out["ambient_energy"] = float(look["ambient_energy"]) * (1.0 - CANOPY_AMBIENT * under)
+	out["fog"] = (look["fog"] as Color).lerp(CANOPY_FOG, 0.5 * under)
+	return out
+
+
+## Eases the canopy's cover round the view toward the sim's (the mean of
+## Fields.canopy_at within CANOPY_AROUND cells of the view's middle) and
+## tells the weather it and its drips; true if it changed.
+func _ease_canopy(delta: float) -> bool:
+	var target := 0.0
+	if World.fields.canopy_kind != "":
+		var middle := Vector2i(roundi(_camera_target.x), roundi(_camera_target.z))
+		for dy in range(-CANOPY_AROUND, CANOPY_AROUND + 1):
+			for dx in range(-CANOPY_AROUND, CANOPY_AROUND + 1):
+				target += World.fields.canopy_at(middle + Vector2i(dx, dy))
+		target /= float((2 * CANOPY_AROUND + 1) * (2 * CANOPY_AROUND + 1))
+	var before := _canopy_cover
+	_canopy_cover = target if absf(target - before) < 0.002 else lerpf(before, target, 1.0 - exp(-CANOPY_EASE * delta))
+	_weather_view.set_canopy(_canopy_cover, Weather.drip_at(World.fields.region, DayNight.now(), _canopy_cover))
+	return _canopy_cover != before
 
 
 ## SKY_KEYS blended for the sun [param elevation] degrees high.
@@ -4031,6 +4087,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	canopy_texture = canopy_mask(_terrain.get("canopy", {}), origin, _mask_size)
 	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
+	material.set_shader_parameter("canopy", canopy_texture)
+	_build_shafts()
 	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
 	var pair_cell := PackedInt32Array()
 	var pair_vertex := PackedInt32Array()
@@ -4203,6 +4261,20 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 		material.set_shader_parameter("floor_%s_own" % floor_set, own != null)
 	_ground_shader_material = material
 	return material
+
+
+## The canopy's light shafts (decision 477), over this map's clearings and
+## gaps; none where it has no canopy.
+func _build_shafts() -> void:
+	if _shafts != null:
+		_shafts.queue_free()
+		_shafts = null
+	var canopy: Dictionary = _terrain.get("canopy", {})
+	if canopy.is_empty() or not bool(_terrain.get("outdoor", false)):
+		return
+	_shafts = LightShafts.new()
+	add_child(_shafts)
+	_shafts.setup(_terrain.get("clearings", []), canopy, _tile_position)
 
 
 ## The noise the ground's shader reads (a texture lookup is far cheaper than
