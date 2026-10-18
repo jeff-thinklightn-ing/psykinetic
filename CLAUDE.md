@@ -109,3 +109,6 @@ which worktree owns each step, and the design rules not to break without asking 
   backslashes: heredocs here have eaten `\` line continuations and turned `\a` or `\t` in
   Windows paths into control characters. From python, write a backslash as `chr(92)`.
 - Never commit a real token: check the diff of `project.godot`.
+- The box's world and players stay on the box: never copy `/var/lib/psykinetic/world.json`, the
+  overlay or a player record off it, and never run a player's id in a local client. Read the box
+  through grepped journal and log lines, and keep no file holding names or ids (2026-10-17).
