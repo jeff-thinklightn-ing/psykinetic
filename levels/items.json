@@ -47,7 +47,7 @@
 			"made": {"by": "smith", "from": {"wood": 2, "ore": 1}, "steps": 2400}},
 		{"id": "giant_axe", "name": "giant axe", "short": "Great axe", "color": "8c9098",
 			"art": "item.giant_axe", "kind": "held", "size": [0.4, 1.4, 0.06], "weight": 5.0, "hands": 2,
-			"tags": ["weapon"], "verb": {"kind": "knockdown", "arc": 1, "down_ticks": 15, "speed": 2.0, "damage": 1.5},
+			"tags": ["weapon"], "verb": {"kind": "knockdown", "arc": 1, "down_ticks": 15, "speed": 2.0, "damage": 1.5, "windup": 8},
 			"made": {"by": "smith", "from": {"ore": 4, "wood": 2}, "steps": 4200}},
 		{"id": "spear", "name": "spear", "short": "Spear", "color": "a08458",
 			"art": "item.spear", "kind": "held", "size": [0.05, 2.0, 0.05], "weight": 2.0, "hands": 1,

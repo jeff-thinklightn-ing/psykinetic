@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_block()
 	_test_bash()
 	_test_axe()
+	_test_wind_up()
 	_test_spear()
 	_test_pickup()
 	_test_names()
@@ -836,6 +837,105 @@ func _test_axe() -> void:
 		if is_instance_valid(foe) and foe.spawned:
 			World.despawn(foe)
 	World._relocate(host, home)
+
+
+func _test_wind_up() -> void:
+	print("
+== the wind-up: a giant axe's blow wound up 8 ticks, then struck through any guard; a step or a stun gives it up; out of reach it whiffs (decision 392) ==")
+	var host := _player(Net.local_id)
+	var home := host.tile
+	var far := _open_line(host, 4)
+	_check(far != World.NO_CELL, "an open line four cells long from the host")
+	if far == World.NO_CELL:
+		return
+	var d := (far - host.tile) / 4
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "WindImp%d" % World.tick,
+		"tile": host.tile + d, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
+	imp.acts = false
+	imp.max_hp = 50
+	imp.hp = 50
+	imp.slots = Items.tidy(["", "", "", "", "", "shield"], Items.CARRIED)
+	var pets: Array = World.get_entities().filter(func(e: GridEntity) -> bool: return e is Companion and e.acts)
+	for pet: GridEntity in pets:
+		pet.acts = false  # Nobody else fights the imp.
+	var ready := func() -> void:
+		host.has_move_order = false
+		if host.tile != home:
+			World._relocate(host, home)
+		if imp.tile != home + d:
+			World._relocate(imp, home + d)
+		imp.stunned_until_tick = 0
+		imp.down_until = 0
+		imp.guard_broken_until = 0
+		imp._world_set_facing(-d)
+		imp.raised = "block"
+		host._world_set_facing(d)
+		host.stunned_until_tick = 0
+		host.next_attack_tick = 0
+		host.next_move_tick = 0
+	var wound := []
+	var wind := func(_direction: Vector2i, ticks: int) -> void: wound.append(ticks)
+	var swings := []
+	var swing := func(direction: Vector2i) -> void: swings.append(direction)
+	host.winding.connect(wind)
+	host.swung.connect(swing)
+	_check(World.windup_ticks(host) == 0, "bare-handed, no wind-up")
+	_give(host, "hammer", Player.RIGHT_HAND)
+	_check(World.windup_ticks(host) == 0, "nor a hammer's")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "giant_axe", Player.RIGHT_HAND)
+	_check(World.windup_ticks(host) == 8, "a giant axe winds up 8 ticks")
+	ready.call()
+	var hp := imp.hp
+	World.command_attack(host, imp)
+	_steps(1)
+	_check(wound == [8] and not World.winding(host).is_empty() and imp.hp == hp, "the attack: wound up, the views told 8 ticks; nothing struck yet")
+	_steps(8)
+	_check(World.winding(host).is_empty() and imp.hp < hp and imp.raised == "" and World.is_down(imp),
+			"8 ticks on it is struck through the raised shield, which breaks; the imp knocked down (%d -> %d)" % [hp, imp.hp])
+	# Given up by a move order.
+	ready.call()
+	wound.clear()
+	World.command_attack(host, imp)
+	_steps(1)
+	World.order_move(host, home - d)
+	_check(World.winding(host).is_empty() and wound == [8, 0], "a move order gives it up; the views told (0 ticks) (%s)" % [wound])
+	hp = imp.hp
+	_steps(10)
+	_check(imp.hp == hp, "and nothing is struck")
+	# Given up by a stun.
+	ready.call()
+	wound.clear()
+	World.command_attack(host, imp)
+	_steps(1)
+	World._stun_for(host, 3)
+	_steps(1)
+	_check(World.winding(host).is_empty() and wound == [8, 0], "a stun gives it up (%s)" % [wound])
+	# Out of reach when it lands: a whiff.
+	ready.call()
+	wound.clear()
+	World.command_attack(host, imp)
+	_steps(1)
+	World._relocate(imp, home + d * 3)
+	hp = imp.hp
+	swings.clear()
+	_steps(8)
+	_check(imp.hp == hp and swings.size() == 1 and wound == [8], "its target stepped out of reach: the blow whiffs at the air")
+	# However light, a wound-up blow breaks a guard.
+	ready.call()
+	_check(World._meet_guard(imp, host, 1, 0.0, false, true) == [1, 0.0] and imp.raised == "", "a wound-up blow breaks a guard however light it is")
+	host.winding.disconnect(wind)
+	host.swung.disconnect(swing)
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	imp.raised = ""
+	for uid in World.slot_uids(imp):
+		if uid != 0:
+			World.items.end(uid, "gone")
+	imp.slots = PackedStringArray()
+	World.despawn(imp)
+	ready.call()
+	for pet: GridEntity in pets:
+		pet.acts = true
 
 
 func _test_spear() -> void:

@@ -172,7 +172,9 @@ func _pursue_action() -> void:
 		var target := action_target
 		var direction := action_direction
 		_clear_action()
-		if order == Order.ATTACK:
+		if order == Order.ATTACK and World.windup_ticks(self) > 0:
+			World.try_wind_up(self, target)  # A heavy weapon winds up first (decision 392).
+		elif order == Order.ATTACK:
 			World.try_attack(self, target)
 		else:
 			World.try_shove(self, target, direction)

@@ -214,8 +214,6 @@ enum Pose { STAND, SIT }
 const AROUND: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1),
 	Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)]
 
-## A blow is coming (HEAVY): which way, over how many ticks. Views wind up.
-signal winding(direction: Vector2i, ticks: int)
 ## It cried out: a noise of [param kind] (&"call", &"rout") its side hears,
 ## and views and sound play (a client never sees World.noise).
 signal cried(kind: StringName)
@@ -469,7 +467,7 @@ func _sim_tick() -> void:
 				pose = Pose.STAND
 	target = seen
 	if target == null:
-		_windup = {}
+		_drop_windup()
 		if not raised.is_empty():
 			World.try_stance(self, "")  # Nobody to shoot or guard against.
 		if _pick_up(false):
@@ -558,7 +556,7 @@ func _sim_tick() -> void:
 ## noticing off: nobody seen or heard; it idles, IDLE.
 func _unnoticing() -> void:
 	target = null
-	_windup = {}
+	_drop_windup()
 	alert = Alert.IDLE
 	_idle_tick()
 
@@ -678,7 +676,7 @@ func _strike() -> void:
 ## else a whiff; a knock off its tile or a stun spoils it.
 func _wind_on() -> void:
 	if tile != _windup["from"] or World.is_stunned(self):
-		_windup = {}
+		_drop_windup()
 		return
 	if World.tick < int(_windup["lands"]):
 		return
@@ -1297,7 +1295,7 @@ func _flee(threat: Vector2i, routs := true) -> void:
 	_alert_until = World.tick + FLEE_TICKS
 	target = null
 	slot = NO_TILE
-	_windup = {}
+	_drop_windup()
 	_bash_key = NO_DOOR
 	_lead = NO_TILE
 	move_ticks = _pace
@@ -1689,7 +1687,7 @@ func _woke_up() -> void:
 func _world_tick(seconds: float) -> void:
 	target = null
 	slot = NO_TILE
-	_windup = {}
+	_drop_windup()
 	_glancing = false
 	_calm()
 	if idle == Idle.MARCH and not route.is_empty():
@@ -1726,15 +1724,12 @@ static func turned(direction: Vector2i, steps: int) -> Vector2i:
 	return AROUND[posmod(at + steps, AROUND.size())]
 
 
-func _world_winding(direction: Vector2i, ticks: int) -> void:
-	winding.emit(direction, ticks)
-	for peer in viewers():
-		_net_winding.rpc_id(peer, direction, ticks)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _net_winding(direction: Vector2i, ticks: int) -> void:
-	winding.emit(direction, ticks)
+## A wound-up blow given up before it was struck: the views told to stop
+## (GridEntity.winding with 0 ticks; decision 392).
+func _drop_windup() -> void:
+	if not _windup.is_empty():
+		_world_winding(_windup["direction"], 0)
+	_windup = {}
 
 
 ## A cry of [param kind], heard [param radius] cells off (World.noise), and

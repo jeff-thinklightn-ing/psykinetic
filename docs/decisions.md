@@ -8897,3 +8897,34 @@ shots in docs/ui/shots/).
   tests/port_offsets.txt.
 
 Client only; protocol unchanged.
+
+## 392. A heavy weapon winds its blow up
+
+Jeff asked for heavy weapons to wind up before they swing. A weapon's verb may
+name windup, the ticks a blow is wound up before it is struck (Items.COMMON,
+0 for none): the giant axe 8; the hammer (one-handed, quick) and the spear
+(reach) none. The attack with such a weapon (Player._pursue_action, the same
+click as any blow: no hold-to-swing, which would need a new input message)
+starts it, World.try_wind_up(by, target), and it is struck on its own
+windup_ticks later (World._tend_wind_ups, before the tick's hits resolve).
+Until then a move order or a step (order_move, order_step), a stun, a
+knockdown or being moved off its cell gives it up (cancel_wind_up); after it is
+struck nothing does. The struck blow is crushing (Hit.crushing): it breaks any
+guard it meets at full weight (_meet_guard's crushing) and lands whole, its
+knockdown too; if the target has left reach it whiffs at the air
+(try_swing). The answer to it is not to be there, or to stun the swinger first
+(a shield bash, 379). World.winding(entity) gives {target, lands, direction,
+from} or {}; monsters holding such a weapon wind up through the same calls,
+when enemy-ai's AI makes them. The brute's bare-handed wind-up (Monster's
+HEAVY tactic) stays its own and blockable.
+
+The views: the "winding" signal and RPC (direction, ticks) move from Monster
+to GridEntity, so a player's wind-up is drawn as a brute's is (Client3D
+_on_winding: the heavy clip timed to land with the sim; a creature's
+CreatureView.wind), and 0 ticks now means a wind-up given up: the views stop it
+(CreatureView.unwind; a humanoid's clip freed). The brute sends it too when its
+wind-up is dropped (Monster._drop_windup, at each place it gave one up).
+PROTOCOL_REVISION 13 for the new meaning of 0; the fingerprint changes with
+the moved RPC. Rejected: hold to wind and release to strike (a new message,
+and clicks walk up and strike today); a wind-up on every weapon (the quick
+ones are quick); the brute's blow made unblockable (enemy-ai's and Jeff's).

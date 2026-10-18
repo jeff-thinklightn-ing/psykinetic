@@ -6684,6 +6684,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# Hooked once: a puppet made again (a body that came late) finds them hooked.
 		_hook(entity.swung, _on_swung.bind(id))
 		_hook(entity.shot, _on_shot.bind(id))
+		_hook(entity.winding, _on_winding.bind(id))
 		_hook(entity.guarded, _on_guarded.bind(id))
 		if entity is Player or entity is Companion:
 			puppet.set_meta("body", str(entity.get("body")))
@@ -6691,7 +6692,6 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		_hook(entity.impacted, _on_impacted.bind(id))
 		_hook(entity.pushed, _on_pushed.bind(id))
 		if entity is Monster:
-			_hook((entity as Monster).winding, _on_winding.bind(id))
 			_hook((entity as Monster).cried, _on_cried.bind(id))
 			puppet.set_meta("creature", str(entity.spawn_spec.get("kind", "")))
 		if entity.max_hp > 0:
@@ -6835,6 +6835,15 @@ func _on_cried(cry: StringName, id: int) -> void:
 func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null:
+		return
+	if ticks <= 0:
+		# Given up (decision 392): the wind-up stops; the gait or rest takes over.
+		puppet.set_meta("wound_until", 0)
+		if puppet.has_meta("creature_view"):
+			(puppet.get_meta("creature_view") as CreatureView).unwind()
+		elif puppet.has_meta("animator"):
+			(puppet.get_meta("animator") as AnimationPlayer).speed_scale = 1.0
+			puppet.set_meta("busy_until", 0)
 		return
 	_combat_at[id] = Time.get_ticks_msec()
 	if puppet.has_meta("creature_view"):

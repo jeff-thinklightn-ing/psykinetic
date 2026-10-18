@@ -73,6 +73,10 @@ extends Node
 ##   items_arrows: arrows in a bundle (decision 375): bow in one hand,
 ##     flame arrows in the other; drawn and loosed at an imp, it burns
 ##     (its name orange) and goes out; the bundle is never used up.
+##   items_windup: the wind-up (decision 392): a giant axe's blow wound up
+##     8 ticks at an imp behind its raised shield, then struck through it
+##     (the guard breaks, the imp knocked down); wound up again, a step back
+##     gives it up and nothing is struck.
 ##   items_bash: the shield bash (decision 379): sword and shield against
 ##     an imp behind its own raised shield; the player raises theirs and
 ##     bashes (the left button with the shield up): the imp is shoved and
@@ -208,6 +212,8 @@ func _ready() -> void:
 			_items_arrows()
 		"items_bash":
 			_items_bash()
+		"items_windup":
+			_items_windup()
 		"sounds":
 			_sounds()
 		"sound_hearing":
@@ -785,6 +791,35 @@ func _items_bash() -> void:
 	]
 
 
+func _items_windup() -> void:
+	var rows: Array[String] = [
+		"###########",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"###########",
+	]
+	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "monster_imp"}
+	var config := {"name": "Clip", "ambient": 0.9,
+		"entities": [{"at": [5, 2], "facing": [-1, 0], "idle": {"mode": "guard"}, "wields": {"left": "shield"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["item_give", ["giant_axe", Player.RIGHT_HAND], "A giant axe, against an imp behind its raised shield."],
+		["item_foe_raise", "imp", ""],
+		["walk", Vector2i(4, 2), ""],
+		["item_face", "imp", ""],
+		["item_attack", "imp", "The attack winds up first: 8 ticks..."],
+		["wait", 7, ""],
+		["wait", 30, "...then it falls, through the shield: the guard breaks, the imp knocked down."],
+		["item_foe_raise", "imp", "Up again, shield raised."],
+		["wait", 10, ""],
+		["item_attack", "imp", "Wound up again..."],
+		["wait", 3, ""],
+		["walk", Vector2i(3, 2), "...and a step back gives it up: nothing is struck."],
+		["wait", 25, ""],
+	]
+
+
 func _items_buffs() -> void:
 	var rows: Array[String] = [
 		"#########",
@@ -1343,6 +1378,14 @@ func _on_tick(tick: int) -> void:
 					if not World.bash_ready(_player):
 						return
 					World.command_attack(_player, entity)
+		"item_attack":
+			# The left button on the first monster of kind step[1], once the
+			# player can strike (a heavy weapon winds up: World.try_wind_up).
+			if World.tick < _player.next_attack_tick or not World.winding(_player).is_empty():
+				return
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					World.command_attack(_player, entity)
 		"item_close":
 			# The player steps up beside the first monster of kind step[1].
 			for entity in World.monsters():
@@ -1668,13 +1711,14 @@ func _log(tick: int) -> void:
 		print("[clip] tick %d: player %s hands %s; ground %s; %s" % [tick, _player.tile, [_player.slots[Player.RIGHT_HAND], _player.slots[Player.LEFT_HAND]],
 			World.zone.ground.keys(), hands])
 		return
-	if scenario in ["items_block", "items_bash"]:
+	if scenario in ["items_block", "items_bash", "items_windup"]:
 		var them := []
 		for entity in World.monsters():
 			them.append("%s at %s hp %d raised %s%s%s" % [entity.name, entity.tile, entity.hp, entity.raised,
 				" stunned" if World.is_stunned(entity) else "", " guarding" if not World.guarding(entity, _player).is_empty() else ""])
-		print("[clip] tick %d: player %s hp %d stamina %d raised %s%s; %s" % [tick, _player.tile, _player.hp, _player.stamina,
-			_player.raised, " stunned" if World.is_stunned(_player) else "", ", ".join(them)])
+		print("[clip] tick %d: player %s hp %d stamina %d raised %s%s%s; %s" % [tick, _player.tile, _player.hp, _player.stamina,
+			_player.raised, " stunned" if World.is_stunned(_player) else "", " winding" if not World.winding(_player).is_empty() else "",
+			", ".join(them)])
 		return
 	if scenario in ["items_bow", "items_blows"]:
 		var game := []

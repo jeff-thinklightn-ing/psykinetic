@@ -171,7 +171,16 @@ func swing() -> void:
 		_once("attack")
 
 
-## A blow wound up over [param seconds] (Monster.winding, the HEAVY tactic):
+## A wound-up blow given up (GridEntity.winding with 0 ticks; decision 392):
+## free for the gait or rest at once.
+func unwind() -> void:
+	_busy_until = 0
+	if _player != null:
+		_player.speed_scale = 1.0
+
+
+## A blow wound up over [param seconds] (GridEntity.winding: a brute's HEAVY
+## tactic, a heavy weapon's wind-up):
 ## the attack played so that its middle, the blow, lands as the sim's does.
 func wind(seconds: float) -> void:
 	var animation := resolve("attack")

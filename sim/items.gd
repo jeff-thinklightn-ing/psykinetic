@@ -347,8 +347,9 @@ const VERBS := {
 	"ranged": {"cells": 8, "draw_min": 5, "draw_full": 20},
 }
 ## Every verb's: speed (a multiple of the wielder's attack time: under 1
-## quicker), damage and force (multiples of the wielder's blow).
-const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0}
+## quicker), damage and force (multiples of the wielder's blow); windup, the
+## ticks a blow is wound up before it is struck (decision 392; 0, none).
+const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0}
 
 
 ## [param verb] as the catalog gives it, every number filled in from its

@@ -164,7 +164,9 @@ signal join_rejected(reason: String, server_version: String)
 ## 12: the "sky" message carries the year (season_days, year_phase,
 ## year_anchor), and the sun's path, the sim's daylight and the weather's
 ## snow follow the season (decision 362).
-const PROTOCOL_REVISION := 12
+## 13: "winding" is any body's, not only a monster's (moved to GridEntity),
+## and its 0 ticks means a wind-up given up (decision 392).
+const PROTOCOL_REVISION := 13
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

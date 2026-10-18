@@ -472,6 +472,8 @@ var _bandaging: Dictionary[GridEntity, Dictionary] = {}
 ## looked at for fading.
 var _buffed: Dictionary[GridEntity, bool] = {}
 var _mending: Dictionary[GridEntity, Dictionary] = {}
+## Whoever is winding up a blow (try_wind_up), for _tend_wind_ups.
+var _winders: Dictionary[GridEntity, bool] = {}
 
 
 ## An attack or shove accepted this tick, waiting for the resolve phase.
@@ -492,6 +494,8 @@ class Hit:
 	## A shield bash's (decision 379): the ticks it staggers; 0 for any
 	## other hit.
 	var bash := 0
+	## A wound-up blow's (decision 392): it breaks any guard it meets.
+	var crushing := false
 	var target: GridEntity
 	var source_id := 0
 	var source_name := ""
@@ -701,6 +705,7 @@ func _step_zone() -> void:
 		if _alive(entity) and not is_stunned(entity) and _thinks(entity, near):
 			entity._sim_tick()
 	# 2. Hits (attacks and shoves) queued during the act phase.
+	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).
 	_resolve_hits()
 	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
 	_apply_hazards()
@@ -2780,8 +2785,10 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 ## brute's, a hammer's; never a [param shot]), or too little stamina,
 ## breaks it: the blow lands whole, the shield is lowered, its holder
 ## stunned GUARD_BREAK_STUN and unable to raise one again for
-## GUARD_BROKEN_TICKS.
-func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false) -> Variant:
+## GUARD_BROKEN_TICKS. A [param crushing] blow (a wound-up one, decision
+## 392) breaks it whatever it weighs.
+func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false,
+		crushing := false) -> Variant:
 	var verb := guarding(target, source)
 	if verb.is_empty():
 		return null
@@ -2790,7 +2797,7 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
 	var cost := maxi(1, ceili(float(verb["stamina"]) * weight * steady))
 	target._world_note_exertion(tick)
-	if weight >= float(verb["breaks_at"]) and not shot or target.max_stamina > 0 and target.stamina < cost:
+	if (weight >= float(verb["breaks_at"]) or crushing) and not shot or target.max_stamina > 0 and target.stamina < cost:
 		if target.max_stamina > 0:
 			target.stamina = maxi(0, target.stamina - cost)
 		target.raised = ""
@@ -3249,6 +3256,89 @@ func try_shove(attacker: GridEntity, target: GridEntity,
 	return _try_hit(attacker, target, 0, true, direction)
 
 
+## The ticks [param entity]'s weapon winds a blow up before striking it
+## (decision 392: its verb's windup; the giant axe's 8); 0, it strikes at once.
+func windup_ticks(entity: GridEntity) -> int:
+	return int(blow_verb(entity).get("windup", 0)) if is_instance_valid(entity) else 0
+
+
+## The blow [param entity] is winding up (try_wind_up): {target, lands,
+## direction, from}; {} for none.
+func winding(entity: GridEntity) -> Dictionary:
+	return entity.wind_up if is_instance_valid(entity) else {}
+
+
+## [param by] winds up its heavy weapon's blow at [param target] (decision
+## 392; the player's attack with such a weapon, Player._pursue_action, and
+## any monster's AI): windup_ticks from now it is struck (_tend_wind_ups),
+## breaking any guard it meets at full weight, if the target is still in
+## reach; else it whiffs. Until then a move order or a step (order_move,
+## order_step), a stun, a knockdown or being moved off its cell gives it up
+## (cancel_wind_up); after, nothing does. The views wind up with it
+## (GridEntity.winding). False, nothing begun, if it cannot strike now.
+func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
+	if not Net.is_authority() or not is_instance_valid(by) or not is_instance_valid(target):
+		return false
+	var ticks := windup_ticks(by)
+	if ticks <= 0 or not by.wind_up.is_empty() or not by.spawned or not target.spawned or by == target:
+		return false
+	if not can_target(by, target) or is_stunned(by) or is_down(by):
+		return false
+	if tick < by.next_attack_tick or tick < by.next_move_tick or not in_reach(by, target):
+		return false
+	var direction := (target.tile - by.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
+	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile}
+	_winders[by] = true
+	by._world_set_facing(direction)
+	by._world_note_exertion(tick)
+	by.protected = false
+	by._world_winding(direction, ticks)
+	_log("windup: %s winds up at %s, %d ticks" % [by.name, target.name, ticks])
+	return true
+
+
+## [param entity]'s wind-up given up (decision 392): nothing is struck, and
+## the views are told (GridEntity.winding, 0 ticks).
+func cancel_wind_up(entity: GridEntity) -> void:
+	if not is_instance_valid(entity) or entity.wind_up.is_empty():
+		return
+	var direction: Vector2i = entity.wind_up["direction"]
+	entity.wind_up = {}
+	_winders.erase(entity)
+	entity._world_winding(direction, 0)
+	_log("windup: %s gives up its wind-up" % entity.name)
+
+
+## Each wind-up (try_wind_up) on: given up if its winder was moved off its
+## cell, stunned or knocked down; struck when due, before the tick's hits
+## resolve: a crushing blow (Hit.crushing) at its target if still in
+## reach, else a swing at the air.
+func _tend_wind_ups() -> void:
+	for entity: GridEntity in _winders.keys():
+		if not _alive(entity) or entity.wind_up.is_empty():
+			_winders.erase(entity)
+			continue
+		if entity.tile != entity.wind_up["from"] or is_stunned(entity) or is_down(entity):
+			cancel_wind_up(entity)
+			continue
+		if tick < int(entity.wind_up["lands"]):
+			continue
+		# Untyped till checked: a target freed since cannot be a GridEntity.
+		var aimed: Variant = entity.wind_up["target"]
+		var direction: Vector2i = entity.wind_up["direction"]
+		entity.wind_up = {}
+		_winders.erase(entity)
+		var first := _hits.size()
+		if is_instance_valid(aimed) and (aimed as GridEntity).spawned and in_reach(entity, aimed as GridEntity) \
+				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false):
+			for i in range(first, _hits.size()):
+				_hits[i].crushing = true
+			_log("windup: %s strikes %s" % [entity.name, (aimed as GridEntity).name])
+		else:
+			try_swing(entity, direction)
+			_log("windup: %s strikes the air" % entity.name)
+
+
 ## The shield in [param entity]'s left hand, if it can bash (decision 379):
 ## its block verb, with bash_force over 0; {} for none.
 func bash_verb(entity: GridEntity) -> Dictionary:
@@ -3368,6 +3458,7 @@ func order_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i] = [])
 		return
 	if not entity.spawned:
 		return
+	cancel_wind_up(entity)  # A move order gives a wind-up up (decision 392).
 	entity.move_order = target
 	entity.has_move_order = true
 	entity.move_via = via.slice(0, MAX_VIA_STEPS)
@@ -3391,6 +3482,7 @@ func order_step(entity: GridEntity, direction: Vector2i, epoch: int, predicted: 
 	var player := entity as Player
 	if epoch != player.refusals or player.queued_steps.size() >= MAX_QUEUED_STEPS:
 		return
+	cancel_wind_up(player)  # A step gives a wind-up up (decision 392).
 	player.has_move_order = false
 	player.move_via.clear()
 	player.action_order = GridEntity.Order.NONE
@@ -3894,7 +3986,7 @@ func _resolve_hits() -> void:
 		if hit.bash > 0:
 			_bash_lands(hit)
 		if not hit.shove:
-			var met: Variant = _meet_guard(hit.target, hit.source, hit.damage, hit.raw_force)
+			var met: Variant = _meet_guard(hit.target, hit.source, hit.damage, hit.raw_force, false, hit.crushing)
 			if met != null:
 				hit.damage = met[0]
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0

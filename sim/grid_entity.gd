@@ -30,6 +30,11 @@ signal shot(to: Vector2i)
 ## A blow or a shot was taken on its guard, or [param broken] it
 ## (World._meet_guard): views knock and stagger. On every peer.
 signal guarded(broken: bool)
+## A blow is wound up toward [param direction], to be struck in
+## [param ticks]; 0 ticks, a wind-up given up (decision 392: a heavy
+## weapon's, World.try_wind_up; a brute's, Monster's HEAVY tactic). Views
+## wind up, or stop. On every peer.
+signal winding(direction: Vector2i, ticks: int)
 
 # Not called "Material"/"material": CanvasItem already owns that name.
 ## FLESH is a creature (hazards hurt it). WOOD takes impact and breaks at 0 hp.
@@ -103,6 +108,9 @@ var guard_broken_until := 0
 ## bash's moment (World.guarding finds no guard).
 var next_bash_tick := 0
 var bash_moment_until := 0
+## Server: a heavy weapon's blow being wound up (World.try_wind_up, decision
+## 392): {target, lands, direction, from}; {} for none.
+var wind_up := {}
 ## Knocked down until this tick (World.knock_down, decision 343): lying,
 ## it cannot act and is easily pushed. A creature's replicates, for the
 ## views.
@@ -1070,6 +1078,17 @@ func _net_shot(to: Vector2i) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_guarded(broken: bool) -> void:
 	guarded.emit(broken)
+
+
+func _world_winding(direction: Vector2i, ticks: int) -> void:
+	winding.emit(direction, ticks)
+	for peer in viewers():
+		_net_winding.rpc_id(peer, direction, ticks)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_winding(direction: Vector2i, ticks: int) -> void:
+	winding.emit(direction, ticks)
 
 
 ## A caption 8 world px tall. Fonts are rasterised at the viewport's
