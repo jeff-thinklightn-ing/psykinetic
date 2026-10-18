@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When the server is newer, the game now downloads the update itself with a progress bar on the connect screen (and a Cancel), rather than closing without a word while it updates.
 - Townsfolk talk among themselves now: at the well, the inn, the square or the
   temple, what one believes or saw passes to a neighbour standing there, kin
   first and never across a grudge, and comes back to you as "At the well, Tam

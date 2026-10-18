@@ -360,9 +360,15 @@ anyway.
 
 The game also updates itself (decision 241): turned away as `client out of
 date` by a server of a newer build (after a deploy that changed the
-protocol, say, the clients reconnecting), an exported game starts
-`update.ps1` and quits; it waits for the game, installs the latest release
-and starts it again, which then joins. Never on `server out of date`, never
+protocol, say, the clients reconnecting), an exported game fetches the
+server's own release itself (decision 430: the GitHub release tagged
+`v<server version>`, not the latest), showing how far on the connect screen
+with a Cancel, and unpacks it into `update_stage` beside itself; it then
+starts `update.ps1 -Stage update_stage` and quits, and the script waits for
+it (30 seconds at most), copies the folder over the game (keeping
+`settings.cfg`), removes it and starts the game again, which then joins. A
+failed or cancelled download leaves nothing behind and says why, with the
+old line to run `launch.bat`. Never on `server out of date`, never
 from the editor or a checkout, and never twice in 10 minutes: it writes
 `update_marker.txt` beside the game first, so a release that still does not
 match (the server deployed before the release was published) cannot loop;

@@ -9599,3 +9599,36 @@ residents speaking aloud to each other (336 rejected idle chatter, and
 nothing reads lines not said to a player); passing lore (Lore.known_by has
 it already); believing a neighbour's sighting by the intellect roll (it is
 first-hand; the roll is for rumours).
+## 430. The in-game update fetches the server's release, showing how far
+
+ui's connect screen (step 2, decision 418) shows the join flow in words; an
+out-of-date client (241) quit to update.ps1, which fetched the latest
+release with nothing on screen, so a slow download looked like a crash, and
+a release published after a deploy could be the wrong one.
+
+- On "client out of date", where SelfUpdate.refusal allows it (an exported
+  game, the server newer, not within MIN_GAP_SEC), Main makes a
+  SelfUpdate.Download: it asks GitHub for the release tagged
+  v<server version> (release_url; the server's own, never "latest"), takes
+  its psykinetic-client-*.zip (asset_url), downloads it beside the game
+  (update_download.zip) and unpacks it with ZIPReader into update_stage, a
+  few files a frame. It reports progress(fraction, text) (fraction -1 while
+  it cannot tell), which Main passes to ConnectScreen.set_progress, and
+  finished(ok, why). The screen's Cancel (cancel_pressed) stops it. A
+  failure (no connection, no such release, no client zip, not a zip, no
+  psykinetic.exe, no room) or a cancel removes the zip and the folder, and
+  the screen says why with the line to run launch.bat, as before.
+- Done, Main starts update.ps1 -Stage <update_stage> (SelfUpdate.start,
+  script_args), says it is updating and quits half a second later.
+  update.ps1 -Stage waits for the game (30 s at most), checks the folder
+  has psykinetic.exe, copies it over the game keeping settings.cfg,
+  removes it and starts the game. Without -Stage (launch.bat) it is as
+  before. -NoStart leaves the game unstarted, for the test's dry run.
+- The marker (update_marker.txt) is written when update.ps1 is started, as
+  before, so a release that still does not match cannot loop.
+
+Client and update.ps1 only: it works from the release after it lands (the
+first update into it goes the old way). Protocol unchanged.
+
+tests/self_update_test (no network: a local zip; update.ps1 -Stage's dry
+run on Windows).

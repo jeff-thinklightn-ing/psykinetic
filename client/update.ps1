@@ -4,6 +4,12 @@
 # settings.cfg), then starts the game. Anything that goes wrong is one line
 # in update.log and the game starts anyway. Needs no admin rights: it only
 # touches this folder and a temp file.
+# With -Stage <folder> (decision 430) the game has already fetched the
+# server's release and unpacked it there: this only waits for the game to
+# quit (30 s at most), copies that folder over this one (keeping
+# settings.cfg), removes it and starts the game. -NoStart leaves the game
+# unstarted (tests/self_update_test's dry run).
+param([string]$Stage = '', [switch]$NoStart)
 $ErrorActionPreference = 'Stop'
 $dir = $PSScriptRoot
 $log = Join-Path $dir 'update.log'
@@ -14,16 +20,46 @@ function Log($message) {
 	"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $message" | Add-Content $log
 }
 
-try {
-	# Never replace files while the game has them open. A game that found
-	# itself out of date started this and is quitting (decision 241): wait
-	# for it, 15 s at most.
-	$deadline = (Get-Date).AddSeconds(15)
+# Everything in $from replaces ours, except the player's settings.
+function Install($from) {
+	Get-ChildItem $from -Recurse -File | ForEach-Object {
+		$relative = $_.FullName.Substring($from.Length).TrimStart('\', '/')
+		if ($relative -ieq 'settings.cfg') { return }
+		$target = Join-Path $dir $relative
+		New-Item -ItemType Directory -Force (Split-Path $target -Parent) | Out-Null
+		Copy-Item $_.FullName $target -Force
+	}
+}
+
+# True once the game is not running, waiting $seconds at most.
+function WaitForGame($seconds) {
+	$deadline = (Get-Date).AddSeconds($seconds)
 	do {
 		$running = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
 		if ($running) { Start-Sleep -Milliseconds 250 }
 	} while ($running -and (Get-Date) -lt $deadline)
-	if ($running) {
+	return -not $running
+}
+
+try {
+	# Never replace files while the game has them open. A game that found
+	# itself out of date started this and is quitting (decision 241): wait
+	# for it.
+	if ($Stage -ne '') {
+		$Stage = (Resolve-Path $Stage).Path
+		try {
+			if (-not (WaitForGame 30)) {
+				Log 'game still running after 30 s; not installing the staged update'
+			} elseif (-not (Test-Path (Join-Path $Stage 'psykinetic.exe'))) {
+				Log "staged update $Stage has no psykinetic.exe; not installing it"
+			} else {
+				Install $Stage
+				Log "installed the staged update from $Stage"
+			}
+		} finally {
+			Remove-Item $Stage -Recurse -Force -ErrorAction SilentlyContinue
+		}
+	} elseif (-not (WaitForGame 15)) {
 		Log 'game still running after 15 s; not updating'
 	} else {
 		$current = (Get-Content (Join-Path $dir 'version.txt') -Raw).Trim()
@@ -44,14 +80,7 @@ try {
 				if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 				Expand-Archive -Path $zip -DestinationPath $stage -Force
 				if (-not (Test-Path (Join-Path $stage 'psykinetic.exe'))) { throw 'downloaded zip has no psykinetic.exe' }
-				# Everything in the zip replaces ours, except the player's settings.
-				Get-ChildItem $stage -Recurse -File | ForEach-Object {
-					$relative = $_.FullName.Substring($stage.Length).TrimStart('\', '/')
-					if ($relative -ieq 'settings.cfg') { return }
-					$target = Join-Path $dir $relative
-					New-Item -ItemType Directory -Force (Split-Path $target -Parent) | Out-Null
-					Copy-Item $_.FullName $target -Force
-				}
+				Install $stage
 				Log "updated v$current -> v$latest"
 			} finally {
 				Remove-Item $zip -Force -ErrorAction SilentlyContinue
@@ -63,7 +92,9 @@ try {
 	Log "update failed: $($_.Exception.Message)"
 }
 
-if (Test-Path $exe) {
+if ($NoStart) {
+	Log 'not starting the game (-NoStart)'
+} elseif (Test-Path $exe) {
 	Start-Process -FilePath $exe -WorkingDirectory $dir
 } else {
 	Log 'psykinetic.exe is missing; nothing to start'

@@ -4984,21 +4984,58 @@ func _on_join_rejected(reason: String, server_version: String) -> void:
 		# An exported game updates itself and starts again (decision 241).
 		var dir := SelfUpdate.game_dir()
 		var why_not := SelfUpdate.refusal(reason, server_version, dir, int(Time.get_unix_time_from_system()))
-		if why_not.is_empty() and SelfUpdate.start(dir):
-			print("[update] the server runs v%s: updating this v%s and starting again" % [server_version, Net.claimed_version()])
-			_connect_status("updating to the server's v%s: the game closes and starts again" % server_version)
-			# Drawn before the window goes (update.ps1 is already running).
-			await get_tree().create_timer(0.5).timeout
-			get_tree().quit()
+		if why_not.is_empty():
+			# Fetched here, shown as it goes (decision 430), then installed by
+			# update.ps1 -Stage once the game has quit.
+			_download_update(server_version, dir)
 			return
-		print("[update] not updating itself: %s" % (why_not if not why_not.is_empty() else "update.ps1 could not be started"))
-		_connect_status("this game is out of date: the server runs v%s, this is v%s. Run launch.bat to update." % [
-			server_version, Net.version], true)
+		print("[update] not updating itself: %s" % why_not)
+		_update_failed(server_version)
 	elif reason == "server out of date":
 		_connect_status("the server is out of date: it runs v%s, this is v%s. It will be updated soon; try again later." % [
 			server_version, Net.version], true)
 	else:
 		_connect_status(reason, true)
+
+
+## The server's v[param version] downloaded beside the game in
+## [param dir] with the connect screen showing how far (set_progress;
+## its Cancel stops it), then update.ps1 -Stage started and the game quit.
+func _download_update(version: String, dir: String) -> void:
+	print("[update] the server runs v%s: fetching it for this v%s" % [version, Net.claimed_version()])
+	var download := SelfUpdate.Download.new()
+	add_child(download)
+	var screen := _connect_screen()
+	_connect_status("fetching the server's v%s" % version)
+	download.progress.connect(func(fraction: float, text: String) -> void:
+		if screen.has_method("set_progress"):
+			screen.set_progress(fraction, text))
+	if screen.has_signal("cancel_pressed"):
+		screen.connect("cancel_pressed", download.cancel, CONNECT_ONE_SHOT)
+	var result: Array = []  # [ok, why], once finished (begin can fail at once).
+	download.finished.connect(func(ok: bool, why: String) -> void: result.assign([ok, why]))
+	download.begin(version, dir)
+	while result.is_empty():
+		await get_tree().process_frame
+	if screen.has_signal("cancel_pressed") and screen.is_connected("cancel_pressed", download.cancel):
+		screen.disconnect("cancel_pressed", download.cancel)
+	if screen.has_method("set_progress"):
+		screen.set_progress(-1.0, "")
+	download.queue_free()
+	if result[0] and SelfUpdate.start(dir, download.stage_path):
+		print("[update] v%s is unpacked: update.ps1 installs it and starts the game again" % version)
+		_connect_status("updating to the server's v%s: the game closes and starts again" % version)
+		# Drawn before the window goes (update.ps1 is already running).
+		await get_tree().create_timer(0.5).timeout
+		get_tree().quit()
+		return
+	print("[update] not updating itself: %s" % (result[1] if not result[1].is_empty() else "update.ps1 could not be started"))
+	_update_failed(version, result[1])
+
+
+func _update_failed(server_version: String, why := "") -> void:
+	_connect_status("this game is out of date: the server runs v%s, this is v%s%s. Run launch.bat to update." % [
+		server_version, Net.version, " (%s)" % why if not why.is_empty() else ""], true)
 
 
 func _on_server_disconnected() -> void:
