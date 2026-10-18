@@ -1214,7 +1214,7 @@ func _test_style() -> void:
 func _test_short() -> void:
 	print("\n== short measure: a scoundrel's sack or bundle, never gear (decision 493) ==")
 	_check(Items.measured("food_sack") and Items.measured("arrows") and Items.measured("hide")
-			and not Items.measured("sword") and not Items.measured("bow") and not Items.measured("shield") and not Items.measured("ration"),
+			and not Items.measured("sword") and not Items.measured("bow") and not Items.measured("shield") and not Items.measured("ration") and not Items.measured("remedy"),
 			"measured: sacks, hides, a bundle of arrows; never a weapon, gear, or a whole ration")
 	var sword := World.items.mint("sword", "made")
 	_check(not World.items.make_short(sword) and World.items.short_of(sword) == 1.0, "a sword is never short")

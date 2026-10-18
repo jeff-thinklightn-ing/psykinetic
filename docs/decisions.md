@@ -13488,3 +13488,21 @@ neighbour (378's tier, lore asked), a plain or official voice slips a
 trait onto someone once in sixty, Snagfin never volunteers that he is a
 goblin though his prompt says so, and the soak tool now reads
 Townsfolk.tally instead of the store's windowed ledger.
+
+## 501. Sickness (npc's), items' side: the remedy
+
+Jeff (2026-10-18, through the coordinator) said yes to sickness: a sick
+resident is cured by the medicine man's visit, a walk to the healer, or
+a remedy a player puts into their hands (443's gift path). The coordinator
+agreed the cure is its own item, not the bandaging kit (a kit is a tool
+that is kept, never used up).
+- levels/items.json "remedy" ("healing remedy", tag medical, value 4, art
+  slot item.remedy, 0.3 kg, one hand): one dose, a whole thing. It is not
+  measured (Items.measured: no yield, no count), so a scoundrel's short
+  measure (493) never touches it.
+- No "made": there is no healer trade and no herb resource. The healer and
+  the medicine man sell it from stock (economy). No "use" for a player:
+  it cures by being given, and npc's side consumes it.
+- slots_items.json and the art status regenerated.
+npc's sickness itself follows under this number. Protocol unchanged; no
+new class_name.
