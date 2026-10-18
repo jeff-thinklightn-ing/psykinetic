@@ -2579,11 +2579,17 @@ func _test_bow() -> void:
 	_check(bow != null and bundle != null and Client3D.held_ids(player) == ["arrows", "bow"],
 			"a bow in the right hand's slot is drawn in the left, its arrows in the right")
 	_check(rig.upper_clip() == "Bow_Idle", "a bow in hand: Bow_Idle (%s)" % rig.upper_clip())
+	# The pose is scrubbed by the draw (bow_pull), carried on between ticks by
+	# World.tick_alpha: held at a tick's start here, so the check doesn't hang
+	# on where in a tick the test happens to run.
+	var alpha_was := World.tick_alpha
+	World.tick_alpha = 0.0
 	player.raised = "draw"
 	player.raised_tick = World.tick
 	_rig._process(0.0)
-	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.05 and not bundle.visible,
+	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.01 and not bundle.visible,
 			"drawing: Bow_Draw from the nock, the bundle put away (%s, %.2f)" % [rig.upper_clip(), rig.upper_position()])
+	World.tick_alpha = alpha_was
 	_check(bow.find_child("Nocked", true, false) != null or not ArtKit.has("fx.arrow"), "an arrow on the string")
 	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
 	# then the pull by draw_of (0.5 at 10 of the bow's 20 ticks: a third of the
