@@ -291,6 +291,9 @@ static func gossip(production: Production) -> void:
 		if at < due:
 			continue
 		_gossip_due[town] = at + every
+		var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+		if log is Array and not TownMemory.candidates(log, at).is_empty():
+			Offers._call(Offers.ctx, "set_memory", [town, log])  # Beliefs that spread and hold: candidates (phase 1).
 		for id: String in towns[town]:
 			# Standing fades toward 0 with time (decision 443): residents' cards only.
 			if id.begins_with(COMPANION):
@@ -402,6 +405,12 @@ static func _pass(production: Production, town: String, place: String, members: 
 	if entry.is_empty():
 		return ""
 	production.set_heard(hearer, heard)
+	if fits == "beyond" and bool(entry.get("believed", false)):
+		# A belief that spreads is the town's to remember (the lawspeaker, phase 1).
+		var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+		if log is Array:
+			TownMemory.hold(log, text, hearer, teller, at)
+			Offers._call(Offers.ctx, "set_memory", [town, log])
 	var where := Hearsay.place_words(place)
 	var line := "[%s, %s told %s: %s]" % [where.left(1).to_upper() + where.substr(1), teller_name, hearer_name, text]
 	Transcript.record(hearer_name, teller_name, line)

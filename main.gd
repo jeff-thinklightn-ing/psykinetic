@@ -3568,6 +3568,8 @@ func _offers_context() -> Dictionary:
 			var record: PlayerRecord = _records.get(player_id)
 			return record.name if record != null else player_id,
 		"players_in": _players_in,
+		"memory": _town_memory,
+		"set_memory": _set_town_memory,
 		"area_of": func(town: String) -> String: return str(World.holdings.place(town).get("area", "")) if World.holdings != null else "",
 		"asked": _on_commission_asked,
 		"done": _on_commission_done,
@@ -3727,7 +3729,8 @@ func _heard_near(speaker: GridEntity, from: String, line: String, to: Resident =
 			continue
 		_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != body.worker_id)
 		_claims_asks.append({"body": body.get_instance_id(), "worker": body.worker_id, "person": body.person,
-			"from": from, "line": line, "at": World.tick})
+			"from": from, "line": line, "at": World.tick,
+			"from_id": ("player:" + (speaker as Player).player_id) if speaker is Player else ((speaker as Resident).worker_id if speaker is Resident else "")})
 	# A companion out with her player hears it too, within her hearing
 	# (decision 442): her own, kept in her player's record.
 	for player_id: String in _companions:
@@ -3742,6 +3745,41 @@ func _heard_near(speaker: GridEntity, from: String, line: String, to: Resident =
 		_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != key)
 		_claims_asks.append({"pet": pet.get_instance_id(), "player": player_id, "worker": key, "person": String(pet.name),
 			"from": from, "line": line, "at": World.tick})
+
+
+
+## Server: [param body] said [param line] to [param to] (the lawspeaker,
+## phase 1): one whose voice may embellish (378: a free type, or creativity
+## high; never an official) gets the claims ask on their own line, and each
+## claim beyond what they know becomes their tale in the town's memory log.
+## The same queue as the hearers', the entry marked "own".
+func _own_tale(body: Resident, line: String, to: String) -> void:
+	if World.production == null or not body.player_id.is_empty() or not Hearsay.worth_asking(line):
+		return
+	if body.binding() == "official" or not (body.binding() == "free" or body.leaning("creativity") >= Resident.HIGH):
+		return
+	_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != body.worker_id)
+	_claims_asks.append({"body": body.get_instance_id(), "worker": body.worker_id, "person": body.person,
+		"from": body.person, "line": line, "at": World.tick, "own": true, "to": to})
+
+
+## The town memory logs (phase 1) until economy's Towns.memory holds them:
+## town -> log. Not saved; a server with the hook saves them with the town.
+var _memory_logs: Dictionary = {}
+
+
+## [param town]'s memory log, a copy (economy's when Towns has it).
+func _town_memory(town: String) -> Array:
+	if World.towns != null and World.towns.has_method("memory"):
+		return World.towns.call("memory", town)
+	return _memory_logs.get(town, []).duplicate(true)
+
+
+func _set_town_memory(town: String, log: Array) -> void:
+	if World.towns != null and World.towns.has_method("set_memory"):
+		World.towns.call("set_memory", town, log)
+	else:
+		_memory_logs[town] = log.duplicate(true)
 
 
 ## Server: [param each] (_claims_asks') sent to the resident mind, with
@@ -3794,15 +3832,35 @@ func _claims_answered(each: Dictionary, answer: Dictionary, error: String) -> vo
 	var superstition := body.leaning("superstition") if is_instance_valid(body) else int(worker.get("superstition", profile.get("superstition", 5)))
 	var kept: Array[Dictionary] = []
 	var claims: Variant = answer.get("facts", [])
-	for claim: Variant in claims if claims is Array else []:
-		if claim is Dictionary:
-			var text := str(claim.get("text", ""))
-			var entry := Hearsay.hear(heard, str(each["worker"]), intellect, text, str(claim.get("fits", "")),
-				str(each["from"]), World.production.now(), Hearsay.is_omen(text, claim.get("omen")), superstition)
-			if not entry.is_empty():
-				kept.append(entry)
+	var town := str(worker.get("town", ""))
+	var log := _town_memory(town) if not town.is_empty() else []
+	var logged := false
+	if bool(each.get("own", false)):
+		# Their own tale (the lawspeaker, phase 1): believed, and the town's to remember.
+		var noted := TownMemory.told(log, heard, str(each["worker"]), str(each.get("to", "")), claims if claims is Array else [], World.production.now())
+		logged = not noted.is_empty()
+		if logged:
+			kept.append_array(noted)
+	else:
+		for claim: Variant in claims if claims is Array else []:
+			if claim is Dictionary:
+				var text := str(claim.get("text", ""))
+				var entry := Hearsay.hear(heard, str(each["worker"]), intellect, text, str(claim.get("fits", "")),
+					str(each["from"]), World.production.now(), Hearsay.is_omen(text, claim.get("omen")), superstition)
+				if not entry.is_empty():
+					kept.append(entry)
+					if bool(entry.get("believed", false)) and str(entry.get("fits", "")) == "beyond" and str(each.get("from", "")).begins_with("player:") == false:
+						# A player's (or anyone's) words believed are logged with their source.
+						var said_by := str(each.get("from_id", "")) if each.has("from_id") else ""
+						TownMemory.hold(log, text, str(each["worker"]), said_by, World.production.now())
+						logged = true
 	var gone: Variant = answer.get("overturns", [])
 	var overturned := Hearsay.overturn(heard, gone if gone is Array else [])
+	for turned: Dictionary in overturned:
+		if not TownMemory.drop(log, str(turned.get("text", "")), str(each["worker"])).is_empty():
+			logged = true
+	if logged and not town.is_empty():
+		_set_town_memory(town, log)
 	if not kept.is_empty() or not overturned.is_empty():
 		World.production.set_heard(str(each["worker"]), heard)
 	MindLog.record({"kind": "claims", "companion": str(each["person"]), "mind": "resident", "trigger": each.get("ask", {}).get("trigger", ""),
@@ -3881,6 +3939,7 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 	Transcript.record(body.person, body.person, line)
 	party_log.add("%s said: \"%s\"" % [body.person, line])
 	_heard_near(body, body.person, line)
+	_own_tale(body, line, str(ask.get("speaker", "")))
 	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line})
 	_send_offers(body, str(out.get("player", "")), int(out.get("peer", -1)))
 

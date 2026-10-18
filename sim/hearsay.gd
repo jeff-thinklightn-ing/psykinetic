@@ -24,6 +24,8 @@ const DEFAULTS := {"max": 8, "shown": 3, "claims_ticks": 150, "against": [7, 6],
 ## A thing a neighbour saw herself, passed on as gossip (decision 422):
 ## believed always.
 const WITNESSED := "witnessed"
+## One's own tale (the town memory log, the lawspeaker's phase 1): believed for sure.
+const OWN := "own"
 ## Where gossip is heard (Townsfolk.PLACES' meeting places), in words.
 const PLACE_WORDS := {"well": "at the well", "inn": "at the inn", "square": "in the square", "temple": "at the temple"}
 ## Words that make a line worth a claims ask: a statement about something,
@@ -58,8 +60,8 @@ static func setting(key: String) -> Variant:
 ## beyond what they know: the higher of that and max(0, (superstition - a)
 ## / b), "omen"'s [a, b].
 static func p_believe(fits: String, intellect: int, omen := false, superstition := 5) -> float:
-	if fits == WITNESSED:
-		return 1.0  # A neighbour saying what she saw herself is no rumour (decision 422).
+	if fits == WITNESSED or fits == OWN:
+		return 1.0  # A neighbour saying what she saw herself is no rumour (decision 422); one's own tale neither.
 	if fits not in ["against", "beyond"]:
 		return 0.0
 	var curve: Array = setting(fits)
@@ -104,7 +106,7 @@ static func worth_asking(line: String) -> bool:
 static func hear(heard: Array, who: String, intellect: int, claim: String, fits: String, from: String, step: int,
 		omen := false, superstition := 5, where := "") -> Dictionary:
 	var text := claim.strip_edges().trim_suffix(".")
-	if text.is_empty() or fits not in ["against", "beyond", WITNESSED]:
+	if text.is_empty() or fits not in ["against", "beyond", WITNESSED, OWN]:
 		return {}
 	for entry: Dictionary in heard:
 		if _key(str(entry.get("text", ""))) == _key(text) and str(entry.get("from", "")) == from:

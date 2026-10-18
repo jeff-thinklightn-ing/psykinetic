@@ -10938,3 +10938,67 @@ shield in the left, an emptied hand drawing nothing, the lantern at the belt,
 a goblin's dagger in its hand. Rejected: items as their own puppets placed by
 script each frame (the bone attachment follows every pose for free); a socket
 table per model file (the profile's frames make one table, scaled, enough).
+## 447. The town memory log: what the town's people say of its small life, kept with its source
+
+Phase 1 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, 2026-10-17:
+"its like the story gets written as it goes"; the coordinator's approval
+2026-10-18), on hearsay (378), gossip (422) and the cards (398). The
+proposal's test, "would this have happened if no player were watching",
+holds: beliefs are born in talk the residents already have, spread on the
+world tick, and are kept whether or not anyone listens.
+
+One log per town (economy's Towns.memory and set_memory, saved with the
+town record; until that hook lands Main keeps the logs in hand, unsaved),
+an Array of entries: {id "tm.<n>", tier belief | candidate | memory | left
+| reconciled, text (one sentence as first said), said_by (the worker id;
+"companion:<name>"; "player:<id>" for a player's words), to, first_said,
+last_said, holders (who believes it now), spread (how many have held it),
+tags (the names in it), world (whether it touches the world), ruling ({}
+until phase 2)}. New class TownMemory (sim/town_memory.gd), all static:
+note, hold, drop, told, candidates, of_tier, remembered, tags, is_world;
+levels/residents.json "memory" for the numbers (spread 3, held 2,
+hold_days 3, max 200). Nothing is erased: a belief nobody holds is left,
+with its history; over max the oldest left goes first.
+
+How a belief is born: a resident's own words. When a resident answers and
+the line passes Hearsay.worth_asking, the speaker gets the claims ask 378
+runs for hearers, on their own line (Main._own_tale, the same queue,
+marked "own"); each claim beyond what they know is a tale of their own:
+into their heard as believed (the new fits "own": one believes one's own
+tale) and into the town's log said by them, to whoever asked
+(TownMemory.told). Under today's speech rule ("towns people don't
+fabricate") only a speaker whose voice may embellish is asked: a free type
+(bards, scoundrels, thieves) or creativity high, as 378's BOUND already
+lets them; never an official. The wider rule (the proposal's a, b or c)
+waits on Jeff and is that one condition. A player's words a hearer comes to
+believe are logged too, said_by "player:<id>" (the hearers' claims asks
+carry the speaker's id now), so phase 2 can leave them out of what goes
+to an outside API. Gossip reads and writes the log: a passed belief that
+is believed adds the hearer to holders and raises spread (and logs a thing
+not yet logged with its source); an overturned belief drops its holder.
+
+Candidates: on the town's gossip tick, a belief held by "spread" people in
+all, still by "held", and "hold_days" old becomes a candidate for town
+memory, for the lawspeaker (448). The guardrail in code, before any model:
+a tale whose names are lore's (Lore.name_forms and entries, drafts
+included: a draft name is still the world's) or that bears the world's
+words (kings and lords, gods, peoples, war, the land's features) is marked
+world and never a candidate; small life is free (neighbours, kin, ailments,
+chores, quarrels, animals, weather), the world is not. The voice changes
+nothing here: a resident already repeats their own beliefs through heard;
+"The town remembers that ..." (TownMemory.remembered) waits for memories
+to exist (448).
+
+memory_test (pure sim, no port, no scratch): the tags and the world guard
+(a lore name, a king, a war; a dog and a smith are small life); a tale
+told, into heard as own and into the log with its source, told again as
+the same entry; held by others, dropped, left and taken up again, the cap;
+candidates by the thresholds and never of the world; gossip holding a
+passed tale and the tick making it a candidate; what the town remembers.
+Protocol unchanged; new class_name TownMemory.
+
+Rejected: a model deciding what counts as a new claim from raw transcripts
+(the claims ask is 378's structured judge: the line and what the speaker
+knows, nothing more); logging every line said (only claims beyond what
+the speaker knows, from one allowed to embellish); erasing a belief when
+nobody holds it (kept as left, the proposal's "reconcile, never erase").
