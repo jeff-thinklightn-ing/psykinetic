@@ -10050,3 +10050,30 @@ counter's view; at a shop counter an unnamed dagger refused with why, the
 fee refused, a target it can't become refused, the order taken and paid,
 being worked on with seconds left, reforged on the same uid with its name,
 waiting, collected, nothing waiting); protocol_test.
+## 429. A cleared camp falls
+
+Nothing in play called Holdings.take, so a camp never changed hands and
+economy's rescues (428, Towns.camp_taken on place_taken) never fired.
+
+- Main looks at its zone's camps every CAMP_CHECK_TICKS (10): a camp with
+  no living monster of its holder's side (Factions.same_side of the kind's
+  faction, decision 416: orcs and kobolds defend the Blood Rot's) within
+  its radius + CAMP_DEFEND_MARGIN (2), and a player within its radius, for
+  CAMP_FALL_TICKS (100, 10 s), falls: Holdings.take(id, "nobody"), so
+  place_taken fires and economy frees who it held. The party log: "The
+  Blood Rot's camp falls." (display name; " at <name>" when the place has
+  one of its own). Leaving, or a defender coming, starts the clock again;
+  it is not saved. A sleeping zone's camp never falls.
+- A cleared camp stays cleared: _check_respawns (382) skips a dead slot
+  whose spawn tile is in a camp of its zone its kind's side no longer
+  holds. Retaken (economy's restock, Holdings.take back), its slots come
+  due again, staggered as any.
+- A fallen camp sends no raids and counts for no hunting (Holdings.camps
+  skips nobody's). A raid group coming home to a camp its side no longer
+  holds breaks up (WorldRaids._arrive): Towns.free_held(group id) frees its
+  captives (428), and what it took is left at the camp (_stow).
+- The town does not take a camp (it goes to nobody): the town's claim on
+  ground is economy's, later. Protocol unchanged.
+
+tests/camp_fall_test (the test room with a camp laid round its imp),
+raid_groups_test's home to a fallen camp.

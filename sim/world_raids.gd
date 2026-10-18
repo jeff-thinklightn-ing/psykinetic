@@ -316,6 +316,15 @@ func _arrive(id: String, last: Dictionary) -> void:
 			group["state"] = HOME
 			_route(id)
 		return
+	if group["state"] == HOME and not holdings.factions.same_side(group["faction"], holdings.holder(group["from"])):
+		# Home to a camp its side no longer holds (decision 429): the group
+		# breaks up, its captives go free (Towns.free_held, decision 428) and
+		# what it took is left at the camp for whoever finds it.
+		var freed: Array[String] = towns.free_held(id) if towns != null else []
+		print("[raids] %s comes home to %s, fallen: it breaks up, freeing %s" % [id, group["from"], freed])
+		_stow(id)
+		_end(id)
+		return
 	if group["state"] == HOME:
 		# Its captives held at the camp; a companion taken in play gets her
 		# entry here (Towns.carried_home, decision 331).

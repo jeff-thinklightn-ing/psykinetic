@@ -134,6 +134,12 @@ const RESPAWN_STAGGER_TICKS := 60
 ## zone, nothing comes back within this many tiles of them.
 const RESPAWN_JOIN_DISTANCE := 12
 const RESPAWN_ARRIVAL_TICKS := 100
+## A camp falls (decision 429) when for CAMP_FALL_TICKS (10 s) no living
+## monster of its holder's side stands within its radius + CAMP_DEFEND_MARGIN
+## and a player stands within its radius; looked at every CAMP_CHECK_TICKS.
+const CAMP_FALL_TICKS := 100
+const CAMP_DEFEND_MARGIN := 2
+const CAMP_CHECK_TICKS := 10
 ## The far tier hands over to records (decision 352): a monster FAR from
 ## every player and companion for RETIRE_AFTER_TICKS, more than
 ## retire_tiles from all of them, calm and with nowhere the world tick
@@ -227,6 +233,9 @@ var _respawned_at: Dictionary[String, int] = {}
 ## Peer -> the tick its player was last put down (a join, a zone entered, a
 ## respawn): the wider no-respawn radius while RESPAWN_ARRIVAL_TICKS last.
 var _arrived_at: Dictionary[int, int] = {}
+## Camp place id -> the tick it was first seen undefended with a player in
+## it (decision 429); not saved, so a restart starts the clock again.
+var _camp_clear_since: Dictionary[String, int] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
@@ -2571,7 +2580,7 @@ func _check_respawns(tick: int, force := false) -> int:
 			continue
 		var spec := _slot_spec(slot)
 		var tile: Vector2i = spec["tile"]
-		if not World.is_free(tile):
+		if not World.is_free(tile) or not _camp_lets_back(spec):
 			continue
 		var away := _nearest_player(tile, tick)
 		if not force and away < 0:
@@ -4644,6 +4653,83 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 		party_log.add("%s broke." % _display_name(entity))
 
 
+## This zone's camps, each looked at (decision 429): one undefended, with a
+## player in it, for CAMP_FALL_TICKS falls to nobody (Holdings.take, so
+## place_taken: Towns.camp_taken frees who it held), told in the party log.
+func _check_camps(tick: int) -> void:
+	if World.holdings == null or World.zone == null:
+		return
+	var here := World.zone.name
+	for camp: Dictionary in World.holdings.camps():
+		var id: String = camp["id"]
+		if camp["area"] != here:
+			continue
+		if not _camp_undefended(camp) or not _player_in(camp):
+			_camp_clear_since.erase(id)
+			continue
+		var since: int = _camp_clear_since.get(id, tick)
+		_camp_clear_since[id] = since
+		if tick - since < CAMP_FALL_TICKS:
+			continue
+		_camp_clear_since.erase(id)
+		var place := World.holdings.place(id)
+		var held_by := World.holdings.factions.display_name(camp["faction"])
+		if World.holdings.take(id, Factions.NOBODY):
+			var named := str(place.get("name", ""))
+			party_log.add("%s's camp%s falls." % [held_by.left(1).to_upper() + held_by.substr(1),
+				" at %s" % named if not named.is_empty() and named.to_lower() != "camp" else ""])
+			print("[holdings] %s falls: nobody of %s defends it, and players hold it" % [id, camp["faction"]])
+
+
+## Whether no living monster of [param camp]'s holder's side stands within
+## its radius + CAMP_DEFEND_MARGIN.
+func _camp_undefended(camp: Dictionary) -> bool:
+	var place := World.holdings.place(camp["id"])
+	var reach: int = int(place.get("radius", 1)) + CAMP_DEFEND_MARGIN
+	var factions := World.holdings.factions
+	for entity in World.get_entities():
+		if not entity is Monster or entity is Animal:
+			continue
+		var kind := str(entity.spawn_spec.get("kind", ""))
+		if factions.same_side(factions.of_kind(kind), camp["faction"]) and _within(entity.tile, camp["cell"], reach):
+			return false
+	return true
+
+
+## Whether a player stands within [param camp]'s radius.
+func _player_in(camp: Dictionary) -> bool:
+	var radius: int = int(World.holdings.place(camp["id"]).get("radius", 1))
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and player.zone == World.zone.name and _within(player.tile, camp["cell"], radius):
+			return true
+	return false
+
+
+static func _within(tile: Vector2i, centre: Vector2i, radius: int) -> bool:
+	var d := tile - centre
+	return d.x * d.x + d.y * d.y <= radius * radius
+
+
+## Whether the monster of [param spec] may come back where it lay: not in
+## a camp of this zone that its side no longer holds (decision 429), so a
+## cleared camp stays cleared till it is retaken.
+func _camp_lets_back(spec: Dictionary) -> bool:
+	if World.holdings == null or World.zone == null:
+		return true
+	var factions := World.holdings.factions
+	var side := factions.of_kind(str(spec.get("kind", "")))
+	if side == Factions.NOBODY:
+		return true
+	for id in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(id)
+		if place.get("kind") != "camp" or factions.same_side(side, World.holdings.holder(id)):
+			continue
+		if _within(spec["tile"], place["cell"], int(place["radius"])):
+			return false
+	return true
+
+
 ## A place changed hands (Holdings.place_taken): a camp's fall frees who it
 ## held (Towns.camp_taken, decision 428).
 func _on_place_taken(id: String, from: String, to: String) -> void:
@@ -4831,6 +4917,8 @@ func _on_world_ticked(tick: int) -> void:
 				print("[weather] %s broke roof %d of %s" % [broke["storm"], broke["index"], broke["level"]])
 		_respawn_due_players(tick)
 		_check_respawns(tick)
+		if tick % CAMP_CHECK_TICKS == 0:
+			_check_camps(tick)
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
 		_recall_due()

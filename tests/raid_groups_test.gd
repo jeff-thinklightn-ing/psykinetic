@@ -10,7 +10,8 @@ extends Node
 ## back in; a beaten group is gone; a hungry camp (decision 410) sends
 ## sooner, the hungrier the sooner, and its group is for food, which goes
 ## with it into play and survives a restart, while a fed camp's is as ever;
-## a restart keeps the groups and the switch, one in play going on from
+## a group coming home to a fallen camp breaks up, its captive freed
+## (decision 429); a restart keeps the groups and the switch, one in play going on from
 ## where it was. Run it with tests/run.ps1
 ## or tests/run.sh.
 
@@ -48,6 +49,7 @@ func _ready() -> void:
 	_test_unseen_raid()
 	_test_handed_over()
 	_test_hungry()
+	_test_fallen_home()
 	_test_saved()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -208,6 +210,28 @@ func _test_hungry() -> void:
 	_groups.hook(null)
 	_groups.live = func(_area: String) -> bool: return false
 	_groups.fed = func(_camp_id: String) -> float: return 1.0
+
+
+func _test_fallen_home() -> void:
+	print("== home to a fallen camp ==")
+	_fresh({})
+	_groups.set_on(true)
+	var id := _groups.send(CAMP, TOWN)
+	var taken := _towns.resident_taken(TOWN, "dag", id, "goblins")
+	_groups.groups[id]["carries"] = {"items": [], "captives": ["dag"]}
+	_groups.groups[id]["raided"] = true
+	_groups.groups[id]["state"] = WorldRaids.HOME
+	_groups._route(id)
+	_holdings.take(CAMP, Factions.NOBODY)
+	for i in 40:
+		if not _groups.groups.has(id):
+			break
+		_tick()
+	var held := _towns.captives(TOWN).filter(func(each: Dictionary) -> bool: return each["id"] == "dag")
+	_check(taken and not _groups.groups.has(id) and held.is_empty(),
+		"a group coming home to a camp its side no longer holds breaks up, and Dag goes free (decision 429; %s)" % [held])
+	_check(_groups.camps().is_empty() and _groups.groups.is_empty(), "and the fallen camp sends no more")
+	_holdings.take(CAMP, "goblins")
 
 
 func _test_saved() -> void:
