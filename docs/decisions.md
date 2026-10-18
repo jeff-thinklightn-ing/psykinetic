@@ -6484,6 +6484,15 @@ in the soak a bard put a blade on the priest. The hidden-type line of the
 card words ("X is a merchant, and keeps it hidden") is left out when the
 type is the resident's own trade (471's Snagfin). resident_test.
 
+Amended again 2026-10-19 (the coordinator's ruling on 378's liar tier, theirs,
+not a lore fact): under Jeff's "nothing fabricated by townsfolk" a liar's
+lies stay about himself (where he was, what he did, what he owns), never an
+invented deed of a named neighbour, until the lawspeaker's disputes can
+carry slander as a thing the town settles; the "lie" binding says so. The
+known residue, the model's: a plain or official voice slips a trait onto a
+named person about once in sixty answers; Snagfin does not volunteer that
+he is a goblin (his body says it) but answers truthfully when asked.
+
 ## 335. The bow's shot: the first body on the line, by the draw
 
 Weapons as verbs in the fight, part 1 of 5 (the roadmap's combat step, the
@@ -12654,6 +12663,12 @@ the poor, the dole or the coffer; the store when nobody is rich; the fence's
 split and gold conserved; caught by the victim at the well with the gold
 back, the cards, the grudge and the dispute; lying low after three. Protocol
 unchanged; no new class_name.
+
+Amended 2026-10-19 (Jeff, through the coordinator: "5 gold", the stronger
+hand the proof offered): townsfolk.json "thief" gold_take 5 and chance 1.0,
+so the thief lifts five gold from the richest purse above the line every
+day he has one; the catch and the fence as they were. The 90-day proof's
+numbers above are the draft's (3 on half the days).
 
 ## 484. The dark forest heard: beds weighed by the canopy, rain on the crowns, drips
 

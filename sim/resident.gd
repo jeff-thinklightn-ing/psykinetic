@@ -124,7 +124,7 @@ const BOUND := {
 	"heard": "Of the world, say only what is written above: what you have heard, say as heard, naming who told you.",
 	"embellish": "You may embellish what you know, in your own way.",
 	"plain": "Never make up more than you know; anything else you don't know, so say so rather than guess.",
-	"lie": "You may lie, as yourself would.",
+	"lie": "You may lie about yourself, as yourself would: where you were, what you did, what you own. Never put a deed or a word on a named neighbour that is not written above.",
 	"honest": "Never say what you believe is false.",
 	"companion": "What is written above is what you know; anything else you don't know, so say so rather than guess.",
 }
