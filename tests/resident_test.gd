@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_means_in_voice()
 	_test_hearsay()
 	_test_houses()
+	_test_companion_hearsay()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
 	Production.type_of = Townsfolk.roll_type
@@ -554,7 +555,7 @@ func _test_hearsay() -> void:
 	for i in 3:
 		World.step()
 	var said_to := str(mara.voice_ask("Player", "What news?", 1)["system"])
-	_check(mind.claims_asks.size() == 1 and "Player told you that the mine is cursed" in said_to,
+	_check(_asks_of(mind, mara) == 1 and "Player told you that the mine is cursed" in said_to,
 		"intellect 1, told it: she repeats it as hearsay (%s)" % said_to.get_slice("What is true now:", 1).get_slice("Say what", 0).strip_edges())
 	_check("say what you have heard, as heard" in said_to.to_lower() or "what you have heard, say as heard" in said_to, "and her rule: never make up more")
 	World.production._workers["rs-mara"]["intellect"] = 10
@@ -565,7 +566,7 @@ func _test_hearsay() -> void:
 	_main._player_said(player, "The mine is cursed, Mara.")
 	for i in 3:
 		World.step()
-	_check(mind.claims_asks.size() == 2 and "the mine is cursed" not in str(mara.voice_ask("Player", "What news?", 2)["system"]).to_lower(),
+	_check(_asks_of(mind, mara) == 2 and "the mine is cursed" not in str(mara.voice_ask("Player", "What news?", 2)["system"]).to_lower(),
 		"intellect 10, told the same: she does not")
 	# A priest, told it and somehow holding it believed, never says it.
 	var was_trade := mara.trade
@@ -608,6 +609,12 @@ func _test_hearsay() -> void:
 	_main._resident_mind = null
 
 
+## How many of [param mind]'s claims asks were [param body]'s (a companion
+## near the player is asked too, decision 442).
+func _asks_of(mind: ClaimsMind, body: Resident) -> int:
+	return mind.claims_asks.filter(func(ask: Dictionary) -> bool: return str(ask.get("speaker", "")) == body.person).size()
+
+
 class ClaimsMind:
 	extends CompanionMind
 	var claims := {}
@@ -637,6 +644,83 @@ class BusyMind:
 ## A town far from everyone has no bodies, and is not in play: a raid on
 ## it takes its people off the record (decision 355). The room is small,
 ## so the distances are made small (Main.recall_tiles, retire_tiles).
+func _test_companion_hearsay() -> void:
+	print("\n== a companion weighs what she hears by her own intellect, says it as hearsay, and brings it to town and back (decision 442) ==")
+	# Her leanings, rolled with her card.
+	var rolled := CompanionCard.roll("lean-test")
+	var leanings: Dictionary = rolled.get("leanings", {})
+	_check(leanings.size() == 2 and leanings.values().all(func(v: Variant) -> bool: return int(v) >= 1 and int(v) <= 10)
+		and leanings == CompanionCard.roll("lean-test")["leanings"] and rolled["fear"] == CompanionCard.roll("lean-test")["fear"],
+		"her intellect and superstition are rolled with her card, the same every time, the rest as it was (%s)" % [leanings])
+	_check(CompanionCard.leaning({"name": "Pip"}, "old", "intellect") == 4 and CompanionCard.leaning({"name": "Pip"}, "old", "superstition") == 8
+		and CompanionCard.leaning({"name": "Nix"}, "old", "intellect") == 8, "Pip, Wren and Nix have theirs fixed")
+	_check(CompanionCard.leaning({"name": "Ysolt"}, "old", "intellect") == CompanionCard.leaning({"name": "Ysolt"}, "old", "intellect")
+		and "Leanings" not in CompanionCard.facts(rolled, "Jeff"), "a card from before has them from her seed; her card is written without them")
+	# Told a lie: kept as heard, weighed, never a fact or a belief.
+	if World.zone.name != TOWN:
+		_main.travel(Net.local_id, TOWN)
+	var owner := _player()
+	var pet := _companion()
+	_check(owner != null and pet != null, "(a player and a companion)")
+	if owner == null or pet == null:
+		return
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_put(owner, Vector2i(6, 8))
+	_put(pet, Vector2i(7, 8))
+	record.companion["traits"]["leanings"] = {"intellect": 1, "superstition": 5}
+	record.companion["heard"] = []
+	pet.heard = []
+	var beliefs := pet.grown.beliefs.size()
+	var facts := pet.grown.facts.size()
+	var mind := ClaimsMind.new()
+	mind.claims = {"facts": [{"text": "The mine is cursed", "fits": "beyond"}], "overturns": []}
+	_main._resident_mind = mind
+	_main._claims_at.clear()
+	_main._chat_tick.clear()
+	_main._player_said(owner, "The mine is cursed, %s." % pet.name)
+	for i in 6:
+		World.step()
+	var asked := mind.claims_asks.filter(func(ask: Dictionary) -> bool: return str(ask.get("speaker", "")) == String(pet.name))
+	_check(asked.size() == 1 and "who travels with %s" % pet.keeper_name() in str(asked[0]["system"]), "one claims ask on her, as one who travels with her player")
+	_check(pet.heard.size() == 1 and bool(pet.heard[0]["believed"]) and record.companion.get("heard", []) == pet.heard,
+		"intellect 1: she believes it, kept in her record (%s)" % [pet.heard])
+	_check("%s told you that the mine is cursed" % pet.keeper_name() in pet.voice_prompt("test"), "her voice says it as hearsay, naming who told her")
+	_check(pet.grown.beliefs.size() == beliefs and pet.grown.facts.size() == facts, "and it is neither a belief nor a fact on her card")
+	record.companion["traits"]["leanings"] = {"intellect": 10, "superstition": 2}
+	record.companion["heard"] = []
+	pet.heard = []
+	_main._claims_at.clear()
+	_main._chat_tick.clear()
+	_main._player_said(owner, "The mine is cursed, %s." % pet.name)
+	for i in 6:
+		World.step()
+	_check(pet.heard.size() == 1 and not bool(pet.heard[0]["believed"]) and "the mine is cursed" not in pet.voice_prompt("test"),
+		"intellect 10: kept but not believed, and not told")
+	# Resting in town she brings it, and takes back what she heard there.
+	record.companion["traits"]["leanings"] = {"intellect": 3, "superstition": 6}
+	record.companion["heard"] = [{"id": "h1", "text": "The mine is cursed", "from": "Player", "step": 1, "fits": "beyond", "believed": true}]
+	var ground := _town_cell(Vector2i(-1, -1))
+	_put(pet, ground)
+	_told_to_stay(pet)
+	_main.travel(Net.local_id, ROAD)
+	var who := "companion:%s" % _pet_name()
+	var worker := World.production.worker(who)
+	_check(not worker.is_empty() and worker.get("heard", []) == record.companion["heard"] and int(worker.get("intellect", 0)) == 3
+		and int(worker.get("superstition", 0)) == 6, "staying in town, her worker record has what she heard and her leanings (%s)" % [worker.get("heard", [])])
+	var there: Array = worker.get("heard", []).duplicate(true)
+	Hearsay.hear(there, who, 3, "The miller hides gold.", "beyond", "Tam", 2, false, 6, "well")
+	World.production.set_heard(who, there)
+	_main.travel(Net.local_id, TOWN)
+	pet = _companion()
+	_check(record.companion.get("heard", []).size() == 2 and pet != null and pet.heard == record.companion["heard"]
+		and str(pet.heard[1].get("where", "")) == "well", "back with her player, what she heard at the well comes with her (%s)" % [record.companion.get("heard", [])])
+	record.companion["traits"].erase("leanings")
+	record.companion["heard"] = []
+	if pet != null:
+		pet.heard = []
+		_settle(pet)
+
+
 func _test_houses() -> void:
 	print("\n== inside a building she knows it; out of doorways but to hold one in a fight (decision 391) ==")
 	if World.zone.name != TOWN:

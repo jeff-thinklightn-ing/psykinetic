@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions weigh what they hear as townsfolk do: how sharp or superstitious
+  each is decides whether she believes a tale, she repeats it as "Jeff told
+  me...", and while she rests in town she trades gossip at the well.
 - A companion resting in town trades talk at the well and the inn like anyone:
   what she believes reaches the neighbours, and what they saw reaches her.
 - Big levels draw much faster: on a large dungeon with eight players together, a frame takes about 11 ms where it took 30. The game no longer checks every creature and door on the level each frame. Client only.

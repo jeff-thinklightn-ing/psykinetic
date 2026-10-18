@@ -10426,3 +10426,47 @@ kind takes them is enemy-ai's, as items and the coordinator meant it.
   grudge draw too much fire, so nothing here is fixed in code.
 
 tests/monster_test (_test_bane_and_grudge).
+## 442. A companion's own beliefs are hearsay, weighed as a resident's
+
+Phase 2 of 378 (the coordinator's design, approved 2026-10-17). A player's
+lie to a companion was kept as her belief, on her card, from the
+extraction's say-so; a resident weighed the same lie by its intellect
+(378) and passed it on at the well (422). Now she hears as they do.
+
+Her card rolls "leanings" {intellect, superstition}, 1..10, by a seed of
+their own, so the rest of her traits roll as before;
+CompanionCard.leaning(traits, seed, key) gives a card from before them
+from her seed, with nothing saved. Wren, Nix and Pip have fixed ones
+(companion_traits.json, drafts for Jeff: Wren 7 and 4, Nix 8 and 3, Pip 4
+and 8, young and eager to believe). Her card is written without them.
+
+A line said near her (within HEARING_RANGE: her player's, another
+player's, a companion's, a resident's) waits for one claims ask, at most
+one per claims_ticks, keyed "pet:<player id>" in Main's _claims_asks
+queue on the resident mind (its facts channel; her own voice's Claude, if
+any, sends voice asks only). The ask is Hearsay.claims_ask with her as
+one "who travels with <player>" (a new optional who_is), shown what lore
+says she knows and what is true of her. Each claim goes through
+Hearsay.hear on her leanings into her player record's "heard" (the same
+shape, cap and curves as a resident's), on her too (Companion.heard); her
+voice is told Hearsay.prompt_words: "Jeff told you that the mine is
+cursed", never as fact. The extraction (CompanionFacts) no longer takes
+beliefs: what is said of the world is left out of it; beliefs saved
+before stay as they are and are still told.
+
+Staying in town she is a resident ("companion:<name>"): what she heard
+and her leanings go onto that worker record (set_heard, and
+Production.set_mind, new), so npc's gossip (422 amended: Townsfolk.gossip
+takes a resting companion as teller and hearer; she has no card, so she
+passes hearsay only, kin and grudges aside) reaches her; when she leaves
+with her player again, what her worker record heard comes back to her
+record. resident_test covers it: intellect 1 believes and says it as
+hearsay, intellect 10 keeps it unbelieved and says nothing, neither is a
+belief or a fact on her card, her leanings reach her worker record in
+town and what she heard at the well comes back with her. Protocol
+unchanged.
+
+Rejected: a claims ask on her own facts mind (the same local model; one
+queue keeps the asks apart in time); keeping her extracted beliefs beside
+the hearsay (two stores of the same thing, and the extracted one took a
+lie whole).

@@ -1132,7 +1132,9 @@ func _test_growing_card() -> void:
 		"quiet, it is read once: what is true already, and what was said")
 	_check(pet.talk.is_empty() and pet.grown.facts.size() == 2 and pet.grown.facts[1]["from"] == "talk"
 		and "sister in the north" in pet.grown.facts[1]["text"], "what she said of herself is now true of her; speech is no fact (%s)" % [pet.grown.facts])
-	_check(pet.grown.beliefs.size() == 1 and "star that fell" in pet.grown.beliefs[0]["text"], "a claim about the world is her belief, not a fact")
+	_check(pet.grown.beliefs.is_empty(), "a claim about the world is no belief taken from talk: she hears it as hearsay (decision 442)")
+	pet.grown.add_belief("The star that fell was a sign.", Net.player_id)  # As one saved from before decision 442.
+	pet.facts_changed.emit()
 	var prompt := pet.voice_prompt("test")
 	_check("Also true of you: " in prompt and "sister in the north" in prompt and "You believe, though it may not be so: The star that fell" in prompt,
 		"her voice is told them, as true and as belief")

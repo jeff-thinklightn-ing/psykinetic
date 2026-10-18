@@ -333,6 +333,9 @@ var card_by := "plain"
 ## too), and when it was last added to; the facts a merge asked for is
 ## folding.
 var grown := CompanionFacts.new()
+## What she has heard said of the world (decision 442, as a resident's,
+## 378): Hearsay's entries, her record's "heard"; Main weighs and keeps them.
+var heard: Array = []
 var talk: Array[String] = []
 var _talk_tick := -100000
 var _merging: Array[Dictionary] = []
@@ -1521,7 +1524,6 @@ func _grow() -> void:
 ## An extraction or a merge came back (or did not).
 func _take_facts(trigger: String, answer: Dictionary, entry: Dictionary) -> void:
 	var said: Variant = answer.get("facts", [])
-	var held: Variant = answer.get("beliefs", [])
 	var added: Array[String] = []
 	if trigger == "merge":
 		var history := str(said[0]) if said is Array and not said.is_empty() else ""
@@ -1538,10 +1540,8 @@ func _take_facts(trigger: String, answer: Dictionary, entry: Dictionary) -> void
 			if not fact.is_empty():
 				added.append(fact["text"])
 				Transcript.record(String(name), "", "[Now true of her: %s]" % fact["text"])
-		for text: Variant in (held if held is Array else []).slice(0, CompanionFacts.PER_CALL):
-			var belief := grown.add_belief(str(text), keeper_id)
-			if not belief.is_empty():
-				added.append("(belief) " + belief["text"])
+		# What is said of the world is no longer taken here: she hears it as
+		# hearsay, weighed by her intellect (decision 442).
 		entry["outcome"] = "added" if not added.is_empty() else ("nothing new" if not answer.is_empty() else "no answer")
 	entry["note"] = " | ".join(added)
 	_log(entry)
@@ -1721,6 +1721,10 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var since := grown.prompt_words()
 	if not since.is_empty():
 		met += " " + since
+	# What she has heard of the world and believes, as hearsay (decision 442).
+	var rumours := Hearsay.prompt_words(self.heard)
+	if not rumours.is_empty():
+		met += " " + rumours
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing

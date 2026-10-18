@@ -3073,6 +3073,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s is %s in %s. Go there to travel together again." % [
 				record.companion.get("name", "Your companion"), "working" if not str(resident.get("trade", "")).is_empty() else "resting", town_name]})
 			return
+		_heard_from_worker(record)
 		if World.towns != null:
 			World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion["name"]))
 		record.companion.erase("resident")
@@ -3139,6 +3140,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.card_by = str(record.companion.get("card_by", "plain"))
 	pet.card_written.connect(_on_card_written.bind(pet, record))
 	pet.grown = CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
+	pet.heard = record.companion.get("heard", [])
 	pet.talk.assign(record.companion.get("talk", []))
 	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
@@ -3596,18 +3598,47 @@ func _heard_near(speaker: GridEntity, from: String, line: String, to: Resident =
 		_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != body.worker_id)
 		_claims_asks.append({"body": body.get_instance_id(), "worker": body.worker_id, "person": body.person,
 			"from": from, "line": line, "at": World.tick})
+	# A companion out with her player hears it too, within her hearing
+	# (decision 442): her own, kept in her player's record.
+	for player_id: String in _companions:
+		var pet: Companion = _companions[player_id]
+		if not is_instance_valid(pet) or not pet.spawned or pet == speaker or not _records.has(player_id):
+			continue
+		if speaker == null or World.distance(pet.tile, speaker.tile) > HEARING_RANGE:
+			continue
+		var key := "pet:" + player_id
+		if World.tick - _claims_at.get(key, -100000) < int(Hearsay.setting("claims_ticks")):
+			continue
+		_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != key)
+		_claims_asks.append({"pet": pet.get_instance_id(), "player": player_id, "worker": key, "person": String(pet.name),
+			"from": from, "line": line, "at": World.tick})
 
 
 ## Server: [param each] (_claims_asks') sent to the resident mind, with
 ## what it knows and holds now.
 func _send_claims(each: Dictionary) -> void:
-	var body := instance_from_id(int(each["body"])) as Resident
-	if body == null or not is_instance_valid(body):
-		return
-	_claims_at[each["worker"]] = World.tick
 	_resident_serial += 1
-	each["ask"] = Hearsay.claims_ask(body.person, body.world_facts(), World.production.worker(body.worker_id).get("heard", []),
-		str(each["from"]), str(each["line"]), _resident_serial)
+	if each.has("pet"):
+		# A companion's (decision 442): shown what lore says she knows and
+		# what is true of her, and what she holds.
+		var pet := instance_from_id(int(each["pet"])) as Companion
+		if pet == null or not is_instance_valid(pet):
+			return
+		var known: Array[String] = []
+		var lore := Companion.lore_words(String(pet.name)).trim_prefix("What you know of the world: ")
+		if not lore.is_empty():
+			known.append(lore)
+		for fact: Dictionary in pet.grown.facts:
+			known.append(str(fact["text"]))
+		each["ask"] = Hearsay.claims_ask(String(pet.name), known, pet.heard, str(each["from"]), str(each["line"]), _resident_serial,
+			"who travels with %s" % pet.keeper_name())
+	else:
+		var body := instance_from_id(int(each["body"])) as Resident
+		if body == null or not is_instance_valid(body):
+			return
+		each["ask"] = Hearsay.claims_ask(body.person, body.world_facts(), World.production.worker(body.worker_id).get("heard", []),
+			str(each["from"]), str(each["line"]), _resident_serial)
+	_claims_at[each["worker"]] = World.tick
 	_claims_out[_resident_serial] = each
 	var answer := _resident_mind.facts(each["ask"])
 	if not answer.is_empty():
@@ -3619,6 +3650,9 @@ func _send_claims(each: Dictionary) -> void:
 ## by the resident's intellect (Hearsay.hear), the held ones it shows false
 ## no longer believed; kept on its worker record; logged.
 func _claims_answered(each: Dictionary, answer: Dictionary, error: String) -> void:
+	if each.has("pet"):
+		_pet_claims_answered(each, answer, error)
+		return
 	var worker := World.production.worker(str(each["worker"]))
 	if worker.is_empty():
 		return
@@ -3644,6 +3678,62 @@ func _claims_answered(each: Dictionary, answer: Dictionary, error: String) -> vo
 	MindLog.record({"kind": "claims", "companion": str(each["person"]), "mind": "resident", "trigger": each.get("ask", {}).get("trigger", ""),
 		"heard": each["line"], "from": each["from"], "claims": claims, "kept": kept, "overturned": overturned, "intellect": intellect, "superstition": superstition,
 		"error": error, "outcome": "weighed" if error.is_empty() else "not weighed"})
+
+
+## Server: a companion's claims [param answer] ([param each]: her player's
+## id, her body): each claim weighed by her intellect and superstition (her
+## card's, CompanionCard.leaning), the held ones it shows false no longer
+## believed; kept in her player's record ("heard") and on her (decision 442).
+func _pet_claims_answered(each: Dictionary, answer: Dictionary, error: String) -> void:
+	var record: PlayerRecord = _records.get(str(each["player"]))
+	if record == null or record.companion.is_empty():
+		return
+	var traits: Dictionary = record.companion.get("traits", {})
+	var intellect := CompanionCard.leaning(traits, record.player_id, "intellect")
+	var superstition := CompanionCard.leaning(traits, record.player_id, "superstition")
+	var heard: Array = record.companion.get("heard", []).duplicate(true)
+	var kept: Array[Dictionary] = []
+	var claims: Variant = answer.get("facts", [])
+	for claim: Variant in claims if claims is Array else []:
+		if claim is Dictionary:
+			var text := str(claim.get("text", ""))
+			var entry := Hearsay.hear(heard, "companion:" + record.player_id, intellect, text, str(claim.get("fits", "")),
+				str(each["from"]), World.production.now() if World.production != null else World.tick,
+				Hearsay.is_omen(text, claim.get("omen")), superstition)
+			if not entry.is_empty():
+				kept.append(entry)
+	var gone: Variant = answer.get("overturns", [])
+	var overturned := Hearsay.overturn(heard, gone if gone is Array else [])
+	if not kept.is_empty() or not overturned.is_empty():
+		record.companion["heard"] = heard
+		var pet := instance_from_id(int(each["pet"])) as Companion
+		if is_instance_valid(pet):
+			pet.heard = heard
+	MindLog.record({"kind": "claims", "companion": str(each["person"]), "mind": "facts", "trigger": each.get("ask", {}).get("trigger", ""),
+		"heard": each["line"], "from": each["from"], "claims": claims, "kept": kept, "overturned": overturned, "intellect": intellect,
+		"superstition": superstition, "error": error, "outcome": "weighed" if error.is_empty() else "not weighed"})
+
+
+## A companion staying in town (as a resident, "companion:<name>"): what she
+## has heard and her leanings go onto her worker record, so she gossips and
+## is told things like anyone there (decision 442, npc's 422).
+func _heard_to_worker(record: PlayerRecord) -> void:
+	var who := "companion:%s" % record.companion.get("name", "")
+	if World.production == null or World.production.worker(who).is_empty():
+		return
+	World.production.set_heard(who, record.companion.get("heard", []))
+	var traits: Dictionary = record.companion.get("traits", {})
+	for key in CompanionCard.LEANINGS:
+		World.production.set_mind(who, key, CompanionCard.leaning(traits, record.player_id, key))
+
+
+## She leaves the town with her player again: what she heard there comes
+## back with her (decision 442).
+func _heard_from_worker(record: PlayerRecord) -> void:
+	var who := "companion:%s" % record.companion.get("name", "")
+	if World.production == null or World.production.worker(who).is_empty():
+		return
+	record.companion["heard"] = World.production.worker(who).get("heard", []).duplicate(true)
 
 
 ## A resident's answer ([param out]: the ask waited for): said from its
@@ -3775,6 +3865,7 @@ func companion_taken(player_id: String, by: String) -> bool:
 		return false
 	var resident: Dictionary = record.companion.get("resident", {})
 	if not resident.is_empty() and World.towns != null:
+		_heard_from_worker(record)
 		World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion.get("name", "")))
 	record.companion.erase("resident")
 	record.companion["taken"] = {"by": by, "zone": World.zone.name if World.zone != null else "", "at": World.steps}
@@ -3805,6 +3896,7 @@ func companion_freed(player_id: String, place := "") -> bool:
 		record.companion["home"] = record.companion["resident"].duplicate()
 		if not trade.is_empty() and World.towns != null:
 			World.towns.note_companion_in(place, pet_name, trade, player_id)
+			_heard_to_worker(record)
 		town = str(Level.load_level(zone).get("display_name", zone)) if Level.exists(zone) else zone
 	var grown := CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
 	grown.add_fact("%s was freed from the raiders%s." % [pet_name, " and brought to " + town if not town.is_empty() else ""],
@@ -3912,6 +4004,7 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	if place.is_empty() or trade.is_empty():
 		return false
 	World.towns.note_companion_in(place, pet_name, trade, record.player_id)
+	_heard_to_worker(record)
 	record.companion["resident"] = {"place": place, "zone": World.zone.name, "trade": trade}
 	record.companion["home"] = record.companion["resident"].duplicate()
 	pet.works_as = trade
@@ -3943,6 +4036,7 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
 	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if not trade.is_empty():
 		World.towns.note_companion_in(place, pet_name, trade, record.player_id)
+		_heard_to_worker(record)
 	record.companion["resident"] = {"place": place, "zone": str(World.holdings.place(place).get("area", "")), "trade": trade}
 	record.companion["home"] = record.companion["resident"].duplicate()
 	record.companion["tile"] = null  # Wherever she rests: beside her player when they come.

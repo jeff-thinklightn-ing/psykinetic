@@ -34,7 +34,7 @@ const CLAIM_WORDS := "(?i)\\b(is|are|was|were|has|have|had|will|did|lives?|died|
 
 ## The claims ask's system prompt: the hearer, what they know, what they
 ## already hold, and the line.
-const CLAIMS_SYSTEM := """You keep track of what %s, who lives in a town, has heard said about the world. You are given what %s knows to be true, what %s has heard before (each with an id), and a line someone just said near them.
+const CLAIMS_SYSTEM := """You keep track of what %s, %s, has heard said about the world. You are given what %s knows to be true, what %s has heard before (each with an id), and a line someone just said near them.
 List each claim the line makes about the world: places, people, peoples, events, the town, the land. Leave out greetings, questions, feelings, plans, and what the speaker says of themselves. Write each claim as one short plain sentence. For each, say whether it agrees with what %s knows to be true ("agrees"), goes against it ("against"), or says something beyond it ("beyond"), and whether it is of omens, curses, spirits or the like ("omen": true). Then list the ids of anything heard before that this line plainly shows to be false. Usually there is no claim. Reply with one JSON object and nothing else:
 {"facts": [{"text": "...", "fits": "agrees|against|beyond", "omen": false}], "overturns": ["..."]}"""
 
@@ -172,9 +172,11 @@ static func prompt_words(heard: Array) -> String:
 
 ## The claims ask for [param line] said by [param from] near [param person]
 ## (who knows [param known], sentences, and holds [param heard]): the facts
-## channel's shape (CompanionMind.facts).
-static func claims_ask(person: String, known: Array[String], heard: Array, from: String, line: String, serial: int) -> Dictionary:
-	var system := CLAIMS_SYSTEM % [person, person, person, person]
+## channel's shape (CompanionMind.facts). [param who_is] says who they are
+## ("who travels with Jeff": a companion's, decision 442).
+static func claims_ask(person: String, known: Array[String], heard: Array, from: String, line: String, serial: int,
+		who_is := "who lives in a town") -> Dictionary:
+	var system := CLAIMS_SYSTEM % [person, who_is, person, person, person]
 	var held: Array[String] = []
 	for entry: Dictionary in heard:
 		held.append("- [%s] %s (from %s)" % [entry.get("id", ""), entry.get("text", ""), entry.get("from", "someone")])

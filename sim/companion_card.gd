@@ -74,7 +74,39 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 				traits[key] = str(fixed[key])
 	traits["body"] = String(body_of(traits, player_id))
 	traits["look"] = roll_look(player_id, traits)
+	traits["leanings"] = roll_leanings(player_id, traits)
 	return traits
+
+
+## Her leanings that weigh what she hears (decision 442, as a resident's,
+## 378): each 1..10.
+const LEANINGS: Array[String] = ["intellect", "superstition"]
+
+
+## Her leanings, rolled for the companion of [param player_id] by a seed of
+## their own (her traits' roll is as it was): {intellect, superstition};
+## one from before (the table's legacy) has her fixed ones ("leanings").
+static func roll_leanings(player_id: String, traits: Dictionary) -> Dictionary:
+	var out := {}
+	for key in LEANINGS:
+		out[key] = leaning(traits, player_id, key)
+	return out
+
+
+## Her leaning [param key] ("intellect", "superstition"): her traits'
+## "leanings", else a legacy one's fixed, else rolled 1..10 by [param seed]
+## (her player's id), the same every time, so a card from before has them
+## with nothing saved.
+static func leaning(traits: Dictionary, seed: String, key: String) -> int:
+	var own: Variant = traits.get("leanings", {}).get(key) if traits.get("leanings") is Dictionary else null
+	if own is int or own is float:
+		return clampi(int(own), 1, 10)
+	var name := str(traits.get("name", ""))
+	if is_legacy(name):
+		var fixed: Variant = tables()["legacy"][name].get("leanings", {})
+		if fixed is Dictionary and (fixed.get(key) is int or fixed.get(key) is float):
+			return clampi(int(fixed[key]), 1, 10)
+	return 1 + absi(hash("%s:%s" % [key, seed])) % 10
 
 
 ## How she looks (pc-character's look keys, agreed with npc): each key's
@@ -192,7 +224,7 @@ static func facts(traits: Dictionary, player: String) -> String:
 	var lines: Array[String] = ["Name: %s" % traits.get("name", "")]
 	# Fixed facts beyond the table's own (who she is, what she wants).
 	for key: String in traits:
-		if key not in KEYS and key not in ["name", "trade", "body", "look"]:
+		if key not in KEYS and key not in ["name", "trade", "body", "look", "leanings"]:
 			lines.append("%s: %s" % [key.capitalize(), traits[key]])
 	for key in KEYS:
 		if key == "how_we_met":

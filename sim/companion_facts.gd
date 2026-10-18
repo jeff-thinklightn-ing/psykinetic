@@ -19,11 +19,10 @@ List anything new that is now true of %s and her own past, people she knows, wha
 said of herself, or that %s said of her and she went along with. Leave out what %s said that she did not take up,
 and anything said in jest or out of the story. Leave out anything already listed, and anything that goes against
 what is already true. What either of them claims about the world itself (places, peoples, history, the land) is not
-a fact about her. Under beliefs put only what someone else told her about the world and she took up, never her own words.
-What she says she does not know, has not seen or does not recognise is neither a fact nor a belief: leave it out. Nothing
-may go against what is true of the world. Write each as one plain sentence in the third
+a fact about her: leave it out. What she says she does not know, has not seen or does not recognise is not a fact
+either: leave it out. Nothing may go against what is true of the world. Write each as one plain sentence in the third
 person, naming her. Usually there is nothing new. Reply with one JSON object and nothing else:
-{"facts": ["..."], "beliefs": ["..."]}."""
+{"facts": ["..."]}."""
 ## The merge, when her facts are over the cap: the oldest of what she
 ## witnessed told as a short history.
 const MERGE_SYSTEM := """You keep the record of a character in a story. Tell these things that happened to %s as her history,

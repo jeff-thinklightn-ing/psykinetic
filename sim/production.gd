@@ -195,6 +195,14 @@ func set_heard(worker_id: String, heard: Array) -> void:
 		_workers[worker_id]["heard"] = heard.duplicate(true)
 
 
+## Worker [param worker_id]'s [param quality] of MIND, 1..10: a companion
+## resting in town brings hers from her card (decision 442); nothing for an
+## unknown id.
+func set_mind(worker_id: String, quality: String, value: int) -> void:
+	if _workers.has(worker_id) and quality in MIND:
+		_workers[worker_id][quality] = clampi(value, 1, 10)
+
+
 ## A resident's mind (decision 378): each 1..10, rolled within MIND_SPREAD
 ## of their trade's profile (profile_of), else MIND_MIDDLE.
 const MIND: Array[String] = ["intellect", "superstition", "creativity", "integrity"]
