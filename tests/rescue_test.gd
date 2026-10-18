@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_freed()
 	_test_lacking()
 	_test_fletcher()
+	_test_lawspeaker()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -144,6 +145,27 @@ func _test_fletcher() -> void:
 				break
 		var expect := TOWN + (":fletcher" if with_fletcher else ":carpenter")
 		_check(shop == expect, "%s: mended at %s" % ["a fletcher in town" if with_fletcher else "no fletcher", shop])
+
+
+## A town of official_from residents of its own gets its lawspeaker (npc's
+## 459, economy's side): appointed once, paid as an official.
+func _test_lawspeaker() -> void:
+	print("
+== the lawspeaker ==")
+	var towns := _towns()
+	var from := int(_rules["official"]["lawspeaker"]["from"])
+	for i in from - 2:
+		towns.note_rescue(TOWN, "f%d" % i, "Folk%d" % i, "hauler")
+	towns.tick()
+	var lawspeakers := func() -> Array: return towns.residents(TOWN).filter(func(who: String) -> bool: return "lawspeaker" in towns.production.worker(who)["trades"])
+	_check(lawspeakers.call().is_empty() and towns.residents(TOWN).size() == from - 1, "%d residents: none yet" % towns.residents(TOWN).size())
+	towns.note_rescue(TOWN, "f9", "Folk9", "hauler")
+	towns.tick()
+	towns.tick()
+	var appointed: Array = lawspeakers.call()
+	_check(appointed.size() == 1 and towns.production.worker(appointed[0])["origin"] == "appointed"
+		and str(towns.production.worker(appointed[0])["name"]) in _rules["official"]["lawspeaker"]["names"], "%d: one is appointed (%s)" % [from, appointed])
+	_check(_rules["official"]["lawspeaker"]["wage"] == _rules["official"]["priest"]["wage"], "paid as the priest")
 
 
 func _check(ok: bool, what: String) -> void:

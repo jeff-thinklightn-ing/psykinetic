@@ -38,7 +38,8 @@
 	"rent_every": 54000,
 	"gold_floor": 5,
 	"start_gold": 150, "start_food": 120,
-	"official": {"guard": {"wage": 4, "every": 18000}, "hauler": {"wage": 2, "every": 18000}, "priest": {"wage": 4, "every": 18000}},
+	"official": {"guard": {"wage": 4, "every": 18000}, "hauler": {"wage": 2, "every": 18000}, "priest": {"wage": 4, "every": 18000},
+		"lawspeaker": {"wage": 4, "every": 18000, "from": 6, "names": ["Ulf", "Sigrid", "Halvard", "Ingrid", "Torvald", "Asa"]}},
 	"town_work": {"fee": 1, "per_steps": 600},
 	"return": {
 		"steps": 600, "fee": 0, "give_up": 6000,

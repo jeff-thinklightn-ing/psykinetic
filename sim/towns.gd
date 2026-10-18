@@ -349,6 +349,28 @@ func _appoint(town: String) -> void:
 		record["residents"].append(who)
 		_note(town, "%s comes to be the town's %s" % [name, trade.replace("_", " ")])
 		_seat(town)
+	# An official the town grows into (rules' official "from": residents of
+	# its own; the lawspeaker, npc's 459): one, named from its names, with
+	# no building (his work place is npc's: the square).
+	var official: Dictionary = rules.get("official", {})
+	var names_of: Array = official.keys()
+	names_of.sort()
+	for trade: String in names_of:
+		var rule: Dictionary = official[trade]
+		if not rule.has("from"):
+			continue
+		var own: Array = record["residents"].filter(func(who: String) -> bool:
+			return not who.begins_with("companion:") and not str(production.worker(who).get("origin", "")).begins_with("companion:"))
+		if own.size() < int(rule["from"]) or record["residents"].any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+			continue
+		var who := "%s:%s" % [trade, town]
+		var names: Array = rule.get("names", [])
+		var name := str(names[absi(hash(town + trade)) % names.size()]) if not names.is_empty() else trade.capitalize()
+		if not production.add_worker(who, name, [trade], town, "appointed"):
+			continue
+		record["residents"].append(who)
+		_note(town, "%s comes to be the town's %s" % [name, trade.replace("_", " ")])
+		_seat(town)
 
 
 ## The building [param town] wants next ("" for none it can afford).

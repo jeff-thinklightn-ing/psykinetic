@@ -11732,3 +11732,12 @@ The hooks npc's thief calls; numbers are npc's (townsfolk.json "thief").
 
 larder_test (a lift, never past the purse, given back, a fence's split,
 gold conserved, the floor).
+
+## 459, economy's side (npc's lawspeaker as a resident)
+
+The lawspeaker is an official: economy.json "official".lawspeaker, at the
+priest's wage (4 every 18000 steps from the treasury, above gold_floor),
+with "from": 6 and "names". Towns._appoint seats one per town once it has
+that many residents of its own (companions not counted), "appointed",
+named from those names, with no building (his work place is npc's: the
+square). Any official given a "from" grows in the same way. rescue_test.

@@ -4350,7 +4350,16 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var places: Dictionary = each["places"]
 	var trade: String = each["trade"]
 	var doing := Resident.doing_now(trade, str(each.get("type", "")), who)
-	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
+	# On his rounds (the lawspeaker, decision 459) "rounds" is a list of stops:
+	# he starts at the hour's stop (as Resident._round_stop has it), or the
+	# square with none.
+	var spot: Variant = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
+	if spot is Array:
+		var stops: Array = spot
+		var now := DayNight.now()
+		var index := Townsfolk.round_stop(stops.size(), Townsfolk.day_of(now), DayNight.hour(now)) if not stops.is_empty() else -1
+		spot = (stops[index] as Dictionary).get("rect", Rect2i()) if index >= 0 and index < stops.size() and stops[index] is Dictionary 				else places.get("square", Rect2i())
+	var area: Rect2i = spot if spot is Rect2i else Rect2i()
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
 	var label := Resident.label_of(str(each["name"]), trade)
 	# Their look for the character generator (decision 419): a companion

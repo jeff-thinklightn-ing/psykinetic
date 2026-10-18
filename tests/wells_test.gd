@@ -61,9 +61,10 @@ func _test_water() -> void:
 	towns.tick()
 	_check(towns.water(TOWN) == float(rule["cap"]) and not towns.dry(TOWN), "it starts full (%.1f)" % towns.water(TOWN))
 	_rain = 0.0
-	var per_day := float(rule["spring"]) - 20.0 * float(rule["draw"])
+	# Everyone there draws, the officials a town of twenty appoints too.
+	var per_day := float(rule["spring"]) - towns.residents(TOWN).size() * float(rule["draw"])
 	_days(towns, 1.0)
-	_check(absf(towns.water(TOWN) - (float(rule["cap"]) + per_day)) < 0.1, "no rain: spring less twenty residents' draw a day (%.1f)" % towns.water(TOWN))
+	_check(absf(towns.water(TOWN) - (float(rule["cap"]) + per_day)) < 0.1, "no rain: spring less its residents' draw a day (%.1f)" % towns.water(TOWN))
 	_days(towns, ceilf(float(rule["cap"]) / -per_day) + 1.0)
 	_check(towns.dry(TOWN) and towns.water(TOWN) == 0.0, "it runs dry")
 	_check(towns.log_of(TOWN).filter(func(line: Dictionary) -> bool: return line["what"] == "the well is dry").size() == 1, "the log says so once")
