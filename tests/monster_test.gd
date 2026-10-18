@@ -94,6 +94,7 @@ func _ready() -> void:
 	_test_monster_bash()
 	_test_monster_wind_up()
 	_test_meets_wind_up()
+	_test_bane_and_grudge()
 	_test_boar_turns()
 	_test_pick_up()
 	_test_art_slots()
@@ -2208,6 +2209,60 @@ func _test_meets_wind_up() -> void:
 					"a shield-bearer bashes it: the wind-up given up, no blow")
 			"bold":
 				_check(hits_on_imp == 1 and imp.tile == Vector2i(3, 1), "a bold one stands and takes it (%d blows)" % hits_on_imp)
+	Monster.idling = true
+
+
+func _test_bane_and_grudge() -> void:
+	print("\n== its kind's bane: dreaded whatever its temper, seen and heard farther; a grudge against its kind: sought first (decision 420) ==")
+	Monster.idling = false
+	var far := float(Items.growth()["bane_notice"])
+	for bane in [false, true]:
+		var e := _build(["###################", "#i...............P#", "###################"])  # 16 apart.
+		var imp: Monster = e["i"][0]
+		var player: GridEntity = e["P"][0]
+		_bold(imp)
+		player.slots[Items.RIGHT_HAND] = "dagger"
+		var uid := World.slot_uid(player, Items.RIGHT_HAND)
+		if bane:
+			World.items.set_bane(uid, "imp")
+		var d := World.distance(imp.tile, player.tile)
+		for i in 3:
+			World.step()
+		if bane:
+			_check(imp.target == player and d > imp.sight_range and d <= imp.sight_range * far,
+				"its bane's bearer %d off (sight %d): seen" % [d, imp.sight_range])
+			_check(imp._dreads_target(), "and dreaded, bold as it is")
+		else:
+			_check(imp.target == null, "a plain dagger's bearer %d off (sight %d): not seen" % [d, imp.sight_range])
+		# Heard: a fight's noise 6 round the bearer, the imp 8 off.
+		imp.senses.forget()
+		World.despawn(imp)
+		World.spawn(imp, player.tile - Vector2i(8, 0))
+		var heard_before := imp.senses.heard.size()
+		World.noise(player.tile, 6, &"fight", player)
+		var heard := imp.senses.heard.size() > heard_before
+		_check(heard == bane, "a noise of radius 6, 8 off: %s" % ("heard (its bane's bearer)" if bane else "not heard"))
+	# A beast's bane too, and one not of its kind changes nothing.
+	var e := _build(["#########", "#P..w...#", "#########"])
+	var wolf: Animal = e["w"][0]
+	var player: GridEntity = e["P"][0]
+	player.slots[Items.RIGHT_HAND] = "dagger"
+	World.items.set_bane(World.slot_uid(player, Items.RIGHT_HAND), "imp")
+	wolf.target = player
+	_check(not wolf._dreads_target(), "an imp-bane is nothing to a wolf")
+	player.slots[Items.RIGHT_HAND] = "sword"
+	World.items.set_bane(World.slot_uid(player, Items.RIGHT_HAND), "wolf")
+	_check(wolf._dreads_target(), "a wolf-bane it dreads, beast as it is")
+	# A grudge: the far bearer before the near one.
+	e = _build(["############", "#P.i......P#", "############"])
+	var imp: Monster = e["i"][0]
+	var near: GridEntity = e["P"][0]
+	var wronged: GridEntity = e["P"][1]
+	_bold(imp)
+	wronged.slots[Items.RIGHT_HAND] = "sword"
+	World.items.set_grudge(World.slot_uid(wronged, Items.RIGHT_HAND), "imp")
+	World.step()
+	_check(imp.target == wronged, "both seen, it goes for the one whose sword holds a grudge against imps (%s), not the nearer" % [imp.target])
 	Monster.idling = true
 
 

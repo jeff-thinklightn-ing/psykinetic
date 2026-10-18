@@ -830,35 +830,47 @@ func _target_beset(need := 1) -> bool:
 
 ## The nearest player, or companion whose owner is online, it sees
 ## (Senses.sees); the one it has kept unless another is RETARGET_TILES
-## nearer.
-## Entities still in their spawn grace are passed over.
+## nearer. One bearing its kind's bane it sees bane_notice times farther;
+## one bearing a grudge against its kind it goes for first (417; decision
+## 420). Entities still in their spawn grace are passed over.
 func _nearest_visible_target() -> GridEntity:
+	var marks := _marks(World.kind_of(self))
+	var bane: Array[GridEntity] = marks["bane"]
 	# Nobody near enough to be seen: its tier's measure (a few ticks old,
 	# nobody come or gone since) is beyond its sight by more than anyone
 	# could close meanwhile. Most looks end here.
 	if target == null and raid == "" and nearest_sought > sight_range + LOOK_MARGIN_TILES \
-			and tier_comings == World.zone.comings and World.tick - tier_tick < World.TIER_EVERY_TICKS:
+			and tier_comings == World.zone.comings and World.tick - tier_tick < World.TIER_EVERY_TICKS \
+			and bane.is_empty():
 		return null
+	var grudge: Array[GridEntity] = marks["grudge"]
+	var farther := float(Items.growth()["bane_notice"]) if not bane.is_empty() else 1.0
 	var nearest: GridEntity = null
-	var nearest_distance := sight_range + 1
+	var nearest_distance := ceili(sight_range * maxf(farther, 1.0)) + 1
+	var grudged: GridEntity = null
+	var grudged_distance := nearest_distance
 	var kept := -1
 	_glimpsed = NO_TILE
 	for entity in World.sought():
 		# Out of sight range first: a few sums, where most looks end.
 		var at := entity.tile
 		var d := maxi(absi(at.x - tile.x), absi(at.y - tile.y))
-		if d > sight_range or entity.protected:
+		var times := farther if entity in bane else 1.0
+		if d > sight_range * times or entity.protected:
 			continue  # Too far, or in its spawn grace.
 		if entity is Player or (entity is Companion and entity.keeper != null):
 			if not _given_up.is_empty() and _letting_be(entity):
 				continue
 			# Its target it follows, cone or not (it turns as it goes).
-			if senses.sees(entity, d, entity != target):
+			if senses.sees(entity, d, entity != target, times):
 				if entity == target:
 					kept = d
 				if d < nearest_distance:
 					nearest = entity
 					nearest_distance = d
+				if entity in grudge and d < grudged_distance:
+					grudged = entity
+					grudged_distance = d
 			elif _wary and alert == Alert.IDLE and _glimpsed == NO_TILE and senses.glimpses(entity, d):
 				_glimpsed = at
 	if raid != "":
@@ -871,6 +883,8 @@ func _nearest_visible_target() -> GridEntity:
 					kept = d
 				nearest = entity
 				nearest_distance = d
+	if grudged != null:
+		return grudged  # Its kind's grudge-bearer first, near or far.
 	if tactic != Tactic.PLAIN and kept >= 0 and kept - nearest_distance < RETARGET_TILES:
 		return target
 	return nearest
@@ -1312,7 +1326,32 @@ func _wear_bundle() -> void:
 ## Whether its target holds a dread thing and it minds (not bold; an
 ## animal never: a wolf is cautious by its row, but knows no names).
 func _dreads_target() -> bool:
-	return temper != Temper.BOLD and not self is Animal and is_instance_valid(target) and World.holder_dread(target)
+	if not is_instance_valid(target):
+		return false
+	var kind := World.kind_of(self)
+	if not kind.is_empty() and World.holder_bane(target, kind):
+		return true  # Its kind's bane (417; decision 420): whatever its temper, a beast too.
+	return temper != Temper.BOLD and not self is Animal and World.holder_dread(target)
+
+
+## The bearers among World.sought() of its kind's bane and of a grudge
+## against its kind (World.holder_bane, holder_grudge; 417, decision 420):
+## {bane: [], grudge: []}, looked up once a tick a kind.
+static var _marked := {}
+static func _marks(kind: String) -> Dictionary:
+	var had: Dictionary = _marked.get(kind, {})
+	if had.get("tick", -1) == World.tick and had.get("zone") == World.zone:
+		return had
+	var bane: Array[GridEntity] = []
+	var grudge: Array[GridEntity] = []
+	for entity in World.sought() if not kind.is_empty() else []:  # A kindless one has no bane.
+		if World.holder_bane(entity, kind):
+			bane.append(entity)
+		if World.holder_grudge(entity, kind):
+			grudge.append(entity)
+	had = {"tick": World.tick, "zone": World.zone, "bane": bane, "grudge": grudge}
+	_marked[kind] = had
+	return had
 
 
 ## Fighting: whether it breaks and runs (FLEE_BELOW of its hp, DREAD_FLEE_BELOW

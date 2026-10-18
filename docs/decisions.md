@@ -10387,3 +10387,34 @@ it, is enemy-ai's. Approved by the coordinator with items' design.
 - Nothing new on the wire: the views already wind up from GridEntity.winding.
 
 tests/monster_test (_test_monster_wind_up, _test_meets_wind_up).
+
+## 420. Monsters dread their kind's bane and seek its grudge-bearers (the AI side of 415 and 417)
+
+Items keeps each thing's tally of kinds felled (415) and makes a thing the
+bane of a kind it has felled enough of, or gives it a grudge against the kind
+its holder fell to (417: World.holder_bane, holder_grudge, kind_of). How a
+kind takes them is enemy-ai's, as items and the coordinator meant it.
+
+- Its kind's bane in its target's hands, a monster dreads it whatever its
+  temper, a beast too (Monster._dreads_target): the dread of 371 (the
+  cautious wait for two and break sooner, a coward counts it as two) and the
+  hold-back of any below HOLD_BACK_BELOW or dreading, so even a bold one
+  waits for its side before it closes. 371's dread weapons stay for the
+  unbold and unbeastly only; a bane is one kind's own fear.
+- It notices that bearer Items.growth's bane_notice (1.5) times farther: by
+  sight (Monster._nearest_visible_target, through Senses.sees' new farther
+  times its range), and by hearing (World.noise: a noise its bearer makes
+  is heard that much farther by monsters of that kind alone, World.banes_held).
+  The look's early end (nobody within its sight) is skipped while any bearer
+  of its kind's bane is in the zone.
+- One bearing a grudge against its kind it goes for first when it sees them,
+  near or far, over the nearest and the one it kept.
+- The bearers are looked up once a tick a kind (Monster._marks), not each
+  look. A kindless monster (no spawn kind) has no bane and no grudge, guarded
+  here as well as in holder_bane and holder_grudge (items' fix to 417: an
+  empty kind once matched every thing with none).
+- The numbers are items' (bane_after, bane_notice in levels/items.json
+  "growth"): Jeff has yet to say whether a bane should cost stealth or a
+  grudge draw too much fire, so nothing here is fixed in code.
+
+tests/monster_test (_test_bane_and_grudge).

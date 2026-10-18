@@ -1388,6 +1388,15 @@ func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = nul
 			var d := maxi(absi(entity.tile.x - at.x), absi(entity.tile.y - at.y))
 			if d <= radius:
 				_hear(entity as Monster, at, radius, kind, source)
+	# A bane's bearer (decision 420) is heard bane_notice times farther by the
+	# kind it is the bane of.
+	var banes := banes_held(source)
+	if not banes.is_empty():
+		var far := ceili(radius * float(Items.growth()["bane_notice"]))
+		for entity in monsters():
+			var d := maxi(absi(entity.tile.x - at.x), absi(entity.tile.y - at.y))
+			if d > radius and d <= far and kind_of(entity) in banes:
+				_hear(entity as Monster, at, far, kind, source)
 
 
 func _hear(listener: GridEntity, at: Vector2i, radius: int, kind: StringName, source: GridEntity) -> void:
@@ -2136,6 +2145,20 @@ func holder_bane(entity: GridEntity, kind: String) -> bool:
 	if kind.is_empty():
 		return false  # No kind (a monster without one): nothing is its bane or grudge.
 	return _in_hands_any(entity, func(uid: int) -> bool: return items.bane_of(uid) == kind)
+
+
+## The kinds the things in [param entity]'s hands are the bane of (decision
+## 417); none for a monster.
+func banes_held(entity: GridEntity) -> Array[String]:
+	var out: Array[String] = []
+	if not is_instance_valid(entity) or entity is Monster or not holds_in_hands(entity):
+		return out
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if slot < entity.slot_items.size() and entity.slot_items[slot] != 0:
+			var kind := items.bane_of(entity.slot_items[slot])
+			if not kind.is_empty() and kind not in out:
+				out.append(kind)
+	return out
 
 
 ## Whether a thing in [param entity]'s hands holds a grudge against

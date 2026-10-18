@@ -81,14 +81,16 @@ func _init(owner: GridEntity, range_cells := 7, cone := CONE_COS) -> void:
 
 
 ## Whether it sees [param entity] now; [param d], its distance (Chebyshev)
-## when the caller has it already. Remembered when seen.
-func sees(entity: GridEntity, d := -1, in_cone := true) -> bool:
+## when the caller has it already; [param farther] times its sight range (a
+## bane's bearer, decision 420). Remembered when seen.
+func sees(entity: GridEntity, d := -1, in_cone := true, farther := 1.0) -> bool:
 	var at := entity.tile
 	var from := agent.tile
 	if d < 0:
 		d = maxi(absi(at.x - from.x), absi(at.y - from.y))
 	# Fog and rain shorten sight (Weather), but a carried light shows as far.
-	if d > (sight_range if entity.emit_light > 0.0 else sight_range * World.weather_sight_at(from)):
+	var reach := sight_range * farther
+	if d > (reach if entity.emit_light > 0.0 else reach * World.weather_sight_at(from)):
 		return false
 	if d > NOTICE_ALWAYS:
 		if in_cone and not _in_cone(at):
