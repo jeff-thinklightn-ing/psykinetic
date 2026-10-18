@@ -2393,9 +2393,23 @@ func _test_bow() -> void:
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.05 and not bundle.visible,
 			"drawing: Bow_Draw from the nock, the bundle put away (%s, %.2f)" % [rig.upper_clip(), rig.upper_position()])
-	_check(absf(rig.upper_speed() - rig.length("Bow_Draw") / 2.0) < 0.05,
-			"played so full draw comes with the sim's, 2 s on (speed %.2f)" % rig.upper_speed())
 	_check(bow.find_child("Nocked", true, false) != null or not ArtKit.has("fx.arrow"), "an arrow on the string")
+	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
+	# then the pull by draw_of (0.5 at 10 of the bow's 20 ticks: a third of the
+	# way from draw_min's 0.25 to 1).
+	var alpha := World.tick_alpha
+	World.tick_alpha = 0.0
+	var length := rig.length("Bow_Draw")
+	var poses := []
+	for drawn: int in [3, 10, 15]:
+		player.raised_tick = World.tick - drawn
+		_rig._process(0.0)
+		poses.append(rig.upper_position() / length)
+	World.tick_alpha = alpha
+	var expected := [Client3D.BOW_NOCK_END * 3.0 / 5.0, Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) / 3.0,
+			Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 2.0 / 3.0]
+	_check(range(3).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0,
+			"the pose scrubbed by the draw: nocking before draw_min, then drawn back as draw_of grows (%s of the clip, expected %s)" % [poses, expected])
 	player.raised_tick = World.tick - 20
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Hold", "at full draw: Bow_Hold (%s)" % rig.upper_clip())

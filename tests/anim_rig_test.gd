@@ -177,6 +177,12 @@ func _test_upper_timed() -> void:
 	rig.upper("Bow_Draw", 0.5)
 	rig.tree.advance(0.2)
 	_check(absf(rig.upper_position() - 0.1) < 0.02, "a new speed, the same clip: slower, not restarted (%.3f)" % rig.upper_position())
+	rig.upper_at("Bow_Draw", 0.6)
+	_check(absf(rig.upper_position() - 0.6) < 0.02 and rig.upper_speed() == 0.0, "upper_at: held at 0.6 s (%.3f)" % rig.upper_position())
+	rig.tree.advance(0.3)
+	_check(absf(rig.upper_position() - 0.6) < 0.02, "and stays there as time goes on (%.3f)" % rig.upper_position())
+	rig.upper_at("Bow_Draw", 0.2)
+	_check(absf(rig.upper_position() - 0.2) < 0.02, "scrubbed back too (%.3f)" % rig.upper_position())
 	rig.get_parent().queue_free()
 
 

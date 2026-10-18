@@ -6654,25 +6654,48 @@ static func _hanging_lantern() -> Node3D:
 
 
 ## What [param entity] holds as drawn [right hand, left hand]: its hand
-## slots, but a bow always in the left and the other hand's thing (its
-## arrows) in the right, as a right-handed archer holds them (decision 462).
+## slots, but a bow (World.drawn_slot) always in the left and the other
+## hand's thing (its arrows) in the right, as a right-handed archer holds
+## them (decision 462).
 static func held_ids(entity: GridEntity) -> Array:
 	var right := entity.slots[Items.RIGHT_HAND] if entity.slots.size() > Items.RIGHT_HAND else ""
 	var left := entity.slots[Items.LEFT_HAND] if entity.slots.size() > Items.LEFT_HAND else ""
-	if right != "" and str(Items.verb_of(right).get("kind", "")) == "ranged":
+	if World.drawn_slot(entity) == Items.RIGHT_HAND:
 		return [left, right]
 	return [right, left]
 
 
+## How far into Bow_Draw [param entity]'s pose is (0 to 1), scrubbed by the
+## sim's draw (decision 462): before the draw counts (draw_of 0, until its
+## draw_min) the nock, the clip's first BOW_NOCK_END, by the ticks toward
+## draw_min; then the pull, the rest of the clip, by World.draw_of from
+## where it starts (draw_min over draw_full) to 1. Carried on between ticks
+## by World.tick_alpha, so it moves every frame, not ten times a second.
+const BOW_NOCK_END := 0.3
+static func bow_pull(entity: GridEntity) -> float:
+	var verb := Items.verb_of(World.drawn_with(entity))
+	if verb.is_empty() or entity.raised != "draw":
+		return 0.0
+	var quick := float(Items.strength_value(World.slot_strength(entity, World.drawn_slot(entity)), "draw", 1.0))
+	var least := roundi(int(verb.get("draw_min", 0)) * quick)
+	var full := maxf(1.0, float(verb.get("draw_full", 1)) * quick)
+	var drawn := World.tick - entity.raised_tick
+	var progress := World.draw_of(entity)
+	if progress <= 0.0:
+		return BOW_NOCK_END * clampf((drawn + World.tick_alpha) / maxf(1.0, least), 0.0, 1.0)
+	progress = minf(1.0, progress * (drawn + World.tick_alpha) / maxf(1.0, drawn))
+	var start := least / full
+	return BOW_NOCK_END + (1.0 - BOW_NOCK_END) * clampf((progress - start) / maxf(0.001, 1.0 - start), 0.0, 1.0)
+
+
 ## A bow's look on its puppet (decision 462), from what the sim replicates
 ## (items' signals): a bow in hand and nothing raised, Bow_Idle on the upper
-## layer; raised "draw", Bow_Draw from the nock, played so its end (full draw)
-## comes when World.draw_of reaches 1, then Bow_Hold while it stays drawn; the
+## layer; raised "draw", Bow_Draw held at bow_pull (the arm drawing back as
+## World.draw_of grows), then Bow_Hold once it reaches 1; the
 ## shot (_on_shot), Bow_Loose; a draw let go with no shot, back to Bow_Idle. A
 ## raised shield ("block") holds the guard (Block_Idle) on the upper layer.
 ## While drawn the bundle's hand shows one arrow (fx.arrow, its kind's
 ## variant) on the bow's string, the string pulled back to that hand.
-const BOW_DRAW_SECONDS := 2.0  # A bow's draw when its verb gives none (draw_full 20 ticks).
 func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if not puppet.has_meta("rig") or not puppet.has_meta("sockets"):
 		return
@@ -6681,7 +6704,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if moves.is_empty():
 		return
 	var ids := held_ids(entity)
-	var bow: String = ids[1] if ids[1] != "" and str(Items.verb_of(ids[1]).get("kind", "")) == "ranged" else ""
+	var bow := World.drawn_with(entity)
 	var state := str(puppet.get_meta("bow_state", ""))
 	var now := Time.get_ticks_msec()
 	var want := ""
@@ -6692,18 +6715,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	elif bow != "":
 		want = "loose" if state == "loose" and now < int(puppet.get_meta("bow_until", 0)) else "idle"
 	if want == "draw":
-		# Full draw when the sim's comes: the draw's ticks from its start, as far
-		# as draw_of tells them (a quick bow's are fewer), else the verb's.
-		var full := float(Items.verb_of(bow).get("draw_full", BOW_DRAW_SECONDS * World.TICK_RATE))
-		var drawn := float(World.tick - entity.raised_tick)
-		var progress := World.draw_of(entity)
-		if progress > 0.0:
-			full = drawn / progress
-		var left := maxf((full - drawn) * World.TICK_DT, 0.05)
 		var clip := str(moves.get("bow_draw", ""))
-		var at := rig.upper_position() if state == "draw" else 0.0
-		var speed := clampf((rig.length(clip) - at) / left, 0.2, 4.0)
-		rig.upper(clip, speed, state != "draw")
+		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
 	elif want != state:
 		match want:
 			"hold":

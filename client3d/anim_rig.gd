@@ -281,6 +281,20 @@ func upper(clip: String, speed := 1.0, from_start := false) -> void:
 	tree.set("parameters/upper/blend_amount", 1.0)
 
 
+## The upper layer held still on [param clip] at [param seconds] into it:
+## a pose scrubbed by something other than time (a bow's draw by how far
+## the sim has it drawn, decision 462). (Nothing on a rig made without the
+## layer.)
+func upper_at(clip: String, seconds: float) -> void:
+	if not _has_upper:
+		return
+	upper(clip, 0.0)
+	if _upper_clip == "":
+		return
+	tree.set("parameters/upper_seek/seek_request", seconds)
+	_apply()
+
+
 ## The upper layer's clip ("" for none) and its speed.
 func upper_clip() -> String:
 	return _upper_clip

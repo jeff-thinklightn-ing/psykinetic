@@ -11542,10 +11542,13 @@ so the bow stands upright (451's sockets: a held piece's length along the fist).
 
 Client3D plays them from items' signals (456; World.draw_of, raised, raised_tick,
 the shot), on AnimRig's upper layer (390) so an archer can step while drawing:
-a bow in hand and nothing raised, Bow_Idle; raised "draw", Bow_Draw from its start,
-its speed set each frame so its end comes when draw_of reaches 1 (the draw's ticks
-read from draw_of's progress, so a quick bow's shorter draw is kept to; a far body
-posed less often still keeps time); full draw, Bow_Hold; the shot, Bow_Loose, then
+a bow in hand and nothing raised, Bow_Idle; raised "draw", Bow_Draw held still at
+the sim's draw rather than played (amended at ui's ask, so the draw reads on the body
+without the HUD's percentage): Client3D.bow_pull scrubs it, the nock (the clip's first
+BOW_NOCK_END, 0.3) by the ticks toward draw_min while draw_of is still 0, then the
+pull, the rest, by draw_of from where it starts (draw_min over draw_full, a quick
+bow's too) to 1, carried on between ticks by World.tick_alpha; AnimRig.upper_at holds
+the upper layer at a time with its speed 0; full draw, Bow_Hold; the shot, Bow_Loose, then
 Bow_Idle; a draw let go with no shot, back to Bow_Idle. A raised shield ("block")
 holds the guard, Block_Idle, on the same layer. AnimRig.upper gains a speed and a
 restart (upper(clip, speed, from_start); perf's shape: upper_clip, upper_seek,

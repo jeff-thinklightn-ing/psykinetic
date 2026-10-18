@@ -59,6 +59,7 @@ notes (decision 324).
 - The wilds have their own art for fallen logs, ferns, wild flowers, reeds,
   the palisade, the timber wall joints and watchtower, the market stall and
   the forge (art-gen's candidates, applied for Jeff to look over in game).
+- An archer's draw now shows how far the bow is drawn: the bow arm draws back as the draw grows, and it's at full draw only when the shot is (decision 462).
 - Only gear you carry and use grows now. A thing starts counting what it fells, and can become a bane or hold a grudge, once one player or companion has carried it a season with 10 deeds, or done 20 deeds with it, or once it is blessed. A bundle of arrows never grows; its bow does (decision 472).
 - Ready for the coming forest zone: a level can have a canopy over its trees, dark under the roof and open in its clearings, and its trees can come from a stand grown year by year by a new offline tool (decisions 466 and 467). Nothing changes in the current levels.
 
