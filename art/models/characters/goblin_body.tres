@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=5 format=3]
+
+[ext_resource type="Shader" path="res://art/models/characters/goblin.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://art/models/characters/goblin_goblin_paint.png" id="2_paint"]
+[ext_resource type="Texture2D" path="res://art/models/characters/goblin_goblin_shine.png" id="3_shine"]
+[ext_resource type="Texture2D" path="res://art/models/characters/goblin_marks.png" id="4_marks"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/paint = ExtResource("2_paint")
+shader_parameter/shine = ExtResource("3_shine")
+shader_parameter/marks = ExtResource("4_marks")

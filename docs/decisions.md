@@ -13124,3 +13124,39 @@ Protocol unchanged; no new class_name.
 Rejected: cheating the bank itself (354); stealing (the thief's); a
 model-written swindle; short weights in residents' fees (nobody would
 notice); short gear.
+## 494. No two goblins alike, by name: build, skin, gear and a mark
+
+The backlog's "body variation for monsters", its look half (the coordinator: "a raid shouldn't
+be clones"). The goblin is the pack's own model: one painted mesh, one material, no parts. Each
+goblin is now its own by its name, which every peer has (162's seed), with no protocol change:
+Client3D.goblin_look(name), seeded by an FNV-1a hash of the name's bytes (not the engine's
+String hash, so every build agrees; release), gives
+
+- its build: a width on x and z, GOBLIN_WIDTH (0.88 to 1.12), on top of 162's size by mass;
+  drawn only (its mass, if it is to follow, is enemy-ai's);
+- its skin: the paint's green texels shifted in hue, saturation and value (GOBLIN_SKIN_*),
+  within the Blood Rot's greens, yellowish to bluish, darker to paler;
+- its gear: the paint's other texels (hood, wraps, leather; not the eyes) tinted toward one of
+  GOBLIN_GEAR, row 5 to 7's browns, greys, a dull red, ochre and straw, keeping their shading,
+  or its own (GOBLIN_OWN_GEAR of the time);
+- a mark, or none (GOBLIN_UNMARKED of the time): a scar across the left eye, white cheek
+  stripes, or a red hand over the mouth, a channel each of goblin_marks.png (tools/goblin_marks.py
+  draws them over the paint's UVs);
+- its words ("build=lean skin=dark gear=red mark=scarred", a word only where it stands out),
+  kept on its puppet ("goblin_look") for a companion's voice to say "the scarred one" if lore
+  wants it later; nothing reads them yet.
+
+One ShaderMaterial for every goblin (goblin_body.tres, goblin.gdshader with
+goblin.gdshaderinc), its look as instance parameters (skin, gear, mark), so a raid batches as
+before: 20 animated goblins drew in the same 100 draw calls with it as with the pack's own
+material, their frames within noise (0.76 to 0.85 ms mean against 0.80 to 0.83, a scratch bench
+under the bench lock). The hover outline's stencil copy of it is goblin_marking.gdshader, the
+same drawing marking the stencil (Client3D._marking_copy). Roughness from the paint's shine, no
+metal, as the pack's material had it.
+
+Next, as this amended: the hood split from the mesh (a scalp patch if the head is hollow), so it
+can be down by seed, and the ears scaled about their root.
+
+view_test: each goblin its own by name, alike for the same name; one shared material, the look
+as instance parameters; a raid of 40 with marks and builds; the outline's stencil with the
+goblin's shader. Sheet of ten for Jeff: C:\dev\review\goblins\goblins_v1.png.

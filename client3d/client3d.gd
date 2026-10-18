@@ -512,7 +512,7 @@ const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.46], ["Jog_Short", 1.82], ["Sp
 ## person is ("parts", a PersonLook of its "people").
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS, "goblin": true},
 	"brute": {"scene": "res://art/models/characters/orc.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.95,
 		"faces": PI * 0.5, "by_mass": false, "gaits": ORC_GAITS, "backpedal": 5.26, "parts": true, "people": "orc",
 		"fidgets": ORC_FIDGETS, "moves": HUMANOID_MOVES, "sockets": ORC_SOCKETS},
@@ -636,6 +636,25 @@ const HUMAN_F_GAITS: Array[Array] = [[CLIP_WALK, 0.89], ["Jog_Short", 3.44], ["S
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
+## The goblin's one material (decision 494): its paint varied per goblin by
+## instance parameters (goblin_look), so a raid draws in one batch.
+const GOBLIN_MATERIAL := preload("res://art/models/characters/goblin_body.tres")
+## Its copy's shader under the hover outline: the same, marking the stencil.
+const GOBLIN_MARKING_SHADER := preload("res://art/models/characters/goblin_marking.gdshader")
+## A goblin's variation (goblin_look), each drawn by its name: its build (a
+## width on its height, GOBLIN_WIDTH), its skin's shift within the Blood
+## Rot's greens (hue, saturation, value: GOBLIN_SKIN_*), its gear tinted to
+## one of GOBLIN_GEAR (or its own, GOBLIN_OWN_GEAR of the time) and a mark of
+## GOBLIN_MARKS (or none, GOBLIN_UNMARKED of the time).
+const GOBLIN_WIDTH := Vector2(0.88, 1.12)
+const GOBLIN_SKIN_HUE := Vector2(-0.06, 0.05)
+const GOBLIN_SKIN_SAT := Vector2(0.85, 1.15)
+const GOBLIN_SKIN_VALUE := Vector2(0.8, 1.15)
+const GOBLIN_GEAR := {"brown": "6b4a35", "dark": "3d2a1f", "grey": "7d8086", "red": "8a3a2c", "ochre": "a37d40",
+	"straw": "9c8f74"}
+const GOBLIN_OWN_GEAR := 0.3
+const GOBLIN_MARKS := ["scarred", "striped", "red-handed"]
+const GOBLIN_UNMARKED := 0.55
 const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
 ## A PersonLook's posture: its pose in the clips (rest plus the bend,
 ## tools/humanoid_clips.py), added at full weight.
@@ -2312,6 +2331,8 @@ func _marking_copy(material: Material) -> Material:
 			copy.stencil_flags = BaseMaterial3D.STENCIL_FLAG_WRITE
 			copy.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_ALWAYS
 			copy.stencil_reference = OUTLINE_STENCIL
+		elif copy is ShaderMaterial and material == GOBLIN_MATERIAL:
+			(copy as ShaderMaterial).shader = GOBLIN_MARKING_SHADER
 		_marking[material] = copy
 	return _marking[material]
 
@@ -6779,6 +6800,16 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		_dress(scene, tunic)
 		if puppet.has_meta("look"):
 			(puppet.get_meta("look") as PersonLook).apply(scene, tunic)
+	if model.get("goblin", false):
+		# Its own goblin (decision 494): the shared material, its variation as instance parameters.
+		var look := goblin_look(str(puppet.get_meta("entity_name", "")))
+		puppet.set_meta("goblin_look", look)
+		scene.scale = Vector3(scene.scale.x * float(look["width"]), scene.scale.y, scene.scale.z * float(look["width"]))
+		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+			mesh.material_override = GOBLIN_MATERIAL
+			mesh.set_instance_shader_parameter("skin", look["skin"])
+			mesh.set_instance_shader_parameter("gear", look["gear"])
+			mesh.set_instance_shader_parameter("mark", look["mark"])
 	if model.has("tint"):
 		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
@@ -7029,6 +7060,50 @@ static func _tint(scene: Node3D, material: String, colour: Color) -> void:
 				var tinted := own.duplicate() as BaseMaterial3D
 				tinted.albedo_color = colour
 				mesh.set_surface_override_material(surface, tinted)
+
+
+## A goblin's look by its name (decision 494), the same on every peer (a
+## hash of the name's bytes, not the engine's String.hash): {width, skin
+## (Vector3: hue shift, saturation, value), gear (Color, its amount in .a),
+## mark (Vector3, one-hot or none), words}, its words for what a voice might
+## call it ("build=lean skin=dark gear=red mark=scarred", a word only where
+## it stands out).
+static func goblin_look(goblin_name: String) -> Dictionary:
+	var h := 2166136261
+	for byte in goblin_name.to_utf8_buffer():
+		h = ((h ^ byte) * 16777619) & 0xffffffff
+	var rng := RandomNumberGenerator.new()
+	rng.seed = h
+	var width := rng.randf_range(GOBLIN_WIDTH.x, GOBLIN_WIDTH.y)
+	var skin := Vector3(rng.randf_range(GOBLIN_SKIN_HUE.x, GOBLIN_SKIN_HUE.y), rng.randf_range(GOBLIN_SKIN_SAT.x, GOBLIN_SKIN_SAT.y),
+		rng.randf_range(GOBLIN_SKIN_VALUE.x, GOBLIN_SKIN_VALUE.y))
+	var own := rng.randf() < GOBLIN_OWN_GEAR
+	var gear_name: String = GOBLIN_GEAR.keys()[rng.randi() % GOBLIN_GEAR.size()]
+	var gear := Color(GOBLIN_GEAR[gear_name])
+	gear.a = 0.0 if own else 0.85
+	var marked := rng.randf() >= GOBLIN_UNMARKED
+	var mark_index := rng.randi() % GOBLIN_MARKS.size()
+	var mark := Vector3.ZERO
+	if marked:
+		mark[mark_index] = 1.0
+	var words: Array[String] = []
+	if width < 0.95:
+		words.append("build=lean")
+	elif width > 1.05:
+		words.append("build=stocky")
+	if skin.z < 0.9:
+		words.append("skin=dark")
+	elif skin.z > 1.07:
+		words.append("skin=pale")
+	elif skin.x < -0.03:
+		words.append("skin=yellowish")
+	elif skin.x > 0.03:
+		words.append("skin=bluish")
+	if not own:
+		words.append("gear=" + gear_name)
+	if marked:
+		words.append("mark=" + GOBLIN_MARKS[mark_index])
+	return {"width": width, "skin": skin, "gear": gear, "mark": mark, "words": " ".join(words)}
 
 
 ## [param entity]'s own look and manner (see MODEL_MASS), on its puppet:

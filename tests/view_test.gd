@@ -2209,6 +2209,26 @@ func _test_goblins_differ() -> void:
 		return float(model["height"]) * float(puppet.get_meta("model_scale"))
 	_check(tall.call(big, Client3D.MODELS["brute"]) > tall.call(a, Client3D.MODELS["imp"]) * 1.4,
 			"and the brute, an orc, much bigger (%.2f m, an imp %.2f m)" % [tall.call(big, Client3D.MODELS["brute"]), tall.call(a, Client3D.MODELS["imp"])])
+	# Their looks (decision 494): by name, alike on every peer; one material for them all.
+	var la: Dictionary = a.get_meta("goblin_look")
+	var lb: Dictionary = b.get_meta("goblin_look")
+	_check(la == Client3D.goblin_look(String(imps[0].name)) and la != lb,
+			"each goblin its own look by its name (%s | %s)" % [la["words"], lb["words"]])
+	var shared := [a, b].all(func(p: Node3D) -> bool:
+		return p.find_children("*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool: return m.get_parent() is Skeleton3D).all(
+			func(m: MeshInstance3D) -> bool: return m.material_override == Client3D.GOBLIN_MATERIAL))
+	var body_mesh := a.find_children("*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool: return m.get_parent() is Skeleton3D)[0] as MeshInstance3D
+	var skin: Vector3 = body_mesh.get_instance_shader_parameter("skin")
+	_check(shared and skin == la["skin"], "drawn in the one shared material, its look as instance parameters (skin %s)" % skin)
+	var marked := 0
+	var stocky_or_lean := 0
+	for i in 40:
+		var look := Client3D.goblin_look("Raider%d" % i)
+		if (look["mark"] as Vector3) != Vector3.ZERO:
+			marked += 1
+		if "build=" in str(look["words"]):
+			stocky_or_lean += 1
+	_check(marked > 5 and marked < 30 and stocky_or_lean > 5, "a raid of 40: %d marked, %d lean or stocky" % [marked, stocky_or_lean])
 	var animators: Array[AnimRig] = [a.get_meta("rig"), b.get_meta("rig")]
 	_check(absf(animators[0].position() - animators[1].position()) > 0.01,
 			"standing side by side, out of step (%.2f s, %.2f s into Idle)" % [animators[0].position(), animators[1].position()])
@@ -2331,6 +2351,12 @@ func _test_target_marked() -> void:
 	_check(passes == 8, "by its silhouette nudged each of the eight ways (%d passes)" % passes)
 	var same := true
 	for n in meshes.size():
+		if own[n] is ShaderMaterial:
+			# A goblin's (decision 494): its shader's twin that marks the stencil, its paint the same.
+			var shaded := meshes[n].get_active_material(0) as ShaderMaterial
+			same = same and shaded != null and shaded.shader == Client3D.GOBLIN_MARKING_SHADER \
+					and shaded.get_shader_parameter("paint") == (own[n] as ShaderMaterial).get_shader_parameter("paint")
+			continue
 		var drawn := meshes[n].get_active_material(0) as BaseMaterial3D
 		var was := own[n] as BaseMaterial3D
 		same = same and drawn != null and was != null and drawn.stencil_mode == BaseMaterial3D.STENCIL_MODE_CUSTOM \
