@@ -628,7 +628,14 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		for used: int in each["uids"]:
 			book().end(used, "used", "made into %s #%d" % [each["recipe"], uid])
 	each["uids"] = []
-	if uid != 0:
+	var yields := Items.yield_of(book().id_of(uid)) if uid != 0 else {}
+	if not yields.is_empty():
+		# A raw made from raws (the tanner's leather) is the town's stock, for
+		# its own work to use (the mend, the buckler: decision 405 amended).
+		for what: String in yields:
+			stockpile.deposit(each["town"], what, int(yields[what]), worker_record["name"], "made at %s" % each["workshop"])
+		book().end(uid, "banked", "%s by %s" % [each["town"], worker_record["name"]])
+	elif uid != 0:
 		stockpile.stock_shop(each["town"], uid, worker_record["name"], worker_record["id"])
 	# The wage, less its tax, which stays in the treasury.
 	var wage: int = taxed(int(rules.get("wage", 0)), "wage", rules)[1]

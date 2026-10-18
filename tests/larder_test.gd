@@ -104,8 +104,8 @@ func _test_tanner() -> void:
 	var made := _started(work, 4000)
 	_check(made == ["leather"], "two hides make leather, whatever the town's tier (%s, %s)" % [made, work.tier(TOWN)])
 	_check(work.stockpile.count(TOWN, "hide") == 1, "one hide left, too few for another")
-	var shop := work.stockpile.shop(TOWN).map(func(uid: int) -> String: return work.book().id_of(uid))
-	_check(shop == ["leather"], "the leather is in the shop to sell (%s)" % [shop])
+	_check(work.stockpile.count(TOWN, "leather") == 1 and work.stockpile.shop(TOWN).is_empty(),
+		"the leather is the town's stock, for its mending and bucklers (%d)" % work.stockpile.count(TOWN, "leather"))
 
 
 func _test_eating() -> void:

@@ -28,6 +28,7 @@ notes (decision 324).
   from the town's coffer), the newest thing they have heard, or a plea (a hand
   with a debt, a word carried to a neighbour they have fallen out with). Take
   one on and they remember your promise; keep it, or it lapses in a week.
+- The tanner's leather goes into the town's store, so the fletcher can mend arrows and the tanner make bucklers with it, instead of sitting in the shop.
 - Each of the town's people carries their look with them now (build, age,
   hair, beard, a hood or hat, the trade's apron), ready for the character
   models when they come; nothing changes on screen yet.

@@ -9169,6 +9169,14 @@ town.
 Protocol unchanged: stock ids ride the fields they did. tests/larder_test;
 builder_test's uses take the tannery.
 
+Amended (the coordinator's balance run, 2026-10-17): a made thing with a
+yield (the tanner's leather) is banked as that yield in the town's stock,
+not put in the shop. In the shop it was gear the town's own work could
+not use: the fletcher's mend and the tanner's buckler (items' 413) take
+leather from the stock, so a town's leather sat unused, six in the shop at
+its cap, while hides piled up uncured. Production._finish now deposits the
+yield and ends the thing, "banked".
+
 ## 407. Camps and hunters take from the herds, above their reserves; wolves starve
 
 Herds step 3 (367, 397, 405), the coordinator's approval of 2026-10-17.
