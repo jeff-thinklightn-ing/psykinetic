@@ -3563,6 +3563,34 @@ cleaning to show the difference.
 Rejected: embeddings or a model call to judge repeats (a call per line on
 the box's tick budget); dropping a whole reply when one sentence fails.
 
+Amended (2026-10-18, Jeff's playtest through the coordinator: Wren at
+22:32 offered Pip help with his carpentry as an imp closed, then said three
+"we should" lines in 30 seconds, none about the two stags Jeff had just
+brought down; at 21:56 three moments went unsaid, her one line said again
+and dropped as an echo each time):
+- A threat leads. A friend's arrival in the same moment is narrated
+  first and the threat last, nearest her answer, then "[The imp is the
+  danger here; the rest can wait.]" when both came.
+- A monster or animal her player brought down is worth a word (note_death's
+  by, Main's last blow), like a big one or the first of its kind:
+  "[Jeff brought down the stag.]", asked as "Stag died, brought down by
+  Jeff."
+- A line, unasked, on what "we" should do next (WE_SHOULD: we should,
+  must, need to, let's...) is said once in WE_SHOULD_TICKS (300, half a
+  minute); the rest are dropped and logged. VOICE_RULES adds: when something
+  has just happened, speak to it, not to what to do next.
+- Her own line said again, unasked, is asked once more, her system prompt
+  told what she just said and not to say it again (as a line speaking for
+  her player is); said again then, it is dropped.
+- The death path: Main._on_entity_died and her note_death write nothing to disk beyond a
+  transcript line and blocks on nothing (her record's facts are a copy in
+  memory, saved with the snapshot). What a kill cost was her stance's and
+  her voice's prompts each seeing the same cells (a line of sight a cell,
+  about 20 us, 169 cells, three times). _sees now keeps them for the tick
+  from where she stands, halving a kill's prompts (17 ms to 9 in the test
+  room).
+companion_test and resident_test cover each. Protocol unchanged.
+
 ## 237. Companions perceive through Senses: sight by light, deaths witnessed, noises heard
 
 A Companion has Senses (222) as the monsters do: Senses.new(self,

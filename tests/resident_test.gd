@@ -888,6 +888,45 @@ func _test_houses() -> void:
 	_put(owner, Vector2i(2, 2))
 	for i in 3:
 		World.step()
+	# A friend and a threat in sight in one moment: the threat told last, as the danger (228 amended).
+	var friends := pet.friends_seen()
+	if friends.is_empty():
+		# None in sight from here: she goes to stand by one of the town's people.
+		for body: GridEntity in World.townsfolk():
+			for offset: Vector2i in [Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]:
+				var at := body.tile + offset
+				var beside := at + offset.sign()
+				if friends.is_empty() and World.is_free(at) and World.is_free(beside) and World.has_line_of_sight(at, body.tile):
+					_put(pet, at)
+					_put(owner, beside)
+					pet._seen_cells_tick = -1
+					if pet.friends_seen().has(body):
+						friends = [body]
+	if friends.is_empty():
+		_check(false, "a resident in her sight for the threat-leads case")
+		return
+	var spot := Vector2i(-1, -1)
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var at := pet.tile + Vector2i(dx, dy)
+			var away := mini(World.distance(pet.tile, at), World.distance(owner.tile, at))
+			if spot == Vector2i(-1, -1) and away > Companion.COMBAT_RANGE and World.distance(pet.tile, at) <= 6 \
+					and World.is_free(at) and World.has_line_of_sight(pet.tile, at):
+				spot = at
+	var lurker := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "LurkImp%d" % World.tick, "tile": spot}) as Monster
+	lurker.sight_range = 0
+	pet._known_friends.erase(friends[0].get_instance_id())
+	pet._known_hostiles.erase(lurker.get_instance_id())
+	pet._was_in_fight = false
+	World.step()
+	var told: Array = pet._exchange.slice(-3).map(func(turn: Dictionary) -> String: return str(turn["text"]))
+	_check(told.size() == 3 and "came into sight" in told[0] and "came into sight" in told[1] and "is the danger here" in told[2]
+		and pet.refer(lurker, true).to_lower() in told[1].to_lower(), "the friend told first, the imp last, named the danger (%s)" % [told])
+	World.despawn(lurker)
+	for body: GridEntity in World.townsfolk():
+		(body as Resident)._hide_until = -1
+	for i in 3:
+		World.step()
 
 
 func _test_bodies_only_near() -> void:

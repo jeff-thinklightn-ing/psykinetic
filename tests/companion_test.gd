@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_transcript_rebuild()
 	_test_monsters_by_kind()
 	_test_death_triggers()
+	_test_event_focus()
 	_test_voice_knows()
 	_test_lapse()
 	_test_said_persists()
@@ -2680,6 +2681,57 @@ func _test_death_triggers() -> void:
 	World.step()
 	_check(mind.triggers("voice").size() == 4, "an ally's death: her voice")
 	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _test_event_focus() -> void:
+	print("\n== a threat leads, her player's kill gets a word, \"we should\" now and then, her own line asked again (228 amended) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 5))
+	pet._kinds_fallen["imp"] = true
+	pet._deaths.clear()
+	pet.note_death(String(imp.name), false, imp, owner)
+	pet.stance_prompt()
+	pet.voice_messages()
+	var seen := pet._seen_cells.size()
+	pet.stance_prompt()
+	pet.voice_messages()
+	_check(seen > 0 and pet._seen_cells.size() == seen and pet._seen_cells_tick == World.tick,
+		"what she sees is worked out once a tick: her stance and her voice see the same cells (%d)" % seen)
+	_check(pet._deaths.back()["speak"] and pet._take_deaths(false) == ["%s died, brought down by %s." % [imp.name, pet.keeper_name()]],
+		"an imp, not the first, brought down by her player: her voice is asked about the kill")
+	_check(("[%s brought down" % pet.keeper_name()) in pet.voice_prompt("test"), "and the exchange says who brought it down")
+	pet.note_death(String(imp.name), false, imp, null)
+	_check(not pet._deaths.back()["speak"], "one no one in particular brought down: not")
+	pet._deaths.clear()
+	World.despawn(imp)
+	mind.clear()
+	pet._last_speech_tick = -1000
+	pet._we_should_tick = -100000
+	pet._take_result({"kind": "voice", "serial": 0, "answer": {"say": "We should move on before nightfall."}, "spoken_to": false, "asked": false})
+	pet._last_speech_tick = -1000
+	pet._take_result({"kind": "voice", "serial": 0, "answer": {"say": "Let's keep moving, there's no telling what is near."}, "spoken_to": false, "asked": false})
+	_check(pet._said.back() == "We should move on before nightfall." and MindLog.last[String(pet.name)].get("note", "").begins_with("what we should do"),
+		"a second \"we should\" within WE_SHOULD_TICKS, unasked: dropped (%s)" % [MindLog.last[String(pet.name)].get("note", "")])
+	pet._last_speech_tick = -1000
+	pet._take_result({"kind": "voice", "serial": 0, "answer": {"say": "Let's go, then."}, "spoken_to": true, "asked": false})
+	_check(pet._said.back() == "Let's go, then.", "asked, it is said")
+	pet._last_speech_tick = -1000
+	pet.remember_said("It is safer to do so away from danger.")
+	mind.voice_answer = {"say": "It is safer to do so away from danger."}
+	pet._ask_voice("A wolf came into sight.")
+	_check(mind.voice_asks.size() == 2 and not "You have just said" in str(mind.voice_asks[0]["system"])
+		and "You have just said \"It is safer to do so away from danger.\" already" in str(mind.voice_asks[1]["system"]),
+		"her own line again, to something new: asked once more, told not to say it (%d asks)" % mind.voice_asks.size())
+	_check(MindLog.last[String(pet.name)].get("note", "") == "echoes her own line" and pet._repeat_note.is_empty(),
+		"and said again on the second try: dropped, no third ask")
+	pet.mind = ScriptedMind.new()
+	_forget(pet)
 	_settle(pet)
 
 

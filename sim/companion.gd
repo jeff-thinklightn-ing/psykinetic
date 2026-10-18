@@ -134,6 +134,11 @@ const OTHERS_SAID_TICKS := 200
 ## A line of fewer words than this, unasked, is a fragment and not said,
 ## unless it is a call ("Behind you!").
 const FRAGMENT_WORDS := 3
+## A line, unasked, on what "we" should do next ("We should move on.",
+## "Let's keep moving."): one in WE_SHOULD_TICKS, the rest dropped (228
+## amended: Jeff's playtest, three in 30 seconds, none on what happened).
+const WE_SHOULD := "(?i)(^|[.!?]\\s+)(we (should|must|need to|ought to|have to|'d better|had better)|let's|let us) "
+const WE_SHOULD_TICKS := 300
 ## Noises she heard and did not see: so many kept, told to her voice for
 ## NOISE_TOLD_TICKS; a loud one (NOISE_WORDS' asking kinds) asks her voice
 ## when calm, at most once in NOISE_ASK_TICKS. Steps and speech are not
@@ -232,7 +237,8 @@ never describe what you do or where you go. Not everything said near you is mean
 names someone else is not; a line that names no one is open to anyone near, and you answer it if you have something
 useful to say; from %s with no one else near, it is for you. When a line is meant for you, always answer in words,
 even if only to say you don't know; when it is not, you usually stay quiet and answer with just: ... Never say again
-what you have already said, and never repeat anyone's words back. Only when nothing has been said to you and there is
+what you have already said, and never repeat anyone's words back. When something has just happened, speak to
+it, not to what to do next. Only when nothing has been said to you and there is
 truly nothing worth saying, answer with just: ...
 Speak to %s as "you", never of them by name, and to no one else unless they have just spoken to you or are in danger you must warn them
 of; say a name only to call out. In what anyone says, "I" and "me" are the one speaking.
@@ -485,6 +491,11 @@ var _report_serials: Dictionary[int, bool] = {}
 ## (SPEAKS_FOR); the next ask sent is one when set.
 var _reask_serials: Dictionary[int, bool] = {}
 var _reask_next := false
+## Her own line her voice said again, to an event (228 amended): asked once
+## more, told not to (voice_messages), "" when none.
+var _repeat_note := ""
+## When she last said what "we" should do unasked (WE_SHOULD).
+var _we_should_tick := -100000
 ## The trade she works in a town she stays in while her player is away
 ## (Main._stay_in_town; decision 284), or "".
 var works_as := ""
@@ -831,9 +842,12 @@ func note_death(who: String, her_player := false, entity: GridEntity = null, by:
 	var first := monster and not _kinds_fallen.has(kind_of(entity))
 	if monster:
 		_kinds_fallen[kind_of(entity)] = true
-	var speak := not monster or big or first
+	# One her player brought down is worth a word on the kill (228 amended).
+	var theirs := monster and by != null and by == keeper and _alive(keeper)
+	var speak := not monster or big or first or theirs
 	_fight_notable = _fight_notable or speak
-	_deaths.append({"who": who, "told": refer(entity, true) if monster else who, "speak": speak, "monster": monster})
+	_deaths.append({"who": who, "told": refer(entity, true) if monster else who, "speak": speak, "monster": monster,
+		"by": keeper_name() if theirs else ""})
 	_fallen.append({"word": kind_of(entity) if monster else who, "monster": monster})
 	if _fallen.size() > 8:
 		_fallen.pop_front()
@@ -1061,6 +1075,9 @@ func _watch() -> void:
 	_seen = now
 	var fight := in_fight()
 	var new_kind := ""
+	var threats: Array[String] = []
+	var arrivals: Array[String] = []
+	var danger := ""
 	for entity in World.get_entities():
 		if entity is Monster and entity.spawned and not _known_hostiles.has(entity.get_instance_id()) and senses.sees(entity):
 			_known_hostiles[entity.get_instance_id()] = true
@@ -1074,14 +1091,23 @@ func _watch() -> void:
 			# In a fight a sighting is no event; only what changes is.
 			if not fight and not _was_in_fight:
 				events.append("%s came into sight." % _name_of(entity))
-				_narrate("%s came into sight, %s." % [refer(entity, true), _paces_toward(Vector2(entity.tile))])
+				threats.append("%s came into sight, %s." % [refer(entity, true), _paces_toward(Vector2(entity.tile))])
+				if _hostile(entity) and danger.is_empty():
+					danger = refer(entity, true)
 	for friend in friends_seen():
 		if not _known_friends.has(friend.get_instance_id()):
 			_known_friends[friend.get_instance_id()] = true
 			if not fight and not _was_in_fight:
 				var who := _name_of(friend) if friend is Companion else friend_words(friend)
 				events.append("%s came into sight." % who)
-				_narrate("%s came into sight, %s." % [who, _paces_toward(Vector2(friend.tile))])
+				arrivals.append("%s came into sight, %s." % [who, _paces_toward(Vector2(friend.tile))])
+	# A threat leads (228 amended: an imp closing and a friend arriving in
+	# one moment, she offered the friend help with his carpentry): told
+	# last, nearest her answer, and named as the danger.
+	for told in arrivals + threats:
+		_narrate(told)
+	if not danger.is_empty() and not arrivals.is_empty():
+		_narrate("%s is the danger here; the rest can wait." % danger)
 	var had_deaths := not _deaths.is_empty()
 	var dead_names: Array[String] = []
 	for death: Dictionary in _deaths:
@@ -1139,10 +1165,12 @@ func _take_deaths(fight_over: bool) -> Array[String]:
 	var spoken: Array[String] = []
 	var any_monster := false
 	for death: Dictionary in _deaths:
-		_narrate("%s fell." % death["told"])
+		var by := str(death.get("by", ""))
+		_narrate("%s brought down %s." % [by, death["told"].left(1).to_lower() + death["told"].substr(1)] if not by.is_empty()
+			else "%s fell." % death["told"])
 		any_monster = any_monster or death["monster"]
 		if death["speak"]:
-			spoken.append("%s died." % death["who"])
+			spoken.append("%s died, brought down by %s." % [death["who"], by] if not by.is_empty() else "%s died." % death["who"])
 	if spoken.is_empty() and any_monster and fight_over:
 		spoken.append("%s died, the last of them." % _deaths.back()["who"])
 	_deaths.clear()
@@ -1787,6 +1815,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 		system += "\n\n" + VOICE_NAMED % speaker
 	elif addressed == "open":
 		system += "\n\n" + VOICE_OPEN % [speaker, " and ".join(others_near())]
+	if not _repeat_note.is_empty():
+		system += "\n\nYou have just said \"%s\" already: never say it again. Say something new about what just happened, or answer with just: ..." % _repeat_note
+		_repeat_note = ""
 	var messages: Array[Dictionary] = [{"role": "system", "content": system}]
 	for turn: Dictionary in _exchange:
 		var role: String = turn["role"]
@@ -2318,7 +2349,22 @@ func _cells_within(reach: int) -> Array[Vector2i]:
 
 
 func _sees(cell: Vector2i) -> bool:
-	return senses.sees_cell(cell, DARK)
+	# Kept for the tick, from where she stands: a kill asked her stance and
+	# her voice, and her line's surroundings, each seeing the same cells
+	# again (228 amended; perf: slow ticks on kills).
+	if _seen_cells_tick != World.tick or _seen_cells_from != tile:
+		_seen_cells.clear()
+		_seen_cells_tick = World.tick
+		_seen_cells_from = tile
+	if not _seen_cells.has(cell):
+		_seen_cells[cell] = senses.sees_cell(cell, DARK)
+	return _seen_cells[cell]
+
+
+## The cells _sees worked out this tick, and from where.
+var _seen_cells: Dictionary[Vector2i, bool] = {}
+var _seen_cells_tick := -1
+var _seen_cells_from := Vector2i(-99999, -99999)
 
 
 ## Whether she sees [param entity] now (Main: a death she witnessed).
@@ -2699,9 +2745,22 @@ func _take_result(result: Dictionary) -> void:
 	# Her things may be spoken of when asked about, told of in a report, or
 	# given or fetched.
 	var items_told: bool = asks_about_items(str(result.get("heard", ""))) or report or chosen >= 0 and offered[chosen].has("item")
+	if echo == "her own line" and not second_try and not spoken_to:
+		# Her own line again, to something new (228 amended: three moments
+		# lost so at 21:56): asked once more, told not to say it.
+		entry["outcome"] = "asked again"
+		entry["say_dropped"] = raw_line
+		entry["note"] = "echoes her own line"
+		_log(entry)
+		_repeat_note = raw_line
+		_reask_next = true
+		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, false, true, report)
+		_reask_next = false
+		return
 	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, items_told, spoken_to))
 	if echo.is_empty() and line != raw_line:
 		entry["say_raw"] = raw_line
+	var we_should := not spoken_to and RegEx.create_from_string(WE_SHOULD).search(line) != null
 	if raw_line.is_empty():
 		entry["outcome"] = "silent"
 	elif not echo.is_empty():
@@ -2717,12 +2776,19 @@ func _take_result(result: Dictionary) -> void:
 		entry["say_dropped"] = line
 		entry["note"] = "a fragment, unasked"
 		line = ""
+	elif we_should and World.tick - _we_should_tick < WE_SHOULD_TICKS:
+		entry["outcome"] = "dropped"
+		entry["say_dropped"] = line
+		entry["note"] = "what we should do, unasked, within %d ticks of the last" % WE_SHOULD_TICKS
+		line = ""
 	elif not _say(line, always):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
 		entry["note"] = "within %d ticks of her last line" % SPEECH_INTERVAL_TICKS
 		line = ""
 	entry["say"] = line
+	if we_should and not line.is_empty():
+		_we_should_tick = World.tick
 	if chosen >= 0:
 		entry["do"] = offered[chosen]["words"]
 	_log(entry)
