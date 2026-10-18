@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_pickup()
 	_test_kills()
 	_test_bane()
+	_test_style()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -1149,6 +1150,62 @@ func _test_kills() -> void:
 	var back := ItemBook.from_dict(World.items.to_dict())
 	_check(back.felled_of(dagger) == {"imp": 2, "wolf": 1}, "saved and read back")
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+
+
+func _test_style() -> void:
+	print("\n== a thing's make: dwarven or dark elven, from its source (decision 474) ==")
+	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
+	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "chest", Vector2i(2, 2): "monster_imp", Vector2i(5, 2): "start"}
+	var config := {"name": "style_test", "item_style": "dwarven",
+		"entities": [{"at": [3, 1], "props": {"style": "dark elven"}}, {"at": [5, 1], "props": {"style": "elvish"}}]}
+	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var style_at := {}
+	for spec: Dictionary in level["entities"]:
+		style_at[spec["tile"]] = spec.get("props", {}).get("style", "")
+	_check(style_at.get(Vector2i(1, 1)) == "dwarven" and style_at.get(Vector2i(2, 2)) == "dwarven",
+			"the level's item_style: its chest and its imp are dwarven (%s)" % [style_at])
+	_check(style_at.get(Vector2i(3, 1)) == "dark elven", "a marker's own style wins over the level's")
+	_check(style_at.get(Vector2i(5, 1)) == "dwarven" and level["warnings"].any(func(w: String) -> bool: return "elvish" in w),
+			"an unknown make: warned, the level's instead")
+	var plain := World.items.mint("dagger", "made", "", "", Vector2i(-1, -1), "elvish")
+	var dwarven := World.items.mint("dagger", "made", "", "", Vector2i(-1, -1), "dwarven")
+	_check(World.items.style_of(plain).is_empty() and World.items.style_of(dwarven) == "dwarven", "minted of a known make only")
+	_check(World.item_note(dwarven) == "dwarven dagger" and World.story_line(dwarven).ends_with("dwarven work"),
+			"its note and story say so (%s; %s)" % [World.item_note(dwarven), World.story_line(dwarven)])
+	_check(ItemBook.from_dict(World.items.to_dict()).style_of(dwarven) == "dwarven", "saved and read back")
+	World.items.end(plain, "gone")
+	World.items.end(dwarven, "gone")
+	var imp: GridEntity = null
+	for monster in World.monsters():
+		if str(monster.spawn_spec.get("kind", "")) == "imp":
+			imp = monster
+			break
+	_check(imp != null, "an imp to carry and drop things")
+	if imp == null:
+		return
+	var props: Dictionary = imp.spawn_spec.get("props", {})
+	var had_props := props.duplicate()
+	var had_slots := imp.slots
+	props["style"] = "dark elven"
+	imp.spawn_spec["props"] = props
+	imp.slots = Items.tidy(["dagger"], Items.CARRIED)
+	var held := World.slot_uid(imp, 0)
+	_check(World.items.style_of(held) == "dark elven", "what a dark elven imp carries is dark elven (%s)" % World.items.style_of(held))
+	var row: Dictionary = Monster.kinds()["imp"]
+	var had_drops: Variant = row.get("drops")
+	row["drops"] = [{"item": "dagger"}, {"item": "ration", "style": "dwarven"}]
+	var dropped := (imp as Monster).remains()
+	_check(dropped.size() == 2 and World.items.style_of(dropped[0]) == "dark elven" and World.items.style_of(dropped[1]) == "dwarven",
+			"its remains: of its make, a row's own style winning")
+	if had_drops == null:
+		row.erase("drops")
+	else:
+		row["drops"] = had_drops
+	for uid in dropped:
+		World.items.end(uid, "gone")
+	World.items.end(held, "gone")
+	imp.slots = had_slots
+	imp.spawn_spec["props"] = had_props
 
 
 func _test_bane() -> void:

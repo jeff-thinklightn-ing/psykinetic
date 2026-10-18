@@ -1969,11 +1969,19 @@ func slot_uid(entity: GridEntity, slot: int) -> int:
 	var uid := entity.slot_items[slot]
 	if uid != 0 and items.id_of(uid) == entity.slots[slot]:
 		return uid
-	uid = items.mint(entity.slots[slot], "stocked", _label_of(entity), entity.zone, entity.tile)
+	uid = items.mint(entity.slots[slot], "stocked", _label_of(entity), entity.zone, entity.tile, style_from(entity))
 	var carrier := _carrier_of(entity)
 	items.place(uid, holder_key(entity), carrier[0], carrier[1])
 	entity.slot_items[slot] = uid
 	return uid
+
+
+## The make of what [param entity] holds or keeps (decision 474): its
+## props' "style" (a level's item_style, or its marker's own, put there by
+## Level); "" for none.
+static func style_from(entity: GridEntity) -> String:
+	var props: Variant = entity.spawn_spec.get("props", {}) if is_instance_valid(entity) else {}
+	return str(props.get("style", "")) if props is Dictionary else ""
 
 
 ## Every slot's instance (slot_uid), made where missing: what a save keeps.
@@ -2151,6 +2159,11 @@ func _show_notes(entity: GridEntity) -> void:
 func item_note(uid: int) -> String:
 	var note := item_title(uid)
 	var more := PackedStringArray()
+	if not items.style_of(uid).is_empty():
+		if note.is_empty():
+			note = "%s %s" % [items.style_of(uid), Items.name_of(items.id_of(uid))]  # "dwarven dagger" (decision 474).
+		else:
+			more.append(items.style_of(uid))
 	if items.condition_of(uid) >= 0:
 		more.append("%d of %d" % [items.condition_of(uid), Items.condition_max(items.id_of(uid))])
 	if not items.bane_of(uid).is_empty():
@@ -2208,6 +2221,8 @@ func story_line(uid: int) -> String:
 				origin = "from %s's hunt" % event["what"] if not str(event["what"]).is_empty() else "from a hunt"
 		if not origin.is_empty():
 			parts.append(origin)
+	if not items.style_of(uid).is_empty():
+		parts.append("%s work" % items.style_of(uid))  # Decision 474.
 	if not items.kept_from(uid).is_empty() and not name.is_empty():
 		parts.append("kept from %s" % name["holder"])
 	if not items.blessed_for(uid).is_empty():

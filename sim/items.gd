@@ -38,6 +38,11 @@ const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight"
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher"]
 
+## The makes a thing can be of (decision 474): set at mint by its source
+## (a drop row, a chest's or a monster's props "style", a level's
+## "item_style"), read by its note and its story.
+const STYLES: Array[String] = ["dwarven", "dark elven"]
+
 ## Deeds done with a thing (ItemBook.deed; decision 365).
 const DEEDS: Array[String] = ["felled", "guarded", "shot", "braced", "behind", "downed", "struck"]
 ## Tags that make a thing without a verb gear, which can be named.

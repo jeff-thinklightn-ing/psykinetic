@@ -642,6 +642,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				props[key] = _prop(key, more[key])
 		_stock(props, spec, entry, config, warnings, at)
 		_arm(props, spec, entry, warnings, at)
+		_style(props, spec, config, warnings, at)
 		if not props.is_empty():
 			spec["props"] = props
 		if spec.get("script") == MONSTER:
@@ -1310,6 +1311,28 @@ static func _arm(props: Dictionary, spec: Dictionary, entry: Dictionary, warning
 			continue
 		slots[hand[1]] = id
 	props["slots"] = slots
+
+
+## The make of what a chest keeps or a monster carries and drops (decision
+## 474): its entry's props "style" if it is one of Items.STYLES, else the
+## level's "item_style" (dungeon sets it per source: below the castle
+## dwarven, the tower dark elven), else none. An unknown one is warned
+## about and the next tried. Animals and the rest have none.
+static func _style(props: Dictionary, spec: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
+	var script := str(spec.get("script", ""))
+	var own: Variant = props.get("style")
+	props.erase("style")
+	if script != CHEST and script != MONSTER:
+		if own != null:
+			warnings.append("style at %s: only a chest or a monster has a make" % at)
+		return
+	for given: Variant in [own, config.get("item_style")]:
+		if given == null:
+			continue
+		if str(given) in Items.STYLES:
+			props["style"] = str(given)
+			return
+		warnings.append("style at %s: no make %s (Items.STYLES has %s)" % [at, given, ", ".join(Items.STYLES)])
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except

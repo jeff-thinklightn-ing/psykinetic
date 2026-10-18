@@ -12052,3 +12052,24 @@ trees, 466 and 467); this is the level and its ways.
 
 tests/level_test's forest (and every level loading clean, the levels
 connecting).
+## 474. A thing's make: dwarven or dark elven
+
+The coordinator's item style, for the growth pass (2026-10-17): a drop is
+"dwarven" (plain, heavy, built to last; the dungeons below the castle) or
+"dark elven" (finer, majestic; the tower), set per source. The server half,
+approved 2026-10-18; protocol unchanged.
+- Items.STYLES lists the makes. ItemBook.mint takes a style (one of them,
+  else none), kept on the entry as "style" and saved; style_of(uid).
+- Its source sets it. Level._style gives a chest or a monster its props
+  "style": its entry's own if it is a known make, else the level's
+  "item_style" (dungeon sets it per halls level), else none; an unknown one
+  is warned about. World.style_from(entity) reads it when what a chest
+  keeps or a monster carries is minted (World.slot_uid, Main._top_up); a
+  monster's remains take their drop row's "style", else the monster's.
+- Its note reads "dwarven dagger" (a named thing's adds ", dwarven"), and
+  its story "dwarven work". Lore.render_name is left alone unless lore asks.
+- Held for later, with one protocol revision for both: a replicated
+  per-slot style (slot_styles, beside slot_notes) and the same for ground
+  piles, so a client can look up ArtKit's item.<id>.<style> before
+  item.<id>. It waits for art-kit's first styled piece.
+items_test's _test_style.

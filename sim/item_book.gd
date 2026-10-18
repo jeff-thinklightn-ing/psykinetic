@@ -52,11 +52,15 @@ func _init(steps: Callable = Callable()) -> void:
 
 ## A new instance of [param id], come into the world by [param kind]
 ## ("stocked" in a level's chest, "built", "migrated" from a save before
-## instances...) in [param what] at [param zone] [param tile]. Its uid.
-func mint(id: String, kind: String, what := "", zone := "", tile := Vector2i(-1, -1)) -> int:
+## instances...) in [param what] at [param zone] [param tile], of
+## [param style]'s make (decision 474; one of Items.STYLES, else none). Its
+## uid.
+func mint(id: String, kind: String, what := "", zone := "", tile := Vector2i(-1, -1), style := "") -> int:
 	var uid := _next
 	_next += 1
 	_book[uid] = {"id": id, "made": _now(), "at": "", "holder": "", "carriers": [], "events": []}
+	if style in Items.STYLES:
+		_book[uid]["style"] = style
 	if Items.condition_max(id) > 0:
 		_book[uid]["condition"] = Items.condition_max(id)  # Made whole (decision 375).
 	_book[uid]["events"].append(_event(kind, what, zone, tile))
@@ -65,6 +69,11 @@ func mint(id: String, kind: String, what := "", zone := "", tile := Vector2i(-1,
 
 func has(uid: int) -> bool:
 	return _book.has(uid)
+
+
+## [param uid]'s make ("dwarven", "dark elven"; decision 474); "" for none.
+func style_of(uid: int) -> String:
+	return str(_book[uid].get("style", "")) if _book.has(uid) else ""
 
 
 ## The Items id of [param uid]; "" for one not in the book.
@@ -495,6 +504,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				"carriers": carriers, "events": events}
 			if entry.get("condition") is float or entry.get("condition") is int:
 				items._book[int(key)]["condition"] = int(entry["condition"])
+			if str(entry.get("style", "")) in Items.STYLES:
+				items._book[int(key)]["style"] = str(entry["style"])
 			if entry.get("blessed") is Dictionary and entry["blessed"].get("for") is String:
 				items._book[int(key)]["blessed"] = {"for": entry["blessed"]["for"], "step": int(entry["blessed"].get("step", 0))}
 			if entry.get("bane") is String and not entry["bane"].is_empty():

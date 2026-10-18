@@ -2852,7 +2852,7 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 			print("[state] %s has no room for its stock: %s" % [entity.name, id])
 			continue
 		slots[free] = id
-		uids[free] = World.items.mint(id, "stocked", World._label_of(entity), entity.zone, entity.tile)
+		uids[free] = World.items.mint(id, "stocked", World._label_of(entity), entity.zone, entity.tile, World.style_from(entity))
 		stocked.append(id)
 		given.append(id)
 	props["stocked"] = stocked

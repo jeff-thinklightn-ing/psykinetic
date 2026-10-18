@@ -1204,7 +1204,9 @@ func remains() -> Array[int]:
 		var least := int(count[0]) if count is Array and count.size() > 0 else 1
 		var most := int(count[1]) if count is Array and count.size() > 1 else least
 		for i in roll.randi_range(least, maxi(least, most)):
-			uids.append(World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile))
+			# Its make (decision 474): the row's own, else this monster's.
+			var style := str(drop.get("style", World.style_from(self)))
+			uids.append(World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, style))
 	return uids
 
 
