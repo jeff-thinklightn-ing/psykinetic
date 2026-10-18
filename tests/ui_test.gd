@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
+	_test_keys()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -429,6 +430,62 @@ func _test_access() -> void:
 	Net.set_ui_scale(kept[3], false)
 	Net.set_text_scale(kept[4], false)
 	Net.set_colours(kept[5], false)
+
+
+func _test_keys() -> void:
+	print("== the keys: today's defaults, a rebinding swap, settings round trip, the Options rows ==")
+	var today := {"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
+		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
+		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B, "phrase_1": KEY_1, "phrase_2": KEY_2,
+		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT}
+	var same := Keys.DEFAULTS.size() == today.size()
+	for action: String in today:
+		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])
+	_check(same, "every default key is the key the game has always used (%d actions)" % today.size())
+	Keys.reset()
+	var press := InputEventKey.new()
+	press.keycode = KEY_E
+	press.pressed = true
+	_check(Keys.pressed(press, "open") and not Keys.pressed(press, "pack"), "Keys.pressed: E opens, not the pack")
+	var enter := InputEventKey.new()
+	enter.keycode = KEY_KP_ENTER
+	enter.pressed = true
+	_check(Keys.pressed(enter, "talk"), "the keypad's Enter counts as Enter")
+	Keys.bind("open", KEY_I)
+	_check(Keys.code("open") == KEY_I and Keys.code("pack") == KEY_E, "binding I to open swaps the pack to E: no key twice")
+	Keys.bind("open", KEY_ESCAPE)
+	_check(Keys.code("open") == KEY_I, "Esc is never bound")
+	var lines := Keys.lines()
+	_check("key_open=I" in lines and "key_pack=E" in lines and lines.size() == 2, "settings lines for the two changed (%s)" % [lines])
+	Keys.reset()
+	Keys.read({"key_open": "I", "key_pack": "E", "key_map": "nonsense"})
+	_check(Keys.code("open") == KEY_I and Keys.code("pack") == KEY_E and Keys.code("map") == KEY_M, "read back; nonsense left as it was")
+	Keys.reset()
+	_check(_main.hint_lines().has("E\topen a chest, crate, cart, door; your companion's pack") and _main._item_action_of(KEY_G) == "drop"
+			and _main._phrase_of(KEY_3) == 3 and _main._phrase_of(KEY_9) == 0, "Main reads the table: the hints' keys, the item keys, the phrases")
+	var panel: OptionsPanel = _main.options_panel
+	var kept: Array = [Net._settings_override, Net.player_id, Net.player_name]
+	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("ui_test_keys.cfg")
+	Net.save_settings("127.0.0.1", 17841, "", Net.player_name)
+	_check(panel.key_buttons.size() == Keys.WORDS.size() and panel.key_buttons["open"].text == "E", "a key row per action, showing its key")
+	panel.visible = true
+	panel.begin_rebind("open")
+	_check(panel.key_buttons["open"].text == "press a key", "pressed: it waits for a key")
+	var q := InputEventKey.new()
+	q.keycode = KEY_Q
+	q.pressed = true
+	panel._input(q)
+	_check(Keys.code("open") == KEY_Q and panel.key_buttons["open"].text == "Q" and panel.rebinding == ""
+			and "key_open=Q" in FileAccess.get_file_as_string(Net._settings_override),
+		"Q pressed: open is Q, shown, saved")
+	panel.visible = false
+	Keys.reset()
+	Net.save_view_settings()
+	_check("key_open" not in FileAccess.get_file_as_string(Net._settings_override), "reset: no key lines saved")
+	DirAccess.remove_absolute(Net._settings_override)
+	Net._settings_override = kept[0]
+	Net.player_id = kept[1]
+	Net.player_name = kept[2]
 
 
 func _check(ok: bool, label: String) -> void:

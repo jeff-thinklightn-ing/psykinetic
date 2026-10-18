@@ -56,6 +56,9 @@ const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), 
 var choices: Dictionary[String, Dictionary] = {}
 ## The Resolution drop-down.
 var resolution: OptionButton
+## The Controls section's key buttons by action, and the action being rebound ("" for none).
+var key_buttons: Dictionary[String, Button] = {}
+var rebinding := ""
 ## A slider moved since the settings were last written.
 var _unsaved := false
 ## The Character section's preview, its swatch rows (the look's key ->
@@ -121,6 +124,16 @@ func _ready() -> void:
 		func(value: String) -> void:
 			Net.set_hints(value == "on")
 			hints_changed.emit(value == "on")))
+	for action: String in Keys.WORDS:
+		controls.add_child(_key_row(action))
+	var reset := Button.new()
+	reset.text = "Reset keys"
+	reset.focus_mode = Control.FOCUS_NONE
+	reset.pressed.connect(func() -> void:
+		Keys.reset()
+		Net.save_view_settings()
+		_show_keys())
+	controls.add_child(reset)
 	# Filled when first shown: the server builds this panel too, and has no
 	# art/audio to credit (2f0db21).
 	_credits = add_section("Credits")
@@ -487,6 +500,52 @@ func _credit_label(text: String, caption: bool) -> Label:
 	if caption:
 		label.theme_type_variation = &"Caption"
 	return label
+
+
+## A key row: the action's words and a button with its key; pressed, it
+## waits for the next key ("press a key"), binds it (Net.set_key, a swap
+## with whatever had it) and shows every key again. Esc cancels.
+func _key_row(action: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	var name := _label(str(Keys.WORDS[action]))
+	name.custom_minimum_size = Vector2(560, 0)
+	row.add_child(name)
+	var button := Button.new()
+	button.text = Keys.name_of(action)
+	button.custom_minimum_size = Vector2(200, 0)
+	button.focus_mode = Control.FOCUS_NONE
+	button.pressed.connect(func() -> void: begin_rebind(action))
+	key_buttons[action] = button
+	row.add_child(button)
+	return row
+
+
+## The next key pressed becomes [param action]'s.
+func begin_rebind(action: String) -> void:
+	if rebinding != "" and key_buttons.has(rebinding):
+		key_buttons[rebinding].text = Keys.name_of(rebinding)
+	rebinding = action
+	if key_buttons.has(action):
+		key_buttons[action].text = "press a key"
+
+
+func _show_keys() -> void:
+	for action: String in key_buttons:
+		key_buttons[action].text = Keys.name_of(action)
+
+
+func _input(event: InputEvent) -> void:
+	if rebinding.is_empty() or not visible:
+		return
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode != KEY_ESCAPE:
+		Net.set_key(rebinding, key.keycode)
+	rebinding = ""
+	_show_keys()
+	get_viewport().set_input_as_handled()
 
 
 ## A label in the theme's body text; [param size] only when another size

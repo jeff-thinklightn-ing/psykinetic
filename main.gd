@@ -14,7 +14,8 @@ const PILE := "res://sim/ground_pile.gd"
 ## Keys for things, in both schemes: F picks up (your cell, the one under the
 ## cursor, or one beside), G puts down what is in your hand, T throws it at
 ## the cursor.
-const ITEM_KEYS := {KEY_F: "pick_up", KEY_G: "drop", KEY_T: "throw"}
+## The item actions a key tap orders (Keys: pick_up, drop, throw).
+const ITEM_ACTIONS: Array[String] = ["pick_up", "drop", "throw"]
 const BANDAGE_HOLD_MSEC := 500
 ## The one grey every wall face is drawn in, 0..1: darker than the floor,
 ## a few steps above the void, the same whichever way the face points.
@@ -397,6 +398,9 @@ var _test_hint_thing: GridEntity
 var _test_counter_shown: Node
 ## --test-show=converse: the panel wanted on the nearest resident, once there is one.
 var _test_converse_due := false
+## The one-time line the first time a townsperson is near (Net.hinted_talk), and when it goes.
+var _talk_hint: Label
+var _talk_hint_until := 0.0
 ## Talking with a town's person (ConversePanel; ui's step 4).
 var converse: ConversePanel
 ## The world map (WorldMapPanel; ui's step 5), M after the zone's big map.
@@ -776,7 +780,7 @@ func _process(delta: float) -> void:
 						words = context_hint_for(entity)
 						break
 			if words.is_empty() and _local_player() != null and not World.ground_at(_mouse_tile()).is_empty():
-				words = "F  pick up"
+				words = "%s  pick up" % Keys.name_of("pick_up")
 		var at := get_viewport().get_mouse_position()
 		if is_instance_valid(_test_hint_thing) and _client3d != null:
 			# --test-show=hint: the hint as the cursor on that thing would show it.
@@ -801,10 +805,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _builder_ui != null and _builder_ui.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_TAB:
+	if Keys.pressed(event, "talk_log"):
 		talk.toggle_pin()
 		return
-	if key != null and key.pressed and not key.echo and minimap != null and key.keycode == KEY_M:
+	if minimap != null and Keys.pressed(event, "map"):
 		press_m()
 		get_viewport().set_input_as_handled()
 		return
@@ -816,25 +820,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		escape()
 		get_viewport().set_input_as_handled()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+	if Keys.pressed(event, "talk"):
 		_open_chat()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_F3:
+	if Keys.pressed(event, "debug"):
 		debug_overlay.visible = not debug_overlay.visible
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_F11:
+	if Keys.pressed(event, "fullscreen"):
 		Net.toggle_fullscreen()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_H:
+	if Keys.pressed(event, "hints"):
 		toggle_hints()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_O:
+	if Keys.pressed(event, "options"):
 		toggle_options()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_I:
+	if Keys.pressed(event, "pack"):
 		toggle_pack()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_R:
+	if Keys.pressed(event, "reset"):
 		# A command like any other, so it works from a client too; the
 		# authority decides. With no player to send it for (dead, respawning)
 		# only the authority's own window can still do it.
@@ -844,22 +848,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_authority():
 			_start_level()
 		return
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_L:
+	if Keys.pressed(event, "lantern"):
 		var holder := _local_player()
 		if holder != null:
 			World.command(holder, "lantern", {})
 		return
-	if key != null and not key.echo and key.keycode == KEY_E:
+	if key != null and not key.echo and Keys.matches(key.keycode, "open"):
 		if key.pressed:
 			_press_e()
 		elif _e_held:
 			_release_e()
 		return
-	if key != null and key.pressed and not key.echo and ITEM_KEYS.has(key.keycode):
-		item_key(ITEM_KEYS[key.keycode])
+	if key != null and key.pressed and not key.echo and not _item_action_of(key.keycode).is_empty():
+		item_key(_item_action_of(key.keycode))
 		return
-	if key != null and key.pressed and not key.echo and key.keycode >= KEY_1 and key.keycode <= KEY_4:
-		say_phrase(key.keycode - KEY_0)
+	if key != null and key.pressed and not key.echo and _phrase_of(key.keycode) > 0:
+		say_phrase(_phrase_of(key.keycode))
 		return
 	var click := event as InputEventMouseButton
 	if click == null:
@@ -917,7 +921,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Left on a friend (a resident, a companion, another player), both
 	# schemes: talk, never an attack (decision 454); Shift attacks one.
 	if click.button_index == MOUSE_BUTTON_LEFT and target != player and is_friend(target):
-		if not click.shift_pressed:
+		if not Keys.held_in(click, "attack_friend"):
 			_talk_to(player, target)
 		elif targetable and not _is_own_companion(target):
 			_talk_wanted = null
@@ -1308,7 +1312,7 @@ func _wasd_click(player: Player, button: MouseButton) -> void:
 		if tile != NONE and World.distance(at, tile) > 1:
 			_move_click(player, tile)
 			_held_target = NONE  # No hold-to-move in WASD: the keys steer.
-		elif reachable and is_friend(next) and not Input.is_key_pressed(KEY_SHIFT):
+		elif reachable and is_friend(next) and not Keys.held("attack_friend"):
 			_talk_to(player, next)  # Decision 454: a friend beside you is talked to, not hit.
 		elif reachable and next.is_creature() and not _is_own_companion(next):
 			World.command_attack(player, next)
@@ -4647,8 +4651,8 @@ func _build_talk() -> void:
 		if key != null and key.pressed and key.keycode == KEY_ESCAPE:
 			_close_chat()
 			get_viewport().set_input_as_handled()
-		elif key != null and key.pressed and key.keycode == KEY_TAB:
-			# The channel swapped, the cursor kept: Tab never leaves the box.
+		elif key != null and key.pressed and Keys.matches(key.keycode, "talk_log"):
+			# The channel swapped, the cursor kept: the key never leaves the box.
 			_swap_chat_channel()
 			_chat_box.accept_event())
 	talk.set_box(_chat_box)
@@ -4692,11 +4696,11 @@ func context_hint_for(thing: Node) -> String:
 	if thing == null or player == null:
 		return ""
 	if thing is Chest:
-		return "E  open the shop" if (thing as Chest).shop else "E  open"
+		return "%s  open the shop" % Keys.name_of("open") if (thing as Chest).shop else "E  open"
 	if thing is Cargo:
-		return "E  open"
+		return "%s  open" % Keys.name_of("open")
 	if thing is Door:
-		return "E  open or close"
+		return "%s  open or close" % Keys.name_of("open")
 	if thing is Companion:
 		return "LMB  talk   E  her pack" if _is_own_companion(thing) else "LMB  talk"
 	if thing is Resident:
@@ -5784,32 +5788,33 @@ func _on_world_ticked(tick: int) -> void:
 		_test_converse_due = not _test_converse(player)
 	if world_map_panel != null and world_map_panel.visible:
 		_refresh_world_map()
+	_first_talk_hint(player)
 
 
 ## The controls for the HUD's list, a line each, "key\twhat it does".
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "Shift+LMB\tattack a friend",
+		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
 			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
 	else:
-		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "Shift+LMB\tattack a friend",
+		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
-		lines.append("%d\t%s" % [i + 1, Net.phrases[i]])
+		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
 	lines.append_array(["RMB, shield\tblock while held", "RMB, bow\tdraw; let go to shoot at the cursor",
-		"E\topen a chest, crate, cart, door; your companion's pack", "I\tyour pack",
-		"F\tpick up", "G\tput down (hand, else pack)", "T\tthrow at the cursor",
-		"E hold\tbandage an ally beside you, else yourself (a kit, out of combat)",
+		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
+		"%s\tpick up" % Keys.name_of("pick_up"), "%s\tput down (hand, else pack)" % Keys.name_of("drop"), "%s\tthrow at the cursor" % Keys.name_of("throw"),
+		"%s hold\tbandage an ally beside you, else yourself (a kit, out of combat)" % Keys.name_of("open"),
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
-		"Enter\ttalk (/w whisper)", "Tab\ttalk log", "M\tmap", "L\tlantern",
-		"R\treset the room", "O\toptions", "F3\tdebug", "F11\tfullscreen", "H\thide these"])
+		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tlantern" % Keys.name_of("lantern"),
+		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"), "%s\thide these" % Keys.name_of("hints")])
 	if Net.mode == Net.Mode.HOST:
-		lines.append("B\tbuilder mode")
+		lines.append("%s\tbuilder mode" % Keys.name_of("builder"))
 	return lines
 
 
@@ -5848,6 +5853,22 @@ func _refresh_world_map() -> void:
 			here.append({"name": String(entity.name), "area": world_map_panel.own_area, "kind": "companion"})
 	var state: Variant = get("world_state")
 	world_map_panel.set_world_state(state if state is Dictionary else {}, here)
+
+
+## The item action [param keycode] is bound to (Keys), "" for none.
+func _item_action_of(keycode: int) -> String:
+	for action in ITEM_ACTIONS:
+		if Keys.matches(keycode, action):
+			return action
+	return ""
+
+
+## The quick phrase 1 to 4 [param keycode] is bound to (Keys), 0 for none.
+func _phrase_of(keycode: int) -> int:
+	for i in 4:
+		if Keys.matches(keycode, "phrase_%d" % (i + 1)):
+			return i + 1
+	return 0
 
 
 ## Esc: whatever is open closes first (the options, an open chest or
@@ -6771,6 +6792,31 @@ func _run_test_chest(player: Player) -> void:
 	pack_panel.drop(from, from_slot, to, to_slot)
 
 
+## The first time a townsperson stands within hearing: one line, once, for
+## a few seconds at the top of the screen, then remembered (hinted_talk=on).
+func _first_talk_hint(player: Player) -> void:
+	if _talk_hint != null and _talk_hint.visible and Time.get_ticks_msec() / 1000.0 > _talk_hint_until:
+		_talk_hint.visible = false
+	if player == null or Net.hinted_talk or DisplayServer.get_name() == "headless":
+		return
+	for entity in World.townsfolk():
+		if entity is Resident and World.distance(entity.tile, player.tile) <= RESIDENT_EARSHOT + 2:
+			if _talk_hint == null:
+				_talk_hint = Label.new()
+				_talk_hint.theme_type_variation = &"Hud"
+				_talk_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				_talk_hint.set_anchors_preset(Control.PRESET_CENTER_TOP)
+				_talk_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+				_talk_hint.offset_top = 120
+				_talk_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				$HUD.add_child(_talk_hint)
+			_talk_hint.text = "Click a townsperson to talk, or press %s" % Keys.name_of("open")
+			_talk_hint.visible = true
+			_talk_hint_until = Time.get_ticks_msec() / 1000.0 + 8.0
+			Net.set_hinted_talk(true)
+			return
+
+
 ## --test-show=converse: the panel on the nearest town's person, with sample
 ## offers in npc's shape (the words are a test's); false while there is none.
 func _test_converse(player: Player) -> bool:
@@ -6839,6 +6885,13 @@ func _run_test_show(player: Player) -> void:
 				if not options_panel.visible:
 					options_panel.toggle()
 				options_panel.toggle_credits()
+			"controls":
+				# The Options scrolled to its Controls section (the key rows).
+				if not options_panel.visible:
+					options_panel.toggle()
+				options_panel.begin_rebind("open")
+				get_tree().create_timer(0.5).timeout.connect(func() -> void:
+					options_panel._scroll.scroll_vertical = 2400)
 			"converse":
 				_test_converse_due = true  # Residents come with the town's sync: tried each tick.
 			"hint":

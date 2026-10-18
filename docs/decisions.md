@@ -11191,6 +11191,26 @@ Client only; nothing on the wire. tests/ui_test: the rows, the theme's
 sizes scaled and restored, the colour swap, the set's lightness gaps.
 Shots in docs/ui/shots/step6/: the Options rows, Largest text and
 interface, and the two colour sets side by side for Jeff.
+
+Second landing, the keys: `Keys` (render/keys.gd, new class_name) is a
+client-side table, action -> keycode, with the defaults the game has
+always had (open E, pack I, pick_up F, drop G, throw T, talk Enter,
+talk_log Tab, map M, lantern L, reset R, options O, hints H, debug F3,
+fullscreen F11, builder B, the four phrases 1 to 4, attack_friend Shift:
+items' 454), read from settings.cfg key_<action>= lines and written back
+by Net.save_settings for every binding that differs. Main's handlers and
+builder's B ask Keys.pressed(event, action), Keys.matches(keycode, action) or
+Keys.held(action) in place of a keycode test, in one mechanical pass that
+changes no behaviour (ui_test checks every default against today's key);
+the controls list and the cursor's hint say the bound key (Keys.name_of).
+The Options' Controls section lists the actions with their keys: a key
+pressed waits for the next key and binds it (Net.set_key, a swap with
+whatever had it; Esc cancels and is never bound), Reset keys puts the
+defaults back. The WASD walk keys stay as they are in this pass: the walk
+reads the letters themselves. Also Jeff's playtest line: the first time a
+townsperson stands within hearing, one line at the top of the screen says
+"Click a townsperson to talk, or press E" for eight seconds, once
+(hinted_talk=on). Owners glanced at their lines before it landed.
 ## 454. A left click on a friend talks; Shift+click attacks one
 
 Jeff's playtest on v0.1.150: "big notes are clicking on npcs attacks them,

@@ -76,7 +76,8 @@ extends Node
 ## and music_volume= (0..1, default 1) set the sound (the options panel, O,
 ## writes them back). ui_scale= (0.5..2, default 1) sizes the whole interface,
 ## text_scale= the text alone, colours=normal|distinct picks the meaning
-## colours' set (decision 453; the Options write them back).
+## colours' set (decision 453; the Options write them back). key_<action>=<key>
+## rebinds an action (Keys.DEFAULTS; the Controls section writes them back).
 ## antialias=off|fxaa|smaa|msaa4 (default smaa) smooths
 ## the 3D view's edges (the options panel's Video section writes it back).
 ## phrase1= ... phrase4= are the quick phrases keys 1-4 say (written back,
@@ -107,7 +108,7 @@ extends Node
 ##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it),
 ##                                converse (the conversation panel on the nearest town's person, sample offers),
 ##                                credits (the Options with its Credits list open), counter (the counter screen, sample work),
-##                                world (the world map)
+##                                world (the world map), controls (the Options scrolled to its key rows, one waiting for a key)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
@@ -390,6 +391,8 @@ var antialias := "smaa"
 var ui_scale := 1.0
 var text_scale := 1.0
 var colours := "normal"
+## The first-time talk hint was shown (hinted_talk=on).
+var hinted_talk := false
 const VOLUME_SETTINGS: Array[String] = ["master_volume", "sfx_volume", "voice_volume", "ambience_volume", "ui_volume", "music_volume"]
 ## The quick phrases, keys 1-4; settings.cfg phrase1= ... phrase4=.
 const DEFAULT_PHRASES: Array[String] = ["With me!", "Stay back!", "Get them!", "Fall back!"]
@@ -751,6 +754,8 @@ func _apply_access_settings() -> void:
 		var set := str(settings.get("colours", "normal"))
 		if UiTheme.COLOUR_SETS.has(set):
 			colours = set
+		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
+		Keys.read(settings)  # key_<action>= (decision 453).
 	set_ui_scale(ui_scale, false)
 	set_text_scale(text_scale, false)
 	set_colours(colours, false)
@@ -774,6 +779,18 @@ func set_text_scale(value: float, save := true) -> void:
 	if save:
 		_settings_kept["text_scale"] = "%.2f" % text_scale
 		save_view_settings()
+
+
+## The one-time talk hint shown (Main), remembered.
+func set_hinted_talk(value: bool) -> void:
+	hinted_talk = value
+	save_view_settings()
+
+
+## A key rebound in the Options (Keys.bind) and the bindings saved.
+func set_key(action: String, keycode: int) -> void:
+	Keys.bind(action, keycode)
+	save_view_settings()
 
 
 ## The Options' Colours: the meaning colours' set (UiTheme.apply_colours;
@@ -951,6 +968,10 @@ func save_settings(new_address: String, new_port: int, new_token: String,
 		file.store_string("phrase%d=%s\n" % [i + 1, phrases[i]])
 	file.store_string("hints=%s\n" % ("on" if hints else "off"))
 	file.store_string("body=%s\n" % player_body)
+	if hinted_talk:
+		file.store_string("hinted_talk=on\n")
+	for line: String in Keys.lines():
+		file.store_string(line + "\n")
 	if player_look != "":
 		file.store_string("look=%s\n" % player_look)
 	for key: String in _settings_kept:

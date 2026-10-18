@@ -62,7 +62,7 @@ func is_typing() -> bool:
 func handle_input(event: InputEvent) -> bool:
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
-		if key.keycode == KEY_B and not key.ctrl_pressed and not is_typing():
+		if Keys.matches(key.keycode, "builder") and not key.ctrl_pressed and not is_typing():
 			toggle()
 			return true
 		if not active:

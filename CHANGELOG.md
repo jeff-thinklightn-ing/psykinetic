@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Every key can be rebound in Options, under Controls: click the key beside an action and press the new one (a key already in use swaps with it; Esc stays Esc; Reset keys puts them all back). The controls list and the hint by the cursor say your keys. The first time you stand near a townsperson, a line says how to talk to them.
 - The lawspeaker walks the town now: once it has six people of its own, one of
   them is appointed to keep its memory, and you can find him at a neighbour's
   door on his rounds, in the square at dawn and dusk, at the inn at noon. What
