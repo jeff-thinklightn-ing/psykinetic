@@ -11615,7 +11615,9 @@ always here).
 
 Economy's side (2026-10-18): Towns.move_in(town, who_id, name, trade,
 origin := "remembered", type := "") as above; origin and type are for
-471's Snagfin (a type like the thief's, 461). rescue_test.
+471's Snagfin (a type like the thief's, 461). Origin "settled" (471: he
+brings his own stall; npc's ask, 2026-10-18) passes the room check, which
+the talk's "remembered" arrivals keep. rescue_test.
 ## 465. Regenerating levels: the shifting halls, anchors kept, the rest laid again
 
 Jeff (2026-10-17): "castle stays persistent, its the entrance marker for

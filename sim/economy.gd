@@ -598,7 +598,7 @@ func fence(town: String, merchant_id: String, thief_id: String, what: String, fa
 	var price := maxi(roundi(raw_price(town, what) * factor_given), 1)
 	if stockpile.count(town, "gold") - price < int(rules.get("gold_floor", 0)) or not stockpile.take(town, "gold", price, "dealer:%s" % merchant_id):
 		return 0
-	stockpile.deposit(town, what, 1, production.worker(merchant_id)["name"], "from a dealer")
+	stockpile.deposit(town, what, 1, production.worker(merchant_id)["name"], "a dealer")
 	var kept := clampi(roundi(price * clampf(margin, 0.0, 1.0)), 0, price)
 	production.pay(merchant_id, kept, "dealt %s" % what)
 	production.pay(thief_id, price - kept, "fenced %s" % what)

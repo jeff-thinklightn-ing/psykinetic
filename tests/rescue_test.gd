@@ -191,6 +191,7 @@ func _test_move_in() -> void:
 		towns.note_rescue(TOWN, "f%d" % towns.residents(TOWN).size(), "Folk", "hauler")
 	_check(not towns.move_in(TOWN, "remembered:%s:Timmy" % TOWN, "Timmy", "hauler") and towns.production.worker("remembered:%s:Timmy" % TOWN).is_empty(),
 		"no room: they wait (%d residents)" % towns.residents(TOWN).size())
+	_check(towns.move_in(TOWN, "settler", "Snag", "merchant", "settled"), "one settled comes with no room: his own stall, not the town's growth")
 
 
 func _check(ok: bool, what: String) -> void:

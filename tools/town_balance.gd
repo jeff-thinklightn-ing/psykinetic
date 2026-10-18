@@ -115,5 +115,5 @@ func _line(day: int, towns: Towns, work: Production, stock: Stockpile, meals: Di
 	print("day %2d %-6s | treasury %3d | all gold %d | loans %3d | meals: bought %d store %d dole %d hungry %d | food %d | lifted %d fenced %d caught %d | %s"
 		% [day, Season.name_at(_now), stock.count(TOWN, "gold"), gold, loans, meals["bought"], meals["store"], meals["dole"], meals["hungry"],
 		stock.count(TOWN, "food"), ledger.filter(func(l: String) -> bool: return l.begins_with("lifted:") or l.begins_with("missing") or l.contains(" missing")).size(),
-		ledger.filter(func(l: String) -> bool: return "from a dealer" in l).size(),
+		ledger.filter(func(l: String) -> bool: return l.ends_with(" a dealer")).size(),
 		ledger.filter(func(l: String) -> bool: return l.begins_with("returned")).size(), purses])
