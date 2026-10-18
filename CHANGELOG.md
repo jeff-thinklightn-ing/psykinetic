@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Credits in the options now name who made the art too: Kenney's Castle Kit and Quaternius's animal rig and animations, each with its licence and a link.
 - Each companion now has a look of her own (build, height, age, hair, beard),
   kept with who she is, for the new character bodies to draw; Wren, Nix and
   Pip each have a fixed one.

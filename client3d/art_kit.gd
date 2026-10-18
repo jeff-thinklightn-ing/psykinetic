@@ -192,6 +192,40 @@ static func filled_by(slot: String) -> String:
 	return "placeholder"
 
 
+## The art's credits for the game's Credits (decision 406, amended):
+## {summary: "Art: <each maker drawn from now>", entries: [{title, by,
+## license, url}]}: each source a slot is filled from now ("Castle Kit 2.0,
+## Kenney" is "Castle Kit 2.0" by Kenney), then the manifest's "credits"
+## (third-party parts in our own art) while a slot they name draws its own
+## art, or always with no slots. Our own and generated art need no line.
+static func credits() -> Dictionary:
+	var all := slots().keys()
+	all.sort()
+	var entries: Array[Dictionary] = []
+	var sources: Dictionary = manifest().get("sources", {})
+	var names := sources.keys()
+	names.sort()
+	for name: String in names:
+		if not all.any(func(slot: String) -> bool:
+				return filled_by(slot) == "fill" and str(spec(slot)["fill"].get("from", "")) == name):
+			continue
+		var source: Dictionary = sources[name]
+		var full := str(source.get("name", name))
+		entries.append({"title": full.get_slice(", ", 0), "by": full.get_slice(", ", 1) if ", " in full else "",
+			"license": str(source.get("license", "")), "url": str(source.get("url", ""))})
+	for credit: Dictionary in manifest().get("credits", []):
+		var named: Array = credit.get("slots", [])
+		if named.is_empty() or named.any(func(slot: String) -> bool: return has(slot) and filled_by(slot) == "own"):
+			entries.append({"title": str(credit["title"]), "by": str(credit["by"]),
+				"license": str(credit.get("license", "")), "url": str(credit.get("url", ""))})
+	var makers: Array[String] = []
+	for entry: Dictionary in entries:
+		if entry["by"] != "" and entry["by"] not in makers:
+			makers.append(entry["by"])
+	makers.sort()
+	return {"summary": "Art: " + ", ".join(makers), "entries": entries}
+
+
 ## A new instance of [param slot] (variant [param variant] of its own art,
 ## wrapped into range; its fill or grey box has one).
 static func instance(slot: String, variant := 1) -> Node3D:

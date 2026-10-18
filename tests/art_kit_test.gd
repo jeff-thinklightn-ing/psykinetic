@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_scene_read()
 	_test_changed_told()
 	_test_creature_rig()
+	_test_credits()
 	_test_swatch_uvs()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -428,6 +429,22 @@ func _test_scene_read() -> void:
 	_check(not found.is_empty() and (found[1] as Transform3D).is_equal_approx(place)
 			and read_bounds.position.is_equal_approx(made_bounds.position) and read_bounds.size.is_equal_approx(made_bounds.size),
 			"its leaf found at Frame/leaf where it stands (%s), and its bounds as made" % [found[1] if not found.is_empty() else "none"])
+
+
+func _test_credits() -> void:
+	print("
+== the art's credits (decision 406): each fill source drawn now, and third-party parts in our own art ==")
+	var given := ArtKit.credits()
+	var entries: Array = given["entries"]
+	var titles := entries.map(func(entry: Dictionary) -> String: return "%s by %s" % [entry["title"], entry["by"]])
+	_check(entries.all(func(entry: Dictionary) -> bool:
+			return str(entry["title"]) != "" and str(entry["by"]) != "" and str(entry["license"]) != "" and str(entry["url"]).begins_with("https://")),
+			"every entry has a title, maker, licence and page: %s" % [titles])
+	_check("Castle Kit 2.0 by Kenney" in titles, "Kenney's castle kit, while slots are filled from it")
+	_check(titles.any(func(title: String) -> bool: return "Pig" in title and title.ends_with("by Quaternius")),
+			"the Pig's rig and clips, in creature.boar's own art")
+	_check(given["summary"] == "Art: Kenney, Quaternius", "the summary names the makers once: %s" % given["summary"])
+	_check(not titles.any(func(title: String) -> bool: return "art-gen" in title or "art-kit" in title), "our own and generated art: no line")
 
 
 func _test_creature_rig() -> void:

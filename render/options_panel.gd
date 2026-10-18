@@ -89,7 +89,7 @@ func _ready() -> void:
 ## fonts' and the animations' can join here. THIRD_PARTY.md (in the zip)
 ## has everything.
 static func credit_providers() -> Array[Callable]:
-	return [SoundKit.credits]
+	return [SoundKit.credits, ArtKit.credits]
 
 
 ## The Credits section's full list (a plain ScrollContainer, which the

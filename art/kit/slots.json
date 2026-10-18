@@ -11,6 +11,13 @@
 			"url": "https://kenney.nl/assets/castle-kit"
 		}
 	},
+	"credits": [
+		{"title": "Ultimate Animated Animal Pack (the Pig's rig and clips)", "by": "Quaternius", "license": "CC0 1.0",
+			"url": "https://quaternius.com/packs/ultimateanimatedanimals.html", "slots": ["creature.boar"],
+			"notes": "third-party parts inside our own art, which no fill names: the game's Credits list one while a slot it names draws its own art (ArtKit.credits, decision 406); a credit with no slots is always listed"},
+		{"title": "Universal Animation Library (Pro)", "by": "Quaternius", "license": "CC0 1.0", "url": "https://quaternius.com",
+			"notes": "the human bodies' skeleton and clips and the goblin's, retargeted (art/models/SOURCES.txt); not an art slot, listed here until the animations have a credits provider of their own"}
+	],
 	"slots": {
 		"wall.castle.profile": {
 			"category": "walls",

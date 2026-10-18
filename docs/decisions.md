@@ -10239,3 +10239,14 @@ three (the panel stays small and the card true); a quest log of its own
 (the commission lives on the card and the player's record, and shows in
 the panel and the party log); crediting a rescue or a camp to a player
 who was elsewhere.
+
+Amended (art's credits, art-kit, release's ask): ArtKit.credits is the second
+provider ("Art: Kenney, Quaternius"). Its entries:
+- each source in slots.json's "sources" that a slot is filled from now;
+- then slots.json's new "credits", third-party parts inside our own art that
+  no fill names. One is listed while a slot it names draws its own art, or
+  always when it names none: the Quaternius Pig's rig and clips in
+  creature.boar, and for now the Universal Animation Library, the humans'
+  and the goblin's clips, until the animations have a provider of their own.
+Our own and generated art have no line. art_kit_test checks the list;
+view_test counts the links across every provider.
