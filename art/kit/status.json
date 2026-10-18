@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 156,
 		"fill": 0,
-		"placeholder": 14
+		"placeholder": 16
 	},
 	"slots": [
 		{
@@ -1794,31 +1794,31 @@
 			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
 		{
-			"slot": "wall.castle.profile",
+			"slot": "creature.cow",
 			"status": "placeholder",
-			"group": "profiles",
+			"group": "farm animals",
 			"order": 163,
-			"type": "profile",
-			"kind": "edge",
-			"category": "walls",
-			"size": "0.5 x 3.0 x 1.0",
-			"budget": 0,
-			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+			"type": "mesh",
+			"kind": "creature",
+			"category": "creatures",
+			"size": "0.9 x 1.5 x 2.3",
+			"budget": 4000,
+			"for": "pc-character: the Quaternius pack's animals moved onto palette swatches (tools/animal_palette.py)"
 		},
 		{
-			"slot": "wall.wood.profile",
+			"slot": "creature.pig",
 			"status": "placeholder",
-			"group": "profiles",
+			"group": "farm animals",
 			"order": 164,
-			"type": "profile",
-			"kind": "edge",
-			"category": "walls",
-			"size": "0.3 x 3.0 x 1.0",
-			"budget": 0,
-			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+			"type": "mesh",
+			"kind": "creature",
+			"category": "creatures",
+			"size": "0.6 x 0.8 x 1.3",
+			"budget": 2500,
+			"for": "pc-character: the Quaternius pack's animals moved onto palette swatches (tools/animal_palette.py)"
 		},
 		{
-			"slot": "wall.stone.profile",
+			"slot": "wall.castle.profile",
 			"status": "placeholder",
 			"group": "profiles",
 			"order": 165,
@@ -1830,10 +1830,34 @@
 			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
 		},
 		{
-			"slot": "wall.cave.profile",
+			"slot": "wall.wood.profile",
 			"status": "placeholder",
 			"group": "profiles",
 			"order": 166,
+			"type": "profile",
+			"kind": "edge",
+			"category": "walls",
+			"size": "0.3 x 3.0 x 1.0",
+			"budget": 0,
+			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+		},
+		{
+			"slot": "wall.stone.profile",
+			"status": "placeholder",
+			"group": "profiles",
+			"order": 167,
+			"type": "profile",
+			"kind": "edge",
+			"category": "walls",
+			"size": "0.5 x 3.0 x 1.0",
+			"budget": 0,
+			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model"
+		},
+		{
+			"slot": "wall.cave.profile",
+			"status": "placeholder",
+			"group": "profiles",
+			"order": 168,
 			"type": "profile",
 			"kind": "edge",
 			"category": "walls",
@@ -1845,7 +1869,7 @@
 			"slot": "roof.shingle.profile",
 			"status": "placeholder",
 			"group": "profiles",
-			"order": 167,
+			"order": 169,
 			"type": "profile",
 			"kind": "cell",
 			"category": "roofs",
@@ -1857,7 +1881,7 @@
 			"slot": "item.buckler",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 168,
+			"order": 170,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
@@ -1868,7 +1892,7 @@
 			"slot": "item.leather",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 169,
+			"order": 171,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
@@ -1879,7 +1903,7 @@
 			"slot": "item.roast",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 170,
+			"order": 172,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",

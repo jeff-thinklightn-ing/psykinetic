@@ -76,6 +76,11 @@
 			"slots": ["creature.orc", "creature.kobold"]
 		},
 		{
+			"name": "farm animals",
+			"for": "pc-character: the Quaternius pack's animals moved onto palette swatches (tools/animal_palette.py)",
+			"slots": ["creature.cow", "creature.pig"]
+		},
+		{
 			"name": "profiles",
 			"for": "Jeff or art-kit by hand: a wall set's cross-section is a list of points, a roof set's a pitch and thickness, not a model",
 			"slots": ["wall.castle.profile", "wall.wood.profile", "wall.stone.profile", "wall.cave.profile", "roof.shingle.profile"]

@@ -1716,6 +1716,54 @@
 				{"at": [0, 0.66, 0.56], "size": [0.35, 0.18, 0.28]}
 			]
 		},
+		"creature.cow": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.9, 1.5, 2.3],
+			"tolerance": 0.15,
+			"budget": 4000,
+			"variants": 2,
+			"uses": "a cow, variant 2 the bull: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a keeper's yard's beast (economy: milk; the coordinator scheduled it 2026-10-18), pc-character's from the Quaternius pack (Cow.gltf, Bull.gltf) through tools/animal_palette.py",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eating", "idle_eating", "idle_headlow"], "required": true},
+				{"name": "alert", "names": ["alert", "look", "idle_2", "idle_headlow"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "attack", "names": ["attack", "attack_headbutt", "attack_kick"], "fallback": "a lunge tween (the bull)"}
+			],
+			"grey": [
+				{"at": [0, 0.3, -0.15], "size": [0.5, 0.6, 1.5]},
+				{"at": [0, 0.925, -0.2], "size": [0.9, 0.65, 1.9]},
+				{"at": [0, 1.275, 0.95], "size": [0.4, 0.45, 0.4]}
+			]
+		},
+		"creature.pig": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.6, 0.8, 1.3],
+			"tolerance": 0.15,
+			"budget": 2500,
+			"uses": "a pig: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a sty's beast (economy: meat from the town's scraps; the coordinator scheduled it 2026-10-18), pc-character's from the Quaternius Pig (the boar's rig) through tools/animal_palette.py",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "root", "eating", "idle_eating", "idle_headlow"], "fallback": "idle"},
+				{"name": "alert", "names": ["alert", "look", "idle_2", "idle_headlow"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.15, -0.1], "size": [0.4, 0.3, 0.8]},
+				{"at": [0, 0.55, -0.15], "size": [0.6, 0.5, 1.0]},
+				{"at": [0, 0.55, 0.5], "size": [0.35, 0.35, 0.3]}
+			]
+		},
 		"creature.rabbit": {
 			"category": "creatures",
 			"type": "mesh",
