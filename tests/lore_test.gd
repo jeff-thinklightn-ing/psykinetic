@@ -253,8 +253,8 @@ func _test_names_file() -> void:
 		ids[thing.get("id")] = true
 	_check(bad.is_empty(), "every thing word is well formed %s" % [bad])
 	Lore.reload()
-	var drafts := Lore.name_forms("", "draft").map(func(form: Dictionary) -> String: return form["id"])
-	_check("holder_possessive" in drafts, "the holder form from style.md is there to preview %s" % [drafts])
+	var agreed := Lore.name_forms("", "agreed").map(func(form: Dictionary) -> String: return form["id"])
+	_check("holder_possessive" in agreed, "the holder form from style.md is agreed (Jeff) %s" % [agreed])
 
 
 func _test_names() -> void:

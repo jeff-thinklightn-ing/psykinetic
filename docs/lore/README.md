@@ -135,7 +135,8 @@ are lore's.
 - A thing word is `{"id", "for", "words", "status", "source"}`: lore's word for a
   thing where it differs from the item's own, `for` naming an item id or a tag.
 - Only `agreed` ones count, as with facts. Until F1 is answered the only form is
-  the holder form from `style.md`, as a draft, and no bynames are invented.
+  the holder form from `style.md`, agreed on Jeff's word ("for now Wren's Dagger is
+  sufficient"), and no bynames are invented.
 
 `Lore.name_forms(how, least)` gives the forms that count. `Lore.thing_word(item_id,
 tags, least)` gives lore's word, or `""`. Items stores a name as `{form, holder,

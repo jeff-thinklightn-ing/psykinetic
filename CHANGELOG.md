@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A thing someone has carried long enough takes their name, such as "Wren's dagger".
+
 - Taking up a bundle of arrows while you hold a bow and a bundle swaps them: yours is put down where the new one lay, and the party log names both with their condition, so you can keep the better one and have it mended.
 - Townsfolk remember what they hear. Tell one something and, depending on how
   sharp or superstitious they are, they may believe it and pass it on as
