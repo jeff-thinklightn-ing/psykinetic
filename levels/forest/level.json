@@ -1,0 +1,91 @@
+{
+	"name": "The Forest",
+	"outdoor": true,
+	"zone": "outdoors",
+	"border": "forest",
+	"canopy": {
+		"kind": "evergreen"
+	},
+	"clearings": [
+		{
+			"centre": [
+				14,
+				48
+			],
+			"radius": 7
+		},
+		{
+			"centre": [
+				46,
+				34
+			],
+			"radius": 8
+		},
+		{
+			"centre": [
+				40,
+				72
+			],
+			"radius": 6
+		},
+		{
+			"centre": [
+				80,
+				44
+			],
+			"radius": 7
+		}
+	],
+	"centre": [
+		8,
+		48
+	],
+	"starts": [
+		[
+			9,
+			47
+		],
+		[
+			9,
+			49
+		],
+		[
+			9,
+			46
+		],
+		[
+			9,
+			50
+		]
+	],
+	"spawn_points": {
+		"from_wilds": [
+			8,
+			48
+		],
+		"from_stronghold": [
+			87,
+			44
+		]
+	},
+	"links": [
+		{
+			"at": [
+				6,
+				48
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_forest"
+		},
+		{
+			"at": [
+				89,
+				44
+			],
+			"to_map": "stronghold",
+			"to_spawn": "from_forest",
+			"closed": true
+		}
+	],
+	"entities": []
+}

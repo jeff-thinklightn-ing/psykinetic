@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A forest east of the wilds: a path through it between sunlit clearings, the way to the elven stronghold (closed for now). Its trees are still to come.
 - The server no longer stalls for a moment at each dawn while it works out where the wild animals can live: it now does that a little at a time.
 - Companions no longer stall a tick on their first turn in a zone, and one
   who can't reach a foe stops trying for a few seconds instead of

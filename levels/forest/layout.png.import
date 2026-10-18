@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://md5uwaot1tv4"
+path="res://.godot/imported/layout.png-3e8889239fa6859d62c375d68d47b857.image"
+
+[deps]
+
+source_file="res://levels/forest/layout.png"
+dest_files=["res://.godot/imported/layout.png-3e8889239fa6859d62c375d68d47b857.image"]
+
+[params]
+

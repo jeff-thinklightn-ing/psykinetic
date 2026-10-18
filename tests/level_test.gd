@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
+	_test_forest()
 	_test_buildings()
 	_test_field()
 	_test_canopy()
@@ -351,6 +352,24 @@ func _stamp(map: LevelMap, config: Dictionary, prefab_name: String, at: Vector2i
 	var out := config.duplicate(true)
 	out.merge(changes.get("config", {}), true)
 	return out
+
+
+## levels/forest (decision 464): the way to the elven stronghold, under a
+## canopy, its clearings listed for terrain and environment; in from the
+## wilds on the west, the way on east closed (463), walkable from one to
+## the other.
+func _test_forest() -> void:
+	print("== levels/forest ==")
+	var forest := Level.load_level("forest")
+	var links: Array = forest.get("links", [])
+	_check(forest.get("display_name") == "The Forest" and links.size() == 2 and links[0]["to_map"] == "wilds"
+		and links[1]["to_map"] == "stronghold" and links[1]["closed"], "The Forest: back to the wilds, on to the stronghold closed (%s)" % [links])
+	_check(_main.load_map("forest") and World.outdoor, "forest loads, outdoors")
+	var player := _player()
+	var east: Vector2i = links[1]["tile"]
+	var path := World.find_path(player.tile, east)
+	_check(not path.is_empty(), "a way from the way in to the way on (%d steps)" % path.size())
+	_check(_main.load_map("test_room"), "back to the test room")
 
 
 func _test_buildings() -> void:

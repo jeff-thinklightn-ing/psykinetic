@@ -12019,3 +12019,36 @@ plays from the archer while raised is "draw", beside 386's one creak
   archer's creak waits for enemy-ai to replicate Monster raised; it then
   needs nothing more.
 Client only, protocol unchanged.
+## 464. The forest: the way to the elven stronghold
+
+Jeff (2026-10-17): "i like the pine canopy, what I want to experiment with
+is a forest zone - while walking through it would be dark because of the
+canopy overhead, with trees nearly everywhere.. but spread enough to walk
+around.. with small clearings where sunlight shines through, maybe some
+rays shining down in a few areas.. this would be the pathway to the elven
+strong hold.. protected by forest". Terrain leads (its canopy and grown
+trees, 466 and 467); this is the level and its ways.
+
+- levels/forest, written by tools/make_forest.tscn (seeded, like
+  make_hills): 96 x 96 under the sky, its edge an uneven band of forest;
+  grass ground, a dirt path 2 wide winding from the way in through four
+  clearings (radius 7, 8, 6 and 7: under 6 the grown crowns close over
+  them) to the way on, with a branch south. level.json "canopy":
+  {"kind": "evergreen"} and "clearings" (terrain's keys; docs/levels.md).
+- Trunks: grown offline by terrain's tools/forest_grow.py into
+  levels/forest/trees.json and made void cells by ForestPack.from_trees,
+  the tool's last step; the path's dirt and the clearings stay clear.
+  This lands without them: terrain re-runs the grower and the tool once
+  both are on main.
+- The way in: a link on the wilds' east edge at (239, 128), the land's last
+  cell on that row (the hills' is on the west, the castle's north),
+  arriving at the forest's west edge (from_wilds); back the same way
+  (from_forest, two cells in). The wilds gains that link cell and spawn
+  point only: no entity.
+- The way on: a link on the east edge to "stronghold", closed (463).
+- Wildlife: rich as it is (WorldRichness: far from the mine, no
+  dead_ground); herds seed it as any outdoor zone. No monsters, no
+  buildings. Weather: the default until lore names its region.
+
+tests/level_test's forest (and every level loading clean, the levels
+connecting).

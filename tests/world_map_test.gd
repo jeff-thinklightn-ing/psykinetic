@@ -374,6 +374,12 @@ func _test_join() -> void:
 	_check(b.config["neighbours"] == {"south": "elsewhere"}, "put_neighbours puts back what join returned")
 
 
+## The ways [param view] can wire: those to a level there is (the forest's
+## closed way on goes to no level yet).
+func _wired(view: WorldMapView) -> int:
+	return view.world_map.ways.filter(func(way: Dictionary) -> bool: return view.world_map.areas.has(way["to"])).size()
+
+
 ## The node map on the real levels, edited in memory and never saved.
 func _test_view() -> void:
 	print("the world map view (not saved)")
@@ -382,7 +388,7 @@ func _test_view() -> void:
 	await get_tree().process_frame
 	var boxes := view.graph.get_children().filter(func(child: Node) -> bool: return child is GraphNode)
 	_check(boxes.size() == Level.names().size(), "a box per level (%d)" % boxes.size())
-	_check(view.graph.get_connection_list().size() == view.world_map.ways.size(), "a wire per way (%d)" % view.graph.get_connection_list().size())
+	_check(view.graph.get_connection_list().size() == _wired(view), "a wire per way to a level (%d)" % view.graph.get_connection_list().size())
 	var to_room := view.graph.get_connection_list().filter(func(wire: Dictionary) -> bool:
 		return wire["from_node"] == &"castle" and wire["to_node"] == &"test_room")
 	_check(to_room.size() == 1 and view._ports["castle"]["right"][to_room[0]["from_port"]] == Vector2i(27, 12)
@@ -390,7 +396,7 @@ func _test_view() -> void:
 	view.join("castle", "west", "sample")
 	_check(view.world_map.areas["castle"]["neighbours"] == {"west": "sample"} and view.world_map.areas["sample"]["neighbours"] == {"east": "castle"},
 		"joining the castle's west to the sample makes them neighbours both ways, in the graph at once")
-	_check(view.unsaved() and view.world_map.ways.size() == view.graph.get_connection_list().size(), "unsaved, and the wires follow")
+	_check(view.unsaved() and _wired(view) == view.graph.get_connection_list().size(), "unsaved, and the wires follow")
 	view.unjoin("castle", "west", "sample")
 	_check(view.world_map.areas["sample"]["neighbours"].is_empty(), "unjoining takes it away again")
 	view.set_link("castle", Vector2i(27, 12), "sample", view.default_spawn("castle", "sample"))

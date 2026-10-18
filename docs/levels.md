@@ -197,6 +197,11 @@ All of it is optional.
   interrupts it, and after the fight it walks back (its cell, its route,
   its place at the point) and goes on.
 - `spawn_points`: named cells where a link into this map can arrive.
+- `canopy` and `clearings` (terrain's, decision 464): `"canopy": {"kind":
+  "evergreen"}` draws the level's interior void cells as grown pines under
+  a closed canopy; `"clearings": [{"centre": [x, y], "radius": r}]` are kept
+  open to the sky (radius 6 or more stays sunlit; environment hangs its
+  light there). levels/forest is the first.
 - `links`: one per link marker, `to_map` the level to load and
   `to_spawn` the spawn point there ("" for its first start); `"one_way":
   true` for a link with no way back on purpose (a drop, a trapdoor), so the

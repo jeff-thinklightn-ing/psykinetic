@@ -31,6 +31,10 @@
 		"from_hills": [
 			16.0,
 			128.0
+		],
+		"from_forest": [
+			237,
+			128
 		]
 	},
 	"links": [
@@ -48,6 +52,14 @@
 				128.0
 			],
 			"to_map": "hills",
+			"to_spawn": "from_wilds"
+		},
+		{
+			"at": [
+				239,
+				128
+			],
+			"to_map": "forest",
 			"to_spawn": "from_wilds"
 		}
 	],
@@ -261,8 +273,8 @@
 		{
 			"slot": "building.temple",
 			"at": [
-				216,
-				195
+				216.0,
+				195.0
 			],
 			"facing": [
 				0.0,
@@ -274,12 +286,12 @@
 		{
 			"slot": "building.healers_hut",
 			"at": [
-				151,
-				233
+				151.0,
+				233.0
 			],
 			"facing": [
-				0,
-				-1
+				0.0,
+				-1.0
 			]
 		}
 	],
