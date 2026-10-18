@@ -11908,3 +11908,36 @@ Rejected: mixing the styles on one map by depth (a level has one walls
 set; the deeper level is the older one); sunk caverns and stairs in the
 old style now (the coordinator: flat first); the generator choosing
 treasure (items' and enemy-ai's).
+## 444. A companion's bond with her player
+
+The coordinator's design, approved 2026-10-17, on npc's Standing (443): Jeff
+wants the bond between player and companion to grow from what they do
+together. Her record holds "standing" ({player_id: {score, met, since,
+why, own}}, Standing's entries), saved with it, read through Standing's
+COMPANION ladder: fond to start, wary at -3 and below, close at 3, devoted
+at 6 (residents.json "standing"). Gossip never touches it (443).
+
+What moves it, each by companion_traits.json "bond" (drafts for Jeff),
+with the reason kept as Standing has it: her player bandages her (+1,
+"bandaged your wounds"), gives her gear or a named thing (+1, "gave you a
+sword"), shares food with her (+1, "shared food with you"), frees her from
+raiders (+4, "carried you out of the raiders' camp"), falls with her
+beside them (+1, "fell with you at their side", the coordinator's: loyalty
+is the saga's note), keeps her named thing from her (-1), strikes her
+(-1, once a day). A day travelling together is +1 once a day, but only
+below close: devotion is earned by deeds. Main._tend_bonds, once a world
+tick, counts the day and, only while she is apart from her player
+(resting in town, held by raiders), lets Standing.decay fade it; never
+while they travel. A fall while with them is the world's doing and
+counts against no one.
+
+Her voice is told one line (Companion.bond_words, Main's: Standing.fact
+on her record as it stands): "You are close to Jeff: they carried you out
+of the raiders' camp." First met at her join when there is no entry, so
+a record from before starts fond. PlayerRecord.from_dict keeps
+"standing" and the day counts. companion_test covers it. Protocol
+unchanged.
+
+Rejected: a model judging the bond (the world's events move it, as 443);
+decay while they travel (a bond does not fade beside its friend); days
+alone reaching devoted.

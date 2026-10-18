@@ -680,6 +680,10 @@ func _go_online() -> void:
 		World.item_kept.connect(_card_kept)
 		World.item_given.connect(_card_given)
 		World.item_grew.connect(_card_grew)
+		# Her bond with her player (decision 444).
+		World.bandage_changed.connect(_bond_bandaged)
+		World.entity_damaged.connect(_bond_struck)
+		World.entity_died.connect(_bond_stood_by)
 		World.bundle_swapped.connect(_narrate_swap)
 		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
@@ -3563,6 +3567,12 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.card_written.connect(_on_card_written.bind(pet, record))
 	pet.grown = CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
 	pet.heard = record.companion.get("heard", [])
+	# Her bond with her player (decision 444): first met now if never, and
+	# her voice told it from her record as it stands.
+	if Standing.entry(record.companion, record.player_id).is_empty():
+		Standing.met(record.companion, record.player_id, World.steps)
+	pet.bond_words = func() -> String:
+		return Standing.fact(record.companion, record.player_id, record.name, Standing.COMPANION)
 	pet.talk.assign(record.companion.get("talk", []))
 	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
@@ -4519,6 +4529,7 @@ func companion_freed(player_id: String, place := "") -> bool:
 		return false
 	record.companion.erase("taken")
 	record.companion["tile"] = null
+	_bond(record, "rescued", "carried you out of the raiders' camp")
 	var pet_name := str(record.companion.get("name", "?"))
 	var town := ""
 	if not place.is_empty() and World.holdings != null and not World.holdings.place(place).is_empty():
@@ -5396,6 +5407,7 @@ func _card_kept(entity: GridEntity, uid: int, kept: bool) -> void:
 		var thing := World.item_title(uid).get_slice(" (", 0)
 		if kept and entity == pet.keeper:
 			pet.note_fact("%s kept %s from her." % [pet.keeper_name(), thing])
+			_bond(_record_of(pet), "kept_from", "kept %s from you" % thing)
 		elif not kept and entity == pet:
 			pet.note_fact("%s came back to %s." % [thing, pet.name])
 
@@ -5403,6 +5415,11 @@ func _card_kept(entity: GridEntity, uid: int, kept: bool) -> void:
 func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 	var id := World.items.id_of(uid)
 	var named := World.item_title(uid).get_slice(" (", 0)
+	if str(Items.def(id).get("use", "")) == "eat":
+		# Food from her player moves her bond (444), though no card fact.
+		for pet: Companion in _companions.values():
+			if is_instance_valid(pet) and from == pet.keeper and to == pet:
+				_bond(_record_of(pet), "fed", "shared food with you")
 	if named.is_empty() and (not Items.is_gear(id) or not str(Items.def(id).get("use", "")).is_empty()):
 		return  # A bandage or a meal handed over (used up) is no event of the card.
 	var thing := named if not named.is_empty() else Companion._a(Items.name_of(id).to_lower())
@@ -5411,9 +5428,81 @@ func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 			continue
 		if from == pet.keeper and to == pet:
 			pet.note_fact("%s gave %s %s." % [pet.keeper_name(), pet.name, thing])
+			_bond(_record_of(pet), "gift", "gave you %s" % thing)
 		elif from == pet and to == pet.keeper:
 			var hers := str(World.items.name_of(uid).get("who", "")) == World.holder_key(pet)
 			pet.note_fact("%s gave %s %s%s." % [pet.name, pet.keeper_name(), thing, ", the thing named for her" if hers else ""])
+
+
+## Her bond with her player (decision 444, on npc's Standing, 443: her
+## record holds "standing", the COMPANION ladder) moved by [param event]
+## (companion_traits.json "bond") for [param why], what they did, without
+## their name ("bandaged your wounds"); logged.
+func _bond(record: PlayerRecord, event: String, why: String) -> void:
+	if record == null or record.companion.is_empty():
+		return
+	var delta := int(CompanionCard.tables().get("bond", {}).get(event, 0))
+	if delta == 0:
+		return
+	Standing.bump(record.companion, record.player_id, delta, why, World.steps)
+	MindLog.record({"kind": "bond", "companion": str(record.companion.get("name", "")), "mind": "hands", "trigger": event,
+		"note": why, "outcome": "%s (%d)" % [Standing.words(record.companion, record.player_id, Standing.COMPANION),
+			Standing.score(record.companion, record.player_id)]})
+
+
+## The record of the player whose companion [param pet] is; null for none.
+func _record_of(pet: Companion) -> PlayerRecord:
+	return _records.get(pet.keeper_id) if is_instance_valid(pet) else null
+
+
+## Her bond's slow changes (decision 444), once a world tick: a day
+## travelling together counts once a day, only up to close (devotion is
+## earned by deeds); apart from her player (resting in town, held by
+## raiders) it fades as Standing.decay says, and only then.
+func _tend_bonds() -> void:
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	for player_id: String in _records:
+		var record: PlayerRecord = _records[player_id]
+		if record.companion.is_empty() or not record.companion.get("alive", true):
+			continue
+		var pet: Companion = _companions.get(player_id)
+		var together := is_instance_valid(pet) and pet.spawned and is_instance_valid(pet.keeper)
+		if not together:
+			if not record.companion.get("resident", {}).is_empty() or record.companion.has("taken"):
+				Standing.decay(record.companion, World.steps)
+			continue
+		if int(record.companion.get("bond_day", -1)) == day:
+			continue
+		record.companion["bond_day"] = day
+		if Standing.score(record.companion, player_id) < Standing.setting("trusted"):
+			_bond(record, "day", "kept you company for days")
+
+
+func _bond_bandaged(by: GridEntity, patient: GridEntity, state: StringName) -> void:
+	if state == &"started" and patient is Companion and by != null and by == (patient as Companion).keeper:
+		_bond(_record_of(patient), "bandaged", "bandaged your wounds")
+
+
+func _bond_struck(entity: GridEntity, amount: int, source: GridEntity, _cause: StringName) -> void:
+	if amount <= 0 or not entity is Companion or source == null or source != (entity as Companion).keeper:
+		return
+	var record := _record_of(entity)
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	if record == null or int(record.companion.get("struck_day", -1)) == day:
+		return
+	record.companion["struck_day"] = day
+	_bond(record, "struck", "struck you")
+
+
+## Her player fell with her beside them (within her hearing, she standing):
+## loyalty, once a fall (the coordinator, 444).
+func _bond_stood_by(entity: GridEntity, _cause: StringName) -> void:
+	if not entity is Player:
+		return
+	for pet: Companion in _companions.values():
+		if is_instance_valid(pet) and pet.spawned and pet.hp > 0 and pet.keeper == entity \
+				and World.distance(pet.tile, entity.tile) <= HEARING_RANGE:
+			_bond(_record_of(pet), "stood_by", "fell with you at their side")
 
 
 ## A thing in her hands grew (417): "Isolde's dagger is imp-bane now.",
@@ -6009,6 +6098,8 @@ func _on_world_ticked(tick: int) -> void:
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
 		t = World.part("residents", t)
+		if tick % World.WORLD_TICK_STEPS == 0 and World.zone == World.home():
+			_tend_bonds()
 		_recall_due()
 		if tick % RETIRE_EVERY_TICKS == 0:
 			_retire_and_recall()

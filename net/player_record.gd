@@ -175,6 +175,13 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		var heard: Variant = pet.get("heard")
 		if heard is Array and not heard.is_empty():
 			record.companion["heard"] = heard.filter(func(entry: Variant) -> bool: return entry is Dictionary).duplicate(true)
+		# Her bond with her player (444, Standing's entries) and its daily counts.
+		var standing: Variant = pet.get("standing")
+		if standing is Dictionary and not standing.is_empty():
+			record.companion["standing"] = standing.duplicate(true)
+		for key: String in ["bond_day", "struck_day"]:
+			if pet.get(key) is float or pet.get(key) is int:
+				record.companion[key] = int(pet[key])
 	return record
 
 

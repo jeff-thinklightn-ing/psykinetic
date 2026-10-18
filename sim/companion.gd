@@ -336,6 +336,10 @@ var grown := CompanionFacts.new()
 ## What she has heard said of the world (decision 442, as a resident's,
 ## 378): Hearsay's entries, her record's "heard"; Main weighs and keeps them.
 var heard: Array = []
+## Her bond with her player in one sentence, as her record has it now
+## (decision 444: Main's, Standing.fact on the COMPANION ladder: "You are
+## close to Jeff: they carried you out of the raiders' camp."); none unset.
+var bond_words := Callable()
 var talk: Array[String] = []
 var _talk_tick := -100000
 var _merging: Array[Dictionary] = []
@@ -1725,6 +1729,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var rumours := Hearsay.prompt_words(self.heard)
 	if not rumours.is_empty():
 		met += " " + rumours
+	var bond := str(bond_words.call()) if bond_words.is_valid() else ""
+	if not bond.is_empty():
+		met += " " + bond
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing

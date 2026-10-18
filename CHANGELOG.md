@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion's bond with you grows from what you do: bandage her, give her
+  gear, share food, free her from raiders or fall with her at your side and
+  she grows close, even devoted; strike her or keep her things from her and
+  she grows wary. Time together alone makes her close, never devoted.
 - A second way for the shifting halls to lay themselves out: rooms and halls instead of a maze, dwarven (square rooms, pillared halls, doors and torches) or old (caverns and crooked ways in the dark), joined so every anchor is reached, with chests in the alcoves and dead ends. Still no real level shifts; a plan-sheet tool draws a generation for Jeff (decision 470).
 - Tools: a heavy job run through the resource gate inside another gated run (a bench script calling frame_budget) goes straight through instead of queueing behind its own parent forever (394 amended).
 - Snagfin no longer spawns as a monster by the town chest in the wilds. A server that saved him hands him over once, ready to become the town's goblin merchant.
@@ -51,7 +55,6 @@ notes (decision 324).
   the jaw, held there at full draw, and loosed. A raised shield is held up in
   guard.
 - The bow is heard: a creak as it's drawn, a twang as it's loosed, and the arrow where it ends as it gets there: a body struck, a friend's soft thud as it sticks in, a door's wood, a wall's stone, a splash, or the arrow falling where it ran out (Freesound takes; decision 386).
-
 ## v0.1.151
 
 - This release changes what the server and client send each other, so update the

@@ -82,6 +82,7 @@ func _ready() -> void:
 	_test_growing_card()
 	_test_card_things()
 	_test_record_loads()
+	_test_bond()
 	_test_wild()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
@@ -1275,6 +1276,48 @@ func _test_record_loads() -> void:
 	loaded = PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(shape)))
 	_check(not loaded.companion.has("heard") and not loaded.companion.has("home") and not loaded.companion["traits"].has("look"),
 		"a record from before them gains nothing")
+func _test_bond() -> void:
+	print("
+== her bond with her player, moved by their deeds, told in one line (decision 444, on Standing 443) ==")
+	var owner := _player()
+	var pet := _companion()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var id := record.player_id
+	record.companion.erase("standing")
+	record.companion.erase("bond_day")
+	record.companion.erase("struck_day")
+	Standing.met(record.companion, id, World.steps)
+	_check(Standing.words(record.companion, id, Standing.COMPANION) == "fond" and ("You are fond of %s." % record.name) in pet.voice_prompt("test"),
+		"from the first she is fond of her player, and her voice is told so")
+	_main._bond_bandaged(owner, pet, &"started")
+	_check(Standing.score(record.companion, id) == 1 and ("You are fond of %s: they bandaged your wounds." % record.name) in pet.voice_prompt("test"),
+		"bandaged by them: a step closer, and why (%s)" % Standing.fact(record.companion, id, record.name, Standing.COMPANION))
+	_main._bond_bandaged(null, pet, &"started")
+	_check(Standing.score(record.companion, id) == 1, "bandaged by no one of hers: nothing")
+	_main._bond(record, "rescued", "carried you out of the raiders' camp")
+	_check(Standing.words(record.companion, id, Standing.COMPANION) == "close"
+		and ("You are close to %s: they carried you out of the raiders' camp." % record.name) in pet.voice_prompt("test"), "freed from the raiders by them: close")
+	_main._bond_struck(pet, 2, owner, &"melee")
+	_main._bond_struck(pet, 2, owner, &"melee")
+	_check(Standing.score(record.companion, id) == 4, "struck by them: a step back, once a day (%d)" % Standing.score(record.companion, id))
+	_main._bond_stood_by(owner, &"melee")
+	_check(Standing.score(record.companion, id) == 5, "they fell with her beside them: loyalty")
+	var before := Standing.score(record.companion, id)
+	_main._tend_bonds()
+	_check(Standing.score(record.companion, id) == before, "close already: a day together moves her no further; devotion is earned")
+	record.companion["standing"][id]["score"] = 1
+	record.companion.erase("bond_day")
+	_main._tend_bonds()
+	_main._tend_bonds()
+	_check(Standing.score(record.companion, id) == 2, "a day together, below close: once a day")
+	record.companion["standing"][id]["since"] = World.steps - 100 * DayNight.day_steps
+	_main._tend_bonds()
+	_check(Standing.score(record.companion, id) == 2, "together, her bond never fades")
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(Standing.score(saved.companion, id) == 2, "her bond is saved with her record")
+	record.companion.erase("standing")
+	record.companion.erase("bond_day")
+	record.companion.erase("struck_day")
 
 
 func _test_log_collapsed() -> void:
