@@ -73,7 +73,10 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 			out.append("error: %s %.2f m in %s, the slot is %.2f m (±%d%%): %s" % [
 				"too big," if have > want[axis] else "too small,", have, axes[axis], want[axis], roundi(share * 100.0),
 				"scale it, or check it was modelled in metres" if absf(have / maxf(want[axis], 0.001) - 1.0) > 0.5 else "trim or stretch it"])
-	var centre := box.get_center()
+	# Where its box's middle sits from its origin: [0, 0, 0] but for a slot
+	# whose shape puts it elsewhere ("middle": a kobold's long tail behind
+	# its feet), so the centring is checked about that.
+	var centre := box.get_center() - ArtKit._vec(entry.get("middle", [0, 0, 0]))
 	if kind == "held":
 		pass  # Its origin is its grip, anywhere along it.
 	elif kind == "floor":

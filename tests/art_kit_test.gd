@@ -611,7 +611,7 @@ func _body_bounds(node: Node3D) -> AABB:
 func _check_fits(slot: String, box: AABB, what: String) -> void:
 	var size := ArtKit.size(slot)
 	var off := (box.size - size).abs() / size
-	var centre := box.get_center()
+	var centre := box.get_center() - ArtKit._vec(ArtKit.spec(slot).get("middle", [0, 0, 0]))
 	var floor := str(ArtKit.spec(slot).get("kind", "")) == "floor"
 	# A shield ("origin": "centre") is held at the middle of its back: centred on its origin.
 	var centred := str(ArtKit.spec(slot).get("origin", "base")) == "centre"
