@@ -7,6 +7,11 @@ extends Node
 ## its owner and held at the temple, the counter shows it to them, they
 ## take it back blessed, and nobody is held for any more; with the priest
 ## away it is refused; what is held is in the saved world and read back.
+## The counter's work (decision 438): the temple counter's view prices a
+## blessing for each thing carried; a shop counter offers a named
+## weapon's reforges with the town's materials and a fee, refuses an
+## unnamed one and a fee they can't pay, takes the order, reforges it on
+## the same uid after the smith's steps, and they collect it.
 ## The general job: a mend is its effect "mend".
 ## Reads the repo's levels, never the shared overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
@@ -28,6 +33,7 @@ func _ready() -> void:
 	_main.returns = false
 	add_child(_main)
 	_test_counter()
+	_test_reforge()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -95,6 +101,62 @@ func _test_counter() -> void:
 	World.production.set_away("priest:" + TOWN, true)
 	World.economy.add_gold(who, offering, "test")
 	_check(not World.try_transfer(player, player, 0, counter, 0), "the priest away: refused")
+
+
+func _test_reforge() -> void:
+	print("
+== a named weapon reforged at the shop counter ==")
+	var counter: Chest = null
+	for entity in World.get_entities():
+		if entity is Chest:
+			counter = entity
+	var player := _player()
+	var who: String = player.player_id
+	var view := World.counter_view(player, counter)
+	_check(view["kind"] == "temple" and view["jobs"].any(func(job: Dictionary) -> bool: return job["effect"] == "bless" and job["slot"] == 0),
+		"the temple counter prices a blessing for what is in hand")
+	# The counter a shop counter of a town that holds a store over it.
+	counter.temple = false
+	counter.shop = true
+	var town := "%s/store" % World.zone.name
+	World.holdings._places[town] = {"id": town, "area": World.zone.name, "key": "store", "cell": counter.tile, "name": "the store",
+		"kind": "stockpile", "radius": 3, "worth": 0, "start": "town"}
+	World.holdings._holder[town] = "town"
+	World.holdings._strength[town] = 1
+	World.holdings._since[town] = World.steps
+	World.towns._town(town)["buildings"]["forge"] = {"kind": "forge", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	World.production.add_worker("smith:" + town, "Odo", ["smith"], town)
+	World.production.add_workshop(town + ":forge", "smith", town)
+	World.production.assign(town + ":forge", "smith:" + town)
+	var uid := World.slot_uid(player, 0)
+	var targets := Items.reforge_targets("dagger")
+	_check(not targets.is_empty(), "(a dagger can become %s)" % [targets])
+	var to_id: String = targets[0]
+	view = World.counter_view(player, counter)
+	var row: Array = view["jobs"].filter(func(job: Dictionary) -> bool: return job["to_id"] == to_id)
+	_check(view["kind"] == "shop" and row.size() == 1 and not row[0]["ok"] and row[0]["why"] == "only a named thing can be reforged",
+		"unnamed: offered, but refused with why (%s)" % [row])
+	World.items.set_name(uid, {"form": "holder_possessive", "holder": "Bo", "who": "player:" + who, "made_step": World.steps, "text": "Bo's dagger"}, "")
+	var cost := Items.reforge_cost("dagger", to_id)
+	for what: String in cost["from"]:
+		World.stockpile.deposit(town, what, int(cost["from"][what]) + 1)
+	World.economy.add_gold(who, -World.economy.gold(who), "test")
+	_check(World.counter_order(player, counter, 0, "reforge", to_id) == "the fee is %d gold" % World.reforge_fee(to_id), "no gold for the fee: refused")
+	World.economy.add_gold(who, World.reforge_fee(to_id), "test")
+	_check(World.counter_order(player, counter, 0, "reforge", "giant_axe_nope") != "", "a target it can't become: refused")
+	_check(World.counter_order(player, counter, 0, "reforge", to_id) == "" and World.slot_uid(player, 0) == 0 and World.economy.gold(who) == 0,
+		"ordered: handed in, the fee paid")
+	view = World.counter_view(player, counter)
+	_check(view["working"].size() == 1 and view["working"][0]["uid"] == uid and int(view["working"][0]["left_seconds"]) > 0,
+		"being worked on, %d seconds left" % (int(view["working"][0]["left_seconds"]) if not view["working"].is_empty() else -1))
+	var until := World.steps + int(cost["steps"]) + World.WORLD_TICK_STEPS * 2
+	while World.steps < until:
+		World.step()
+	_check(World.items.id_of(uid) == to_id and not World.items.name_of(uid).is_empty(), "reforged on the same uid, its name kept (%s)" % World.items.id_of(uid))
+	view = World.counter_view(player, counter)
+	_check(view["waiting"].size() == 1 and view["waiting"][0]["uid"] == uid, "waiting for them")
+	_check(World.counter_collect(player, counter, uid) == "" and uid in Array(player.slot_items), "collected into their slots")
+	_check(World.counter_view(player, counter)["waiting"].is_empty(), "nothing waiting now")
 
 
 func _beside(cell: Vector2i) -> Vector2i:

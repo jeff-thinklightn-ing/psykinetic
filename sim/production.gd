@@ -387,21 +387,34 @@ func open_return(workshop_id: String, who: String, who_kind: String, place := ""
 
 ## A thing, [param uid], handed in at [param workshop_id] for
 ## [param owner] (a carrier key) to be worked on with [param effect]
-## ("bless": rules' bless.steps), by its worker, held by the job; its
-## own job, not the workshop's slot. Its id, or 0 if nobody works there.
-func open_work(workshop_id: String, uid: int, effect: String, owner: String) -> int:
+## ("bless": rules' bless.steps; "reforge" into [param to_id], decision
+## 436: [param materials] taken from the town's stock now, [param steps]
+## of work), by its worker, held by the job; its own job, not the
+## workshop's slot. Its id, or 0 if nobody works there or the town lacks
+## the materials. [param fee] and [param payer]: what the owner paid, kept
+## on the job to give back if the work can't be done.
+func open_work(workshop_id: String, uid: int, effect: String, owner: String, to_id := "", materials := {},
+		steps := 0, fee := 0, payer := "") -> int:
 	var shop: Dictionary = _workshops.get(workshop_id, {})
 	if shop.is_empty() or str(shop["worker"]).is_empty():
 		return 0
+	for what: String in materials:
+		if stockpile.count(shop["town"], what) < int(materials[what]):
+			return 0
 	var id := _new_job("work", book().id_of(uid), shop)
 	var each: Dictionary = _jobs[id]
+	for what: String in materials:
+		stockpile.take(shop["town"], what, int(materials[what]), "job #%d" % id)
+		each["resources"][what] = int(materials[what])
 	each["state"] = "working"
 	each["worker"] = shop["worker"]
 	each["effect"] = effect
 	each["for"] = owner
-	each["to_id"] = book().id_of(uid)
+	each["to_id"] = to_id if not to_id.is_empty() else book().id_of(uid)
 	each["uids"] = [uid]
-	each["needed"] = maxi(int(rules.get(effect, {}).get("steps", 600)), 1)
+	each["fee"] = fee
+	each["payer"] = payer
+	each["needed"] = steps if steps > 0 else maxi(int(rules.get(effect, {}).get("steps", 600)), 1)
 	each["last"] = now()
 	book().place(uid, "job:%d" % id)
 	print("[production] %s (#%d) handed in at %s to %s for %s" % [book().id_of(uid), uid, workshop_id, effect, owner])
@@ -584,6 +597,11 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		book().place(worked_on, "")
 		if each["effect"] == "bless":
 			book().bless(worked_on, str(each["for"]))
+		elif each["effect"] == "reforge" and not book().reforge(worked_on, str(each["to_id"])):
+			# Refused now (it lost its name, say): its materials back to the
+			# town, the fee back to its payer (World, on work_done).
+			_give_back(each)
+			each["failed"] = true
 		each["worked_on"] = worked_on
 		each["by"] = str(worker_record["name"])
 		work_done.emit(each.duplicate(true))
@@ -1234,6 +1252,8 @@ func from_dict(saved: Dictionary) -> void:
 				each["kind"] = "work"
 				each["for"] = str(entry.get("for", ""))
 				each["to_id"] = str(entry.get("to_id", each["recipe"]))
+				each["fee"] = maxi(int(entry.get("fee", 0)), 0)
+				each["payer"] = str(entry.get("payer", ""))
 			if each["kind"] == "return":
 				each["who"] = str(entry.get("who", ""))
 				each["who_kind"] = str(entry.get("who_kind", ""))

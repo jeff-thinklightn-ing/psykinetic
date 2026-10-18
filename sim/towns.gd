@@ -609,10 +609,13 @@ func _on_work_done(job: Dictionary) -> void:
 	if not record["held_for"].has(owner):
 		record["held_for"][owner] = []
 	record["held_for"][owner].append(uid)
-	production.book().place(uid, "temple:%s" % town)
-	production.book().note(uid, "held", "at %s's temple for %s, %s by %s" % [town, owner, job.get("effect", ""), job.get("by", "")])
-	_note(town, "%s %s a %s, held for its owner" % [job.get("by", "the priest"), "blessed" if job.get("effect") == "bless" else "worked on",
-		Items.name_of(production.book().id_of(uid))])
+	var where := "temple" if job.get("effect") == "bless" else "forge"
+	production.book().place(uid, "%s:%s" % [where, town])
+	production.book().note(uid, "held", "at %s's %s for %s, %s by %s" % [town, where, owner, job.get("effect", ""), job.get("by", "")])
+	var done: String = {"bless": "blessed", "reforge": "reforged"}.get(str(job.get("effect", "")), "worked on")
+	if bool(job.get("failed", false)):
+		done = "could not reforge"
+	_note(town, "%s %s a %s, held for its owner" % [job.get("by", "someone"), done, Items.name_of(production.book().id_of(uid))])
 
 
 # --- Rescues (decision 428) ---------------------------------------------

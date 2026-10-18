@@ -9,6 +9,7 @@ notes (decision 324).
 
 - The game can ask a server whether it is up, its version and how many are playing before you join, so the menu can show it.
 - The options end with Credits: who made the sounds (Freesound, Kenney, Sonniss), and a button that lists each sound's maker, licence and page (decision 406).
+- This release changes what the server and client send each other: update the game before joining. The shop and temple counters can now show what can be done to the things you carry, and what it costs. The town's smith can reforge a named weapon into another, keeping its name and history, for some of the town's ore and wood and a fee; you collect it from the counter when it's done.
 - Companions know when they are inside a building, and whose home it is; can
   look round inside one for you; step out of your way when asked or bumped;
   follow you indoors instead of standing in the doorway; and hold a door

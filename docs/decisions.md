@@ -10007,3 +10007,46 @@ body (Quaternius's: a superhero nude, painted clothes fail); shape keys by
 pushing along normals (243's; a belt and an apron would part from the tunic).
 Later: an orc base for the brute and a kobold base for the sneak from the same
 tool (Jeff, via lore), and the player's Character panel.
+## 438. The counter's work: what can be done, ordered and collected; the reforge
+
+On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and
+434 (the work job, held things), for ui's counter screen. The
+coordinator's approval of 2026-10-17. PROTOCOL_REVISION 14.
+
+- The wire: the "counter" command rides the command RPC ({counter: path,
+  do: "look" | "order" | "collect", slot, effect, to_id, uid}); the
+  "counter" message answers it (MESSAGE_KINDS): {counter, kind ("temple"
+  | "shop"), town, gold, jobs: [{slot, uid, id, effect, to_id, price,
+  materials, steps, ok, why}], working: [{uid, id, effect, to_id, left,
+  left_seconds}], waiting: [{uid, id, effect}], why}. Sent on every look,
+  order and collect, and when a job of theirs finishes while they stand at
+  a counter of that town (Production.work_done). Shop goods and offers
+  stay in the "shop" message. A thing with nothing to be done has no job
+  entry; one that could be but can't now has ok false and its why. The
+  client keeps the last in Main.counter_data and emits counter_told.
+- A temple counter offers a blessing for each thing carried, at 434's
+  offering; ordering it is the same as dragging it on.
+- A shop counter offers each allowed reforge of each thing carried
+  (Items.reforge_targets): the town's materials (Items.reforge_cost's
+  from, half the target's, at least 1 ore) from its stock, a fee from the
+  player of reforge.fee (0.5) of the target's value, at least
+  reforge.least (1), into the treasury, and the cost's steps by the
+  smith at his forge (Towns.kind_for). Refused, with why: an unnamed
+  thing ("only a named thing can be reforged"), no smith there, the town
+  short of a material, the fee. THE FEE IS A PLACEHOLDER, JEFF'S TO TUNE
+  (economy.json "reforge").
+- The work: Production.open_work(..., to_id, materials, steps, fee,
+  payer), effect "reforge"; at the finish ItemBook.reforge(uid, to_id) on
+  the same uid (its name, curse, bane, grudge, blessing and tally kept,
+  items'). If it refuses then, the materials go back to the town and Main
+  gives the fee back from the treasury; the thing is held for its owner
+  either way.
+- Collecting: "collect" puts a thing held for them into their first free
+  slot that their hands allow (World.counter_collect), at either counter
+  of the town; the temple counter still shows them in its slots too.
+
+Protocol changed: the client goes first. tests/blessing_test (the temple
+counter's view; at a shop counter an unnamed dagger refused with why, the
+fee refused, a target it can't become refused, the order taken and paid,
+being worked on with seconds left, reforged on the same uid with its name,
+waiting, collected, nothing waiting); protocol_test.

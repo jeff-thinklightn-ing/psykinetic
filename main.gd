@@ -393,6 +393,9 @@ var shop_panel: ShopPanel
 var ui_sounds: UiSounds
 ## The local player's gold, as the server last said ("shop" messages).
 var gold := 0
+## The last "counter" message, for ui's counter screen (decision 438).
+var counter_data := {}
+signal counter_told(data: Dictionary)
 ## A chest or companion right-clicked from afar: opened once in reach.
 var _pack_wanted: GridEntity
 ## The pack sounds asked for, "set entity" each, newest last (tests).
@@ -1835,6 +1838,8 @@ func _boot() -> void:
 	World.economy.dole_changed.connect(_on_dole_changed)
 	# The fallen come back at a temple or a healer's hut (decision 396).
 	World.production.returned = _on_returned
+	if not World.production.work_done.is_connected(_on_counter_work_done):
+		World.production.work_done.connect(_on_counter_work_done)
 	_seat_healers()
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
@@ -2980,6 +2985,37 @@ func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
 	Net.message_to(player.owner_peer, "shop", data)
 
 
+## Server: [param player]'s client is sent counter [param counter]'s work
+## for them (World.counter_view: "counter" message, decision 438).
+func _send_counter(player: Player, counter: GridEntity, why := "") -> void:
+	Net.message_to(player.owner_peer, "counter", World.counter_view(player, counter, why))
+
+
+## Server: a job on a thing for someone is done (Production.work_done): a
+## reforge that could not be done gives the fee back from the treasury;
+## its owner, at a counter of that town, is sent it again.
+func _on_counter_work_done(job: Dictionary) -> void:
+	var town := str(job.get("town", ""))
+	if bool(job.get("failed", false)) and int(job.get("fee", 0)) > 0 and World.stockpile.take(town, "gold", int(job["fee"]), "refund:%s" % job.get("payer", "")):
+		World.add_gold(str(job.get("payer", "")), int(job["fee"]), "a reforge that could not be done")
+	var owner := str(job.get("for", ""))
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or World.owner_of(player) != owner:
+			continue
+		for entity: GridEntity in World.get_entities():
+			if not World.counter_kind(entity).is_empty() and World.reaches(player, entity) and World.counter_place(entity) == town:
+				_send_counter(player, entity)
+
+
+## The client's counter screen's data.
+func _on_counter_message(data: Dictionary) -> void:
+	counter_data = data
+	if data.has("gold"):
+		gold = int(data["gold"])
+	counter_told.emit(data)
+
+
 ## The client's shop panel and the gold beside the pack.
 func _on_shop_message(data: Dictionary) -> void:
 	if data.has("gold"):
@@ -3898,6 +3934,18 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			World.try_buy(entity, shop, int(args.get("uid", 0)))  # Answered by traded.
 		else:
 			_send_shop(entity as Player, shop)
+	elif command_name == "counter" and entity is Player:
+		# A temple's or a shop's counter's work (decision 438): look, order, collect.
+		var counter := get_node_or_null(NodePath(str(args.get("counter", "")))) as GridEntity
+		if counter == null or not World.reaches(entity, counter) or World.counter_kind(counter).is_empty():
+			return
+		var why := ""
+		match str(args.get("do", "look")):
+			"order":
+				why = World.counter_order(entity, counter, int(args.get("slot", -1)), str(args.get("effect", "")), str(args.get("to_id", "")))
+			"collect":
+				why = World.counter_collect(entity, counter, int(args.get("uid", 0)))
+		_send_counter(entity as Player, counter, why)
 	elif command_name == "reset" and entity is Player:
 		var who := _display_name(entity)  # The rebuild frees the entity.
 		if not Net.player_reset and entity.owner_peer != Net.local_id:
@@ -4303,6 +4351,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "shop":
 		_on_shop_message(data)
+	elif kind == "counter":
+		_on_counter_message(data)
 		return
 	if kind == "map":
 		# The zone this client's player is in: it draws and predicts on that

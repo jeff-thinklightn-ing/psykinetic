@@ -178,11 +178,13 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## snow follow the season (decision 362).
 ## 13: "winding" is any body's, not only a monster's (moved to GridEntity),
 ## and its 0 ticks means a wind-up given up (decision 392).
-const PROTOCOL_REVISION := 13
+## 14: the "counter" command (look, order, collect) rides the command RPC,
+## answered by the "counter" message (decision 438).
+const PROTOCOL_REVISION := 14
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["builder", "chat", "death", "map", "party", "roofs", "shop", "sky", "speech", "terrain", "town"]
+const MESSAGE_KINDS: Array[String] = ["builder", "chat", "counter", "death", "map", "party", "roofs", "shop", "sky", "speech", "terrain", "town"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["ailments", "alert", "body", "buffs", "down_until", "emit_light", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"

@@ -452,6 +452,8 @@ var towns: Towns = null
 ## temple building whose rect holds it, its "town"); unset, the stockpile
 ## place over its tile.
 var counter_town := Callable()
+## The last refusal at a counter, for counter_order.
+var _counter_why := ""
 ## Server: the wildlife's herds (Herds, decision 367), moved on by the
 ## world tick's first slice; made by Main at boot. Null on a client.
 var herds: Herds = null
@@ -2365,6 +2367,199 @@ func _collects(by: GridEntity, counter: GridEntity, slot: int) -> bool:
 	return towns != null and slot_uid(counter, slot) in towns.held(temple_town(counter), owner_of(by))
 
 
+## What kind of counter [param counter] is: "temple", "shop" or "".
+func counter_kind(counter: GridEntity) -> String:
+	if counter is Chest and (counter as Chest).temple:
+		return "temple"
+	if counter is Chest and (counter as Chest).shop:
+		return "shop"
+	return ""
+
+
+## The town of counter [param counter] ("" for none).
+func counter_place(counter: GridEntity) -> String:
+	match counter_kind(counter):
+		"temple":
+			return temple_town(counter)
+		"shop":
+			return shop_place(counter)
+	return ""
+
+
+## The offering for blessing a thing of [param id] (rules' bless).
+func bless_offering(id: String) -> int:
+	var rule: Dictionary = production.rules.get("bless", {})
+	return maxi(ceili(float(economy.value_of(id)) * float(rule.get("offering", 0.5))), int(rule.get("least", 1)))
+
+
+## The fee for reforging into [param to_id] (rules' reforge, decision 438).
+func reforge_fee(to_id: String) -> int:
+	var rule: Dictionary = production.rules.get("reforge", {})
+	return maxi(ceili(float(economy.value_of(to_id)) * float(rule.get("fee", 0.5))), int(rule.get("least", 1)))
+
+
+## The workshop a counter's work is done at: a temple's priest, a shop
+## counter's smith (his building's, Towns.kind_for).
+func _counter_workshop(counter: GridEntity, town: String) -> String:
+	if counter_kind(counter) == "temple":
+		return "%s:temple" % town
+	var trade := str(production.rules.get("reforge", {}).get("trade", "smith"))
+	var kind := towns.kind_for(trade) if towns != null else ""
+	return "%s:%s" % [town, kind if not kind.is_empty() else trade]
+
+
+## Player [param by] at counter [param counter] (decision 438, ui's
+## counter screen): what can be done to each thing they carry, priced,
+## {counter, kind, town, gold, jobs: [{slot, uid, id, effect, to_id, price,
+## materials, steps, ok, why}], working: [{uid, id, effect, to_id, left,
+## left_seconds}], waiting: [{uid, id, effect}], why}.
+func counter_view(by: GridEntity, counter: GridEntity, why := "") -> Dictionary:
+	var town := counter_place(counter)
+	var owner := owner_of(by)
+	var who := owner.trim_prefix("player:")
+	var out := {"counter": str(counter.get_path()), "kind": counter_kind(counter), "town": town,
+		"gold": economy.gold(who) if economy != null else 0, "jobs": [], "working": [], "waiting": [], "why": why}
+	if town.is_empty() or production == null or economy == null:
+		return out
+	var workshop := _counter_workshop(counter, town)
+	var manned := production.manned(workshop)
+	for slot in by.slots.size():
+		var id := str(by.slots[slot])
+		if id.is_empty():
+			continue
+		var uid := slot_uid(by, slot)
+		if out["kind"] == "temple":
+			var price := bless_offering(id)
+			var whyn := "" if manned else "there is no priest at the temple now"
+			if whyn.is_empty() and economy.gold(who) < price:
+				whyn = "the offering is %d gold" % price
+			out["jobs"].append({"slot": slot, "uid": uid, "id": id, "effect": "bless", "to_id": id, "price": price,
+				"materials": {}, "steps": int(production.rules.get("bless", {}).get("steps", 600)), "ok": whyn.is_empty(), "why": whyn})
+			continue
+		for to_id in Items.reforge_targets(id):
+			var cost := Items.reforge_cost(id, to_id)
+			var price := reforge_fee(to_id)
+			out["jobs"].append({"slot": slot, "uid": uid, "id": id, "effect": "reforge", "to_id": to_id, "price": price,
+				"materials": cost["from"], "steps": int(cost["steps"]), "ok": true, "why": ""})
+			var entry: Dictionary = out["jobs"].back()
+			entry["why"] = _reforge_refusal(by, uid, town, workshop, cost, price)
+			entry["ok"] = str(entry["why"]).is_empty()
+	for id in production.jobs():
+		var job := production.job(id)
+		if job.get("kind") == "work" and str(job.get("for", "")) == owner and job.get("town") == town:
+			var left := maxi(int(job["needed"]) - int(job["worked"]), 0)
+			var worked_on: int = job["uids"][0] if not (job["uids"] as Array).is_empty() else 0
+			out["working"].append({"uid": worked_on, "id": items.id_of(worked_on), "effect": job["effect"], "to_id": job["to_id"],
+				"left": left, "left_seconds": roundi(left * TICK_DT)})
+	if towns != null:
+		for uid in towns.held(town, owner):
+			out["waiting"].append({"uid": uid, "id": items.id_of(uid), "effect": "bless" if items.blessed_for(uid) == owner else "reforge"})
+	return out
+
+
+## Why [param by] can't have [param uid] reforged at [param town] now
+## ("" if they can).
+func _reforge_refusal(by: GridEntity, uid: int, town: String, workshop: String, cost: Dictionary, fee: int) -> String:
+	if items.name_of(uid).is_empty():
+		return "only a named thing can be reforged"
+	if not production.manned(workshop):
+		return "there is no smith at the forge now"
+	for what: String in cost.get("from", {}):
+		var short := int(cost["from"][what]) - stockpile.count(town, what)
+		if short > 0:
+			return "the town lacks %d %s" % [short, what]
+	if economy.gold(owner_of(by).trim_prefix("player:")) < fee:
+		return "the fee is %d gold" % fee
+	return ""
+
+
+## Player [param by] orders [param effect] ("bless", "reforge" into
+## [param to_id]) on what is in their [param slot] at [param counter]: ""
+## if it was taken, else why not.
+func counter_order(by: GridEntity, counter: GridEntity, slot: int, effect: String, to_id := "") -> String:
+	if not Net.is_authority() or not reaches(by, counter) or slot < 0 or slot >= by.slots.size() or str(by.slots[slot]).is_empty():
+		return "nothing to hand over"
+	var kind := counter_kind(counter)
+	if effect == "bless" and kind == "temple":
+		_counter_why = ""
+		return "" if _hand_to_priest(by, by, slot, counter) else _counter_why
+	if effect != "reforge" or kind != "shop":
+		return "that is not done here"
+	var town := counter_place(counter)
+	var owner := owner_of(by)
+	var id := str(by.slots[slot])
+	var uid := slot_uid(by, slot)
+	if to_id not in Items.reforge_targets(id):
+		return "a %s can't become that" % Items.name_of(id)
+	var cost := Items.reforge_cost(id, to_id)
+	var fee := reforge_fee(to_id)
+	var workshop := _counter_workshop(counter, town)
+	var why := _reforge_refusal(by, uid, town, workshop, cost, fee)
+	if not why.is_empty():
+		return why
+	var who := owner.trim_prefix("player:")
+	var taken := by.slots.duplicate()
+	var taken_uids := by.slot_items.duplicate()
+	taken[slot] = ""
+	taken_uids[slot] = 0
+	if production.open_work(workshop, uid, "reforge", owner, to_id, cost["from"], int(cost["steps"]), fee, who) == 0:
+		return "there is no smith at the forge now"
+	by.slots = taken
+	by.slot_items = taken_uids
+	economy.add_gold(who, -fee, "a reforge at %s" % town)
+	stockpile.deposit(town, "gold", fee, "reforge:%s" % who, "a fee for a reforge")
+	items.note(uid, "handed in", "at %s's forge by %s, to be a %s, %d gold paid" % [town, _label_of(by), Items.name_of(to_id), fee],
+		counter.zone, counter.tile)
+	_log("forge: %s handed in %s at %s to become %s for %d gold" % [by.name, id, town, to_id, fee])
+	_slots_changed(by)
+	gold_changed.emit(who, economy.gold(who))
+	return ""
+
+
+## Player [param by] collects [param uid], held for them at
+## [param counter]'s town, into their first free slot: "" if they did,
+## else why not.
+func counter_collect(by: GridEntity, counter: GridEntity, uid: int) -> String:
+	if not Net.is_authority() or not reaches(by, counter) or towns == null:
+		return "nothing to collect here"
+	var town := counter_place(counter)
+	var owner := owner_of(by)
+	if uid not in towns.held(town, owner):
+		return "that waits for someone else"
+	var slots := by.slots.duplicate()
+	var free := -1
+	for i in slots.size():
+		if str(slots[i]).is_empty():
+			slots[i] = items.id_of(uid)
+			if hands_allow(by, slots):
+				free = i
+				break
+			slots[i] = ""
+	if free < 0:
+		return "no room to carry it"
+	# If the counter shows it (a temple's slots), it leaves there first.
+	_fit_uids(counter)
+	var shown := Array(counter.slot_items).find(uid)
+	if shown >= 0:
+		var counter_slots := counter.slots.duplicate()
+		var counter_uids := counter.slot_items.duplicate()
+		counter_slots[shown] = ""
+		counter_uids[shown] = 0
+		counter.slots = counter_slots
+		counter.slot_items = counter_uids
+		_slots_changed(counter)
+	_fit_uids(by)
+	var uids := by.slot_items.duplicate()
+	uids[free] = uid
+	by.slots = slots
+	by.slot_items = uids
+	towns.release_held(town, owner, uid)
+	_moved_item(uid, counter, by)
+	_log("counter: %s collected %s at %s" % [by.name, items.id_of(uid), town])
+	_slots_changed(by)
+	return ""
+
+
 ## [param by] hands [param from]'s [param from_slot] to the priest at
 ## temple counter [param counter], with an offering (rules' bless.offering
 ## of its value, at least bless.least) from their player's gold into the
@@ -2378,15 +2573,17 @@ func _hand_to_priest(by: GridEntity, from: GridEntity, from_slot: int, counter: 
 	var workshop := "%s:temple" % town
 	var item := from.slots[from_slot]
 	if from == counter or not owner.begins_with("player:") or town.is_empty() or production == null or economy == null:
-		traded.emit(by, counter, "nobody takes things here")
+		_counter_why = "nobody takes things here"
+		traded.emit(by, counter, _counter_why)
 		return false
 	if not production.manned(workshop):
-		traded.emit(by, counter, "there is no priest at the temple now")
+		_counter_why = "there is no priest at the temple now"
+		traded.emit(by, counter, _counter_why)
 		return false
-	var rule: Dictionary = production.rules.get("bless", {})
-	var offering := maxi(ceili(float(economy.value_of(item)) * float(rule.get("offering", 0.5))), int(rule.get("least", 1)))
+	var offering := bless_offering(item)
 	if economy.gold(who) < offering:
-		traded.emit(by, counter, "the offering is %d gold" % offering)
+		_counter_why = "the offering is %d gold" % offering
+		traded.emit(by, counter, _counter_why)
 		return false
 	var uid := slot_uid(from, from_slot)
 	var taken := from.slots.duplicate()
