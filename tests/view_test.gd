@@ -2134,7 +2134,7 @@ func _test_allies() -> void:
 		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
 			if mesh.visible and mesh.get_parent() is Skeleton3D and mesh.name != "Body":
 				shown.append(String(mesh.name))
-		var allowed: Array = ["Hair_Cropped", "Hair_Bound"] if people == "orc" else ["Cap_Candle"]
+		var allowed: Array = ["Hair_Cropped", "Hair_Bound"] if people == "orc" else []
 		_check(look.people == people and (PersonLook.PEOPLE_SKINS[people] as Array).has(look.colours["skin"].to_html(false))
 				and shown.all(func(part: String) -> bool: return part in allowed)
 				and look.posture == PersonLook.PEOPLE_POSTURES[people],

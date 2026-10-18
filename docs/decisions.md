@@ -12329,6 +12329,17 @@ the review sheet (C:\dev\review\orc_kobold\) or in game, as for art picks.
 view_test _test_allies (each its people's skin, parts and posture, its clips
 playing and its hands; an orc about 1.95 m, a kobold about 1 m; two orcs
 differ); _test_goblins_differ's brute an orc, much bigger than an imp.
+
+Amended (Jeff, 2026-10-18: "not happy with orc and kobold" and, from art-gen's redo v7,
+"p1 kobold from redo", the sleek scaly climber with a long tail): the kobold restyled to it.
+Light red (the "Skin" tint, PersonLook's kobold PEOPLE_SKINS) on its head, chest and hands,
+purple (the "Trousers" tint, KOBOLD_LIMBS) on its arms, legs, feet and tail, its little fur a
+crest of spines from the brow over the crown and a ruff down the nape (the "Hair" tint,
+KOBOLD_CREST), long ears swept back where the horns were, two teeth, a loincloth (the kilt,
+shorter); its tail long and whip-thin, rigid on the pelvis so the legs swing clear (checked in
+Walk and the crouch), curling up at its tip; slighter (TORSO_WIDTH), less crouched (posture
+slouching). No cap, no candle: kobolds see in the dark (art-gen's notes). It fights with the
+dagger (481). The orc stays as built until Jeff picks one.
 ## 481. A kobold fights with a dagger and drops a pick 1 time in 5
 
 The coordinator, on the kobold's look (pc-character's 478) and items' pick

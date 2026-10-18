@@ -76,16 +76,21 @@ const BEARD_CHANCE := 0.5
 const HOOD_CHANCE := 0.1
 const HAT_CHANCE := 0.12
 const POSTURES := ["straight", "stooped", "slouching"]
-## An ally's skins (decision 478), tints of the Blood Rot's green, and hair.
+## An ally's skins (decision 478): an orc's tints of the Blood Rot's green, a
+## kobold's light reds (Jeff's pick); and hair.
 const PEOPLE_SKINS := {"orc": ["6f8a4a", "5f7a40", "7d9152", "56703c", "68804a"],
-	"kobold": ["7f8a52", "8a8a4a", "6e7d48", "93955a", "77854e"]}
+	"kobold": ["c8656e", "d0707a", "b85a66", "c26a76", "d27880"]}
+## A kobold's (Jeff's p1, 478 restyled): its limbs and tail purple (the
+## "trousers" tint on body_gen's kobold), its crest and ruff dark purple, its
+## loincloth brown.
+const KOBOLD_LIMBS := ["74508f", "6e4a8a", "7c5596", "664283"]
+const KOBOLD_CREST := "4a2f5e"
+const KOBOLD_LOINCLOTH := "6b4a35"
 const PEOPLE_HAIR := "1f1a17"
 ## An orc's hair: cropped, bound (a topknot) or none.
 const ORC_HAIR := ["cropped", "bound", "bald"]
-## How likely a kobold wears its miner's cap.
-const KOBOLD_CAP_CHANCE := 0.6
 ## An ally's posture: an orc's slouch, a kobold's crouch.
-const PEOPLE_POSTURES := {"orc": "slouching", "kobold": "stooped"}
+const PEOPLE_POSTURES := {"orc": "slouching", "kobold": "slouching"}
 ## How likely an old person with no posture named stoops.
 const OLD_STOOPED := 0.3
 
@@ -279,9 +284,11 @@ func _ally(said: String, rng: RandomNumberGenerator) -> void:
 		if HAIR_PARTS[hair] != "":
 			parts.append(HAIR_PARTS[hair])
 	else:
+		# No cap or lamp (kobolds see in the dark); its limbs, crest and loincloth.
 		hair = "bald"
-		if rng.randf() < KOBOLD_CAP_CHANCE:
-			parts.append("Cap_Candle")
+		colours["trousers"] = Color(KOBOLD_LIMBS[rng.randi() % KOBOLD_LIMBS.size()])
+		colours["hair"] = Color(KOBOLD_CREST)
+		colours["tunic"] = Color(KOBOLD_LOINCLOTH)
 	posture = str(words.get("posture", "")) if str(words.get("posture", "")) in POSTURES else PEOPLE_POSTURES[people]
 
 
