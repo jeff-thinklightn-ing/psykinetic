@@ -179,6 +179,16 @@
 			"volume_db": -6.0,
 			"uses": "a person drawing a bow, as its stance goes to draw (Client3D._sync_draw)"
 		},
+		"sfx.bow_creak": {
+			"category": "combat",
+			"type": "loop",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -8.0,
+			"uses": "the bow's creak while it is held drawn, its pitch and level rising with World.draw_of (Client3D._sync_draw)",
+			"fallback": "sfx.bow_draw"
+		},
 		"sfx.bow_loose": {
 			"category": "combat",
 			"type": "oneshot",

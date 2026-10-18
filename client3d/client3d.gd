@@ -778,6 +778,10 @@ const SHOT_SPEED := 40.0
 ## A shot that strikes nobody stands in the ground this long, and one that
 ## meets a friend sticks in them as long (decision 456).
 const SHOT_STUCK_SECONDS := 4.0
+## The bow's held creak (decision 475): its pitch, and its level over the
+## slot's in dB, from no draw (x) to full (y).
+const CREAK_PITCH := Vector2(0.85, 1.25)
+const CREAK_DB := Vector2(-18.0, 0.0)
 const LUNGE_SECONDS := 0.16
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
@@ -6024,6 +6028,7 @@ func _sync_puppets() -> void:
 func _entity_went(id: int) -> void:
 	var puppet: Node3D = _puppets[id]
 	_puppets.erase(id)
+	_stop_creak(puppet)
 	if puppet == _outlined:
 		target(null)
 	_combat_at.erase(id)
@@ -6378,13 +6383,43 @@ func _play_later(slot: String, at: Vector3, seconds: float) -> void:
 
 
 ## A person's bow drawn (raised "draw", replicated for players): the
-## creak, once as the stance begins.
+## creak once as the stance begins, then the bow's creak held while it stays
+## drawn, its pitch and level rising with World.draw_of (decision 475).
 func _sync_draw(entity: GridEntity, puppet: Node3D) -> void:
 	var drawing := entity.raised == "draw"
+	var at := puppet.position + Vector3.UP * 1.2
 	if drawing != bool(puppet.get_meta("drawing", false)):
 		puppet.set_meta("drawing", drawing)
 		if drawing:
-			sfx.play("sfx.bow_draw", puppet.position + Vector3.UP * 1.2)
+			sfx.play("sfx.bow_draw", at)
+	var creak := puppet.get_meta("creak") as AudioStreamPlayer3D if puppet.has_meta("creak") else null
+	if not drawing:
+		_stop_creak(puppet)
+		return
+	if creak == null or not is_instance_valid(creak):
+		creak = sfx.hold("sfx.bow_creak", at)
+		if creak == null:
+			return
+		puppet.set_meta("creak", creak)
+	var tune := creak_tune(World.draw_of(entity))
+	sfx.steer(creak, at, tune.x, tune.y)
+
+
+## The held creak's pitch (x) and level over its slot's in dB (y) at
+## [param draw] (0..1): low and faint as the string comes back, high and
+## full at the jaw.
+static func creak_tune(draw: float) -> Vector2:
+	return Vector2(lerpf(CREAK_PITCH.x, CREAK_PITCH.y, draw), lerpf(CREAK_DB.x, CREAK_DB.y, draw))
+
+
+## The bow's held creak stopped: loosed, or the draw let down.
+func _stop_creak(puppet: Node3D) -> void:
+	if not puppet.has_meta("creak"):
+		return
+	var creak := puppet.get_meta("creak") as AudioStreamPlayer3D
+	if creak != null and is_instance_valid(creak):
+		creak.queue_free()
+	puppet.remove_meta("creak")
 
 
 ## The arrow in flight to [param cell] not yet heard, marked heard now; {}
@@ -7278,6 +7313,7 @@ func _on_shot(to: Vector2i, id: int) -> void:
 	var from := puppet.position + Vector3.UP * 1.1
 	var end := _tile_position(to)
 	end.y = _ground_height(Vector2(end.x, end.z)) + 1.0
+	_stop_creak(puppet)
 	sfx.play("sfx.bow_loose", from)
 	var shooter := instance_from_id(id) as GridEntity
 	var flight := 0.0 if from.distance_to(end) < 0.1 else maxf(0.06, from.distance_to(end) / SHOT_SPEED)

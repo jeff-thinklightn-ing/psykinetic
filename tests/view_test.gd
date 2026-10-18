@@ -323,8 +323,18 @@ func _test_bow_sounds() -> void:
 	player.raised = "draw"
 	_check(_heard(func() -> void: _rig._process(0.0)).has("sfx.bow_draw"), "drawn: the creak")
 	_check(not _heard(func() -> void: _rig._process(0.0)).has("sfx.bow_draw"), "held drawn: once")
+	var creaks := _rig.sfx.get_children().filter(func(child: Node) -> bool:
+		return str(child.get_meta("slot", "")) == "sfx.bow_creak" and not child.is_queued_for_deletion())
+	_check(creaks.size() == 1 and (creaks[0] as AudioStreamPlayer3D).playing, "held drawn: the bow's creak held, one (%d)" % creaks.size())
+	var low := Client3D.creak_tune(0.0)
+	var full := Client3D.creak_tune(1.0)
+	_check(is_equal_approx(low.x, 0.85) and is_equal_approx(full.x, 1.25) and full.y > low.y + 12.0,
+			"the creak rises with the draw (%s to %s)" % [low, full])
+	_check(creaks.size() == 1 and is_equal_approx(float(creaks[0].get_meta("pitch")), Client3D.creak_tune(World.draw_of(player)).x),
+			"the creak tuned to the draw")
 	player.raised = ""
 	_rig._process(0.0)
+	_check(creaks.size() == 1 and creaks[0].is_queued_for_deletion(), "the draw let down: the creak stops")
 	var before := _rig.sfx.played.size()
 	var loosed := _heard(func() -> void:
 		player._world_shot(imp.tile)

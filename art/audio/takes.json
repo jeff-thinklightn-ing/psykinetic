@@ -406,6 +406,26 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.bow_creak": [
+			{
+				"file": "sfx.bow_creak.ogg",
+				"from": "freesound",
+				"original": "freesound 559079: Foley_Leather_Stress_Mono.wav (from 2.54 s for 3.29 s)",
+				"sha256": "dc7ec93b18c6a105b2f1898bb4b5a24119a636a45e7b61171d3c274c48e6c99c",
+				"by": "Nox_Sound",
+				"url": "https://freesound.org/people/Nox_Sound/sounds/559079/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bow_creak.2.ogg",
+				"from": "freesound",
+				"original": "freesound 676986: Stretch - Long",
+				"sha256": "8d4191d3776dfc77a2fb198a291403c006c29b7fe8848f7e58c17a44809cd729",
+				"by": "NearTheAtmoshphere",
+				"url": "https://freesound.org/people/NearTheAtmoshphere/sounds/676986/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.bow_draw": [
 			{
 				"file": "sfx.bow_draw.ogg",

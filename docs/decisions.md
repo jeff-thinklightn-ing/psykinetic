@@ -11968,3 +11968,24 @@ bane and grudge side by side (a thing could hold both).
   it holds a grudge against them".
 No damage number: the growths stay sidegrades unless Jeff asks. Protocol
 unchanged (the server's book and the notes' text). items_test's _test_bane.
+
+## 475, sound's side: the bow's creak heard rising as it's drawn
+
+ui's 475 shows how far the bow is drawn (World.draw_of); this is the same
+draw heard. A new loop slot, sfx.bow_creak (two Freesound takes, CC0:
+Nox_Sound's leather stress and NearTheAtmoshphere's stretch, cut to loop),
+plays from the archer while raised is "draw", beside 386's one creak
+(sfx.bow_draw) as the stance begins.
+- Client3D._sync_draw holds it (Sfx.hold, a looping AudioStreamPlayer3D kept
+  in the puppet's meta "creak") and tunes it each frame (Sfx.steer):
+  Client3D.creak_tune(World.draw_of(entity)) from 0.85x pitch and -18 dB over
+  the slot's level at no draw to 1.25x and 0 dB at full (CREAK_PITCH,
+  CREAK_DB), heard as Sfx.play hears a sound there (silent past its reach,
+  muffled behind a wall).
+- It stops at the shot (_on_shot), when the draw is let down, and when the
+  puppet goes (_entity_went).
+- Sfx.looping makes a take loop, for Ambience's beds and the torch too.
+- It follows raised, which is replicated for players only, so a monster
+  archer's creak waits for enemy-ai to replicate Monster raised; it then
+  needs nothing more.
+Client only, protocol unchanged.

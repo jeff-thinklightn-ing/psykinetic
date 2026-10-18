@@ -190,14 +190,4 @@ func _set_level(bed: String, level: float) -> void:
 
 ## A take of [param slot], set to loop; null when it has none.
 static func _stream(slot: String) -> AudioStream:
-	var files := SoundKit.files(slot)
-	if files.is_empty():
-		return null
-	var stream: AudioStream = load(files[randi() % files.size()])
-	if stream is AudioStreamOggVorbis:
-		(stream as AudioStreamOggVorbis).loop = true
-	elif stream is AudioStreamWAV:
-		var wav := stream as AudioStreamWAV
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		wav.loop_end = int(wav.get_length() * wav.mix_rate)
-	return stream
+	return Sfx.looping(slot)

@@ -170,6 +170,60 @@ func play(slot: String, at: Vector3, pitch := 1.0, volume_db := 0.0, radius := -
 	played.append([slot, stream.resource_path, player.bus])
 
 
+## A loop of [param slot] held at [param at] until it is freed (a bow's
+## creak while it is drawn): [method steer] moves and tunes it as it goes.
+## null when the slot has no take.
+func hold(slot: String, at: Vector3) -> AudioStreamPlayer3D:
+	var stream := looping(slot)
+	if stream == null:
+		return null
+	var player := AudioStreamPlayer3D.new()
+	player.stream = stream
+	player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
+	player.bus = _bus_of(slot)
+	_mark(player, slot, 1.0)
+	add_child(player)
+	steer(player, at)
+	player.play()
+	played.append([slot, stream.resource_path, player.bus])
+	return player
+
+
+## [param player] from [method hold] at [param at], [param pitch] times its
+## own and [param volume_db] over its slot's, heard as [method play] hears
+## a sound there: silent while the listener can't hear it.
+func steer(player: AudioStreamPlayer3D, at: Vector3, pitch := 1.0, volume_db := 0.0) -> void:
+	var slot := str(player.get_meta("slot"))
+	player.position = at
+	player.pitch_scale = pitch
+	player.set_meta("pitch", pitch)
+	var muffled := false
+	if listener != null and not hear_everything:
+		var heard := _best_hearing(slot, at, -1)
+		if not heard.heard:
+			player.volume_db = -80.0
+			return
+		muffled = heard.muffled
+		volume_db += float(heard.db)
+	player.bus = _bus_of(slot) + (MUFFLED_SUFFIX if muffled else "")
+	player.volume_db = SoundKit.volume_db(slot) + volume_db
+
+
+## A take of [param slot], set to loop; null when it has none.
+static func looping(slot: String) -> AudioStream:
+	var files := SoundKit.files(slot)
+	if files.is_empty():
+		return null
+	var stream: AudioStream = load(files[randi() % files.size()])
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	elif stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_end = int(wav.get_length() * wav.mix_rate)
+	return stream
+
+
 ## How [param slot] at [param at] sounds from the listener: from its cell,
 ## or, on a cell edge (a door, a blow on a wall: half a cell off the grid),
 ## from whichever cell beside the edge is heard best, since it faces both.
