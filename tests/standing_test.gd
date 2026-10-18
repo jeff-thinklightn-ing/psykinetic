@@ -199,16 +199,17 @@ func _test_commissions_move_it() -> void:
 	Offers.rescued(TOWN, "s-bram", _ctx)
 	_check(_score("s-mara") == 0, "brought home by another's hand: unchanged")
 	_setup()
-	_short = ["wood"]
+	Townsfolk.learn(_work, "s-mara", "Mara saw raiders at the walls.")
+	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}]
 	Offers.accept("s-mara", "p1", "Jeff", Offers.of("s-mara", "p1", _ctx)[0]["id"], 0, _ctx)
 	_now += 8 * DayNight.day_steps
 	Offers.tick(_ctx)
 	_check(_score("s-mara") == -2 and _why("s-mara").begins_with("let a promise lapse"), "a lapse: -2 (%d, %s)" % [_score("s-mara"), _why("s-mara")])
 	_setup()
 	_short = ["wood"]
-	Offers.accept("s-mara", "p1", "Jeff", Offers.of("s-mara", "p1", _ctx)[0]["id"], 0, _ctx)
 	Offers.deposited(TOWN, "Player1", "player:p1", "wood", 6, _ctx)
-	_check(_score("s-mara") == 3 and _why("s-mara") == "brought 6 wood to the store", "a fetch met: +3, trusted")
+	_check(_score("s-mara") == 1 and _score("s-tam") == 1 and _why("s-mara") == "brought wood the town was short of" and _paid == [["p1", TOWN, 6]],
+		"what the store was short of, banked: +1 on every card and the pay, with nothing asked (%d, %s)" % [_score("s-mara"), _why("s-mara")])
 
 
 func _test_word_loan_gift() -> void:
@@ -312,7 +313,8 @@ func _test_decay() -> void:
 func _test_offers_scaled() -> void:
 	print("\n== offers scaled by standing ==")
 	_setup([["s-mara", "Mara", "smith"], ["s-bram", "Bram", "hauler"]])
-	_short = ["wood"]
+	Townsfolk.learn(_work, "s-mara", "Mara saw raiders at the walls.")
+	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}]
 	_ctx["goods"] = func(_town: String) -> Array: return [{"uid": 9, "id": "knife", "price": 12}]
 	var card := _card("s-mara")
 	card["grudge"] = ["s-bram"]
@@ -330,7 +332,7 @@ func _test_offers_scaled() -> void:
 	kinds = Offers.of("s-mara", "p1", _ctx).map(func(e: Dictionary) -> String: return str(e["kind"]))
 	_check(kinds == [Offers.COMMISSION, Offers.SHOP, Offers.PLEA], "trusted: the commission first (%s)" % [kinds])
 	Offers.accept("s-mara", "p1", "Jeff", Offers.of("s-mara", "p1", _ctx)[0]["id"], 0, _ctx)
-	_short = ["cloth"]
+	_camps = [{"id": "s/camp@2,2", "area": "fen", "faction": "goblins"}]
 	var again := Offers.of("s-mara", "p1", _ctx)
 	_check(again.size() >= 2 and bool(again[0].get("open", false)) and again[1]["kind"] == Offers.COMMISSION, "and a second commission while one is open (%s)" % [again.map(func(e: Dictionary) -> String: return str(e["title"]))])
 	_check(Offers.of("s-mara", "p2", _ctx).map(func(e: Dictionary) -> String: return str(e["kind"])) == [Offers.SHOP, Offers.PLEA], "a stranger gets the plain order, and no commission while another's is open")

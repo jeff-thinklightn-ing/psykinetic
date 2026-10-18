@@ -10330,6 +10330,27 @@ provider ("Art: Kenney, Quaternius"). Its entries:
   and the goblin's clips, until the animations have a provider of their own.
 Our own and generated art have no line. art_kit_test checks the list;
 view_test counts the links across every provider.
+Amended (2026-10-18, Jeff, through the coordinator): "try to minimize quests
+that are just 'go get object A from location B'", and "if those types of
+quests exist, make them so they are auto completed, no need to talk to the
+NPC first. Just give player a notice that it was completed and the reward,
+and the NPC will remember they completed it." So: the fetch commission is
+no longer offered; what the town is short of stays talk (the voice has
+signals_of), and a player who banks it is paid then and there (economy's
+pay_commission, the fetch rate a unit) with the party-log notice ("The store
+was short of wood; Mara's thanks. The town pays 4 gold.") and a point of
+standing on every resident's card (443). And no commission needs accepting:
+the event that would complete one completes it whether or not it was taken
+on, with the notice and the pay: kin home with the player in the camp's area
+(Offers.rescued pays the rescuers once and the kin's cards remember), a camp
+falling with the player there (Offers.camp_taken pays from every town the
+camp's faction threatened whose people saw raiders), a word carried (the
+errand, which is the ask itself). "Take it on" in the panel only records
+interest and keeps the ask open on the card; an open ask still closes as
+before. Commissions come from people and what is between them (kin, a camp,
+a word, a loan; later a dispute for the lawspeaker, sick kin to the healer,
+someone walked home); the rule is in Offers' header and residents.json
+"offers", so no future kind is a fetch. offers_test and standing_test follow.
 ## 440. The scholar and the merchant: what the last two hidden types do on the side
 
 Step 2's last two (393: a hidden type per resident, what it does beyond

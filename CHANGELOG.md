@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- No more "fetch six wood" errands from the townsfolk: a shortage is something
+  they talk about, and if you bank what the store was short of, the town pays
+  you then and there and says so. The same for every favour: bring someone's
+  kin home or clear the camp that raided the town and the thanks and the
+  coin come whether or not anyone asked you first.
 - Your companion remembers what passes between you: the things you give her
   and she gives you, the gear that takes her name, the named thing you kept
   from her, and who brought her back at the temple when she fell.

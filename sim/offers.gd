@@ -4,10 +4,24 @@ class_name Offers
 ## offer per kind and "offers.max" (3) in all, in this order: a shop line
 ## (a thing in the town's shop that this resident's trade makes, at
 ## economy's price), one true commission (kin held captive brought home, a
-## raiders' camp cleared, a thing the town is short of fetched to the
-## store), a rumour (the newest believed hearsay, 378; an official offers
-## the weightiest lore fact it knows instead) and a plea (help with a loan,
-## or a word carried to a neighbour the resident holds a grudge against).
+## raiders' camp cleared), a rumour (the newest believed hearsay, 378; an
+## official offers the weightiest lore fact it knows instead) and a plea
+## (help with a loan, or a word carried to a neighbour the resident holds a
+## grudge against).
+##
+## The rule for commissions (Jeff, 2026-10-18, 435 amended): "try to
+## minimize quests that are just 'go get object A from location B'", and
+## "if those types of quests exist, make them so they are auto completed,
+## no need to talk to the NPC first. Just give player a notice that it was
+## completed and the reward, and the NPC will remember they completed it."
+## So a commission comes from people and what is between them (kin to
+## bring home, a camp to clear, a word to carry, a loan to cover; later a
+## dispute for the lawspeaker, sick kin to the healer, someone walked home),
+## never a fetch; a thing the town is short of is talk (the voice has it)
+## and banking it pays on its own. And no commission needs accepting: the
+## event that would complete one completes it whether or not it was taken
+## on, with the party-log notice and the pay, and the card remembers;
+## "take" only records interest and keeps the ask open on the card.
 ## Each offer: {id, kind, title (three or four words for a button), words
 ## (one plain sentence), what (the record it comes from), accept ("buy",
 ## "take", "lend", "carry" or "" for nothing), cost (gold, 0 for none)}.
@@ -219,16 +233,7 @@ static func _commission_offer(worker_id: String, who: Dictionary, card: Dictiona
 			return _offer(worker_id, COMMISSION, CAMP + ":" + str(camp.get("id", "")), "Clear the camp",
 				"Clear the camp of %s%s, before they come again." % [faction, " at " + where if not where.is_empty() else ""],
 				{"sub": CAMP, "camp": str(camp.get("id", "")), "area": area, "faction": str(camp.get("faction", ""))}, TAKE)
-	var short: Variant = _call(given, "short", [town])
-	if short is Array and not short.is_empty():
-		var wants: Array = short.duplicate()
-		wants.sort()
-		var item := str(wants[0])
-		var count := int(settings().get("fetch", 6))
-		return _offer(worker_id, COMMISSION, FETCH + ":" + item, "Fetch %d %s" % [count, item.replace("_", " ")],
-			"The town is short of %s: bring %d to the store and the coffer pays." % [item.replace("_", " "), count],
-			{"sub": FETCH, "item": item, "count": count, "got": 0}, TAKE)
-	return {}
+	return {}  # Never a fetch (the rule above): what the town is short of is talk.
 
 
 static func _camp_area(camps: Variant, camp_id: String) -> String:
@@ -450,6 +455,23 @@ static func _asks(production: Production, town := "") -> Array:
 
 # --- Meeting them -----------------------------------------------------------------------
 
+## Something done for the town with no ask taken (the rule above): the
+## treasury's pay to [param player_id] through economy ([param pay_key] times
+## [param units]), the party-log notice through Main ("done", an ask-shaped
+## record of kind "notice"), and nothing on any card here (the callers move
+## standing and facts). The gold paid.
+static func _notice(player_id: String, town: String, key: String, line: String, pay_key: String, units := 1, given: Dictionary = ctx) -> int:
+	var paid := 0
+	var pay: Variant = _call(given, "pay")
+	var each := int(pay.get(pay_key, 0)) if pay is Dictionary else 0
+	if each * units > 0:
+		paid = int(_call(given, "pay_commission", [player_id, town, each * units]))
+	var production: Production = given.get("production")
+	_call(given, "done", [player_id, {"id": SEP.join(["notice", key, str(production.now() if production != null else 0)]), "kind": "notice",
+		"by": player_id, "town": town}, line + (" The town pays %d gold." % paid if paid > 0 else ""), paid])
+	return paid
+
+
 ## An ask met (or not): dropped from the card, the fact on it, the
 ## treasury's pay to the player through economy, Main told ("done").
 static func _close(worker_id: String, ask: Dictionary, fact: String, line: String, pay_key: String, units := 1, given: Dictionary = ctx,
@@ -492,12 +514,19 @@ static func rescued(town: String, who_id: String, given: Dictionary = ctx) -> vo
 					rescuers[str(player_id)] = true
 	if not rescuers.is_empty():
 		var name := str(production.worker(who_id).get("name", who_id))
+		var thanked: Array[String] = []
 		for id: String in production.worker_ids(town):
 			var card: Dictionary = production.worker(id).get("card", {})
 			if id in asked or not card.get("kin", {}).has(who_id):
 				continue
+			thanked.append(str(production.worker(id).get("name", id)))
 			for player_id: String in rescuers:
 				_regard(production, id, player_id, Standing.setting("kin_home"), "brought %s home" % name)
+				Townsfolk.learn(production, id, "%s brought %s home." % [str(_call(given, "name_of", [player_id])), name])
+		if not thanked.is_empty() and asked.is_empty():
+			# Done with no ask taken: the notice and the pay, once per rescuer.
+			for player_id: String in rescuers:
+				_notice(player_id, town, RESCUE + ":" + who_id, "%s is home; %s's thanks." % [name, " and ".join(thanked)], RESCUE, 1, given)
 	for pair: Array in _asks(production, town):
 		var ask: Dictionary = pair[1]
 		if str(ask.get("sub", "")) != RESCUE or str(ask.get("what", {}).get("captive", "")) != who_id:
@@ -520,6 +549,42 @@ static func camp_taken(camp_id: String, _from: String, to: String, given: Dictio
 	var production: Production = given.get("production")
 	if production == null:
 		return
+	var asked_by := {}  # town -> [player ids] whose ask closes below
+	for pair: Array in _asks(production):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("sub", "")) == CAMP and str(ask.get("what", {}).get("camp", "")) == camp_id:
+			asked_by.get_or_add(str(ask.get("town", "")), []).append(str(ask.get("by", "")))
+	# Done with no ask taken (the rule above): every town the camp's faction
+	# threatened, whose people saw raiders, pays the players standing there.
+	if to != _from and not _from.is_empty():
+		var camps: Variant = _call(given, "camps")
+		var area := _camp_area(camps, camp_id)
+		var there: Variant = _call(given, "players_in", [area]) if not area.is_empty() else null
+		if there is Array and not there.is_empty():
+			var towns := {}
+			for id: String in production.worker_ids():
+				var town := str(production.worker(id).get("town", ""))
+				if not town.is_empty() and not id.begins_with(Townsfolk.COMPANION):
+					towns.get_or_add(town, []).append(id)
+			var faction := ResidentCard.faction_name(_from)
+			for town: String in towns:
+				if not bool(_call(given, "hostile", [_from, town])):
+					continue
+				var saw: Array[String] = []
+				for id: String in towns[town]:
+					for fact: Variant in production.worker(id).get("card", {}).get("facts", []):
+						if fact is Dictionary and str(fact.get("text", "")).containsn("raid"):
+							saw.append(id)
+							break
+				if saw.is_empty():
+					continue
+				for player_id: Variant in there:
+					if str(player_id) in asked_by.get(town, []):
+						continue
+					for id: String in saw:
+						_regard(production, id, str(player_id), Standing.setting("met"), "cleared the camp of %s" % faction)
+						Townsfolk.learn(production, id, "%s cleared the camp of %s." % [str(_call(given, "name_of", [player_id])), faction])
+					_notice(str(player_id), town, CAMP + ":" + camp_id, "The camp of %s is cleared; the town's thanks." % faction, CAMP, 1, given)
 	for pair: Array in _asks(production):
 		var ask: Dictionary = pair[1]
 		if str(ask.get("sub", "")) != CAMP or str(ask.get("what", {}).get("camp", "")) != camp_id or to == str(ask["what"].get("faction", "")):
@@ -538,9 +603,27 @@ static func camp_taken(camp_id: String, _from: String, to: String, given: Dictio
 ## met at their count.
 static func deposited(place: String, _by: String, by_id: String, what: String, count: int, given: Dictionary = ctx) -> void:
 	var production: Production = given.get("production")
-	if production == null or not by_id.begins_with("player:"):
+	if production == null or not by_id.begins_with("player:") or count <= 0:
 		return
 	var player_id := by_id.trim_prefix("player:")
+	# What the store was short of, banked by a player: paid then and there
+	# (the rule above), the town's people a little the better for it.
+	var short: Variant = _call(given, "short", [place])
+	var owed_by_ask := false
+	for pair: Array in _asks(production, place):
+		var held: Dictionary = pair[1]
+		if str(held.get("sub", "")) == FETCH and str(held.get("by", "")) == player_id and str(held.get("what", {}).get("item", "")) == what:
+			owed_by_ask = true
+	if short is Array and what in short and not owed_by_ask:
+		var item := what.replace("_", " ")
+		var thanks: Array[String] = []
+		for id: String in production.worker_ids(place):
+			if id.begins_with(Townsfolk.COMPANION):
+				continue
+			_regard(production, id, player_id, Standing.setting("fetch"), "brought %s the town was short of" % item)
+			if thanks.size() < 2:
+				thanks.append(str(production.worker(id).get("name", id)))
+		_notice(player_id, place, FETCH + ":" + what, "The store was short of %s%s." % [item, "; " + " and ".join(thanks) + "'s thanks" if not thanks.is_empty() else ""], FETCH, count, given)
 	for pair: Array in _asks(production, place):
 		var ask: Dictionary = pair[1]
 		if str(ask.get("sub", "")) != FETCH or str(ask.get("by", "")) != player_id or str(ask.get("what", {}).get("item", "")) != what:

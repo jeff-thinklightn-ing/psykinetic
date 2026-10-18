@@ -115,6 +115,7 @@ func _setup(folk: Array = [["o-mara", "Mara", "smith"], ["o-tam", "Tam", "hauler
 			return gold,
 		"pay": func() -> Dictionary: return {"rescue": 10, "camp": 20, "fetch": 1},
 		"zone_of": func(_player_id: String) -> String: return _zone,
+		"players_in": func(area: String) -> Array: return ["p1"] if area == _zone else [],
 		"name_of": func(player_id: String) -> String: return "Jeff" if player_id == "p1" else player_id,
 		"asked": func(player_id: String, ask: Dictionary) -> void: _asked.append([player_id, ask]),
 		"done": func(player_id: String, ask: Dictionary, line: String, paid: int) -> void: _done.append([player_id, ask, line, paid]),
@@ -180,6 +181,10 @@ func _test_commission_kin() -> void:
 		and mine[0]["what"]["area"] == "wood", "Mara asks for her brother back: %s" % [mine])
 	_check(mine.size() == 1 and mine[0]["title"] == "Bring Bram home" and mine[0]["words"].begins_with("Bring my brother Bram home from the camp of ")
 		and mine[0]["words"].ends_with(" camp of the goblins at the Dark Wood."), "in words, with the camp's place: %s" % (mine[0]["words"] if not mine.is_empty() else ""))
+	_zone = "wood"
+	Offers.rescued(TOWN, "o-bram", _ctx)
+	_check(_paid == [["p1", TOWN, 10]] and _done.size() == 1 and _done[0][1]["kind"] == "notice" and _done[0][2] == "Bram is home; Mara's thanks. The town pays 10 gold.",
+		"brought home with nothing taken on: paid and told all the same (Jeff's rule): %s" % [_done])
 	_captives = []
 	_check(_offers().is_empty(), "once he is home (no captive), no such commission")
 
@@ -190,9 +195,7 @@ func _test_commission_camp_and_fetch() -> void:
 	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}, {"id": "o/camp@2,2", "area": "fen", "faction": "deer"}]
 	_short = ["wood", "cloth"]
 	var mine := _offers()
-	_check(mine.size() == 1 and mine[0]["what"]["sub"] == Offers.FETCH and mine[0]["what"]["item"] == "cloth" and mine[0]["what"]["count"] == 6,
-		"no raid seen: she asks for the first thing the town is short of, cloth, six of it: %s" % [mine])
-	_check(mine.size() == 1 and mine[0]["title"] == "Fetch 6 cloth" and mine[0]["words"] == "The town is short of cloth: bring 6 to the store and the coffer pays.", "in words")
+	_check(mine.is_empty(), "no raid seen, and what the town is short of is never a commission (Jeff's rule): %s" % [mine])
 	Townsfolk.learn(_work, "o-mara", "Mara saw raiders at the walls.")
 	mine = _offers()
 	_check(mine.size() == 1 and mine[0]["what"]["sub"] == Offers.CAMP and mine[0]["what"]["camp"] == CAMP and mine[0]["what"]["faction"] == "goblins",
@@ -240,7 +243,8 @@ func _test_cap_and_order() -> void:
 	print("\n== at most three, in order: shop, commission, rumour, plea ==")
 	_setup([["o-mara", "Mara", "smith"], ["o-bram", "Bram", "hauler"]])
 	_goods = [{"uid": 9, "id": "knife", "price": 12}]
-	_short = ["wood"]
+	Townsfolk.learn(_work, "o-mara", "Mara saw raiders at the walls.")
+	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}]
 	_plant("o-mara", "The mine is cursed", "Tam", "well")
 	var card := Townsfolk.card_of(_work, "o-mara")
 	card["grudge"] = ["o-bram"]
@@ -273,7 +277,7 @@ func _test_accept_and_meet() -> void:
 	var facts: Array = Townsfolk.card_of(_work, "o-mara").get("facts", [])
 	_check(not facts.is_empty() and str(facts.back()["text"]) == "Jeff promised Mara: to bring Bram home", "the promise is a fact on the card: %s" % facts.back()["text"])
 	# Tam's card asks: the per-player cap.
-	_short = ["wood"]
+	Townsfolk.learn(_work, "o-tam", "Tam saw raiders at the walls.")
 	var tams := _offers("o-tam")
 	_check(tams.size() == 1 and Offers.accept("o-tam", "p1", "Jeff", tams[0]["id"], 0, _ctx)["ok"], "a second commission, from Tam")
 	var cards := Townsfolk.card_of(_work, "o-bram")
@@ -301,18 +305,17 @@ func _test_accept_and_meet() -> void:
 	Offers.camp_taken(CAMP, "goblins", "nobody", _ctx)
 	_check(_paid.is_empty() and _done.size() == 1 and _done[0][3] == 0 and str(_done[0][2]).ends_with("promise is kept by another."),
 		"cleared by another's hand: the ask closes unpaid, honestly: %s" % [_done])
-	# A fetch counted from deposits.
+	# What the store is short of, banked: paid then and there, no ask (Jeff's rule).
 	_setup([["o-mara", "Mara", "smith"]])
 	_short = ["wood"]
-	var fetch: Dictionary = _offers()[0]
-	Offers.accept("o-mara", "p1", "Jeff", fetch["id"], 0, _ctx)
+	_check(_offers().is_empty(), "the shortage is no offer")
 	Offers.deposited(TOWN, "Player1", "player:p1", "wood", 4, _ctx)
-	_check(Townsfolk.card_of(_work, "o-mara")["asks"][0]["what"]["got"] == 4 and _done.is_empty(), "four of six wood counted, not met yet")
+	_check(_paid == [["p1", TOWN, 4]] and _done.size() == 1 and _done[0][1]["kind"] == "notice" and _done[0][2] == "The store was short of wood; Mara's thanks. The town pays 4 gold.",
+		"four wood banked: four gold and a notice, with nothing taken on: %s" % [_done])
+	Offers.deposited(TOWN, "Player2", "player:p2", "cloth", 9, _ctx)
+	_check(_paid.size() == 1, "cloth, which the town is not short of, pays nothing")
 	Offers.deposited(TOWN, "Player2", "player:p2", "wood", 9, _ctx)
-	_check(_done.is_empty(), "another player's wood does not count")
-	Offers.deposited(TOWN, "Player1", "player:p1", "wood", 2, _ctx)
-	_check(_done.size() == 1 and _paid == [["p1", TOWN, 6]] and _done[0][2] == "Jeff brought 6 wood to the store, as promised. The town pays 6 gold.",
-		"six wood: met and paid 1 a unit: %s" % [_done])
+	_check(_paid.size() == 2 and _paid[1] == ["p2", TOWN, 9], "another player's wood pays them too")
 
 
 func _test_errand() -> void:
@@ -339,14 +342,15 @@ func _test_errand() -> void:
 func _test_lapse() -> void:
 	print("\n== a promise not kept lapses after the days ==")
 	_setup([["o-mara", "Mara", "smith"]])
-	_short = ["wood"]
+	Townsfolk.learn(_work, "o-mara", "Mara saw raiders at the walls.")
+	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}]
 	Offers.accept("o-mara", "p1", "Jeff", _offers()[0]["id"], 0, _ctx)
 	_now = 6 * DayNight.day_steps
 	Offers.tick(_ctx)
 	_check(_done.is_empty(), "six days on, it stands")
 	_now = 8 * DayNight.day_steps
 	Offers.tick(_ctx)
-	_check(_done.size() == 1 and _done[0][2] == "Jeff's promise to Mara lapsed: to bring 6 wood to the store." and _done[0][3] == 0
+	_check(_done.size() == 1 and _done[0][2] == "Jeff's promise to Mara lapsed: to clear the camp of the goblins." and _done[0][3] == 0
 		and Townsfolk.card_of(_work, "o-mara").get("asks", []).is_empty(), "eight days on, it lapses: %s" % [_done])
 	_check(str(Townsfolk.card_of(_work, "o-mara")["facts"].back()["text"]).begins_with("Jeff never kept the promise to Mara"), "told once, as a fact")
 
@@ -361,10 +365,11 @@ func _test_voice_words() -> void:
 		or words.begins_with("What you can offer Jeff, if it comes up: "), "offers as a fact, never a line: %s" % words)
 	_check(words.contains("a knife at the counter for 12 gold") and words.contains("told me at the well that the mine is cursed"), "both in it")
 	_check(Offers.voice_words("o-bram", "p1", "Jeff", _ctx).is_empty(), "nothing to offer, nothing said")
-	_short = ["wood"]
-	Offers.accept("o-mara", "p1", "Jeff", "o-mara|commission|fetch:wood", 0, _ctx)
+	Townsfolk.learn(_work, "o-mara", "Mara saw raiders at the walls.")
+	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}]
+	Offers.accept("o-mara", "p1", "Jeff", "o-mara|commission|camp:" + CAMP, 0, _ctx)
 	words = Offers.voice_words("o-mara", "p1", "Jeff", _ctx)
-	_check(words.ends_with("Jeff promised to bring 6 wood to the store and has not yet."), "an open promise is a fact too: %s" % words)
+	_check(words.ends_with("Jeff promised to clear the camp of the goblins and has not yet."), "an open promise is a fact too: %s" % words)
 
 
 func _check(ok: bool, what: String) -> void:
