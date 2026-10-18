@@ -10250,6 +10250,12 @@ body (Quaternius's: a superhero nude, painted clothes fail); shape keys by
 pushing along normals (243's; a belt and an apron would part from the tunic).
 Later: an orc base for the brute and a kobold base for the sneak from the same
 tool (Jeff, via lore), and the player's Character panel.
+
+Amended (the base pair's "shoulder tips", Jeff on its sheet): a sleeve's top end, its two
+rings at the shoulder, now sits flatter and 1.8 cm lower, under the torso's shoulder line,
+and the ring past the joint is half on the clavicle (Part.mixes): as high as the arm and
+turning wholly with it, it stood above the shoulder as a ridge when the arm came down.
+human_m, human_f (and 478's orc and kobold, the same sleeves) built again.
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and

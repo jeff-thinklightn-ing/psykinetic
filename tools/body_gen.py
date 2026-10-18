@@ -323,6 +323,9 @@ class Part:
 		# Rings held to one bone whatever their distances say ({ring index: bone}): a
 		# sleeve's end inside the shoulder stays with the clavicle as the arm turns.
 		self.pins = {}
+		# Rings shared with another bone at a weight ({ring index: (bone, weight)}): the top of
+		# a sleeve half on the clavicle, so it turns only part way as the arm comes down.
+		self.mixes = {}
 
 	def add(self, points: list) -> "Part":
 		self.rings.append(points)
@@ -359,6 +362,15 @@ class Part:
 				for g in obj.vertex_groups:
 					g.remove(held)
 				obj.vertex_groups[bone].add(held, 1.0, "REPLACE")
+			for k, (bone, share) in self.mixes.items():
+				for i in range(k * n, (k + 1) * n):
+					for g in obj.vertex_groups:
+						try:
+							w = g.weight(i)
+						except RuntimeError:
+							continue
+						g.add([i], w * (1.0 - share), "REPLACE")
+					obj.vertex_groups[bone].add([i], share, "ADD")
 		return obj
 
 
@@ -471,7 +483,14 @@ def sleeve(J: dict, side: str) -> Part:
 	# That end held to the clavicle: weighted by distance it took the upper arm's turn and
 	# rose out of the shoulder as the arm came down.
 	p.pins = {0: "clavicle_" + side}
-	stations = [(inner, 0.068, 0.075), (sh + along * 0.03, 0.074, 0.074), (sh.lerp(el, 0.45), 0.058, 0.058),
+	# The shoulder's cap (the ring past the joint) half with the clavicle: turned wholly with the
+	# upper arm, its top rose above the shoulder's line as the arm came down (the base pair's
+	# "shoulder tips", Jeff on its sheet; decision 419 amended).
+	p.mixes = {1: ("clavicle_" + side, 0.5)}
+	# Its top end (the two rings at the shoulder) flatter and a little lower, under the torso's
+	# shoulder line: as high as the arm's, it stood above the shoulder when the arm came down.
+	down = Vector((0.0, 0.0, -0.018))
+	stations = [(inner + down, 0.052, 0.075), (sh + along * 0.03 + down, 0.060, 0.074), (sh.lerp(el, 0.45), 0.058, 0.058),
 		(el, 0.048, 0.050), (el.lerp(wr, 0.5), 0.046, 0.044), (wr - along * 0.01, 0.040, 0.036)]
 	k = pick(1.0, 0.86) * m("arms") * per(1.0, 1.45, 1.05)  # The woman's arms slighter, an orc's thick.
 	for c, rv, ru in stations:
