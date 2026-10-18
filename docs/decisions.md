@@ -8928,3 +8928,40 @@ PROTOCOL_REVISION 13 for the new meaning of 0; the fingerprint changes with
 the moved RPC. Rejected: hold to wind and release to strike (a new message,
 and clicks walk up and strike today); a wind-up on every weapon (the quick
 ones are quick); the brute's blow made unblockable (enemy-ai's and Jeff's).
+
+## 390. One rig plays a model's clips: an AnimationTree each, in layers (combat animation, phase A)
+
+Roadmap step 3. Every model's clips play through an AnimRig
+(client3d/anim_rig.gd), the one way to play them (release's ask, agreed
+with art-kit; CreatureView moves onto it next): an AnimationTree of each
+body's own beside its AnimationPlayer, in layers. The base plays a loop or
+a clip held at its end, every change crossfaded over the rig's blend, so a
+knockdown hands over to lying and getting up with no frame of standing
+between. An upper layer plays a clip over the spine, clavicles, neck, head
+and arms with the legs left to the base (left out of a rig made with
+upper = false: quadrupeds have no such bones). A posture layer adds a pose
+made outside the rig (pc-character's stooped and slouching, coming). An
+action layer plays a strike over everything, timed so its contact (seconds
+in at speed 1, from the model's table; half the clip if none) lands when
+the blow does and fitted after it to the time till the next, each speed
+kept within 0.4 to 3.0. Which clip is played stays with the caller: a
+humanoid strikes with what it holds (HUMANOID_MOVES' "strikes" by
+World.wielded, bare hands' if it has none for that, never the same blow
+twice running), its contact landing STRIKE_LANDS_IN (a tick and a half:
+remote bodies are drawn that far behind the sim) after the news, the local
+player's own at once; the wound-up heavy blow (392) is a strike too, and a
+wind-up given up lets it go. A loop asked for again with only its speed
+changed goes on at the new speed (gaits change pace every frame).
+Cost, measured: 100 goblins walking posed every frame take 2.6 ms of CPU
+(26 us each) against 2.0 ms on bare AnimationPlayers, the tree's layers
+about a third more. So each body is posed every frame only within 9 m of
+the camera's aim, every other frame within 16 m, every third beyond and
+every eighth out of the frame (AnimRig.every, Client3D._pose_every), the
+rest spread over the frames. tests/anim_rig_test checks each layer moving
+the bones, the held clip's hand-over and the strike's timing; view_test
+reads models through the rig. Still to come in phase A: the events of a
+blow taken played on the display clock like the strike's. Rejected: one
+AnimationTree resource shared by all (each body's clips and speeds are its
+own); an AnimationNodeStateMachine of every clip (the tables name clips at
+run time, and the code picks them); posing everything every frame (over
+the 1 ms budget at sixty people and a herd).

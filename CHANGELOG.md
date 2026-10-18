@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- People strike with what they hold: a sword swings, an axe falls overhead, a dagger stabs, a spear thrusts, and bare hands punch. Each blow is timed so it lands as the hit does. Bodies far from the middle of the view, or out of it, move less often, which keeps crowds cheap. Client only.
 - Companions know that brutes are orcs and sneaks are kobolds, allied to the Blood
   Rot's goblins (the imps), and why they fight for them.
 - The giant axe winds up before it falls: an attack takes almost a second to land, and nothing blocks it when it does. A raised shield breaks under it, and the one struck is knocked down. Stepping away or being stunned before it lands gives the swing up, and if your target has moved out of reach it hits only air. Brutes' wind-ups now visibly stop when they give one up.

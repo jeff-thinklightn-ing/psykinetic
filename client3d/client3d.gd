@@ -570,6 +570,17 @@ const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
+## A body's pose's level of detail (_pose_every): metres from the camera's
+## aim (the view is CAMERA_SIZE across) posed every frame, then every other; beyond, every POSE_FAR_EVERY; out
+## of the frame, every POSE_UNSEEN_EVERY. A hundred bodies posed every frame
+## cost 2.6 ms (26 us each).
+const POSE_NEAR := 9.0
+const POSE_MID := 16.0
+const POSE_FAR_EVERY := 3
+const POSE_UNSEEN_EVERY := 8
+## How long after a blow's news a drawn body's blow lands: remote bodies are
+## drawn about a tick and a half behind the sim (decision 390).
+const STRIKE_LANDS_IN := 1.5 * World.TICK_DT
 const MODEL_RADIUS := 0.3
 ## A click this near a monster's body (ground units, past its own pick
 ## shape, from the cursor's ray to the line from its feet to its head) is a
@@ -5837,10 +5848,11 @@ func _sync_puppets() -> void:
 			_sync_chatter(entity as Monster, puppet)
 		_sync_down(entity, puppet)
 		_sync_ailments(entity, puppet)
-		if puppet.has_meta("animator"):
+		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
+			(puppet.get_meta("rig") as AnimRig).every = _pose_every(puppet)
 			_animate(puppet)
 		elif puppet.has_meta("creature_view"):
 			var body := puppet.get_node("Body") as Node3D
@@ -5951,7 +5963,7 @@ func _on_pushed(tiles: int, id: int) -> void:
 		get_tree().create_timer(SLIDE_SECONDS).timeout.connect(func() -> void:
 			if is_instance_valid(entity) and is_instance_valid(sfx) and sfx.is_inside_tree() and World.is_water(entity.tile):
 				sfx.play("sfx.splash", _tile_position(entity.tile)))
-	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("animator"):
+	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("rig"):
 		return
 	if puppet.has_meta("knock"):
 		var knock: Dictionary = puppet.get_meta("knock")
@@ -6113,7 +6125,7 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	if _play_once(puppet, death):
 		puppet.set_meta("busy_until", 1 << 62)
 		var lie := create_tween()
-		lie.tween_interval(CORPSE_SECONDS + (puppet.get_meta("animator") as AnimationPlayer).get_animation(death).length)
+		lie.tween_interval(CORPSE_SECONDS + (puppet.get_meta("rig") as AnimRig).length(death))
 		lie.tween_property(puppet, "position:y", -SINK_DEPTH, SINK_SECONDS).set_ease(Tween.EASE_IN)
 		lie.tween_callback(puppet.queue_free)
 		if kind == "player" and str(data.get("entity", "")) == _local_name:
@@ -6255,7 +6267,9 @@ static func model_for(entity: GridEntity) -> Dictionary:
 
 ## The model as the puppet's Body: the scene turned to face +X (as the
 ## nose does, so Body turns with the facing; MODELS' "faces"), with an AnimationPlayer on
-## its root playing its clips, kept as the puppet's "animator".
+## its root playing its clips through an AnimRig of its own (decision 390),
+## kept as the puppet's "rig"; its fight's clips (a model's "moves") as its
+## "moves".
 func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	var body := Node3D.new()
 	body.name = "Body"
@@ -6277,14 +6291,11 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
 	puppet.set_meta("backpedal", float(model.get("backpedal", BACKPEDAL_CLIP_SPEED)))
 	puppet.set_meta("fidgets", model.get("fidgets", FIDGETS))
-	var animator := AnimationPlayer.new()
-	animator.name = "Animator"
-	scene.add_child(animator)
-	animator.root_node = NodePath("..")
-	animator.add_animation_library("", load(model["clips"]) as AnimationLibrary)
-	animator.play(CLIP_IDLE)
-	puppet.set_meta("animator", animator)
-	_start_anywhere(puppet, animator)
+	puppet.set_meta("moves", model.get("moves", {}))
+	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, CLIP_BLEND, true,
+			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
+	rig.loop(CLIP_IDLE)
+	puppet.set_meta("rig", rig)
 	return body
 
 
@@ -6332,14 +6343,6 @@ static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void
 	puppet.set_meta("fidget_at", Time.get_ticks_msec() + int(rng.randf_range(2.0, FIDGET_SECONDS_MAX) * 1000.0))
 
 
-## A loop just started somewhere along it, not at its start.
-static func _start_anywhere(puppet: Node3D, animator: AnimationPlayer) -> void:
-	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
-	var clip := animator.get_animation(animator.current_animation)
-	if rng != null and clip != null:
-		animator.seek(rng.randf() * clip.length, true)
-
-
 ## One of [param clips], at random, not [param puppet]'s last of them.
 static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
@@ -6354,20 +6357,20 @@ static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 
 
 ## One of FIDGETS for [param puppet], by weight, not its last (any with no
-## clip in [param animator] left out); "" for none.
-static func _pick_fidget(puppet: Node3D, animator: AnimationPlayer) -> String:
+## clip in [param rig] left out); "" for none.
+static func _pick_fidget(puppet: Node3D, rig: AnimRig) -> String:
 	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
 	var last := str(puppet.get_meta("last_fidget", ""))
 	var fidgets: Dictionary = puppet.get_meta("fidgets", FIDGETS)
 	var total := 0
 	for clip: String in fidgets:
-		if clip != last and animator.has_animation(clip):
+		if clip != last and rig.has(clip):
 			total += int(fidgets[clip])
 	if total == 0:
 		return ""
 	var roll := rng.randi_range(1, total) if rng != null else 1
 	for clip: String in fidgets:
-		if clip == last or not animator.has_animation(clip):
+		if clip == last or not rig.has(clip):
 			continue
 		roll -= int(fidgets[clip])
 		if roll <= 0:
@@ -6395,7 +6398,7 @@ static func _idle_clip(puppet: Node3D) -> String:
 ## death) plays out; otherwise it walks while it moves, at its pace, and
 ## stands idle when it does not.
 func _animate(puppet: Node3D) -> void:
-	var animator := puppet.get_meta("animator") as AnimationPlayer
+	var rig := puppet.get_meta("rig") as AnimRig
 	var now := Time.get_ticks_msec()
 	var last: Vector3 = puppet.get_meta("last_at", puppet.position)
 	var seconds := (now - int(puppet.get_meta("last_ms", now))) / 1000.0
@@ -6406,7 +6409,7 @@ func _animate(puppet: Node3D) -> void:
 	if seconds > 0.0:
 		speed = lerpf(speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
 	puppet.set_meta("speed", speed)
-	if puppet.has_meta("knock") and _knocked(puppet, animator, speed, now):
+	if puppet.has_meta("knock") and _knocked(puppet, rig, speed, now):
 		return
 	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)
 	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm):
@@ -6422,54 +6425,43 @@ func _animate(puppet: Node3D) -> void:
 	puppet.set_meta("fidgeting", false)
 	var pace: float = puppet.get_meta("pace", 1.0)
 	var tempo: float = puppet.get_meta("tempo", 1.0)
-	if speed <= WALKING and animator.has_animation(CLIP_SITTING):
+	if speed <= WALKING and rig.has(CLIP_SITTING):
 		var sitting := _sitting(puppet)
 		var seated: bool = puppet.get_meta("seated", false)
 		if sitting and not seated:
-			_play_fidget(puppet, animator, CLIP_SIT_DOWN, now, tempo)
+			_play_fidget(puppet, rig, CLIP_SIT_DOWN, now, tempo)
 			puppet.set_meta("seated", true)
 			return
 		if sitting:
-			if animator.current_animation != CLIP_SITTING:
-				animator.play(CLIP_SITTING, CLIP_BLEND)
-				_start_anywhere(puppet, animator)
-			animator.speed_scale = tempo
+			rig.loop(CLIP_SITTING, tempo)
 			return
 		if seated:
-			_play_fidget(puppet, animator, CLIP_SIT_UP, now, tempo)
+			_play_fidget(puppet, rig, CLIP_SIT_UP, now, tempo)
 			puppet.set_meta("seated", false)
 			return
 	if speed > WALKING:
 		var gaits: Array = puppet.get_meta("gaits", GAITS)
-		var gait: Array = gaits[gait_for(animator.current_animation, speed / pace, gaits)]
-		if animator.current_animation != gait[0]:
-			animator.play(gait[0], CLIP_BLEND)
-			_start_anywhere(puppet, animator)
-		animator.speed_scale = clampf(speed / (float(gait[1]) * pace), 0.3, 3.0)
+		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
+		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace), 0.3, 3.0))
 		return
 	var idle := _idle_clip(puppet)
 	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
 		var rng: RandomNumberGenerator = puppet.get_meta("rng")
 		puppet.set_meta("fidget_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
-		var fidget := _pick_fidget(puppet, animator)
+		var fidget := _pick_fidget(puppet, rig)
 		if not fidget.is_empty():
-			_play_fidget(puppet, animator, fidget, now, tempo)
+			_play_fidget(puppet, rig, fidget, now, tempo)
 			return
-	if animator.current_animation != idle:
-		animator.play(idle, CLIP_BLEND)
-		_start_anywhere(puppet, animator)
-	animator.speed_scale = tempo
+	rig.loop(idle, tempo)
 
 
 ## [param clip] once through from its start, at [param tempo], blended in,
 ## the model busy with it till it ends (a fidget: dropped if it moves or a
 ## fight comes to it).
-static func _play_fidget(puppet: Node3D, animator: AnimationPlayer, clip: String, now: int, tempo: float) -> void:
-	animator.play(clip, CLIP_BLEND * 2.0)
-	animator.seek(0.0, true)
-	animator.speed_scale = tempo
+static func _play_fidget(puppet: Node3D, rig: AnimRig, clip: String, now: int, tempo: float) -> void:
+	var seconds := rig.once(clip, tempo, CLIP_BLEND * 2.0)
 	puppet.set_meta("fidgeting", true)
-	puppet.set_meta("busy_until", now + int(animator.get_animation(clip).length / tempo * 1000.0))
+	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
 
 
 ## A knocked-back model's frame (see CLIP_BACKPEDAL): true while the knock
@@ -6477,7 +6469,7 @@ static func _play_fidget(puppet: Node3D, animator: AnimationPlayer, clip: String
 ## blow's own clip plays on). The sim says which slide is the push's
 ## (GridEntity.push_shown), so a slide cut short or drawn in pieces on a
 ## client, or one never drawn, is still known for what it is.
-func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int) -> bool:
+func _knocked(puppet: Node3D, rig: AnimRig, speed: float, now: int) -> bool:
 	var knock: Dictionary = puppet.get_meta("knock")
 	var toss: bool = knock["toss"]
 	var started: int = knock["started"]
@@ -6496,12 +6488,11 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 		started = now
 		knock["started"] = now
 		if toss:
-			animator.play_backwards(CLIP_ROLL, CLIP_BLEND)
-			animator.speed_scale = ROLL_SPEED
-			puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_ROLL).length / ROLL_SPEED * 1000.0))
+			rig.cancel_strike()
+			puppet.set_meta("busy_until", now + int(rig.once(CLIP_ROLL, -ROLL_SPEED) * 1000.0))
 		else:
-			animator.play(CLIP_BACKPEDAL, CLIP_BLEND)
-			animator.seek(0.0, true)
+			rig.cancel_strike()
+			rig.loop(CLIP_BACKPEDAL, 1.0, -1.0, true)
 	if not walking:
 		# Turned to it as the sim turns a body, not snapped round.
 		knock["shown"] = lerp_angle(knock["shown"], knock["yaw"],
@@ -6513,7 +6504,7 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 				return true
 		else:
 			if not toss:
-				animator.speed_scale = clampf(speed / (float(puppet.get_meta("backpedal", BACKPEDAL_CLIP_SPEED)) * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0)
+				rig.set_speed(clampf(speed / (float(puppet.get_meta("backpedal", BACKPEDAL_CLIP_SPEED)) * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0))
 			var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
 			# It doubles over when it gets there: a push back always, a toss
 			# if a wall or a door stopped it. One knocked where it stands holds.
@@ -6534,6 +6525,23 @@ func _knocked(puppet: Node3D, animator: AnimationPlayer, speed: float, now: int)
 		# Off on its own: the walk takes over now, from where it faces.
 		(puppet.get_node("Body") as Node3D).rotation.y = knock["shown"]
 	return false
+
+
+## How often [param puppet]'s body is posed (AnimRig.every, decision 390):
+## every frame near what the camera looks at (POSE_NEAR, on the ground: the
+## view is orthographic, so nearer the camera is nothing), every other
+## within POSE_MID, every POSE_FAR_EVERY beyond, every POSE_UNSEEN_EVERY out
+## of the frame.
+func _pose_every(puppet: Node3D) -> int:
+	if _camera == null:
+		return 1
+	var at := puppet.global_position + Vector3.UP
+	if not _camera.is_position_in_frustum(at):
+		return POSE_UNSEEN_EVERY
+	var away := Vector2(at.x - _camera_target.x, at.z - _camera_target.z).length_squared()
+	if away <= POSE_NEAR * POSE_NEAR:
+		return 1
+	return 2 if away <= POSE_MID * POSE_MID else POSE_FAR_EVERY
 
 
 ## The index in [param gaits] (GAITS, or a model's own) for moving at
@@ -6558,18 +6566,44 @@ static func is_gait(clip: String) -> bool:
 
 
 ## Plays [param clip] once on [param puppet]'s model, if it has one, and
-## holds it till done. False if there is no model.
+## holds it till done (a blow it was striking cut short: a flinch, a fall
+## take it). False if there is no model.
 func _play_once(puppet: Node3D, clip: String) -> bool:
-	if not puppet.has_meta("animator"):
+	if not puppet.has_meta("rig"):
 		return false
-	var animator := puppet.get_meta("animator") as AnimationPlayer
-	if not animator.has_animation(clip):
+	var rig := puppet.get_meta("rig") as AnimRig
+	if not rig.has(clip):
 		return false
-	animator.speed_scale = 1.0
 	puppet.set_meta("fidgeting", false)
-	animator.play(clip, CLIP_BLEND)
-	animator.seek(0.0, true)
-	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(animator.get_animation(clip).length * 1000.0))
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(rig.once(clip) * 1000.0))
+	return true
+
+
+## [param puppet]'s blow for [param swinger] holding [param weapon]: one of
+## its model's strikes for that weapon (HUMANOID_MOVES' "strikes"; bare
+## hands' if it has none for it), not the last one, played so its contact
+## lands when the drawn body's blow does (STRIKE_LANDS_IN: bodies are drawn
+## that far behind the sim, the local player's own at once) and recovered
+## by its next. A model with no strikes plays one of ATTACK_CLIPS. False if
+## there is no model.
+func _strike(puppet: Node3D, swinger: GridEntity, weapon: String) -> bool:
+	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
+	var choices: Array = strikes.get(weapon, strikes.get("", []))
+	if choices.is_empty() or not puppet.has_meta("rig"):
+		return _play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
+	var names: Array[String] = []
+	for choice: Array in choices:
+		names.append(str(choice[0]))
+	var clip := _pick_clip(puppet, names)
+	var contact := float(choices[names.find(clip)][1])
+	var own := swinger is Player and (swinger as Player).owner_peer == Net.local_id
+	var lands_in := 0.0 if own else STRIKE_LANDS_IN
+	var between := World.attack_ticks_of(swinger) * World.TICK_DT if swinger != null else 1.0
+	var rig := puppet.get_meta("rig") as AnimRig
+	puppet.set_meta("fidgeting", false)
+	var seconds := rig.strike(clip, contact, lands_in, maxf(between - lands_in - contact, 0.2))
+	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(seconds * 1000.0))
 	return true
 
 
@@ -6748,7 +6782,7 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	if effort != "" and randi() % EFFORT_EVERY == 0:
 		sfx.play(effort, puppet.position + Vector3.UP * 1.5)
 	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
-		_play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
+		_strike(puppet, swinger, weapon)
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).swing()
 	var body := puppet.get_node("Body") as Node3D
@@ -6841,8 +6875,8 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 		puppet.set_meta("wound_until", 0)
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).unwind()
-		elif puppet.has_meta("animator"):
-			(puppet.get_meta("animator") as AnimationPlayer).speed_scale = 1.0
+		elif puppet.has_meta("rig"):
+			(puppet.get_meta("rig") as AnimRig).cancel_strike()
 			puppet.set_meta("busy_until", 0)
 		return
 	_combat_at[id] = Time.get_ticks_msec()
@@ -6851,13 +6885,15 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 		(puppet.get_meta("creature_view") as CreatureView).wind(ticks * World.TICK_DT)
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) + 400)
 		return
-	if not _play_once(puppet, CLIP_HEAVY):
+	if not puppet.has_meta("rig") or not (puppet.get_meta("rig") as AnimRig).has(CLIP_HEAVY):
 		return
-	var animator := puppet.get_meta("animator") as AnimationPlayer
+	var rig := puppet.get_meta("rig") as AnimRig
 	var seconds := ticks * World.TICK_DT
-	animator.speed_scale = CLIP_HEAVY_CONTACT / seconds
+	puppet.set_meta("fidgeting", false)
+	# Its contact as the wound-up blow lands, the rest at the same pace.
+	var after := (rig.length(CLIP_HEAVY) - CLIP_HEAVY_CONTACT) * seconds / CLIP_HEAVY_CONTACT
 	var now := Time.get_ticks_msec()
-	puppet.set_meta("busy_until", now + int(animator.get_animation(CLIP_HEAVY).length / animator.speed_scale * 1000.0))
+	puppet.set_meta("busy_until", now + int(rig.strike(CLIP_HEAVY, CLIP_HEAVY_CONTACT, seconds, after) * 1000.0))
 	puppet.set_meta("wound_until", now + int(seconds * 1000.0) + 400)
 
 
