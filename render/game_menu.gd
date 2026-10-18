@@ -1,26 +1,29 @@
-class_name PausePanel
+class_name GameMenu
 extends PanelContainer
-## Esc with nothing else open: a small panel in the middle of the screen
-## with Resume, Options, Leave and Quit, and a line saying the world goes
-## on (a co-op world never pauses for one player). What each does is
-## Main's, through the signals; Esc again resumes (Main). The look is the
-## shared theme's (UiTheme, docs/ui_style.md).
+## Esc with nothing else open: the game's menu in the middle of the screen,
+## titled with the zone's name, with Close, Options, Leave and Quit and a
+## plain line that the world goes on while it is open. The game never
+## pauses (Jeff, 2026-10-17: "there's no pause for the game"; a co-op world
+## goes on), so nothing here says pause. What each does is Main's, through
+## the signals; Esc again closes it (Main). The look is the shared theme's
+## (UiTheme, docs/ui_style.md).
 
-signal resume_pressed
+signal close_pressed
 signal options_pressed
 signal leave_pressed
 signal quit_pressed
 
 const WIDTH := 640.0
 
-var resume: Button
+var close: Button
 var options: Button
 var leave: Button
 var quit: Button
+var _title: Label
 
 
 func _init() -> void:
-	name = "Pause"
+	name = "GameMenu"
 	visible = false
 
 
@@ -37,34 +40,40 @@ func _ready() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	add_child(column)
-	var title := Label.new()
-	title.text = "Paused"
-	title.theme_type_variation = &"Title"
-	column.add_child(title)
+	_title = Label.new()
+	_title.text = "Menu"
+	_title.theme_type_variation = &"Title"
+	column.add_child(_title)
 	var note := Label.new()
-	note.text = "The world goes on while you are away."
+	note.text = "The world goes on while this is open."
 	note.theme_type_variation = &"Caption"
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(note)
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, UiTheme.constant("unit"))
 	column.add_child(gap)
-	resume = _button("Resume", resume_pressed)
-	column.add_child(resume)
+	close = _button("Close", close_pressed)
+	column.add_child(close)
 	options = _button("Options", options_pressed)
 	column.add_child(options)
 	leave = _button("Leave", leave_pressed)
-	leave.tooltip_text = "Back to the menu"
+	leave.tooltip_text = "Back to the main menu"
 	column.add_child(leave)
 	quit = _button("Quit", quit_pressed)
 	column.add_child(quit)
 
 
-## Shown, with Resume focused; or hidden.
-func open(shown: bool) -> void:
+## Shown, titled with [param place] (the zone's name; "Menu" for none),
+## Close focused; or hidden.
+func open(shown: bool, place := "") -> void:
 	visible = shown
 	if shown:
-		resume.grab_focus()
+		_title.text = place if not place.is_empty() else "Menu"
+		close.grab_focus()
+
+
+func title_shown() -> String:
+	return _title.text
 
 
 func _button(text: String, pressed_signal: Signal) -> Button:

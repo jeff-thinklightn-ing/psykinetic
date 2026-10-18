@@ -17,7 +17,7 @@ func _ready() -> void:
 	Net.port = preload("res://tests/test_ports.gd").of(17840)  # Its own, beside the other tests'.
 	_test_menu()
 	_test_connect_screen()
-	_test_pause_panel()
+	_test_game_menu()
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	await _test_escape()
@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_converse_panel()
 	_test_counter_panel()
 	_test_world_map()
+	_test_access()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -109,44 +110,47 @@ func _test_connect_screen() -> void:
 	screen.queue_free()
 
 
-func _test_pause_panel() -> void:
-	print("== the pause panel ==")
-	var pause := PausePanel.new()
-	add_child(pause)
-	_check(not pause.visible, "hidden until Esc")
-	pause.open(true)
-	_check(pause.visible and pause.resume.has_focus(), "open: shown, Resume focused")
-	var resumed := [false]
-	pause.resume_pressed.connect(func() -> void: resumed[0] = true)
-	pause.resume.pressed.emit()
-	_check(resumed[0], "Resume asks Main to close it")
-	pause.queue_free()
+func _test_game_menu() -> void:
+	print("== the game menu (no pause: the world goes on) ==")
+	var menu := GameMenu.new()
+	add_child(menu)
+	_check(not menu.visible, "hidden until Esc")
+	menu.open(true, "The Castle")
+	_check(menu.visible and menu.close.has_focus() and menu.title_shown() == "The Castle", "open: the zone's name, Close focused")
+	menu.open(true)
+	_check(menu.title_shown() == "Menu", "no name: Menu")
+	var closed := [false]
+	menu.close_pressed.connect(func() -> void: closed[0] = true)
+	menu.close.pressed.emit()
+	_check(closed[0], "Close asks Main to close it")
+	_check(menu.close.text == "Close" and menu.leave.text == "Leave" and menu.quit.text == "Quit", "nothing says pause or resume")
+	menu.queue_free()
 
 
 func _test_escape() -> void:
 	await get_tree().process_frame
 	print("== Esc: what is open closes first, then the pause ==")
-	_check(_main.pause_panel == null, "no pause panel before the first Esc")
+	_check(_main.game_menu == null, "no game menu before the first Esc")
 	_main.escape()
-	_check(_main.pause_panel != null and _main.pause_panel.visible, "Esc with nothing open: the pause")
+	_check(_main.game_menu != null and _main.game_menu.visible, "Esc with nothing open: the game menu")
 	await get_tree().process_frame
-	var rect: Rect2 = _main.pause_panel.get_global_rect()
+	var rect: Rect2 = _main.game_menu.get_global_rect()
 	var middle := get_viewport().get_visible_rect().get_center()
 	_check(rect.get_center().distance_to(middle) < 4.0 and rect.size.y > 100.0,
 		"in the middle of the screen (%s, middle %s)" % [rect, middle])
 	_main.escape()
-	_check(not _main.pause_panel.visible, "Esc again: resumed")
+	_check(not _main.game_menu.visible, "Esc again: closed")
 	_main.toggle_options()
 	_check(_main.options_panel.visible, "O: the options open")
 	_main.escape()
-	_check(not _main.options_panel.visible and not _main.pause_panel.visible, "Esc closes the options, not the pause")
+	_check(not _main.options_panel.visible and not _main.game_menu.visible, "Esc closes the options, not the menu")
 	_main.escape()
-	_check(_main.pause_panel.visible, "then the pause")
-	_main.pause_panel.options.pressed.emit()
-	_check(_main.options_panel.visible, "the pause's Options opens them")
+	_check(_main.game_menu.visible, "then the menu")
+	_main.game_menu.options.pressed.emit()
+	_check(_main.options_panel.visible, "the menu's Options opens them")
 	_main.escape()
 	_main.escape()
-	_check(not _main.options_panel.visible and not _main.pause_panel.visible, "and two Escs close both")
+	_check(not _main.options_panel.visible and not _main.game_menu.visible, "and two Escs close both")
 
 
 func _test_options_choices() -> void:
@@ -377,6 +381,54 @@ func _test_world_map() -> void:
 	_check(not _main.minimap.big and panel.visible, "M again: the world map in its place")
 	_main.press_m()
 	_check(not panel.visible and not _main.minimap.big, "M again: closed")
+
+
+func _test_access() -> void:
+	print("== accessibility: the interface size, the text size, the colour set ==")
+	var panel: OptionsPanel = _main.options_panel
+	var kept: Array = [Net._settings_override, Net.player_id, Net.player_name, Net.ui_scale, Net.text_scale, Net.colours]
+	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("ui_test_access.cfg")
+	Net.save_settings("127.0.0.1", 17841, "", Net.player_name)
+	_check(panel.choices.has("ui_scale") and panel.choices.has("text_scale") and panel.choices.has("colours"),
+		"a choice row each for the interface size, the text size and the colours")
+	var body_was := UiTheme.theme().default_font_size
+	var title_was := UiTheme.theme().get_font_size("font_size", "Title")
+	(panel.choices["text_scale"]["buttons"]["1.50"] as Button).pressed.emit()
+	_check(is_equal_approx(Net.text_scale, 1.5) and UiTheme.theme().default_font_size == roundi(body_was * 1.5)
+			and UiTheme.theme().get_font_size("font_size", "Title") == roundi(title_was * 1.5)
+			and UiTheme.size("body") == roundi(body_was * 1.5)
+			and "text_scale=1.50" in FileAccess.get_file_as_string(Net._settings_override),
+		"Largest text: the theme's sizes half again, settings.cfg follows")
+	(panel.choices["text_scale"]["buttons"]["1.00"] as Button).pressed.emit()
+	_check(UiTheme.theme().default_font_size == body_was and UiTheme.theme().get_font_size("font_size", "Title") == title_was,
+		"and back to the .tres's own")
+	(panel.choices["ui_scale"]["buttons"]["1.25"] as Button).pressed.emit()
+	_check(is_equal_approx(Net.ui_scale, 1.25) and "ui_scale=1.25" in FileAccess.get_file_as_string(Net._settings_override),
+		"Larger interface: Net and settings.cfg follow (the root scales when there is a window)")
+	(panel.choices["ui_scale"]["buttons"]["1.00"] as Button).pressed.emit()
+	var friend_was := UiTheme.color("friend")
+	(panel.choices["colours"]["buttons"]["distinct"] as Button).pressed.emit()
+	_check(Net.colours == "distinct" and UiTheme.color("friend") != friend_was
+			and UiTheme.color("friend").is_equal_approx(Color.html("#7ab8ec"))
+			and "colours=distinct" in FileAccess.get_file_as_string(Net._settings_override),
+		"Distinct colours: the theme's friend colour swapped, settings.cfg follows")
+	var normal: Dictionary = UiTheme.COLOUR_SETS["normal"]
+	var distinct: Dictionary = UiTheme.COLOUR_SETS["distinct"]
+	var apart := true
+	for a: String in distinct:
+		for b: String in distinct:
+			if a < b and absf(Color.html(distinct[a]).get_luminance() - Color.html(distinct[b]).get_luminance()) < 0.08:
+				apart = false
+	_check(normal.keys() == distinct.keys() and apart, "the Distinct set differs in lightness between every pair, not hue alone")
+	(panel.choices["colours"]["buttons"]["normal"] as Button).pressed.emit()
+	_check(UiTheme.color("friend").is_equal_approx(friend_was), "and back")
+	DirAccess.remove_absolute(Net._settings_override)
+	Net._settings_override = kept[0]
+	Net.player_id = kept[1]
+	Net.player_name = kept[2]
+	Net.set_ui_scale(kept[3], false)
+	Net.set_text_scale(kept[4], false)
+	Net.set_colours(kept[5], false)
 
 
 func _check(ok: bool, label: String) -> void:

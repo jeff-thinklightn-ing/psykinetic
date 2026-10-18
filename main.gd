@@ -374,9 +374,9 @@ var compass: HudCompass
 var hint_panel: HintPanel
 ## The options (O): sound volumes; other trees add their sections.
 var options_panel: OptionsPanel
-## Esc's panel (PausePanel), the main menu (MainMenu) while it shows, and
+## Esc's menu (GameMenu; the game never pauses), the main menu (MainMenu) while it shows, and
 ## the join flow's screen (ConnectScreen) while it shows; null otherwise.
-var pause_panel: PausePanel
+var game_menu: GameMenu
 var main_menu: MainMenu
 var connect_screen: ConnectScreen
 ## _go_online was called (Play once; Change server reconnects instead).
@@ -5703,12 +5703,12 @@ func _refresh_world_map() -> void:
 
 
 ## Esc: whatever is open closes first (the options, an open chest or
-## companion's pack, the pause itself); with nothing open, the pause.
+## companion's pack, the menu itself); with nothing open, the game menu.
 func escape() -> void:
 	if world_map_panel != null and world_map_panel.visible:
 		world_map_panel.close()
-	elif pause_panel != null and pause_panel.visible:
-		pause_panel.open(false)
+	elif game_menu != null and game_menu.visible:
+		game_menu.open(false)
 	elif converse != null and converse.visible:
 		converse.close()
 	elif options_panel != null and options_panel.visible:
@@ -5716,14 +5716,14 @@ func escape() -> void:
 	elif pack_panel != null and pack_panel.other != null:
 		close_other()
 	elif main_menu == null or not main_menu.visible:
-		if pause_panel == null:
-			pause_panel = PausePanel.new()
-			pause_panel.resume_pressed.connect(func() -> void: pause_panel.open(false))
-			pause_panel.options_pressed.connect(toggle_options)
-			pause_panel.leave_pressed.connect(_leave_game)
-			pause_panel.quit_pressed.connect(_quit_game)
-			$HUD.add_child(pause_panel)
-		pause_panel.open(true)
+		if game_menu == null:
+			game_menu = GameMenu.new()
+			game_menu.close_pressed.connect(func() -> void: game_menu.open(false))
+			game_menu.options_pressed.connect(toggle_options)
+			game_menu.leave_pressed.connect(_leave_game)
+			game_menu.quit_pressed.connect(_quit_game)
+			$HUD.add_child(game_menu)
+		game_menu.open(true, str(level.get("display_name", level.get("name", ""))))
 
 
 ## O: the options shown or hidden; hiding writes what changed.
@@ -6672,7 +6672,7 @@ func _run_test_show(player: Player) -> void:
 				debug_overlay.visible = true
 			"say":
 				_send_chat("(a test line) Stay close, the gate's watched.")
-			"pause":
+			"game_menu":
 				escape()
 			"counter":
 				# The counter screen with sample data in economy's shape (a test's words).

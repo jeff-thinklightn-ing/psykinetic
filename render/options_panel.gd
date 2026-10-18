@@ -100,6 +100,19 @@ func _ready() -> void:
 		func() -> String: return "fullscreen" if Net.fullscreen else "windowed",
 		func(value: String) -> void: Net.set_fullscreen(value == "fullscreen")))
 	video.add_child(_resolution_row())
+	video.add_child(_choice_row("Interface size", "ui_scale",
+		[["0.80", "Smaller"], ["1.00", "Normal"], ["1.25", "Larger"], ["1.50", "Largest"]],
+		func() -> String: return "%.2f" % Net.ui_scale, func(value: String) -> void: Net.set_ui_scale(value.to_float())))
+	video.add_child(_choice_row("Text size", "text_scale", [["1.00", "Normal"], ["1.25", "Larger"], ["1.50", "Largest"]],
+		func() -> String: return "%.2f" % Net.text_scale, func(value: String) -> void: Net.set_text_scale(value.to_float())))
+	var colours := _choice_row("Colours", "colours", [["normal", "Normal"], ["distinct", "Distinct"]],
+		func() -> String: return Net.colours, Net.set_colours)
+	var note := Label.new()
+	note.text = "in full from your next start"
+	note.theme_type_variation = &"Caption"
+	note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	colours.add_child(note)
+	video.add_child(colours)
 	var controls := add_section("Controls")
 	controls.add_child(_choice_row("Move", "controls", [["click", "Click to move"], ["wasd", "WASD and aim"]],
 		func() -> String: return Net.controls, Net.set_controls))

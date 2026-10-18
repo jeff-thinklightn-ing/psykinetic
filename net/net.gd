@@ -74,7 +74,10 @@ extends Node
 ## read and kept the same way. hp_bars=0 turns the 3D view's HP bars off;
 ## master_volume=, sfx_volume=, voice_volume=, ambience_volume=, ui_volume=
 ## and music_volume= (0..1, default 1) set the sound (the options panel, O,
-## writes them back). antialias=off|fxaa|smaa|msaa4 (default smaa) smooths
+## writes them back). ui_scale= (0.5..2, default 1) sizes the whole interface,
+## text_scale= the text alone, colours=normal|distinct picks the meaning
+## colours' set (decision 453; the Options write them back).
+## antialias=off|fxaa|smaa|msaa4 (default smaa) smooths
 ## the 3D view's edges (the options panel's Video section writes it back).
 ## phrase1= ... phrase4= are the quick phrases keys 1-4 say (written back,
 ## the defaults where there is none). Any line
@@ -99,7 +102,7 @@ extends Node
 ##   --menu                       start at the main menu, as an exported client does (for screenshots)
 ##   --test-show=<a,b>            open these on the HUD once the player is in (for the ui tree's screenshots):
 ##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's),
-##                                pause, menu, setup (the connect screen's fields), connect, failed (its states), over the game;
+##                                game_menu, menu, setup (the connect screen's fields), connect, failed (its states), over the game;
 ##                                tip (a sample named dagger's tip over the pack: nothing in play is named yet),
 ##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it),
 ##                                converse (the conversation panel on the nearest town's person, sample offers),
@@ -372,6 +375,13 @@ signal volumes_changed
 ## thin limbs, FXAA for a weak card.
 const ANTIALIAS: Array[String] = ["off", "fxaa", "smaa", "msaa4"]
 var antialias := "smaa"
+## The interface's size (the root's content scale, ui_scale=), the text size
+## (the theme's font sizes, text_scale=) and the colour set (colours=,
+## "normal" or "distinct"; UiTheme.COLOUR_SETS), the Options' accessibility
+## rows (decision 453).
+var ui_scale := 1.0
+var text_scale := 1.0
+var colours := "normal"
 const VOLUME_SETTINGS: Array[String] = ["master_volume", "sfx_volume", "voice_volume", "ambience_volume", "ui_volume", "music_volume"]
 ## The quick phrases, keys 1-4; settings.cfg phrase1= ... phrase4=.
 const DEFAULT_PHRASES: Array[String] = ["With me!", "Stay back!", "Get them!", "Fall back!"]
@@ -713,6 +723,59 @@ func _apply_window_settings() -> void:
 	else:
 		window.move_to_center()
 	window.size_changed.connect(_on_window_size_changed)
+	_apply_access_settings()
+
+
+## ui_scale=, text_scale= and colours= from the settings file, applied
+## before the first frame (the colours before any panel loads).
+func _apply_access_settings() -> void:
+	var path := settings_path()
+	if path != "" and FileAccess.file_exists(path):
+		var settings := _read_settings(path)
+		var scale := str(settings.get("ui_scale", ""))
+		if scale.is_valid_float():
+			ui_scale = clampf(scale.to_float(), 0.5, 2.0)
+		var text := str(settings.get("text_scale", ""))
+		if text.is_valid_float():
+			text_scale = clampf(text.to_float(), 0.5, 2.0)
+		var set := str(settings.get("colours", "normal"))
+		if UiTheme.COLOUR_SETS.has(set):
+			colours = set
+	set_ui_scale(ui_scale, false)
+	set_text_scale(text_scale, false)
+	set_colours(colours, false)
+
+
+## The Options' Interface size: the root's content scale (every panel is laid
+## out in canvas units, so one number sizes them all).
+func set_ui_scale(value: float, save := true) -> void:
+	ui_scale = clampf(value, 0.5, 2.0)
+	if DisplayServer.get_name() != "headless" and get_tree() != null and get_tree().root != null:
+		get_tree().root.content_scale_factor = ui_scale
+	if save:
+		_settings_kept["ui_scale"] = "%.2f" % ui_scale
+		save_view_settings()
+
+
+## The Options' Text size: the theme's font sizes (UiTheme.apply_text_scale).
+func set_text_scale(value: float, save := true) -> void:
+	text_scale = clampf(value, 0.5, 2.0)
+	UiTheme.apply_text_scale(text_scale)
+	if save:
+		_settings_kept["text_scale"] = "%.2f" % text_scale
+		save_view_settings()
+
+
+## The Options' Colours: the meaning colours' set (UiTheme.apply_colours;
+## shown in full from the next start).
+func set_colours(value: String, save := true) -> void:
+	if not UiTheme.COLOUR_SETS.has(value):
+		return
+	colours = value
+	UiTheme.apply_colours(value)
+	if save:
+		_settings_kept["colours"] = value
+		save_view_settings()
 
 
 ## camera_yaw= as read from the settings file: only a diamond view is a

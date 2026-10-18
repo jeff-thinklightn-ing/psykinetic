@@ -9353,7 +9353,12 @@ tick in the player's eye line.
   a server status reply are maps' later items; the screen will show them.
 - `PausePanel` (render/pause_panel.gd, new): Esc with nothing open shows
   Resume, Options, Leave and Quit and says the world goes on (co-op never
-  pauses the sim). Esc closes what is open first (Main.escape: the pause,
+  pauses the sim).
+  Amended (Jeff, 2026-10-17, "might wanna tell UI there's no pause for the
+  game"): it is the game menu, `GameMenu` (render/game_menu.gd; PausePanel
+  gone), titled with the zone's name, with Close, Options, Leave and Quit
+  and the plain line that the world goes on while it is open; nothing the
+  player sees says pause or resume (decision 453's landing). Esc closes what is open first (Main.escape: the pause,
   the options, an open chest or pack, the big map as before). Leave on an
   exported build starts the game again and quits; a project run quits.
 - Options (sound's and perf's sections untouched): Video gains Window
@@ -11130,3 +11135,36 @@ the lawspeaker editing cards, logs or lore directly (rulings are data,
 code applies them); a budget of its own (one key, one cap); erasing a
 belief a ruling overrides (reconciled, with its history); running with a
 key by default (off until turned on).
+## 453. Accessibility: the interface size, the text size, distinct colours, and keys
+
+Roadmap `ui`, step 6 (the coordinator approved it as written; release asked
+for two landings, the sizes and colours first, the keys after). This entry
+is the first; the keys amend it.
+
+- Interface size: the whole interface is laid out in canvas units and the
+  window stretch scales it, so one number sizes it all: the root's
+  content_scale_factor (Net.set_ui_scale; ui_scale= 0.5 to 2, Smaller 0.8,
+  Normal, Larger 1.25, Largest 1.5 in the Options' Video section). The 3D
+  view is untouched.
+- Text size: the theme's font sizes alone (UiTheme.apply_text_scale: the
+  default size, the sized variations Title, Heading, Hud, Caption, Small,
+  Display, TooltipLabel, the Psykinetic sizes and RichTextLabel's, from the
+  base the .tres has; Net.set_text_scale; text_scale=, Normal, Larger 1.25,
+  Largest 1.5). Everything on the theme and everything reading UiTheme.size
+  follows at once; a size a class kept in a static var at load (the pack's
+  slot captions) follows at the next start.
+- Colours: the meaning colours are the only hues that tell anything, and
+  nothing is told by hue alone (docs/ui_style.md); the Distinct set
+  (UiTheme.COLOUR_SETS, Net.set_colours; colours=normal|distinct) keeps
+  brass and rust and moves friend to a light blue, party to a pale cyan and
+  alarm to a dark magenta, each pair apart in lightness as well as hue (ui_test checks the
+  luminance gaps), so a red-green simulation keeps them apart. Applied at
+  start by Net from the settings before any panel loads; a change in the
+  Options shows in full from the next start (static colours), said so.
+- Every setting is read in Net._apply_access_settings before the first
+  frame and written back as the others are.
+
+Client only; nothing on the wire. tests/ui_test: the rows, the theme's
+sizes scaled and restored, the colour swap, the set's lightness gaps.
+Shots in docs/ui/shots/step6/: the Options rows, Largest text and
+interface, and the two colour sets side by side for Jeff.

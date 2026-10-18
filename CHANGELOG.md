@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Options gained an Interface size (the whole interface smaller or larger), a Text size (the words alone, up to half again), and a Colours choice: Distinct keeps the game's meaning colours apart for red-green colour blindness (friends blue, the party pale, a warning magenta); it shows in full from your next start. Esc opens the game menu, titled with where you are, with Close, Options, Leave and Quit: the world goes on while it is open, as it always did; nothing calls it a pause.
 - Each town has a lawspeaker now, unseen as yet, who keeps the town's memory
   straight: once a day he weighs the tales several people have come to hold
   (Old Marta by the east field, the boy who was sick all winter), takes some
