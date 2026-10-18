@@ -2277,6 +2277,7 @@ func _test_bane_and_grudge() -> void:
 	var wronged: GridEntity = e["P"][1]
 	_bold(imp)
 	wronged.slots[Items.RIGHT_HAND] = "sword"
+	World.items.give_character(World.slot_uid(wronged, Items.RIGHT_HAND), "named")  # Only a thing with character grows (items' 472).
 	World.items.set_grudge(World.slot_uid(wronged, Items.RIGHT_HAND), "imp")
 	World.step()
 	_check(imp.target == wronged, "both seen, it goes for the one whose sword holds a grudge against imps (%s), not the nearer" % [imp.target])

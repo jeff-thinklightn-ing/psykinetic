@@ -5413,6 +5413,8 @@ func _narrate_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> 
 			party_log.add("%s holds a grudge against %s." % [thing, kinds])
 		"avenged":
 			party_log.add("%s has had its vengeance on %s." % [thing, kinds])
+		"character":
+			party_log.add("%s has seen enough use to grow: it counts what it fells now." % thing)  # Decision 472.
 
 
 ## A named thing kept from its namer, or back with them (World.item_kept;

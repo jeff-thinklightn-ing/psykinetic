@@ -2032,15 +2032,20 @@ func _consider_name(entity: GridEntity, slot: int) -> void:
 	if not Items.is_gear(id) or not items.name_of(uid).is_empty():
 		return
 	var naming := Items.naming()
-	var due := items.name_due(uid, roundi(float(naming["held_days"]) * DayNight.day_steps), int(naming["deeds"]))
+	var due := items.name_due(uid, roundi(float(naming["held_days"]) * DayNight.day_steps), int(naming["deeds"]),
+			int(naming.get("deeds_alone", 0)))
 	if due.is_empty() or str(due["name"]).is_empty():
 		return
+	var earned := not items.grows(uid)
+	if earned:
+		# Its character comes with the threshold, named or not yet (decision 472).
+		items.give_character(uid, "named", entity.zone, entity.tile)
 	var forms := Lore.name_forms("holder", name_least)
-	if forms.is_empty():
-		return
-	var name := {"form": str(forms[0]["id"]), "holder": str(due["name"]), "who": str(due["who"]), "made_step": steps}
-	var text := Lore.render_name(name, id, PackedStringArray(Items.def(id)["tags"]), Items.name_of(id), name_least)
+	var name := {"form": str(forms[0]["id"]), "holder": str(due["name"]), "who": str(due["who"]), "made_step": steps} if not forms.is_empty() else {}
+	var text := Lore.render_name(name, id, PackedStringArray(Items.def(id)["tags"]), Items.name_of(id), name_least) if not name.is_empty() else ""
 	if text.is_empty():
+		if earned:
+			item_grew.emit(entity, uid, "character", "")  # No name to tell it by yet.
 		return
 	name["text"] = text
 	var strength := Items.strength_from(due["deeds"])

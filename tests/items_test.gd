@@ -1106,6 +1106,26 @@ func _test_kills() -> void:
 		return
 	var d := (far - host.tile) / 2
 	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	World.items.fell(dagger, "imp")
+	_check(World.items.felled_of(dagger).is_empty() and not World.items.grows(dagger), "a plain dagger keeps no tally: it has no character yet (decision 472)")
+	World.items.give_character(dagger, "named")
+	var arrows := World.items.mint("arrows", "built")
+	World.items.give_character(arrows, "blessed")
+	var kit := World.items.mint("bow", "built")
+	World.items.bless(kit, "player:test")
+	var row := {"who": "player:test", "name": "Wren", "since": 0, "held": 0, "deeds": {"shot": 20}, "ill": 0.0, "ill_at": 0}
+	var plain := World.items.mint("sword", "built")
+	World.items._book[plain]["holder"] = "player:test"
+	World.items._book[plain]["carriers"] = [row]
+	_check(not World.items.grows(arrows) and World.items.grows(kit) and World.items.character_of(kit) == "blessed"
+			and World.items.grows(dagger) and World.items.history(dagger)["events"].back()["kind"] == "character",
+			"a bundle of arrows never grows; a blessed bow does; earning it is in the history")
+	_check(World.items.name_due(plain, 99999, 10).is_empty() and not World.items.name_due(plain, 99999, 10, 20).is_empty(),
+			"20 deeds earn it however short the holding; without that route, not before held_days (%s)" % [World.items.name_due(plain, 99999, 10, 20)])
+	var before := ItemBook.from_dict({"book": {"1": {"id": "dagger", "felled": {"imp": 2}}, "2": {"id": "dagger"}}})
+	_check(before.grows(1) and not before.grows(2), "a save from before: a tallied thing has grown already, a plain one not")
+	for each in [arrows, kit, plain]:
+		World.items.end(each, "gone")
 	var fell := func(kind: String) -> void:
 		var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "KillImp%d" % World.tick,
 			"tile": host.tile + d, "kind": kind, "props": {"sight_range": 0}}) as GridEntity
@@ -1144,6 +1164,7 @@ func _test_bane() -> void:
 	var growing := func(_entity: GridEntity, _uid: int, mark: String, kind: String) -> void: grew.append([mark, kind])
 	World.item_grew.connect(growing)
 	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	World.items.give_character(dagger, "named")  # Only a thing with character grows (decision 472).
 	var foe_of := func(kind: String) -> GridEntity:
 		var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "BaneFoe%d" % World.tick,
 			"tile": host.tile + d, "kind": kind, "props": {"sight_range": 0}}) as GridEntity

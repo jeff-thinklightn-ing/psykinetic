@@ -11767,3 +11767,29 @@ parts. The coordinator's approval of 2026-10-17. PROTOCOL_REVISION 17.
 
 tests/farm_test (the look through a year with a late storm: bare, sown,
 growing, flattened, ripe, bare; each change told once); protocol_test.
+## 472. An item's character: only a thing held and used grows
+
+Coordinator's defaults while Jeff's growth questions wait (2026-10-17):
+"only a named or held-and-used item grows: a plain drop has no character
+until a player has carried and used it for a while (say 20 kills or a
+season), when it earns a name slot and starts counting; blessing at the
+temple or reforging with special materials starts it at once". This
+supersedes part of 415 (every thing tallied what it felled, a monster's
+dagger too) and of 417 (any thing could take a bane or a grudge).
+- ItemBook.grows(uid): the thing has a "character" ({how, step}, saved),
+  earned by give_character for life, noted "character" in its history (a
+  kept event). Only then does it tally kills (fell), and so become a
+  bane, or take a grudge (set_grudge). A bundle of arrows never grows (its
+  bow does: shots credit the bow).
+- Earned at 365's naming threshold: one named holder (a player or a
+  companion) has held it held_days with deeds done, or done deeds_alone
+  however long (items.json "naming": held_days 7.0, a season at the default
+  Season.season_days, with 10 deeds; deeds_alone 20). The character comes
+  whether or not a name form is agreed yet (the name follows once it is:
+  Jeff, "for now Wren's Dagger is sufficient", lore marking the holder form
+  agreed). A blessing (424) gives it at once, and so does any set_name. A
+  reforge with a special material will, once lore's materials (D3) exist.
+- With no name to tell it by, the party log says "<thing> has seen enough
+  use to grow: it counts what it fells now" (World.item_grew "character").
+- A save from before: a named, blessed or tallied thing has grown already.
+Protocol unchanged (all of it is the server's book and the notes' text).

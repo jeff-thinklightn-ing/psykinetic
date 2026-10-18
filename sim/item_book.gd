@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -161,8 +161,8 @@ func deed(uid: int, who: String, kind: String) -> void:
 ## [param uid] felled a body of [param kind] (decision 415): counted for
 ## the thing, whoever held it, by kind.
 func fell(uid: int, kind: String) -> void:
-	if not _book.has(uid) or kind.is_empty():
-		return
+	if not grows(uid) or kind.is_empty():
+		return  # A plain thing keeps no tally (decision 472).
 	var felled: Dictionary = _book[uid].get("felled", {})
 	felled[kind] = int(felled.get(kind, 0)) + 1
 	_book[uid]["felled"] = felled
@@ -172,6 +172,31 @@ func fell(uid: int, kind: String) -> void:
 ## for none.
 func felled_of(uid: int) -> Dictionary:
 	return _book[uid].get("felled", {}) if _book.has(uid) else {}
+
+
+## Whether [param uid] has character and grows (decision 472, on 415 and
+## 417): only a thing held and used does. It earns it by 365's naming
+## threshold (World._consider_name), a blessing (bless), or later a reforge
+## with a special material; before that it keeps no kill tally, and takes
+## no bane or grudge. A bundle of arrows never grows (its bow does).
+func grows(uid: int) -> bool:
+	return _book.has(uid) and _book[uid].has("character") and Items.ammo_of(id_of(uid)).is_empty()
+
+
+## How [param uid] earned its character ("named", "blessed", "reforged");
+## "" for none.
+func character_of(uid: int) -> String:
+	return str(_book[uid]["character"].get("how", "")) if _book.has(uid) and _book[uid].has("character") else ""
+
+
+## [param uid] earns its character (decision 472): it grows from now on,
+## for life, noted "character" in its history. Nothing for a bundle of
+## arrows or a thing that has it.
+func give_character(uid: int, how: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or _book[uid].has("character") or not Items.ammo_of(id_of(uid)).is_empty():
+		return
+	_book[uid]["character"] = {"how": how, "step": _now()}
+	note(uid, "character", how, zone, tile)
 
 
 ## The kind [param uid] is the bane of (decision 417); "" for none.
@@ -195,7 +220,7 @@ func grudge_of(uid: int) -> Dictionary:
 ## [param uid] takes a grudge against [param kind] (its holder fell to one;
 ## decision 417), unless it holds one already.
 func set_grudge(uid: int, kind: String, zone := "", tile := Vector2i(-1, -1)) -> void:
-	if not _book.has(uid) or kind.is_empty() or not grudge_of(uid).is_empty():
+	if not grows(uid) or kind.is_empty() or not grudge_of(uid).is_empty():
 		return
 	_book[uid]["grudge"] = {"kind": kind, "paid": 0}
 	note(uid, "grudge", kind, zone, tile)
@@ -230,7 +255,7 @@ func strength_of(uid: int) -> String:
 ## [param uid] now, when it has carried it [param held] steps or more and
 ## done [param deeds] deeds or more with it, and it has no name yet; {}
 ## otherwise.
-func name_due(uid: int, held: int, deeds: int) -> Dictionary:
+func name_due(uid: int, held: int, deeds: int, deeds_alone := 0) -> Dictionary:
 	if not _book.has(uid) or not name_of(uid).is_empty() or str(_book[uid]["holder"]).is_empty():
 		return {}
 	for row: Dictionary in history(uid)["carriers"]:
@@ -239,7 +264,8 @@ func name_due(uid: int, held: int, deeds: int) -> Dictionary:
 		var done := 0
 		for kind: String in row["deeds"]:
 			done += int(row["deeds"][kind])
-		return row if int(row["held"]) >= held and done >= deeds else {}
+		# Held long enough with its deeds, or deeds_alone however long (decision 472).
+		return row if int(row["held"]) >= held and done >= deeds or deeds_alone > 0 and done >= deeds_alone else {}
 	return {}
 
 
@@ -296,6 +322,7 @@ func bless(uid: int, owner: String, zone := "", tile := Vector2i(-1, -1)) -> voi
 		row["ill_at"] = _now()
 	_book[uid]["blessed"] = {"for": owner, "step": _now()}
 	note(uid, "blessed", owner, zone, tile)
+	give_character(uid, "blessed", zone, tile)  # Decision 472.
 
 
 ## [param uid] given by its blessed owner to [param owner]: the blessing
@@ -347,6 +374,7 @@ func set_name(uid: int, name: Dictionary, strength: String, zone := "", tile := 
 	_book[uid]["name"] = name.duplicate()
 	_book[uid]["strength"] = strength
 	note(uid, "named", str(name.get("text", "")), zone, tile)
+	give_character(uid, "named", zone, tile)  # A named thing grows (decision 472).
 
 
 ## [param uid], a named thing, reforged into [param to_id] (decision 432;
@@ -443,6 +471,11 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["bane"] = entry["bane"]
 			if entry.get("grudge") is Dictionary and entry["grudge"].get("kind") is String:
 				items._book[int(key)]["grudge"] = {"kind": entry["grudge"]["kind"], "paid": int(entry["grudge"].get("paid", 0))}
+			if entry.get("character") is Dictionary:
+				items._book[int(key)]["character"] = {"how": str(entry["character"].get("how", "")), "step": int(entry["character"].get("step", 0))}
+			elif entry.get("name") is Dictionary or entry.get("blessed") is Dictionary or entry.get("felled") is Dictionary:
+				# Saved before 472: a named, blessed or tallied thing has grown already.
+				items._book[int(key)]["character"] = {"how": "named" if entry.get("name") is Dictionary else "blessed" if entry.get("blessed") is Dictionary else "used", "step": int(entry.get("made", 0))}
 			if entry.get("felled") is Dictionary and not entry["felled"].is_empty():
 				var felled := {}
 				for kind: Variant in entry["felled"]:

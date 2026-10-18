@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Only gear you carry and use grows now. A thing starts counting what it fells, and can become a bane or hold a grudge, once one player or companion has carried it a season with 10 deeds, or done 20 deeds with it, or once it is blessed. A bundle of arrows never grows; its bow does (decision 472).
 - Ready for the coming forest zone: a level can have a canopy over its trees, dark under the roof and open in its clearings, and its trees can come from a stand grown year by year by a new offline tool (decisions 466 and 467). Nothing changes in the current levels.
 
 - Levels can shift: a level marked `"regenerate"` in its level.json is laid again by a generator every few days while nobody is in it (or just before someone travels in), its anchors (the gatehouse, the deepest room, the ways in and out) kept exactly and the corridors between them new each time. Things left lying in the corridors are lost to the shifting halls; a chest in an anchor keeps what it holds. Coming back after a shift says "The ways have shifted since you were last here", and someone saved where rock now stands comes back at the nearest anchor. No real level shifts yet: the castle stays as it is. Server and client both: the "map" message gains the level's generation (decision 465, protocol 18).
