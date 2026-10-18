@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_same_state_same_pass()
 	_test_where_in_words()
 	_test_scholar_lore_pass()
+	_test_resting_companion()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	Townsfolk.use_days({})
@@ -88,6 +89,8 @@ func _setup(table: Dictionary = ALL_WELL, folk: Array = [["g-tam", "Tam", "haule
 	for each: Array in folk:
 		Townsfolk.card_of(_work, each[0])
 	for each: Array in folk:
+		if each[0].begins_with("companion:"):
+			continue  # No card of her own (442).
 		var card := Townsfolk.card_of(_work, each[0])
 		card["kin"] = {}
 		card["grudge"] = []
@@ -306,3 +309,25 @@ func _test_scholar_lore_pass() -> void:
 	_check(not texts.has("Lights are seen in the mine at night") and texts.has(LIE), "lore's rumours are not passed as witnessed; his belief follows once the fact is held: %s" % [texts])
 	_types = {}
 	Lore.reload()
+
+
+func _test_resting_companion() -> void:
+	print("
+== a companion resting in town gossips too, hearsay only (companions' 442) ==")
+	_setup(ALL_WELL, [["g-tam", "Tam", "hauler"], ["companion:p1", "Wren", "cook"]])
+	_check(Townsfolk.card_of(_work, "companion:p1").is_empty(), "she has no resident card")
+	_plant("companion:p1", LIE, "Jeff")
+	Townsfolk.learn(_work, "g-tam", "Tam saw raiders at the walls.")
+	var took := _until_heard("g-tam", 8)
+	var his := _from("g-tam", "Wren")
+	_check(took > 0 and not his.is_empty() and str(his[0].get("text", "")) == LIE and str(his[0].get("where", "")) == "well",
+		"Tam hears what she believes, at the well, from Wren (after %d ticks): %s" % [took, his.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	var took2 := _until_heard("companion:p1", 8)
+	var hers := _from("companion:p1", "Tam")
+	_check(took2 > 0 and not hers.is_empty() and str(hers[0].get("text", "")).ends_with("saw raiders at the walls") and str(hers[0].get("fits", "")) == Hearsay.WITNESSED,
+		"and she hears what he saw, as anyone would: %s" % [hers.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	_setup(ALL_WELL, [["g-tam", "Tam", "hauler"], ["companion:p1", "Wren", "cook"]])
+	_work.set_away("companion:p1", true)
+	_plant("companion:p1", LIE, "Jeff")
+	_plant("g-tam", OTHER_LIE, "Jeff")
+	_check(_until_heard("g-tam", 8) == 0 and _until_heard("companion:p1", 8) == 0, "out with her player (away), she is in no group")

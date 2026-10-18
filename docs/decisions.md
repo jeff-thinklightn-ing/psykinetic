@@ -10168,6 +10168,14 @@ snapshot, forgotten once anyone holds it; fallen_camps()), and on the world
 tick Main._retake_camps gives it back to them once economy.json's
 rescue.restock_days (5) have passed since it fell, with no player standing
 in it, so it is retaken as economy restocks it, and its slots come back.
+Amended (2026-10-18, companions' 442: a companion's beliefs as hearsay):
+a companion resting in town (her worker record "companion:<name>" in the
+town and not away, with her heard, intellect and superstition copied onto
+it by companions) stands in gossip groups like anyone (Townsfolk.gossip no
+longer skips her id; _pass takes an empty card): as teller she passes only
+what she believes, having no card facts; as hearer there is no kin-first
+and no grudge check, which read the card; she hears a scholar's lore pass
+as anyone does. gossip_test covers her, telling and hearing, and away.
 ## 435. Conversation offers: what a town's person has for you, from records only
 
 The data side of ui's step 4 (the conversation panel: who speaks, what

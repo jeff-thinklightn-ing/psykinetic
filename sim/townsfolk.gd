@@ -274,8 +274,8 @@ static func gossip(production: Production) -> void:
 		return  # No day length set: nobody knows where anyone is.
 	var towns := {}  # town -> [worker ids]
 	for id: String in production.worker_ids():
-		if id.begins_with(COMPANION):
-			continue
+		# A companion resting in town (her record there and not away) stands
+		# among them (companions' 442): she tells only what she believes.
 		var who := production.worker(id)
 		if bool(who.get("away", false)) or str(who.get("town", "")).is_empty():
 			continue
@@ -311,9 +311,8 @@ static func _pass(production: Production, town: String, place: String, members: 
 	rng.seed = hash("gossip:%s:%s:%d" % [town, place, at])
 	members.sort()
 	var teller: String = members[rng.randi_range(0, members.size() - 1)]
+	# {} for a resting companion (no card): no kin, no grudge, no facts of her own.
 	var card := card_of(production, teller)
-	if card.is_empty():
-		return ""
 	var grudges: Array = card.get("grudge", [])
 	var kin: Dictionary = card.get("kin", {})
 	var hearers: Array = []
