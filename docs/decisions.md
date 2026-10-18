@@ -10338,3 +10338,29 @@ down, is beaten (raid_beaten) and gone from the world map too.
   raiders' blows take people instead (331).
 
 tests/raid_groups_test.
+
+## 411. Monsters bash with their shields (the AI side of 379)
+
+Items' shield bash (379: World.try_bash, bash_ready, a shove and a stagger,
+no damage, a guard up against it opened) is the player's and any monster's;
+when a monster uses it is enemy-ai's. Approved by the coordinator with the
+design.
+
+- Fighting (Monster._bash_guard): a shield-bearer whose bash is ready, its
+  target beside it with a guard up against it (World.guarding: a raised
+  shield turned to it, or a sword ready), bashes instead of its blow; the
+  guard is opened and its next blows land. It never bashes an open foe: a
+  bash does no damage, and against one with no guard a blow is better. In
+  the plain fight and the tactics' alike, before the flanker's walk round a
+  guard (a bash beats going round).
+- Fleeing (Monster._bash_free): cornered (no step away), a shield-bearer
+  with its bash ready bashes a foe beside it, to shove it off and stagger it,
+  then runs on; without a shield it waits a moment, as before. Any fleer,
+  not only cowards: only the unbold flee, and a cornered cautious one would
+  do the same. A light monster cannot shove a heavy foe (the force falls
+  under knockback_min_force), so then the bash only staggers it: a few ticks
+  free of its blows, not a way out.
+- Its own raised shield goes down for the bash's moment (379's
+  bash_moment_until), as a player's does.
+
+tests/monster_test (_test_monster_bash).

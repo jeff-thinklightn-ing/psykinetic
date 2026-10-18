@@ -84,6 +84,7 @@ notes (decision 324).
   ask ("what is a stag?"), and no longer remember "not knowing" someone as a
   fact about themselves.
 - Shield bash: with your shield raised (right button held), the left button bashes with it instead of swinging. It shoves the one in front (light ones further), staggers them briefly and knocks a raised guard open for a moment, so your next blow lands. No damage; it costs a little stamina and can't be repeated for 2 seconds.
+- Monsters with shields bash too: hold your shield up against one and it bashes your guard open, then strikes. It never bashes someone with no guard up, and one cornered as it flees bashes you to stagger you.
 - The forest round outdoor maps has real broadleaf trees: round, lumpy olive crowns on brown trunks in place of the old teal tiered trees with orange bases, so they turn colour in autumn and catch snow on top in winter.
 - A goblin camp that has hunted its land bare raids for food: it carries off more of the town's food and meat, but takes no one.
 - Goblin camps hunt the herds around them, so game grows thin near a camp, and a rescued hunter brings the town meat, hides and the odd pair of antlers. Neither ever hunts a herd out, nor the animals you are stalking. Wolves that run out of prey dwindle.

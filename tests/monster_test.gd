@@ -91,6 +91,7 @@ func _ready() -> void:
 	_test_archer()
 	_test_worn_bundles()
 	_test_shield()
+	_test_monster_bash()
 	_test_boar_turns()
 	_test_pick_up()
 	_test_art_slots()
@@ -2064,6 +2065,76 @@ func _test_shield() -> void:
 			if hit["source"] == sneak and int(hit["tick"]) == World.tick:
 				struck += 1
 	_check(struck > 0, "the sneak gets blows in (%d) round the shield" % struck)
+	Monster.idling = true
+
+
+func _test_monster_bash() -> void:
+	print("
+== a shield-bearer bashes a guard up against it, then strikes; never an open foe; cornered, it bashes free (decision 411) ==")
+	Monster.idling = false
+	var bashes: Array[Dictionary] = []
+	var on_bash := func(by: GridEntity, target: GridEntity, opened: bool) -> void:
+		bashes.append({"by": by, "target": target, "opened": opened, "tick": World.tick})
+	World.shield_bashed.connect(on_bash)
+	# An open foe: blows, no bash.
+	var e := _build(["#######", "#.Pi..#", "#######"])
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	_bold(imp)
+	imp.slots = PackedStringArray(["", "", "", "", "", "shield"])
+	var struck := 0
+	for i in 60:
+		World.step()
+		for hit: Dictionary in _damage_log:
+			if hit["source"] == imp and int(hit["tick"]) == World.tick:
+				struck += 1
+	_check(struck > 0 and bashes.is_empty(), "at an open foe it strikes (%d blows) and never bashes (%d)" % [struck, bashes.size()])
+	# A foe behind a raised shield: bashed open, then struck.
+	e = _build(["#######", "#.Pi..#", "#######"])
+	imp = e["i"][0]
+	player = e["P"][0]
+	_bold(imp)
+	imp.slots = PackedStringArray(["", "", "", "", "", "shield"])
+	player.slots[Items.LEFT_HAND] = "shield"
+	World.face(player, Vector2i(1, 0))
+	World.try_stance(player, "block")
+	_check(not World.guarding(player, imp).is_empty(), "the player's shield is up against it")
+	var bashed_at := -1
+	var struck_after := 0
+	for i in 60:
+		World.step()
+		if bashed_at < 0 and not bashes.is_empty():
+			bashed_at = World.tick
+		if player.raised.is_empty() and player.guard_broken_until <= World.tick:
+			World.try_stance(player, "block")  # The player raises it again as soon as it may.
+		for hit: Dictionary in _damage_log:
+			if hit["source"] == imp and int(hit["tick"]) == World.tick and bashed_at >= 0:
+				struck_after += 1
+	_check(not bashes.is_empty() and bashes[0]["by"] == imp and bashes[0]["target"] == player and bashes[0]["opened"],
+		"it bashes the guard open (%s)" % [bashes.slice(0, 1)])
+	_check(struck_after > 0, "and its blows land after (%d)" % struck_after)
+	# Cornered while it flees: a bash to break free.
+	bashes.clear()
+	e = _build(["######", "#iP..#", "######"])
+	imp = e["i"][0]
+	player = e["P"][0]
+	_bold(imp)
+	imp.slots = PackedStringArray(["", "", "", "", "", "shield"])
+	imp._flee(player.tile)
+	for i in 30:
+		World.step()
+	_check(not bashes.is_empty() and bashes[0]["by"] == imp, "cornered, it bashes the one hemming it in (%d)" % bashes.size())
+	# And without a shield it only waits.
+	bashes.clear()
+	e = _build(["######", "#iP..#", "######"])
+	imp = e["i"][0]
+	player = e["P"][0]
+	_bold(imp)
+	imp._flee(player.tile)
+	for i in 30:
+		World.step()
+	_check(bashes.is_empty(), "no shield, no bash")
+	World.shield_bashed.disconnect(on_bash)
 	Monster.idling = true
 
 

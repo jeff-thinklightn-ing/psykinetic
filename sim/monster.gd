@@ -496,7 +496,8 @@ func _sim_tick() -> void:
 			_guard_tick()
 	if tactic == Tactic.PLAIN:
 		if World.can_melee(tile, target.tile):
-			World.try_attack(self, target)
+			if not _bash_guard():
+				World.try_attack(self, target)
 		elif World.tick >= next_move_tick:
 			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 			if not path.is_empty():
@@ -515,6 +516,8 @@ func _sim_tick() -> void:
 			if World.tick >= _dart_from:
 				_step_out()
 			return
+		if _bash_guard():
+			return  # Its guard opened: the blows next.
 		if not can_strike:
 			return
 		if tactic == Tactic.FLANK and (_in_front() or not World.guarding(target, self).is_empty()) \
@@ -603,6 +606,26 @@ func _guard_tick() -> void:
 			World.try_stance(self, "block")
 	elif raised == "block":
 		World.try_stance(self, "")
+
+
+## A shield-bearer's bash (World.try_bash, 379; decision 411) at its target
+## beside it whose guard is up against it (World.guarding): the guard
+## opened and the target staggered, so its next blows land. Never at an
+## open foe. Whether it bashed.
+func _bash_guard() -> bool:
+	return World.bash_ready(self) and not World.guarding(target, self).is_empty() and World.try_bash(self, target)
+
+
+## Cornered while it flees, with a shield that bashes: a bash at a foe
+## beside it (World.try_bash), to shove it off and stagger it, then away.
+## Whether it bashed.
+func _bash_free() -> bool:
+	if not World.bash_ready(self):
+		return false
+	for entity in World.sought():
+		if World.can_melee(tile, entity.tile) and World.try_bash(self, entity):
+			return true
+	return false
 
 
 ## One of a kind that "picks_up" (decision 349), with a weapon beside it it
@@ -1320,6 +1343,8 @@ func _flee_tick() -> void:
 		return
 	var goal := _flee_goal()
 	if goal == NO_TILE or goal == tile or not _idle_step(goal):
+		if _bash_free():
+			return  # Shoved off: away next.
 		next_move_tick = World.tick + CHASE_RETRY_TICKS  # Cornered: a moment, then again.
 
 
