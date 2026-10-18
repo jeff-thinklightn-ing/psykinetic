@@ -730,6 +730,7 @@ func _process(delta: float) -> void:
 		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
 	_check_bandage_hold()
 	_run_test_steer()
+	_run_test_chase()
 	# Hover is the floor cell under the cursor, on the ground plane alone:
 	# nothing standing on the map intercepts it. In 3D a monster a click
 	# would attack is outlined instead, and the cell is not shown.
@@ -5771,12 +5772,14 @@ func _respawn_due_players(tick: int) -> void:
 
 func _on_world_ticked(tick: int) -> void:
 	if Net.is_authority():
+		var t := Time.get_ticks_usec()  # Each part's time for a slow tick's line (decision 469).
 		if tick % World.WORLD_TICK_STEPS == 0 and _world_map != null:
 			# Storms break roofs (Weather.break_roofs).
 			for broke: Dictionary in Weather.break_roofs(_world_map.areas, World.steps):
 				print("[weather] %s broke roof %d of %s" % [broke["storm"], broke["index"], broke["level"]])
 		_respawn_due_players(tick)
 		_check_respawns(tick)
+		t = World.part("respawns", t)
 		if tick % CAMP_CHECK_TICKS == 0:
 			_check_camps(tick)
 			_tell_world(tick)
@@ -5784,14 +5787,18 @@ func _on_world_ticked(tick: int) -> void:
 			_retake_camps()
 			if _lawspeaker_client != null and World.production != null:
 				Lawspeaker.tick(World.production.now(), _lawspeaker_client)  # His daily rulings (decision 448); a coroutine, not awaited.
+		t = World.part("camps, lawspeaker", t)
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
+		t = World.part("residents", t)
 		_recall_due()
 		if tick % RETIRE_EVERY_TICKS == 0:
 			_retire_and_recall()
+		t = World.part("retire and recall", t)
 		if tick % TEMPLE_COUNTER_TICKS == 0:
 			_temple_counters()
 		_resident_voices()
+		World.part("temple, voices", t)
 	if World.zone != World.home():
 		return  # Another zone's tick: the HUD and the test hooks are this view's.
 	var player := _local_player()
@@ -6998,6 +7005,13 @@ func _run_test_contest(player: Player, tick: int) -> void:
 ## --test-steer: hold-to-move with the cursor kept three cells from the
 ## player and swung a quarter turn every that many seconds, as a hand
 ## steering does (the 3D camera following makes every frame a new target).
+var _test_chase_from := -1
+var _test_chase_orders := 0
+var _test_chase_said := false
+var _test_chase_what := "nothing in sight"
+var _test_chase_order_at := 0
+
+
 func _run_test_steer() -> void:
 	var player := _local_player()
 	if Net.test_steer <= 0.0 or player == null:
@@ -7009,6 +7023,51 @@ func _run_test_steer() -> void:
 	var want := player.shown_tile() + turns[turn]
 	if World.is_walkable(want) and want != _test_target:
 		_test_target = want
+		World.command_move(player, want)
+
+
+## --test-chase: hold-to-move on the nearest animal as this view draws it
+## (a deer if one is in sight), the order made again whenever the cell it
+## is drawn on changes, as a cursor kept on a fleeing deer does; with none
+## in sight, east to find one. For that many seconds, then it stands. Its
+## counts at the end: the orders given, the cells the animal was drawn on.
+func _run_test_chase() -> void:
+	var player := _local_player()
+	if Net.test_chase <= 0.0 or player == null:
+		return
+	if _test_chase_from < 0:
+		_test_chase_from = Time.get_ticks_msec()
+	if Time.get_ticks_msec() - _test_chase_from > Net.test_chase * 1000.0:
+		if not _test_chase_said:
+			_test_chase_said = true
+			print("[test] chase: %d orders, %s" % [_test_chase_orders, _test_chase_what])
+		return
+	var prey: GridEntity = null
+	var best := INF
+	for entity in World.entities():
+		if entity is Animal and entity.spawned:
+			# A deer before anything else, then the nearest.
+			var rank := World.distance(entity.tile, player.tile) 					+ (0.0 if String(entity.name).contains("deer") or str(entity.spawn_spec.get("kind", "")).contains("deer") else 1000.0)
+			if rank < best:
+				best = rank
+				prey = entity
+	var want := _test_target
+	if prey != null:
+		want = prey.shown_tile()
+		if _test_chase_what == "nothing in sight":
+			print("[test] chase: %s in sight at %.1f s" % [prey.name, (Time.get_ticks_msec() - _test_chase_from) / 1000.0])
+		_test_chase_what = "chasing %s" % prey.name
+	elif _test_target == World.NO_CELL or player.shown_tile() == _test_target 			or Time.get_ticks_msec() - _test_chase_order_at > 3000:
+		# None in sight: one far order east, kept, to find one (an order
+		# every step would turn it back and forth round whatever is there).
+		for reach in range(30, 4, -1):
+			if World.is_walkable(player.tile + Vector2i(reach, 0)):
+				want = player.tile + Vector2i(reach, 0)
+				break
+	if want != _test_target and World.is_walkable(want):
+		_test_chase_order_at = Time.get_ticks_msec()
+		_test_target = want
+		_test_chase_orders += 1
 		World.command_move(player, want)
 
 

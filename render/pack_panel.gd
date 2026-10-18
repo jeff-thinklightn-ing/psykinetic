@@ -231,6 +231,9 @@ func _row(mine: bool) -> HBoxContainer:
 
 
 func _process(_delta: float) -> void:
+	if Net.mode == Net.Mode.SERVER:
+		set_process(false)  # Nobody sees a dedicated server's pack (decision 469).
+		return
 	_refresh()
 
 

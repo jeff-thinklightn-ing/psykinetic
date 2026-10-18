@@ -525,6 +525,78 @@ class Hit:
 	var force := 0.0
 
 
+## A slow tick's breakdown (decision 469): microseconds by part of the tick
+## going now, each part timed where it runs (part()). A tick over
+## SLOW_TICK_USEC, or a frame over SLOW_FRAME_USEC whose ticks were quick (a
+## mind's answer, a save: work outside the sim), is told in one line, at
+## most one every SLOW_SAY_MSEC with how many it stands for, so journald
+## names the cause of a bad minute on the box.
+const SLOW_TICK_USEC := 50000
+const SLOW_FRAME_USEC := 100000
+const SLOW_SAY_MSEC := 10000
+var tick_parts: Dictionary[String, int] = {}
+var _slow_count := 0
+var _slow_frames := 0
+var _slow_worst := 0
+var _slow_worst_tick := 0
+var _slow_worst_parts: Dictionary[String, int] = {}
+var _slow_worst_frame := 0
+var _slow_said := -SLOW_SAY_MSEC
+var _frame_at := 0
+var _last_ticks_usec := 0
+
+
+## Adds the time since [param since] (Time.get_ticks_usec) to this tick's
+## [param name] part; the time now, to time the next part from.
+func part(name: String, since: int) -> int:
+	var now := Time.get_ticks_usec()
+	tick_parts[name] = tick_parts.get(name, 0) + now - since
+	return now
+
+
+func _parts_total() -> int:
+	var total := 0
+	for name: String in tick_parts:
+		total += tick_parts[name]
+	return total
+
+
+## Counts a tick of [param usec] or a frame of [param frame_usec] outside
+## the sim; the line told now, or "" (none slow, or one told within
+## SLOW_SAY_MSEC).
+func _note_slow(usec: int, frame_usec: int) -> String:
+	if usec > SLOW_TICK_USEC:
+		_slow_count += 1
+		if usec > _slow_worst:
+			_slow_worst = usec
+			_slow_worst_tick = tick
+			_slow_worst_parts = tick_parts.duplicate()
+	elif frame_usec > SLOW_FRAME_USEC:
+		_slow_frames += 1
+		_slow_worst_frame = maxi(_slow_worst_frame, frame_usec)
+	if _slow_count + _slow_frames == 0 or Time.get_ticks_msec() - _slow_said < SLOW_SAY_MSEC:
+		return ""
+	_slow_said = Time.get_ticks_msec()
+	var line := "[net] slow:"
+	if _slow_count > 0:
+		var order := _slow_worst_parts.keys()
+		order.sort_custom(func(a: String, b: String) -> bool: return _slow_worst_parts[a] > _slow_worst_parts[b])
+		var top: Array[String] = []
+		for name: String in order.slice(0, 6):
+			top.append("%s %.1f" % [name, _slow_worst_parts[name] / 1000.0])
+		line += " %d tick%s over %d ms, the worst %.1f ms (tick %d): %s" % [_slow_count, "" if _slow_count == 1 else "s",
+			SLOW_TICK_USEC / 1000, _slow_worst / 1000.0, _slow_worst_tick, ", ".join(top)]
+	if _slow_frames > 0:
+		line += "%s %d frame%s over %d ms outside the sim, the worst %.1f ms" % ["" if _slow_count == 0 else ";",
+			_slow_frames, "" if _slow_frames == 1 else "s", SLOW_FRAME_USEC / 1000, _slow_worst_frame / 1000.0]
+	print(line)
+	_slow_count = 0
+	_slow_frames = 0
+	_slow_worst = 0
+	_slow_worst_frame = 0
+	return line
+
+
 func _process(delta: float) -> void:
 	if not Net.is_authority():
 		# Mirror: no sim, only the display clock, running on smoothly.
@@ -540,13 +612,26 @@ func _process(delta: float) -> void:
 		return
 	_accumulator += delta
 	var steps := 0
+	var frame_start := Time.get_ticks_usec()
+	var frame_usec := frame_start - _frame_at if _frame_at > 0 else 0
+	_frame_at = frame_start
+	var ticks_usec := 0
 	while _accumulator >= TICK_DT:
 		_accumulator -= TICK_DT
 		if steps < MAX_CATCHUP_TICKS:
 			var started := Time.get_ticks_usec()
+			tick_parts.clear()
 			step()
-			Net.stats.record_tick(Time.get_ticks_usec() - started, tick)
+			var took := Time.get_ticks_usec() - started
+			ticks_usec += took
+			Net.stats.record_tick(took, tick)
+			_note_slow(took, 0)
 			steps += 1
+	# The frame before this one, less its ticks (timed above): slow for
+	# something outside the sim.
+	if frame_usec - _last_ticks_usec > SLOW_FRAME_USEC:
+		_note_slow(0, frame_usec - _last_ticks_usec)
+	_last_ticks_usec = ticks_usec
 	tick_alpha = _accumulator / TICK_DT
 	if Net.tick_send_hz >= 20 and steps == 0 and tick_alpha >= 0.5 and _half_sent != tick:
 		# Net.tick_send_hz 20: the clock's half ticks go out too.
@@ -563,6 +648,7 @@ func step() -> void:
 	if not Net.is_authority():
 		return
 	var was := zone
+	var t := Time.get_ticks_usec()
 	if zones.is_empty():
 		fields.update_weather(steps)
 		_step_zone()
@@ -582,16 +668,22 @@ func step() -> void:
 			fields.update_weather(steps)
 			_step_zone()
 	enter(was)
+	t = Time.get_ticks_usec()
 	raids.step()
+	t = part("raids", t)
 	steps += 1
 	# The sky's light on the new hour (DayNight; the light field reads it).
 	DayNight.update()
+	t = part("sky", t)
 	var every := WORLD_TICK_STEPS / WORLD_TICK_SLICES
 	if steps % every == 0:
 		world_tick(steps / every % WORLD_TICK_SLICES)
+	t = Time.get_ticks_usec()
 	_world_tick_due(WORLD_TICK_BUDGET_USEC)
+	t = part("far and sleeping monsters", t)
 	enter(was)
 	stepped.emit()
+	part("after the tick (snapshot, sky)", t)
 
 
 ## The world tick, every zone in turn (the one World is in if there are no
@@ -600,6 +692,7 @@ func step() -> void:
 ## WORLD_TICK_SLICES), queued for _world_tick_due, or all of them at once
 ## for -1. Called by step, a slice at a time; tests call it directly.
 func world_tick(slice := -1) -> void:
+	var t := Time.get_ticks_usec()
 	if production != null and slice <= 0:
 		# The towns choose what to build first, so its build job is taken
 		# on the same tick.
@@ -616,8 +709,10 @@ func world_tick(slice := -1) -> void:
 		Offers.tick()  # Promises to them that lapse (decision 435).
 		if raid_groups != null:
 			raid_groups.world_tick()
+		t = part("towns, production, economy", t)
 	if herds != null and slice <= 0:
 		herds.tick()
+		t = part("herds", t)
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())
@@ -704,6 +799,7 @@ func _woke(each: Zone, seconds: float) -> void:
 
 ## One tick of the zone World is in.
 func _step_zone() -> void:
+	var t := Time.get_ticks_usec()
 	tick += 1
 	for entity in _entities:
 		if entity.protected and tick >= entity.protected_until_tick:
@@ -713,6 +809,7 @@ func _step_zone() -> void:
 	# mid-tick leaves this one as it was.
 	var near := _tier_origins()
 	_take_roster()
+	t = part("tiers, roster", t)
 	for entity in _actors:
 		# Not its turn by the tier it has, and that tier not due to be
 		# looked at again: passed over here, without a call (most of a
@@ -724,22 +821,35 @@ func _step_zone() -> void:
 		# A stunned entity skips its turn; its orders wait for it.
 		if _alive(entity) and not is_stunned(entity) and _thinks(entity, near):
 			entity._sim_tick()
+			# Its turn's time, by what it is (decision 469).
+			t = part("act: monsters" if entity is Monster else "act: companions" if entity is Companion 					else "act: players" if entity is Player else "act: others", t)
+	t = Time.get_ticks_usec()
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).
 	_resolve_hits()
+	t = part("hits", t)
 	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
 	_apply_hazards()
 	_tend_ailments()
+	t = part("hazards, ailments", t)
 	# 4. Stamina comes back for whoever did not exert themselves this tick.
 	_regen_stamina()
 	# 5. Bandaging and mending; buffs wearing off.
 	_tend_wounds()
 	_fade_buffs()
+	t = part("stamina, wounds, buffs", t)
+	var timed := _parts_total()
 	ticked.emit(tick)
+	# Its listeners' own parts (Main's respawns, residents...) are their
+	# own; this part is what they did not time.
+	var listeners := Time.get_ticks_usec() - t - (_parts_total() - timed)
+	tick_parts["on each tick, the rest"] = tick_parts.get("on each tick, the rest", 0) + listeners
+	t = Time.get_ticks_usec()
 	# 6. The tick counter goes once per tick to the clients in this zone.
 	for peer in Net.sendable_peers():
 		if peer_sees(peer, zone.name):
 			_net_tick.rpc_id(peer, tick)
+	part("net", t)
 
 
 ## Where the zone's players and companions stand, that a monster's tier

@@ -11412,3 +11412,25 @@ arrows and stock bow, arrows. The castle has no listed chests and players
 start in the wilds, so it has none. Rejected: an admin "stock <chest>
 <item>" command (a step for release on each deploy; the level file as the
 source of a chest's kit comes up again).
+
+## 469. A slow tick names where its time went; the dedicated server shows no pack
+
+The box's journal gave a minute's tick average and worst (NetStats) but not
+why: Jeff's session of 2026-10-17 had ticks of 219, 90 and 105 ms that no
+log line explained. World now times each part of a tick where it runs
+(World.part: the act phase by what acts, monsters, companions, players and
+others; tiers and roster; hits; hazards and ailments; stamina, wounds and
+buffs; Main's respawns, camps, residents, retire and recall, temple and
+voices; what else listens to the tick; the net; raids; the sky; far and
+sleeping monsters; towns, production and economy; herds; what runs after
+the tick, the snapshot among it), and a tick over 50 ms is told in one
+line, its six biggest parts first: "[net] slow: 1 tick over 50 ms, the
+worst 164.7 ms (tick 1): act: companions 156.4, ...". A frame over 100 ms
+whose ticks were quick is told as outside the sim (a mind's answer, a
+save). At most one line every 10 s, with how many slow ticks and frames it
+stands for (release: a bad minute must not flood journald). On the box's
+own world, run here, it named a companion's first turn after a wake (156
+ms) and a herds tick (60 ms) at once. And a dedicated server stops
+refreshing the pack panel every frame (0.4 ms of a HUD nobody sees).
+Rejected: Godot's profiler on the box (an editor connection, and costly);
+timing every function (the parts are enough to know whose it is).

@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_speech_by_zone()
 	_test_overheard()
 	_test_stats_with_nobody_on()
+	_test_slow_tick_line()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -108,6 +109,25 @@ func _test_companion_follows() -> void:
 	_check(left_behind == 0, "and not in the test room any more")
 	var host_pet: Companion = _main._companions.get(Net.player_id)
 	_check(host_pet != null and host_pet.zone == "test_room", "the host's companion stayed with the host")
+
+
+func _test_slow_tick_line() -> void:
+	print("
+== a slow tick names where its time went (decision 469) ==")
+	World._slow_said = -World.SLOW_SAY_MSEC
+	World.tick_parts.clear()
+	World.tick_parts["act: companions"] = 52000
+	World.tick_parts["hits"] = 3000
+	_check(World._note_slow(20000, 0) == "", "a quick tick: nothing told")
+	var line := World._note_slow(60000, 0)
+	_check(line.contains("1 tick over 50 ms") and line.contains("60.0 ms") and line.find("act: companions 52.0") < line.find("hits 3.0"),
+			"a slow one: told, its parts biggest first (%s)" % line)
+	_check(World._note_slow(70000, 0) == "", "another within 10 s: counted, not told")
+	World._slow_said -= World.SLOW_SAY_MSEC
+	line = World._note_slow(0, 150000)
+	_check(line.contains("1 tick over") and line.contains("1 frame over 100 ms outside the sim, the worst 150.0 ms"),
+			"then, 10 s on: the one held back and a slow frame outside the sim (%s)" % line)
+	World.tick_parts.clear()
 
 
 func _test_stats_with_nobody_on() -> void:
