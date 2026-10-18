@@ -12737,3 +12737,21 @@ class_name Heel.
 Rejected: npc calling Companion's own _follow (her members: keeper, the
 stalking rule); a node per follower (no scene, nothing to draw, a ticked
 RefCounted is enough).
+Amended (Jeff: "no birds at night, maybe owls bats"): birds belong to the
+day only. The drips' take with birds (freesound 841641) is dropped, and the
+deep night bed's owl-dense takes (475376, 151241) are replaced by two quiet
+night woods (662095, 532301), so night's voices come as sparse calls, not
+in a bed: Ambience.calls(zone, daylight, weather, canopy, tower) gives each
+call's rate and Ambience._call plays it from round the listener (Sfx.play,
+heard as any sound there):
+- amb.owl (four takes, CC0): now and then, up in the trees 4 to 10 cells
+  off, every OWL_SECONDS (45) on average under a full roof, four times as
+  long in the open;
+- amb.bat (four takes, CC0 and CC BY): overhead near by, every BAT_SECONDS
+  (20) where they're most at home: a canopy's edges and clearings (cover
+  half way, 4 x c x (1 - c)) or within TOWER_NEAR (4) cells of a town
+  wall's drawn tower, none by TOWER_FAR (12); the lore's tower joins when it
+  is a level;
+- both at night only, hushed by rain as the birds are, never under stone.
+The retired takes are kept in the sound library's retired/ folder, out of
+the game and its credits.

@@ -1,6 +1,44 @@
 {
 	"about": "Third-party takes of the sound slots: slot -> [{file, from (a source in slots.json), original (where in the source it was cut from), sha256, ...}]. Written by tools/sound_take.ps1; read by SoundKit. A take of a source stored external is kept outside the repo (the sound library takes/<slot>/<file>) and copied into art/audio/external/<slot>/ by tools/sound_sync.ps1.",
 	"takes": {
+		"amb.bat": [
+			{
+				"file": "amb.bat.ogg",
+				"from": "freesound",
+				"original": "freesound 437934: G12-02-Bats Chirping.wav (from 8.25 s for 3 s)",
+				"sha256": "43fc81800c9d772c48e96bd00a9fcc3c896e62bdc037676d423b5d7be59b562a",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/437934/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.bat.2.ogg",
+				"from": "freesound",
+				"original": "freesound 437934: G12-02-Bats Chirping.wav (from 0.75 s for 3 s)",
+				"sha256": "a832a24a5196461b4d7eb053d4b92f1d3fb757e943897c9e8d774eba62bc519d",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/437934/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.bat.3.ogg",
+				"from": "freesound",
+				"original": "freesound 320721: bat sounds (from 13.5 s for 3 s)",
+				"sha256": "ca7c77ddfb27853aa11acc3563d063213f219764c6292938240d98910b925dda",
+				"by": "pillonoise",
+				"url": "https://freesound.org/people/pillonoise/sounds/320721/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.bat.4.ogg",
+				"from": "freesound",
+				"original": "freesound 349225: Bat Wings (Fast)",
+				"sha256": "058f950efb6b198fb2c481c2c981ca2bd1cf1fe22a8ea3c11b5fb93be8f5293d",
+				"by": "Natty23",
+				"url": "https://freesound.org/people/Natty23/sounds/349225/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"amb.drips": [
 			{
 				"file": "amb.drips.ogg",
@@ -10,15 +48,6 @@
 				"by": "CRAFTCREST.com",
 				"url": "https://freesound.org/people/CRAFTCREST.com/sounds/277466/",
 				"license": "CC BY 4.0"
-			},
-			{
-				"file": "amb.drips.2.ogg",
-				"from": "freesound",
-				"original": "freesound 841641: AMBForst Native birds in the bush reserve, light dripping after rain, Invercargill, New Zealand (from 20 s for 60 s)",
-				"sha256": "e18312dc4bee4753ebe8da1e030a3baa8080bcef89963c78b5c6fe2b14c62630",
-				"by": "vhio",
-				"url": "https://freesound.org/people/vhio/sounds/841641/",
-				"license": "CC0 1.0"
 			}
 		],
 		"amb.dungeon": [
@@ -77,19 +106,19 @@
 			{
 				"file": "amb.forest_deep_night.ogg",
 				"from": "freesound",
-				"original": "freesound 475376: night_forest_owl.WAV (from 4 s for 60 s)",
-				"sha256": "48370d2869efa0e39244cc9d70f6a35b6b074a8b5ccebda730c3dd1c21fd1500",
-				"by": "thom_cookes",
-				"url": "https://freesound.org/people/thom_cookes/sounds/475376/",
+				"original": "freesound 662095: amb_forest_night.wav (from 5 s for 60 s)",
+				"sha256": "152949d5bf99084e444c32f9e30b679afc03dd1af9bd4ab2cd817dba7c38483f",
+				"by": "Dokuta_Gerovv",
+				"url": "https://freesound.org/people/Dokuta_Gerovv/sounds/662095/",
 				"license": "CC0 1.0"
 			},
 			{
 				"file": "amb.forest_deep_night.2.ogg",
 				"from": "freesound",
-				"original": "freesound 151241: OwlsForestApril82012.wav (from 10 s for 60 s)",
-				"sha256": "365cec2cff4c760bc4ac3194c96f0e8296fe98986c7cc3afc5da2e49ef80b11c",
-				"by": "kvgarlic",
-				"url": "https://freesound.org/people/kvgarlic/sounds/151241/",
+				"original": "freesound 532301: Night Woods (from 30 s for 60 s)",
+				"sha256": "bf66687a646dac6c17c411b0de8c74dfe5f930495ad7ee891f2f0ac0a291b5c1",
+				"by": "widgetstudios",
+				"url": "https://freesound.org/people/widgetstudios/sounds/532301/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -105,6 +134,44 @@
 				"from": "sonniss-gdc-2024",
 				"original": "2024/Justsoundeffects - Forest Ambiences/BIRDPrey_Spring Night Deciduous Forest Many Tawny Owls Wind Leaves Rustling_JSE_FA.wav (from 1 s for 50 s)",
 				"sha256": "bdef45c37f9f5be3659cbce572bb430991006ef1d8f70418de025b816fd88395"
+			}
+		],
+		"amb.owl": [
+			{
+				"file": "amb.owl.ogg",
+				"from": "freesound",
+				"original": "freesound 465697: Owl Hoot",
+				"sha256": "dad8f3ea0af8ff75e0dfc93aa12d2a733f68e73bc6c47c728ead593c7deb03fc",
+				"by": "Breviceps",
+				"url": "https://freesound.org/people/Breviceps/sounds/465697/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.owl.2.ogg",
+				"from": "freesound",
+				"original": "freesound 398734: owl.wav",
+				"sha256": "2141bf0396e7a5773b3141c7713f3e8e812fff3fbe9b13ffe5e132501857c27e",
+				"by": "Anthousai",
+				"url": "https://freesound.org/people/Anthousai/sounds/398734/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.owl.3.ogg",
+				"from": "freesound",
+				"original": "freesound 558397: owl_hooting_000102_0145S3 002-070 000-002 037-044.wav",
+				"sha256": "c46c3aa127926e37f3cb8e874e7799f9c43915b8dcbcc0382784838ca5f5f71b",
+				"by": "Gerent",
+				"url": "https://freesound.org/people/Gerent/sounds/558397/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.owl.4.ogg",
+				"from": "freesound",
+				"original": "freesound 558398: owl_hooting_000102_0145S3 002-070 000-002 007-015.wav",
+				"sha256": "7dda7ed3cc56a1aaa6145be86a1d0d3aba99006d0e23e6ed15fb6d010544531c",
+				"by": "Gerent",
+				"url": "https://freesound.org/people/Gerent/sounds/558398/",
+				"license": "CC0 1.0"
 			}
 		],
 		"amb.rain": [

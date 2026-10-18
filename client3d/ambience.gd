@@ -24,6 +24,11 @@ extends Node
 ##   drawn drops read the same).
 ## A torch is a point, not a bed: the torch loop (amb.torch_fire) plays from
 ## the nearest torch within hearing (Sfx.hearing, its slot's range).
+## Night's own voices are calls, not beds (Jeff: "no birds at night, maybe
+## owls bats"): now and then an owl (amb.owl) up in the trees round the
+## listener, more often under a forest's roof, and bats (amb.bat) overhead
+## by a canopy's edges and clearings and by a town wall's towers; both
+## sparse, hushed by rain, at the rates calls() gives.
 ## A bed with no takes plays nothing.
 
 ## Seconds a bed takes to ease most of the way to its new loudness.
@@ -45,6 +50,14 @@ const TOWN_FAR := 22.0
 ## The hour dawn's bed peaks, and how many hours either side it fades over.
 const DAWN_HOUR := 6.2
 const DAWN_HOURS := 1.4
+## Seconds between owl calls on average at night under a full roof (four
+## times as long in the open), and between bats where they are most at home.
+const OWL_SECONDS := 45.0
+const BAT_SECONDS := 20.0
+## Bats by a town wall's tower: always within TOWER_NEAR cells, none by
+## TOWER_FAR.
+const TOWER_NEAR := 4.0
+const TOWER_FAR := 12.0
 ## Below this weight a bed is stopped.
 const SILENT := 0.01
 const BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
@@ -102,6 +115,10 @@ func _weigh() -> void:
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
 			canopy, drip))
 	_place_torch(cell)
+	var rates := calls(zone, DayNight.daylight(steps), weather, canopy, _tower_nearness(cell))
+	for slot: String in rates:
+		if randf() < rates[slot] * WEIGH_EVERY:
+			_call(slot, cell)
 
 
 ## How loud each bed should be (0..1) in [param zone] ("outdoors",
@@ -142,6 +159,42 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 	else:
 		out["amb.dungeon"] = 1.0 if zone in ["cave", "dungeon"] else 0.0
 	return out
+
+
+## How often each night call comes (calls a second) in [param zone] with
+## the sky's [param daylight], [param weather], a forest's [param canopy]
+## round the view (0..1) and [param tower] (0..1: how near a town wall's
+## tower): an owl more under the roof, bats by its edges and clearings (a
+## cover half way) and by towers; none by day or away from the open air.
+static func calls(zone: String, daylight: float, weather: Dictionary, canopy: float, tower: float) -> Dictionary:
+	var out := {"amb.owl": 0.0, "amb.bat": 0.0}
+	if zone != "outdoors":
+		return out
+	var night := 1.0 - clampf((daylight - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
+	var hush := 1.0 - RAIN_HUSH * float(weather.get("rain", 0.0))
+	var edge := clampf(4.0 * canopy * (1.0 - canopy), 0.0, 1.0)
+	out["amb.owl"] = night * hush * (0.25 + 0.75 * canopy) / OWL_SECONDS
+	out["amb.bat"] = night * hush * maxf(edge, tower) / BAT_SECONDS
+	return out
+
+
+## One night call of [param slot] from somewhere round [param cell]: an owl
+## up in the trees a way off, bats overhead near by.
+func _call(slot: String, cell: Vector2i) -> void:
+	var reach := float(SoundKit.reach(slot))
+	var away := Vector2.from_angle(randf() * TAU) * randf_range(reach * 0.3, reach * 0.7)
+	var at := view._tile_position(cell + Vector2i(roundi(away.x), roundi(away.y)))
+	at.y += 6.0 if slot == "amb.owl" else 3.5
+	view.sfx.play(slot, at)
+
+
+## 0..1: how near [param cell] is to a town wall's drawn tower.
+func _tower_nearness(cell: Vector2i) -> float:
+	var nearest := INF
+	for ring: Dictionary in view._town_walls:
+		for vertex: Vector2i in (ring["towers"] as Dictionary):
+			nearest = minf(nearest, maxf(absi(vertex.x - cell.x), absi(vertex.y - cell.y)))
+	return clampf((TOWER_FAR - nearest) / (TOWER_FAR - TOWER_NEAR), 0.0, 1.0)
 
 
 ## 0..1: how near [param cell] is to a building that serves a town.

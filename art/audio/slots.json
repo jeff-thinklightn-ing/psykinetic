@@ -1154,7 +1154,7 @@
 			"bus": "ambience",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "deep under a forest's roof at night: owls, a hush; a bed under a zone, time or weather; Ambience.weights"
+			"uses": "deep under a forest's roof at night: a hush, no birds (its owls are amb.owl's calls); a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.rain_canopy": {
 			"category": "ambience",
@@ -1303,6 +1303,24 @@
 			"range": 4,
 			"volume_db": -10.0,
 			"uses": "the crackle of a torch or brazier, from where it burns; Ambience, from the nearest torch heard"
+		},
+		"amb.owl": {
+			"category": "ambience",
+			"type": "oneshot",
+			"bus": "ambience",
+			"noise": null,
+			"range": 14,
+			"volume_db": -8.0,
+			"uses": "an owl calling now and then in the trees at night, more under a forest's roof; Ambience.calls, up in the trees round the listener"
+		},
+		"amb.bat": {
+			"category": "ambience",
+			"type": "oneshot",
+			"bus": "ambience",
+			"noise": null,
+			"range": 6,
+			"volume_db": -10.0,
+			"uses": "bats flitting at night by a forest's edges and clearings and by towers; Ambience.calls, overhead near the listener"
 		}
 	}
 }

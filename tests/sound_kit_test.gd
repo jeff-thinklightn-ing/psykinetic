@@ -237,7 +237,7 @@ func _test_ambience_weights() -> void:
 			and deep["amb.forest_deep_night"] == 0.0, "under a full roof at noon: the deep forest by day over the open's (%s)" % [deep])
 	var deep_night := Ambience.weights("outdoors", true, DayNight.NIGHT, 0.0, clear, 0.0, 0.5)
 	_check(is_equal_approx(deep_night["amb.forest_deep_night"], 0.5) and is_equal_approx(deep_night["amb.forest_night"], 1.0 - Ambience.DEEP * 0.5),
-			"half under the roof at midnight: the deep night bed (owls) half in")
+			"half under the roof at midnight: the deep night bed half in")
 	var crowns := Ambience.weights("outdoors", true, 1.0, 12.0, {"kind": "rain", "rain": 1.0, "wind": 0.0}, 0.0, 1.0, 1.0)
 	_check(is_equal_approx(crowns["amb.rain_canopy"], 1.0) and is_equal_approx(crowns["amb.rain"], 1.0 - Ambience.CANOPY_RAIN)
 			and is_equal_approx(crowns["amb.drips"], 1.0), "rain under the roof: on the crowns, little through, dripping")
@@ -246,6 +246,23 @@ func _test_ambience_weights() -> void:
 	var roofed_deep := Ambience.weights("outdoors", false, 1.0, 12.0, clear, 0.0, 1.0, 1.0)
 	_check(is_equal_approx(roofed_deep["amb.drips"], Ambience.ROOFED) and is_equal_approx(roofed_deep["amb.forest_deep_day"], Ambience.ROOFED),
 			"under a roof in the forest: its beds quieter too")
+	# Night's voices (Jeff: "no birds at night, maybe owls bats").
+	var by_day := Ambience.calls("outdoors", 1.0, clear, 1.0, 1.0)
+	_check(by_day["amb.owl"] == 0.0 and by_day["amb.bat"] == 0.0, "by day: no owls, no bats")
+	var open_night := Ambience.calls("outdoors", DayNight.NIGHT, clear, 0.0, 0.0)
+	var roofed_night := Ambience.calls("outdoors", DayNight.NIGHT, clear, 1.0, 0.0)
+	_check(is_equal_approx(roofed_night["amb.owl"], 1.0 / Ambience.OWL_SECONDS) and is_equal_approx(open_night["amb.owl"] * 4.0, roofed_night["amb.owl"]),
+			"at night an owl now and then, more under the roof (every %.0f s, %.0f s in the open)" % [1.0 / roofed_night["amb.owl"], 1.0 / open_night["amb.owl"]])
+	var edge_night := Ambience.calls("outdoors", DayNight.NIGHT, clear, 0.5, 0.0)
+	_check(is_equal_approx(edge_night["amb.bat"], 1.0 / Ambience.BAT_SECONDS) and roofed_night["amb.bat"] == 0.0 and open_night["amb.bat"] == 0.0,
+			"bats by the canopy's edge, not deep under it nor out in the open")
+	_check(is_equal_approx(Ambience.calls("outdoors", DayNight.NIGHT, clear, 0.0, 1.0)["amb.bat"], 1.0 / Ambience.BAT_SECONDS), "bats by a tower")
+	var wet_night := Ambience.calls("outdoors", DayNight.NIGHT, {"kind": "rain", "rain": 1.0, "wind": 0.0}, 1.0, 0.0)
+	_check(wet_night["amb.owl"] < roofed_night["amb.owl"] * 0.5, "rain hushes them")
+	var under := Ambience.calls("dungeon", DayNight.NIGHT, clear, 1.0, 1.0)
+	_check(under["amb.owl"] == 0.0 and under["amb.bat"] == 0.0, "none under stone")
+	for slot: String in ["amb.owl", "amb.bat"]:
+		_check(SoundKit.has(slot) and SoundKit.positional(slot) and SoundKit.reach(slot) > 0, "%s is a call from somewhere" % slot)
 	for bed: String in Ambience.BEDS:
 		_check(SoundKit.has(bed) and not SoundKit.positional(bed), "%s is a flat slot" % bed)
 
