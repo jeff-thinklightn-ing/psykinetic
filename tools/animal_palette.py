@@ -12,7 +12,9 @@
 # Each material takes the swatch nearest its colour (the glTF's linear colour as sRGB, by
 # hue twice its lightness, tools/body_build.py's distance) among the palette rows --rows
 # (default 0,1,2,3,5: skin, stone, wood, straw, cloth and leather), unless --swatch names
-# one. The swatches chosen are printed.
+# one. A material drawn from an image (an atlas-textured animal, the pig) is coloured face by
+# face instead: each face's colour sampled from the image at its UVs' middle, its own nearest
+# swatch. The swatches chosen are printed.
 import math
 import os
 import sys
@@ -105,6 +107,14 @@ def main() -> None:
 			given[m.get("name", "")] = Vector([srgb(v) for v in factor[:3]])
 	palette, count = swatches(rows)
 	picked = {}
+	# An image-textured material's pixels, read once: {material name: (w, h, pixels)}.
+	textures = {}
+	for material in bpy.data.materials:
+		if material.node_tree:
+			for node in material.node_tree.nodes:
+				if node.type == "TEX_IMAGE" and node.image is not None:
+					textures[material.name] = (node.image.size[0], node.image.size[1], list(node.image.pixels))
+	by_colour = {}
 	for obj in meshes:
 		mesh = obj.data
 		if not mesh.uv_layers:
@@ -113,6 +123,20 @@ def main() -> None:
 		for poly in mesh.polygons:
 			material = mesh.materials[poly.material_index] if mesh.materials else None
 			name = material.name if material else ""
+			if name in textures and name not in chosen:
+				w, h, px = textures[name]
+				u = sum(uv[li].uv[0] for li in poly.loop_indices) / len(poly.loop_indices)
+				v = sum(uv[li].uv[1] for li in poly.loop_indices) / len(poly.loop_indices)
+				x, y = min(w - 1, max(0, int((u % 1.0) * w))), min(h - 1, max(0, int((v % 1.0) * h)))
+				i = (y * w + x) * 4
+				colour = Vector(px[i:i + 3])  # The image's own values (an sRGB PNG, as stored).
+				key = tuple(round(c, 2) for c in colour)
+				if key not in by_colour:
+					by_colour[key] = min(palette, key=lambda at: distance(palette[at], colour))
+				row, col = by_colour[key]
+				for li in poly.loop_indices:
+					uv[li].uv = ((col + 0.5) / 8.0, 1.0 - (row + 0.5) / count)
+				continue
 			if name not in picked:
 				if name in chosen:
 					picked[name] = chosen[name]
@@ -129,6 +153,8 @@ def main() -> None:
 		mesh.materials.clear()
 		mesh.materials.append(bpy.data.materials.get("palette") or bpy.data.materials.new("palette"))
 	print("swatches: %s" % {name: picked[name] for name in sorted(picked)})
+	if by_colour:
+		print("from the image: %s" % {"%02x%02x%02x" % tuple(int(c * 255) for c in k): at for k, at in sorted(by_colour.items())})
 	# One mesh, skinned as it was.
 	bpy.ops.object.select_all(action="DESELECT")
 	for obj in meshes:
