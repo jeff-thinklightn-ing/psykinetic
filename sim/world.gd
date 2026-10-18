@@ -607,6 +607,7 @@ func world_tick(slice := -1) -> void:
 		# what they tell each other (decision 422: gossip).
 		Townsfolk.tick(production, stockpile)
 		Townsfolk.gossip(production)
+		Offers.tick()  # Promises to them that lapse (decision 435).
 		if raid_groups != null:
 			raid_groups.world_tick()
 	if herds != null and slice <= 0:

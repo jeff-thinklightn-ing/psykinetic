@@ -7,6 +7,12 @@ notes (decision 324).
 
 ## Unreleased
 
+- Speak to one of the town's people and they have something for you: a thing
+  of their own making at the counter, a job the town needs done (kin brought
+  home from a raiders' camp, the camp cleared, wood fetched to the store, paid
+  from the town's coffer), the newest thing they have heard, or a plea (a hand
+  with a debt, a word carried to a neighbour they have fallen out with). Take
+  one on and they remember your promise; keep it, or it lapses in a week.
 - Each of the town's people carries their look with them now (build, age,
   hair, beard, a hood or hat, the trade's apron), ready for the character
   models when they come; nothing changes on screen yet.

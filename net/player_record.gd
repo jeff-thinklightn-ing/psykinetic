@@ -29,6 +29,9 @@ var last_seen := 0
 ## step} (decision 314)}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
+## The commissions and errands they took on from the town's people (decision
+## 435): the asks as the residents' cards hold them, by id.
+var commissions: Array = []
 ## What is in the player's slots (Items ids, "" empty), kept through
 ## death, travel and leaving.
 var slots := Items.tidy([], Player.SLOTS)
@@ -63,6 +66,7 @@ func to_dict() -> Dictionary:
 		"zone": zone,
 		"last_seen": last_seen,
 		"companion": companion.duplicate(true),
+		"commissions": commissions.duplicate(true),
 		"slots": Array(slots),
 		"items": Array(slot_items),
 	}
@@ -91,6 +95,8 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.zone = str(entry.get("zone", ""))
 	record.slots = Items.tidy(entry.get("slots", []), Player.SLOTS)
 	record.slot_items = _uids(entry.get("items", []))
+	var asks: Variant = entry.get("commissions", [])
+	record.commissions = asks.duplicate(true) if asks is Array else []
 	var pet: Variant = entry.get("companion", {})
 	if pet is Dictionary and pet.get("name") is String:
 		record.companion = {

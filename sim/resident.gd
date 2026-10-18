@@ -55,6 +55,10 @@ var trade := ""
 ## Its hidden personality type (decision 393: the worker record's,
 ## Townsfolk.roll_type; "" for a companion), server side only, never shown.
 var type := ""
+## Who is speaking to it now (a player id and their shown name), for its
+## offers (decision 435); "" between asks.
+var asked_by := ""
+var asked_by_name := ""
 ## Where it goes: "work", "home", "square" -> Rect2i of cells (Main's).
 var places: Dictionary = {}
 var senses: Senses
@@ -269,6 +273,12 @@ func facts_now() -> Array[String]:
 		var heard := Hearsay.prompt_words(World.production.worker(worker_id).get("heard", []))
 		if not heard.is_empty():
 			out.append(heard)
+	# What it can offer the one speaking to it, and what they promised it
+	# (decision 435): facts, never lines.
+	if player_id.is_empty() and not asked_by.is_empty():
+		var offered := Offers.voice_words(worker_id, asked_by, asked_by_name)
+		if not offered.is_empty():
+			out.append(offered)
 	# A companion's past is in her own card; a resident's, in the town's records.
 	var taken := World.towns.taken_before(worker_id) if World.towns != null and player_id.is_empty() else 0
 	if taken > 0:

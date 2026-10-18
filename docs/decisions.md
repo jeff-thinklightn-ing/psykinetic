@@ -10151,3 +10151,74 @@ snapshot, forgotten once anyone holds it; fallen_camps()), and on the world
 tick Main._retake_camps gives it back to them once economy.json's
 rescue.restock_days (5) have passed since it fell, with no player standing
 in it, so it is retaken as economy restocks it, and its slots come back.
+## 435. Conversation offers: what a town's person has for you, from records only
+
+The data side of ui's step 4 (the conversation panel: who speaks, what
+they offer, the exchange), the coordinator's approval 2026-10-18, shapes
+agreed with ui. A resident spoken to has at most three things to offer
+(Offers.of, sim/offers.gd; residents.json "offers"), each from a record
+and never invented, in this order and one of each kind: a shop line (a
+thing in the town's shop that this resident's trade makes, economy's
+price: "I have a knife at the counter for 12 gold"); one true commission
+(the first that holds: kin on the card held captive (Towns.captives) to
+be brought home from the camp that holds them; a camp of a faction hostile
+to the town (Holdings.camps) to be cleared, from one whose card says they
+saw raiders; a thing the town is short of (Production.signals_of) to be
+fetched to the store, six of it); a rumour (the newest believed hearsay as
+told, "Tam told me at the well that the mine is cursed"; an official
+offers the weightiest lore fact it knows instead, never hearsay, 378); and
+a plea (help with a loan, through economy's pay_loan, else a word carried
+to a neighbour the resident holds a grudge against). Each offer is {id
+("<worker>|<kind>|<key>"), kind, title (three or four words for the
+panel's button), words (the resident's sentence), what (the record),
+accept ("buy", "take", "lend", "carry", ""), cost}.
+
+Accepting: "buy" sells the thing at the town's counter when the player
+stands at one (World.try_buy, answered as the shop is); "take" and "carry"
+put an ask on the resident's card ("asks", saved with the worker record,
+398) and on the player's record ("commissions", PlayerRecord), at most one
+open per resident and offers.per_player (3) per player, as a fact on the
+card ("Jeff promised Mara: to bring Bram home"); "lend" pays the loan down
+through economy. A commission is met from the world's own signals, with
+no model call (Offers.watch): a rescue when Towns.rescued names the
+captive, a camp when Holdings.place_taken moves it off its faction, in
+both the player standing in the camp's area (else it closes unpaid, "kept
+by another", said honestly); a fetch when economy's Stockpile.deposited
+counts the player's own banking to the number. Met, economy pays the
+player from the town's treasury (pay_commission, economy.json
+"commissions": rescue 10, camp 20, fetch 1 a unit; economy's 60aaf7b),
+the card gains the fact, the party log says. An errand is met when the
+player next speaks to the one it is for: the grudge is dropped from both
+cards and both gain the fact, which gossip (422) may pass on. An ask not
+met in offers.days (7) lapses with a fact told once. The voice is told the
+offers as facts, never lines ("What you can offer Jeff, if it comes up:
+..."; "Jeff promised to bring Bram home and has not yet."), in
+Resident.facts_now while the ask is being made.
+
+Wire: a server message kind "offers" {entity, speaker, offers}, sent to
+the player with each answer that resident gives them, when the panel opens
+on a resident within earshot (the client's "offers" command {entity}) and
+after every accept; accepting is the "offer" command {id} or {id, gold}
+(commands ride the existing request RPC, which protocol() cannot see, so
+the two new verbs take PROTOCOL_REVISION 15, after economy's 14; the new
+MESSAGE_KINDS entry changes the fingerprint too). ui draws the panel; npc
+owns the data, the two commands, the accept handling and the voice facts.
+
+offers_test (pure sim: a context of callables stands in for the world;
+no port, no scratch): nothing from nothing; the shop line for the trade's
+own making; each commission from its record and their order; the rumour
+and the official's lore fact; the plea and economy's lend; the cap and the
+order; a commission taken, listed as open, refused twice and by the
+per-player cap, met with the player there and paid, met by another and
+not; a fetch counted from the player's own deposits; an errand met by
+speaking, the grudge dropped both ways; the lapse; the voice's facts.
+resident_test's round trip is covered by the existing voice cases (the
+offers ride with the answer). Protocol changed (revision 15); new class_name
+Offers.
+
+Rejected: free-text commissions from the model (invented); offers from
+residents with no body (the panel is for one you stand before); more than
+three (the panel stays small and the card true); a quest log of its own
+(the commission lives on the card and the player's record, and shows in
+the panel and the party log); crediting a rescue or a camp to a player
+who was elsewhere.

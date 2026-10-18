@@ -20,5 +20,6 @@
 		"summer": {"morning": -0.5, "evening": 1.0}
 	},
 	"temple": {"every_days": 7, "from": 9, "to": 10},
-	"gossip": {"_": "Decision 422: every 'every' steps, in each town, residents standing at one of 'places' (never at work or home) pass one thing between two of them: a belief, or something the teller saw. No model call.", "every": 1200, "places": ["well", "inn", "square", "temple"]}
+	"gossip": {"_": "Decision 422: every 'every' steps, in each town, residents standing at one of 'places' (never at work or home) pass one thing between two of them: a belief, or something the teller saw. No model call.", "every": 1200, "places": ["well", "inn", "square", "temple"]},
+	"offers": {"_": "Decision 435: what a resident offers when spoken to: at most max fresh offers, per_player open commissions at once, a commission lapses after days, a fetch commission asks for fetch of the thing the town is short of.", "max": 3, "per_player": 3, "days": 7, "fetch": 6}
 }

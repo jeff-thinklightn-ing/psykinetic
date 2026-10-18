@@ -1840,6 +1840,8 @@ func _boot() -> void:
 	World.economy = Economy.new(snapshot.get("economy", {}), World.stockpile, World.production, World.steps_now)
 	# Residents' cards grow from the town's events (decision 398).
 	Townsfolk.watch(World.production, World.towns)
+	Offers.ctx = _offers_context()  # What the town's people can offer (decision 435).
+	Offers.watch(World.towns, World.holdings, World.stockpile)
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
@@ -3364,13 +3366,123 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 
 ## Server: [param body] is asked [param line] by [param speaker]: an ask
 ## waits for the resident mind, replacing one of theirs still waiting.
-func _ask_resident(body: Resident, speaker: String, line: String) -> void:
+func _ask_resident(body: Resident, speaker: String, line: String, player: Player = null) -> void:
 	_write_resident_card(body)
 	_resident_serial += 1
 	var id := body.get_instance_id()
+	var player_id := player.player_id if player != null else ""
+	if not player_id.is_empty():
+		Offers.spoke_to(player_id, body.worker_id)  # An errand to them is done by speaking (decision 435).
+	body.asked_by = player_id
+	body.asked_by_name = speaker
 	_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
-	_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick})
+	_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick,
+		"player": player_id, "peer": player.owner_peer if player != null else -1})
+	body.asked_by = ""
+	body.asked_by_name = ""
 	Transcript.record(body.person, speaker, line)
+
+
+## Server: [param player_id]'s client (peer [param peer]) is sent what
+## [param body] offers them now ("offers" {entity, speaker, offers}; decision
+## 435): with each answer, when the panel opens, after an accept.
+func _send_offers(body: Resident, player_id: String, peer: int) -> void:
+	if body == null or not is_instance_valid(body) or player_id.is_empty() or peer < 0 or not body.player_id.is_empty():
+		return
+	Net.message_to(peer, "offers", {"entity": String(body.get_path()), "speaker": body.person,
+		"offers": Offers.of(body.worker_id, player_id)})
+
+
+## Server: [param player] accepts offer [param offer_id] (of the resident
+## whose id it opens with), with [param gold] for a loan: a shop line is
+## sold at the town's counter when they stand at one, a commission or an
+## errand goes on the resident's card and their record, a loan is paid
+## down (economy); the party log says, and their offers are sent again.
+func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
+	var worker_id := offer_id.get_slice(Offers.SEP, 0)
+	var body: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and (entity as Resident).worker_id == worker_id:
+			body = entity
+	if body == null or World.distance(body.tile, player.tile) > HEARING_RANGE:
+		return
+	var result := Offers.accept(worker_id, player.player_id, _display_name(player), offer_id, gold)
+	if int(result.get("buy", 0)) > 0:
+		var counter := _counter_near(player, str(World.production.worker(worker_id).get("town", "")))
+		if counter == null:
+			party_log.add("%s must stand at the town's counter to buy." % _display_name(player))
+		else:
+			World.try_buy(player, counter, int(result["buy"]))  # Answered by traded.
+	elif not str(result.get("line", "")).is_empty():
+		party_log.add(str(result["line"]))
+	_send_offers(body, player.player_id, player.owner_peer)
+
+
+## The shop counter of [param town] that [param player] reaches, if any.
+func _counter_near(player: Player, town: String) -> GridEntity:
+	for entity: GridEntity in World._entities:
+		if entity is Chest and (entity as Chest).shop and entity.spawned and World.shop_place(entity) == town and World.reaches(player, entity):
+			return entity
+	return null
+
+
+## The zone [param player_id] is in: their body's (in this zone), else their
+## record's last.
+func _zone_of_player(player_id: String) -> String:
+	for entity: GridEntity in World.sought():
+		if entity is Player and (entity as Player).player_id == player_id and entity.spawned:
+			return entity.zone
+	var record: PlayerRecord = _records.get(player_id)
+	return record.zone if record != null else ""
+
+
+## What Offers reads of the world (decision 435): World's records and the
+## callables it needs, economy's where economy has them (pay_loan,
+## pay_commission), so a server without them offers no loan help and pays
+## no commission yet.
+func _offers_context() -> Dictionary:
+	var pay: Dictionary = Production.read_rules().get("commissions", {})
+	return {
+		"production": World.production,
+		"goods": Callable(World.economy, "goods") if World.economy != null else Callable(),
+		"catalog": Callable(Production, "items_catalog"),
+		"captives": Callable(World.towns, "captives") if World.towns != null else Callable(),
+		"camps": (func() -> Array: return World.holdings.camps()) if World.holdings != null else Callable(),
+		"hostile": func(faction: String, town: String) -> bool:
+			return World.holdings != null and World.holdings.factions.hostile(faction, World.holdings.holder(town)),
+		"short": func(town: String) -> Array:
+			var short: Array = World.production.signals_of(town, Production.items_catalog()).get("short", {}).keys() if World.production != null else []
+			short.sort()
+			return short,
+		"area_name": func(area: String) -> String: return str(_world_map.areas.get(area, {}).get("display_name", area)) if _world_map != null else area,
+		"pay_loan": Callable(World.economy, "pay_loan") if World.economy != null and World.economy.has_method("pay_loan") else Callable(),
+		"pay_commission": Callable(World.economy, "pay_commission") if World.economy != null and World.economy.has_method("pay_commission") else Callable(),
+		"pay": func() -> Dictionary: return pay,
+		"zone_of": _zone_of_player,
+		"name_of": func(player_id: String) -> String:
+			var record: PlayerRecord = _records.get(player_id)
+			return record.name if record != null else player_id,
+		"asked": _on_commission_asked,
+		"done": _on_commission_done,
+	}
+
+
+## Server: [param player_id] took on [param ask]: on their record too.
+func _on_commission_asked(player_id: String, ask: Dictionary) -> void:
+	var record: PlayerRecord = _records.get(player_id)
+	if record != null:
+		record.commissions.append(ask.duplicate(true))
+
+
+## Server: [param ask] is met or lapsed: off their record, the party log
+## told [param line]; economy paid them [param _paid] already.
+func _on_commission_done(player_id: String, ask: Dictionary, line: String, _paid: int) -> void:
+	var record: PlayerRecord = _records.get(player_id)
+	if record != null:
+		record.commissions = record.commissions.filter(func(each: Variant) -> bool:
+			return not each is Dictionary or str(each.get("id", "")) != str(ask.get("id", "")))
+	if not line.is_empty():
+		party_log.add(line)
 
 
 ## A town's resident spoken to for the first time: its card's paragraph is
@@ -3545,6 +3657,7 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 	party_log.add("%s said: \"%s\"" % [body.person, line])
 	_heard_near(body, body.person, line)
 	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line})
+	_send_offers(body, str(out.get("player", "")), int(out.get("peer", -1)))
 
 
 ## A body for [param each] (_sync_residents' entry: key, name, trade,
@@ -3958,6 +4071,13 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			"collect":
 				why = World.counter_collect(entity, counter, int(args.get("uid", 0)))
 		_send_counter(entity as Player, counter, why)
+	elif command_name == "offers" and entity is Player:
+		# The talk panel opens on a resident (decision 435): their offers.
+		var body := get_node_or_null(NodePath(str(args.get("entity", "")))) as Resident
+		if body != null and body.spawned and World.distance(body.tile, entity.tile) <= HEARING_RANGE:
+			_send_offers(body, (entity as Player).player_id, entity.owner_peer)
+	elif command_name == "offer" and entity is Player:
+		_accept_offer(entity as Player, str(args.get("id", "")), int(args.get("gold", 0)))
 	elif command_name == "reset" and entity is Player:
 		var who := _display_name(entity)  # The rebuild frees the entity.
 		if not Net.player_reset and entity.owner_peer != Net.local_id:
@@ -4266,7 +4386,7 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
 	if resident != null:
-		_ask_resident(resident, _display_name(player), line)
+		_ask_resident(resident, _display_name(player), line, player)
 		if hears:
 			pet.overheard(_display_name(player), line, false)
 	elif to != "":
