@@ -7,6 +7,19 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.150
+
+- This release changes what the server and client send each other, so update the
+  client to keep playing (the launcher's update does it). New in it: people made by
+  the character generator, so every townsperson looks different; a main menu, a
+  connect screen and one shared look for every panel, with tooltips on what you
+  carry; townsfolk with cards of their own, daily routines, gossip at the well, and
+  offers when you speak to them; the temple brings the fallen back and blesses
+  cursed things; arrow bundles swapped and mended, the shield bash and heavy
+  weapons' wind-up, with weapons that keep their kills and grudges;
+  pines along the border and the broadleaf tree; the rabbit; camps that fall when
+  cleared, with their captives rescued; hungry camps raiding for food; meat, hides
+  and leather; wells and roof repair; the Blood Rot and its orc and kobold allies.
 - Talk to the town's people face to face: press E on someone (or just speak near them) and a panel at the left shows who you are talking to, what you have said to each other, and what they offer, with a button to take them up on it (work, wares, a plea), and three quick asks (what they sell, any work, the news). The world stays in view; they keep answering in speech. The main menu's server line says "status unknown" when the server does not answer, which older servers never do.
 - Companions weigh what they hear as townsfolk do: how sharp or superstitious
   each is decides whether she believes a tale, she repeats it as "Jeff told
