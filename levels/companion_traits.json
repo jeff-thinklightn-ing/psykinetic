@@ -11,10 +11,13 @@
 		"quiet_seconds": 60
 	},
 	"legacy": {
-		"_note": "Companions from before the roll, kept (Jeff): a companion with one of these names keeps it, and her 'fixed' facts are seeds the roll keeps, the rest rolled round them; a new roll never gives the name. Keys of 'fixed' replace the rolled trait of that name; others ('who', 'aspiration', 'though': what stands against the aspiration) are added to what the card is written from. They rest in town between trips: when their player leaves the game they go to the town's stockpile and wait (decision 293).",
-		"Pip": {"fixed": {"pronoun": "he", "who": "a young man", "aspiration": "wants to become a squire", "though": "no one has been knighted in ages"}},
-		"Wren": {"fixed": {"pronoun": "she", "who": "a woman"}},
-		"Nix": {"fixed": {"pronoun": "she", "who": "a woman"}}
+		"_note": "Companions from before the roll, kept (Jeff): a companion with one of these names keeps it, and her 'fixed' facts are seeds the roll keeps, the rest rolled round them; a new roll never gives the name. Keys of 'fixed' replace the rolled trait of that name; others ('who', 'aspiration', 'though': what stands against the aspiration) are added to what the card is written from. 'look' is her fixed look (decision 293 amended, for 419). They rest in town between trips: when their player leaves the game they go to the town's stockpile and wait (decision 293).",
+		"Pip": {"fixed": {"pronoun": "he", "who": "a young man", "aspiration": "wants to become a squire", "though": "no one has been knighted in ages"},
+			"look": {"build": "lean", "stature": "middling", "age": "young", "posture": "straight", "shoulders": "narrow", "hair": "cropped", "hair_colour": "fair", "beard": "none"}},
+		"Wren": {"fixed": {"pronoun": "she", "who": "a woman"},
+			"look": {"build": "lean", "stature": "middling", "age": "grown", "posture": "straight", "shoulders": "narrow", "hair": "bound", "hair_colour": "chestnut", "beard": "none"}},
+		"Nix": {"fixed": {"pronoun": "she", "who": "a woman"},
+			"look": {"build": "middling", "stature": "short", "age": "grown", "posture": "straight", "shoulders": "middling", "hair": "cropped", "hair_colour": "black", "beard": "none"}}
 	},
 	"pronoun": ["she", "she", "he", "he", "they"],
 	"birthplace": ["a fishing village on a grey coast", "the hill farms", "a mining town in the north", "the lower streets of an old city", "a river barge that never stopped long", "a forest hamlet of charcoal burners", "a crossroads inn", "a walled market town"],

@@ -3120,6 +3120,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var pet := _spawn({
 		"script": COMPANION, "shape": "capsule", "name": String(record.companion["name"]), "tile": tile,
 		"tint": COMPANION_TINT, "label": String(record.companion["name"]),
+		"look": CompanionCard.look_of(record.companion.get("traits", {}), record.player_id),
 		"props": {"keeper_peer": player.owner_peer},
 	}) as Companion
 	if pet == null:
@@ -3671,9 +3672,12 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var area: Rect2i = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
 	var label := Resident.label_of(str(each["name"]), trade)
-	# Their look for the character generator (decision 419), from the card
-	# (made now if need be, 398).
-	var look := ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade)
+	# Their look for the character generator (decision 419): a companion
+	# resting in town as she looks out with her player (293 amended), the
+	# rest from their card (made now if need be, 398).
+	var record: PlayerRecord = _records.get(str(each.get("player", "")))
+	var look := CompanionCard.look_of(record.companion.get("traits", {}), record.player_id) \
+			if record != null and not record.companion.is_empty() else ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade)
 	var body := _spawn({"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(),
 		"label": label, "tile": at, "look": look}) as Resident
 	if body == null:
@@ -3682,7 +3686,6 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	body.player_id = each["player"]
 	body.person = str(each["name"])
 	body.town_name = str(_world_map.areas.get(World.zone.name, {}).get("display_name", World.zone.name))
-	var record: PlayerRecord = _records.get(each["player"])
 	body.card = str(record.companion.get("card", "")) if record != null else ""
 	body.town = town
 	body.trade = trade

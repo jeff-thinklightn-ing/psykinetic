@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Each companion now has a look of her own (build, height, age, hair, beard),
+  kept with who she is, for the new character bodies to draw; Wren, Nix and
+  Pip each have a fixed one.
 - Speak to one of the town's people and they have something for you: a thing
   of their own making at the counter, a job the town needs done (kin brought
   home from a raiders' camp, the camp cleared, wood fetched to the store, paid

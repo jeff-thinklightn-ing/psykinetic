@@ -4459,6 +4459,23 @@ rolled before this has one too and needs nothing saved. Wren and Nix are
 female and Pip male by their fixed pronouns. Her card's facts leave the
 body out (the pronoun says what the card needs).
 
+Amended (2026-10-17, release: no new number; for pc-character's decision
+419, the look string): her traits carry her look, "look": {build,
+stature, age, posture, shoulders, hair, hair_colour, beard}, each one of
+CompanionCard.LOOKS' values (419's keys, agreed with npc), rolled at the
+roll by a seed of its own so the traits' roll is as it was; a woman has
+no beard, and grey hair only when old. Wren, Nix and Pip have fixed
+looks (companion_traits.json's legacy "look"; lore says little of how
+they look, so the companions tree chose them: Pip young, lean and
+narrow-shouldered, fair hair cropped, no beard). CompanionCard.look_of
+says it as the view reads it, "seed=N body=female build=lean ...", her
+seed (her card's) and body first; a card rolled before this has seed and
+body alone (a legacy one her fixed look), the rest the seed's, and
+nothing is saved. Main puts it in her spawn spec ("look") following her
+player and resting in town as a Resident body, so she looks the same in
+both; headwear, apron and skin are left to the seed. Her card's facts
+leave it out. companion_test covers it.
+
 ## 295. Raids on a town: one entry point, food and people only, damage repaired, captives kept until rescued
 
 Economy step 6 (sim/towns.gd). A raid is a real group of raiders: maps

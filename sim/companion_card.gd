@@ -73,7 +73,69 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 			for key: String in fixed:
 				traits[key] = str(fixed[key])
 	traits["body"] = String(body_of(traits, player_id))
+	traits["look"] = roll_look(player_id, traits)
 	return traits
+
+
+## How she looks (pc-character's look keys, agreed with npc): each key's
+## values, her look rolled from them with her traits; what is not here
+## (headwear, apron, skin) the view takes from her seed.
+const LOOKS := {
+	"build": ["lean", "middling", "heavy"],
+	"stature": ["short", "middling", "tall"],
+	"age": ["young", "grown", "old"],
+	"posture": ["straight", "stooped", "slouching"],
+	"shoulders": ["narrow", "middling", "broad"],
+	"hair": ["cropped", "bound", "long", "bald"],
+	"hair_colour": ["black", "dark", "brown", "chestnut", "fair", "blond", "red", "grey"],
+	"beard": ["none", "short", "full"],
+}
+
+
+## Her look, rolled for the companion of [param player_id] by a seed of its
+## own (the traits' roll is as it was): {build, stature, ...}; a female
+## body has no beard, and grey hair only when old. One from before (the
+## table's legacy) has her fixed look ("look" in her entry).
+static func roll_look(player_id: String, traits: Dictionary) -> Dictionary:
+	var fixed := legacy_look(str(traits.get("name", "")))
+	if not fixed.is_empty():
+		return fixed
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("look:" + player_id)
+	var look := {}
+	for key: String in LOOKS:
+		var options: Array = LOOKS[key]
+		look[key] = options[rng.randi_range(0, options.size() - 1)]
+	if str(traits.get("body", "")) == "female":
+		look["beard"] = "none"
+	if look["hair_colour"] == "grey" and look["age"] != "old":
+		look["hair_colour"] = "dark"
+	return look
+
+
+## The fixed look of one from before named [param name] (her legacy
+## entry's "look"), {} for none.
+static func legacy_look(name: String) -> Dictionary:
+	if not is_legacy(name):
+		return {}
+	var fixed: Variant = tables()["legacy"][name].get("look", {})
+	return fixed.duplicate() if fixed is Dictionary else {}
+
+
+## Her look as the view reads it (spec["look"], pc-character's PersonLook):
+## "seed=48213 body=female build=lean ...", her seed (her card's, of
+## [param seed], her player's id) and body first, then her look's keys
+## (her traits' "look", else a legacy one's fixed look); a card from before
+## the look has seed and body alone, the rest the seed's.
+static func look_of(traits: Dictionary, seed: String) -> String:
+	var parts: Array[String] = ["seed=%d" % absi(hash("companion:" + seed)), "body=%s" % body_of(traits, seed)]
+	var look: Variant = traits.get("look", {})
+	if not look is Dictionary or look.is_empty():
+		look = legacy_look(str(traits.get("name", "")))
+	for key: String in LOOKS:
+		if look.has(key) and str(look[key]) in LOOKS[key]:
+			parts.append("%s=%s" % [key, look[key]])
+	return " ".join(parts)
 
 
 ## Her body, &"male" or &"female" (decision 293 amended, for pc-character's
@@ -130,7 +192,7 @@ static func facts(traits: Dictionary, player: String) -> String:
 	var lines: Array[String] = ["Name: %s" % traits.get("name", "")]
 	# Fixed facts beyond the table's own (who she is, what she wants).
 	for key: String in traits:
-		if key not in KEYS and key not in ["name", "trade", "body"]:
+		if key not in KEYS and key not in ["name", "trade", "body", "look"]:
 			lines.append("%s: %s" % [key.capitalize(), traits[key]])
 	for key in KEYS:
 		if key == "how_we_met":

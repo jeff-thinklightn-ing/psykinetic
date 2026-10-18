@@ -1037,6 +1037,21 @@ func _test_card() -> void:
 		theys[CompanionCard.body_of({"pronoun": "they"}, "seed-%d" % i)] = true
 	_check(theys.size() == 2 and str(traits.get("body", "")) in ["male", "female"] and _companion().body == CompanionCard.body_of(_companion().traits, _companion().keeper_id),
 		"one who is \"they\" may be either; the roll keeps it; her body is her card's")
+	# Her look (293 amended, for pc-character's 419): rolled with her, said as the view reads it.
+	var look: Dictionary = traits.get("look", {})
+	_check(look.size() == CompanionCard.LOOKS.size() and look.keys().all(func(key: String) -> bool: return str(look[key]) in CompanionCard.LOOKS[key])
+		and look == CompanionCard.roll(Net.player_id)["look"], "her look is rolled with her, every key one of its values, the same every time (%s)" % [look])
+	var women := range(40).map(func(i: int) -> Dictionary: return CompanionCard.roll("look-%d" % i)).filter(
+		func(rolled: Dictionary) -> bool: return rolled["body"] == "female")
+	_check(not women.is_empty() and women.all(func(rolled: Dictionary) -> bool: return rolled["look"]["beard"] == "none"), "a woman has no beard")
+	var said := CompanionCard.look_of(traits, Net.player_id)
+	_check(said.begins_with("seed=%d body=%s build=" % [absi(hash("companion:" + Net.player_id)), traits["body"]]) and said.split(" ").size() == 2 + CompanionCard.LOOKS.size(),
+		"as the view reads it: seed, body, then each key (%s)" % said)
+	_check(CompanionCard.look_of({"name": "Ysolt", "pronoun": "she"}, "old") == "seed=%d body=female" % absi(hash("companion:old")),
+		"a card from before the look: seed and body alone, nothing else changed")
+	_check(CompanionCard.look_of({"name": "Pip", "pronoun": "he"}, "old").ends_with("age=young posture=straight shoulders=narrow hair=cropped hair_colour=fair beard=none")
+		and CompanionCard.roll("p1", "Wren")["look"]["hair_colour"] == "chestnut", "Pip and Wren have their fixed looks, a card from before too")
+	_check(str(pet.spawn_spec.get("look", "")) == CompanionCard.look_of(record.companion["traits"], Net.player_id), "and her spawn carries it: %s" % pet.spawn_spec.get("look", ""))
 	var never: Array[String] = []
 	for i in 200:
 		var rolled: String = CompanionCard.roll("player %d" % i)["name"]
