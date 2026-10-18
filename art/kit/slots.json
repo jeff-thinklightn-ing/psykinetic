@@ -26,7 +26,23 @@
 		"item.meat": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.meat/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c3, scaled up to 0.2): its 500 mesh, held at its middle, flesh in fat and red, the bone end pale; 491 tris"}},
 		"item.hide": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.hide/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; redone as a flat folded pelt, c6 clean, scaled up across not in height to 0.5 x 0.06 x 0.4): its 500 mesh's crumbs dropped, 222 tris, fur on row 5's browns, the flesh side pale"}},
 		"item.antlers": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.antlers/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3 fits as is): its 500 mesh squeezed to 0.15 deep, held at its middle, bone and horn on row 5 and 7; 476 tris"}},
-		"item.tusks": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.tusks/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c1, laid flat and scaled to 0.18 x 0.06 x 0.06): its 500 mesh, ivory; 470 tris"}}
+		"item.tusks": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.tusks/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c1, laid flat and scaled to 0.18 x 0.06 x 0.06): its 500 mesh, ivory; 470 tris"}},
+		"item.sword": {"size": [0.2, 0.9, 0.04], "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.sword/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh; the box widened from 0.08 to 0.2 across for its crossguard (0.29 in the concept), so the blade isn't squeezed to a needle"}},
+		"item.dagger": {"size": [0.08, 0.3, 0.03], "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.dagger/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 500 mesh; the box widened from 0.03 to 0.08 for its guard"}},
+		"item.knife": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.knife/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh"}},
+		"item.spear": {"size": [0.12, 2.0, 0.05], "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.spear/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 500 mesh, its crumbly shaft's crumbs dropped; the box widened from 0.05 to 0.12 for its head"}},
+		"item.hammer": {"size": [0.22, 0.7, 0.14], "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.hammer/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh; the box widened from 0.14 x 0.07 to 0.22 x 0.14 for its head"}},
+		"item.giant_axe": {"size": [0.6, 1.4, 0.1], "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.giant_axe/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 500 mesh; the box widened from 0.4 to 0.6 for its blade (0.82 in the concept)"}},
+		"item.shield": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.shield/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh flattened to 0.06 deep, its boss kept, face (the boss) toward +z"}},
+		"item.ration": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.ration/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh"}},
+		"item.bandaging_kit": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.bandaging_kit/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh"}},
+		"item.food_sack": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.food_sack/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh"}},
+		"item.ore_sack": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.ore_sack/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh"}},
+		"item.wood_bundle": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.wood_bundle/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 500 mesh squeezed x/z to 0.3"}},
+		"item.cloth_bolt": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.cloth_bolt/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh"}},
+		"item.coin_purse": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.coin_purse/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh"}},
+		"item.nails": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.nails/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 500 mesh"}},
+		"item.axe_head": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.axe_head/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c5's 500 mesh"}}
 	},
 	"credits": [
 		{"title": "Ultimate Animated Animal Pack (the Pig's rig and clips)", "by": "Quaternius", "license": "CC0 1.0",
@@ -69,6 +85,7 @@
 			"kind": "edge",
 			"size": [0.5, 3, 1],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 300 mesh, a 1 m cut from its long slab, depth 1.35 to 0.5, 113 tris (in place of the Kenney fill)"},
 			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.castle.profile along runs",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]},
 			"fill": {"from": "kenney-castle", "piece": "wall-narrow", "offset": [0.25, 0, 0], "scale": [1, 2.290076, 1]}
@@ -108,6 +125,7 @@
 			"kind": "vertex",
 			"size": [0.6, 1.1, 0.6],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.end_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 200 mesh scaled to 0.6, 198 tris"},
 			"uses": "a run's free end low (1 m), capping the wall.castle.profile section, a little proud of it"
 		},
 		"wall.castle.end_tall": {
@@ -134,6 +152,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
 			"uses": "an L joint low (1 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.castle.corner_tall": {
@@ -160,6 +179,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
 			"uses": "a T joint low (1 m), a run along z met by one along +x"
 		},
 		"wall.castle.t_tall": {
@@ -186,6 +206,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
 			"uses": "a + joint low (1 m), runs along z and x crossing"
 		},
 		"wall.castle.cross_tall": {
@@ -213,6 +234,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
 			"uses": "a free-standing pillar low (1 m) at a cell corner"
 		},
 		"wall.castle.post_tall": {
@@ -588,6 +610,7 @@
 			"kind": "vertex",
 			"size": [0.6, 1.1, 0.6],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.end_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 200 mesh scaled to 0.6, 146 tris"},
 			"uses": "a run's free end low (1 m), capping the wall.stone.profile section, a little proud of it; ledges and rails"
 		},
 		"wall.stone.post_low": {
@@ -596,6 +619,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 200 mesh scaled to 0.5, 182 tris"},
 			"uses": "a free-standing pillar low (1 m) at a cell corner; ledges and rails"
 		},
 		"wall.stone.window": {
@@ -676,6 +700,7 @@
 			"kind": "vertex",
 			"size": [0.9, 3.1, 0.9],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.cave.end/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 300 mesh slimmed to 0.9, 280 tris"},
 			"uses": "the rounded butt of rock where a cave wall stops"
 		},
 		"wall.cave.pillar": {
@@ -693,6 +718,7 @@
 			"kind": "edge",
 			"size": [1.0, 1.2, 1.0],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.cave.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh squeezed to 1.0, 373 tris"},
 			"uses": "a rockfall across a whole 1 m edge, reading as blocked"
 		},
 		"wall.castle.tower": {
@@ -814,6 +840,7 @@
 			"kind": "cell",
 			"size": [1.03, 0.5, 1.1],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/rock.small/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c7's 200 mesh, grey, moss on its top, 190 tris (in place of the Kenney fill)"},
 			"uses": "rocks among the forest round an outdoor map (Client3D._add_forest), turned per cell",
 			"scatter": {"scale": [0.8, 1.2], "yaw": "free", "tilt_max": 10, "sink": 0.05, "footprint_r": 0.55, "blocks": false},
 			"fill": {"from": "kenney-castle", "piece": "rocks-small"}
@@ -877,6 +904,7 @@
 			"kind": "cell",
 			"size": [0.9, 0.6, 0.6],
 			"budget": 500,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.chest/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c10's 500 mesh stretched to 0.9 across, the lid above 0.4 m cut out as its part hinged at the back (0, 0.4, -0.3), 419 tris"},
 			"uses": "a chest holding loot, its lid hinged at the back and lifted when opened (the chest entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)",
 			"parts": [
 				{"name": "lid", "motion": "hinge", "axis": "x", "pivot": [0, 0.4, -0.3], "range": [0, -100], "size": [0.9, 0.2, 0.6]}
@@ -1424,6 +1452,7 @@
 			"kind": "cell",
 			"size": [1, 0.6, 2],
 			"budget": 500,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bed/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh stretched along z to 2.0, 450 tris"},
 			"uses": "a bed, its head toward -z"
 		},
 		"prop.sack": {
@@ -1441,6 +1470,7 @@
 			"kind": "cell",
 			"size": [0.6, 0.9, 1.4],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.grave/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh squeezed to 0.6 x 0.9 x 1.4, 398 tris"},
 			"uses": "a grave: a headstone at -z and its mound"
 		},
 		"prop.anvil": {
@@ -1567,6 +1597,7 @@
 			"kind": "cell",
 			"size": [0.6, 3, 0.15],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.ladder/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c7's 200 mesh, meshed leaning, stood upright (turned 27 degrees) and fitted 0.6 x 3 x 0.15, 198 tris"},
 			"uses": "a ladder up one wall's height, leaning on a wall toward -z"
 		},
 		"creature.deer": {

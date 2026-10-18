@@ -735,7 +735,10 @@ func _test_cave_walls() -> void:
 	var lumps := _rig._posts.values().filter(func(post: Node3D) -> bool:
 		var body := post.get_node_or_null("Body") as MeshInstance3D
 		return body != null and body.mesh is ArrayMesh)
-	_check(_rig._posts.size() > 0 and lumps.size() == _rig._posts.size(), "its posts lumps of the same rock while wall.cave.end has no art (%d of %d)" % [lumps.size(), _rig._posts.size()])
+	if ArtKit.filled_by("wall.cave.end") == "own":
+		_check(_rig._posts.size() > 0 and lumps.is_empty(), "its posts drawn from wall.cave.end's art, no lumps (%d of %d)" % [lumps.size(), _rig._posts.size()])
+	else:
+		_check(_rig._posts.size() > 0 and lumps.size() == _rig._posts.size(), "its posts lumps of the same rock while wall.cave.end has no art (%d of %d)" % [lumps.size(), _rig._posts.size()])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

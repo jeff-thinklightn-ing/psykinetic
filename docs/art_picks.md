@@ -9,6 +9,16 @@ through the coordinator as a redo.
 
 | Date | Slot | Pick | Note |
 |---|---|---|---|
+| 2026-10-18 | item.sword, dagger, knife, spear, hammer, giant_axe | c3, c2, c1, c4, c3, c4, applied | boxes widened for the guards and heads (sword 0.2, dagger 0.08, spear 0.12, hammer 0.22 x 0.14, axe 0.6 across) so blades aren't squeezed to needles; origin a little up the handle; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | item.shield | c1, applied | flattened to 0.06, boss toward +z; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | item.ration, bandaging_kit, food_sack, ore_sack, wood_bundle, cloth_bolt, coin_purse, nails, axe_head | c3, c3, c3, c1, c4, c3, c1, c4, c5, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | prop.chest, ladder, bed, grave | c10, c7, c1, c1, applied | the chest's lid its part; the ladder stood upright; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.castle.straight | c2, applied | 1 m cut, in place of the Kenney fill; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.castle post/corner/t/cross_low, end_low | corner_low c1, end_low c2, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.stone.end_low, post_low | c3, c3, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | wall.cave.end, wall.cave.rubble | c3, c2, applied | art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | rock.small | c7, applied | in place of the Kenney fill; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
+| 2026-10-18 | door.single | art-kit's hand door kept | art-gen's c12 is a whole stone doorway 2 m wide with no separate leaf; the plank door by hand (2026-10-17) stays until a candidate fits |
 | 2026-10-18 | ground.dirt, ground.sand | p1, p1, applied | procedural and seamless; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
 | 2026-10-18 | floor.wood, floor.stone, floor.castle, floor.cave | c2, c10, c2, c9, applied | made seamless by art-gen (floor.wood's seam breaks its cross-board rows; a procedural plank rebuild if vetoed); art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |
 | 2026-10-18 | material.wall.wood, stone, castle, cave; material.rock | c5, c3, c6, c9; c6, applied | made seamless by art-gen; art-gen's best (no sheet pick; Jeff: "go ahead and apply the candidates and ill veto in game") |

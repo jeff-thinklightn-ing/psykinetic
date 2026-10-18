@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+- Weapons, the shield, rations, bandages, sacks, bundles, cloth, purses, nails
+  and axe heads have their own art, and so do chests, ladders, beds, graves,
+  small rocks, cave walls and the castle's plain and low walls (nothing is
+  drawn from the Castle Kit any more).
 - The ground, floors and walls have their own textures (dirt, sand, plank,
   flagstone, cobble and cave floors, timber, stone, castle and cave walls,
   cliffs), and bushes, rocks, tufts, roots, the well, roof ridges, timber

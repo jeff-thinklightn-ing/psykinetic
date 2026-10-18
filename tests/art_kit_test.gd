@@ -444,10 +444,13 @@ func _test_credits() -> void:
 	_check(entries.all(func(entry: Dictionary) -> bool:
 			return str(entry["title"]) != "" and str(entry["by"]) != "" and str(entry["license"]) != "" and str(entry["url"]).begins_with("https://")),
 			"every entry has a title, maker, licence and page: %s" % [titles])
-	_check("Castle Kit 2.0 by Kenney" in titles, "Kenney's castle kit, while slots are filled from it")
+	# Kenney's kit is credited exactly while some slot is still drawn from it.
+	var kenney := (ArtKit.manifest()["slots"] as Dictionary).keys().any(func(slot: String) -> bool:
+			return ArtKit.filled_by(slot) == "fill" and str(ArtKit.spec(slot)["fill"].get("from", "")) == "kenney-castle")
+	_check(("Castle Kit 2.0 by Kenney" in titles) == kenney, "Kenney's castle kit, while slots are filled from it (%s)" % kenney)
 	_check(titles.any(func(title: String) -> bool: return "Pig" in title and title.ends_with("by Quaternius")),
 			"the Pig's rig and clips, in creature.boar's own art")
-	_check(given["summary"] == "Art: Kenney, Quaternius", "the summary names the makers once: %s" % given["summary"])
+	_check(given["summary"] == ("Art: Kenney, Quaternius" if kenney else "Art: Quaternius"), "the summary names the makers once: %s" % given["summary"])
 	_check(not titles.any(func(title: String) -> bool: return "art-gen" in title or "art-kit" in title), "our own and generated art: no line")
 
 
