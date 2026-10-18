@@ -1125,6 +1125,7 @@ func _test_bane() -> void:
 		strike.call(imp)
 	_check(World.items.bane_of(dagger) == "imp" and World.holder_bane(host, "imp") and not World.holder_bane(host, "wolf")
 			and grew == [["bane", "imp"]], "three imps felled (3 here, 25 in play): the dagger is their bane (%s)" % [grew])
+	_check(not World.holder_bane(host, "") and not World.holder_grudge(host, ""), "no kind: nobody's bane or grudge (enemy-ai's find)")
 	_check(World.item_note(dagger) == "dagger, imp-bane", "its note says so (%s)" % World.item_note(dagger))
 	# A grudge: its holder falls to a wolf.
 	var wolf: GridEntity = foe_of.call("wolf")

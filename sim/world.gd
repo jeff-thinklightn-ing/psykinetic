@@ -2055,6 +2055,8 @@ func _felled_with(entity: GridEntity, slot: int, victim: GridEntity) -> void:
 ## (decision 417): that kind dreads its bearer and notices it further
 ## (Items.growth's bane_notice); enemy-ai reads it, as holder_dread.
 func holder_bane(entity: GridEntity, kind: String) -> bool:
+	if kind.is_empty():
+		return false  # No kind (a monster without one): nothing is its bane or grudge.
 	return _in_hands_any(entity, func(uid: int) -> bool: return items.bane_of(uid) == kind)
 
 
@@ -2062,6 +2064,8 @@ func holder_bane(entity: GridEntity, kind: String) -> bool:
 ## [param kind] (decision 417): that kind seeks its bearer first (enemy-ai
 ## reads it), and its blows stagger them.
 func holder_grudge(entity: GridEntity, kind: String) -> bool:
+	if kind.is_empty():
+		return false  # No kind (a monster without one): nothing is its bane or grudge.
 	return _in_hands_any(entity, func(uid: int) -> bool: return str(items.grudge_of(uid).get("kind", "")) == kind)
 
 
