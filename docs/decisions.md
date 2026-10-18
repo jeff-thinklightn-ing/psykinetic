@@ -13506,3 +13506,75 @@ that is kept, never used up).
 - slots_items.json and the art status regenerated.
 npc's sickness itself follows under this number. Protocol unchanged; no
 new class_name.
+## 498. Gathered, hauled and paid for: the store buys, makers pay for materials
+
+Jeff (2026-10-18, word for word): "gold economy - makers have more expense
+- raw material and apprentices - trade with other town", and "everything
+has to be gathered and someone paid to do it, wood cutter, hauler, hunter
+etc". Phase 1 of three (trade routes and luxury goods follow); the
+coordinator's approval with two guards. Numbers are economy.json's,
+Jeff's to move.
+- Pay on delivery: whatever a resident brings into the town's store (the
+  hunter's meat and hide, the farmer's harvest and roots, the woodcutter's
+  wood, a maker's raw like the tanner's leather) goes through
+  Production.deliver_to, which Main and the balance tool point at
+  Economy.deliver: banked, and bought at raw_price x store.buy (1.0), the
+  same table the shop's prices read, from the treasury above gold_floor.
+- Hauling is paid per load: the town's hauler who carried longest ago
+  (in town, not away) carries it, haul.fee (1) for every haul.load (5),
+  out of the gatherer's price. With no hauler the gatherer keeps it all.
+  Haulers lose their time wage (official.hauler): pay is for work done.
+- What the treasury can't pay now is owed to the worker (Production
+  "owed", saved), paid first as gold comes in (Economy._pay_owed on its
+  tick). Guard 1: once the town owes a worker store.owed_cap (30) the
+  store buys no more from them ("the town can't pay Bran for more wood",
+  once, in the ledger), so a stalled treasury shows instead of piling up
+  debt. A maker's raw it won't take stays theirs, on their shelf.
+- Makers pay for materials: a make or rework job's resources are bought
+  from the store when it starts (Production.buy_materials ->
+  Economy.buy_materials) at raw_price x store.sell (1.1). Guard 2: never
+  under the last unit price the store paid for that resource (x sell), so
+  a maker never buys for less than the gatherer and hauler were paid.
+  Paid from the purse or a loan (the bank as for anything); a maker who
+  can't pay waits ("its maker can't pay for the materials"). Town work
+  (builds, the town's mends) costs the town nothing, and so do the town's
+  meals (store.town_account: things tagged food, the cook's): a cook at
+  her loan cap still cooks, and a meal's sale sends its materials share
+  to the treasury as before.
+- Players bank goods for gold (Jeff, 2026-10-18: "players bank goods for
+  gold and if they want they spend gold later to help the town ...
+  players lose gold through spend"): raw goods a player (or their
+  companion) banks at a store are bought at the same delivery price
+  (Economy.bank_sale, from World._bank_thing; a counter sale is paid at
+  the counter as before), the rest owed and paid as gold comes in
+  (Economy.owed_paid -> World.gold_changed). Past owed_cap the goods are
+  the town's as a gift, said in the ledger. Player gold is never lost to
+  death or theft, only to spending.
+- A sale's tax by class of goods. Jeff (2026-10-18): "taxes can be most
+  higher on luxury goods which the rich prefer then wages are paid by
+  town". economy.json tax_class {staple 0.1, made 0.2, luxury 0.5}
+  (Economy.goods_class: a thing tagged luxury, then food and raws as
+  staples, the rest made) in place of tax.sale; the luxuries themselves
+  are phase 3's. From the treasury it fills, the town pays its wages:
+  the officials and what it owes gatherers and haulers.
+- A shop sale no longer sends the made thing's materials value to the
+  treasury once makers buy their materials (it would charge them twice):
+  that share is the maker's.
+Apprentices come as 498 amended. Unset hooks (tests, tools) bank free, as
+before. Protocol unchanged. larder_test.
+
+Measured with npc's soak (496), 30 days, 3 players, the woodcutter (497)
+on both sides of it: before (main), no building in the month; after, the
+tannery on day 2.3, the field and the woodshed on day 2.5, the inn on day
+26.2 and the field at level 2. The inn comes late because it waits on
+leather 5: the hunter brings home about 1.8 animals a day (the herds'
+take_share), each one hide, and the tanner works them into leather among
+his other work. That's a number, the hunt's rate against the tannery's,
+for Jeff to move if he wants the inn sooner. Officials unpaid: 464 times
+before, 249 after. Loans: 32 taken and 2 repaid before, 48 and 31 after,
+223 outstanding at the end against 137. The smith and the carpenter end
+with 170 of the town's gold. The treasury still sits at its floor: phase
+1 moves the same founding gold faster, and apprentices (the makers'
+second expense), players' contributions (499) and the luxury tax (phase
+3) are what bring it back.
+

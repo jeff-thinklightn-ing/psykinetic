@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_first_stores()
 	_test_thief_hooks()
 	_test_scoundrel_hooks()
+	_test_delivery()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -414,6 +415,83 @@ func _test_scoundrel_hooks() -> void:
 		work.tick()
 	_check(told.size() == 1 and told[0][0] == TOWN and told[0][1] == "s1" and stock.book.id_of(int(told[0][2])) == "ration"
 		and not told[0][3] and int(told[0][2]) in stock.all_items(), "made: the town, the maker and the ration's uid, before it is shelved (%s)" % [told])
+
+
+## Gathered, hauled and paid for (decision 498): a delivery bought at the
+## shop's raw price, a hauler's fee a load out of it, the rest owed when the
+## treasury is at its floor and paid as gold comes in, no more bought past
+## owed_cap; a maker paying for materials, never under what the store paid.
+func _test_delivery() -> void:
+	print("
+== gathered, hauled and paid for ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.deliver = economy.deliver
+	work.buy_materials = economy.buy_materials
+	var floor_gold := int(_rules["gold_floor"])
+	work.add_worker("w1", "Bran", ["woodcutter"], TOWN, "test", "steady")
+	stock.deposit(TOWN, "gold", 100)
+	var unit := economy.raw_price(TOWN, "wood") * float(_rules["store"]["buy"])
+	_check(work.deliver_to(TOWN, "w1", "wood", 4, "w", "test") and stock.count(TOWN, "wood") == 4
+		and int(work.worker("w1")["purse"]) == roundi(unit * 4) and stock.count(TOWN, "gold") == 100 - roundi(unit * 4),
+		"4 wood delivered: banked, the woodcutter paid %d from the treasury" % int(work.worker("w1")["purse"]))
+	work.add_worker("h1", "Ash", ["hauler"], TOWN, "test", "steady")
+	var before := int(work.worker("w1")["purse"])
+	var price := roundi(economy.raw_price(TOWN, "wood") * float(_rules["store"]["buy"]) * 12)
+	var fee := ceili(12.0 / int(_rules["haul"]["load"])) * int(_rules["haul"]["fee"])
+	work.deliver_to(TOWN, "w1", "wood", 12, "w", "test")
+	_check(int(work.worker("h1")["purse"]) == fee and int(work.worker("w1")["purse"]) - before == price - fee,
+		"12 hauled in %d loads: the hauler %d, the woodcutter the rest (%d)" % [fee, fee, price - fee])
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold)
+	before = int(work.worker("w1")["purse"])
+	work.deliver_to(TOWN, "w1", "wood", 10, "w", "test")
+	var owed := int(work.worker("w1")["owed"])
+	_check(owed > 0 and int(work.worker("w1")["purse"]) == before and stock.count(TOWN, "gold") == floor_gold, "the treasury at its floor: owed %d" % owed)
+	stock.deposit(TOWN, "gold", 100)
+	economy._pay_owed("w1", TOWN)
+	_check(int(work.worker("w1")["owed"]) == 0 and int(work.worker("w1")["purse"]) == before + owed, "paid when gold comes in")
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold)
+	var wood := stock.count(TOWN, "wood")
+	while int(work.worker("w1")["owed"]) < int(_rules["store"]["owed_cap"]):
+		work.deliver_to(TOWN, "w1", "wood", 10, "w", "test")
+	wood = stock.count(TOWN, "wood")
+	_check(not work.deliver_to(TOWN, "w1", "wood", 10, "w", "test") and stock.count(TOWN, "wood") == wood
+		and stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return "can't pay Bran for more wood" in str(line.get("from", "")) + str(line.get("what", "")) + str(line)),
+		"owed its cap: the store takes no more, and says so")
+	work.add_worker("m1", "Odo", ["smith"], TOWN, "test", "steady")
+	work.pay("m1", 40)
+	var paid_unit := float(economy._paid[TOWN]["wood"])
+	var cost := ceili(maxf(float(economy.raw_price(TOWN, "wood")), paid_unit) * float(_rules["store"]["sell"]) * 3)
+	var treasury := stock.count(TOWN, "gold")
+	_check(economy.buy_materials(TOWN, "m1", {"wood": 3}) and int(work.worker("m1")["purse"]) == 40 - cost and stock.count(TOWN, "gold") == treasury + cost
+		and cost >= ceili(paid_unit * 3), "a maker pays %d for 3 wood, not under the %.1f a unit the store paid" % [cost, paid_unit])
+	work.add_worker("m2", "Pell", ["carpenter"], TOWN, "test", "steady")
+	work.set_loan("m2", float(_rules["bank"]["cap"]))
+	_check(not economy.buy_materials(TOWN, "m2", {"wood": 3}) and int(work.worker("m2")["purse"]) == 0, "one who can't pay or borrow: no materials")
+	work.add_worker("c1", "Mags", ["cook"], TOWN, "test", "steady")
+	work.set_loan("c1", float(_rules["bank"]["cap"]))
+	work.add_workshop("k1", "cook", TOWN)
+	work.assign("k1", "c1")
+	stock.deposit(TOWN, "food", 5)
+	work.order("k1", "ration")
+	var until := _now + 3 * World.WORLD_TICK_STEPS
+	while _now < until:
+		_now += World.WORLD_TICK_STEPS
+		work.tick()
+	_check(work.jobs().any(func(job_id: int) -> bool: return work.job(job_id)["workshop"] == "k1" and work.job(job_id)["state"] == "working")
+		and int(work.worker("c1")["purse"]) == 0, "a cook at her loan cap still cooks: the town's meals on its account")
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold - 2)
+	var sale := roundi(economy.raw_price(TOWN, "hide") * float(_rules["store"]["buy"]) * 5)
+	var now_paid := economy.bank_sale(TOWN, "p1", {"hide": 5})
+	_check(now_paid == mini(sale, 2) and economy.owed_to("p1", TOWN) == sale - now_paid, "a player banks 5 hides: %d paid now, %d owed" % [now_paid, economy.owed_to("p1", TOWN)])
+	var told := []
+	economy.owed_paid.connect(func(id: String, gold: int) -> void: told.append([id, gold]))
+	stock.deposit(TOWN, "gold", 100)
+	economy._pay_player("p1")
+	_check(economy.owed_to("p1", TOWN) == 0 and economy.gold("p1") == sale - now_paid and told == [["p1", sale - now_paid]], "the rest paid as gold comes in, and told")
 
 
 func _check(ok: bool, what: String) -> void:

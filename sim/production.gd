@@ -72,6 +72,14 @@ var returned := Callable()
 ## (decision 407; Main sets it: Herds.hunt_one near its store): the kind
 ## caught, or "" for no game.
 var hunt := Callable()
+## (town, worker_id, what, count, why) -> bool: a gatherer's delivery to
+## the town's store, bought and hauled (Economy.deliver, decision 498);
+## false when the store won't take it. Unset (tests), it is banked free.
+var deliver := Callable()
+## (town, worker_id, needs: {resource: count}) -> bool: a maker pays the
+## store for a job's materials (Economy.buy_materials, decision 498);
+## false when they can't. Unset, they are free.
+var buy_materials := Callable()
 ## (shop) -> float: how fast [param shop]'s work goes now, 1 normal (Towns
 ## sets it: a dry well halves the kitchen's, decision 426); unset, 1.
 var work_rate := Callable()
@@ -105,6 +113,8 @@ var _jobs: Dictionary[int, Dictionary] = {}
 ## Workshop id -> what it was last said to wait for (not saved): a wait
 ## is told when it starts or what it is short of changes, not each tick.
 var _waits_told: Dictionary = {}
+## Workshop id -> true while its worker can't pay for a job's materials.
+var _unpaid: Dictionary = {}
 var _next_job := 1
 ## Town -> {tier, pending, held, sales: [{step, what, count}], upkeep}.
 var _towns: Dictionary[String, Dictionary] = {}
@@ -173,7 +183,7 @@ func add_worker(id: String, worker_name: String, trades: Array, town: String, or
 	_workers[id] = {"id": id, "name": worker_name, "trades": list, "town": town, "origin": origin, "purse": 0,
 		"rent_due": now() + int(rules.get("rent_every", 6000)), "away": false,
 		"needs": {}, "fed": "", "hungry_since": 0, "last_trade": {}, "wage_due": 0, "hunt_due": 0,
-		"loan": 0.0, "working_off": false, "heard": [], "card": {}}
+		"loan": 0.0, "working_off": false, "heard": [], "card": {}, "owed": 0}
 	# Their mind (companions' Hearsay, decision 378): a hidden type (npc's
 	# roll), and the four rolled about their trade's and type's profile by
 	# the id, so the same every load; a companion's comes from her card.
@@ -254,6 +264,30 @@ func worker_ids(town := "") -> Array[String]:
 
 
 # --- Residents' own trade (decision 353; Economy.tick does the buying) ---------------
+
+## What the town owes worker [param worker_id] for deliveries it could not
+## pay for yet (decision 498).
+func set_owed(worker_id: String, gold: int) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["owed"] = maxi(gold, 0)
+
+
+## [param what] x [param count] brought into [param town]'s store by
+## worker [param worker_id] ([param by] in the ledger): through the deliver
+## hook when set (bought, hauled), else banked free. False when the store
+## would not take it.
+func deliver_to(town: String, worker_id: String, what: String, count: int, by: String, why: String) -> bool:
+	if count < 1:
+		return false
+	if deliver.is_valid() and not worker(worker_id).is_empty():
+		return bool(deliver.call(town, worker_id, what, count, why))
+	return stockpile.deposit(town, what, count, by, why, worker_id)
+
+
+## The worker at workshop [param workshop_id] ("" for none).
+func worker_at(workshop_id: String) -> String:
+	return str(_workshops.get(workshop_id, {}).get("worker", ""))
+
 
 ## Takes [param amount] gold from worker [param worker_id]'s purse: false
 ## (nothing taken) if it hasn't that much.
@@ -670,13 +704,16 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		made.emit(str(each["town"]), str(worker_record["id"]), uid)
 	each["uids"] = []
 	var yields := book().yields_of(uid) if uid != 0 else {}  # A short one's share (decision 493).
-	if not yields.is_empty():
+	var taken := not yields.is_empty()
+	if taken:
 		# A raw made from raws (the tanner's leather) is the town's stock, for
-		# its own work to use (the mend, the buckler: decision 405 amended).
+		# its own work to use (the mend, the buckler: decision 405 amended),
+		# bought from its maker (498); one the store won't take stays theirs.
 		for what: String in yields:
-			stockpile.deposit(each["town"], what, int(yields[what]), worker_record["name"], "made at %s" % each["workshop"])
-		book().end(uid, "banked", "%s by %s" % [each["town"], worker_record["name"]])
-	elif uid != 0:
+			taken = deliver_to(each["town"], str(worker_record["id"]), what, int(yields[what]), worker_record["name"], "made at %s" % each["workshop"]) and taken
+		if taken:
+			book().end(uid, "banked", "%s by %s" % [each["town"], worker_record["name"]])
+	if not taken and uid != 0:
 		stockpile.stock_shop(each["town"], uid, worker_record["name"], worker_record["id"])
 	# The wage, less its tax, which stays in the treasury.
 	var wage: int = taxed(int(rules.get("wage", 0)), "wage", rules)[1]
@@ -774,7 +811,7 @@ func _hunts(at: int) -> void:
 				continue
 			var yields := Items.yield_of(item)
 			for what: String in yields:
-				stockpile.deposit(town, what, int(yields[what]) * least, by, "%s's hunt" % worker_record["name"])
+				deliver_to(town, id, what, int(yields[what]) * least, by, "%s's hunt" % worker_record["name"])
 			if yields.is_empty():
 				for i in least:
 					stockpile.bank(town, book().mint(item, "hunted", worker_record["name"]), by, "%s's hunt" % worker_record["name"])
@@ -976,12 +1013,13 @@ func _choose(town: String, signals: Dictionary, cat: Dictionary) -> void:
 			_waits_told.erase(bid["workshop"])
 		else:
 			shop["waited"] = int(shop["waited"]) + 1
-			var short := _short_of(town, bid, cat)
+			var short := _short_of(town, bid, cat) if not _unpaid.has(bid["workshop"]) else ""
 			var told := "%s %s" % [bid["recipe"], short]
 			if _waits_told.get(bid["workshop"], "") != told:
 				_waits_told[bid["workshop"]] = told
 				print("[production] %s waits for %s: %s, step %d" % [bid["workshop"], bid["recipe"],
-					"short of %s" % short if not short.is_empty() else "its materials went to work that came first", now()])
+					"short of %s" % short if not short.is_empty() else "its maker can't pay for the materials" if _unpaid.has(bid["workshop"])
+					else "its materials went to work that came first", now()])
 
 
 ## The work [param shop] would take on, with its place in the queue
@@ -1156,6 +1194,19 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	var needs := _needs(made, rework != 0 and not mending)
 	if not _affords(town, made, rework != 0 and not mending):
 		return false
+	# The town's meals (store.town_account tags: a cook's food) are made on
+	# the town's account, like its own work: a cook at her loan cap still cooks.
+	var on_town: bool = cat.has(bid["recipe"]) and cat[bid["recipe"]].get("tags", []).any(func(tag: Variant) -> bool:
+		return str(tag) in rules.get("store", {}).get("town_account", []))
+	if buy_materials.is_valid() and bid["kind"] in ["make", "rework"] and not on_town:
+		var raws := {}
+		for what: String in needs:
+			if what in Stockpile.RESOURCES:
+				raws[what] = int(needs[what])
+		if not raws.is_empty() and not bool(buy_materials.call(town, str(shop["worker"]), raws)):
+			_unpaid[bid["workshop"]] = true
+			return false
+	_unpaid.erase(bid["workshop"])
 	var id: int = bid["job"] if int(bid["job"]) != 0 else _new_job(bid["kind"], bid["recipe"], shop)
 	var each: Dictionary = _jobs[id]
 	var reason := "job #%d" % id
@@ -1278,6 +1329,7 @@ func from_dict(saved: Dictionary) -> void:
 			_workers[id]["fed"] = str(entry.get("fed", ""))
 			_workers[id]["wage_due"] = maxi(int(entry.get("wage_due", 0)), 0)
 			_workers[id]["hunt_due"] = maxi(int(entry.get("hunt_due", 0)), 0)
+			_workers[id]["owed"] = maxi(int(entry.get("owed", 0)), 0)
 			_workers[id]["loan"] = maxf(float(entry.get("loan", 0.0)), 0.0)
 			_workers[id]["working_off"] = bool(entry.get("working_off", false)) and float(_workers[id]["loan"]) > 0.0
 			_workers[id]["hungry_since"] = maxi(int(entry.get("hungry_since", 0)), 0)

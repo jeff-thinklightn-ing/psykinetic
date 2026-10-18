@@ -2506,6 +2506,14 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 	if yields.is_empty():
 		stockpile.bank(place, uid, who, from, at_zone, tile, "banked", by_id)
 		return
+	# A player's raw goods (or their companion's) are a sale at the delivery
+	# price (decision 498; Jeff: "players bank goods for gold"). A counter
+	# sale has no by_id: it was paid there.
+	if economy != null and by_id.begins_with("player:"):
+		var player_id := by_id.trim_prefix("player:")
+		var paid := economy.bank_sale(place, player_id, yields)
+		if paid > 0:
+			add_gold(player_id, paid, "banked %s" % [yields])
 	for what: String in yields:
 		stockpile.deposit(place, what, int(yields[what]), who, from, by_id)
 	items.end(uid, "banked", "%s by %s" % [place, who], at_zone, tile)

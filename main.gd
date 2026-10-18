@@ -2141,6 +2141,7 @@ func _boot() -> void:
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
 		return World.towns.building(town, kind).get("state") == Towns.STANDING
 	World.economy.dole_changed.connect(_on_dole_changed)
+	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
 	# The fallen come back at a temple or a healer's hut (decision 396).
 	World.production.returned = _on_returned
 	if not World.production.work_done.is_connected(_on_counter_work_done):
@@ -2173,6 +2174,9 @@ func _boot() -> void:
 	_herds_kept = World.herds
 	World.keepers.append(World.herds)
 	# A town's hunter takes from its area's herds near its store (decision 407).
+	# Gathered and made raws bought by the store, materials by the makers (decision 498).
+	World.production.deliver = World.economy.deliver
+	World.production.buy_materials = World.economy.buy_materials
 	World.production.hunt = func(town: String) -> String:
 		var place := World.holdings.place(town)
 		var cell: Vector2i = place.get("cell", Vector2i.ZERO)

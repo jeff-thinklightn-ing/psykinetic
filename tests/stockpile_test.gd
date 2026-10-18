@@ -320,7 +320,8 @@ func _test_restart() -> void:
 	await _boot()
 	var kits: Array[int] = []
 	kits.assign(before[STORE]["items"])
-	_check(World.stockpile.resources(STORE) == {"gold": 10, "ore": 7, "wood": 0, "cloth": 0, "food": 0, "meat": 0, "hide": 0, "leather": 0}
+	# 5 of its 10 gold paid the player for the 5 ore they banked (decision 498).
+	_check(World.stockpile.resources(STORE) == {"gold": 5, "ore": 7, "wood": 0, "cloth": 0, "food": 0, "meat": 0, "hide": 0, "leather": 0}
 		and World.stockpile.items(STORE) == kits and World.stockpile.item_ids(STORE) == _strings([KIT, KIT]),
 		"after the restart: the same resources and the same two kits (%s)" % [World.stockpile.to_dict()])
 	_check(kits.all(func(uid: int) -> bool: return World.items.at_of(uid) == Stockpile.holder(STORE)),

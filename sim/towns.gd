@@ -880,14 +880,14 @@ func _crop(town: String) -> void:
 				crop_now["worked"] = int(crop_now["worked"]) + since
 				if int(crop_now["worked"]) >= int(rule.get("harvest_steps", 3000)):
 					var food := roundi(float(rule.get("harvest", 150)) * level * float(crop_now["growth"]))
-					production.stockpile.deposit(town, "food", food, "harvest", "the harvest")
+					production.deliver_to(town, production.worker_at("%s:field" % town), "food", food, "harvest", "the harvest")
 					crop_now["stage"] = "harvested"
 					crop_now["worked"] = 0
 					_note(town, "the harvest is in: %d food" % food)
 		"winter":
 			if not bool(crop_now["roots"]) and farming:
 				var roots := int(rule.get("roots", 20)) * level
-				production.stockpile.deposit(town, "food", roots, "roots", "roots dug in winter")
+				production.deliver_to(town, production.worker_at("%s:field" % town), "food", roots, "roots", "roots dug in winter")
 				crop_now["roots"] = true
 				_note(town, "roots dug: %d food" % roots)
 
@@ -976,8 +976,7 @@ func _woodcut(town: String) -> void:
 			continue
 		due[who] = now() + every
 		var wood := int(rule.get("wood", 2)) + int(rule.get("per_level", 1)) * levels
-		if wood > 0:
-			production.stockpile.deposit(town, "wood", wood, "woodcutter:%s" % who, "%s's cutting" % worker["name"])
+		production.deliver_to(town, who, "wood", wood, "woodcutter:%s" % who, "%s's cutting" % worker["name"])
 
 
 ## A town with a building waiting on wood and no woodcutter gets one, a
