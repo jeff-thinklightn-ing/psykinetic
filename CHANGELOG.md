@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The temple in the wilds has its counter now, at the back behind the doors: hand the priest a thing and an offering there, and come back to it for what waits.
 - The server now tells your game what you have seen of the world, who holds the places you know, and where the rest of the party is, for the world map. What you have seen is kept with your character on the server.
 - No more "fetch six wood" errands from the townsfolk: a shortage is something
   they talk about, and if you bank what the store was short of, the town pays

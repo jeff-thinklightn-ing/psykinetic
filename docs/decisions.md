@@ -9625,6 +9625,13 @@ would move every later slot on Jeff's saved town; a rule that a level's
 later additions take the next free slot comes first, as its own decision,
 then the wilds counter. view_test: the stamped temple has the one counter,
 at its back, a chest with props temple.
+Amended (the wilds counter): that rule came as decision 433 (a level
+entity known by its marker cell), and once v0.1.150 had it on the box and
+the box had saved with keys (its log: 51 level entities, 51 keyed), the
+wilds temple (at 216,195, facing south) gained its counter as the prefab
+has it: a chest marker at (217,195) in levels/wilds/layout.png and its
+level.json entry, facing [0, 1], props {"temple": true}, listed last; the
+temple's "use"/"town" unchanged. Approved by the coordinator.
 ## 428. Rescues: a fallen camp's people come home, and strangers bring their trades
 
 Economy's roadmap step 4 ("rescued people unlock their trade"), the

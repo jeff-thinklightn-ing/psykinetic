@@ -184,6 +184,19 @@
 			"props": {
 				"shop": true
 			}
+		},
+		{
+			"at": [
+				217.0,
+				195.0
+			],
+			"facing": [
+				0.0,
+				1.0
+			],
+			"props": {
+				"temple": true
+			}
 		}
 	],
 	"buildings": [
