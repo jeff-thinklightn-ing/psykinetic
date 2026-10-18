@@ -111,6 +111,13 @@ const OPEN_AIR: Array[String] = ["building.field"]
 const BUILDING_FACING := Vector2i(0, 1)
 ## The region of a level that names none (region_of).
 const DEFAULT_REGION := "town_lands"
+## A canopy (level.json "canopy", decision 466): each trunk (a void cell)
+## within CANOPY_REACH cells shades a cell by 1 - its distance over the
+## reach, the shares added and capped at 1; a listed clearing's cells are
+## open (0). The kinds a canopy is ("kind"): an evergreen one keeps its
+## needles, a broadleaf one thins in winter (environment's to draw).
+const CANOPY_REACH := 3.2
+const CANOPY_KINDS: Array[String] = ["evergreen", "broadleaf"]
 ## What a marker spawns, before level.json's props for that tile: each
 ## kind's body, from its row in levels/monsters.json (Monster.kinds), where
 ## its tactics, idling, doors and temperaments are too: the brute plods and
@@ -517,6 +524,10 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 		"size": cells,
 		"warnings": warnings,
 	}
+	var clearings := clearings_from(config, warnings)
+	level["terrain"]["clearings"] = clearings
+	level["terrain"]["canopy_kind"] = canopy_kind(config, warnings)
+	level["terrain"]["canopy"] = canopy_from(cell_codes, cells, clearings) if config.has("canopy") else {}
 	_place(level, markers, config, warnings)
 	level["regenerate"] = regenerate_from(config, warnings)
 	_check_anchors(level, warnings)
@@ -853,6 +864,56 @@ static func zone_of(config: Dictionary) -> String:
 	if zone in DayNight.ZONES:
 		return zone
 	return "outdoors" if bool(config.get("outdoor", false)) else "indoors"
+
+
+## level.json's "clearings", [{centre: [x, y], radius}] (decision 466):
+## open ground under a canopy, as {centre: Vector2, radius: float}; a bad
+## entry is left out and said in [param warnings].
+static func clearings_from(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Variant in config.get("clearings", []):
+		if entry is Dictionary and entry.get("centre") is Array and (entry["centre"] as Array).size() == 2 				and float(entry.get("radius", 0.0)) > 0.0:
+			out.append({"centre": Vector2(float(entry["centre"][0]), float(entry["centre"][1])), "radius": float(entry["radius"])})
+		else:
+			warnings.append("a clearing in level.json is not {centre: [x, y], radius}: left out (%s)" % [entry])
+	return out
+
+
+## The kind of level.json [param config]'s canopy (CANOPY_KINDS), "" for a
+## level without one; one not known is said and read as evergreen.
+static func canopy_kind(config: Dictionary, warnings: Array[String]) -> String:
+	if not config.has("canopy"):
+		return ""
+	var kind := str((config["canopy"] as Dictionary).get("kind", "evergreen")) if config["canopy"] is Dictionary else "evergreen"
+	if kind not in CANOPY_KINDS:
+		warnings.append("\"canopy\" kind in level.json is %s, one of %s: it is evergreen" % [kind, ", ".join(CANOPY_KINDS)])
+		kind = "evergreen"
+	return kind
+
+
+## Each cell's canopy cover, 0..1, from the trunks (the VOID cells of
+## [param codes], a map [param cells] across): {cell: cover}, the cells
+## with none left out. The same on every peer, from the same layout.
+static func canopy_from(codes: PackedInt32Array, cells: Vector2i, clearings: Array[Dictionary]) -> Dictionary[Vector2i, float]:
+	var cover: Dictionary[Vector2i, float] = {}
+	var reach := ceili(CANOPY_REACH)
+	for y in cells.y:
+		for x in cells.x:
+			if codes[y * cells.x + x] != VOID:
+				continue
+			for dy in range(-reach, reach + 1):
+				for dx in range(-reach, reach + 1):
+					var cell := Vector2i(x + dx, y + dy)
+					var d := Vector2(dx, dy).length()
+					if d < CANOPY_REACH and cell.x >= 0 and cell.y >= 0 and cell.x < cells.x and cell.y < cells.y:
+						cover[cell] = minf(cover.get(cell, 0.0) + 1.0 - d / CANOPY_REACH, 1.0)
+	for clearing in clearings:
+		var centre: Vector2 = clearing["centre"]
+		var radius: float = clearing["radius"]
+		for cell: Vector2i in cover.keys():
+			if (Vector2(cell) + Vector2(0.5, 0.5)).distance_to(centre) < radius:
+				cover.erase(cell)
+	return cover
 
 
 ## The lore region level.json [param config] is in (its "region": an entry

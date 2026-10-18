@@ -69,6 +69,13 @@ var town_buildings: Array[Dictionary] = []
 ## The wall edges on an open-air building's outline (Level.OPEN_AIR,
 ## decision 452): a fence, which sight crosses (World.edge_blocks_sight).
 var fences: Dictionary[Vector3i, bool] = {}
+## The canopy over this level (decision 466; Level.canopy_from): each
+## cell's cover, 0..1, from its trunks, open in its clearings; its kind
+## ("evergreen", "broadleaf", "" for none) and the clearings, [{centre:
+## Vector2, radius}]. Empty for a level without one.
+var canopy: Dictionary[Vector2i, float] = {}
+var canopy_kind := ""
+var clearings: Array[Dictionary] = []
 var _fire: Array[Vector2i] = []
 var _torches: Array[Vector2i] = []
 var _lanterns: Array[Vector2i] = []
@@ -122,6 +129,9 @@ func load(terrain: Dictionary) -> void:
 			continue
 		for cell in Level.rect_cells(building["rect"]):
 			_roofed_whole[cell] = true
+	canopy.assign(terrain.get("canopy", {}))
+	canopy_kind = str(terrain.get("canopy_kind", ""))
+	clearings.assign(terrain.get("clearings", []))
 	level = str(terrain.get("level", ""))
 	roofs.clear()
 	town_buildings.clear()
@@ -269,6 +279,12 @@ func ambient_at(cell: Vector2i) -> float:
 	if open_sky(cell):
 		return DayNight.NIGHT + (DayNight.light - DayNight.NIGHT) * (1.0 - sky_dim)
 	return ambient
+
+
+## How much of the sky the canopy over [param cell] hides, 0..1 (0 where
+## the level has none, in a clearing, or away from its trunks).
+func canopy_at(cell: Vector2i) -> float:
+	return canopy.get(cell, 0.0)
 
 
 ## Whether the weather reaches [param cell]: outdoors, not under a roof.

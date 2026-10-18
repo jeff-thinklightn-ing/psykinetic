@@ -1082,6 +1082,12 @@ var _scatter_aim := Vector2i(1 << 30, 0)
 var _scatter_jobs: Array[Array] = []
 var _mask_origin := Vector2i.ZERO
 var _mask_size := Vector2i.ONE
+## The canopy over this map (decision 466; Fields.canopy_at, from the same
+## level data): each cell's cover in one R8 texel, on the ground mask's
+## grid, the texel at (0, 0) being cell canopy_origin; null where the map
+## has no canopy. Read by environment's look and the ground.
+var canopy_texture: ImageTexture
+var canopy_origin := Vector2i.ZERO
 var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
@@ -4002,6 +4008,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
+	canopy_texture = canopy_mask(_terrain.get("canopy", {}), origin, _mask_size)
+	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
 	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
 	var pair_cell := PackedInt32Array()
@@ -4322,6 +4330,20 @@ func _build_water() -> void:
 		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_room.add_child(drawn)
 		_water_bodies.append(drawn)
+
+
+## [param canopy] (cell -> cover) as an R8 texture of [param size] texels
+## from cell [param origin]; null for none.
+static func canopy_mask(canopy: Dictionary, origin: Vector2i, size: Vector2i) -> ImageTexture:
+	if canopy.is_empty():
+		return null
+	var bytes := PackedByteArray()
+	bytes.resize(size.x * size.y)
+	for cell: Vector2i in canopy:
+		var at := cell - origin
+		if at.x >= 0 and at.y >= 0 and at.x < size.x and at.y < size.y:
+			bytes[at.y * size.x + at.x] = roundi(clampf(canopy[cell], 0.0, 1.0) * 255.0)
+	return ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_R8, bytes))
 
 
 ## What stands on [param cell]'s side toward [param direction].

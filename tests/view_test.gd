@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_outdoor()
 	_test_pine_stands()
 	_test_ground_textures()
+	_test_canopy_mask()
 	_test_seasons()
 	_test_heights()
 	_test_hills()
@@ -1699,6 +1700,18 @@ func _test_seasons() -> void:
 ## The ground's kinds drawn with their own textures once ground.<kind> has
 ## art (decision 437; stand-ins made here while it has none), and the
 ## forest's edge into the stands' needles (423).
+func _test_canopy_mask() -> void:
+	print("
+== the canopy's texture: a texel a cell, on the ground mask's grid ==")
+	var cover: Dictionary[Vector2i, float] = {Vector2i(5, 4): 1.0, Vector2i(6, 4): 0.5, Vector2i(40, 40): 1.0}
+	var texture := Client3D.canopy_mask(cover, Vector2i(4, 3), Vector2i(8, 6))
+	var image := texture.get_image() if texture != null else null
+	_check(image != null and image.get_size() == Vector2i(8, 6) and is_equal_approx(image.get_pixel(1, 1).r, 1.0)
+			and absf(image.get_pixel(2, 1).r - 0.5) < 0.01 and image.get_pixel(0, 0).r == 0.0,
+			"each cell's cover at its texel from the origin, none elsewhere, a cell off the grid left out")
+	_check(Client3D.canopy_mask({}, Vector2i.ZERO, Vector2i(8, 6)) == null, "no canopy: no texture")
+
+
 func _test_ground_textures() -> void:
 	print("\n== the ground's kinds: their own textures once they have art, the forest's edge into the needles ==")
 	var ground_of := func() -> ShaderMaterial:

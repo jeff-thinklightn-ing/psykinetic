@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_hills()
 	_test_buildings()
 	_test_field()
+	_test_canopy()
 	_test_building_links()
 	_test_regenerate_mark()
 	_test_town_walls()
@@ -435,6 +436,61 @@ func _test_field() -> void:
 	_check(Level.rect_cells(Rect2i(2, 2, 4, 4)).all(func(cell: Vector2i) -> bool: return not World.fields._roofed.has(cell))
 			and World.fields._roofed.has(Vector2i(9, 3)), "nothing of the field is roofed; the hut is")
 	Level.unregister("test_field")
+
+
+func _test_canopy() -> void:
+	print("
+== a canopy: trunks from a grown stand, cover from the trunks, open in a clearing ==")
+	var map := LevelMap.new(Vector2i(16, 12))
+	for y in 12:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(0, 0), "start")
+	map.set_cell(Vector2i(6, 6), "dirt")
+	var trees_path := preload("res://tests/test_ports.gd").scratch("canopy_trees.json")
+	DirAccess.make_dir_recursive_absolute(trees_path.get_base_dir())
+	var trees := [{"at": [3.4, 3.6], "height": 12.0}, {"at": [5.2, 3.1], "height": 9.0, "state": "snag"},
+		{"at": [6.5, 6.5], "height": 11.0}, {"at": [8.5, 4.5], "height": 1.2}, {"at": [0.5, 0.5], "height": 10.0}]
+	var file := FileAccess.open(trees_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"trees": trees}))
+	file.close()
+	_check(ForestPack.from_trees(map, trees_path) == 2 and map.cell(Vector2i(3, 3)) == "void" and map.cell(Vector2i(5, 3)) == "void",
+			"ForestPack makes a trunk under each tree of 3 m or more, a snag too")
+	_check(map.cell(Vector2i(6, 6)) == "dirt" and map.cell(Vector2i(8, 4)) == "grass" and map.cell(Vector2i(0, 0)) == "start",
+			"but never on the path's dirt or a marker, nor for undergrowth")
+	_check(ForestPack.from_trees(map, trees_path + ".missing") == 0, "no trees file: no trunks")
+	var config := {"canopy": {"kind": "evergreen"}, "clearings": [{"centre": [12.5, 8.5], "radius": 2.0}, {"centre": "x"}]}
+	# A void cell out by the clearing, so it would be shaded but for it.
+	map.set_cell(Vector2i(13, 7), "void")
+	var level := Level.parse(map.to_image(), null, config)
+	var cover: Dictionary = level["terrain"]["canopy"]
+	var expect := func(cell: Vector2i) -> float:
+		var total := 0.0
+		for trunk: Vector2i in [Vector2i(3, 3), Vector2i(5, 3), Vector2i(13, 7)]:
+			var d := Vector2(cell - trunk).length()
+			if d < Level.CANOPY_REACH:
+				total += 1.0 - d / Level.CANOPY_REACH
+		return minf(total, 1.0)
+	var near := Vector2i(2, 5)
+	_check(is_equal_approx(cover.get(near, 0.0), expect.call(near)) and cover.get(near, 0.0) > 0.2 and cover.get(near, 0.0) < 0.5
+			and is_equal_approx(cover.get(Vector2i(4, 3), 0.0), 1.0),
+			"cover adds 1 - d / %s from each trunk, capped at 1 (%.2f at %s, %.2f between the trunks)" % [Level.CANOPY_REACH, cover.get(near, 0.0), near, cover.get(Vector2i(4, 3), 0.0)])
+	_check(not cover.has(Vector2i(9, 9)) and not cover.has(Vector2i(12, 8)) and cover.has(Vector2i(13, 6)),
+			"none far from a trunk, none in the clearing, some past its radius")
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("clearing"))
+	_check(level["terrain"]["canopy_kind"] == "evergreen" and level["terrain"]["clearings"].size() == 1 and said.size() == 1,
+			"the kind read, the bad clearing left out and said (%s)" % [said])
+	var odd := Level.parse(map.to_image(), null, {"canopy": {"kind": "palm"}})
+	_check(odd["terrain"]["canopy_kind"] == "evergreen" and (odd["warnings"] as Array).any(func(text: String) -> bool: return text.contains("palm")),
+			"a kind not known is said and read as evergreen")
+	_check((Level.parse(map.to_image(), null, {})["terrain"]["canopy"] as Dictionary).is_empty(), "no canopy in level.json: no cover, trunks or not")
+	Level.register("test_canopy", map.to_image(), null, config)
+	_check(_main.load_map("test_canopy"), "the level with a canopy loads")
+	_check(is_equal_approx(World.fields.canopy_at(near), cover[near]) and World.fields.canopy_at(Vector2i(12, 8)) == 0.0
+			and World.fields.canopy_kind == "evergreen" and World.fields.clearings.size() == 1, "and World's fields answer canopy_at from it")
+	_check(not World.is_walkable(Vector2i(3, 3)) and not World.has_line_of_sight(Vector2i(2, 3), Vector2i(4, 3)), "a trunk stops walkers and sight")
+	Level.unregister("test_canopy")
+	DirAccess.remove_absolute(trees_path)
 
 
 func _test_building_links() -> void:

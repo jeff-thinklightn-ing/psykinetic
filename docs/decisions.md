@@ -11615,3 +11615,89 @@ under anyone's feet, Jeff's words on the castle as the persistent
 marker); a new prune field in the "world" message (the full resend does
 it); marking levels/castle (the halls are a level below it); keeping
 entities outside the anchors by name (their markers are gone).
+## 466. A forest's canopy: trunks as void cells, a cover layer on every peer
+
+Jeff (2026-10-17, through the coordinator): "a forest zone - while walking
+through it would be dark because of the canopy overhead, with trees nearly
+everywhere.. but spread enough to walk around.. with small clearings where
+sunlight shines through". The pieces are terrain's, environment's, sound's
+and maps' (levels/forest, maps' 464); this one is what the rest read.
+- A trunk is a void cell. Void already stops walkers, sight, light and heat,
+  so the sim needs nothing new for one, and a chase through a packing keeps
+  going: a prototype ran 16 chases each against open ground and packings of
+  2.6, 3.0 and 3.4 m. The player struck the fleeing deer in all of them and
+  never lost sight of it; only the first strike came later in the trees (18,
+  30 and 43 ticks).
+- level.json "canopy": {"kind": "evergreen" | "broadleaf"} and "clearings":
+  [{centre: [x, y], radius}]. Level.canopy_from works out each cell's
+  cover from the trunks: each void cell within CANOPY_REACH (3.2) cells adds
+  1 - d / 3.2, the sum capped at 1, and a clearing's cells are open (0).
+  Gaps where the trunks are sparse fall out of it; environment finds them
+  there. Level's terrain carries "canopy" (cell -> cover), "canopy_kind"
+  and "clearings"; Fields.canopy_at(cell), canopy_kind and clearings give
+  them to the sim. A client parses the same level files (a "terrain"
+  message carries files, not the parse), so nothing new goes over the wire.
+- Client3D.canopy_texture: the cover, an R8 texel a cell on the ground
+  mask's grid from canopy_origin (Client3D.canopy_mask), for environment's
+  look and the ground.
+- ForestPack.from_trees(map, trees_path) (editor/, new class_name): a void
+  cell under every tree of 3 m or more, live or a snag, in a grown stand's
+  trees.json (467), on grass only, never on the path's dirt or a marker.
+  maps' make_forest lays its ground and calls it last.
+What reads it is the other trees': environment's daylight cut in
+Fields.ambient_at and its look and light shafts, sound's deep-forest bed,
+and terrain's drawing of the grown trees (467). Rejected: a canopy image of
+its own beside layout.png (a second thing to keep in step with the trunks);
+packing the trunks by rule (ForestPack.pack, the first plan) once the trees
+were grown (467); a new cell kind for a trunk that stops walkers but not
+sight (the forest is meant to hide things).
+
+## 467. Trees grown by a simulation, offline: tools/forest_grow.py and trees.json
+
+Jeff (2026-10-17): "the idea for the trees was to build a sim outside the
+game to model how trees look in a forest.. not necessarily in game". The
+rule-built pines (a cone of whorls, branches cut short at a neighbour) were
+not that. tools/forest_grow.py (Python and numpy) grows a pine stand year by
+year from a crop of seedlings and writes what stands to the level's
+trees.json; the game draws from it and grows nothing.
+- Where trees may stand: a level's grass cells, not its dirt (the path), not
+  within a clearing's radius + 1 (--level levels/forest). Or a stand-in map
+  of the same kind (--standin N).
+- The model, on 1 m cells at the game's scale (pines top out near 13 m):
+  - Light: a grid of 0.5 m voxels, 14 m high. Every live branch lays
+    needles along its outer part into the voxels it passes. The light at a
+    voxel is the sky seen through the needles above it, overhead and along
+    four 45-degree slants, each voxel passing exp(-0.9 x its needles). The
+    map wraps, as the forest goes on past its edge.
+  - Each year a tree's leader grows by the light at its top, at its own
+    pace (lognormal), slower near 13 m. Each 0.42 m of new height starts a
+    whorl of 4 to 6 buds.
+  - A branch lengthens by its tip's light up to 2.4 m, and stops where
+    another tree's needles fill the voxel ahead. One whose middle sees under
+    0.14 for 3 years dies; a dead branch drops after 6. So crowns lift as
+    they close, and trunks go bare below.
+  - A tree has a bad year when its needles catch less light than its upkeep
+    (0.8 x height^1.5), or too little reaches its crown or top. After 5 bad
+    years in a row it dies, stands as a snag for 10 to 25 years, then falls.
+  - Seedlings come up where the ground's light passes 0.3, once some tree is
+    15 years old.
+- Nothing is placed or tuned by hand afterwards. The one rule chosen was the
+  upkeep, from what a healthy 12 m crown needs; values from 0.4 to 1.5 only
+  shift the density, from about 1 tree in 6.5 cells to 1 in 10.
+- The first run, on a 96 x 96 stand-in: 4,879 seedlings; 2,539 alive at
+  20 years, 1,058 at 50 and 913 at 100 (881 over 3 m, about 2.2 m apart,
+  12.6 m tall, crowns from 3.8 m). At 100 years 90 % of the ground under
+  them is dark. It takes 7 s. Sheets for Jeff: C:\dev\review\forest\.
+- trees.json: {"decision", "years", "stats", "clearings", "path", "trees":
+  [{at: [x, y] in cells, height, radius, lean, age, state "live" | "snag",
+  whorls: [{y, branches: [[angle, length]]}], dead: [[y, angle, length]]}]},
+  every tree of 3 m or more and the live undergrowth. --snapshots writes
+  trees_yN.json at those years.
+- Grown crowns close over small clearings, as real ones do: a clearing that
+  should stay sunlit needs a radius of 6 or more.
+The client's drawing of trees.json (a trunk, needle pads along each live
+branch, a bare stick for each dead one, a snag grey and broken) lands next,
+under this number. Rejected: growing at level load (minutes in GDScript, and
+the same every load); growing per player chunk (the same stand everywhere is
+the point); the space-colonisation broadleaf of the first study (no years,
+no light, a preset crown).
