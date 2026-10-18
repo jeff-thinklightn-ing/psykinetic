@@ -45,6 +45,11 @@ notes (decision 324).
   they remember of what happened here (a raid that took a neighbour, one who came
   home, a loan, raiders at the walls). Ask them and they tell you from it.
 - Weapons can earn a bane or a vengeance. One that fells 25 of a kind becomes their bane: that kind dreads whoever holds it, but notices them from further off. One held by someone who falls to a creature holds a grudge against that kind: its blows stagger them, but they come for its bearer first, until five of them have fallen to it. The pack and the party log say which.
+- Townsfolk, companions and players are all people now, each their own:
+  heavy or lean, tall or short, young or old, broad or narrow, in their own
+  skin and hair, cropped, bound up, long or bald, some bearded, some in a
+  hood or a hat, some in aprons, the old sometimes stooped. New
+  bodies, made by our own tool. Client only.
 - Your companion now knows when she or you are bleeding or burning, and
   while one of you bleeds, bandaging comes first among what she offers.
 - Weapons keep count of what they've felled, by kind, whoever held them: hover a slot in your pack to see "felled 14: 9 imps, 4 wolves, 1 brute" under its name.

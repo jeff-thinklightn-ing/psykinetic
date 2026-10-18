@@ -9948,3 +9948,62 @@ Client only: the protocol is unchanged.
 Rejected: a separate credits screen from the title menu (there is none yet;
 the options are where a player looks); copying THIRD_PARTY.md's text into the
 panel (it is long, Markdown, and written for the zip).
+## 419. People from a tool of our own: one base body each, keyed, with parts, from a look
+
+Jeff wants numerous town characters with different postures, statures, builds
+and hair, and the candidate-mesh route (243's c4 bodies) gave a final product
+unlike its candidates. So people's bodies are made by our own script,
+tools/body_gen.py (Blender, headless): every vertex placed in code on the
+Universal Animation Library's skeleton, which every humanoid clip already plays
+on. A body is lofted rings (torso and tunic, sleeves, trousers, boots, mitten
+hands, neck, a planar head with nose, brows, eyes and ears, belt, collar),
+faceted, about 1,500 triangles; a man's and a woman's (her own proportions),
+built at 1.75 m and scaled to the height (1.75, 1.66). The same tool makes the
+parts a person may wear, each its own mesh on the same skeleton: three hair
+styles (cropped, bound up with a bun, long), two beards, a hood, a brimmed
+hat and an apron (100 to 250 triangles each). Seven shape keys (lean, heavy,
+broad, narrow, hips, old, young) are the body and every part built again at
+other proportions (a MORPH table on the stations' sizes): the same rings, so
+the same vertices, exact, never pushed along normals; parts follow the keys
+because they are built from the body's own rings. tools/body_build.py --parts
+colours it by part as 243 amended (one material, the part one-hot in the
+vertex colour, palette swatches for belt, boots, hats and the apron) and keeps
+the keys. Both bodies live where 243's did (art/models/characters/human_m,
+human_f), so nothing else moves.
+
+A person is values, not a mesh: their spawn spec's "look", one string of
+space-separated key=value words, each optional (seed, body, build, stature,
+age, posture, shoulders, hair, hair_colour, beard, headwear, apron, skin),
+agreed with npc (residents' card["look"], Main writes it; the apron from the
+trade) and companions (CompanionCard.look_of). A new class_name, PersonLook,
+turns it into a body, key values, a stature (the model's scale, its gaits'
+paces scaled with it, so taller legs take longer strides), the parts shown,
+the colours (an 8-step skin ramp, 8 hair colours, grey likelier when old) and
+a posture. Whatever a look leaves out, the seed decides, the same on every
+client; a key or value it does not know is passed over, so words can be added
+without breaking older clients. Client3D.look_for reads it, else seeds one by
+the entity's name; a player's body is their "body" (388) and they wear no
+headwear or apron until the Character panel lets them choose. Residents are
+drawn as people too (model_for). Posture is an additive pose on the person's
+AnimRig (390's posture layer): Posture_Stooped and Posture_Slouch in the clip
+library, authored by tools/humanoid_clips.py as the rest pose plus the bend, so
+the layer adds the bend alone to whatever plays; a stooped old man walks
+stooped.
+
+Protocol: unchanged. "look" is a new spawn spec key older peers ignore and
+whose absence means today's behaviour, and it is purely visual: the sim never
+reads it. If anything in a look ever touches reach, collision or sight
+(stature is the likeliest), that is a protocol revision. Cost: a person draws
+their body and one to three parts, each a surface (perf, 2026-10-17: affordable,
+rendering is about 2.5 ms of a 20 ms party frame; merging a person's chosen
+parts at make time is the first fix if the budget bench says otherwise).
+tools/body_sheet.gd draws looks (keys, scale, colours, parts) for sheets.
+view_test checks a look's determinism, its words over the seed, the hood over
+the hair, a resident drawn as its look, every part in both bodies with the
+seven keys, the postures in the clips, and a player's body, parts, skin and
+stature. Rejected: a mesh per person (memory grows with the town); TRELLIS
+meshes per candidate (unlike their candidates, and narrow); a third-party base
+body (Quaternius's: a superhero nude, painted clothes fail); shape keys by
+pushing along normals (243's; a belt and an apron would part from the tunic).
+Later: an orc base for the brute and a kobold base for the sneak from the same
+tool (Jeff, via lore), and the player's Character panel.

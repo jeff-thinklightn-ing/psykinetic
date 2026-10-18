@@ -54,6 +54,7 @@ func _ready() -> void:
 	await _test_target_marked()
 	await _test_goblin()
 	_test_humans()
+	_test_person_looks()
 	_test_goblins_differ()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
@@ -2017,6 +2018,8 @@ func _test_humans() -> void:
 		var low := INF
 		var high := -INF
 		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			if not mesh.visible:
+				continue
 			var box := mesh.global_transform * mesh.get_aabb()
 			low = minf(low, box.position.y)
 			high = maxf(high, box.end.y)
@@ -2026,13 +2029,21 @@ func _test_humans() -> void:
 		var wanted := Vector2(player.facing).normalized()
 		_check(_toes_ahead(puppet).dot(wanted) > 0.9, "its toes point where it faces (%s)" % _toes_ahead(puppet))
 		var meshes := model.find_children("*", "MeshInstance3D", true, false)
-		var mesh := meshes[0] as MeshInstance3D
-		_check(meshes.size() == 1 and mesh.mesh.get_surface_count() == 1 and mesh.get_active_material(0) == Client3D.HUMAN_MATERIAL,
-				"one surface in the bodies' one shared material")
-		var own: Dictionary = mesh.get_meta("extras", {})
-		_check(Client3D.HUMAN_PARTS.all(func(part: String) -> bool: return own.has(part))
-				and mesh.get_instance_shader_parameter("skin") == Color(str(own.get("skin", ""))),
-				"its own skin and hair from its mesh (%s)" % own.get("skin", ""))
+		var mesh := model.find_child("Body", true, false) as MeshInstance3D
+		var look := puppet.get_meta("look") as PersonLook
+		var shown: Array = meshes.filter(func(m: MeshInstance3D) -> bool: return m.visible and m != mesh).map(func(m: MeshInstance3D) -> String: return String(m.name))
+		_check(mesh != null and mesh.mesh.get_surface_count() == 1
+				and meshes.all(func(m: MeshInstance3D) -> bool: return m.get_active_material(0) == Client3D.HUMAN_MATERIAL),
+				"a body of one surface and its parts, all in the bodies' one shared material")
+		if mesh == null:
+			continue
+		shown.sort()
+		var worn := look.parts.duplicate()
+		worn.sort()
+		_check(shown == worn and not ("Hood" in worn or "Hat_Brimmed" in worn or "Apron" in worn),
+				"wearing its look's parts (%s), no headwear or apron for a player" % [shown])
+		_check(mesh.get_instance_shader_parameter("skin") == look.colours["skin"] and absf(float(puppet.get_meta("model_scale")) - look.scale) < 1e-4,
+				"its look's skin and stature (%.3f)" % look.scale)
 		var tint: Color = puppet.get_meta("tint")
 		_check(tint == Color.WHITE or mesh.get_instance_shader_parameter("tunic") == tint, "the tunic in the player's colour")
 	player.body = &"male"
@@ -2066,6 +2077,50 @@ func _test_humans() -> void:
 		_check(pet.body == wanted and model != null
 				and model.scene_file_path == str((Client3D.HUMAN if wanted == &"male" else Client3D.HUMAN_F)["scene"]),
 				"%s wears her card's body, %s" % [pet.name, wanted])
+
+
+func _test_person_looks() -> void:
+	print("
+== a person's look (decision 419): the same words the same person; words over the seed; parts, keys, posture ==")
+	var full := "seed=48213 body=female build=heavy stature=tall age=old posture=stooped hair=long hair_colour=grey beard=none headwear=hood apron=yes skin=8 shoulders=broad"
+	var a := PersonLook.make(full)
+	var b := PersonLook.make(full)
+	_check(a.keys == b.keys and a.parts == b.parts and a.scale == b.scale and a.colours == b.colours,
+			"the same look twice is the same person")
+	_check(a.body == &"female" and a.keys.get("heavy", 0.0) > 0.4 and a.keys.get("old", 0.0) > 0.5 and a.keys.get("broad", 0.0) >= 0.3
+			and a.scale > 1.03 and a.posture == "stooped" and a.colours["hair"] == Color(PersonLook.HAIR_COLOURS["grey"])
+			and a.colours["skin"] == Color(PersonLook.SKINS[7]),
+			"its words: heavy, old, broad, tall, stooped, grey, the darkest skin (%s, %.3f)" % [a.keys, a.scale])
+	_check(a.parts == ["Hood", "Apron"], "a hood over the hair (not drawn under it), an apron (%s)" % [a.parts])
+	var seeded := PersonLook.make("seed=7")
+	var odd := PersonLook.make("seed=7 build=enormous colour_of_eyes=blue")
+	_check(seeded.keys == odd.keys and seeded.parts == odd.parts and seeded.scale == odd.scale,
+			"a word it does not know, or a value, is passed over: the seed decides")
+	var men := 0
+	for i in 40:
+		if PersonLook.make("seed=%d" % i).body == &"male":
+			men += 1
+	_check(men > 10 and men < 30, "no body named and none given: the seed picks (%d men of 40)" % men)
+	_check(PersonLook.make("seed=7", &"female").body == &"female", "else the body given (the pronoun's)")
+	# A resident is a person, drawn as its spec's look.
+	var resident := Resident.new()
+	resident.name = "LookTestResident"
+	resident.spawn_spec = {"look": full}
+	_check(Client3D.model_for(resident) == Client3D.HUMAN_F and Client3D.look_for(resident).parts == ["Hood", "Apron"],
+			"a resident is the human body its look says")
+	resident.free()
+	# Every part body_gen makes is in both bodies, keyed as the body is.
+	for scene_path: String in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]]:
+		var scene := (load(scene_path) as PackedScene).instantiate() as Node3D
+		var names: Array = scene.find_children("*", "MeshInstance3D", true, false).map(func(m: MeshInstance3D) -> String: return String(m.name))
+		var wanted: Array = ["Body"] + PersonLook.HAIR_PARTS.values() + PersonLook.BEARD_PARTS.values() + PersonLook.HEADWEAR_PARTS.values() + ["Apron"]
+		var missing := wanted.filter(func(n: String) -> bool: return n != "" and not n in names)
+		var unkeyed := scene.find_children("*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool:
+			return (m.mesh as ArrayMesh).get_blend_shape_count() < 7)
+		_check(missing.is_empty() and unkeyed.is_empty(), "%s: every part (%s missing), each with the seven keys" % [scene_path.get_file(), missing])
+		scene.free()
+	var library := load(str(Client3D.HUMAN["clips"])) as AnimationLibrary
+	_check(Client3D.POSTURES.values().all(func(clip: String) -> bool: return library.has_animation(clip)), "the postures are in the clips")
 
 
 func _test_goblin() -> void:

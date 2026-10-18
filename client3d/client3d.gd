@@ -538,15 +538,18 @@ const GAITS: Array[Array] = [[CLIP_WALK, 0.5], [CLIP_JOG, 3.5], [CLIP_SPRINT, 5.
 ## Gaits change past the geometric mean of their paces, this much beyond it
 ## either way, so a pace near a change does not flicker between them.
 const GAIT_HYSTERESIS := 1.15
-## Players and companions: humanoid bodies (decision 243), a man's and a
-## woman's (the entity's "body", decision 388), rigged to the animation
-## library's own skeleton, so its clips play at the proportions they were
-## made for. Their gaits are their own (HUMAN_GAITS: the two step alike), as
-## is their backpedal; one surface each, drawn in HUMAN_MATERIAL
-## ("parts"), the tunic in the player's colour (the capsule's); standing,
-## they only look about now and then. Their
-## size is not their mass: what they carry counts in their mass, and picking
-## up a hammer should not make them grow.
+## People (players, companions, residents): humanoid bodies (decision 243), a
+## man's and a woman's (the entity's "body", decision 388), made by
+## tools/body_gen.py (decision 419) on the animation library's own skeleton,
+## so its clips play at the proportions they were made for. Each is drawn as
+## its PersonLook (look_for): shape keys, a stature, the parts it wears
+## (hair, beard, headwear, apron: meshes of the same scene, shown or not), its
+## colours, its posture (an additive pose on its AnimRig, POSTURES). Their gaits
+## are their own (HUMAN_GAITS: the two step alike), paced by their stature, as
+## is their backpedal; all drawn in HUMAN_MATERIAL ("parts"), the tunic in the
+## player's colour (the capsule's); standing, they only look about now and then.
+## Their size is not their mass: what they carry counts in their mass, and
+## picking up a hammer should not make them grow.
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
@@ -563,6 +566,9 @@ const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.93], ["Jog_Short", 2.66], ["Spr
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
 const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
+## A PersonLook's posture: its pose in the clips (rest plus the bend,
+## tools/humanoid_clips.py), added at full weight.
+const POSTURES := {"stooped": "Posture_Stooped", "slouching": "Posture_Slouch"}
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
@@ -6265,11 +6271,12 @@ static func creature_slot_for(entity: GridEntity) -> String:
 	return slot
 
 
-## The model for [param entity]: HUMAN or HUMAN_F by its body for a player
-## or a companion, MODELS' entry for a monster of a kind that has one, or {}.
+## The model for [param entity]: HUMAN or HUMAN_F by its look's body for a
+## person (a player, a companion, a resident), MODELS' entry for a monster of a
+## kind that has one, or {}.
 static func model_for(entity: GridEntity) -> Dictionary:
-	if entity is Player or entity is Companion:
-		return HUMAN_F if body_of(entity) == &"female" else HUMAN
+	if entity is Player or entity is Companion or entity is Resident:
+		return HUMAN_F if look_for(entity).body == &"female" else HUMAN
 	if not entity is Monster:
 		return {}
 	return MODELS.get(str(entity.spawn_spec.get("kind", "")), {})
@@ -6296,6 +6303,8 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 				mesh.set_surface_override_material(surface, load(ArtKit.PALETTE))
 	if model.get("parts", false):
 		_dress(scene, puppet.get_meta("tint", Color.WHITE))
+		if puppet.has_meta("look"):
+			(puppet.get_meta("look") as PersonLook).apply(scene, puppet.get_meta("tint", Color.WHITE))
 	if model.has("tint"):
 		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
@@ -6305,6 +6314,10 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, CLIP_BLEND, true,
 			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
 	rig.loop(CLIP_IDLE)
+	if puppet.has_meta("look"):
+		var posture := str(POSTURES.get((puppet.get_meta("look") as PersonLook).posture, ""))
+		if posture != "" and rig.has(posture):
+			rig.posture((load(model["clips"]) as AnimationLibrary).get_animation(posture), 1.0)
 	puppet.set_meta("rig", rig)
 	return body
 
@@ -6346,6 +6359,11 @@ static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void
 	if model.get("by_mass", true):
 		size = clampf(pow(entity.mass / MODEL_MASS, 1.0 / 3.0), MODEL_SCALE_MIN, MODEL_SCALE_MAX)
 	size *= 1.0 + rng.randf_range(-MODEL_SCALE_SPREAD, MODEL_SCALE_SPREAD)
+	if model.get("parts", false):
+		# A person: their look's stature (its pace with it: longer legs, longer strides).
+		var look := look_for(entity)
+		puppet.set_meta("look", look)
+		size = look.scale
 	puppet.set_meta("model_scale", size)
 	puppet.set_meta("pace", size * (1.0 + rng.randf_range(-PACE_SPREAD, PACE_SPREAD)))
 	puppet.set_meta("tempo", 1.0 + rng.randf_range(-TEMPO_SPREAD, TEMPO_SPREAD))
@@ -6620,6 +6638,20 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String) -> bool:
 static func _hook(sig: Signal, callable: Callable) -> void:
 	if not sig.is_connected(callable):
 		sig.connect(callable)
+
+
+## A person's look (decision 419): their spawn spec's "look" (a resident's
+## from npc's card, a companion's from hers, as Main writes them), else one
+## seeded by their name; a player's (and anyone's that names none) body is
+## their "body"; a player wears no headwear or apron until they choose (the
+## Character panel, later).
+static func look_for(entity: GridEntity) -> PersonLook:
+	var look := str(entity.spawn_spec.get("look", ""))
+	if look == "":
+		look = "seed=%d" % absi(hash(String(entity.name)))
+	if entity is Player:
+		look += " headwear=none apron=no"
+	return PersonLook.make(look, body_of(entity))
 
 
 ## [param entity]'s body (decision 388), &"" if it wears none.

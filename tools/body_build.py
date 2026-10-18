@@ -22,6 +22,8 @@
 #       --smooth keeps the surface smooth-shaded (the mesh's own normals) instead of faceted.
 #       --vertex-colours keeps the mesh's own vertex colours (art-gen's projected concept)
 #       on one material, "VertexColour", instead of colouring by region.
+#       --parts colours a body built of named parts (tools/body_gen.py): each face's region
+#       is its material's name, the colours PART_COLOURS (the concept c4's).
 #
 # The shape keys move each vertex along its normal by its bones' weights times the
 # amounts below (metres), so a body fills out where people do (belly, hips, thighs,
@@ -48,7 +50,7 @@ LEAN = {
 ## Flat colour regions, each its own material (the game tints "Tunic"), and which of
 ## them a face may be, by the bone that moves it most: the concept's colour picks
 ## among these, so a dark boot is never read as hair.
-REGIONS = ["Skin", "Hair", "Tunic", "Trousers", "Belt", "Boots"]
+REGIONS = ["Skin", "Hair", "Tunic", "Trousers", "Belt", "Boots", "Hat", "Apron"]
 ALLOWED = [
 	(("Head", "neck_01"), ("Skin", "Hair")),
 	(("hand_", "thumb_", "index_", "middle_", "ring_", "pinky_"), ("Skin",)),  # Sleeves end at the wrist.
@@ -65,7 +67,7 @@ MATERIAL = "human"
 TINTED = ["Skin", "Hair", "Tunic", "Trousers"]
 ## The regions that go on the palette, and the palette rows each picks its swatch from
 ## (5 cloth and leather, 6 metal).
-PALETTE_ROWS = {"Belt": (5,), "Boots": (5, 6)}
+PALETTE_ROWS = {"Belt": (5,), "Boots": (5, 6), "Hat": (5,), "Apron": (5,)}
 PALETTE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "art", "kit", "palette.png")
 ## The neck opening, where the chest may show skin: within this far of the centre line
 ## (metres) and above this far below the neck bone's head.
@@ -75,6 +77,9 @@ FRONT = {"pelvis", "spine_01", "spine_02"}
 FRONT_FLOOR = 0.25
 SOURCE = ("Qwen-Image-2512 concept, TRELLIS.2 mesh (C:/dev/art-gen); rigged to Quaternius UAL "
 	+ "(CC0) by tools/body_rig.py; decimated, flat-shaded, lean/heavy shape keys by tools/body_build.py")
+## A generated body's (--parts).
+GENERATED_SOURCE = ("tools/body_gen.py: every vertex placed by script on the Quaternius Universal Animation "
+	+ "Library's skeleton (CC0), its parts and shape keys; coloured by part by tools/body_build.py --parts")
 
 
 def args() -> list:
@@ -221,7 +226,7 @@ def allowed(bone: str) -> tuple:
 	for prefixes, regions in ALLOWED:
 		if any(bone.startswith(p) for p in prefixes):
 			return regions
-	return tuple(REGIONS)
+	return tuple(REGIONS[:6])  # A concept's colours: never the generator's hat or apron.
 
 
 ## Each region's colour, sampled from the concept where the rig says that region is.
@@ -401,6 +406,14 @@ def colour(obj, arm, concept_path: str, forward_world: Vector, right_world: Vect
 				if counts[best] >= 2:
 					changed[i] = best
 		region = changed
+	dress(obj, region, refs)
+
+
+## The body's one material and its parts: each face's [region] one-hot in the vertex
+## colour, the untinted ones (belt, boots) on their palette swatch by UV, the tinted parts'
+## colours ([refs], sRGB) as the mesh's extras.
+def dress(obj, region: list, refs: dict) -> None:
+	mesh = obj.data
 	mesh.materials.clear()
 	swatches = palette_swatches(refs)
 	if not mesh.uv_layers:
@@ -414,6 +427,9 @@ def colour(obj, arm, concept_path: str, forward_world: Vector, right_world: Vect
 		mesh.color_attributes.remove(mesh.color_attributes[0])
 	parts = mesh.color_attributes.new(name="parts", type="FLOAT_COLOR", domain="CORNER")
 	mesh.color_attributes.active_color = parts
+	# The exporter takes the render colour: a mesh that came with colours of its own
+	# (Quaternius's) would otherwise export those.
+	mesh.color_attributes.render_color_index = mesh.color_attributes.find("parts")
 	for poly, name in zip(mesh.polygons, region):
 		at = swatches[name][1] if name in swatches else swatches[next(iter(swatches))][1]
 		mask = [1.0 if TINTED.index(name) == i else 0.0 for i in range(4)] if name in TINTED else [0.0] * 4
@@ -428,6 +444,20 @@ def colour(obj, arm, concept_path: str, forward_world: Vector, right_world: Vect
 		obj[name.lower()] = "#%02x%02x%02x" % tuple(round(max(0.0, min(1.0, v)) * 255) for v in (c.x, c.y, c.z))
 	print("  faces: %s" % {n: region.count(n) for n in REGIONS})
 	print("  palette: %s" % {n: swatches[n][0] for n in swatches})
+
+
+## A body built of named parts (tools/body_gen.py): each face's region is its
+## material's name; the tinted parts' colours are the concept c4's (PART_COLOURS).
+PART_COLOURS = {"Skin": "c49075", "Hair": "564135", "Tunic": "838065", "Trousers": "533e2d", "Belt": "3d2a1f",
+	"Boots": "29231b", "Hat": "6e5a44", "Apron": "b8a888"}
+
+
+def colour_parts(obj) -> None:
+	names = [m.name.split(".")[0] if m else "" for m in obj.data.materials]
+	region = [names[p.material_index] if names[p.material_index] in REGIONS else "Tunic" for p in obj.data.polygons]
+	refs = {k: Vector([int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]) for k, h in PART_COLOURS.items()}
+	dress(obj, region, refs)
+	print("  parts: %s" % {n: region.count(n) for n in REGIONS})
 
 
 ## How far apart two colours look: their hue (each one's offset from its own grey) counts
@@ -448,6 +478,8 @@ def palette_swatches(refs: dict) -> dict:
 	rows = round(h / size)
 	out = {}
 	for region, allowed in PALETTE_ROWS.items():
+		if region not in refs:
+			continue  # A body without the part (hats and aprons are tools/body_gen.py's).
 		best = None
 		for row in allowed:
 			for col in range(8):
@@ -526,7 +558,7 @@ def shape_keys(obj, forward_world: Vector) -> None:
 
 
 def build(path: str, stem: str, target: int, keep: list, source: str, concept: str, smooth: bool = False,
-		vertex_colours: bool = False) -> None:
+		vertex_colours: bool = False, parts: bool = False) -> None:
 	load(path)
 	arm = armature()
 	meshes = skinned(arm)
@@ -547,21 +579,29 @@ def build(path: str, stem: str, target: int, keep: list, source: str, concept: s
 	forward, right = axes(arm)
 	total = sum(tris(o) for o in meshes)
 	for obj in meshes:
-		weld(obj)
-		# Each mesh keeps its share of the budget.
-		decimate(obj, max(8, round(target * tris(obj) / total)), right)
+		# A generated body (tools/body_gen.py) comes built to its budget with its own shape
+		# keys: kept as they are, neither welded, decimated nor keyed again.
+		generated = obj.data.shape_keys is not None
+		if not generated:
+			weld(obj)
+			# Each mesh keeps its share of the budget.
+			decimate(obj, max(8, round(target * tris(obj) / total)), right)
 		for poly in obj.data.polygons:
 			poly.use_smooth = smooth
 		if vertex_colours:
 			keep_vertex_colours(obj)
+		elif parts:
+			colour_parts(obj)
 		elif concept:
 			colour(obj, arm, concept, forward, right)
-		shape_keys(obj, forward)
+		if not generated:
+			shape_keys(obj, forward)
 		obj.data.update()
 	bpy.context.scene["source"] = source
 	lo, hi = bounds(meshes)
-	print("built %s: tris %d, height %.3f m, keys lean/heavy" % (
-		stem, sum(tris(o) for o in meshes), hi.z - lo.z))
+	keys = sorted({k.name for o in meshes for k in o.data.shape_keys.key_blocks[1:]})
+	print("built %s: tris %d, height %.3f m, keys %s" % (
+		stem, sum(tris(o) for o in meshes), hi.z - lo.z, "/".join(keys)))
 	bpy.context.preferences.filepaths.save_version = 0  # no .blend1 beside it
 	bpy.ops.wm.save_as_mainfile(filepath=bpy.path.abspath(stem + ".blend"))
 	bpy.ops.object.select_all(action="DESELECT")
@@ -585,7 +625,7 @@ def main() -> None:
 	keep = []
 	source = SOURCE
 	concept = ""
-	smooth, vertex_colours = False, False
+	smooth, vertex_colours, parts = False, False, False
 	rest = a[2:]
 	i = 0
 	while i < len(rest):
@@ -595,9 +635,10 @@ def main() -> None:
 		elif rest[i] == "--colours":
 			concept = os.path.abspath(rest[i + 1])
 			i += 2
-		elif rest[i] in ("--smooth", "--vertex-colours"):
+		elif rest[i] in ("--smooth", "--vertex-colours", "--parts"):
 			smooth = smooth or rest[i] == "--smooth"
 			vertex_colours = vertex_colours or rest[i] == "--vertex-colours"
+			parts = parts or rest[i] == "--parts"
 			i += 1
 		elif rest[i] == "--source":
 			source = rest[i + 1]
@@ -609,7 +650,9 @@ def main() -> None:
 				i += 1
 		else:
 			raise SystemExit("unknown argument %s" % rest[i])
-	build(a[0], a[1], target, keep, source, concept, smooth, vertex_colours)
+	if parts and source == SOURCE:
+		source = GENERATED_SOURCE
+	build(a[0], a[1], target, keep, source, concept, smooth, vertex_colours, parts)
 
 
 main()

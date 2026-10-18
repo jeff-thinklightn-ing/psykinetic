@@ -130,6 +130,13 @@ CONTACT = {}
 # The run's stride, shortened for the human bodies (Jeff on v0.1.149: "the strides seem
 # just a little too long for the legs"): the pack's Jog_Fwd and Sprint, their legs' and
 # arms' swing narrowed, so the same ground speed plays them faster, in shorter steps.
+# Postures (perf's additive layer, decision 390): the rest pose with the bend, so the
+# layer adds the bend alone to whatever plays. Stooped: the back bent forward, the head
+# held up to look ahead; slouching: the shoulders rounded forward, the head forward.
+CLIPS["Posture_Stooped"] = {"keys": [(0.0, P("rest", 0.0, [("spine_01", LIFT, -8.0), ("spine_02", LIFT, -10.0),
+	("spine_03", LIFT, -8.0), ("neck_01", LIFT, 12.0), ("Head", LIFT, 10.0)] + both("clavicle", TURN, -6.0)))]}
+CLIPS["Posture_Slouch"] = {"keys": [(0.0, P("rest", 0.0, [("spine_02", LIFT, -4.0), ("spine_03", LIFT, -7.0),
+	("neck_01", LIFT, -4.0), ("Head", LIFT, 8.0)] + both("clavicle", TURN, -14.0)))]}
 CLIPS["Jog_Short_Loop"] = {"loop": True, "segment": ("Jog_Fwd_Loop", 0.0, 0.9333), "stride": {"legs": 0.45, "arms": 0.7, "bounce": 0.55}}
 CLIPS["Sprint_Short_Loop"] = {"loop": True, "segment": ("Sprint_Loop", 0.0, 0.6667), "stride": {"legs": 0.72, "arms": 0.85, "bounce": 0.75}}
 
@@ -157,7 +164,9 @@ class Rig:
 			arm.animation_data_create()
 
 	def posed(self, base: str, at: float) -> dict:
-		"""Each bone's armature-space matrix in [base] at [at] seconds."""
+		"""Each bone's armature-space matrix in [base] at [at] seconds ("rest": the rest pose)."""
+		if base == "rest":
+			return {b.name: b.matrix_local.copy() for b in self.bones}
 		self.arm.animation_data.action = action_named(base)
 		frame = at * FPS
 		bpy.context.scene.frame_set(int(math.floor(frame)), subframe=frame - math.floor(frame))

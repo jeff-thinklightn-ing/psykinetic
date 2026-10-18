@@ -149,8 +149,8 @@ Takes credited to their makers:
 
 | Tool | By | Licence | Used for |
 |------|----|---------|----------|
-| TRELLIS.2 | Microsoft | MIT | meshes from a concept image: the goblin and the human bodies (`art/models/SOURCES.txt`), slot candidates |
-| DINOv3 image encoder | Meta | DINOv3 License | inside TRELLIS.2, for the goblin and the human bodies |
+| TRELLIS.2 | Microsoft | MIT | meshes from a concept image: the goblin (`art/models/SOURCES.txt`), slot candidates |
+| DINOv3 image encoder | Meta | DINOv3 License | inside TRELLIS.2, for the goblin |
 | BiRefNet | ZhengPeng7 | MIT | background removal for the goblin's concept image |
 | Qwen-Image-2512 | Qwen (Alibaba) | Apache-2.0 | concept images for slot candidates (the art-gen session, run through ComfyUI) |
 | Qwen2.5-VL-7B (text encoder) | Qwen (Alibaba) | Apache-2.0 | inside Qwen-Image-2512 |

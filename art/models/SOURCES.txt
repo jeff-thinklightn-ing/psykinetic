@@ -15,22 +15,19 @@ asset, plain white background, no shadow, no props, no text". Negative: "multipl
 cropped, cut off, background scenery, text, watermark, blurry".
 
 characters/human_m.blend, characters/human_f.blend
-                         the players' and companions' bodies (decisions 243, 388), Jeff's pick c4
-                         of each: art-gen's concepts (Qwen-Image-2512 base model, no LoRA, 40 steps,
-                         cfg 4.0, shift 3.1, euler / simple, 1328 x 1328; male seed 790982997,
-                         female seed 1233402083; prompts in the candidates' notes,
-                         N:\assets\candidates\character.base_male\notes.md and
-                         character.base_female\notes.md, 2026-10-17), meshed by TRELLIS.2 (seed 42,
-                         5000 faces). Rigged by tools/body_rig.py to the Quaternius Universal
-                         Animation Library's own skeleton (CC0; stood 1.75 m and 1.66 m, bone heat
-                         weights, each leg's weights its own below the crotch), then
-                         tools/body_build.py: welded, decimated to 4,261 and 4,053 triangles,
-                         flat-shaded, lean and heavy shape keys, coloured from the concept: one
-                         surface, one material ("human"), skin, hair, tunic and trousers marked in
-                         the vertex colour with the concept's colours as the mesh's extras, belt
-                         and boots on the palette's leather and iron swatches; the game draws it
-                         with characters/human_body.tres. Each .blend's scene property `source`
-                         says so.
+                         people's bodies (decisions 243, 388, 419): our own, every vertex placed by
+                         tools/body_gen.py on the Quaternius Universal Animation Library's own
+                         skeleton (CC0; stood 1.75 m and 1.66 m), no mesh from elsewhere:
+                           blender -b -P tools/body_gen.py -- build/ual_extract/UAL1.glb <out>.glb [--sex female]
+                         a body (1,526 triangles) and the parts a person may wear, each its own mesh
+                         on the skeleton (Hair_Cropped, Hair_Bound, Hair_Long, Beard_Short,
+                         Beard_Full, Hood, Hat_Brimmed, Apron), each with seven shape keys (lean,
+                         heavy, broad, narrow, hips, old, young: the same parts built again at other
+                         proportions); then tools/body_build.py --parts: flat-shaded, one material
+                         ("human"), skin, hair, tunic and trousers marked in the vertex colour,
+                         belt, boots, hats and the apron on the palette's swatches; the game draws
+                         them with characters/human_body.tres. Each .blend's scene property
+                         `source` says so.
 characters/goblin.blend  generated:trellis2, blender (goblin-4000f.glb: loose parts removed, holes
                          closed, watertight, 1.2 m tall, flat colours; 22-bone humanoid rig with
                          Godot SkeletonProfileHumanoid bone names, T-pose rest, no animations)

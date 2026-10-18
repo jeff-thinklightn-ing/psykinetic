@@ -10,7 +10,12 @@ extends SceneTree
 ## <clips.res> "self" plays each model's own clips. A model may be given as
 ## <model.glb>@<blend>@<yaw degrees> to turn it (e.g. a creature side on:
 ## model.glb@@90); a fourth field "srgb" reads its vertex colours as sRGB (glTF's
-## are linear: a file that wrote sRGB values as they are). <blend> sets a model's "lean"/"heavy" shape keys (-1 lean .. 1 heavy);
+## are linear: a file that wrote sRGB values as they are). <blend> sets a model's "lean"/"heavy" shape keys (-1 lean .. 1 heavy),
+## or is a look, <name>=<value> joined by "+": any shape key by name (0..1), "scale"
+## (the whole model's, a stature), and a built body's part colours by name (skin, hair,
+## tunic, trousers; hex without "#"), and "parts", the generator's parts it wears joined by
+## "," (tools/body_gen.py's WEARABLES; the rest hidden, "parts=" for none), e.g.
+## heavy=0.6+old=1+scale=0.94+hair=b0b0b0+parts=Hair_Cropped,Beard_Full;
 ## <t> is how far through the clip (0..1, default 0.3); <pixels> a cell's
 ## width (default PIXELS); <cell> the metres between models (default CELL; 0.5 for a rabbit). "rest" is the rest pose. Clips default to: rest Idle Walk@0.25 Jog_Fwd@0.25 Sprint@0.3
 ## Sword_Attack@0.45 Hit_Chest@0.3 Death01@1.
@@ -53,11 +58,14 @@ func _initialize() -> void:
 			var model := (load(spec[0]) as PackedScene).instantiate() as Node3D
 			model.position = Vector3(column * _cell, -row * _cell, 0.0)
 			_view.add_child(model)
-			if spec.size() > 1 and spec[1] != "":
+			var look := spec.size() > 1 and spec[1].contains("=")
+			if spec.size() > 1 and spec[1] != "" and not look:
 				_blend(model, float(spec[1]))
 			if spec.size() > 2:
 				model.rotation.y = deg_to_rad(float(spec[2]))
 			_palette(model, spec.size() > 3 and spec[3] == "srgb")
+			if look:
+				_look(model, spec[1])
 			var clip := str(clips[column]).split("@")
 			if clip[0] != "rest":
 				var animator: AnimationPlayer
@@ -133,6 +141,28 @@ func _blend(model: Node3D, value: float) -> void:
 					mesh.set_blend_shape_value(i, maxf(-value, 0.0))
 				&"heavy":
 					mesh.set_blend_shape_value(i, maxf(value, 0.0))
+
+
+## A look ("name=value+..."; see the usage): shape keys, scale, part colours.
+func _look(model: Node3D, look: String) -> void:
+	for pair in look.split("+"):
+		var field := pair.split("=")
+		if field[0] == "scale":
+			model.scale = Vector3.ONE * float(field[1])
+			continue
+		if field[0] == "parts":
+			var worn := field[1].split(",", false)
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				mesh.visible = mesh.name == "Body" or mesh.name in worn
+			continue
+		for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			if field[0] in ["skin", "hair", "tunic", "trousers"]:
+				mesh.set_instance_shader_parameter(field[0], Color(field[1]))
+				continue
+			var shapes := mesh.mesh as ArrayMesh
+			for i in shapes.get_blend_shape_count():
+				if shapes.get_blend_shape_name(i) == StringName(field[0]):
+					mesh.set_blend_shape_value(i, float(field[1]))
 
 
 func _height(model: Node3D) -> float:
