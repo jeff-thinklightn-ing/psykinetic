@@ -330,6 +330,25 @@
 			"source": {"by": "art-gen, procedural (no model)", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/material.roof.shingle/notes.md: Jeff picked c6 (\"c6 roof shingles is good\"); c6, as p4: its look rebuilt procedurally from c6's own measurements (material.roof.shingle_p4_s32114.png), an exact repeat without the ghosted bands of c6's seamless version"},
 			"uses": "the shingles of roof.shingle.profile's slopes: u is metres along the ridge, v metres down the slope"
 		},
+		"material.roof.thatch": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"source": {"by": "art-kit, procedural", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-18", "notes": "eight courses of straw down the 2 m tile, strands shaded in clumps on row 3's straw and earth, each course's lip ragged in tufts and waving, shadowed where it laps the course below; seamless (whole courses, wrapped columns); a stand-in for an art-gen concept"},
+			"uses": "the thatch of roof.thatch.profile's slopes (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): u is metres along the ridge, v metres down the slope"
+		},
+		"roof.thatch.profile": {
+			"category": "roofs",
+			"type": "profile",
+			"kind": "cell",
+			"size": [1, 0.9, 1],
+			"uses": "the thatch roof set, as roof.shingle.profile: buildings' code-drawn roofs (BuildingComposer's slopes per block, buildings' composer, decision 489; Jeff, 2026-10-18: building variety) read its rise (metres the roof climbs a cell in from the eave: steeper than shingle, as thatch sheds rain), thickness (thatch is thick) and overhang; its slopes in material.roof.thatch",
+			"rise": 0.9,
+			"thickness": 0.3,
+			"overhang": 0.4,
+			"material": "material.roof.thatch"
+		},
 		"roof.shingle.ridge": {
 			"category": "roofs",
 			"type": "mesh",
@@ -356,6 +375,15 @@
 			"budget": 400,
 			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17", "notes": "by hand (art-gen's candidates all had radial splinters): three rafters 0.06 wide down the slope, the middle one snapped and sagging, two battens across (one broken), shingle courses in c6's browns round the edges, two loose ones on the rafters; 384 tris"},
 			"uses": "one roof cell's hole dressing on a damaged shingle roof (a third of its cells, by hash, as walls' 298): the cell's slope is left out by code and this is all there is: its rafters running down the slope (three, at the cell's thirds, one snapped at most), battens across them, ragged courses of shingles left round the edges, open to the sky between; never radial splinters round a hole (Jeff: \"beams in one direction, not like spokes, that's not how roofs are made\"). Modelled lying flat, x down the slope (1.25 m: a cell's run on a slope rising 0.75 a metre), z along the ridge; origin the cell's middle on the slope's underside, the rafters within the slope's 0.15 m and the shingles on top (nothing below y 0); code tilts it onto the slope"
+		},
+		"chimney.stone": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.8, 2.6, 0.8],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "seven rough stone courses tapering 0.66 to 0.56, jittered, proud stones on their faces, row 1's greys in blocks; an overhanging slab cap and a clay pot; 288 tris; a stand-in for an art-gen concept"},
+			"uses": "a stone chimney stack for BuildingComposer (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): placed at a gable end, its origin at its foot on the roof line (the eaves' height), its lower part running down into the roof, its top over the ridge with a cap and a pot"
 		},
 		"floor.wood": {
 			"category": "floors",

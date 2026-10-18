@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Chimneys are stacks of rough stone with a slab cap and a clay pot.
 - Some goblins go bare-headed with their hoods down, and their ears differ, big or small. Pointing at a goblin for the first time no longer stutters (decision 494).
 - The scoundrel (decision 492, on 393, with economy's and items' sides): a thing he makes that is measured by count or weight (a sack, a bolt, a bundle; never gear) may come out short, sold at the full price and telling on him only in the hand; he never pays back what he borrows on his own and rides his debt to the bank's cap, where the town's official learns it as a thing seen, his card knows what he owes, and with rulings on it is a dispute before the lawspeaker; with the lawspeaker off the talk passes and nothing is set down.
 - No two goblins look alike: each has its own build, a shade of the Blood Rot's green, its gear in its own colours, and some carry a scar, cheek stripes or a red hand (decision 494).

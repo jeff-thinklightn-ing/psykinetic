@@ -10,7 +10,7 @@
 				"rock.large", "rock.boulder",
 				"scatter.tuft", "scatter.stone", "scatter.flower", "scatter.root", "scatter.reeds",
 				"building.hut", "building.house", "building.shed", "building.well",
-				"material.roof.shingle", "roof.shingle.ridge", "roof.shingle.end", "roof.shingle.broken",
+				"material.roof.shingle", "roof.shingle.ridge", "roof.shingle.end", "roof.shingle.broken", "material.roof.thatch", "roof.thatch.profile", "chimney.stone",
 				"ground.needles",
 				"building.field",
 				"building.temple", "building.healers_hut",
