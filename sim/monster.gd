@@ -1252,7 +1252,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
 			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
-			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", ""))}
+			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
+			"label": str(row.get("label", ""))}
 	return out
 
 

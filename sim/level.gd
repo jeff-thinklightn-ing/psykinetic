@@ -1030,7 +1030,12 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 	if type_props is Dictionary:
 		for key: String in type_props:
 			props[key] = _prop(key, type_props[key])
-	return {"script": ANIMAL if Animal.is_wild(type) else MONSTER, "shape": "capsule", "props": props, "kind": type}
+	var spec := {"script": ANIMAL if Animal.is_wild(type) else MONSTER, "shape": "capsule", "props": props, "kind": type}
+	# Its kind's name over it ("Wild doe"; 397 amended), not its spawn name.
+	var label := str(Monster.kinds().get(type, {}).get("label", ""))
+	if not label.is_empty():
+		spec["label"] = label
+	return spec
 
 
 ## A loot table rolled into [param props]' slots (decision 330): the

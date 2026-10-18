@@ -8531,6 +8531,17 @@ Rejected: animals stepping off diagonally (they arrived a row off); a wolf's
 day kept as a sitting idle mode (the wander radius already holds it at home,
 and keeps W1's grazing poses); placement by line of sight (a distance check
 is enough at a recall's reach, and cheap).
+Amended (enemy-ai, 2026-10-17): an animal is shown by its kind, not its
+spawn name. Jeff's playtest: "Deer shouldn't show a full name and number,
+'Wild doe' or 'Wild stag' perhaps?" A row of levels/monsters.json may give
+a "label" (Wild doe, Wild stag, Wild boar, Wild rabbit, Wolf), and
+Level._spec_for puts it in the spawn spec, so a herd's body, a level's own
+animal and a den's wolf all show it; the sim's name stays unique beneath.
+The deer, stag, wolf and rabbit rows also gain their "art"
+(creature.<kind>): Monster.art_of reads it, so without it the deer's and
+the rabbit's art, on main already, was never drawn; the stag and wolf are
+shapes until their slots are filled. Protocol unchanged ("label" is a spec
+key every peer reads already). monster_test's wild case.
 ## 394. Heavy jobs wait for room: a shared resource gate
 
 Jeff's rule (2026-10-17), after two TRELLIS jobs at once ran the machine

@@ -1564,6 +1564,12 @@ func _indoors() -> void:
 func _test_wild_kinds() -> void:
 	print("\n== animals are rows of monsters.json of side wild: Animals, of no side but their herd's ==")
 	_check(Animal.is_wild("deer") and Animal.is_wild("wolf") and not Animal.is_wild("imp"), "deer and wolves are wild, imps not")
+	var labels := ["deer", "stag", "boar", "rabbit", "wolf", "imp"].map(
+			func(kind: String) -> String: return str(Level._spec_for("monster_" + kind, Level.MONSTER_TYPES).get("label", "")))
+	_check(labels == ["Wild doe", "Wild stag", "Wild boar", "Wild rabbit", "Wolf", ""],
+			"an animal's spec is labelled by its kind, no number; an imp's not (%s)" % [labels])
+	_check(["deer", "stag", "boar", "rabbit", "wolf"].all(func(kind: String) -> bool: return Monster.art_of(kind) == "creature." + kind),
+			"each animal names its creature slot")
 	_check(Level._spec_for("monster_deer", Level.MONSTER_TYPES)["script"] == Level.ANIMAL
 			and Level._spec_for("monster_imp", Level.MONSTER_TYPES)["script"] == Level.MONSTER, "a level's deer is an Animal")
 	var e := _build(["##########", "#d.D.o.i.#", "##########"])

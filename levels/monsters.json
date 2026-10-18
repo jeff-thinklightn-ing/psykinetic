@@ -30,35 +30,35 @@
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 2}
 	},
 	"rabbit": {
-		"side": "wild", "role": "prey", "herd": "rabbit",
+		"side": "wild", "role": "prey", "herd": "rabbit", "label": "Wild rabbit", "art": "creature.rabbit",
 		"body": {"mass": 3.0, "max_hp": 3, "move_ticks": 2.5, "attack_damage": 0, "sight_range": 7},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 20,
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 1},
 		"drops": [{"item": "meat", "count": [1, 1]}, {"item": "hide", "count": [1, 1]}]
 	},
 	"deer": {
-		"side": "wild", "role": "prey", "herd": "deer",
+		"side": "wild", "role": "prey", "herd": "deer", "label": "Wild doe", "art": "creature.deer",
 		"body": {"mass": 60.0, "max_hp": 14, "move_ticks": 2.5, "attack_damage": 0, "sight_range": 9},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 20,
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 1},
 		"drops": [{"item": "meat", "count": [3, 4]}, {"item": "hide", "count": [1, 1]}]
 	},
 	"stag": {
-		"side": "wild", "role": "prey", "herd": "deer",
+		"side": "wild", "role": "prey", "herd": "deer", "label": "Wild stag", "art": "creature.stag",
 		"body": {"mass": 90.0, "max_hp": 20, "move_ticks": 2.6, "attack_damage": 0, "sight_range": 9},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 20,
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 1},
 		"drops": [{"item": "meat", "count": [4, 5]}, {"item": "hide", "count": [1, 1]}, {"item": "antlers", "count": [1, 1]}]
 	},
 	"boar": {
-		"side": "wild", "role": "game", "herd": "boar", "art": "creature.boar",
+		"side": "wild", "role": "game", "herd": "boar", "label": "Wild boar", "art": "creature.boar",
 		"body": {"mass": 80.0, "max_hp": 18, "move_ticks": 3.5, "attack_ticks": 14, "attack_damage": 3, "sight_range": 6},
 		"tactic": "heavy", "idle": "wander", "opens_doors": false, "door_force": 2, "leash": 12,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"drops": [{"item": "meat", "count": [3, 4]}, {"item": "hide", "count": [1, 1]}, {"item": "tusks", "count": [1, 1]}]
 	},
 	"wolf": {
-		"side": "wild", "role": "predator", "herd": "wolf", "diet": ["rabbit", "deer", "stag"],
+		"side": "wild", "role": "predator", "herd": "wolf", "label": "Wolf", "art": "creature.wolf", "diet": ["rabbit", "deer", "stag"],
 		"body": {"mass": 40.0, "max_hp": 12, "move_ticks": 2.8, "attack_damage": 2, "sight_range": 8},
 		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
 		"temperament": {"bold": 0, "cautious": 1, "cowardly": 0},
