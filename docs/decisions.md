@@ -10614,6 +10614,16 @@ Rejected: a claims ask on her own facts mind (the same local model; one
 queue keeps the asks apart in time); keeping her extracted beliefs beside
 the hearsay (two stores of the same thing, and the extracted one took a
 lie whole).
+
+Fixed (2026-10-17, release): PlayerRecord.from_dict rebuilt her record
+from a list of keys and made every trait a word, so a load dropped her
+"heard" and her "home" (381) and turned her look (293 amended) and
+leanings into text. It keeps them now (PlayerRecord.TABLE_TRAITS), and
+reads back as tables a look or leanings already saved as text; text that
+is no table is dropped and her seed gives them. to_dict always wrote them
+as they were, so nothing was lost before a load. companion_test's round
+trip covers a record as v0.1.150 saves it, one with the tables as text,
+and one from before them.
 ## 436. The conversation panel: who speaks, the exchange, their offers
 
 Roadmap `ui`, step 4's first landing (the coordinator approved the design

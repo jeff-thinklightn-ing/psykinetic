@@ -81,6 +81,7 @@ func _ready() -> void:
 	_test_card()
 	_test_growing_card()
 	_test_card_things()
+	_test_record_loads()
 	_test_wild()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
@@ -1235,6 +1236,45 @@ func _test_card_things() -> void:
 	_check(Main.return_fact("Wren", "the temple", "Father Aldo") == "Wren fell, and was brought back at the temple by Father Aldo."
 		and Main.return_fact("Wren", "the healer's hut", "") == "Wren fell, and was brought back at the healer's hut.", "her return, as her card has it")
 	pet.grown = CompanionFacts.new()
+
+
+func _test_record_loads() -> void:
+	print("
+== a saved companion loads as she was saved: her look, leanings, hearsay and home (they were dropped on load) ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var shape := record.to_dict()
+	# As v0.1.150 saves her: tables in her traits, hearsay and home beside them.
+	shape["companion"]["traits"]["look"] = {"build": "lean", "hair": "bound", "hair_colour": "chestnut"}
+	shape["companion"]["traits"]["leanings"] = {"intellect": 7, "superstition": 4}
+	shape["companion"]["heard"] = [{"id": "h1", "text": "The mine is cursed", "from": "Player", "step": 3, "fits": "beyond", "believed": true}]
+	shape["companion"]["home"] = {"place": "t/store", "zone": "t", "trade": "carpenter"}
+	var loaded := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(shape)))
+	var traits: Dictionary = loaded.companion.get("traits", {})
+	_check(traits.get("look") == {"build": "lean", "hair": "bound", "hair_colour": "chestnut"}
+		and CompanionCard.leaning(traits, Net.player_id, "intellect") == 7 and CompanionCard.leaning(traits, Net.player_id, "superstition") == 4,
+		"her look and leanings come back as tables (%s, %s)" % [traits.get("look"), traits.get("leanings")])
+	_check(CompanionCard.look_of(traits, Net.player_id).ends_with("build=lean hair=bound hair_colour=chestnut"), "and her look reads as saved: %s" % CompanionCard.look_of(traits, Net.player_id))
+	_check(loaded.companion.get("heard", []).size() == 1 and str(loaded.companion["heard"][0].get("text")) == "The mine is cursed"
+		and loaded.companion.get("home", {}) == {"place": "t/store", "zone": "t", "trade": "carpenter"}, "her hearsay and her home come back")
+	_check(str(traits.get("fear", "")) == str(record.companion["traits"].get("fear", "")), "her other traits as ever")
+	# Loaded once by the old code: the tables kept as text. Read back as tables; text that is no table is left to her seed.
+	shape["companion"]["traits"]["look"] = str({"build": "heavy", "hair": "long"})
+	shape["companion"]["traits"]["leanings"] = str({"intellect": 2, "superstition": 9})
+	loaded = PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(shape)))
+	traits = loaded.companion.get("traits", {})
+	_check(traits.get("look") is Dictionary and traits["look"].get("build") == "heavy" and CompanionCard.leaning(traits, Net.player_id, "intellect") == 2,
+		"tables saved as text by the old load come back as tables (%s)" % [traits.get("look")])
+	shape["companion"]["traits"]["look"] = "lean"
+	loaded = PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(shape)))
+	_check(not loaded.companion["traits"].has("look") and CompanionCard.look_of(loaded.companion["traits"], Net.player_id).begins_with("seed="),
+		"text that is no table: dropped, her look from her seed")
+	shape["companion"].erase("heard")
+	shape["companion"].erase("home")
+	shape["companion"]["traits"].erase("look")
+	shape["companion"]["traits"].erase("leanings")
+	loaded = PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(shape)))
+	_check(not loaded.companion.has("heard") and not loaded.companion.has("home") and not loaded.companion["traits"].has("look"),
+		"a record from before them gains nothing")
 
 
 func _test_log_collapsed() -> void:

@@ -32,6 +32,9 @@ var last_seen := 0
 ## step} (decision 314)}.
 ## Empty until one has been given. A tile of null means beside its owner.
 var companion: Dictionary = {}
+## Her traits that are tables, not words: her look (293 amended) and her
+## leanings (442).
+const TABLE_TRAITS: Array[String] = ["look", "leanings"]
 ## The commissions and errands they took on from the town's people (decision
 ## 435): the asks as the residents' cards hold them, by id.
 var commissions: Array = []
@@ -127,7 +130,15 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		if traits is Dictionary and not traits.is_empty():
 			var kept := {}
 			for key: Variant in traits:
-				kept[str(key)] = str(traits[key])
+				# Her look and leanings are tables of their own (293
+				# amended, 442); every other trait is a word. One loaded
+				# before this kept them as text: read back as a table.
+				var value: Variant = traits[key]
+				if value is String and str(key) in TABLE_TRAITS:
+					value = JSON.parse_string(value) if value.begins_with("{") else null
+					if not value is Dictionary:
+						continue  # Not a table: her seed's again (CompanionCard.look_of, leaning).
+				kept[str(key)] = value.duplicate(true) if value is Dictionary else str(value)
 			record.companion["traits"] = kept
 			record.companion["how_we_met"] = str(pet.get("how_we_met", ""))
 			record.companion["card_by"] = str(pet.get("card_by", "plain"))
@@ -146,6 +157,14 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		var taken: Variant = pet.get("taken")
 		if taken is Dictionary and str(taken.get("by", "")) != "":
 			record.companion["taken"] = {"by": str(taken["by"]), "zone": str(taken.get("zone", "")), "at": int(taken.get("at", 0))}
+		# Her home town (381) and what she has heard (442): kept through a
+		# save, as written (they were dropped on load before).
+		var home: Variant = pet.get("home")
+		if home is Dictionary and str(home.get("zone", "")) != "":
+			record.companion["home"] = {"place": str(home.get("place", "")), "zone": str(home["zone"]), "trade": str(home.get("trade", ""))}
+		var heard: Variant = pet.get("heard")
+		if heard is Array and not heard.is_empty():
+			record.companion["heard"] = heard.filter(func(entry: Variant) -> bool: return entry is Dictionary).duplicate(true)
 	return record
 
 

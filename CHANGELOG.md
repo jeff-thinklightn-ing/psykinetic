@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: after a server restart a companion forgot what she had heard and her
+  home town, and her looks and nature could come back different.
 - What a town's lawspeaker thinks good enough to be the world's goes on a list
   for Jeff (docs/lore/proposed.md) instead of into the world's lore; he agrees
   or declines each in his own time, and nothing becomes lore by itself.
