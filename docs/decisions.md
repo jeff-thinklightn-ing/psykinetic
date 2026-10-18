@@ -11849,3 +11849,62 @@ enemy-ai's side, agreed with npc.
   treats him as its townsfolk.
 
 tests/spawn_key_test (_test_became).
+
+## 470. The labyrinth generator: dwarven rooms and halls, or the old caverns, between the anchors
+
+The second generator for regenerating levels (465), the coordinator's
+go-ahead 2026-10-17 ("dwarven rooms and halls between the anchors (a
+gatehouse, halls, chambers, the older style below), content-free"), from
+Jeff's lore: dwarven work plain, heavy, built to last; lore's proposal of
+a third, older style for the labyrinths themselves. Content-free: no real
+level is marked; the sample halls live in the tool and the test.
+
+- sim/level_gen/labyrinth.gd, the same contract as maze (generate(template,
+  config, seed) -> LevelMap), with "style": "dwarven" or "old". A style
+  is a vocabulary for a whole level (each real level later picks one and
+  its own walls and floors sets), never mixed on one map.
+- Rooms: "rooms": {"count": [lo, hi], "size": [least, most]} placed at
+  random in the rock, a cell of rock between any two and from the anchors;
+  dwarven rectangles, the first two great halls (wider, every other
+  interior cell a pillar); old caverns, a blob grown from the rectangle's
+  middle to two thirds of it. The anchors and rooms are nodes joined by a
+  minimum spanning tree over their centres (Prim's, by walking distance)
+  plus "loops" (0.2) times the nodes of extra ways drawn among the
+  shortest left, so the halls loop and the ways are never the same twice.
+- Ways: out of each node by its exit nearest the other (an anchor's only
+  through an open edge of the template); dwarven straight with one bend,
+  two cells wide when neither end is a plain room, a door edge where it
+  meets a room, with the cell inside remembered; old a walk leaning toward
+  where it goes (LEAN 0.65), finished straight. Never into an anchor.
+  Blind ways: dwarven alcoves a cell deep off about half the rooms; old
+  crooked ways four to ten cells off a corridor, touching nothing. Then
+  gen_tools' join_up and Regen's flood fill as before.
+- Light and things: dwarven torches on the cell inside each door and
+  every eighth corridor cell; the old style none. "chests" on the blind
+  ways' ends, then room corners, then rooms; "crates" in rooms;
+  "monsters" {kind: count}, brutes in the halls first, every kind in rooms
+  and corridors; never beside an anchor. What the kinds and loot mean is
+  enemy-ai's and items'.
+- Level.regenerate_from passes the block's other keys through as the
+  generator's own; sim/level_gen/gen_tools.gd holds what the generators
+  share (clear_outside, carve, parts, join_up, l_path, shuffle), maze
+  moved onto it.
+- tools/plan_sheet.tscn (write_sheet): a generation drawn at --scale (8)
+  pixels a layout pixel in the legend's colours, each anchor outlined in
+  blue, with a line of what is on it; --level=<name> for a marked level,
+  --sample=dwarven|old for the built-in sample halls (48 x 40: a
+  gatehouse, two halls and a deepest chamber). Jeff's sheets go to
+  C:\dev\review\dungeon\.
+
+tests/labyrinth_test (port 17861): the block's keys through, and for each
+style the anchors verbatim, generations differing outside, rooms (3 x 3
+blocks of floor), every anchor reached, the same seed the same map,
+doors between floor cells and torches in dwarven and none in old, the
+markers counted and none beside an anchor, the sample's links and spawn
+points kept; the sheet written and refused without an out or for a level
+that does not regenerate. No protocol change; no new class_name.
+
+Rejected: mixing the styles on one map by depth (a level has one walls
+set; the deeper level is the older one); sunk caverns and stairs in the
+old style now (the coordinator: flat first); the generator choosing
+treasure (items' and enemy-ai's).

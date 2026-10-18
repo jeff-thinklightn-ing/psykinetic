@@ -745,7 +745,13 @@ static func regenerate_from(config: Dictionary, warnings: Array[String]) -> Dict
 	if counts is Dictionary:
 		for kind: Variant in counts:
 			monsters[str(kind)] = maxi(int(counts[kind]), 0)
-	return {"generator": generator, "every_days": maxi(int(given.get("every_days", 3)), 1), "anchors": anchors, "monsters": monsters}
+	var out := {"generator": generator, "every_days": maxi(int(given.get("every_days", 3)), 1), "anchors": anchors, "monsters": monsters}
+	# The rest of the block is the generator's own (a style, rooms, loops,
+	# chests...: docs/levels.md), passed as written.
+	for key: Variant in given:
+		if str(key) not in out:
+			out[str(key)] = given[key]
+	return out
 
 
 ## Whether [param cell] lies in one of [param anchors] (regenerate_from's).

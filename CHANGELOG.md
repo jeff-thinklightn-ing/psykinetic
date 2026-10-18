@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A second way for the shifting halls to lay themselves out: rooms and halls instead of a maze, dwarven (square rooms, pillared halls, doors and torches) or old (caverns and crooked ways in the dark), joined so every anchor is reached, with chests in the alcoves and dead ends. Still no real level shifts; a plan-sheet tool draws a generation for Jeff (decision 470).
 - Tools: a heavy job run through the resource gate inside another gated run (a bench script calling frame_budget) goes straight through instead of queueing behind its own parent forever (394 amended).
 - Snagfin no longer spawns as a monster by the town chest in the wilds. A server that saved him hands him over once, ready to become the town's goblin merchant.
 - Weapons, the shield, rations, bandages, sacks, bundles, cloth, purses, nails

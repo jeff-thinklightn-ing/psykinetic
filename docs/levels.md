@@ -312,6 +312,24 @@ generation number, so a generation is the same on any machine; a map whose
 anchors do not all reach each other is thrown away and the next seed
 tried, eight times, after which the last map stands.
 
+The `labyrinth` generator (decision 470) lays rooms and halls instead of a
+maze, in one of two styles, `"style"`: `"dwarven"` (the halls under the
+gatehouse: rooms square-cut, a couple of great halls with a row of pillars,
+corridors straight with one bend and two cells wide between halls and
+anchors, a door where a corridor meets a room, torches along the ways and
+inside the doors, alcoves off the rooms) or `"old"` (the older labyrinths
+below: caverns grown from a seed cell, crooked ways, blind ways wandering
+into the rock, no doors and no torches, so lanterns matter). Its own keys:
+`"rooms": {"count": [lo, hi], "size": [[w, h], [w, h]]}` (least and most),
+`"loops"` (extra ways as a share of the rooms and anchors, 0.2), `"chests"`
+and `"crates"` (counts; chests on the blind ways' ends and room corners
+first), and `"monsters"` as the maze (brutes in the great halls first). The
+anchors and rooms are joined by a minimum spanning tree over their centres
+plus the loops. Any key of the block beyond the four Level reads is the
+generator's own and passed as written. `tools/plan_sheet.tscn` draws a
+generation large, the anchors outlined (`--level=<name>` or
+`--sample=dwarven|old`, `--generation=n`, `--out=<png>`).
+
 When it shifts: on the slow world tick (every `World.WORLD_TICK_STEPS`), a
 level whose `every_days` have gone by since its last generation is laid
 again, only while its zone is asleep (nobody in it, nobody dead there
