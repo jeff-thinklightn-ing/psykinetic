@@ -15,7 +15,13 @@ extends Node
 ##   outdoor beds are quieter and muffled (the Ambience bus's low-pass twin);
 ## - rain quietening the birds and crickets;
 ## - a town: its day or night bed within TOWN_NEAR cells of a building that
-##   serves one, fading out by TOWN_FAR.
+##   serves one, fading out by TOWN_FAR;
+## - a forest's canopy (decision 466) round the view (Client3D's eased
+##   cover, the mean of Fields.canopy_at the drawn canopy uses): the deep
+##   forest's day and night beds taking over from the open forest's as the
+##   roof closes, rain heard on the crowns instead of falling through, and
+##   the drips after it as Weather.drip_at has them (decision 477: the
+##   drawn drops read the same).
 ## A torch is a point, not a bed: the torch loop (amb.torch_fire) plays from
 ## the nearest torch within hearing (Sfx.hearing, its slot's range).
 ## A bed with no takes plays nothing.
@@ -28,6 +34,10 @@ const WEIGH_EVERY := 0.25
 const ROOFED := 0.35
 ## How much rain quietens birds and crickets (at full rain).
 const RAIN_HUSH := 0.7
+## Under a full roof: the share of the open forest's beds the deep forest's
+## take over, and the share of the rain kept off (heard on the crowns).
+const DEEP := 0.8
+const CANOPY_RAIN := 0.7
 ## A town's bed: full within TOWN_NEAR cells of one of its buildings, gone
 ## by TOWN_FAR.
 const TOWN_NEAR := 10.0
@@ -38,10 +48,11 @@ const DAWN_HOURS := 1.4
 ## Below this weight a bed is stopped.
 const SILENT := 0.01
 const BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
-	"amb.rain", "amb.storm", "amb.dungeon", "amb.town_day", "amb.town_night"]
+	"amb.rain", "amb.storm", "amb.dungeon", "amb.town_day", "amb.town_night",
+	"amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips"]
 ## Beds of the open air: muffled under a roof.
 const OUTDOOR_BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
-	"amb.rain", "amb.storm"]
+	"amb.rain", "amb.storm", "amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips"]
 
 ## The view this plays for (its listener, zone, torches and buildings).
 var view: Client3D
@@ -86,7 +97,10 @@ func _weigh() -> void:
 	var under_sky := World.fields.under_sky(cell) if World.fields != null else true
 	var weather: Dictionary = World.fields.weather if World.fields != null else {}
 	var zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
-	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell)))
+	var canopy := view._canopy_cover
+	var drip := Weather.drip_at(World.fields.region, steps, canopy) if World.fields != null else 0.0
+	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
+			canopy, drip))
 	_place_torch(cell)
 
 
@@ -94,8 +108,11 @@ func _weigh() -> void:
 ## "indoors", "cave", "dungeon"), [param under_sky] or under a roof, with
 ## the sky's [param daylight] (DayNight: NIGHT .. 1) at [param hour],
 ## [param weather] (Weather's: rain, wind, ... each 0..1) and
-## [param town] (0..1: how near a town's buildings).
-static func weights(zone: String, under_sky: bool, daylight: float, hour: float, weather: Dictionary, town: float) -> Dictionary:
+## [param town] (0..1: how near a town's buildings), under a forest's
+## [param canopy] (0..1: its cover round the view) with its [param drip]
+## (0..1, Weather.drip_at).
+static func weights(zone: String, under_sky: bool, daylight: float, hour: float, weather: Dictionary, town: float,
+		canopy := 0.0, drip := 0.0) -> Dictionary:
 	var out := {}
 	for bed in BEDS:
 		out[bed] = 0.0
@@ -105,13 +122,18 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 		var day := clampf((daylight - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
 		var dawn := clampf(1.0 - absf(hour - DAWN_HOUR) / DAWN_HOURS, 0.0, 1.0)
 		var hush := 1.0 - RAIN_HUSH * rain
-		out["amb.forest_dawn"] = dawn * hush
-		out["amb.forest_day"] = day * (1.0 - dawn) * hush
-		out["amb.forest_night"] = (1.0 - day) * (1.0 - dawn) * hush
+		var open := 1.0 - DEEP * canopy
+		out["amb.forest_dawn"] = dawn * hush * open
+		out["amb.forest_day"] = day * (1.0 - dawn) * hush * open
+		out["amb.forest_night"] = (1.0 - day) * (1.0 - dawn) * hush * open
+		out["amb.forest_deep_day"] = day * (1.0 - dawn) * hush * canopy
+		out["amb.forest_deep_night"] = (1.0 - day) * (1.0 - dawn) * hush * canopy
 		out["amb.field_wind"] = wind
 		var storm := clampf(rain * wind * 2.0 - 0.2, 0.0, 1.0) if str(weather.get("kind", "")) == "storm" else 0.0
 		out["amb.storm"] = storm
-		out["amb.rain"] = rain * (1.0 - storm)
+		out["amb.rain"] = rain * (1.0 - storm) * (1.0 - CANOPY_RAIN * canopy)
+		out["amb.rain_canopy"] = rain * canopy
+		out["amb.drips"] = drip
 		out["amb.town_day"] = town * day
 		out["amb.town_night"] = town * (1.0 - day)
 		if not under_sky:

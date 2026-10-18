@@ -1,6 +1,26 @@
 {
 	"about": "Third-party takes of the sound slots: slot -> [{file, from (a source in slots.json), original (where in the source it was cut from), sha256, ...}]. Written by tools/sound_take.ps1; read by SoundKit. A take of a source stored external is kept outside the repo (the sound library takes/<slot>/<file>) and copied into art/audio/external/<slot>/ by tools/sound_sync.ps1.",
 	"takes": {
+		"amb.drips": [
+			{
+				"file": "amb.drips.ogg",
+				"from": "freesound",
+				"original": "freesound 277466: the sound of a forest after rain / drops falling on ferns rear (from 30 s for 60 s)",
+				"sha256": "8d6387ed57ba7a3fd8ad6eb286b1e4c551d51c34cf8be3b25a193a5981f12879",
+				"by": "CRAFTCREST.com",
+				"url": "https://freesound.org/people/CRAFTCREST.com/sounds/277466/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "amb.drips.2.ogg",
+				"from": "freesound",
+				"original": "freesound 841641: AMBForst Native birds in the bush reserve, light dripping after rain, Invercargill, New Zealand (from 20 s for 60 s)",
+				"sha256": "e18312dc4bee4753ebe8da1e030a3baa8080bcef89963c78b5c6fe2b14c62630",
+				"by": "vhio",
+				"url": "https://freesound.org/people/vhio/sounds/841641/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.dungeon": [
 			{
 				"file": "amb.dungeon.ogg",
@@ -33,6 +53,46 @@
 				"sha256": "9fa99be4ca80db2e7d8af5af6ad0da14fe363ccbf1c6179c70753ba5743a8858"
 			}
 		],
+		"amb.forest_deep_day": [
+			{
+				"file": "amb.forest_deep_day.ogg",
+				"from": "freesound",
+				"original": "freesound 563571: Wind in forest with creaking tree (from 5 s for 60 s)",
+				"sha256": "7c4dbefc8ed0e59f2cebeb1aedc7ad2b22244e87233132aba8633a81b354d60f",
+				"by": "Cinetony",
+				"url": "https://freesound.org/people/Cinetony/sounds/563571/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.forest_deep_day.2.ogg",
+				"from": "freesound",
+				"original": "freesound 140047: A tree is creaking in the patagonian forest of Argentina in a deep creaky sound. (Argentina, Tierra del Fuego). (from 20 s for 60 s)",
+				"sha256": "d91ade73f72d6ed1fe2c801495de386bf0783d04b4154b08c734b3e955193074",
+				"by": "felix.blume",
+				"url": "https://freesound.org/people/felix.blume/sounds/140047/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.forest_deep_night": [
+			{
+				"file": "amb.forest_deep_night.ogg",
+				"from": "freesound",
+				"original": "freesound 475376: night_forest_owl.WAV (from 4 s for 60 s)",
+				"sha256": "48370d2869efa0e39244cc9d70f6a35b6b074a8b5ccebda730c3dd1c21fd1500",
+				"by": "thom_cookes",
+				"url": "https://freesound.org/people/thom_cookes/sounds/475376/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.forest_deep_night.2.ogg",
+				"from": "freesound",
+				"original": "freesound 151241: OwlsForestApril82012.wav (from 10 s for 60 s)",
+				"sha256": "365cec2cff4c760bc4ac3194c96f0e8296fe98986c7cc3afc5da2e49ef80b11c",
+				"by": "kvgarlic",
+				"url": "https://freesound.org/people/kvgarlic/sounds/151241/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.forest_night": [
 			{
 				"file": "amb.forest_night.ogg",
@@ -53,6 +113,26 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/InspectorJ - Essentials 06 Rain/RAINVege_InsJ_Ambience_Rain_Moderate_02_LOOP.wav (from 0 s for 20 s)",
 				"sha256": "f8f92b477b509a93cd3c175d2007293f448b26f027904be25a776ac56126a834"
+			}
+		],
+		"amb.rain_canopy": [
+			{
+				"file": "amb.rain_canopy.ogg",
+				"from": "freesound",
+				"original": "freesound 242956: Rain Fall Through Trees (from 5 s for 60 s)",
+				"sha256": "7c8cf114ed0513c2a814987714c3626154c3ff610a978dd5675bf7de27605bdf",
+				"by": "acollier123",
+				"url": "https://freesound.org/people/acollier123/sounds/242956/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.rain_canopy.2.ogg",
+				"from": "freesound",
+				"original": "freesound 34073: AMBIENT - Rain on Forest Canopy - Light (LOOP).mp3",
+				"sha256": "194a9655cfe4e9ff731899d6adc7c925fa7b611562d2995e99c8b34df158aef3",
+				"by": "Arctura",
+				"url": "https://freesound.org/people/Arctura/sounds/34073/",
+				"license": "CC BY 3.0"
 			}
 		],
 		"amb.storm": [

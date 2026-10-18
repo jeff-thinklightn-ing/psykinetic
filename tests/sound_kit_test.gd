@@ -230,6 +230,22 @@ func _test_ambience_weights() -> void:
 	_check(is_equal_approx(town["amb.town_day"], 1.0) and town["amb.town_night"] == 0.0, "by a town's buildings by day: its day bed")
 	var dungeon := Ambience.weights("dungeon", true, 1.0, 12.0, {"kind": "storm", "rain": 1.0, "wind": 1.0}, 0.0)
 	_check(dungeon["amb.dungeon"] == 1.0 and dungeon["amb.rain"] == 0.0 and dungeon["amb.forest_day"] == 0.0, "under stone: the dungeon bed, no weather")
+	_check(noon["amb.forest_deep_day"] == 0.0 and noon["amb.rain_canopy"] == 0.0 and noon["amb.drips"] == 0.0,
+			"no canopy: no deep forest, no crowns, no drips")
+	var deep := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 1.0)
+	_check(is_equal_approx(deep["amb.forest_deep_day"], 1.0) and is_equal_approx(deep["amb.forest_day"], 1.0 - Ambience.DEEP)
+			and deep["amb.forest_deep_night"] == 0.0, "under a full roof at noon: the deep forest by day over the open's (%s)" % [deep])
+	var deep_night := Ambience.weights("outdoors", true, DayNight.NIGHT, 0.0, clear, 0.0, 0.5)
+	_check(is_equal_approx(deep_night["amb.forest_deep_night"], 0.5) and is_equal_approx(deep_night["amb.forest_night"], 1.0 - Ambience.DEEP * 0.5),
+			"half under the roof at midnight: the deep night bed (owls) half in")
+	var crowns := Ambience.weights("outdoors", true, 1.0, 12.0, {"kind": "rain", "rain": 1.0, "wind": 0.0}, 0.0, 1.0, 1.0)
+	_check(is_equal_approx(crowns["amb.rain_canopy"], 1.0) and is_equal_approx(crowns["amb.rain"], 1.0 - Ambience.CANOPY_RAIN)
+			and is_equal_approx(crowns["amb.drips"], 1.0), "rain under the roof: on the crowns, little through, dripping")
+	var after := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 0.8, 0.4)
+	_check(after["amb.rain_canopy"] == 0.0 and is_equal_approx(after["amb.drips"], 0.4), "after the rain: the drips as Weather.drip_at has them")
+	var roofed_deep := Ambience.weights("outdoors", false, 1.0, 12.0, clear, 0.0, 1.0, 1.0)
+	_check(is_equal_approx(roofed_deep["amb.drips"], Ambience.ROOFED) and is_equal_approx(roofed_deep["amb.forest_deep_day"], Ambience.ROOFED),
+			"under a roof in the forest: its beds quieter too")
 	for bed: String in Ambience.BEDS:
 		_check(SoundKit.has(bed) and not SoundKit.positional(bed), "%s is a flat slot" % bed)
 

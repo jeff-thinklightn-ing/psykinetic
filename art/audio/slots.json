@@ -1140,6 +1140,38 @@
 			"volume_db": -12.0,
 			"uses": "wind and rain hard; a bed under a zone, time or weather; Ambience.weights"
 		},
+		"amb.forest_deep_day": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "deep under a forest's roof by day: trunks creaking, a hush; a bed under a zone, time or weather; Ambience.weights"
+		},
+		"amb.forest_deep_night": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "deep under a forest's roof at night: owls, a hush; a bed under a zone, time or weather; Ambience.weights"
+		},
+		"amb.rain_canopy": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "rain pattering on the crowns overhead; a bed under a zone, time or weather; Ambience.weights"
+		},
+		"amb.drips": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "drops falling from the crowns after rain; a bed under a zone, time or weather; Ambience.weights"
+		},
 		"music.town_base": {
 			"category": "music",
 			"type": "bed",

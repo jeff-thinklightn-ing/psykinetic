@@ -12507,3 +12507,25 @@ the poor, the dole or the coffer; the store when nobody is rich; the fence's
 split and gold conserved; caught by the victim at the well with the gold
 back, the cards, the grudge and the dispute; lying low after three. Protocol
 unchanged; no new class_name.
+
+## 484. The dark forest heard: beds weighed by the canopy, rain on the crowns, drips
+
+Terrain's canopy (466) and environment's look under it (477) heard: four
+new Ambience beds (decision 270), each from two Freesound takes (CC0, and
+CC BY credited in THIRD_PARTY.md), weighed by the canopy's cover round the
+view: Client3D's eased _canopy_cover, the mean of Fields.canopy_at the
+drawn canopy uses, so what is heard closes in as what is seen does.
+- amb.forest_deep_day (trunks creaking, a hush) and amb.forest_deep_night
+  (owls) take over from the open forest's dawn, day and night beds as the
+  roof closes: those at 1 - DEEP (0.8) x cover, the deep ones at cover,
+  by the same clock and the same rain hush.
+- Rain is heard on the crowns: amb.rain_canopy at rain x cover, the open
+  rain bed kept off to 1 - CANOPY_RAIN (0.7) x cover.
+- amb.drips at Weather.drip_at(region, steps, cover) (477): the cover while
+  it rains, fading after over 90 s x cover, never for snow; the drawn drops
+  read the same call, so the drips start and stop together.
+- All four are outdoor beds: quieter and muffled under a roof.
+Ambience.weights takes canopy and drip as two more arguments (0 by default:
+no forest, as before). The tests weigh the beds, not their takes, so a
+checkout without the external takes passes alike.
+Client only, protocol unchanged.
