@@ -3460,13 +3460,46 @@ static func _scatter_mesh(kind: String) -> Mesh:
 		var piece := ArtKit.instance(slot)
 		for node in ArtKit._descendants(piece):
 			if node is MeshInstance3D:
-				mesh = (node as MeshInstance3D).mesh
+				mesh = _coloured(node as MeshInstance3D)
 				break
 		piece.free()
 	if mesh == null:
 		mesh = _make_scatter(kind)
 	_scatter_meshes[kind] = mesh
 	return mesh
+
+
+## [param source]'s mesh with its colour in its vertices, as the scatter's
+## materials draw (vertex colours times each instance's): a surface with no
+## vertex colours of its own takes its material's albedo colour times its
+## texture (the palette) at each vertex's UV. Art's scatter is coloured by
+## the palette through UVs; drawn as it came it was white.
+static func _coloured(source: MeshInstance3D) -> Mesh:
+	var made := ArrayMesh.new()
+	for surface in source.mesh.get_surface_count():
+		var arrays := source.mesh.surface_get_arrays(surface)
+		var colours: Variant = arrays[Mesh.ARRAY_COLOR]
+		if colours == null or (colours as PackedColorArray).is_empty():
+			var material := source.get_active_material(surface) as BaseMaterial3D
+			var base := material.albedo_color if material != null else Color.WHITE
+			var image: Image = null
+			if material != null and material.albedo_texture != null:
+				image = material.albedo_texture.get_image()
+				if image != null and image.is_compressed():
+					image.decompress()
+			var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var uvs: Variant = arrays[Mesh.ARRAY_TEX_UV]
+			var baked := PackedColorArray()
+			for i in points.size():
+				var colour := base
+				if image != null and uvs != null and i < (uvs as PackedVector2Array).size():
+					var uv: Vector2 = uvs[i]
+					var size := image.get_size()
+					colour *= image.get_pixel(clampi(int(fposmod(uv.x, 1.0) * size.x), 0, size.x - 1), clampi(int(fposmod(uv.y, 1.0) * size.y), 0, size.y - 1))
+				baked.append(Color(colour, 1.0))
+			arrays[Mesh.ARRAY_COLOR] = baked
+		made.add_surface_from_arrays(source.mesh.surface_get_primitive_type(surface), arrays)
+	return made
 
 
 static func _make_scatter(kind: String) -> ArrayMesh:

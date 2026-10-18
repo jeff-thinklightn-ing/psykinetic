@@ -534,6 +534,15 @@ func _test_scatter() -> void:
 	_check(counts.get("tuft", 0) > 0 and counts.get("flower", 0) > 0 and counts.get("stone", 0) > 0 and counts.get("root", 0) > 0
 			and counts.get("reeds", 0) > 0, "tufts, flowers, stones, roots, and reeds by the water (%s)" % counts)
 	_check(wet == 0 and off_grid > total * 0.9, "none on water, and off the cells' middles (%d of %d)" % [off_grid, total])
+	# Art's scatter is coloured by the palette through UVs; the scatter draws
+	# vertex colours, so they are baked in (white tufts on 2026-10-18).
+	var pale: Array[String] = []
+	for kind: String in ["tuft", "flower", "stone", "root", "reeds"]:
+		var mesh := Client3D._scatter_mesh(kind)
+		var colours: Variant = mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+		if colours == null or (colours as PackedColorArray).is_empty() or Array(colours).all(func(c: Color) -> bool: return c.r > 0.95 and c.g > 0.95 and c.b > 0.95):
+			pale.append(kind)
+	_check(pale.is_empty(), "every scatter kind's mesh carries its colours, art or not (white: %s)" % [pale])
 	var forest_cells := _rig._ground_cells.size() - _rig._ground_water_end
 	_check(forest_cells > 0, "the ground runs into the forest, its floor blended in (%d cells)" % forest_cells)
 	var sizes: Dictionary[float, bool] = {}

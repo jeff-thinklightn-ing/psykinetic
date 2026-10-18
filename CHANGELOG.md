@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Grass tufts, stones, roots, reeds and flowers on the ground are in their colours again; since this morning's new art they were drawn white.
 - Someone walked home (decision 487, on 435 and Jeff's rule): now and then one of a town's people of the working trades loses their way beyond the walls and stands at a far cell of the town's zone (off held ground, reachable), away from work till walked home; their kin ask you to walk them home, a word to the lost one and they follow you at heel (companions' Heel), and reaching the town's ground pays whoever walked them (economy's commissions.escort, 8) with the notice and memories on both cards; after three days the lost find their own way back, so nobody is ever stranded.
 - Internal: the way a companion walks at your heel is shared, ready for townspeople
   who walk home with you (decision 485). Companions walk as before.
