@@ -12339,7 +12339,15 @@ KOBOLD_CREST), long ears swept back where the horns were, two teeth, a loincloth
 shorter); its tail long and whip-thin, rigid on the pelvis so the legs swing clear (checked in
 Walk and the crouch), curling up at its tip; slighter (TORSO_WIDTH), less crouched (posture
 slouching). No cap, no candle: kobolds see in the dark (art-gen's notes). It fights with the
-dagger (481). The orc stays as built until Jeff picks one.
+dagger (481). The orc stays as built until Jeff picks one. Then a second pass (the coordinator on the
+first beside the concept: "a stick figure"): a broader chest and shoulders, thicker forearms
+and thighs, bigger hands and feet with four claws each, a shorter neck, a longer snout with
+its mouth's line; digitigrade legs on the same bones (the knee forward, the hock back, a long
+raised foot, kobold_foot); the tail twice as thick at its root, tapering, longer, rooted under
+the loincloth (widened over the thighs); scales as banding (kobold_bands: every other band of
+SCALE_BAND on its back, the tail's top and the shins' fronts the crest's dark tint), its belly
+pale (a new palette region, "Belly", body_build); the crest and ruff half the size, the ears
+swept out.
 ## 481. A kobold fights with a dagger and drops a pick 1 time in 5
 
 The coordinator, on the kobold's look (pc-character's 478) and items' pick
