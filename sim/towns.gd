@@ -1294,10 +1294,20 @@ func _take_companion(town: String, who: String, faction: String, by: String) -> 
 
 
 ## A hunter came home (Production.hunted, decision 407): the town log says
-## what with, or that there was no game.
+## what with, or that there was no game, the first time only after a catch
+## (most tries in a day find the day's game taken: npc's soak, 484 lines a
+## month).
 func _on_hunted(town: String, who: String, kind: String) -> void:
 	var name := str(production.worker(who).get("name", who))
-	_note(town, "%s the hunter found no game" % name if kind.is_empty() else "%s the hunter brought home a %s" % [name, kind])
+	var missed: Dictionary = _town(town).get("hunter_missed", {})
+	_town(town)["hunter_missed"] = missed
+	if kind.is_empty():
+		if not missed.has(who):
+			missed[who] = true
+			_note(town, "%s the hunter found no game" % name)
+		return
+	missed.erase(who)
+	_note(town, "%s the hunter brought home a %s" % [name, kind])
 
 
 ## Faction [param id] as the town's log names it (Factions.display_name:
