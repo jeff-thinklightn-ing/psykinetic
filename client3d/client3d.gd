@@ -298,6 +298,9 @@ const SHADOW_MARGIN := 2.0
 ## reach and this (cells), or within earshot (Sfx.MAX_DISTANCE); further
 ## off, only what it will need on coming back (its tile, its hp).
 const PUPPET_MARGIN := 4.0
+## A puppet left far off is looked at again every this many frames (its
+## coming near, its hp), not every frame.
+const FAR_EVERY := 4
 const SHADOW_RECHECK := 0.5
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
@@ -1429,7 +1432,9 @@ func _follow(delta: float) -> void:
 
 
 func _local_player() -> Player:
-	for entity in World.get_entities():
+	# The roster (players and companions), not a copy of every entity: this
+	# is asked several times a frame.
+	for entity in World.sought():
 		if entity is Player and entity.owner_peer == Net.local_id and entity.spawned:
 			return entity
 	return null
@@ -1862,6 +1867,8 @@ func monster_near_ray(origin: Vector3, direction: Vector3) -> GridEntity:
 	var best: GridEntity = null
 	var best_off := MODEL_RADIUS + PICK_SLACK
 	for id: int in _puppets:
+		if _far.has(id):
+			continue  # Out of the view (and its reach) altogether.
 		var entity := instance_from_id(id) as GridEntity
 		var puppet := _puppets[id]
 		if not entity is Monster or not entity.spawned or not is_instance_valid(puppet) or not puppet.is_visible_in_tree():
@@ -5841,13 +5848,19 @@ func _sync_puppets() -> void:
 	var now := Time.get_ticks_msec()
 	var reach := maxf(_view_reach() + PUPPET_MARGIN, Sfx.MAX_DISTANCE) if _camera != null else INF
 	var aim := Vector2(_camera_target.x, _camera_target.z)
-	for entity in World.get_entities():
+	var frame := Engine.get_process_frames()
+	# World's own list, not a copy: nothing here spawns or despawns.
+	for entity in World.entities():
 		if not entity.spawned:
 			continue
 		var id := entity.get_instance_id()
 		seen[id] = true
+		if (id + frame) % FAR_EVERY != 0 and _far.has(id):
+			# Far off when last looked at: looked at again every FAR_EVERY
+			# frames (a big map holds thousands of them).
+			continue
 		var made := not _puppets.has(id)
-		if not made and _puppets[id].get_meta("body", &"") != body_of(entity):
+		if not made and not _far.has(id) and Vector2(entity.tile).distance_to(aim) <= reach 				and _puppets[id].get_meta("body", &"") != body_of(entity):
 			# Its body came after it did (a client hears it a moment later).
 			if _puppets[id] == _outlined:
 				target(null)

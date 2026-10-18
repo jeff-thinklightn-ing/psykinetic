@@ -448,6 +448,7 @@ func _ready() -> void:
 	_paint_level()
 	# The minimap was made (_build_talk) before there was a level, and a
 	# host's boot draws this map no more (_view_zone): drawn here.
+	_door_marks_at = -1  # A new level: its doors.
 	minimap.rebuild(level)
 	Iso.set_azimuth(Net.test_azimuth)
 	_apply_azimuth()
@@ -1449,7 +1450,9 @@ static func camera_lean(lean: Vector2, viewport: Viewport, yaw_degrees: float, d
 ## The player this peer's input controls, or null (dedicated server, dead,
 ## or not spawned yet).
 func _local_player() -> Player:
-	for entity in World.get_entities():
+	# The roster (players and companions), not a copy of every entity: this
+	# is asked several times a frame.
+	for entity in World.sought():
 		if entity is Player and entity.owner_peer == Net.local_id and entity.spawned:
 			return entity
 	return null
@@ -1697,6 +1700,7 @@ func _on_terrain(data: Dictionary) -> void:
 func _repaint() -> void:
 	_paint_level()
 	if minimap != null:
+		_door_marks_at = -1  # A new level: its doors.
 		minimap.rebuild(level)
 	if _client3d != null:
 		_client3d.rebuild(_terrain, level_centre)
@@ -4143,6 +4147,7 @@ func _build_talk() -> void:
 	minimap.marks = _minimap_marks
 	$HUD.add_child(minimap)
 	if not level.is_empty():
+		_door_marks_at = -1  # A new level: its doors.
 		minimap.rebuild(level)
 	minimap.big = Net.test_minimap
 	shop_panel = ShopPanel.new()
@@ -5425,13 +5430,19 @@ func toggle_hints() -> void:
 
 ## Which way the level's north points on screen (unit, y down), in
 ## whichever view is showing.
+## The minimap's door marks, made again every DOOR_MARKS_FRAMES frames.
+const DOOR_MARKS_FRAMES := 30
+var _door_marks: Array = []
+var _door_marks_at := -1
+
+
 ## The minimap's marks, from what is replicated: you (pointing where the
 ## camera looks), your companion, the other players in their tints, and the
 ## doors. No monsters.
 func _minimap_marks() -> Array:
 	var out: Array = []
 	var me := _local_player()
-	for entity in World.get_entities():
+	for entity in World.sought():  # The players and companions: no copy of every entity.
 		if not is_instance_valid(entity) or not entity.spawned:
 			continue
 		if entity is Player:
@@ -5442,9 +5453,15 @@ func _minimap_marks() -> Array:
 		elif entity is Companion and entity.keeper_peer == Net.local_id:
 			out.append({"cell": Vector2(entity.tile), "kind": "companion",
 				"colour": me.tint.lightened(0.35) if me != null else Color(0.8, 0.9, 1.0)})
-	for door: Door in World.get_doors():
-		if is_instance_valid(door):
-			out.append({"cell": Vector2(door.key.x, door.key.y), "kind": "door"})
+	if _door_marks_at < 0 or Engine.get_process_frames() - _door_marks_at >= DOOR_MARKS_FRAMES:
+		# The doors stay where they are: their marks made again now and then
+		# (one opened up or broken shows a moment late), not every frame.
+		_door_marks_at = Engine.get_process_frames()
+		_door_marks = []
+		for door: Door in World.get_doors():
+			if is_instance_valid(door):
+				_door_marks.append({"cell": Vector2(door.key.x, door.key.y), "kind": "door"})
+	out.append_array(_door_marks)
 	return out
 
 

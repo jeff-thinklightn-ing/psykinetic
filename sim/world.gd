@@ -4901,6 +4901,12 @@ func get_entities() -> Array[GridEntity]:
 	return _entities.duplicate()
 
 
+## Every entity in the zone. Not a copy: read it, do not change it, and do
+## not spawn or despawn while going through it (get_entities for that).
+func entities() -> Array[GridEntity]:
+	return _entities
+
+
 ## The players and companions in the zone, in id order: what a monster
 ## looks for, without going through every crate and monster. Not a copy:
 ## read it, do not change it.

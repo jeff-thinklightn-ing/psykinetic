@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Big levels draw much faster: on a large dungeon with eight players together, a frame takes about 11 ms where it took 30. The game no longer checks every creature and door on the level each frame. Client only.
 - Two more kinds of townsfolk walk the town, unmarked: a scholar, who knows
   more of the old stories, tells them when asked and passes them on at the
   well, and a merchant, who buys cheaper and sells dearer among the

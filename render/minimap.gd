@@ -222,7 +222,10 @@ func _draw() -> void:
 			draw_rect(Rect2(p - Vector2(dot + 1, dot + 1), Vector2(dot + 1, dot + 1) * 2), PLACE, false, 1.5)
 			if big:
 				draw_string(font, p + Vector2(dot + 5, 5), str(place["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, label_size, PLACE))
+	var on_map: Rect2 = (shown["source"] as Rect2).grow(1.0)
 	for mark: Dictionary in all:
+		if not on_map.has_point(mark["cell"]):
+			continue  # Off the part shown (most of a big level's doors).
 		var at := to_screen(mark["cell"], shown)
 		var colour: Color = mark.get("colour", YOU)
 		match mark["kind"]:

@@ -10292,3 +10292,26 @@ unchanged; no new class_name.
 Rejected: a merchant who trades with players at private prices; a scholar
 who knows draft lore (lore's status rules stand); a scholar who repeats
 no rumours at all (they are townsfolk, not officials).
+## 425. A frame's walks over every entity cut: a no-copy read, far puppets looked at every fourth frame, door marks kept
+
+Measured on map_bench's 256 x 256 dungeon (about 2,900 entities) with
+players standing together: the median frame 29.5 ms with 8 players and
+24.4 ms with 2, rendering under 2 ms of it; Godot's script profiler (a
+stand-in for the editor's, on the remote debugger) put most of the rest in
+walks over every entity each frame. World.get_entities() copies the zone's
+list; Client3D._sync_puppets walked such a copy every frame, each
+_local_player (Main's and Client3D's, several calls a frame) and the
+minimap's marks walked another. World.entities() now reads the list itself
+(not a copy: for code that neither spawns nor despawns while going
+through it; get_entities() is as it was for the rest), _sync_puppets uses
+it, and _local_player and the marks go through the roster (World.sought(),
+the players and companions). A puppet left far off (outside the view's
+reach, decision 312's) is looked at again every FAR_EVERY (4) frames,
+staggered by its id, not every frame, its body checked only near, and the
+mouse's pick (monster_near_ray) skips far ones. The minimap's door marks
+(about 1,900 on that map) are made again every DOOR_MARKS_FRAMES (30)
+frames and at every level's rebuild, not every frame, and Minimap._draw
+skips marks off the part it shows before placing them. After: 11.3 ms with
+8 players, about 14 with 2. Rejected: caching _local_player for a frame (a
+player spawned or gone in that frame would be missed); events for doors
+coming and going (more wiring for what half a second late does not show).
