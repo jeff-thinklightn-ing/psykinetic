@@ -249,16 +249,24 @@ void fragment() {
 	float wet = smoothstep(0.25, 0.6, texture(water, (at - kinds_origin + 0.5) / kinds_size).r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
 	float forest = smoothstep(0.35, 0.65, texture(water, uv).g + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
+	// Under a grown forest's roof (decisions 466, 467) the grass is needles
+	// where the cover passes a half, raggedly; the path's dirt and the
+	// floors stay.
+	float roof = texture(canopy, (at - kinds_origin + 0.5) / kinds_size).r;
+	if (floor_set == 0) {
+		forest = max(forest, smoothstep(0.45, 0.75, roof + (noise(at * 1.3 + 70.0) - 0.5) * 0.3) * weights.r);
+	}
 	vec3 under_trees = needles_own ? textureGrad(needles_tex, at / needles_tile, dx / needles_tile, dy / needles_tile).rgb * needles_shade
 			: forest_floor * (0.8 + 0.4 * fbm(at * 0.4 + 50.0));
 	colour = mix(colour, under_trees, forest);
 	if (floor_set == 0) {
-		float drift = 0.85 + 0.3 * fbm(at * 0.7 + 80.0);
+		// Less snow lies under the roof: a third under full cover.
+		float drift = (0.85 + 0.3 * fbm(at * 0.7 + 80.0)) * (1.0 - 0.7 * roof);
 		colour = mix(colour, vec3(0.9, 0.93, 0.97), clamp(season.z * drift, 0.0, 1.0) * smoothstep(0.75, 0.95, up) * (1.0 - wet));
 	}
 
 	// Light and heat as the old floor had them, worked out in sRGB.
-	float sky_here = mix(sky_floor, sky_floor_roof, texture(canopy, (at - kinds_origin + 0.5) / kinds_size).r);
+	float sky_here = mix(sky_floor, sky_floor_roof, roof);
 	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * max(shade.r, sky_here);
 	vec3 warm_srgb = pow(warm, vec3(1.0 / 2.2));
 	ALBEDO = pow(mix(lit, warm_srgb, shade.g), vec3(2.2));

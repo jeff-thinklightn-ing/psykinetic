@@ -734,6 +734,9 @@ const SCATTER_DENSITY := {
 	"forest": {"tuft": 1.4, "root": 0.25, "stone": 0.1, "flower": 0.04},
 }
 const SCATTER_EDGE_ROOTS := 0.3
+## A grass cell under a canopy this thick or more takes the forest's
+## scatter (decision 467: ground.gdshader turns it to needles from 0.45).
+const SCATTER_ROOF := 0.6
 const SCATTER_REEDS := 1.6
 const SCATTER_SIZES := {"tuft": Vector2(0.7, 1.3), "flower": Vector2(0.8, 1.1), "stone": Vector2(0.6, 1.6), "root": Vector2(0.8, 1.4),
 		"reeds": Vector2(0.8, 1.3)}
@@ -3385,11 +3388,14 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 	for cell: Vector2i in _terrain["fire"]:
 		fire[cell] = true
 	var placed: Dictionary[String, Array] = {}
+	var roof: Dictionary = _terrain.get("canopy", {})
 	for index: int in _scatter_chunks[chunk]:
 		var cell: Vector2i = _ground_cells[index]
 		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell):
 			continue
-		var forest := index >= _ground_water_end
+		# Grass under a grown forest's roof (its cover past SCATTER_ROOF) is
+		# its floor of needles, as the ground draws it: the forest's scatter.
+		var forest := index >= _ground_water_end 				or _ground_kinds[cell] == "grass" and float(roof.get(cell, 0.0)) > SCATTER_ROOF and not _floor_sets.has(cell)
 		var ground := "forest" if forest else _ground_kinds[cell]
 		var density: Dictionary = SCATTER_DENSITY.get(ground, {})
 		# Roots where the land meets the forest; reeds by water.

@@ -1854,6 +1854,17 @@ func _test_grown_trees() -> void:
 			"the three on void and the undergrowth on grass drawn; the tall one on grass not (%s trees, %s chunks)" % [grown.tree_count if grown else -1, grown.chunks.size() if grown else -1])
 	_check(not _rig._trees.has(Vector2i(5, 5)) and not _rig._trees.has(Vector2i(8, 6)) and _rig._grounds.has(Vector2i(5, 5)),
 			"no ring tree on a grown trunk's cell, and the ground runs under it")
+	var roofed := Vector2i(6, 5)
+	var open_cell := Vector2i(30, 15)
+	var as_forest := {}
+	for scatter_chunk: Vector2i in _rig._scatter_chunks:
+		var plan := _rig._scatter_plan(scatter_chunk)
+		for kind: String in plan:
+			for item: Array in plan[kind]:
+				if item[0] == roofed or item[0] == open_cell:
+					as_forest[item[0]] = as_forest.get(item[0], true) and bool(item[3])
+	_check(float(terrain["canopy"].get(roofed, 0.0)) > Client3D.SCATTER_ROOF and as_forest.get(roofed, false) and not as_forest.get(open_cell, true),
+			"grass under the roof takes the forest's scatter, as its floor turns to needles; open grass its own")
 	grown.set_focus(Vector3(5.0, 0.0, 5.0), Vector3(5.0, 0.0, 5.0))
 	grown.finish()
 	var near_one: Node3D = grown.chunks[chunk_of.call(Vector2i(5, 5))]["near"]

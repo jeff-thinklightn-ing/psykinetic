@@ -11882,6 +11882,12 @@ approval of the pad pass, 2026-10-18):
   piece has a shadow-only twin, so the canopy's shadows and the dark under
   it stay whole; the crowns stay opaque outside the region, in the rain's
   heightfield.
+- The ground under the roof (on environment's 477 canopy uniform in
+  ground.gdshader): grass turns to the forest's needles where the cover
+  passes about a half, raggedly by noise (the path's dirt and floors
+  stay); a third as much snow lies under full cover; and a grass cell
+  whose cover passes Client3D.SCATTER_ROOF (0.6) takes the forest's
+  sparse scatter, not the grass's tufts.
 - levels/forest: its trees grown from maps' 464 layout (740 at 100 years,
   710 trunks about 2 m apart, 12.6 m tall), 716 void cells (snags too) laid
   by make_forest. In the game's view there (map_bench, 6 s each): 500 to
