@@ -16,7 +16,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.healers_hut` | cell | 3.6 x 4.5 x 3.6 | 3000 | the healer's hut in the wilds, where its medicine man brings the fallen back (Jeff, 202... |
 | `building.temple` | cell | 4.6 x 7.0 x 6.6 | 4000 | the town's temple, where its priest serves (Jeff, 2026-10-17), 4 x 6 cells, its ridge a... |
 | `creature.cow` | creature | 0.8 x 1.5 x 2.64 | 4000 | a cow, variant 2 the bull: a rigged body (one Skeleton3D) and its clips, by the names l... |
-| `creature.pig` | creature | 0.42 x 0.8 x 1.0 | 2800 | a pig: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a ... |
+| `creature.pig` | creature | 0.41 x 0.75 x 1.13 | 2500 | a pig: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a ... |
 | `ground.grass` | texture | tile 4.0 |  | terrain's ground shader on grass: blended, lit and noised there; procedural colour whil... |
 | `ground.stone` | texture | tile 4.0 |  | terrain's ground shader on stone floors; procedural colour while empty |
 | `item.buckler` | held | 0.35 x 0.35 x 0.05 | 500 | leather buckler (Items: levels/items.json): in a pack or chest as its icon, in a hand, ... |

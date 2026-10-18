@@ -1746,11 +1746,11 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [0.42, 0.8, 1.0],
+			"size": [0.41, 0.75, 1.13],
 			"tolerance": 0.15,
-			"budget": 2800,
-			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette from its atlas)", "tool": "blender (tools/animal_palette.py)", "license": "CC0 1.0 (Quaternius, via poly.pizza u35l6uP5vj, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-18", "notes": "N:/assets/sources/quaternius/animals/poly.pizza/Pig_atlas.glb"},
-			"uses": "a pig: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a sty's beast (economy: meat from the town's scraps; the coordinator scheduled it 2026-10-18), pc-character's from the Quaternius Pig (the boar's rig) through tools/animal_palette.py",
+			"budget": 2500,
+			"source": {"by": "art-gen (the boar's mesh), pc-character (rig fit; made a farm pig by tools/pig_from_boar.py)", "tool": "blender (tools/pig_from_boar.py)", "license": "own (mesh); CC0 1.0 (the Quaternius Pig's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-18", "notes": "from art/kit/creatures/creature.boar; the coordinator's quick route, a veto sends it to art-gen as a farm-pig concept"},
+			"uses": "a pig: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a sty's beast (economy: meat from the town's scraps; the coordinator scheduled it 2026-10-18), pc-character's from the boar's own mesh made a farm pig (tools/pig_from_boar.py)",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},
 				{"name": "walk", "names": ["walk"], "required": true},
@@ -1761,9 +1761,9 @@
 				{"name": "death", "names": ["death", "die"], "required": true}
 			],
 			"grey": [
-				{"at": [0, 0.15, -0.1], "size": [0.3, 0.3, 0.6]},
-				{"at": [0, 0.55, -0.1], "size": [0.42, 0.5, 0.8]},
-				{"at": [0, 0.55, 0.4], "size": [0.3, 0.3, 0.2]}
+				{"at": [0, 0.15, -0.1], "size": [0.3, 0.3, 0.7]},
+				{"at": [0, 0.525, -0.105], "size": [0.41, 0.45, 0.92]},
+				{"at": [0, 0.5, 0.46], "size": [0.3, 0.3, 0.21]}
 			]
 		},
 		"creature.rabbit": {
