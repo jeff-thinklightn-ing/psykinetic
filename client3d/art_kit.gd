@@ -427,6 +427,7 @@ static func _grey_recipe(slot: String) -> Array:
 		# held at the middle of its back) or the top.
 		var origin := str(entry.get("origin", "base"))
 		var base := 0.0 if origin == "base" else -whole.y * 0.5 if origin == "centre" else -whole.y
+		base += float(entry.get("base", 0.0))
 		# A slot whose box's middle is off its origin ("middle": a porch out
 		# from its wall) has its box there.
 		var middle := _vec(entry.get("middle", [0, 0, 0]))

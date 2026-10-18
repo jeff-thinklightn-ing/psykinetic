@@ -42,7 +42,8 @@
 		"item.cloth_bolt": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.cloth_bolt/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 500 mesh"}},
 		"item.coin_purse": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.coin_purse/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh"}},
 		"item.nails": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.nails/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 500 mesh"}},
-		"item.axe_head": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.axe_head/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c5's 500 mesh"}}
+		"item.axe_head": {"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.axe_head/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c5's 500 mesh"}},
+		"item.remedy": {"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a squat eight-sided green glass vial (items' colour 6a8a5a on row 4's greens), a narrow neck tied with cloth, a cork; held at its foot"}}
 	},
 	"credits": [
 		{"title": "Ultimate Animated Animal Pack (the Pig's rig and clips)", "by": "Quaternius", "license": "CC0 1.0",
@@ -348,6 +349,27 @@
 			"thickness": 0.3,
 			"overhang": 0.4,
 			"material": "material.roof.thatch"
+		},
+		"roof.thatch.ridge": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.87, 0.62, 1.12],
+			"base": -0.32,
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a lumpy rounded roll 0.5 across and 0.26 high over the ridge, its wings draping down both slopes at the thatch's rise (0.9), two hazel liggers along its flanks; straw in row 3's mid earth, darker on the flanks, a little weathered grey; 1.12 m so neighbours overlap, its ends ragged; 128 tris; a stand-in for an art-gen concept"},
+			"uses": "a thatch roof's ridge roll (the coordinator: a thick rounded ridge), laid a metre at a time along the ridge by BuildingComposer (buildings' composer, decision 489), following its sag and shift: an edge piece along z, its origin the middle of its underside on the ridge line, its wings down the slopes to y -0.32 (\"base\")"
+		},
+		"roof.thatch.eave": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.38, 0.49, 1.1],
+			"base": -0.23,
+			"middle": [-0.066, 0, 0],
+			"budget": 200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "the thatch's thick lower edge: the slope's 0.3 m running up under the thatch, a rounded lip over the drip, ragged tufts of varied width and length hanging below it; straw as the ridge's; 1.1 m so neighbours overlap; 80 tris; a stand-in for an art-gen concept"},
+			"uses": "a thatch roof's ragged eave (the coordinator: ragged eaves), laid a metre at a time along each eave by BuildingComposer (buildings' composer, decision 489), turned to it: an edge piece along z, its origin on the slope's lower edge, up the slope toward -x under the thatch, overhanging and hanging toward -y down to -0.23 (\"base\") over +x"
 		},
 		"roof.shingle.ridge": {
 			"category": "roofs",

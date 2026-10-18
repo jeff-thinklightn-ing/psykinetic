@@ -82,8 +82,9 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	elif kind == "floor":
 		if absf(box.end.y) > SLACK:
 			out.append("error: its top is at y %.2f m: a floor piece's top is at its origin (y = 0)" % box.end.y)
-	elif absf(box.position.y) > SLACK:
-		out.append("error: its base is at y %.2f m: the origin should be at the bottom (y = 0), so it stands on the ground" % box.position.y)
+	elif absf(box.position.y - float(entry.get("base", 0.0))) > SLACK:
+		# ("base": where a piece hung below its origin has its box's bottom, a ridge's wings down the slopes)
+		out.append("error: its base is at y %.2f m: the origin should be at the bottom (y = %s), so it stands on the ground" % [box.position.y, str(entry.get("base", 0))])
 	if kind != "held" and (absf(centre.x) > want.x * share + SLACK or absf(centre.z) > want.z * share + SLACK):
 		out.append("error: its middle is at x %.2f, z %.2f m: the origin should be at the middle of its base%s (set the origin in Blender, or move the mesh)" % [
 			centre.x, centre.z, ", on the edge's line" if kind == "edge" else ""])

@@ -21,6 +21,7 @@ notes (decision 324).
 - The thief's hand is stronger (461 amended, Jeff's "5 gold"): five gold from the richest purse above the line every day, not three on half the days.
 - A liar among the townsfolk lies only about himself (336 amended, the coordinator's ruling): never an invented deed of a named neighbour, until the lawspeaker can settle slander.
 - Townsfolk are paid for what they bring in: the woodcutter for wood, the hunter for game, the farmer for the harvest, and a hauler for each load carried to the store. Makers now buy their materials from the store, so their earnings flow back to the town. Players are paid for raw goods they bank at a town's store, at the same price. When the town's treasury runs dry it owes what it can't pay, and stops buying once it owes too much.
+- The healing remedy is a small green glass vial with a cork.
 - A healing remedy item: one dose, sold by the healer and the medicine man, to cure a sick resident.
 - The words soak (496 amended; 336 amended): tools/town_soak --ask asks every resident the usual things with the resident mind on the box's model over a tunnel; from its first five days the voice rule is now held by code (at most two sentences, never the speaker's name first), an embellishing voice never puts a deed, look or trait on a named person, and Snagfin's card no longer calls him a merchant who keeps it hidden.
 - The server's lawspeaker is switched on, ruling on what the towns talk of once a day (once the box's service file is reloaded).
