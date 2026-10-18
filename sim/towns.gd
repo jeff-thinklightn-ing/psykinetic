@@ -148,6 +148,8 @@ func buildings_of(town: String) -> Dictionary:
 	var houses: Dictionary = _towns.get(town, {}).get("buildings", {})
 	for kind: String in houses:
 		out[kind] = {"state": houses[kind]["state"], "level": houses[kind]["level"]}
+	if out.has("field"):
+		out["field"]["crop"] = crop_look(town)  # The field's look (decision 457).
 	return out
 
 
@@ -315,6 +317,7 @@ func tick() -> void:
 		_appoint(town)
 		_water(town)
 		_crop(town)
+		_crop_shown(town)
 		_farmer_comes(town)
 		if production.building_in(town):
 			continue
@@ -787,6 +790,25 @@ func crop(town: String) -> Dictionary:
 	return _towns.get(town, {}).get("crop", {}).duplicate()
 
 
+## How [param town]'s field looks (decision 457; art-kit's state
+## parts): "sown" in spring once sown, "growing" in summer ("flattened" for
+## a day after a storm flattened it), "ripe" in autumn till brought in, ""
+## otherwise (unsown, harvested, rotted, winter, no field).
+func crop_look(town: String) -> String:
+	var crop_now: Dictionary = _towns.get(town, {}).get("crop", {})
+	if crop_now.get("stage") != "sown":
+		return ""
+	match str(crop_now.get("season", "")):
+		"spring":
+			return "sown"
+		"summer":
+			var flattened := int(crop_now.get("flattened", -1))
+			return "flattened" if flattened >= 0 and now() - flattened < maxi(DayNight.day_steps, 1) else "growing"
+		"autumn":
+			return "ripe"
+	return ""
+
+
 ## The year's crop moved on to now (Season.name_at): sown in spring by the
 ## farmer's sow_steps of work; in summer growth a day, clamp(base + rain x
 ## the day's rain, least, most) / season_days, each storm flattening it
@@ -847,6 +869,18 @@ func _crop(town: String) -> void:
 				production.stockpile.deposit(town, "food", roots, "roots", "roots dug in winter")
 				crop_now["roots"] = true
 				_note(town, "roots dug: %d food" % roots)
+
+
+## When [param town]'s field's look changed, building_changed for it: Main
+## sends the town's buildings ("town"), the look with them.
+func _crop_shown(town: String) -> void:
+	var record: Dictionary = _towns.get(town, {})
+	if not record.has("crop"):
+		return
+	var look := crop_look(town)
+	if look != str(record["crop"].get("look", "")):
+		record["crop"]["look"] = look
+		building_changed.emit(town, "field")
 
 
 ## A season ended for [param town]'s crop: a crop not brought in by winter
@@ -1284,7 +1318,8 @@ func from_dict(saved: Dictionary) -> void:
 		if crop_saved is Dictionary and not crop_saved.is_empty():
 			record["crop"] = {"stage": str(crop_saved.get("stage", "")), "growth": maxf(float(crop_saved.get("growth", 0.0)), 0.0),
 				"worked": maxi(int(crop_saved.get("worked", 0)), 0), "season": str(crop_saved.get("season", "")),
-				"roots": bool(crop_saved.get("roots", false)), "at": int(crop_saved.get("at", 0)), "flattened": int(crop_saved.get("flattened", -1))}
+				"roots": bool(crop_saved.get("roots", false)), "at": int(crop_saved.get("at", 0)), "flattened": int(crop_saved.get("flattened", -1)),
+				"look": str(crop_saved.get("look", ""))}
 		if entry.has("farmer_wanted"):
 			record["farmer_wanted"] = int(entry["farmer_wanted"])
 		record["farmers_came"] = maxi(int(entry.get("farmers_came", 0)), 0)

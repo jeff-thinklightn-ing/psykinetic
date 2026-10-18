@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_years()
 	_test_missed()
 	_test_farmer_comes()
+	_test_look()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -127,6 +128,37 @@ func _test_farmer_comes() -> void:
 	_check(farmers.size() == 1 and towns.production.worker(farmers[0])["origin"] == "growth", "then a farmer comes (%s)" % [farmers])
 	_year(towns, 7)
 	_check(towns.residents(TOWN).size() == 1, "and only one")
+
+
+## The field's look through a year (decision 457), each change told once.
+func _test_look() -> void:
+	print("
+== the field's look ==")
+	_rain = 0.11
+	_storm = true
+	var rules := _rules.duplicate(true)
+	rules["crop"]["flatten"] = 1.0
+	var towns := _towns(1, true, rules)
+	var told: Array[String] = []
+	var tell := func(_town: String, kind: String) -> void:
+		if kind == "field":
+			told.append(towns.buildings_of(TOWN)["field"]["crop"])
+	towns.building_changed.connect(tell)
+	var seen: Array[String] = []
+	var until := _now + 28 * DAY
+	while _now < until:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+		towns.production.tick()
+		var look := towns.crop_look(TOWN)
+		if seen.is_empty() or seen.back() != look:
+			seen.append(look)
+	# The storm is late in summer (day 13): its day of "flattened" runs into autumn.
+	_check(seen == ["", "sown", "growing", "flattened", "ripe", ""], "bare, sown, growing, flattened, ripe, bare (%s)" % [seen])
+	_check(told == ["sown", "growing", "flattened", "ripe", ""], "each change told once, with the town's buildings (%s)" % [told])
+	_check(not towns.buildings_of(TOWN)["field"].is_empty() and towns.buildings_of(TOWN)["field"].has("crop"), "the field's entry carries it")
+	towns.building_changed.disconnect(tell)  # It holds the town: let both go.
+	_storm = false
 
 
 func _check(ok: bool, what: String) -> void:

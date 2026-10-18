@@ -11741,3 +11741,25 @@ with "from": 6 and "names". Towns._appoint seats one per town once it has
 that many residents of its own (companions not counted), "appointed",
 named from those names, with no building (his work place is npc's: the
 square). Any official given a "from" grows in the same way. rescue_test.
+
+## 457. The field's look: the crop's stage in the "town" message
+
+On 449 (farms) and buildings' 452 (building.field), for art-kit's state
+parts. The coordinator's approval of 2026-10-17. PROTOCOL_REVISION 17.
+
+- Towns.crop_look(town): "sown" (spring, once sown), "growing" (summer),
+  "flattened" (for a day after a storm flattened it), "ripe" (autumn, not
+  yet brought in), "" otherwise (unsown, harvested, rotted, winter, no
+  field).
+- The "town" message's buildings ({town, buildings}: Towns.buildings_of)
+  carry it on the field's entry: buildings["field"] = {state, level, crop}.
+  The town tick keeps the last look on the crop record and, when it
+  changes (a few times a year), emits building_changed(town, "field"),
+  which Main already sends to every peer; a peer coming to the zone gets it
+  with the town's buildings (_send_towns). No new message: the "town"
+  message's content changed, hence the revision.
+- Buildings' Client3D shows the field slot's state_<crop> part, none for ""
+  or a missing key (an older server).
+
+tests/farm_test (the look through a year with a late storm: bare, sown,
+growing, flattened, ripe, bare; each change told once); protocol_test.

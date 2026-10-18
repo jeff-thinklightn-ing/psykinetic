@@ -193,6 +193,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## offers asked for and one accepted) and the "offers" message (decision 435).
 ## 16: monsters and animals replicate raised and raised_tick, as players do
 ## (decision 455): their synchronizer's layout, unseen by the names above.
+## 17: the "town" message's field entry carries the crop's look ("crop":
+## sown, growing, ripe, flattened or "", decision 457).
 ## 18: the "map" message carries "generation", the regenerating level's
 ## generation the client is sent (decision 465).
 const PROTOCOL_REVISION := 18
