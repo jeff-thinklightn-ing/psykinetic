@@ -1823,14 +1823,14 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [2.34, 1.95, 0.55],
+			"size": [2.7, 1.95, 0.73],
 			"tolerance": 0.15,
 			"clip_library": "res://art/models/animations/goblin.res",
 			"model": "res://art/models/characters/orc.glb",
 			"body_material": "human",
 			"source": {"by": "pc-character (tools/body_gen.py, body_build.py --parts)", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "generated on the UAL skeleton, skinned, on the palette; clips the shared humanoid library (clip_library) through the UAL bone map (decision 416)"},
 			"budget": 5000,
-			"uses": "the orc, the brute's body (decision 416): a rigged body (one Skeleton3D) on the UAL skeleton, made by pc-character's body_gen, skinned, on the one palette material, its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose (the UAL's and the human bodies' rest), so x is its arm span; budget as the human bodies' (decision 416)",
+			"uses": "the orc, the brute's body (decision 416; Jeff's pick p2 of art-gen's redo v7, a hulking hunched brute, grey-blue, an iron plate on its left shoulder and a chain; 0.326 m in front of the feet to 0.403 behind, pc-character's measure): a rigged body (one Skeleton3D) on the UAL skeleton, made by pc-character's body_gen, skinned, on the one palette material, its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose (the UAL's and the human bodies' rest), so x is its arm span; budget as the human bodies' (decision 416)",
 			"clips": [
 				{"name": "idle", "names": ["idle", "idle_loop"], "required": true},
 				{"name": "walk", "names": ["walk", "walk_loop"], "required": true},
@@ -1840,10 +1840,10 @@
 				{"name": "death", "names": ["death01", "death02", "death"], "required": true}
 			],
 			"grey": [
-				{"at": [0, 1.55, 0], "size": [2.34, 0.14, 0.14]},
-				{"at": [0, 0.45, 0], "size": [0.5, 0.9, 0.3]},
-				{"at": [0, 1.3, 0], "size": [0.85, 0.8, 0.55]},
-				{"at": [0, 1.8, 0.03], "size": [0.3, 0.3, 0.32]}
+				{"at": [0, 1.55, -0.04], "size": [2.7, 0.14, 0.14]},
+				{"at": [0, 0.45, -0.04], "size": [0.55, 0.9, 0.4]},
+				{"at": [0, 1.3, -0.04], "size": [0.95, 0.8, 0.73]},
+				{"at": [0, 1.8, 0.05], "size": [0.32, 0.3, 0.32]}
 			]
 		},
 		"creature.kobold": {
