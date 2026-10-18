@@ -333,9 +333,9 @@
 		"material.roof.thatch": {
 			"category": "materials",
 			"type": "texture",
-			"tile_m": 2.0,
-			"pixels": 512,
-			"source": {"by": "art-kit, procedural", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-18", "notes": "eight courses of straw down the 2 m tile, strands shaded in clumps on row 3's straw and earth, each course's lip ragged in tufts and waving, shadowed where it laps the course below; seamless (whole courses, wrapped columns); a stand-in for an art-gen concept"},
+			"tile_m": 4.0,
+			"pixels": 1024,
+			"source": {"by": "art-kit, procedural", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-18", "notes": "reworked after the coordinator's look at buildings' kinds shots (the first read as a bright, pale woven mat lighting the whole view): old straw, darker and greyer (row 3's earths drawn toward row 1's grey), weathered in broad blotches, a trace of moss; twelve courses of uneven depth that bulge and sag, their lips ragged and soft-shadowed; low-contrast strands; 1024 px over 4 m so its repeat is wider than a cottage; seamless; Jeff's accepted hand thatch (building.hut) the reference; a stand-in for an art-gen concept"},
 			"uses": "the thatch of roof.thatch.profile's slopes (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): u is metres along the ridge, v metres down the slope"
 		},
 		"roof.thatch.profile": {
