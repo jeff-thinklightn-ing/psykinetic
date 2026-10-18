@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_ground_textures()
 	_test_canopy_mask()
 	_test_grown_trees()
+	await _test_warm_ups()
 	_test_seasons()
 	_test_heights()
 	_test_hills()
@@ -1873,6 +1874,38 @@ func _test_canopy_mask() -> void:
 			and absf(image.get_pixel(2, 1).r - 0.5) < 0.01 and image.get_pixel(0, 0).r == 0.0,
 			"each cell's cover at its texel from the origin, none elsewhere, a cell off the grid left out")
 	_check(Client3D.canopy_mask({}, Vector2i.ZERO, Vector2i(8, 6)) == null, "no canopy: no texture")
+
+
+static var _warm_calls := 0
+
+
+## A warm-up for the test: a box, counted.
+static func _warm_probe() -> Node3D:
+	_warm_calls += 1
+	var box := MeshInstance3D.new()
+	box.mesh = BoxMesh.new()
+	return box
+
+
+func _test_warm_ups() -> void:
+	print("
+== shader warm-ups: drawn once a process under the ground after a room is built, then freed ==")
+	var probe := Callable(get_script(), "_warm_probe")
+	Client3D.warm_ups.append(probe)
+	_warm_calls = 0
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var warming := _rig._room.find_children("WarmUp_*", "Node3D", false, false)
+	var under := warming.filter(func(node: Node3D) -> bool: return node.position.y < _rig._camera_target.y - 5.0)
+	_check(_warm_calls == 1 and not warming.is_empty() and under.size() == warming.size(),
+			"each drawn after the build, under the ground at the view's middle (%d)" % warming.size())
+	_check(Client3D.warm_ups.has(Callable(GrownTrees, "warm")), "the forest's see-through among them")
+	for i in Client3D.WARM_FRAMES + 2:
+		await get_tree().process_frame
+	_check(_rig._room.find_children("WarmUp_*", "Node3D", false, false).is_empty(), "freed after WARM_FRAMES frames")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	_check(_warm_calls == 1 and _rig._room.find_children("WarmUp_*", "Node3D", false, false).is_empty(), "never again in the same process")
+	Client3D.warm_ups.erase(probe)
 
 
 func _test_grown_trees() -> void:

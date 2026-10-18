@@ -13217,3 +13217,37 @@ metres; one look built once, two copies sharing a mesh; a round hut's
 cone; a ruin with no roof, no inside and broken walls). Protocol unchanged.
 Rejected: a mesh per kind from art-kit (no variation, and the grid shows);
 art-kit's roofs as pieces per cell (the joints and repeats show).
+
+## 495. Shader warm-ups: a material drawn once at load, not first at play
+
+A material's pipelines are compiled the first time it is drawn, so its first
+draw can cost a frame: pc-character's goblin outline (494, its stencil
+twin) took 20.6 ms on the first hover on a fresh profile. Perf asked for a
+warm-up; the coordinator approved it on one condition, that it never shows.
+- Client3D.warm_ups: Array[Callable], each a static func's Callable taking
+  nothing and returning a Node3D drawn as in play (a skinned instance, its
+  next pass or stencil twin, its shadows), or null. Never a lambda: a
+  lambda held in a static Callable array has crashed Godot at exit here
+  (exit 139) and one capturing objects leaks at exit. Registered from client
+  code only; the server builds no rooms and its pck has no art.
+- After a room is built (setup and rebuild; not a glimpse's), each not yet
+  warmed in this process is added WARM_DEPTH (6 m) under the ground at the
+  view's middle, at its own size, for WARM_FRAMES (2) frames, then freed.
+  Its draws are issued, so its pipelines compile (colour, depth prepass,
+  shadow, next pass, stencil), but every fragment fails the depth test
+  behind the opaque ground: nothing of it shows on screen or in a shot, and
+  its shadow falls below the ground. A scale of 0.01 just past the near
+  plane was the first idea; rejected, as a drawn speck could show.
+- Godot's own help, to check before adding a warm-up: Forward+ on d3d12
+  (project.godot rendering_device/driver.windows) compiles pipelines in
+  the background with ubershaders (4.4 and on), and keeps a shader and
+  pipeline cache in user data (the defaults; none set here); occlusion
+  culling is off, which a warm-up behind the ground relies on.
+- The first registered: GrownTrees.warm, a pad of needles in the forest's
+  see-through passes and its shadow-only twin (467). Its own case was
+  small: a fresh profile's forest start's worst frame 7.7 ms before, 5.4 to
+  7.1 after, the wilds 7.4 to 8.7, all within a run's noise; the goblin's
+  first hover is the number that matters (pc-character measures it).
+view_test _test_warm_ups (drawn under the ground after a build, freed after
+WARM_FRAMES, never twice in a process; the forest's registered); map_bench
+on a fresh profile exits 0 with no resources left at exit.

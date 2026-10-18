@@ -1277,9 +1277,11 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_apply_size()
 	_place_camera()
 	_classify_walls()
+	_start_warm_ups()
 
 
 func _process(delta: float) -> void:
+	_end_warm_ups()
 	_sync_puppets()
 	_sync_doors()
 	_ease_yaw(delta)
@@ -2460,6 +2462,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	# A new map: the view starts on the player.
 	pan = Vector3.ZERO
 	_pan_home = false
+	_start_warm_ups()
 
 
 ## The depth pass every near material draws first (_make_near).
@@ -3232,6 +3235,60 @@ static func _warm_art() -> void:
 		var spec: Dictionary = ArtKit.spec(slot)
 		if str(spec.get("type", "mesh")) == "mesh" and str(spec.get("category", "")) in WARM_CATEGORIES:
 			ArtKit.instance(slot).free()
+
+
+## Shader warm-ups (decision 495): what another part of the view will draw
+## later and whose first draw hitches (a material's pipelines compiled on
+## first use: pc-character's goblin outline, 20.6 ms on a fresh profile).
+## Each a static func's Callable (never a lambda: a lambda held here has
+## crashed Godot at exit) taking nothing and returning a Node3D drawn as in
+## play (skinned, its next pass or stencil twin, its shadows), or null.
+## Registered from client code before a room is built; the server builds
+## no rooms. After a room is built each not yet warmed in this process is
+## drawn for WARM_FRAMES frames WARM_DEPTH under the ground at the view's
+## middle, then freed: its draws issued, so every pipeline compiles, but
+## behind the opaque ground, so nothing of it ever shows (nor its shadow,
+## cast below the ground). Godot (Forward+ on d3d12, 4.4 and on) also
+## compiles pipelines in the background with its ubershaders, and keeps a
+## shader cache in user data: check those before adding a warm-up.
+static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm")]
+static var _warmed_ups: Dictionary[String, bool] = {}
+const WARM_FRAMES := 2
+const WARM_DEPTH := 6.0
+var _warming: Array[Node3D] = []
+var _warm_frames := 0
+
+
+## Draws each warm-up not yet warmed in this process (decision 495).
+func _start_warm_ups() -> void:
+	if _glimpse or _room == null:
+		return
+	for warm: Callable in warm_ups:
+		var key := "%s.%s" % [warm.get_object(), warm.get_method()]
+		if _warmed_ups.has(key) or not warm.is_valid():
+			continue
+		_warmed_ups[key] = true
+		var node: Node3D = warm.call()
+		if node == null:
+			continue
+		node.name = "WarmUp_%d" % _warming.size()
+		_room.add_child(node)
+		node.position = _camera_target + Vector3.DOWN * WARM_DEPTH
+		_warming.append(node)
+	_warm_frames = WARM_FRAMES if not _warming.is_empty() else 0
+
+
+## Frees the warm-ups once they have been drawn WARM_FRAMES frames.
+func _end_warm_ups() -> void:
+	if _warm_frames <= 0:
+		return
+	_warm_frames -= 1
+	if _warm_frames > 0:
+		return
+	for node in _warming:
+		if is_instance_valid(node):
+			node.queue_free()
+	_warming.clear()
 
 
 ## An edge between the land and the void: the map's outline.

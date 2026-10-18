@@ -127,15 +127,9 @@ func build(data: Dictionary, land: Dictionary, ground: Dictionary, heights: Dict
 		"needles": [Client3D.swatch(4, 3), Client3D.swatch(4, 4), Client3D.swatch(4, 6), Client3D.swatch(4, 7)],
 	}
 	_material = _season(preload("res://client3d/season_cut.gdshader"), leaf)
-	_see = _season(preload("res://client3d/season_cut.gdshader"), leaf)
-	_see_colour = _season(preload("res://client3d/season_see.gdshader"), leaf)
-	_see_colour.set_shader_parameter("alpha", Client3D.NEAR_ALPHA)
-	_see_colour.render_priority = Client3D.NEAR_PRIORITY
-	_see_depth = ShaderMaterial.new()
-	_see_depth.shader = preload("res://client3d/season_see_depth.gdshader")
-	_see_depth.render_priority = Client3D.NEAR_DEPTH_PRIORITY
-	_see.next_pass = _see_colour
-	_see_colour.next_pass = _see_depth
+	_see = _see_chain(leaf)
+	_see_colour = _see.next_pass as ShaderMaterial
+	_see_depth = _see_colour.next_pass as ShaderMaterial
 	set_see(see_outer - SEE_SOFT * 0.5, true)
 	_shadow = StandardMaterial3D.new()
 	_shadow.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -285,6 +279,50 @@ func _dress(chunk: Vector2i) -> void:
 
 func _materials() -> Array[ShaderMaterial]:
 	return [_material, _see, _see_colour, _see_depth]
+
+
+## The see-through's three passes: opaque but for it, then its colour
+## faded after its depth (decision 188's order).
+static func _see_chain(leaf: bool) -> ShaderMaterial:
+	var see := _season(preload("res://client3d/season_cut.gdshader"), leaf)
+	var colour := _season(preload("res://client3d/season_see.gdshader"), leaf)
+	colour.set_shader_parameter("alpha", Client3D.NEAR_ALPHA)
+	colour.render_priority = Client3D.NEAR_PRIORITY
+	var depth := ShaderMaterial.new()
+	depth.shader = preload("res://client3d/season_see_depth.gdshader")
+	depth.render_priority = Client3D.NEAR_DEPTH_PRIORITY
+	see.next_pass = colour
+	colour.next_pass = depth
+	return see
+
+
+## A pad of needles in the see-through's passes, and its shadow-only twin
+## (Client3D.warm_ups, decision 495): the forest's shaders compiled when a
+## room is built, not when the forest is first seen.
+static func warm() -> Node3D:
+	var arrays := _new_arrays()
+	_pad(arrays, Vector3.ZERO, 0.5, Vector3.RIGHT, 0.6, RandomNumberGenerator.new(), Color.DARK_GREEN, Color.DARK_OLIVE_GREEN, 0.1, 0.1)
+	var surface := []
+	surface.resize(Mesh.ARRAY_MAX)
+	surface[Mesh.ARRAY_VERTEX] = arrays[0]
+	surface[Mesh.ARRAY_NORMAL] = arrays[1]
+	surface[Mesh.ARRAY_COLOR] = arrays[2]
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface)
+	var piece := Node3D.new()
+	var drawn := MeshInstance3D.new()
+	drawn.mesh = mesh
+	drawn.material_override = _see_chain(false)
+	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	piece.add_child(drawn)
+	var twin := MeshInstance3D.new()
+	twin.mesh = mesh
+	var shadow := StandardMaterial3D.new()
+	shadow.cull_mode = BaseMaterial3D.CULL_DISABLED
+	twin.material_override = shadow
+	twin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	piece.add_child(twin)
+	return piece
 
 
 ## A season material on [param shader] for the trees' vertex colours.
