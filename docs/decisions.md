@@ -13624,3 +13624,9 @@ The hooks npc's sickness calls; npc's numbers, Jeff's to move.
 - economy.json commissions.healing 6.
 Protocol unchanged. rescue_test.
 
+Amended (2026-10-18): "herbs" (value 1) and "wool" (value 2) are store
+resources (Stockpile.RESOURCES), ahead of their gatherers, so items can
+give the remedy its recipe (the healer's, from herbs 2) and the weaver
+his cloth_bolt (500), and terrain lay herbs for players to bank. The
+medicine man's gathering of herbs and the shepherd's wool follow.
+

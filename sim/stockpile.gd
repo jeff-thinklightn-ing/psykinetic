@@ -25,7 +25,7 @@ extends RefCounted
 ## economy's side).
 signal deposited(place: String, by: String, by_id: String, what: String, count: int)
 
-const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food", "meat", "hide", "leather"]
+const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food", "meat", "hide", "leather", "wool", "herbs"]
 const KIND := "stockpile"
 ## The faction whose stockpiles take deposits.
 const TOWN := "town"
