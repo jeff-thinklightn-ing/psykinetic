@@ -161,6 +161,7 @@ func play(slot: String, at: Vector3, pitch := 1.0, volume_db := 0.0, radius := -
 	player.bus = _bus_of(slot) + (MUFFLED_SUFFIX if muffled else "")
 	player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
 	player.pitch_scale = pitch * randf_range(1.0 - PITCH_JITTER, 1.0 + PITCH_JITTER)
+	_mark(player, slot, pitch)
 	player.volume_db = _volume(slot, volume_db)
 	player.position = at
 	add_child(player)
@@ -190,6 +191,13 @@ static func _cells_beside(value: float) -> Array[int]:
 	return [roundi(value)]
 
 
+## What a player plays, for tests: its slot, and its pitch before the
+## jitter (the jitter can swap two pitches less than 14% apart).
+static func _mark(player: Node, slot: String, pitch: float) -> void:
+	player.set_meta("slot", slot)
+	player.set_meta("pitch", pitch)
+
+
 ## One sound of [param slot], not from anywhere (UI, a bed).
 func play_flat(slot: String, pitch := 1.0, volume_db := 0.0) -> void:
 	var stream := _pick(slot)
@@ -199,6 +207,7 @@ func play_flat(slot: String, pitch := 1.0, volume_db := 0.0) -> void:
 	player.stream = stream
 	player.bus = _bus_of(slot)
 	player.pitch_scale = pitch * randf_range(1.0 - PITCH_JITTER, 1.0 + PITCH_JITTER)
+	_mark(player, slot, pitch)
 	player.volume_db = _volume(slot, volume_db)
 	add_child(player)
 	player.finished.connect(player.queue_free)

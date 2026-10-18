@@ -2545,8 +2545,13 @@ func _heard(action: Callable) -> Array[String]:
 func _swing_pitch(entity: GridEntity) -> float:
 	var before := _rig.sfx.get_child_count()
 	entity._world_swung(Vector2i(1, 0))
-	var player := _rig.sfx.get_child(_rig.sfx.get_child_count() - 1) as AudioStreamPlayer3D
-	return player.pitch_scale if _rig.sfx.get_child_count() > before else 0.0
+	# The pitch before the jitter, which could swap two close ones; a voice
+	# beside the swing is skipped.
+	for i: int in range(before, _rig.sfx.get_child_count()):
+		var player := _rig.sfx.get_child(i)
+		if str(player.get_meta("slot", "")).begins_with("sfx.swing"):
+			return float(player.get_meta("pitch"))
+	return 0.0
 
 
 func _bar(entity: GridEntity) -> MeshInstance3D:
