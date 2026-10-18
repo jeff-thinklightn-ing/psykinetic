@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_bodies()
 	_test_records()
 	_test_taken()
+	_test_multiplier()
 	for body in _bodies:
 		body.free()
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -247,6 +248,24 @@ func _test_taken() -> void:
 	full._add_group("meadow", "rabbit", Vector2i(52, 50), 30.0)
 	full._hunt("meadow", "wolf", 1.0)
 	_check(float(pack2["count"]) == 5.0, "fed, they keep their number")
+
+
+func _test_multiplier() -> void:
+	print("
+== a level's own wildlife (decision 367 amended) ==")
+	var plain := _herds()
+	var areas := _areas.duplicate(true)
+	areas["meadow"]["herds"] = {"all": 2.5, "wolf": 4.0}
+	var rich := Herds.new({}, areas, _rules, func() -> int: return _now)
+	_check(is_equal_approx(rich.capacity("meadow", "deer"), plain.capacity("meadow", "deer") * 2.5), "\"all\": 2.5 keeps two and a half times the deer")
+	_check(is_equal_approx(rich.capacity("meadow", "wolf"), plain.capacity("meadow", "wolf") * 10.0), "\"wolf\": 4 on top: ten times the wolves")
+	_check(is_equal_approx(rich.capacity("fields", "deer"), plain.capacity("fields", "deer")), "another level as it was")
+	_now = 0
+	rich.tick()
+	plain.tick()
+	_check(rich.total("meadow", "wolf") > plain.total("meadow", "wolf") * 5.0, "seeded by it (%.0f wolves, %.0f)" % [rich.total("meadow", "wolf"), plain.total("meadow", "wolf")])
+	var empty: Array[String] = []
+	_check(Herds.areas_of(WorldMap.build(empty)).is_empty(), "(areas_of with no levels)")
 
 
 func _spawn(spec: Dictionary) -> Object:

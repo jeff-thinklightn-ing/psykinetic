@@ -98,6 +98,8 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		# Its roofs (decision 383: damage_roof's index is into this) and
 		# its lore region (its weather), for what works on every level.
 		"roofs": level["roofs"], "region": level["terrain"]["region"],
+		# Its wildlife's multipliers ({"all": x, species: y}; decision 367 amended).
+		"herds": config.get("herds", {}) if config.get("herds") is Dictionary else {},
 	}
 	_configs[area_name] = config
 	for link: Dictionary in level["links"]:

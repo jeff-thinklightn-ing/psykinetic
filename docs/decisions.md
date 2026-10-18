@@ -8475,6 +8475,15 @@ roam; the wolf's prey and eats, agreed with enemy-ai). The wilds seeds
 34 groups (deer 37, rabbits 75, boar 15, wolves 6), 24 bodies about a host
 at its start, the same after a restart. tests/herds_test. Protocol
 unchanged: animals spawn as monsters do.
+
+Amended (terrain's need, Jeff's forest, the coordinator's approval of
+2026-10-17): a level's own wildlife. level.json "herds": {"all": x,
+"<species>": y} multiplies an area's capacity per species (Herds.multiplier:
+"all" times the species' own, each 1 if not given), read through WorldMap's
+area ("herds") into Herds.areas_of, so seeding and breeding both follow.
+Its first user is maps' forest zone (464). Raise the prey with the wolves:
+at the old rates wolves ate the rabbits out.
+
 ## 385. Anti-aliasing: SMAA by default, chosen in the Options panel
 
 Jeff found the new human bodies in game looking like a hundred polygons.

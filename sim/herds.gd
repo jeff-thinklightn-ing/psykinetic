@@ -85,7 +85,8 @@ func _init(saved := {}, with_areas := {}, with_rules := {}, with_clock := Callab
 static func areas_of(world_map: WorldMap) -> Dictionary:
 	var out := {}
 	for name: String in world_map.areas:
-		out[name] = {"floor": world_map.areas[name]["floor"], "outdoor": world_map.is_outdoor(name)}
+		out[name] = {"floor": world_map.areas[name]["floor"], "outdoor": world_map.is_outdoor(name),
+			"herds": world_map.areas[name].get("herds", {})}
 	return out
 
 
@@ -129,7 +130,15 @@ func total(area: String, species: String) -> float:
 
 ## How many of [param species] [param area]'s ground keeps.
 func capacity(area: String, species: String) -> float:
-	return float(_ground_of(area)["total"]) * float(_species(species).get("density", 0.0)) / 1000.0
+	return float(_ground_of(area)["total"]) * float(_species(species).get("density", 0.0)) / 1000.0 * multiplier(area, species)
+
+
+## How much more of [param species] [param area] keeps than the rules'
+## density (its level's "herds": "all" times the species' own, each 1 if
+## not given; decision 367 amended: maps' forest, 464).
+func multiplier(area: String, species: String) -> float:
+	var given: Dictionary = areas.get(area, {}).get("herds", {})
+	return maxf(float(given.get("all", 1.0)), 0.0) * maxf(float(given.get(species, 1.0)), 0.0)
 
 
 ## How much game [param cell] of [param area] keeps (richness, or the
