@@ -106,6 +106,15 @@ static func manifest() -> Dictionary:
 					push_error("ArtKit: %s names slot %s again" % [ROOT + file, slot])
 					continue
 				slots[slot] = more[slot]
+		# A generated slot's fields given or changed by hand (slots.json's
+		# "overrides": a bow's string part and sockets, which the item
+		# catalog can't say).
+		var overrides: Dictionary = main.get("overrides", {})
+		for slot: String in overrides:
+			if not slots.has(slot):
+				push_error("ArtKit: %s overrides slot %s, which no file names" % [MANIFEST, slot])
+				continue
+			slots[slot] = (slots[slot] as Dictionary).merged(overrides[slot], true)
 		main["slots"] = slots
 		_manifest = main
 	return _manifest

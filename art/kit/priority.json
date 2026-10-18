@@ -46,7 +46,7 @@
 			"name": "items",
 			"why": "in hands, packs and chests everywhere; small on screen, so after the places",
 			"slots": [
-				"item.sword", "item.dagger", "item.knife", "item.spear", "item.bow", "item.arrows", "item.arrows_flame", "item.arrows_barbed", "item.hammer", "item.giant_axe", "item.shield",
+				"item.sword", "item.dagger", "item.knife", "item.spear", "item.bow", "item.arrows", "item.arrows_flame", "item.arrows_barbed", "fx.arrow", "item.hammer", "item.giant_axe", "item.shield",
 				"item.meat", "item.hide", "item.antlers", "item.tusks",
 				"item.ration", "item.bandaging_kit", "item.food_sack", "item.ore_sack", "item.wood_bundle", "item.cloth_bolt",
 				"item.coin_purse", "item.nails", "item.axe_head"

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bows and arrows are drawn as themselves: a hunting bow with a leather grip and its string, bundles of arrows tied with a cord (plain, flame and barbed heads), and a real arrow in flight instead of a grey stick.
 - Fixed: after a server restart a companion forgot what she had heard and her
   home town, and her looks and nature could come back different.
 - What a town's lawspeaker thinks good enough to be the world's goes on a list

@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_changed_told()
 	_test_creature_rig()
 	_test_credits()
+	_test_overrides()
 	_test_swatch_uvs()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -447,6 +448,17 @@ func _test_credits() -> void:
 	_check(not titles.any(func(title: String) -> bool: return "art-gen" in title or "art-kit" in title), "our own and generated art: no line")
 
 
+func _test_overrides() -> void:
+	print("
+== slots.json's overrides: a generated slot's fields given by hand (the bow's string and sockets) ==")
+	var bow := ArtKit.spec("item.bow")
+	_check(str(bow.get("origin", "")) == "centre" and (bow.get("parts", []) as Array).any(func(part: Dictionary) -> bool: return part["name"] == "string")
+			and (bow.get("sockets", {}) as Dictionary).has_all(["grip", "nock", "rest"]) and is_equal_approx(float(bow["size"][1]), 1.3),
+			"item.bow: the catalog's size, and by hand its centre origin, its string part and its nock and rest")
+	_check(ArtKit.spec("item.arrows").get("origin", "") == "centre" and ArtKit.has("fx.arrow") and ArtKit.variant_count("fx.arrow") == 3,
+			"the bundles held mid-shaft; fx.arrow, three heads")
+
+
 func _test_creature_rig() -> void:
 	print("
 == a creature (decision 319): a rig, and its clips by any of their names; a required one missing is an error ==")
@@ -576,7 +588,10 @@ func _check_fits(slot: String, box: AABB, what: String) -> void:
 	# A shield ("origin": "centre") is held at the middle of its back: centred on its origin.
 	var centred := str(ArtKit.spec(slot).get("origin", "base")) == "centre"
 	var low := absf(centre.y) if centred else absf(box.end.y if floor else box.position.y)
-	var stands := low < 0.01 and absf(centre.x) < size.x * TOLERANCE + 0.01 and absf(centre.z) < size.z * TOLERANCE + 0.01
+	# A held piece's origin is its grip, anywhere across it (a bow's string behind it), as ArtCheck has it.
+	var held := str(ArtKit.spec(slot).get("kind", "")) == "held"
+	var across := held or absf(centre.x) < size.x * TOLERANCE + 0.01 and absf(centre.z) < size.z * TOLERANCE + 0.01
+	var stands := low < 0.01 and across
 	_check(off.x <= TOLERANCE and off.y <= TOLERANCE and off.z <= TOLERANCE and stands,
 			"%s: %s is %s, the slot %s, standing on its origin (%s)" % [slot, what, box.size, size, box.position])
 

@@ -77,6 +77,9 @@ are texture slots, not materials on a model (see Budgets).
   A shield (an item tagged `shield`, `"origin": "centre"`) is held at the middle of its back:
   its origin there, its face in x and y, its thickness along z, its face out at +z (the hand's
   socket turns a shield a quarter turn about +y, so the face looks out from the back of the hand).
+- **Generated slots** (`art/kit/slots_items.json`, from the item catalog) take fields the catalog
+  can't say from `slots.json`'s `"overrides"`, merged over them: the bow's string part and its
+  `nock` and `rest` sockets, a bundle's centre origin.
 - **Buildings** are a roof and trim, **never walls or a floor**.
   - The walls are the map's wall edges in the slot's `wall_set`, drawn by terrain's wall runs and
     faded edge by edge. The inside is terrain's ground in its `floor_set` (wood for homes).
