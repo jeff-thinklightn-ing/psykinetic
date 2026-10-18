@@ -27,7 +27,9 @@
 		"door_force": 1,
 		"leash": 20,
 		"strength": 1,
-		"temperament": {"bold": 0, "cautious": 2, "cowardly": 2}
+		"temperament": {"bold": 0, "cautious": 2, "cowardly": 2},
+		"wields": {"right": "dagger"},
+		"drops": [{"item": "pick", "count": [1, 1], "chance": 0.2}]
 	},
 	"rabbit": {
 		"side": "wild", "role": "prey", "herd": "rabbit", "label": "Wild rabbit", "art": "creature.rabbit",

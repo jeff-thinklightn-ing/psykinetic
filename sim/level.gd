@@ -1313,6 +1313,19 @@ static func _arm(props: Dictionary, spec: Dictionary, entry: Dictionary, warning
 	props["slots"] = slots
 
 
+## A monster spawned outside a level (a raid's, Raids) armed by its kind's
+## "wields" as a level's are (_arm; decision 481: raiders came bare-handed).
+static func arm(spec: Dictionary) -> void:
+	var props: Dictionary = spec.get("props", {})
+	var warnings: Array[String] = []
+	var at: Variant = spec.get("tile")
+	_arm(props, spec, {}, warnings, at if at is Vector2i else Vector2i.ZERO)
+	for warning in warnings:
+		push_warning("[level] " + warning)
+	if not props.is_empty():
+		spec["props"] = props
+
+
 ## The make of what a chest, a crate or a cart keeps or a monster carries
 ## and drops (decision 474): its entry's props "style" if it is one of Items.STYLES, else the
 ## level's "item_style" (dungeon sets it per source: below the castle

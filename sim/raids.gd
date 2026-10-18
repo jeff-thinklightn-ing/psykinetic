@@ -272,6 +272,7 @@ func _spawn(record: Dictionary, at: Vector2i) -> void:
 		spec["tile"] = cells[i]
 		spec["home"] = record["goal"]
 		spec["idle"] = {"mode": "march", "route": record["route"].duplicate(), "loop": false}
+		Level.arm(spec)  # Its kind's weapon, as a level's monster has (a kobold's dagger).
 		var made: Variant = World.spawn_spec.call(spec)
 		if not made is Monster:
 			continue

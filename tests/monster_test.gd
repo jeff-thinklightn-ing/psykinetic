@@ -83,6 +83,7 @@ func _ready() -> void:
 	_test_wild_boar()
 	_test_wild_wolf()
 	_test_wild_remains()
+	_test_kobold_dagger_and_pick()
 	_test_herd_hunt()
 	_test_wolf_den()
 	_test_lead_occupied()
@@ -1869,6 +1870,32 @@ func _test_wild_remains() -> void:
 	var before := World.zone.ground.size()
 	World.damage(imp, imp.hp)
 	_check(not imp.spawned and World.zone.ground.size() == before, "an imp's row drops nothing")
+
+
+func _test_kobold_dagger_and_pick() -> void:
+	print("\n== a kobold fights with a dagger, armed in a raid too; it drops a pick 1 time in 5 (decision 481) ==")
+	var spec := Level._spec_for("monster_sneak", Level.MONSTER_TYPES)
+	spec["tile"] = Vector2i(3, 3)
+	Level.arm(spec)
+	var slots: Array = spec.get("props", {}).get("slots", [])
+	_check(slots.size() == Items.CARRIED and slots[Items.RIGHT_HAND] == "dagger" and slots[Items.LEFT_HAND] == "",
+			"a sneak spawned outside a level (a raider) holds its kind's dagger (%s)" % [slots])
+	_check(Items.verb_of("dagger").get("kind") == "backstab", "a backstabber's weapon, for a flanker")
+	var roll := RandomNumberGenerator.new()
+	roll.seed = 471
+	var picks := 0
+	for i in 1000:
+		picks += Monster.dropped({"item": "pick", "count": [1, 1], "chance": 0.2}, roll)
+	var always := 0
+	var never := 0
+	for i in 100:
+		always += Monster.dropped({"item": "meat", "count": [1, 1]}, roll)
+		never += Monster.dropped({"item": "meat", "count": [1, 1], "chance": 0.0}, roll)
+	_check(picks >= 150 and picks <= 250 and always == 100 and never == 0,
+			"a chance of 0.2 drops about 1 in 5 (%d of 1000), no chance always, 0 never" % picks)
+	var drops: Array = Monster.kinds()["sneak"]["drops"]
+	_check(drops.size() == 1 and drops[0]["item"] == "pick" and is_equal_approx(float(drops[0]["chance"]), 0.2),
+			"the sneak's row: a pick, 1 in 5 (%s)" % [drops])
 
 
 func _test_lead_occupied() -> void:

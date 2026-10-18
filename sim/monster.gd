@@ -1188,26 +1188,36 @@ func _calm() -> void:
 ## weight)}. A row that will not read is left out, with a warning; a field
 ## missing or wrong falls back to a monster of no kind's.
 ## What it leaves where it falls (decision 318): its kind's "drops" (each
-## {item, count: [least, most]}, levels/monsters.json), made now
-## (ItemBook.mint, "remains" of it), as many of each as a roll between
-## least and most, seeded by its name and the tick. World.damage lays them
-## on the ground. Server only.
+## {item, count: [least, most], chance}, levels/monsters.json), made now
+## (ItemBook.mint, "remains" of it), as many of each as dropped rolls,
+## seeded by its name and the tick. World.damage lays them on the ground.
+## Server only.
 func remains() -> Array[int]:
 	var uids: Array[int] = []
 	var row: Dictionary = kinds().get(str(spawn_spec.get("kind", "")), {})
 	var roll := RandomNumberGenerator.new()
 	roll.seed = hash("%s/remains/%d" % [name, World.tick])
 	for drop: Variant in row.get("drops", []):
-		if not drop is Dictionary or str(drop.get("item", "")).is_empty():
-			continue
-		var count: Variant = drop.get("count", [1, 1])
-		var least := int(count[0]) if count is Array and count.size() > 0 else 1
-		var most := int(count[1]) if count is Array and count.size() > 1 else least
-		for i in roll.randi_range(least, maxi(least, most)):
+		for i in dropped(drop, roll):
 			# Its make (decision 474): the row's own, else this monster's.
 			var style := str(drop.get("style", World.style_from(self)))
 			uids.append(World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, style))
 	return uids
+
+
+## How many of drop row [param drop] fall, by [param roll]: none if its
+## "chance" (decision 481: a kobold's pick 1 in 5; 1 when absent, and then
+## no roll is spent on it) fails, else a roll between its count's least and
+## most. 0 for a row with no item.
+static func dropped(drop: Variant, roll: RandomNumberGenerator) -> int:
+	if not drop is Dictionary or str(drop.get("item", "")).is_empty():
+		return 0
+	if drop.has("chance") and roll.randf() >= float(drop["chance"]):
+		return 0
+	var count: Variant = drop.get("count", [1, 1])
+	var least := int(count[0]) if count is Array and count.size() > 0 else 1
+	var most := int(count[1]) if count is Array and count.size() > 1 else least
+	return roll.randi_range(least, maxi(least, most))
 
 
 static func kinds() -> Dictionary:

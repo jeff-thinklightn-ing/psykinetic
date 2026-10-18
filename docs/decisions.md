@@ -12226,3 +12226,25 @@ the review sheet (C:\dev\review\orc_kobold\) or in game, as for art picks.
 view_test _test_allies (each its people's skin, parts and posture, its clips
 playing and its hands; an orc about 1.95 m, a kobold about 1 m; two orcs
 differ); _test_goblins_differ's brute an orc, much bigger than an imp.
+## 481. A kobold fights with a dagger and drops a pick 1 time in 5
+
+The coordinator, on the kobold's look (pc-character's 478) and items' pick
+(479): the sneak keeps its verb. A pick in its hands (windup 4, a slower
+swing, a knockback that shoves its target off the back it circled to)
+would make the flanker a small brute, and hiding what it holds would break
+338 (a monster drops what it carried). So:
+- The sneak's row wields the dagger (decision 338's "wields"): backstab,
+  twice the hurt from behind, quick. It drops it when it dies, as 338 says.
+- A drop row (decision 318) may give a "chance", 0 to 1; absent, 1, and no
+  roll is spent on it, so every row without one drops as before
+  (Monster.dropped). The sneak's row: a pick, chance 0.2, so a raid leaves
+  a pick or two for the town's miner-to-be, not a flood. Economy may retune
+  it.
+- Raiders are armed by their kind's "wields" (Level.arm, the same _arm a
+  level's monsters get): Raids spawned them from Level._spec_for alone, so
+  a raid's kobolds would have come bare-handed. A server-side change; the
+  protocol is unchanged (a monster's slots are not replicated).
+A digging kobold that wields the pick, and fights badly with it, can be a
+kind of its own when the mine comes.
+
+tests/monster_test (_test_kobold_dagger_and_pick).
