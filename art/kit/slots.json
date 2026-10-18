@@ -1906,6 +1906,30 @@
 				{"at": [0, 0.51, 0.3272], "size": [0.105, 0.18, 0.1155]}
 			]
 		},
+		"creature.sheep": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.5, 0.9, 1.2],
+			"tolerance": 0.15,
+			"budget": 2500,
+			"variants": 2,
+			"uses": "a sheep, variant 1 the ewe, 2 the ram (curled horns, within the box): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a keeper's yard's beast for wool (Jeff, 2026-10-18: \"sheep and wool yes\"), not in the Quaternius pack on disk: art-gen's concept by the goblin recipe (one figure, side and front, white), rigged by pc-character as the rabbit was",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "eat", "eating", "idle_eating", "idle_headlow"], "required": true},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.225, -0.06], "size": [0.35, 0.45, 0.84]},
+				{"at": [0, 0.6075, -0.09], "size": [0.5, 0.315, 1.02]},
+				{"at": [0, 0.765, 0.51], "size": [0.25, 0.27, 0.18]}
+			]
+		},
 		"creature.rabbit": {
 			"category": "creatures",
 			"type": "mesh",

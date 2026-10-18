@@ -78,7 +78,7 @@
 		{
 			"name": "farm animals",
 			"for": "pc-character: the Quaternius pack's animals moved onto palette swatches (tools/animal_palette.py)",
-			"slots": ["creature.cow", "creature.pig", "creature.horse", "creature.donkey", "creature.dog"]
+			"slots": ["creature.cow", "creature.pig", "creature.horse", "creature.donkey", "creature.dog", "creature.sheep"]
 		},
 		{
 			"name": "profiles",
