@@ -1463,6 +1463,9 @@
 			"size": [0.45, 1.4, 1.5],
 			"tolerance": 0.15,
 			"budget": 2500,
+			"source": {"by": "Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette)", "tool": "blender (tools/animal_palette.py)",
+				"license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Deer, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-17",
+				"notes": "N:/assets/sources/quaternius/animals/ultimate_animated_animal_pack/glTF/Deer.gltf (Jeff: \"deer stag wolf look amazing\")"},
 			"uses": "a doe: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; the wilds' creatures (decision 319), enemy-ai's behaviour, pc-character's rig. From the Ultimate Animated Animal Pack's Deer",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},

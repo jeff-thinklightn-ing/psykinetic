@@ -16,6 +16,8 @@ notes (decision 324).
   up as what the town remembers, squares others with what is known ("the boy
   is mending"), and leaves the rest as talk; the townsfolk tell you what the
   town remembers as memory, never as fact. Off unless the server turns him on.
+- Deer in the wilds are deer now, not grey boxes: they walk, bound away,
+  graze, look up and fall.
 - The town starts keeping its own stories: when a bard or a tale-teller among
   the townsfolk speaks of a neighbour, an ailment, a quarrel, the town
   remembers who said it and to whom, and the tale spreads at the well with
