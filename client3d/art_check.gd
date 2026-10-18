@@ -109,7 +109,10 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	if counts.materials > allowed:
 		out.append("error: %d materials, at most %d: use the shared \"palette\" material (the template has it)%s" % [
 			counts.materials, allowed, ", and one more for the glowing or glass part" if allowed > 1 else ""])
-	var foreign: Array = counts.names.filter(func(name: String) -> bool: return name != "" and name != ArtKit.PALETTE_NAME)
+	# A body drawn in a material of the game's own (a humanoid's "human":
+	# Client3D's HUMAN_MATERIAL, its tints per person) names it: accepted.
+	var accepted := str(entry.get("body_material", ""))
+	var foreign: Array = counts.names.filter(func(name: String) -> bool: return name != "" and name != ArtKit.PALETTE_NAME and name != accepted)
 	if foreign.size() > allowed - 1 and not foreign.is_empty():
 		out.append("warning: material%s %s, not the shared \"palette\": colour it from the palette (the template's material), so it draws with every other piece" % [
 			"s" if foreign.size() > 1 else "", ", ".join(foreign.map(func(name: String) -> String: return "\"%s\"" % name))])

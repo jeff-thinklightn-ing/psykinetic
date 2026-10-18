@@ -109,7 +109,9 @@ are texture slots, not materials on a model (see Budgets).
     `clip_library` names the shared library it plays through the UAL bone map
     (`art/models/animations/goblin.res`), and its clips are found there. Its `model` names
     the file the game draws (`art/models/characters/orc.glb`, Client3D's MODELS), and that
-    file is the slot's own art: no copy in `art/kit`.
+    file is the slot's own art: no copy in `art/kit`. Its `body_material` (`human`) names the
+    game's own material it is drawn in (Client3D's HUMAN_MATERIAL, tinted per person; its
+    fixed parts still UV'd onto the palette), accepted beside the shared palette.
   - A `required` clip missing is an error. One with a `fallback` missing is a warning naming
     the stand-in the game uses (a wolf's howl is idle with a head-up tween until it has one).
   - Every face sits on the palette, like any piece. A pack's flat materials move onto swatches
