@@ -11701,3 +11701,25 @@ under this number. Rejected: growing at level load (minutes in GDScript, and
 the same every load); growing per player chunk (the same stand everywhere is
 the point); the space-colonisation broadleaf of the first study (no years,
 no light, a preset crown).
+tests/farm_test (the look through a year with a late storm: bare, sown,
+growing, flattened, ripe, bare; each change told once); protocol_test.
+
+## 461, economy's side (npc's thief: Jeff, "thieves could be the answer to balancing the economy")
+
+The hooks npc's thief calls; numbers are npc's (townsfolk.json "thief").
+- Production.lift_gold(worker, gold, thief): up to gold from a worker's
+  purse into the thief's, never more than it holds; gold only moves.
+- Production.return_gold(thief, victim, gold): a caught thief gives back up
+  to gold, never more than they hold.
+- Economy.fence(town, merchant, thief, what, factor, margin): a lifted
+  resource sold back to the store at raw_price x factor, the treasury
+  paying (never below gold_floor; nothing moves when it can't), the
+  resource banked by the merchant, who keeps margin of the gold, the thief
+  the rest.
+- tools/town_balance.tscn: the coordinator's balance run as a tool (the
+  wilds town, nine residents, a field, the real rules, no players; --days,
+  --thief=<resident>, --no-field), printing a line a week; no state, no
+  shared overlay. Run through the gate (bench), its output to a file.
+
+larder_test (a lift, never past the purse, given back, a fence's split,
+gold conserved, the floor).

@@ -529,6 +529,37 @@ func pay(worker_id: String, amount: int, why := "") -> void:
 	print("[production] %s paid %d gold (%s), step %d" % [_workers[worker_id]["name"], amount, why, now()])
 
 
+## Thief [param thief_id] lifts up to [param gold] from worker
+## [param worker_id]'s purse (never more than it holds) into their own
+## (npc's thief, decision 461): what was taken. Gold only moves.
+func lift_gold(worker_id: String, gold: int, thief_id: String) -> int:
+	if not _workers.has(worker_id) or not _workers.has(thief_id) or worker_id == thief_id or gold <= 0:
+		return 0
+	var taken := mini(gold, int(_workers[worker_id]["purse"]))
+	if taken <= 0:
+		return 0
+	spend(worker_id, taken, "lifted")
+	pay(thief_id, taken, "lifted")
+	stockpile.note(str(_workers[worker_id]["town"]), "gold", 0, "lifted:%s" % worker_id,
+		"%d gold went missing from %s's purse" % [taken, _workers[worker_id]["name"]])
+	return taken
+
+
+## A caught thief [param thief_id] gives back up to [param gold] to
+## [param victim_id] (never more than they hold): what was given back.
+func return_gold(thief_id: String, victim_id: String, gold: int) -> int:
+	if not _workers.has(thief_id) or not _workers.has(victim_id) or gold <= 0:
+		return 0
+	var back := mini(gold, int(_workers[thief_id]["purse"]))
+	if back <= 0:
+		return 0
+	spend(thief_id, back, "returned what was lifted")
+	pay(victim_id, back, "given back")
+	stockpile.note(str(_workers[victim_id]["town"]), "gold", 0, "returned:%s" % victim_id,
+		"%d gold given back to %s" % [back, _workers[victim_id]["name"]])
+	return back
+
+
 func note_sale(town: String, what: String, amount: int) -> void:
 	_town(town)["sales"].append({"step": now(), "what": what, "count": amount})
 

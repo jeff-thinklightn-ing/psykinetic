@@ -584,6 +584,27 @@ func _folk_price(base: int, buyer: String, seller: String) -> int:
 	return maxi(roundi(base * folk_factor(buyer, "buy") * folk_factor(seller, "sell")), 1)
 
 
+# --- The thief's fence (npc's thief, decision 461) --------------------------------
+
+## A lifted [param what] (a resource) fenced through merchant
+## [param merchant_id]: sold back to [param town]'s store at its raw price
+## times [param factor], the treasury paying (never below gold_floor;
+## nothing moves when it can't), the resource banked by the merchant, who
+## keeps [param margin] of the gold, the thief [param thief_id] the rest.
+## The gold paid in all.
+func fence(town: String, merchant_id: String, thief_id: String, what: String, factor_given: float, margin: float) -> int:
+	if what not in Stockpile.RESOURCES or production.worker(merchant_id).is_empty() or production.worker(thief_id).is_empty():
+		return 0
+	var price := maxi(roundi(raw_price(town, what) * factor_given), 1)
+	if stockpile.count(town, "gold") - price < int(rules.get("gold_floor", 0)) or not stockpile.take(town, "gold", price, "dealer:%s" % merchant_id):
+		return 0
+	stockpile.deposit(town, what, 1, production.worker(merchant_id)["name"], "from a dealer")
+	var kept := clampi(roundi(price * clampf(margin, 0.0, 1.0)), 0, price)
+	production.pay(merchant_id, kept, "dealt %s" % what)
+	production.pay(thief_id, price - kept, "fenced %s" % what)
+	return price
+
+
 # --- For npc's offers (decision 435, economy's side) -------------------------------
 
 ## Player [param player_id] pays up to [param gold] of worker

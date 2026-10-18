@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_offers()
 	_test_merchant()
 	_test_first_stores()
+	_test_thief_hooks()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -344,6 +345,37 @@ func _test_first_stores() -> void:
 	stock.take(TOWN, "food", stock.count(TOWN, "food"))
 	economy._eat("p1", rules["folk"]["needs"]["meal"], Production.items_catalog())
 	_check(folk.worker("p1")["fed"] == "bought" and float(folk.worker("p1")["loan"]) > 0.0, "the store empty: then he borrows for the cook's meal")
+
+
+## npc's thief (decision 461, economy's side): a lift from a purse, its
+## return when caught, a lifted resource fenced through a merchant; gold
+## only moves.
+func _test_thief_hooks() -> void:
+	print("
+== the thief's hooks ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.add_worker("v1", "Odo", ["smith"], TOWN)
+	work.add_worker("t1", "Nim", ["hauler"], TOWN)
+	work.add_worker("m1", "Vell", ["hauler"], TOWN)
+	work.pay("v1", 5)
+	stock.deposit(TOWN, "gold", 40)
+	var all_gold := func() -> int: return stock.count(TOWN, "gold") + int(work.worker("v1")["purse"]) + int(work.worker("t1")["purse"]) + int(work.worker("m1")["purse"])
+	var before: int = all_gold.call()
+	_check(work.lift_gold("v1", 3, "t1") == 3 and int(work.worker("v1")["purse"]) == 2 and int(work.worker("t1")["purse"]) == 3, "a lift of 3 from Odo's purse")
+	_check(work.lift_gold("v1", 9, "t1") == 2 and int(work.worker("v1")["purse"]) == 0, "never more than the purse holds")
+	_check(work.return_gold("t1", "v1", 4) == 4 and int(work.worker("v1")["purse"]) == 4, "caught: given back")
+	stock.deposit(TOWN, "cloth", 0)
+	var price := maxi(roundi(economy.raw_price(TOWN, "cloth") * 0.5), 1)
+	var paid := economy.fence(TOWN, "m1", "t1", "cloth", 0.5, 0.4)
+	_check(paid == price and stock.count(TOWN, "cloth") == 1 and int(work.worker("m1")["purse"]) == roundi(price * 0.4)
+		and int(work.worker("t1")["purse"]) == 1 + price - roundi(price * 0.4), "a cloth fenced: %d paid, the merchant's margin, the rest the thief's" % paid)
+	_check(all_gold.call() == before, "gold only moved (%d)" % all_gold.call())
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold"))
+	_check(economy.fence(TOWN, "m1", "t1", "cloth", 0.5, 0.4) == 0 and stock.count(TOWN, "cloth") == 1, "the treasury at its floor: nothing moves")
 
 
 func _check(ok: bool, what: String) -> void:
