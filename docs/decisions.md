@@ -11865,10 +11865,15 @@ approval of the pad pass, 2026-10-18):
   as they came in).
 - The see-through (Jeff, 2026-10-18: "use transparency that moves with
   player to see through the tree tops since its a isometric game"):
-  round the line from the player's body toward the camera, 4.5 m, its edge
-  soft over 2 m, whatever is above their knees and on the camera's side is
-  faded toward the near walls' NEAR_ALPHA (see_through.gdshaderinc). It is
-  decision 188's fade: the chunks within 20 m of the player draw three
+  round the line from the player's body toward the camera, whatever is
+  above their knees and on the camera's side is faded toward the near
+  walls' NEAR_ALPHA (see_through.gdshaderinc). How wide: Jeff on the
+  concept, "larger circle, probably even most of visible screen", so 0.8
+  of the view's half-height (Net.see_through, settings.cfg see_through=
+  0.2 to 1.5, read only, to try sizes without a build) to the middle of a
+  3.5 m soft edge, with the zoom: the faded part reaches the screen's top
+  and bottom, the roof stays at its sides and corners. It is decision
+  188's fade: the chunks within its outer edge + 17 m of the player draw three
   passes, opaque but for the region (season_cut, dithered where the two
   meet, at alpha near 1), the region's depth (season_see_depth, at
   NEAR_DEPTH_PRIORITY), its colour faded (season_see, at NEAR_PRIORITY), so
@@ -11882,8 +11887,9 @@ approval of the pad pass, 2026-10-18):
   by make_forest. In the game's view there (map_bench, 6 s each): 500 to
   780 fps on average; the worst single frame 4.5 to 6.5 ms standing, 7.5 to
   10 ms while the view pans into new chunks or turns and walks.
-  With the see-through, standing under the roof: 575 to 605 fps on
-  average, the worst frame 7.5 to 13.5 ms.
+  With the see-through at 0.8, at zoom 1.1 (map_bench, 8 s): frame time
+  median 1.4 to 1.7 ms, 99th 3.7 to 4.4 ms, standing, walking or turning,
+  as at 0.45; every frame over 5 ms in the first 0.1 s (start-up).
 Rejected: fading whole trees as the ring's are (hundreds of nodes to test
 a frame, and a whole 13 m tree gone for one crown in the way); a dithered
 hole over the player (the first cut: Jeff asked for transparency); every

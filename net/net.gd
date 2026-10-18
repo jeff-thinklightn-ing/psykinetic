@@ -399,6 +399,12 @@ var text_scale := 1.0
 var colours := "normal"
 ## The first-time talk hint was shown (hinted_talk=on).
 var hinted_talk := false
+## How far round the player a grown forest's crowns are seen through
+## (GrownTrees, decision 467; Jeff: "larger circle, probably even most of
+## visible screen"): a share of the view's half-height, to the middle of its
+## soft edge. settings.cfg see_through= (0.2 to 1.5), read only, so it is
+## tried without a build; the file keeps it.
+var see_through := 0.8
 const VOLUME_SETTINGS: Array[String] = ["master_volume", "sfx_volume", "voice_volume", "ambience_volume", "ui_volume", "music_volume"]
 ## The quick phrases, keys 1-4; settings.cfg phrase1= ... phrase4=.
 const DEFAULT_PHRASES: Array[String] = ["With me!", "Stay back!", "Get them!", "Fall back!"]
@@ -734,6 +740,9 @@ func _apply_window_settings() -> void:
 		fullscreen = str(settings.get("window_mode", "")) == "fullscreen"
 		camera_yaw = saved_yaw(str(settings.get("camera_yaw", "")), camera_yaw)
 		camera_zoom = saved_zoom(str(settings.get("camera_zoom", "")), camera_zoom)
+		var see := str(settings.get("see_through", ""))
+		if see.is_valid_float():
+			see_through = clampf(see.to_float(), 0.2, 1.5)
 		hints = str(settings.get("hints", "off")) == "on"
 	if _test_yaw_given:
 		camera_yaw = test_yaw

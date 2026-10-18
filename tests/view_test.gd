@@ -1879,6 +1879,10 @@ func _test_grown_trees() -> void:
 			"by the player, seen through: opaque but for it, its depth, then its colour at NEAR_ALPHA after (decision 188's order), on the player")
 	var far_drawn_off := (grown.chunks[chunk_of.call(Vector2i(60, 20))]["far"] as Node3D).get_node("Drawn") as MeshInstance3D
 	_check((far_drawn_off.material_override as ShaderMaterial).next_pass == null, "a chunk far from the player the opaque pass alone")
+	grown.set_see(6.0)
+	_check(is_equal_approx(float(material.get_shader_parameter("see_radius")), 6.0 + GrownTrees.SEE_SOFT * 0.5)
+			and is_equal_approx(float(see_colour.get_shader_parameter("see_radius")), 6.0 + GrownTrees.SEE_SOFT * 0.5),
+			"its width set from the view (Net's see_through x the half-height), to its soft edge's middle")
 	var arrays := drawn.mesh.surface_get_arrays(0)
 	var low := 0
 	for i in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size():

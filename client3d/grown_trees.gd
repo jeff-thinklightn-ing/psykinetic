@@ -21,10 +21,13 @@ extends Node3D
 ## the dark under the roof stay whole whatever is seen through.
 ##
 ## The see-through (Jeff: "use transparency that moves with player to see
-## through the tree tops since its a isometric game"): round the line from
-## the player's body toward the camera (see_through.gdshaderinc), whatever
-## is above their knees is faded toward the near walls' NEAR_ALPHA, softly
-## at its edge, moving with them. The chunks within SEE_REACH of the player
+## through the tree tops since its a isometric game"; then "larger circle,
+## probably even most of visible screen"): round the line from the player's
+## body toward the camera (see_through.gdshaderinc), whatever is above their
+## knees is faded toward the near walls' NEAR_ALPHA, softly at its edge,
+## moving with them; how wide is a share of the view (set_see, Net's
+## see_through), so the roof stays as a rim at the screen's edges and
+## corners at any zoom. The chunks near enough the player to reach it
 ## draw with three passes: opaque but for that region (season_cut), its
 ## depth (season_see_depth), then its colour faded (season_see), so only
 ## the nearest surface shows, as a near wall does (decision 188); the rest
@@ -46,12 +49,12 @@ const DROP_REACH := 46.0
 const PAD_CLEAR := 2.1
 ## Below this, a pad droops and thickens: a branch's tip.
 const HEAD_HIGH := 3.4
-## The see-through's radius round the line to the camera (metres), how
-## soft its edge, and how near the player (a chunk's middle) a chunk must be
-## to draw it: a 13 m crown stands about 11 m off them toward the camera.
-const SEE_RADIUS := 4.5
-const SEE_SOFT := 2.0
-const SEE_REACH := 20.0
+## How soft the see-through's edge is (metres), and how much further than
+## its outer edge a chunk's middle may be from the player and still draw
+## it: a 13 m crown stands about 11 m off them toward the camera, and a
+## chunk's middle is up to 6 m from its corner.
+const SEE_SOFT := 3.5
+const SEE_BEYOND := 17.0
 
 ## Tests: a level's trees by its name, read before the file.
 static var registered: Dictionary[String, Dictionary] = {}
@@ -74,6 +77,8 @@ var _shadow: StandardMaterial3D
 var _focus_chunk := Vector2i(1 << 30, 0)
 var _player := Vector3(1 << 20, 0.0, 0.0)
 var _see_chunk := Vector2i(1 << 30, 0)
+## The see-through's outer edge round the line to the camera (metres).
+var see_outer := 4.5
 ## Near chunks being built: chunk -> task id; built ones waiting to be added.
 var _tasks: Dictionary[Vector2i, int] = {}
 var _built: Dictionary[Vector2i, Array] = {}
@@ -131,9 +136,7 @@ func build(data: Dictionary, land: Dictionary, ground: Dictionary, heights: Dict
 	_see_depth.render_priority = Client3D.NEAR_DEPTH_PRIORITY
 	_see.next_pass = _see_colour
 	_see_colour.next_pass = _see_depth
-	for material: ShaderMaterial in _materials():
-		material.set_shader_parameter("see_radius", SEE_RADIUS)
-		material.set_shader_parameter("see_soft", SEE_SOFT)
+	set_see(see_outer - SEE_SOFT * 0.5, true)
 	_shadow = StandardMaterial3D.new()
 	_shadow.cull_mode = BaseMaterial3D.CULL_DISABLED
 	for tree: Dictionary in data.get("trees", []):
@@ -251,11 +254,30 @@ func _place(all := false) -> void:
 			return
 
 
-## [param chunk]'s pieces drawn with the see-through's passes if it is
-## within SEE_REACH of the player, else the opaque one alone.
+## How wide the see-through is: [param middle] metres from the line to
+## the camera to the middle of its soft edge (Client3D: Net's see_through
+## times the view's half-height). The chunks that draw it are worked out
+## again when it changes by more than a step.
+func set_see(middle: float, force := false) -> void:
+	var outer := maxf(middle, 0.5) + SEE_SOFT * 0.5
+	if not force and absf(outer - see_outer) < 0.05:
+		return
+	var wider := absf(outer - see_outer) >= 1.0
+	see_outer = outer
+	for material: ShaderMaterial in _materials():
+		material.set_shader_parameter("see_radius", see_outer)
+		material.set_shader_parameter("see_soft", SEE_SOFT)
+	if wider:
+		for chunk: Vector2i in chunks:
+			_dress(chunk)
+
+
+## [param chunk]'s pieces drawn with the see-through's passes if its middle
+## is within the see-through's outer edge and SEE_BEYOND of the player,
+## else the opaque one alone.
 func _dress(chunk: Vector2i) -> void:
 	var middle := Vector2(chunk * CHUNK) + Vector2.ONE * CHUNK * 0.5
-	var material := _see if middle.distance_to(Vector2(_player.x, _player.z)) <= SEE_REACH else _material
+	var material := _see if middle.distance_to(Vector2(_player.x, _player.z)) <= see_outer + SEE_BEYOND else _material
 	for piece: Node3D in [chunks[chunk]["far"], chunks[chunk]["near"]]:
 		if piece != null:
 			(piece.get_node("Drawn") as MeshInstance3D).material_override = material

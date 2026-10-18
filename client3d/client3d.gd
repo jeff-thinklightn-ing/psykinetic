@@ -6011,6 +6011,8 @@ func _hiding_pieces(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3
 func _update_grown() -> void:
 	if _grown == null:
 		return
+	if _camera != null:
+		_grown.set_see(Net.see_through * _camera.size * 0.5)
 	var points := _focus_points()
 	_grown.set_focus(_room.to_local(points[0]) if not points.is_empty() else _camera_target, _camera_target)
 
