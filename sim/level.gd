@@ -700,6 +700,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	var centre: Variant = _tile(config.get("centre"))
 	level["neighbours"] = neighbours_from(config, warnings)
 	level["places"] = places_from(config, warnings)
+	level["became"] = became_from(config, warnings)
 	level["entities"] = entities
 	level["starts"] = starts
 	level["spawn_points"] = spawn_points
@@ -777,6 +778,20 @@ static func _check_anchors(level: Dictionary, warnings: Array[String]) -> void:
 ## level.json's "neighbours", {side: map name} ("east": "wilds": walk off
 ## the east edge, arrive at the west edge of wilds at the same row), with
 ## sides that are not north, east, south or west said in [param warnings].
+## level.json "became" (decision 471): a level entity's marker cell, "x,y"
+## (its spawn key, decision 433), -> what it became ("snagfin"). A save's
+## entity of that key is handed over (Main._hand_over), not spawned.
+static func became_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, String]:
+	var out: Dictionary[String, String] = {}
+	var given: Variant = config.get("became", {})
+	if not given is Dictionary:
+		warnings.append("level.json \"became\" is not an object of \"x,y\": what it became")
+		return out
+	for key: Variant in given:
+		out[str(key)] = str(given[key])
+	return out
+
+
 static func neighbours_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, String]:
 	var out: Dictionary[String, String] = {}
 	var listed: Variant = config.get("neighbours", {})

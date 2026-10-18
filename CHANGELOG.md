@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Snagfin no longer spawns as a monster by the town chest in the wilds. A server that saved him hands him over once, ready to become the town's goblin merchant.
 - Weapons, the shield, rations, bandages, sacks, bundles, cloth, purses, nails
   and axe heads have their own art, and so do chests, ladders, beds, graves,
   small rocks, cave walls and the castle's plain and low walls (nothing is

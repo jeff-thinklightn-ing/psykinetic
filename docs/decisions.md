@@ -11810,3 +11810,25 @@ dagger too) and of 417 (any thing could take a bane or a grudge).
   use to grow: it counts what it fells now" (World.item_grew "character").
 - A save from before: a named, blessed or tallied thing has grown already.
 Protocol unchanged (all of it is the server's book and the notes' text).
+## 471. Snagfin, a goblin merchant: the monster leaves the wilds (enemy-ai's side)
+
+Jeff: "snagfin could be an friendly goblin merchant - somewhat outcast but
+tolerated". npc leads the design (the coordinator approved it); this is
+enemy-ai's side, agreed with npc.
+- The wilds no longer spawn him as a monster: his imp marker by the town
+  chest (cell 222,227) is dirt now, and his level.json entry is gone, so
+  nothing spawns or respawns him there.
+- level.json "became" (Level.became_from): a level entity's marker cell,
+  its spawn key (decision 433), -> what it became: {"222,227": "snagfin"}.
+  Main._spawn_saved hands a saved entity or far record (decision 352) of
+  that key, or from before keys one of that name, to Main.on_became(id,
+  {name, hp, slots, items, tile}) once (_hand_over), and neither spawns nor
+  keeps it; a dead one's respawn timer is dropped as any lost marker's is.
+  Once handed over it is in no save again, so it is handed over once.
+- npc's on_became seats the resident "snagfin" (economy's Towns.move_in) and
+  banks what he carried in his name; until it lands, on_became keeps what
+  it was handed (became_handed) and nothing more.
+- Monsters leave him be as they leave every resident; a raid on his town
+  treats him as its townsfolk.
+
+tests/spawn_key_test (_test_became).

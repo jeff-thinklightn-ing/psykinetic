@@ -4,7 +4,8 @@ extends Node
 ## (moving their slots) still brings every saved one back as itself, its
 ## dead slot's timer and its far record too, and the new one spawns; one
 ## whose marker the level lost comes back as saved, holding no slot; a
-## snapshot from before keys loads by its slots as it did.
+## snapshot from before keys loads by its slots as it did; one the level
+## says became something else (decision 471) is handed over, not spawned.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -40,6 +41,7 @@ func _run() -> void:
 	_test_a_lost_marker(path, saved)
 	_test_an_old_snapshot_by_slots(path, saved)
 	_test_stock_tops_up_once(path, saved)
+	_test_became(path, saved)
 	DirAccess.remove_absolute(path)
 	Net.state_path = ""
 	Level.unregister(LEVEL)
@@ -50,10 +52,12 @@ func _run() -> void:
 
 ## The level, as saved or with GAINED (a chest, props {"temple": true}),
 ## or without the marker at [param lost].
-func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = []) -> void:
+func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = [], became := {}) -> void:
 	Level.unregister(LEVEL)
 	var markers := MARKERS.duplicate()
 	markers.erase(lost)
+	for key: String in became:
+		markers.erase(Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1))))
 	var entries: Array = []
 	if not stock.is_empty():
 		entries.append({"at": [6, 2], "props": {"slots": stock, "stock": stock}})
@@ -72,7 +76,7 @@ func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = []) -> voi
 				image.set_pixel(x * 2 + 1, y * 2, ground)
 			if y + 1 < HEIGHT:
 				image.set_pixel(x * 2, y * 2 + 1, ground)
-	Level.register(LEVEL, image, null, {"name": "Spawn keys", "entities": entries})
+	Level.register(LEVEL, image, null, {"name": "Spawn keys", "entities": entries, "became": became})
 
 
 ## The world saved, then made to tell its entities apart: each level entity
@@ -191,6 +195,38 @@ func _test_stock_tops_up_once(path: String, data: Dictionary) -> void:
 	chest = _by_tile().get(Vector2i(6, 4))
 	_check(chest is Chest and not "bow" in chest.slots and "arrows" in chest.slots and chest.spawn_spec["props"].get("stocked") == ["bow", "arrows"],
 			"the bow taken and the world saved: loaded again, it does not come back (%s)" % [chest.slots if chest is Chest else null])
+
+
+func _test_became(path: String, data: Dictionary) -> void:
+	print("\n== level entities that became something else (decision 471): handed over once, not spawned ==")
+	_write(path, data)
+	# Imp1 dead (a timer), Imp2 a far record, Crate2 alive: all three became.
+	_register(false, Vector2i(-1, -1), [], {"8,2": "imp_one", "10,2": "imp_two", "12,2": "crate_two"})
+	_main.became_handed.clear()
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	var at := _by_tile()
+	var handed: Array = _main.became_handed.map(func(each: Dictionary) -> String: return each["id"])
+	handed.sort()
+	_check(handed == ["crate_two", "imp_two"], "the record and the living one handed over, once each (%s)" % [handed])
+	var crate: Dictionary = _main.became_handed.filter(func(each: Dictionary) -> bool: return each["id"] == "crate_two")[0]["entry"]
+	_check(crate["tile"] == Vector2i(12, 4) and crate["name"] == "Crate2" and int(crate["hp"]) > 0,
+			"with where it was, its name and hp (%s)" % [crate])
+	_check(not at.has(Vector2i(10, 4)) and not at.has(Vector2i(12, 4)) and not at.has(Vector2i(8, 4))
+			and World.record_list().is_empty() and _main._dead_since.is_empty(),
+			"none of them spawned, kept as a record, or waiting to respawn (%s)" % [_names(at)])
+	_check(at.get(Vector2i(4, 4)) is Pushable and at.get(Vector2i(6, 4)) is Chest and _main._alive_slots.size() == 2,
+			"the rest back as ever")
+	var old: Dictionary = data.duplicate(true)
+	for entry: Dictionary in old["zones"][LEVEL]["entities"]:
+		entry.erase("spawn_key")
+	_write(path, old)
+	_register(false, Vector2i(-1, -1), [], {"12,2": "crate2"})
+	_main.became_handed.clear()
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	_check(_main.became_handed.size() == 1 and _main.became_handed[0]["id"] == "crate2" and not _by_tile().has(Vector2i(12, 4)),
+			"from before keys, by its name")
 
 
 ## The level entity with [param key] in Main's table now: its slot, or -1.

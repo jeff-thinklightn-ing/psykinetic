@@ -2588,6 +2588,13 @@ func _spawn_saved(section: Dictionary) -> bool:
 	var records: Array = section.get("records", [])
 	if saved.is_empty() and section.get("respawns", []).is_empty() and records.is_empty():
 		return false
+	# Level entities that became something else (decision 471): handed over
+	# once, neither spawned nor kept. A dead one's timer, its key gone from
+	# the level, is dropped below as any lost marker's is.
+	var became: Dictionary = level.get("became", {})
+	if not became.is_empty():
+		saved = saved.filter(func(entry: Dictionary) -> bool: return not _hand_over(became, entry["spec"], entry))
+		records = records.filter(func(record: Dictionary) -> bool: return not _hand_over(became, record["entry"], record["entry"]))
 	# Monsters kept as records stay records, holding their slots (and their
 	# things) till someone comes near (decision 352); none before them.
 	if World.herds != null:
@@ -2623,6 +2630,35 @@ func _spawn_saved(section: Dictionary) -> bool:
 			if _spawn(_slot_spec(slot)) == null:
 				_dead_since[slot] = World.tick
 	return true
+
+
+## Whether the saved level entity [param spec] (a saved entry's spec, or a
+## record's entry; [param saved], where its hp and things are) is one the
+## level says became something else ([param became], level.json "became",
+## decision 471): by its spawn key, or from before keys by its name. If so,
+## it goes to on_became, its id and {name, hp, slots, items, tile}.
+func _hand_over(became: Dictionary, spec: Dictionary, saved: Dictionary) -> bool:
+	var key := str(spec.get("spawn_key", ""))
+	var id := str(became.get(key, ""))
+	if key.is_empty():
+		for each: String in became.values():
+			if str(spec.get("name", "")).to_lower() == each:
+				id = each
+	if id.is_empty():
+		return false
+	var tile: Variant = spec.get("tile")
+	var entry := {"name": str(spec.get("name", "")), "hp": int(saved.get("hp", 0)), "slots": saved.get("slots"),
+		"items": saved.get("items", []), "tile": tile if tile is Vector2i else Snapshot.vector(tile)}
+	print("[state] %s became %s (decision 471): handed over, not spawned" % [entry["name"], id])
+	on_became(id, entry)
+	return true
+
+
+## A saved level entity became [param id] (decision 471, _hand_over); npc's
+## side seats it as that resident. Each one handed over is kept here too.
+var became_handed: Array[Dictionary] = []
+func on_became(id: String, entry: Dictionary) -> void:
+	became_handed.append({"id": id, "entry": entry})
 
 
 # --- Far monsters kept as records (decision 352) -------------------------------
