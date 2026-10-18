@@ -13387,3 +13387,29 @@ proof Jeff's "living world" line asks for.
   song, the carpenter's line 5,399 times again, which is economy's.
 
 Protocol unchanged; no new class_name.
+
+## 497. The woodcutter: wood into the town's store, so a town can build
+
+npc's 30-day soak of the wilds (496, 2026-10-18) found the town had built
+nothing in a month: no wood was ever banked, and every building costs
+wood. Only players brought it. Jeff (2026-10-18, through the
+coordinator): yes to a woodcutter at these numbers; "makers have more
+expense - raw material", so gatherers feed the store.
+- A trade, woodcutter (economy.json "woodcutter": trade, every 3000
+  steps, wood 2 a cut, per_level 1 more for each level of a standing
+  woodshed): each one in town, not away, brings wood into the store on
+  the hunter's pattern (Towns._woodcut, the next cut per resident saved as
+  the town's cut_due). About 34 wood a day; Jeff's to move.
+- The woodshed (buildings.woodshed: trade woodcutter, by the carpenter,
+  xp 10, cost nothing, 1500 steps, max level 3): free, so a town without
+  wood can still build it. The woodcutter works without one.
+- How one comes: by rescue (rescue.trades weight 3), or, as the field gets
+  its farmer (449), by growth: a town with a planned building whose wood
+  it lacks and no woodcutter gets a newcomer after woodcutter.growth_days
+  (2), named from woodcutter.names.
+- The inn costs leather 5 instead of cloth 5 until a weaver exists (cloth
+  has no source; the tannery makes leather from the hunter's hides).
+Selling wood to the store at a price (Jeff's maker expenses) is the next
+step. Protocol unchanged. farm_test (a day's cutting, the woodshed, away,
+a newcomer only when a building waits on wood, and only one).
+

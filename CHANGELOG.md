@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns can build again without players hauling wood: a woodcutter brings wood into the town's store, more with a woodshed, and turns up on his own when the town has building to do and no wood. An inn now takes leather instead of cloth, since nobody weaves yet.
 - Timber windows have plank shutters.
 - Tools: a heavy job waiting at the resource gate no longer dies of "Permission denied" on the gate's state lock (Windows' answer while the lock is being deleted); it waits, as for a held lock.
 - The living-world soak (decision 496): tools/town_soak runs the wilds town for a month as the box runs it, with test players at the counter and the inn, and prints what happened; it found and this fixes three things: gossip no longer tells anyone the same thing twice (a card remembers what it was told), a stray home on their own closes the kin's pleas without a lapse against anyone, and promise words keep names; the rest (no inn built in a month, the treasury at its floor) went to economy.

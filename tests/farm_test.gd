@@ -6,7 +6,9 @@ extends Node
 ## summer storm flattening half, brought in in autumn as harvest x level x
 ## growth food, roots in winter; no farmer in spring: no crop; away in
 ## autumn: it rots; a field at level 2 gives twice; a field with no farmer
-## gets a newcomer after growth_days; the crop saved and loaded.
+## gets a newcomer after growth_days; the crop saved and loaded. A
+## woodcutter's wood, more with a woodshed, and one coming to a town with
+## a building waiting on wood.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
@@ -31,6 +33,7 @@ func _ready() -> void:
 	_test_missed()
 	_test_farmer_comes()
 	_test_look()
+	_test_woodcutter()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -159,6 +162,39 @@ func _test_look() -> void:
 	_check(not towns.buildings_of(TOWN)["field"].is_empty() and towns.buildings_of(TOWN)["field"].has("crop"), "the field's entry carries it")
 	towns.building_changed.disconnect(tell)  # It holds the town: let both go.
 	_storm = false
+
+
+## The woodcutter (decision 497): wood every woodcutter.every steps,
+## per_level more for a standing woodshed; a newcomer to a town whose
+## building waits on wood with nobody to cut it.
+func _test_woodcutter() -> void:
+	print("
+== the woodcutter ==")
+	var rule: Dictionary = _rules["woodcutter"]
+	var cuts := DAY / int(rule["every"]) - 1  # The first due one every after joining.
+	var towns := _towns(1, false)
+	towns.note_rescue(TOWN, "w1", "Bran", "woodcutter")
+	var stock := towns.production.stockpile
+	_year(towns, 1)
+	_check(stock.count(TOWN, "wood") == int(rule["wood"]) * cuts, "a day's cutting: %d wood (%d cuts)" % [stock.count(TOWN, "wood"), cuts])
+	towns._town(TOWN)["buildings"]["woodshed"] = {"kind": "woodshed", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	var before := stock.count(TOWN, "wood")
+	_year(towns, 1)
+	_check(stock.count(TOWN, "wood") - before == (int(rule["wood"]) + int(rule["per_level"])) * (cuts + 1), "with a woodshed: %d more a cut" % int(rule["per_level"]))
+	towns.production.set_away("w1", true)
+	before = stock.count(TOWN, "wood")
+	_year(towns, 1)
+	_check(stock.count(TOWN, "wood") == before, "away: none")
+	var bare := _towns(1, false)
+	_year(bare, int(ceilf(float(rule["growth_days"]))) + 1)
+	_check(bare.residents(TOWN).is_empty(), "nothing waiting on wood: nobody comes")
+	bare.add_xp(TOWN, 100, "test")
+	_check(bare.unlock(TOWN, "tannery") and bare.building(TOWN, "tannery")["state"] == Towns.PLANNED, "a tannery planned, no wood for it")
+	_year(bare, int(ceilf(float(rule["growth_days"]))) + 1)
+	var cutters := bare.residents(TOWN).filter(func(id: String) -> bool: return "woodcutter" in bare.production.worker(id)["trades"])
+	_check(cutters.size() == 1 and bare.production.worker(cutters[0])["origin"] == "growth", "a woodcutter comes (%s)" % [cutters])
+	_year(bare, 3)
+	_check(bare.residents(TOWN).filter(func(id: String) -> bool: return "woodcutter" in bare.production.worker(id)["trades"]).size() == 1, "and only one")
 
 
 func _check(ok: bool, what: String) -> void:

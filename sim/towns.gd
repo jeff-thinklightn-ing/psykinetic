@@ -338,6 +338,8 @@ func tick() -> void:
 		_crop(town)
 		_crop_shown(town)
 		_farmer_comes(town)
+		_woodcut(town)
+		_woodcutter_comes(town)
 		if production.building_in(town):
 			continue
 		if _repair(town):
@@ -945,6 +947,74 @@ func _farmer_comes(town: String) -> void:
 		_seat(town)
 
 
+# --- Woodcutters (decision 497) --------------------------------------------------
+
+## Each woodcutter of [param town] (rules' woodcutter.trade, a resident in
+## town and not away) every woodcutter.every steps brings wood into the
+## store: wood, and per_level more for each level of a standing woodshed.
+## Wood is what every building costs: without it a town builds nothing
+## (npc's soak, 2026-10-18).
+func _woodcut(town: String) -> void:
+	var rule: Dictionary = rules.get("woodcutter", {})
+	var trade := str(rule.get("trade", ""))
+	if trade.is_empty():
+		return
+	var record := _town(town)
+	var due: Dictionary = record.get("cut_due", {})
+	record["cut_due"] = due
+	var every := maxi(int(rule.get("every", 3000)), 1)
+	var shed := building(town, "woodshed")
+	var levels := int(shed.get("level", 0)) if shed.get("state") in [STANDING, BUILDING] else 0
+	for who in residents(town):
+		var worker := production.worker(who)
+		if worker.is_empty() or trade not in worker.get("trades", []) or worker["away"] or production.outside(who):
+			continue
+		if not due.has(who):
+			due[who] = now() + every
+			continue
+		if now() < int(due[who]):
+			continue
+		due[who] = now() + every
+		var wood := int(rule.get("wood", 2)) + int(rule.get("per_level", 1)) * levels
+		if wood > 0:
+			production.stockpile.deposit(town, "wood", wood, "woodcutter:%s" % who, "%s's cutting" % worker["name"])
+
+
+## A town with a building waiting on wood and no woodcutter gets one, a
+## newcomer, once it has waited woodcutter.growth_days (a rescue may bring
+## one first), as a field gets its farmer (449).
+func _woodcutter_comes(town: String) -> void:
+	var rule: Dictionary = rules.get("woodcutter", {})
+	var trade := str(rule.get("trade", ""))
+	var record := _town(town)
+	var short := false
+	for kind: String in record["buildings"]:
+		var house: Dictionary = record["buildings"][kind]
+		var job := production.job(int(house.get("job", 0))) if int(house.get("job", 0)) != 0 else {}
+		if house.get("state") == PLANNED and int(job.get("cost", {}).get("wood", 0)) > production.stockpile.count(town, "wood"):
+			short = true
+	var has_one := residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", []))
+	if trade.is_empty() or not short or has_one:
+		record.erase("woodcutter_wanted")
+		return
+	var waiting_since := int(record.get("woodcutter_wanted", -1))
+	if waiting_since < 0:
+		record["woodcutter_wanted"] = now()
+		return
+	if now() - waiting_since < int(float(rule.get("growth_days", 2)) * maxi(DayNight.day_steps, 1)):
+		return
+	var count := int(record.get("woodcutters_came", 0)) + 1
+	record["woodcutters_came"] = count
+	record.erase("woodcutter_wanted")
+	var names: Array = rule.get("names", ["Bran"])
+	var name := str(names[absi(hash("%s/wood/%d" % [town, count])) % names.size()])
+	var id := "woodcutter_%s_%d" % [town.replace("/", "_"), count]
+	if production.add_worker(id, name, [trade], town, "growth"):
+		record["residents"].append(id)
+		_note(town, "%s the woodcutter comes: the town has building to do and no wood" % name)
+		_seat(town)
+
+
 # --- Wells and roofs (decision 426) -------------------------------------------------
 
 ## [param town]'s water now ({} with no well: nothing of this applies).
@@ -1342,6 +1412,14 @@ func from_dict(saved: Dictionary) -> void:
 		if entry.has("farmer_wanted"):
 			record["farmer_wanted"] = int(entry["farmer_wanted"])
 		record["farmers_came"] = maxi(int(entry.get("farmers_came", 0)), 0)
+		var cut_due: Variant = entry.get("cut_due", {})
+		if cut_due is Dictionary:
+			record["cut_due"] = {}
+			for who: Variant in cut_due:
+				record["cut_due"][str(who)] = int(cut_due[who])
+		if entry.has("woodcutter_wanted"):
+			record["woodcutter_wanted"] = int(entry["woodcutter_wanted"])
+		record["woodcutters_came"] = maxi(int(entry.get("woodcutters_came", 0)), 0)
 		if entry.has("water_at"):
 			record["water"] = maxf(float(entry.get("water", 0.0)), 0.0)
 			record["water_at"] = int(entry["water_at"])
