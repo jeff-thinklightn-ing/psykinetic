@@ -501,6 +501,14 @@ func _test_creature_rig() -> void:
 	_check(timed.call(0.35).is_empty() and timed.call(1.5).any(func(line: String) -> bool: return "contact" in line)
 			and timed.call("mid").any(func(line: String) -> bool: return "contact" in line),
 			"a clip's contact (where its blow lands, for CreatureView): a fraction of it, else an error")
+	# A humanoid body's clips come from a shared library (clip_library), none in its .glb.
+	var body := Node3D.new()
+	body.add_child(Skeleton3D.new())
+	var shared := ArtCheck._check_rig(ArtKit.spec("creature.orc"), body)
+	var missing := ArtCheck._check_rig({"clips": (ArtKit.spec("creature.orc")["clips"] as Array)}, body)
+	_check(shared.is_empty() and missing.any(func(line: String) -> bool: return line.begins_with("error: no \"idle\" clip")),
+			"the orc's clips found in its clip_library (goblin.res), not in its .glb: %s" % [shared])
+	body.free()
 	grey.free()
 
 

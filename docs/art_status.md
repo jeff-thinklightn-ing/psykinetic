@@ -15,8 +15,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.field` | cell | 4.0 x 1.2 x 4.0 | 2500 | economy's farm field (Jeff, 2026-10-17), 4 x 4 cells, open to the sky: a split-rail fen... |
 | `building.healers_hut` | cell | 3.6 x 4.5 x 3.6 | 3000 | the healer's hut in the wilds, where its medicine man brings the fallen back (Jeff, 202... |
 | `building.temple` | cell | 4.6 x 7.0 x 6.6 | 4000 | the town's temple, where its priest serves (Jeff, 2026-10-17), 4 x 6 cells, its ridge a... |
-| `creature.kobold` | creature | 0.45 x 1.0 x 0.75 | 5000 | the kobold, the sneak's body (decision 416), a short tail behind (about 0.3 m, so 0.75 ... |
-| `creature.orc` | creature | 0.85 x 1.95 x 0.5 | 5000 | the orc, the brute's body (decision 416): a rigged body (one Skeleton3D) on the UAL ske... |
+| `creature.kobold` | creature | 0.45 x 1.0 x 0.66 | 5000 | the kobold, the sneak's body (decision 416), a short tail behind (0.23 m in front of th... |
+| `creature.orc` | creature | 0.85 x 1.95 x 0.55 | 5000 | the orc, the brute's body (decision 416): a rigged body (one Skeleton3D) on the UAL ske... |
 | `ground.grass` | texture | tile 4.0 |  | terrain's ground shader on grass: blended, lit and noised there; procedural colour whil... |
 | `ground.stone` | texture | tile 4.0 |  | terrain's ground shader on stone floors; procedural colour while empty |
 | `item.buckler` | held | 0.35 x 0.35 x 0.05 | 500 | leather buckler (Items: levels/items.json): in a pack or chest as its icon, in a hand, ... |

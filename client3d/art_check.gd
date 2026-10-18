@@ -169,13 +169,24 @@ const PALETTE_COLUMNS := 8
 
 
 ## A creature's rig and clips (decision 319): an armature (a Skeleton3D),
-## and each clip the slot lists found by any of its names; a required one
-## missing is an error, one with a fallback a warning naming what stands in.
+## and each clip the slot lists found by any of its names, in the .glb or in
+## the slot's "clip_library"; a required one missing is an error, one with a
+## fallback a warning naming what stands in.
 static func _check_rig(entry: Dictionary, node: Node3D) -> Array[String]:
 	var out: Array[String] = []
 	if node.find_children("*", "Skeleton3D", true, false).is_empty():
 		out.append("error: no armature: a creature is a rigged body, its mesh skinned to one Skeleton3D")
 	var have := clip_names(node)
+	# A body whose clips are a shared library played through a bone map (the
+	# humanoid bodies: goblin.res over the UAL skeleton) names it: its clips
+	# count as the body's own.
+	if entry.has("clip_library"):
+		var library := load(str(entry["clip_library"])) as AnimationLibrary
+		if library == null:
+			out.append("error: its clip_library %s is not an AnimationLibrary" % entry["clip_library"])
+		else:
+			for name in library.get_animation_list():
+				have[str(name).to_lower()] = true
 	for clip: Dictionary in entry.get("clips", []):
 		# Where its blow lands, a fraction of the clip (CreatureView strikes it
 		# so this lands with the sim's blow; CONTACT without).
