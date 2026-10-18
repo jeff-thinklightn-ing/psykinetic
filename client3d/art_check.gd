@@ -179,7 +179,7 @@ static func _check_rig(entry: Dictionary, node: Node3D) -> Array[String]:
 	for clip: Dictionary in entry.get("clips", []):
 		# Where its blow lands, a fraction of the clip (CreatureView strikes it
 		# so this lands with the sim's blow; CONTACT without).
-		var contact: Variant = clip.get("contact", CreatureView.CONTACT)
+		var contact: Variant = clip.get("contact", ArtKit.CLIP_CONTACT)
 		if not (contact is float or contact is int) or float(contact) <= 0.0 or float(contact) >= 1.0:
 			out.append("error: \"%s\" clip's contact %s: a fraction of the clip, over 0 and under 1, where its blow lands" % [clip["name"], contact])
 		var names: Array = clip.get("names", [clip["name"]])

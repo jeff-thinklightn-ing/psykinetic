@@ -43,6 +43,10 @@ const ROOT := "res://art/kit/"
 ## named PALETTE_NAME draws with this one instead of its own copy.
 const PALETTE := "res://art/kit/palette.tres"
 const PALETTE_NAME := "palette"
+## Where a creature's blow lands in its clip when the slot's clip names no
+## "contact": this far through it (CreatureView strikes it so; ArtCheck
+## checks a named one).
+const CLIP_CONTACT := 0.5
 ## The greys a placeholder is drawn in, by category: told apart, all plainly
 ## not art.
 const GREYS := {

@@ -41,7 +41,7 @@ const FLINCH_SECONDS := 0.25
 const BLEND := 0.2
 ## Where a blow lands in its clip when the slot's clip names no "contact":
 ## this far through it.
-const CONTACT := 0.5
+const CONTACT := ArtKit.CLIP_CONTACT
 
 ## The clip a slot clip falls back to when the art has none of its own.
 const FALLBACKS := {"graze": "idle", "feed": "graze", "trot": "walk", "charge": "run", "alert": "idle",
