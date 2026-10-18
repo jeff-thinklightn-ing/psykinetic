@@ -362,6 +362,8 @@ func _frames() -> void:
 	# of a frame is the scripts and the engine's own nodes.
 	var render_cpu := 0.0
 	var render_gpu := 0.0
+	var map_draws: int = _main.minimap.draws if _main.minimap != null else 0
+	var map_usec: int = _main.minimap.draw_usec if _main.minimap != null else 0
 	var started := Time.get_ticks_usec()
 	var last := started
 	# Every frame's length with when it came: the median, the 99th, and the
@@ -403,6 +405,10 @@ func _frames() -> void:
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
 		render_cpu / frames, render_gpu / frames])
+	if _main.minimap != null and _main.minimap.visible:
+		var drawn: int = _main.minimap.draws - map_draws
+		print("BENCH minimap: drawn %d times in %d frames, %.3f ms a draw, %.3f ms a frame" % [drawn, frames,
+			(_main.minimap.draw_usec - map_usec) / 1000.0 / maxi(drawn, 1), (_main.minimap.draw_usec - map_usec) / 1000.0 / frames])
 	var times: Array[float] = []
 	for spike in spikes:
 		times.append(spike.x)

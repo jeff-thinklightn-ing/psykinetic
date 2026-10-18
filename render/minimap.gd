@@ -55,6 +55,15 @@ var places: Array[Dictionary] = []
 ## Main's: () -> Array of {cell: Vector2, kind: "you"|"companion"|"player"|"door", colour, facing: Vector2}.
 var marks: Callable = func() -> Array: return []
 
+## How often it has drawn, and the microseconds drawing took (map_bench).
+var draws := 0
+var draw_usec := 0
+## The marks as last drawn, and their hash: drawn again only when that
+## changes (decision 482), or the map is rebuilt, opened or zoomed (each
+## queues a draw), or resized (a Control redraws then by itself).
+var _marks: Array = []
+var _marks_hash := 0
+
 static var _palette: Image
 
 
@@ -64,7 +73,14 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	queue_redraw()
+	if texture == null or not is_visible_in_tree():
+		return
+	var all: Array = marks.call()
+	var now := hash(all)
+	if now != _marks_hash:
+		_marks = all
+		_marks_hash = now
+		queue_redraw()
 
 
 ## What [param kind] of ground looks like: its palette swatch's middle.
@@ -139,6 +155,7 @@ func rebuild(level: Dictionary) -> void:
 	for key: String in listed:
 		var place: Dictionary = listed[key]
 		places.append({"cell": place["cell"], "name": place["name"], "kind": place["kind"]})
+	queue_redraw()
 
 
 func toggle() -> void:
@@ -194,7 +211,9 @@ static func to_screen(cell: Vector2, shown: Dictionary) -> Vector2:
 func _draw() -> void:
 	if texture == null:
 		return
-	var all: Array = marks.call()
+	var started := Time.get_ticks_usec()
+	draws += 1
+	var all := _marks
 	var centre := Vector2(cells) / 2.0
 	for mark: Dictionary in all:
 		if mark["kind"] == "you":
@@ -246,6 +265,7 @@ func _draw() -> void:
 	if big:
 		draw_string(font, dest.position + Vector2(0, -10 * ui), "%s%s" % [title, "  x%d" % int(ZOOMS[zoom_step]) if zoom_step > 0 else ""],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, int(TITLE_SIZE * ui), UiTheme.color("text"))
+	draw_usec += Time.get_ticks_usec() - started
 
 
 ## Draws with [param draw] at [param at] only if it is on the map.

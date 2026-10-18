@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The minimap no longer redraws every frame, only when something on it moves (482).
 - Raiding parties on the world map follow a shifting level's new layout instead of its old one (465 amended).
 - Your companion speaks to what just happened. A threat comes before a
   friend's arrival, a kill of yours gets a word, "we should move on" lines

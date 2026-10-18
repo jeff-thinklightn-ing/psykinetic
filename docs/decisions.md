@@ -12349,3 +12349,30 @@ with no PROTOCOL_REVISION bump (release); the server ships with the next
 cut.
 
 tests/monster_test (the replication config; the kobold case's hands).
+
+## 482. The minimap draws again only when what it shows changes
+
+The minimap (321) called queue_redraw() in _process, so it drew every frame
+whether anything had moved or not (ui's measurement, for perf's regression
+hunt; Jeff: "performance is suffering lately yes"). Now _process asks Main
+for the marks (you, your companion, the other players, the doors) and draws
+again only when their hash changes: you stepping or turning, a player or a
+companion moving, a door's mark made again differently. rebuild (a new
+zone), toggle (M) and zoom queue a draw themselves; a resize redraws as any
+Control does; hidden, it neither asks nor draws. Nothing else on it moves:
+the picture, starts, ways out and places change only on a rebuild.
+
+Measured with map_bench on the wilds, windowed, standing still: before,
+drawn every frame at 0.13 to 0.14 ms a frame (its _draw alone), the frame
+median 1.63 and 1.78 ms over two runs; after, drawn 0 times in some 7,000
+frames, the median 1.36 and 1.32 ms (the canvas not recorded again either,
+so more is saved than _draw's own time). Turning the camera (--spin=30)
+the pointer turns, so it draws every frame as before (0.12 ms a frame).
+Minimap.draws and draw_usec count it; map_bench prints them.
+
+tests/minimap_test: ten frames with nothing changed draw nothing; a step, a
+turn, opening, zooming and a rebuild each draw once; hidden, nothing.
+
+Rejected: drawing at a fixed rate (late when you move, wasted when you
+don't); a texture the marks are baked into (the marks are a few dozen
+shapes, the picture is already one texture).

@@ -3,7 +3,10 @@ extends Node
 ## from the palette, water, walls darkening the cells either side, nothing
 ## where there is no floor), the start cells, ways out and places it marks,
 ## and its views: a corner map that never shows past the zone's edge, and
-## the big map's zoom steps round you. Run it with tests/run.ps1 or run.sh.
+## the big map's zoom steps round you. It draws again only when what it
+## shows changes (decision 482): you moving or turning, a mark, the big map
+## opened or zoomed, a rebuild; not every frame. Run it with tests/run.ps1
+## or run.sh.
 
 var _failures := 0
 
@@ -12,6 +15,7 @@ func _ready() -> void:
 	World.set_process(false)
 	_test_picture()
 	_test_views()
+	await _test_redraws()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -97,6 +101,49 @@ func _test_views() -> void:
 	map.toggle()
 	_check(not map.big and map.zoom_step == 0, "and back out, and closed")
 	map.queue_free()
+
+
+func _test_redraws() -> void:
+	print("== drawn again only when what it shows changes (decision 482) ==")
+	var rows: Array[String] = []
+	for y in 2 * 20 - 1:
+		rows.append(".".repeat(2 * 20 - 1))
+	Level.register("mm_redraw", Level.image_from_rows(rows), null, {})
+	var you := {"cell": Vector2(5, 5), "kind": "you", "facing": Vector2(0, -1)}
+	var map := Minimap.new()
+	map.marks = func() -> Array: return [you.duplicate(), {"cell": Vector2(8, 8), "kind": "door"}]
+	add_child(map)
+	map.rebuild(Level.load_level("mm_redraw"))
+	await _frames(3)
+	var drawn := map.draws
+	_check(drawn > 0, "drawn once it has its picture (%d)" % drawn)
+	await _frames(10)
+	_check(map.draws == drawn, "ten frames with nothing changed: not drawn again (%d)" % (map.draws - drawn))
+	you["cell"] = Vector2(6, 5)
+	await _frames(2)
+	_check(map.draws == drawn + 1, "you step: drawn again, once (%d)" % (map.draws - drawn))
+	you["facing"] = Vector2(1, 0)
+	await _frames(2)
+	_check(map.draws == drawn + 2, "you turn: drawn again (%d)" % (map.draws - drawn))
+	map.toggle()
+	await _frames(2)
+	_check(map.draws == drawn + 3, "the big map opened: drawn again (%d)" % (map.draws - drawn))
+	map.zoom(1)
+	await _frames(2)
+	_check(map.draws == drawn + 4, "zoomed: drawn again (%d)" % (map.draws - drawn))
+	map.rebuild(Level.load_level("mm_redraw"))
+	await _frames(2)
+	_check(map.draws == drawn + 5, "rebuilt: drawn again (%d)" % (map.draws - drawn))
+	map.visible = false
+	you["cell"] = Vector2(7, 5)
+	await _frames(2)
+	_check(map.draws == drawn + 5, "hidden: not drawn (%d)" % (map.draws - drawn))
+	map.queue_free()
+
+
+func _frames(count: int) -> void:
+	for i in count:
+		await get_tree().process_frame
 
 
 func _check(ok: bool, label: String) -> void:
