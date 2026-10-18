@@ -89,7 +89,7 @@ const AIL_BURN := Color(1.0, 0.6, 0.25)
 const AIL_BLEED := Color(0.95, 0.3, 0.3)
 const WALL_HEIGHT := 3.0
 ## A kind's roof set (decision 488): thatch, Jeff's default until he says,
-## shingle (Level.ROOF_SETS' first) while art-kit has no thatch set.
+## shingle (Level.ROOF_SETS' first) while art-kit has no material.roof.thatch.
 const KIND_ROOF := "thatch"
 ## How much of a ruin's walls stand broken (decision 489).
 const RUIN_BROKEN := 0.45
@@ -2799,7 +2799,7 @@ func _add_kind(building: Dictionary) -> void:
 	var cells := Level.building_cells(building)
 	var base := _height(rect.position) * LEVEL_RISE
 	var eaves := float(building["eaves"])
-	var roof_set := KIND_ROOF if KIND_ROOF in Level.ROOF_SETS else Level.ROOF_SETS[0]
+	var roof_set := KIND_ROOF if ArtKit.has("material.roof." + KIND_ROOF) else Level.ROOF_SETS[0]
 	var node := BuildingComposer.compose(building, roof_set)
 	node.name = "Building_%d_%d" % [rect.position.x, rect.position.y]
 	node.position = Vector3(rect.position.x, base, rect.position.y)

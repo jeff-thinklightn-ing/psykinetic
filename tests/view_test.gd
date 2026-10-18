@@ -1208,6 +1208,10 @@ func _test_composer() -> void:
 	var round_hut := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(14, 2, 5, 5))
 	_check(round_hut.size() == 1 and (round_hut[0]["node"] as Node3D).find_child("Cone", true, false) != null,
 			"the round hut: one cone over its blocks")
+	var house := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 2, 10, 8))
+	var thatched: MeshInstance3D = (house[0]["roof"] as Node3D).find_child("Slopes", true, false) if house.size() == 1 else null
+	_check(thatched != null and thatched.material_override == Client3D._roof_material("thatch") and ArtKit.has("material.roof.thatch"),
+			"its roofs thatched, art-kit's thatch set there (decision 489 amended)")
 	var ruin := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 13, 6, 8))
 	var broken := Level.blocks_outline(Level._union([Rect2i(2, 13, 6, 8)])).filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "broken")
 	_check(ruin.size() == 1 and ruin[0]["roof"] == null and broken.size() > 3 and not _rig._building_at.has(Vector2i(4, 16)),

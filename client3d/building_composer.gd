@@ -24,6 +24,9 @@ extends RefCounted
 ## length, each seeded between these.
 const RISE := Vector2(0.75, 1.1)
 const REACH := Vector2(0.3, 0.5)
+## A block's overhang strays this far either way from its roof set's
+## (roof.<set>.profile's "overhang"; REACH's middle without one).
+const REACH_SPREAD := 0.1
 const SAG := Vector2(0.01, 0.025)
 ## How far below the main block's eaves a wing's are, and a lean-to's low
 ## eave; a lean-to's high side keeps LEAN_TUCK under them.
@@ -127,6 +130,28 @@ static func _stream(building: Dictionary, salt: int) -> RandomNumberGenerator:
 	return rng
 
 
+## The main block's roof's rise over its eaves, as _block_roof draws it
+## (its stream: the reach, then the rise).
+static func _main_rise(building: Dictionary) -> float:
+	var blocks: Array = building["blocks"]
+	var main: Rect2i = blocks[_main_of(blocks)]
+	var rng := _stream(building, _main_of(blocks))
+	rng.randf()  # Its reach.
+	return float(mini(main.size.x, main.size.y)) * 0.5 * rng.randf_range(RISE.x, RISE.y)
+
+
+## [param roof_set]'s profile (roof.<set>.profile: its thickness and
+## overhang), else THICK and REACH's middle.
+static func _profile(roof_set: String) -> Dictionary:
+	var out := {"thickness": THICK, "overhang": (REACH.x + REACH.y) * 0.5}
+	var slot := "roof.%s.profile" % roof_set
+	if ArtKit.has(slot):
+		var spec := ArtKit.spec(slot)
+		for key: String in out:
+			out[key] = float(spec.get(key, out[key]))
+	return out
+
+
 ## The index of [param blocks]' largest (the first of the largest).
 static func _main_of(blocks: Array) -> int:
 	var best := 0
@@ -160,18 +185,18 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 			roof.add_child(_cone(Vector2(rect.size), eaves, rng, material))
 		else:
 			for index in blocks.size():
-				var piece := _block_roof(building, index, material, gable)
+				var piece := _block_roof(building, index, material, gable, _profile(roof_set))
 				piece.name = "Roof_%d" % index
 				roof.add_child(piece)
 	var odds := float(CHIMNEYS.get(str(building["kind"]), 0.0)) * (0.6 if ruined else 1.0)
 	if rng.randf() < odds and str(building.get("roof", "gable")) != "round":
-		parts.add_child(_chimney(main, rect, eaves, rng))
+		parts.add_child(_chimney(building, main, rect, eaves, rng))
 	return out
 
 
 ## Block [param index]'s roof by its role, placed in the building's frame
 ## (its box's top-left cell's middle at the origin), from its own stream.
-static func _block_roof(building: Dictionary, index: int, material: Material, gable: Material) -> Node3D:
+static func _block_roof(building: Dictionary, index: int, material: Material, gable: Material, profile: Dictionary) -> Node3D:
 	var blocks: Array = building["blocks"]
 	var block: Rect2i = blocks[index]
 	var rect: Rect2i = building["rect"]
@@ -182,7 +207,9 @@ static func _block_roof(building: Dictionary, index: int, material: Material, ga
 	if not is_main:
 		rng.randf()  # Its eaves' draw, made by block_eaves.
 	var middle := Vector2(block.position - rect.position) + Vector2(block.size - Vector2i.ONE) * 0.5
-	var reach := rng.randf_range(REACH.x, REACH.y)
+	# Its overhang about its roof set's, a little either way.
+	var reach := rng.randf_range(profile["overhang"] - REACH_SPREAD, profile["overhang"] + REACH_SPREAD)
+	var thick: float = profile["thickness"]
 	var holder := Node3D.new()
 	var leans := _leans_on(block, blocks)
 	if not is_main and _leaning(building, index):
@@ -191,14 +218,14 @@ static func _block_roof(building: Dictionary, index: int, material: Material, ga
 		var along := float(block.size.y if leans.x != 0 else block.size.x)
 		var low := at
 		var rise := maxf(eaves - LEAN_TUCK - low, 0.3)
-		holder.add_child(_slopes(across, along, rise, reach, rng.randf_range(SAG.x, SAG.y) * along, true, material, gable))
+		holder.add_child(_slopes(across, along, rise, reach, rng.randf_range(SAG.x, SAG.y) * along, true, thick, material, gable))
 		holder.position = Vector3(middle.x, low, middle.y)
 		holder.rotation.y = {Vector2i(1, 0): 0.0, Vector2i(-1, 0): PI, Vector2i(0, 1): -PI * 0.5, Vector2i(0, -1): PI * 0.5}[leans]
 	else:
 		var along_x := block.size.x > block.size.y
 		var span := Vector2(block.size.y, block.size.x) if along_x else Vector2(block.size)
 		var rise := span.x * 0.5 * rng.randf_range(RISE.x, RISE.y)
-		holder.add_child(_slopes(span.x, span.y, rise, reach, rng.randf_range(SAG.x, SAG.y) * span.y, false, material, gable))
+		holder.add_child(_slopes(span.x, span.y, rise, reach, rng.randf_range(SAG.x, SAG.y) * span.y, false, thick, material, gable))
 		holder.position = Vector3(middle.x, at, middle.y)
 		holder.rotation.y = PI * 0.5 if along_x else 0.0
 	holder.position += Vector3(rng.randf_range(-SHIFT, SHIFT), 0.0, rng.randf_range(-SHIFT, SHIFT))
@@ -230,9 +257,9 @@ static func _leans_on(block: Rect2i, blocks: Array) -> Vector2i:
 ## both eaves to the ridge over x = 0, or a lean-to ([param mono]) from its
 ## low eave at -x to its high side at +x; reaching [param reach] past the
 ## walls each way, the ridge sagging [param sag] in the middle of its
-## length (the eaves do not), a top THICK above its underside; and its
+## length (the eaves do not), a top [param thick] above its underside; and its
 ## ends closed down to the eaves in [param gable].
-static func _slopes(across: float, along: float, rise: float, reach: float, sag: float, mono: bool,
+static func _slopes(across: float, along: float, rise: float, reach: float, sag: float, mono: bool, thick: float,
 		material: Material, gable: Material) -> Node3D:
 	var half := across * 0.5
 	var length := along + reach * 2.0
@@ -250,7 +277,7 @@ static func _slopes(across: float, along: float, rise: float, reach: float, sag:
 		for j in STEPS:
 			var z0 := -length * 0.5 + length * j / STEPS
 			var z1 := -length * 0.5 + length * (j + 1) / STEPS
-			for lift in [THICK, 0.0]:
+			for lift in [thick, 0.0]:
 				var corners := [Vector3(xs[i], height.call(xs[i], z0) + lift, z0), Vector3(xs[i], height.call(xs[i], z1) + lift, z1),
 					Vector3(xs[i + 1], height.call(xs[i + 1], z1) + lift, z1), Vector3(xs[i + 1], height.call(xs[i + 1], z0) + lift, z0)]
 				for k in [0, 1, 2, 0, 2, 3]:
@@ -310,23 +337,26 @@ static func _cone(size: Vector2, eaves: float, rng: RandomNumberGenerator, mater
 	return holder
 
 
-## A chimney at one gable end of [param main], a little off its middle,
-## standing from the ground to over its ridge: art-kit's chimney.stone on
-## the roof line if it is there, else a stack and cap of the stone set.
-static func _chimney(main: Rect2i, rect: Rect2i, eaves: float, rng: RandomNumberGenerator) -> Node3D:
+## A chimney at one gable end of [param main], a little off its middle:
+## art-kit's chimney.stone seated on the roof where it stands (the slope's
+## height there, so its stack clears the roof round it however steep), else
+## a stack and cap of the stone set from the ground to over the ridge.
+static func _chimney(building: Dictionary, main: Rect2i, rect: Rect2i, eaves: float, rng: RandomNumberGenerator) -> Node3D:
 	var middle := Vector2(main.position - rect.position) + Vector2(main.size - Vector2i.ONE) * 0.5
 	var along_x := main.size.x > main.size.y
 	var end := (float(main.size.x if along_x else main.size.y) * 0.5 - 0.35) * (1.0 if rng.randf() < 0.5 else -1.0)
 	var off := rng.randf_range(-0.3, 0.3)
 	var at := middle + (Vector2(end, off) if along_x else Vector2(off, end))
-	var ridge := eaves + float(mini(main.size.x, main.size.y)) * 0.5 * RISE.y
+	var half := float(mini(main.size.x, main.size.y)) * 0.5
+	var rise := _main_rise(building)
+	var ridge := eaves + rise
 	var out := Node3D.new()
 	out.name = "Chimney"
 	out.position = Vector3(at.x, 0.0, at.y)
 	out.rotation.y = rng.randf_range(-0.05, 0.05)
 	if ArtKit.has("chimney.stone"):
 		var piece := ArtKit.instance("chimney.stone")
-		piece.position.y = eaves
+		piece.position.y = eaves + rise * (1.0 - absf(off) / half)
 		out.add_child(piece)
 		return out
 	var stone := Client3D._wall_material("stone")

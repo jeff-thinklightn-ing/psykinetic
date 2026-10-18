@@ -13252,6 +13252,14 @@ metres; one look built once, two copies sharing a mesh; a round hut's
 cone; a ruin with no roof, no inside and broken walls). Protocol unchanged.
 Rejected: a mesh per kind from art-kit (no variation, and the grid shows);
 art-kit's roofs as pieces per cell (the joints and repeats show).
+Amended (art-kit's chimney.stone and thatch set, e3ef61a; its packing fix
+507ec10, a piece packed as plain nodes): a kind's roof is thatch once
+material.roof.thatch is there (Jeff's default), shingle else; each roof's
+thickness and its overhang (REACH_SPREAD either way) are its set's
+roof.<set>.profile's; chimney.stone is seated on the roof where it stands
+(the main roof's rise there, replayed from its stream: _main_rise), so its
+2.2 m stack clears the roof round it however steep, the hall's 5 m rise
+too. view_test: the L-house thatched.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
