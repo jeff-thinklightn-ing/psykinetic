@@ -1219,6 +1219,23 @@ func _test_composer() -> void:
 			"a porch on its door's edge, its front out of the house (%s, %.2f)" % [porch.position if porch else null, porch.rotation.y if porch else 0.0])
 	if porch != null:
 		porch.free()
+	# Windows: wood walls in a straight stretch, art-kit's window drawn there,
+	# its shutters opening outward.
+	var windows := BuildingComposer.windows(buildings[0], level["terrain"]["edges"])
+	var drawn := windows.filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "window")
+	var outward := true
+	for key in drawn:
+		var mid := Vector2(key.x + 0.5, key.y) if key.z == Terrain.EAST else Vector2(key.x, key.y + 0.5)
+		var piece: Node3D = null
+		for child in (_rig._walls[key] as Node3D).get_children() if _rig._walls.has(key) else []:
+			if str(child.name).begins_with("Piece_") and Vector2(child.global_position.x, child.global_position.z).distance_to(mid) < 0.1:
+				piece = child
+		var sides := Terrain.edge_cells(key)
+		var out := Vector2(sides[1] - sides[0]) * (1.0 if Level.building_cells(buildings[0]).has(sides[0]) else -1.0)
+		var plus_x := (piece.global_transform.basis.x if piece != null else Vector3.ZERO)
+		outward = outward and piece != null and Vector2(plus_x.x, plus_x.z).dot(out) > 0.9
+	_check(not windows.is_empty() and drawn.size() == windows.size() and outward,
+			"the L-house's windows (%d) drawn as art-kit's, their shutters' side out" % windows.size())
 	var longhouse: Dictionary = _kinds_level([["building_longhouse_small", Vector2i(1, 1), false]])["buildings"][0]
 	var cruck := BuildingComposer.cruck_of(longhouse, false)
 	_check(cruck != null and is_equal_approx(absf(cruck.position.x - 5.5), 6.0) and is_equal_approx(cruck.position.z, 2.0),

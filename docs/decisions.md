@@ -13301,6 +13301,17 @@ without a door); each turned so its front faces out of the building (the
 edge's inside cell to its outside one). Drawn only: they stand outside the
 footprint and block nothing. No porch on a ruin. view_test: the L-house's
 porch on its door's edge facing out; a longhouse's cruck on its gable.
+Amended (windows; art-kit's shutters on wall.wood.window, b13cf50): a
+kind's wood walls get windows (BuildingComposer.windows, by its seed and
+the edge: WINDOW_ODDS of the walls in a straight stretch, neither at a
+corner nor beside a door, never two side by side, none on a ruin), where
+the wall is within WINDOW_STRETCH of a storey: Client3D marks the edge
+"window" and its run draws art-kit's wall.wood.window there in place of
+the swept wall, turned half round where the outside is the run's -x (its
+shutters swing out), stretched to the wall's height; two in three stand
+with their shutters open (each leaf 90 to 108 degrees, by the edge). The
+sim's wall is unchanged: a window is drawn, not seen through. view_test:
+the L-house's windows drawn, their shutters' side out.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 

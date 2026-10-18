@@ -93,6 +93,10 @@ const WALL_HEIGHT := 3.0
 const KIND_ROOF := "thatch"
 ## How much of a ruin's walls stand broken (decision 489).
 const RUIN_BROKEN := 0.45
+## A window's wall may differ from a storey this much (it is stretched to
+## it); how many windows stand with their shutters open (489 amended).
+const WINDOW_STRETCH := 0.6
+const SHUTTERS_OPEN := 0.66
 ## Wall runs (_add_wall_runs), each in its set's profile and variation
 ## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
 ## many edges a mesh; a height every WALL_SWAY edges, the body up to the
@@ -1015,6 +1019,9 @@ var _wall_heights: Dictionary[Vector3i, float] = {}
 ## wall drawn: {town_id, walls, gates, rect, towers (vertex -> Node3D),
 ## shown: the look it has}.
 var _state_walls: Array[Vector3i] = []
+## The window edges whose outside is their run's -x: the piece turned half
+## round (_dress_window).
+var _window_flipped: Dictionary[Vector3i, bool] = {}
 var _town_wall_sets: Array[Vector3i] = []
 var _town_walls: Array[Dictionary] = []
 var _building_floors: Array[Vector2i] = []
@@ -2592,6 +2599,7 @@ func _build_room() -> void:
 	for key in _state_walls:
 		_wall_states.erase(key)
 	_state_walls.clear()
+	_window_flipped.clear()
 	for key in _town_wall_sets:
 		_wall_sets.erase(key)
 	_town_wall_sets.clear()
@@ -2620,8 +2628,13 @@ func _build_room() -> void:
 		var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
 		# A kind's walls each to its block's eaves (BuildingComposer, 489).
 		var heights: Dictionary[Vector3i, float] = {}
+		var windows: Array[Vector3i] = []
+		var cells: Dictionary[Vector2i, bool] = {}
 		if building.has("kind"):
 			heights = BuildingComposer.wall_heights(building)
+			windows = BuildingComposer.windows(building, _terrain["edges"])
+			for cell in Level.building_cells(building):
+				cells[cell] = true
 		for key in Level.building_outline(building):
 			if not _wall_sets.has(key):
 				_building_walls.append(key)
@@ -2629,6 +2642,15 @@ func _build_room() -> void:
 				var tall: float = heights.get(key, wall_height)
 				if not is_equal_approx(tall, WALL_HEIGHT):
 					_wall_heights[key] = tall
+			# A kind's windows (489 amended), its wood walls of a storey's height:
+			# art-kit's window there, turned so its shutters open outward.
+			if building.has("kind") and wall_set == "wood" and key in windows \
+					and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH:
+				_set_wall_state(key, "window")
+				var sides := Terrain.edge_cells(key)
+				# A run's +x is east for an east edge, north (its first cell) for a south one.
+				var outside_first := not cells.has(sides[0])
+				_window_flipped[key] = outside_first if key.z == Terrain.EAST else not outside_first
 			# A ruin's walls broken here and there before they are drawn (489).
 			if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL 					and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
 				_set_wall_state(key, "broken")
@@ -3155,6 +3177,25 @@ static func _broken_pick(key: Vector3i) -> bool:
 	var hash := (key.x * 374761393 + key.y * 668265263 + key.z * 2246822519) & 0x7fffffff
 	hash = ((hash ^ (hash >> 13)) * 1274126177) & 0x7fffffff
 	return (hash ^ (hash >> 16)) % 3 == 0
+
+
+## A window piece [param made] on edge [param key] (489 amended): turned
+## half round where its outside is the run's -x (_window_flipped), as tall
+## as the wall there, its shutters open (two in three, by the edge: each
+## leaf 90 to 108 degrees, a little apart) or shut.
+func _dress_window(made: Node3D, key: Vector3i) -> void:
+	if _window_flipped.get(key, false):
+		made.rotation.y = PI
+	made.scale.y = _height_of(key) / WALL_HEIGHT
+	var cell := Vector2i(key.x, key.y)
+	if _roll(cell, 50 + key.z) >= SHUTTERS_OPEN:
+		return
+	var a := made.find_child("shutter_a", true, false) as Node3D
+	var b := made.find_child("shutter_b", true, false) as Node3D
+	if a != null:
+		a.rotation_degrees.y = lerpf(90.0, 108.0, _roll(cell, 52 + key.z))
+	if b != null:
+		b.rotation_degrees.y = -lerpf(90.0, 108.0, _roll(cell, 54 + key.z))
 
 
 ## Sets wall edge [param key]'s state in _wall_states ("" takes it out),
@@ -5135,6 +5176,8 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 			piece = "wall.%s.rubble" % set_name
 		elif states[k] == WALL_TOPLESS and _wall_states.has(run[k]):
 			piece = "wall.%s.straight_ruined" % set_name
+		elif states[k] == WALL_WHOLE and _wall_states.get(run[k]) == "window":
+			piece = "wall.%s.window" % set_name
 		if piece != "" and ArtKit.has(piece) and ArtKit.filled_by(piece) != "placeholder":
 			pieces[k] = piece
 	for k: int in pieces:
@@ -5189,6 +5232,8 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		var made := ArtKit.instance(pieces[k])
 		made.name = "Piece_%d" % k
 		made.position = Vector3(0.0, 0.0, k + 0.5)
+		if _wall_states.get(run[k]) == "window":
+			_dress_window(made, run[k])
 		holder.add_child(made)
 	if mesh[0].is_empty() and pieces.is_empty():
 		holder.free()

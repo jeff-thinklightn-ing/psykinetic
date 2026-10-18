@@ -54,6 +54,8 @@ const PORCHES := {"house": 0.5, "l_house": 0.5, "house_leanto": 0.4, "house_wing
 	"cottage": 0.4, "inn": 0.9, "hall": 0.6}
 const CRUCKS := {"longhouse": 0.8, "cottage": 0.4, "hut": 0.3, "house": 0.2}
 const CRUCK_SPAN := Vector2i(4, 6)
+## How likely a wall of a straight stretch is a window (windows).
+const WINDOW_ODDS := 0.3
 ## The roles of blocks roofed with a single slope.
 const LEANING: Array[String] = ["leanto", "outshot", "bay"]
 ## The stream salt for what is the building's own, not a block's.
@@ -222,6 +224,26 @@ static func _edge_piece(slot: String, middle: Vector2, out: Vector2i) -> Node3D:
 	piece.position = Vector3(middle.x, 0.0, middle.y)
 	piece.rotation.y = atan2(-float(out.y), float(out.x))
 	return piece
+
+
+## [param building]'s window edges, seeded by cell: walls of its outline in
+## a straight stretch (both neighbours along the line its walls too, not a
+## corner, nor beside a door), at WINDOW_ODDS each, never two side by side.
+## A ruin has none. [param edges] are the map's (Terrain.Edge by key).
+static func windows(building: Dictionary, edges: Dictionary) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	if building.get("ruined", false):
+		return out
+	var outline := Level.building_outline(building)
+	var wall := func(key: Vector3i) -> bool: return key in outline and edges.get(key) == Terrain.Edge.WALL
+	for key in outline:
+		var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+		if not wall.call(key) or not wall.call(key - step) or not wall.call(key + step) or out.has(key - step):
+			continue
+		var roll := float(absi(hash([int(building["seed"]), key])) % 10007) / 10007.0
+		if roll < WINDOW_ODDS:
+			out.append(key)
+	return out
 
 
 ## [param key]'s middle in [param building]'s frame and its outward side
