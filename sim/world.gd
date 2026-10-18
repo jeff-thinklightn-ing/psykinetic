@@ -704,7 +704,7 @@ func world_tick(slice := -1) -> void:
 			economy.tick()
 		# Then what they do on the side (decision 393: the thief's lift) and
 		# what they tell each other (decision 422: gossip).
-		Townsfolk.tick(production, stockpile)
+		Townsfolk.tick(production, stockpile, economy)
 		Townsfolk.gossip(production)
 		Offers.tick()  # Promises to them that lapse (decision 435).
 		if raid_groups != null:

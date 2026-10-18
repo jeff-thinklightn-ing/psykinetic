@@ -9,7 +9,7 @@ extends Node
 ## LEDGER_SIZE lines); the residents at the end. For the
 ## coordinator's balance runs (decisions 354, 449, 461): no state written,
 ## nothing in the shared user:// (Level.overlay_dir a private folder).
-##   godot --headless --path <repo> res://tools/town_balance.tscn -- --days=90 [--thief=hand_1] [--no-field]
+##   godot --headless --path <repo> res://tools/town_balance.tscn -- --days=90 [--thief=hand_1] [--merchant=hand_2] [--no-field]
 ## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> bench -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
 
 const TOWN := "wilds/store"
@@ -26,23 +26,26 @@ func _ready() -> void:
 	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("town_balance/no_overlay/")
 	var days := 90
 	var thief := ""
+	var merchant := ""
 	var field := true
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--days="):
 			days = maxi(int(arg.trim_prefix("--days=")), 1)
 		elif arg.begins_with("--thief="):
 			thief = arg.trim_prefix("--thief=")
+		elif arg.begins_with("--merchant="):
+			merchant = arg.trim_prefix("--merchant=")
 		elif arg == "--no-field":
 			field = false
 	DayNight.day_steps = DAY
 	Season.season_days = 7
 	Season.year_phase = 0.0
 	Season.year_anchor = 0
-	_run(days, thief, field)
+	_run(days, thief, merchant, field)
 	get_tree().quit(0)
 
 
-func _run(days: int, thief: String, field: bool) -> void:
+func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	var clock := func() -> int: return _now
 	var names: Array[String] = ["wilds", "hills", "castle"]
 	var world_map := WorldMap.build(names)
@@ -76,7 +79,13 @@ func _run(days: int, thief: String, field: bool) -> void:
 			print("no resident %s to make a thief" % thief)
 		else:
 			work._workers[thief]["type"] = "thief"
-	print("######## %d days%s%s ########" % [days, ", %s a thief" % thief if not thief.is_empty() else "", "" if field else ", no field"])
+	if not merchant.is_empty():
+		if work.worker(merchant).is_empty():
+			print("no resident %s to make a merchant" % merchant)
+		else:
+			work._workers[merchant]["type"] = "merchant"  # The thief's fence runs through him (decision 461).
+	print("######## %d days%s%s%s ########" % [days, ", %s a thief" % thief if not thief.is_empty() else "",
+		", %s a merchant" % merchant if not merchant.is_empty() else "", "" if field else ", no field"])
 	var meals := {"dole": 0, "hungry": 0, "bought": 0, "store": 0}
 	for day in days:
 		var day_end := (day + 1) * DAY
@@ -85,7 +94,7 @@ func _run(days: int, thief: String, field: bool) -> void:
 			towns.tick()
 			work.tick()
 			economy.tick()
-			Townsfolk.tick(work, stock)
+			Townsfolk.tick(work, stock, economy)  # With the economy: the thief's fence (decision 461).
 			herds.tick()
 			for id in work.worker_ids(TOWN):
 				var fed := str(work.worker(id).get("fed", ""))

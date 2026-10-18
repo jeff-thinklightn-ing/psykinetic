@@ -96,7 +96,7 @@ static func roll_type(worker_id: String) -> String:
 ## Every resident's side-doing that is due: the thief's lift (lift). Called
 ## by the world tick after Economy.tick; tests call it with a clock of
 ## their own.
-static func tick(production: Production, stockpile: Stockpile) -> void:
+static func tick(production: Production, stockpile: Stockpile, economy: Economy = null) -> void:
 	if production == null or stockpile == null:
 		return
 	var thief: Dictionary = rules().get("thief", {})
@@ -115,8 +115,153 @@ static func tick(production: Production, stockpile: Stockpile) -> void:
 		if at < due:
 			continue
 		production.set_need_due(id, LIFT, at + every)
-		if _chance(id, due) < float(thief.get("chance", 1.0)):
-			lift(stockpile, str(who["town"]), thief)
+		if _chance(id, due) >= float(thief.get("chance", 1.0)):
+			continue
+		if int(production.worker(id).get("card", {}).get("lie_low_until", 0)) > at:
+			continue  # Caught too often: he lies low a while (decision 461).
+		var town := str(who["town"])
+		# Gold from the richest purse above the line first (decision 461:
+		# "thieves could be the answer to balancing the economy"), else goods.
+		var victim := _mark(production, town, id, thief, _rich_line(economy))
+		if not victim.is_empty():
+			var gold := _lift_gold(production, town, id, victim, thief, at, due)
+			if gold != 0:
+				continue
+		var goods := lift(stockpile, town, thief)
+		if goods.is_empty():
+			continue
+		var catcher := _catcher(production, town, id, "", at, due, thief)
+		if not catcher.is_empty():
+			stockpile.deposit(town, goods, 1, "returned")
+			_caught(production, town, id, catcher, "", "taking %s from the store" % goods.replace("_", " "), at, thief)
+			continue
+		var merchant := _merchant(production, town, id)
+		if not merchant.is_empty() and economy != null and economy.has_method("fence"):
+			economy.fence(town, merchant, id, goods, float(thief.get("fence", 0.5)), float(thief.get("margin", 0.4)))
+
+
+## Economy's line for a rich purse (economy.json folk.rich_above, the same
+## line its dole and prices use): [param economy]'s rules, else the file's.
+static func _rich_line(economy: Economy) -> int:
+	var rules: Dictionary = economy.rules if economy != null and economy.rules is Dictionary else Production.read_rules(Economy.PATH)
+	return int(rules.get("folk", {}).get("rich_above", 25))
+
+
+## The richest of [param town]'s people above [param line] (economy's
+## folk.rich_above; never [param thief], a resting companion, one on the
+## dole or hungry), with at least the take to spare; "" for none.
+static func _mark(production: Production, town: String, thief: String, rule: Dictionary, line: int) -> String:
+	var take := int(rule.get("gold_take", 0))
+	var best := ""
+	var most := 0
+	for id: String in production.worker_ids(town):
+		if id == thief or id.begins_with(COMPANION):
+			continue
+		var who := production.worker(id)
+		if bool(who.get("away", false)) or str(who.get("fed", "")) in ["dole", "hungry"]:
+			continue
+		var purse := int(who.get("purse", 0))
+		if purse > line and purse >= line + take and purse > most:
+			most = purse
+			best = id
+	return best
+
+
+## [param thief] lifts the take from [param victim]'s purse (economy's
+## Production.lift_gold), the victim's card remembering a loss with no name;
+## or is caught at it. The gold moved (0 for none, or caught).
+static func _lift_gold(production: Production, town: String, thief: String, victim: String, rule: Dictionary, at: int, due: int) -> int:
+	if not production.has_method("lift_gold"):
+		return 0
+	var taken := int(production.lift_gold(victim, int(rule.get("gold_take", 0)), thief))
+	if taken <= 0:
+		return 0
+	var catcher := _catcher(production, town, thief, victim, at, due, rule)
+	if not catcher.is_empty():
+		if production.has_method("return_gold"):
+			production.return_gold(thief, victim, taken)
+		_caught(production, town, thief, catcher, victim, "with a hand in %s's purse" % production.worker(victim).get("name", victim), at, rule)
+		return taken
+	var pronoun := str(production.worker(victim).get("card", {}).get("traits", {}).get("pronoun", "their"))
+	learn(production, victim, "%s missed %d gold from %s purse." % [production.worker(victim).get("name", victim), taken,
+		{"she": "her", "he": "his"}.get(pronoun, "their")])
+	return taken
+
+
+## Who catches [param thief] at [param at], if anyone: the victim when their
+## routine puts them where the thief is at the hour he picks (drawn by the
+## day between six and ten at night: his clock ticks at one hour of the
+## day, and a fixed hour would never meet anyone), a meeting place; or a
+## guard at the same place (or at work, for the store); by a seeded draw
+## against "caught" / "caught_guard". "" for nobody.
+static func _catcher(production: Production, town: String, thief: String, victim: String, at: int, due: int, rule: Dictionary) -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("caught:%s:%d" % [thief, due])
+	var draw := rng.randf()
+	var hour := 6.0 + rng.randf() * 16.0
+	var season := Season.name_at(at)
+	var day := day_of(at)
+	var where := whereabouts(_trade_of(production, thief), hour, season, THIEF, thief, day)
+	var meeting := where in ["well", "inn", "square", "temple"]
+	if not victim.is_empty() and meeting:
+		var theirs := whereabouts(_trade_of(production, victim), hour, season, str(production.worker(victim).get("type", "")), victim, day)
+		if theirs == where and draw < float(rule.get("caught", 0.0)):
+			return victim
+	for id: String in production.worker_ids(town):
+		if id == thief or _trade_of(production, id) != "guard" or bool(production.worker(id).get("away", false)):
+			continue
+		var post := whereabouts("guard", hour, season, str(production.worker(id).get("type", "")), id, day)
+		if (victim.is_empty() and post == "work") or (not victim.is_empty() and post == where and meeting):
+			if draw < float(rule.get("caught_guard", 0.0)):
+				return id
+	return ""
+
+
+## Caught: facts on the catcher's, the victim's and the thief's cards, a
+## grudge from the catcher and the victim against him, a dispute for the
+## lawspeaker in the town's memory log, and, caught enough times in a
+## season, lying low.
+static func _caught(production: Production, town: String, thief: String, catcher: String, victim: String, doing: String, at: int, rule: Dictionary) -> void:
+	var thief_name := str(production.worker(thief).get("name", thief))
+	var catcher_name := str(production.worker(catcher).get("name", catcher))
+	learn(production, catcher, "%s caught %s %s." % [catcher_name, thief_name, doing])
+	learn(production, thief, "%s was caught %s by %s." % [thief_name, doing, catcher_name])
+	for id: String in ([catcher] if victim.is_empty() or victim == catcher else [catcher, victim]):
+		if id != catcher:
+			learn(production, id, "%s caught %s %s." % [catcher_name, thief_name, doing])
+		var card := card_of(production, id)
+		if not card.is_empty():
+			var grudges: Array = card.get("grudge", [])
+			if thief not in grudges:
+				grudges.append(thief)
+				card["grudge"] = grudges
+				production.set_card(id, card)
+	var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+	if log is Array:
+		var dispute := TownMemory.note(log, "%s was caught %s" % [thief_name, doing], catcher, "", at)
+		if not dispute.is_empty():
+			dispute["dispute"] = true  # For the lawspeaker's rounds (phase 3).
+		Offers._call(Offers.ctx, "set_memory", [town, log])
+	var mine := card_of(production, thief)
+	if mine.is_empty():
+		return
+	var season := int(rule.get("caught_season_days", 90)) * maxi(DayNight.day_steps, 1)
+	var times: Array = mine.get("caught", []).filter(func(step: Variant) -> bool: return at - int(step) < season)
+	times.append(at)
+	mine["caught"] = times
+	if times.size() >= int(rule.get("caught_before_lying_low", 3)):
+		mine["lie_low_until"] = at + int(rule.get("lie_low_days", 30)) * maxi(DayNight.day_steps, 1)
+		mine["caught"] = []
+	production.set_card(thief, mine)
+
+
+## A merchant of [param town] who is not [param thief], to fence through; "".
+static func _merchant(production: Production, town: String, thief: String) -> String:
+	for id: String in production.worker_ids(town):
+		if id != thief and not id.begins_with(COMPANION) and str(production.worker(id).get("type", "")) == "merchant" \
+				and not bool(production.worker(id).get("away", false)):
+			return id
+	return ""
 
 
 ## A thief's lift at [param town]'s store: one of the first of the rules'

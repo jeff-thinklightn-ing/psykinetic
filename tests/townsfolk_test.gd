@@ -32,8 +32,11 @@ func _ready() -> void:
 	_test_record()
 	_test_lift()
 	_test_hidden()
+	_test_gold_lift()
+	_test_fence_and_catch()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
+	Offers.ctx = {}  # Static callables into this node would crash the quit.
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
@@ -179,6 +182,107 @@ func _test_hidden() -> void:
 	body.type = Townsfolk.STEADY
 	_check(not "hidden" in body.card_words(), "a steady resident's card says nothing of a type")
 	body.free()
+
+
+## A town with a thief, a rich smith, a poor hauler and a guard; the thief's
+## lift due now. Townsfolk reads the routines table for who stands where.
+func _thief_town(with_merchant := false) -> void:
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 100, "chance": 1.0, "leave": 2, "takes": ["cloth"],
+		"gold_take": 3, "fence": 0.5, "margin": 0.4, "caught": 0.0, "caught_guard": 0.0, "lie_low_days": 30, "caught_season_days": 90, "caught_before_lying_low": 3}})
+	_setup()
+	Townsfolk.use_days({"default": {"stints": [{"from": 0, "to": 12, "at": "well"}, {"from": 12, "to": 24, "at": "well"}]}, "offset_hours": 0,
+		"types": {"thief": [{"from": 0, "to": 12, "at": "well"}, {"from": 12, "to": 24, "at": "well"}]}, "gossip": {"every": 0}})
+	Townsfolk._gossip_due.clear()
+	Offers.ctx = {"production": _work, "memory": func(_town: String) -> Array: return _memory.duplicate(true),
+		"set_memory": func(_town: String, log: Array) -> void: _memory = log.duplicate(true)}
+	_memory = []
+	# Types given outright (add_worker's last argument), the roll aside.
+	Production.type_of = Callable()
+	_work.add_worker("t-sly", "Sly", ["hauler"], TOWN, "placeholder", "thief")
+	for each: Array in [["t-odo", "Odo", "smith"], ["t-nell", "Nell", "hauler"], ["t-gar", "Gar", "guard"]] + ([["t-mab", "Mab", "hauler", "merchant"]] if with_merchant else []):
+		_work.add_worker(each[0], each[1], [each[2]], TOWN, "placeholder", each[3] if each.size() > 3 else "")
+	Production.type_of = Townsfolk.roll_type
+	_work.pay("t-odo", 40, "test")
+	_work.pay("t-nell", 10, "test")
+	_work.pay("t-gar", 30, "test")
+	_stock.deposit(TOWN, "cloth", 5, "test")
+	# Economy's line for a rich purse is its rules' (economy.json folk.rich_above): 25 here, whatever the file says.
+	_economy = Economy.new({}, _stock, _work, func() -> int: return _now, {"folk": {"rich_above": 25}, "gold_floor": 0, "value": {"cloth": 10}}, func() -> Dictionary: return CATALOG)
+	Townsfolk.tick(_work, _stock, _economy)  # Arms the lift's clock.
+	_now += 100
+
+
+var _memory: Array = []
+var _economy: Economy
+
+
+func _test_gold_lift() -> void:
+	print("\n== the thief lifts gold from the richest purse above the line, never the poor or the coffer (decision 461) ==")
+	if not _work_has("lift_gold"):
+		_check(true, "(economy's lift_gold is not here yet: skipped)")
+		return
+	_thief_town()
+	var coffer := _stock.count(TOWN, "gold")
+	Townsfolk.tick(_work, _stock, _economy)
+	_check(_work.worker("t-odo")["purse"] == 37 and _work.worker("t-sly")["purse"] == 3, "3 gold moved from Odo (40, the richest) to Sly (%d, %d)" % [_work.worker("t-odo")["purse"], _work.worker("t-sly")["purse"]])
+	_check(_work.worker("t-nell")["purse"] == 10 and _work.worker("t-gar")["purse"] == 30 and _stock.count(TOWN, "gold") == coffer, "Nell, Gar and the coffer untouched")
+	_check(_stock.count(TOWN, "cloth") == 5, "gold found: no goods lifted that day")
+	var facts: Array = Townsfolk.card_of(_work, "t-odo").get("facts", [])
+	_check(not facts.is_empty() and str(facts.back()["text"]) == "Odo missed 3 gold from his purse" or str(facts.back()["text"]).begins_with("Odo missed 3 gold"), "Odo's card: a loss with no name (%s)" % (facts.back()["text"] if not facts.is_empty() else ""))
+	_work.spend("t-odo", 20, "test")
+	_work.note_meal("t-gar", "dole")
+	_now += 100
+	Townsfolk.tick(_work, _stock, _economy)
+	_check(_work.worker("t-gar")["purse"] == 30 and _work.worker("t-odo")["purse"] == 17 and _stock.count(TOWN, "cloth") == 4,
+		"nobody rich above 25 who is not on the dole: the store is lifted instead (cloth 5 -> %d)" % _stock.count(TOWN, "cloth"))
+
+
+func _test_fence_and_catch() -> void:
+	print("\n== fenced through a merchant; caught by the victim or a guard ==")
+	if not _work_has("lift_gold") or not _work_has("return_gold"):
+		_check(true, "(economy's hooks are not here yet: skipped)")
+		return
+	_thief_town(true)
+	var economy := _economy
+	if not economy.has_method("fence"):
+		_check(true, "(economy's fence is not here yet: skipped)")
+		return
+	_work.spend("t-odo", 40, "test")
+	_work.spend("t-gar", 30, "test")
+	_stock.deposit(TOWN, "gold", 50, "test")
+	var coffer := _stock.count(TOWN, "gold")
+	Townsfolk.tick(_work, _stock, economy)
+	var mab: int = _work.worker("t-mab")["purse"]
+	var sly: int = _work.worker("t-sly")["purse"]
+	var price := coffer - _stock.count(TOWN, "gold")  # Economy's raw price (its glut factor) times the fence's half.
+	_check(_stock.count(TOWN, "cloth") == 5 and price > 0 and mab == roundi(price * 0.4) and sly == price - mab,
+		"the cloth comes back through Mab at half its price, the coffer pays, Mab keeps 0.4 of it and Sly the rest (coffer %d -> %d; Mab %d, Sly %d)" % [coffer, _stock.count(TOWN, "gold"), mab, sly])
+	_check(coffer - _stock.count(TOWN, "gold") == mab + sly, "gold conserved: what the coffer paid is what the two hold")
+	# Caught every time: the victim at the well with him.
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 100, "chance": 1.0, "leave": 2, "takes": ["cloth"],
+		"gold_take": 3, "fence": 0.5, "margin": 0.4, "caught": 1.0, "caught_guard": 0.0, "lie_low_days": 30, "caught_season_days": 90, "caught_before_lying_low": 3}})
+	_work.pay("t-odo", 40, "test")
+	var sly_before: int = _work.worker("t-sly")["purse"]
+	_now += 100
+	Townsfolk.tick(_work, _stock, economy)
+	_check(_work.worker("t-odo")["purse"] == 40 and _work.worker("t-sly")["purse"] == sly_before, "caught by Odo at the well: the gold is back")
+	_check(str(Townsfolk.card_of(_work, "t-odo")["facts"].back()["text"]) == "Odo caught Sly with a hand in Odo's purse." and "t-sly" in Townsfolk.card_of(_work, "t-odo")["grudge"],
+		"Odo's card: the catch, and a grudge against Sly")
+	_check(str(Townsfolk.card_of(_work, "t-sly")["facts"].back()["text"]).begins_with("Sly was caught with a hand in Odo's purse"), "Sly's card: caught")
+	_check(_memory.size() == 1 and _memory[0]["dispute"] == true and _memory[0]["said_by"] == "t-odo", "a dispute for the lawspeaker in the town's log: %s" % [_memory])
+	for i in 2:
+		_now += 100
+		Townsfolk.tick(_work, _stock, economy)
+	var card := Townsfolk.card_of(_work, "t-sly")
+	_check(int(card.get("lie_low_until", 0)) > _now and card.get("caught", []).is_empty(), "caught thrice in a season: he lies low")
+	_work.pay("t-odo", 10, "test")
+	_now += 100
+	Townsfolk.tick(_work, _stock, economy)
+	_check(_work.worker("t-odo")["purse"] == 50, "and lifts nothing while he does")
+
+
+func _work_has(method: String) -> bool:
+	return _work != null and _work.has_method(method) or Production.new({}, Stockpile.new({}, func() -> int: return 0, ItemBook.new(func() -> int: return 0)), null, func() -> int: return 0, {}, func() -> Dictionary: return {}).has_method(method)
 
 
 func _check(ok: bool, what: String) -> void:

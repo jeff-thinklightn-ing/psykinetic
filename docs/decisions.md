@@ -12436,3 +12436,74 @@ CANOPY_AROUND cells) and:
 
 Placeholders all: the shade, the drips' length, the look's numbers, the
 shafts' strength, until Jeff has walked the forest.
+## 461. The thief balances the town: gold from the rich, the store through a fence, and getting caught
+
+Jeff (2026-10-18): "thieves could be the answer to balancing the economy".
+On 393 (the hidden thief, who lifted one thing a day from the store with
+no name on it) and economy's side above (Production.lift_gold and
+return_gold, Economy.fence, tools/town_balance). The coordinator's design
+of 2026-10-18; the numbers are npc's drafts in townsfolk.json "thief", for
+Jeff to move.
+
+What the thief does, on his day (Townsfolk.tick, which now takes the
+economy; the same seeded draw as before says whether he works at all):
+- Gold first. The mark (Townsfolk._mark) is the richest of his town's
+  people whose purse stands above economy's line for a rich purse
+  (economy.json folk.rich_above, the line its dole and prices already
+  use; read from the economy given, else its file) with gold_take to
+  spare; never himself, a resting companion, anyone on the dole or hungry,
+  and never the coffer. Production.lift_gold moves gold_take (3) from that
+  purse to his, and the victim's card learns a loss with no name on it
+  ("Odo missed 3 gold from his purse."). That is the balance Jeff asked
+  for: gold piling in one purse goes back into circulation through a man
+  who buys his bread and pays his rent.
+- The store only when nobody is rich: the lift of 393, one of "takes"
+  above "leave", the ledger's "missing" line. What he lifts there comes
+  back the same day through the town's merchant (type "merchant", 440;
+  Snagfin once 471 lands) by Economy.fence: the store buys it back at its
+  raw price times "fence" (0.5), the treasury paying, the merchant keeping
+  "margin" (0.4) of that and the thief the rest; the ledger shows the
+  merchant banking it "from a dealer". Gold is conserved throughout: what
+  the coffer pays is what the two hold.
+- Caught (Townsfolk._catcher, one seeded draw per lift): the victim, when
+  the routines put both at the same meeting place that hour (the well, the
+  inn, the square, the temple), against "caught" (0.06); a guard there, or
+  at his post for a store lift, against "caught_guard" (0.12). Caught, the
+  gold goes back (Production.return_gold) or the goods are "returned" to
+  the store; the catcher's, the victim's and the thief's cards learn it
+  ("Odo caught Sly with a hand in Odo's purse."), the catcher and the
+  victim hold a grudge against him (card "grudge", 398: gossip and the
+  voice already read it), and the town's memory log (447) gets the catch
+  as a dispute, which the lawspeaker's rounds take first (459). Caught
+  "caught_before_lying_low" (3) times within "caught_season_days" (90) he
+  lies low "lie_low_days" (30): no lifts, the count cleared.
+
+Not here: a thief among players' things (the store and purses only); the
+thief's own words about it (his card says he is a thief and keeps it
+hidden, 393, and now what he was caught at); a jail or a fine (the
+lawspeaker's rulings are words, 448).
+
+The 90-day proof (tools/town_balance, the wilds town, nine residents and
+the field, no players; economy's tool, which now ticks the thief with its
+economy and takes --merchant=<id> for the fence; its folk hold no guard,
+so there only a victim catches):
+- With Ash (a hauler) the thief and Bea the merchant: 44 gold lifts in 90
+  days (chance 0.5 a day), 132 gold moved, every one from Pell the
+  carpenter or Odo the smith, the only purses above the line; the store
+  never lifted (someone was always rich), so nothing fenced; nobody caught
+  (the victim's 6% applies only when both stand at a meeting place at the
+  hour he picks: under one catch in 90 days is what the numbers say).
+- Day 90, thief against none: loans 77 against 107; dole meals 61 against
+  73; bought meals 348 against 319; hungry 222 against 207 (hunger is the
+  food supply's, not gold's); the two rich purses 59 and 79 against 114
+  and 26 (the lifted gold goes to the thief's own meals and rent, so to
+  the cook and the treasury, and from there round again). So he evens the
+  rich out and lowers the town's debt a quarter, and moves a gold and a
+  half a day: a modest balance at npc's numbers. More needs gold_take or
+  chance raised (townsfolk.json), which is Jeff's to say; the catch rate
+  wants a guard in the town to mean much.
+townsfolk_test: the gold lift from the richest purse above the line, never
+the poor, the dole or the coffer; the store when nobody is rich; the fence's
+split and gold conserved; caught by the victim at the well with the gold
+back, the cards, the grudge and the dispute; lying low after three. Protocol
+unchanged; no new class_name.
