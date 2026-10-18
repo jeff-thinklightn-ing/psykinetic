@@ -95,8 +95,8 @@ var mending := 0
 ## and a companion's replicate, for the HUD.
 var buffs := {}
 ## The right button's off hand (World.try_stance, decision 329): "" none,
-## "block" a guard raised, "draw" a bow drawn. A player's replicates, for
-## the views and the HUD.
+## "block" a guard raised, "draw" a bow drawn. A player's and a monster's
+## replicate, for the views and the HUD (decision 455).
 var raised := ""
 ## The tick it was raised (World.tick): how long a bow has been drawn.
 var raised_tick := 0

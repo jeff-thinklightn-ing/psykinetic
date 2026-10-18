@@ -370,6 +370,10 @@ func _init() -> void:
 	replicate("alert")
 	replicate("down_until")
 	replicate("ailments")
+	# Its bow drawn, its guard up: the tell a player steps out of the line by
+	# (decision 455).
+	replicate("raised")
+	replicate("raised_tick")
 
 
 func _ready() -> void:

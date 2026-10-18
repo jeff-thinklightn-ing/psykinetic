@@ -426,8 +426,9 @@ func _test_facing() -> void:
 	for node in again["b"][0].find_children("*", "MultiplayerSynchronizer", true, false):
 		var replication := (node as MultiplayerSynchronizer).replication_config
 		config_ok = replication.has_property(NodePath(".:facing")) and replication.property_get_spawn(NodePath(".:facing")) \
-				and replication.has_property(NodePath(".:pose"))
-	_check(config_ok, "replicated to every peer, from its spawn on (facing, and its pose)")
+				and replication.has_property(NodePath(".:pose")) and replication.has_property(NodePath(".:raised")) \
+				and replication.has_property(NodePath(".:raised_tick"))
+	_check(config_ok, "replicated to every peer, from its spawn on (facing, its pose, its bow drawn or guard up and since when)")
 
 
 func _test_guard() -> void:

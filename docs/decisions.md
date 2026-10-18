@@ -11262,3 +11262,15 @@ Rejected: writing proposals into levels/lore (Jeff only, the proposal's
 guardrail); the server writing the repo's page (an exported build has no
 repo; the tool does, from a snapshot); the tool reading the box's save
 (release's rule: local or test snapshots only).
+
+## 455. A monster's bow drawn and guard up are seen by every peer
+
+Items' bow audit: a goblin archer drew and loosed with no tell on a client,
+since raised and raised_tick replicated only on players. A Monster (and so
+an Animal) now replicates both too (Monster._init), so the views can play
+the draw on an archer and the guard on a shield-bearer, and a player can
+step out of the line before the arrow. The names were already in
+Net.SUBCLASS_REPLICATED, so protocol() could not see the change of the
+synchronizer's layout: PROTOCOL_REVISION 16. Nothing of the sim changes.
+
+tests/monster_test (the replication config of a monster).
