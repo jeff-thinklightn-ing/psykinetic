@@ -30,6 +30,7 @@ func _ready() -> void:
 
 	_test_catalog()
 	_test_book()
+	_test_leather()
 
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
@@ -114,6 +115,20 @@ func _test_catalog() -> void:
 	var read := Items.read('{"items": [{"id": "a", "name": "A", "weight": 2}, {"name": "no id"}, {"id": "a", "name": "again"}]}')
 	_check(read.keys() == ["a"] and read["a"]["name"] == "A" and read["a"]["hands"] == 1,
 			"a catalog with an entry with no id and an id twice: the first a, filled in (%s)" % [read.keys()])
+
+
+func _test_leather() -> void:
+	print("\n== leather's uses: bundles mended by the carpenter, the tanner's buckler (decision 413) ==")
+	var mend := {"by": "carpenter", "from": {"leather": 1, "wood": 1}, "steps": 600}
+	_check(["arrows", "flame_arrows", "barbed_arrows"].all(func(id: String) -> bool: return Items.mend_of(id) == mend),
+			"every bundle is mended by the carpenter from leather and wood (%s)" % Items.mend_of("arrows"))
+	_check(Items.mend_of("sword").is_empty(), "a sword has no mend")
+	var buckler := Items.verb_of("buckler")
+	_check(buckler.get("kind") == "block" and buckler.get("arc") == 0 and buckler.get("absorb") == 0.75 and buckler.get("stamina") == 6
+			and buckler.get("breaks_at") == 1.5 and buckler.get("bash_force") == 1.0 and Items.weight_of("buckler") == 1.5,
+			"a buckler: straight ahead only, takes three quarters, 6 stamina, breaks at 1.5, a light bash; 1.5 kg (%s)" % buckler)
+	_check(Items.def("buckler")["made"] == {"by": "tanner", "from": {"leather": 2, "wood": 1}, "steps": 1800}
+			and "shield" in Items.def("buckler")["tags"], "made by the tanner from leather and wood, a shield the town wants")
 
 
 func _test_book() -> void:

@@ -14,7 +14,9 @@ extends RefCounted
 ## made (how the town makes it, read by economy's production: {by: a trade
 ## (TRADES), from: {resource or item id: count}, steps} to make it, or
 ## {by, rework: the id it is reworked from, steps}; first: true tried
-## before its trade's other recipes, decision 405; {} for none).
+## before its trade's other recipes, decision 405; {} for none), mend
+## (how the town mends a worn one back to full condition, decision 413:
+## {by, from, steps}, as made's; read by economy's mend job).
 ## Levels, prefabs and the builder name ids; an unknown id is dropped.
 
 const CATALOG := "res://levels/items.json"
@@ -32,7 +34,7 @@ const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value", "blunt", "ammo", "condition"]
+	"opens", "value", "blunt", "ammo", "condition", "mend"]
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner"]
 
@@ -84,6 +86,13 @@ static func read(text: String) -> Dictionary:
 		if not problem.is_empty():
 			push_warning("Items: %s's made %s; left out" % [id, problem])
 			definitions[id]["made"] = {}
+		# A mend (decision 413) is a made from things, kept to a thing with a condition.
+		var mend: Dictionary = definitions[id]["mend"]
+		problem = "has no condition to mend" if not mend.is_empty() and int(definitions[id]["condition"]) <= 0 \
+				else "is a rework" if mend.has("rework") else made_problem(mend, definitions)
+		if not problem.is_empty():
+			push_warning("Items: %s's mend %s; left out" % [id, problem])
+			definitions[id]["mend"] = {}
 	return definitions
 
 
@@ -140,6 +149,7 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"verb": verb_from(id, entry["verb"]) if entry.get("verb") is Dictionary else {},
 		"yield": yields,
 		"made": _made(entry.get("made")),
+		"mend": _made(entry.get("mend")),
 		"blunt": entry.get("blunt") == true,
 		"ammo": _ammo(entry["ammo"]) if entry.get("ammo") is Dictionary else {},
 		"condition": maxi(int(entry.get("condition", 0)), 0) if entry.get("condition") is float or entry.get("condition") is int else 0,
@@ -157,6 +167,12 @@ static func _ammo(value: Dictionary) -> Dictionary:
 ## A bundle of arrows' ammo (decision 375); {} for anything else.
 static func ammo_of(id: String) -> Dictionary:
 	return def(id).get("ammo", {})
+
+
+## How the town mends a worn [param id] back to full (decision 413): {by,
+## from, steps}, as a made's; {} for a thing nobody mends.
+static func mend_of(id: String) -> Dictionary:
+	return def(id).get("mend", {})
 
 
 ## The most [param id]'s condition can be (decision 375); 0 for a thing

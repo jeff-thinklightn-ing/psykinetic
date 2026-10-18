@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Leather has uses: the carpenter can mend a worn bundle of arrows back to full with a piece of leather and some wood, and the tanner makes a leather buckler, lighter and cheaper to hold up than the round shield but covering only straight ahead, letting a little through and breaking sooner.
 - The game starts at a main menu now (Play, Options, Quit) when you run the downloaded client, and joining happens on one screen that says what it is doing in plain words: connecting, checking the version, the server restarting, or what went wrong, with Retry and Change server. Esc opens a pause panel (Resume, Options, Leave, Quit; the world goes on while you are away). Options gained Window (fullscreen or windowed), Resolution, and a Controls section (click to move or WASD, and whether the controls list shows). The line at the top left shows only your state now; "host" and the tick moved into F3.
 - Each of the town's people has a life of their own now: where they were born,
   how they came to the town, kin among the neighbours, maybe a grudge, and what

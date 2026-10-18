@@ -9212,3 +9212,29 @@ menu's and pause's signals, the connect screen's states, buttons and
 fields, Esc's order, the options' choices writing Net and settings.cfg.
 `--test-show` gains pause, menu, setup, connect, failed. Shots in
 docs/ui/shots/step2/.
+
+## 413. Leather's uses: bundles mended, the tanner's buckler
+
+The coordinator asked for a use for leather once the tanner makes it (405),
+kept to what the sim already does; designed with economy.
+
+Mending: an item may say how the town mends a worn one back to full condition,
+"mend" beside "made" ({by, from, steps}, read as made is: Items.mend_of; checked
+as a made from things, and only on a thing with a condition, 375). The three
+bundles of arrows are mended by the carpenter from a piece of leather and a
+bundle of wood in 600 steps: every town has a carpenter from the start, so leather
+is of use as soon as a tanner makes some; a fletcher, as 375 had it, is a "by"
+change and a trade when there is one. Economy's mend job (414) works it on the same
+uid, so its name and history stay: Production holds the uid, sets its condition
+full (ItemBook.set_condition) and banks it back. The reforge (later) is that job
+with another id.
+
+The buckler: a leather buckler, made by the tanner from 2 leather and 1 wood
+(1800 steps, value 6), tagged shield so a town that wants shields may make it. The
+block verb's own numbers, no new verb: a sidegrade to the round shield, lighter
+(1.5 kg against 4) and cheaper to guard with (6 stamina against 8), its bash
+lighter (bash_force 1.0), but it covers only straight ahead (arc 0), takes three
+quarters of a blow (absorb 0.75) and breaks sooner (breaks_at 1.5). Art slot
+item.buckler. Rejected: a leather jerkin (armour here would only add mass, all
+gain but a pack slot); a sling or bag (the slots are fixed; a new rule); a
+bandaging kit variant (the kit has no numbers to vary).

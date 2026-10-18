@@ -134,6 +134,25 @@
 			"type": "mesh",
 			"uses": "hunting bow (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.buckler": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.35,
+				0.35,
+				0.05
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "leather buckler (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.cloth_bolt": {
 			"budget": 500,
 			"category": "items",
