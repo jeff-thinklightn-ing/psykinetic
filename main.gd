@@ -2118,6 +2118,7 @@ func _boot() -> void:
 	# Residents' cards grow from the town's events (decision 398).
 	Townsfolk.watch(World.production, World.towns)
 	Offers.ctx = _offers_context()  # What the town's people can offer (decision 435).
+	_seat_settled()  # Snagfin and his like (decision 471).
 	Offers.watch(World.towns, World.holdings, World.stockpile)
 	if not World.handed.is_connected(_on_handed):
 		World.handed.connect(_on_handed)  # A gift to one of them (decision 443).
@@ -2662,8 +2663,28 @@ func _hand_over(became: Dictionary, spec: Dictionary, saved: Dictionary) -> bool
 ## A saved level entity became [param id] (decision 471, _hand_over); npc's
 ## side seats it as that resident. Each one handed over is kept here too.
 var became_handed: Array[Dictionary] = []
+## Server: a saved monster whose spawn key the level says "became" a
+## resident (enemy-ai's hook in _spawn_saved, decision 471): the one-time
+## conversion. [param id] is the resident's (residents.json "settled"),
+## [param entry] the saved monster ({name, hp, slots, items, tile}). He is
+## seated as at boot, and what he carried goes to the town's store in his
+## name; logged once, and never again (he is a worker from then on, and
+## nothing saved carries his key). spawn_key_test reads became_handed.
 func on_became(id: String, entry: Dictionary) -> void:
 	became_handed.append({"id": id, "entry": entry})
+	var table := Townsfolk.settled()
+	if not table.has(id) or World.production == null:
+		return
+	var was_worker := not World.production.worker(id).is_empty()
+	_seat_settled()
+	var settled: Dictionary = table[id]
+	var town := str(settled.get("town", ""))
+	if World.stockpile != null and not town.is_empty():
+		for uid: Variant in entry.get("items", []) if entry.get("items") is Array else []:
+			if int(uid) != 0:
+				World.stockpile.bank(town, int(uid), str(settled.get("name", id)), "his own", World.zone.name if World.zone != null else "", Vector2i(-1, -1), "banked", "")
+	if not was_worker:
+		print("[state] %s became a resident (was monster at %s)" % [settled.get("name", id), entry.get("tile", "?")])
 
 
 # --- Far monsters kept as records (decision 352) -------------------------------
@@ -3693,6 +3714,16 @@ func _sync_residents() -> void:
 					var each: Dictionary = folk[i]
 					each["town"] = place_id
 					each["places"] = _resident_places(area, place, each["trade"], homes, i)
+					var settled := Townsfolk.settled()
+					if settled.has(each["key"]):
+						# A stall, not a house (decision 471): the 3x3 about the marked cell;
+						# his work the store's counter; his body's kind the table's.
+						var home_at: Variant = settled[each["key"]].get("home")
+						if home_at is Array and home_at.size() == 2:
+							each["places"]["home"] = Rect2i(Vector2i(int(home_at[0]) - 1, int(home_at[1]) - 1), Vector2i(3, 3))
+						var store: Vector2i = place.get("cell", Vector2i.ZERO)
+						each["places"]["work"] = Rect2i(store - Vector2i(1, 1), Vector2i(3, 3))
+						each["kind"] = str(settled[each["key"]].get("kind", ""))
 					if each["trade"] == "lawspeaker":
 						# His rounds (decision 459): the town's homes in the order
 						# they are given, with who lives there; his own left out.
@@ -4021,6 +4052,43 @@ func _town_folk(town: String) -> Array:
 		return not who.begins_with("companion:") and not World.production.worker(who).is_empty() and not bool(World.production.worker(who).get("away", false)))
 	ids.sort()
 	return ids
+
+
+## Server: the people settled in a town by name (residents.json "settled",
+## decision 471: Snagfin, the goblin merchant), seated through economy's
+## door once their town has people of its own (so a town founded later
+## does not spread its founding gold over him alone) and they are no
+## worker yet: trade, type and origin "settled" to the record, a card in
+## Jeff's words. At boot and on the world tick; nothing once he is there.
+func _seat_settled() -> void:
+	if World.production == null or World.towns == null or not World.towns.has_method("move_in"):
+		return
+	var table := Townsfolk.settled()
+	for id: String in table:
+		var entry: Dictionary = table[id]
+		var town := str(entry.get("town", ""))
+		if town.is_empty() or not World.production.worker(id).is_empty():
+			continue
+		if World.towns.residents(town).filter(func(who: String) -> bool: return who != id).is_empty():
+			continue  # Not founded yet: he comes once there is a town to come to.
+		# Economy's door; origin "settled" passes the town's room check (460 amended: he keeps his own stall).
+		if not bool(World.towns.call("move_in", town, id, str(entry.get("name", id)), str(entry.get("trade", "")), "settled", str(entry.get("type", "")))):
+			continue
+		_write_settled_card(id, entry)
+		print("[state] %s settled in %s as the town's %s" % [entry.get("name", id), town, str(entry.get("trade", "")).replace("_", " ")])
+
+
+## [param id]'s card from its settled [param entry]: rolled as anyone's,
+## then how they came and the standing fact in Jeff's words; outcast: no
+## kin or grudge is ever rolled for them.
+func _write_settled_card(id: String, entry: Dictionary) -> void:
+	var card := ResidentCard.roll(id, str(entry.get("name", id)), str(entry.get("trade", "")), "settled")
+	if not str(entry.get("came", "")).is_empty():
+		card["came"] = str(entry["came"])
+	card["outcast"] = bool(entry.get("outcast", false))
+	if not str(entry.get("fact", "")).is_empty():
+		ResidentCard.add_fact(card, World.production.now(), str(entry["fact"]))
+	World.production.set_card(id, card)
 
 
 ## Server: the proposals list for Jeff (decision 458), every town's
@@ -4415,8 +4483,10 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var record: PlayerRecord = _records.get(str(each.get("player", "")))
 	var look := CompanionCard.look_of(record.companion.get("traits", {}), record.player_id) \
 			if record != null and not record.companion.is_empty() else ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade)
-	var body := _spawn({"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(),
-		"label": label, "tile": at, "look": look}) as Resident
+	var spec := {"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(), "label": label, "tile": at, "look": look}
+	if not str(each.get("kind", "")).is_empty():
+		spec["kind"] = str(each["kind"])  # A goblin among them (decision 471): the client draws the kind's model.
+	var body := _spawn(spec) as Resident
 	if body == null:
 		return null
 	body.worker_id = who
@@ -6085,6 +6155,7 @@ func _on_world_ticked(tick: int) -> void:
 			# Storms break roofs (Weather.break_roofs).
 			for broke: Dictionary in Weather.break_roofs(_world_map.areas, World.steps):
 				print("[weather] %s broke roof %d of %s" % [broke["storm"], broke["index"], broke["level"]])
+			_seat_settled()  # A settled person whose town has since been founded (decision 471).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

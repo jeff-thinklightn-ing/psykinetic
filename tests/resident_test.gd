@@ -44,6 +44,8 @@ func _ready() -> void:
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
 	_test_healer_at_hut()
+	_test_settled_goblin()
+	_test_lawspeaker_mid_rounds()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -395,6 +397,65 @@ func _test_healer_at_hut() -> void:
 	_sync()
 	_check(_body("medicine_man:" + hut_place) != null, "back, his body again")
 	World.production.set_away("medicine_man:" + hut_place, true)
+	_sync()
+
+
+## Snagfin (decision 471): a settled resident of another kind, with a stall
+## for a home, a card in Jeff's words, no kin, and a neutral start with a
+## player; one of the townsfolk, so raiders take him as they take anyone.
+func _test_settled_goblin() -> void:
+	print("\n== Snagfin, the town's goblin merchant: settled, a stall, his card, no kin (decision 471) ==")
+	var table := Townsfolk.days().duplicate(true)
+	table["settled"] = {"rs-snag": {"name": "Snagfin", "town": STORE, "trade": "merchant", "type": "merchant", "kind": "imp", "home": [4, 4],
+		"came": "came to the town from the goblins and stays, somewhat outcast but tolerated",
+		"fact": "Snagfin is a goblin among humans; the town tolerates him, which is more than most do.", "outcast": true}}
+	Townsfolk.use_days(table)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(10.0)
+	# The test town is crowded (room 3), so economy's door, Towns.move_in, which Main._seat_settled takes
+	# and economy's rescue_test covers, would refuse him here: seated as a rescue, with his type set as the door sets it.
+	_check(World.towns.note_rescue(STORE, "rs-snag", "Snagfin", "merchant"), "(Snagfin the merchant, a resident)")
+	World.production._workers["rs-snag"]["type"] = "merchant"
+	_main._write_settled_card("rs-snag", table["settled"]["rs-snag"])
+	_sync()
+	var snag := _body("rs-snag")
+	_check(snag != null and snag.label == "Snagfin [merchant]" and str(snag.spawn_spec.get("kind", "")) == "imp", "a body, labelled, with the goblin's kind in its spec (%s)" % [snag.spawn_spec.get("kind", "") if snag != null else "none"])
+	_check(snag != null and snag.places["home"] == Rect2i(3, 3, 3, 3) and snag.places["work"] == Rect2i(4, 2, 3, 3), "his home the stall about the marked cell, his work the store's counter (%s)" % [snag.places if snag != null else {}])
+	var card := Townsfolk.card_of(World.production, "rs-snag")
+	_check(card.get("came", "") == "came to the town from the goblins and stays, somewhat outcast but tolerated" and card.get("outcast", false)
+		and card.get("facts", []).any(func(f: Dictionary) -> bool: return str(f["text"]).begins_with("Snagfin is a goblin among humans")), "his card: Jeff's words, outcast")
+	_check(card.get("kin", {}).is_empty() and card.get("grudge", []).is_empty(), "no kin and no grudge rolled for him")
+	_check(Standing.words(card, "player-who-killed-him-often") == "stranger", "a player who fought the imp every session starts neutral with the man")
+	_check(snag != null and World.townsfolk().has(snag), "one of the townsfolk: raiders take him as they take anyone")
+	World.production.set_away("rs-snag", true)
+	_sync()
+	Townsfolk.use_days({})
+
+
+## A lawspeaker (459) spawned while on his rounds starts at the hour's stop
+## (a home of the town's), not in the square; found by economy's appointment.
+func _test_lawspeaker_mid_rounds() -> void:
+	print("\n== a lawspeaker spawned mid-rounds stands at the hour's stop (459) ==")
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	World.production.set_away("rs-snag", true)
+	_check(World.towns.note_rescue(STORE, "rs-law", "Hrolf", "lawspeaker"), "(Hrolf the lawspeaker, a resident)")
+	World.production.set_away("rs-folk00", false)
+	World.production.set_away("rs-folk01", false)
+	DayNight.set_hour(9.0)
+	_sync()
+	var law := _body("rs-law")
+	_check(law != null and law.doing == Resident.Doing.ROUNDS, "at nine he is on his rounds (%s)" % [law.doing if law != null else -1])
+	var stops: Array = law.places.get("rounds", []) if law != null else []
+	_check(not stops.is_empty() and stops.all(func(s: Dictionary) -> bool: return s.get("id", "") != "rs-law"), "his stops are the others' homes, never his own: %s" % [stops.map(func(s: Dictionary) -> String: return str(s["who"]))])
+	var stop := Townsfolk.round_stop(stops.size(), Townsfolk.day_of(DayNight.now()), DayNight.hour(DayNight.now())) if not stops.is_empty() else -1
+	_check(law != null and stop >= 0 and (stops[stop]["rect"] as Rect2i).grow(1).has_point(law.tile), "and his body stands at (or beside) the hour's stop, not the square (%s in %s)" % [law.tile if law != null else Vector2i.ZERO, stops[stop]["rect"] if stop >= 0 else Rect2i()])
+	World.production.set_away("rs-law", true)
+	World.production.set_away("rs-folk00", true)
+	World.production.set_away("rs-folk01", true)
 	_sync()
 
 

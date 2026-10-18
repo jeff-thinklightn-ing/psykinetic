@@ -12090,3 +12090,73 @@ kobolds dig the Blood Rot's shafts), which holds one.
   offsets.
 slots_items.json and the art status regenerated (tools/items_art_slots.gd).
 Protocol unchanged (the same fingerprint before and after).
+### npc's side: the resident
+
+Jeff (2026-10-18): "snagfin could be an friendly goblin merchant - somewhat
+outcast but tolerated". The coordinator's design 2026-10-18 (npc leading;
+enemy-ai's side above; economy's, lore's, companions' and pc-character's
+sides quote 471). Snagfin, the imp Jeff killed every playtest at the wilds'
+town chest, is one of the town's people.
+
+Who he is: residents.json "settled" (id -> name, town, trade, type, kind,
+home, came, fact, outcast): "snagfin" in the wilds' town, trade "merchant"
+(a trade with no building, no recipes and no wage: he earns nothing on his
+own and pays rent and needs like anyone), hidden type "merchant" (440:
+commerce and goods his domain, any good at the counter dearest first, an
+ear for prices; the thief's fencing, 461, runs through him), origin
+"settled". Seated (Main._seat_settled, at boot and on the world tick)
+through economy's door, Towns.move_in(town, id, name, trade, "settled",
+type) (460's call with a type; origin "settled" passes the town's room
+check, 460 amended, the coordinator's ruling: "somewhat outcast but
+tolerated" means he is not housed by the town, he keeps his own stall at
+the edge, so the inn's room is not his; he counts among the town's people
+and not its lodging), once his town has people of its own (a town founded
+after him would spread its founding gold over him alone) and he is no
+worker yet; nothing once he is there. v0.1.152 shipped enemy-ai's half
+alone: its stub took the hand-over, so that release has no Snagfin at all
+and what the imp carried is gone; the first boot after this lands logs
+"[state] Snagfin settled in wilds/store as the town's merchant". His card
+(Main._write_settled_card): rolled by his id as anyone's,
+then Jeff's words: came "came to the town from the goblins and stays,
+somewhat outcast but tolerated", and the standing fact "Snagfin is a goblin
+among humans; the town tolerates him, which is more than most do."; no kin
+and no grudge are ever rolled for him (card "outcast": true,
+Townsfolk._found_among), so nobody gossips to him kin-first, though gossip
+passes to and from him: tolerated, not shunned. His voice (336, 378): a
+merchant's profile, his card words, so he can say "they tolerate me, which
+is more than most"; the town's regard is lore's one agreed fact in Jeff's
+words. Standing (443) with him is a player's as with anyone, and a player
+who killed the imp every session starts a stranger to the man.
+
+The body and the stall: Main gives him home = the 3x3 about his marked
+cell (222,227, by the south door: a stall, not a house), work = the 3x3
+about the store's cell (the counter), the square as everyone's; his day is
+the merchant's (residents.json "merchant": the counter 7-12 and 13-18, the
+inn at noon and dusk, home at night). His spawn spec carries "kind": "imp",
+so the client draws the goblin rig and the imp art as he is (pc-character's
+side: Client3D.model_for takes a Resident's kind); label "Snagfin
+[merchant]"; is_friend covers him, so a click talks (454). He is one of the
+townsfolk: raiders take him as they take anyone, and if he falls he returns
+as the fallen do (396); never a monster respawn again.
+
+The live box: enemy-ai's hook, Main.on_became(id, entry), called once from
+_spawn_saved for a saved monster at his key ({name, hp, slots, items,
+tile}): he is seated as at boot, the items he carried are banked at the
+town's store in his name, and one line is logged, "[state] Snagfin became
+a resident (was monster at (222, 227))"; later boots say nothing, since he
+is a worker and nothing saved carries his key. A fresh world seats him the
+same way with no hook.
+
+resident_test: a settled resident of kind imp with the label, the stall
+and the counter, his card in Jeff's words, no kin or grudge, a neutral
+start for a player, one of the townsfolk (the test town being crowded, he
+is seated there as a rescue; economy's door is rescue_test's), and a
+lawspeaker spawned on his rounds standing at the hour's stop (459;
+economy's fix). spawn_key_test: the round trip from a save shaped like
+today's (the monster at his key with his things, its respawn) through the
+conversion and a second load: one resident, no monster, no respawn, his
+things in the store, the line once. Protocol unchanged ("kind" is a
+spawn-spec key the client reads: pc-character's side); no new class_name.
+
+Rejected: new art (he is the imp Jeff knows); an official's place (tolerated,
+not trusted); a house (a stall); keeping a respawn.

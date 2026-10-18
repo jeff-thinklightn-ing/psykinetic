@@ -166,10 +166,24 @@ static func card_of(production: Production, worker_id: String) -> Dictionary:
 	return card
 
 
+## The people settled in a town by name (residents.json "settled", decision
+## 471): id -> {name, town, trade, type, kind, home, came, fact, outcast}.
+static func settled() -> Dictionary:
+	var table: Variant = days().get("settled", {})
+	var out := {}
+	if table is Dictionary:
+		for id: String in table:
+			if table[id] is Dictionary and not id.begins_with("_"):
+				out[id] = table[id]
+	return out
+
+
 ## At founding, [param card]'s kin and grudge (resident_traits.json "kin",
 ## "grudge": a chance each, by the id) among [param town]'s residents who
 ## have cards: the facts written into both cards.
 static func _found_among(production: Production, worker_id: String, card: Dictionary, town: String) -> void:
+	if bool(card.get("outcast", false)):
+		return  # Tolerated, not kin to anyone (decision 471).
 	var table := ResidentCard.tables()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("kin:" + worker_id)
