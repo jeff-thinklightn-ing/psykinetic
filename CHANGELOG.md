@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The server's lawspeaker is switched on, ruling on what the towns talk of once a day (once the box's service file is reloaded).
 - Towns can build again without players hauling wood: a woodcutter brings wood into the town's store, more with a woodshed, and turns up on his own when the town has building to do and no wood. An inn now takes leather instead of cloth, since nobody weaves yet.
 - Timber windows have plank shutters.
 - Tools: a heavy job waiting at the resource gate no longer dies of "Permission denied" on the gate's state lock (Windows' answer while the lock is being deleted); it waits, as for a held lock.
