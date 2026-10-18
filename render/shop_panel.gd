@@ -113,6 +113,12 @@ func show_shop(data: Dictionary) -> void:
 	_rebuild()
 
 
+## The goods box's rect on screen while it shows, else an empty rect (the
+## counter panel sits above it).
+func box_rect() -> Rect2:
+	return _box.get_global_rect() if _box.visible else Rect2()
+
+
 ## The rows shown, "name price" each (tests).
 func rows_shown() -> Array[String]:
 	var out: Array[String] = []

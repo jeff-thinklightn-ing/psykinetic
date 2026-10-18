@@ -26,6 +26,7 @@ func _ready() -> void:
 	await _test_talk_panel()
 	_test_context_and_place()
 	_test_converse_panel()
+	_test_counter_panel()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -311,6 +312,37 @@ func _test_converse_panel() -> void:
 	var fonts := UiTheme.credits()
 	_check(fonts["entries"].size() == 2 and UiTheme.credits in OptionsPanel.credit_providers(),
 		"the fonts' credit (Alegreya, Alegreya Sans, OFL) is one of the Credits' providers")
+
+
+func _test_counter_panel() -> void:
+	print("== the counter screen: the work offered, being worked, waiting, refusals ==")
+	var panel: CounterPanel = _main.counter_panel
+	_check(panel != null and not panel.visible, "there, hidden")
+	panel.show_counter({"kind": "temple", "why": "the fee is 6 gold",
+		"jobs": [{"slot": 0, "uid": 1, "id": "dagger", "effect": "bless", "price": 6, "ok": true},
+			{"slot": 1, "uid": 2, "id": "hammer", "effect": "reforge", "to_id": "sword", "price": 12, "materials": {"ore": 2},
+				"ok": false, "why": "the town lacks 2 ore"}],
+		"working": [{"uid": 3, "id": "bow", "effect": "bless", "left": 900, "left_seconds": 90}],
+		"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]},
+		func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
+	var rows := panel.rows_shown()
+	_check(rows.size() == 6 and rows[0] == "Wren's dagger: blessed [Order]"
+			and rows[1] == "hammer: reforged into a %s (the town lacks 2 ore)" % Items.name_of("sword")
+			and rows[3].begins_with("%s, being blessed; ready in about 2 minute" % Items.name_of("bow"))
+			and rows[5] == "%s, blessed [Collect]" % Items.name_of("shield"),
+		"a row per job with Order or its why, the work in hand with its time, the waiting with Collect (%s)" % [rows])
+	_check(panel.why_shown() == "the fee is 6 gold", "the last refusal under it all")
+	var ordered := []
+	panel.order_pressed.connect(func(slot: int, effect: String, to_id: String) -> void: ordered.assign([slot, effect, to_id]))
+	(panel._jobs.get_child(0).get_node("Button") as Button).pressed.emit()
+	_check(ordered == [0, "bless", ""], "Order: the slot and the effect (%s)" % [ordered])
+	var collected := [0]
+	panel.collect_pressed.connect(func(uid: int) -> void: collected[0] = uid)
+	(panel._waiting.get_child(1).get_node("Button") as Button).pressed.emit()
+	_check(collected[0] == 4, "Collect: the thing's uid")
+	panel.show_counter({"kind": "shop", "jobs": [], "working": [], "waiting": [], "why": ""}, Callable())
+	_check(panel.rows_shown() == ["Nothing you carry can be worked here."] and panel.why_shown() == "",
+		"nothing to do: said so")
 
 
 func _check(ok: bool, label: String) -> void:

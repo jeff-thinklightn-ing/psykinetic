@@ -389,10 +389,14 @@ var _hud_tick := 0
 var _context_hint: Label
 ## --test-show=hint: the thing the hint is shown on, as if the cursor were on it.
 var _test_hint_thing: GridEntity
+## --test-show=counter: the pack panel, for the counter screen's sample.
+var _test_counter_shown: Node
 ## --test-show=converse: the panel wanted on the nearest resident, once there is one.
 var _test_converse_due := false
 ## Talking with a town's person (ConversePanel; ui's step 4).
 var converse: ConversePanel
+## The counter screen beside the pack (CounterPanel; economy's job, 438).
+var counter_panel: CounterPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
@@ -716,6 +720,16 @@ func _process(delta: float) -> void:
 	if compass != null:
 		compass.north_on_screen = screen_north()
 		compass.place = place_text(_local_player())
+	if counter_panel != null and pack_panel != null:
+		var at_counter := pack_panel.visible and is_instance_valid(pack_panel.other) \
+				and not World.counter_kind(pack_panel.other).is_empty() or is_instance_valid(_test_counter_shown)
+		counter_panel.visible = at_counter
+		if at_counter:
+			var rect := pack_panel.get_global_rect()
+			var shop_box := shop_panel.box_rect() if shop_panel != null else Rect2()
+			counter_panel.reset_size()
+			var bottom := shop_box.position.y - ShopPanel.GAP if shop_box.size.y > 0.0 else rect.end.y
+			counter_panel.global_position = Vector2(rect.position.x - counter_panel.size.x - ShopPanel.GAP, bottom - counter_panel.size.y)
 	if _context_hint != null:
 		var words := ""
 		if not is_typing() and DisplayServer.get_name() != "headless":
@@ -3033,6 +3047,44 @@ func _on_counter_work_done(job: Dictionary) -> void:
 				_send_counter(player, entity)
 
 
+## The counter screen fed (economy's "counter" message for the open counter).
+func _on_counter_told(data: Dictionary) -> void:
+	if counter_panel == null or pack_panel == null or not is_instance_valid(pack_panel.other):
+		return
+	if str(data.get("counter", "")) != str(pack_panel.other.get_path()):
+		return
+	counter_panel.show_counter(data, slot_title)
+
+
+## What the pack calls the thing in the player's slot [param slot]: the
+## note's head (a named thing's title) or the catalog name.
+func slot_title(slot: int) -> String:
+	var player := _local_player()
+	if player == null or slot < 0 or slot >= player.slots.size():
+		return ""
+	if slot < player.slot_notes.size() and not player.slot_notes[slot].is_empty():
+		var head := player.slot_notes[slot].split("\n", false)[0]
+		return head.substr(0, head.find(",")) if head.contains(",") else head
+	return Items.name_of(player.slots[slot])
+
+
+func _order_at_counter(slot: int, effect: String, to_id: String) -> void:
+	var player := _local_player()
+	if player == null or pack_panel == null or not is_instance_valid(pack_panel.other):
+		return
+	var args := {"counter": str(pack_panel.other.get_path()), "do": "order", "slot": slot, "effect": effect}
+	if not to_id.is_empty():
+		args["to_id"] = to_id
+	World.command(player, "counter", args)
+
+
+func _collect_at_counter(uid: int) -> void:
+	var player := _local_player()
+	if player == null or pack_panel == null or not is_instance_valid(pack_panel.other):
+		return
+	World.command(player, "counter", {"counter": str(pack_panel.other.get_path()), "do": "collect", "uid": uid})
+
+
 ## The client's counter screen's data.
 func _on_counter_message(data: Dictionary) -> void:
 	counter_data = data
@@ -4291,6 +4343,11 @@ func _build_talk() -> void:
 			_swap_chat_channel()
 			_chat_box.accept_event())
 	talk.set_box(_chat_box)
+	counter_panel = CounterPanel.new()
+	counter_panel.order_pressed.connect(_order_at_counter)
+	counter_panel.collect_pressed.connect(_collect_at_counter)
+	$HUD.add_child(counter_panel)
+	counter_told.connect(_on_counter_told)
 	converse = ConversePanel.new()
 	converse.ask_pressed.connect(func(line: String) -> void: _send_chat(line))
 	converse.offer_accepted.connect(_accept_offer_from_panel)
@@ -5416,6 +5473,10 @@ func open_other(target: GridEntity) -> void:
 		var player := _local_player()
 		if player != null:
 			World.command(player, "shop", {"shop": str(target.get_path())})
+	if counter_panel != null and target != null and not World.counter_kind(target).is_empty():
+		var player := _local_player()
+		if player != null:
+			World.command(player, "counter", {"counter": str(target.get_path()), "do": "look"})
 
 
 func close_other() -> void:
@@ -6289,6 +6350,17 @@ func _run_test_show(player: Player) -> void:
 				_send_chat("(a test line) Stay close, the gate's watched.")
 			"pause":
 				escape()
+			"counter":
+				# The counter screen with sample data in economy's shape (a test's words).
+				pack_panel.shown = true
+				_test_counter_shown = pack_panel
+				counter_panel.show_counter({"kind": "temple", "why": "",
+					"jobs": [{"slot": 0, "uid": 1, "id": "dagger", "effect": "bless", "price": 6, "ok": true},
+						{"slot": 1, "uid": 2, "id": "hammer", "effect": "reforge", "to_id": "sword", "price": 12,
+							"materials": {"ore": 2}, "ok": false, "why": "the town lacks 2 ore"}],
+					"working": [{"uid": 3, "id": "bow", "effect": "bless", "left": 900, "left_seconds": 90}],
+					"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]},
+					func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
 			"credits":
 				if not options_panel.visible:
 					options_panel.toggle()

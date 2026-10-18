@@ -10557,3 +10557,33 @@ tests/ui_test: the panel's name, exchange, thinking, offers, the accept
 signals, the asks, Esc; the status words. `--test-show=converse` opens the
 panel on the nearest resident with sample offers (a test's words). The
 counter screen (economy's job, decision 434) is step 4's second landing.
+
+## 441. The counter screen: work ordered, worked and collected at a counter
+
+Roadmap `ui`, step 4's second landing (the coordinator approved it with the
+conversation panel, 436). Economy's counter job (438: one job shape for the
+blessing, 434, the mend and the reforge, {uid, to_id, effect, for owner};
+the "counter" command and message) at buildings' temple counter (424
+amended: a Chest with temple true) and the store's shop counter had no
+screen: a blessing could only be dragged onto the temple's chest.
+
+- `CounterPanel` (render/counter_panel.gd, new class_name): beside the pack,
+  above the shop's goods box when both show, while a counter chest is open
+  (World.counter_kind not empty). Its title by the kind ("The temple's
+  counter", "The smith's counter"); a row per job entry: the thing's title
+  as the pack shows it (Main.slot_title: the note's head, else the catalog
+  name), the work's word and its target ("blessed", "reforged into a
+  sword"), the effect's words from items' growth "says" when the catalog has
+  them, the price and the materials in brass, and Order; a refusal (ok
+  false) shows its why in rust in Order's place. Then what of theirs is
+  being worked, with the time left from left_seconds ("ready in about 2
+  minutes", "ready in 40 seconds"), what waits for them with Collect, and
+  the last refusal under it all. Nothing to do says so.
+- Main sends economy's "counter" command: look when a counter opens
+  (open_other), order {slot, effect, to_id} and collect {uid} from the
+  buttons; counter_told feeds the panel when the message names the open
+  counter. Gold in the message updates the pack's gold (economy's).
+
+Client only; nothing on the wire from ui. tests/ui_test: the rows, the
+refusal, Order and Collect, nothing to do. `--test-show=counter` shows the
+screen with sample work (a test's words). Shots in docs/ui/shots/step4/.
