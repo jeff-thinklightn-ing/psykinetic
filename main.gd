@@ -4684,6 +4684,37 @@ func _check_camps(tick: int) -> void:
 			print("[holdings] %s falls: nobody of %s defends it, and players hold it" % [id, camp["faction"]])
 
 
+## Fallen camps taken back by who held them (decision 429) once
+## economy.json's rescue.restock_days (5) have passed since they fell, as
+## economy restocks them (428), with no player standing in them; their
+## slots then come back. Returns how many.
+func _retake_camps() -> int:
+	if World.holdings == null:
+		return 0
+	var days := 5.0
+	if World.towns != null:
+		days = float(World.towns.rules.get("rescue", {}).get("restock_days", days))
+	var after := roundi(days * maxi(DayNight.day_steps, 1))
+	var count := 0
+	for fallen: Dictionary in World.holdings.fallen_camps():
+		if int(fallen["age"]) < after or _anyone_in(fallen["id"]):
+			continue
+		if World.holdings.take(fallen["id"], fallen["faction"]):
+			count += 1
+			print("[holdings] %s is taken back by %s" % [fallen["id"], fallen["faction"]])
+	return count
+
+
+## Whether a player of any zone stands within place [param id]'s radius.
+func _anyone_in(id: String) -> bool:
+	var place := World.holdings.place(id)
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and player.zone == place.get("area") and _within(player.tile, place["cell"], int(place["radius"])):
+			return true
+	return false
+
+
 ## Whether no living monster of [param camp]'s holder's side stands within
 ## its radius + CAMP_DEFEND_MARGIN.
 func _camp_undefended(camp: Dictionary) -> bool:
@@ -4922,6 +4953,8 @@ func _on_world_ticked(tick: int) -> void:
 		_check_respawns(tick)
 		if tick % CAMP_CHECK_TICKS == 0:
 			_check_camps(tick)
+		if tick % World.WORLD_TICK_STEPS == 0:
+			_retake_camps()
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
 		_recall_due()

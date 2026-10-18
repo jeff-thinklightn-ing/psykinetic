@@ -5,7 +5,8 @@ extends Node
 ## 10 s, it falls to nobody (place_taken fires; the party log says so); a
 ## player stepping out before then starts the clock again; a dead monster
 ## whose spawn tile is in the fallen camp does not come back, others do;
-## retaken, it does. Run it with tests/run.ps1 or tests/run.sh.
+## who held it takes it back after rescue.restock_days, not with a player
+## in it, remembered across a restart; then it does. Run it with tests/run.ps1 or tests/run.sh.
 
 const IMP_SLOT := 4  # Imp2 at (2, 6) in the test room.
 const CAMP_CELL := Vector2i(2, 6)
@@ -95,8 +96,21 @@ func _test_stays_cleared() -> void:
 
 
 func _test_retaken() -> void:
-	print("\n== retaken, it refills ==")
-	World.holdings.take(_camp, "goblins")
+	print("\n== taken back in time, it refills ==")
+	_check(World.holdings.fallen_camps().map(func(f: Dictionary) -> String: return f["id"] + " " + f["faction"]) == [_camp + " goblins"],
+		"Holdings remembers who held the fallen camp")
+	var saved := World.holdings.to_dict()
+	var names: Array[String] = [World.zone.name]
+	var again := Holdings.new(WorldMap.build(names), Factions.read(), JSON.parse_string(JSON.stringify(saved)))
+	_check(again.fallen_camps().size() == 1 and again.fallen_camps()[0]["faction"] == "goblins", "and still after a restart")
+	_check(_main._retake_camps() == 0, "not before rescue.restock_days have passed")
+	World.holdings._since[_camp] = World.holdings.now() - 6 * maxi(DayNight.day_steps, 1)
+	var player := _player()
+	_walk_to(player, CAMP_CELL + Vector2i(1, 0))
+	_check(_main._retake_camps() == 0, "nor with a player standing in it")
+	_walk_to(player, Vector2i(9, 6))
+	_check(_main._retake_camps() == 1 and World.holdings.holder(_camp) == "goblins" and World.holdings.fallen_camps().is_empty(),
+		"after them, with nobody in it, the goblins take it back")
 	_main._respawned_at.clear()
 	_step(_main.RESPAWN_STAGGER_TICKS * 4)
 	_check(_slot_entity(IMP_SLOT) is Monster, "the goblins hold it again: the imp comes back")

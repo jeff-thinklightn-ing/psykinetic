@@ -28,6 +28,9 @@ var _places: Dictionary[String, Dictionary] = {}
 var _holder: Dictionary[String, String] = {}
 var _strength: Dictionary[String, int] = {}
 var _since: Dictionary[String, int] = {}
+## A fallen camp's id -> the faction that held it (decision 429): taken back
+## by it in time (Main._retake_camps); forgotten once anyone holds it.
+var _fell_from: Dictionary[String, String] = {}
 
 
 ## The holdings of [param world_map]'s places: their starting holders, then
@@ -290,6 +293,10 @@ func take(id: String, faction: String, with_strength := 1) -> bool:
 	_holder[id] = faction
 	_strength[id] = maxi(with_strength, 0)
 	_since[id] = now()
+	if faction == Factions.NOBODY and from != Factions.NOBODY and _places[id].get("kind") == "camp":
+		_fell_from[id] = from
+	elif faction != Factions.NOBODY:
+		_fell_from.erase(id)
 	place_taken.emit(id, from, faction)
 	strength_changed.emit(id, _strength[id])
 	var area_after := area_holder(area_name)
@@ -327,6 +334,20 @@ func to_dict() -> Dictionary:
 	var out := {}
 	for id in all_places():
 		out[id] = {"holder": _holder[id], "strength": _strength[id], "age": now() - _since[id]}
+		if _fell_from.has(id):
+			out[id]["fell_from"] = _fell_from[id]
+	return out
+
+
+## The camps that fell and are nobody's still (decision 429): {id, faction
+## (who held it), age (World steps since it fell)}, sorted by id.
+func fallen_camps() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ids: Array[String] = []
+	ids.assign(_fell_from.keys())
+	ids.sort()
+	for id in ids:
+		out.append({"id": id, "faction": _fell_from[id], "age": now() - _since[id]})
 	return out
 
 
@@ -345,3 +366,6 @@ func from_dict(saved: Dictionary) -> void:
 		_holder[str(id)] = faction
 		_strength[str(id)] = maxi(int(entry.get("strength", 1)), 0)
 		_since[str(id)] = now() - maxi(int(entry.get("age", 0)), 0)
+		var fell := str(entry.get("fell_from", ""))
+		if faction == Factions.NOBODY and factions.all.has(fell):
+			_fell_from[str(id)] = fell

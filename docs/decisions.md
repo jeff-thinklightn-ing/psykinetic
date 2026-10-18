@@ -10144,3 +10144,10 @@ the design.
 Cost: five samplers more (13 of 16); one texture read a kind where it
 shows (two where kinds meet), only once that kind has art; about 1.4 MB of
 video memory a 512 x 512 texture. Client only; no protocol change.
+Amended (economy, 2026-10-17): 428's restock only gives a camp new
+strangers once it is hostile again; nothing took a fallen camp back. Maps
+does: Holdings remembers who held a fallen camp (fell_from, saved in the
+snapshot, forgotten once anyone holds it; fallen_camps()), and on the world
+tick Main._retake_camps gives it back to them once economy.json's
+rescue.restock_days (5) have passed since it fell, with no player standing
+in it, so it is retaken as economy restocks it, and its slots come back.
