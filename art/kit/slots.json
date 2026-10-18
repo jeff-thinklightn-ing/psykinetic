@@ -482,14 +482,20 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.3, 3, 1],
-			"budget": 400,
+			"budget": 600,
 			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh cut to 1 m round the opening, depth to 0.3, 378 tris"},
-			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; shuttered",
+			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; shuttered: two shutters hung in the opening's reveal (z -0.35 to 0.35, 1.3 to 2.0 m up), flush with the outside face (+x), shutter_a hinged at z -0.35 and shutter_b at z +0.35, closed in the glb, swinging out to +x as BuildingComposer opens them (buildings, decision 489)",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.3, 1.2, 1]},
 				{"at": [0, 2.6, 0], "size": [0.3, 0.8, 1]},
 				{"at": [0, 1.7, -0.4], "size": [0.3, 1, 0.2]},
 				{"at": [0, 1.7, 0.4], "size": [0.3, 1, 0.2]}
+			],
+			"parts": [
+				{"name": "shutter_a", "motion": "hinge", "axis": "y", "pivot": [0.1, 1.3, -0.35], "range": [0, 110],
+					"grey": [{"at": [0.015, 0.35, 0.175], "size": [0.03, 0.7, 0.35]}]},
+				{"name": "shutter_b", "motion": "hinge", "axis": "y", "pivot": [0.1, 1.3, 0.35], "range": [0, -110],
+					"grey": [{"at": [0.015, 0.35, -0.175], "size": [0.03, 0.7, 0.35]}]}
 			]
 		},
 		"wall.wood.straight_ruined": {

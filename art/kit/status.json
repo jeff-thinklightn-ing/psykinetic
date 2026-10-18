@@ -510,7 +510,7 @@
 			"kind": "edge",
 			"category": "walls",
 			"size": "0.3 x 3.0 x 1.0",
-			"budget": 400
+			"budget": 600
 		},
 		{
 			"slot": "wall.wood.straight_ruined",
