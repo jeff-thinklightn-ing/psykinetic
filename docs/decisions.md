@@ -8429,6 +8429,23 @@ barred state yet; the rattle is a server-only noise), bandaging, a cart rolling,
 breaking, and the UI sounds (next). Clip scenarios `sound_combat` and `sound_world`;
 sound_kit_test checks the mappings, and view_test's sound checks allow the voices. Client
 only.
+
+Amended (the bow, Jeff: "we need to prioritize bow since archery is already working"):
+six slots, filled from Freesound (CC0 and CC BY, under 361). `sfx.bow_draw` creaks as a
+body's `raised` turns to "draw" (`_sync_draw`; replicated for players only, so a
+monster's draw is heard only on the host). `sfx.bow_loose` twangs at the shot
+(`GridEntity.shot`), with World.shoot's bow noise radius; the pitched-up swing it replaces
+is gone. The arrow is heard where it ends as the drawn arrow gets there (`SHOT_SPEED`; one
+list of arrows in flight, `_arrows`, also holds 390's flinch, which replaced `_arrows_due`):
+- A body struck (`struck`, cause shot): `sfx.arrow_hit_flesh` and its pain cry.
+- A body's guard (`guarded`): the block's own sound, as before.
+- A friend it stops at harmless (456's `World.spares`): `sfx.arrow_spared`, soft (for now the
+  flesh hit, 10 dB down), as the arrow sticks in them.
+- Neither (`_arrow_landed`, from what lies past its last cell along the shot, World.shot_line's
+  stops): a closed door's `sfx.arrow_hit_wood`; a wall, higher ground or rock,
+  `sfx.arrow_hit_stone`; water, `sfx.splash`; else `sfx.arrow_land`, fallen at its range's end.
+A new projectile needs nothing more as long as it goes through World.shoot (or calls
+`GridEntity._world_shot(end)` and damages with cause `&"shot"`). view_test plays each case.
 ## 367. The wildlife's herds: counts on the world tick, bodies near someone
 
 Roadmap W3 (hunting and wildlife, enemy-ai leads; the coordinator approved

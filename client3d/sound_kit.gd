@@ -45,6 +45,7 @@ const NOISES := {
 	"door_rattle": Senses.NOISE_RATTLE, "latch": Senses.NOISE_LATCH, "rummage": Senses.NOISE_RUMMAGE,
 	"break": Senses.NOISE_BREAK, "thud_light": Senses.NOISE_THUD_LIGHT, "thud_heavy": Senses.NOISE_THUD_HEAVY,
 	"call": Senses.NOISE_CALL, "rout": Senses.NOISE_ROUT, "charge": Animal.NOISE_CHARGE,
+	"bow": preload("res://sim/world.gd").NOISE_BOW,
 }
 ## A slot's noise that is one radius of a sim kind: the kind World.noise
 ## makes for it.

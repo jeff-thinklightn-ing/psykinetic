@@ -170,6 +170,72 @@
 			"volume_db": -2.0,
 			"uses": "a blow parried with a weapon; Client3D._on_guarded (SoundKit.block)"
 		},
+		"sfx.bow_draw": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -6.0,
+			"uses": "a person drawing a bow, as its stance goes to draw (Client3D._sync_draw)"
+		},
+		"sfx.bow_loose": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "bow",
+			"volume_db": -4.0,
+			"uses": "a bow loosed, the twang (Client3D._on_shot)",
+			"fallback": "sfx.swing"
+		},
+		"sfx.arrow_hit_flesh": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "an arrow striking a body (Client3D._on_struck, cause shot, as the arrow arrives)",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.arrow_hit_wood": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 6,
+			"volume_db": -4.0,
+			"uses": "an arrow stopped by a closed door (Client3D._arrow_landed)",
+			"fallback": "sfx.hit_wood"
+		},
+		"sfx.arrow_hit_stone": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 6,
+			"volume_db": -4.0,
+			"uses": "an arrow stopped by a wall or higher ground (Client3D._arrow_landed)",
+			"fallback": "sfx.hit_stone"
+		},
+		"sfx.arrow_spared": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -10.0,
+			"uses": "an arrow stopped harmless in a friend, sticking in (Client3D._on_shot; decision 456)",
+			"fallback": "sfx.arrow_hit_flesh"
+		},
+		"sfx.arrow_land": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 4,
+			"volume_db": -6.0,
+			"uses": "an arrow that hit nothing, falling at its range's end (Client3D._arrow_landed)",
+			"fallback": "sfx.thrown_land_light"
+		},
 		"sfx.knockback_stone": {
 			"category": "combat",
 			"type": "oneshot",

@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_every_sound_has_its_files()
 	await _test_hp_bars()
 	_test_sounds_follow_events()
+	await _test_bow_sounds()
 	await _test_monster_death()
 	await _test_companion_death()
 	await _test_player_death()
@@ -309,6 +310,68 @@ func _test_hp_bars() -> void:
 	_check(not imp_bar.visible and not bar.visible, "hp_bars=0: none, even with Alt")
 	Net.hp_bars = true
 	_rig.show_all_bars = false
+	World.despawn(imp)
+	_rig._process(0.0)
+
+
+func _test_bow_sounds() -> void:
+	print("
+== the bow: a creak as it's drawn, a twang as it's loosed, the arrow heard where it ends as it gets there ==")
+	var player := _player()
+	var imp := _spawn_imp(Vector2i(9, 4))
+	_rig._process(0.0)
+	player.raised = "draw"
+	_check(_heard(func() -> void: _rig._process(0.0)).has("sfx.bow_draw"), "drawn: the creak")
+	_check(not _heard(func() -> void: _rig._process(0.0)).has("sfx.bow_draw"), "held drawn: once")
+	player.raised = ""
+	_rig._process(0.0)
+	var before := _rig.sfx.played.size()
+	var loosed := _heard(func() -> void:
+		player._world_shot(imp.tile)
+		World.damage(imp, 1, player, &"shot"))
+	_check(loosed.slice(0, 1) == ["sfx.bow_loose"] and not loosed.has("sfx.arrow_hit_flesh"),
+			"loosed at the imp: the twang, its hit not yet (%s)" % [loosed])
+	await get_tree().create_timer(0.5).timeout
+	var after: Array[String] = []
+	for entry: Array in _rig.sfx.played.slice(before):
+		after.append(entry[0])
+	_check(after.count("sfx.arrow_hit_flesh") == 1 and not after.any(func(slot: String) -> bool: return slot in ["sfx.arrow_land", "sfx.arrow_hit_stone", "sfx.arrow_hit_wood"]),
+			"as the arrow arrives: its hit on flesh, once, and no miss (%s)" % [after])
+	# A miss, heard by what stopped it.
+	var open := Vector2i(-1, -1)
+	var wall := Vector2i(-1, -1)
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.is_water(cell) or not World.is_walkable(cell):
+			continue
+		var kind := World.edge_kind(cell, Vector2i(1, 0))
+		var past := cell + Vector2i(1, 0)
+		if open.x < 0 and kind == Terrain.Edge.OPEN and World.is_walkable(past) and World.height_at(past) <= World.height_at(cell):
+			open = cell
+		if wall.x < 0 and kind == Terrain.Edge.WALL:
+			wall = cell
+	_check(Client3D._arrow_landed(open - Vector2i(3, 0), open) == "sfx.arrow_land", "nothing past it: it falls (%s)" % open)
+	_check(wall.x < 0 or Client3D._arrow_landed(wall - Vector2i(3, 0), wall) == "sfx.arrow_hit_stone", "a wall past it: stone (%s)" % wall)
+	var door: Door = World.get_doors()[0]
+	var cell := Vector2i(door.key.x, door.key.y)
+	var across := Vector2i(1, 0) if door.key.z == Terrain.EAST else Vector2i(0, 1)
+	if door.is_open():
+		World._set_door(door, false, player)
+	_check(Client3D._arrow_landed(cell - across * 3, cell) == "sfx.arrow_hit_wood", "a closed door past it: wood")
+	var miss := _rig.sfx.played.size()
+	var unheard := _rig.sfx.unheard.size()
+	var expected := Client3D._arrow_landed(player.tile, open)
+	player._world_shot(open)
+	await get_tree().create_timer(0.5).timeout
+	_check((_rig.sfx.played.slice(miss).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(unheard)).has(expected),
+			"loosed at nobody: as it gets there, what stopped it (%s)" % expected)
+	var friend := _companion()
+	if friend != null and World.spares(player, friend):
+		var heard := _rig.sfx.played.size()
+		var unheard_before := _rig.sfx.unheard.size()
+		player._world_shot(friend.tile)
+		await get_tree().create_timer(0.5).timeout
+		_check((_rig.sfx.played.slice(heard).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(unheard_before)).has("sfx.arrow_spared"),
+				"loosed at a companion, who is spared (456): it sticks in, softly")
 	World.despawn(imp)
 	_rig._process(0.0)
 
@@ -2424,12 +2487,12 @@ func _test_goblin() -> void:
 	await get_tree().create_timer(0.6).timeout
 	var aimed := imp.tile + Vector2i(6, 0)
 	imp.shot.emit(aimed)
-	var due := int(_rig._arrows_due.get(aimed, 0)) - Time.get_ticks_msec()
+	var flying: Array = _rig._arrows.filter(func(arrow: Dictionary) -> bool: return arrow["end"] == aimed)
+	var due := int(flying[0]["arrive"]) - Time.get_ticks_msec() if not flying.is_empty() else 0
 	_check(due > 100 and due < 250, "an arrow shot six cells off gets there in its flight's time (%d ms)" % due)
-	_rig._arrows_due.erase(aimed)
 	_rig._animate(puppet)
 	var standing := animator.playing()
-	_rig._arrows_due[imp.tile] = Time.get_ticks_msec() + 300
+	_rig._arrows.append({"end": imp.tile, "arrive": Time.get_ticks_msec() + 300, "heard": false})
 	imp.struck.emit(1, &"shot")
 	_check(animator.playing() == standing, "shot: no flinch before the arrow arrives (%s)" % animator.playing())
 	await get_tree().create_timer(0.45).timeout

@@ -773,11 +773,8 @@ const LUNGE := 0.3
 ## Knocked down: how far the body tips (radians), and how fast.
 const DOWN_TILT := 1.4
 const DOWN_TILT_SPEED := 9.0
-## A shot's arrow: metres a second as drawn, and its sound's pitch.
+## A shot's arrow: metres a second as drawn (its hit is heard as it arrives).
 const SHOT_SPEED := 40.0
-## Cell -> the msec the arrow shot at it gets there (_on_shot, _on_struck).
-var _arrows_due: Dictionary[Vector2i, int] = {}
-const SHOT_PITCH := 1.8
 ## A shot that strikes nobody stands in the ground this long, and one that
 ## meets a friend sticks in them as long (decision 456).
 const SHOT_STUCK_SECONDS := 4.0
@@ -1005,6 +1002,10 @@ const CHATTER_SECONDS := Vector2(8.0, 25.0)
 var _last_hp: Dictionary[int, int] = {}
 ## Entity instance id -> its tile as last seen, for footsteps.
 var _last_tile: Dictionary[int, Vector2i] = {}
+## Arrows in flight (_on_shot): {end: its last cell, arrive: msec, heard:
+## whether a body's hit or guard was heard for it}; what stopped one that
+## hit no body is heard as it arrives (_arrow_landed).
+var _arrows: Array[Dictionary] = []
 ## Entity name -> the "death" message, for an entity still here when it
 ## came; it falls when it goes.
 var _pending_deaths: Dictionary[String, Dictionary] = {}
@@ -5995,6 +5996,7 @@ func _sync_puppets() -> void:
 			_sync_alert(entity as Monster, puppet)
 			_sync_chatter(entity as Monster, puppet)
 		_sync_down(entity, puppet)
+		_sync_draw(entity, puppet)
 		_sync_ailments(entity, puppet)
 		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
@@ -6088,13 +6090,13 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own
 ## sound, and fire has none yet). A shot's lands when its arrow gets there
-## (_arrows_due), not when the sim's news does (decision 390).
+## (_arrows), not when the sim's news does (decision 390).
 func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	if cause == &"shot":
 		var target := instance_from_id(id) as GridEntity
-		if target != null and _arrows_due.has(target.tile):
-			var wait: int = _arrows_due[target.tile] - Time.get_ticks_msec()
-			_arrows_due.erase(target.tile)
+		var flying := _arrow_to(target.tile) if target != null else {}
+		if not flying.is_empty():
+			var wait: int = int(flying["arrive"]) - Time.get_ticks_msec()
 			if wait > 0:
 				get_tree().create_timer(wait / 1000.0).timeout.connect(_on_struck.bind(_amount, cause, id))
 				return
@@ -6104,6 +6106,10 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))  # An impact is shown by _on_impacted.
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).hit()
+	if puppet != null and cause == &"shot":
+		var shot := instance_from_id(id) as GridEntity
+		sfx.play("sfx.arrow_hit_flesh", puppet.position + Vector3.UP * 0.8)
+		_pain(shot, puppet)
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity
 		sfx.play(_struck_with(struck), puppet.position + Vector3.UP * 0.8)
@@ -6369,6 +6375,57 @@ func _play_later(slot: String, at: Vector3, seconds: float) -> void:
 	get_tree().create_timer(seconds).timeout.connect(func() -> void:
 		if is_instance_valid(sfx) and sfx.is_inside_tree():
 			sfx.play(slot, at))
+
+
+## A person's bow drawn (raised "draw", replicated for players): the
+## creak, once as the stance begins.
+func _sync_draw(entity: GridEntity, puppet: Node3D) -> void:
+	var drawing := entity.raised == "draw"
+	if drawing != bool(puppet.get_meta("drawing", false)):
+		puppet.set_meta("drawing", drawing)
+		if drawing:
+			sfx.play("sfx.bow_draw", puppet.position + Vector3.UP * 1.2)
+
+
+## The arrow in flight to [param cell] not yet heard, marked heard now; {}
+## for none.
+func _arrow_to(cell: Vector2i) -> Dictionary:
+	for arrow: Dictionary in _arrows:
+		if arrow["end"] == cell and not arrow["heard"]:
+			arrow["heard"] = true
+			return arrow
+	return {}
+
+
+## What an arrow from [param from] that stopped at [param end] without
+## striking anyone sounds like, by what lies past it along the shot
+## (World.shot_line's stops): a closed door's wood, a wall's or higher
+## ground's stone, water's splash, else the arrow falling at its range's end.
+static func _arrow_landed(from: Vector2i, end: Vector2i) -> String:
+	if World.is_water(end):
+		return "sfx.splash"
+	var d := end - from
+	var longest := maxi(absi(d.x), absi(d.y))
+	if longest == 0:
+		d = Vector2i(1, 0)
+		longest = 1
+	var step := Vector2i(roundi(float(d.x) / longest), roundi(float(d.y) / longest))
+	var edges: Array[Vector2i] = [step]
+	if step.x != 0 and step.y != 0:
+		edges = [Vector2i(step.x, 0), Vector2i(0, step.y)]
+	var wall := false
+	for edge: Vector2i in edges:
+		match World.edge_kind(end, edge):
+			Terrain.Edge.DOOR:
+				var door := World.door_across(end, edge)
+				if door != null and not door.is_open():
+					return "sfx.arrow_hit_wood"
+			Terrain.Edge.WALL:
+				wall = true
+	var past := end + step
+	if wall or World.height_at(past) > World.height_at(from) or not (World.is_walkable(past) or World.is_water(past)):
+		return "sfx.arrow_hit_stone"
+	return "sfx.arrow_land"
 
 
 ## Cells between [param a] and [param b], Chebyshev (as hearing counts).
@@ -7186,6 +7243,9 @@ func _on_guarded(broken: bool, id: int) -> void:
 	if puppet == null:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
+	var holder_now := instance_from_id(id) as GridEntity
+	if holder_now != null:
+		_arrow_to(holder_now.tile)  # An arrow taken on a guard: not a miss.
 	var guard := ""
 	var holder := instance_from_id(id) as GridEntity
 	if holder != null and World.holds_in_hands(holder):
@@ -7199,9 +7259,10 @@ func _on_guarded(broken: bool, id: int) -> void:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 
 
-## A shot (World.shoot) flew to [param to]: an arrow streaks from the
-## shooter's chest to that cell, a soft whip of air as it goes (the swing's
-## sound, pitched up, until the bow has its own).
+## A shot (World.shoot) flew to [param to]: the bow's twang, and an arrow
+## streaks from the shooter's chest to that cell. As it arrives, a body
+## there is heard struck (_on_struck) or guarding (_on_guarded); else what
+## stopped it (_arrow_landed).
 func _on_shot(to: Vector2i, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null or puppet.get_parent() == null:
@@ -7217,8 +7278,23 @@ func _on_shot(to: Vector2i, id: int) -> void:
 	var from := puppet.position + Vector3.UP * 1.1
 	var end := _tile_position(to)
 	end.y = _ground_height(Vector2(end.x, end.z)) + 1.0
-	sfx.play("sfx.swing", from, SHOT_PITCH)
-	if from.distance_to(end) < 0.1:
+	sfx.play("sfx.bow_loose", from)
+	var shooter := instance_from_id(id) as GridEntity
+	var flight := 0.0 if from.distance_to(end) < 0.1 else maxf(0.06, from.distance_to(end) / SHOT_SPEED)
+	var flying := {"end": to, "arrive": Time.get_ticks_msec() + roundi(flight * 1000.0), "heard": false}
+	_arrows.append(flying)
+	# The hit, sent with the shot, comes first; whatever is left by the
+	# arrow's arrival is a friend spared or a miss.
+	var origin := shooter.tile if shooter != null else to
+	get_tree().create_timer(maxf(flight, 0.05)).timeout.connect(func() -> void:
+		_arrows.erase(flying)
+		if not flying["heard"] and is_instance_valid(sfx) and sfx.is_inside_tree():
+			var met := World.get_entity_at(to)
+			# A friend on the line (decision 456): it sticks in them, softly.
+			var by := instance_from_id(id) as GridEntity  # By id: the shooter may be gone by now.
+			var spared := met != null and by != null and World.spares(by, met)
+			sfx.play("sfx.arrow_spared" if spared else _arrow_landed(origin, to), end))
+	if flight <= 0.0:
 		return
 	var arrow := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
@@ -7231,13 +7307,9 @@ func _on_shot(to: Vector2i, id: int) -> void:
 	puppet.get_parent().add_child(arrow)
 	arrow.position = from
 	arrow.look_at_from_position(from, end, Vector3.UP)
-	var flight := maxf(0.06, from.distance_to(end) / SHOT_SPEED)
-	# Whoever is hit there flinches as the arrow arrives (_on_struck).
-	_arrows_due[to] = Time.get_ticks_msec() + int(flight * 1000.0)
 	var tween := create_tween()
 	tween.tween_property(arrow, "position", end, flight)
 	var struck := World.get_entity_at(to)
-	var shooter := instance_from_id(id) as GridEntity
 	var body: Node3D = _puppets.get(struck.get_instance_id()) if struck != null else null
 	if body != null and shooter != null and World.spares(shooter, struck):
 		# A friend on the line (decision 456): it sticks in them a while,

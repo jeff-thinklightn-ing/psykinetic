@@ -210,6 +210,104 @@
 				"sha256": "a738a92f4e4ee454e0707d23720e1f1a6737f6e51ce3acf6b7ef36bc9e908f09"
 			}
 		],
+		"sfx.arrow_hit_flesh": [
+			{
+				"file": "sfx.arrow_hit_flesh.ogg",
+				"from": "freesound",
+				"original": "freesound 161098: arrow_damage.wav",
+				"sha256": "a4cd18954095722ce0ed97615ee597f84b838d60c63012b79a9d8688f988c812",
+				"by": "braqoon",
+				"url": "https://freesound.org/people/braqoon/sounds/161098/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_hit_flesh.2.ogg",
+				"from": "freesound",
+				"original": "freesound 205938: Arrow Impact",
+				"sha256": "d244def128f3e0193b213de6152ef628a0d01436fba9624ebe4b891e3e6aac88",
+				"by": "Twisted_Euphoria",
+				"url": "https://freesound.org/people/Twisted_Euphoria/sounds/205938/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_hit_flesh.3.ogg",
+				"from": "freesound",
+				"original": "freesound 464839: Anime Sound Effect - Piercing impact / Stabbing (from 0 s for 0.8 s)",
+				"sha256": "c438798f29877f4684d450f069bb4d25b125733aa77af3e31d7c15e4e1642ba6",
+				"by": "Breviceps",
+				"url": "https://freesound.org/people/Breviceps/sounds/464839/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.arrow_hit_stone": [
+			{
+				"file": "sfx.arrow_hit_stone.ogg",
+				"from": "freesound",
+				"original": "freesound 50772: arrow_clatter.ogg (from 0 s for 0.9 s)",
+				"sha256": "7820d9da24ecc651a070ccfd9bb5c68f8c794129ce2c377ad46a09ab49f4c3aa",
+				"by": "smcameron",
+				"url": "https://freesound.org/people/smcameron/sounds/50772/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.arrow_hit_wood": [
+			{
+				"file": "sfx.arrow_hit_wood.ogg",
+				"from": "freesound",
+				"original": "freesound 384914: Arrow Impact 1",
+				"sha256": "9339ea804ca399ee77ebeea76cf737fab44b395ac5fa98b45f2c1d098f80c230",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384914/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_hit_wood.2.ogg",
+				"from": "freesound",
+				"original": "freesound 384913: Arrow Impact 2",
+				"sha256": "f42b4f06843638d3fe460f8751855e2e1255a974c4bb8638d11bc63e08265b63",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384913/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_hit_wood.3.ogg",
+				"from": "freesound",
+				"original": "freesound 384911: Arrow Impact 4",
+				"sha256": "e8d13f4171a3d75b0a286450cf2bc1f4aa33236f15ce8c5a07599ed91c1ed8a9",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384911/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.arrow_land": [
+			{
+				"file": "sfx.arrow_land.ogg",
+				"from": "freesound",
+				"original": "freesound 773759: Small Sticks Drop (from 0 s for 0.6 s)",
+				"sha256": "10dd8a5f98cb1931d7bad7da7c4a97dcaef34c9735b90003491baf4b97e9f162",
+				"by": "IENBA",
+				"url": "https://freesound.org/people/IENBA/sounds/773759/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_land.2.ogg",
+				"from": "freesound",
+				"original": "freesound 773759: Small Sticks Drop (from 1.5 s for 1.05 s)",
+				"sha256": "7dbceda29208a760559da5e94d675d860e71df8fc841876f4326997a7dd36e5d",
+				"by": "IENBA",
+				"url": "https://freesound.org/people/IENBA/sounds/773759/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_land.3.ogg",
+				"from": "freesound",
+				"original": "freesound 773759: Small Sticks Drop (from 3.5 s for 0.65 s)",
+				"sha256": "885f60e58c7b578ccbd309ffe5d851190d1f03d25d555e85f738e8e27ad862ac",
+				"by": "IENBA",
+				"url": "https://freesound.org/people/IENBA/sounds/773759/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.bandage": [
 			{
 				"file": "sfx.bandage.ogg",
@@ -305,6 +403,73 @@
 				"sha256": "b7feb5f153430597a337f791ead0e39e5d366b3d0632706da145336c02e734da",
 				"by": "deleted_user_2104797",
 				"url": "https://freesound.org/people/deleted_user_2104797/sounds/346694/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.bow_draw": [
+			{
+				"file": "sfx.bow_draw.ogg",
+				"from": "freesound",
+				"original": "freesound 490556: Bow Drawn (from 0 s for 2.15 s)",
+				"sha256": "551dd29a4c4880aca326e16e97acfcb8606c0f28aa1de41c770d60477c90b724",
+				"by": "Paveroux",
+				"url": "https://freesound.org/people/Paveroux/sounds/490556/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bow_draw.2.ogg",
+				"from": "freesound",
+				"original": "freesound 649336: Bow_draw_slow01.wav",
+				"sha256": "698a94f44ac9b3f399bcd2d71b5ad14696fb71d44962c17ec8f215c4084a60c9",
+				"by": "SonoFxAudio",
+				"url": "https://freesound.org/people/SonoFxAudio/sounds/649336/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.bow_draw.3.ogg",
+				"from": "freesound",
+				"original": "freesound 649332: Bow_draw_fast01.wav",
+				"sha256": "df89151af6a38e8075bcbe3ef8225322a82856450eb9a8475076a1b3f86242c3",
+				"by": "SonoFxAudio",
+				"url": "https://freesound.org/people/SonoFxAudio/sounds/649332/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.bow_loose": [
+			{
+				"file": "sfx.bow_loose.ogg",
+				"from": "freesound",
+				"original": "freesound 384915: Bow Release (Bow and Arrow)",
+				"sha256": "6760684018f8fe414923e9a1a74e6cd8825794e361119fbf50921f862ec25d0c",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384915/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bow_loose.2.ogg",
+				"from": "freesound",
+				"original": "freesound 263675: Bow_release.wav",
+				"sha256": "6145bd768e30958992177e845fc3254e1746324aa818a72dd08411f9f1af5ebc",
+				"by": "PorkMuncher",
+				"url": "https://freesound.org/people/PorkMuncher/sounds/263675/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bow_loose.3.ogg",
+				"from": "freesound",
+				"original": "freesound 394178: Longbow Release 1.wav",
+				"sha256": "37fefdf5f2fd1679291c1be5eb87dbcf90a86b11e58c30c957a0b0501970c726",
+				"by": "saturdaysoundguy",
+				"url": "https://freesound.org/people/saturdaysoundguy/sounds/394178/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bow_loose.4.ogg",
+				"from": "freesound",
+				"original": "freesound 394180: Arrow Loose and Flyby",
+				"sha256": "da28cd54a2ea0e87c23411523ffc4ae9bc93961c6bb082ba6f10344dd9294c05",
+				"by": "saturdaysoundguy",
+				"url": "https://freesound.org/people/saturdaysoundguy/sounds/394180/",
 				"license": "CC0 1.0"
 			}
 		],
