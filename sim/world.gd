@@ -1926,7 +1926,20 @@ func item_title(uid: int) -> String:
 func _taken(uid: int, to: GridEntity, from_key: String) -> void:
 	var namer := str(items.name_of(uid).get("who", ""))
 	var taker := _carrier_of(to)[0]
-	if namer.is_empty() or taker.is_empty() or taker == from_key:
+	if taker.is_empty() or taker == from_key:
+		return
+	# A blessed thing (decision 424): given by its owner, the blessing goes
+	# with it; taken by anyone else, it is lost, and it may be kept again.
+	var owner := items.blessed_for(uid)
+	if not owner.is_empty() and taker != owner:
+		if from_key == owner:
+			items.pass_blessing(uid, taker)
+			return
+		items.unbless(uid, to.zone, to.tile)
+		_log("blessing: %s's %s is no longer blessed" % [to.name, items.id_of(uid)])
+	elif not owner.is_empty():
+		return  # Back with whom it is blessed for.
+	if namer.is_empty():
 		return
 	if taker == namer:
 		if not items.kept_from(uid).is_empty():
@@ -1989,6 +2002,8 @@ func item_note(uid: int) -> String:
 		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
 	if not items.grudge_of(uid).is_empty():
 		more.append("vengeance on %s" % _plural(str(items.grudge_of(uid)["kind"])))
+	if not items.blessed_for(uid).is_empty():
+		more.append("blessed")  # Decision 424.
 	if not more.is_empty():
 		note = "%s, %s" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)), ", ".join(more)]
 	return note
@@ -2040,6 +2055,8 @@ func story_line(uid: int) -> String:
 			parts.append(origin)
 	if not items.kept_from(uid).is_empty() and not name.is_empty():
 		parts.append("kept from %s" % name["holder"])
+	if not items.blessed_for(uid).is_empty():
+		parts.append("blessed at the temple")  # Decision 424.
 	for event: Dictionary in history["events"]:
 		if event["kind"] == "avenged":
 			parts.append("avenged on %s" % _plural(str(event["what"])))

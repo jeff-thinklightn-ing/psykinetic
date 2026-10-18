@@ -9463,3 +9463,25 @@ Protocol unchanged: sim only. tests/wells_test (full at first, spring and
 draw, dry and wet once each, the kitchen at half speed and the forge not,
 cap, saved, no well, a printed season for 10 and 4 residents, a roof
 ordered and mended, one at a time, wood by size, whole already).
+
+## 424. Blessed at the temple: a kept thing made its holder's own
+
+Jeff: items held and used grow, and may be blessed at the temple (growth step 3,
+approved by the coordinator; with 370's curse, beside 415 and 417's marks).
+ItemBook.bless(uid, owner) blesses a thing for an owner (a carrier key): a kept
+thing is cleansed (no longer kept from its namer, every carrier's ill gone), and
+while it is blessed no ill gathers on it (_ill_now). Noted "blessed"; kept in the
+history like a naming. The blessing follows the owner's will: given by its owner
+(World._taken, from the owner's hand) it goes with the gift (pass_blessing);
+taken from them by anyone else, not given, it is lost ("unblessed"), and a named
+thing may then be kept from its namer again, as 370 has it. No combat effect: it
+is how a found heirloom becomes its finder's. The note's head says ", blessed"
+and the story "blessed at the temple" (421).
+
+Who does it is economy's: the priest's job (one job kind with the mend and the
+reforge: {uid, to_id, effect "bless", for the owner}), an offering in gold about
+the thing's value to the town's treasury, the thing held for its owner at the
+temple until they next open its counter; buildings' counter spot in the temple
+prefab and ui's counter screen (step 4) are theirs, amendments to this entry.
+Saved; display text only, so the protocol is unchanged. Open with Jeff: whether a
+blessing also grows a name faster.

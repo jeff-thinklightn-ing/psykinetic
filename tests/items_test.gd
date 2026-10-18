@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_kills()
 	_test_bane()
 	_test_story()
+	_test_bless()
 	_test_names()
 	_test_curse()
 	_test_arrows()
@@ -1195,6 +1196,39 @@ func _test_story() -> void:
 			"every strength says what it means")
 	_check(not str(Items.growth()["says"].get("bane", "")).is_empty() and not str(Items.growth()["says"].get("vengeance", "")).is_empty(),
 			"and bane and vengeance")
+
+
+func _test_bless() -> void:
+	print("\n== the temple's blessing: a kept thing cleansed, no ill while blessed, lost if taken again (decision 424) ==")
+	var host := _player(Net.local_id)
+	var pets: Array = World.get_entities().filter(func(e: GridEntity) -> bool: return e is Companion)
+	_check(not pets.is_empty(), "a companion to take it")
+	if pets.is_empty():
+		return
+	var pet: GridEntity = pets[0]
+	var dagger := _give(host, "dagger", Player.RIGHT_HAND)
+	World.items.set_name(dagger, {"form": "holder_possessive", "holder": "Wren", "who": "companion:test:Wren", "made_step": World.steps,
+		"text": "Wren's dagger"}, "quiet")
+	World._taken(dagger, host, "")
+	var me := World.holder_key(host)
+	_check(World.items.kept_from(dagger) == "companion:test:Wren", "taken up, not given: kept from Wren (370)")
+	World.items.bless(dagger, me)
+	_check(World.items.kept_from(dagger).is_empty() and World.items.ill_of(dagger, me) == 0.0 and World.items.blessed_for(dagger) == me,
+			"blessed for the host: cleansed, no longer kept, no ill")
+	World._show_notes(host)
+	_check(World.item_note(dagger).ends_with(", blessed") and World.story_line(dagger).contains("blessed at the temple"),
+			"its note and story say so (%s | %s)" % [World.item_note(dagger), World.story_line(dagger)])
+	World._taken(dagger, pet, me)
+	_check(World.items.blessed_for(dagger) == World.holder_key(pet) and World.items.kept_from(dagger).is_empty(),
+			"given by its owner: the blessing goes with it")
+	World._taken(dagger, host, "")
+	_check(World.items.blessed_for(dagger).is_empty() and World.items.kept_from(dagger) == "companion:test:Wren"
+			and World.items.history(dagger)["events"].any(func(e: Dictionary) -> bool: return e["kind"] == "unblessed"),
+			"taken from whom it was blessed for, not given: no longer blessed, and kept again")
+	var back := ItemBook.from_dict(World.items.to_dict())
+	World.items.bless(dagger, me)
+	_check(ItemBook.from_dict(World.items.to_dict()).blessed_for(dagger) == me and back.blessed_for(dagger).is_empty(), "saved and read back")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 
 
 func _test_names() -> void:

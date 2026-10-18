@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -276,6 +276,45 @@ func keep(uid: int, who: String, who_name: String, zone := "", tile := Vector2i(
 	note(uid, "kept", "from %s by %s" % [name_of(uid).get("holder", ""), who_name], zone, tile)
 
 
+## Who [param uid] is blessed for (a carrier key; decision 424); "" when
+## it is not blessed.
+func blessed_for(uid: int) -> String:
+	return str(_book[uid].get("blessed", {}).get("for", "")) if _book.has(uid) else ""
+
+
+## [param uid] blessed at the temple for [param owner] (a carrier key;
+## decision 424): a kept thing cleansed (no longer kept, every carrier's ill
+## gone), and while it is blessed no ill gathers on it. Noted "blessed".
+func bless(uid: int, owner: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or owner.is_empty():
+		return
+	_settle(_book[uid])
+	_book[uid].erase("kept_from")
+	_book[uid].erase("kept_by")
+	for row: Dictionary in _book[uid]["carriers"]:
+		row["ill"] = 0.0
+		row["ill_at"] = _now()
+	_book[uid]["blessed"] = {"for": owner, "step": _now()}
+	note(uid, "blessed", owner, zone, tile)
+
+
+## [param uid] given by its blessed owner to [param owner]: the blessing
+## goes with the gift (decision 424).
+func pass_blessing(uid: int, owner: String) -> void:
+	if not blessed_for(uid).is_empty() and not owner.is_empty():
+		_book[uid]["blessed"]["for"] = owner
+
+
+## [param uid]'s blessing lost: taken from its owner, not given (decision
+## 424). Noted "unblessed".
+func unbless(uid: int, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if blessed_for(uid).is_empty():
+		return
+	_settle(_book[uid])
+	_book[uid].erase("blessed")
+	note(uid, "unblessed", "", zone, tile)
+
+
 ## [param uid] is back in its namer's hands: no longer kept, noted
 ## "back"; the ill on it fades from now. Nothing if it is not kept.
 func lift(uid: int, zone := "", tile := Vector2i(-1, -1)) -> void:
@@ -373,6 +412,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				"carriers": carriers, "events": events}
 			if entry.get("condition") is float or entry.get("condition") is int:
 				items._book[int(key)]["condition"] = int(entry["condition"])
+			if entry.get("blessed") is Dictionary and entry["blessed"].get("for") is String:
+				items._book[int(key)]["blessed"] = {"for": entry["blessed"]["for"], "step": int(entry["blessed"].get("step", 0))}
 			if entry.get("bane") is String and not entry["bane"].is_empty():
 				items._book[int(key)]["bane"] = entry["bane"]
 			if entry.get("grudge") is Dictionary and entry["grudge"].get("kind") is String:
@@ -416,7 +457,7 @@ func _ill_now(entry: Dictionary, row: Dictionary) -> float:
 	var curse := Items.curse()
 	var full := maxf(1.0, float(curse["full_days"]) * DayNight.day_steps)
 	var kept := str(entry.get("kept_from", ""))
-	var counts: bool = not kept.is_empty() and row["who"] != kept \
+	var counts: bool = not kept.is_empty() and row["who"] != kept and not entry.has("blessed") \
 			and (curse["follows"] == "thing" or row["who"] == entry.get("kept_by", ""))
 	if counts and int(row["since"]) >= 0:
 		return minf(1.0, ill + since / full)
