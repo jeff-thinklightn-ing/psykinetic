@@ -102,6 +102,9 @@ var _workshops: Dictionary[String, Dictionary] = {}
 ## Id -> {id, kind (make, rework), recipe, town, workshop, worker, state
 ## (queued, working), ordered, resources, uids, needed, worked, last}.
 var _jobs: Dictionary[int, Dictionary] = {}
+## Workshop id -> what it was last said to wait for (not saved): a wait
+## is told when it starts or what it is short of changes, not each tick.
+var _waits_told: Dictionary = {}
 var _next_job := 1
 ## Town -> {tier, pending, held, sales: [{step, what, count}], upkeep}.
 var _towns: Dictionary[String, Dictionary] = {}
@@ -970,10 +973,15 @@ func _choose(town: String, signals: Dictionary, cat: Dictionary) -> void:
 		var shop: Dictionary = _workshops[bid["workshop"]]
 		if _start(bid, cat):
 			shop["waited"] = 0
+			_waits_told.erase(bid["workshop"])
 		else:
 			shop["waited"] = int(shop["waited"]) + 1
-			print("[production] %s waits for %s: its materials went to work that came first (%d time%s)" % [
-				bid["workshop"], bid["recipe"], shop["waited"], "" if shop["waited"] == 1 else "s"])
+			var short := _short_of(town, bid, cat)
+			var told := "%s %s" % [bid["recipe"], short]
+			if _waits_told.get(bid["workshop"], "") != told:
+				_waits_told[bid["workshop"]] = told
+				print("[production] %s waits for %s: %s, step %d" % [bid["workshop"], bid["recipe"],
+					"short of %s" % short if not short.is_empty() else "its materials went to work that came first", now()])
 
 
 ## The work [param shop] would take on, with its place in the queue
@@ -1072,6 +1080,25 @@ func _reworkable(town: String, id: String) -> int:
 
 ## Whether [param town]'s stockpile has what [param made] needs: its
 ## "from", or for a rework one of its first resource.
+## What [param town]'s store lacks for [param bid] ("wood 8 of 8, ore 1 of
+## 5": short, of needed), "" when nothing (another workshop took it).
+func _short_of(town: String, bid: Dictionary, cat: Dictionary) -> String:
+	var queued: Dictionary = _jobs.get(int(bid["job"]), {})
+	var made: Dictionary = {}
+	if bid["kind"] == "build":
+		made = {"from": queued.get("cost", {})}
+	elif cat.has(bid["recipe"]):
+		made = cat[bid["recipe"]].get("mend" if bid["kind"] == "work" else "made", {})
+	var rework: bool = int(bid["rework"]) != 0 and bid["kind"] != "work"
+	var parts: Array[String] = []
+	var needs := _needs(made, rework)
+	for what: String in needs:
+		var lacking := int(needs[what]) - stockpile.count(town, what)
+		if lacking > 0:
+			parts.append("%s %d of %d" % [what, lacking, int(needs[what])])
+	return ", ".join(parts)
+
+
 func _affords(town: String, made: Dictionary, rework: bool) -> bool:
 	for what: String in _needs(made, rework):
 		var have := stockpile.count(town, what)
