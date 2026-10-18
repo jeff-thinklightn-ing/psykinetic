@@ -11168,3 +11168,33 @@ Client only; nothing on the wire. tests/ui_test: the rows, the theme's
 sizes scaled and restored, the colour swap, the set's lightness gaps.
 Shots in docs/ui/shots/step6/: the Options rows, Largest text and
 interface, and the two colour sets side by side for Jeff.
+## 454. A left click on a friend talks; Shift+click attacks one
+
+Jeff's playtest on v0.1.150: "big notes are clicking on npcs attacks them,
+thats not good. its not obvious how to interact with them". A left click
+attacked any creature but your own companion, residents included. Now a
+friend (Main.is_friend: a Resident, any Companion, a Player) is never
+attacked by a plain left click, in either scheme: it is the interact
+order. Within TALK_REACH (RESIDENT_EARSHOT, 2) talk opens at once; from
+afar the player walks to the free cell beside them and it opens on
+arrival (_talk_wanted, forgotten after TALK_WAIT_MSEC or a new move
+click; holding the button does not steer that walk away). Talk is the E
+path's: a resident's conversation panel (open_converse); a companion's is
+the chat box addressed to her ("Wren, "), a player's the chat box. In
+WASD a left click toward a friend beside you talks too, instead of the
+attack. Attacking a friend takes Shift held on the click (never your own
+companion, as before); monsters and animals stay click-to-attack. The
+cursor hint, agreed with ui, says "LMB  talk" over a resident or a
+companion ("LMB  talk   E  her pack" over your own, "LMB  talk   E hold
+bandage" over a player), "LMB  attack" over a hostile; the controls list
+adds "Shift+LMB  attack a friend". ui's Keys pass (453) makes the Shift a
+rebindable action, "attack_friend". Rejected: no way to attack a friend
+by mouse (a thief or a turned resident must be fightable) and a right
+click to talk (329 gave the right button to the off hand).
+
+The same playtest: "items from kiling a deer couldn't be picked up or
+moused over". The server laid the remains right (enemy-ai checked); a
+client's World.ground_at read Zone.ground, which only the server fills,
+so the "F  pick up" hover never showed on a client over any pile. A
+client now reads the cell's replicated GroundPile. Client only, protocol
+unchanged.

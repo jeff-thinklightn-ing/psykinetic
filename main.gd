@@ -64,6 +64,10 @@ const RESIDENT_SYNC_TICKS := 30
 ## many cells of its speaker (or one it names); an ask waits for the
 ## resident mind at most so many ticks, then is dropped.
 const RESIDENT_EARSHOT := 2
+## How near a friend a left click walks before talk opens (decision 454).
+const TALK_REACH := RESIDENT_EARSHOT
+## How long a talk walk waits to arrive before it is forgotten.
+const TALK_WAIT_MSEC := 15000
 const RESIDENT_ASK_TICKS := 150
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
@@ -426,6 +430,10 @@ var _world_news: WorldNews
 var _news_tick := -1
 ## A chest or companion right-clicked from afar: opened once in reach.
 var _pack_wanted: GridEntity
+## A friend left-clicked from afar (decision 454): talk opens once within
+## TALK_REACH, if before _talk_until (msec).
+var _talk_wanted: GridEntity
+var _talk_until := 0
 ## The pack sounds asked for, "set entity" each, newest last (tests).
 var sounds: Array[String] = []
 var _test_chest_done := false
@@ -733,6 +741,7 @@ func _process(delta: float) -> void:
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
 	_update_pack()
+	_update_talk()
 	if compass != null:
 		compass.north_on_screen = screen_north()
 		compass.place = place_text(_local_player())
@@ -898,15 +907,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		_walk_to_chest(player, target)
 		return
 	var targetable := target != null and target != player and World.can_target(player, target)
+	# Left on a friend (a resident, a companion, another player), both
+	# schemes: talk, never an attack (decision 454); Shift attacks one.
+	if click.button_index == MOUSE_BUTTON_LEFT and target != player and is_friend(target):
+		if not click.shift_pressed:
+			_talk_to(player, target)
+		elif targetable and not _is_own_companion(target):
+			_talk_wanted = null
+			World.command_attack(player, target)
+		return
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
 		return
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
-			# A creature: go to it and attack. Anything else: walk there (and
-			# push), to the nearest floor if the click was off it. Your own
-			# companion is walked into, not hit: she steps aside.
-			if targetable and target.is_creature() and not _is_own_companion(target):
+			# A creature (a monster: friends are above): go to it and
+			# attack. Anything else: walk there (and push), to the nearest
+			# floor if the click was off it.
+			if targetable and target.is_creature():
 				World.command_attack(player, target)
 			else:
 				_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
@@ -916,6 +934,58 @@ func _unhandled_input(event: InputEvent) -> void:
 			if targetable:
 				_toss_target = target
 				_toss_from = get_global_mouse_position()
+
+
+## Whether [param entity] is a friend (decision 454): a town's resident, a
+## companion (anyone's) or a player. A left click talks to one; only
+## Shift+click attacks.
+func is_friend(entity: GridEntity) -> bool:
+	return entity is Resident or entity is Companion or entity is Player
+
+
+## A left click on [param friend] (decision 454): within TALK_REACH, talk
+## opens at once (_open_talk); from afar the player walks beside them and
+## it opens on arrival (_update_talk). Holding the button does not steer
+## this walk away.
+func _talk_to(player: Player, friend: GridEntity) -> void:
+	if World.distance(player.tile, friend.tile) <= TALK_REACH:
+		_open_talk(friend)
+		return
+	var beside := _beside(friend.tile, player.tile)
+	if beside == NONE:
+		return
+	_move_click(player, beside)
+	_held_target = NONE
+	_talk_wanted = friend
+	_talk_until = Time.get_ticks_msec() + TALK_WAIT_MSEC
+
+
+## Talk with [param friend] (decision 454): a resident's conversation panel
+## (the E path); for a companion the chat box addressed to her ("Wren, "),
+## for a player the chat box.
+func _open_talk(friend: GridEntity) -> void:
+	_talk_wanted = null
+	if friend is Resident:
+		open_converse(friend)
+		return
+	_open_chat()
+	if friend is Companion and _chat_box.visible:
+		_chat_box.text = "%s, " % _display_name(friend)
+		_chat_box.caret_column = _chat_box.text.length()
+
+
+## Each frame: a friend walked to opens talk once within TALK_REACH; gone,
+## or not reached in TALK_WAIT_MSEC, it is forgotten.
+func _update_talk() -> void:
+	if _talk_wanted == null:
+		return
+	var player := _local_player()
+	if player == null or not is_instance_valid(_talk_wanted) or not _talk_wanted.spawned \
+			or Time.get_ticks_msec() > _talk_until:
+		_talk_wanted = null
+		return
+	if World.distance(player.tile, _talk_wanted.tile) <= TALK_REACH:
+		_open_talk(_talk_wanted)
 
 
 ## The right button pressed: what the off hand holds is raised (a
@@ -1231,6 +1301,8 @@ func _wasd_click(player: Player, button: MouseButton) -> void:
 		if tile != NONE and World.distance(at, tile) > 1:
 			_move_click(player, tile)
 			_held_target = NONE  # No hold-to-move in WASD: the keys steer.
+		elif reachable and is_friend(next) and not Input.is_key_pressed(KEY_SHIFT):
+			_talk_to(player, next)  # Decision 454: a friend beside you is talked to, not hit.
 		elif reachable and next.is_creature() and not _is_own_companion(next):
 			World.command_attack(player, next)
 		else:
@@ -1277,6 +1349,7 @@ func _apply_azimuth() -> void:
 ## from _process as the cursor moves to other cells.
 func _move_click(player: Player, tile: Vector2i) -> void:
 	_pack_wanted = null
+	_talk_wanted = null
 	_held_target = tile
 	if tile == NONE:
 		return
@@ -4554,11 +4627,13 @@ func context_hint_for(thing: Node) -> String:
 	if thing is Door:
 		return "E  open or close"
 	if thing is Companion:
-		return "E  her pack" if _is_own_companion(thing) else ""
+		return "LMB  talk   E  her pack" if _is_own_companion(thing) else "LMB  talk"
+	if thing is Resident:
+		return "LMB  talk"  # Decision 454: Shift+LMB attacks, said in the controls list.
 	if thing is Monster and World.can_target(player, thing):
 		return "LMB  attack"
 	if thing is Player and thing != player:
-		return "E hold  bandage"
+		return "LMB  talk   E hold  bandage"
 	return ""
 
 
@@ -5644,11 +5719,13 @@ func _on_world_ticked(tick: int) -> void:
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk)", "RMB\toff hand; empty: grab (drag to toss)"])
+		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "Shift+LMB\tattack a friend",
+			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
 	else:
-		lines.append_array(["LMB\tmove / attack (hold to steer)", "RMB\toff hand; empty: shove (drag to toss)"])
+		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "Shift+LMB\tattack a friend",
+			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():

@@ -2849,8 +2849,13 @@ func _bank_ground(zone_name: String, cell: Vector2i) -> void:
 
 
 ## The things lying on [param cell] of the zone World is in: their ids,
-## the top (the last put down) last.
+## the top (the last put down) last. A client has no Zone.ground (the
+## server keeps the things): it reads the cell's replicated GroundPile, so
+## its hover says "F  pick up" over a deer's remains as over anything.
 func ground_at(cell: Vector2i) -> PackedStringArray:
+	if not Net.is_authority():
+		var pile: GroundPile = zone.piles.get(cell)
+		return pile.ids if is_instance_valid(pile) else PackedStringArray()
 	var ids := PackedStringArray()
 	for uid in zone.ground.get(cell, PackedInt32Array()):
 		ids.append(items.id_of(uid))

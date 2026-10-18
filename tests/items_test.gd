@@ -265,6 +265,15 @@ func _test_ground() -> void:
 	var pile: GroundPile = World.zone.piles.get(cell)
 	_check(is_instance_valid(pile) and pile.ids == PackedStringArray(["wood_bundle"]) and pile.zone == World.zone.name,
 			"a pile is there to be seen")
+	var was_mode: Net.Mode = Net.mode
+	Net.mode = Net.Mode.CLIENT
+	var seen := World.ground_at(cell)
+	World.zone.ground.erase(cell)
+	var seen_bare := World.ground_at(cell)
+	Net.mode = was_mode
+	World.zone.ground[cell] = PackedInt32Array([wood])
+	_check(seen == PackedStringArray(["wood_bundle"]) and seen_bare == seen,
+			"a client, with no Zone.ground, reads the pile: its hover says F pick up (Jeff's deer remains, v0.1.150) (%s)" % [seen])
 	_check(World.items.at_of(wood) == "%s@%d,%d" % [World.zone.name, cell.x, cell.y] and World.items.history(wood)["holder"] == "",
 			"the wood knows where it lies, carried by nobody")
 	var host_mass := host.mass

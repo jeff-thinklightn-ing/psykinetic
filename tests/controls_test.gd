@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
+	_test_friend_click()
 	_test_item_keys()
 
 	print("")
@@ -610,6 +611,42 @@ func _test_click_uses_the_frame_pick() -> void:
 			"and the click sends the player there (%s)" % player.move_order)
 	player.has_move_order = false
 	Net.controls = saved
+
+
+func _test_friend_click() -> void:
+	print("
+== a left click on a friend talks, never attacks; Shift+click attacks one (decision 454) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	var occupant := World.get_entity_at(Vector2i(9, 6))
+	if occupant != null:
+		World.despawn(occupant)
+	var body := Resident.new()
+	body.name = "Tam"
+	_check(World.spawn(body, Vector2i(9, 6)), "(a resident stands at 9,6)")
+	_main._pick_grid = Vector2(9.1, 6.1)
+	_left(false)
+	_check(player.action_order != GridEntity.Order.ATTACK and player.has_move_order
+			and World.distance(player.move_order, body.tile) == 1 and _main._talk_wanted == body,
+			"a plain click walks beside them to talk, no attack (%s)" % player.move_order)
+	_check(_main.context_hint_for(body) == "LMB  talk", "the hint says talk (%s)" % _main.context_hint_for(body))
+	_check("Shift+LMB	attack a friend" in _main.hint_lines(), "the controls list says Shift+LMB attacks a friend")
+	player.has_move_order = false
+	_left(true)
+	_check(player.action_order == GridEntity.Order.ATTACK and _main._talk_wanted == null, "Shift+click: an attack order")
+	player.action_order = GridEntity.Order.NONE
+	World.despawn(body)
+	Net.controls = saved
+
+
+func _left(shift: bool) -> void:
+	for pressed in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = pressed
+		click.shift_pressed = shift
+		_main._unhandled_input(click)
 
 
 # --- helpers ------------------------------------------------------------------
