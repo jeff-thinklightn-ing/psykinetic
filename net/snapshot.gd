@@ -90,6 +90,10 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			"props": JSON.from_native(entity.spawn_spec.get("props", {})),
 			"spawn": int(entity.spawn_spec.get("spawn", -1)),
 		}
+		# Which level entity it is, by its marker cell (decision 433): the
+		# slot's index moves when a level gains one before it, its key not.
+		if str(spec.get("spawn_key", "")) != "":
+			entry["spawn_key"] = str(spec["spawn_key"])
 		if spec.has("kind"):
 			entry["kind"] = str(spec["kind"])
 		if spec.has("art"):
@@ -222,7 +226,8 @@ static func _parse_zone(raw: Dictionary) -> Dictionary:
 	if respawn_entries is Array:
 		for entry in respawn_entries:
 			if entry is Dictionary and entry.get("spawn") is float:
-				respawns.append({"spawn": int(entry["spawn"]), "ticks_left": int(entry.get("ticks_left", 0))})
+				respawns.append({"spawn": int(entry["spawn"]), "spawn_key": str(entry.get("spawn_key", "")),
+					"ticks_left": int(entry.get("ticks_left", 0))})
 	var ground: Array = []
 	for pile: Variant in raw.get("ground", []) if raw.get("ground") is Array else []:
 		var cell: Variant = vector(pile.get("cell")) if pile is Dictionary else null
@@ -285,6 +290,8 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		spec["label"] = entry["label"]
 	if entry.get("spawn") is float and int(entry["spawn"]) >= 0:
 		spec["spawn"] = int(entry["spawn"])
+	if entry.get("spawn_key") is String and not entry["spawn_key"].is_empty():
+		spec["spawn_key"] = entry["spawn_key"]
 	if entry.get("art") is String and not entry["art"].is_empty():
 		spec["art"] = entry["art"]
 	if entry.get("kind") is String and not entry["kind"].is_empty():

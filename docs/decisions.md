@@ -9791,3 +9791,43 @@ The coordinator approved the design.
 Cost: one 512 x 512 texture with mipmaps (about 1.4 MB of video memory)
 and one texture read on two planes that already exist. Client only; no
 protocol change.
+
+## 433. Level entities known by their marker cell in a snapshot
+
+A save brought a level entity back by its spawn slot, its index in Level's
+order (level.json's listed entries, then the markers by scan), with the
+saved tile. A level that gains an entity before others moves every later
+slot, so a saved goblin could come back as slot k's new spec, a chest, on
+the goblin's tile. Found adding the temple's counter (424) to the wilds,
+whose save on the box is Jeff's town. Approved by the coordinator; release
+sequences it.
+- A level entity's identity is its marker cell: Main._key_of(slot), "x,y"
+  of its level spec's tile. Main._slot_spec puts it in the spawn spec as
+  "spawn_key" beside "spawn"; Snapshot writes and reads it for entities and
+  respawns, and a far record (352) keeps it in its entry.
+- Each key and its slot are indexed once as the level is read
+  (Main._index_keys, swapped with the zone), so a lookup costs nothing on
+  a map of thousands of entities (perf's review).
+- Loading finds a slot by key (Main._slot_for): an entity
+  (_level_spec_for), a dead slot's timer, a record's slot. A key the level
+  no longer has: the entity comes back as saved, holding no slot (its
+  "spawn" dropped, so it cannot claim another's). Without a key (a save
+  from before), by its index, as before, which is right while the level is
+  as it was then; a record from before is given its key on loading, so the
+  next save keeps it.
+- Order: this ships and the box saves once with keys before any real level
+  gains or reorders an entity (the wilds counter first). The server says
+  so at its first save each run, "[state] saved N level entities, N keyed",
+  for release, which may not read the save itself.
+- Slots stay indices inside a run: _alive_slots, _dead_since. Names still
+  come from Level's count (a gained chest renames the chests after it);
+  nothing saved hangs on a name but the pre-slot fallback, and a thing's
+  holder is set again from its entity on loading (World.set_slots).
+tests/spawn_key_test (a level gains a listed chest before the rest: the
+crates and chest back as themselves, the gained one new, Imp1's timer and
+Imp2's record on their own slots; the level loses a crate's marker and the
+saved crate comes back as saved in no slot; a save without keys by its
+slots).
+Snapshot only: the protocol is unchanged; old saves load.
+Rejected: a free-slot table written into level.json (every editor and tool
+would have to keep it); matching by name (names move with the count too).

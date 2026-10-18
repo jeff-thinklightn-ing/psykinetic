@@ -1577,6 +1577,7 @@ func _load_level(level_name: String) -> bool:
 	map_name = str(loaded["name"])
 	_terrain = loaded["terrain"]
 	level_entities.assign(loaded["entities"])
+	_index_keys()
 	player_starts.assign(loaded["starts"])
 	level_centre = loaded["centre"]
 	_level_stamps[map_name] = _level_stamp(map_name)
@@ -1922,11 +1923,14 @@ func _zone_nodes(zone_name: String) -> void:
 func _on_zone_switched(from: Zone, to: Zone) -> void:
 	from.main = {"level": level, "level_entities": level_entities, "player_starts": player_starts,
 		"level_centre": level_centre, "map_name": map_name, "terrain": _terrain, "alive_slots": _alive_slots,
-		"dead_since": _dead_since, "spawner": spawner, "entities": entities, "party_log": party_log}
+		"dead_since": _dead_since, "spawner": spawner, "entities": entities, "party_log": party_log,
+		"slot_keys": _slot_keys, "key_slots": _key_slots}
 	if to.main.is_empty():
 		# A zone being opened: fresh state, until its level loads.
 		level = {}
 		level_entities = []
+		_slot_keys = PackedStringArray()
+		_key_slots = {}
 		player_starts = []
 		_terrain = {}
 		_alive_slots = {}
@@ -1935,6 +1939,8 @@ func _on_zone_switched(from: Zone, to: Zone) -> void:
 		return
 	level = to.main["level"]
 	level_entities = to.main["level_entities"]
+	_slot_keys = to.main["slot_keys"]
+	_key_slots = to.main["key_slots"]
 	player_starts = to.main["player_starts"]
 	level_centre = to.main["level_centre"]
 	map_name = to.main["map_name"]
@@ -2267,6 +2273,13 @@ func _spawn_saved(section: Dictionary) -> bool:
 	if World.herds != null:
 		records = World.herds.fold_records(World.zone.name, records)  # Animals of before the herds (decision 367).
 	World.set_records(records)
+	# A record from before keys (decision 433) gets its slot's key now, while
+	# its index still means what it did, so the next save keeps it by key.
+	for record in World.record_list():
+		var spawn: Variant = record["entry"].get("spawn", -1)
+		var slot := _slot_for(int(spawn) if spawn is int or spawn is float else -1, str(record["entry"].get("spawn_key", "")))
+		if slot >= 0 and str(record["entry"].get("spawn_key", "")).is_empty():
+			record["entry"]["spawn_key"] = _key_of(slot)
 	var recorded := _recorded_slots()
 	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
@@ -2278,8 +2291,9 @@ func _spawn_saved(section: Dictionary) -> bool:
 			World.set_slots(entity, entry["slots"], entry.get("items", []))
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
-		if not _alive_slots.has(respawn["spawn"]) and not recorded.has(respawn["spawn"]):
-			_dead_since[respawn["spawn"]] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
+		var dead := _slot_for(int(respawn["spawn"]), str(respawn.get("spawn_key", "")))
+		if dead >= 0 and not _alive_slots.has(dead) and not recorded.has(dead):
+			_dead_since[dead] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
 	# Slots with neither are new in the level since the save (every dead
 	# slot's timer is saved): there now, or dead from now if their tile is taken.
 	for slot in level_entities.size():
@@ -2450,9 +2464,10 @@ func _recall(record: Dictionary) -> GridEntity:
 func _recorded_slots() -> Dictionary:
 	var slots := {}
 	for record in World.record_list():
-		var slot: Variant = record["entry"].get("spawn", -1)
-		if (slot is int or slot is float) and int(slot) >= 0:
-			slots[int(slot)] = true
+		var spawn: Variant = record["entry"].get("spawn", -1)
+		var slot := _slot_for(int(spawn) if spawn is int or spawn is float else -1, str(record["entry"].get("spawn_key", "")))
+		if slot >= 0:
+			slots[slot] = true
 	return slots
 
 
@@ -2463,14 +2478,18 @@ func _recorded_slots() -> Dictionary:
 ## saved one, or for a snapshot from before slots, the table entry of the
 ## same name. Anything that is not a level entity is returned as saved.
 func _level_spec_for(saved: Dictionary) -> Dictionary:
-	var slot := int(saved.get("spawn", -1))
-	if slot < 0 or slot >= level_entities.size():
-		slot = -1
+	var key := str(saved.get("spawn_key", ""))
+	var slot := _slot_for(int(saved.get("spawn", -1)), key)
+	if slot == -1 and key.is_empty():
 		for i in level_entities.size():
 			if level_entities[i]["name"] == saved.get("name") and not _alive_slots.has(i):
 				slot = i
 				break
 	if slot == -1 or _alive_slots.has(slot):
+		# No level entity now (its marker gone), or its slot taken: as saved,
+		# holding no slot.
+		saved.erase("spawn")
+		saved.erase("spawn_key")
 		return saved
 	var spec := _slot_spec(slot)
 	spec["tile"] = saved["tile"]
@@ -2478,11 +2497,44 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 
 
 ## The spawn table entry for [param slot], tagged with its index so the
-## entity can be tracked through death and respawn.
+## entity can be tracked through death and respawn, and its key, which a
+## snapshot keeps (decision 433).
 func _slot_spec(slot: int) -> Dictionary:
 	var spec: Dictionary = level_entities[slot].duplicate(true)
 	spec["spawn"] = slot
+	spec["spawn_key"] = _key_of(slot)
 	return spec
+
+
+## Each level entity's key by slot, and each key's slot (decision 433),
+## made once as the level is read (_index_keys) and swapped with the zone.
+var _slot_keys := PackedStringArray()
+var _key_slots: Dictionary[String, int] = {}
+
+
+func _index_keys() -> void:
+	_slot_keys = PackedStringArray()
+	_key_slots = {}
+	for slot in level_entities.size():
+		var at: Vector2i = level_entities[slot]["tile"]
+		var key := "%d,%d" % [at.x, at.y]
+		_slot_keys.append(key)
+		_key_slots[key] = slot
+
+
+## Level entity [param slot]'s key (decision 433): its marker cell, "x,y".
+## A level that gains an entity moves the slots after it; their keys stay.
+func _key_of(slot: int) -> String:
+	return _slot_keys[slot]
+
+
+## The slot a snapshot names: by [param key] if it has one (-1 if the level
+## no longer has that marker), else, from before keys, by its index
+## [param spawn] (right while the level is as it was then).
+func _slot_for(spawn: int, key: String) -> int:
+	if not key.is_empty():
+		return _key_slots.get(key, -1)
+	return spawn if spawn >= 0 and spawn < level_entities.size() else -1
 
 
 ## Brings dead level entities back: after RESPAWN_DELAY_TICKS, with no player
@@ -2547,6 +2599,8 @@ func _nearest_player(tile: Vector2i, tick: int) -> int:
 ## skipped (the next comes in SNAPSHOT_EVERY_TICKS), and any other waits
 ## for that one first, then for its own; quitting waits for the last.
 var _saver: Thread = null
+## Whether this run has said how many level entities a save holds by key.
+var _keys_said := false
 
 
 ## The snapshot, written before this returns; with [param wait] false (the
@@ -2565,21 +2619,31 @@ func _save_state(wait := true) -> void:
 	var records: Array[PlayerRecord] = []
 	records.assign(_records.values())
 	var zones := {}
+	var level_held := 0
+	var keyed := 0
 	var was := World.zone
 	for each: Zone in World.zones.values():
 		World.enter(each)
 		var respawns: Array[Dictionary] = []
 		for slot: int in _dead_since:
-			respawns.append({"spawn": slot,
+			respawns.append({"spawn": slot, "spawn_key": _key_of(slot),
 				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
 		for entity in World.get_entities():
 			World.slot_uids(entity)  # A chest's things get their instances before the book is saved.
+			if int(entity.spawn_spec.get("spawn", -1)) >= 0:
+				level_held += 1
+				keyed += 1 if str(entity.spawn_spec.get("spawn_key", "")) != "" else 0
 		var ground: Array[Dictionary] = []
 		for cell: Vector2i in each.ground:
 			ground.append({"cell": [cell.x, cell.y], "items": Array(each.ground[cell]), "ids": Array(World.ground_at(cell))})
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns, "ground": ground,
 			"records": World.record_list()}
 	World.enter(was)
+	if not _keys_said:
+		# Once a run, for release (decision 433): whether the save has its
+		# level entities by their keys, told without reading it.
+		_keys_said = true
+		print("[state] saved %d level entities, %d keyed" % [level_held, keyed])
 	var data := Snapshot.data_of(zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
