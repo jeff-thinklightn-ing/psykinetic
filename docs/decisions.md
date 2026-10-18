@@ -9485,3 +9485,19 @@ temple until they next open its counter; buildings' counter spot in the temple
 prefab and ui's counter screen (step 4) are theirs, amendments to this entry.
 Saved; display text only, so the protocol is unchanged. Open with Jeff: whether a
 blessing also grows a name faster.
+
+Amended (buildings): the temple's counter, defined as the store's shop
+counter is (decision 301). The temple prefab (tools/seed_prefabs.gd,
+levels/prefabs/building_temple) has a chest marker at its back, the cell
+behind the left of its double door, facing the door, with props {"temple":
+true}; Chest.temple is the flag, as shop and depot are, set from the spawn
+spec's props on every peer, so the protocol is unchanged (no replicated
+property). It keeps its slots as any chest does: what is handed in and what
+waits is economy's job and ui's screen. Its town is the temple building's
+(the record whose footprint holds it: use "temple", its "town"). Not yet in
+the wilds temple: a save brings level entities back by spawn slot (their
+index in Level's order, Main._level_spec_for), and a chest added mid-order
+would move every later slot on Jeff's saved town; a rule that a level's
+later additions take the next free slot comes first, as its own decision,
+then the wilds counter. view_test: the stamped temple has the one counter,
+at its back, a chest with props temple.

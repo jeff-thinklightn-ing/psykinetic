@@ -934,6 +934,9 @@ func _test_wall_heights() -> void:
 	_check(rects == [["building.temple", Rect2i(2, 2, 4, 6)], ["building.healers_hut", Rect2i(10, 2, 3, 3)]]
 			and (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building")).is_empty(),
 			"each prefab stamps its building on its footprint, walled, nothing said (%s)" % [rects])
+	var counters := (level["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec.get("props", {}).get("temple") == true)
+	_check(counters.size() == 1 and counters[0]["tile"] == Vector2i(3, 2) and counters[0]["script"] == Level.CHEST,
+			"the temple's counter (decision 424): a chest at its back, props temple (%s)" % [counters.map(func(spec: Dictionary) -> Vector2i: return spec["tile"])])
 	_rig.rebuild(level["terrain"], Vector2i(7, 6))
 	var tall := float(ArtKit.spec("building.temple").get("wall_height", Client3D.WALL_HEIGHT))
 	var temple := Level.outline(Rect2i(2, 2, 4, 6))
@@ -988,6 +991,7 @@ func _kit_level() -> Dictionary:
 		for key: Vector3i in changes["edges"]:
 			map.set_edge(key, changes["edges"][key])
 		config.merge(changes.get("config", {}), true)
+		config["entities"] = config.get("entities", []) + changes["entries"]
 	return Level.parse(map.to_image(), null, config)
 
 

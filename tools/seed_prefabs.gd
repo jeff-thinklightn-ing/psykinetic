@@ -174,11 +174,14 @@ const PREFABS := {
 	# The town's temple (its walls stone, 4.5 m, the slot's) and the
 	# healer's hut out in the wilds (Jeff, 2026-10-17): the house's and
 	# the hut's footprints, the temple's door in the middle of its front.
+	# The temple's counter (decision 424): a chest at its back, facing the
+	# door, props {"temple": true}, where a player hands the priest a thing
+	# and an offering and collects what waits.
 	"building_temple": {
 		"rows": [
 			", , , , , ,",
 			"  # # # #  ",
-			",#_ _ _ _#,",
+			",#_ h _ _#,",
 			"           ",
 			",#_ _ _ _#,",
 			"           ",
@@ -192,7 +195,10 @@ const PREFABS := {
 			"  # + + #  ",
 			", , , , , ,",
 		],
-		"config": {"buildings": [{"slot": "building.temple", "at": [1, 1], "facing": [0, 1]}]},
+		"config": {
+			"buildings": [{"slot": "building.temple", "at": [1, 1], "facing": [0, 1]}],
+			"entities": [{"at": [2, 1], "facing": [0, 1], "props": {"temple": true}}],
+		},
 	},
 	"building_healers_hut": {
 		"rows": [

@@ -16,6 +16,10 @@ var depot := false
 ## Economy.sell), and a player beside it buys from the town's shop
 ## (World.try_buy).
 var shop := false
+## Whether this is a temple's counter (props {"temple": true}, decision
+## 424): where a player hands the priest a thing and an offering, and
+## collects what waits (economy's job, ui's screen).
+var temple := false
 
 
 func _init() -> void:

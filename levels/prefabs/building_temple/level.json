@@ -11,5 +11,20 @@
 				1
 			]
 		}
+	],
+	"entities": [
+		{
+			"at": [
+				2,
+				1
+			],
+			"facing": [
+				0,
+				1
+			],
+			"props": {
+				"temple": true
+			}
+		}
 	]
 }
