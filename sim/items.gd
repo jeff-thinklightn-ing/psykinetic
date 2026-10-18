@@ -36,7 +36,7 @@ const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
 	"opens", "value", "blunt", "ammo", "condition", "mend"]
 ## Who makes things (made's "by"), as economy's production has them.
-const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner"]
+const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher"]
 
 ## Deeds done with a thing (ItemBook.deed; decision 365).
 const DEEDS: Array[String] = ["felled", "guarded", "shot", "braced", "behind", "downed", "struck"]

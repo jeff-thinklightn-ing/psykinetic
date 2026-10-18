@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - A blessing lifts a curse: a named weapon you found and kept from its namer, once blessed, is rightly yours, and no ill gathers on it. Give it away and the blessing goes with it; have it taken from you and the blessing is lost. (The temple's counter, where you'll have things blessed, is coming.)
+- Taking a goblin camp frees the people it holds: townsfolk carried off in raids go home to their work, and the camp's other prisoners join the town with their trades, often the hunters, tanners and fletchers it lacks. A fletcher now mends arrow bundles; until the town has one, the carpenter does.
 - The goblins are the Blood Rot now, with the orcs (brutes) and kobolds (sneaks) as their allies: they share ground and raid together, and the town's log names the Blood Rot.
 - With raids on, a raider camp that has hunted out the game around it grows hungry: it raids more often, and its raiders come for food rather than people.
 

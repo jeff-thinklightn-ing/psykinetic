@@ -121,7 +121,7 @@ func _test_catalog() -> void:
 
 func _test_leather() -> void:
 	print("\n== leather's uses: bundles mended by the carpenter, the tanner's buckler (decision 413) ==")
-	var mend := {"by": "carpenter", "from": {"leather": 1, "wood": 1}, "steps": 600}
+	var mend := {"by": "fletcher", "from": {"leather": 1, "wood": 1}, "steps": 600}
 	_check(["arrows", "flame_arrows", "barbed_arrows"].all(func(id: String) -> bool: return Items.mend_of(id) == mend),
 			"every bundle is mended by the carpenter from leather and wood (%s)" % Items.mend_of("arrows"))
 	_check(Items.mend_of("sword").is_empty(), "a sword has no mend")

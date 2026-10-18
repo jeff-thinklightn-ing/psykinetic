@@ -9243,6 +9243,10 @@ item.buckler. Rejected: a leather jerkin (armour here would only add mass, all
 gain but a pack slot); a sling or bag (the slots are fixed; a new rule); a
 bandaging kit variant (the kit has no numbers to vary).
 
+Amended by 428 (Jeff: bundles are "repaired by the town fletcher"): the
+three bundles' mend is by the fletcher, a trade in Items.TRADES; the
+carpenter stands in (rules' stand_in) while his town has no fletcher.
+
 ## 414. The mend job: a worn thing in the store made whole on its own uid
 
 Items' 413 gives a thing with a condition a "mend" ({by, from, steps};
@@ -9501,3 +9505,43 @@ would move every later slot on Jeff's saved town; a rule that a level's
 later additions take the next free slot comes first, as its own decision,
 then the wilds counter. view_test: the stamped temple has the one counter,
 at its back, a chest with props temple.
+## 428. Rescues: a fallen camp's people come home, and strangers bring their trades
+
+Economy's roadmap step 4 ("rescued people unlock their trade"), the
+coordinator's approval of 2026-10-17. Until now nothing in play rescued
+anyone: raids carried people off (Jeff's rule: raids take food and people
+only) and Towns kept them held at a camp, but only tests and the town_state
+tool called note_rescue.
+
+- Freeing the held: Towns.free_held(holder) frees every captive held by a
+  camp's place id or by a raid group's id (while it carries them), each
+  through note_rescue: a resident back to their work, a companion through
+  companion_freed, rescue experience each. Main connects
+  Holdings.place_taken: a camp taken by the town or by nobody calls
+  Towns.camp_taken, which frees its held; one taken by another hostile
+  faction frees nobody. Maps' 429 makes a cleared camp fall in play, and
+  calls free_held for a raid group that breaks up on the way home.
+- Strangers: each hostile camp (Towns.camps: Holdings.camps) holds
+  rescue.per_camp (1) strangers for its home town (Towns.home_of: the
+  nearest held store by routes), kept on that town's record ("strangers",
+  saved). Each one's trade is drawn by the town, the camp and a running
+  count, from rescue.trades' weights (hunter, tanner, fletcher 3; smith,
+  cook, carpenter 1) times rescue.lacking (3) for a trade the town has
+  nobody of; a name from rescue.names. When the camp falls they join the
+  town as residents of their trade (note_rescue, origin "camp:<id>"), and
+  the log says where they were held. A trade with a building waits for it
+  (a tanner for the tannery). The camp gets new strangers once it is
+  hostile again and rescue.restock_days (5) have passed.
+- The fletcher is a trade (Items.TRADES, with items): the bundles' mend
+  (414) goes to him first; rules' stand_in {"fletcher": "carpenter"} lets
+  the carpenter do it while the town has no fletcher there.
+- Bodies: record-level. The freed appear in town through npc's resident
+  bodies; walking home from the camp in play is for npc or companions
+  later.
+
+Protocol unchanged: sim only. tests/rescue_test (a stranger held, the same
+every run, once, saved; a camp falling to nobody frees the raid's captive
+and the stranger, not to another faction; experience and the log; restock
+after its days; free_held by a group's id; the draw leaning to lacking
+trades; the fletcher mends, the carpenter stands in). items_test's mend
+recipe is the fletcher's.

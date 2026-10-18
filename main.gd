@@ -1706,6 +1706,20 @@ func _boot() -> void:
 		return zone != null and zone.awake and _towns_near.has(town)
 	World.towns.companion_taken = companion_taken
 	World.towns.companion_freed = companion_freed
+	# Rescues (decision 428): a camp's held come home when it falls.
+	World.towns.camps = World.holdings.camps
+	World.towns.home_of = func(camp: String) -> String:
+		var place := World.holdings.place(camp)
+		var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
+		var kinds: Array[String] = ["stockpile"]
+		var store := World.holdings.nearest(kinds, str(place.get("area", "")), place.get("cell", Vector2i.ZERO), routes)
+		if store.is_empty() or World.holdings.holder(store) != Stockpile.TOWN:
+			var names: Array = World.towns.to_dict().keys()
+			names.sort()
+			return str(names[0]) if not names.is_empty() else ""
+		return store
+	if not World.holdings.place_taken.is_connected(_on_place_taken):
+		World.holdings.place_taken.connect(_on_place_taken)
 	# Wells and roofs (decision 426): a town's are its level's.
 	World.towns.wells = func(town: String) -> int:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
@@ -4377,6 +4391,13 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 		party_log.add("%s died." % _display_name(entity))
 	elif entity.body_material == GridEntity.BodyMaterial.WOOD:
 		party_log.add("%s broke." % _display_name(entity))
+
+
+## A place changed hands (Holdings.place_taken): a camp's fall frees who it
+## held (Towns.camp_taken, decision 428).
+func _on_place_taken(id: String, from: String, to: String) -> void:
+	if World.towns != null and World.holdings.place(id).get("kind") == "camp":
+		World.towns.camp_taken(id, from, to)
 
 
 # --- The fallen brought back (decision 396) -----------------------------------------

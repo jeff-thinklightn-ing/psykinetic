@@ -915,11 +915,23 @@ func _mend_bid(shop: Dictionary, cat: Dictionary) -> Dictionary:
 	for uid in stockpile.items(shop["town"]):
 		var id := book().id_of(uid)
 		var mend: Dictionary = cat.get(id, {}).get("mend", {})
-		if mend.get("by") != shop["trade"] or book().condition_of(uid) < 0 or book().condition_of(uid) >= Items.condition_max(id):
+		if not _mends(shop, str(mend.get("by", ""))) or book().condition_of(uid) < 0 or book().condition_of(uid) >= Items.condition_max(id):
 			continue
 		if _affords(shop["town"], mend, false):
 			return {"workshop": shop["id"], "recipe": id, "kind": "mend", "job": 0, "rework": uid}
 	return {}
+
+
+## Whether [param shop] does work that is [param by]'s: its trade, or the
+## trade standing in for it (rules' stand_in: the carpenter for a fletcher)
+## while its town has no one of that trade there (decision 428).
+func _mends(shop: Dictionary, by: String) -> bool:
+	if shop["trade"] == by:
+		return true
+	if str(rules.get("stand_in", {}).get(by, "")) != shop["trade"]:
+		return false
+	return not worker_ids(shop["town"]).any(func(id: String) -> bool:
+		return by in _workers[id]["trades"] and not _workers[id]["away"])
 
 
 func _recipe_ok(entry: Dictionary) -> bool:

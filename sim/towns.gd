@@ -79,6 +79,11 @@ var companion_of := Callable()
 ## rain that fell on it between two steps in days of full rain
 ## (Weather.rain_between); (town) -> [{index, cells}], its level's damaged
 ## roofs; (town, index) -> bool, mends one (World.repair_roof).
+## Rescues (decision 428; Main sets them): () -> the hostile camps
+## ({id, area, cell, faction}: Holdings.camps); (camp id) -> the town its
+## freed go home to (the nearest held store by routes).
+var camps := Callable()
+var home_of := Callable()
 var wells := Callable()
 var rain := Callable()
 var roofs := Callable()
@@ -296,6 +301,7 @@ func note_companion_out(town: String, companion_name: String) -> void:
 ## when crowded, else the lowest building that houses a trade. Nothing if
 ## it can't afford it.
 func tick() -> void:
+	_stock_camps()
 	var towns: Array[String] = []
 	towns.assign(_towns.keys())
 	towns.sort()
@@ -557,6 +563,111 @@ func _repair(town: String) -> bool:
 		_note(town, "the %s is to be repaired" % kind)
 		return true
 	return false
+
+
+# --- Rescues (decision 428) ---------------------------------------------
+
+## Camp [param camp] (a Holdings place) went from [param from] to
+## [param to] (Holdings.place_taken): taken by the town or freed of its
+## holder, everyone it held comes home (each town's captives held there,
+## through note_rescue) and so do the strangers it held, to the town
+## home_of names, each a resident of their trade. Taken by another
+## hostile faction: nothing yet.
+func camp_taken(camp: String, _from: String, to: String) -> void:
+	if to != Stockpile.TOWN and to != Factions.NOBODY:
+		return
+	free_held(camp)
+	var names: Array[String] = []
+	names.assign(_towns.keys())
+	names.sort()
+	for town in names:
+		var record := _town(town)
+		var strangers: Dictionary = record.get("strangers", {})
+		if not strangers.has(camp):
+			continue
+		var home := str(home_of.call(camp)) if home_of.is_valid() else town
+		for each: Dictionary in strangers[camp]:
+			if note_rescue(home if not home.is_empty() else town, str(each["id"]), str(each["name"]), str(each["trade"]), "camp:%s" % camp):
+				_note(home if not home.is_empty() else town, "%s the %s was held at %s" % [each["name"], str(each["trade"]).replace("_", " "), camp])
+		strangers.erase(camp)
+		record["restock"] = record.get("restock", {})
+		record["restock"][camp] = now() + int(float(rules.get("rescue", {}).get("restock_days", 5)) * maxi(DayNight.day_steps, 1))
+
+
+## Every captive held by [param holder] (a camp's place id, or a raid
+## group's id while it carries them) freed home to their town, through
+## note_rescue: maps calls it for a group that breaks up on the way. The
+## ids freed.
+func free_held(holder: String) -> Array[String]:
+	var out: Array[String] = []
+	var names: Array[String] = []
+	names.assign(_towns.keys())
+	names.sort()
+	for town in names:
+		for held: Dictionary in _town(town)["captives"].duplicate():
+			if str(held.get("held_by", "")) == holder 					and note_rescue(town, str(held["id"]), str(held["name"]), str(held["trade"]), str(held.get("origin", ""))):
+				out.append(str(held["id"]))
+	return out
+
+
+## [param town]'s strangers held at camps, {camp id: [{id, name, trade}]}.
+func strangers(town: String) -> Dictionary:
+	return _towns.get(town, {}).get("strangers", {}).duplicate(true)
+
+
+## Each hostile camp with nobody held for its home town gets rules'
+## rescue.per_camp strangers once its restock time is past: a trade drawn
+## by the camp and how many it has held, by rescue.trades' weights, times
+## rescue.lacking for a trade the town has nobody of yet.
+func _stock_camps() -> void:
+	if not camps.is_valid():
+		return
+	var rule: Dictionary = rules.get("rescue", {})
+	for camp: Dictionary in camps.call():
+		var id := str(camp["id"])
+		var town := str(home_of.call(id)) if home_of.is_valid() else ""
+		if town.is_empty():
+			continue
+		var record := _town(town)
+		var held: Dictionary = record.get("strangers", {})
+		if held.has(id) or now() < int(record.get("restock", {}).get(id, 0)):
+			continue
+		var made: Array = []
+		var count := int(record.get("strangers_made", 0))
+		for i in int(rule.get("per_camp", 1)):
+			count += 1
+			var draw := RandomNumberGenerator.new()
+			draw.seed = hash("%s/%s/%d" % [town, id, count])
+			var trade := _draw_trade(town, draw)
+			var names_list: Array = rule.get("names", ["Someone"])
+			var name := str(names_list[draw.randi_range(0, names_list.size() - 1)])
+			made.append({"id": "%s_%s_%d" % [trade, town.replace("/", "_"), count], "name": name, "trade": trade})
+		record["strangers_made"] = count
+		held[id] = made
+		record["strangers"] = held
+
+
+func _draw_trade(town: String, draw: RandomNumberGenerator) -> String:
+	var rule: Dictionary = rules.get("rescue", {})
+	var weights: Dictionary = rule.get("trades", {"carpenter": 1})
+	var have := {}
+	for who in residents(town):
+		for trade: String in production.worker(who).get("trades", []):
+			have[trade] = true
+	var names: Array = weights.keys()
+	names.sort()
+	var total := 0.0
+	var each_weight: Array[float] = []
+	for trade: String in names:
+		var weight := float(weights[trade]) * (1.0 if have.has(trade) else float(rule.get("lacking", 3)))
+		each_weight.append(weight)
+		total += weight
+	var roll := draw.randf() * total
+	for i in names.size():
+		roll -= each_weight[i]
+		if roll < 0.0:
+			return str(names[i])
+	return str(names[-1])
 
 
 # --- Wells and roofs (decision 426) -------------------------------------------------
@@ -919,6 +1030,19 @@ func from_dict(saved: Dictionary) -> void:
 		for line: Variant in entry.get("log", []):
 			if line is Dictionary:
 				record["log"].append({"step": int(line.get("step", 0)), "what": str(line.get("what", ""))})
+		var held_at: Variant = entry.get("strangers", {})
+		if held_at is Dictionary:
+			for camp: Variant in held_at:
+				if held_at[camp] is Array:
+					record["strangers"] = record.get("strangers", {})
+					record["strangers"][str(camp)] = (held_at[camp] as Array).filter(func(each: Variant) -> bool:
+						return each is Dictionary and str(each.get("id", "")) != "" and str(each.get("trade", "")) != "")
+		var restock: Variant = entry.get("restock", {})
+		if restock is Dictionary:
+			record["restock"] = {}
+			for camp: Variant in restock:
+				record["restock"][str(camp)] = int(restock[camp])
+		record["strangers_made"] = maxi(int(entry.get("strangers_made", 0)), 0)
 		if entry.has("water_at"):
 			record["water"] = maxf(float(entry.get("water", 0.0)), 0.0)
 			record["water_at"] = int(entry["water_at"])
