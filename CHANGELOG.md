@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Internal: the way a companion walks at your heel is shared, ready for townspeople
+  who walk home with you (decision 485). Companions walk as before.
 - A quarrel brought before the lawspeaker (decision 486, on 435 and Jeff's rule): in a town with a sitting lawspeaker and rulings on, two residents who hold a grudge become a dispute before him on their own; the wronged one asks you to speak for them, a word to him when you see him lays it before him (nothing handed in), and his ruling, whichever it is, closes the quarrel on both cards and pays whoever spoke for them (economy's commissions.dispute, 5) with the notice and a memory of it; with the lawspeaker off (the server today) nothing changes.
 - A resident's look string ends with their trade ("trade=smith"; ResidentCard.look_spec, for pc-character's decision 480: garb for the trade where the look names none), left out for an outcast (471's Snagfin stays as drawn); older clients ignore the word.
 - Raiding groups route over a regenerated level's new floor: a generation drops their routes and each group goes on from where it stands (maps' use_map).

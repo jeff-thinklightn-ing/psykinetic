@@ -12709,3 +12709,31 @@ message; "carry" stays the accept verb); no new class_name.
 Rejected: the player choosing a side (the lawspeaker rules, 448); a
 fine or a jail (rulings are words); the quarrel as a thing to deliver; a
 new accept verb (the client knows four).
+## 485. Heel: walking at someone's heel, shared by companions and escorts
+
+npc's escorts (435's next errands, the coordinator's go-ahead) need a
+townsperson to walk home with a player, and the coordinator gave that
+walking to companions' movement (381's heel) rather than new pathing.
+sim/heel.gd (class Heel, RefCounted) is that following cut out of
+Companion, with no change to how she walks: one per follower,
+follow(body, leader) once a tick (set off at START 3, or at once when in a
+doorway or across a building's walls from the leader; make for the heel
+cell; stop there, or within STOP 2 and not ahead, once the leader has stood
+WALKING_TICKS; with no heel cell free, close to CLOSE 1, and one that
+cannot get closer waits), static cell(body, leader) for the pick (never a
+door's cells, the leader's side of a building's walls, behind their facing,
+nearest them, then the follower) and step(body, goal, occupied_ok) for one
+A* step when the body's next move is due. Companion holds a Heel (heel)
+and keeps her own stalking rule (332) in front of it; her FOLLOW_* constants
+are Heel's, _catching_up reads its catching_up, and _step_toward is
+Heel.step. A body with a Heel is moved on the grid like any other; a zone
+change is the owner's (Main.travel respawns a companion beside her player
+from her record; npc's escort stays in one zone by design). Doors and
+buildings are still read through Companion.door_cells and building_at
+(391; Main hands her each level, 391 amended). companion_test covers a
+plain body following a walk with a Heel. Protocol unchanged; new
+class_name Heel.
+
+Rejected: npc calling Companion's own _follow (her members: keeper, the
+stalking rule); a node per follower (no scene, nothing to draw, a ticked
+RefCounted is enough).

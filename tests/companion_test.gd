@@ -251,6 +251,24 @@ func _test_following() -> void:
 	_check(far.max() <= Companion.FOLLOW_START and far.back() <= 2, "following a walk: never more than 3 behind (%s)" % [far])
 	_check(in_the_way == 0 and pet.tile.x < owner.tile.x, "and never in their way: behind them, east-bound (%s, they at %s)" % [pet.tile, owner.tile])
 	_check(MindLog.written - logged <= 2, "her steps after them are not each logged (%d written)" % (MindLog.written - logged))
+	# Any body walks so with a Heel of its own (decision 485: npc's escorts).
+	var walker := _spawn_imp(Vector2i(4, 12))
+	var heel := Heel.new()
+	_put(owner, Vector2i(6, 11))
+	_put(pet, owner_was)
+	pet.stance = Companion.Stance.HOLD  # Away, holding: the imp walking is not hers to fight.
+	pet.hold_tile = owner_was
+	World.order_move(owner, Vector2i(14, 11))
+	var behind: Array[int] = []
+	for i in 40:
+		World.step()
+		heel.follow(walker, owner)
+		behind.append(World.distance(walker.tile, owner.tile))
+	_check(walker.tile != Vector2i(4, 12) and behind.back() <= Heel.STOP and walker.tile.x < owner.tile.x,
+		"a body with a Heel follows a walk and stops at their heel (%s)" % [behind])
+	_check(Heel.cell(walker, owner) == walker.tile or World.distance(Heel.cell(walker, owner), owner.tile) <= Heel.STOP,
+		"Heel.cell: within STOP of them")
+	World.despawn(walker)
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)

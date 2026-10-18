@@ -93,14 +93,14 @@ const PHRASE_MEANINGS := {
 const PHRASE_STANCES := {1: Stance.STAY_CLOSE, 2: Stance.PULL_BACK, 3: Stance.PRESS, 4: Stance.PULL_BACK}
 ## Following (STAY_CLOSE, GUARD): she lets her player get this far before
 ## she moves, then closes in to FOLLOW_CLOSE, finding her way afresh each step.
-const FOLLOW_START := 3
-const FOLLOW_CLOSE := 1
+const FOLLOW_START := Heel.START
+const FOLLOW_CLOSE := Heel.CLOSE
 ## Where a follow stops (decision 381): within this of her player, at his
-## heel (_heel: behind his facing), not in his way; set off again only at
+## heel (Heel.cell: behind his facing), not in his way; set off again only at
 ## FOLLOW_START. While he walks (moved within WALKING_TICKS) she keeps on
 ## for the cell just behind him instead of stopping.
-const FOLLOW_STOP := 2
-const WALKING_TICKS := 12
+const FOLLOW_STOP := Heel.STOP
+const WALKING_TICKS := Heel.WALKING_TICKS
 ## Her own last lines: SAID_REMEMBERED kept (in her record, across
 ## sessions) and never said again.
 const SAID_REMEMBERED := 20
@@ -368,7 +368,11 @@ var _stance_serial := 0
 var _serial := 0
 ## Following: she has set off after her player (FOLLOW_START) and not yet
 ## closed in (FOLLOW_CLOSE).
-var _catching_up := false
+var _catching_up: bool:
+	get: return heel.catching_up
+	set(value): heel.catching_up = value
+## Her walking at her player's heel (decision 485, shared with npc's escorts).
+var heel := Heel.new()
 ## Voice asks (by serial) answering a quick phrase, whose stance is set.
 var _phrase_serials: Dictionary[int, bool] = {}
 ## What she has seen, kind -> {at, point, tick, open}: the nearest of each
@@ -502,9 +506,6 @@ var works_as := ""
 ## Her home town, kept while she travels (decision 381: her record's
 ## "home", {place, zone, trade}): where she rests between trips (Main's).
 var home: Dictionary = {}
-## Where her player was, and when they last moved (_follow).
-var _keeper_at := NONE
-var _keeper_moved := -1000
 
 
 ## Her slots (Items): a pack and two hands, as a player's, empty at first;
@@ -3352,7 +3353,7 @@ func _log(entry: Dictionary) -> void:
 
 
 ## FOLLOW: still while her player is within FOLLOW_START - 1 cells; once
-## they are FOLLOW_START away she sets off for their heel (_heel), the path
+## they are FOLLOW_START away she sets off for their heel (Heel, decision 485), the path
 ## found afresh every step (they keep moving), and, once they stand, stops
 ## there or within FOLLOW_STOP of them and not ahead (decision 381: she had
 ## closed to 1 in front of him and been walked into). Not logged: hands,
@@ -3373,30 +3374,7 @@ func _follow() -> void:
 		if _catching_up:
 			_approach(keeper, STALK_CLOSE)
 		return
-	if keeper.tile != _keeper_at:
-		_keeper_at = keeper.tile
-		_keeper_moved = World.tick
-	# In a doorway, or on the other side of a building's walls from her
-	# player (they went in, or out): she moves, however near (decision 391).
-	var astray := door_cells().has(tile) or _inside_of(tile) != _inside_of(keeper.tile)
-	if astray:
-		_catching_up = true
-	if not _catching_up:
-		return
-	var walking := World.tick - _keeper_moved <= WALKING_TICKS
-	var heel := _heel()
-	var ahead := _ahead_of(tile - keeper.tile, keeper.facing) > 0
-	if tile == heel:
-		if not walking:
-			_catching_up = false
-		return
-	if not walking and not astray and (distance <= FOLLOW_STOP and not ahead or heel == NONE and distance <= FOLLOW_STOP):
-		_catching_up = false
-		return
-	if heel != NONE:
-		_step_toward(heel, false)
-	else:
-		_approach(keeper, FOLLOW_CLOSE)
+	heel.follow(self, keeper)
 
 
 ## The cells either side of each door: a door's inside cell and the one
@@ -3415,32 +3393,6 @@ static func door_cells() -> Dictionary[Vector2i, bool]:
 static func _inside_of(cell: Vector2i) -> Rect2i:
 	var building := building_at(cell)
 	return Rect2i() if building.is_empty() else building["rect"]
-
-
-## The cell at her player's heel: of the free walkable cells within
-## FOLLOW_STOP of them (hers among them), never a door's (door_cells), one
-## on their side of a building's walls (inside with them, or outside), then
-## one behind their facing (not ahead, nor beside if any behind is free),
-## the nearest to them, then to her; NONE if none.
-func _heel() -> Vector2i:
-	var best := NONE
-	var best_key := Vector2i(1 << 20, 1 << 20)
-	var doors := door_cells()
-	var theirs := _inside_of(keeper.tile)
-	for dy in range(-FOLLOW_STOP, FOLLOW_STOP + 1):
-		for dx in range(-FOLLOW_STOP, FOLLOW_STOP + 1):
-			var at := keeper.tile + Vector2i(dx, dy)
-			if at == keeper.tile or World.distance(at, keeper.tile) > FOLLOW_STOP or doors.has(at):
-				continue
-			if at != tile and not (World.is_walkable(at) and World.is_free(at)):
-				continue
-			var along := _ahead_of(Vector2i(dx, dy), keeper.facing)
-			var apart := 0 if _inside_of(at) == theirs else 10
-			var key := Vector2i(apart + (0 if along < 0 else 1 + along), World.distance(at, keeper.tile) * 100 + World.distance(tile, at))
-			if key.x < best_key.x or key.x == best_key.x and key.y < best_key.y:
-				best_key = key
-				best = at
-	return best
 
 
 ## The free walkable cell of [param rect] nearest its middle (its middle
@@ -3491,18 +3443,12 @@ func _door_to_hold() -> Vector2i:
 
 ## How far [param offset] lies along [param facing] (a dot product).
 static func _ahead_of(offset: Vector2i, facing: Vector2i) -> int:
-	return offset.x * facing.x + offset.y * facing.y
+	return Heel.ahead_of(offset, facing)
 
 
 ## One A* step toward [param goal]. False if there is no way there.
 func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
-	if World.tick < next_move_tick:
-		return true
-	var path := World.find_path(tile, goal, occupied_goal_ok)
-	if path.is_empty():
-		return false
-	World.try_move(self, path[0] - tile)
-	return true
+	return Heel.step(self, goal, occupied_goal_ok)
 
 
 # --- Errands: what she does when asked ------------------------------------------
