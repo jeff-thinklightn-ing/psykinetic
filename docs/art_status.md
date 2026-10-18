@@ -19,8 +19,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.shed` | cell | 2.6 x 4.0 x 3.6 | 3000 | a shed, 2 x 3 cells: its roof and trim, never walls or a floor: its walls are the map's... |
 | `building.temple` | cell | 4.6 x 7.0 x 6.6 | 4000 | the town's temple, where its priest serves (Jeff, 2026-10-17), 4 x 6 cells, its ridge a... |
 | `building.well` | cell | 1.4 x 2.4 x 1.4 | 800 | a well, 1 x 1 cell, a whole piece standing in the open: its rim and posts the body, its... |
-| `creature.stag` | creature | 0.7 x 1.95 x 1.7 | 4000 | a stag, the antlered male: a rigged body (one Skeleton3D) and its clips, by the names l... |
-| `creature.wolf` | creature | 0.35 x 0.95 x 1.4 | 2500 | a wolf: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a... |
+| `creature.stag` | creature | 0.9 x 1.95 x 1.7 | 4000 | a stag, the antlered male: a rigged body (one Skeleton3D) and its clips, by the names l... |
+| `creature.wolf` | creature | 0.35 x 0.95 x 1.9 | 2500 | a wolf: a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a... |
 | `door.gate` | edge | 0.6 x 4.0 x 2.0 | 1200 | a castle gate over two cell edges (2 m along z): two heavy leaves hinged at its ends |
 | `door.portcullis` | edge | 0.5 x 3.0 x 1.0 | 800 | a portcullis on a cell edge: the frame, and a grate that slides up into it to open |
 | `door.trapdoor` | floor | 1.0 x 0.1 x 1.0 | 400 | a trapdoor in the floor of a cell, its top level with the floor, its lid hinged along t... |
