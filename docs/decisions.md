@@ -9346,3 +9346,33 @@ rain for the building; a slot match is enough); shifting whole stints by
 the season (gaps and overlaps at the seams; edges shift by their hour
 instead); the priest or the medicine man as Towns residents (economy seats
 them; the sync reads the record's town either way).
+## 410. A hungry camp raids sooner, and for food
+
+Jeff's raids are "food and people only" and "real raiders on the world
+tick"; economy's herds step (407) makes a camp hunt its area's herds and
+says how well it ate (Herds.camp_fed, 0..1 over the last whole day, 1 until
+a day has passed). Raid groups (328) read it through WorldRaids.fed, a
+Callable Main sets to World.herds.camp_fed (a camp nobody says is fed ate
+well).
+
+- Sooner: raids keep no wait, only a chance a world tick (send_chance times
+  the town's threat), so a hungry camp's chance is multiplied: by 1 at or
+  above hungry_below (0.5), rising in a straight line to hungry_send (3.0)
+  for a camp that ate nothing, never above 1 (WorldRaids.send_chance,
+  hunger_factor). Its target is chosen as before, the most threatened town.
+  Both are raids.groups data in levels/economy.json.
+- For food: a camp hungry when its group sets out gives the group "want":
+  "food" (WorldRaids.WANT_FOOD; "" is the usual raid). It is kept on the
+  group (saved with it, an old save reading ""), and goes with it to
+  Towns.raid_arrives, whose take rules read it (economy's 409: food and meat
+  and food-tagged things, no captives), and to World.raids.enter, for
+  enemy-ai's raiders later. The send is logged "… hungry (fed 0.20), for
+  food".
+- A fed camp is unchanged: the same chance and a want of "".
+
+In play: a camp that has hunted out the herds near a town eats less, so it
+raids more often and carries food home rather than people; the ledger and
+the guards' lines can name a hungry camp later. Raids stay off until
+switched on. Protocol unchanged.
+
+tests/raid_groups_test.

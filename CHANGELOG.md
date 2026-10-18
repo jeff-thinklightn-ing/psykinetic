@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- With raids on, a raider camp that has hunted out the game around it grows hungry: it raids more often, and its raiders come for food rather than people.
+
 - Townsfolk keep hours now: the well at dawn, the forge or kitchen through the
   day, the inn at midday and in the evening where the town has one, home at
   night, each on their own clock, later out in winter and earlier home, a

@@ -8,7 +8,9 @@ extends RefCounted
 ## sleeps or it leaves the area; at a town nobody watches it raids by the
 ## numbers (Towns.raid_arrives) and carries what it took and whom home,
 ## where its captives are held at the camp (Towns.carried_home). The camps
-## also make each town's threat (Towns.threat). Server only, on the world
+## also make each town's threat (Towns.threat). A hungry camp (Herds'
+## camp_fed) sends sooner, and its group is for food (decision 410; economy's
+## raid takes read its want, decision 409). Server only, on the world
 ## tick, saved in the snapshot. Off until switched on (--raids, or the
 ## console's raids on): nothing is sent and nothing moves while it is off.
 
@@ -25,7 +27,15 @@ const DEFAULTS := {
 	"strength_per_size": 1.0,
 	# Route steps a group covers a world tick.
 	"steps_per_world_tick": 12.0,
+	# A camp that ate less than this share of its food the last day (fed)
+	# is hungry: it sends sooner and its group is for food.
+	"hungry_below": 0.5,
+	# A starving camp's send chance is this many times a fed one's; less
+	# hungry, less (a straight line from 1 at hungry_below).
+	"hungry_send": 3.0,
 }
+## What a hungry camp's group is for (its "want"; "" is the usual raid).
+const WANT_FOOD := "food"
 const RULES := "res://levels/economy.json"
 
 ## Going to the town, coming home, or in play (World.raids has it).
@@ -47,7 +57,8 @@ var routes: WorldRoutes:
 var _routes: WorldRoutes
 var rules := {}
 ## Id -> {id, faction, from (camp place id), town, strength, carries:
-## {items, captives}, state, raided (the town was hit), area, cell, walked
+## {items, captives}, want (WANT_FOOD or ""), state, raided (the town was
+## hit), area, cell, walked
 ## (route steps covered since the route was made), skip_area (the area it
 ## was handed back from, not entered again until it has left it)}.
 var groups: Dictionary[String, Dictionary] = {}
@@ -56,6 +67,9 @@ var live := func(_area: String) -> bool: return false
 ## World.raids, or a test's stand-in: enter(group, area, arrival, goal) -> int,
 ## and its raid_left, raid_done and raid_beaten.
 var raids: Object
+## (camp place id) -> 0..1: how well that camp ate the last day
+## (World.herds.camp_fed); a camp nobody says is fed.
+var fed := func(_camp_id: String) -> float: return 1.0
 ## () -> int: the World's steps, for ids.
 var clock := func() -> int: return 0
 var rng := RandomNumberGenerator.new()
@@ -182,9 +196,30 @@ func _send_some() -> void:
 			if threat > best_threat:
 				best = town
 				best_threat = threat
-		if best != "" and rng.randf() < best_threat * float(rules["send_chance"]):
+		if best != "" and rng.randf() < send_chance(camp["id"], best_threat):
 			send(camp["id"], best)
 			busy_towns[best] = true
+
+
+## The chance a world tick that camp [param camp_id], with no group out,
+## sends one at a town of [param threat]: send_chance times the threat,
+## times more the hungrier the camp (hungry_send when it ate nothing).
+func send_chance(camp_id: String, threat: float) -> float:
+	return minf(1.0, threat * float(rules["send_chance"]) * hunger_factor(float(fed.call(camp_id))))
+
+
+## How many times a camp that ate [param ate] (0..1) sends sooner: 1 at or
+## above hungry_below, up to hungry_send at nothing.
+func hunger_factor(ate: float) -> float:
+	var below := float(rules["hungry_below"])
+	if below <= 0.0 or ate >= below:
+		return 1.0
+	return 1.0 + (float(rules["hungry_send"]) - 1.0) * (1.0 - clampf(ate, 0.0, 1.0) / below)
+
+
+## Whether camp [param camp_id] is hungry: ate less than hungry_below.
+func hungry(camp_id: String) -> bool:
+	return float(fed.call(camp_id)) < float(rules["hungry_below"])
 
 
 ## A group sent from camp [param camp_id] at [param town] now: its id, or ""
@@ -197,13 +232,15 @@ func send(camp_id: String, town: String) -> String:
 	if camp.is_empty() or holdings.place(town).is_empty():
 		return ""
 	var id := "raid:%s:%d" % [camp_id, int(clock.call())]
+	var want := WANT_FOOD if hungry(camp_id) else ""
 	groups[id] = {"id": id, "faction": camp["faction"], "from": camp_id, "town": town,
 		"strength": camp["size"] * float(rules["strength_per_size"]), "carries": {"items": [], "captives": []},
-		"state": OUT, "raided": false, "area": camp["area"], "cell": camp["cell"], "walked": 0.0, "skip_area": ""}
+		"want": want, "state": OUT, "raided": false, "area": camp["area"], "cell": camp["cell"], "walked": 0.0, "skip_area": ""}
 	if _route(id).is_empty():
 		groups.erase(id)
 		return ""
-	print("[raids] %s sets out from %s for %s, strength %.1f" % [id, camp_id, town, groups[id]["strength"]])
+	print("[raids] %s sets out from %s for %s, strength %.1f%s" % [id, camp_id, town, groups[id]["strength"],
+		" hungry (fed %.2f), for food" % float(fed.call(camp_id)) if want == WANT_FOOD else ""])
 	return id
 
 
@@ -260,7 +297,7 @@ func _enter(id: String, at: Dictionary) -> void:
 	if group["state"] == HOME or target.get("area") != at["area"]:
 		goal = leg.get("to", Raids.NO_CELL)
 	var handed := {"id": id, "faction": group["faction"], "strength": group["strength"], "town": group["town"],
-		"from": group["from"], "carries": group["carries"]}
+		"from": group["from"], "carries": group["carries"], "want": group.get("want", "")}
 	var spawned: int = raids.enter(handed, at["area"], at["cell"], goal)
 	group["state_before"] = group["state"]
 	group["state"] = PRESENT
@@ -288,7 +325,8 @@ func _arrive(id: String, last: Dictionary) -> void:
 		_end(id)
 		return
 	# At a town nobody watches: by the numbers.
-	var report := towns.raid_arrives(group["town"], {"id": id, "faction": group["faction"], "strength": group["strength"], "from": group["from"]})
+	var report := towns.raid_arrives(group["town"], {"id": id, "faction": group["faction"], "strength": group["strength"], "from": group["from"],
+		"want": group.get("want", "")})
 	group["raided"] = true
 	group["carries"] = _carried(report, group["carries"])
 	print("[raids] %s raids %s unseen: %s" % [id, group["town"], "fought off" if report.get("repelled", false) else "takes %s" % [report.get("took", {})]])

@@ -1687,6 +1687,9 @@ func _boot() -> void:
 	World.raid_groups = WorldRaids.new(world_map, World.holdings, World.towns, snapshot.get("raid_groups", {}))
 	World.raid_groups.clock = func() -> int: return World.steps
 	World.raid_groups.live = func(area: String) -> bool: return World.zones.has(area) and (World.zones[area] as Zone).awake
+	# A hungry camp raids sooner, for food (decision 410): how well it ate,
+	# from the herds (made below, so read when asked).
+	World.raid_groups.fed = func(camp_id: String) -> float: return World.herds.camp_fed(camp_id) if World.herds != null else 1.0
 	World.raid_groups.hook(World.raids)
 	if Net.raids:
 		World.raid_groups.set_on(true)

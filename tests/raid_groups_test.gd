@@ -7,8 +7,11 @@ extends Node
 ## food and a captive home, where the captive is held at the camp; a group
 ## walking into an awake zone is handed to World.raids (a stand-in here) and
 ## stands still until it is handed back, then goes on, not walking straight
-## back in; a beaten group is gone; a restart keeps the groups and the
-## switch, one in play going on from where it was. Run it with tests/run.ps1
+## back in; a beaten group is gone; a hungry camp (decision 410) sends
+## sooner, the hungrier the sooner, and its group is for food, which goes
+## with it into play and survives a restart, while a fed camp's is as ever;
+## a restart keeps the groups and the switch, one in play going on from
+## where it was. Run it with tests/run.ps1
 ## or tests/run.sh.
 
 const RaidsTest := preload("res://tests/raids_test.gd")
@@ -44,6 +47,7 @@ func _ready() -> void:
 	_test_threat()
 	_test_unseen_raid()
 	_test_handed_over()
+	_test_hungry()
 	_test_saved()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -169,6 +173,41 @@ func _test_handed_over() -> void:
 	_groups.groups[id]["state"] = WorldRaids.PRESENT
 	stub.raid_beaten.emit(id, "rg_camp", Vector2i(5, 2))
 	_check(not _groups.groups.has(id), "a beaten group is gone")
+
+
+func _test_hungry() -> void:
+	print("== a hungry camp ==")
+	var ate := {CAMP: 1.0}
+	_groups.fed = func(camp_id: String) -> float: return float(ate.get(camp_id, 1.0))
+	var base := _groups.send_chance(CAMP, 0.0001)
+	_check(is_equal_approx(_groups.hunger_factor(1.0), 1.0) and is_equal_approx(_groups.hunger_factor(0.5), 1.0),
+		"a camp that ate half its food or more sends as ever")
+	_check(is_equal_approx(_groups.hunger_factor(0.25), 2.0) and is_equal_approx(_groups.hunger_factor(0.0), 3.0),
+		"one that ate a quarter sends twice as soon, one that ate nothing three times (%.2f, %.2f)" % [_groups.hunger_factor(0.25), _groups.hunger_factor(0.0)])
+	ate[CAMP] = 0.0
+	_check(is_equal_approx(_groups.send_chance(CAMP, 0.0001), 3.0 * base) and _groups.send_chance(CAMP, 1.0) == 1.0,
+		"its send chance three times a fed camp's, never above 1")
+	var stub := StubRaids.new()
+	_groups.hook(stub)
+	_groups.live = func(area: String) -> bool: return area == "rg_town"
+	var id := _groups.send(CAMP, TOWN)
+	_check(_groups.groups.get(id, {}).get("want") == WorldRaids.WANT_FOOD, "its group is for food")
+	for i in 30:
+		if not stub.entered.is_empty():
+			break
+		_tick()
+	_check(not stub.entered.is_empty() and stub.entered[0]["group"].get("want") == WorldRaids.WANT_FOOD, "and says so in play")
+	var saved := _groups.to_dict()
+	var again := WorldRaids.new(_groups.world_map, _holdings, _towns, JSON.parse_string(JSON.stringify(saved)), RULES)
+	_check(again.groups.get(id, {}).get("want") == WorldRaids.WANT_FOOD, "still after a restart")
+	_groups.groups.erase(id)
+	ate[CAMP] = 0.9
+	var fed_id := _groups.send(CAMP, TOWN)
+	_check(_groups.groups.get(fed_id, {}).get("want") == "", "a fed camp's group is the usual raid")
+	_groups.groups.erase(fed_id)
+	_groups.hook(null)
+	_groups.live = func(_area: String) -> bool: return false
+	_groups.fed = func(_camp_id: String) -> float: return 1.0
 
 
 func _test_saved() -> void:
