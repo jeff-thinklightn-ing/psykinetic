@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_hunter()
 	_test_mend()
 	_test_offers()
+	_test_merchant()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -254,6 +255,65 @@ func _test_offers() -> void:
 	_check(paid > 0 and paid == maxi(have - floor_gold, 0) and stock.count(TOWN, "gold") == mini(have, floor_gold) and economy.gold("p2") == paid,
 		"pay_commission: what the treasury has above its floor (%d)" % paid)
 	_check(int(rules["commissions"]["rescue"]) == 10 and int(rules["commissions"]["camp"]) == 20 and int(rules["commissions"]["fetch"]) == 1, "commissions' rates in the rules")
+
+
+## A merchant's sharper trades (decision 440, economy's side): buying a
+## meal at merchant.buy of its price and selling their own at
+## merchant.sell, the difference out of the maker's share; the town's
+## materials and tax as for anyone; nobody else's prices changed.
+func _test_merchant() -> void:
+	print("
+== a merchant's own trades ==")
+	var rule: Dictionary = _rules["merchant"]
+	var got := {}
+	for buyer_type in ["steady", "merchant"]:
+		for maker_type in ["steady", "merchant"]:
+			var rules := _rules.duplicate(true)
+			rules.erase("bank")
+			_now = 0
+			var clock := func() -> int: return _now
+			var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+			var work := Production.new({}, stock, null, clock, rules)
+			var economy := Economy.new({}, stock, work, clock, rules)
+			work.add_worker("b1", "Ash", ["hauler"], TOWN, "test", buyer_type)
+			work.add_worker("c1", "Mags", ["cook"], TOWN, "test", maker_type)
+			work.pay("b1", 50)
+			for i in 3:
+				stock.stock_shop(TOWN, stock.book.mint("ration", "made", "test"), "test", "c1")
+			var price := int(economy.goods(TOWN)[0]["price"])
+			var treasury := stock.count(TOWN, "gold")
+			economy._eat("b1", rules["folk"]["needs"]["meal"], Production.items_catalog())
+			got["%s/%s" % [buyer_type, maker_type]] = {"price": price, "paid": 50 - int(work.worker("b1")["purse"]),
+				"maker": int(work.worker("c1")["purse"]), "town": stock.count(TOWN, "gold") - treasury}
+	var plain: Dictionary = got["steady/steady"]
+	var buys: Dictionary = got["merchant/steady"]
+	var sells: Dictionary = got["steady/merchant"]
+	_check(plain["paid"] == plain["price"], "steady folk pay the price (%d)" % plain["paid"])
+	_check(buys["paid"] == roundi(plain["price"] * float(rule["buy"])) and buys["town"] == plain["town"] and buys["maker"] == plain["maker"] - (plain["paid"] - buys["paid"]),
+		"a merchant buys at %.2f: the maker takes the difference, the town's share the same (%s)" % [float(rule["buy"]), buys])
+	_check(sells["paid"] == roundi(plain["price"] * float(rule["sell"])) and sells["town"] == plain["town"] and sells["maker"] == plain["maker"] + (sells["paid"] - plain["paid"]),
+		"a merchant's own sells at %.2f, the extra the maker's (%s)" % [float(rule["sell"]), sells])
+	_check(absi(int(got["merchant/merchant"]["paid"]) - plain["paid"]) <= 1, "two merchants nearly cancel (%d)" % got["merchant/merchant"]["paid"])
+	# At a price the factor shows on: 20 gold.
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.add_worker("m1", "Rook", ["hauler"], TOWN, "test", "merchant")
+	work.add_worker("s1", "Odo", ["smith"], TOWN, "test", "steady")
+	work.add_worker("m2", "Vell", ["smith"], TOWN, "test", "merchant")
+	_check(economy._folk_price(20, "m1", "s1") == roundi(20 * float(rule["buy"])) and economy._folk_price(20, "s1", "m2") == roundi(20 * float(rule["sell"]))
+		and economy._folk_price(20, "s1", "s1") == 20 and economy.folk_factor("", "buy") == 1.0, "20 gold: %d to a merchant buying, %d from a merchant selling, 20 otherwise"
+		% [economy._folk_price(20, "m1", "s1"), economy._folk_price(20, "s1", "m2")])
+	var before := stock.count(TOWN, "gold")
+	economy._sale(TOWN, "s1", "sword", 20, "test", "plain")
+	var town_plain := stock.count(TOWN, "gold") - before
+	var maker_plain := int(work.worker("s1")["purse"])
+	before = stock.count(TOWN, "gold")
+	economy._sale(TOWN, "s1", "sword", 17, "test", "to a merchant", 20)
+	_check(stock.count(TOWN, "gold") - before == town_plain and int(work.worker("s1")["purse"]) - maker_plain == maker_plain - 3,
+		"a sale of 20 at 17: the town's materials and tax the same (%d), the maker 3 less" % town_plain)
 
 
 func _check(ok: bool, what: String) -> void:

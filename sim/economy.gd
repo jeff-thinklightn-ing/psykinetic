@@ -387,14 +387,15 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 		food.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return a["price"] < b["price"] or a["price"] == b["price"] and a["uid"] < b["uid"])
 		var pick: Dictionary = food[0]
-		var cost := int(pick["price"])
+		var maker := stockpile.maker_of(town, pick["uid"])
+		var base := int(pick["price"])
+		var cost := _folk_price(base, id, maker)
 		if _afford(id, town, cost):
 			var thing := Items.name_of(pick["id"])
-			var maker := stockpile.maker_of(town, pick["uid"])
 			stockpile.take_from_shop(town, pick["uid"], "folk:%s" % id)
 			stockpile.book.end(pick["uid"], "eaten", "by %s at %s" % [who["name"], town])
 			production.spend(id, cost, "a %s" % thing)
-			var seller := _sale(town, maker, pick["id"], cost, "folk:%s" % id, "sold a %s to %s" % [thing, who["name"]])
+			var seller := _sale(town, maker, pick["id"], cost, "folk:%s" % id, "sold a %s to %s" % [thing, who["name"]], base)
 			production.note_meal(id, "bought")
 			production.note_trade(id, "bought a %s" % thing, cost, seller)
 			if seller != TREASURY:
@@ -410,7 +411,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 			store = str(each)
 			break
 	if not store.is_empty() and stockpile.has(town, store):
-		var cost := raw_price(town, store)
+		var cost := _folk_price(raw_price(town, store), id, "")
 		if _afford(id, town, cost):
 			production.spend(id, cost, "%s from the store" % store)
 			stockpile.take(town, store, 1, "folk:%s" % id)
@@ -430,7 +431,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 func _stay(id: String, need: String, rule: Dictionary) -> void:
 	var who := production.worker(id)
 	var town: String = who["town"]
-	var fee := int(rule.get("fee", 0))
+	var fee := _folk_price(int(rule.get("fee", 0)), id, "")
 	var what := str(rule.get("what", need))
 	if fee <= 0 or not building_stands.is_valid() \
 			or not building_stands.call(town, str(rule["building"])) or not _afford(id, town, fee):
@@ -458,10 +459,12 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 		if best.is_empty() or int(them["purse"]) < least:
 			best = other
 			least = int(them["purse"])
+	var base := fee
+	fee = _folk_price(base, id, best)
 	if best.is_empty() or not _afford(id, town, fee):
 		return
 	production.spend(id, fee, what)
-	var seller := _pay(town, best, fee, "trade", "%s for %s" % [what, who["name"]])
+	var seller := _pay(town, best, fee, "trade", "%s for %s" % [what, who["name"]], base)
 	production.note_trade(id, what, fee, seller)
 	production.note_trade(best, "%s for %s" % [what, who["name"]], fee, who["name"])
 	stockpile.note(town, need, fee, "folk:%s" % id, "%s paid %s %d gold for %s" % [who["name"], seller, fee, what])
@@ -473,16 +476,20 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 ## wood paid for), the sale tax on the rest too, and the maker the rest,
 ## their labour. All of it to the treasury for no such worker. Who was
 ## paid: the maker's name or TREASURY.
-func _sale(town: String, maker: String, id: String, cost: int, by: String, why: String) -> String:
+func _sale(town: String, maker: String, id: String, cost: int, by: String, why: String, base := -1) -> String:
 	var worker := production.worker(maker) if not maker.is_empty() else {}
 	if worker.is_empty():
 		stockpile.deposit(town, "gold", cost, by, why)
 		return TREASURY
-	var stuff := mini(materials(id), cost)
-	var split := Economy.taxed(cost - stuff, "sale", rules)
-	if stuff + split[0] > 0:
-		stockpile.deposit(town, "gold", stuff + split[0], "tax:sale", "%s: materials %d, tax %d" % [why, stuff, split[0]])
-	production.pay(maker, split[1], why)
+	# Materials and tax on the price before a merchant's factor (decision
+	# 440, economy's side): the difference is the maker's alone.
+	var listed := base if base >= 0 else cost
+	var stuff := mini(materials(id), listed)
+	var split := Economy.taxed(listed - stuff, "sale", rules)
+	var to_town := mini(stuff + split[0], cost)
+	if to_town > 0:
+		stockpile.deposit(town, "gold", to_town, "tax:sale", "%s: materials %d, tax %d" % [why, stuff, split[0]])
+	production.pay(maker, cost - to_town, why)
 	return str(worker["name"])
 
 
@@ -540,16 +547,37 @@ func _bank_turn(id: String, town: String) -> void:
 ## [param amount] paid to worker [param payee] in [param town] for a
 ## [param kind] of transaction, the tax to the treasury (all of it, for no
 ## such worker): who was paid, their name or TREASURY.
-func _pay(town: String, payee: String, amount: int, kind: String, why: String) -> String:
+func _pay(town: String, payee: String, amount: int, kind: String, why: String, base := -1) -> String:
 	var worker := production.worker(payee) if not payee.is_empty() else {}
 	if worker.is_empty():
 		stockpile.deposit(town, "gold", amount, "folk", why)
 		return TREASURY
-	var split := Economy.taxed(amount, kind, rules)
-	if split[0] > 0:
-		stockpile.deposit(town, "gold", split[0], "tax:folk", why)
-	production.pay(payee, split[1], why)
+	# The tax on the fee before a merchant's factor; the rest is the payee's.
+	var tax := mini(Economy.taxed(base if base >= 0 else amount, kind, rules)[0], amount)
+	if tax > 0:
+		stockpile.deposit(town, "gold", tax, "tax:folk", why)
+	production.pay(payee, amount - tax, why)
 	return str(worker["name"])
+
+
+# --- Merchants (decision 440, economy's side) --------------------------------------
+
+## How worker [param worker_id]'s hidden type (npc's 393) bends their own
+## trade on [param side] ("buy" or "sell"): rules' merchant buy or sell for
+## a merchant, 1 for everyone else (and for no worker).
+func folk_factor(worker_id: String, side: String) -> float:
+	if worker_id.is_empty() or str(production.worker(worker_id).get("type", "")) != "merchant":
+		return 1.0
+	return float(rules.get("merchant", {}).get(side, 1.0))
+
+
+## [param base] as resident [param buyer] pays it to [param seller] (a
+## worker, or "" for the town): each one's folk_factor, at least 1 gold
+## for anything that cost some.
+func _folk_price(base: int, buyer: String, seller: String) -> int:
+	if base <= 0:
+		return base
+	return maxi(roundi(base * folk_factor(buyer, "buy") * folk_factor(seller, "sell")), 1)
 
 
 # --- For npc's offers (decision 435, economy's side) -------------------------------

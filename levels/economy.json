@@ -16,6 +16,7 @@
 	"water": {"spring": 4, "catch": 12, "cap": 30, "draw": 0.5, "dry_slows": "cook", "dry_rate": 0.5},
 	"roof": {"by": "carpenter", "wood_base": 1, "wood_cells": 8, "steps": 1200},
 	"stand_in": {"fletcher": "carpenter"},
+	"merchant": {"buy": 0.85, "sell": 1.15},
 	"commissions": {"rescue": 10, "camp": 20, "fetch": 1},
 	"reforge": {"trade": "smith", "fee": 0.5, "least": 1},
 	"bless": {"trade": "priest", "offering": 0.5, "least": 1, "steps": 600},

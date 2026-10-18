@@ -8655,6 +8655,17 @@ resident cards, step 3); rolling from every type in the file (Jeff has not
 agreed scholar or merchant); showing the type to a player who talks long
 enough (it is hidden by Jeff's word; what a thief lets slip is the voice's
 to decide from the standing fact).
+
+440, economy's side (npc's scholar and merchant side-doings): a merchant
+trades sharper for themself. Economy.folk_factor(worker, side) is rules'
+"merchant" buy (0.85) or sell (1.15) for a worker of type merchant, 1 for
+anyone else. A resident's own purchases (a shop meal, the store's food,
+the inn's bed, a trade's service) cost base x buyer's buy x seller's sell
+(Economy._folk_price, at least 1). The town's materials and tax are
+reckoned on the base price; the difference is the seller's alone (the
+treasury, for the store's food and the inn). Players' prices are
+unchanged.
+
 ## 378. Who may say what: speech bound to lore, and townsfolk's hearsay
 
 Jeff (2026-10-17): "official characters only speak lore facts, priests,

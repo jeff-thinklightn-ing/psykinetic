@@ -11,6 +11,7 @@ notes (decision 324).
   hair, beard, a hood or hat, the trade's apron), ready for the character
   models when they come; nothing changes on screen yet.
 - Clearing a raider camp takes it: kill its defenders and hold it for ten seconds, and it falls, freeing whoever it held. Its monsters stay gone until the raiders take it back, and a raid party coming home to it scatters.
+- Some townsfolk are shrewd merchants: they pay a little less for what they buy in town and get a little more for what they make, at the other townsfolk's expense, never the town's.
 - The game can ask a server whether it is up, its version and how many are playing before you join, so the menu can show it.
 - The options end with Credits: who made the sounds (Freesound, Kenney, Sonniss), and a button that lists each sound's maker, licence and page (decision 406).
 - This release changes what the server and client send each other: update the game before joining. The shop and temple counters can now show what can be done to the things you carry, and what it costs. The town's smith can reforge a named weapon into another, keeping its name and history, for some of the town's ore and wood and a fee; you collect it from the counter when it's done.
