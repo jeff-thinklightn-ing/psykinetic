@@ -1212,6 +1212,19 @@ func _test_composer() -> void:
 	var thatched: MeshInstance3D = (house[0]["roof"] as Node3D).find_child("Slopes", true, false) if house.size() == 1 else null
 	_check(thatched != null and thatched.material_override == Client3D._roof_material("thatch") and ArtKit.has("material.roof.thatch"),
 			"its roofs thatched, art-kit's thatch set there (decision 489 amended)")
+	# A porch over the L-house's door (4, 9 south: out is +z), its front out;
+	# a cruck on the round hut's... none: a longhouse's far gable instead.
+	var porch := BuildingComposer.porch_of(buildings[0])
+	_check(porch != null and porch.position.is_equal_approx(Vector3(2.0, 0.0, 7.5)) and is_equal_approx(porch.rotation.y, -PI * 0.5),
+			"a porch on its door's edge, its front out of the house (%s, %.2f)" % [porch.position if porch else null, porch.rotation.y if porch else 0.0])
+	if porch != null:
+		porch.free()
+	var longhouse: Dictionary = _kinds_level([["building_longhouse_small", Vector2i(1, 1), false]])["buildings"][0]
+	var cruck := BuildingComposer.cruck_of(longhouse, false)
+	_check(cruck != null and is_equal_approx(absf(cruck.position.x - 5.5), 6.0) and is_equal_approx(cruck.position.z, 2.0),
+			"a cruck frame on the longhouse's gable end, outside its 12 cells (%s)" % [cruck.position if cruck else null])
+	if cruck != null:
+		cruck.free()
 	var ruin := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 13, 6, 8))
 	var broken := Level.blocks_outline(Level._union([Rect2i(2, 13, 6, 8)])).filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "broken")
 	_check(ruin.size() == 1 and ruin[0]["roof"] == null and broken.size() > 3 and not _rig._building_at.has(Vector2i(4, 16)),

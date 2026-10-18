@@ -13281,6 +13281,15 @@ roof.<set>.profile's; chimney.stone is seated on the roof where it stands
 (the main roof's rise there, replayed from its stream: _main_rise), so its
 2.2 m stack clears the roof round it however steep, the hall's 5 m rise
 too. view_test: the L-house thatched.
+Amended (art-kit's porch.timber, porch.timber_wide and frame.cruck, 9fbac06;
+edge pieces along z, their front +x, the origin on the edge's middle at the
+ground): a porch over a kind's first door by kind (PORCHES' odds; the wide
+one over a door two edges wide), a cruck frame on a gable end of its main
+block where the gable spans CRUCK_SPAN cells (CRUCKS' odds; the end
+without a door); each turned so its front faces out of the building (the
+edge's inside cell to its outside one). Drawn only: they stand outside the
+footprint and block nothing. No porch on a ruin. view_test: the L-house's
+porch on its door's edge facing out; a longhouse's cruck on its gable.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 

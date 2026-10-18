@@ -10,8 +10,9 @@ extends RefCounted
 ## in the middle of its ridge, and is set a few centimetres off true; a
 ## round kind's one faceted cone over all its blocks. A chimney stands at a
 ## gable end of a house's main block when its seed says so (art-kit's
-## chimney.stone if it is there, else a stack of the stone set). A ruin has
-## no roof, perhaps its chimney.
+## chimney.stone if it is there, else a stack of the stone set); a porch
+## over the front door and a cruck frame on a gable end by kind (art-kit's
+## edge pieces). A ruin has no roof and no porch, perhaps its chimney.
 ## The walls and floors are not drawn here: they are the map's edges, the
 ## terrain's runs in the kind's sets (Client3D).
 ## What it makes is kept by kind, size, seed, facing and ruin (compose), so
@@ -46,6 +47,13 @@ const FACET_STRAY := 0.05
 const CHIMNEYS := {"house": 0.7, "l_house": 0.7, "house_leanto": 0.6, "house_wing": 0.7, "two_storey": 0.8,
 	"cottage": 0.8, "inn": 0.9, "hall": 0.6, "longhouse": 0.5, "hut": 0.3, "healers_hut": 0.5}
 const CHIMNEY := Vector3(0.75, 0.9, 0.65)
+## The kinds that may have a porch over their front door, and how likely;
+## those with a cruck frame on a gable end, and the gable's span (cells)
+## its 4.16 m frame suits.
+const PORCHES := {"house": 0.5, "l_house": 0.5, "house_leanto": 0.4, "house_wing": 0.5, "two_storey": 0.4,
+	"cottage": 0.4, "inn": 0.9, "hall": 0.6}
+const CRUCKS := {"longhouse": 0.8, "cottage": 0.4, "hut": 0.3, "house": 0.2}
+const CRUCK_SPAN := Vector2i(4, 6)
 ## The roles of blocks roofed with a single slope.
 const LEANING: Array[String] = ["leanto", "outshot", "bay"]
 ## The stream salt for what is the building's own, not a block's.
@@ -191,7 +199,82 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 	var odds := float(CHIMNEYS.get(str(building["kind"]), 0.0)) * (0.6 if ruined else 1.0)
 	if rng.randf() < odds and str(building.get("roof", "gable")) != "round":
 		parts.add_child(_chimney(building, main, rect, eaves, rng))
+	if not ruined and rng.randf() < float(PORCHES.get(str(building["kind"]), 0.0)):
+		var porch := porch_of(building)
+		if porch != null:
+			parts.add_child(porch)
+	if rng.randf() < float(CRUCKS.get(str(building["kind"]), 0.0)):
+		var cruck := cruck_of(building, rng.randf() < 0.5)
+		if cruck != null:
+			parts.add_child(cruck)
 	return out
+
+
+## Art-kit's edge piece [param slot] (along z, its front +x, its origin on
+## the edge's middle at the ground) at [param middle] (the building's
+## frame, x and z) with its front toward [param out]; null if the slot is
+## not there.
+static func _edge_piece(slot: String, middle: Vector2, out: Vector2i) -> Node3D:
+	if not ArtKit.has(slot):
+		return null
+	var piece := ArtKit.instance(slot)
+	piece.name = slot.get_slice(".", 0).capitalize()
+	piece.position = Vector3(middle.x, 0.0, middle.y)
+	piece.rotation.y = atan2(-float(out.y), float(out.x))
+	return piece
+
+
+## [param key]'s middle in [param building]'s frame and its outward side
+## (from its inside cell to its outside one).
+static func _edge_out(building: Dictionary, key: Vector3i) -> Array:
+	var rect: Rect2i = building["rect"]
+	var sides := Terrain.edge_cells(key)
+	var inside := Level.building_cells(building).has(sides[0])
+	var out := (sides[1] - sides[0]) * (1 if inside else -1)
+	return [(Vector2(sides[0]) + Vector2(sides[1])) * 0.5 - Vector2(rect.position), out]
+
+
+## A porch over [param building]'s first door (art-kit's porch.timber; its
+## wide one, porch.timber_wide, over a door two edges wide), null without
+## the slot or a door.
+static func porch_of(building: Dictionary) -> Node3D:
+	var doors: Array = building.get("doors", [])
+	if doors.is_empty():
+		return null
+	var first: Array = _edge_out(building, doors[0])
+	var wide: bool = doors.size() > 1 and (_edge_out(building, doors[1])[0] as Vector2).distance_to(first[0]) < 1.01 \
+			and _edge_out(building, doors[1])[1] == first[1]
+	var middle: Vector2 = first[0]
+	if wide:
+		middle = (middle + (_edge_out(building, doors[1])[0] as Vector2)) * 0.5
+	return _edge_piece("porch.timber_wide" if wide and ArtKit.has("porch.timber_wide") else "porch.timber", middle, first[1])
+
+
+## A cruck frame on a gable end of [param building]'s main block (the far
+## one from its doors, else [param far]'s pick), its outer face out; null
+## without the slot, or where the gable is not CRUCK_SPAN wide.
+static func cruck_of(building: Dictionary, far: bool) -> Node3D:
+	var blocks: Array = building["blocks"]
+	var main: Rect2i = blocks[_main_of(blocks)]
+	var rect: Rect2i = building["rect"]
+	var along_x := main.size.x > main.size.y
+	var span := main.size.y if along_x else main.size.x
+	if span < CRUCK_SPAN.x or span > CRUCK_SPAN.y:
+		return null
+	var middle := Vector2(main.position - rect.position) + Vector2(main.size - Vector2i.ONE) * 0.5
+	var reach := float(main.size.x if along_x else main.size.y) * 0.5
+	var ends: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0)]
+	if not along_x:
+		ends = [Vector2i(0, 1), Vector2i(0, -1)]
+	var outline := Level.building_outline(building)
+	var doored := ends.filter(func(side: Vector2i) -> bool:
+		return (building.get("doors", []) as Array).any(func(key: Vector3i) -> bool:
+			return key in outline and _edge_out(building, key)[1] == side))
+	var free := ends.filter(func(side: Vector2i) -> bool: return not side in doored)
+	if free.is_empty():
+		return null
+	var side: Vector2i = free[0] if free.size() == 1 or not far else free[1]
+	return _edge_piece("frame.cruck", middle + Vector2(side) * reach, side)
 
 
 ## Block [param index]'s roof by its role, placed in the building's frame
