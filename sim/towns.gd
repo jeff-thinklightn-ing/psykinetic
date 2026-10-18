@@ -46,6 +46,8 @@ const DAMAGED := "damaged"
 const LOG_SIZE := 50
 ## A repair job's building id: REPAIR + the kind.
 const REPAIR := "repair:"
+## A roof's build job's id prefix: "roof:<index>" (decision 426).
+const ROOF := "roof:"
 
 ## A raid reached [param town]: raid_arrives' report.
 signal raided(town: String, report: Dictionary)
@@ -72,6 +74,15 @@ var in_play := Callable()
 var companion_taken := Callable()
 var companion_freed := Callable()
 var companion_of := Callable()
+## Wells and roofs (decision 426; Main sets them, tests stand in):
+## (town) -> int, the wells in its area; (town, from, to) -> float, the
+## rain that fell on it between two steps in days of full rain
+## (Weather.rain_between); (town) -> [{index, cells}], its level's damaged
+## roofs; (town, index) -> bool, mends one (World.repair_roof).
+var wells := Callable()
+var rain := Callable()
+var roofs := Callable()
+var mend_roof := Callable()
 
 ## Town -> {xp, spent, residents: Array[String] (worker ids), buildings:
 ## {kind: {kind, level, state, since, job}}, objectives (done, by id),
@@ -87,6 +98,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.workshop_open = allows
 	production.workshop_level = level_for
 	production.on_built = _built
+	production.work_rate = _work_rate
 	production.hunted.connect(_on_hunted)
 	from_dict(saved)
 
@@ -290,9 +302,12 @@ func tick() -> void:
 	for town in towns:
 		_spread(town)
 		_appoint(town)
+		_water(town)
 		if production.building_in(town):
 			continue
 		if _repair(town):
+			continue
+		if _roof(town):
 			continue
 		var kind := choose(town)
 		if not kind.is_empty():
@@ -465,6 +480,11 @@ func _spread(town: String) -> void:
 ## standing; its trade's workshop opens and waiting residents are seated.
 func _built(town: String, kind: String) -> void:
 	var record := _town(town)
+	if kind.begins_with(ROOF):
+		var index := int(kind.trim_prefix(ROOF))
+		var mended := mend_roof.is_valid() and bool(mend_roof.call(town, index))
+		_note(town, "a roof is mended" if mended else "a roof the carpenter came to was whole already")
+		return
 	if kind.begins_with(REPAIR):
 		var repaired: Dictionary = record["buildings"].get(kind.trim_prefix(REPAIR), {})
 		if not repaired.is_empty():
@@ -535,6 +555,72 @@ func _repair(town: String) -> bool:
 			return true
 		entry["job"] = production.order_build(town, REPAIR + kind, by, cost, maxi(ceili(int(spec.get("steps", 1)) * level * share), 1))
 		_note(town, "the %s is to be repaired" % kind)
+		return true
+	return false
+
+
+# --- Wells and roofs (decision 426) -------------------------------------------------
+
+## [param town]'s water now ({} with no well: nothing of this applies).
+func water(town: String) -> float:
+	return float(_towns.get(town, {}).get("water", 0.0))
+
+
+## Whether [param town]'s wells are dry (it has some, and no water).
+func dry(town: String) -> bool:
+	return bool(_towns.get(town, {}).get("dry", false))
+
+
+## [param town]'s water moved on to now: each well's spring a day and its
+## catch of the rain that fell, up to cap a well; its residents' draw a
+## day each. Dry and wet again said once each in the log.
+func _water(town: String) -> void:
+	var count := int(wells.call(town)) if wells.is_valid() else 0
+	if count <= 0:
+		return
+	var rule: Dictionary = rules.get("water", {})
+	var record := _town(town)
+	var at := now()
+	if not record.has("water_at"):
+		record["water"] = float(rule.get("cap", 30)) * count
+		record["water_at"] = at
+		record["dry"] = false
+		return
+	var days := float(at - int(record["water_at"])) / maxi(DayNight.day_steps, 1)
+	if days <= 0.0:
+		return
+	var fell := float(rain.call(town, float(record["water_at"]), float(at))) if rain.is_valid() else 0.0
+	record["water_at"] = at
+	var gained := (float(rule.get("spring", 4)) * days + float(rule.get("catch", 12)) * fell) * count
+	var drawn := float(rule.get("draw", 1)) * days * residents(town).size()
+	record["water"] = clampf(float(record["water"]) + gained - drawn, 0.0, float(rule.get("cap", 30)) * count)
+	var now_dry := float(record["water"]) <= 0.0
+	if now_dry != bool(record["dry"]):
+		record["dry"] = now_dry
+		_note(town, "the well is dry" if now_dry else "the well has water again")
+
+
+## Production.work_rate: rules' water dry_slows trade (the cook) works at
+## dry_rate while its town is dry. PROVISIONAL (decision 426): Jeff's to
+## confirm what a dry well does.
+func _work_rate(shop: Dictionary) -> float:
+	var rule: Dictionary = rules.get("water", {})
+	if str(shop.get("trade", "")) == str(rule.get("dry_slows", "")) and dry(str(shop.get("town", ""))):
+		return float(rule.get("dry_rate", 0.5))
+	return 1.0
+
+
+## Orders the mending of [param town]'s first damaged roof, if no other
+## is open: a build job by rules' roof.by, priced in wood by its size.
+## True if it did.
+func _roof(town: String) -> bool:
+	if not roofs.is_valid():
+		return false
+	var rule: Dictionary = rules.get("roof", {})
+	for roof: Dictionary in roofs.call(town):
+		var wood := int(rule.get("wood_base", 1)) + int(int(roof.get("cells", 0)) / maxi(int(rule.get("wood_cells", 8)), 1))
+		production.order_build(town, ROOF + str(roof["index"]), str(rule.get("by", "carpenter")), {"wood": wood}, int(rule.get("steps", 1200)))
+		_note(town, "a roof broken by the storm is to be mended (%d wood)" % wood)
 		return true
 	return false
 
@@ -833,3 +919,7 @@ func from_dict(saved: Dictionary) -> void:
 		for line: Variant in entry.get("log", []):
 			if line is Dictionary:
 				record["log"].append({"step": int(line.get("step", 0)), "what": str(line.get("what", ""))})
+		if entry.has("water_at"):
+			record["water"] = maxf(float(entry.get("water", 0.0)), 0.0)
+			record["water_at"] = int(entry["water_at"])
+			record["dry"] = bool(entry.get("dry", false))

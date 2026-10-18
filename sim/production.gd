@@ -72,6 +72,9 @@ var returned := Callable()
 ## (decision 407; Main sets it: Herds.hunt_one near its store): the kind
 ## caught, or "" for no game.
 var hunt := Callable()
+## (shop) -> float: how fast [param shop]'s work goes now, 1 normal (Towns
+## sets it: a dry well halves the kitchen's, decision 426); unset, 1.
+var work_rate := Callable()
 
 ## What worker [param worker_id] owes the town's bank changed (set_loan):
 ## for npc's cards.
@@ -509,7 +512,8 @@ func _advance(at: int, cat: Dictionary) -> void:
 		if each["state"] != "working":
 			continue
 		if _present(each["worker"], each["workshop"]):
-			each["worked"] = int(each["worked"]) + at - int(each["last"])
+			var rate := float(work_rate.call(_workshops.get(each["workshop"], {}))) if work_rate.is_valid() else 1.0
+			each["worked"] = int(each["worked"]) + roundi((at - int(each["last"])) * rate)
 		each["last"] = at
 		if each["kind"] == "return" and int(each["worked"]) < int(each["needed"]) 				and at - int(each["opened"]) >= int(rules.get("return", {}).get("give_up", 6000)):
 			each["fallback"] = true  # Nobody there to do it: brought back as before.

@@ -1706,6 +1706,24 @@ func _boot() -> void:
 		return zone != null and zone.awake and _towns_near.has(town)
 	World.towns.companion_taken = companion_taken
 	World.towns.companion_freed = companion_freed
+	# Wells and roofs (decision 426): a town's are its level's.
+	World.towns.wells = func(town: String) -> int:
+		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
+		return (area.get("buildings", []) as Array).filter(func(house: Dictionary) -> bool:
+			return str(house.get("slot", "")) == "building.well").size()
+	World.towns.rain = func(town: String, from: float, to: float) -> float:
+		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
+		return Weather.rain_between(str(area.get("region", Level.DEFAULT_REGION)), from, to)
+	World.towns.roofs = func(town: String) -> Array:
+		var level := town.get_slice("/", 0)
+		var listed: Array = _world_map.areas.get(level, {}).get("roofs", [])
+		var out := []
+		for index in World.damaged_roofs(level):
+			var rect: Rect2i = listed[index]["rect"] if index < listed.size() else Rect2i()
+			out.append({"index": index, "cells": rect.get_area()})
+		return out
+	World.towns.mend_roof = func(town: String, index: int) -> bool:
+		return World.repair_roof(town.get_slice("/", 0), index)
 	World.towns.companion_of = func(player_id: String) -> Dictionary:
 		var record: PlayerRecord = _records.get(player_id)
 		if record == null or record.companion.is_empty():

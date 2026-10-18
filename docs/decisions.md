@@ -9419,3 +9419,47 @@ Not in this step: turned or broken alliances (the hook: an ally without
 allied_to is its own side). Protocol unchanged.
 
 tests/factions_test.
+
+## 426. Wells keep a town's water; the carpenter mends storm-broken roofs
+
+On environment's 384 (town weather: rain fills wells, storms break roofs;
+Weather.rain_between) and 383 (roof damage: World.damaged_roofs,
+World.repair_roof). The coordinator's approval of 2026-10-17.
+
+Wells:
+- A town's wells are the building.well entries in its area (no level edit,
+  no "use" link). With none, the town keeps no water and nothing here
+  applies.
+- The town record keeps "water", full (cap x wells) the first time it is
+  seen. On the town tick each well adds spring (4) a day and catch (12) x
+  the rain that fell on its region (days of full rain), up to cap (30) a
+  well; residents draw draw (0.5) a day each. Saved on the record.
+- Dry and wet again are each said once in the town log ("the well is
+  dry", "the well has water again").
+- PROVISIONAL, JEFF'S TO CONFIRM: while dry, the kitchen (water.dry_slows,
+  the cook) works at dry_rate (0.5), so meals take twice as long
+  (Production.work_rate, set by Towns). Nothing else changes: no thirst,
+  no deaths, no change to the dole.
+- Tuning: a season of the town lands' rain (about 10 days of full rain in
+  90) with 10 residents: the water dips to about 19 of 30 and never runs
+  dry; with 4, it stays full. A draw of 1 left a 10-resident town dry 68
+  days of 90, hence 0.5. A big town (20 residents) runs dry in a dry spell.
+
+Roofs:
+- A damaged roof of a level belongs to the town whose store is in it.
+  After any building repair, Towns orders one roof mended at a time: a
+  build job ("roof:<index>") by rules' roof.by (the carpenter), costing
+  wood_base (1) + one wood per wood_cells (8) of the roof, roof.steps
+  (1200), paid as town work. Done: World.repair_roof; if the roof was
+  whole already, the wood is still spent and the log says so.
+- Load: about 1.2 storms a season each breaking a quarter of the roofs is
+  2 to 3 roofs a season for a town of 8, a small fraction of the
+  carpenter's time.
+- Towns' hooks wells, rain, roofs and mend_roof are set by Main (the
+  level's buildings, Weather.rain_between of its region, World's roofs);
+  tests stand in for them.
+
+Protocol unchanged: sim only. tests/wells_test (full at first, spring and
+draw, dry and wet once each, the kitchen at half speed and the forge not,
+cap, saved, no well, a printed season for 10 and 4 residents, a roof
+ordered and mended, one at a time, wood by size, whole already).

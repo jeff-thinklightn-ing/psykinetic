@@ -13,6 +13,8 @@
 	},
 	"always_want": ["resource", "repair"],
 	"hunter": {"trade": "hunter", "every": 3000},
+	"water": {"spring": 4, "catch": 12, "cap": 30, "draw": 0.5, "dry_slows": "cook", "dry_rate": 0.5},
+	"roof": {"by": "carpenter", "wood_base": 1, "wood_cells": 8, "steps": 1200},
 	"work_up": {"ore": ["weapon", "shield"], "wood": ["shield", "weapon"], "cloth": ["bandage"], "food": ["food"]},
 	"defend_trades": ["smith", "carpenter", "cook"],
 	"busy": {"quiet_below": 4, "busy_from": 20},
