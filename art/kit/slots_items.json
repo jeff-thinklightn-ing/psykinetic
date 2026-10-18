@@ -197,9 +197,9 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.03,
+				0.08,
 				0.3,
-				0.02
+				0.03
 			],
 			"sockets": {
 				"grip": [
@@ -235,9 +235,9 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.4,
+				0.6,
 				1.4,
-				0.06
+				0.1
 			],
 			"sockets": {
 				"grip": [
@@ -259,9 +259,9 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.14,
+				0.22,
 				0.7,
-				0.07
+				0.14
 			],
 			"sockets": {
 				"grip": [
@@ -387,6 +387,30 @@
 			"type": "mesh",
 			"uses": "sack of ore (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.pick": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.5,
+				0.9,
+				0.06
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				],
+				"grip_2": [
+					0,
+					0.54,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "pick (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.ration": {
 			"budget": 500,
 			"category": "items",
@@ -450,7 +474,7 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.05,
+				0.12,
 				2.0,
 				0.05
 			],
@@ -469,9 +493,9 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.08,
+				0.2,
 				0.9,
-				0.03
+				0.04
 			],
 			"sockets": {
 				"grip": [

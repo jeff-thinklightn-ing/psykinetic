@@ -12073,3 +12073,20 @@ approved 2026-10-18; protocol unchanged.
   piles, so a client can look up ArtKit's item.<id>.<style> before
   item.<id>. It waits for art-kit's first styled piece.
 items_test's _test_style.
+
+## 479. The pick, and art-kit's weapon sizes in the catalog
+
+Approved by the coordinator (2026-10-18) for pc-character's kobold (416:
+kobolds dig the Blood Rot's shafts), which holds one.
+- items.json "pick": a two-handed tool and weapon, a knockback verb that
+  is slow and heavy (speed 1.6, damage 1.4, force 1.5, windup 4), made by
+  the smith from 2 ore and 1 wood. Players can make and hold it too. Art
+  slot item.pick (Items.art_slots): art-kit's grey box until art-gen's
+  candidate. A miner's trade using it is economy's to decide.
+- The sword, dagger, spear, hammer and giant axe "size"s are widened to
+  art-kit's boxes (its overrides in slots.json, 084fb41) so their guards and
+  heads are not squeezed. A size is read only for the art slot, so the
+  catalog carries it; art-kit drops its size overrides and keeps its origin
+  offsets.
+slots_items.json and the art status regenerated (tools/items_art_slots.gd).
+Protocol unchanged (the same fingerprint before and after).

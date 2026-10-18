@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 154,
 		"fill": 0,
-		"placeholder": 15
+		"placeholder": 16
 	},
 	"slots": [
 		{
@@ -1865,10 +1865,21 @@
 			"budget": 500
 		},
 		{
-			"slot": "item.roast",
+			"slot": "item.pick",
 			"status": "placeholder",
 			"group": "rest",
 			"order": 169,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.5 x 0.9 x 0.06",
+			"budget": 500
+		},
+		{
+			"slot": "item.roast",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 170,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
