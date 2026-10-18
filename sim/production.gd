@@ -121,8 +121,11 @@ static func items_catalog() -> Dictionary:
 	for id: String in Items.ids():
 		var def := Items.def(id)
 		var made: Variant = def.get("made", {})
-		if made is Dictionary and not made.is_empty():
-			out[id] = {"id": id, "tags": def.get("tags", []), "made": made}
+		var mend := Items.mend_of(id)
+		if made is Dictionary and not made.is_empty() or not mend.is_empty():
+			out[id] = {"id": id, "tags": def.get("tags", []), "made": made if made is Dictionary else {}}
+			if not mend.is_empty():
+				out[id]["mend"] = mend  # Items' 413: how a worn one is mended (decision 414).
 	return out
 
 
@@ -543,6 +546,15 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		uid = int(each["uids"][0])
 		book().place(uid, "")
 		book().note(uid, "reworked", made_at)
+	elif each["kind"] == "mend":
+		# The same thing (its history, its name) back to its most, banked
+		# where it was taken from, not put up for sale (decision 414).
+		var mended := int(each["uids"][0])
+		book().place(mended, "")
+		book().set_condition(mended, Items.condition_max(book().id_of(mended)))
+		book().note(mended, "mended", made_at)
+		stockpile.bank(each["town"], mended, worker_record["name"], "a mend", "", Vector2i(-1, -1), "")
+		each["mended"] = mended
 	else:
 		uid = book().mint(each["recipe"], "made", made_at)
 		# Gear it was made from is in what it became.
@@ -558,7 +570,7 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 			and stockpile.take(each["town"], "gold", wage, "wage:%s" % worker_record["id"])
 	if paid:
 		worker_record["purse"] = int(worker_record["purse"]) + wage
-	print("[production] %s finished %s #%d (%s), step %d; %s" % [made_at, each["recipe"], uid, each["kind"], now(),
+	print("[production] %s finished %s #%d (%s), step %d; %s" % [made_at, each["recipe"], uid if uid != 0 else int(each.get("mended", 0)), each["kind"], now(),
 		"paid %d gold" % wage if paid else "unpaid (the town's gold is at its floor)" if wage > 0 else "no wage"])
 	var shop: Dictionary = _workshops.get(each["workshop"], {})
 	if not shop.is_empty() and shop["job"] == each["id"]:
@@ -869,6 +881,13 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 			return int(a["made"]["steps"]) < int(b["made"]["steps"])
 		return str(a["id"]) < str(b["id"]))
 	for want in wants:
+		if want == "repair":
+			var mend := _mend_bid(shop, cat)
+			if not mend.is_empty():
+				mend["key"] = [starved, 1, _tier_key(shop, cat[mend["recipe"]], want, signals), -int(shop["waited"]), shop["id"]]
+				mend["want"] = want
+				return mend
+			continue
 		for entry: Dictionary in recipes:
 			var rework := 0
 			if want == "rework":
@@ -882,6 +901,20 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 			return {"workshop": shop["id"], "recipe": entry["id"], "kind": "rework" if rework != 0 else "make",
 				"want": want, "job": 0, "rework": rework,
 				"key": [starved, 1, _tier_key(shop, entry, want, signals), -int(shop["waited"]), shop["id"]]}
+	return {}
+
+
+## A mend [param shop] could take on (decision 414): the first thing banked
+## in its town's store, by uid, worn below its most whose mend is by the
+## shop's trade and whose mend's "from" the store has ({} for none).
+func _mend_bid(shop: Dictionary, cat: Dictionary) -> Dictionary:
+	for uid in stockpile.items(shop["town"]):
+		var id := book().id_of(uid)
+		var mend: Dictionary = cat.get(id, {}).get("mend", {})
+		if mend.get("by") != shop["trade"] or book().condition_of(uid) < 0 or book().condition_of(uid) >= Items.condition_max(id):
+			continue
+		if _affords(shop["town"], mend, false):
+			return {"workshop": shop["id"], "recipe": id, "kind": "mend", "job": 0, "rework": uid}
 	return {}
 
 
@@ -958,13 +991,14 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	var queued: Dictionary = _jobs.get(int(bid["job"]), {})
 	if int(bid["job"]) != 0 and queued.get("state") != "queued":
 		return false  # Another workshop took it this tick.
+	var mending: bool = bid["kind"] == "mend"
 	var made: Dictionary = {"from": queued["cost"], "steps": queued["steps"]} if bid["kind"] == "build" \
-			else cat[bid["recipe"]]["made"]
+			else cat[bid["recipe"]]["mend"] if mending else cat[bid["recipe"]]["made"]
 	var rework := int(bid["rework"])
 	if rework != 0 and rework not in stockpile.items(town):
 		return false
-	var needs := _needs(made, rework != 0)
-	if not _affords(town, made, rework != 0):
+	var needs := _needs(made, rework != 0 and not mending)
+	if not _affords(town, made, rework != 0 and not mending):
 		return false
 	var id: int = bid["job"] if int(bid["job"]) != 0 else _new_job(bid["kind"], bid["recipe"], shop)
 	var each: Dictionary = _jobs[id]
@@ -983,19 +1017,22 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 		stockpile.take_item(town, rework, reason)
 		book().place(rework, "job:%d" % id)
 		each["uids"].append(rework)
-	if each["kind"] != "build":
+	if mending:
+		each["kind"] = "mend"
+		each["to_id"] = bid["recipe"]  # The same id: a mend (a reforge's later, decision 414).
+	elif each["kind"] != "build":
 		each["kind"] = "rework" if rework != 0 else "make"
 	each["workshop"] = shop["id"]
 	each["state"] = "working"
 	each["worker"] = shop["worker"]
 	var level := int(workshop_level.call(shop)) if workshop_level.is_valid() else 1
 	var speed := 1.0 + float(rules.get("level_speed", 0.25)) * maxi(level - 1, 0)
-	each["needed"] = ceili(int(made["steps"]) / (2.0 if rework != 0 else 1.0) / speed)
+	each["needed"] = ceili(int(made["steps"]) / (2.0 if rework != 0 and not mending else 1.0) / speed)
 	each["worked"] = 0
 	each["last"] = now()
 	shop["job"] = id
 	print("[production] %s (%s) starts %s%s #%d at %s for %s, step %d; takes %s; done in %d steps" % [
-		_workers[shop["worker"]]["name"], shop["trade"], "a rework of " if rework != 0 else "", bid["recipe"], id,
+		_workers[shop["worker"]]["name"], shop["trade"], "a mend of " if mending else "a rework of " if rework != 0 else "", bid["recipe"], id,
 		bid["workshop"], bid["want"], now(), needs if not needs.is_empty() else "nothing", each["needed"]])
 	return true
 
@@ -1133,6 +1170,8 @@ func from_dict(saved: Dictionary) -> void:
 				"rework": int(entry.get("rework", 0)), "resources": {}, "uids": [], "needed": int(entry.get("needed", 0)),
 				"worked": int(entry.get("worked", 0)), "last": int(entry.get("last", 0)),
 				"trade": str(entry.get("trade", "")), "cost": {}, "steps": int(entry.get("steps", 0))}
+			if each["kind"] == "mend":
+				each["to_id"] = str(entry.get("to_id", each["recipe"]))
 			if each["kind"] == "return":
 				each["who"] = str(entry.get("who", ""))
 				each["who_kind"] = str(entry.get("who_kind", ""))

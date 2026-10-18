@@ -9,7 +9,10 @@ extends Node
 ## decision 409) more of both and nobody. A town's hunter (decision 407) every
 ## hunter.every steps brings home what the herds give: a stag's meat and
 ## hide into the store, its antlers banked; no game, nothing, and the town
-## log says so. Reads the repo's levels, never the shared
+## log says so. The carpenter mends a worn bundle of arrows banked in the
+## store (decision 414, items' 413 mend): leather and wood used, the same
+## uid back to its most, banked again; not a whole one, nor without the
+## leather. Reads the repo's levels, never the shared
 ## overlay.
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
@@ -30,6 +33,7 @@ func _ready() -> void:
 	_test_eating()
 	_test_raid()
 	_test_hunter()
+	_test_mend()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -181,6 +185,35 @@ func _test_hunter() -> void:
 	work.set_away("u1", true)
 	_started(work, every * 2)
 	_check(asked.size() == 2, "away, he does not hunt")
+
+
+func _test_mend() -> void:
+	print("
+== the carpenter mends a bundle of arrows ==")
+	var work := _work()
+	var book := work.book()
+	var worn := book.mint("arrows", "made", "test")
+	var whole := book.mint("arrows", "made", "test")
+	book.set_condition(worn, 3)
+	work.stockpile.bank(TOWN, whole, "Bo")
+	work.stockpile.bank(TOWN, worn, "Bo")
+	work.add_worker("p1", "Pell", ["carpenter"], TOWN)
+	work.add_workshop(TOWN + ":carpenter", "carpenter", TOWN)
+	work.assign(TOWN + ":carpenter", "p1")
+	_check(_started(work, 1200).is_empty(), "no leather in the store: it waits")
+	work.stockpile.deposit(TOWN, "leather", 1)
+	work.stockpile.deposit(TOWN, "wood", 3)
+	var jobs := _started(work, 1200)
+	_check(jobs == ["arrows"], "with leather and wood, a mend (%s)" % [jobs])
+	_check(book.condition_of(worn) == Items.condition_max("arrows") and worn in work.stockpile.items(TOWN),
+		"the same bundle back to its most (%d), banked again" % book.condition_of(worn))
+	_check(work.stockpile.count(TOWN, "leather") == 0 and work.stockpile.count(TOWN, "wood") == 2, "a leather and a wood used")
+	_check(book.history(worn)["events"].any(func(event: Dictionary) -> bool: return event["kind"] == "mended"), "its history says mended")
+	_check(work.stockpile.shop(TOWN).is_empty(), "not put up for sale")
+	work.stockpile.deposit(TOWN, "leather", 1)
+	_check(_started(work, 1200).is_empty(), "nothing worn left: no more mending")
+	var saved := Production.new(JSON.parse_string(JSON.stringify(work.to_dict())), work.stockpile, null, func() -> int: return _now, _rules)
+	_check(saved.jobs().is_empty(), "and nothing left over in a save")
 
 
 func _check(ok: bool, what: String) -> void:

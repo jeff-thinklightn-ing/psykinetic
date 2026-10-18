@@ -11,7 +11,7 @@
 		"stock": ["bandage", "food", "weapon", "shield"],
 		"surplus": ["goods", "rework"]
 	},
-	"always_want": ["resource"],
+	"always_want": ["resource", "repair"],
 	"hunter": {"trade": "hunter", "every": 3000},
 	"work_up": {"ore": ["weapon", "shield"], "wood": ["shield", "weapon"], "cloth": ["bandage"], "food": ["food"]},
 	"defend_trades": ["smith", "carpenter", "cook"],

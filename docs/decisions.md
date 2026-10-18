@@ -9242,3 +9242,29 @@ quarters of a blow (absorb 0.75) and breaks sooner (breaks_at 1.5). Art slot
 item.buckler. Rejected: a leather jerkin (armour here would only add mass, all
 gain but a pack slot); a sling or bag (the slots are fixed; a new rule); a
 bandaging kit variant (the kit has no numbers to vary).
+
+## 414. The mend job: a worn thing in the store made whole on its own uid
+
+Items' 413 gives a thing with a condition a "mend" ({by, from, steps};
+the three bundles of arrows: the carpenter, leather 1 and wood 1, 600
+steps). Production does the work, agreed with items.
+
+- One job kind, "mend", holding the thing's uid and a to_id (the same id
+  for a mend). A reforge later is this job with another to_id, so it needs
+  no kind of its own.
+- It serves the "repair" want, which the defend tier lists and nothing
+  served before. always_want gains "repair" after "resource", so mending
+  happens in every tier, last. Production.items_catalog carries an item's
+  mend (Items.mend_of) beside its made.
+- A shop bids on the first thing banked in its town's store, by uid, worn
+  below its most (ItemBook.condition_of < Items.condition_max), whose mend
+  is by its trade, when the store has the mend's "from". It takes those
+  resources and the thing (held by the job, job:<id>, as a rework's) for
+  the mend's full steps. Done: the same uid set to its most
+  (ItemBook.set_condition), "mended" in its history, banked back in the
+  store, not put up for sale; its name and history stay.
+- Saved as any job, with to_id.
+
+Protocol unchanged: sim only. tests/larder_test (waits without leather, a
+mend, the same uid whole and banked, the materials used, none for a whole
+bundle, nothing left over in a save).
