@@ -121,9 +121,14 @@ static func request(town: String, log: Array, given: Dictionary) -> Dictionary:
 		var holders: Array[String] = []
 		for id: Variant in entry.get("holders", []):
 			holders.append(_who(production, str(id)))
-		lines.append("- [%s] \"%s\", first said by %s to %s, held by %s (%d of %d who heard it), %d days old." % [entry.get("id", ""), entry.get("text", ""),
+		var tag := ""
+		if bool(entry.get("dispute", false)):
+			tag = " A dispute between them." if entry.get("pair") is Array else " A dispute."
+			if entry.get("brought") is Dictionary:
+				tag += " Laid before you by %s, a traveller." % entry["brought"].get("by_name", "someone")
+		lines.append("- [%s] \"%s\", first said by %s to %s, held by %s (%d of %d who heard it), %d days old.%s" % [entry.get("id", ""), entry.get("text", ""),
 			_who(production, str(entry.get("said_by", ""))), _who(production, str(entry.get("to", ""))), ", ".join(holders) if not holders.is_empty() else "nobody now",
-			entry.get("holders", []).size(), int(entry.get("spread", 0)), int((now - int(entry.get("first_said", now))) / day)])
+			entry.get("holders", []).size(), int(entry.get("spread", 0)), int((now - int(entry.get("first_said", now))) / day), tag])
 	lines.append("")
 	lines.append("Rule on each candidate.")
 	var model := str(Offers._call(given, "model"))
@@ -182,7 +187,7 @@ static func parse(response: Dictionary) -> Array:
 ## [param rulings] applied to [param log] at [param step]: what each did,
 ## a line each, for the town's log. A memory text that touches the world is
 ## refused and the candidate left.
-static func apply(log: Array, rulings: Array, step: int) -> Array[String]:
+static func apply(log: Array, rulings: Array, step: int, given: Dictionary = {}, town := "") -> Array[String]:
 	var lines: Array[String] = []
 	var rest := setting("rest_days") * maxi(DayNight.day_steps, 1)
 	for ruling: Dictionary in rulings:
@@ -213,6 +218,7 @@ static func apply(log: Array, rulings: Array, step: int) -> Array[String]:
 					entry["tier"] = TownMemory.BELIEF
 					entry["rest_until"] = step + rest
 					lines.append("the lawspeaker left %s as %s's talk" % [id, entry.get("said_by", "someone")])
+					_settled(town, entry, "leave", "", step, given)
 					continue
 				var made := TownMemory.note(log, memory, SAID_BY, "", step)
 				made["tier"] = TownMemory.MEMORY
@@ -227,8 +233,19 @@ static func apply(log: Array, rulings: Array, step: int) -> Array[String]:
 			"move_in":
 				entry["ready"] = true
 				lines.append("the lawspeaker ruled that %s may be real: the town has room for them in time" % entry.get("text", ""))
+		if kind != "move_in":
+			_settled(town, entry, kind, memory, step, given)
 	last_applied = lines.duplicate()
 	return lines
+
+
+## A ruled entry that was a quarrel between two of the town's people
+## (decision 486, "pair") closes it through Offers.ruled, when the caller
+## gave the context ([param given]) to reach the cards and the players.
+static func _settled(town: String, entry: Dictionary, kind: String, memory: String, step: int, given: Dictionary) -> void:
+	if given.is_empty() or not entry.get("pair") is Array:
+		return
+	Offers.ruled(town, entry, kind, memory, step, given)
 
 
 ## The round's spend into ClaudeMind's session counters (one budget for
@@ -296,7 +313,7 @@ static func tick(step: int, client: Variant, given: Dictionary = Offers.ctx) -> 
 				"outcome": "no rulings", "error": str(response.get("error", "")), "cost": cost})
 			continue
 		var fresh: Array = Offers._call(given, "memory", [town])  # Read again: talk went on while we waited.
-		var lines := apply(fresh, rulings, step)
+		var lines := apply(fresh, rulings, step, given, town)
 		Offers._call(given, "set_memory", [town, fresh])
 		mine["rulings"] = int(mine.get("rulings", 0)) + rulings.size()
 		mine["requests"] = int(mine.get("requests", 0)) + 1

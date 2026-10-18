@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_cap_and_order()
 	_test_accept_and_meet()
 	_test_errand()
+	_test_quarrel()
 	_test_lapse()
 	_test_voice_words()
 	_test_scholar_and_merchant()
@@ -337,6 +338,80 @@ func _test_errand() -> void:
 	_check(_done.size() == 1 and _done[0][2] == "Jeff carried Mara's word to Bram." and _done[0][3] == 0, "Main told, unpaid: %s" % [_done])
 	_check(str(Townsfolk.card_of(_work, "o-bram")["facts"].back()["text"]).begins_with("Jeff carried Mara's word to Bram"), "true of Bram now")
 	_check(_offers().is_empty(), "no grudge, no plea")
+
+
+var _log: Array = []
+var _law := ""
+var _model := "off"
+
+
+func _grudge(a: String, b: String) -> void:
+	for pair: Array in [[a, b], [b, a]]:
+		var card := Townsfolk.card_of(_work, pair[0])
+		card["grudge"] = [pair[1]]
+		_work.set_card(pair[0], card)
+
+
+func _test_quarrel() -> void:
+	print("\n== a quarrel brought before the lawspeaker (decision 486) ==")
+	_setup([["o-mara", "Mara", "smith"], ["o-bram", "Bram", "hauler"], ["o-tam", "Tam", "hauler"], ["o-law", "Hrolf", "lawspeaker"]])
+	_log = []
+	_law = "o-law"
+	_model = "claude-haiku-5-5"
+	_ctx["memory"] = func(_town: String) -> Array: return _log.duplicate(true)
+	_ctx["set_memory"] = func(_town: String, log: Array) -> void: _log = log.duplicate(true)
+	_ctx["lawspeaker_of"] = func(_town: String) -> String: return _law
+	_ctx["model"] = func() -> String: return _model
+	_ctx["lore"] = func(_town: String) -> Array: return []
+	_ctx["town_name"] = func(_town: String) -> String: return "Ashford"
+	_ctx["players_words"] = func() -> bool: return false
+	_grudge("o-mara", "o-bram")
+	var noted := Townsfolk.note_disputes(_work, TOWN, _log, _now)
+	_check(noted and _log.size() == 1 and _log[0]["tier"] == TownMemory.CANDIDATE and _log[0]["dispute"] == true and _log[0]["pair"] == ["o-bram", "o-mara"]
+		and str(_log[0]["text"]) == "Bram and Mara are at odds", "one candidate dispute for the pair, said by the first of them by id: %s" % [_log])
+	_check(not Townsfolk.note_disputes(_work, TOWN, _log, _now + 1) and _log.size() == 1, "and not twice")
+	var mine := _offers()
+	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.CARRY and mine[0]["what"].get("law") == "o-law"
+		and mine[0]["title"] == "Speak for me" and str(mine[0]["words"]).begins_with("Lay my quarrel with Bram before the lawspeaker"),
+		"Mara's plea: speak for her before the lawspeaker: %s" % [mine])
+	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(taken["ok"] and taken["line"] == "Jeff will speak for Mara before the lawspeaker." and _asked.size() == 1, "taken, interest only: %s" % [taken])
+	Offers.spoke_to("p1", "o-bram", _ctx)
+	_check(_done.is_empty() and Townsfolk.card_of(_work, "o-mara")["grudge"] == ["o-bram"], "speaking to Bram carries no word: this is not that errand")
+	Offers.spoke_to("p1", "o-law", _ctx)
+	_check(_log.size() == 1 and _log[0].get("brought", {}).get("by") == "p1", "speaking to the lawspeaker lays it before him, nothing handed in: %s" % [_log[0].get("brought")])
+	_check(str(Townsfolk.card_of(_work, "o-law")["facts"].back()["text"]) == "Jeff laid Mara's quarrel with Bram before Hrolf.", "his card: who brought it")
+	var body := Lawspeaker.request(TOWN, _log, _ctx)
+	var content: String = body.get("messages", [{}])[0].get("content", "") if not body.is_empty() else ""
+	_check(content.contains("A dispute between them.") and content.contains("Laid before you by Jeff"), "his request names the dispute and who brought it")
+	Lawspeaker.apply(_log, [{"candidate": _log[0]["id"], "ruling": "reconcile", "memory": "Bram and Mara made their peace at the well", "because": "test"}], _now, _ctx, TOWN)
+	_check(Townsfolk.card_of(_work, "o-mara")["grudge"].is_empty() and Townsfolk.card_of(_work, "o-bram")["grudge"].is_empty(), "the ruling closes the quarrel: both grudges dropped")
+	_check(_done.size() == 1 and _done[0][0] == "p1" and _done[0][3] == 5 and _paid.size() == 1 and _paid[0][2] == 5
+		and str(_done[0][2]).begins_with("The lawspeaker has ruled on Mara's quarrel with Bram: Bram and Mara made their peace at the well. Mara remembers that Jeff spoke for her."),
+		"Jeff gets the notice and the dispute's pay (5, the default until economy's key): %s" % [_done])
+	_check(str(Townsfolk.card_of(_work, "o-mara")["facts"].back()["text"]).begins_with("Jeff spoke for Mara before the lawspeaker, who ruled"), "Mara remembers who spoke for her")
+	_check(str(Townsfolk.card_of(_work, "o-bram")["facts"].back()["text"]).begins_with("The lawspeaker ruled on the quarrel between Bram and Mara"), "Bram remembers the ruling")
+	_check(Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") >= Standing.setting("word") and Standing.score(Townsfolk.card_of(_work, "o-bram"), "p1") == 1,
+		"standing: word from Mara, one from Bram for the peace (%d, %d)" % [Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1"), Standing.score(Townsfolk.card_of(_work, "o-bram"), "p1")])
+	_check(Townsfolk.card_of(_work, "o-mara")["asks"].is_empty() and _offers().is_empty(), "the ask is gone; no grudge, no plea")
+	# Nobody holding the plea: the ruling still closes it, and nobody is paid.
+	_grudge("o-mara", "o-tam")
+	Townsfolk.note_disputes(_work, TOWN, _log, _now)
+	var open := Townsfolk.dispute_of(_log, "o-mara", "o-tam")
+	Lawspeaker.apply(_log, [{"candidate": open.get("id", ""), "ruling": "leave", "because": "talk"}], _now, _ctx, TOWN)
+	_check(not open.is_empty() and Townsfolk.card_of(_work, "o-tam")["grudge"].is_empty() and Townsfolk.card_of(_work, "o-mara")["grudge"].is_empty() and _done.size() == 1,
+		"a ruling with nobody holding the plea closes the quarrel and pays nobody")
+	_check(str(Townsfolk.card_of(_work, "o-tam")["facts"].back()["text"]) == "The lawspeaker ruled on the quarrel between Mara and Tam: the matter may lie.", "left: the matter may lie")
+	# The lawspeaker off (the box today): nothing noted, nothing shown, the carried word as before.
+	_model = "off"
+	_grudge("o-bram", "o-tam")
+	var before := _log.size()
+	_check(not Townsfolk.note_disputes(_work, TOWN, _log, _now) and _log.size() == before, "with rulings off no quarrel is noted")
+	var word := _offers("o-bram")
+	_check(word.size() == 1 and word[0]["what"].has("to") and word[0]["title"] == "A word for Tam", "and the plea is 435's carried word: %s" % [word])
+	_model = "claude-haiku-5-5"
+	_law = ""
+	_check(_offers("o-bram")[0]["what"].has("to"), "no sitting lawspeaker: the carried word too")
 
 
 func _test_lapse() -> void:

@@ -60,6 +60,9 @@ const BUY := "buy"
 const TAKE := "take"
 const LEND := "lend"
 const CARRY := "carry"
+## What the treasury pays when economy's rules have no line for a key yet
+## (economy.json "commissions"; decisions 486 and 487).
+const DEFAULT_PAY := {"dispute": 5, "escort": 8}
 const RESCUE := "rescue"
 const CAMP := "camp"
 const FETCH := "fetch"
@@ -296,15 +299,33 @@ static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, to
 	if owed > 0 and can_lend is Callable and can_lend.is_valid():
 		return _offer(worker_id, PLEA, "loan", "Help with a debt", "I owe the town %d gold; could you spare some of it?" % owed,
 			{"loan": owed, "town": town}, LEND, owed)
+	var law := _law_sitting(town, given)
 	for other: Variant in card.get("grudge", []):
 		var theirs := production.worker(str(other))
 		if theirs.is_empty():
 			continue
 		var name := str(theirs.get("name", other))
+		if not law.is_empty() and law != worker_id and law != str(other):
+			# A quarrel for the lawspeaker (decision 486): speak for them when you see him.
+			return _offer(worker_id, PLEA, "quarrel:" + str(other), "Speak for me",
+				"Lay my quarrel with %s before the lawspeaker when you see %s; say I was wronged." % [name, _them(production.worker(law).get("card", {}))],
+				{"other": str(other), "name": name, "law": law}, CARRY)
 		return _offer(worker_id, PLEA, "word:" + str(other), "A word for %s" % name,
 			"If you see %s, tell %s the matter between us is forgotten." % [name, _them(theirs.get("card", {}))],
 			{"to": str(other), "name": name}, CARRY)
 	return {}
+
+
+## [param town]'s sitting lawspeaker's id when there is one and rulings are
+## on (Main's "lawspeaker_of" and "model"; off on a server without the
+## flag, when quarrels stay as they were); "" otherwise.
+static func _law_sitting(town: String, given: Dictionary) -> String:
+	var law := str(_call(given, "lawspeaker_of", [town]))
+	var model := str(_call(given, "model"))
+	if law.is_empty() or law == "<null>" or model.is_empty() or model == "off" or model == "<null>":
+		return ""
+	var production: Production = given.get("production")
+	return law if production != null and not production.worker(law).is_empty() else ""
 
 
 static func _upper_first(text: String) -> String:
@@ -364,13 +385,18 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 				out["line"] = "%s gives %d gold toward %s's debt." % [player_name, paid, name]
 				out["ok"] = true
 		CARRY:
-			var ask := {"id": offer_id, "kind": ERRAND, "sub": ERRAND, "by": player_id, "by_name": player_name, "step": now,
+			var quarrel: bool = offer["what"].has("law")  # A quarrel for the lawspeaker (486), else a word carried (435).
+			var ask := {"id": offer_id, "kind": ERRAND, "sub": "quarrel" if quarrel else ERRAND, "by": player_id, "by_name": player_name, "step": now,
 				"town": str(who.get("town", "")), "worker": worker_id, "title": offer["title"], "words": offer["words"],
 				"what": offer["what"].duplicate(true)}
 			_add_ask(production, worker_id, ask)
 			_call(given, "asked", [player_id, ask])
-			Townsfolk.learn(production, worker_id, "%s promised to carry %s's word to %s." % [player_name, name, offer["what"].get("name", "")])
-			out["line"] = "%s will carry %s's word to %s." % [player_name, name, offer["what"].get("name", "")]
+			if quarrel:
+				Townsfolk.learn(production, worker_id, "%s promised to lay %s's quarrel with %s before the lawspeaker." % [player_name, name, offer["what"].get("name", "")])
+				out["line"] = "%s will speak for %s before the lawspeaker." % [player_name, name]
+			else:
+				Townsfolk.learn(production, worker_id, "%s promised to carry %s's word to %s." % [player_name, name, offer["what"].get("name", "")])
+				out["line"] = "%s will carry %s's word to %s." % [player_name, name, offer["what"].get("name", "")]
 			out["ok"] = true
 	return out
 
@@ -463,7 +489,7 @@ static func _asks(production: Production, town := "") -> Array:
 static func _notice(player_id: String, town: String, key: String, line: String, pay_key: String, units := 1, given: Dictionary = ctx) -> int:
 	var paid := 0
 	var pay: Variant = _call(given, "pay")
-	var each := int(pay.get(pay_key, 0)) if pay is Dictionary else 0
+	var each := int(pay.get(pay_key, DEFAULT_PAY.get(pay_key, 0))) if pay is Dictionary else int(DEFAULT_PAY.get(pay_key, 0))
 	if each * units > 0:
 		paid = int(_call(given, "pay_commission", [player_id, town, each * units]))
 	var production: Production = given.get("production")
@@ -483,7 +509,7 @@ static func _close(worker_id: String, ask: Dictionary, fact: String, line: Strin
 		_regard(production, worker_id, player_id, Standing.setting(regard_key), regard_why)
 	if not pay_key.is_empty():
 		var pay: Variant = _call(given, "pay")
-		var each := int(pay.get(pay_key, 0)) if pay is Dictionary else 0
+		var each := int(pay.get(pay_key, DEFAULT_PAY.get(pay_key, 0))) if pay is Dictionary else int(DEFAULT_PAY.get(pay_key, 0))
 		if each * units > 0:
 			paid = int(_call(given, "pay_commission", [player_id, str(ask.get("town", "")), each * units]))
 	_drop_ask(production, worker_id, str(ask.get("id", "")))
@@ -666,6 +692,73 @@ static func spoke_to(player_id: String, worker_id: String, given: Dictionary = c
 		_regard(production, worker_id, player_id, Standing.setting("word"), "carried %s's word" % from_name)
 		_close(from_id, ask, "%s carried %s's word to %s: the matter between them is forgotten." % [by, from_name, to_name],
 			"%s carried %s's word to %s." % [by, from_name, to_name], "", 1, given, "word", "carried a word to %s" % to_name)
+	# A quarrel laid before the lawspeaker (decision 486): speaking to him with
+	# the plea open marks the pair's dispute as brought by this player, so his
+	# batch takes it first and his request names them; nothing is handed in.
+	for pair: Array in _asks(production):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("kind", "")) != ERRAND or str(ask.get("by", "")) != player_id or str(ask.get("what", {}).get("law", "")) != worker_id:
+			continue
+		var town := str(ask.get("town", ""))
+		var log: Variant = _call(given, "memory", [town])
+		if not log is Array:
+			continue
+		var from_id: String = pair[0]
+		var other := str(ask["what"].get("other", ""))
+		Townsfolk.note_disputes(production, town, log, production.now())
+		var entry := Townsfolk.dispute_of(log, from_id, other)
+		if entry.is_empty() or entry.has("brought"):
+			continue
+		entry["brought"] = {"by": player_id, "by_name": str(ask.get("by_name", "")), "step": production.now()}
+		entry["tier"] = TownMemory.CANDIDATE
+		_call(given, "set_memory", [town, log])
+		Townsfolk.learn(production, worker_id, "%s laid %s's quarrel with %s before %s." % [ask.get("by_name", "someone"),
+			production.worker(from_id).get("name", from_id), production.worker(other).get("name", other), production.worker(worker_id).get("name", worker_id)])
+		_regard(production, from_id, player_id, Standing.setting("heard"), "laid their quarrel before the lawspeaker")
+
+
+## The lawspeaker ruled on [param entry], a dispute with a "pair" (decision
+## 486; Lawspeaker.apply): whichever the ruling ([param kind], its
+## [param memory] sentence), the quarrel is closed: both cards drop the
+## grudge and learn the ruling; every player holding the plea to speak for
+## one of them gets the notice, the treasury's "dispute" pay, standing
+## "word" from the one they spoke for and one more from the other when the
+## ruling reconciled them. Nobody holding it, the matter still closes and
+## nobody is paid: the world moved on its own.
+static func ruled(town: String, entry: Dictionary, kind: String, memory: String, _step: int, given: Dictionary = ctx) -> void:
+	var production: Production = given.get("production")
+	if production == null or not entry.get("pair") is Array or entry["pair"].size() != 2:
+		return
+	var a := str(entry["pair"][0])
+	var b := str(entry["pair"][1])
+	var a_name := str(production.worker(a).get("name", a))
+	var b_name := str(production.worker(b).get("name", b))
+	var said := memory.trim_suffix(".") if not memory.is_empty() else "the matter may lie"
+	var fact := "The lawspeaker ruled on the quarrel between %s and %s: %s." % [a_name, b_name, said]
+	for id: String in [a, b]:
+		var card := Townsfolk.card_of(production, id)
+		if card.is_empty():
+			continue
+		var other := b if id == a else a
+		card["grudge"] = card.get("grudge", []).filter(func(each: Variant) -> bool: return str(each) != other)
+		production.set_card(id, card)
+		Townsfolk.learn(production, id, fact)
+	for pair: Array in _asks(production, town):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("kind", "")) != ERRAND or not ask.get("what", {}).has("law"):
+			continue
+		var mine: String = pair[0]
+		var other := str(ask["what"].get("other", ""))
+		if not ((mine == a and other == b) or (mine == b and other == a)):
+			continue
+		var by := str(ask.get("by_name", "someone"))
+		var mine_name := str(production.worker(mine).get("name", mine))
+		var other_name := str(production.worker(other).get("name", other))
+		_close(mine, ask, "%s spoke for %s before the lawspeaker, who ruled: %s." % [by, mine_name, said],
+			"The lawspeaker has ruled on %s's quarrel with %s: %s. %s remembers that %s spoke for %s." % [mine_name, other_name, said, mine_name, by, _them(production.worker(mine).get("card", {}))],
+			"dispute", 1, given, "word", "spoke for them before the lawspeaker")
+		if kind == "reconcile":
+			_regard(production, other, str(ask.get("by", "")), 1, "brought the quarrel with %s to a reconciling" % mine_name)
 
 
 ## Asks older than "offers.days" lapse, with a fact told once.
@@ -674,10 +767,12 @@ static func tick(given: Dictionary = ctx) -> void:
 	if production == null:
 		return
 	var limit := int(settings().get("days", 7)) * maxi(DayNight.day_steps, 1)
+	# A quarrel waits for the lawspeaker's pace (486): a batch and his rest.
+	var law_limit := maxi(limit, Lawspeaker.setting("every") + Lawspeaker.setting("rest_days") * maxi(DayNight.day_steps, 1))
 	var now := production.now()
 	for pair: Array in _asks(production):
 		var ask: Dictionary = pair[1]
-		if now - int(ask.get("step", now)) <= limit:
+		if now - int(ask.get("step", now)) <= (law_limit if ask.get("what", {}).has("law") else limit):
 			continue
 		var by := str(ask.get("by_name", "someone"))
 		var name := str(production.worker(pair[0]).get("name", pair[0]))

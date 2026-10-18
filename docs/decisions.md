@@ -12641,3 +12641,71 @@ companion_test's know_level by cells.
 Rejected: a mesh per kind (boxes again, and no variation); footprints
 off the grid (the sim's walls are edges); saved prefab folders per kind
 (two sources for one shape).
+
+## 486. A quarrel brought before the lawspeaker
+
+The coordinator's assignment of 2026-10-18 ("errands from what is
+between people", half one; half two is 487), on 435 as Jeff amended it
+("try to minimize quests that are just 'go get object A from location
+B'"; "make them so they are auto completed, no need to talk to the NPC
+first. Just give player a notice that it was completed and the reward,
+and the NPC will remember"), on the grudges of 398, the town's memory
+447 and the lawspeaker 448/459. Approved with one condition: with the
+lawspeaker off, a grudge pair stays as it is today.
+
+- The source is the grudge two residents' cards hold (398, rolled at
+  founding, grown by events such as the thief's catch, 461). In a town
+  with a sitting lawspeaker and rulings on (Offers.ctx "lawspeaker_of"
+  and "model"), the gossip tick (Townsfolk.note_disputes) writes one
+  entry per grudge pair into the town's memory if none is open for the
+  pair: "A and B are at odds" (with the card's latest fact naming the
+  other as the reason: "since Odo caught Sly with a hand in Odo's
+  purse"), said by the one whose grudge it is, to the other, a candidate
+  from the start (a dispute is not talk to be spread) with "dispute" and
+  "pair", so his next batch takes it first (459's order). The quarrel
+  goes before him on its own, as the town's business, players or none.
+  461's catch entry is written the same way now (it was a belief, which
+  never reached his batch).
+- The plea (Offers._plea_offer), in place of 435's carried word in such a
+  town: "Speak for me": "Lay my quarrel with B before the lawspeaker when
+  you see him; say I was wronged." Taking it records interest on the
+  card's asks and nothing else (an errand ask, sub "quarrel").
+- Speaking to the lawspeaker with the plea open (Offers.spoke_to, which
+  runs on every word to a resident) marks the pair's entry "brought" by
+  that player: his facts say who laid it before him, his request to the
+  model says so too ("Laid before you by Jeff, a traveller"), and the one
+  spoken for gives a "heard" point. A conversation he was going to have;
+  nothing handed in.
+- His ruling completes it (Lawspeaker.apply calls Offers.ruled for any
+  ruled entry with a pair), whichever it is: reconcile (the town
+  remembers his sentence of it), accept (the complaint stands as memory),
+  leave (talk, resting: "the matter may lie"). In every case the quarrel
+  is closed: both cards drop the grudge and learn "The lawspeaker ruled
+  on the quarrel between A and B: ...". Every player holding the plea
+  gets the party-log notice, the treasury's pay through economy's
+  pay_commission at rules "commissions.dispute" (5, economy's key,
+  80c41d6; Offers.DEFAULT_PAY until it is there), standing "word" (2)
+  from the one they spoke for and one more from the other when the ruling
+  reconciled them; the card remembers who spoke for them. Nobody holding
+  the plea, the matter still closes and nobody is paid: the world moved on
+  its own, as the rule says.
+- Lapse: a quarrel's ask waits the lawspeaker's pace, a batch plus his
+  rest (rulings.every + rest_days), instead of offers.days, so no player
+  is marked lapsed for his slowness.
+- Off (the box today, --lawspeaker off): no entry is noted, no plea of
+  this kind is offered, nothing is shown; the grudge and 435's carried
+  word stay exactly as they are. That is the documented behaviour of the
+  server until Jeff turns rulings on.
+
+Numbers: commissions.dispute 5 (economy.json); standing word 2 and heard
+1 as they are. offers_test (the note once, the plea, taken, speaking to
+the other carries nothing, speaking to him marks it brought and his
+request says so, the ruling closes both cards and pays the one who held
+the plea, a ruling with nobody holding it pays nobody, off and no sitting
+lawspeaker fall back to the carried word); townsfolk_test (the catch's
+entry a candidate pair). Protocol unchanged (offers are an existing
+message; "carry" stays the accept verb); no new class_name.
+
+Rejected: the player choosing a side (the lawspeaker rules, 448); a
+fine or a jail (rulings are words); the quarrel as a thing to deliver; a
+new accept verb (the client knows four).

@@ -289,8 +289,9 @@ func facts_now() -> Array[String]:
 		if log is Array:
 			for entry: Variant in log:
 				if entry is Dictionary and bool(entry.get("dispute", false)) and str(entry.get("tier", "")) in [TownMemory.BELIEF, TownMemory.CANDIDATE]:
-					out.append("A dispute is before you: %s, says %s." % [Hearsay._lower_first(str(entry.get("text", ""))),
-						World.production.worker(str(entry.get("said_by", ""))).get("name", "someone") if World.production != null else "someone"])
+					out.append("A dispute is before you: %s, says %s.%s" % [Hearsay._lower_first(str(entry.get("text", ""))),
+						World.production.worker(str(entry.get("said_by", ""))).get("name", "someone") if World.production != null else "someone",
+						" %s laid it before you." % entry["brought"].get("by_name", "A traveller") if entry.get("brought") is Dictionary else ""])
 	out.append(work_words())
 	out.append_array(means_words())
 	# What it knows of the world, and has heard (decision 378); a companion

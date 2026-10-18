@@ -269,7 +269,8 @@ func _test_fence_and_catch() -> void:
 	_check(str(Townsfolk.card_of(_work, "t-odo")["facts"].back()["text"]) == "Odo caught Sly with a hand in Odo's purse." and "t-sly" in Townsfolk.card_of(_work, "t-odo")["grudge"],
 		"Odo's card: the catch, and a grudge against Sly")
 	_check(str(Townsfolk.card_of(_work, "t-sly")["facts"].back()["text"]).begins_with("Sly was caught with a hand in Odo's purse"), "Sly's card: caught")
-	_check(_memory.size() == 1 and _memory[0]["dispute"] == true and _memory[0]["said_by"] == "t-odo", "a dispute for the lawspeaker in the town's log: %s" % [_memory])
+	_check(_memory.size() == 1 and _memory[0]["dispute"] == true and _memory[0]["said_by"] == "t-odo" and _memory[0]["tier"] == TownMemory.CANDIDATE
+		and _memory[0]["pair"] == ["t-odo", "t-sly"], "a dispute for the lawspeaker in the town's log, a candidate at once, the pair named (486): %s" % [_memory])
 	for i in 2:
 		_now += 100
 		Townsfolk.tick(_work, _stock, economy)

@@ -147,6 +147,80 @@ static func _rich_line(economy: Economy) -> int:
 	return int(rules.get("folk", {}).get("rich_above", 25))
 
 
+## Quarrels before the lawspeaker (decision 486): in [param town], with a
+## sitting lawspeaker and rulings on (Offers.ctx "lawspeaker_of", "model"),
+## every pair of its people whose card holds a grudge against the other
+## gets one entry in [param log] if none is open for the pair: "A and B are
+## at odds" (since the card's latest fact naming the other, when there is
+## one), said by the one whose grudge it is, a candidate from the start
+## with "dispute" and "pair", so his next batch takes it first. Nothing
+## with the lawspeaker off: the box's grudges stay as they were. Whether
+## anything was noted.
+static func note_disputes(production: Production, town: String, log: Array, at: int) -> bool:
+	if production == null:
+		return false
+	var law := str(Offers._call(Offers.ctx, "lawspeaker_of", [town]))
+	var model := str(Offers._call(Offers.ctx, "model"))
+	if law.is_empty() or law == "<null>" or model.is_empty() or model == "off" or model == "<null>":
+		return false
+	var changed := false
+	var ids := production.worker_ids(town)
+	ids.sort()
+	for a: String in ids:
+		if a.begins_with(COMPANION):
+			continue
+		for other: Variant in production.worker(a).get("card", {}).get("grudge", []):
+			var b := str(other)
+			if b.begins_with(COMPANION) or production.worker(b).is_empty() or str(production.worker(b).get("town", "")) != town:
+				continue
+			if not dispute_of(log, a, b).is_empty():
+				continue
+			var a_name := str(production.worker(a).get("name", a))
+			var b_name := str(production.worker(b).get("name", b))
+			var text := "%s and %s are at odds" % [a_name, b_name]
+			var why := _why_at_odds(production, a, b_name)
+			if not why.is_empty():
+				text += " since " + why
+			var entry := TownMemory.note(log, text, a, b, at)
+			if entry.is_empty() or str(entry.get("tier", "")) not in [TownMemory.BELIEF, TownMemory.CANDIDATE] or not entry.get("ruling", {}).is_empty():
+				continue  # The same words already ruled on: that quarrel is closed.
+			entry["tier"] = TownMemory.CANDIDATE
+			entry["dispute"] = true
+			entry["pair"] = [a, b]
+			changed = true
+	return changed
+
+
+## The open dispute of [param log] between [param a] and [param b], either
+## way round (noted, not yet ruled); {} for none.
+static func dispute_of(log: Array, a: String, b: String) -> Dictionary:
+	for entry: Variant in log:
+		if not entry is Dictionary or not entry.get("pair") is Array:
+			continue
+		var pair: Array = entry["pair"]
+		if (pair == [a, b] or pair == [b, a]) and str(entry.get("tier", "")) in [TownMemory.BELIEF, TownMemory.CANDIDATE] and entry.get("ruling", {}).is_empty():
+			return entry
+	return {}
+
+
+## The latest fact on [param a]'s card from after its founding (an event:
+## a catch, a word; never the founding's kin lines) that names
+## [param b_name], as a clause ("odo caught sly with a hand in odo's purse",
+## lower-cased at the front, no full stop); "" for none.
+static func _why_at_odds(production: Production, a: String, b_name: String) -> String:
+	var facts: Array = card_of(production, a).get("facts", [])
+	if facts.is_empty():
+		return ""
+	var founding := int(facts[0].get("step", 0)) if facts[0] is Dictionary else 0
+	for i in range(facts.size() - 1, -1, -1):
+		if not facts[i] is Dictionary or int(facts[i].get("step", 0)) <= founding:
+			continue
+		var text := str(facts[i].get("text", ""))
+		if text.contains(b_name):
+			return Hearsay._lower_first(text.trim_suffix("."))
+	return ""
+
+
 ## The richest of [param town]'s people above [param line] (economy's
 ## folk.rich_above; never [param thief], a resting companion, one on the
 ## dole or hungry), with at least the take to spare; "" for none.
@@ -239,8 +313,10 @@ static func _caught(production: Production, town: String, thief: String, catcher
 	var log: Variant = Offers._call(Offers.ctx, "memory", [town])
 	if log is Array:
 		var dispute := TownMemory.note(log, "%s was caught %s" % [thief_name, doing], catcher, "", at)
-		if not dispute.is_empty():
+		if not dispute.is_empty() and str(dispute.get("tier", "")) in [TownMemory.BELIEF, TownMemory.CANDIDATE] and dispute.get("ruling", {}).is_empty():
 			dispute["dispute"] = true  # For the lawspeaker's rounds (phase 3).
+			dispute["tier"] = TownMemory.CANDIDATE  # Before him at once, not talk to spread (decision 486).
+			dispute["pair"] = [catcher, thief]
 		Offers._call(Offers.ctx, "set_memory", [town, log])
 	var mine := card_of(production, thief)
 	if mine.is_empty():
@@ -454,6 +530,7 @@ static func gossip(production: Production) -> void:
 		if log is Array:
 			var changed := not TownMemory.candidates(log, at).is_empty()  # Beliefs that spread and hold: candidates (phase 1).
 			changed = _arrive(production, town, log, at) or changed  # Remembered people moving in (phase 4).
+			changed = note_disputes(production, town, log, at) or changed  # Quarrels for the lawspeaker (decision 486).
 			if changed:
 				Offers._call(Offers.ctx, "set_memory", [town, log])
 		for id: String in towns[town]:
