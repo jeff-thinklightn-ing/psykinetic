@@ -9,7 +9,7 @@
 #      outside the repo, or stops the release (nothing tracked touched yet)
 #   2. write version.txt, export the "Windows Client" preset to build\client\,
 #      bundle launch.bat, update.ps1, settings.example.cfg, README.txt,
-#      version.txt and THIRD_PARTY.md (the credits), zip to build\psykinetic-client-v<version>.zip
+#      version.txt, THIRD_PARTY.md (the credits) and the fonts' OFL texts, zip to build\psykinetic-client-v<version>.zip
 #      (a failure here puts version.txt back)
 #   3. commit "Release v<version>" and tag it
 #   4. with gh: push the commit to main and the tag, create the GitHub
@@ -118,6 +118,8 @@ try {
 	Copy-Item (Join-Path $root 'version.txt') $out
 	# The credits ship with the game: CC BY sounds (decision 361) need their makers named.
 	Copy-Item (Join-Path $root 'THIRD_PARTY.md') $out
+	# The OFL fonts (decision 401) travel with their licence text.
+	Get-ChildItem (Join-Path $root 'art\fonts') -Filter 'OFL-*.txt' | Copy-Item -Destination $out
 
 	# Nothing player-specific goes in the zip.
 	if (Test-Path (Join-Path $out 'settings.cfg')) { Remove-Item (Join-Path $out 'settings.cfg') }
