@@ -1528,6 +1528,13 @@
 			"pixels": 512,
 			"uses": "terrain's ground shader on sand; procedural colour while empty"
 		},
+		"ground.needles": {
+			"category": "ground",
+			"type": "texture",
+			"tile_m": 4.0,
+			"pixels": 512,
+			"uses": "terrain's ground shader on the needle floor under the pine border and its stands: fallen pine needles, orange-brown, a few cones, seamless (art-gen, procedural); procedural colour while empty"
+		},
 		"material.rock": {
 			"category": "materials",
 			"type": "texture",
