@@ -4476,6 +4476,24 @@ player and resting in town as a Resident body, so she looks the same in
 both; headwear, apron and skin are left to the seed. Her card's facts
 leave it out. companion_test covers it.
 
+Amended (2026-10-17, the coordinator's cards step; release: no new
+number): her things and her player are facts of her card, Jeff's bond
+angle ("it may strengthen the bond between player and companion"), on
+items' 365, 370 and 417 and economy's 396; facts only, never lines to
+say. A thing named for her (World.item_named): "Isolde's dagger is named
+for Isolde now, after long use." A gift between her and her player
+(World.item_given, new: emitted where World._moved_item writes "given"):
+"Jeff gave Isolde a sword.", or "Isolde gave Jeff Isolde's dagger, the
+thing named for her."; gear or a named thing only, never what is used up
+(a bandage, a meal). Her named thing kept from her by her player and back
+with her (World.item_kept): "Jeff kept Isolde's dagger from her.",
+"Isolde's dagger came back to Isolde." Her return after a fall (396's
+Main._on_returned, at a place): "Isolde fell, and was brought back at the
+temple by Father Aldo." (Main.return_fact), written to her record before
+she rejoins. A bane, grudge or vengeance of her named thing (417) is her
+card's too. companion_test covers them. Her bond with her player, which
+these events will move, is 444.
+
 ## 295. Raids on a town: one entry point, food and people only, damage repaired, captives kept until rescued
 
 Economy step 6 (sim/towns.gd). A raid is a real group of raiders: maps

@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion remembers what passes between you: the things you give her
+  and she gives you, the gear that takes her name, the named thing you kept
+  from her, and who brought her back at the temple when she fell.
 - The town's people remember what you did for them, and to them: a promise
   kept, kin brought home, a debt covered, a word carried, a gift pressed into
   their hands, a raid you stood through with them, a promise let lapse. It

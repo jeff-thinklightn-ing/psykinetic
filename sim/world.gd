@@ -86,6 +86,10 @@ signal item_named(entity: GridEntity, uid: int, text: String)
 ## A named thing is kept from its namer (decision 370) by [param entity],
 ## or is back with its namer ([param kept] false).
 signal item_kept(entity: GridEntity, uid: int, kept: bool)
+## [param uid] went from [param from]'s hands to [param to]'s (a player, a
+## companion: "given" in its history); a companion's card takes a gift
+## between her and her player as a fact (293 amended).
+signal item_given(from: GridEntity, to: GridEntity, uid: int)
 ## [param uid], in [param entity]'s hands, grew (decision 417): [param mark]
 ## "bane", "grudge" or "avenged", against [param kind].
 signal item_grew(entity: GridEntity, uid: int, mark: String, kind: String)
@@ -2282,6 +2286,7 @@ func _moved_item(uid: int, from: GridEntity, to: GridEntity) -> void:
 		return
 	if not giver[0].is_empty():
 		items.note(uid, "given", "%s to %s" % [giver[1], taker[1]], to.zone, to.tile)
+		item_given.emit(from, to, uid)
 	elif not carried_before:
 		items.note(uid, "found", "%s by %s" % [_label_of(from), taker[1]], from.zone, from.tile)
 

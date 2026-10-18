@@ -642,6 +642,11 @@ func _go_online() -> void:
 		World.item_named.connect(_narrate_named)
 		World.item_kept.connect(_narrate_kept)
 		World.item_grew.connect(_narrate_grew)
+		# Her named things and gifts are facts of her card (293 amended).
+		World.item_named.connect(_card_named)
+		World.item_kept.connect(_card_kept)
+		World.item_given.connect(_card_given)
+		World.item_grew.connect(_card_grew)
 		World.bundle_swapped.connect(_narrate_swap)
 		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
@@ -4840,6 +4845,64 @@ func _narrate_named(entity: GridEntity, uid: int, text: String) -> void:
 	party_log.add("%s's %s is %s now." % [_display_name(entity), Items.name_of(World.items.id_of(uid)), text])
 
 
+## Her card's facts of her things and her player (293 amended, Jeff: "it
+## may strengthen the bond between player and companion"): a thing named
+## for her (365), a gift either way between her and her player, her named
+## thing kept from her by her player (370) and back with her. Facts only,
+## never lines to say.
+func _card_named(entity: GridEntity, uid: int, text: String) -> void:
+	if entity is Companion:
+		(entity as Companion).note_fact("%s is named for %s now, after long use." % [text, entity.name])
+
+
+func _card_kept(entity: GridEntity, uid: int, kept: bool) -> void:
+	var namer := str(World.items.name_of(uid).get("who", ""))
+	for pet: Companion in _companions.values():
+		if not is_instance_valid(pet) or World.holder_key(pet) != namer:
+			continue
+		var thing := World.item_title(uid).get_slice(" (", 0)
+		if kept and entity == pet.keeper:
+			pet.note_fact("%s kept %s from her." % [pet.keeper_name(), thing])
+		elif not kept and entity == pet:
+			pet.note_fact("%s came back to %s." % [thing, pet.name])
+
+
+func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
+	var id := World.items.id_of(uid)
+	var named := World.item_title(uid).get_slice(" (", 0)
+	if named.is_empty() and (not Items.is_gear(id) or not str(Items.def(id).get("use", "")).is_empty()):
+		return  # A bandage or a meal handed over (used up) is no event of the card.
+	var thing := named if not named.is_empty() else Companion._a(Items.name_of(id).to_lower())
+	for pet: Companion in _companions.values():
+		if not is_instance_valid(pet) or not is_instance_valid(pet.keeper):
+			continue
+		if from == pet.keeper and to == pet:
+			pet.note_fact("%s gave %s %s." % [pet.keeper_name(), pet.name, thing])
+		elif from == pet and to == pet.keeper:
+			var hers := str(World.items.name_of(uid).get("who", "")) == World.holder_key(pet)
+			pet.note_fact("%s gave %s %s%s." % [pet.name, pet.keeper_name(), thing, ", the thing named for her" if hers else ""])
+
+
+## A thing in her hands grew (417): "Isolde's dagger is imp-bane now.",
+## "... holds a grudge against wolves.", "... has had its vengeance on wolves."
+func _card_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> void:
+	if not entity is Companion:
+		return
+	var thing := World.item_title(uid).get_slice(" (", 0)
+	if thing.is_empty():
+		thing = "%s's %s" % [entity.name, Items.name_of(World.items.id_of(uid))]
+	var words: String = {"bane": "is %s-bane now" % kind, "grudge": "holds a grudge against %s" % World._plural(kind),
+		"avenged": "has had its vengeance on %s" % World._plural(kind)}.get(mark, "")
+	if not words.is_empty():
+		(entity as Companion).note_fact("%s %s." % [thing, words])
+
+
+## Her card's fact of a return (293 amended, on 396): "Wren fell, and was
+## brought back at the temple by Father Aldo."
+static func return_fact(who: String, where: String, by: String) -> String:
+	return "%s fell, and was brought back at %s%s." % [who, where, " by " + by if not by.is_empty() else ""]
+
+
 ## A thing grew (World.item_grew; decision 417): a bane, a grudge, avenged.
 func _narrate_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> void:
 	var thing := World.item_title(uid)
@@ -5314,6 +5377,11 @@ func _on_returned(job: Dictionary) -> void:
 			record.companion["alive"] = true
 			record.companion["hp"] = 0  # Full stats.
 			record.companion["tile"] = [cell.x, cell.y] if with_them and player.zone == area and cell != World.NO_CELL else null
+			if cell != World.NO_CELL:
+				# Her card takes it (293 amended): the one who brought her back.
+				var grown := CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
+				grown.add_fact(return_fact(str(record.companion.get("name", "She")), where, by), "event", who)
+				record.companion["facts"] = grown.facts
 			if with_them:
 				World.enter_named(player.zone)
 				_join_companion(record, player)

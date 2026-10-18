@@ -80,6 +80,7 @@ func _ready() -> void:
 	_test_nobody_hears()
 	_test_card()
 	_test_growing_card()
+	_test_card_things()
 	_test_wild()
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
@@ -1191,6 +1192,43 @@ func _narrated(pet: Companion, words: String) -> bool:
 		if words in str(turn["text"]):
 			return true
 	return false
+
+
+func _test_card_things() -> void:
+	print("
+== her named things, gifts with her player, and her return are facts of her card (293 amended) ==")
+	var owner := _player()
+	var pet := _companion()
+	pet.grown = CompanionFacts.new()
+	var me := Companion._name_of(pet)
+	var uid: int = World.items.mint("dagger", "built")
+	var text := "%s's dagger" % me
+	World.items.set_name(uid, {"form": "holder", "holder": me, "who": World.holder_key(pet), "text": text}, "", pet.zone, pet.tile)
+	_main._card_named(pet, uid, text)
+	_check(pet.grown.facts.size() == 1 and pet.grown.facts[0]["text"] == "%s is named for %s now, after long use." % [text, me]
+		and pet.grown.facts[0]["from"] == "event", "a thing named for her: %s" % [pet.grown.facts])
+	_main._card_kept(owner, uid, true)
+	_check(pet.grown.facts.back()["text"].begins_with("%s kept %s" % [pet.keeper_name(), text]), "kept from her by her player: %s" % pet.grown.facts.back()["text"])
+	_main._card_kept(pet, uid, false)
+	_check(pet.grown.facts.back()["text"] == "%s came back to %s." % [text, me], "and back with her")
+	var given: Array[int] = []
+	var listen := func(_from: GridEntity, _to: GridEntity, each: int) -> void: given.append(each)
+	World.item_given.connect(listen)
+	World._moved_item(uid, pet, owner)
+	World.item_given.disconnect(listen)
+	_check(given == [uid] and pet.grown.facts.back()["text"] == "%s gave %s %s, the thing named for her." % [me, pet.keeper_name(), text],
+		"she gave her player her named thing: %s" % pet.grown.facts.back()["text"])
+	var sword: int = World.items.mint("sword", "built")
+	_main._card_given(owner, pet, sword)
+	_check(pet.grown.facts.back()["text"] == "%s gave %s a sword." % [pet.keeper_name(), me], "a gift from her player: %s" % pet.grown.facts.back()["text"])
+	var before := pet.grown.facts.size()
+	_main._card_given(owner, pet, World.items.mint("bandaging_kit", "built"))
+	_check(pet.grown.facts.size() == before, "a bandage handed over is no event of her card")
+	_main._card_grew(pet, uid, "bane", "imp")
+	_check(pet.grown.facts.back()["text"] == "%s is imp-bane now." % text, "her named thing grew: %s" % pet.grown.facts.back()["text"])
+	_check(Main.return_fact("Wren", "the temple", "Father Aldo") == "Wren fell, and was brought back at the temple by Father Aldo."
+		and Main.return_fact("Wren", "the healer's hut", "") == "Wren fell, and was brought back at the healer's hut.", "her return, as her card has it")
+	pet.grown = CompanionFacts.new()
 
 
 func _test_log_collapsed() -> void:
