@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_routes()
 	_test_level_routes()
 	_test_territory_routes()
+	_test_closed()
 	await _test_view()
 
 	print("")
@@ -425,6 +426,29 @@ static func _block(width: int, height: int) -> Image:
 	for y in 2 * height - 1:
 		rows.append(".".repeat(2 * width - 1))
 	return Level.image_from_rows(rows)
+
+
+## A closed link (decision 463): read with its flag, no problem though it
+## leads to no level yet, and no route through one between two real areas.
+func _test_closed() -> void:
+	print("closed links")
+	Level.register("wm_gate", _strip(3, [Vector2i(0, 0), Vector2i(2, 0)]), null, {"spawn_points": {"in": [1, 0]},
+		"links": [{"at": [2, 0], "to_map": "wm_beyond", "to_spawn": "", "closed": true},
+			{"at": [0, 0], "to_map": "wm_yard", "to_spawn": "", "closed": true}]})
+	Level.register("wm_yard", _strip(3, [Vector2i(0, 0)]), null, {"links": [{"at": [0, 0], "to_map": "wm_gate", "to_spawn": "in"}]})
+	var gate := Level.load_level("wm_gate")
+	_check(gate["links"].all(func(link: Dictionary) -> bool: return link["closed"] == true)
+		and not gate["warnings"].any(func(warning: String) -> bool: return "link" in warning),
+		"closed links read with their flag, no warning (%s)" % [gate["warnings"]])
+	var names: Array[String] = ["wm_gate", "wm_yard"]
+	var world_map := WorldMap.build(names)
+	var problems := world_map.problems("wm_yard")
+	_check(not problems.any(func(problem: String) -> bool: return problem.begins_with("wm_gate:") and "link" in problem),
+		"no problem for a closed link to no level yet, nor one with no way back (%s)" % [problems])
+	_check(world_map.ways.filter(func(way: Dictionary) -> bool: return way["closed"]).size() == 2, "the ways say closed")
+	var routes := WorldRoutes.new(world_map, false, false)
+	_check(routes.route("wm_gate", Vector2i(1, 0), "wm_yard", Vector2i(1, 0)).is_empty(), "no route through a closed link")
+	_check(not routes.route("wm_yard", Vector2i(1, 0), "wm_gate", Vector2i(1, 0)).is_empty(), "the open way back still routes")
 
 
 func _test_routes() -> void:

@@ -200,7 +200,10 @@ All of it is optional.
 - `links`: one per link marker, `to_map` the level to load and
   `to_spawn` the spawn point there ("" for its first start); `"one_way":
   true` for a link with no way back on purpose (a drop, a trapdoor), so the
-  world map's check does not flag it.
+  world map's check does not flag it; `"closed": true` for a way shown but
+  not travelled yet (decision 463): stepping on it says "The way on is
+  closed." and goes nowhere, no route passes through it, and its `to_map`
+  may be a level still to come.
 - `walls` and `floors`: the wall and floor sets the map is drawn in
   (art-kit's `wall.<set>.*` and `floor.<set>`: castle, wood, stone, cave;
   castle if not given or not a set). The floor set is drawn on the map's

@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_click_snaps_to_floor()
 	_test_renderer_setting()
 	_test_player_body()
+	_test_closed_link()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -251,6 +252,26 @@ func _monsters() -> int:
 		if entity is Monster and entity.spawned:
 			count += 1
 	return count
+
+
+func _test_closed_link() -> void:
+	print("\n== a closed link (decision 463) ==")
+	var player := _player()
+	var at := Vector2i(9, 4)
+	_main.level["links"].append({"tile": at, "to_map": "nowhere_yet", "to_spawn": "", "one_way": false, "closed": true})
+	var zone: String = World.zone.name
+	_kill_monsters()  # Nobody to crowd the steps on and off.
+	var before: int = _main.party_log.size()
+	_walk_to(player, at)
+	World.step()
+	_walk_to(player, at + Vector2i(1, 0))
+	_walk_to(player, at)
+	World.step()
+	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - before)
+	_check(player.tile == at and World.zone.name == zone and is_instance_valid(player) and player.spawned,
+		"stepping on it goes nowhere (at %s in %s)" % [player.tile, World.zone.name])
+	_check(lines.count("The way on is closed.") == 2, "and says the way on is closed, once each time stepped on (%s)" % [lines])
+	_main.level["links"].pop_back()
 
 
 ## Kills every monster, and starts every dead slot's delay again from now

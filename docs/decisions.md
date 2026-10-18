@@ -11434,3 +11434,26 @@ ms) and a herds tick (60 ms) at once. And a dedicated server stops
 refreshing the pack panel every frame (0.4 ms of a HUD nobody sees).
 Rejected: Godot's profiler on the box (an editor connection, and costly);
 timing every function (the parts are enough to know whose it is).
+
+## 463. A link can be closed: shown, not travelled yet
+
+The forest (464) leads on to the elven stronghold, which is not built: the
+way should be on the map, and say so, without taking anyone anywhere.
+
+- A level.json link may carry "closed": true. Level keeps the flag
+  (links' "closed"); a closed link may name a level that does not exist
+  yet, and WorldMap.problems does not flag it (no level, no way back).
+- WorldMap.ways carry "closed"; WorldRoutes adds no portal pair for a
+  closed way, so no raid group, herd or nearest-place search routes
+  through one.
+- Play: a player stepping on a closed link's marker stays where they are,
+  and the party log says "The way on is closed." once each time they step
+  on it (Main._told_closed, cleared on stepping off). The marker cell is
+  plain walkable ground.
+- The editor's world map lists it as "link (x, y) -> to |closed|"; ui's map
+  reads the flag from WorldMap.build.
+- Opening it later: drop "closed" once the level exists.
+
+Protocol unchanged.
+
+tests/world_map_test's closed links, respawn_test's closed link.

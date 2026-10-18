@@ -16,7 +16,9 @@ extends RefCounted
 var areas: Dictionary[String, Dictionary] = {}
 ## Every way out of every area, in area order: {from, to, kind ("link" or
 ## "edge"), at (the link's cell; Vector2i.ZERO for an edge), side (the
-## edge, "" for a link), to_spawn ("" for an edge), one_way}.
+## edge, "" for a link), to_spawn ("" for an edge), one_way, closed (a link
+## shown but not travelled yet, decision 463: no route through it, and its
+## target may be no level yet)}.
 var ways: Array[Dictionary] = []
 ## What config each area was read with (level.json), for the cell check.
 var _configs: Dictionary[String, Dictionary] = {}
@@ -100,11 +102,11 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 	_configs[area_name] = config
 	for link: Dictionary in level["links"]:
 		ways.append({"from": area_name, "to": link["to_map"], "kind": "link", "at": link["tile"], "side": "",
-			"to_spawn": link["to_spawn"], "one_way": link["one_way"]})
+			"to_spawn": link["to_spawn"], "one_way": link["one_way"], "closed": link.get("closed", false)})
 	var neighbours: Dictionary[String, String] = level["neighbours"]
 	for side: String in neighbours:
 		ways.append({"from": area_name, "to": neighbours[side], "kind": "edge", "at": Vector2i.ZERO, "side": side,
-			"to_spawn": "", "one_way": false})
+			"to_spawn": "", "one_way": false, "closed": false})
 
 
 ## Where a step from [param cell] by [param direction] in
@@ -435,6 +437,8 @@ func _check_way(way: Dictionary, out: Array[String]) -> void:
 	var from: String = way["from"]
 	var to: String = way["to"]
 	var what := "the link at %s" % way["at"] if way["kind"] == "link" else "the %s neighbour" % way["side"]
+	if way.get("closed", false):
+		return  # Closed (decision 463): it may lead to a level still to come.
 	if to.is_empty():
 		out.append("%s: %s goes to no area" % [from, what])
 		return

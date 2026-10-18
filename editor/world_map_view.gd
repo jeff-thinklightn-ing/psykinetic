@@ -257,7 +257,7 @@ func _link_row(area_name: String, link: Dictionary) -> HBoxContainer:
 	var to: String = link["to_map"]
 	var row := HBoxContainer.new()
 	var label := Label.new()
-	label.text = "link %s -> %s" % [at, to if not to.is_empty() else "nowhere"]
+	label.text = "link %s -> %s%s" % [at, to if not to.is_empty() else "nowhere", "  |closed|" if link.get("closed", false) else ""]
 	row.add_child(label)
 	if world_map.areas.has(to):
 		var spawn := OptionButton.new()

@@ -241,6 +241,9 @@ var _arrived_at: Dictionary[int, int] = {}
 ## Camp place id -> the tick it was first seen undefended with a player in
 ## it (decision 429); not saved, so a restart starts the clock again.
 var _camp_clear_since: Dictionary[String, int] = {}
+## Peer -> the closed link (decision 463) it was last told of, so stepping
+## about on it says so once.
+var _told_closed: Dictionary[int, Vector2i] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
@@ -2261,11 +2264,19 @@ func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void
 	if not entity is Player:
 		return
 	for link: Dictionary in level.get("links", []):
+		if link["tile"] == to and link.get("closed", false):
+			# Shown, not travelled yet (decision 463): said once a stand.
+			if _told_closed.get(entity.owner_peer) != to:
+				_told_closed[entity.owner_peer] = to
+				party_log.add("The way on is closed.")
+			return
 		if link["tile"] == to:
+			_told_closed.erase(entity.owner_peer)
 			print("[level] %s took the link at %s to %s (%s)" % [_display_name(entity), to, link["to_map"], link["to_spawn"]])
 			# After the tick: not mid-step.
 			travel.call_deferred(entity.owner_peer, str(link["to_map"]), str(link["to_spawn"]))
 			return
+	_told_closed.erase(entity.owner_peer)  # Off it: told again next time.
 
 
 ## Server: a player walking into the map's edge where the level has a

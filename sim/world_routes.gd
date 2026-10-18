@@ -130,7 +130,8 @@ func _init(world_map: WorldMap, threaded := true, make_fields := true, obstacles
 		layer.graph.faction = faction
 		_layers[faction] = layer
 	for index in _ways.size():
-		_add_way(index)
+		if not _ways[index].get("closed", false):  # No way through a closed link (decision 463).
+			_add_way(index)
 	for area_name: String in _in_area:
 		var area: Dictionary = _areas[area_name]
 		_copies[area_name] = {"size": area["size"], "floor": area["floor"].duplicate(), "edges": area["edges"].duplicate(),
