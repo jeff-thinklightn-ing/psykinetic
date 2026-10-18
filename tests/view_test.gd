@@ -57,6 +57,7 @@ func _ready() -> void:
 	await _test_goblin()
 	_test_humans()
 	_test_person_looks()
+	_test_attach_points()
 	_test_goblins_differ()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
@@ -2110,7 +2111,9 @@ func _test_humans() -> void:
 				"its feet on the ground (%.3f), %.2f m tall" % [low - puppet.global_position.y, high - low])
 		var wanted := Vector2(player.facing).normalized()
 		_check(_toes_ahead(puppet).dot(wanted) > 0.9, "its toes point where it faces (%s)" % _toes_ahead(puppet))
-		var meshes := model.find_children("*", "MeshInstance3D", true, false)
+		# The body and its parts: the skinned meshes (not what its sockets hold).
+		var meshes := model.find_children("*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool:
+			return m.get_parent() is Skeleton3D)
 		var mesh := model.find_child("Body", true, false) as MeshInstance3D
 		var look := puppet.get_meta("look") as PersonLook
 		var shown: Array = meshes.filter(func(m: MeshInstance3D) -> bool: return m.visible and m != mesh).map(func(m: MeshInstance3D) -> String: return String(m.name))
@@ -2203,6 +2206,56 @@ func _test_person_looks() -> void:
 		scene.free()
 	var library := load(str(Client3D.HUMAN["clips"])) as AnimationLibrary
 	_check(Client3D.POSTURES.values().all(func(clip: String) -> bool: return library.has_animation(clip)), "the postures are in the clips")
+
+
+func _test_attach_points() -> void:
+	print("
+== attach points (decision 451): what a hand holds is drawn in it, the lantern at the belt ==")
+	var player := _player()
+	var hold := func(entity: GridEntity, right: String, left: String) -> void:
+		var slots := entity.slots
+		while slots.size() < Items.CARRIED:
+			slots.append("")
+		slots[Items.RIGHT_HAND] = right
+		slots[Items.LEFT_HAND] = left
+		entity.slots = slots
+		_rig._process(0.0)
+	hold.call(player, "sword", "shield")
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var sockets: Dictionary = puppet.get_meta("sockets", {})
+	_check(sockets.has_all(["hand_r", "hand_l", "back", "belt_l"]) and (sockets["hand_r"].get_parent() as BoneAttachment3D).bone_name == "RightHand",
+			"a person has hand, back and belt sockets on their bones")
+	var sword := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	var shield := (sockets["hand_l"] as Node3D).get_node_or_null("Held") as Node3D
+	_check(sword != null and shield != null, "a sword drawn in the right hand, a shield in the left")
+	if sword != null:
+		var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		# Where the socket puts it in the hand's pose now (the attachment follows
+		# the pose a frame later): beside the fist's knuckles, along its axis.
+		var bone := func(name: String) -> Transform3D:
+			return skeleton.get_bone_global_pose(skeleton.find_bone(name))
+		var grip: Transform3D = bone.call("RightHand") * (sockets["hand_r"] as Node3D).transform
+		var fist: Vector3 = (bone.call("RightIndexProximal").origin - bone.call("RightLittleProximal").origin).normalized()
+		var knuckles: Vector3 = (bone.call("RightIndexProximal").origin + bone.call("RightLittleProximal").origin) * 0.5
+		var scale: float = skeleton.global_transform.basis.get_scale().y
+		_check(grip.basis.y.normalized().dot(fist) > 0.9 and grip.origin.distance_to(knuckles) * scale < 0.06,
+				"its grip in the fist (%.3f m from the knuckles), its length along the fist's axis (%.2f)" % [
+				grip.origin.distance_to(knuckles) * scale, grip.basis.y.normalized().dot(fist)])
+		_check(absf((skeleton.global_transform.basis * grip.basis).get_scale().y - 1.0) < 0.02,
+				"at its own size, whatever the person's stature")
+	hold.call(player, "", "shield")
+	_check((sockets["hand_r"] as Node3D).get_children().all(func(n: Node) -> bool: return n.is_queued_for_deletion()),
+			"the hand emptied: nothing drawn in it")
+	hold.call(player, "", "")
+	_check((sockets["belt_l"] as Node3D).get_node_or_null("LanternBody") != null, "the lantern hangs at the belt")
+	var imp := _spawn_imp(Vector2i(9, 6), "imp")
+	_rig._process(0.0)
+	hold.call(imp, "dagger", "")
+	var goblin: Node3D = _rig._puppets[imp.get_instance_id()]
+	var held: Node3D = (goblin.get_meta("sockets", {}) as Dictionary).get("hand_r")
+	_check(held != null and held.get_node_or_null("Held") != null, "a goblin's dagger is in its hand")
+	World.despawn(imp)
+	_rig._process(0.0)
 
 
 func _test_goblin() -> void:

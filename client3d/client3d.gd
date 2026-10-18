@@ -459,13 +459,38 @@ const HUMANOID_MOVES := {
 	"deaths": ["Death01", "Death02"], "bow_aim": "Pistol_Aim_Neutral", "bow_shoot": "Pistol_Shoot", "bow_idle": "Pistol_Idle",
 	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle",
 }
+## Attach points (decision 451): where a humanoid holds and hangs things, on
+## its skeleton's bones (the retargeted SkeletonProfileHumanoid's names, so
+## every humanoid model has the same bones in the same frames: a hand's +Y
+## along the fingers, +X toward the right hand's index and the left's little
+## finger, +Z out of the palm; the trunk's +X its left, +Z its front), as
+## {socket: [bone, transform in the bone's frame]}. A held piece (art_style:
+## its origin the grip, its length along +Y) sits at a hand's socket inside
+## the closed fist, its length out of the thumb's side; tools/grip_sockets.gd
+## measured these from the bodies' finger bones (the goblin, without them,
+## takes the human hand's frame scaled to its hand's length, 0.69).
+const HAND_GRIP := 0.10
+const HAND_PALM := 0.03
+static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dictionary:
+	return {
+		"hand_r": ["RightHand", Transform3D(Basis(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0)),
+			Vector3(0.0, HAND_GRIP, HAND_PALM) * hand)],
+		"hand_l": ["LeftHand", Transform3D(Basis(Vector3(0, 0, -1), Vector3(-1, 0, 0), Vector3(0, 1, 0)),
+			Vector3(0.0, HAND_GRIP, HAND_PALM) * hand)],
+		# Between the shoulder blades, a stowed thing's length up and over the right shoulder.
+		"back": ["UpperChest", Transform3D(Basis(Vector3(0, 0, -1), PI * 0.2), Vector3(0.0, chest, -back))],
+		# The left hip, a hung thing's length down.
+		"belt_l": ["Hips", Transform3D(Basis(Vector3(0, 0, 1), PI), Vector3(hip, 0.0, 0.0))],
+	}
+const HUMAN_SOCKETS := {"hand": 1.0, "hip": 0.17, "back": 0.13, "chest": 0.04}
+const GOBLIN_SOCKETS := {"hand": 0.69, "hip": 0.19, "back": 0.16, "chest": 0.02}
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5, "moves": HUMANOID_MOVES},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
 	"brute": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5, "moves": HUMANOID_MOVES},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
 	"sneak": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
-		"faces": PI * 0.5, "moves": HUMANOID_MOVES},
+		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS},
 }
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
@@ -556,7 +581,7 @@ const GAIT_HYSTERESIS := 1.15
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES}
+	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
 ## The human bodies' gaits (decision 399 amended): the pack's jog and sprint
 ## take 2.6 m and 4 m steps, too long for a player's 4 tiles a second (Jeff
 ## on v0.1.149); Jog_Short and Sprint_Short narrow their swing
@@ -575,7 +600,7 @@ const POSTURES := {"stooped": "Posture_Stooped", "slouching": "Posture_Slouch"}
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES}
+	"parts": true, "fidgets": {"Idle_LookAround": 1}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
 ## Moving faster than this (tiles a second) walks.
 const WALKING := 0.4
 const CLIP_BLEND := 0.15
@@ -5910,6 +5935,7 @@ func _sync_puppets() -> void:
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null and not is_equal_approx(facing.rotation.y, yaw):
 			facing.rotation.y = yaw
+		_sync_held(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
 			if lantern != null and lantern.visible != (entity.emit_light > 0.0):
@@ -6372,12 +6398,102 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, CLIP_BLEND, true,
 			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
 	rig.loop(CLIP_IDLE)
+	if model.has("sockets"):
+		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)
 	if puppet.has_meta("look"):
 		var posture := str(POSTURES.get((puppet.get_meta("look") as PersonLook).posture, ""))
 		if posture != "" and rig.has(posture):
 			rig.posture((load(model["clips"]) as AnimationLibrary).get_animation(posture), 1.0)
 	puppet.set_meta("rig", rig)
 	return body
+
+
+## [param scene]'s attach points (decision 451): a BoneAttachment3D on its
+## skeleton for each socket's bone, the socket a node under it at its place
+## in the bone's frame, scaled back by [param model_scale] so what it holds
+## keeps its own size; kept as the puppet's "sockets" {name: Node3D}.
+static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float, puppet: Node3D) -> void:
+	var skeletons := scene.find_children("*", "Skeleton3D", true, false)
+	if skeletons.is_empty():
+		return
+	var skeleton := skeletons[0] as Skeleton3D
+	var made := {}
+	var table := _sockets(sizes["hand"], sizes["hip"], sizes["back"], sizes["chest"])
+	for name: String in table:
+		var bone: String = table[name][0]
+		if skeleton.find_bone(bone) < 0:
+			continue
+		var on := BoneAttachment3D.new()
+		on.name = "On" + bone
+		on.bone_name = bone
+		skeleton.add_child(on)
+		var socket := Node3D.new()
+		socket.name = name
+		socket.transform = table[name][1]
+		socket.scale = Vector3.ONE / maxf(model_scale, 0.01)
+		on.add_child(socket)
+		made[name] = socket
+	puppet.set_meta("sockets", made)
+	puppet.set_meta("held", ["", ""])
+
+
+## What [param entity] holds in each hand drawn at its puppet's hand sockets
+## (decision 451): each thing from its art slot (ArtKit: its own art, a
+## fill, or a grey box sized as the slot is until it has art), swapped when
+## the slot changes, gone when the hand empties.
+func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
+	if not puppet.has_meta("sockets"):
+		return
+	var held: Array = puppet.get_meta("held")
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	for hand in 2:
+		var slot := Items.RIGHT_HAND + hand
+		var id := entity.slots[slot] if entity.slots.size() > slot else ""
+		if id == held[hand]:
+			continue
+		held[hand] = id
+		var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
+		if socket == null:
+			continue
+		for old in socket.get_children():
+			old.queue_free()
+		if id == "":
+			continue
+		var art := str(Items.def(id).get("art", "item." + id))
+		if ArtKit.has(art):
+			var thing := ArtKit.instance(art)
+			thing.name = "Held"
+			socket.add_child(thing)
+
+
+## A carried lantern as it hangs at the belt: a small dark frame round a
+## warm glow, below the socket.
+static var _lantern_parts: Array = []
+static func _hanging_lantern() -> Node3D:
+	if _lantern_parts.is_empty():
+		var frame := BoxMesh.new()
+		frame.size = Vector3(0.09, 0.13, 0.09)
+		var iron := StandardMaterial3D.new()
+		iron.albedo_color = Color(0.16, 0.14, 0.12)
+		iron.roughness = 0.8
+		var glow := BoxMesh.new()
+		glow.size = Vector3(0.1, 0.08, 0.1)
+		var flame := StandardMaterial3D.new()
+		flame.albedo_color = PLAYER_LIGHT
+		flame.emission_enabled = true
+		flame.emission = PLAYER_LIGHT
+		flame.emission_energy_multiplier = 1.5
+		_lantern_parts = [frame, iron, glow, flame]
+	var lantern := Node3D.new()
+	lantern.name = "LanternBody"
+	for i in 2:
+		var piece := MeshInstance3D.new()
+		piece.mesh = _lantern_parts[i * 2]
+		piece.material_override = _lantern_parts[i * 2 + 1]
+		piece.position = Vector3(0.0, 0.1, 0.0)
+		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if i == 1 else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		lantern.add_child(piece)
+	return lantern
 
 
 ## A human body's meshes in HUMAN_MATERIAL, each part in its own colour (its
@@ -6844,6 +6960,10 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# and leave its outside in its own shadow.
 		light.position.y = height + 0.6
 		puppet.add_child(light)
+		# The lantern itself hangs at the belt (decision 451), the light above.
+		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_l")
+		if belt != null:
+			belt.add_child(_hanging_lantern())
 	add_child(puppet)
 	return puppet
 

@@ -10898,3 +10898,43 @@ Client only; nothing on the wire from ui. tests/ui_test: the layout from
 the levels (no two boxes overlap), the player's area, the factions' look,
 maps' state read, Esc and M's order. `--test-show=world` opens it. Shots
 in docs/ui/shots/step5/.
+
+## 451. Attach points: what a hand holds is drawn in it
+
+Roadmap #244: people and goblins hold what is in their hands. Each humanoid
+model has sockets on its skeleton (Client3D._sockets, a "sockets" size table
+on HUMAN, HUMAN_F and the goblin's MODELS): hand_r and hand_l on RightHand and
+LeftHand, back on UpperChest, belt_l on Hips, each a BoneAttachment3D with the
+socket a node under it at a place in the bone's frame, scaled back by the
+model's scale so what it holds keeps its own size. The bones are the
+retargeted SkeletonProfileHumanoid's, so every humanoid model has them in the
+same frames (419's bodies and the goblin alike): a hand's +Y along the
+fingers, +X toward the right hand's index (the left's little finger), +Z out
+of the palm. A held piece's origin is its grip and its length +Y (art_style);
+the hand socket puts it inside the closed fist, between the first knuckles
+and the palm (HAND_GRIP, HAND_PALM), its length along the fist's axis, out of
+the thumb's side. tools/grip_sockets.gd measured that from the bodies' finger
+bones (the knuckles at 0.109 and 0.103 m along the hand, the axis little to
+index); the goblin, without finger bones, takes the human hand's frame
+scaled to its hand's length (0.69).
+
+What is in a carrier's hand slots (Items.RIGHT_HAND, LEFT_HAND, already
+replicated) is drawn at the hand sockets from its art slot
+(ArtKit.instance(Items.def(id).art): its own art once there is some, a grey
+box sized as the slot until then), swapped when the slot changes and gone
+when the hand empties (Client3D._sync_held, each frame against what it
+drew). It moves with every clip AnimRig plays (390), so a strike's contact
+(399) lands with the blade. A two-hander rides in the right hand; its grip_2
+waits for a left-hand IK. A shield sits at the left hand by its slot's own
+grip, which its art sets on the strap. The carried lantern hangs at belt_l (a
+small iron frame round a glow); its light stays above the head, where it lights
+the body from outside (decision 388's reason). back is ready for a stowed
+two-hander; nothing goes there yet.
+
+Client only: protocol unchanged, no new class_name. view_test: the sockets on
+their bones, a sword in the right fist (its grip within 6 cm of the knuckles,
+its length along the fist's axis, at its own size whatever the stature), a
+shield in the left, an emptied hand drawing nothing, the lantern at the belt,
+a goblin's dagger in its hand. Rejected: items as their own puppets placed by
+script each frame (the bone attachment follows every pose for free); a socket
+table per model file (the profile's frames make one table, scaled, enough).
