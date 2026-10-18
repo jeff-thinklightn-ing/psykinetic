@@ -85,6 +85,10 @@ var companion_of := Callable()
 var camps := Callable()
 var home_of := Callable()
 var wells := Callable()
+## (town, from, to) -> [{id, strength}]: the storms over the town between
+## two steps that count (strength at least its climate's storm_min; Main:
+## Weather.storms_between), for its crop (decision 449).
+var storms := Callable()
 var rain := Callable()
 var roofs := Callable()
 var mend_roof := Callable()
@@ -310,6 +314,8 @@ func tick() -> void:
 		_spread(town)
 		_appoint(town)
 		_water(town)
+		_crop(town)
+		_farmer_comes(town)
 		if production.building_in(town):
 			continue
 		if _repair(town):
@@ -745,6 +751,120 @@ func _draw_trade(town: String, draw: RandomNumberGenerator) -> String:
 	return str(names[-1])
 
 
+# --- Farms (decision 449) -------------------------------------------------------------
+
+## [param town]'s crop this year ({} with no field): {stage ("" | "sown" |
+## "harvested" | "rotted"), growth, worked (steps sowing or harvesting),
+## season (the last seen), roots (dug this winter), at}.
+func crop(town: String) -> Dictionary:
+	return _towns.get(town, {}).get("crop", {}).duplicate()
+
+
+## The year's crop moved on to now (Season.name_at): sown in spring by the
+## farmer's sow_steps of work; in summer growth a day, clamp(base + rain x
+## the day's rain, least, most) / season_days, each storm flattening it
+## (by half) with chance flatten; in autumn brought in by his
+## harvest_steps of work as harvest x the field's level x growth food,
+## rotting if not by winter; in winter roots x level food, dug once. A
+## season passed by with no farmer leaves the crop as it is.
+func _crop(town: String) -> void:
+	var level := int(building(town, "field").get("level", 0))
+	if level < 1 or building(town, "field").get("state") not in [STANDING, BUILDING]:
+		return
+	var rule: Dictionary = rules.get("crop", {})
+	var record := _town(town)
+	var at := now()
+	var crop_now: Dictionary = record.get("crop", {"stage": "", "growth": 0.0, "worked": 0, "season": "", "roots": false, "at": at, "flattened": -1})
+	record["crop"] = crop_now
+	var since := maxi(at - int(crop_now["at"]), 0)
+	crop_now["at"] = at
+	var season := Season.name_at(at)
+	if season != crop_now["season"]:
+		_crop_turn(town, crop_now, str(crop_now["season"]), season)
+		crop_now["season"] = season
+	var farming := production.manned("%s:field" % town)
+	match season:
+		"spring":
+			if crop_now["stage"] == "" and farming:
+				crop_now["worked"] = int(crop_now["worked"]) + since
+				if int(crop_now["worked"]) >= int(rule.get("sow_steps", 3000)):
+					crop_now["stage"] = "sown"
+					crop_now["worked"] = 0
+					_note(town, "the field is sown")
+		"summer":
+			if crop_now["stage"] == "sown" and since > 0:
+				var days := float(since) / maxi(DayNight.day_steps, 1)
+				var fell := float(rain.call(town, float(at - since), float(at))) if rain.is_valid() else 0.0
+				var growth: Dictionary = rule.get("growth", {})
+				var per_day := clampf(float(growth.get("base", 0.7)) + float(growth.get("rain", 3.0)) * fell / maxf(days, 0.0001),
+					float(growth.get("least", 0.4)), float(growth.get("most", 1.3)))
+				crop_now["growth"] = float(crop_now["growth"]) + per_day * days / maxi(Season.season_days, 1)
+				if storms.is_valid():
+					for storm: Dictionary in storms.call(town, float(at - since), float(at)):
+						if Weather._unit("%s:%s:crop" % [storm["id"], town]) < float(rule.get("flatten", 0.5)):
+							crop_now["growth"] = float(crop_now["growth"]) * 0.5
+							crop_now["flattened"] = at  # For the field's look later: "flattened".
+							_note(town, "a storm flattened half the crop")
+		"autumn":
+			if crop_now["stage"] == "sown" and farming:
+				crop_now["worked"] = int(crop_now["worked"]) + since
+				if int(crop_now["worked"]) >= int(rule.get("harvest_steps", 3000)):
+					var food := roundi(float(rule.get("harvest", 150)) * level * float(crop_now["growth"]))
+					production.stockpile.deposit(town, "food", food, "harvest", "the harvest")
+					crop_now["stage"] = "harvested"
+					crop_now["worked"] = 0
+					_note(town, "the harvest is in: %d food" % food)
+		"winter":
+			if not bool(crop_now["roots"]) and farming:
+				var roots := int(rule.get("roots", 20)) * level
+				production.stockpile.deposit(town, "food", roots, "roots", "roots dug in winter")
+				crop_now["roots"] = true
+				_note(town, "roots dug: %d food" % roots)
+
+
+## A season ended for [param town]'s crop: a crop not brought in by winter
+## rots; a new year's spring starts bare.
+func _crop_turn(town: String, crop_now: Dictionary, was: String, now_season: String) -> void:
+	if now_season == "winter" and crop_now["stage"] == "sown" and was != "":
+		crop_now["stage"] = "rotted"
+		_note(town, "the crop rotted in the field")
+	if now_season == "spring":
+		crop_now["stage"] = ""
+		crop_now["growth"] = 0.0
+		crop_now["worked"] = 0
+		crop_now["roots"] = false
+
+
+## A town whose field stands with no farmer gets one, a newcomer, once it
+## has stood growth_days without one (by growth; a rescue may bring one
+## first).
+func _farmer_comes(town: String) -> void:
+	var house := building(town, "field")
+	if int(house.get("level", 0)) < 1 or house.get("state") != STANDING:
+		return
+	for who in residents(town):
+		if "farmer" in production.worker(who).get("trades", []):
+			return
+	var rule: Dictionary = rules.get("crop", {})
+	var record := _town(town)
+	var waiting_since := int(record.get("farmer_wanted", -1))
+	if waiting_since < 0:
+		record["farmer_wanted"] = now()
+		return
+	if now() - waiting_since < int(float(rule.get("growth_days", 5)) * maxi(DayNight.day_steps, 1)):
+		return
+	var count := int(record.get("farmers_came", 0)) + 1
+	record["farmers_came"] = count
+	record.erase("farmer_wanted")
+	var names: Array = rule.get("names", ["Tam"])
+	var name := str(names[absi(hash("%s/%d" % [town, count])) % names.size()])
+	var id := "farmer_%s_%d" % [town.replace("/", "_"), count]
+	if production.add_worker(id, name, ["farmer"], town, "growth"):
+		record["residents"].append(id)
+		_note(town, "%s the farmer comes to work the field" % name)
+		_seat(town)
+
+
 # --- Wells and roofs (decision 426) -------------------------------------------------
 
 ## [param town]'s water now ({} with no well: nothing of this applies).
@@ -1133,6 +1253,14 @@ func from_dict(saved: Dictionary) -> void:
 			for camp: Variant in restock:
 				record["restock"][str(camp)] = int(restock[camp])
 		record["strangers_made"] = maxi(int(entry.get("strangers_made", 0)), 0)
+		var crop_saved: Variant = entry.get("crop", {})
+		if crop_saved is Dictionary and not crop_saved.is_empty():
+			record["crop"] = {"stage": str(crop_saved.get("stage", "")), "growth": maxf(float(crop_saved.get("growth", 0.0)), 0.0),
+				"worked": maxi(int(crop_saved.get("worked", 0)), 0), "season": str(crop_saved.get("season", "")),
+				"roots": bool(crop_saved.get("roots", false)), "at": int(crop_saved.get("at", 0)), "flattened": int(crop_saved.get("flattened", -1))}
+		if entry.has("farmer_wanted"):
+			record["farmer_wanted"] = int(entry["farmer_wanted"])
+		record["farmers_came"] = maxi(int(entry.get("farmers_came", 0)), 0)
 		if entry.has("water_at"):
 			record["water"] = maxf(float(entry.get("water", 0.0)), 0.0)
 			record["water_at"] = int(entry["water_at"])

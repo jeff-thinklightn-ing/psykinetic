@@ -1851,6 +1851,11 @@ func _boot() -> void:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
 		return (area.get("buildings", []) as Array).filter(func(house: Dictionary) -> bool:
 			return str(house.get("slot", "")) == "building.well").size()
+	World.towns.storms = func(town: String, from: float, to: float) -> Array:
+		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
+		var region := str(area.get("region", Level.DEFAULT_REGION))
+		var least := float(Weather.climate_of(region).get("storm_min", Weather.STORM_MIN))
+		return Weather.storms_between(region, from, to).filter(func(storm: Dictionary) -> bool: return float(storm["strength"]) >= least)
 	World.towns.rain = func(town: String, from: float, to: float) -> float:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
 		return Weather.rain_between(str(area.get("region", Level.DEFAULT_REGION)), from, to)

@@ -10721,3 +10721,48 @@ Rejected: a model judging what a player deserves (events only); a town-wide
 reputation number (it is each person's, and spreads only by gossip);
 standing on the wire; scripted greetings (a fact, and the model greets);
 crediting a rescue or a camp to a player who was elsewhere.
+## 449. Farms: a field, a farmer, and a crop through the seasons
+
+Jeff (2026-10-17): "i wanted to add farms and farmers too - tune with
+seasons". The coordinator's approval of 2026-10-17. On 362 (seasons:
+Season.name_at, season_days 7, so a year of 28 days), 384 (town weather:
+Weather.rain_between, storms_between) and 428 (rescues).
+
+- The field: economy.json buildings.field (trade farmer, built by the
+  carpenter, wood 6, 3000 steps, max level 3), a town building like the
+  kitchen. Its slot building.field (a fenced 4x4, open air), prefab and art
+  are buildings' and art-kit's.
+- The crop, on the town record ("crop", saved), moved on the town tick:
+  spring, sown by the farmer's crop.sow_steps (3000) of work at the field
+  (Production.manned "<town>:field"); summer, growth a day clamp(base 0.7
+  + rain 3.0 x the day's rain, least 0.4, most 1.3) / season_days, and each
+  storm over the town (Towns.storms; Main: storms_between, strength at its
+  climate's storm_min, by storm id) flattens half the growth so far with
+  chance crop.flatten (0.5), its step kept ("flattened") for the field's
+  look later; autumn, brought in by crop.harvest_steps (3000) of work as
+  crop.harvest x the field's level x growth food into the store; not by
+  winter, it rots; winter, crop.roots x level food dug once. A season with
+  no farmer leaves the crop as it is. All the numbers are in economy.json
+  "crop" for Jeff to tune the year.
+- The farmer: a trade (rescue.trades, weight 3, by 428), or by growth: a
+  town whose field has stood growth_days (5) with no farmer gets a newcomer
+  (origin "growth", named from crop.names). His day at the field is npc's.
+- The field's look (sown, growing, ripe, flattened, bare: art-kit's state
+  nodes) is not sent to clients yet: record-only now, a protocol step with
+  buildings later.
+
+The year, from the 90-day balance run of the wilds town (nine residents
+with one farmer and one hunter, no players; tables in
+C:/dev/review/balance30): at harvest 150 and roots 20 (the first numbers)
+the town went hungry about half the time even in normal years, a year's
+harvest eaten in two weeks against the 252 food nine people eat in 28
+days. At harvest 260 and roots 30: a normal year (growth about 0.87) feeds
+the town from the harvest to the next summer; a year whose crop storms
+flattened (0.25), and every bad year (no rain and a storm: growth 0.40),
+goes hungry before the next harvest. Every run starts hungry for its first
+two weeks, before any harvest: a town's starting food (start_food, like
+start_gold) is Jeff's to choose.
+
+Protocol unchanged. tests/farm_test (a normal year, a drought, a summer
+storm, level 2 twice, saved and loaded, unsown with the farmer away in
+spring, rotted with him away in autumn, a farmer coming by growth).

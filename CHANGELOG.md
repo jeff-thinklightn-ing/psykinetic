@@ -16,6 +16,7 @@ notes (decision 324).
   shows in how they greet you, what they offer you, and what they tell the
   neighbours at the well; and it fades, slowly, with time.
 - At the temple's counter or the smith's, a screen beside your pack shows what can be done to what you carry (a blessing, a reforge), what it costs, what of yours is being worked and when it will be ready, and what waits for you to collect.
+- Towns can farm: a field worked by a farmer is sown in spring, grows through summer with the rain (a drought or a storm can ruin it), is harvested in autumn, and gives a few roots in winter. A good harvest feeds a small town through the year; a bad one means hungry months. A farmer comes by rescue, or to a town whose field has stood a few days with nobody to work it.
 - Townsfolk eat once a day, not three times. Their rent now goes into the town's bank, where it is lent back out, instead of vanishing. Goblin camps, wolves and the town's hunter hunt more gently, so the deer and rabbits of the wilds last instead of being hunted out within a season.
 - Choose how you look: the Character section of the options (O) now picks
   your build, height, hair and its colour, beard and skin beside a turning
