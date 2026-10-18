@@ -6,8 +6,11 @@ shader_type spatial;
 // its edge caught by the light.
 // Which ground is where comes from kinds, a texel a cell (r grass, g dirt,
 // b stone, a sand), read where the noise pushes it, so kinds meet along
-// ragged borders, not cell edges. Everything else is noise (noise_tex, made
-// at run time): no texture assets.
+// ragged borders, not cell edges. Each kind's look is noise (noise_tex,
+// made at run time) until its ground.<kind> texture has art (decision 437),
+// then that texture in world metres, a slow swell on it against the tile's
+// repeat; everything over the kinds (the season, wet, the forest's edge,
+// light and heat) is the same either way.
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2D kinds : filter_linear, repeat_disable;
@@ -19,6 +22,18 @@ uniform vec3 dirt : source_color = vec3(0.45, 0.35, 0.22);
 uniform vec3 stone : source_color = vec3(0.56, 0.56, 0.54);
 uniform vec3 sand : source_color = vec3(0.78, 0.7, 0.5);
 uniform vec3 warm : source_color = vec3(1.0, 0.5, 0.2);
+// The kinds' own textures (ground.<kind>, decision 437), each read at the
+// world xz over its tile (metres: r grass, g dirt, b stone, a sand) while
+// its flag is on.
+uniform sampler2D grass_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D dirt_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D stone_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D sand_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform bool grass_own = false;
+uniform bool dirt_own = false;
+uniform bool stone_own = false;
+uniform bool sand_own = false;
+uniform vec4 kind_tiles = vec4(4.0);
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 // Where the water is, a texel a cell like kinds (Client3D._build_ground):
 // the bed and the shore beside it darker, wet.
@@ -26,6 +41,12 @@ uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
 // Outdoors, the forest's floor (the mask's g): the land runs into it along
 // a ragged line.
 uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
+// Past pine stands, the needles' own texture there (decision 423's
+// ground.needles), so the land's edge meets the floor beyond it.
+uniform sampler2D needles_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform bool needles_own = false;
+uniform float needles_tile = 4.0;
+uniform float needles_shade = 0.7;
 // Outdoors, the sky's light on the floor (as a brightness, like CUSTOM0's
 // r, which then holds the cell's own sources alone): the floor is lit to
 // the brighter of the two, so a torch's pool shows at night and the hour
@@ -127,6 +148,14 @@ vec2 boards(vec2 p, float row, float run) {
 	return vec2(joint, hash2(vec2(r, floor(along) + 101.0)).x);
 }
 
+// [param tex] at [param at] over [param tile] metres, with the pixel's own
+// rate of change (worked out before any branch, so its mipmap is right
+// where kinds meet), under a slow swell so the tile's repeat doesn't show
+// as a grid.
+vec3 tiled(sampler2D tex, vec2 at, float tile, vec2 dx, vec2 dy, float salt) {
+	return textureGrad(tex, at / tile, dx / tile, dy / tile).rgb * (0.86 + 0.28 * fbm(at * 0.18 + salt));
+}
+
 vec3 floor_look(int floor_set, vec2 at, float fine) {
 	if (floor_set == 1) {
 		if (floor_wood_own) {
@@ -173,9 +202,12 @@ void fragment() {
 
 	// Each kind's look, worked out only where it shows.
 	float fine = noise(at * 7.0);
+	vec2 dx = dFdx(at);
+	vec2 dy = dFdy(at);
 	vec3 colour = vec3(0.0);
 	if (weights.r > 0.0) {
-		vec3 here = grass * (0.82 + 0.36 * fbm(at * 0.18)) * (0.92 + 0.16 * fine);
+		vec3 here = grass_own ? tiled(grass_tex, at, kind_tiles.r, dx, dy, 0.0)
+				: grass * (0.82 + 0.36 * fbm(at * 0.18)) * (0.92 + 0.16 * fine);
 		here = mix(here, here * vec3(1.12, 1.05, 0.7), smoothstep(0.55, 0.75, noise(at * 0.31 + 3.0)));
 		float grey = clamp(dot(here, vec3(0.3, 0.55, 0.15)) * 3.0, 0.6, 1.3);
 		here = mix(here, vec3(0.3, 0.25, 0.1) * grey, (1.0 - season.x) * 0.5);
@@ -183,14 +215,19 @@ void fragment() {
 		colour += here * weights.r;
 	}
 	if (weights.g > 0.0) {
-		colour += dirt * (0.85 + 0.3 * fbm(at * 0.6 + 7.0)) * (0.9 + 0.2 * noise(at * 9.0)) * weights.g;
+		colour += (dirt_own ? tiled(dirt_tex, at, kind_tiles.g, dx, dy, 7.0)
+				: dirt * (0.85 + 0.3 * fbm(at * 0.6 + 7.0)) * (0.9 + 0.2 * noise(at * 9.0))) * weights.g;
 	}
-	if (weights.b > 0.0) {
+	if (weights.b > 0.0 && stone_own) {
+		colour += tiled(stone_tex, at, kind_tiles.b, dx, dy, 13.0) * weights.b;
+	} else if (weights.b > 0.0) {
 		vec2 cobble = cobbles(mat2(vec2(0.94, 0.34), vec2(-0.34, 0.94)) * at * 1.6);
 		vec3 here = stone * (0.86 + 0.2 * cobble.y) * (0.94 + 0.12 * fine);
 		colour += here * mix(0.62, 1.0, smoothstep(0.02, 0.12, cobble.x)) * weights.b;
 	}
-	if (weights.a > 0.0) {
+	if (weights.a > 0.0 && sand_own) {
+		colour += tiled(sand_tex, at, kind_tiles.a, dx, dy, 21.0) * weights.a;
+	} else if (weights.a > 0.0) {
 		colour += sand * (0.92 + 0.12 * noise(at * 0.5 + 21.0))
 				* (0.96 + 0.08 * noise(vec2(at.x * 1.5 + at.y * 0.4, at.y * 6.0))) * weights.a;
 	}
@@ -205,7 +242,9 @@ void fragment() {
 	float wet = smoothstep(0.25, 0.6, texture(water, (at - kinds_origin + 0.5) / kinds_size).r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
 	float forest = smoothstep(0.35, 0.65, texture(water, uv).g + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
-	colour = mix(colour, forest_floor * (0.8 + 0.4 * fbm(at * 0.4 + 50.0)), forest);
+	vec3 under_trees = needles_own ? textureGrad(needles_tex, at / needles_tile, dx / needles_tile, dy / needles_tile).rgb * needles_shade
+			: forest_floor * (0.8 + 0.4 * fbm(at * 0.4 + 50.0));
+	colour = mix(colour, under_trees, forest);
 	if (floor_set == 0) {
 		float drift = 0.85 + 0.3 * fbm(at * 0.7 + 80.0);
 		colour = mix(colour, vec3(0.9, 0.93, 0.97), clamp(season.z * drift, 0.0, 1.0) * smoothstep(0.75, 0.95, up) * (1.0 - wet));

@@ -10092,3 +10092,44 @@ well that the mine is cursed." (Hearsay.prompt_words), not "At the well, Tam
 told you that": the first transcript had Mara answer "You heard from Tam at
 the well ...", the sentence's opening "You have heard" pulling her into the
 second person.
+
+## 437. The ground's kinds drawn with their own textures
+
+The ground (ground.gdshader) drew each kind, grass, dirt, stone and sand,
+from its palette colour and noise; the slots ground.grass, dirt, stone and
+sand (art-kit: textures, tile_m 4, 512 px) had no reader. Art-gen's
+candidates for them wait on Jeff's picks; this lands first, so each kind
+switches over by itself when its picture is in. The coordinator approved
+the design.
+
+- `Client3D._ground_material` sets, for each kind (`GROUND_KINDS`, the
+  kinds texture's r, g, b, a), `<kind>_tex` and `<kind>_own` from
+  `Client3D.ground_texture` (ArtKit.texture("ground.<kind>")), and
+  `kind_tiles` from the slots' tile_m. The floors' textures (floor.<set>,
+  285) were already read this way.
+- With art, a kind's look is its texture at world xz over its tile, under
+  a slow swell (fbm at 0.18 a metre, 0.86 to 1.14) so the 4 m repeat
+  doesn't read as a grid from the game camera. Read with textureGrad from
+  the pixel's derivatives worked out before the kinds' branches, so the
+  mipmap is right where kinds meet. Without art, its procedural look as
+  before, untouched.
+- Everything over the kinds is the same either way: the ragged borders and
+  blend between kinds, grass's yellow patches, drying and autumn, wet by
+  water, the forest's edge, light and heat, snow, and the floor sets.
+- The forest's edge (the land running into the forest floor along a
+  ragged line) blends to the forest floor's own look: past pine stands
+  (369) their NEEDLES, and 423's ground.needles texture once it has art,
+  so the land's edge meets the ForestFloor plane beyond it with no step;
+  without stands the dark forest colour as before. The edge's needles are
+  EDGE_NEEDLES_DARK (0.3) darker: the edge lies in the sun, the floor
+  beyond in the canopy's shade, and at full strength the edge read as a
+  bright clay path along the trees (wilds shots).
+- Held back until real art shows a repeat: a second read of each texture
+  turned about 37 degrees at another scale, blended by noise (twice the
+  reads where that kind shows).
+- `Client3D.ground_stand_ins` lets view_test check the wiring with
+  textures made in code.
+
+Cost: five samplers more (13 of 16); one texture read a kind where it
+shows (two where kinds meet), only once that kind has art; about 1.4 MB of
+video memory a 512 x 512 texture. Client only; no protocol change.

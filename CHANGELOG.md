@@ -99,6 +99,7 @@ notes (decision 324).
 - When you fall, you are brought back at the nearest temple or healer's hut with someone there: after about a minute the priest or the medicine man brings you back at full health, and the party log says who did it. Companions and townsfolk who fall come back the same way. Where there is neither, you come back as before. The wilds town's temple now has its priest, paid by the town like the guard, and the healer's hut in the wilds has its medicine man.
 - The odd gaps between the border's pine stands hold single pines now, not broadleaf trees.
 - The forest floor under the border's pine stands gets ready for a texture of fallen needles and cones in place of its flat brown; it shows once the art is in.
+- The ground gets ready for real grass, dirt, stone and sand textures; each shows once its art is picked. Where the land meets a pine forest, its edge now fades into the forest's needles.
 - Animals come into view from a distance instead of appearing beside you, a hunted deer or rabbit can escape off the edge of the map into the next area, and wolves keep to their den by day and range far by night.
 - The minimap and the big map (M) show when you host a game, not only when
   you join one.

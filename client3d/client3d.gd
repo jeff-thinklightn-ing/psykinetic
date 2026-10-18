@@ -4071,12 +4071,30 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("kinds", ImageTexture.create_from_image(image))
 	material.set_shader_parameter("kinds_origin", Vector2(origin))
 	material.set_shader_parameter("kinds_size", Vector2(across, down))
-	for kind: String in GROUND_SWATCHES:
+	var tiles := Vector4.ONE * 4.0
+	for i in GROUND_KINDS.size():
+		var kind: String = GROUND_KINDS[i]
 		material.set_shader_parameter(kind, ground_colour(kind))
+		# Its own texture once ground.<kind> has art (decision 437).
+		var own := ground_texture(kind)
+		material.set_shader_parameter(kind + "_tex", own)
+		material.set_shader_parameter(kind + "_own", own != null)
+		if ArtKit.has("ground." + kind):
+			tiles[i] = float(ArtKit.spec("ground." + kind).get("tile_m", 4.0))
+	material.set_shader_parameter("kind_tiles", tiles)
 	material.set_shader_parameter("warm", WARM)
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("water", _water_mask)
-	material.set_shader_parameter("forest_floor", FOREST_FLOOR)
+	# Past pine stands the forest's edge runs into their needles (423), as
+	# dark as the floor beyond looks in the canopy's shade (the edge is in
+	# the sun).
+	material.set_shader_parameter("forest_floor", _forest_floor_colour().darkened(EDGE_NEEDLES_DARK) if PineStands.drawn() else FOREST_FLOOR)
+	material.set_shader_parameter("needles_shade", 1.0 - EDGE_NEEDLES_DARK)
+	var needles := PineStands.needles_texture() if PineStands.drawn() else null
+	material.set_shader_parameter("needles_tex", needles)
+	material.set_shader_parameter("needles_own", needles != null)
+	if ArtKit.has(PineStands.NEEDLES_SLOT):
+		material.set_shader_parameter("needles_tile", float(ArtKit.spec(PineStands.NEEDLES_SLOT).get("tile_m", 4.0)))
 	material.set_shader_parameter("sky_floor", _sky_floor)
 	material.set_shader_parameter("floors", _floor_mask)
 	for floor_set: String in FLOOR_SWATCHES:
@@ -4108,6 +4126,23 @@ static func _ground_noise() -> NoiseTexture2D:
 		_noise_texture.generate_mipmaps = true
 		_noise_texture.noise = noise
 	return _noise_texture
+
+
+## How much darker the needles are where the land's ground runs into them
+## (sunlit) than on the forest floor beyond (in the canopy's shade).
+const EDGE_NEEDLES_DARK := 0.3
+## The ground's kinds in the kinds texture's channels' order (r, g, b, a).
+const GROUND_KINDS: PackedStringArray = ["grass", "dirt", "stone", "sand"]
+## Tests only: a ground kind drawn with this texture while its slot has no
+## image of its own.
+static var ground_stand_ins: Dictionary[String, Texture2D] = {}
+
+
+## A ground kind's own texture (ground.<kind>), else the tests' stand-in,
+## else null (its procedural look).
+static func ground_texture(kind: String) -> Texture2D:
+	var own := ArtKit.texture("ground." + kind) if ArtKit.has("ground." + kind) else null
+	return own if own != null else ground_stand_ins.get(kind)
 
 
 ## A ground kind's colour (sRGB), from the palette.

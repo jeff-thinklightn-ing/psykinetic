@@ -36,6 +36,7 @@ func _ready() -> void:
 	await _test_fade()
 	_test_outdoor()
 	_test_pine_stands()
+	_test_ground_textures()
 	_test_seasons()
 	_test_heights()
 	_test_hills()
@@ -1629,6 +1630,48 @@ func _test_seasons() -> void:
 	_rig._set_near(tree, false)
 	_check(faded != null and faded.shader == Client3D.SEASON_NEAR_SHADER and season_of.call(tree) == before,
 			"a near tree fades in its season's see-through copy, and is in season again after")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The ground's kinds drawn with their own textures once ground.<kind> has
+## art (decision 437; stand-ins made here while it has none), and the
+## forest's edge into the stands' needles (423).
+func _test_ground_textures() -> void:
+	print("\n== the ground's kinds: their own textures once they have art, the forest's edge into the needles ==")
+	var ground_of := func() -> ShaderMaterial:
+		var chunks := _rig._room.find_children("Ground_*", "MeshInstance3D", false, false)
+		return (chunks[0] as MeshInstance3D).material_override as ShaderMaterial
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var plain: ShaderMaterial = ground_of.call()
+	var off := Array(Client3D.GROUND_KINDS).filter(func(kind: String) -> bool:
+		return Client3D.ground_texture(kind) == null and not plain.get_shader_parameter(kind + "_own"))
+	var bare := Array(Client3D.GROUND_KINDS).filter(func(kind: String) -> bool: return Client3D.ground_texture(kind) == null)
+	_check(off.size() == bare.size(), "a kind with no art its procedural look (%s)" % [off])
+	var stand_ins: Dictionary[String, Texture2D] = {}
+	for kind in Client3D.GROUND_KINDS:
+		var image := Image.create(4, 4, false, Image.FORMAT_RGB8)
+		image.fill(Client3D.ground_colour(kind))
+		stand_ins[kind] = ImageTexture.create_from_image(image)
+	Client3D.ground_stand_ins = stand_ins
+	var needles := Image.create(4, 4, false, Image.FORMAT_RGB8)
+	needles.fill(PineStands.NEEDLES)
+	PineStands.needles_stand_in = ImageTexture.create_from_image(needles)
+	PineStands.stand_in = true
+	PineStands.forget()
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var drawn: ShaderMaterial = ground_of.call()
+	var own := Array(Client3D.GROUND_KINDS).filter(func(kind: String) -> bool:
+		return drawn.get_shader_parameter(kind + "_own") and drawn.get_shader_parameter(kind + "_tex") == Client3D.ground_texture(kind))
+	var tiles: Vector4 = drawn.get_shader_parameter("kind_tiles")
+	_check(own.size() == 4 and tiles.x > 0.0 and tiles.w > 0.0, "with art each kind its own texture, tiled in metres (%s, %s)" % [own, tiles])
+	_check(drawn.get_shader_parameter("needles_own") and drawn.get_shader_parameter("needles_tex") == PineStands.needles_texture()
+			and drawn.get_shader_parameter("forest_floor") == PineStands.NEEDLES.darkened(Client3D.EDGE_NEEDLES_DARK),
+			"past pine stands the land's edge runs into their needles")
+	Client3D.ground_stand_ins = {}
+	PineStands.needles_stand_in = null
+	PineStands.stand_in = false
+	PineStands.forget()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
