@@ -9,6 +9,7 @@ notes (decision 324).
 
 - Tools: a heavy job waiting at the resource gate no longer dies of "Permission denied" on the gate's state lock (Windows' answer while the lock is being deleted); it waits, as for a held lock.
 - The living-world soak (decision 496): tools/town_soak runs the wilds town for a month as the box runs it, with test players at the counter and the inn, and prints what happened; it found and this fixes three things: gossip no longer tells anyone the same thing twice (a card remembers what it was told), a stray home on their own closes the kin's pleas without a lapse against anyone, and promise words keep names; the rest (no inn built in a month, the treasury at its floor) went to economy.
+- Horses (a bay and a white), donkeys and dogs (a husky and a shiba) have bodies of their own, ready for the town's carters and guards.
 - Chimneys are stacks of rough stone with a slab cap and a clay pot.
 - Orcs have a new look, Jeff's pick: hulking, hunched and grey-blue, with an iron shoulder plate and a chain across the chest.
 - Snagfin, the wilds' goblin merchant, now looks like a goblin (bare-headed in town), not a person.
