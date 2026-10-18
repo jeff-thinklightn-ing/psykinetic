@@ -1,0 +1,400 @@
+[gd_resource type="Theme" load_steps=25 format=3]
+
+; The shared look of every screen (docs/ui_style.md): the project theme
+; (project.godot gui/theme/custom), read by code through UiTheme. Every
+; colour is a swatch of art/kit/palette.png; sizes are canvas units (3840 x
+; 2160). A panel sets none of its own: it uses the types and variations here.
+
+[ext_resource type="FontFile" path="res://art/fonts/AlegreyaSans-Regular.ttf" id="sans"]
+[ext_resource type="FontFile" path="res://art/fonts/AlegreyaSans-Bold.ttf" id="sans_bold"]
+[ext_resource type="FontFile" path="res://art/fonts/Alegreya[wght].ttf" id="serif_file"]
+
+[sub_resource type="FontVariation" id="serif"]
+base_font = ExtResource("serif_file")
+
+[sub_resource type="FontVariation" id="serif_bold"]
+base_font = ExtResource("serif_file")
+variation_opentype = {
+2003265652: 700.0
+}
+
+; backing #2c2418 at 0.86, edge leather #7a6e58: a panel.
+[sub_resource type="StyleBoxFlat" id="panel"]
+content_margin_left = 24.0
+content_margin_top = 24.0
+content_margin_right = 24.0
+content_margin_bottom = 24.0
+bg_color = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.86)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; A tooltip: the panel, closer margins.
+[sub_resource type="StyleBoxFlat" id="tooltip"]
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+bg_color = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; backing_deep #1e1812: an inset (a slot, a text field).
+[sub_resource type="StyleBoxFlat" id="inset"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; The inset with focus: a brass edge.
+[sub_resource type="StyleBoxFlat" id="inset_focus"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; A hand's slot: the inset edged in brass, 3 wide.
+[sub_resource type="StyleBoxFlat" id="hand_slot"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 0.95)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="button_normal"]
+content_margin_left = 20.0
+content_margin_top = 8.0
+content_margin_right = 20.0
+content_margin_bottom = 8.0
+bg_color = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="button_hover"]
+content_margin_left = 20.0
+content_margin_top = 8.0
+content_margin_right = 20.0
+content_margin_bottom = 8.0
+bg_color = Color(0.16, 0.13, 0.1, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="button_pressed"]
+content_margin_left = 20.0
+content_margin_top = 8.0
+content_margin_right = 20.0
+content_margin_bottom = 8.0
+bg_color = Color(0.3, 0.27, 0.22, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="button_disabled"]
+content_margin_left = 20.0
+content_margin_top = 8.0
+content_margin_right = 20.0
+content_margin_bottom = 8.0
+bg_color = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.6)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.45)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; Keyboard focus: a brass edge over whatever the control shows.
+[sub_resource type="StyleBoxFlat" id="focus"]
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; A menu's highlighted item.
+[sub_resource type="StyleBoxFlat" id="menu_hover"]
+content_margin_left = 12.0
+content_margin_top = 4.0
+content_margin_right = 12.0
+content_margin_bottom = 4.0
+bg_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.45)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+; A slider's track, leather, 8 thick.
+[sub_resource type="StyleBoxFlat" id="slider_track"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+; The part of the track up to the grabber, brass.
+[sub_resource type="StyleBoxFlat" id="slider_filled"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="Gradient" id="grabber_gradient"]
+offsets = PackedFloat32Array(0, 0.9, 0.96)
+colors = PackedColorArray(0.78, 0.604, 0.333, 1, 0.78, 0.604, 0.333, 1, 0.78, 0.604, 0.333, 0)
+
+; The grabber: a brass disc, 28 across.
+[sub_resource type="GradientTexture2D" id="grabber"]
+gradient = SubResource("grabber_gradient")
+width = 28
+height = 28
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="grabber_bright_gradient"]
+offsets = PackedFloat32Array(0, 0.9, 0.96)
+colors = PackedColorArray(1, 0.824, 0.478, 1, 1, 0.824, 0.478, 1, 1, 0.824, 0.478, 0)
+
+[sub_resource type="GradientTexture2D" id="grabber_bright"]
+gradient = SubResource("grabber_bright_gradient")
+width = 28
+height = 28
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+; A scroll bar's track and its brass grabber (a ScrollContainer is an inset).
+[sub_resource type="StyleBoxFlat" id="scroll_track"]
+content_margin_left = 5.0
+content_margin_right = 5.0
+bg_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.35)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="scroll_grabber"]
+content_margin_left = 5.0
+content_margin_right = 5.0
+bg_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="scroll_grabber_bright"]
+content_margin_left = 5.0
+content_margin_right = 5.0
+bg_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[resource]
+default_font = ExtResource("sans")
+default_font_size = 38
+Button/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Button/colors/font_disabled_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.5)
+Button/colors/font_focus_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Button/colors/font_hover_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Button/colors/font_hover_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Button/colors/font_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Button/styles/disabled = SubResource("button_disabled")
+Button/styles/focus = SubResource("focus")
+Button/styles/hover = SubResource("button_hover")
+Button/styles/normal = SubResource("button_normal")
+Button/styles/pressed = SubResource("button_pressed")
+Caption/base_type = &"Label"
+Caption/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+Caption/font_sizes/font_size = 30
+Deep/base_type = &"PanelContainer"
+Deep/styles/panel = SubResource("inset")
+HScrollBar/styles/grabber = SubResource("scroll_grabber")
+HScrollBar/styles/grabber_highlight = SubResource("scroll_grabber_bright")
+HScrollBar/styles/grabber_pressed = SubResource("scroll_grabber_bright")
+HScrollBar/styles/scroll = SubResource("scroll_track")
+HSlider/icons/grabber = SubResource("grabber")
+HSlider/icons/grabber_disabled = SubResource("grabber")
+HSlider/icons/grabber_highlight = SubResource("grabber_bright")
+HSlider/styles/grabber_area = SubResource("slider_filled")
+HSlider/styles/grabber_area_highlight = SubResource("slider_filled")
+HSlider/styles/slider = SubResource("slider_track")
+HandSlot/base_type = &"Panel"
+HandSlot/styles/panel = SubResource("hand_slot")
+Heading/base_type = &"Label"
+Heading/font_sizes/font_size = 44
+Heading/fonts/font = SubResource("serif")
+Hud/base_type = &"Label"
+Hud/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)
+Hud/constants/outline_size = 8
+Hud/font_sizes/font_size = 44
+Inset/base_type = &"Panel"
+Inset/styles/panel = SubResource("inset")
+Label/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Label/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)
+LineEdit/colors/caret_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+LineEdit/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+LineEdit/colors/font_placeholder_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.6)
+LineEdit/colors/font_selected_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 1)
+LineEdit/colors/font_uneditable_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+LineEdit/colors/selection_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 0.35)
+LineEdit/styles/focus = SubResource("inset_focus")
+LineEdit/styles/normal = SubResource("inset")
+LineEdit/styles/read_only = SubResource("inset")
+LinkButton/colors/font_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+LinkButton/colors/font_focus_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+LinkButton/colors/font_hover_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+LinkButton/colors/font_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+LinkButton/styles/focus = SubResource("focus")
+Name/base_type = &"Label"
+Name/colors/font_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Name/fonts/font = SubResource("serif")
+OptionButton/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+OptionButton/colors/font_disabled_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.5)
+OptionButton/colors/font_focus_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+OptionButton/colors/font_hover_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+OptionButton/colors/font_hover_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+OptionButton/colors/font_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+OptionButton/styles/disabled = SubResource("button_disabled")
+OptionButton/styles/focus = SubResource("focus")
+OptionButton/styles/hover = SubResource("button_hover")
+OptionButton/styles/normal = SubResource("button_normal")
+OptionButton/styles/pressed = SubResource("button_pressed")
+Outlined/base_type = &"Label"
+Outlined/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)
+Outlined/constants/outline_size = 8
+Panel/styles/panel = SubResource("panel")
+PanelContainer/styles/panel = SubResource("panel")
+PopupMenu/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+PopupMenu/colors/font_disabled_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.5)
+PopupMenu/colors/font_hover_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+PopupMenu/styles/hover = SubResource("menu_hover")
+PopupMenu/styles/panel = SubResource("panel")
+Psykinetic/colors/aloud = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Psykinetic/colors/alarm = Color(0.7215686274509804, 0.19607843137254902, 0.16470588235294117, 1)
+Psykinetic/colors/backing = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.86)
+Psykinetic/colors/backing_deep = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
+Psykinetic/colors/brass = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+Psykinetic/colors/brass_bright = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Psykinetic/colors/edge = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+Psykinetic/colors/friend = Color(0.5607843137254902, 0.6588235294117647, 0.3411764705882353, 1)
+Psykinetic/colors/outline = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)
+Psykinetic/colors/party = Color(0.24705882352941178, 0.7215686274509804, 0.6588235294117647, 1)
+Psykinetic/colors/rust = Color(0.9098039215686274, 0.4745098039215686, 0.1803921568627451, 1)
+Psykinetic/colors/text = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Psykinetic/colors/text_dim = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+Psykinetic/colors/water = Color(0.37254901960784315, 0.5411764705882353, 0.5490196078431373, 1)
+Psykinetic/constants/margin = 40
+Psykinetic/constants/outline = 8
+Psykinetic/constants/pad = 24
+Psykinetic/constants/radius = 6
+Psykinetic/constants/row = 12
+Psykinetic/constants/section = 24
+Psykinetic/constants/slot = 132
+Psykinetic/constants/slot_gap = 10
+Psykinetic/constants/unit = 8
+Psykinetic/font_sizes/body = 38
+Psykinetic/font_sizes/caption = 30
+Psykinetic/font_sizes/heading = 44
+Psykinetic/font_sizes/hud = 44
+Psykinetic/font_sizes/small = 24
+Psykinetic/font_sizes/speech = 17
+Psykinetic/font_sizes/title = 56
+Psykinetic/fonts/sans = ExtResource("sans")
+Psykinetic/fonts/sans_bold = ExtResource("sans_bold")
+Psykinetic/fonts/serif = SubResource("serif")
+Psykinetic/fonts/serif_bold = SubResource("serif_bold")
+RichTextLabel/colors/default_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+RichTextLabel/font_sizes/bold_font_size = 38
+RichTextLabel/font_sizes/normal_font_size = 38
+RichTextLabel/fonts/bold_font = ExtResource("sans_bold")
+RichTextLabel/fonts/normal_font = ExtResource("sans")
+ScrollContainer/styles/panel = SubResource("inset")
+Small/base_type = &"Label"
+Small/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+Small/font_sizes/font_size = 24
+Title/base_type = &"Label"
+Title/font_sizes/font_size = 56
+Title/fonts/font = SubResource("serif_bold")
+VScrollBar/styles/grabber = SubResource("scroll_grabber")
+VScrollBar/styles/grabber_highlight = SubResource("scroll_grabber_bright")
+VScrollBar/styles/grabber_pressed = SubResource("scroll_grabber_bright")
+VScrollBar/styles/scroll = SubResource("scroll_track")
+TooltipLabel/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+TooltipLabel/font_sizes/font_size = 30
+TooltipPanel/styles/panel = SubResource("tooltip")

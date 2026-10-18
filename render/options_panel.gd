@@ -9,13 +9,12 @@ extends PanelContainer
 ## written at once and sent with the next join (a character creation flow
 ## will replace it). Video: the 3D view's anti-aliasing, a button per kind
 ## (Net.ANTIALIAS), applied and written at a click (Net.set_antialias,
-## decision 385). Sizes in the HUD's 3840 x 2160 units, styled as the pack
-## panel.
+## decision 385). Sizes in the HUD's 3840 x 2160 units; its look is the
+## shared theme's (UiTheme, docs/ui_style.md): the title the Title
+## variation, a section's name a Heading, a note a Caption.
 
-const FONT_SIZE := PackPanel.FONT_SIZE
-const BACKING := PackPanel.BACKING
-const TEXT := PackPanel.TEXT
-const EDGE := PackPanel.SLOT_EDGE
+## The theme's body size, for a label of another size's sake (_label).
+static var FONT_SIZE: int = UiTheme.size("body")
 const WIDTH := 760.0
 const SLIDER_WIDTH := 420.0
 ## The sound section's sliders: [Net's setting, the label].
@@ -39,17 +38,13 @@ var body_choice: OptionButton
 func _ready() -> void:
 	custom_minimum_size = Vector2(WIDTH, 0)
 	position = Vector2((3840.0 - WIDTH) * 0.5, 180)
-	var style := StyleBoxFlat.new()
-	style.bg_color = BACKING
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(26)
-	style.border_color = EDGE
-	style.set_border_width_all(2)
-	add_theme_stylebox_override("panel", style)
 	_column = VBoxContainer.new()
-	_column.add_theme_constant_override("separation", 12)
+	_column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	add_child(_column)
-	_column.add_child(_label("Options", FONT_SIZE + 6))
+	var title := Label.new()
+	title.text = "Options"
+	title.theme_type_variation = &"Title"
+	_column.add_child(title)
 	# Who you are first: what a new player sets before anything else.
 	var character := add_section("Character")
 	character.add_child(_body_row())
@@ -61,11 +56,12 @@ func _ready() -> void:
 
 ## A titled section, its controls to be added to the box returned.
 func add_section(title: String) -> VBoxContainer:
-	var heading := _label(title, FONT_SIZE)
-	heading.modulate = Color(1, 1, 1, 0.8)
+	var heading := Label.new()
+	heading.text = title
+	heading.theme_type_variation = &"Heading"
 	_column.add_child(heading)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", UiTheme.constant("unit"))
 	_column.add_child(box)
 	return box
 
@@ -123,12 +119,14 @@ func _body_row() -> HBoxContainer:
 	body_choice = OptionButton.new()
 	for text: String in BODY_LABELS:
 		body_choice.add_item(text)
-	body_choice.add_theme_font_size_override("font_size", FONT_SIZE)
-	body_choice.get_popup().add_theme_font_size_override("font_size", FONT_SIZE)
 	body_choice.select(Net.BODIES.find(Net.player_body))
 	body_choice.focus_mode = Control.FOCUS_NONE
 	row.add_child(body_choice)
-	row.add_child(_label("from your next join", FONT_SIZE - 6))
+	var note := Label.new()
+	note.text = "from your next join"
+	note.theme_type_variation = &"Caption"
+	note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(note)
 	body_choice.item_selected.connect(func(index: int) -> void:
 		Net.player_body = Net.BODIES[index]
 		Net.save_view_settings())
@@ -150,16 +148,17 @@ func _antialias_row() -> HBoxContainer:
 		button.button_group = group
 		button.button_pressed = value == Net.antialias
 		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_size_override("font_size", FONT_SIZE)
 		button.pressed.connect(func() -> void: Net.set_antialias(value))
 		row.add_child(button)
 		antialias_buttons[value] = button
 	return row
 
 
-func _label(text: String, size: int) -> Label:
+## A label in the theme's body text; [param size] only when another size
+## is wanted (the theme's sizes, UiTheme.size).
+func _label(text: String, size: int = 0) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", TEXT)
+	if size > 0 and size != FONT_SIZE:
+		label.add_theme_font_size_override("font_size", size)
 	return label

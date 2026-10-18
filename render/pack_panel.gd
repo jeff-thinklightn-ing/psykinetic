@@ -13,25 +13,23 @@ extends PanelContainer
 ## sounds like opening (SoundKit.opening: a chest's thud, a crate's, a pack's leather), once a
 ## frame. A player's or a companion's last two boxes are their hands
 ## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L.
-## Sizes in the HUD's 3840 x 2160 units.
+## Sizes in the HUD's 3840 x 2160 units, its look the shared theme's
+## (UiTheme, docs/ui_style.md): the panel's box, a slot the Inset
+## variation, a hand's HandSlot.
 
-const SLOT_SIZE := Vector2(132, 132)
-const FONT_SIZE := 26
-## The short name under an icon.
-const CAPTION_SIZE := 20
+## A slot's box, the theme's "slot" constant square.
+static var SLOT_SIZE: Vector2 = Vector2.ONE * UiTheme.constant("slot")
+## The theme's body size: a name alone in its box, a title.
+static var FONT_SIZE: int = UiTheme.size("body")
+## The theme's caption size: the short name under an icon.
+static var CAPTION_SIZE: int = UiTheme.size("caption")
 ## Room round an icon in its box, and under it for the caption.
 const ICON_INSET := 8
-const ICON_CAPTION := 26
-const BACKING := Color(0.04, 0.04, 0.06, 0.82)
-const SLOT := Color(0.16, 0.15, 0.14, 0.95)
-const SLOT_EDGE := Color(0.55, 0.5, 0.42, 0.9)
-const HAND_EDGE := Color(0.85, 0.68, 0.3, 0.95)
-const HAND_MARK := Color(0.85, 0.68, 0.3, 0.8)
-## A named thing's caption (decision 365).
-const NAMED_COLOR := Color(0.98, 0.82, 0.38)
-## One kept from its namer (World.KEPT_MARK; decision 370).
-const KEPT_COLOR := Color(0.72, 0.36, 0.24)
-const TEXT := Color(0.93, 0.92, 0.88, 0.95)
+const ICON_CAPTION := 30
+## A named thing's caption (decision 365): the theme's brass_bright.
+static var NAMED_COLOR: Color = UiTheme.color("brass_bright")
+## One kept from its namer (World.KEPT_MARK; decision 370): rust.
+static var KEPT_COLOR: Color = UiTheme.color("rust")
 
 ## Called with (from, from_slot, to, to_slot) when an item is dropped.
 var transfer: Callable
@@ -131,15 +129,10 @@ func _ready() -> void:
 	anchor_bottom = 1.0
 	grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	grow_vertical = Control.GROW_DIRECTION_BEGIN
-	offset_right = -40
-	offset_bottom = -40
-	var style := StyleBoxFlat.new()
-	style.bg_color = BACKING
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(18)
-	add_theme_stylebox_override("panel", style)
+	offset_right = -UiTheme.constant("margin")
+	offset_bottom = -UiTheme.constant("margin")
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	add_child(column)
 	_other_title = _title()
 	column.add_child(_other_title)
@@ -154,14 +147,13 @@ func _ready() -> void:
 
 func _title() -> Label:
 	var title := Label.new()
-	title.add_theme_font_size_override("font_size", FONT_SIZE)
-	title.add_theme_color_override("font_color", TEXT)
+	title.theme_type_variation = &"Heading"
 	return title
 
 
 func _row(mine: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", UiTheme.constant("slot_gap"))
 	for i in maxi(Player.SLOTS, Cargo.MAX):
 		var box := SlotBox.new()
 		box.panel = self
@@ -169,19 +161,14 @@ func _row(mine: bool) -> HBoxContainer:
 		box.index = i
 		box.custom_minimum_size = SLOT_SIZE
 		var hand := i >= Items.PACK
-		var style := StyleBoxFlat.new()
-		style.bg_color = SLOT
-		style.border_color = HAND_EDGE if hand else SLOT_EDGE
-		style.set_border_width_all(3 if hand else 2)
-		style.set_corner_radius_all(8)
-		box.add_theme_stylebox_override("panel", style)
+		box.theme_type_variation = &"HandSlot" if hand else &"Inset"
 		if hand:
 			var mark := Label.new()
 			mark.text = "R" if i == Items.RIGHT_HAND else "L"
+			mark.theme_type_variation = &"Small"
+			mark.add_theme_color_override("font_color", UiTheme.color("brass"))
 			mark.position = Vector2(10, 4)
 			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			mark.add_theme_font_size_override("font_size", FONT_SIZE - 6)
-			mark.add_theme_color_override("font_color", HAND_MARK)
 			box.add_child(mark)
 		var picture := TextureRect.new()
 		picture.set_anchors_preset(Control.PRESET_FULL_RECT)

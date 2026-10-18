@@ -20,9 +20,11 @@ const FADE_OUT := 0.3
 const HOLD_SECONDS := 4.0
 const CHARS_PER_SECOND := 40.0
 const MAX_WIDTH_TILES := 3.0
-const BACKGROUND := Color(0.05, 0.05, 0.07, 0.7)
-const TEXT := Color(0.94, 0.94, 0.9)
-const FONT_SIZE := 15
+## The shared theme's (UiTheme, docs/ui_style.md): a panel's backing, bone
+## text in the serif face, at the theme's speech size.
+static var BACKGROUND: Color = UiTheme.color("backing")
+static var TEXT: Color = UiTheme.color("text")
+static var FONT_SIZE: int = UiTheme.size("speech")
 ## Laid out for this many screen px per tile, then scaled to the view's.
 const REFERENCE_TILE_PX := 64.0
 const PADDING := Vector2(7, 4)
@@ -159,11 +161,12 @@ class Bubble:
 
 	func _init(text: String) -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_style.bg_color = BACKGROUND
+		_style.bg_color = SpeechBubbles.BACKGROUND
 		panel.add_theme_stylebox_override("panel", _style)
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.text = text
-		label.add_theme_color_override("font_color", TEXT)
+		label.add_theme_color_override("font_color", SpeechBubbles.TEXT)
+		label.add_theme_font_override("font", UiTheme.font("serif"))
 		label.add_theme_constant_override("line_spacing", 0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -176,7 +179,7 @@ class Bubble:
 	func fit(k: float) -> void:
 		if absf(k - _scale) > 0.01:
 			_scale = k
-			var font_size := maxi(roundi(FONT_SIZE * k), 6)
+			var font_size := maxi(roundi(SpeechBubbles.FONT_SIZE * k), 6)
 			label.add_theme_font_size_override("font_size", font_size)
 			_style.set_corner_radius_all(roundi(CORNER * k))
 			_style.content_margin_left = PADDING.x * k
@@ -201,4 +204,4 @@ class Bubble:
 		var top := panel.size.y
 		var tail := TAIL * _scale
 		draw_colored_polygon(PackedVector2Array([Vector2(middle - tail.x * 0.5, top),
-			Vector2(middle + tail.x * 0.5, top), Vector2(middle, top + tail.y)]), BACKGROUND)
+			Vector2(middle + tail.x * 0.5, top), Vector2(middle, top + tail.y)]), SpeechBubbles.BACKGROUND)

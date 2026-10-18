@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The interface has one look now: a shared theme (warm dark panels edged in leather, bone text, brass for keys, hands, prices and focus, the Alegreya faces) that every screen takes its fonts, colours and panel style from, with a style guide for the trees that build screens; the first-run screen, options, pack and chest, shop, talk log, chat, hints, compass and speech bubbles all wear it. The talk log reads as speech (the speaker's name, then the words); hover a line for when it was said.
 - Companions know their town is a town, know the beasts lore knows when you
   ask ("what is a stag?"), and no longer remember "not knowing" someone as a
   fact about themselves.

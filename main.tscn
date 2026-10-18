@@ -43,6 +43,7 @@ offset_left = 40.0
 offset_top = 24.0
 offset_right = 3000.0
 offset_bottom = 96.0
+theme_type_variation = &"Hud"
 
 [node name="Debug" type="Label" parent="HUD"]
 visible = false
@@ -50,3 +51,4 @@ offset_left = 40.0
 offset_top = 130.0
 offset_right = 1700.0
 offset_bottom = 470.0
+theme_type_variation = &"Outlined"

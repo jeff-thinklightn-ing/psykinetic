@@ -8858,3 +8858,42 @@ Rejected: a town name made up here (lore's to give); dropping not-knowing
 from event facts or histories (an event's are the game's words; a history
 holds more than the not knowing); any "never" ("she will never see home
 again" is a fact).
+## 401. One shared UI theme and a style guide
+
+Roadmap `ui`, step 1 (Jeff, 2026-10-17: audit and style, "one shared theme all
+screens use"; the coordinator approved the design). Every panel had styled
+itself: four copies of the pack panel's constants, five text sizes for one
+kind of text, two blacks, three corner radii, and the engine's grey defaults
+wherever nothing was set (docs/ui_style.md, "Screens today"; before and after
+shots in docs/ui/shots/).
+
+- `render/ui_theme.tres` is the project theme (project.godot `gui/theme/custom`),
+  so every Control inherits it with no code: the panel, inset, button, slider,
+  text-field, menu and tooltip styles, and named variations a panel asks for
+  by `theme_type_variation` (Title, Heading, Hud, Caption, Small, Name,
+  Outlined, Inset, HandSlot, Deep; LinkButton for a link). Its type `Psykinetic` holds the named colours (every
+  one a swatch of art/kit/palette.png), fonts, sizes and spacing constants,
+  which `UiTheme` (render/ui_theme.gd, new class_name; static color, font,
+  size, constant, style) reads for what is drawn by hand (the compass, the
+  maps, the speech bubbles). The .tres is the one source of truth; a panel
+  sets no font, size, colour or style of its own, and a new meaning gets a
+  named colour in docs/ui_style.md first.
+- Fonts: Alegreya (serif: titles, names, speech, map labels) and Alegreya Sans
+  (everything else), SIL OFL 1.1, in art/fonts/ with their licences
+  (THIRD_PARTY.md). Sizes in canvas units (3840 x 2160): title 56, heading 44,
+  the HUD's line 44, body 38, caption 30, small 24, speech 17 then scaled with
+  the zoom (the Alegreya faces have a small x-height: body 30 read too small).
+- The panels adopt it in place, behaviour unchanged (their owners' decisions
+  stand): pack and chest (items), options (sound, pc-character, perf), shop
+  and gold (economy), hints, talk log and chat (companions: the clock time is
+  the line's tooltip now, not printed; lines[] keeps its shape), compass,
+  minimap (maps: frame, water and labels only), builder's box, the HUD line
+  and F3 text (outlined), the first-run screen. Sound's UiSounds hooks and
+  the TalkPanel and ShopPanel signals (395) are untouched. The level editor
+  and the world map view inherit the theme but are not restyled until the
+  game's screens are done.
+- `--test-show=<panels>` (hints, options, pack, talk, chat, debug, say, shop,
+  setup) opens panels once the player is in, for screenshots; `ui 3200` in
+  tests/port_offsets.txt.
+
+Client only; protocol unchanged.

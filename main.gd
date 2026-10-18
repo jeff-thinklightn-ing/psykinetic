@@ -378,6 +378,7 @@ var _pack_wanted: GridEntity
 ## The pack sounds asked for, "set entity" each, newest last (tests).
 var sounds: Array[String] = []
 var _test_chest_done := false
+var _test_show_done := false
 var _test_chest_walking := false
 @onready var toss_aim: Line2D = $TossAim
 ## The map as parsed once at start: floor, fire, edges (see Terrain).
@@ -438,6 +439,9 @@ func _ready() -> void:
 	if Net.test_fullscreen_after > 0.0:
 		get_tree().create_timer(Net.test_fullscreen_after).timeout.connect(Net.toggle_fullscreen)
 
+	if "setup" in Net.test_show:
+		# The first-run screen over the game, for screenshots: its answer is dropped.
+		add_child(SetupScreen.new())
 	if Net.needs_setup:
 		# An exported client with no settings.cfg yet: ask once, then join.
 		var setup := SetupScreen.new()
@@ -4344,6 +4348,7 @@ func _on_world_ticked(tick: int) -> void:
 		Net.test_builder = ""
 	_run_test_door(player, tick)
 	_run_test_chest(player)
+	_run_test_show(player)
 
 
 ## The controls for the HUD's list, a line each, "key\twhat it does".
@@ -5211,6 +5216,46 @@ func _run_test_chest(player: Player) -> void:
 		return
 	print("[test] %s drags %s from %s %d to %s %d" % [player.name, from.slots[from_slot], from.name, from_slot, to.name, to_slot])
 	pack_panel.drop(from, from_slot, to, to_slot)
+
+
+## --test-show: the named HUD panels opened once the player is in, for
+## screenshots of them (the ui tree's audit); the talk log gets a few
+## marked test lines so there is something to see.
+func _run_test_show(player: Player) -> void:
+	if Net.test_show.is_empty() or _test_show_done or player == null:
+		return
+	_test_show_done = true
+	for what: String in Net.test_show:
+		match what:
+			"hints":
+				hint_panel.visible = true
+			"options":
+				if not options_panel.visible:
+					options_panel.toggle()
+			"pack":
+				pack_panel.shown = true
+			"talk":
+				talk.add_line("Wren", "(a test line) The door's barred from the other side.")
+				talk.add_line(player.label, "(a test line) hold here", true)
+				talk.add_line(player.label, "(a test line) anyone near the well?", true, true)
+				talk.visible = true
+			"chat":
+				_open_chat()
+			"debug":
+				debug_overlay.visible = true
+			"say":
+				_send_chat("(a test line) Stay close, the gate's watched.")
+			"shop":
+				# The nearest shop counter opened from where the player stands (the
+				# server may refuse the trade; the panel shows the same).
+				var counter: GridEntity = null
+				for entity in World.get_entities():
+					if entity is Chest and (entity as Chest).shop and (counter == null
+							or World.distance(player.tile, entity.tile) < World.distance(player.tile, counter.tile)):
+						counter = entity
+				if counter != null:
+					open_other(counter)
+	print("[test] shown: %s" % ", ".join(Net.test_show))
 
 
 func _run_test_reset(player: Player, tick: int) -> void:

@@ -32,10 +32,7 @@ func _ready() -> void:
 	_status.offset_top = 90
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.add_theme_font_size_override("font_size", 28)
-	_status.add_theme_color_override("font_color", Color(0.75, 0.9, 1.0))
-	_status.add_theme_color_override("font_outline_color", Color.BLACK)
-	_status.add_theme_constant_override("outline_size", 8)
+	_status.theme_type_variation = &"Outlined"
 	_status.visible = false
 	main.get_node("HUD").add_child(_status)
 	_box = LineEdit.new()
@@ -48,7 +45,6 @@ func _ready() -> void:
 	_box.offset_right = 800
 	_box.offset_top = 270
 	_box.offset_bottom = 350
-	_box.add_theme_font_size_override("font_size", 28)
 	_box.text_submitted.connect(_submitted)
 	_box.gui_input.connect(func(event: InputEvent) -> void:
 		var key := event as InputEventKey

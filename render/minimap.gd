@@ -26,14 +26,16 @@ const PALETTE := "res://art/kit/palette.png"
 const SWATCH := 16
 ## Swatches of art/kit/palette.png by ground kind (as the 3D view's ground).
 const GROUND_SWATCHES := {"grass": Vector2i(4, 3), "dirt": Vector2i(3, 4), "stone": Vector2i(1, 3), "sand": Vector2i(3, 1)}
-const WATER := Color("#2f6fd0")
+## Its frame, water, marks and labels take the shared theme's colours and
+## serif (UiTheme, docs/ui_style.md); the ground keeps the palette's swatches.
+static var WATER: Color = UiTheme.color("water")
 const WALL := Color(0.16, 0.14, 0.12)
-const DOOR := Color(0.85, 0.6, 0.3)
-const FRAME := Color(0.08, 0.08, 0.09, 0.85)
-const START := Color(1.0, 0.95, 0.55)
-const WAY_OUT := Color(0.55, 0.9, 1.0)
-const PLACE := Color(1.0, 0.85, 0.4)
-const YOU := Color(1, 1, 1)
+static var DOOR: Color = UiTheme.color("brass")
+static var FRAME: Color = UiTheme.color("backing")
+static var START: Color = UiTheme.color("text")
+static var WAY_OUT: Color = UiTheme.color("party")
+static var PLACE: Color = UiTheme.color("brass_bright")
+static var YOU: Color = UiTheme.color("text")
 
 ## The big map is open.
 var big := false
@@ -203,7 +205,7 @@ func _draw() -> void:
 	var ui := ui_scale()
 	draw_rect(dest.grow(3.0 * ui), FRAME)
 	draw_texture_rect_region(texture, dest, shown["source"], Color.WHITE, false, false)
-	var font := get_theme_default_font()
+	var font := UiTheme.font("serif")
 	var label_size := int(LABEL_SIZE * ui)
 	var dot := maxf(2.0 * ui, scale * 0.6)
 	for cell in starts:
@@ -240,7 +242,7 @@ func _draw() -> void:
 				draw_polyline(arrow, Color(0, 0, 0, 0.8), 1.5)
 	if big:
 		draw_string(font, dest.position + Vector2(0, -10 * ui), "%s%s" % [title, "  x%d" % int(ZOOMS[zoom_step]) if zoom_step > 0 else ""],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, int(TITLE_SIZE * ui), Color.WHITE)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, int(TITLE_SIZE * ui), UiTheme.color("text"))
 
 
 ## Draws with [param draw] at [param at] only if it is on the map.

@@ -1,0 +1,3 @@
+Alegreya (variable, weight axis): https://github.com/google/fonts/tree/main/ofl/alegreya (Alegreya[wght].ttf, OFL.txt), fetched 2026-10-17.
+Alegreya Sans (Regular, Bold): https://github.com/google/fonts/tree/main/ofl/alegreyasans (AlegreyaSans-Regular.ttf, AlegreyaSans-Bold.ttf, OFL.txt), fetched 2026-10-17.
+Both by Juan Pablo del Peral, Huerta Tipografica, SIL Open Font License 1.1: OFL-Alegreya.txt and OFL-AlegreyaSans.txt here. Not modified, not renamed (the OFL reserves the names).

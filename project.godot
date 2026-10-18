@@ -36,6 +36,7 @@ import/blender/enabled=false
 
 [gui]
 
+theme/custom="res://render/ui_theme.tres"
 theme/default_theme_scale=3.0
 
 [physics]

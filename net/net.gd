@@ -94,6 +94,8 @@ extends Node
 ##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
+##   --test-show=<a,b>            open these on the HUD once the player is in (for the ui tree's screenshots):
+##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's), setup (the first-run screen, over the game)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
@@ -369,6 +371,8 @@ var test_builder := ""
 var test_exit_after := 0.0
 var test_exit_on := ""
 var test_minimap := false
+## --test-show: HUD panels opened once the local player is in (Main._run_test_show).
+var test_show: PackedStringArray = []
 ## --raids: raid groups on from the start (World.raid_groups; the console can too).
 var raids := false
 var test_wait_players := 0
@@ -1287,7 +1291,7 @@ func _parse_args() -> void:
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
-					"--screenshot", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
+					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-walk", "--tick-send-hz":
 				if not has_value and i + 1 < args.size():
 					i += 1
@@ -1427,6 +1431,8 @@ func _set_option(key: String, value: String) -> void:
 				test_hold_orders = hold[1].to_int()
 		"--screenshot":
 			screenshot_path = value
+		"--test-show":
+			test_show = value.split(",", false)
 		"--test-door":
 			test_door_tick = value.to_int()
 		"--test-chest":

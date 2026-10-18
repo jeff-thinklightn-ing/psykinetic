@@ -1,7 +1,8 @@
 class_name SetupScreen
 extends CanvasLayer
 ## First-run screen for an exported client with no settings.cfg: asks for the
-## server address and token once. Main writes the file and connects.
+## server address and token once. Main writes the file and connects. Its
+## look is the shared theme's (UiTheme, docs/ui_style.md).
 
 signal submitted(address: String, port: int, token: String, player_name: String)
 
@@ -15,7 +16,7 @@ var _error: Label
 func _ready() -> void:
 	layer = 20
 	var backdrop := ColorRect.new()
-	backdrop.color = Color(0.05, 0.05, 0.08, 0.92)
+	backdrop.color = Color(UiTheme.color("outline"), 0.92)
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(backdrop)
 
@@ -27,12 +28,12 @@ func _ready() -> void:
 	add_child(panel)
 
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 30)
+	column.add_theme_constant_override("separation", UiTheme.constant("section"))
 	panel.add_child(column)
 
 	var title := Label.new()
 	title.text = "Join a Psykinetic server"
-	title.add_theme_font_size_override("font_size", 66)
+	title.theme_type_variation = &"Title"
 	column.add_child(title)
 
 	var hint := Label.new()
@@ -49,7 +50,7 @@ func _ready() -> void:
 	_name.text = "Player"
 
 	_error = Label.new()
-	_error.modulate = Color(1.0, 0.5, 0.5)
+	_error.add_theme_color_override("font_color", UiTheme.color("rust"))
 	column.add_child(_error)
 
 	var button := Button.new()
@@ -65,6 +66,7 @@ func _ready() -> void:
 func _field(parent: Control, label_text: String, placeholder: String) -> LineEdit:
 	var label := Label.new()
 	label.text = label_text
+	label.theme_type_variation = &"Caption"
 	parent.add_child(label)
 	var edit := LineEdit.new()
 	edit.placeholder_text = placeholder

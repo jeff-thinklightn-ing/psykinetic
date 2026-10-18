@@ -5,14 +5,15 @@ extends Control
 ## its price and Buy, and under them what the town would pay for the things
 ## the player carries (put one in the shop's counter to sell it). The
 ## server sends both ("shop" messages, Main._send_shop); Buy goes back as a
-## command (Main._buy) and the answer is the shop again. In PackPanel's
-## look. Sizes in the HUD's 3840 x 2160 units.
+## command (Main._buy) and the answer is the shop again. In the shared
+## theme's look (UiTheme, docs/ui_style.md): prices brass, a refusal rust.
+## Sizes in the HUD's 3840 x 2160 units.
 
-const FONT_SIZE := PackPanel.FONT_SIZE
 const ROW_HEIGHT := 64
 const GAP := 20
-const WHY := Color(0.9, 0.55, 0.45, 0.95)
-const PRICE := Color(0.85, 0.68, 0.3, 0.95)
+## A refusal's colour, and a price's or the gold's: the theme's.
+static var WHY: Color = UiTheme.color("rust")
+static var PRICE: Color = UiTheme.color("brass")
 
 ## The pack panel it sits beside.
 var pack: PackPanel
@@ -52,12 +53,13 @@ func _ready() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
 	_box.add_child(column)
-	_title = _label(PackPanel.TEXT)
+	_title = _label()
+	_title.theme_type_variation = &"Heading"
 	column.add_child(_title)
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override("separation", 6)
 	column.add_child(_rows)
-	_offer_label = _label(PackPanel.TEXT)
+	_offer_label = _label()
 	_offer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_offer_label.custom_minimum_size.x = 640
 	column.add_child(_offer_label)
@@ -69,20 +71,16 @@ func _ready() -> void:
 	_rebuild()
 
 
+## A box in the theme's panel style.
 func _panel() -> PanelContainer:
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = PackPanel.BACKING
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(18)
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
+	return PanelContainer.new()
 
 
-func _label(color: Color) -> Label:
+## A label in the theme's text, or in [param color] (one of the theme's).
+func _label(color: Variant = null) -> Label:
 	var label := Label.new()
-	label.add_theme_font_size_override("font_size", FONT_SIZE)
-	label.add_theme_color_override("font_color", color)
+	if color is Color:
+		label.add_theme_color_override("font_color", color)
 	return label
 
 
@@ -157,7 +155,6 @@ func _rebuild() -> void:
 		row.add_child(price_label)
 		var button := Button.new()
 		button.text = "Buy"
-		button.add_theme_font_size_override("font_size", FONT_SIZE)
 		button.disabled = gold < int(each.get("price", 0))
 		var uid := int(each.get("uid", 0))
 		button.pressed.connect(func() -> void:

@@ -5,19 +5,20 @@ extends Control
 ## screen, and N, E, S, W in bold outlined letters (N red) that move round
 ## with the ring but stay upright. Main sets north_on_screen each frame
 ## from the view. Sizes are in the HUD's units (the 3840 x 2160 canvas, so
-## half as many pixels at 1080p): about 110 px across at 1080p.
+## half as many pixels at 1080p): about 110 px across at 1080p. Its colours
+## and letters are the shared theme's (UiTheme, docs/ui_style.md).
 
 const RADIUS := 110.0
 const MARGIN := 40.0
-const DISC := Color(0.06, 0.06, 0.08, 0.62)
-const RING := Color(0.86, 0.83, 0.74, 0.85)
-const TICK := Color(0.86, 0.83, 0.74, 0.7)
-const NORTH := Color(0.93, 0.22, 0.18)
-const LETTER := Color(0.96, 0.94, 0.88)
-const OUTLINE := Color(0.02, 0.02, 0.03, 0.95)
+static var DISC: Color = UiTheme.color("backing")
+static var RING: Color = UiTheme.color("text")
+static var TICK: Color = Color(UiTheme.color("text"), 0.7)
+static var NORTH: Color = UiTheme.color("alarm")
+static var LETTER: Color = UiTheme.color("text")
+static var OUTLINE: Color = UiTheme.color("outline")
 const NORTH_SIZE := 46
 const LETTER_SIZE := 36
-const OUTLINE_SIZE := 9
+static var OUTLINE_SIZE: int = UiTheme.constant("outline")
 
 ## The screen direction of the level's north (unit; y down).
 var north_on_screen := Vector2.UP:
@@ -25,7 +26,7 @@ var north_on_screen := Vector2.UP:
 		if value.length() > 0.001 and not value.normalized().is_equal_approx(north_on_screen):
 			north_on_screen = value.normalized()
 			queue_redraw()
-var _bold: FontVariation
+var _bold: Font
 
 
 func _ready() -> void:
@@ -35,9 +36,7 @@ func _ready() -> void:
 	offset_right = -MARGIN
 	offset_top = MARGIN
 	offset_bottom = MARGIN + RADIUS * 2.0
-	_bold = FontVariation.new()
-	_bold.base_font = get_theme_default_font()
-	_bold.variation_embolden = 0.9
+	_bold = UiTheme.font("serif_bold")
 
 
 func _draw() -> void:
