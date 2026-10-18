@@ -1932,11 +1932,11 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [0.5, 0.9, 1.2],
+			"size": [0.55, 0.9, 1.2],
 			"tolerance": 0.15,
 			"budget": 2500,
 			"variants": 2,
-			"uses": "a sheep, variant 1 the ewe, 2 the ram (curled horns, within the box): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a keeper's yard's beast for wool (Jeff, 2026-10-18: \"sheep and wool yes\"), not in the Quaternius pack on disk: art-gen's concept by the goblin recipe (one figure, side and front, white), rigged by pc-character as the rabbit was",
+			"uses": "a sheep, variant 1 the ewe (art-gen's c2), 2 the ram (c10; its spiral horns about 0.6 across, the box widened from 0.5 to 0.55 so both sit inside the tolerance): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a keeper's yard's beast for wool (Jeff, 2026-10-18: \"sheep and wool yes\"), not in the Quaternius pack on disk: art-gen's concept by the goblin recipe (one figure, side and front, white), rigged by pc-character as the rabbit was",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},
 				{"name": "walk", "names": ["walk"], "required": true},
@@ -1947,9 +1947,9 @@
 				{"name": "death", "names": ["death", "die"], "required": true}
 			],
 			"grey": [
-				{"at": [0, 0.225, -0.06], "size": [0.35, 0.45, 0.84]},
-				{"at": [0, 0.6075, -0.09], "size": [0.5, 0.315, 1.02]},
-				{"at": [0, 0.765, 0.51], "size": [0.25, 0.27, 0.18]}
+				{"at": [0, 0.225, -0.06], "size": [0.385, 0.45, 0.84]},
+				{"at": [0, 0.6075, -0.09], "size": [0.55, 0.315, 1.02]},
+				{"at": [0, 0.765, 0.51], "size": [0.275, 0.27, 0.18]}
 			]
 		},
 		"creature.rabbit": {

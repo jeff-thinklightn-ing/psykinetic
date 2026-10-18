@@ -1960,7 +1960,7 @@
 			"type": "mesh",
 			"kind": "creature",
 			"category": "creatures",
-			"size": "0.5 x 0.9 x 1.2",
+			"size": "0.55 x 0.9 x 1.2",
 			"budget": 2500,
 			"for": "pc-character: the Quaternius pack's animals moved onto palette swatches (tools/animal_palette.py)"
 		},
