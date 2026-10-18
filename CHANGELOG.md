@@ -7,6 +7,14 @@ notes (decision 324).
 
 ## Unreleased
 
+- Houses, sheds and huts have their own roofs (shingle, plank and thatch); a
+  damaged one shows a hole with its rafters running down the slope and rubble
+  at the walls.
+- Stone and castle walls have their own posts, joints, towers, windows, ruined
+  sections and low and tall heights, and the castle gate, portcullis, double
+  door and trapdoor, the cage, stairs, bookshelf and cave pillars their own
+  art.
+- Small trees, meat, hides, antlers and tusks have their own art.
 - The wilds have their own art for fallen logs, ferns, wild flowers, reeds,
   the palisade, the timber wall joints and watchtower, the market stall and
   the forge (art-gen's candidates, applied for Jeff to look over in game).

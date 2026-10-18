@@ -646,11 +646,13 @@ func _test_wall_runs() -> void:
 		for key: Vector3i in [rubble_at, broken_at]:
 			var middle := Client3D._edge_midpoint(key)
 			var top := 0.0
-			var body := _rig._walls[key].get_node("Body") as MeshInstance3D
-			for local: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
-				var point := body.global_transform * local
-				if Vector2(point.x - middle.x, point.z - middle.z).length() < 0.45:
-					top = maxf(top, point.y - _rig._edge_base(key))
+			# The run's swept body, and an art piece (wall.<set>.straight_ruined) where the set has one.
+			for drawn: MeshInstance3D in _rig._walls[key].find_children("*", "MeshInstance3D", true, false):
+				for surface in drawn.mesh.get_surface_count():
+					for local: Vector3 in drawn.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+						var point := drawn.global_transform * local
+						if Vector2(point.x - middle.x, point.z - middle.z).length() < 0.45:
+							top = maxf(top, point.y - _rig._edge_base(key))
 			tops[key] = top
 		var cap: float = Client3D._wall_set("castle")["cap"]
 		_check(rubble_at in _rig._wall_breaches and tops[rubble_at] >= Client3D.WALL_RUBBLE_LOW and tops[rubble_at] <= Client3D.WALL_RUBBLE_HIGH + 0.01

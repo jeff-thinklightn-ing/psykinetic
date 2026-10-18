@@ -22,7 +22,11 @@
 				"grey": [{"at": [0, -0.04, 0], "size": [0.006, 1.16, 0.006]}]}]},
 		"item.arrows": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its own pyramid heads"}},
 		"item.arrows_flame": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its heads replaced by art-kit: rag-wrapped, a flame tip (row 7)"}},
-		"item.arrows_barbed": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its heads replaced by art-kit: wide and hooked"}}
+		"item.arrows_barbed": {"origin": "centre", "tolerance": 0.15, "source": {"by": "art-gen, procedural (no model); fitted by art-kit", "tool": "numpy, blender", "license": "own", "date": "2026-10-17", "notes": "N:/assets/candidates/item.arrows/meshes/item.arrows_proc_300f.glb (TRELLIS tangled at every budget, so built procedurally): 12 shafts, three vanes, a cord band, 300 tris; fitted: welded, its flat colours to their nearest swatches, the origin moved to mid-shaft; its heads replaced by art-kit: wide and hooked"}},
+		"item.meat": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.meat/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c3, scaled up to 0.2): its 500 mesh, held at its middle, flesh in fat and red, the bone end pale; 491 tris"}},
+		"item.hide": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.hide/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; redone as a flat folded pelt, c6 clean, scaled up across not in height to 0.5 x 0.06 x 0.4): its 500 mesh's crumbs dropped, 222 tris, fur on row 5's browns, the flesh side pale"}},
+		"item.antlers": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.antlers/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3 fits as is): its 500 mesh squeezed to 0.15 deep, held at its middle, bone and horn on row 5 and 7; 476 tris"}},
+		"item.tusks": {"origin": "centre", "source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/item.tusks/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c1, laid flat and scaled to 0.18 x 0.06 x 0.06): its 500 mesh, ivory; 470 tris"}}
 	},
 	"credits": [
 		{"title": "Ultimate Animated Animal Pack (the Pig's rig and clips)", "by": "Quaternius", "license": "CC0 1.0",
@@ -72,7 +76,8 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.5, 1, 1],
-			"budget": 300,
+			"budget": 600,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c4, budget 300 -> 600, tiles a metre at a time): a 1 m section cut from its 1200 mesh, decimated to 572"},
 			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.castle.profile section",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -82,6 +87,7 @@
 			"kind": "edge",
 			"size": [0.5, 4.5, 1],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1 slab trimmed to 1 m, budget 300): its 1200 mesh cut to 1 m, depth to 0.5, decimated to 286"},
 			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.castle.profile section",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -90,7 +96,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.6, 3.1, 0.6],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
 			"uses": "a run's free end, capping the wall.castle.profile section, a little proud of it"
 		},
 		"wall.castle.end_low": {
@@ -106,7 +113,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.6, 4.6, 0.6],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
 			"uses": "a run's free end tall (4.5 m), capping the wall.castle.profile section, a little proud of it"
 		},
 		"wall.castle.corner": {
@@ -114,7 +122,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
 			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.castle.corner_low": {
@@ -130,7 +139,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
 			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.castle.t": {
@@ -138,7 +148,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
 			"uses": "a T joint, a run along z met by one along +x"
 		},
 		"wall.castle.t_low": {
@@ -154,7 +165,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
 			"uses": "a T joint tall (4.5 m), a run along z met by one along +x"
 		},
 		"wall.castle.cross": {
@@ -162,7 +174,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
 			"uses": "a + joint, runs along z and x crossing"
 		},
 		"wall.castle.cross_low": {
@@ -178,7 +191,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
 			"uses": "a + joint tall (4.5 m), runs along z and x crossing"
 		},
 		"wall.castle.post": {
@@ -186,7 +200,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
 			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post)",
 			"fill": {"from": "kenney-castle", "piece": "wall-narrow-corner", "scale": [1, 2.290076, 1]}
 		},
@@ -203,7 +218,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
-			"budget": 200,
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
 			"uses": "a free-standing pillar tall (4.5 m) at a cell corner"
 		},
 		"wall.castle.window": {
@@ -212,6 +228,7 @@
 			"kind": "edge",
 			"size": [0.5, 3, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3, depth squeezed to the wall): its 400 mesh, the slit on the +-x faces, 349 tris"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; an arrow slit",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
@@ -226,6 +243,7 @@
 			"kind": "edge",
 			"size": [0.5, 2.2, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c8 trimmed to 1 m): its 1600 mesh cut to 1 m and decimated to 378"},
 			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
 			"grey": [
 				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
@@ -443,6 +461,7 @@
 			"kind": "vertex",
 			"size": [0.6, 3.1, 0.6],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one pillar mesh for the stone set's posts and joints, scaled to 0.5 wide and 3 m, the end 0.6 x 3.1): wall.stone.post's c3, dressed blocks on row 0"},
 			"uses": "a run's free end, capping the wall.stone.profile section, a little proud of it"
 		},
 		"wall.stone.corner": {
@@ -451,6 +470,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one pillar mesh for the stone set's posts and joints, scaled to 0.5 wide and 3 m, the end 0.6 x 3.1): wall.stone.post's c3, dressed blocks on row 0"},
 			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.stone.t": {
@@ -459,6 +479,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one pillar mesh for the stone set's posts and joints, scaled to 0.5 wide and 3 m, the end 0.6 x 3.1): wall.stone.post's c3, dressed blocks on row 0"},
 			"uses": "a T joint, a run along z met by one along +x"
 		},
 		"wall.stone.cross": {
@@ -467,6 +488,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one pillar mesh for the stone set's posts and joints, scaled to 0.5 wide and 3 m, the end 0.6 x 3.1): wall.stone.post's c3, dressed blocks on row 0"},
 			"uses": "a + joint, runs along z and x crossing"
 		},
 		"wall.stone.post": {
@@ -475,6 +497,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one pillar mesh for the stone set's posts and joints, scaled to 0.5 wide and 3 m, the end 0.6 x 3.1): wall.stone.post's c3, dressed blocks on row 0"},
 			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post); a pillar"
 		},
 		"wall.stone.straight_tall": {
@@ -482,7 +505,8 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.5, 4.5, 1],
-			"budget": 300,
+			"budget": 600,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.straight_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; budget 300 -> 600, tiles a metre at a time; c3 worked down from its 2400 mesh): a 1 m section cut out, decimated to 391, depth to 0.5"},
 			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.stone.profile section; crypt halls",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -492,6 +516,7 @@
 			"kind": "vertex",
 			"size": [0.6, 4.6, 0.6],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6): wall.stone.post_tall's c3"},
 			"uses": "a run's free end tall (4.5 m), capping the wall.stone.profile section, a little proud of it; crypt halls"
 		},
 		"wall.stone.corner_tall": {
@@ -500,6 +525,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6): wall.stone.post_tall's c3"},
 			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x; crypt halls"
 		},
 		"wall.stone.t_tall": {
@@ -508,6 +534,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6): wall.stone.post_tall's c3"},
 			"uses": "a T joint tall (4.5 m), a run along z met by one along +x; crypt halls"
 		},
 		"wall.stone.cross_tall": {
@@ -516,6 +543,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6): wall.stone.post_tall's c3"},
 			"uses": "a + joint tall (4.5 m), runs along z and x crossing; crypt halls"
 		},
 		"wall.stone.post_tall": {
@@ -524,6 +552,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.post_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6): wall.stone.post_tall's c3"},
 			"uses": "a free-standing pillar tall (4.5 m) at a cell corner; crypt halls"
 		},
 		"wall.stone.straight_low": {
@@ -531,7 +560,8 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.5, 1, 1],
-			"budget": 300,
+			"budget": 600,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.straight_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; budget 300 -> 600; c3): a 1 m section cut from its 2400 mesh, decimated to 572"},
 			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.stone.profile section; ledges and rails",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -557,6 +587,7 @@
 			"kind": "edge",
 			"size": [0.5, 3, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2 cut to 1 m round the opening): its 1600 mesh cut to 1 m, decimated to 382, depth to 0.5"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; a barred grate",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
@@ -571,6 +602,7 @@
 			"kind": "edge",
 			"size": [0.5, 2.2, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.straight_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2 cut to a 1 m piece, not scaled along): its 1600 mesh cut to 1 m, decimated to 378, depth to 0.5"},
 			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
 			"grey": [
 				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
@@ -582,7 +614,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [0.6, 1.8, 0.6],
-			"budget": 300,
+			"budget": 1200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.end_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; budget 300 -> 1200, only at broken run ends): c2's 1200 mesh fitted to 0.6 x 1.8, 1141 tris"},
 			"uses": "a run's broken free end: rubble and a jagged stub"
 		},
 		"wall.stone.rubble": {
@@ -631,6 +664,7 @@
 			"kind": "vertex",
 			"size": [0.8, 3.0, 0.8],
 			"budget": 300,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.cave.pillar/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3 slimmed to 0.8 wide at 3 m): its 300 mesh, rock on row 1's darks"},
 			"uses": "a free-standing column of rock or a stalagmite at a cell corner"
 		},
 		"wall.cave.rubble": {
@@ -646,7 +680,8 @@
 			"type": "mesh",
 			"kind": "vertex",
 			"size": [1.6, 6, 1.6],
-			"budget": 800,
+			"budget": 3200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.tower/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c7, budget 800 -> 3200): its 3200 mesh fitted to 1.6 x 6, 3045 tris, grey stone on row 1"},
 			"uses": "a castle tower at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
 			"sockets": {"top": [0, 5, 0]}
 		},
@@ -656,6 +691,7 @@
 			"kind": "vertex",
 			"size": [1.6, 6, 1.6],
 			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.tower/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c8, budget stays 800): its 800 mesh fitted to 1.6 x 6, 656 tris"},
 			"uses": "a stone tower at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
 			"sockets": {"top": [0, 5, 0]}
 		},
@@ -709,8 +745,7 @@
 			"size": [2.0, 3.6, 2.0],
 			"budget": 1500,
 			"variants": 3,
-			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
-				"notes": "a stand-in by hand until a pick (replaced the Kenney fill, a teal conifer that turned orange in autumn): a tapered bark trunk with two limbs, a crown of 11 lumps fused by a 0.07 m voxel remesh and decimated, 900 tris; bark on row 2, the crown on row 4's mid greens by facing (the seasons turn it, snow sits on the lumps' tops); 3 seeds"},
+			"source": {"by": "art-gen, fitted by art-kit (variant 1); art-kit by hand (2, 3)", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/tree.small/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note's c2, scaled x/z 0.67 to 2.0 wide, 3.6 tall, budget 1500): variant 1 c2's 1500 mesh fitted as tree.broadleaf's c2 (wood told from the clumps by thickness, bark on row 2, the clumps on row 4's mid greens by facing), 1416 tris; variants 2 and 3 art-kit's hand stand-ins of 2026-10-17 (a tapered trunk, a crown of 11 lumps remeshed, 900 tris)"},
 			"uses": "the forest on the void round an outdoor map (Client3D._add_tree), 4 in 10 trees; sized 0.85 to 1.2, turned and nudged per cell",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.25, 1.2, 0.25]},
@@ -854,6 +889,7 @@
 			"footprint": [3, 3],
 			"size": [3.6, 4.5, 3.6],
 			"budget": 3000,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.hut/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; the note: no clean mesh, straw shreds the mesher, so by hand with c14 for shape and size): a thatch roof of three thick courses a slope with ragged lips and a ridge roll, gable boards, 368 tris; roof_damaged: the roof with a hole torn in the +x slope, the rafters under it running down the slope (one snapped), battens across, loose pieces of the cover on them (Jeff: beams one way, never spokes); trim the eave boards; state_damaged rubble and planks at the walls' feet"},
 			"uses": "a hut, 3 x 3 cells: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
 			"wall_set": "wood",
@@ -886,7 +922,8 @@
 			"kind": "cell",
 			"footprint": [4, 6],
 			"size": [4.6, 4.5, 6.6],
-			"budget": 3000,
+			"budget": 4000,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.house/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c5's roof, budget 3000 -> 4000: its shingles are separate pieces, so it decimates only to about 1700, and the damaged roof is a second copy): fitted to the 4.6 x 1.5 x 6.6 roof box, pivot at the eaves, shingles on row 2's browns in blocks, gable boards; roof_damaged: the roof with a hole torn in the +x slope, the rafters under it running down the slope (one snapped), battens across, loose pieces of the cover on them (Jeff: beams one way, never spokes); trim the eave boards; state_damaged rubble and planks at the walls' feet"},
 			"uses": "a house, 4 x 6 cells, its ridge along z: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
 			"wall_set": "wood",
@@ -990,6 +1027,7 @@
 			"footprint": [2, 3],
 			"size": [2.6, 4, 3.6],
 			"budget": 3000,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.shed/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c11's plank roof): decimated to 1211 and stretched to the 2.6 x 1.0 x 3.6 roof box, pivot at the eaves, planks down the slope on row 2 in bands, gable boards; roof_damaged: the roof with a hole torn in the +x slope, the rafters under it running down the slope (one snapped), battens across, loose pieces of the cover on them (Jeff: beams one way, never spokes); trim the eave boards; state_damaged rubble and planks at the walls' feet"},
 			"uses": "a shed, 2 x 3 cells: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
 			"wall_set": "wood",
@@ -1117,10 +1155,9 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.5, 3, 2],
-			"budget": 900,
+			"budget": 3600,
 			"uses": "a double door over two cell edges (2 m along z): the frame, two leaves hinged at its ends, swinging apart; open and closed are the leaves' swing; its opening 1.8 x 2.4 m, as door.single's 0.8 x 2.4 (decision 402)",
-			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
-				"notes": "a plank double door by hand (a stand-in until Jeff picks a candidate), as door.single's: timber jambs and lintel, each leaf four planks, two battens, iron straps and a ring pull"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.double/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1, budget 900 -> 3600): its 3600 mesh fitted to 0.5 x 3 x 2; leaf_a cut out hinged at z -0.9 and mirrored for leaf_b; colours projected from the concept onto wood and iron swatches; 3408 tris"},
 			"states": ["locked", "barred", "broken"],
 			"grey": [
 				{"at": [0, 1.5, -0.95], "size": [0.5, 3, 0.1]},
@@ -1140,6 +1177,7 @@
 			"kind": "edge",
 			"size": [0.6, 4, 2],
 			"budget": 1200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.gate/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1): its 1200 mesh squeezed to the 0.6 x 4 x 2 gate, decimated; leaf_a cut from it hinged at z -0.9 and mirrored for leaf_b; posts and lintel the body; 1155 tris"},
 			"uses": "a castle gate over two cell edges (2 m along z): two heavy leaves hinged at its ends",
 			"states": ["locked", "barred", "broken"],
 			"grey": [
@@ -1159,7 +1197,8 @@
 			"type": "mesh",
 			"kind": "edge",
 			"size": [0.5, 3, 1],
-			"budget": 800,
+			"budget": 3200,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.portcullis/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3, budget 800 -> 3200): its 3200 mesh squeezed to 0.5 x 3 x 1; the grate cut out as the sliding part (pivot 0), iron on row 6, the frame stone; 3152 tris"},
 			"uses": "a portcullis on a cell edge: the frame, and a grate that slides up into it to open",
 			"states": ["locked", "barred", "broken"],
 			"grey": [
@@ -1179,6 +1218,7 @@
 			"kind": "floor",
 			"size": [1, 0.1, 1],
 			"budget": 400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.trapdoor/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2 fitted to the 1 x 1 footprint, flattened to 0.1, top at the floor): the lid cut out hinged along -z; 359 tris"},
 			"uses": "a trapdoor in the floor of a cell, its top level with the floor, its lid hinged along the -z edge, lifting up",
 			"states": ["locked", "barred", "broken"],
 			"grey": "none",
@@ -1320,7 +1360,8 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [1, 0.5, 1],
-			"budget": 300,
+			"budget": 600,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.stairs/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; budget 300 -> 600; c4): its 600 mesh fitted to one cell and 0.5 m, 451 tris"},
 			"uses": "stairs up one height level (0.5 m) over one cell, rising toward +z"
 		},
 		"prop.table": {
@@ -1387,7 +1428,8 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [1.2, 2, 0.4],
-			"budget": 600,
+			"budget": 2400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bookshelf/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3, budget 600 -> 2400): its 2400 mesh fitted to 1.2 x 2 x 0.4, the books coloured from the concept onto cloth, leather and accent swatches; 1826 tris"},
 			"uses": "a bookshelf against a wall, its back toward -z"
 		},
 		"prop.market_stall": {
@@ -1451,7 +1493,8 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [1.2, 1.6, 1.2],
-			"budget": 600,
+			"budget": 2400,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.cage/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2, budget 600 -> 2400): its 2400 mesh fitted to 1.2 x 1.6; the +x side's door cut out hinged at (0.6, 0.6); iron bars on row 6, a plank floor; 1962 tris"},
 			"uses": "a cage for a captive, its door hinged at one side",
 			"states": ["locked", "broken"],
 			"grey": [
