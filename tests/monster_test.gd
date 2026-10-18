@@ -1749,8 +1749,18 @@ func _test_herd_hunt() -> void:
 	_check(bodies.size() == 5 and int(deer["out"]) == 5, "the herd near the hunter made bodies (%d, out %d)" % [bodies.size(), deer["out"]])
 	_check(bodies.all(func(body: Animal) -> bool: return World.distance(body.tile, hunter.tile) > Animal.UNSEEN_TILES),
 			"each out of the hunter's sight (more than %d off)" % Animal.UNSEEN_TILES)
+	var fell := bodies[0].tile
 	World.damage(bodies[0], 999, hunter)
 	_check(int(deer["out"]) == 4 and is_equal_approx(herds.total("meadow", "deer"), 4.0), "one killed: gone from the herd for good (out %d)" % deer["out"])
+	# Its drops still spill, on open ground where it fell, for the hunter to take (Jeff's v0.1.150 playtest).
+	var laid: Array[String] = []
+	var open := true
+	for cell: Vector2i in World.zone.ground:
+		if World.distance(cell, fell) <= World.GROUND_SPILL:
+			laid.append_array(World.ground_at(cell))
+			open = open and World.is_free(cell)
+	_check(laid.count("meat") >= 3 and laid.count("meat") <= 4 and laid.count("hide") == 1 and open,
+			"its meat and hide lie on open ground where it fell (%s)" % [laid])
 	# Hunted to the edge: the rest bolt east, and off it.
 	var map := WorldMap.new()
 	map.areas = {"meadow": {"size": Vector2i(W, rows.size()), "neighbours": {"east": "fields"}},
