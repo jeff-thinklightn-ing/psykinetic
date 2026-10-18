@@ -3395,16 +3395,27 @@ static func _inside_of(cell: Vector2i) -> Rect2i:
 	return Rect2i() if building.is_empty() else building["rect"]
 
 
-## The free walkable cell of [param rect] nearest its middle (its middle
-## when none is free).
-static func _middle_of(rect: Rect2i) -> Vector2i:
-	var middle := rect.position + rect.size / 2
+## The free walkable cell of [param cells] (a building's, Level.building_cells)
+## nearest the middle of the box round them (the nearest of them when none
+## is free): of an L-shaped building's own cells, never the box's empty
+## corner (391 amended, buildings' 488).
+static func _middle_of(cells: Array[Vector2i]) -> Vector2i:
+	if cells.is_empty():
+		return NONE
+	var low := cells[0]
+	var high := cells[0]
+	for cell in cells:
+		low = low.min(cell)
+		high = high.max(cell)
+	var middle := low + (high - low + Vector2i.ONE) / 2
 	var best := middle
-	var best_distance := 1 << 20
-	for cell in Level.rect_cells(rect):
-		if World.is_walkable(cell) and World.is_free(cell) and World.distance(cell, middle) < best_distance:
+	var best_key := 1 << 30
+	for cell in cells:
+		# A free cell first; none free, the building's own nearest the middle.
+		var key := (0 if World.is_walkable(cell) and World.is_free(cell) else 1 << 20) + World.distance(cell, middle)
+		if key < best_key:
 			best = cell
-			best_distance = World.distance(cell, middle)
+			best_key = key
 	return best
 
 
@@ -3514,7 +3525,7 @@ func can_do() -> Array[Dictionary]:
 	# Inside a building: a look round all of it (decision 391).
 	var building := building_at(tile)
 	if not building.is_empty():
-		var middle := _middle_of(building["rect"])
+		var middle := _middle_of(Level.building_cells(building))
 		actions.append({"verb": "look_inside", "building": building, "cell": middle, "at": middle,
 			"words": "look round inside %s and see what is there" % building_short(building)})
 	actions.sort_custom(_nearer_found)
@@ -3824,7 +3835,7 @@ func _errand_do() -> void:
 			_report_errand("You looked in the chest %s: it holds %s." % [_paces_toward(Vector2(chest.tile)), held])
 		"look_inside":
 			var building: Dictionary = errand["building"]
-			var seen := _found_in(building["rect"])
+			var seen := _found_in(Level.building_cells(building))
 			var short := building_short(building)
 			if not seen.is_empty():
 				note_fact("%s looked round inside %s in %s and found %s." % [_name_of(self), short, _place_words(), _listed(seen)])
@@ -3847,14 +3858,17 @@ func _errand_do() -> void:
 			errand["phase"] = "returning"
 
 
-## What lies in [param rect], for a look round a building: each chest and
+## What lies in [param cells] (a building's own), for a look round it: each chest and
 ## what it holds, each thing on the ground, each crate or such, and anyone
 ## there but her and her player ("a chest holding a dagger", "a bandaging
 ## kit on the floor").
-func _found_in(rect: Rect2i) -> Array[String]:
+func _found_in(cells: Array[Vector2i]) -> Array[String]:
 	var seen: Array[String] = []
+	var inside: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		inside[cell] = true
 	for entity in World.get_entities():
-		if entity == self or entity == keeper or not entity.spawned or not rect.has_point(entity.tile):
+		if entity == self or entity == keeper or not entity.spawned or not inside.has(entity.tile):
 			continue
 		if entity is Chest:
 			var held: Array[String] = []
@@ -3866,7 +3880,7 @@ func _found_in(rect: Rect2i) -> Array[String]:
 			seen.append(refer(entity))
 		elif entity.pushable:
 			seen.append("a " + object_word(entity))
-	for cell in Level.rect_cells(rect):
+	for cell in cells:
 		for id: String in World.ground_at(cell):
 			seen.append("%s on the floor" % _a(Items.name_of(id)))
 	return seen

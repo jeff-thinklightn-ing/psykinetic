@@ -10039,6 +10039,13 @@ UNREACHABLE_TICKS (30, three seconds), or till it or she has moved
 UNREACHABLE_MOVED (3) cells; "cannot reach" is printed once for each. A
 foe next to her is fought all the same. companion_test covers both.
 Protocol unchanged.
+
+Amended again (2026-10-18, buildings' 488: a building's "rect" is the box
+round its blocks): a look round inside an L-shaped building goes to the
+free cell of its own (Level.building_cells) nearest the box's middle,
+never the box's empty corner, and counts only what is on its own cells.
+A one-block building's look is as before. companion_test covers it.
+Protocol unchanged.
 ## 423. The needles' floor: a ground.needles texture under the pine stands
 
 The floor under the border's pine stands (369) was the flat NEEDLES colour

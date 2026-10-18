@@ -1374,6 +1374,12 @@ func _test_knows_level() -> void:
 		"the level Main loaded is known")
 	for cache: Dictionary in [Companion._place_names, Companion._zone_kinds, Companion._zone_buildings]:
 		cache.erase(zone)
+	# An L-shaped building (buildings' 488): a look round it goes to, and
+	# counts, its own cells, never the box's empty corner.
+	var wing := Level.building_cells({"rect": Rect2i(40, 40, 4, 4), "blocks": [Rect2i(40, 40, 4, 2), Rect2i(40, 42, 2, 2)]})
+	var middle := Companion._middle_of(wing)
+	_check(middle in wing and Companion._middle_of(Level.rect_cells(Rect2i(40, 40, 3, 3))) == Vector2i(41, 41),
+		"the middle of an L-shaped building is one of its cells (%s); a plain one's is its middle" % middle)
 
 
 func _test_log_collapsed() -> void:
