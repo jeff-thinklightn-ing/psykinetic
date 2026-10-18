@@ -1,8 +1,8 @@
 # World primer
 
 Status: **draft**, except where Jeff has said it word for word: those facts are
-agreed in `levels/lore/` (the Blood Rot's own wait on H4, since a faction is
-agreed only once maps has its key). This page states only what has been decided: the roadmap's
+agreed in `levels/lore/` (the Blood Rot's own wait on a faction key from maps,
+since a faction is agreed only once maps has its key). This page states only what has been decided: the roadmap's
 first scenario, the companions' world text (`VOICE_WORLD` in `sim/companion.gd`),
 the tone, and Jeff's points in `docs/lore/blood_rot.md` (his Blood Rot starter,
 where each point is marked [Jeff] or [proposal]; only [Jeff] points are stated
@@ -102,15 +102,23 @@ placeholder. Who takes him now, from where and why, is open *(asked: C3)*, as is
 whether there is a castle at all *(asked: A2)*. The smith's name, and whether his
 hammer has one, are open *(asked: E3)*.
 
-## The goblins in play
+## The goblins in play and their allies
 
-Three goblin kinds are in the game today, and everyone in the land knows them. The imp is small and darts in and out.
-The brute is big and heavy, and it stands guard. The sneak patrols and comes at
-its prey from the side. Goblins win by holding things (captives and ground), not by
-taking loot from the people they fight. How these goblins stand to the Blood Rot
-(the same clan, kin in a feud, or unrelated) is open *(asked: H4)*, as is whether
-the three kinds are ranks of one people *(asked: C2)* and whether goblins can be
-bargained with *(asked: C1)*.
+Three kinds are in the game today, and everyone in the land knows them (Jeff,
+2026-10-17). Imps are goblins, and every goblin in the Blood Rot's land is of the
+Blood Rot: the region is dominated by Blood Rot goblins. Brutes are orcs and
+sneaks are kobolds, peoples allied to the Blood Rot. The imp is small and darts in
+and out. The brute is big and heavy, and it stands guard. The sneak patrols and
+comes at its prey from the side.
+
+The allies do not worship the fallen star. They are with the Blood Rot for what it
+gets them, so the alliance can break, and one of them can be turned. Kobolds dig
+the mine's shafts for the Blood Rot; orcs fight for a share of what the raids bring
+in. Whether the allies who live near the mine are changed by the rot is open
+*(proposal: yes, and those at the edges are not)*. Goblins win by holding things
+(captives and ground), not by taking loot from the people they fight *(draft)*.
+Whether goblins can be bargained with is open *(asked: C1)*. Orcs and kobolds need
+faction keys in `levels/factions.json` from maps before entries of their own.
 
 Whether there are other factions (outlaws, a rival steading) is open *(asked: E1)*.
 

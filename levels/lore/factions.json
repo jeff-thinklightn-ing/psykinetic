@@ -85,7 +85,7 @@
 			"name": "the goblins",
 			"status": "agreed",
 			"source": "game",
-			"summary": "Imps, brutes and sneaks, the goblin kinds met in the land today.",
+			"summary": "The Blood Rot's goblins, the imps, with their allies the orcs (the brutes) and the kobolds (the sneaks), as met in the land today.",
 			"relations": [
 				{
 					"to": "town",
@@ -98,13 +98,78 @@
 			"facts": [
 				{
 					"id": "goblins.kinds_known",
-					"text": "Imps, brutes and sneaks are goblins.",
+					"text": "Imps are goblins; brutes are orcs, and sneaks are kobolds.",
 					"known": "common",
 					"where": [],
 					"tags": [
 						"monsters"
 					],
-					"source": "game",
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "goblins.blood_rot",
+					"text": "Every goblin in the Blood Rot's land is of the Blood Rot.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"monsters"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "goblins.dominated",
+					"text": "The region is dominated by Blood Rot goblins.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "goblins.allies",
+					"text": "Orcs and kobolds are allied to the Blood Rot.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"monsters"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "goblins.allies_why",
+					"text": "The orcs and kobolds do not worship the fallen star; they are with the Blood Rot for what it gets them, so the alliance can break, and one of them can be turned.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"tags": [
+						"faith"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "goblins.kobolds_dig",
+					"text": "Kobolds dig the mine's shafts for the Blood Rot.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "goblins.orcs_paid",
+					"text": "Orcs fight for the Blood Rot for a share of what the raids bring in.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff",
 					"status": "agreed"
 				},
 				{
@@ -154,14 +219,6 @@
 					"status": "agreed"
 				},
 				{
-					"id": "goblins.blood_rot",
-					"text": "How these goblins stand to the Blood Rot: the same clan, kin in a feud, or unrelated.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "H4"
-				},
-				{
 					"id": "goblins.nature",
 					"text": "Whether goblins can be bargained with, and whether one could leave its own.",
 					"known": "common",
@@ -170,12 +227,12 @@
 					"ask": "C1"
 				},
 				{
-					"id": "goblins.kinds",
-					"text": "Whether imps, brutes and sneaks are one people (perhaps ranks of the Blood Rot) or creatures the goblins keep.",
+					"id": "goblins.allies_changed",
+					"text": "The orcs and kobolds who live near the mine are changed by the rot, as the Blood Rot are; those who keep to the edges are not.",
 					"known": "common",
 					"where": [],
-					"status": "asked",
-					"ask": "C2"
+					"source": "proposal",
+					"status": "draft"
 				},
 				{
 					"id": "goblins.castle",

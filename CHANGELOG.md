@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions know that brutes are orcs and sneaks are kobolds, allied to the Blood
+  Rot's goblins (the imps), and why they fight for them.
 - The giant axe winds up before it falls: an attack takes almost a second to land, and nothing blocks it when it does. A raised shield breaks under it, and the one struck is knocked down. Stepping away or being stunned before it lands gives the swing up, and if your target has moved out of reach it hits only air. Brutes' wind-ups now visibly stop when they give one up.
 - The interface has one look now: a shared theme (warm dark panels edged in leather, bone text, brass for keys, hands, prices and focus, the Alegreya faces) that every screen takes its fonts, colours and panel style from, with a style guide for the trees that build screens; the first-run screen, options, pack and chest, shop, talk log, chat, hints, compass and speech bubbles all wear it. The talk log reads as speech (the speaker's name, then the words); hover a line for when it was said.
 - Companions know their town is a town, know the beasts lore knows when you

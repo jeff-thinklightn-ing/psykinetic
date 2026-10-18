@@ -1,7 +1,9 @@
 # The Blood Rot
 
-Status: **draft**. Brainstormed by Jeff in a lore session; not yet confirmed with Dire.
-Nothing here is `agreed`. This page answers, in draft, the primer's open questions
+Status: **draft**. Brainstormed by Jeff in a lore session. Jeff decides; Dire
+playtests and brings ideas to Jeff. Under lore's rule a fact is `agreed` only when
+Jeff said it word for word or it is already in the game, so **[Jeff]** lines here
+that paraphrase him stay draft until lore checks the wording with him. This page answers, in draft, the primer's open questions
 D1 (who the Blood Rot are), D2 (what the blight is) and D3 (what blighted ore does),
 and touches B2 (magic) and B3 (gods).
 
@@ -56,6 +58,19 @@ are stated plainly and found as aftermath, not depicted.
 - **[Jeff]** The raiders keep small camps in the forests.
 - **[Jeff]** When their numbers grow too high, the raids spill into neighbouring regions.
 
+### Allies
+
+- **[Jeff]** The first region is dominated by Blood Rot goblins.
+- **[Jeff]** The Blood Rot may have other factions allied to them. For example, the
+  brutes might be orcs and the sneaks might be kobolds.
+- **[proposal]** The allies do not worship the star. They are with the Blood Rot for
+  what it gets them, so an alliance can break, and one can be turned.
+- **[proposal]** Kobolds dig. They could be the ones who work the shafts for the
+  Blood Rot, or who dug toward the star in the first place.
+- **[proposal]** Orcs are paid muscle, paid in a share of what the raids bring in.
+- **[proposal]** Open: are the allies touched by the rot? If they live near the mine
+  they would be changed too; if they keep to the edges, they stay as they are.
+
 ### The tower
 
 - **[Jeff]** A tower stands over the mine. It was built by earlier humans.
@@ -86,9 +101,10 @@ are stated plainly and found as aftermath, not depicted.
 - The primer's raid (goblins took the smith and his hammer) needs a new home. If the
   Blood Rot took him, why: to work the ore, or as tribute for the star? The second
   puts a clock on the rescue. **[proposal]**
-- The game's three goblin kinds (imp, brute, sneak) could become Blood Rot ranks
-  rather than a separate people, e.g. imp and sneak as raider kinds, brute as a
-  hauler or warden. Keeps what is already in play. **[proposal]**
+- **[Jeff]** Brutes might be orcs and sneaks might be kobolds, allied to the Blood
+  Rot. Open: is the imp the Blood Rot goblin itself (the raider rank)? **[proposal]**
+- New factions (orcs, kobolds) need keys in `levels/factions.json` from maps before
+  their entries can be `agreed`.
 - Who were the earlier humans? Ancestors of the town, or a people wholly gone?
   Did any survive and leave? **[proposal]**
 - Did the earlier humans worship the star too, and did the goblins take up that
@@ -157,8 +173,11 @@ All ranks and names are **[proposal]**; high priests are **[Jeff]**.
   rank. Five readable models from one skeleton; the change is visible at a glance.
 - **[proposal]** Mass rises with rank, so the shove-and-collide physics tells the
   story: raiders fly, wardens barely move. (Numbers belong to combat/economy, not lore.)
-- **[proposal]** The existing imp, brute and sneak could be reworked as early ranks
-  on this base, so current enemies carry over (see Open threads).
+- **[Jeff]** Brutes may become orcs and sneaks kobolds: allied peoples with their
+  own base meshes, not Blood Rot ranks.
+- **[proposal]** The imp could stay as the Blood Rot raider, sharing the goblin base.
+- **[proposal]** Allies show which side they are on through kit (Blood Rot markings,
+  tribute trinkets) rather than the rot's changes, unless they live near the mine.
 - Keep it restrained: changed and wrong, not gory.
 
 ### The tower
@@ -181,3 +200,5 @@ All ranks and names are **[proposal]**; high priests are **[Jeff]**.
   rot; holds their artifacts and treasures.
 - Session 1, cont.: castle was a placeholder (Jeff); the Blood Rot are the main
   faction of the region. Primer's castle and goblin sections to be revised.
+- Session 1, cont.: Blood Rot dominate the first region with allied factions (Jeff):
+  brutes may be orcs, sneaks may be kobolds.
