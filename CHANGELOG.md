@@ -9,6 +9,8 @@ notes (decision 324).
 
 - Raiding groups route over a regenerated level's new floor: a generation drops their routes and each group goes on from where it stands (maps' use_map).
 - The thief balances the town (decision 461; Jeff: "thieves could be the answer to balancing the economy"): on his day he lifts a few gold from the richest purse above economy's line first (never the poor, the dole, a resting companion or the coffer; the victim's card remembers a loss with no name), the store only when nobody is rich; what he lifts from the store comes back through the town's merchant, who sells it to the store at half price and keeps a margin, the thief the rest; the victim at the same meeting place, or a guard, may catch him (seeded draws): the gold goes back, the catch is on three cards with a grudge, and the town's log holds a dispute for the lawspeaker; caught three times in a season he lies low a month. The numbers are townsfolk.json "thief" (Jeff's to move); a 90-day run of tools/town_balance with and without him is in the decision.
+- Under a forest's canopy it is darker, dark enough to hide in through the morning and evening, while its clearings stay in the sun; shafts of sunlight fall through the clearings and gaps on clear days, the crowns catch the rain and drip for a while after it, and mist lies thicker under the trees (decision 477). No forest level is out yet.
+
 - The minimap no longer redraws every frame, only when something on it moves (482).
 - Raiding parties on the world map follow a shifting level's new layout instead of its old one (465 amended).
 - Your companion speaks to what just happened. A threat comes before a
@@ -75,7 +77,6 @@ notes (decision 324).
   the palisade, the timber wall joints and watchtower, the market stall and
   the forge (art-gen's candidates, applied for Jeff to look over in game).
 - Only gear you carry and use grows now. A thing starts counting what it fells, and can become a bane or hold a grudge, once one player or companion has carried it a season with 10 deeds, or done 20 deeds with it, or once it is blessed. A bundle of arrows never grows; its bow does (decision 472).
-- Under a forest's canopy it is darker, dark enough to hide in through the morning and evening, while its clearings stay in the sun; shafts of sunlight fall through the clearings and gaps on clear days, the crowns catch the rain and drip for a while after it, and mist lies thicker under the trees (decision 477). No forest level is out yet.
 
 - Ready for the coming forest zone: a level can have a canopy over its trees, dark under the roof and open in its clearings, and its trees can come from a stand grown year by year by a new offline tool (decisions 466 and 467). Nothing changes in the current levels.
 
