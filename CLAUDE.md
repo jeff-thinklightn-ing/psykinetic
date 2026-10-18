@@ -88,7 +88,10 @@ which worktree owns each step, and the design rules not to break without asking 
   margin and how many heavy jobs already run; if there is no room the job waits in a
   first-come queue rather than starting. Estimates update from what jobs actually used.
   Take the gate before the land lock, never while holding it (the landing flow above);
-  `heavy_job holds <tree> <kind>` says whether your tree already holds a kind. If free
+  `heavy_job holds <tree> <kind>` says whether your tree already holds a kind. A script run
+  under `heavy_job run` never calls heavy_job itself: a nested take queues behind its own
+  parent for ever and, since suites and benches exclude each other, stalls every landing
+  (ui's bench did, 10 hours, 2026-10-18). If free
   memory falls under
   the margin while jobs run, the newest job's own wrapper stops it first and retries;
   nobody stops another session's job. The daily summary lists jobs that waited or were
