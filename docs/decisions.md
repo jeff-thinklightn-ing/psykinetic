@@ -8738,6 +8738,16 @@ meant. A suite still doesn't pass a bench waiting at the head on a held
 bench slot, since bench and suite exclude each other; the stuck holder is
 what had to be caught.
 
+Amended a fifth time (2026-10-18, release): a queued job out of reach,
+whose estimate and margin pass free RAM (or commit) plus all that running
+heavy jobs use, so that it could not start were every gated job done, is
+gone past by jobs that fit (out_of_reach in may_pass). It waits on memory
+held outside the gate, which nothing in the queue gives back: art-gen's
+mesh job wanted 28.9 + 8 GB with 32 GB free and nothing running, and held
+ten landings behind it. Once it is in reach it holds those behind it again,
+so it is not starved. A job whose estimate and margin pass the machine's
+physical RAM is refused at once (exit 4), never queued.
+
 
 ## 395. UI sounds
 

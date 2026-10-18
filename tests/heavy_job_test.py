@@ -81,6 +81,14 @@ check(not gate.may_pass(bench_row, [queued_suite], [other]), "nor a bench (it ex
 check(not gate.may_pass(import_row, [dict(suite, kind="trellis_mesh", gpu=True)], [other]),
 	"nor anything past a job waiting for memory (first come for that)")
 check(gate.may_pass(import_row, [], [other]), "first in the queue: its turn")
+# art-gen's mesh job at the head wanting 28.9 + 8 GB with 32 GB free and
+# nothing running held ten landings for half an hour (release, 2026-10-18).
+mesh = dict(suite, kind="trellis_mesh", ram_gb=28.9, gpu=True)
+check(gate.out_of_reach(mesh, [], 32.0) and gate.may_pass(capped, [mesh], [], 32.0),
+	"a job out of reach even with nothing running is gone past by one that fits")
+check(not gate.out_of_reach(mesh, [dict(running(6, 6), kind="suite")], 32.0) and not gate.may_pass(import_row, [mesh], [dict(running(6, 6), kind="suite")], 32.0),
+	"but not when the running jobs' memory would make room: then first come again")
+check(gate.out_of_reach(mesh, [], 60.0, 20.0), "out of reach on commit too")
 ok, why = gate.decide(suite, [], True, 60.0, None, 5.0)
 check(not ok and why.startswith("commit"), "60 GB RAM free but 5 GB commit: waits, saying commit (%s)" % why)
 check(gate.decide(suite, [], True, 60.0, None, 4.0 + gate.COMMIT_MARGIN_GB)[0], "commit at the estimate plus its margin starts")
@@ -144,6 +152,15 @@ try:
     check(False, "a take with a dead pid stops waiting")
 except SystemExit as stop:
     check(stop.code == 3, "a take whose pid is no live process stops waiting at once (exit 3), not forever")
+
+real_total = gate.total_ram_gb
+gate.total_ram_gb = lambda: gate.kinds()["suite"]["ram_gb"] + gate.MARGIN_GB - 1.0
+try:
+    gate.take("huge", "suite", os.getpid())
+    check(False, "a job bigger than the machine is refused")
+except SystemExit as stop:
+    check(stop.code == 4 and not gate._entries("queue"), "a job whose estimate and margin pass the machine's RAM is refused at once (exit 4), never queued")
+gate.total_ram_gb = real_total
 
 print("== a run inside the tree's own take ==")
 gate.take("lander", "suite", os.getpid())

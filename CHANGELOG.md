@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tools: a heavy job too big to start even with nothing else running no longer holds up every job behind it at the resource gate; jobs that fit go past it, and one bigger than the machine's RAM is refused at once (394 amended).
+
 - The thief's hand is stronger (461 amended, Jeff's "5 gold"): five gold from the richest purse above the line every day, not three on half the days.
 - A liar among the townsfolk lies only about himself (336 amended, the coordinator's ruling): never an invented deed of a named neighbour, until the lawspeaker can settle slander.
 - Townsfolk are paid for what they bring in: the woodcutter for wood, the hunter for game, the farmer for the harvest, and a hauler for each load carried to the store. Makers now buy their materials from the store, so their earnings flow back to the town. Players are paid for raw goods they bank at a town's store, at the same price. When the town's treasury runs dry it owes what it can't pay, and stops buying once it owes too much.

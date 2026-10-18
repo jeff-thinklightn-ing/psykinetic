@@ -145,13 +145,29 @@ def kind_blocked(job, running):
     return cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")) >= cap
 
 
-def may_pass(job, ahead, running):
+def out_of_reach(job, running, free_ram_gb, free_commit_gb=None):
+    """Whether [job] could not start even were every gated job done: its
+    estimate and margin over free RAM plus what running jobs use (or the
+    same for commit). It waits on memory held outside the gate (sessions,
+    browsers, a model server), which no job in the queue gives back."""
+    back = sum(each.get("using_gb", 0.0) for each in running)
+    if free_ram_gb + back < job["ram_gb"] + MARGIN_GB:
+        return True
+    return free_commit_gb is not None and free_commit_gb + back < job["ram_gb"] + COMMIT_MARGIN_GB
+
+
+def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None):
     """Whether [job] may start though [ahead] (the rows queued before it)
-    came first: none, or each waits only on its own kind (kind_blocked: a
-    suite behind a suite, a bench beside one) and [job] is of another kind
-    that neither excludes. A wait for memory, or for the running count, is
-    first come first served for everyone: a big job is not starved."""
+    came first: none, or each is out of reach (out_of_reach: a 29 GB mesh
+    job on a machine with 32 GB free held ten landings behind it), or waits
+    only on its own kind (kind_blocked: a suite behind a suite, a bench
+    beside one) and [job] is of another kind that neither excludes. A wait
+    for memory the queue will give back, or for the running count, is first
+    come first served for everyone: a big job is not starved; once in reach
+    it holds those behind it again."""
     for other in ahead:
+        if free_ram_gb is not None and out_of_reach(other, running, free_ram_gb, free_commit_gb):
+            continue
         if not kind_blocked(other, running):
             return False
         if other.get("kind") == job.get("kind") or other.get("kind") in job.get("excludes", [])                 or job.get("kind") in other.get("excludes", []):
@@ -177,6 +193,23 @@ def updated_estimate(old_gb, peak_gb):
 
 def free_ram_gb():
     return _memory()[0]
+
+
+def total_ram_gb():
+    """The machine's physical RAM in GB, or None where not known."""
+    if os.name == "nt":
+        kilobytes = ctypes.c_ulonglong(0)
+        if ctypes.windll.kernel32.GetPhysicallyInstalledSystemMemory(ctypes.byref(kilobytes)):
+            return kilobytes.value / (1024.0 * 1024.0)
+        return None
+    try:
+        with open("/proc/meminfo") as meminfo:
+            for line in meminfo:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) * 1024 / GB
+    except OSError:
+        pass
+    return None
 
 
 def _memory():
@@ -432,6 +465,13 @@ def wait_turn(tree, kind, pid, watched):
     """Queues, waits to be at the head with room, then moves to running.
     Returns the running entry's file name."""
     row = dict(kinds()[kind], kind=kind)
+    total = total_ram_gb()
+    if total is not None and row["ram_gb"] + MARGIN_GB > total:
+        print("heavy_job: %s %s wants %.1f + %.0f GB, more than this machine's %.0f GB of RAM: it could never start; "
+            "not queued (lower its estimate in kinds.json if that is wrong)" % (tree, kind, row["ram_gb"], MARGIN_GB, total),
+            file=sys.stderr)
+        log("refused", tree, kind, "%.1f + %.0f GB over %.0f GB of RAM" % (row["ram_gb"], MARGIN_GB, total))
+        raise SystemExit(4)
     queued = time.time()
     ticket = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
     with StateLock():
@@ -456,9 +496,11 @@ def wait_turn(tree, kind, pid, watched):
             # First in the queue, or every job before it waits on its own
             # kind alone (may_pass): an import is not held behind a suite
             # waiting for a suite.
-            head = may_pass(row, ahead, running)
             free_ram, free_commit = _memory()
+            head = may_pass(row, ahead, running, free_ram, free_commit)
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
+            if not ok and head and out_of_reach(row, running, free_ram, free_commit):
+                why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
             if not head and queue and queue[0]["file"] != ticket:
                 first = queue[0]
                 first_row = dict(kinds().get(first["kind"], row), kind=first["kind"])
