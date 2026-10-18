@@ -9145,3 +9145,19 @@ stalking.
 Protocol unchanged: all sim. tests/herds_test (reserves, the stalked herd,
 the budget, a camp fed and short, wolves starving and fed), tests/larder_test
 (the hunter's catch, no game, away).
+
+## 409. A hungry camp raids for food
+
+Maps' hungry-camp raids, the coordinator's approval of 2026-10-17: a raid
+group sets out with "want": "food" when its camp is hungry (407's
+Herds.camp_fed under 0.5), "" otherwise; maps sends it.
+
+- Towns.raid_arrives reads the group's "want" against rules' raids.wants.
+  "food": its own takes (food 0.75, meat 0.75, food-tagged things 4, each
+  scaled by margin / strength as ever) and no captives ("captives": false):
+  it came to eat, not to take people. Damage past damage.margin as ever.
+- "" or a want the rules don't know: the raid as before, with no change.
+- The report carries "want" (the group's, if the rules know it).
+
+Protocol unchanged: sim only. tests/larder_test (a food raid, a plain one,
+an unknown want).

@@ -610,7 +610,9 @@ func carried_home(town: String, group_id: String, faction: String, captives: Arr
 ## after anything done to it on the way) has reached [param town]'s ground,
 ## travelled there or walked there in play, alike. Its strength less the
 ## town's defence is what gets past (margin); none, and it is fought off.
-## Else it takes rules' raids takes in order, each scaled by margin /
+## Else it takes rules' raids takes in order (a group's "want" in rules'
+## raids wants, decision 409: a hungry camp's "food" its own takes and no
+## captives), each scaled by margin /
 ## strength (only food, the hunt's meat with it, decision 405: never gold,
 ## materials, experience or buildings),
 ## damages one building past damage.margin and carries off up to
@@ -618,7 +620,8 @@ func carried_home(town: String, group_id: String, faction: String, captives: Arr
 ## id, "companion:<player id>", Main told: companion_taken) past
 ## captives.margin, only when the town is not in play (in play the
 ## raiders' blows take people: resident_taken). The report, also emitted on raided: {town, group,
-## faction, repelled, margin, took: {resource: count, items: [uids]},
+## faction, repelled, margin, want (the group's, if the rules know it),
+## took: {resource: count, items: [uids]},
 ## damaged (a kind or ""), captives: [{id, name, trade}]}: what the group
 ## carries off is maps' to move home with it.
 func raid_arrives(town: String, group: Dictionary) -> Dictionary:
@@ -637,7 +640,11 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 	var scale := clampf(margin / strength, 0.0, 1.0)
 	var stock := production.stockpile
 	var book := production.book()
-	for take: Variant in raids.get("takes", []):
+	# What the group came for (maps' hungry camps: "food"): its own takes,
+	# and captives or not; unknown or "", the raid as ever.
+	var wanting: Dictionary = raids.get("wants", {}).get(str(group.get("want", "")), {})
+	report["want"] = str(group.get("want", "")) if not wanting.is_empty() else ""
+	for take: Variant in wanting.get("takes", raids.get("takes", [])):
 		if not take is Dictionary:
 			continue
 		var what := str(take.get("what", ""))
@@ -675,7 +682,7 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 	var taking: Dictionary = raids.get("captives", {})
 	# In play the raiders' blows decide who is taken (resident_taken, Main's
 	# companion_taken): nobody is carried off by the numbers as well.
-	if margin >= float(taking.get("margin", INF)) and not (in_play.is_valid() and in_play.call(town)):
+	if margin >= float(taking.get("margin", INF)) and not (in_play.is_valid() and in_play.call(town)) 			and bool(wanting.get("captives", true)):
 		var record := _town(town)
 		var people: Array = record["residents"].duplicate()
 		people.reverse()

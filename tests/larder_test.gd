@@ -5,7 +5,8 @@ extends Node
 ## meat and food before she bakes rations, and rations again once the meat
 ## is gone; the tanner makes leather from two hides whatever the tier, in
 ## his tannery; townsfolk eat the store's meat when it has no food; a raid
-## takes meat as it takes food. A town's hunter (decision 407) every
+## takes meat as it takes food, and a hungry camp's raid (want "food",
+## decision 409) more of both and nobody. A town's hunter (decision 407) every
 ## hunter.every steps brings home what the herds give: a stag's meat and
 ## hide into the store, its antlers banked; no game, nothing, and the town
 ## log says so. Reads the repo's levels, never the shared
@@ -134,6 +135,18 @@ func _test_raid() -> void:
 	var report := towns.raid_arrives(TOWN, {"id": "g1", "faction": "goblins", "strength": 100.0, "from": "x"})
 	_check(int(report["took"].get("meat", 0)) > 0 and int(report["took"].get("food", 0)) > 0, "meat and food taken (%s)" % [report["took"]])
 	_check(work.stockpile.count(TOWN, "hide") == 10 and work.stockpile.count(TOWN, "gold") == 10, "hides and gold left alone")
+	for want in ["", "food", "gold"]:
+		work = _work()
+		towns = Towns.new({}, work, _rules, func() -> int: return _now)
+		work.stockpile.deposit(TOWN, "food", 10)
+		work.stockpile.deposit(TOWN, "meat", 10)
+		towns.note_rescue(TOWN, "r1", "Ann", "carpenter")
+		report = towns.raid_arrives(TOWN, {"id": "g2", "faction": "goblins", "strength": 100.0, "from": "x", "want": want})
+		var took := [int(report["took"].get("food", 0)), int(report["took"].get("meat", 0)), report["captives"].size()]
+		if want == "food":
+			_check(took == [7, 7, 0] and report["want"] == "food", "a hungry camp's raid: three quarters of the food and meat, nobody carried off (%s)" % [took])
+		else:
+			_check(took == [4, 4, 1] and report["want"] == "", "want %s: the raid as ever, half (at 99 of 100 past Ann) and a captive (%s)" % ["\"%s\"" % want, took])
 
 
 func _test_hunter() -> void:

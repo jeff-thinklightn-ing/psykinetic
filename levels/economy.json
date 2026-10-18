@@ -64,6 +64,7 @@
 		"raiders": "goblins",
 		"defence": {"per_wall_level": 4, "per_resident": 1},
 		"takes": [{"what": "food", "share": 0.5}, {"what": "meat", "share": 0.5}, {"tag": "food", "count": 2}],
+		"wants": {"food": {"takes": [{"what": "food", "share": 0.75}, {"what": "meat", "share": 0.75}, {"tag": "food", "count": 4}], "captives": false}},
 		"damage": {"margin": 3, "prefer": ["walls", "kitchen", "forge", "inn"]},
 		"captives": {"margin": 6, "count": 1},
 		"repair": {"share": 0.5},
