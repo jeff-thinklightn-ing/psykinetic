@@ -1766,7 +1766,7 @@
 			"type": "mesh",
 			"kind": "creature",
 			"category": "creatures",
-			"size": "0.85 x 1.95 x 0.55",
+			"size": "2.34 x 1.95 x 0.55",
 			"budget": 5000,
 			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
@@ -1778,7 +1778,7 @@
 			"type": "mesh",
 			"kind": "creature",
 			"category": "creatures",
-			"size": "0.45 x 1.0 x 0.66",
+			"size": "1.25 x 1.0 x 0.66",
 			"budget": 5000,
 			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},
