@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_candidates()
 	_test_gossip_spreads_it()
 	_test_remembered()
+	_test_moving_in()
 	Production.profile_of = Callable()
 	Production.type_of = Callable()
 	Townsfolk.use_days({})
@@ -202,6 +203,71 @@ func _test_remembered() -> void:
 	_check(TownMemory.remembered(log) == ["The town remembers that timmy was sick through the winter and is mending."] or TownMemory.remembered(log) == ["The town remembers that Timmy was sick through the winter and is mending."],
 		"memories only, in the town's words: %s" % [TownMemory.remembered(log)])
 	_check(TownMemory.of_tier(log, TownMemory.BELIEF).size() == 1 and TownMemory.of_tier(log, "").size() == 2, "by tier, or all")
+
+
+var _moved: Array = []
+var _room := true
+
+
+func _test_moving_in() -> void:
+	print("\n== remembered people move in, with room and the lawspeaker's word (decision 460) ==")
+	_setup()
+	_moved.clear()
+	_room = true
+	_ctx["move_in"] = func(town: String, who: String, name: String, trade: String) -> bool:
+		if not _room:
+			return false
+		_moved.append([town, who, name, trade])
+		return _work.add_worker(who, name, [trade], town, "remembered")
+	var log: Array = []
+	TownMemory.note(log, "Old Marta lives by the east field", "m-tam", "player:p1", 0)
+	TownMemory.note(log, "Marta's boy Timmy is sick again", "m-tam", "m-mara", 0)
+	TownMemory.note(log, "The miller Hob waters the flour", "m-bram", "m-tam", 0)
+	TownMemory.note(log, "The goblins' king Gorm lives in the hills", "m-bram", "m-tam", 0)
+	for entry: Dictionary in log:
+		entry["tier"] = TownMemory.MEMORY
+	log[0]["ready"] = true
+	log[0]["ruling"] = {"ruling": "move_in", "step": 100}
+	log[2]["ready"] = true
+	log[2]["ruling"] = {"ruling": "move_in", "step": 50}
+	log[3]["ready"] = true
+	log[3]["ruling"] = {"ruling": "move_in", "step": 10}
+	var who := TownMemory.arrivals(log).map(func(e: Dictionary) -> String: return str(e["id"]))
+	_check(who == ["tm.3", "tm.1"], "ready, named and not of the world, oldest ruling first (the goblins' king never): %s" % [who])
+	_check(TownMemory.person_of(log[0], ["cook", "hauler"]) == {"name": "Marta", "old": true, "trade": "hauler"}, "Old Marta: Marta, old, the stand-in trade: %s" % [TownMemory.person_of(log[0], ["cook", "hauler"])])
+	_check(TownMemory.person_of(log[2], ["miller", "hauler"])["trade"] == "miller" and TownMemory.person_of(log[2], ["cook"])["trade"] == "hauler",
+		"a trade the talk names when the town has it, else the stand-in")
+	_logs[TOWN] = log
+	Townsfolk.gossip(_work)  # Arms.
+	_now += EVERY
+	Townsfolk.gossip(_work)
+	_check(_moved.size() == 2 and _moved[0][2] == "Hob" and _moved[1][2] == "Marta" and _moved[1][1] == "remembered:%s:marta" % TOWN,
+		"both arrive through economy, oldest ruling first: %s" % [_moved])
+	var marta := _work.worker("remembered:%s:marta" % TOWN)
+	_check(not marta.is_empty() and marta["origin"] == "remembered" and marta["trades"] == ["hauler"], "Marta is a resident now, a hauler, origin remembered")
+	var card: Dictionary = marta.get("card", {})
+	_check(card.get("came", "") == "has lived here all along, as the town tells it" and card.get("look", {}).get("age", "") == "old"
+		and card.get("facts", []).any(func(f: Dictionary) -> bool: return str(f["text"]) == "Marta's boy Timmy is sick again"),
+		"her card: how she came, old, and the town's talk of her as facts (%s)" % [card.get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))])
+	_check(TownMemory.find(_log(), "Old Marta lives by the east field")["arrived"] == "remembered:%s:marta" % TOWN and TownMemory.find(_log(), "Old Marta lives by the east field")["tier"] == TownMemory.MEMORY,
+		"the entry keeps who arrived and stays memory")
+	_now += EVERY
+	Townsfolk.gossip(_work)
+	_check(_moved.size() == 2, "nobody arrives twice")
+	_room = false
+	var more: Array = _log()
+	TownMemory.note(more, "Young Wat the hunter sleeps in the barn", "m-tam", "m-mara", 0)
+	TownMemory.find(more, "Young Wat the hunter sleeps in the barn")["tier"] = TownMemory.MEMORY
+	TownMemory.find(more, "Young Wat the hunter sleeps in the barn")["ready"] = true
+	TownMemory.find(more, "Young Wat the hunter sleeps in the barn")["ruling"] = {"ruling": "move_in", "step": 200}
+	_logs[TOWN] = more
+	_now += EVERY
+	Townsfolk.gossip(_work)
+	_check(_moved.size() == 2 and str(TownMemory.find(_log(), "Young Wat the hunter sleeps in the barn").get("arrived", "")).is_empty(), "no room: Wat waits")
+	_room = true
+	_now += EVERY
+	Townsfolk.gossip(_work)
+	_check(_moved.size() == 3 and _moved[2][2] == "Wat" and _moved[2][3] == "hauler", "room again: Wat arrives, a hauler since the town has no hunter's trade (%s)" % [_moved.back() if not _moved.is_empty() else []])
 
 
 func _check(ok: bool, what: String) -> void:

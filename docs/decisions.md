@@ -11494,3 +11494,50 @@ the draw from the nock with the bundle put away, its speed for a 2 s draw, an ar
 the string, the hold, the loose, a cancelled draw, the shield's guard. Rejected: the
 draw as a whole-body strike (the legs would stop); one clip played at a fixed speed
 (full draw would not come when the sim's does).
+## 460. Moving in: a person the town remembers arrives, with room and the lawspeaker's word
+
+Phase 4 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, Jeff: "when
+someone speaks of Old Marta and her sick son Timmy, they could then
+silently move into town"), on the memory log (447), the rulings (448), the
+rounds (459) and the cards (398); the coordinator's defaults 2026-10-18,
+with Jeff's Q4 answered by default: they leave or die only through the
+world.
+
+When the lawspeaker rules move_in (448) the entry is marked ready. On the
+town's tick (Townsfolk._arrive), each ready entry not yet arrived is tried,
+oldest ruling first (TownMemory.arrivals): it must name someone (its tags)
+and not touch the world, and the ruling itself says they live in or near
+the town. Then economy's door: Towns.move_in(town, who_id, name, trade)
+(460's economy side: false when the town's residents are at its room, the
+same growth that takes in rescued captives, so invented people never
+crowd out rescued ones, or the id is a worker already; else add_worker
+with origin "remembered", the residents list, the town's log line "<Name>
+is found to have lived here all along", a seat, no founding gold, no
+rescue xp, no rescued signal). The person is the talk's: the name its
+first name word ("Old Marta" gives Marta; "old" makes the card's age
+old), the trade a trade word in the talk when the town's trades know it
+(TownMemory.TRADE_WORDS: miller, smith, cook, carpenter, farmer, hunter,
+priest, guard, healer, tanner), else the stand-in (hauler); the id
+"remembered:<town>:<name>". Their card is rolled as anyone's
+(ResidentCard.roll, origin "remembered") and then written from the talk:
+came "has lived here all along, as the town tells it", and every memory
+naming them a card fact (TownMemory.talk_of: "Marta's boy Timmy is sick
+again"), so their voice has the life the town gave them; kin and a grudge
+are rolled among the neighbours as at any founding (Townsfolk
+._found_among). The entry keeps "arrived": who_id and stays memory, so
+the town goes on saying what made them. They get a body, a home and a
+day like anyone (355, 404), and no memory ever removes them: a town's
+talk can say Timmy does not mend, and only the world can make it so.
+Transcript and mind.log (kind "arrival") note the arrival.
+
+memory_test: who is ready, named and not of the world, oldest ruling
+first; the person from the talk (name, old, the trade when the town has
+it); two arrivals through economy's door in order, the resident and her
+card from the talk, the entry marked; nobody twice; no room, they wait,
+and arrive when there is. Protocol unchanged; no new class_name.
+
+Rejected: arriving on one mention (the lawspeaker rules first, after the
+talk has spread and held); a card invented by a model (the talk is the
+card, and the rest is rolled as for anyone); dying by memory alone (Q4's
+default); a founding gold share (a newcomer's, not a neighbour's who was
+always here).

@@ -254,6 +254,57 @@ static func _most(log: Array) -> int:
 	return most
 
 
+# --- Moving in (the lawspeaker, phase 4, decision 460) -----------------------------------
+
+## Trades the talk may name, and the word the town's trades know them by.
+const TRADE_WORDS := {"miller": "miller", "smith": "smith", "cook": "cook", "carpenter": "carpenter", "farmer": "farmer",
+	"hunter": "hunter", "priest": "priest", "guard": "guard", "healer": "medicine_man", "tanner": "tanner"}
+const STAND_IN_TRADE := "hauler"
+
+
+## The entries of [param log] the lawspeaker ruled move_in ("ready") that
+## have not arrived, name someone, and do not touch the world: who may come,
+## oldest ruling first.
+static func arrivals(log: Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Dictionary in log:
+		if bool(entry.get("ready", false)) and str(entry.get("arrived", "")).is_empty() and not bool(entry.get("world", false)) \
+				and not entry.get("tags", []).is_empty():
+			out.append(entry)
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("ruling", {}).get("step", 0)) < int(b.get("ruling", {}).get("step", 0)))
+	return out
+
+
+## The person [param entry] speaks of: {"name": the first name word,
+## capitalised ("Old Marta" gives "Marta"), "old": whether the talk calls
+## them old, "trade": a trade word in the talk among [param trades] (the
+## town's), else the stand-in}.
+static func person_of(entry: Dictionary, trades: Array = []) -> Dictionary:
+	var tags: Array = entry.get("tags", [])
+	if tags.is_empty():
+		return {}
+	var name := str(tags[0])
+	name = name.left(1).to_upper() + name.substr(1)
+	var text := str(entry.get("text", "")).to_lower()
+	var trade := STAND_IN_TRADE
+	for word: String in TRADE_WORDS:
+		if RegEx.create_from_string("\\b" + word + "\\b").search(text) != null and (trades.is_empty() or TRADE_WORDS[word] in trades):
+			trade = TRADE_WORDS[word]
+			break
+	return {"name": name, "old": RegEx.create_from_string("(?i)\\bold\\b").search(str(entry.get("text", ""))) != null, "trade": trade}
+
+
+## Every memory of [param log] that names [param name] (as a word of its
+## text, "Marta's" included): the talk that is their card's facts.
+static func talk_of(log: Array, name: String) -> Array[String]:
+	var out: Array[String] = []
+	var named := RegEx.create_from_string("(?i)\\b" + _escape(name.to_lower()) + "\\b")
+	for entry: Dictionary in of_tier(log, MEMORY):
+		if named.search(str(entry.get("text", ""))) != null:
+			out.append(str(entry.get("text", "")))
+	return out
+
+
 # --- The proposals list for Jeff (the lawspeaker, phase 5, decision 458) ---------------
 
 const PAGE_HEAD := """# Proposed to lore

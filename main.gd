@@ -3733,6 +3733,8 @@ func _offers_context() -> Dictionary:
 			return str(_world_map.areas.get(town.get_slice("/", 0), {}).get("display_name", town.get_slice("/", 0))) if _world_map != null else town,
 		"players_words": func() -> bool: return Net.lawspeaker_players,
 		"lawspeaker_of": _lawspeaker_of,
+		"move_in": func(town: String, who: String, name: String, trade: String) -> bool:
+			return World.towns != null and World.towns.has_method("move_in") and bool(World.towns.call("move_in", town, who, name, trade)),
 		"visits": func(town: String) -> Array:
 			var law := _lawspeaker_of(town)
 			if law.is_empty() or World.production == null:

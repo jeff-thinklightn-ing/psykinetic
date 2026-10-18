@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- When the town has talked long enough of someone who would live there, and
+  the lawspeaker agrees, they turn out to have lived there all along: Old
+  Marta by the east field, with everything the town said of her as her own
+  story, a home, a day and a trade, as long as the town has room for one
+  more. Once here, only the world can take them away.
 ## v0.1.151
 
 - This release changes what the server and client send each other, so update the

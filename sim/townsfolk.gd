@@ -292,8 +292,11 @@ static func gossip(production: Production) -> void:
 			continue
 		_gossip_due[town] = at + every
 		var log: Variant = Offers._call(Offers.ctx, "memory", [town])
-		if log is Array and not TownMemory.candidates(log, at).is_empty():
-			Offers._call(Offers.ctx, "set_memory", [town, log])  # Beliefs that spread and hold: candidates (phase 1).
+		if log is Array:
+			var changed := not TownMemory.candidates(log, at).is_empty()  # Beliefs that spread and hold: candidates (phase 1).
+			changed = _arrive(production, town, log, at) or changed  # Remembered people moving in (phase 4).
+			if changed:
+				Offers._call(Offers.ctx, "set_memory", [town, log])
 		for id: String in towns[town]:
 			# Standing fades toward 0 with time (decision 443): residents' cards only.
 			if id.begins_with(COMPANION):
@@ -312,6 +315,48 @@ static func gossip(production: Production) -> void:
 		for place: String in keys:
 			if groups[place].size() >= 2:
 				_pass(production, town, place, groups[place], at)
+
+
+## Remembered people moving in (decision 460): each entry of [param log]
+## the lawspeaker ruled ready arrives through economy (Offers.ctx
+## "move_in": Towns.move_in, which refuses when the town has no room), as
+## "remembered:<town>:<name>" with the trade the talk names, their card
+## rolled as anyone's and then written from the talk; the entry keeps who
+## arrived. Whether the log changed. They leave or die only through the
+## world.
+static func _arrive(production: Production, town: String, log: Array, at: int) -> bool:
+	var changed := false
+	var trades: Array = []
+	for id: String in production.worker_ids(town):
+		for trade: Variant in production.worker(id).get("trades", []):
+			if str(trade) not in trades:
+				trades.append(str(trade))
+	for entry: Dictionary in TownMemory.arrivals(log):
+		var person := TownMemory.person_of(entry, trades)
+		if person.is_empty():
+			continue
+		var who := "remembered:%s:%s" % [town, str(person["name"]).to_lower()]
+		if not production.worker(who).is_empty():
+			entry["arrived"] = who
+			changed = true
+			continue
+		var came: Variant = Offers._call(Offers.ctx, "move_in", [town, who, str(person["name"]), str(person["trade"])])
+		if came != true:
+			continue  # No room, or no call to make: they wait.
+		entry["arrived"] = who
+		changed = true
+		var card := ResidentCard.roll(who, str(person["name"]), str(person["trade"]), "remembered")
+		card["came"] = "has lived here all along, as the town tells it"
+		if bool(person.get("old", false)):
+			card["look"]["age"] = "old"
+		for text: String in TownMemory.talk_of(log, str(person["name"])):
+			ResidentCard.add_fact(card, at, text)
+		production.set_card(who, card)
+		_found_among(production, who, card, town)
+		production.set_card(who, card)
+		Transcript.record(str(person["name"]), str(person["name"]), "[%s is found to have lived in the town all along: %s]" % [person["name"], entry.get("text", "")])
+		MindLog.record({"kind": "arrival", "companion": str(person["name"]), "mind": "resident", "say": str(entry.get("text", "")), "outcome": "arrived", "town": town})
+	return changed
 
 
 ## One pass of gossip at [param place] in [param town] among [param
