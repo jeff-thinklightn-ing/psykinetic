@@ -7,6 +7,17 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.152
+
+- This release changes what the server and client send each other, so update the
+  client to keep playing (the launcher's update does it). New in it: most of what
+  you see now has its own art, from walls, roofs and doors to weapons, rocks and
+  the wilds' ferns and palisade (candidates applied for Jeff to veto in game);
+  stags and wolves; archers who draw and loose, and a bow you can hear; fields
+  that show their crop through the year; a lawspeaker in bigger towns, and people
+  the town talks of who turn out to have lived there all along; companions whose
+  bond with you grows from what you do; and, underground, halls that can shift
+  between visits (none do yet).
 - Your companion's bond with you grows from what you do: bandage her, give her
   gear, share food, free her from raiders or fall with her at your side and
   she grows close, even devoted; strike her or keep her things from her and
@@ -55,6 +66,7 @@ notes (decision 324).
   the jaw, held there at full draw, and loosed. A raised shield is held up in
   guard.
 - The bow is heard: a creak as it's drawn, a twang as it's loosed, and the arrow where it ends as it gets there: a body struck, a friend's soft thud as it sticks in, a door's wood, a wall's stone, a splash, or the arrow falling where it ran out (Freesound takes; decision 386).
+
 ## v0.1.151
 
 - This release changes what the server and client send each other, so update the
