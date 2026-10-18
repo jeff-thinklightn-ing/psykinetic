@@ -64,8 +64,9 @@ static var _placeholders: Dictionary[String, AudioStreamWAV] = {}
 
 static func manifest() -> Dictionary:
 	if _manifest.is_empty():
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST))
-		_manifest = parsed if parsed is Dictionary else {"slots": {}}
+		# The server's export leaves art/audio out, and the Credits still ask (decision 406).
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST)) if FileAccess.file_exists(MANIFEST) else {}
+		_manifest = parsed if parsed is Dictionary and not parsed.is_empty() else {"slots": {}}
 	return _manifest
 
 
